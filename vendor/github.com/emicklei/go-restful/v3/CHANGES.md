@@ -1,10 +1,21 @@
 # Change history of go-restful
 
-## [v3.9.0] - 20221-07-21
+## [v3.10.1] - 2022-11-19
+
+- fix broken 3.10.0 by using path package for joining paths
+
+## [v3.10.0] - 2022-10-11 - BROKEN
+
+- changed tokenizer to match std route match behavior; do not trimright the path (#511)
+- Add MIME_ZIP (#512)
+- Add MIME_ZIP and HEADER_ContentDisposition (#513)
+- Changed how to get query parameter issue #510
+
+## [v3.9.0] - 2022-07-21
 
 - add support for http.Handler implementations to work as FilterFunction, issue #504 (thanks to https://github.com/ggicci)
 
-## [v3.8.0] - 20221-06-06
+## [v3.8.0] - 2022-06-06
 
 - use exact matching of allowed domain entries, issue #489 (#493)
 	- this changes fixes [security] Authorization Bypass Through User-Controlled Key

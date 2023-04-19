@@ -24,6 +24,7 @@ import (
 	"context"
 	"net"
 	"net/url"
+	"strings"
 
 	"google.golang.org/grpc/attributes"
 	"google.golang.org/grpc/credentials"
@@ -247,14 +248,29 @@ type Target struct {
 	Scheme string
 	// Deprecated: use URL.Host instead.
 	Authority string
-	// Deprecated: use URL.Path or URL.Opaque instead. The latter is set when
-	// the former is empty.
-	Endpoint string
 	// URL contains the parsed dial target with an optional default scheme added
 	// to it if the original dial target contained no scheme or contained an
 	// unregistered scheme. Any query params specified in the original dial
 	// target can be accessed from here.
 	URL url.URL
+}
+
+// Endpoint retrieves endpoint without leading "/" from either `URL.Path`
+// or `URL.Opaque`. The latter is used when the former is empty.
+func (t Target) Endpoint() string {
+	endpoint := t.URL.Path
+	if endpoint == "" {
+		endpoint = t.URL.Opaque
+	}
+	// For targets of the form "[scheme]://[authority]/endpoint, the endpoint
+	// value returned from url.Parse() contains a leading "/". Although this is
+	// in accordance with RFC 3986, we do not want to break existing resolver
+	// implementations which expect the endpoint without the leading "/". So, we
+	// end up stripping the leading "/" here. But this will result in an
+	// incorrect parsing for something like "unix:///path/to/socket". Since we
+	// own the "unix" resolver, we can workaround in the unix resolver by using
+	// the `URL` field.
+	return strings.TrimPrefix(endpoint, "/")
 }
 
 // Builder creates a resolver that will be used to watch name resolution updates.

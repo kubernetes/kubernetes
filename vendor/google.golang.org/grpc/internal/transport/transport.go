@@ -583,8 +583,8 @@ type ConnectOptions struct {
 
 // NewClientTransport establishes the transport with the required ConnectOptions
 // and returns it to the caller.
-func NewClientTransport(connectCtx, ctx context.Context, addr resolver.Address, opts ConnectOptions, onGoAway func(GoAwayReason), onClose func()) (ClientTransport, error) {
-	return newHTTP2Client(connectCtx, ctx, addr, opts, onGoAway, onClose)
+func NewClientTransport(connectCtx, ctx context.Context, addr resolver.Address, opts ConnectOptions, onClose func(GoAwayReason)) (ClientTransport, error) {
+	return newHTTP2Client(connectCtx, ctx, addr, opts, onClose)
 }
 
 // Options provides additional hints and information for message
@@ -701,7 +701,7 @@ type ServerTransport interface {
 	// Close tears down the transport. Once it is called, the transport
 	// should not be accessed any more. All the pending streams and their
 	// handlers will be terminated asynchronously.
-	Close()
+	Close(err error)
 
 	// RemoteAddr returns the remote network address.
 	RemoteAddr() net.Addr

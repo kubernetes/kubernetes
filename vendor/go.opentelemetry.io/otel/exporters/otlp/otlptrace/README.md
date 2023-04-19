@@ -12,8 +12,8 @@ go get -u go.opentelemetry.io/otel/exporters/otlp/otlptrace
 
 ## Examples
 
-- [Exporter setup and examples](./otlptracehttp/example_test.go)
-- [Full example sending telemetry to a local collector](../../../example/otel-collector)
+- [HTTP Exporter setup and examples](./otlptracehttp/example_test.go)
+- [Full example of gRPC Exporter sending telemetry to a local collector](../../../example/otel-collector)
 
 ## [`otlptrace`](https://pkg.go.dev/go.opentelemetry.io/otel/exporters/otlp/otlptrace)
 

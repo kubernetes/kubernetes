@@ -6,17 +6,17 @@
 // Authentication according to https://google.aip.dev/auth/4114
 //
 // The overall logic for DCA is as follows:
-// 1. If both endpoint override and client certificate are specified, use them as is.
-// 2. If user does not specify client certificate, we will attempt to use default
-//    client certificate.
-// 3. If user does not specify endpoint override, we will use defaultMtlsEndpoint if
-//    client certificate is available and defaultEndpoint otherwise.
+//  1. If both endpoint override and client certificate are specified, use them as is.
+//  2. If user does not specify client certificate, we will attempt to use default
+//     client certificate.
+//  3. If user does not specify endpoint override, we will use defaultMtlsEndpoint if
+//     client certificate is available and defaultEndpoint otherwise.
 //
 // Implications of the above logic:
-// 1. If the user specifies a non-mTLS endpoint override but client certificate is
-//    available, we will pass along the cert anyway and let the server decide what to do.
-// 2. If the user specifies an mTLS endpoint override but client certificate is not
-//    available, we will not fail-fast, but let backend throw error when connecting.
+//  1. If the user specifies a non-mTLS endpoint override but client certificate is
+//     available, we will pass along the cert anyway and let the server decide what to do.
+//  2. If the user specifies an mTLS endpoint override but client certificate is not
+//     available, we will not fail-fast, but let backend throw error when connecting.
 //
 // We would like to avoid introducing client-side logic that parses whether the
 // endpoint override is an mTLS url, since the url pattern may change at anytime.

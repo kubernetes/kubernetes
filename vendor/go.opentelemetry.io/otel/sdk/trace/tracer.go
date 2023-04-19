@@ -51,7 +51,7 @@ func (tr *tracer) Start(ctx context.Context, name string, options ...trace.SpanS
 
 	s := tr.newSpan(ctx, name, &config)
 	if rw, ok := s.(ReadWriteSpan); ok && s.IsRecording() {
-		sps, _ := tr.provider.spanProcessors.Load().(spanProcessorStates)
+		sps := tr.provider.spanProcessors.Load().(spanProcessorStates)
 		for _, sp := range sps {
 			sp.sp.OnStart(ctx, rw)
 		}

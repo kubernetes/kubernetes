@@ -30,7 +30,7 @@ func Meter(instrumentationName string, opts ...metric.MeterOption) metric.Meter 
 	return MeterProvider().Meter(instrumentationName, opts...)
 }
 
-// MeterProvider returns the registered global trace provider.
+// MeterProvider returns the registered global meter provider.
 // If none is registered then a No-op MeterProvider is returned.
 func MeterProvider() metric.MeterProvider {
 	return global.MeterProvider()
