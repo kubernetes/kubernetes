@@ -120,7 +120,7 @@
   },
   "openapi": "3.0.0",
   "paths": {
-    "/apis/batch/": {
+    "/apis/batch": {
       "get": {
         "description": "get information of a group",
         "operationId": "getBatchAPIGroup",

@@ -82,7 +82,7 @@
   },
   "openapi": "3.0.0",
   "paths": {
-    "/api/": {
+    "/api": {
       "get": {
         "description": "get available API versions",
         "operationId": "getCoreAPIVersions",

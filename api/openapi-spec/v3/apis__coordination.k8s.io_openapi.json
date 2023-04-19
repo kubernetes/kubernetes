@@ -120,7 +120,7 @@
   },
   "openapi": "3.0.0",
   "paths": {
-    "/apis/coordination.k8s.io/": {
+    "/apis/coordination.k8s.io": {
       "get": {
         "description": "get information of a group",
         "operationId": "getCoordinationAPIGroup",

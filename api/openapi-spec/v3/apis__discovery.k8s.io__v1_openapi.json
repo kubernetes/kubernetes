@@ -1423,7 +1423,7 @@
   },
   "openapi": "3.0.0",
   "paths": {
-    "/apis/discovery.k8s.io/v1/": {
+    "/apis/discovery.k8s.io/v1": {
       "get": {
         "description": "get available resources",
         "operationId": "getDiscoveryV1APIResources",

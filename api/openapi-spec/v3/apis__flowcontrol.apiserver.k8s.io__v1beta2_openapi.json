@@ -1843,7 +1843,7 @@
   },
   "openapi": "3.0.0",
   "paths": {
-    "/apis/flowcontrol.apiserver.k8s.io/v1beta2/": {
+    "/apis/flowcontrol.apiserver.k8s.io/v1beta2": {
       "get": {
         "description": "get available resources",
         "operationId": "getFlowcontrolApiserverV1beta2APIResources",

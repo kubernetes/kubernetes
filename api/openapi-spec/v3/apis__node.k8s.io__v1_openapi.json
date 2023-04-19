@@ -1323,7 +1323,7 @@
   },
   "openapi": "3.0.0",
   "paths": {
-    "/apis/node.k8s.io/v1/": {
+    "/apis/node.k8s.io/v1": {
       "get": {
         "description": "get available resources",
         "operationId": "getNodeV1APIResources",

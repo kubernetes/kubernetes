@@ -1877,7 +1877,7 @@
   },
   "openapi": "3.0.0",
   "paths": {
-    "/apis/resource.k8s.io/v1alpha2/": {
+    "/apis/resource.k8s.io/v1alpha2": {
       "get": {
         "description": "get available resources",
         "operationId": "getResourceV1alpha2APIResources",

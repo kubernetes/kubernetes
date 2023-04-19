@@ -70,7 +70,7 @@
   },
   "openapi": "3.0.0",
   "paths": {
-    "/version/": {
+    "/version": {
       "get": {
         "description": "get the code version",
         "operationId": "getCodeVersion",

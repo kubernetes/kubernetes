@@ -1350,7 +1350,7 @@
   },
   "openapi": "3.0.0",
   "paths": {
-    "/apis/internal.apiserver.k8s.io/v1alpha1/": {
+    "/apis/internal.apiserver.k8s.io/v1alpha1": {
       "get": {
         "description": "get available resources",
         "operationId": "getInternalApiserverV1alpha1APIResources",

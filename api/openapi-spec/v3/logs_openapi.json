@@ -15,7 +15,7 @@
   },
   "openapi": "3.0.0",
   "paths": {
-    "/logs/": {
+    "/logs": {
       "get": {
         "operationId": "logFileListHandler",
         "responses": {
