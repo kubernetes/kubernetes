@@ -80,7 +80,7 @@ dependencies:
       match: configs\[Etcd\] = Config{list\.GcEtcdRegistry, "etcd", "\d+\.\d+.\d+(-(alpha|beta|rc).\d+)?(-\d+)?"}
 
   - name: "etcd-image"
-    version: 3.5.7
+    version: 3.5.8
     refPaths:
     - path: cluster/images/etcd/Makefile
       match: BUNDLED_ETCD_VERSIONS\?|LATEST_ETCD_VERSION\?
@@ -88,7 +88,7 @@ dependencies:
 
   # From https://github.com/etcd-io/etcd/blob/main/Makefile
   - name: "golang: etcd release version"
-    version: 1.17.13 # for etcd v3.5.6: https://github.com/etcd-io/etcd/blob/v3.5.6/Makefile#L58 golang version should be 1.16.15, BUT because of newer dependencies in our repository we use newer golang which has `unsafe.Slice`
+    version: 1.19.8 # https://github.com/etcd-io/etcd/blob/main/CHANGELOG/CHANGELOG-3.5.md
     refPaths:
     - path: cluster/images/etcd/Makefile
       match: 'GOLANG_VERSION := \d+.\d+(alpha|beta|rc)?\.?(\d+)?'
