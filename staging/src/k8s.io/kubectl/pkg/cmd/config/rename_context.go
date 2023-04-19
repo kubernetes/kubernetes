@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 
 	"github.com/spf13/cobra"
 
@@ -59,7 +60,7 @@ var (
 )
 
 // NewCmdConfigRenameContext creates a command object for the "rename-context" action
-func NewCmdConfigRenameContext(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
+func NewCmdConfigRenameContext(ioStreams genericiooptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &RenameContextOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
@@ -70,9 +71,9 @@ func NewCmdConfigRenameContext(out io.Writer, configAccess clientcmd.ConfigAcces
 		Example:               renameContextExample,
 		ValidArgsFunction:     completion.ContextCompletionFunc,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(cmd, args, out))
+			cmdutil.CheckErr(options.Complete(cmd, args, ioStreams.Out))
 			cmdutil.CheckErr(options.Validate())
-			cmdutil.CheckErr(options.RunRenameContext(out))
+			cmdutil.CheckErr(options.RunRenameContext(ioStreams.Out))
 		},
 	}
 	return cmd

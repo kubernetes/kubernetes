@@ -26,6 +26,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -116,15 +117,9 @@ var (
 )
 
 // NewCmdConfigSetCredentials returns a Command instance for 'config set-credentials' sub command
-func NewCmdConfigSetCredentials(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
+func NewCmdConfigSetCredentials(ioStreams genericiooptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &setCredentialsOptions{configAccess: configAccess}
-	return newCmdConfigSetCredentials(out, options)
-}
-
-// NewCmdConfigSetAuthInfo returns a Command instance for 'config set-credentials' sub command
-// DEPRECATED: Use NewCmdConfigSetCredentials instead
-func NewCmdConfigSetAuthInfo(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
-	return NewCmdConfigSetCredentials(out, configAccess)
+	return newCmdConfigSetCredentials(ioStreams.Out, options)
 }
 
 func newCmdConfigSetCredentials(out io.Writer, options *setCredentialsOptions) *cobra.Command {

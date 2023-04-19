@@ -22,6 +22,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/tools/clientcmd"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -43,7 +44,7 @@ var (
 )
 
 // NewCmdConfigCurrentContext returns a Command instance for 'config current-context' sub command
-func NewCmdConfigCurrentContext(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
+func NewCmdConfigCurrentContext(ioStreams genericiooptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &CurrentContextOptions{ConfigAccess: configAccess}
 
 	cmd := &cobra.Command{
@@ -52,7 +53,7 @@ func NewCmdConfigCurrentContext(out io.Writer, configAccess clientcmd.ConfigAcce
 		Long:    currentContextLong,
 		Example: currentContextExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(RunCurrentContext(out, options))
+			cmdutil.CheckErr(RunCurrentContext(ioStreams.Out, options))
 		},
 	}
 

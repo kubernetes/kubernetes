@@ -21,6 +21,7 @@ import (
 	"io"
 
 	"github.com/spf13/cobra"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/tools/clientcmd"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/completion"
@@ -35,7 +36,7 @@ var (
 )
 
 // NewCmdConfigDeleteCluster returns a Command instance for 'config delete-cluster' sub command
-func NewCmdConfigDeleteCluster(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
+func NewCmdConfigDeleteCluster(ioStreams genericiooptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "delete-cluster NAME",
 		DisableFlagsInUseLine: true,
@@ -44,7 +45,7 @@ func NewCmdConfigDeleteCluster(out io.Writer, configAccess clientcmd.ConfigAcces
 		Example:               deleteClusterExample,
 		ValidArgsFunction:     completion.ClusterCompletionFunc,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(runDeleteCluster(out, configAccess, cmd))
+			cmdutil.CheckErr(runDeleteCluster(ioStreams.Out, configAccess, cmd))
 		},
 	}
 

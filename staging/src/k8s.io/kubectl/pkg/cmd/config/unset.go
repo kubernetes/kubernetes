@@ -25,6 +25,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/kubectl/pkg/util/templates"
 
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/tools/clientcmd"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -50,7 +51,7 @@ var (
 )
 
 // NewCmdConfigUnset returns a Command instance for 'config unset' sub command
-func NewCmdConfigUnset(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
+func NewCmdConfigUnset(ioStreams genericiooptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &unsetOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
@@ -61,7 +62,7 @@ func NewCmdConfigUnset(out io.Writer, configAccess clientcmd.ConfigAccess) *cobr
 		Example:               unsetExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.complete(cmd, args))
-			cmdutil.CheckErr(options.run(out))
+			cmdutil.CheckErr(options.run(ioStreams.Out))
 
 		},
 	}

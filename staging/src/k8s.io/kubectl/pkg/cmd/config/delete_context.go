@@ -21,6 +21,7 @@ import (
 	"io"
 
 	"github.com/spf13/cobra"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/tools/clientcmd"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/completion"
@@ -35,7 +36,7 @@ var (
 )
 
 // NewCmdConfigDeleteContext returns a Command instance for 'config delete-context' sub command
-func NewCmdConfigDeleteContext(out, errOut io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
+func NewCmdConfigDeleteContext(ioStreams genericiooptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "delete-context NAME",
 		DisableFlagsInUseLine: true,
@@ -44,7 +45,7 @@ func NewCmdConfigDeleteContext(out, errOut io.Writer, configAccess clientcmd.Con
 		Example:               deleteContextExample,
 		ValidArgsFunction:     completion.ContextCompletionFunc,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(runDeleteContext(out, errOut, configAccess, cmd))
+			cmdutil.CheckErr(runDeleteContext(ioStreams.Out, ioStreams.ErrOut, configAccess, cmd))
 		},
 	}
 

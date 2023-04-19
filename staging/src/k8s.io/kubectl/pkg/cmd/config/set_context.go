@@ -19,10 +19,9 @@ package config
 import (
 	"errors"
 	"fmt"
-	"io"
-
 	"github.com/spf13/cobra"
 
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -53,7 +52,7 @@ var (
 )
 
 // NewCmdConfigSetContext returns a Command instance for 'config set-context' sub command
-func NewCmdConfigSetContext(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
+func NewCmdConfigSetContext(ioStreams genericiooptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &setContextOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
@@ -68,9 +67,9 @@ func NewCmdConfigSetContext(out io.Writer, configAccess clientcmd.ConfigAccess) 
 			name, exists, err := options.run()
 			cmdutil.CheckErr(err)
 			if exists {
-				fmt.Fprintf(out, "Context %q modified.\n", name)
+				fmt.Fprintf(ioStreams.Out, "Context %q modified.\n", name)
 			} else {
-				fmt.Fprintf(out, "Context %q created.\n", name)
+				fmt.Fprintf(ioStreams.Out, "Context %q created.\n", name)
 			}
 		},
 	}

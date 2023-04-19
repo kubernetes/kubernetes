@@ -56,8 +56,8 @@ func NewDeleteUserOptions(ioStreams genericiooptions.IOStreams, configAccess cli
 }
 
 // NewCmdConfigDeleteUser returns a Command instance for 'config delete-user' sub command
-func NewCmdConfigDeleteUser(streams genericiooptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
-	o := NewDeleteUserOptions(streams, configAccess)
+func NewCmdConfigDeleteUser(ioStreams genericiooptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
+	o := NewDeleteUserOptions(ioStreams, configAccess)
 
 	cmd := &cobra.Command{
 		Use:                   "delete-user NAME",

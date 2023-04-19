@@ -21,6 +21,7 @@ import (
 	"io"
 
 	"github.com/spf13/cobra"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/tools/clientcmd"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -35,14 +36,14 @@ var (
 
 // NewCmdConfigGetClusters creates a command object for the "get-clusters" action, which
 // lists all clusters defined in the kubeconfig.
-func NewCmdConfigGetClusters(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
+func NewCmdConfigGetClusters(ioStreams genericiooptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "get-clusters",
 		Short:   i18n.T("Display clusters defined in the kubeconfig"),
 		Long:    i18n.T("Display clusters defined in the kubeconfig."),
 		Example: getClustersExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(runGetClusters(out, configAccess))
+			cmdutil.CheckErr(runGetClusters(ioStreams.Out, configAccess))
 		},
 	}
 
