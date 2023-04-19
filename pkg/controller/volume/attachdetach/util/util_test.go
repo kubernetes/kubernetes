@@ -37,7 +37,6 @@ import (
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
-	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -283,7 +282,7 @@ func Test_CreateVolumeSpec(t *testing.T) {
 }
 
 func setup(nodeName string, t *testing.T) (*volume.VolumePluginMgr, csimigration.PluginManager, csitrans.CSITranslator, fakeframework.PersistentVolumeLister, fakeframework.PersistentVolumeClaimLister) {
-	tmpDir, err := utiltesting.MkTmpdir("csi-test")
+	tmpDir, err := os.MkdirTemp("", "csi-test")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}

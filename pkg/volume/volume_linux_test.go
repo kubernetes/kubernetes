@@ -27,7 +27,6 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	utiltesting "k8s.io/client-go/util/testing"
 )
 
 type localFakeMounter struct {
@@ -119,7 +118,7 @@ func TestSkipPermissionChange(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			tmpDir, err := utiltesting.MkTmpdir("volume_linux_test")
+			tmpDir, err := os.MkdirTemp("", "volume_linux_test")
 			if err != nil {
 				t.Fatalf("error creating temp dir: %v", err)
 			}
@@ -280,7 +279,7 @@ func TestSetVolumeOwnershipMode(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			tmpDir, err := utiltesting.MkTmpdir("volume_linux_ownership")
+			tmpDir, err := os.MkdirTemp("", "volume_linux_ownership")
 			if err != nil {
 				t.Fatalf("error creating temp dir: %v", err)
 			}
@@ -425,7 +424,7 @@ func TestSetVolumeOwnershipOwner(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			tmpDir, err := utiltesting.MkTmpdir("volume_linux_ownership")
+			tmpDir, err := os.MkdirTemp("", "volume_linux_ownership")
 			if err != nil {
 				t.Fatalf("error creating temp dir: %v", err)
 			}

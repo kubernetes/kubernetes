@@ -20,7 +20,6 @@ import (
 	"os"
 	"testing"
 
-	utiltesting "k8s.io/client-go/util/testing"
 	. "k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -45,7 +44,7 @@ func TestGetMetricsStatFS(t *testing.T) {
 		t.Errorf("Expected error when calling GetMetrics on incorrectly initialized MetricsStatFS, actual nil")
 	}
 
-	tmpDir, err := utiltesting.MkTmpdir("metric_statfs_test")
+	tmpDir, err := os.MkdirTemp("", "metric_statfs_test")
 	if err != nil {
 		t.Fatalf("Can't make a tmp dir: %v", err)
 	}

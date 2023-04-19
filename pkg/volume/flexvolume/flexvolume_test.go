@@ -26,7 +26,6 @@ import (
 	"text/template"
 
 	"k8s.io/api/core/v1"
-	utiltesting "k8s.io/client-go/util/testing"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -158,7 +157,7 @@ func installPluginUnderTest(t *testing.T, vendorName, plugName, tmpDir string, e
 }
 
 func TestCanSupport(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("flexvolume_test")
+	tmpDir, err := os.MkdirTemp("", "flexvolume_test")
 	if err != nil {
 		t.Fatalf("error creating temp dir: %v", err)
 	}
@@ -193,7 +192,7 @@ func TestCanSupport(t *testing.T) {
 }
 
 func TestGetAccessModes(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("flexvolume_test")
+	tmpDir, err := os.MkdirTemp("", "flexvolume_test")
 	if err != nil {
 		t.Fatalf("error creating temp dir: %v", err)
 	}

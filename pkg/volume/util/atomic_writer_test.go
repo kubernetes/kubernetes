@@ -30,11 +30,10 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	utiltesting "k8s.io/client-go/util/testing"
 )
 
 func TestNewAtomicWriter(t *testing.T) {
-	targetDir, err := utiltesting.MkTmpdir("atomic-write")
+	targetDir, err := os.MkdirTemp("", "atomic-write")
 	if err != nil {
 		t.Fatalf("unexpected error creating tmp dir: %v", err)
 	}
@@ -45,7 +44,7 @@ func TestNewAtomicWriter(t *testing.T) {
 		t.Fatalf("unexpected error creating writer for existing target dir: %v", err)
 	}
 
-	nonExistentDir, err := utiltesting.MkTmpdir("atomic-write")
+	nonExistentDir, err := os.MkdirTemp("", "atomic-write")
 	if err != nil {
 		t.Fatalf("unexpected error creating tmp dir: %v", err)
 	}
@@ -222,7 +221,7 @@ func TestPathsToRemove(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		targetDir, err := utiltesting.MkTmpdir("atomic-write")
+		targetDir, err := os.MkdirTemp("", "atomic-write")
 		if err != nil {
 			t.Errorf("%v: unexpected error creating tmp dir: %v", tc.name, err)
 			continue
@@ -390,7 +389,7 @@ IAAAAAAAsDyZDwU=`
 	}
 
 	for _, tc := range cases {
-		targetDir, err := utiltesting.MkTmpdir("atomic-write")
+		targetDir, err := os.MkdirTemp("", "atomic-write")
 		if err != nil {
 			t.Errorf("%v: unexpected error creating tmp dir: %v", tc.name, err)
 			continue
@@ -566,7 +565,7 @@ func TestUpdate(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		targetDir, err := utiltesting.MkTmpdir("atomic-write")
+		targetDir, err := os.MkdirTemp("", "atomic-write")
 		if err != nil {
 			t.Errorf("%v: unexpected error creating tmp dir: %v", tc.name, err)
 			continue
@@ -734,7 +733,7 @@ func TestMultipleUpdates(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		targetDir, err := utiltesting.MkTmpdir("atomic-write")
+		targetDir, err := os.MkdirTemp("", "atomic-write")
 		if err != nil {
 			t.Errorf("%v: unexpected error creating tmp dir: %v", tc.name, err)
 			continue
@@ -947,7 +946,7 @@ func TestCreateUserVisibleFiles(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		targetDir, err := utiltesting.MkTmpdir("atomic-write")
+		targetDir, err := os.MkdirTemp("", "atomic-write")
 		if err != nil {
 			t.Errorf("%v: unexpected error creating tmp dir: %v", tc.name, err)
 			continue
@@ -987,7 +986,7 @@ func TestCreateUserVisibleFiles(t *testing.T) {
 }
 
 func TestSetPerms(t *testing.T) {
-	targetDir, err := utiltesting.MkTmpdir("atomic-write")
+	targetDir, err := os.MkdirTemp("", "atomic-write")
 	if err != nil {
 		t.Fatalf("unexpected error creating tmp dir: %v", err)
 	}

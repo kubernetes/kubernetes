@@ -22,7 +22,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	utiltesting "k8s.io/client-go/util/testing"
 	. "k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -30,7 +29,7 @@ import (
 // TestMetricsDuGetCapacity tests that MetricsDu can read disk usage
 // for path
 func TestMetricsDuGetCapacity(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("metrics_du_test")
+	tmpDir, err := os.MkdirTemp("", "metrics_du_test")
 	if err != nil {
 		t.Fatalf("Can't make a tmp dir: %v", err)
 	}

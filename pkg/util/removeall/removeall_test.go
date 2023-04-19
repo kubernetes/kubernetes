@@ -24,7 +24,6 @@ import (
 	"strings"
 	"testing"
 
-	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/mount-utils"
 )
 
@@ -108,7 +107,7 @@ func TestRemoveAllOneFilesystem(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		tmpDir, err := utiltesting.MkTmpdir("removeall-" + test.name + "-")
+		tmpDir, err := os.MkdirTemp("", "removeall-"+test.name+"-")
 		if err != nil {
 			t.Fatalf("Can't make a tmp dir: %v", err)
 		}
@@ -228,7 +227,7 @@ func TestRemoveDirsOneFilesystem(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		tmpDir, err := utiltesting.MkTmpdir("removeall-" + test.name + "-")
+		tmpDir, err := os.MkdirTemp("", "removeall-"+test.name+"-")
 		if err != nil {
 			t.Fatalf("Can't make a tmp dir: %v", err)
 		}

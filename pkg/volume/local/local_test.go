@@ -30,7 +30,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
@@ -46,7 +45,7 @@ const (
 )
 
 func getPlugin(t *testing.T) (string, volume.VolumePlugin) {
-	tmpDir, err := utiltesting.MkTmpdir("localVolumeTest")
+	tmpDir, err := os.MkdirTemp("", "localVolumeTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
@@ -66,7 +65,7 @@ func getPlugin(t *testing.T) (string, volume.VolumePlugin) {
 }
 
 func getBlockPlugin(t *testing.T) (string, volume.BlockVolumePlugin) {
-	tmpDir, err := utiltesting.MkTmpdir("localVolumeTest")
+	tmpDir, err := os.MkdirTemp("", "localVolumeTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
@@ -85,7 +84,7 @@ func getBlockPlugin(t *testing.T) (string, volume.BlockVolumePlugin) {
 }
 
 func getNodeExpandablePlugin(t *testing.T, isBlockDevice bool) (string, volume.NodeExpandableVolumePlugin) {
-	tmpDir, err := utiltesting.MkTmpdir("localVolumeTest")
+	tmpDir, err := os.MkdirTemp("", "localVolumeTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
@@ -116,7 +115,7 @@ func getNodeExpandablePlugin(t *testing.T, isBlockDevice bool) (string, volume.N
 }
 
 func getPersistentPlugin(t *testing.T) (string, volume.PersistentVolumePlugin) {
-	tmpDir, err := utiltesting.MkTmpdir("localVolumeTest")
+	tmpDir, err := os.MkdirTemp("", "localVolumeTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
@@ -136,7 +135,7 @@ func getPersistentPlugin(t *testing.T) (string, volume.PersistentVolumePlugin) {
 }
 
 func getDeviceMountablePluginWithBlockPath(t *testing.T, isBlockDevice bool) (string, volume.DeviceMountableVolumePlugin) {
-	tmpDir, err := utiltesting.MkTmpdir("localVolumeTest")
+	tmpDir, err := os.MkdirTemp("", "localVolumeTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
@@ -531,7 +530,7 @@ func TestConstructVolumeSpec(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tmpDir, err := utiltesting.MkTmpdir("localVolumeTest")
+			tmpDir, err := os.MkdirTemp("", "localVolumeTest")
 			if err != nil {
 				t.Fatalf("can't make a temp dir: %v", err)
 			}
@@ -690,7 +689,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 }
 
 func TestUnsupportedPlugins(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("localVolumeTest")
+	tmpDir, err := os.MkdirTemp("", "localVolumeTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}

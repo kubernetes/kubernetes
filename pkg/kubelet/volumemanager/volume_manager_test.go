@@ -35,7 +35,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
-	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
@@ -83,7 +82,7 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tmpDir, err := utiltesting.MkTmpdir("volumeManagerTest")
+			tmpDir, err := os.MkdirTemp("", "volumeManagerTest")
 			if err != nil {
 				t.Fatalf("can't make a temp dir: %v", err)
 			}
@@ -139,7 +138,7 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 }
 
 func TestWaitForAttachAndMountError(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("volumeManagerTest")
+	tmpDir, err := os.MkdirTemp("", "volumeManagerTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
@@ -215,7 +214,7 @@ func TestWaitForAttachAndMountError(t *testing.T) {
 }
 
 func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("volumeManagerTest")
+	tmpDir, err := os.MkdirTemp("", "volumeManagerTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
@@ -260,7 +259,7 @@ func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
 }
 
 func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("volumeManagerTest")
+	tmpDir, err := os.MkdirTemp("", "volumeManagerTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}

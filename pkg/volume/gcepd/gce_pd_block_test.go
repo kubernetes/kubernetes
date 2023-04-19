@@ -27,7 +27,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -43,7 +42,7 @@ func TestGetVolumeSpecFromGlobalMapPath(t *testing.T) {
 	// make our test path for fake GlobalMapPath
 	// /tmp symbolized our pluginDir
 	// /tmp/testGlobalPathXXXXX/plugins/kubernetes.io/gce-pd/volumeDevices/pdVol1
-	tmpVDir, err := utiltesting.MkTmpdir("gceBlockTest")
+	tmpVDir, err := os.MkdirTemp("", "gceBlockTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
@@ -101,7 +100,7 @@ func getTestVolume(readOnly bool, path string, isBlock bool) *volume.Spec {
 }
 
 func TestGetPodAndPluginMapPaths(t *testing.T) {
-	tmpVDir, err := utiltesting.MkTmpdir("gceBlockTest")
+	tmpVDir, err := os.MkdirTemp("", "gceBlockTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}

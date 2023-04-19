@@ -34,14 +34,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
-	utiltesting "k8s.io/client-go/util/testing"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
 
 func TestCanSupport(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("gcepdTest")
+	tmpDir, err := os.MkdirTemp("", "gcepdTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
@@ -65,7 +64,7 @@ func TestCanSupport(t *testing.T) {
 }
 
 func TestGetAccessModes(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("gcepdTest")
+	tmpDir, err := os.MkdirTemp("", "gcepdTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
@@ -109,7 +108,7 @@ func getNodeSelectorRequirementWithKey(key string, term v1.NodeSelectorTerm) (*v
 }
 
 func TestPlugin(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("gcepdTest")
+	tmpDir, err := os.MkdirTemp("", "gcepdTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
@@ -250,7 +249,7 @@ func TestPlugin(t *testing.T) {
 }
 
 func TestMountOptions(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("gcepdTest")
+	tmpDir, err := os.MkdirTemp("", "gcepdTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
@@ -329,7 +328,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 
 	client := fake.NewSimpleClientset(pv, claim)
 
-	tmpDir, err := utiltesting.MkTmpdir("gcepdTest")
+	tmpDir, err := os.MkdirTemp("", "gcepdTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
@@ -352,7 +351,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 }
 
 func TestUnsupportedVolumeHost(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("gcepdTest")
+	tmpDir, err := os.MkdirTemp("", "gcepdTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}

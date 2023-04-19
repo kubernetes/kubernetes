@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
-	utiltesting "k8s.io/client-go/util/testing"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
@@ -76,7 +75,7 @@ func TestRunOnce(t *testing.T) {
 		podtest.NewFakeMirrorClient())
 	fakeRuntime := &containertest.FakeRuntime{}
 	podStartupLatencyTracker := kubeletutil.NewPodStartupLatencyTracker()
-	basePath, err := utiltesting.MkTmpdir("kubelet")
+	basePath, err := os.MkdirTemp("", "kubelet")
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir %v", err)
 	}

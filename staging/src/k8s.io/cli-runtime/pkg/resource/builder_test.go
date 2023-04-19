@@ -47,8 +47,6 @@ import (
 	"k8s.io/client-go/rest/fake"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/client-go/restmapper"
-	utiltesting "k8s.io/client-go/util/testing"
-
 	// TODO we need to remove this linkage and create our own scheme
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -488,7 +486,7 @@ func TestFilenameOptionsValidate(t *testing.T) {
 
 func TestPathBuilderWithMultiple(t *testing.T) {
 	// create test dirs
-	tmpDir, err := utiltesting.MkTmpdir("recursive_test_multiple")
+	tmpDir, err := os.MkdirTemp("", "recursive_test_multiple")
 	if err != nil {
 		t.Fatalf("error creating temp dir: %v", err)
 	}
@@ -556,7 +554,7 @@ func TestPathBuilderWithMultiple(t *testing.T) {
 
 func TestPathBuilderWithMultipleInvalid(t *testing.T) {
 	// create test dirs
-	tmpDir, err := utiltesting.MkTmpdir("recursive_test_multiple_invalid")
+	tmpDir, err := os.MkdirTemp("", "recursive_test_multiple_invalid")
 	if err != nil {
 		t.Fatalf("error creating temp dir: %v", err)
 	}
@@ -1892,7 +1890,7 @@ func TestHasNames(t *testing.T) {
 
 func TestUnstructured(t *testing.T) {
 	// create test dirs
-	tmpDir, err := utiltesting.MkTmpdir("unstructured_test")
+	tmpDir, err := os.MkdirTemp("", "unstructured_test")
 	if err != nil {
 		t.Fatalf("error creating temp dir: %v", err)
 	}

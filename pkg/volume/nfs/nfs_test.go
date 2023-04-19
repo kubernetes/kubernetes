@@ -27,13 +27,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
-	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
 
 func TestCanSupport(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("nfs_test")
+	tmpDir, err := os.MkdirTemp("", "nfs_test")
 	if err != nil {
 		t.Fatalf("error creating temp dir: %v", err)
 	}
@@ -61,7 +60,7 @@ func TestCanSupport(t *testing.T) {
 }
 
 func TestGetAccessModes(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("nfs_test")
+	tmpDir, err := os.MkdirTemp("", "nfs_test")
 	if err != nil {
 		t.Fatalf("error creating temp dir: %v", err)
 	}
@@ -80,7 +79,7 @@ func TestGetAccessModes(t *testing.T) {
 }
 
 func TestRecycler(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("nfs_test")
+	tmpDir, err := os.MkdirTemp("", "nfs_test")
 	if err != nil {
 		t.Fatalf("error creating temp dir: %v", err)
 	}
@@ -97,7 +96,7 @@ func TestRecycler(t *testing.T) {
 }
 
 func doTestPlugin(t *testing.T, spec *volume.Spec, expectedDevice string) {
-	tmpDir, err := utiltesting.MkTmpdir("nfs_test")
+	tmpDir, err := os.MkdirTemp("", "nfs_test")
 	if err != nil {
 		t.Fatalf("error creating temp dir: %v", err)
 	}
@@ -227,7 +226,7 @@ func TestPluginPersistentVolume(t *testing.T) {
 }
 
 func TestPersistentClaimReadOnlyFlag(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("nfs_test")
+	tmpDir, err := os.MkdirTemp("", "nfs_test")
 	if err != nil {
 		t.Fatalf("error creating temp dir: %v", err)
 	}

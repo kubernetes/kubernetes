@@ -25,7 +25,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utiltesting "k8s.io/client-go/util/testing"
 )
 
 var rsaCertPEM = `-----BEGIN CERTIFICATE-----
@@ -83,16 +82,24 @@ rLTt0TTazzwBCgCD0Jkoqg==
 -----END PRIVATE KEY-----`
 
 func TestCreateSecretTLS(t *testing.T) {
+	mustMkdirTemp := func(p string) string {
+		dir, err := os.MkdirTemp("", p)
+		if err != nil {
+			t.Fatalf("failed creating a tmp dir: %v", err)
+		}
 
-	validCertTmpDir := utiltesting.MkTmpdirOrDie("tls-valid-cert-test")
+		return dir
+	}
+
+	validCertTmpDir := mustMkdirTemp("tls-valid-cert-test")
 	validKeyPath, validCertPath := writeKeyPair(validCertTmpDir, rsaKeyPEM, rsaCertPEM, t)
 	defer tearDown(validCertTmpDir)
 
-	invalidCertTmpDir := utiltesting.MkTmpdirOrDie("tls-invalid-cert-test")
+	invalidCertTmpDir := mustMkdirTemp("tls-invalid-cert-test")
 	invalidKeyPath, invalidCertPath := writeKeyPair(invalidCertTmpDir, "test", "test", t)
 	defer tearDown(invalidCertTmpDir)
 
-	mismatchCertTmpDir := utiltesting.MkTmpdirOrDie("tls-mismatch-test")
+	mismatchCertTmpDir := mustMkdirTemp("tls-mismatch-test")
 	mismatchKeyPath, mismatchCertPath := writeKeyPair(mismatchCertTmpDir, rsaKeyPEM, mismatchRSAKeyPEM, t)
 	defer tearDown(mismatchCertTmpDir)
 

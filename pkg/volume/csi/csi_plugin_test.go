@@ -32,7 +32,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
-	utiltesting "k8s.io/client-go/util/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
@@ -55,7 +54,7 @@ func newTestPluginWithAttachDetachVolumeHost(t *testing.T, client *fakeclient.Cl
 
 // create a plugin mgr to load plugins and setup a fake client
 func newTestPluginWithVolumeHost(t *testing.T, client *fakeclient.Clientset, hostType int) (*csiPlugin, string) {
-	tmpDir, err := utiltesting.MkTmpdir("csi-test")
+	tmpDir, err := os.MkdirTemp("", "csi-test")
 	if err != nil {
 		t.Fatalf("can't create temp dir: %v", err)
 	}
@@ -951,7 +950,7 @@ func TestPluginFindAttachablePlugin(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tmpDir, err := utiltesting.MkTmpdir("csi-test")
+			tmpDir, err := os.MkdirTemp("", "csi-test")
 			if err != nil {
 				t.Fatalf("can't create temp dir: %v", err)
 			}
@@ -1077,7 +1076,7 @@ func TestPluginFindDeviceMountablePluginBySpec(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tmpDir, err := utiltesting.MkTmpdir("csi-test")
+			tmpDir, err := os.MkdirTemp("", "csi-test")
 			if err != nil {
 				t.Fatalf("can't create temp dir: %v", err)
 			}

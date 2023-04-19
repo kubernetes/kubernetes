@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/kubernetes/fake"
-	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -51,7 +50,7 @@ func TestGetVolumeSpecFromGlobalMapPath(t *testing.T) {
 	// make our test path for fake GlobalMapPath
 	// /tmp symbolized our pluginDir
 	// /tmp/testGlobalPathXXXXX/plugins/kubernetes.io/rbd/volumeDevices/pdVol1
-	tmpVDir, err := utiltesting.MkTmpdir("rbdBlockTest")
+	tmpVDir, err := os.MkdirTemp("", "rbdBlockTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
@@ -95,7 +94,7 @@ func TestGetVolumeSpecFromGlobalMapPath(t *testing.T) {
 }
 
 func TestCanSupport(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("rbd_test")
+	tmpDir, err := os.MkdirTemp("", "rbd_test")
 	if err != nil {
 		t.Fatalf("error creating temp dir: %v", err)
 	}
@@ -364,7 +363,7 @@ func TestPlugin(t *testing.T) {
 		t.Skip("Skipping test that fails on Windows")
 	}
 
-	tmpDir, err := utiltesting.MkTmpdir("rbd_test")
+	tmpDir, err := os.MkdirTemp("", "rbd_test")
 	if err != nil {
 		t.Fatalf("error creating temp dir: %v", err)
 	}
@@ -442,7 +441,7 @@ func TestPlugin(t *testing.T) {
 }
 
 func TestPersistentClaimReadOnlyFlag(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("rbd_test")
+	tmpDir, err := os.MkdirTemp("", "rbd_test")
 	if err != nil {
 		t.Fatalf("error creating temp dir: %v", err)
 	}
@@ -532,7 +531,7 @@ func TestGetSecretNameAndNamespace(t *testing.T) {
 
 // https://github.com/kubernetes/kubernetes/issues/57744
 func TestGetDeviceMountPath(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("rbd_test")
+	tmpDir, err := os.MkdirTemp("", "rbd_test")
 	if err != nil {
 		t.Fatalf("error creating temp dir: %v", err)
 	}
@@ -599,7 +598,7 @@ func TestConstructVolumeSpec(t *testing.T) {
 	if runtime.GOOS == "darwin" {
 		t.Skipf("TestConstructVolumeSpec is not supported on GOOS=%s", runtime.GOOS)
 	}
-	tmpDir, err := utiltesting.MkTmpdir("rbd_test")
+	tmpDir, err := os.MkdirTemp("", "rbd_test")
 	if err != nil {
 		t.Fatalf("error creating temp dir: %v", err)
 	}
@@ -658,7 +657,7 @@ func TestConstructVolumeSpec(t *testing.T) {
 }
 
 func TestGetAccessModes(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("rbd_test")
+	tmpDir, err := os.MkdirTemp("", "rbd_test")
 	if err != nil {
 		t.Fatalf("error creating temp dir: %v", err)
 	}
@@ -680,7 +679,7 @@ func TestGetAccessModes(t *testing.T) {
 }
 
 func TestRequiresRemount(t *testing.T) {
-	tmpDir, _ := utiltesting.MkTmpdir("rbd_test")
+	tmpDir, _ := os.MkdirTemp("", "rbd_test")
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeKubeletVolumeHost(t, tmpDir, nil, nil))
@@ -717,7 +716,7 @@ func TestGetRbdImageSize(t *testing.T) {
 }
 
 func TestGetRbdImageInfo(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("rbd_test")
+	tmpDir, err := os.MkdirTemp("", "rbd_test")
 	if err != nil {
 		t.Fatalf("error creating temp dir: %v", err)
 	}
@@ -748,7 +747,7 @@ func TestGetRbdImageInfo(t *testing.T) {
 }
 
 func TestUnsupportedVolumeHost(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("rbd_test")
+	tmpDir, err := os.MkdirTemp("", "rbd_test")
 	if err != nil {
 		t.Fatalf("error creating temp dir: %v", err)
 	}
