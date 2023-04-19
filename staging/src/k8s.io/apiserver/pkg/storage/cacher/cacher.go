@@ -922,12 +922,24 @@ func (c *Cacher) dispatchEvents() {
 			bookmarkTimer.Reset(wait.Jitter(time.Second, 0.25))
 			// Never send a bookmark event if we did not see an event here, this is fine
 			// because we don't provide any guarantees on sending bookmarks.
+			//
+			// Just pop closed watchers and requeue others if needed.
+			//
+			// TODO(#115478): rework the following logic
+			//  in a way that would allow more
+			//  efficient cleanup of closed watchers
 			if lastProcessedResourceVersion == 0 {
 				func() {
 					c.Lock()
 					defer c.Unlock()
-					// pop expired watchers in case there has been no update
-					c.bookmarkWatchers.popExpiredWatchersThreadUnsafe()
+					for _, watchers := range c.bookmarkWatchers.popExpiredWatchersThreadUnsafe() {
+						for _, watcher := range watchers {
+							if watcher.stopped {
+								continue
+							}
+							c.bookmarkWatchers.addWatcherThreadUnsafe(watcher)
+						}
+					}
 				}()
 				continue
 			}
