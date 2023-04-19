@@ -725,6 +725,9 @@ github.com/xlab/treeprint
 # go.etcd.io/bbolt v1.3.7
 ## explicit; go 1.17
 go.etcd.io/bbolt
+# go.etcd.io/etcd/api/v3 v3.5.7
+## explicit; go 1.17
+go.etcd.io/bbolt
 # go.etcd.io/etcd/api/v3 v3.5.9
 ## explicit; go 1.19
 go.etcd.io/etcd/api/v3/authpb
