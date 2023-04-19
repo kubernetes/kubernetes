@@ -638,6 +638,14 @@ func (a *Authenticator) AuthenticateToken(ctx context.Context, token string) (*a
 		}
 	}
 
+	// Forward "aud" OIDC claims to the authorizer stage through Extra field :
+	// It allows any further authz process to be audience-aware (in addition of being user-aware)
+	// by adding optional information about audience & auth recipient context.
+	if len(idToken.Audience) > 0 {
+		info.Extra = map[string][]string{}
+		info.Extra["oidc:aud"] = idToken.Audience
+	}
+
 	return &authenticator.Response{User: info}, true, nil
 }
 

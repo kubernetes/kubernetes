@@ -352,7 +352,8 @@ func TestToken(t *testing.T) {
 				"exp": %d
 			}`, valid.Unix()),
 			want: &user.DefaultInfo{
-				Name: "jane",
+				Name:  "jane",
+				Extra: map[string][]string{"oidc:aud": {"my-client"}},
 			},
 		},
 		{
@@ -394,7 +395,8 @@ func TestToken(t *testing.T) {
 				"exp": %d
 			}`, valid.Unix()),
 			want: &user.DefaultInfo{
-				Name: "jane@example.com",
+				Name:  "jane@example.com",
+				Extra: map[string][]string{"oidc:aud": {"my-client"}},
 			},
 		},
 		{
@@ -438,7 +440,8 @@ func TestToken(t *testing.T) {
 				"exp": %d
 			}`, valid.Unix()),
 			want: &user.DefaultInfo{
-				Name: "jane@example.com",
+				Name:  "jane@example.com",
+				Extra: map[string][]string{"oidc:aud": {"my-client"}},
 			},
 		},
 		{
@@ -486,6 +489,7 @@ func TestToken(t *testing.T) {
 			want: &user.DefaultInfo{
 				Name:   "jane",
 				Groups: []string{"team1", "team2"},
+				Extra:  map[string][]string{"oidc:aud": {"my-client"}},
 			},
 		},
 		{
@@ -531,6 +535,7 @@ func TestToken(t *testing.T) {
 			want: &user.DefaultInfo{
 				Name:   "jane",
 				Groups: []string{"team1", "team2"},
+				Extra:  map[string][]string{"oidc:aud": {"my-client"}},
 			},
 		},
 		{
@@ -742,6 +747,7 @@ func TestToken(t *testing.T) {
 			want: &user.DefaultInfo{
 				Name:   "jane",
 				Groups: []string{"team1", "team2"},
+				Extra:  map[string][]string{"oidc:aud": {"my-client"}},
 			},
 		},
 		{
@@ -877,6 +883,7 @@ func TestToken(t *testing.T) {
 				Name: "jane",
 				// "team1" is from the normal "groups" claim.
 				Groups: []string{"team1"},
+				Extra:  map[string][]string{"oidc:aud": {"my-client"}},
 			},
 		},
 		{
@@ -903,6 +910,7 @@ func TestToken(t *testing.T) {
 			want: &user.DefaultInfo{
 				Name:   "jane",
 				Groups: []string{"team1"},
+				Extra:  map[string][]string{"oidc:aud": {"my-client"}},
 			},
 		},
 		{
@@ -949,6 +957,7 @@ func TestToken(t *testing.T) {
 			want: &user.DefaultInfo{
 				Name:   "jane",
 				Groups: []string{"team1"},
+				Extra:  map[string][]string{"oidc:aud": {"my-client"}},
 			},
 		},
 		{
@@ -979,7 +988,8 @@ func TestToken(t *testing.T) {
 				"exp": %d
 			}`, valid.Unix()),
 			want: &user.DefaultInfo{
-				Name: "jane",
+				Name:  "jane",
+				Extra: map[string][]string{"oidc:aud": {"my-client"}},
 			},
 		},
 		{
@@ -1003,7 +1013,8 @@ func TestToken(t *testing.T) {
 				"exp": %d
 			}`, valid.Unix()),
 			want: &user.DefaultInfo{
-				Name: "jane",
+				Name:  "jane",
+				Extra: map[string][]string{"oidc:aud": {"my-client"}},
 			},
 		},
 		{
@@ -1054,7 +1065,8 @@ func TestToken(t *testing.T) {
 				"exp": %d
 			}`, valid.Unix()),
 			want: &user.DefaultInfo{
-				Name: "jane",
+				Name:  "jane",
+				Extra: map[string][]string{"oidc:aud": {"my-client"}},
 			},
 		},
 		{
@@ -1188,7 +1200,8 @@ func TestToken(t *testing.T) {
 				"exp": %d
 			}`, valid.Unix()),
 			want: &user.DefaultInfo{
-				Name: "jane",
+				Name:  "jane",
+				Extra: map[string][]string{"oidc:aud": {"not-my-client", "my-client"}},
 			},
 		},
 		{
@@ -1231,7 +1244,8 @@ func TestToken(t *testing.T) {
 				"exp": %d
 			}`, valid.Unix()),
 			want: &user.DefaultInfo{
-				Name: "oidc:jane",
+				Name:  "oidc:jane",
+				Extra: map[string][]string{"oidc:aud": {"my-client"}},
 			},
 		},
 		{
@@ -1259,6 +1273,7 @@ func TestToken(t *testing.T) {
 			want: &user.DefaultInfo{
 				Name:   "oidc:jane",
 				Groups: []string{"groups:team1", "groups:team2"},
+				Extra:  map[string][]string{"oidc:aud": {"my-client"}},
 			},
 		},
 		{
@@ -1306,6 +1321,7 @@ func TestToken(t *testing.T) {
 			want: &user.DefaultInfo{
 				Name:   "oidc:jane",
 				Groups: []string{"groups:team1", "groups:team2"},
+				Extra:  map[string][]string{"oidc:aud": {"my-client"}},
 			},
 		},
 		{
@@ -1349,7 +1365,8 @@ func TestToken(t *testing.T) {
 				"exp": %d
 			}`, valid.Unix()),
 			want: &user.DefaultInfo{
-				Name: "jane",
+				Name:  "jane",
+				Extra: map[string][]string{"oidc:aud": {"my-client"}},
 			},
 		},
 		{
@@ -1373,7 +1390,8 @@ func TestToken(t *testing.T) {
 				"exp": %d
 			}`, valid.Unix()),
 			want: &user.DefaultInfo{
-				Name: "jane",
+				Name:  "jane",
+				Extra: map[string][]string{"oidc:aud": {"my-client"}},
 			},
 		},
 		{
@@ -1449,7 +1467,8 @@ func TestToken(t *testing.T) {
 				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
 			},
 			want: &user.DefaultInfo{
-				Name: "thomas.jefferson@gmail.com",
+				Name:  "thomas.jefferson@gmail.com",
+				Extra: map[string][]string{"oidc:aud": {"my-client"}},
 			},
 		},
 		{
