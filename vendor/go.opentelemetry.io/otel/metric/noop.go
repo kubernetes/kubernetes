@@ -19,10 +19,6 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric/instrument"
-	"go.opentelemetry.io/otel/metric/instrument/asyncfloat64"
-	"go.opentelemetry.io/otel/metric/instrument/asyncint64"
-	"go.opentelemetry.io/otel/metric/instrument/syncfloat64"
-	"go.opentelemetry.io/otel/metric/instrument/syncint64"
 )
 
 // NewNoopMeterProvider creates a MeterProvider that does not record any metrics.
@@ -43,139 +39,105 @@ func NewNoopMeter() Meter {
 
 type noopMeter struct{}
 
-// AsyncInt64 creates an instrument that does not record any metrics.
-func (noopMeter) AsyncInt64() asyncint64.InstrumentProvider {
-	return nonrecordingAsyncInt64Instrument{}
+func (noopMeter) Int64Counter(string, ...instrument.Int64Option) (instrument.Int64Counter, error) {
+	return nonrecordingSyncInt64Instrument{}, nil
 }
 
-// AsyncFloat64 creates an instrument that does not record any metrics.
-func (noopMeter) AsyncFloat64() asyncfloat64.InstrumentProvider {
-	return nonrecordingAsyncFloat64Instrument{}
+func (noopMeter) Int64UpDownCounter(string, ...instrument.Int64Option) (instrument.Int64UpDownCounter, error) {
+	return nonrecordingSyncInt64Instrument{}, nil
 }
 
-// SyncInt64 creates an instrument that does not record any metrics.
-func (noopMeter) SyncInt64() syncint64.InstrumentProvider {
-	return nonrecordingSyncInt64Instrument{}
+func (noopMeter) Int64Histogram(string, ...instrument.Int64Option) (instrument.Int64Histogram, error) {
+	return nonrecordingSyncInt64Instrument{}, nil
 }
 
-// SyncFloat64 creates an instrument that does not record any metrics.
-func (noopMeter) SyncFloat64() syncfloat64.InstrumentProvider {
-	return nonrecordingSyncFloat64Instrument{}
+func (noopMeter) Int64ObservableCounter(string, ...instrument.Int64ObserverOption) (instrument.Int64ObservableCounter, error) {
+	return nonrecordingAsyncInt64Instrument{}, nil
+}
+
+func (noopMeter) Int64ObservableUpDownCounter(string, ...instrument.Int64ObserverOption) (instrument.Int64ObservableUpDownCounter, error) {
+	return nonrecordingAsyncInt64Instrument{}, nil
+}
+
+func (noopMeter) Int64ObservableGauge(string, ...instrument.Int64ObserverOption) (instrument.Int64ObservableGauge, error) {
+	return nonrecordingAsyncInt64Instrument{}, nil
+}
+
+func (noopMeter) Float64Counter(string, ...instrument.Float64Option) (instrument.Float64Counter, error) {
+	return nonrecordingSyncFloat64Instrument{}, nil
+}
+
+func (noopMeter) Float64UpDownCounter(string, ...instrument.Float64Option) (instrument.Float64UpDownCounter, error) {
+	return nonrecordingSyncFloat64Instrument{}, nil
+}
+
+func (noopMeter) Float64Histogram(string, ...instrument.Float64Option) (instrument.Float64Histogram, error) {
+	return nonrecordingSyncFloat64Instrument{}, nil
+}
+
+func (noopMeter) Float64ObservableCounter(string, ...instrument.Float64ObserverOption) (instrument.Float64ObservableCounter, error) {
+	return nonrecordingAsyncFloat64Instrument{}, nil
+}
+
+func (noopMeter) Float64ObservableUpDownCounter(string, ...instrument.Float64ObserverOption) (instrument.Float64ObservableUpDownCounter, error) {
+	return nonrecordingAsyncFloat64Instrument{}, nil
+}
+
+func (noopMeter) Float64ObservableGauge(string, ...instrument.Float64ObserverOption) (instrument.Float64ObservableGauge, error) {
+	return nonrecordingAsyncFloat64Instrument{}, nil
 }
 
 // RegisterCallback creates a register callback that does not record any metrics.
-func (noopMeter) RegisterCallback([]instrument.Asynchronous, func(context.Context)) error {
-	return nil
+func (noopMeter) RegisterCallback(Callback, ...instrument.Asynchronous) (Registration, error) {
+	return noopReg{}, nil
 }
+
+type noopReg struct{}
+
+func (noopReg) Unregister() error { return nil }
 
 type nonrecordingAsyncFloat64Instrument struct {
-	instrument.Asynchronous
+	instrument.Float64Observable
 }
 
 var (
-	_ asyncfloat64.InstrumentProvider = nonrecordingAsyncFloat64Instrument{}
-	_ asyncfloat64.Counter            = nonrecordingAsyncFloat64Instrument{}
-	_ asyncfloat64.UpDownCounter      = nonrecordingAsyncFloat64Instrument{}
-	_ asyncfloat64.Gauge              = nonrecordingAsyncFloat64Instrument{}
+	_ instrument.Float64ObservableCounter       = nonrecordingAsyncFloat64Instrument{}
+	_ instrument.Float64ObservableUpDownCounter = nonrecordingAsyncFloat64Instrument{}
+	_ instrument.Float64ObservableGauge         = nonrecordingAsyncFloat64Instrument{}
 )
-
-func (n nonrecordingAsyncFloat64Instrument) Counter(string, ...instrument.Option) (asyncfloat64.Counter, error) {
-	return n, nil
-}
-
-func (n nonrecordingAsyncFloat64Instrument) UpDownCounter(string, ...instrument.Option) (asyncfloat64.UpDownCounter, error) {
-	return n, nil
-}
-
-func (n nonrecordingAsyncFloat64Instrument) Gauge(string, ...instrument.Option) (asyncfloat64.Gauge, error) {
-	return n, nil
-}
-
-func (nonrecordingAsyncFloat64Instrument) Observe(context.Context, float64, ...attribute.KeyValue) {
-
-}
 
 type nonrecordingAsyncInt64Instrument struct {
-	instrument.Asynchronous
+	instrument.Int64Observable
 }
 
 var (
-	_ asyncint64.InstrumentProvider = nonrecordingAsyncInt64Instrument{}
-	_ asyncint64.Counter            = nonrecordingAsyncInt64Instrument{}
-	_ asyncint64.UpDownCounter      = nonrecordingAsyncInt64Instrument{}
-	_ asyncint64.Gauge              = nonrecordingAsyncInt64Instrument{}
+	_ instrument.Int64ObservableCounter       = nonrecordingAsyncInt64Instrument{}
+	_ instrument.Int64ObservableUpDownCounter = nonrecordingAsyncInt64Instrument{}
+	_ instrument.Int64ObservableGauge         = nonrecordingAsyncInt64Instrument{}
 )
-
-func (n nonrecordingAsyncInt64Instrument) Counter(string, ...instrument.Option) (asyncint64.Counter, error) {
-	return n, nil
-}
-
-func (n nonrecordingAsyncInt64Instrument) UpDownCounter(string, ...instrument.Option) (asyncint64.UpDownCounter, error) {
-	return n, nil
-}
-
-func (n nonrecordingAsyncInt64Instrument) Gauge(string, ...instrument.Option) (asyncint64.Gauge, error) {
-	return n, nil
-}
-
-func (nonrecordingAsyncInt64Instrument) Observe(context.Context, int64, ...attribute.KeyValue) {
-}
 
 type nonrecordingSyncFloat64Instrument struct {
 	instrument.Synchronous
 }
 
 var (
-	_ syncfloat64.InstrumentProvider = nonrecordingSyncFloat64Instrument{}
-	_ syncfloat64.Counter            = nonrecordingSyncFloat64Instrument{}
-	_ syncfloat64.UpDownCounter      = nonrecordingSyncFloat64Instrument{}
-	_ syncfloat64.Histogram          = nonrecordingSyncFloat64Instrument{}
+	_ instrument.Float64Counter       = nonrecordingSyncFloat64Instrument{}
+	_ instrument.Float64UpDownCounter = nonrecordingSyncFloat64Instrument{}
+	_ instrument.Float64Histogram     = nonrecordingSyncFloat64Instrument{}
 )
 
-func (n nonrecordingSyncFloat64Instrument) Counter(string, ...instrument.Option) (syncfloat64.Counter, error) {
-	return n, nil
-}
-
-func (n nonrecordingSyncFloat64Instrument) UpDownCounter(string, ...instrument.Option) (syncfloat64.UpDownCounter, error) {
-	return n, nil
-}
-
-func (n nonrecordingSyncFloat64Instrument) Histogram(string, ...instrument.Option) (syncfloat64.Histogram, error) {
-	return n, nil
-}
-
-func (nonrecordingSyncFloat64Instrument) Add(context.Context, float64, ...attribute.KeyValue) {
-
-}
-
-func (nonrecordingSyncFloat64Instrument) Record(context.Context, float64, ...attribute.KeyValue) {
-
-}
+func (nonrecordingSyncFloat64Instrument) Add(context.Context, float64, ...attribute.KeyValue)    {}
+func (nonrecordingSyncFloat64Instrument) Record(context.Context, float64, ...attribute.KeyValue) {}
 
 type nonrecordingSyncInt64Instrument struct {
 	instrument.Synchronous
 }
 
 var (
-	_ syncint64.InstrumentProvider = nonrecordingSyncInt64Instrument{}
-	_ syncint64.Counter            = nonrecordingSyncInt64Instrument{}
-	_ syncint64.UpDownCounter      = nonrecordingSyncInt64Instrument{}
-	_ syncint64.Histogram          = nonrecordingSyncInt64Instrument{}
+	_ instrument.Int64Counter       = nonrecordingSyncInt64Instrument{}
+	_ instrument.Int64UpDownCounter = nonrecordingSyncInt64Instrument{}
+	_ instrument.Int64Histogram     = nonrecordingSyncInt64Instrument{}
 )
 
-func (n nonrecordingSyncInt64Instrument) Counter(string, ...instrument.Option) (syncint64.Counter, error) {
-	return n, nil
-}
-
-func (n nonrecordingSyncInt64Instrument) UpDownCounter(string, ...instrument.Option) (syncint64.UpDownCounter, error) {
-	return n, nil
-}
-
-func (n nonrecordingSyncInt64Instrument) Histogram(string, ...instrument.Option) (syncint64.Histogram, error) {
-	return n, nil
-}
-
-func (nonrecordingSyncInt64Instrument) Add(context.Context, int64, ...attribute.KeyValue) {
-}
-func (nonrecordingSyncInt64Instrument) Record(context.Context, int64, ...attribute.KeyValue) {
-}
+func (nonrecordingSyncInt64Instrument) Add(context.Context, int64, ...attribute.KeyValue)    {}
+func (nonrecordingSyncInt64Instrument) Record(context.Context, int64, ...attribute.KeyValue) {}

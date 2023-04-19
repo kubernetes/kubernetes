@@ -28,3 +28,61 @@ type Asynchronous interface {
 type Synchronous interface {
 	synchronous()
 }
+
+// Option applies options to all instruments.
+type Option interface {
+	Float64ObserverOption
+	Int64ObserverOption
+	Float64Option
+	Int64Option
+}
+
+type descOpt string
+
+func (o descOpt) applyFloat64(c Float64Config) Float64Config {
+	c.description = string(o)
+	return c
+}
+
+func (o descOpt) applyInt64(c Int64Config) Int64Config {
+	c.description = string(o)
+	return c
+}
+
+func (o descOpt) applyFloat64Observer(c Float64ObserverConfig) Float64ObserverConfig {
+	c.description = string(o)
+	return c
+}
+
+func (o descOpt) applyInt64Observer(c Int64ObserverConfig) Int64ObserverConfig {
+	c.description = string(o)
+	return c
+}
+
+// WithDescription sets the instrument description.
+func WithDescription(desc string) Option { return descOpt(desc) }
+
+type unitOpt string
+
+func (o unitOpt) applyFloat64(c Float64Config) Float64Config {
+	c.unit = string(o)
+	return c
+}
+
+func (o unitOpt) applyInt64(c Int64Config) Int64Config {
+	c.unit = string(o)
+	return c
+}
+
+func (o unitOpt) applyFloat64Observer(c Float64ObserverConfig) Float64ObserverConfig {
+	c.unit = string(o)
+	return c
+}
+
+func (o unitOpt) applyInt64Observer(c Int64ObserverConfig) Int64ObserverConfig {
+	c.unit = string(o)
+	return c
+}
+
+// WithUnit sets the instrument unit.
+func WithUnit(u string) Option { return unitOpt(u) }

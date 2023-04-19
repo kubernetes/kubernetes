@@ -17,44 +17,122 @@ package metric // import "go.opentelemetry.io/otel/metric"
 import (
 	"context"
 
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric/instrument"
-	"go.opentelemetry.io/otel/metric/instrument/asyncfloat64"
-	"go.opentelemetry.io/otel/metric/instrument/asyncint64"
-	"go.opentelemetry.io/otel/metric/instrument/syncfloat64"
-	"go.opentelemetry.io/otel/metric/instrument/syncint64"
 )
 
 // MeterProvider provides access to named Meter instances, for instrumenting
 // an application or library.
+//
+// Warning: methods may be added to this interface in minor releases.
 type MeterProvider interface {
-	// Meter creates an instance of a `Meter` interface. The instrumentationName
-	// must be the name of the library providing instrumentation. This name may
-	// be the same as the instrumented code only if that code provides built-in
-	// instrumentation. If the instrumentationName is empty, then a
-	// implementation defined default name will be used instead.
-	Meter(instrumentationName string, opts ...MeterOption) Meter
+	// Meter creates an instance of a `Meter` interface. The name must be the
+	// name of the library providing instrumentation. This name may be the same
+	// as the instrumented code only if that code provides built-in
+	// instrumentation. If the name is empty, then a implementation defined
+	// default name will be used instead.
+	Meter(name string, opts ...MeterOption) Meter
 }
 
 // Meter provides access to instrument instances for recording metrics.
+//
+// Warning: methods may be added to this interface in minor releases.
 type Meter interface {
-	// AsyncInt64 is the namespace for the Asynchronous Integer instruments.
-	//
-	// To Observe data with instruments it must be registered in a callback.
-	AsyncInt64() asyncint64.InstrumentProvider
+	// Int64Counter returns a new instrument identified by name and configured
+	// with options. The instrument is used to synchronously record increasing
+	// int64 measurements during a computational operation.
+	Int64Counter(name string, options ...instrument.Int64Option) (instrument.Int64Counter, error)
+	// Int64UpDownCounter returns a new instrument identified by name and
+	// configured with options. The instrument is used to synchronously record
+	// int64 measurements during a computational operation.
+	Int64UpDownCounter(name string, options ...instrument.Int64Option) (instrument.Int64UpDownCounter, error)
+	// Int64Histogram returns a new instrument identified by name and
+	// configured with options. The instrument is used to synchronously record
+	// the distribution of int64 measurements during a computational operation.
+	Int64Histogram(name string, options ...instrument.Int64Option) (instrument.Int64Histogram, error)
+	// Int64ObservableCounter returns a new instrument identified by name and
+	// configured with options. The instrument is used to asynchronously record
+	// increasing int64 measurements once per a measurement collection cycle.
+	Int64ObservableCounter(name string, options ...instrument.Int64ObserverOption) (instrument.Int64ObservableCounter, error)
+	// Int64ObservableUpDownCounter returns a new instrument identified by name
+	// and configured with options. The instrument is used to asynchronously
+	// record int64 measurements once per a measurement collection cycle.
+	Int64ObservableUpDownCounter(name string, options ...instrument.Int64ObserverOption) (instrument.Int64ObservableUpDownCounter, error)
+	// Int64ObservableGauge returns a new instrument identified by name and
+	// configured with options. The instrument is used to asynchronously record
+	// instantaneous int64 measurements once per a measurement collection
+	// cycle.
+	Int64ObservableGauge(name string, options ...instrument.Int64ObserverOption) (instrument.Int64ObservableGauge, error)
 
-	// AsyncFloat64 is the namespace for the Asynchronous Float instruments
-	//
-	// To Observe data with instruments it must be registered in a callback.
-	AsyncFloat64() asyncfloat64.InstrumentProvider
+	// Float64Counter returns a new instrument identified by name and
+	// configured with options. The instrument is used to synchronously record
+	// increasing float64 measurements during a computational operation.
+	Float64Counter(name string, options ...instrument.Float64Option) (instrument.Float64Counter, error)
+	// Float64UpDownCounter returns a new instrument identified by name and
+	// configured with options. The instrument is used to synchronously record
+	// float64 measurements during a computational operation.
+	Float64UpDownCounter(name string, options ...instrument.Float64Option) (instrument.Float64UpDownCounter, error)
+	// Float64Histogram returns a new instrument identified by name and
+	// configured with options. The instrument is used to synchronously record
+	// the distribution of float64 measurements during a computational
+	// operation.
+	Float64Histogram(name string, options ...instrument.Float64Option) (instrument.Float64Histogram, error)
+	// Float64ObservableCounter returns a new instrument identified by name and
+	// configured with options. The instrument is used to asynchronously record
+	// increasing float64 measurements once per a measurement collection cycle.
+	Float64ObservableCounter(name string, options ...instrument.Float64ObserverOption) (instrument.Float64ObservableCounter, error)
+	// Float64ObservableUpDownCounter returns a new instrument identified by
+	// name and configured with options. The instrument is used to
+	// asynchronously record float64 measurements once per a measurement
+	// collection cycle.
+	Float64ObservableUpDownCounter(name string, options ...instrument.Float64ObserverOption) (instrument.Float64ObservableUpDownCounter, error)
+	// Float64ObservableGauge returns a new instrument identified by name and
+	// configured with options. The instrument is used to asynchronously record
+	// instantaneous float64 measurements once per a measurement collection
+	// cycle.
+	Float64ObservableGauge(name string, options ...instrument.Float64ObserverOption) (instrument.Float64ObservableGauge, error)
 
-	// RegisterCallback captures the function that will be called during Collect.
+	// RegisterCallback registers f to be called during the collection of a
+	// measurement cycle.
 	//
-	// It is only valid to call Observe within the scope of the passed function,
-	// and only on the instruments that were registered with this call.
-	RegisterCallback(insts []instrument.Asynchronous, function func(context.Context)) error
+	// If Unregister of the returned Registration is called, f needs to be
+	// unregistered and not called during collection.
+	//
+	// The instruments f is registered with are the only instruments that f may
+	// observe values for.
+	//
+	// If no instruments are passed, f should not be registered nor called
+	// during collection.
+	RegisterCallback(f Callback, instruments ...instrument.Asynchronous) (Registration, error)
+}
 
-	// SyncInt64 is the namespace for the Synchronous Integer instruments
-	SyncInt64() syncint64.InstrumentProvider
-	// SyncFloat64 is the namespace for the Synchronous Float instruments
-	SyncFloat64() syncfloat64.InstrumentProvider
+// Callback is a function registered with a Meter that makes observations for
+// the set of instruments it is registered with. The Observer parameter is used
+// to record measurment observations for these instruments.
+//
+// The function needs to complete in a finite amount of time and the deadline
+// of the passed context is expected to be honored.
+//
+// The function needs to make unique observations across all registered
+// Callbacks. Meaning, it should not report measurements for an instrument with
+// the same attributes as another Callback will report.
+//
+// The function needs to be concurrent safe.
+type Callback func(context.Context, Observer) error
+
+// Observer records measurements for multiple instruments in a Callback.
+type Observer interface {
+	// ObserveFloat64 records the float64 value with attributes for obsrv.
+	ObserveFloat64(obsrv instrument.Float64Observable, value float64, attributes ...attribute.KeyValue)
+	// ObserveInt64 records the int64 value with attributes for obsrv.
+	ObserveInt64(obsrv instrument.Int64Observable, value int64, attributes ...attribute.KeyValue)
+}
+
+// Registration is an token representing the unique registration of a callback
+// for a set of instruments with a Meter.
+type Registration interface {
+	// Unregister removes the callback registration from a Meter.
+	//
+	// This method needs to be idempotent and concurrent safe.
+	Unregister() error
 }

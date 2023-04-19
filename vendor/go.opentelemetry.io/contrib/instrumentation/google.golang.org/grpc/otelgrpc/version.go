@@ -16,7 +16,7 @@ package otelgrpc // import "go.opentelemetry.io/contrib/instrumentation/google.g
 
 // Version is the current release version of the gRPC instrumentation.
 func Version() string {
-	return "0.35.0"
+	return "0.40.0"
 	// This string is updated by the pre_release.sh script during release
 }
 

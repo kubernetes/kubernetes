@@ -66,6 +66,17 @@ elif [[ "$#" -ne 0 ]]; then
   die "Unknown argument(s): $*"
 fi
 
+# - Check that generated proto files are up to date.
+if [[ -z "${VET_SKIP_PROTO}" ]]; then
+  PATH="/home/travis/bin:${PATH}" make proto && \
+    git status --porcelain 2>&1 | fail_on_output || \
+    (git status; git --no-pager diff; exit 1)
+fi
+
+if [[ -n "${VET_ONLY_PROTO}" ]]; then
+  exit 0
+fi
+
 # - Ensure all source files contain a copyright message.
 # (Done in two parts because Darwin "git grep" has broken support for compound
 # exclusion matches.)
@@ -93,13 +104,6 @@ git grep '"github.com/envoyproxy/go-control-plane/envoy' -- '*.go' ':(exclude)*.
 
 misspell -error .
 
-# - Check that generated proto files are up to date.
-if [[ -z "${VET_SKIP_PROTO}" ]]; then
-  PATH="/home/travis/bin:${PATH}" make proto && \
-    git status --porcelain 2>&1 | fail_on_output || \
-    (git status; git --no-pager diff; exit 1)
-fi
-
 # - gofmt, goimports, golint (with exceptions for generated code), go vet,
 # go mod tidy.
 # Perform these checks on each module inside gRPC.
@@ -111,7 +115,7 @@ for MOD_FILE in $(find . -name 'go.mod'); do
   goimports -l . 2>&1 | not grep -vE "\.pb\.go"
   golint ./... 2>&1 | not grep -vE "/grpc_testing_not_regenerate/.*\.pb\.go:"
 
-  go mod tidy
+  go mod tidy -compat=1.17
   git status --porcelain 2>&1 | fail_on_output || \
     (git status; git --no-pager diff; exit 1)
   popd
@@ -121,8 +125,9 @@ done
 #
 # TODO(dfawley): don't use deprecated functions in examples or first-party
 # plugins.
+# TODO(dfawley): enable ST1019 (duplicate imports) but allow for protobufs.
 SC_OUT="$(mktemp)"
-staticcheck -go 1.9 -checks 'inherit,-ST1015' ./... > "${SC_OUT}" || true
+staticcheck -go 1.19 -checks 'inherit,-ST1015,-ST1019,-SA1019' ./... > "${SC_OUT}" || true
 # Error if anything other than deprecation warnings are printed.
 not grep -v "is deprecated:.*SA1019" "${SC_OUT}"
 # Only ignore the following deprecated types/fields/functions.
