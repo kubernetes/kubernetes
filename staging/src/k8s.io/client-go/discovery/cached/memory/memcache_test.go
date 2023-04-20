@@ -611,12 +611,12 @@ func TestMemCacheGroupsAndMaybeResources(t *testing.T) {
 		expectedGroupNames := sets.New[string](test.expectedGroupNames...)
 		actualGroupNames := sets.New[string](groupNamesFromList(apiGroupList)...)
 		assert.True(t, expectedGroupNames.Equal(actualGroupNames),
-			"%s: Expected groups (%s), got (%s)", test.name, expectedGroupNames.UnsortedList(), actualGroupNames.UnsortedList())
+			"%s: Expected groups (%s), got (%s)", test.name, sets.List[string](expectedGroupNames), sets.List[string](actualGroupNames))
 		// Test the expected group versions for the aggregated discovery is correct.
 		expectedGroupVersions := sets.New[string](test.expectedGroupVersions...)
 		actualGroupVersions := sets.New[string](groupVersionsFromGroups(apiGroupList)...)
 		assert.True(t, expectedGroupVersions.Equal(actualGroupVersions),
-			"%s: Expected group/versions (%s), got (%s)", test.name, expectedGroupVersions.UnsortedList(), actualGroupVersions.UnsortedList())
+			"%s: Expected group/versions (%s), got (%s)", test.name, sets.List[string](expectedGroupVersions), sets.List[string](actualGroupVersions))
 		// Invalidate the cache and retrieve the server groups and resources again.
 		memClient.Invalidate()
 		assert.False(t, memClient.Fresh())
@@ -627,7 +627,7 @@ func TestMemCacheGroupsAndMaybeResources(t *testing.T) {
 		// Test the expected groups are returned for the aggregated format.
 		actualGroupNames = sets.New[string](groupNamesFromList(apiGroupList)...)
 		assert.True(t, expectedGroupNames.Equal(actualGroupNames),
-			"%s: Expected after invalidation groups (%s), got (%s)", test.name, expectedGroupNames.UnsortedList(), actualGroupNames.UnsortedList())
+			"%s: Expected after invalidation groups (%s), got (%s)", test.name, sets.List[string](expectedGroupNames), sets.List[string](actualGroupNames))
 	}
 }
 
@@ -1137,12 +1137,12 @@ func TestAggregatedMemCacheGroupsAndMaybeResources(t *testing.T) {
 		expectedGroupNames := sets.New[string](test.expectedGroupNames...)
 		actualGroupNames := sets.New[string](groupNamesFromList(apiGroupList)...)
 		assert.True(t, expectedGroupNames.Equal(actualGroupNames),
-			"%s: Expected groups (%s), got (%s)", test.name, expectedGroupNames.UnsortedList(), actualGroupNames.UnsortedList())
+			"%s: Expected groups (%s), got (%s)", test.name, sets.List[string](expectedGroupNames), sets.List[string](actualGroupNames))
 		// Test the expected group versions for the aggregated discovery is correct.
 		expectedGroupVersions := sets.New[string](test.expectedGroupVersions...)
 		actualGroupVersions := sets.New[string](groupVersionsFromGroups(apiGroupList)...)
 		assert.True(t, expectedGroupVersions.Equal(actualGroupVersions),
-			"%s: Expected group/versions (%s), got (%s)", test.name, expectedGroupVersions.UnsortedList(), actualGroupVersions.UnsortedList())
+			"%s: Expected group/versions (%s), got (%s)", test.name, sets.List[string](expectedGroupVersions), sets.List[string](actualGroupVersions))
 		// Test the resources are correct.
 		expectedGVKs := sets.New[string](test.expectedGVKs...)
 		resources := []*metav1.APIResourceList{}
@@ -1151,12 +1151,12 @@ func TestAggregatedMemCacheGroupsAndMaybeResources(t *testing.T) {
 		}
 		actualGVKs := sets.New[string](groupVersionKinds(resources)...)
 		assert.True(t, expectedGVKs.Equal(actualGVKs),
-			"%s: Expected GVKs (%s), got (%s)", test.name, expectedGVKs.UnsortedList(), actualGVKs.UnsortedList())
+			"%s: Expected GVKs (%s), got (%s)", test.name, sets.List[string](expectedGVKs), sets.List[string](actualGVKs))
 		// Test the returned failed GroupVersions are correct.
 		expectedFailedGVs := sets.New[string](test.expectedFailedGVs...)
 		actualFailedGVs := sets.New[string](failedGroupVersions(failedGVs)...)
 		assert.True(t, expectedFailedGVs.Equal(actualFailedGVs),
-			"%s: Expected Failed GroupVersions (%s), got (%s)", test.name, expectedFailedGVs.UnsortedList(), actualFailedGVs.UnsortedList())
+			"%s: Expected Failed GroupVersions (%s), got (%s)", test.name, sets.List[string](expectedFailedGVs), sets.List[string](actualFailedGVs))
 		// Invalidate the cache and retrieve the server groups again.
 		memClient.Invalidate()
 		assert.False(t, memClient.Fresh())
@@ -1165,7 +1165,7 @@ func TestAggregatedMemCacheGroupsAndMaybeResources(t *testing.T) {
 		// Test the expected groups are returned for the aggregated format.
 		actualGroupNames = sets.New[string](groupNamesFromList(apiGroupList)...)
 		assert.True(t, expectedGroupNames.Equal(actualGroupNames),
-			"%s: Expected after invalidation groups (%s), got (%s)", test.name, expectedGroupNames.UnsortedList(), actualGroupNames.UnsortedList())
+			"%s: Expected after invalidation groups (%s), got (%s)", test.name, sets.List[string](expectedGroupNames), sets.List[string](actualGroupNames))
 	}
 }
 
@@ -1430,17 +1430,17 @@ func TestMemCacheAggregatedServerGroups(t *testing.T) {
 		expectedGroupNames := sets.New[string](test.expectedGroupNames...)
 		actualGroupNames := sets.New[string](groupNamesFromList(apiGroupList)...)
 		assert.True(t, expectedGroupNames.Equal(actualGroupNames),
-			"%s: Expected groups (%s), got (%s)", test.name, expectedGroupNames.UnsortedList(), actualGroupNames.UnsortedList())
+			"%s: Expected groups (%s), got (%s)", test.name, sets.List[string](expectedGroupNames), sets.List[string](actualGroupNames))
 		// Test the expected group versions for the aggregated discovery is correct.
 		expectedGroupVersions := sets.New[string](test.expectedGroupVersions...)
 		actualGroupVersions := sets.New[string](groupVersionsFromGroups(apiGroupList)...)
 		assert.True(t, expectedGroupVersions.Equal(actualGroupVersions),
-			"%s: Expected group/versions (%s), got (%s)", test.name, expectedGroupVersions.UnsortedList(), actualGroupVersions.UnsortedList())
+			"%s: Expected group/versions (%s), got (%s)", test.name, sets.List[string](expectedGroupVersions), sets.List[string](actualGroupVersions))
 		// Test the groups preferred version is correct.
 		expectedPreferredVersions := sets.New[string](test.expectedPreferredVersions...)
 		actualPreferredVersions := sets.New[string](preferredVersionsFromList(apiGroupList)...)
 		assert.True(t, expectedPreferredVersions.Equal(actualPreferredVersions),
-			"%s: Expected preferred group/version (%s), got (%s)", test.name, expectedPreferredVersions.UnsortedList(), actualPreferredVersions.UnsortedList())
+			"%s: Expected preferred group/version (%s), got (%s)", test.name, sets.List[string](expectedPreferredVersions), sets.List[string](actualPreferredVersions))
 		// Invalidate the cache and retrieve the server groups again.
 		memCacheClient.Invalidate()
 		assert.False(t, memCacheClient.Fresh())
@@ -1449,7 +1449,7 @@ func TestMemCacheAggregatedServerGroups(t *testing.T) {
 		// Test the expected groups are returned for the aggregated format.
 		actualGroupNames = sets.New[string](groupNamesFromList(apiGroupList)...)
 		assert.True(t, expectedGroupNames.Equal(actualGroupNames),
-			"%s: Expected after invalidation groups (%s), got (%s)", test.name, expectedGroupNames.UnsortedList(), actualGroupNames.UnsortedList())
+			"%s: Expected after invalidation groups (%s), got (%s)", test.name, sets.List[string](expectedGroupNames), sets.List[string](actualGroupNames))
 	}
 }
 

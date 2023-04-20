@@ -88,7 +88,7 @@ func TestMultiIndexKeys(t *testing.T) {
 				found.Insert(item.(*v1.Pod).Name)
 			}
 			if !found.Equal(v) {
-				t.Errorf("missing items, index %s, expected %v but found %v", k, v.UnsortedList(), found.UnsortedList())
+				t.Errorf("missing items, index %s, expected %v but found %v", k, sets.List[string](v), sets.List[string](found))
 			}
 		}
 	}

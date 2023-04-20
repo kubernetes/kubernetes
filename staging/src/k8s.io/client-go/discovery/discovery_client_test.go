@@ -1407,17 +1407,17 @@ func TestAggregatedServerGroups(t *testing.T) {
 		expectedGroupNames := sets.New[string](test.expectedGroupNames...)
 		actualGroupNames := sets.New[string](groupNamesFromList(apiGroupList)...)
 		assert.True(t, expectedGroupNames.Equal(actualGroupNames),
-			"%s: Expected groups (%s), got (%s)", test.name, expectedGroupNames.UnsortedList(), actualGroupNames.UnsortedList())
+			"%s: Expected groups (%s), got (%s)", test.name, sets.List[string](expectedGroupNames), sets.List[string](actualGroupNames))
 		// Test the expected group versions for the aggregated discovery is correct.
 		expectedGroupVersions := sets.New[string](test.expectedGroupVersions...)
 		actualGroupVersions := sets.New[string](groupVersionsFromGroups(apiGroupList)...)
 		assert.True(t, expectedGroupVersions.Equal(actualGroupVersions),
-			"%s: Expected group/versions (%s), got (%s)", test.name, expectedGroupVersions.UnsortedList(), actualGroupVersions.UnsortedList())
+			"%s: Expected group/versions (%s), got (%s)", test.name, sets.List[string](expectedGroupVersions), sets.List[string](actualGroupVersions))
 		// Test the groups preferred version is correct.
 		expectedPreferredVersions := sets.New[string](test.expectedPreferredVersions...)
 		actualPreferredVersions := sets.New[string](preferredVersionsFromList(apiGroupList)...)
 		assert.True(t, expectedPreferredVersions.Equal(actualPreferredVersions),
-			"%s: Expected preferred group/version (%s), got (%s)", test.name, expectedPreferredVersions.UnsortedList(), actualPreferredVersions.UnsortedList())
+			"%s: Expected preferred group/version (%s), got (%s)", test.name, sets.List[string](expectedPreferredVersions), sets.List[string](actualPreferredVersions))
 	}
 }
 
@@ -2005,7 +2005,7 @@ func TestAggregatedServerGroupsAndResources(t *testing.T) {
 		expectedGroupNames := sets.New[string](test.expectedGroupNames...)
 		actualGroupNames := sets.New[string](groupNames(apiGroups)...)
 		assert.True(t, expectedGroupNames.Equal(actualGroupNames),
-			"%s: Expected GVKs (%s), got (%s)", test.name, expectedGroupNames.UnsortedList(), actualGroupNames.UnsortedList())
+			"%s: Expected GVKs (%s), got (%s)", test.name, sets.List[string](expectedGroupNames), sets.List[string](actualGroupNames))
 		// If the core V1 group is returned from /api, it should be the first group.
 		if expectedGroupNames.Has("") {
 			assert.True(t, len(apiGroups) > 0)
@@ -2018,12 +2018,12 @@ func TestAggregatedServerGroupsAndResources(t *testing.T) {
 		expectedGroupVersions := sets.New[string](test.expectedGroupVersions...)
 		actualGroupVersions := sets.New[string](groupVersions(resources)...)
 		assert.True(t, expectedGroupVersions.Equal(actualGroupVersions),
-			"%s: Expected GroupVersions(%s), got (%s)", test.name, expectedGroupVersions.UnsortedList(), actualGroupVersions.UnsortedList())
+			"%s: Expected GroupVersions(%s), got (%s)", test.name, sets.List[string](expectedGroupVersions), sets.List[string](actualGroupVersions))
 		// Test the expected GVKs are returned from the aggregated discovery.
 		expectedGVKs := sets.New[string](test.expectedGVKs...)
 		actualGVKs := sets.New[string](groupVersionKinds(resources)...)
 		assert.True(t, expectedGVKs.Equal(actualGVKs),
-			"%s: Expected GVKs (%s), got (%s)", test.name, expectedGVKs.UnsortedList(), actualGVKs.UnsortedList())
+			"%s: Expected GVKs (%s), got (%s)", test.name, sets.List[string](expectedGVKs), sets.List[string](actualGVKs))
 	}
 }
 
@@ -2143,12 +2143,12 @@ func TestAggregatedServerGroupsAndResourcesWithErrors(t *testing.T) {
 		expectedGroups := sets.New[string](test.expectedGroups...)
 		actualGroups := sets.New[string](groupNames(apiGroups)...)
 		assert.True(t, expectedGroups.Equal(actualGroups),
-			"%s: Expected GVKs (%s), got (%s)", test.name, expectedGroups.UnsortedList(), actualGroups.UnsortedList())
+			"%s: Expected GVKs (%s), got (%s)", test.name, sets.List[string](expectedGroups), sets.List[string](actualGroups))
 		// Next check the returned resources
 		expectedGVKs := sets.New[string](test.expectedResources...)
 		actualGVKs := sets.New[string](groupVersionKinds(resources)...)
 		assert.True(t, expectedGVKs.Equal(actualGVKs),
-			"%s: Expected GVKs (%s), got (%s)", test.name, expectedGVKs.UnsortedList(), actualGVKs.UnsortedList())
+			"%s: Expected GVKs (%s), got (%s)", test.name, sets.List[string](expectedGVKs), sets.List[string](actualGVKs))
 	}
 }
 
@@ -2753,7 +2753,7 @@ func TestAggregatedServerPreferredResources(t *testing.T) {
 		expectedGVKs := sets.New[string](test.expectedGVKs...)
 		actualGVKs := sets.New[string](groupVersionKinds(resources)...)
 		assert.True(t, expectedGVKs.Equal(actualGVKs),
-			"%s: Expected GVKs (%s), got (%s)", test.name, expectedGVKs.UnsortedList(), actualGVKs.UnsortedList())
+			"%s: Expected GVKs (%s), got (%s)", test.name, sets.List[string](expectedGVKs), sets.List[string](actualGVKs))
 	}
 }
 
