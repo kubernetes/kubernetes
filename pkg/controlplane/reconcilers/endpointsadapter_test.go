@@ -163,7 +163,7 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 				t.Errorf("Wrong result from Create. Diff:\n%s", cmp.Diff(testCase.expectedResult, endpoints))
 			}
 
-			err = verifyCreatesAndUpdates(client, testCase.expectCreate, testCase.expectUpdate)
+			err = verifyActions(client, testCase.expectCreate, testCase.expectUpdate, nil)
 			if err != nil {
 				t.Errorf("unexpected error in side effects: %v", err)
 			}
@@ -188,6 +188,7 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 		expectedResult *corev1.Endpoints
 		expectCreate   []runtime.Object
 		expectUpdate   []runtime.Object
+		expectDelete   []runtime.Object
 		initialState   []runtime.Object
 		endpointsParam *corev1.Endpoints
 	}{
@@ -206,11 +207,9 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 			expectedResult: endpoints4,
 			initialState:   []runtime.Object{endpoints4, epSlice4IP},
 			endpointsParam: endpoints4,
-
-			// When AddressType changes, we Delete+Create the EndpointSlice,
-			// so that shows up in expectCreate, not expectUpdate.
-			expectUpdate: []runtime.Object{endpoints4},
-			expectCreate: []runtime.Object{epSlice4IPv4},
+			expectUpdate:   []runtime.Object{endpoints4},
+			expectDelete:   []runtime.Object{epSlice4IP},
+			expectCreate:   []runtime.Object{epSlice4IPv4},
 		},
 		"add-ports-and-ips": {
 			expectedError:  nil,
@@ -269,7 +268,7 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 				t.Errorf("Wrong result from Update. Diff:\n%s", cmp.Diff(testCase.expectedResult, endpoints))
 			}
 
-			err = verifyCreatesAndUpdates(client, testCase.expectCreate, testCase.expectUpdate)
+			err = verifyActions(client, testCase.expectCreate, testCase.expectUpdate, testCase.expectDelete)
 			if err != nil {
 				t.Errorf("unexpected error in side effects: %v", err)
 			}

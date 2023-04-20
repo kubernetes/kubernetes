@@ -327,7 +327,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 				t.Errorf("unexpected error reconciling: %v", err)
 			}
 
-			err = verifyCreatesAndUpdates(clientset, test.expectCreate, test.expectUpdate)
+			err = verifyActions(clientset, test.expectCreate, test.expectUpdate, nil)
 			if err != nil {
 				t.Errorf("unexpected error in side effects: %v", err)
 			}
@@ -401,7 +401,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 				t.Errorf("unexpected error reconciling: %v", err)
 			}
 
-			err = verifyCreatesAndUpdates(clientset, test.expectCreate, test.expectUpdate)
+			err = verifyActions(clientset, test.expectCreate, test.expectUpdate, nil)
 			if err != nil {
 				t.Errorf("unexpected error in side effects: %v", err)
 			}
@@ -513,7 +513,7 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 				t.Errorf("unexpected error reconciling: %v", err)
 			}
 
-			err = verifyCreatesAndUpdates(clientset, nil, test.expectUpdate)
+			err = verifyActions(clientset, nil, test.expectUpdate, nil)
 			if err != nil {
 				t.Errorf("unexpected error in side effects: %v", err)
 			}
@@ -645,7 +645,7 @@ func TestApiserverShutdown(t *testing.T) {
 				}
 			}
 
-			err = verifyCreatesAndUpdates(clientset, nil, test.expectUpdate)
+			err = verifyActions(clientset, nil, test.expectUpdate, nil)
 			if err != nil {
 				t.Errorf("unexpected error in side effects: %v", err)
 			}

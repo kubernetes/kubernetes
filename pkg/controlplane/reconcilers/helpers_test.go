@@ -91,16 +91,19 @@ func makeEndpointSlice(ips []string, ports []corev1.EndpointPort) *discoveryv1.E
 	return slice
 }
 
-func verifyCreatesAndUpdates(fakeClient *fake.Clientset, expectedCreates, expectedUpdates []runtime.Object) error {
+func verifyActions(fakeClient *fake.Clientset, expectedCreates, expectedUpdates, expectedDeletes []runtime.Object) error {
 	errors := []error{}
 
 	updates := []k8stesting.UpdateAction{}
 	creates := []k8stesting.CreateAction{}
+	deletes := []k8stesting.DeleteAction{}
 	for _, action := range fakeClient.Actions() {
 		if action.GetVerb() == "update" {
 			updates = append(updates, action.(k8stesting.UpdateAction))
 		} else if action.GetVerb() == "create" {
 			creates = append(creates, action.(k8stesting.CreateAction))
+		} else if action.GetVerb() == "delete" {
+			deletes = append(deletes, action.(k8stesting.DeleteAction))
 		}
 	}
 
@@ -133,6 +136,33 @@ func verifyCreatesAndUpdates(fakeClient *fake.Clientset, expectedCreates, expect
 		}
 		if !apiequality.Semantic.DeepEqual(expected, actual) {
 			errors = append(errors, fmt.Errorf("update %d has diff:\n%s\n", i+1, cmp.Diff(expected, actual)))
+		}
+	}
+
+	if len(deletes) != len(expectedDeletes) {
+		errors = append(errors, fmt.Errorf("expected %d deletes got %d", len(expectedDeletes), len(deletes)))
+	}
+	for i := 0; i < len(deletes) || i < len(expectedDeletes); i++ {
+		// testing.DeleteAction doesn't include the actual object so we just make sure
+		// that it has the expected resource type and name.
+		var expected, actual string
+		if i < len(deletes) {
+			actual = fmt.Sprintf("%s %s/%s", deletes[i].GetResource().Resource, deletes[i].GetNamespace(), deletes[i].GetName())
+		}
+		if i < len(expectedDeletes) {
+			metaObject := expectedDeletes[i].(metav1.Object)
+			// NB: expectedDeletes[i].GetObjectKind() returns an empty ObjectKind here
+			resource := "unknown type"
+			switch expectedDeletes[i].(type) {
+			case *corev1.Endpoints:
+				resource = "endpoints"
+			case *discoveryv1.EndpointSlice:
+				resource = "endpointslices"
+			}
+			expected = fmt.Sprintf("%s %s/%s", resource, metaObject.GetNamespace(), metaObject.GetName())
+		}
+		if expected != actual {
+			errors = append(errors, fmt.Errorf("expected delete %d to be %q got %q\n", i, expected, actual))
 		}
 	}
 

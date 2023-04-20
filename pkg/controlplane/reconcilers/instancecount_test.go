@@ -210,7 +210,7 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 				t.Errorf("unexpected error reconciling: %v", err)
 			}
 
-			err = verifyCreatesAndUpdates(fakeClient, test.expectCreate, test.expectUpdate)
+			err = verifyActions(fakeClient, test.expectCreate, test.expectUpdate, nil)
 			if err != nil {
 				t.Errorf("unexpected error in side effects: %v", err)
 			}
@@ -264,7 +264,7 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 				t.Errorf("unexpected error reconciling: %v", err)
 			}
 
-			err = verifyCreatesAndUpdates(fakeClient, test.expectCreate, test.expectUpdate)
+			err = verifyActions(fakeClient, test.expectCreate, test.expectUpdate, nil)
 			if err != nil {
 				t.Errorf("unexpected error in side effects: %v", err)
 			}
