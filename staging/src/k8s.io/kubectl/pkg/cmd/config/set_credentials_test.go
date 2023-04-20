@@ -18,6 +18,7 @@ package config
 
 import (
 	"bytes"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"os"
 	"reflect"
 	"testing"
@@ -466,8 +467,8 @@ func (test setCredentialsTest) run(t *testing.T) {
 	pathOptions := clientcmd.NewDefaultPathOptions()
 	pathOptions.GlobalFile = fakeKubeFile.Name()
 	pathOptions.EnvVar = ""
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdConfigSetCredentials(buf, pathOptions)
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
+	cmd := NewCmdConfigSetCredentials(streams, pathOptions)
 	cmd.SetArgs(test.args)
 	cmd.Flags().Parse(test.flags)
 	if err := cmd.Execute(); err != nil {

@@ -17,8 +17,8 @@ limitations under the License.
 package config
 
 import (
-	"bytes"
 	"fmt"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"os"
 	"strings"
 	"testing"
@@ -117,8 +117,8 @@ func (test renameContextTest) run(t *testing.T) {
 		contextName:  test.args[0],
 		newName:      test.args[1],
 	}
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdConfigRenameContext(buf, options.configAccess)
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
+	cmd := NewCmdConfigRenameContext(streams, options.configAccess)
 
 	options.Complete(cmd, test.args, buf)
 	options.Validate()

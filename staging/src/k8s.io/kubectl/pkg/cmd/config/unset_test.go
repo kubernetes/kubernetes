@@ -17,7 +17,7 @@ limitations under the License.
 package config
 
 import (
-	"bytes"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"os"
 	"testing"
 
@@ -117,8 +117,8 @@ func (test unsetConfigTest) run(t *testing.T) {
 	pathOptions := clientcmd.NewDefaultPathOptions()
 	pathOptions.GlobalFile = fakeKubeFile.Name()
 	pathOptions.EnvVar = ""
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdConfigUnset(buf, pathOptions)
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
+	cmd := NewCmdConfigUnset(streams, pathOptions)
 	opts := &unsetOptions{configAccess: pathOptions}
 	err = opts.complete(cmd, test.args)
 	if err == nil {

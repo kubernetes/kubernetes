@@ -17,7 +17,7 @@ limitations under the License.
 package config
 
 import (
-	"bytes"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"os"
 	"testing"
 
@@ -69,8 +69,8 @@ func (test getClustersTest) run(t *testing.T) {
 	pathOptions := clientcmd.NewDefaultPathOptions()
 	pathOptions.GlobalFile = fakeKubeFile.Name()
 	pathOptions.EnvVar = ""
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdConfigGetClusters(buf, pathOptions)
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
+	cmd := NewCmdConfigGetClusters(streams, pathOptions)
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("unexpected error executing command: %v", err)
 	}

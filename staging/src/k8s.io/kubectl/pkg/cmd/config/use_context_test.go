@@ -17,7 +17,7 @@ limitations under the License.
 package config
 
 import (
-	"bytes"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"os"
 	"testing"
 
@@ -82,8 +82,8 @@ func (test useContextTest) run(t *testing.T) {
 	pathOptions := clientcmd.NewDefaultPathOptions()
 	pathOptions.GlobalFile = fakeKubeFile.Name()
 	pathOptions.EnvVar = ""
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdConfigUseContext(buf, pathOptions)
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
+	cmd := NewCmdConfigUseContext(streams, pathOptions)
 	cmd.SetArgs(test.args)
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("unexpected error executing command: %v,kubectl config use-context args: %v", err, test.args)

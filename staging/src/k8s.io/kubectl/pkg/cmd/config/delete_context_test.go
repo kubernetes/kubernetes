@@ -17,8 +17,8 @@ limitations under the License.
 package config
 
 import (
-	"bytes"
 	"fmt"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"os"
 	"reflect"
 	"testing"
@@ -65,10 +65,8 @@ func (test deleteContextTest) run(t *testing.T) {
 	pathOptions := clientcmd.NewDefaultPathOptions()
 	pathOptions.GlobalFile = fakeKubeFile.Name()
 	pathOptions.EnvVar = ""
-
-	buf := bytes.NewBuffer([]byte{})
-	errBuf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdConfigDeleteContext(buf, errBuf, pathOptions)
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
+	cmd := NewCmdConfigDeleteContext(streams, pathOptions)
 	cmd.SetArgs([]string{test.contextToDelete})
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("unexpected error executing command: %v", err)

@@ -17,8 +17,8 @@ limitations under the License.
 package config
 
 import (
-	"bytes"
 	"fmt"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"os"
 	"reflect"
 	"testing"
@@ -66,8 +66,8 @@ func (test deleteClusterTest) run(t *testing.T) {
 	pathOptions.GlobalFile = fakeKubeFile.Name()
 	pathOptions.EnvVar = ""
 
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdConfigDeleteCluster(buf, pathOptions)
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
+	cmd := NewCmdConfigDeleteCluster(streams, pathOptions)
 	cmd.SetArgs([]string{test.clusterToDelete})
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("unexpected error executing command: %v", err)
