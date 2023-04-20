@@ -42,8 +42,8 @@ func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(config 
 
 // generateContainerResources generates platform specific (windows) container resources config for runtime
 func (m *kubeGenericRuntimeManager) generateContainerResources(pod *v1.Pod, container *v1.Container) *runtimeapi.ContainerResources {
-	//TODO: Add windows support
-	return nil
+	// TODO: Add windows support
+	return &runtimeapi.ContainerResources{}
 }
 
 // generateWindowsContainerConfig generates windows container config for kubelet runtime v1.
@@ -134,6 +134,6 @@ func calculateCPUMaximum(cpuLimit *resource.Quantity, cpuCount int64) int64 {
 }
 
 func toKubeContainerResources(statusResources *runtimeapi.ContainerResources) *kubecontainer.ContainerResources {
-	//TODO: Add windows support
+	// TODO: Add windows support
 	return nil
 }

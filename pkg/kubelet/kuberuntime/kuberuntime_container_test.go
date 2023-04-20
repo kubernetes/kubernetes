@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -244,10 +245,12 @@ func TestToKubeContainerStatusWithResources(t *testing.T) {
 	)
 
 	for desc, test := range map[string]struct {
+		os       string
 		input    *runtimeapi.ContainerStatus
 		expected *kubecontainer.Status
 	}{
 		"container reporting cpu and memory": {
+			os: "linux",
 			input: &runtimeapi.ContainerStatus{
 				Id:        cid.ID,
 				Metadata:  meta,
@@ -277,6 +280,7 @@ func TestToKubeContainerStatusWithResources(t *testing.T) {
 			},
 		},
 		"container reporting cpu only": {
+			os: "linux",
 			input: &runtimeapi.ContainerStatus{
 				Id:        cid.ID,
 				Metadata:  meta,
@@ -303,6 +307,7 @@ func TestToKubeContainerStatusWithResources(t *testing.T) {
 			},
 		},
 		"container reporting memory only": {
+			os: "linux",
 			input: &runtimeapi.ContainerStatus{
 				Id:        cid.ID,
 				Metadata:  meta,
@@ -330,6 +335,10 @@ func TestToKubeContainerStatusWithResources(t *testing.T) {
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
+			if test.os != runtime.GOOS {
+				t.Skipf("skipping test %q because it is not intended for %q", desc, runtime.GOOS)
+			}
+
 			actual := toKubeContainerStatus(test.input, cid.Type)
 			assert.Equal(t, test.expected, actual, desc)
 		})
