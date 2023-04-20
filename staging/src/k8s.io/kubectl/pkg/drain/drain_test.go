@@ -331,6 +331,39 @@ func TestDeleteOrEvict(t *testing.T) {
 			h := &Helper{
 				Out:                os.Stdout,
 				GracePeriodSeconds: 10,
+				OnPodDeletionOrEvictionStarted: func(pod *corev1.Pod, usingEviction bool) {
+					if tc.evictionSupported && !tc.disableEviction {
+						if !usingEviction {
+							t.Errorf("%s: OnPodDeletionOrEvictionStarted callback failed while evicting; actual\n\t%v\nexpected\n\t%v", tc.description, usingEviction, !usingEviction)
+						}
+					} else if tc.evictionSupported && tc.disableEviction {
+						if usingEviction {
+							t.Errorf("%s: OnPodDeletionOrEvictionStarted callback failed while deleting; actual\n\t%v\nexpected\n\t%v", tc.description, !usingEviction, usingEviction)
+						}
+					}
+				},
+				OnPodDeletedOrEvicted: func(pod *corev1.Pod, usingEviction bool) {
+					if tc.evictionSupported && !tc.disableEviction {
+						if !usingEviction {
+							t.Errorf("%s: OnPodDeletedOrEvicted callback failed while evicting; actual\n\t%v\nexpected\n\t%v", tc.description, usingEviction, !usingEviction)
+						}
+					} else if tc.evictionSupported && tc.disableEviction {
+						if usingEviction {
+							t.Errorf("%s: OnPodDeletedOrEvicted callback failed while deleting; actual\n\t%v\nexpected\n\t%v", tc.description, !usingEviction, usingEviction)
+						}
+					}
+				},
+				OnPodDeletionOrEvictionFinished: func(pod *corev1.Pod, usingEviction bool, err error) {
+					if tc.evictionSupported && !tc.disableEviction {
+						if !usingEviction {
+							t.Errorf("%s: OnPodDeletionOrEvictionFinished callback failed while evicting; actual\n\t%v\nexpected\n\t%v", tc.description, usingEviction, !usingEviction)
+						}
+					} else if tc.evictionSupported && tc.disableEviction {
+						if usingEviction {
+							t.Errorf("%s: OnPodDeletionOrEvictionFinished callback failed while deleting; actual\n\t%v\nexpected\n\t%v", tc.description, !usingEviction, usingEviction)
+						}
+					}
+				},
 			}
 
 			// Create 4 pods, and try to remove the first 2
