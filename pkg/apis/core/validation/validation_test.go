@@ -8667,11 +8667,17 @@ func TestValidateInitContainers(t *testing.T) {
 			TerminationMessagePolicy: "File",
 		},
 		{
-			Name:                     "container-3-sidecar",
+			Name:                     "container-3-sidecar-with-startup-probe",
 			Image:                    "image",
 			ImagePullPolicy:          "IfNotPresent",
 			TerminationMessagePolicy: "File",
 			RestartPolicy:            &containerRestartPolicyAlways,
+			StartupProbe: &core.Probe{
+				ProbeHandler: core.ProbeHandler{
+					TCPSocket: &core.TCPSocketAction{Port: intstr.FromInt(80)},
+				},
+				SuccessThreshold: 1,
+			},
 		},
 	}
 

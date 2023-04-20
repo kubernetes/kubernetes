@@ -3184,9 +3184,11 @@ func validateInitContainers(containers []core.Container, regularContainers []cor
 		// Apply the validation common to all container types
 		allErrs = append(allErrs, validateContainerCommon(&ctr, volumes, podClaimNames, idxPath, opts)...)
 
+		isSidecar := false
 		// Apply the validation specific to init containers
 		if ctr.RestartPolicy != nil {
 			allErrs = append(allErrs, validateInitContainerRestartPolicy(ctr.RestartPolicy, idxPath.Child("restartPolicy"))...)
+			isSidecar = *ctr.RestartPolicy == core.ContainerRestartPolicyAlways
 		}
 
 		// Names must be unique within regular and init containers. Collisions with ephemeral containers
@@ -3210,7 +3212,7 @@ func validateInitContainers(containers []core.Container, regularContainers []cor
 		if ctr.ReadinessProbe != nil {
 			allErrs = append(allErrs, field.Forbidden(idxPath.Child("readinessProbe"), "may not be set for init containers"))
 		}
-		if ctr.StartupProbe != nil {
+		if ctr.StartupProbe != nil && !isSidecar {
 			allErrs = append(allErrs, field.Forbidden(idxPath.Child("startupProbe"), "may not be set for init containers"))
 		}
 		if len(ctr.ResizePolicy) > 0 {
