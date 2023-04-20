@@ -22,9 +22,7 @@ import (
 	"sync"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	endpointsv1 "k8s.io/kubernetes/pkg/api/v1/endpoints"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // masterCountEndpointReconciler reconciles endpoints based on a specified expected number of
@@ -65,100 +63,53 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(ip net.IP, endpointPo
 		return nil
 	}
 
-	e, err := r.epAdapter.Get()
+	endpointIPs, err := r.epAdapter.Get()
 	if err != nil {
-		e = &corev1.Endpoints{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      r.epAdapter.serviceName,
-				Namespace: r.epAdapter.serviceNamespace,
-			},
-		}
+		return err
 	}
 
-	// Don't use the EndpointSliceMirroring controller to mirror this to
-	// EndpointSlices. This may change in the future.
-	setSkipMirrorTrue(e)
+	// We *always* add our own IP address.
+	ipStr := ip.String()
+	endpointIPs.Insert(ipStr)
 
-	if errors.IsNotFound(err) {
-		// Simply create non-existing endpoints for the service.
-		e.Subsets = []corev1.EndpointSubset{{
-			Addresses: []corev1.EndpointAddress{{IP: ip.String()}},
-			Ports:     endpointPorts,
-		}}
-		return r.epAdapter.Sync(e)
-	}
-
-	// First, determine if the endpoint is in the format we expect (one
-	// subset, ports matching endpointPorts, N IP addresses).
-	formatCorrect, ipCorrect, portsCorrect := checkEndpointSubsetFormat(e, ip.String(), endpointPorts, r.masterCount, reconcilePorts)
-	if !formatCorrect {
-		// Something is egregiously wrong, just re-make the endpoints record.
-		e.Subsets = []corev1.EndpointSubset{{
-			Addresses: []corev1.EndpointAddress{{IP: ip.String()}},
-			Ports:     endpointPorts,
-		}}
-		return r.epAdapter.Sync(e)
-	}
-
-	if !ipCorrect {
-		// We *always* add our own IP address.
-		e.Subsets[0].Addresses = append(e.Subsets[0].Addresses, corev1.EndpointAddress{IP: ip.String()})
-
-		// Lexicographic order is retained by this step.
-		e.Subsets = endpointsv1.RepackSubsets(e.Subsets)
-
-		// If too many IP addresses, remove the ones lexicographically after our
-		// own IP address.  Given the requirements stated at the top of
-		// this function, this should cause the list of IP addresses to
-		// become eventually correct.
-		if addrs := &e.Subsets[0].Addresses; len(*addrs) > r.masterCount {
-			// addrs is a pointer because we're going to mutate it.
-			for i, addr := range *addrs {
-				if addr.IP == ip.String() {
-					for len(*addrs) > r.masterCount {
-						// wrap around if necessary.
-						remove := (i + 1) % len(*addrs)
-						*addrs = append((*addrs)[:remove], (*addrs)[remove+1:]...)
-					}
-					break
+	// If we want M IPs and have N where N>M, then remove the (N-M) IPs immediately
+	// following our own in the list (wrapping back around to the start if necessary).
+	// Given the requirements stated at the top of this function, this should cause
+	// the list of IP addresses to become eventually correct.
+	if len(endpointIPs) > r.masterCount {
+		sortedIPs := sets.List(endpointIPs)
+		for i := range sortedIPs {
+			if sortedIPs[i] == ipStr {
+				for len(endpointIPs) > r.masterCount {
+					// wrap around if necessary.
+					remove := (i + 1) % len(sortedIPs)
+					endpointIPs.Delete(sortedIPs[remove])
 				}
+				break
 			}
 		}
 	}
-	if !portsCorrect {
-		// Reset ports.
-		e.Subsets[0].Ports = endpointPorts
-	}
-	return r.epAdapter.Sync(e)
+
+	return r.epAdapter.Sync(endpointIPs, endpointPorts, reconcilePorts)
 }
 
 func (r *masterCountEndpointReconciler) RemoveEndpoints(ip net.IP, endpointPorts []corev1.EndpointPort) error {
 	r.reconcilingLock.Lock()
 	defer r.reconcilingLock.Unlock()
 
-	e, err := r.epAdapter.Get()
+	endpointIPs, err := r.epAdapter.Get()
 	if err != nil {
-		if errors.IsNotFound(err) {
-			// Endpoint doesn't exist
-			return nil
-		}
 		return err
 	}
 
-	if len(e.Subsets) == 0 {
-		// no action is needed to remove the endpoint
+	ipStr := ip.String()
+	if len(endpointIPs) == 0 || !endpointIPs.Has(ipStr) {
+		// Nothing to do
 		return nil
 	}
-	// Remove our IP from the list of addresses
-	new := []corev1.EndpointAddress{}
-	for _, addr := range e.Subsets[0].Addresses {
-		if addr.IP != ip.String() {
-			new = append(new, addr)
-		}
-	}
-	e.Subsets[0].Addresses = new
-	e.Subsets = endpointsv1.RepackSubsets(e.Subsets)
-	return r.epAdapter.Sync(e)
+
+	endpointIPs.Delete(ipStr)
+	return r.epAdapter.Sync(endpointIPs, endpointPorts, false)
 }
 
 func (r *masterCountEndpointReconciler) StopReconciling() {
@@ -168,38 +119,4 @@ func (r *masterCountEndpointReconciler) StopReconciling() {
 }
 
 func (r *masterCountEndpointReconciler) Destroy() {
-}
-
-// Determine if the endpoint is in the format ReconcileEndpoints expects.
-//
-// Return values:
-//   - formatCorrect is true if exactly one subset is found.
-//   - ipCorrect is true when current master's IP is found and the number
-//     of addresses is less than or equal to the master count.
-//   - portsCorrect is true when endpoint ports exactly match provided ports.
-//     portsCorrect is only evaluated when reconcilePorts is set to true.
-func checkEndpointSubsetFormat(e *corev1.Endpoints, ip string, ports []corev1.EndpointPort, count int, reconcilePorts bool) (formatCorrect bool, ipCorrect bool, portsCorrect bool) {
-	if len(e.Subsets) != 1 {
-		return false, false, false
-	}
-	sub := &e.Subsets[0]
-	portsCorrect = true
-	if reconcilePorts {
-		if len(sub.Ports) != len(ports) {
-			portsCorrect = false
-		}
-		for i, port := range ports {
-			if len(sub.Ports) <= i || port != sub.Ports[i] {
-				portsCorrect = false
-				break
-			}
-		}
-	}
-	for _, addr := range sub.Addresses {
-		if addr.IP == ip {
-			ipCorrect = len(sub.Addresses) <= count
-			break
-		}
-	}
-	return true, ipCorrect, portsCorrect
 }

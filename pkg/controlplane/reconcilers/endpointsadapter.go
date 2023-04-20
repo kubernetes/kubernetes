@@ -24,6 +24,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1"
 	"k8s.io/klog/v2"
@@ -51,19 +52,40 @@ func NewEndpointsAdapter(endpointClient corev1client.EndpointsGetter, endpointSl
 	}
 }
 
-// Get returns the Endpoints object if it exists, and an error if there is any.
-func (adapter *EndpointsAdapter) Get() (*corev1.Endpoints, error) {
-	return adapter.endpointClient.Endpoints(adapter.serviceNamespace).Get(context.TODO(), adapter.serviceName, metav1.GetOptions{})
+// Get returns the IPs from the existing apiserver Endpoints/EndpointSlice objects. If an
+// error (beside "not found") occurs fetching the data, that error will be returned.
+func (adapter *EndpointsAdapter) Get() (sets.Set[string], error) {
+	ips := sets.New[string]()
+
+	endpoints, err := adapter.endpointClient.Endpoints(adapter.serviceNamespace).Get(context.TODO(), adapter.serviceName, metav1.GetOptions{})
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return ips, nil
+		}
+		return nil, err
+	}
+
+	if len(endpoints.Subsets) == 1 {
+		for _, addr := range endpoints.Subsets[0].Addresses {
+			ips.Insert(addr.IP)
+		}
+	}
+	return ips, nil
 }
 
-// Sync creates or updates the Endpoints and EndpointSlice objects. If an error occurs it
-// will be returned.
-func (adapter *EndpointsAdapter) Sync(endpoints *corev1.Endpoints) error {
+// Sync updates the apiserver Endpoints/EndpointSlice objects with the new set of IPs. If
+// reconcilePorts is true it will also ensure that the objects have the correct ports. If
+// an error occurs while updating, that error will be returned.
+func (adapter *EndpointsAdapter) Sync(ips sets.Set[string], endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
 	// Sync Endpoints
 	currentEndpoints, err := adapter.endpointClient.Endpoints(adapter.serviceNamespace).Get(context.TODO(), adapter.serviceName, metav1.GetOptions{})
-	if err != nil && !errors.IsNotFound(err) {
-		return err
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return err
+		}
+		currentEndpoints = nil
 	}
+	endpoints := adapter.updateEndpoints(currentEndpoints, ips, endpointPorts, reconcilePorts)
 
 	if currentEndpoints == nil {
 		_, err = adapter.endpointClient.Endpoints(endpoints.Namespace).Create(context.TODO(), endpoints, metav1.CreateOptions{})
@@ -78,8 +100,11 @@ func (adapter *EndpointsAdapter) Sync(endpoints *corev1.Endpoints) error {
 
 	// Sync EndpointSlice
 	currentEndpointSlice, err := adapter.endpointSliceClient.EndpointSlices(adapter.serviceNamespace).Get(context.TODO(), adapter.serviceName, metav1.GetOptions{})
-	if err != nil && !errors.IsNotFound(err) {
-		return err
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return err
+		}
+		currentEndpointSlice = nil
 	}
 
 	endpointSlice := endpointSliceFromEndpoints(endpoints)
@@ -101,6 +126,45 @@ func (adapter *EndpointsAdapter) Sync(endpoints *corev1.Endpoints) error {
 		_, err = adapter.endpointSliceClient.EndpointSlices(endpointSlice.Namespace).Update(context.TODO(), endpointSlice, metav1.UpdateOptions{})
 	}
 	return err
+}
+
+// updateEndpoints updates endpoints to reflect ips and (optionally) endpointPorts
+func (adapter *EndpointsAdapter) updateEndpoints(currentEndpoints *corev1.Endpoints, ips sets.Set[string], endpointPorts []corev1.EndpointPort, reconcilePorts bool) *corev1.Endpoints {
+	var endpoints *corev1.Endpoints
+
+	if currentEndpoints != nil {
+		endpoints = currentEndpoints.DeepCopy()
+	} else {
+		endpoints = &corev1.Endpoints{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      adapter.serviceName,
+				Namespace: adapter.serviceNamespace,
+			},
+		}
+	}
+
+	// Ensure correct labels
+	endpoints.Labels = map[string]string{
+		discovery.LabelSkipMirror: "true",
+	}
+	// Ensure correct format
+	if len(endpoints.Subsets) != 1 {
+		endpoints.Subsets = make([]corev1.EndpointSubset, 1)
+	}
+
+	// Set addresses
+	sortedIPs := sets.List(ips)
+	endpoints.Subsets[0].Addresses = make([]corev1.EndpointAddress, len(sortedIPs))
+	for i := range sortedIPs {
+		endpoints.Subsets[0].Addresses[i].IP = sortedIPs[i]
+	}
+
+	// Set ports
+	if len(endpoints.Subsets[0].Ports) == 0 || (reconcilePorts && !apiequality.Semantic.DeepEqual(endpoints.Subsets[0].Ports, endpointPorts)) {
+		endpoints.Subsets[0].Ports = endpointPorts
+	}
+
+	return endpoints
 }
 
 // endpointSliceFromEndpoints generates an EndpointSlice from an Endpoints
@@ -178,18 +242,4 @@ func allAddressesIPv6(addresses []corev1.EndpointAddress) bool {
 	}
 
 	return true
-}
-
-// setSkipMirrorTrue sets endpointslice.kubernetes.io/skip-mirror to true. It
-// returns true if this has resulted in a change to the Endpoints resource.
-func setSkipMirrorTrue(e *corev1.Endpoints) bool {
-	skipMirrorVal, ok := e.Labels[discovery.LabelSkipMirror]
-	if !ok || skipMirrorVal != "true" {
-		if e.Labels == nil {
-			e.Labels = map[string]string{}
-		}
-		e.Labels[discovery.LabelSkipMirror] = "true"
-		return true
-	}
-	return false
 }

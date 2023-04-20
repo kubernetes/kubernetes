@@ -32,15 +32,14 @@ import (
 	"k8s.io/klog/v2"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	storagefactory "k8s.io/apiserver/pkg/storage/storagebackend/factory"
-	endpointsv1 "k8s.io/kubernetes/pkg/api/v1/endpoints"
 )
 
 // Leases is an interface which assists in managing the set of active masters
@@ -192,26 +191,6 @@ func (r *leaseEndpointReconciler) ReconcileEndpoints(ip net.IP, endpointPorts []
 // doReconcile can be called from ReconcileEndpoints() or RemoveEndpoints().
 // it is NOT SAFE to call it from multiple goroutines.
 func (r *leaseEndpointReconciler) doReconcile(endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
-	e, err := r.epAdapter.Get()
-	if err != nil {
-		if !errors.IsNotFound(err) {
-			return err
-		}
-
-		// there are no endpoints and we should stop reconciling
-		if r.stopReconcilingCalled.Load() {
-			return nil
-		}
-
-		e = &corev1.Endpoints{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      r.epAdapter.serviceName,
-				Namespace: r.epAdapter.serviceNamespace,
-			},
-		}
-	}
-
-	// ... and the list of master IP keys from etcd
 	masterIPs, err := r.masterLeases.ListLeases()
 	if err != nil {
 		return err
@@ -226,91 +205,7 @@ func (r *leaseEndpointReconciler) doReconcile(endpointPorts []corev1.EndpointPor
 		return fmt.Errorf("no API server IP addresses were listed in storage, refusing to erase all endpoints for the kubernetes Service")
 	}
 
-	// Don't use the EndpointSliceMirroring controller to mirror this to
-	// EndpointSlices. This may change in the future.
-	setSkipMirrorTrue(e)
-
-	// Next, we compare the current list of endpoints with the list of master IP keys
-	formatCorrect, ipCorrect, portsCorrect := checkEndpointSubsetFormatWithLease(e, masterIPs, endpointPorts, reconcilePorts)
-
-	if !formatCorrect {
-		// Something is egregiously wrong, just re-make the endpoints record.
-		e.Subsets = []corev1.EndpointSubset{{
-			Addresses: []corev1.EndpointAddress{},
-			Ports:     endpointPorts,
-		}}
-	}
-
-	if !formatCorrect || !ipCorrect {
-		// repopulate the addresses according to the expected IPs from etcd
-		e.Subsets[0].Addresses = make([]corev1.EndpointAddress, len(masterIPs))
-		for ind, ip := range masterIPs {
-			e.Subsets[0].Addresses[ind] = corev1.EndpointAddress{IP: ip}
-		}
-
-		// Lexicographic order is retained by this step.
-		e.Subsets = endpointsv1.RepackSubsets(e.Subsets)
-	}
-
-	if len(e.Subsets) != 0 && !portsCorrect {
-		// Reset ports.
-		e.Subsets[0].Ports = endpointPorts
-	}
-
-	return r.epAdapter.Sync(e)
-}
-
-// checkEndpointSubsetFormatWithLease determines if the endpoint is in the
-// format ReconcileEndpoints expects when the controller is using leases.
-//
-// Return values:
-//   - formatCorrect is true if exactly one subset is found.
-//   - ipsCorrect when the addresses in the endpoints match the expected addresses list
-//   - portsCorrect is true when endpoint ports exactly match provided ports.
-//     portsCorrect is only evaluated when reconcilePorts is set to true.
-func checkEndpointSubsetFormatWithLease(e *corev1.Endpoints, expectedIPs []string, ports []corev1.EndpointPort, reconcilePorts bool) (formatCorrect bool, ipsCorrect bool, portsCorrect bool) {
-	if len(e.Subsets) != 1 {
-		return false, false, false
-	}
-	sub := &e.Subsets[0]
-	portsCorrect = true
-	if reconcilePorts {
-		if len(sub.Ports) != len(ports) {
-			portsCorrect = false
-		} else {
-			for i, port := range ports {
-				if port != sub.Ports[i] {
-					portsCorrect = false
-					break
-				}
-			}
-		}
-	}
-
-	ipsCorrect = true
-	if len(sub.Addresses) != len(expectedIPs) {
-		ipsCorrect = false
-	} else {
-		// check the actual content of the addresses
-		// present addrs is used as a set (the keys) and to indicate if a
-		// value was already found (the values)
-		presentAddrs := make(map[string]bool, len(expectedIPs))
-		for _, ip := range expectedIPs {
-			presentAddrs[ip] = false
-		}
-
-		// uniqueness is assumed amongst all Addresses.
-		for _, addr := range sub.Addresses {
-			if alreadySeen, ok := presentAddrs[addr.IP]; alreadySeen || !ok {
-				ipsCorrect = false
-				break
-			}
-
-			presentAddrs[addr.IP] = true
-		}
-	}
-
-	return true, ipsCorrect, portsCorrect
+	return r.epAdapter.Sync(sets.New(masterIPs...), endpointPorts, reconcilePorts)
 }
 
 func (r *leaseEndpointReconciler) RemoveEndpoints(ip net.IP, endpointPorts []corev1.EndpointPort) error {

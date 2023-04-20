@@ -25,37 +25,37 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/fake"
 	utilnet "k8s.io/utils/net"
 )
 
 func TestEndpointsAdapterGet(t *testing.T) {
 	endpoints1, epSlice1 := generateEndpointsAndSlice([]int{80, 443}, []string{"10.1.2.3", "10.1.2.4"})
+	ips1 := sets.New("10.1.2.3", "10.1.2.4")
 
 	testCases := map[string]struct {
 		initialState []runtime.Object
 
-		expectedError     error
-		expectedEndpoints *corev1.Endpoints
+		expectedError error
+		expectedIPs   sets.Set[string]
 	}{
 		"single-existing-endpoints": {
 			initialState: []runtime.Object{endpoints1, epSlice1},
 
-			expectedEndpoints: endpoints1,
+			expectedIPs: ips1,
 		},
 		"endpoints exists, endpointslice does not": {
 			initialState: []runtime.Object{endpoints1},
 
-			expectedEndpoints: endpoints1,
+			expectedIPs: ips1,
 		},
 		"endpointslice exists, endpoints does not": {
 			initialState: []runtime.Object{epSlice1},
 
-			expectedError: errors.NewNotFound(schema.GroupResource{Group: "", Resource: "endpoints"}, testServiceName),
+			expectedIPs: sets.New[string](),
 		},
 	}
 
@@ -64,14 +64,14 @@ func TestEndpointsAdapterGet(t *testing.T) {
 			client := fake.NewSimpleClientset(testCase.initialState...)
 			epAdapter := NewEndpointsAdapter(client.CoreV1(), client.DiscoveryV1(), testServiceNamespace, testServiceName)
 
-			endpoints, err := epAdapter.Get()
+			ips, err := epAdapter.Get()
 
 			if !apiequality.Semantic.DeepEqual(testCase.expectedError, err) {
 				t.Errorf("Expected error: %v, got: %v", testCase.expectedError, err)
 			}
 
-			if !apiequality.Semantic.DeepEqual(endpoints, testCase.expectedEndpoints) {
-				t.Errorf("Wrong result from Get. Diff:\n%s", cmp.Diff(testCase.expectedEndpoints, endpoints))
+			if !apiequality.Semantic.DeepEqual(ips, testCase.expectedIPs) {
+				t.Errorf("Wrong result from Get. Diff:\n%s", cmp.Diff(testCase.expectedIPs, ips))
 			}
 		})
 	}
@@ -79,18 +79,26 @@ func TestEndpointsAdapterGet(t *testing.T) {
 
 func TestEndpointsAdapterSync(t *testing.T) {
 	endpoints1, epSlice1 := generateEndpointsAndSlice([]int{80}, []string{"10.1.2.3", "10.1.2.4"})
+	ips1 := sets.New("10.1.2.3", "10.1.2.4")
+	ports1 := endpoints1.Subsets[0].Ports
+
 	endpoints2, epSlice2 := generateEndpointsAndSlice([]int{80, 443}, []string{"10.1.2.3", "10.1.2.4", "10.1.2.5"})
+	ips2 := sets.New("10.1.2.3", "10.1.2.4", "10.1.2.5")
+	ports2 := endpoints2.Subsets[0].Ports
 
 	endpointsV6, epSliceV6 := generateEndpointsAndSlice([]int{80}, []string{"1234::5678", "1234::abcd"})
+	ipsV6 := sets.New("1234::5678", "1234::abcd")
 
 	endpointsDual, _ := generateEndpointsAndSlice([]int{80}, []string{"10.1.2.3", "10.1.2.4", "1234::5678", "1234::abcd"})
+	ipsDual := sets.New("10.1.2.3", "10.1.2.4", "1234::5678", "1234::abcd")
 
 	_, epSlice1Deprecated := generateEndpointsAndSlice([]int{80}, []string{"10.1.3", "10.1.2.4"})
 	epSlice1Deprecated.AddressType = discovery.AddressType("IP")
 
 	testCases := map[string]struct {
-		initialState   []runtime.Object
-		endpointsParam *corev1.Endpoints
+		initialState []runtime.Object
+		ipsParam     sets.Set[string]
+		portsParam   []corev1.EndpointPort
 
 		expectedError error
 		expectCreate  []runtime.Object
@@ -100,8 +108,9 @@ func TestEndpointsAdapterSync(t *testing.T) {
 		"single-endpoint": {
 			// If the Endpoints/EndpointSlice do not exist, they will be
 			// created.
-			initialState:   []runtime.Object{},
-			endpointsParam: endpoints1,
+			initialState: []runtime.Object{},
+			ipsParam:     ips1,
+			portsParam:   ports1,
 
 			expectCreate: []runtime.Object{endpoints1, epSlice1},
 		},
@@ -110,8 +119,9 @@ func TestEndpointsAdapterSync(t *testing.T) {
 			// erroneously tries to create a dual-stack Endpoints, we will
 			// accept the erroneous Endpoints but create a single-stack IPv4
 			// EndpointSlice.
-			initialState:   []runtime.Object{},
-			endpointsParam: endpointsDual,
+			initialState: []runtime.Object{},
+			ipsParam:     ipsDual,
+			portsParam:   ports1,
 
 			expectCreate: []runtime.Object{endpointsDual, epSlice1},
 		},
@@ -119,24 +129,27 @@ func TestEndpointsAdapterSync(t *testing.T) {
 			// If the Endpoints/EndpointSlice do not exist, and the reconciler
 			// creates a single-stack IPv6 Endpoints, we will create a
 			// single-stack IPv6 EndpointSlice.
-			initialState:   []runtime.Object{},
-			endpointsParam: endpointsV6,
+			initialState: []runtime.Object{},
+			ipsParam:     ipsV6,
+			portsParam:   ports1,
 
 			expectCreate: []runtime.Object{endpointsV6, epSliceV6},
 		},
 		"existing-endpointslice-correct": {
 			// No error when we need to create the Endpoints but the correct
 			// EndpointSlice already exists
-			initialState:   []runtime.Object{epSlice1},
-			endpointsParam: endpoints1,
+			initialState: []runtime.Object{epSlice1},
+			ipsParam:     ips1,
+			portsParam:   ports1,
 
 			expectCreate: []runtime.Object{endpoints1},
 		},
 		"existing-endpointslice-incorrect": {
 			// No error when we need to create the Endpoints but an incorrect
 			// EndpointSlice already exists
-			initialState:   []runtime.Object{epSlice1},
-			endpointsParam: endpoints2,
+			initialState: []runtime.Object{epSlice1},
+			ipsParam:     ips2,
+			portsParam:   ports2,
 
 			expectCreate: []runtime.Object{endpoints2},
 			expectUpdate: []runtime.Object{epSlice2},
@@ -144,15 +157,17 @@ func TestEndpointsAdapterSync(t *testing.T) {
 		"single-existing-endpoints-no-change": {
 			// If the Endpoints/EndpointSlice already exist and are correct,
 			// then Sync will do nothing
-			initialState:   []runtime.Object{endpoints1, epSlice1},
-			endpointsParam: endpoints1,
+			initialState: []runtime.Object{endpoints1, epSlice1},
+			ipsParam:     ips1,
+			portsParam:   ports1,
 		},
 		"existing-endpointslice-replaced-with-updated-ipv4-address-type": {
 			// If an EndpointSlice with deprecated "IP" address type exists,
 			// it is deleted and replaced with one that has "IPv4" address
 			// type.
-			initialState:   []runtime.Object{endpoints1, epSlice1Deprecated},
-			endpointsParam: endpoints1,
+			initialState: []runtime.Object{endpoints1, epSlice1Deprecated},
+			ipsParam:     ips1,
+			portsParam:   ports1,
 
 			expectDelete: []runtime.Object{epSlice1Deprecated},
 			expectCreate: []runtime.Object{epSlice1},
@@ -160,32 +175,36 @@ func TestEndpointsAdapterSync(t *testing.T) {
 		"add-ports-and-ips": {
 			// If we add ports/IPs to the Endpoints they will be added to
 			// the EndpointSlice.
-			initialState:   []runtime.Object{endpoints1, epSlice1},
-			endpointsParam: endpoints2,
+			initialState: []runtime.Object{endpoints1, epSlice1},
+			ipsParam:     ips2,
+			portsParam:   ports2,
 
 			expectUpdate: []runtime.Object{endpoints2, epSlice2},
 		},
 		"endpoints-correct-endpointslice-wrong": {
 			// If the Endpoints is correct and the EndpointSlice is wrong,
 			// Sync will update the EndpointSlice.
-			initialState:   []runtime.Object{endpoints2, epSlice1},
-			endpointsParam: endpoints2,
+			initialState: []runtime.Object{endpoints2, epSlice1},
+			ipsParam:     ips2,
+			portsParam:   ports2,
 
 			expectUpdate: []runtime.Object{epSlice2},
 		},
 		"endpointslice-correct-endpoints-wrong": {
 			// If the EndpointSlice is correct and the Endpoints is wrong,
 			// Sync will update the Endpoints.
-			initialState:   []runtime.Object{endpoints1, epSlice2},
-			endpointsParam: endpoints2,
+			initialState: []runtime.Object{endpoints1, epSlice2},
+			ipsParam:     ips2,
+			portsParam:   ports2,
 
 			expectUpdate: []runtime.Object{endpoints2},
 		},
 		"missing-endpointslice": {
 			// No error when we need to update the Endpoints but the
 			// EndpointSlice doesn't exist
-			initialState:   []runtime.Object{endpoints2},
-			endpointsParam: endpoints1,
+			initialState: []runtime.Object{endpoints2},
+			ipsParam:     ips1,
+			portsParam:   ports1,
 
 			expectUpdate: []runtime.Object{endpoints1},
 			expectCreate: []runtime.Object{epSlice1},
@@ -197,7 +216,7 @@ func TestEndpointsAdapterSync(t *testing.T) {
 			client := fake.NewSimpleClientset(testCase.initialState...)
 			epAdapter := NewEndpointsAdapter(client.CoreV1(), client.DiscoveryV1(), testServiceNamespace, testServiceName)
 
-			err := epAdapter.Sync(testCase.endpointsParam)
+			err := epAdapter.Sync(testCase.ipsParam, testCase.portsParam, true)
 			if !apiequality.Semantic.DeepEqual(testCase.expectedError, err) {
 				t.Errorf("Expected error: %v, got: %v", testCase.expectedError, err)
 			}
