@@ -93,6 +93,7 @@ STORAGE_BACKEND=${STORAGE_BACKEND:-"etcd3"}
 STORAGE_MEDIA_TYPE=${STORAGE_MEDIA_TYPE:-"application/vnd.kubernetes.protobuf"}
 # preserve etcd data. you also need to set ETCD_DIR.
 PRESERVE_ETCD="${PRESERVE_ETCD:-false}"
+ENABLE_TRACING=${ENABLE_TRACING:-false}
 
 # enable Kubernetes-CSI snapshotter
 ENABLE_CSI_SNAPSHOTTER=${ENABLE_CSI_SNAPSHOTTER:-false}
@@ -501,6 +502,13 @@ function start_apiserver {
     fi
 
     if [[ "${REUSE_CERTS}" != true ]]; then
+      # Clean previous dynamic certs
+      # This file is owned by root, so we can't always overwrite it (depends if
+      # we run the script as root or not). Let's remove it, that is something we
+      # can always do: either we have write permissions as a user in CERT_DIR or
+      # we run the rm with sudo.
+      ${CONTROLPLANE_SUDO} rm -f "${CERT_DIR}"/kubelet-rotated.kubeconfig
+
       # Create Certs
       generate_certs
     fi
@@ -655,8 +663,9 @@ function start_cloud_controller_manager {
     fi
 
     CLOUD_CTLRMGR_LOG=${LOG_DIR}/cloud-controller-manager.log
+    # shellcheck disable=SC2086
     ${CONTROLPLANE_SUDO} "${EXTERNAL_CLOUD_PROVIDER_BINARY:-"${GO_OUT}/cloud-controller-manager"}" \
-      "${CLOUD_CTLRMGR_FLAGS}" \
+      ${CLOUD_CTLRMGR_FLAGS} \
       --v="${LOG_LEVEL}" \
       --vmodule="${LOG_SPEC}" \
       --feature-gates="${FEATURE_GATES}" \
@@ -753,7 +762,7 @@ staticPodPath: "${POD_MANIFEST_PATH}"
 resolvConf: "${KUBELET_RESOLV_CONF}"
 EOF
 
-    if [[ "$FEATURE_GATES" == *KubeletTracing=true* ]]; then
+  if [[ "$ENABLE_TRACING" = true ]]; then
         cat <<EOF >> "${TMP_DIR}"/kubelet.yaml
 tracing:
   endpoint: localhost:4317 # the default value

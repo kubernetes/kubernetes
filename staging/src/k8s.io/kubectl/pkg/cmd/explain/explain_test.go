@@ -22,10 +22,9 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/meta"
 	sptest "k8s.io/apimachinery/pkg/util/strategicpatch/testing"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/discovery"
 	openapiclient "k8s.io/client-go/openapi"
 	"k8s.io/client-go/rest"
@@ -58,8 +57,8 @@ func TestExplainInvalidArgs(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
-	opts := explain.NewExplainOptions("kubectl", genericclioptions.NewTestIOStreamsDiscard())
-	cmd := explain.NewCmdExplain("kubectl", tf, genericclioptions.NewTestIOStreamsDiscard())
+	opts := explain.NewExplainOptions("kubectl", genericiooptions.NewTestIOStreamsDiscard())
+	cmd := explain.NewCmdExplain("kubectl", tf, genericiooptions.NewTestIOStreamsDiscard())
 	err := opts.Complete(tf, cmd, []string{})
 	if err != nil {
 		t.Fatalf("unexpected error %v", err)
@@ -85,8 +84,8 @@ func TestExplainNotExistResource(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
-	opts := explain.NewExplainOptions("kubectl", genericclioptions.NewTestIOStreamsDiscard())
-	cmd := explain.NewCmdExplain("kubectl", tf, genericclioptions.NewTestIOStreamsDiscard())
+	opts := explain.NewExplainOptions("kubectl", genericiooptions.NewTestIOStreamsDiscard())
+	cmd := explain.NewCmdExplain("kubectl", tf, genericiooptions.NewTestIOStreamsDiscard())
 	err := opts.Complete(tf, cmd, []string{"foo"})
 	if err != nil {
 		t.Fatalf("unexpected error %v", err)
@@ -209,7 +208,7 @@ func runExplainTestCases(t *testing.T, cases []explainTestCase) {
 	tf.OpenAPISchemaFunc = FakeOpenAPISchema.OpenAPISchemaFn
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
 
 	type catchFatal error
 
@@ -276,23 +275,5 @@ func runExplainTestCases(t *testing.T, cases []explainTestCase) {
 		})
 
 		buf.Reset()
-	}
-}
-
-func TestAlphaEnablement(t *testing.T) {
-	alphas := map[cmdutil.FeatureGate]string{
-		cmdutil.ExplainOpenapiV3: "output",
-	}
-	for feature, flag := range alphas {
-		f := cmdtesting.NewTestFactory()
-		defer f.Cleanup()
-
-		cmd := explain.NewCmdExplain("kubectl", f, genericclioptions.NewTestIOStreamsDiscard())
-		require.Nil(t, cmd.Flags().Lookup(flag), "flag %q should not be registered without the %q feature enabled", flag, feature)
-
-		cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{feature}, t, func(t *testing.T) {
-			cmd := explain.NewCmdExplain("kubectl", f, genericclioptions.NewTestIOStreamsDiscard())
-			require.NotNil(t, cmd.Flags().Lookup(flag), "flag %q should be registered with the %q feature enabled", flag, feature)
-		})
 	}
 }

@@ -247,9 +247,6 @@ aliases:
     - bobbypage
     - pacoxu
     - bart0sh
-  sig-network-driver-approvers:
-    - dcbw
-    - freehan
   sig-network-approvers:
     - andrewsykim
     - aojea
@@ -317,32 +314,40 @@ aliases:
   # - DirectXMan12
 
   api-approvers:
+    - deads2k
     - lavalamp
+    - msau42
     - smarterclayton
     - thockin
     - liggitt
   # subsets of api-approvers by sig area to help focus approval requests to those with domain knowledge
   sig-api-machinery-api-approvers:
+    - deads2k
     - lavalamp
     - liggitt
     - smarterclayton
   sig-apps-api-approvers:
+    - deads2k
     - lavalamp
     - liggitt
     - smarterclayton
   sig-auth-api-approvers:
+    - deads2k
     - liggitt
     - smarterclayton
   sig-cli-api-approvers:
+    - deads2k
     - liggitt
     - smarterclayton
   sig-cloud-provider-api-approvers:
     - liggitt
     - thockin
   sig-cluster-lifecycle-api-approvers:
+    - deads2k
     - liggitt
     - smarterclayton
   sig-cluster-lifecycle-leads:
+    - CecileRobertMichon
     - fabriziopandini
     - justinsb
     - neolit123
@@ -356,10 +361,12 @@ aliases:
     - danwinship
     - thockin
   sig-node-api-approvers:
+    - msau42
     - smarterclayton
     - thockin
   sig-scheduling-api-approvers:
     - lavalamp
+    - msau42
     - smarterclayton
     - thockin
   sig-security-approvers:
@@ -370,6 +377,7 @@ aliases:
     - tabbysable
   sig-storage-api-approvers:
     - liggitt
+    - msau42
     - thockin
   sig-windows-api-approvers:
     - smarterclayton
@@ -431,6 +439,10 @@ aliases:
     - mrbobbytables
     - cblecker
     - nikhita
+    - palnabarun
+    - kaslin
+    - MadhavJivrajani
+    - Priyankasaggu11929
   sig-docs-approvers:
     - jimangel
     - kbhawkey

@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	v1 "k8s.io/client-go/kubernetes/typed/certificates/v1"
@@ -40,7 +41,7 @@ import (
 )
 
 // NewCmdCertificate returns `certificate` Cobra command
-func NewCmdCertificate(restClientGetter genericclioptions.RESTClientGetter, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdCertificate(restClientGetter genericclioptions.RESTClientGetter, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "certificate SUBCOMMAND",
 		DisableFlagsInUseLine: true,
@@ -70,11 +71,11 @@ type CertificateOptions struct {
 	certificatesV1Client v1.CertificatesV1Interface
 	builder              *resource.Builder
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewCertificateOptions creates CertificateOptions struct for `certificate` command
-func NewCertificateOptions(ioStreams genericclioptions.IOStreams, operation string) *CertificateOptions {
+func NewCertificateOptions(ioStreams genericiooptions.IOStreams, operation string) *CertificateOptions {
 	return &CertificateOptions{
 		PrintFlags: genericclioptions.NewPrintFlags(operation).WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
@@ -119,7 +120,7 @@ func (o *CertificateOptions) Validate() error {
 }
 
 // NewCmdCertificateApprove returns the `certificate approve` Cobra command
-func NewCmdCertificateApprove(restClientGetter genericclioptions.RESTClientGetter, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdCertificateApprove(restClientGetter genericclioptions.RESTClientGetter, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewCertificateOptions(ioStreams, "approved")
 
 	cmd := &cobra.Command{
@@ -167,7 +168,7 @@ func (o *CertificateOptions) RunCertificateApprove(force bool) error {
 }
 
 // NewCmdCertificateDeny returns the `certificate deny` Cobra command
-func NewCmdCertificateDeny(restClientGetter genericclioptions.RESTClientGetter, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdCertificateDeny(restClientGetter genericclioptions.RESTClientGetter, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewCertificateOptions(ioStreams, "denied")
 
 	cmd := &cobra.Command{

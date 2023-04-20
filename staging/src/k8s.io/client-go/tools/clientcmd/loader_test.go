@@ -26,10 +26,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	clientcmdlatest "k8s.io/client-go/tools/clientcmd/api/latest"
 )
@@ -248,7 +248,7 @@ preferences: {}
 users: null
 `)
 	if !bytes.Equal(expected, data) {
-		t.Error(diff.ObjectReflectDiff(string(expected), string(data)))
+		t.Error(cmp.Diff(string(expected), string(data)))
 	}
 }
 

@@ -55,7 +55,12 @@
   "status": {
     "driverName": "driverNameValue",
     "allocation": {
-      "resourceHandle": "resourceHandleValue",
+      "resourceHandles": [
+        {
+          "driverName": "driverNameValue",
+          "data": "dataValue"
+        }
+      ],
       "availableOnNodes": {
         "nodeSelectorTerms": [
           {

@@ -216,7 +216,7 @@ func (pl *nonCSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod
 		return nil
 	}
 
-	newVolumes := make(sets.String)
+	newVolumes := sets.New[string]()
 	if err := pl.filterVolumes(pod, true /* new pod */, newVolumes); err != nil {
 		return framework.AsStatus(err)
 	}
@@ -248,7 +248,7 @@ func (pl *nonCSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod
 	}
 
 	// count unique volumes
-	existingVolumes := make(sets.String)
+	existingVolumes := sets.New[string]()
 	for _, existingPod := range nodeInfo.Pods {
 		if err := pl.filterVolumes(existingPod.Pod, false /* existing pod */, existingVolumes); err != nil {
 			return framework.AsStatus(err)
@@ -274,7 +274,7 @@ func (pl *nonCSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod
 	return nil
 }
 
-func (pl *nonCSILimits) filterVolumes(pod *v1.Pod, newPod bool, filteredVolumes sets.String) error {
+func (pl *nonCSILimits) filterVolumes(pod *v1.Pod, newPod bool, filteredVolumes sets.Set[string]) error {
 	volumes := pod.Spec.Volumes
 	for i := range volumes {
 		vol := &volumes[i]

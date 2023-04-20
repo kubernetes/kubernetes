@@ -1149,24 +1149,72 @@ func Test_hintsEnabled(t *testing.T) {
 		annotations:   map[string]string{"topology-hints": "enabled"},
 		expectEnabled: false,
 	}, {
-		name:          "annotation == enabled",
-		annotations:   map[string]string{v1.AnnotationTopologyAwareHints: "enabled"},
+		name:          "hints annotation == enabled",
+		annotations:   map[string]string{v1.DeprecatedAnnotationTopologyAwareHints: "enabled"},
 		expectEnabled: false,
 	}, {
-		name:          "annotation == aUto",
-		annotations:   map[string]string{v1.AnnotationTopologyAwareHints: "aUto"},
+		name:          "hints annotation == aUto",
+		annotations:   map[string]string{v1.DeprecatedAnnotationTopologyAwareHints: "aUto"},
 		expectEnabled: false,
 	}, {
-		name:          "annotation == auto",
-		annotations:   map[string]string{v1.AnnotationTopologyAwareHints: "auto"},
+		name:          "hints annotation == auto",
+		annotations:   map[string]string{v1.DeprecatedAnnotationTopologyAwareHints: "auto"},
 		expectEnabled: true,
 	}, {
-		name:          "annotation == Auto",
-		annotations:   map[string]string{v1.AnnotationTopologyAwareHints: "Auto"},
+		name:          "hints annotation == Auto",
+		annotations:   map[string]string{v1.DeprecatedAnnotationTopologyAwareHints: "Auto"},
 		expectEnabled: true,
 	}, {
-		name:          "annotation == disabled",
-		annotations:   map[string]string{v1.AnnotationTopologyAwareHints: "disabled"},
+		name:          "hints annotation == disabled",
+		annotations:   map[string]string{v1.DeprecatedAnnotationTopologyAwareHints: "disabled"},
+		expectEnabled: false,
+	}, {
+		name:          "mode annotation == enabled",
+		annotations:   map[string]string{v1.AnnotationTopologyMode: "enabled"},
+		expectEnabled: false,
+	}, {
+		name:          "mode annotation == aUto",
+		annotations:   map[string]string{v1.AnnotationTopologyMode: "aUto"},
+		expectEnabled: false,
+	}, {
+		name:          "mode annotation == auto",
+		annotations:   map[string]string{v1.AnnotationTopologyMode: "auto"},
+		expectEnabled: true,
+	}, {
+		name:          "mode annotation == Auto",
+		annotations:   map[string]string{v1.AnnotationTopologyMode: "Auto"},
+		expectEnabled: true,
+	}, {
+		name:          "mode annotation == disabled",
+		annotations:   map[string]string{v1.AnnotationTopologyMode: "disabled"},
+		expectEnabled: false,
+	}, {
+		name:          "mode annotation == enabled",
+		annotations:   map[string]string{v1.AnnotationTopologyMode: "enabled"},
+		expectEnabled: false,
+	}, {
+		name:          "mode annotation == aUto",
+		annotations:   map[string]string{v1.AnnotationTopologyMode: "aUto"},
+		expectEnabled: false,
+	}, {
+		name:          "mode annotation == auto",
+		annotations:   map[string]string{v1.AnnotationTopologyMode: "auto"},
+		expectEnabled: true,
+	}, {
+		name:          "mode annotation == Auto",
+		annotations:   map[string]string{v1.AnnotationTopologyMode: "Auto"},
+		expectEnabled: true,
+	}, {
+		name:          "mode annotation == disabled",
+		annotations:   map[string]string{v1.AnnotationTopologyMode: "disabled"},
+		expectEnabled: false,
+	}, {
+		name:          "mode annotation == disabled, hints annotation == auto",
+		annotations:   map[string]string{v1.AnnotationTopologyMode: "disabled", v1.DeprecatedAnnotationTopologyAwareHints: "auto"},
+		expectEnabled: true,
+	}, {
+		name:          "mode annotation == auto, hints annotation == disabled",
+		annotations:   map[string]string{v1.AnnotationTopologyMode: "auto", v1.DeprecatedAnnotationTopologyAwareHints: "disabled"},
 		expectEnabled: false,
 	}}
 	for _, tc := range testCases {

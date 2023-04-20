@@ -424,6 +424,29 @@ func (a *HorizontalController) validateAndParseSelector(hpa *autoscalingv2.Horiz
 func (a *HorizontalController) computeReplicasForMetric(ctx context.Context, hpa *autoscalingv2.HorizontalPodAutoscaler, spec autoscalingv2.MetricSpec,
 	specReplicas, statusReplicas int32, selector labels.Selector, status *autoscalingv2.MetricStatus) (replicaCountProposal int32, metricNameProposal string,
 	timestampProposal time.Time, condition autoscalingv2.HorizontalPodAutoscalerCondition, err error) {
+	// actionLabel is used to report which actions this reconciliation has taken.
+	start := time.Now()
+	defer func() {
+		actionLabel := monitor.ActionLabelNone
+		switch {
+		case replicaCountProposal > hpa.Status.CurrentReplicas:
+			actionLabel = monitor.ActionLabelScaleUp
+		case replicaCountProposal < hpa.Status.CurrentReplicas:
+			actionLabel = monitor.ActionLabelScaleDown
+		}
+
+		errorLabel := monitor.ErrorLabelNone
+		if err != nil {
+			// In case of error, set "internal" as default.
+			errorLabel = monitor.ErrorLabelInternal
+			actionLabel = monitor.ActionLabelNone
+		}
+		if errors.Is(err, errSpec) {
+			errorLabel = monitor.ErrorLabelSpec
+		}
+
+		a.monitor.ObserveMetricComputationResult(actionLabel, errorLabel, time.Since(start), spec.Type)
+	}()
 
 	switch spec.Type {
 	case autoscalingv2.ObjectMetricSourceType:

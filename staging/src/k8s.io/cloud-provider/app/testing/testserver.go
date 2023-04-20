@@ -112,14 +112,22 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 	commandArgs := []string{}
 	listeners := []net.Listener{}
 	disableSecure := false
+	webhookServing := false
 	for _, arg := range customFlags {
-		if strings.HasPrefix(arg, "--secure-port=") {
+		// This block collects all custom flags other than secure serving flags,
+		// which are added after creating a listener.
+		if strings.HasPrefix(arg, "--secure-port=") || strings.HasPrefix(arg, "--cert-dir=") {
 			if arg == "--secure-port=0" {
 				commandArgs = append(commandArgs, arg)
 				disableSecure = true
 			}
-		} else if strings.HasPrefix(arg, "--cert-dir=") {
-			// skip it
+		} else if strings.HasPrefix(arg, "--webhook-secure-port=") || strings.HasPrefix(arg, "--webhook-cert-dir=") {
+			if arg == "--webhook-secure-port=0" {
+				commandArgs = append(commandArgs, arg)
+				webhookServing = false
+			} else {
+				webhookServing = true
+			}
 		} else {
 			commandArgs = append(commandArgs, arg)
 		}
@@ -136,6 +144,19 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 
 		logger.Info("cloud-controller-manager will listen securely", "port", bindPort)
 	}
+
+	if webhookServing {
+		listener, bindPort, err := createListenerOnFreePort()
+		if err != nil {
+			return result, fmt.Errorf("failed to create listener: %v", err)
+		}
+		listeners = append(listeners, listener)
+		commandArgs = append(commandArgs, fmt.Sprintf("--webhook-secure-port=%d", bindPort))
+		commandArgs = append(commandArgs, fmt.Sprintf("--webhook-cert-dir=%s", result.TmpDir))
+
+		logger.Info("cloud-controller-manager (webhook endpoint) will listen securely", "port", bindPort)
+	}
+
 	for _, listener := range listeners {
 		listener.Close()
 	}

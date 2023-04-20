@@ -25,6 +25,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
@@ -49,7 +50,7 @@ type DeleteFlags struct {
 	Raw               *string
 }
 
-func (f *DeleteFlags) ToOptions(dynamicClient dynamic.Interface, streams genericclioptions.IOStreams) (*DeleteOptions, error) {
+func (f *DeleteFlags) ToOptions(dynamicClient dynamic.Interface, streams genericiooptions.IOStreams) (*DeleteOptions, error) {
 	options := &DeleteOptions{
 		DynamicClient: dynamicClient,
 		IOStreams:     streams,
@@ -226,7 +227,7 @@ func NewDeleteFlags(usage string) *DeleteFlags {
 	}
 }
 
-func parseCascadingFlag(streams genericclioptions.IOStreams, cascadingFlag string) (metav1.DeletionPropagation, error) {
+func parseCascadingFlag(streams genericiooptions.IOStreams, cascadingFlag string) (metav1.DeletionPropagation, error) {
 	boolValue, err := strconv.ParseBool(cascadingFlag)
 	// The flag is not a boolean
 	if err != nil {

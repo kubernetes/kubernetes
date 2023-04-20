@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -41,7 +42,7 @@ import (
 
 // NewCmdCreateSecret groups subcommands to create various types of secrets.
 // This is the entry point of create_secret.go which will be called by create.go
-func NewCmdCreateSecret(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdCreateSecret(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "secret",
 		Short: i18n.T("Create a secret using specified subcommand"),
@@ -114,11 +115,11 @@ type CreateSecretOptions struct {
 	DryRunStrategy      cmdutil.DryRunStrategy
 	ValidationDirective string
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewSecretOptions creates a new *CreateSecretOptions with default value
-func NewSecretOptions(ioStreams genericclioptions.IOStreams) *CreateSecretOptions {
+func NewSecretOptions(ioStreams genericiooptions.IOStreams) *CreateSecretOptions {
 	return &CreateSecretOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
@@ -126,7 +127,7 @@ func NewSecretOptions(ioStreams genericclioptions.IOStreams) *CreateSecretOption
 }
 
 // NewCmdCreateSecretGeneric is a command to create generic secrets from files, directories, or literal values
-func NewCmdCreateSecretGeneric(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdCreateSecretGeneric(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewSecretOptions(ioStreams)
 
 	cmd := &cobra.Command{

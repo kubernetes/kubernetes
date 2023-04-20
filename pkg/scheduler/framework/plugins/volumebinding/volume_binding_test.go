@@ -148,7 +148,7 @@ func TestVolumeBinding(t *testing.T) {
 				}).PersistentVolume,
 			},
 			wantPreFilterResult: &framework.PreFilterResult{
-				NodeNames: sets.NewString("node-a"),
+				NodeNames: sets.New("node-a"),
 			},
 			wantStateAfterPreFilter: &stateData{
 				podVolumeClaims: &PodVolumeClaims{

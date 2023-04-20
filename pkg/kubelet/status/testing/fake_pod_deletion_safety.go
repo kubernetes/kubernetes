@@ -20,12 +20,7 @@ import v1 "k8s.io/api/core/v1"
 
 // FakePodDeletionSafetyProvider is a fake PodDeletionSafetyProvider for test.
 type FakePodDeletionSafetyProvider struct {
-	Reclaimed  bool
 	HasRunning bool
-}
-
-func (f *FakePodDeletionSafetyProvider) PodResourcesAreReclaimed(pod *v1.Pod, status v1.PodStatus) bool {
-	return f.Reclaimed
 }
 
 func (f *FakePodDeletionSafetyProvider) PodCouldHaveRunningContainers(pod *v1.Pod) bool {

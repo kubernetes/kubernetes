@@ -155,8 +155,7 @@ func (gc *GarbageCollector) Run(ctx context.Context, workers int) {
 	logger.Info("Starting controller", "controller", "garbagecollector")
 	defer logger.Info("Shutting down controller", "controller", "garbagecollector")
 
-	graphLogger := klog.LoggerWithName(logger, "graphbuilder")
-	go gc.dependencyGraphBuilder.Run(klog.NewContext(ctx, graphLogger))
+	go gc.dependencyGraphBuilder.Run(ctx)
 
 	if !cache.WaitForNamedCacheSync("garbage collector", ctx.Done(), func() bool {
 		return gc.dependencyGraphBuilder.IsSynced(logger)

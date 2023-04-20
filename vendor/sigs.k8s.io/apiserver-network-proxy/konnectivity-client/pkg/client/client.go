@@ -132,6 +132,11 @@ type grpcTunnel struct {
 	// serving.
 	done chan struct{}
 
+	// started is an atomic bool represented as a 0 or 1, and set to true when a single-use tunnel has been started (dialed).
+	// started should only be accessed through atomic methods.
+	// TODO: switch this to an atomic.Bool once the client is exclusively buit with go1.19+
+	started uint32
+
 	// closing is an atomic bool represented as a 0 or 1, and set to true when the tunnel is being closed.
 	// closing should only be accessed through atomic methods.
 	// TODO: switch this to an atomic.Bool once the client is exclusively buit with go1.19+
@@ -197,6 +202,7 @@ func newUnstartedTunnel(stream client.ProxyService_ProxyClient, c clientConn) *g
 		conns:              connectionManager{conns: make(map[int64]*conn)},
 		readTimeoutSeconds: 10,
 		done:               make(chan struct{}),
+		started:            0,
 	}
 	s := metrics.ClientConnectionStatusCreated
 	t.prevStatus.Store(s)
@@ -393,6 +399,11 @@ func (t *grpcTunnel) DialContext(requestCtx context.Context, protocol, address s
 }
 
 func (t *grpcTunnel) dialContext(requestCtx context.Context, protocol, address string) (net.Conn, error) {
+	prevStarted := atomic.SwapUint32(&t.started, 1)
+	if prevStarted != 0 {
+		return nil, &dialFailure{"single-use dialer already dialed", metrics.DialFailureAlreadyStarted}
+	}
+
 	select {
 	case <-t.done:
 		return nil, errors.New("tunnel is closed")
@@ -515,11 +526,11 @@ func (t *grpcTunnel) Recv() (*client.Packet, error) {
 
 	const segment = commonmetrics.SegmentToClient
 	pkt, err := t.stream.Recv()
-	if err != nil && err != io.EOF {
-		metrics.Metrics.ObserveStreamErrorNoPacket(segment, err)
-	}
 	if err != nil {
-		return pkt, err
+		if err != io.EOF {
+			metrics.Metrics.ObserveStreamErrorNoPacket(segment, err)
+		}
+		return nil, err
 	}
 	metrics.Metrics.ObservePacket(segment, pkt.Type)
 	return pkt, nil

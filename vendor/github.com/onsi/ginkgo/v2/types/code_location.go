@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"runtime/debug"
 	"strings"
+	"sync"
 )
 
 type CodeLocation struct {
@@ -38,6 +39,73 @@ func (codeLocation CodeLocation) ContentsOfLine() string {
 	return lines[codeLocation.LineNumber-1]
 }
 
+type codeLocationLocator struct {
+	pcs     map[uintptr]bool
+	helpers map[string]bool
+	lock    *sync.Mutex
+}
+
+func (c *codeLocationLocator) addHelper(pc uintptr) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	if c.pcs[pc] {
+		return
+	}
+	c.lock.Unlock()
+	f := runtime.FuncForPC(pc)
+	c.lock.Lock()
+	if f == nil {
+		return
+	}
+	c.helpers[f.Name()] = true
+	c.pcs[pc] = true
+}
+
+func (c *codeLocationLocator) hasHelper(name string) bool {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	return c.helpers[name]
+}
+
+func (c *codeLocationLocator) getCodeLocation(skip int) CodeLocation {
+	pc := make([]uintptr, 40)
+	n := runtime.Callers(skip+2, pc)
+	if n == 0 {
+		return CodeLocation{}
+	}
+	pc = pc[:n]
+	frames := runtime.CallersFrames(pc)
+	for {
+		frame, more := frames.Next()
+		if !c.hasHelper(frame.Function) {
+			return CodeLocation{FileName: frame.File, LineNumber: frame.Line}
+		}
+		if !more {
+			break
+		}
+	}
+	return CodeLocation{}
+}
+
+var clLocator = &codeLocationLocator{
+	pcs:     map[uintptr]bool{},
+	helpers: map[string]bool{},
+	lock:    &sync.Mutex{},
+}
+
+// MarkAsHelper is used by GinkgoHelper to mark the caller (appropriately offset by skip)as a helper.  You can use this directly if you need to provide an optional `skip` to mark functions further up the call stack as helpers.
+func MarkAsHelper(optionalSkip ...int) {
+	skip := 1
+	if len(optionalSkip) > 0 {
+		skip += optionalSkip[0]
+	}
+	pc, _, _, ok := runtime.Caller(skip)
+	if ok {
+		clLocator.addHelper(pc)
+	}
+}
+
 func NewCustomCodeLocation(message string) CodeLocation {
 	return CodeLocation{
 		CustomMessage: message,
@@ -45,14 +113,13 @@ func NewCustomCodeLocation(message string) CodeLocation {
 }
 
 func NewCodeLocation(skip int) CodeLocation {
-	_, file, line, _ := runtime.Caller(skip + 1)
-	return CodeLocation{FileName: file, LineNumber: line}
+	return clLocator.getCodeLocation(skip + 1)
 }
 
 func NewCodeLocationWithStackTrace(skip int) CodeLocation {
-	_, file, line, _ := runtime.Caller(skip + 1)
-	stackTrace := PruneStack(string(debug.Stack()), skip+1)
-	return CodeLocation{FileName: file, LineNumber: line, FullStackTrace: stackTrace}
+	cl := clLocator.getCodeLocation(skip + 1)
+	cl.FullStackTrace = PruneStack(string(debug.Stack()), skip+1)
+	return cl
 }
 
 // PruneStack removes references to functions that are internal to Ginkgo

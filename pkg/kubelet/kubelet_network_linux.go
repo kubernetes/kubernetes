@@ -87,6 +87,12 @@ func (kl *Kubelet) syncIPTablesRules(iptClient utiliptables.Interface) bool {
 	if !iptClient.IsIPv6() { // ipv6 doesn't have this issue
 		// Set up the KUBE-FIREWALL chain and martian packet protection rule.
 		// (See below.)
+
+		// NOTE: kube-proxy (in iptables mode) creates an identical copy of this
+		// rule. If you want to change this rule in the future, you MUST do so in
+		// a way that will interoperate correctly with skewed versions of the rule
+		// created by kube-proxy.
+
 		if _, err := iptClient.EnsureChain(utiliptables.TableFilter, KubeFirewallChain); err != nil {
 			klog.ErrorS(err, "Failed to ensure that filter table KUBE-FIREWALL chain exists")
 			return false
@@ -178,8 +184,12 @@ func (kl *Kubelet) syncIPTablesRulesDeprecated(iptClient utiliptables.Interface)
 	}
 
 	// Set up KUBE-POSTROUTING to unmark and masquerade marked packets
-	// NB: THIS MUST MATCH the corresponding code in the iptables and ipvs
-	// modes of kube-proxy
+
+	// NOTE: kube-proxy (in iptables and ipvs modes) creates identical copies of these
+	// rules. If you want to change these rules in the future, you MUST do so in a way
+	// that will interoperate correctly with skewed versions of the rules created by
+	// kube-proxy.
+
 	if _, err := iptClient.EnsureRule(utiliptables.Append, utiliptables.TableNAT, KubePostroutingChain,
 		"-m", "mark", "!", "--mark", fmt.Sprintf("%s/%s", masqueradeMark, masqueradeMark),
 		"-j", "RETURN"); err != nil {

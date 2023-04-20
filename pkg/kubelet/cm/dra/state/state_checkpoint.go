@@ -39,6 +39,9 @@ type ClaimInfoState struct {
 	// Name of the DRA driver
 	DriverName string
 
+	// ClassName is a resource class of the claim
+	ClassName string
+
 	// ClaimUID is an UID of the resource claim
 	ClaimUID types.UID
 
@@ -51,7 +54,7 @@ type ClaimInfoState struct {
 	// PodUIDs is a set of pod UIDs that reference a resource
 	PodUIDs sets.Set[string]
 
-	// CDIDevices is a map of KubeletPluginName --> CDI devices returned by the
+	// CDIDevices is a map of DriverName --> CDI devices returned by the
 	// GRPC API call NodePrepareResource
 	CDIDevices map[string][]string
 }

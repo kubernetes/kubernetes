@@ -608,8 +608,8 @@ func (w *watchCache) Resync() error {
 }
 
 func (w *watchCache) currentCapacity() int {
-	w.Lock()
-	defer w.Unlock()
+	w.RLock()
+	defer w.RUnlock()
 	return w.capacity
 }
 

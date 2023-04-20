@@ -95,6 +95,7 @@ kube::golang::server_image_targets() {
     cmd/kube-controller-manager
     cmd/kube-scheduler
     cmd/kube-proxy
+    cmd/kubectl
   )
   echo "${targets[@]}"
 }
@@ -248,8 +249,6 @@ kube::golang::setup_platforms() {
   fi
 }
 
-kube::log::status "WARNING: linux/arm will no longer be built/shipped by default, please build it explicitly if needed."
-kube::log::status "         support for linux/arm will be removed in a subsequent release."
 kube::golang::setup_platforms
 
 # The set of client targets that we are building for all platforms
@@ -263,11 +262,6 @@ readonly KUBE_CLIENT_BINARIES_WIN=("${KUBE_CLIENT_BINARIES[@]/%/.exe}")
 # The set of test targets that we are building for all platforms
 kube::golang::test_targets() {
   local targets=(
-    cmd/gendocs
-    cmd/genkubedocs
-    cmd/genman
-    cmd/genyaml
-    cmd/genswaggertypedocs
     ginkgo
     test/e2e/e2e.test
     test/conformance/image/go-runner
@@ -561,6 +555,19 @@ kube::golang::setup_env() {
 
   # This seems to matter to some tools
   export GO15VENDOREXPERIMENT=1
+
+  # GOMAXPROCS by default does not reflect the number of cpu(s) available
+  # when running in a container, please see https://github.com/golang/go/issues/33803
+  if ! command -v ncpu >/dev/null 2>&1; then
+    # shellcheck disable=SC2164
+    pushd "${KUBE_ROOT}/hack/tools" >/dev/null
+    GO111MODULE=on go install ./ncpu
+    # shellcheck disable=SC2164
+    popd >/dev/null
+  fi
+
+  GOMAXPROCS=${GOMAXPROCS:-$(ncpu)}
+  kube::log::status "Setting GOMAXPROCS: ${GOMAXPROCS}"
 }
 
 # This will take binaries from $GOPATH/bin and copy them to the appropriate
@@ -885,6 +892,9 @@ kube::golang::build_binaries() {
     IFS=" " read -ra platforms <<< "${KUBE_BUILD_PLATFORMS:-}"
     if [[ ${#platforms[@]} -eq 0 ]]; then
       platforms=("${host_platform}")
+    else
+      kube::log::status "WARNING: linux/arm will no longer be built/shipped by default, please build it explicitly if needed."
+      kube::log::status "         support for linux/arm will be removed in a subsequent release."
     fi
 
     local -a binaries

@@ -401,7 +401,7 @@ func WaitForPodTerminatingInNamespaceTimeout(ctx context.Context, c clientset.In
 // WaitForPodSuccessInNamespaceTimeout returns nil if the pod reached state success, or an error if it reached failure or ran too long.
 func WaitForPodSuccessInNamespaceTimeout(ctx context.Context, c clientset.Interface, podName, namespace string, timeout time.Duration) error {
 	return WaitForPodCondition(ctx, c, namespace, podName, fmt.Sprintf("%s or %s", v1.PodSucceeded, v1.PodFailed), timeout, func(pod *v1.Pod) (bool, error) {
-		if pod.Spec.RestartPolicy == v1.RestartPolicyAlways {
+		if pod.DeletionTimestamp == nil && pod.Spec.RestartPolicy == v1.RestartPolicyAlways {
 			return true, fmt.Errorf("pod %q will never terminate with a succeeded state since its restart policy is Always", podName)
 		}
 		switch pod.Status.Phase {
@@ -725,6 +725,13 @@ func WaitForPodContainerToFail(ctx context.Context, c clientset.Interface, names
 			return false, fmt.Errorf("pod was expected to be pending, but it is in the state: %s", pod.Status.Phase)
 		}
 		return false, nil
+	})
+}
+
+// WaitForPodScheduled waits for the pod to be schedule, ie. the .spec.nodeName is set
+func WaitForPodScheduled(ctx context.Context, c clientset.Interface, namespace, podName string) error {
+	return WaitForPodCondition(ctx, c, namespace, podName, "pod is scheduled", podScheduledBeforeTimeout, func(pod *v1.Pod) (bool, error) {
+		return pod.Spec.NodeName != "", nil
 	})
 }
 

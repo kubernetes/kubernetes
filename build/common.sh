@@ -95,8 +95,8 @@ readonly KUBE_RSYNC_PORT="${KUBE_RSYNC_PORT:-}"
 readonly KUBE_CONTAINER_RSYNC_PORT=8730
 
 # These are the default versions (image tags) for their respective base images.
-readonly __default_distroless_iptables_version=v0.2.2
-readonly __default_go_runner_version=v2.3.1-go1.20.2-bullseye.0
+readonly __default_distroless_iptables_version=v0.2.3
+readonly __default_go_runner_version=v2.3.1-go1.20.3-bullseye.0
 readonly __default_setcap_version=bullseye-v1.4.2
 
 # These are the base images for the Docker-wrapped binaries.
@@ -105,6 +105,7 @@ readonly KUBE_APISERVER_BASE_IMAGE="${KUBE_APISERVER_BASE_IMAGE:-$KUBE_GORUNNER_
 readonly KUBE_CONTROLLER_MANAGER_BASE_IMAGE="${KUBE_CONTROLLER_MANAGER_BASE_IMAGE:-$KUBE_GORUNNER_IMAGE}"
 readonly KUBE_SCHEDULER_BASE_IMAGE="${KUBE_SCHEDULER_BASE_IMAGE:-$KUBE_GORUNNER_IMAGE}"
 readonly KUBE_PROXY_BASE_IMAGE="${KUBE_PROXY_BASE_IMAGE:-$KUBE_BASE_IMAGE_REGISTRY/distroless-iptables:$__default_distroless_iptables_version}"
+readonly KUBECTL_BASE_IMAGE="${KUBECTL_BASE_IMAGE:-$KUBE_GORUNNER_IMAGE}"
 
 # This is the image used in a multi-stage build to apply capabilities to Docker-wrapped binaries.
 readonly KUBE_BUILD_SETCAP_IMAGE="${KUBE_BUILD_SETCAP_IMAGE:-$KUBE_BASE_IMAGE_REGISTRY/setcap:$__default_setcap_version}"
@@ -124,6 +125,7 @@ kube::build::get_docker_wrapped_binaries() {
     "kube-controller-manager,${KUBE_CONTROLLER_MANAGER_BASE_IMAGE}"
     "kube-scheduler,${KUBE_SCHEDULER_BASE_IMAGE}"
     "kube-proxy,${KUBE_PROXY_BASE_IMAGE}"
+    "kubectl,${KUBECTL_BASE_IMAGE}"
   )
 
   echo "${targets[@]}"

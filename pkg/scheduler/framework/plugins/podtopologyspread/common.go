@@ -135,16 +135,23 @@ func (pl *PodTopologySpread) filterTopologySpreadConstraints(constraints []v1.To
 
 func mergeLabelSetWithSelector(matchLabels labels.Set, s labels.Selector) labels.Selector {
 	mergedSelector := labels.SelectorFromSet(matchLabels)
-	if requirements, ok := s.Requirements(); ok {
-		for _, r := range requirements {
-			mergedSelector = mergedSelector.Add(r)
-		}
+
+	requirements, ok := s.Requirements()
+	if !ok {
+		return s
+	}
+
+	for _, r := range requirements {
+		mergedSelector = mergedSelector.Add(r)
 	}
 
 	return mergedSelector
 }
 
 func countPodsMatchSelector(podInfos []*framework.PodInfo, selector labels.Selector, ns string) int {
+	if selector.Empty() {
+		return 0
+	}
 	count := 0
 	for _, p := range podInfos {
 		// Bypass terminating Pod (see #87621).

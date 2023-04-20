@@ -81,11 +81,14 @@ func (v *validator) Validate(pod *v1.Pod) error {
 	return retErr
 }
 
+// ValidateHost verifies that the host and runtime is capable of enforcing AppArmor profiles.
+// Note, this is intentionally only check the host at kubelet startup and never re-evaluates the host
+// as the expectation is that the kubelet restart will be needed to enable or disable AppArmor support.
 func (v *validator) ValidateHost() error {
 	return v.validateHostErr
 }
 
-// Verify that the host and runtime is capable of enforcing AppArmor profiles.
+// validateHost verifies that the host and runtime is capable of enforcing AppArmor profiles.
 func validateHost() error {
 	// Check feature-gates
 	if !utilfeature.DefaultFeatureGate.Enabled(features.AppArmor) {

@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -399,7 +400,9 @@ func TestJobPodFailurePolicyWithFailedPodDeletedDuringControllerRestart(t *testi
 		Ready:  pointer.Int32(0),
 	})
 
-	jobPods, err := getJobPods(ctx, t, cs, jobObj)
+	jobPods, err := getJobPods(ctx, t, cs, jobObj, func(s v1.PodStatus) bool {
+		return (s.Phase == v1.PodPending || s.Phase == v1.PodRunning)
+	})
 	if err != nil {
 		t.Fatalf("Failed to list Job Pods: %v", err)
 	}
@@ -543,6 +546,13 @@ func TestJobPodFailurePolicy(t *testing.T) {
 	}
 	podStatusNotMatchingAnyRule := v1.PodStatus{
 		Phase: v1.PodFailed,
+		ContainerStatuses: []v1.ContainerStatus{
+			{
+				State: v1.ContainerState{
+					Terminated: &v1.ContainerStateTerminated{},
+				},
+			},
+		},
 	}
 	testCases := map[string]struct {
 		enableJobPodFailurePolicy                bool
@@ -1367,6 +1377,92 @@ func TestFinalizersClearedWhenBackoffLimitExceeded(t *testing.T) {
 	validateNoOrphanPodsWithFinalizers(ctx, t, clientSet, jobObj)
 }
 
+func TestJobPodsCreatedWithExponentialBackoff(t *testing.T) {
+	// overwrite the default value for faster testing
+	oldBackoff := jobcontroller.DefaultJobBackOff
+	defer func() { jobcontroller.DefaultJobBackOff = oldBackoff }()
+	jobcontroller.DefaultJobBackOff = 2 * time.Second
+
+	closeFn, restConfig, clientSet, ns := setup(t, "simple")
+	defer closeFn()
+	ctx, cancel := startJobControllerAndWaitForCaches(restConfig)
+	defer cancel()
+
+	jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{})
+	if err != nil {
+		t.Fatalf("Could not create job: %v", err)
+	}
+	validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
+		Active: 1,
+		Ready:  pointer.Int32(0),
+	})
+
+	// Fail the first pod
+	if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, 1); err != nil {
+		t.Fatalf("Failed setting phase %s on Job Pod: %v", v1.PodFailed, err)
+	}
+	validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
+		Active: 1,
+		Ready:  pointer.Int32(0),
+		Failed: 1,
+	})
+
+	// Fail the second pod
+	if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, 1); err != nil {
+		t.Fatalf("Failed setting phase %s on Job Pod: %v", v1.PodFailed, err)
+	}
+	validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
+		Active: 1,
+		Ready:  pointer.Int32(0),
+		Failed: 2,
+	})
+
+	jobPods, err := getJobPods(ctx, t, clientSet, jobObj, func(ps v1.PodStatus) bool { return true })
+	if err != nil {
+		t.Fatalf("Failed to list Job Pods: %v", err)
+	}
+	if len(jobPods) != 3 {
+		t.Fatalf("Expected to get %v pods, received %v", 4, len(jobPods))
+	}
+
+	creationTime := []time.Time{}
+	finishTime := []time.Time{}
+	for _, pod := range jobPods {
+		creationTime = append(creationTime, pod.CreationTimestamp.Time)
+		if len(pod.Status.ContainerStatuses) > 0 {
+			finishTime = append(finishTime, pod.Status.ContainerStatuses[0].State.Terminated.FinishedAt.Time)
+		}
+	}
+
+	sort.Slice(creationTime, func(i, j int) bool {
+		return creationTime[i].Before(creationTime[j])
+	})
+	sort.Slice(finishTime, func(i, j int) bool {
+		return finishTime[i].Before(finishTime[j])
+	})
+
+	if creationTime[1].Sub(finishTime[0]).Seconds() < jobcontroller.DefaultJobBackOff.Seconds() {
+		t.Fatalf("Second pod should be created at least %v seconds after the first pod", jobcontroller.DefaultJobBackOff)
+	}
+
+	if creationTime[1].Sub(finishTime[0]).Seconds() >= 2*jobcontroller.DefaultJobBackOff.Seconds() {
+		t.Fatalf("Second pod should be created before %v seconds after the first pod", 2*jobcontroller.DefaultJobBackOff)
+	}
+
+	diff := creationTime[2].Sub(finishTime[1]).Seconds()
+
+	// The third pod should not be created before 4 seconds
+	if diff < 2*jobcontroller.DefaultJobBackOff.Seconds() {
+		t.Fatalf("Third pod should be created at least %v seconds after the second pod", 2*jobcontroller.DefaultJobBackOff)
+	}
+
+	// The third pod should be created within 8 seconds
+	// This check rules out double counting
+	if diff >= 4*jobcontroller.DefaultJobBackOff.Seconds() {
+		t.Fatalf("Third pod should be created before %v seconds after the second pod", 4*jobcontroller.DefaultJobBackOff)
+	}
+}
+
 // TestJobFailedWithInterrupts tests that a job were one pod fails and the rest
 // succeed is marked as Failed, even if the controller fails in the middle.
 func TestJobFailedWithInterrupts(t *testing.T) {
@@ -1686,7 +1782,7 @@ func validateJobPodsStatus(ctx context.Context, t *testing.T, clientSet clientse
 	}
 }
 
-func getJobPods(ctx context.Context, t *testing.T, clientSet clientset.Interface, jobObj *batchv1.Job) ([]*v1.Pod, error) {
+func getJobPods(ctx context.Context, t *testing.T, clientSet clientset.Interface, jobObj *batchv1.Job, filter func(v1.PodStatus) bool) ([]*v1.Pod, error) {
 	t.Helper()
 	allPods, err := clientSet.CoreV1().Pods(jobObj.Namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
@@ -1694,8 +1790,7 @@ func getJobPods(ctx context.Context, t *testing.T, clientSet clientset.Interface
 	}
 	jobPods := make([]*v1.Pod, 0, 0)
 	for _, pod := range allPods.Items {
-		phase := pod.Status.Phase
-		if metav1.IsControlledBy(&pod, jobObj) && (phase == v1.PodPending || phase == v1.PodRunning) {
+		if metav1.IsControlledBy(&pod, jobObj) && filter(pod.Status) {
 			p := pod
 			jobPods = append(jobPods, &p)
 		}
@@ -1817,6 +1912,17 @@ func validateJobCondition(ctx context.Context, t testing.TB, clientSet clientset
 func setJobPodsPhase(ctx context.Context, clientSet clientset.Interface, jobObj *batchv1.Job, phase v1.PodPhase, cnt int) (error, int) {
 	op := func(p *v1.Pod) bool {
 		p.Status.Phase = phase
+		if phase == v1.PodFailed || phase == v1.PodSucceeded {
+			p.Status.ContainerStatuses = []v1.ContainerStatus{
+				{
+					State: v1.ContainerState{
+						Terminated: &v1.ContainerStateTerminated{
+							FinishedAt: metav1.Now(),
+						},
+					},
+				},
+			}
+		}
 		return true
 	}
 	return updateJobPodsStatus(ctx, clientSet, jobObj, op, cnt)

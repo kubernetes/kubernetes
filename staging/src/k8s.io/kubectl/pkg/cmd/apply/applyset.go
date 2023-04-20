@@ -46,13 +46,13 @@ const (
 	// Tooling should refuse to mutate ApplySets belonging to other tools.
 	// The value must be in the format <toolname>/<semver>.
 	// Example value: "kubectl/v1.27" or "helm/v3" or "kpt/v1.0.0"
-	ApplySetToolingAnnotation = "applyset.k8s.io/tooling"
+	ApplySetToolingAnnotation = "applyset.kubernetes.io/tooling"
 
 	// ApplySetAdditionalNamespacesAnnotation annotation extends the scope of the ApplySet beyond the parent
 	// object's own namespace (if any) to include the listed namespaces. The value is a comma-separated
 	// list of the names of namespaces other than the parent's namespace in which objects are found
 	// Example value: "kube-system,ns1,ns2".
-	ApplySetAdditionalNamespacesAnnotation = "applyset.k8s.io/additional-namespaces"
+	ApplySetAdditionalNamespacesAnnotation = "applyset.kubernetes.io/additional-namespaces"
 
 	// ApplySetGRsAnnotation is a list of group-resources used to optimize listing of ApplySet member objects.
 	// It is optional in the ApplySet specification, as tools can perform discovery or use a different optimization.
@@ -60,11 +60,11 @@ const (
 	// When present, the value of this annotation must be a comma separated list of the group-kinds,
 	// in the fully-qualified name format, i.e. <resourcename>.<group>.
 	// Example value: "certificates.cert-manager.io,configmaps,deployments.apps,secrets,services"
-	ApplySetGRsAnnotation = "applyset.k8s.io/contains-group-resources"
+	ApplySetGRsAnnotation = "applyset.kubernetes.io/contains-group-resources"
 
 	// ApplySetParentIDLabel is the key of the label that makes object an ApplySet parent object.
 	// Its value MUST use the format specified in V1ApplySetIdFormat below
-	ApplySetParentIDLabel = "applyset.k8s.io/id"
+	ApplySetParentIDLabel = "applyset.kubernetes.io/id"
 
 	// V1ApplySetIdFormat is the format required for the value of ApplySetParentIDLabel (and ApplysetPartOfLabel).
 	// The %s segment is the unique ID of the object itself, which MUST be the base64 encoding
@@ -74,11 +74,11 @@ const (
 
 	// ApplysetPartOfLabel is the key of the label which indicates that the object is a member of an ApplySet.
 	// The value of the label MUST match the value of ApplySetParentIDLabel on the parent object.
-	ApplysetPartOfLabel = "applyset.k8s.io/part-of"
+	ApplysetPartOfLabel = "applyset.kubernetes.io/part-of"
 
 	// ApplysetParentCRDLabel is the key of the label that can be set on a CRD to identify
 	// the custom resource type it defines (not the CRD itself) as an allowed parent for an ApplySet.
-	ApplysetParentCRDLabel = "applyset.k8s.io/is-parent-type"
+	ApplysetParentCRDLabel = "applyset.kubernetes.io/is-parent-type"
 )
 
 var defaultApplySetParentGVR = schema.GroupVersionResource{Version: "v1", Resource: "secrets"}
@@ -88,7 +88,7 @@ type ApplySet struct {
 	// parentRef is a reference to the parent object that is used to track the applyset.
 	parentRef *ApplySetParentRef
 
-	// toolingID is the value to be used and validated in the applyset.k8s.io/tooling annotation.
+	// toolingID is the value to be used and validated in the applyset.kubernetes.io/tooling annotation.
 	toolingID ApplySetTooling
 
 	// currentResources is the set of resources that are part of the sever-side set as of when the current operation started.
@@ -132,12 +132,12 @@ func (p ApplySetParentRef) String() string {
 }
 
 type ApplySetTooling struct {
-	name    string
-	version string
+	Name    string
+	Version string
 }
 
 func (t ApplySetTooling) String() string {
-	return fmt.Sprintf("%s/%s", t.name, t.version)
+	return fmt.Sprintf("%s/%s", t.Name, t.Version)
 }
 
 // NewApplySet creates a new ApplySet object tracked by the given parent object.
@@ -226,7 +226,7 @@ func (a *ApplySet) LabelsForMember() map[string]string {
 }
 
 // addLabels sets our tracking labels on each object; this should be called as part of loading the objects.
-func (a *ApplySet) addLabels(objects []*resource.Info) error {
+func (a *ApplySet) AddLabels(objects ...*resource.Info) error {
 	applysetLabels := a.LabelsForMember()
 	for _, obj := range objects {
 		accessor, err := meta.Accessor(obj.Object)
@@ -249,7 +249,7 @@ func (a *ApplySet) addLabels(objects []*resource.Info) error {
 	return nil
 }
 
-func (a *ApplySet) FetchParent() error {
+func (a *ApplySet) fetchParent() error {
 	helper := resource.NewHelper(a.client, a.parentRef.RESTMapping)
 	obj, err := helper.Get(a.parentRef.Namespace, a.parentRef.Name)
 	if errors.IsNotFound(err) {
@@ -272,8 +272,8 @@ func (a *ApplySet) FetchParent() error {
 	if !hasToolAnno {
 		return fmt.Errorf("ApplySet parent object %q already exists and is missing required annotation %q", a.parentRef, ApplySetToolingAnnotation)
 	}
-	if managedBy := toolingBaseName(toolAnnotation); managedBy != a.toolingID.name {
-		return fmt.Errorf("ApplySet parent object %q already exists and is managed by tooling %q instead of %q", a.parentRef, managedBy, a.toolingID.name)
+	if managedBy := toolingBaseName(toolAnnotation); managedBy != a.toolingID.Name {
+		return fmt.Errorf("ApplySet parent object %q already exists and is managed by tooling %q instead of %q", a.parentRef, managedBy, a.toolingID.Name)
 	}
 
 	idLabel, hasIDLabel := labels[ApplySetParentIDLabel]
@@ -375,9 +375,9 @@ func parseNamespacesAnnotation(annotations map[string]string) sets.Set[string] {
 	return sets.New(strings.Split(annotation, ",")...)
 }
 
-// AddResource registers the given resource and namespace as being part of the updated set of
+// addResource registers the given resource and namespace as being part of the updated set of
 // resources being applied by the current operation.
-func (a *ApplySet) AddResource(resource *meta.RESTMapping, namespace string) {
+func (a *ApplySet) addResource(resource *meta.RESTMapping, namespace string) {
 	a.updatedResources[resource.Resource] = resource
 	if resource.Scope == meta.RESTScopeNamespace && namespace != "" {
 		a.updatedNamespaces.Insert(namespace)
@@ -386,10 +386,10 @@ func (a *ApplySet) AddResource(resource *meta.RESTMapping, namespace string) {
 
 type ApplySetUpdateMode string
 
-var UpdateToLatestSet ApplySetUpdateMode = "latest"
-var UpdateToSuperset ApplySetUpdateMode = "superset"
+var updateToLatestSet ApplySetUpdateMode = "latest"
+var updateToSuperset ApplySetUpdateMode = "superset"
 
-func (a *ApplySet) UpdateParent(mode ApplySetUpdateMode, dryRun cmdutil.DryRunStrategy, validation string) error {
+func (a *ApplySet) updateParent(mode ApplySetUpdateMode, dryRun cmdutil.DryRunStrategy, validation string) error {
 	data, err := json.Marshal(a.buildParentPatch(mode))
 	if err != nil {
 		return fmt.Errorf("failed to encode patch for ApplySet parent: %w", err)
@@ -431,14 +431,14 @@ func serverSideApplyRequest(a *ApplySet, data []byte, dryRun cmdutil.DryRunStrat
 func (a *ApplySet) buildParentPatch(mode ApplySetUpdateMode) *metav1.PartialObjectMetadata {
 	var newGRsAnnotation, newNsAnnotation string
 	switch mode {
-	case UpdateToSuperset:
+	case updateToSuperset:
 		// If the apply succeeded but pruning failed, the set of group resources that
 		// the ApplySet should track is the superset of the previous and current resources.
 		// This ensures that the resources that failed to be pruned are not orphaned from the set.
 		grSuperset := sets.KeySet(a.currentResources).Union(sets.KeySet(a.updatedResources))
 		newGRsAnnotation = generateResourcesAnnotation(grSuperset)
 		newNsAnnotation = generateNamespacesAnnotation(a.currentNamespaces.Union(a.updatedNamespaces), a.parentRef.Namespace)
-	case UpdateToLatestSet:
+	case updateToLatestSet:
 		newGRsAnnotation = generateResourcesAnnotation(sets.KeySet(a.updatedResources))
 		newNsAnnotation = generateNamespacesAnnotation(a.updatedNamespaces, a.parentRef.Namespace)
 	}
@@ -479,7 +479,7 @@ func generateResourcesAnnotation(resources sets.Set[schema.GroupVersionResource]
 }
 
 func (a ApplySet) FieldManager() string {
-	return fmt.Sprintf("%s-applyset", a.toolingID.name)
+	return fmt.Sprintf("%s-applyset", a.toolingID.Name)
 }
 
 // ParseApplySetParentRef creates a new ApplySetParentRef from a parent reference in the format [RESOURCE][.GROUP]/NAME
@@ -508,4 +508,53 @@ func ParseApplySetParentRef(parentRefStr string, mapper meta.RESTMapper) (*Apply
 		return nil, err
 	}
 	return &ApplySetParentRef{Name: name, RESTMapping: mapping}, nil
+}
+
+// Prune deletes any objects from the apiserver that are no longer in the applyset.
+func (a *ApplySet) Prune(ctx context.Context, o *ApplyOptions) error {
+	printer, err := o.ToPrinter("pruned")
+	if err != nil {
+		return err
+	}
+	opt := &ApplySetDeleteOptions{
+		CascadingStrategy: o.DeleteOptions.CascadingStrategy,
+		DryRunStrategy:    o.DryRunStrategy,
+		GracePeriod:       o.DeleteOptions.GracePeriod,
+
+		Printer: printer,
+
+		IOStreams: o.IOStreams,
+	}
+
+	if err := a.pruneAll(ctx, o.DynamicClient, o.VisitedUids, opt); err != nil {
+		return err
+	}
+
+	if err := a.updateParent(updateToLatestSet, o.DryRunStrategy, o.ValidationDirective); err != nil {
+		return fmt.Errorf("apply and prune succeeded, but ApplySet update failed: %w", err)
+	}
+
+	return nil
+}
+
+// BeforeApply should be called before applying the objects.
+// It pre-updates the parent object so that it covers the resources that will be applied.
+// In this way, even if we are interrupted, we will not leak objects.
+func (a *ApplySet) BeforeApply(objects []*resource.Info, dryRunStrategy cmdutil.DryRunStrategy, validationDirective string) error {
+	if err := a.fetchParent(); err != nil {
+		return err
+	}
+	// Update the live parent object to the superset of the current and previous resources.
+	// Doing this before the actual apply and prune operations improves behavior by ensuring
+	// the live object contains the superset on failure. This may cause the next pruning
+	// operation to make a larger number of GET requests than strictly necessary, but it prevents
+	// object leakage from the set. The superset will automatically be reduced to the correct
+	// set by the next successful operation.
+	for _, info := range objects {
+		a.addResource(info.ResourceMapping(), info.Namespace)
+	}
+	if err := a.updateParent(updateToSuperset, dryRunStrategy, validationDirective); err != nil {
+		return err
+	}
+	return nil
 }

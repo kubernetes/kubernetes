@@ -227,8 +227,9 @@ func (ec *Controller) Run(ctx context.Context, workers int) {
 	defer runtime.HandleCrash()
 	defer ec.queue.ShutDown()
 
-	klog.Infof("Starting ephemeral volume controller")
-	defer klog.Infof("Shutting down ephemeral volume controller")
+	logger := klog.FromContext(ctx)
+	logger.Info("Starting ephemeral volume controller")
+	defer logger.Info("Shutting down ephemeral volume controller")
 
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(klog.Infof)

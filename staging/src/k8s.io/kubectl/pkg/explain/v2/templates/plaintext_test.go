@@ -66,21 +66,21 @@ type testCase struct {
 }
 
 type check interface {
-	doCheck(output string) error
+	doCheck(output string, err error) error
 }
 
 type checkError string
 
-func (c checkError) doCheck(output string) error {
-	if !strings.Contains(output, "error: "+string(c)) {
-		return fmt.Errorf("expected error: '%v' in string:\n%v", string(c), output)
+func (c checkError) doCheck(output string, err error) error {
+	if !strings.Contains(err.Error(), "error: "+string(c)) {
+		return fmt.Errorf("expected error: '%v' in string:\n%v", string(c), err)
 	}
 	return nil
 }
 
 type checkContains string
 
-func (c checkContains) doCheck(output string) error {
+func (c checkContains) doCheck(output string, err error) error {
 	if !strings.Contains(output, string(c)) {
 		return fmt.Errorf("expected substring: '%v' in string:\n%v", string(c), output)
 	}
@@ -89,7 +89,7 @@ func (c checkContains) doCheck(output string) error {
 
 type checkEquals string
 
-func (c checkEquals) doCheck(output string) error {
+func (c checkEquals) doCheck(output string, err error) error {
 	if output != string(c) {
 		return fmt.Errorf("output is not equal to expectation:\n%v", cmp.Diff(string(c), output))
 	}
@@ -123,7 +123,7 @@ func TestPlaintext(t *testing.T) {
 				Recursive: false,
 			},
 			Checks: []check{
-				checkError("GVR (/, Resource=) not found in OpenAPI schema\n"),
+				checkError("GVR (/, Resource=) not found in OpenAPI schema"),
 			},
 		},
 		{
@@ -158,7 +158,7 @@ func TestPlaintext(t *testing.T) {
 				Recursive: false,
 			},
 			Checks: []check{
-				checkError(`field "[does not exist]" does not exist`),
+				checkError(`field "exist" does not exist`),
 			},
 		},
 		{
@@ -296,6 +296,30 @@ func TestPlaintext(t *testing.T) {
 			},
 		},
 		{
+			// Show that a ref to a primitive type uses the referred type's type
+			Name:        "PrimitiveRef",
+			Subtemplate: "typeGuess",
+			Context: map[string]any{
+				"schema": map[string]any{
+					"description": "a cool field",
+					"$ref":        "#/components/schemas/v1.Time",
+				},
+				"Document": map[string]any{
+					"components": map[string]any{
+						"schemas": map[string]any{
+							"v1.Time": map[string]any{
+								"type":   "string",
+								"format": "date-time",
+							},
+						},
+					},
+				},
+			},
+			Checks: []check{
+				checkEquals("string"),
+			},
+		},
+		{
 			// Shows that the typeguess template behaves correctly given an
 			// array with unknown items
 			Name:        "ArrayUnknown",
@@ -308,6 +332,20 @@ func TestPlaintext(t *testing.T) {
 			},
 			Checks: []check{
 				checkEquals("array"),
+			},
+		},
+		{
+			// Shows that the typeguess puts Object tpye in title case
+			Name:        "ObjectTitle",
+			Subtemplate: "typeGuess",
+			Context: map[string]any{
+				"schema": map[string]any{
+					"description": "a cool field",
+					"type":        "object",
+				},
+			},
+			Checks: []check{
+				checkEquals("Object"),
 			},
 		},
 		{
@@ -526,16 +564,17 @@ func TestPlaintext(t *testing.T) {
 
 		t.Run(testName, func(t *testing.T) {
 			buf := bytes.NewBuffer(nil)
+
+			var outputErr error
 			if len(tcase.Subtemplate) == 0 {
-				tmpl.Execute(buf, tcase.Context)
+				outputErr = tmpl.Execute(buf, tcase.Context)
 			} else {
-				tmpl.ExecuteTemplate(buf, tcase.Subtemplate, tcase.Context)
+				outputErr = tmpl.ExecuteTemplate(buf, tcase.Subtemplate, tcase.Context)
 			}
-			require.NoError(t, err)
 
 			output := buf.String()
 			for _, check := range tcase.Checks {
-				err = check.doCheck(output)
+				err = check.doCheck(output, outputErr)
 
 				if err != nil {
 					t.Log("test failed on output:\n" + output)

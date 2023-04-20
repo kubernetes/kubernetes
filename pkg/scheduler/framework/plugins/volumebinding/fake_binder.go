@@ -55,7 +55,7 @@ func (b *FakeVolumeBinder) GetPodVolumeClaims(pod *v1.Pod) (podVolumeClaims *Pod
 }
 
 // GetEligibleNodes implements SchedulerVolumeBinder.GetEligibleNodes.
-func (b *FakeVolumeBinder) GetEligibleNodes(boundClaims []*v1.PersistentVolumeClaim) (eligibleNodes sets.String) {
+func (b *FakeVolumeBinder) GetEligibleNodes(boundClaims []*v1.PersistentVolumeClaim) (eligibleNodes sets.Set[string]) {
 	return nil
 }
 

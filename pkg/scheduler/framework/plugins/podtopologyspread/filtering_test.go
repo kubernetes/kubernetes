@@ -150,6 +150,44 @@ func TestPreFilterState(t *testing.T) {
 			},
 		},
 		{
+			name: "normal case with null label selector",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, nil, nil, nil, nil, nil).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
+			},
+			want: &preFilterState{
+				Constraints: []topologySpreadConstraint{
+					{
+						MaxSkew:            1,
+						TopologyKey:        "zone",
+						Selector:           labels.Nothing(),
+						MinDomains:         1,
+						NodeAffinityPolicy: v1.NodeInclusionPolicyHonor,
+						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
+					},
+				},
+				TpKeyToCriticalPaths: map[string]*criticalPaths{
+					"zone": {{"zone2", 0}, {"zone1", 0}},
+				},
+				TpPairToMatchNum: map[topologyPair]int{
+					{key: "zone", value: "zone1"}: 0,
+					{key: "zone", value: "zone2"}: 0,
+				},
+			},
+		},
+		{
 			name: "normal case with one spreadConstraint, on a 3-zone cluster",
 			pod: st.MakePod().Name("p").Label("foo", "").
 				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
@@ -1300,6 +1338,83 @@ func TestPreFilterState(t *testing.T) {
 			enableMatchLabelKeys: true,
 		},
 		{
+			name: "key in matchLabelKeys is ignored when LabelSelector is nil when feature gate enabled",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, nil, nil, nil, nil, []string{"bar"}).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "a").Obj(),
+				st.MakePod().Name("p-a2").Node("node-a").Label("foo", "a").Obj(),
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "a").Obj(),
+				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "a").Obj(),
+				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "a").Obj(),
+			},
+			want: &preFilterState{
+				Constraints: []topologySpreadConstraint{
+					{
+						MaxSkew:            1,
+						TopologyKey:        "zone",
+						Selector:           mustConvertLabelSelectorAsSelector(t, nil),
+						MinDomains:         1,
+						NodeAffinityPolicy: v1.NodeInclusionPolicyHonor,
+						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
+					},
+				},
+				TpKeyToCriticalPaths: map[string]*criticalPaths{
+					"zone": {{"zone2", 0}, {"zone1", 0}},
+				},
+				TpPairToMatchNum: map[topologyPair]int{
+					{key: "zone", value: "zone1"}: 0,
+					{key: "zone", value: "zone2"}: 0,
+				},
+			},
+			enableMatchLabelKeys: true,
+		},
+		{
+			name: "no pod is matched when LabelSelector is nil when feature gate disabled",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, nil, nil, nil, nil, []string{"bar"}).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "a").Obj(),
+				st.MakePod().Name("p-a2").Node("node-a").Label("foo", "a").Obj(),
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "a").Obj(),
+				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "a").Obj(),
+				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "a").Obj(),
+			},
+			want: &preFilterState{
+				Constraints: []topologySpreadConstraint{
+					{
+						MaxSkew:            1,
+						TopologyKey:        "zone",
+						Selector:           mustConvertLabelSelectorAsSelector(t, nil),
+						MinDomains:         1,
+						NodeAffinityPolicy: v1.NodeInclusionPolicyHonor,
+						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
+					},
+				},
+				TpKeyToCriticalPaths: map[string]*criticalPaths{
+					"zone": {{"zone2", 0}, {"zone1", 0}},
+				},
+				TpPairToMatchNum: map[topologyPair]int{
+					{key: "zone", value: "zone1"}: 0,
+					{key: "zone", value: "zone2"}: 0,
+				},
+			},
+		},
+		{
 			name: "key in matchLabelKeys is ignored when it isn't exist in pod.labels",
 			pod: st.MakePod().Name("p").Label("foo", "").
 				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, []string{"bar"}).
@@ -2345,6 +2460,28 @@ func TestSingleConstraint(t *testing.T) {
 				"node-b": framework.Success,
 				"node-x": framework.Unschedulable,
 				"node-y": framework.Unschedulable,
+			},
+		},
+		{
+			name: "existing pods do not match null selector",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, nil, nil, nil, nil, nil).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-x1").Node("node-x").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
+			},
+			wantStatusCode: map[string]framework.Code{
+				"node-a": framework.Success,
+				"node-b": framework.Success,
+				"node-x": framework.Success,
+				"node-y": framework.Success,
 			},
 		},
 		{

@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	apps "k8s.io/api/apps/v1"
+	"github.com/google/go-cmp/cmp"
 	coordv1 "k8s.io/api/coordination/v1"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/informers"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coordinformers "k8s.io/client-go/informers/coordination/v1"
@@ -167,561 +166,671 @@ func newNodeLifecycleControllerFromClient(
 	return &nodeLifecycleController{nc, leaseInformer, nodeInformer, daemonSetInformer}, nil
 }
 
-func TestMonitorNodeHealthEvictPods(t *testing.T) {
+func TestMonitorNodeHealth(t *testing.T) {
 	fakeNow := metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
-	labels := map[string]string{
-		v1.LabelTopologyRegion:          "region1",
-		v1.LabelTopologyZone:            "zone1",
-		v1.LabelFailureDomainBetaRegion: "region1",
-		v1.LabelFailureDomainBetaZone:   "zone1",
-	}
-
-	// Because of the logic that prevents NC from evicting anything when all Nodes are NotReady
-	// we need second healthy node in tests. Because of how the tests are written we need to update
-	// the status of this Node.
+	timeToPass := 60 * time.Minute
 	healthyNodeNewStatus := v1.NodeStatus{
 		Conditions: []v1.NodeCondition{
 			{
+				Type:               v1.NodeReady,
+				Status:             v1.ConditionTrue,
+				LastHeartbeatTime:  metav1.NewTime(fakeNow.Add(timeToPass)),
+				LastTransitionTime: fakeNow,
+			},
+		},
+	}
+	unhealthyNodeNewStatus := v1.NodeStatus{
+		Conditions: []v1.NodeCondition{
+			{
 				Type:   v1.NodeReady,
-				Status: v1.ConditionTrue,
-				// Node status has just been updated, and is NotReady for 10min.
-				LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 9, 0, 0, time.UTC),
-				LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+				Status: v1.ConditionUnknown,
+				// Node status was updated by nodecontroller timeToPass ago
+				LastHeartbeatTime:  fakeNow,
+				LastTransitionTime: fakeNow,
 			},
 		},
 	}
 
-	table := []struct {
-		fakeNodeHandler     *testutil.FakeNodeHandler
-		daemonSets          []apps.DaemonSet
-		timeToPass          time.Duration
-		newNodeStatus       v1.NodeStatus
-		secondNodeNewStatus v1.NodeStatus
-		expectedEvictPods   bool
-		description         string
+	tests := map[string]struct {
+		nodeList                []*v1.Node
+		updatedNodeStatuses     []v1.NodeStatus
+		expectedInitialStates   map[string]ZoneState
+		expectedFollowingStates map[string]ZoneState
 	}{
-		// Node created recently, with no status (happens only at cluster startup).
-		{
-			fakeNodeHandler: &testutil.FakeNodeHandler{
-				Existing: []*v1.Node{
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:              "node0",
-							CreationTimestamp: fakeNow,
-							Labels: map[string]string{
-								v1.LabelTopologyRegion:          "region1",
-								v1.LabelTopologyZone:            "zone1",
-								v1.LabelFailureDomainBetaRegion: "region1",
-								v1.LabelFailureDomainBetaZone:   "zone1",
-							},
-						},
-					},
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:              "node1",
-							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-							Labels: map[string]string{
-								v1.LabelTopologyRegion:          "region1",
-								v1.LabelTopologyZone:            "zone1",
-								v1.LabelFailureDomainBetaRegion: "region1",
-								v1.LabelFailureDomainBetaZone:   "zone1",
-							},
-						},
-						Status: v1.NodeStatus{
-							Conditions: []v1.NodeCondition{
-								{
-									Type:               v1.NodeReady,
-									Status:             v1.ConditionTrue,
-									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								},
-							},
-						},
-					},
-				},
-				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
-			},
-			daemonSets:          nil,
-			timeToPass:          0,
-			newNodeStatus:       v1.NodeStatus{},
-			secondNodeNewStatus: healthyNodeNewStatus,
-			expectedEvictPods:   false,
-			description:         "Node created recently, with no status.",
-		},
-		// Node created recently without FailureDomain labels which is added back later, with no status (happens only at cluster startup).
-		{
-			fakeNodeHandler: &testutil.FakeNodeHandler{
-				Existing: []*v1.Node{
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:              "node0",
-							CreationTimestamp: fakeNow,
-						},
-					},
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:              "node1",
-							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						},
-						Status: v1.NodeStatus{
-							Conditions: []v1.NodeCondition{
-								{
-									Type:               v1.NodeReady,
-									Status:             v1.ConditionTrue,
-									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								},
-							},
-						},
-					},
-				},
-				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
-			},
-			daemonSets:          nil,
-			timeToPass:          0,
-			newNodeStatus:       v1.NodeStatus{},
-			secondNodeNewStatus: healthyNodeNewStatus,
-			expectedEvictPods:   false,
-			description:         "Node created recently without FailureDomain labels which is added back later, with no status (happens only at cluster startup).",
-		},
-		// Node created long time ago, and kubelet posted NotReady for a short period of time.
-		{
-			fakeNodeHandler: &testutil.FakeNodeHandler{
-				Existing: []*v1.Node{
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:              "node0",
-							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-							Labels: map[string]string{
-								v1.LabelTopologyRegion:          "region1",
-								v1.LabelTopologyZone:            "zone1",
-								v1.LabelFailureDomainBetaRegion: "region1",
-								v1.LabelFailureDomainBetaZone:   "zone1",
-							},
-						},
-						Status: v1.NodeStatus{
-							Conditions: []v1.NodeCondition{
-								{
-									Type:               v1.NodeReady,
-									Status:             v1.ConditionFalse,
-									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								},
-							},
-						},
-					},
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:              "node1",
-							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-							Labels: map[string]string{
-								v1.LabelTopologyRegion:          "region1",
-								v1.LabelTopologyZone:            "zone1",
-								v1.LabelFailureDomainBetaRegion: "region1",
-								v1.LabelFailureDomainBetaZone:   "zone1",
-							},
-						},
-						Status: v1.NodeStatus{
-							Conditions: []v1.NodeCondition{
-								{
-									Type:               v1.NodeReady,
-									Status:             v1.ConditionTrue,
-									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								},
-							},
-						},
-					},
-				},
-				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
-			},
-			daemonSets: nil,
-			newNodeStatus: v1.NodeStatus{
-				Conditions: []v1.NodeCondition{
-					{
-						Type:   v1.NodeReady,
-						Status: v1.ConditionFalse,
-						// Node status has just been updated, and is NotReady for 10min.
-						LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 9, 0, 0, time.UTC),
-						LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-					},
-				},
-			},
-			secondNodeNewStatus: healthyNodeNewStatus,
-			expectedEvictPods:   true,
-			description:         "Node created long time ago, and kubelet posted NotReady for a short period of time.",
-		},
-		// Pod is ds-managed, and kubelet posted NotReady for a long period of time.
-		{
-			fakeNodeHandler: &testutil.FakeNodeHandler{
-				Existing: []*v1.Node{
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:              "node0",
-							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-							Labels: map[string]string{
-								v1.LabelTopologyRegion:          "region1",
-								v1.LabelTopologyZone:            "zone1",
-								v1.LabelFailureDomainBetaRegion: "region1",
-								v1.LabelFailureDomainBetaZone:   "zone1",
-							},
-						},
-						Status: v1.NodeStatus{
-							Conditions: []v1.NodeCondition{
-								{
-									Type:               v1.NodeReady,
-									Status:             v1.ConditionFalse,
-									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								},
-							},
-						},
-					},
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:              "node1",
-							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-							Labels: map[string]string{
-								v1.LabelTopologyRegion:          "region1",
-								v1.LabelTopologyZone:            "zone1",
-								v1.LabelFailureDomainBetaRegion: "region1",
-								v1.LabelFailureDomainBetaZone:   "zone1",
-							},
-						},
-						Status: v1.NodeStatus{
-							Conditions: []v1.NodeCondition{
-								{
-									Type:               v1.NodeReady,
-									Status:             v1.ConditionTrue,
-									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								},
-							},
-						},
-					},
-				},
-				Clientset: fake.NewSimpleClientset(
-					&v1.PodList{
-						Items: []v1.Pod{
-							{
-								ObjectMeta: metav1.ObjectMeta{
-									Name:      "pod0",
-									Namespace: "default",
-									Labels:    map[string]string{"daemon": "yes"},
-								},
-								Spec: v1.PodSpec{
-									NodeName: "node0",
-								},
-							},
-						},
-					},
-				),
-			},
-			daemonSets: []apps.DaemonSet{
+		"No Disruption: Node created recently without failure domain labels (happens only at cluster startup)": {
+			nodeList: []*v1.Node{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "ds0",
-						Namespace: "default",
+						Name:              "node0",
+						CreationTimestamp: fakeNow,
 					},
-					Spec: apps.DaemonSetSpec{
-						Selector: &metav1.LabelSelector{
-							MatchLabels: map[string]string{"daemon": "yes"},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:               v1.NodeReady,
+								Status:             v1.ConditionTrue,
+								LastHeartbeatTime:  fakeNow,
+								LastTransitionTime: fakeNow,
+							},
 						},
 					},
 				},
 			},
-			timeToPass: time.Hour,
-			newNodeStatus: v1.NodeStatus{
-				Conditions: []v1.NodeCondition{
-					{
-						Type:   v1.NodeReady,
-						Status: v1.ConditionFalse,
-						// Node status has just been updated, and is NotReady for 1hr.
-						LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 59, 0, 0, time.UTC),
-						LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-					},
-				},
+			updatedNodeStatuses: []v1.NodeStatus{
+				healthyNodeNewStatus,
 			},
-			secondNodeNewStatus: healthyNodeNewStatus,
-			expectedEvictPods:   false,
-			description:         "Pod is ds-managed, and kubelet posted NotReady for a long period of time.",
+			expectedInitialStates: map[string]ZoneState{
+				"": stateNormal,
+			},
+			expectedFollowingStates: map[string]ZoneState{
+				"": stateNormal,
+			},
 		},
-		// Node created long time ago, and kubelet posted NotReady for a long period of time.
-		{
-			fakeNodeHandler: &testutil.FakeNodeHandler{
-				Existing: []*v1.Node{
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:              "node0",
-							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-							Labels: map[string]string{
-								v1.LabelTopologyRegion:          "region1",
-								v1.LabelTopologyZone:            "zone1",
-								v1.LabelFailureDomainBetaRegion: "region1",
-								v1.LabelFailureDomainBetaZone:   "zone1",
-							},
-						},
-						Status: v1.NodeStatus{
-							Conditions: []v1.NodeCondition{
-								{
-									Type:               v1.NodeReady,
-									Status:             v1.ConditionFalse,
-									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								},
-							},
+		"No Disruption: Initially both zones down, one comes back": {
+			nodeList: []*v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "node0",
+						CreationTimestamp: fakeNow,
+						Labels: map[string]string{
+							v1.LabelTopologyRegion:          "region1",
+							v1.LabelTopologyZone:            "zone1",
+							v1.LabelFailureDomainBetaRegion: "region1",
+							v1.LabelFailureDomainBetaZone:   "zone1",
 						},
 					},
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:              "node1",
-							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-							Labels: map[string]string{
-								v1.LabelTopologyRegion:          "region1",
-								v1.LabelTopologyZone:            "zone1",
-								v1.LabelFailureDomainBetaRegion: "region1",
-								v1.LabelFailureDomainBetaZone:   "zone1",
-							},
-						},
-						Status: v1.NodeStatus{
-							Conditions: []v1.NodeCondition{
-								{
-									Type:               v1.NodeReady,
-									Status:             v1.ConditionTrue,
-									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:               v1.NodeReady,
+								Status:             v1.ConditionUnknown,
+								LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 							},
 						},
 					},
 				},
-				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
-			},
-			daemonSets: nil,
-			timeToPass: time.Hour,
-			newNodeStatus: v1.NodeStatus{
-				Conditions: []v1.NodeCondition{
-					{
-						Type:   v1.NodeReady,
-						Status: v1.ConditionFalse,
-						// Node status has just been updated, and is NotReady for 1hr.
-						LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 59, 0, 0, time.UTC),
-						LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "node1",
+						CreationTimestamp: fakeNow,
+						Labels: map[string]string{
+							v1.LabelTopologyRegion:          "region1",
+							v1.LabelTopologyZone:            "zone2",
+							v1.LabelFailureDomainBetaRegion: "region1",
+							v1.LabelFailureDomainBetaZone:   "zone2",
+						},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:               v1.NodeReady,
+								Status:             v1.ConditionUnknown,
+								LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							},
+						},
 					},
 				},
 			},
-			secondNodeNewStatus: healthyNodeNewStatus,
-			expectedEvictPods:   true,
-			description:         "Node created long time ago, and kubelet posted NotReady for a long period of time.",
+			updatedNodeStatuses: []v1.NodeStatus{
+				unhealthyNodeNewStatus,
+				healthyNodeNewStatus,
+			},
+			expectedInitialStates: map[string]ZoneState{
+				testutil.CreateZoneID("region1", "zone1"): stateFullDisruption,
+				testutil.CreateZoneID("region1", "zone2"): stateFullDisruption,
+			},
+			expectedFollowingStates: map[string]ZoneState{
+				testutil.CreateZoneID("region1", "zone1"): stateFullDisruption,
+				testutil.CreateZoneID("region1", "zone2"): stateNormal,
+			},
 		},
-		// Node created long time ago, node controller posted Unknown for a short period of time.
-		{
-			fakeNodeHandler: &testutil.FakeNodeHandler{
-				Existing: []*v1.Node{
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:              "node0",
-							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-							Labels: map[string]string{
-								v1.LabelTopologyRegion:          "region1",
-								v1.LabelTopologyZone:            "zone1",
-								v1.LabelFailureDomainBetaRegion: "region1",
-								v1.LabelFailureDomainBetaZone:   "zone1",
-							},
-						},
-						Status: v1.NodeStatus{
-							Conditions: []v1.NodeCondition{
-								{
-									Type:               v1.NodeReady,
-									Status:             v1.ConditionUnknown,
-									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								},
-							},
-						},
-					},
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:              "node1",
-							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-							Labels: map[string]string{
-								v1.LabelTopologyRegion:          "region1",
-								v1.LabelTopologyZone:            "zone1",
-								v1.LabelFailureDomainBetaRegion: "region1",
-								v1.LabelFailureDomainBetaZone:   "zone1",
-							},
-						},
-						Status: v1.NodeStatus{
-							Conditions: []v1.NodeCondition{
-								{
-									Type:               v1.NodeReady,
-									Status:             v1.ConditionTrue,
-									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								},
-							},
+		"Partial Disruption: Nodes created recently without status conditions (happens only at cluster startup)": {
+			nodeList: []*v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "node0",
+						CreationTimestamp: fakeNow,
+						Labels: map[string]string{
+							v1.LabelTopologyRegion:          "region1",
+							v1.LabelTopologyZone:            "zone1",
+							v1.LabelFailureDomainBetaRegion: "region1",
+							v1.LabelFailureDomainBetaZone:   "zone1",
 						},
 					},
 				},
-				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
-			},
-			daemonSets: nil,
-			timeToPass: testNodeMonitorGracePeriod,
-			newNodeStatus: v1.NodeStatus{
-				Conditions: []v1.NodeCondition{
-					{
-						Type:   v1.NodeReady,
-						Status: v1.ConditionUnknown,
-						// Node status was updated by nodecontroller 10min ago
-						LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-						LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "node1",
+						CreationTimestamp: fakeNow,
+						Labels: map[string]string{
+							v1.LabelTopologyRegion:          "region1",
+							v1.LabelTopologyZone:            "zone1",
+							v1.LabelFailureDomainBetaRegion: "region1",
+							v1.LabelFailureDomainBetaZone:   "zone1",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "node2",
+						CreationTimestamp: fakeNow,
+						Labels: map[string]string{
+							v1.LabelTopologyRegion:          "region1",
+							v1.LabelTopologyZone:            "zone1",
+							v1.LabelFailureDomainBetaRegion: "region1",
+							v1.LabelFailureDomainBetaZone:   "zone1",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "node3",
+						CreationTimestamp: fakeNow,
+						Labels: map[string]string{
+							v1.LabelTopologyRegion:          "region1",
+							v1.LabelTopologyZone:            "zone1",
+							v1.LabelFailureDomainBetaRegion: "region1",
+							v1.LabelFailureDomainBetaZone:   "zone1",
+						},
 					},
 				},
 			},
-			secondNodeNewStatus: healthyNodeNewStatus,
-			expectedEvictPods:   true,
-			description:         "Node created long time ago, node controller posted Unknown for a short period of time.",
+			updatedNodeStatuses: []v1.NodeStatus{
+				unhealthyNodeNewStatus,
+				unhealthyNodeNewStatus,
+				unhealthyNodeNewStatus,
+				healthyNodeNewStatus,
+			},
+			expectedInitialStates: map[string]ZoneState{
+				// we've not received any status for the nodes yet
+				// so the controller assumes the zones is fully disrupted
+				testutil.CreateZoneID("region1", "zone1"): stateFullDisruption,
+			},
+			expectedFollowingStates: map[string]ZoneState{
+				testutil.CreateZoneID("region1", "zone1"): statePartialDisruption,
+			},
 		},
-		// Node created long time ago, node controller posted Unknown for a long period of time.
-		{
-			fakeNodeHandler: &testutil.FakeNodeHandler{
-				Existing: []*v1.Node{
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:              "node0",
-							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-							Labels: map[string]string{
-								v1.LabelTopologyRegion:          "region1",
-								v1.LabelTopologyZone:            "zone1",
-								v1.LabelFailureDomainBetaRegion: "region1",
-								v1.LabelFailureDomainBetaZone:   "zone1",
-							},
-						},
-						Status: v1.NodeStatus{
-							Conditions: []v1.NodeCondition{
-								{
-									Type:               v1.NodeReady,
-									Status:             v1.ConditionUnknown,
-									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								},
-							},
+		"Partial Disruption: one Node failed leading to the number of healthy Nodes to exceed the configured threshold": {
+			nodeList: []*v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "node0",
+						CreationTimestamp: fakeNow,
+						Labels: map[string]string{
+							v1.LabelTopologyRegion:          "region1",
+							v1.LabelTopologyZone:            "zone1",
+							v1.LabelFailureDomainBetaRegion: "region1",
+							v1.LabelFailureDomainBetaZone:   "zone1",
 						},
 					},
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:              "node1",
-							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-							Labels: map[string]string{
-								v1.LabelTopologyRegion:          "region1",
-								v1.LabelTopologyZone:            "zone1",
-								v1.LabelFailureDomainBetaRegion: "region1",
-								v1.LabelFailureDomainBetaZone:   "zone1",
-							},
-						},
-						Status: v1.NodeStatus{
-							Conditions: []v1.NodeCondition{
-								{
-									Type:               v1.NodeReady,
-									Status:             v1.ConditionTrue,
-									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:               v1.NodeReady,
+								Status:             v1.ConditionUnknown,
+								LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 							},
 						},
 					},
 				},
-				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
-			},
-			daemonSets: nil,
-			timeToPass: 60 * time.Minute,
-			newNodeStatus: v1.NodeStatus{
-				Conditions: []v1.NodeCondition{
-					{
-						Type:   v1.NodeReady,
-						Status: v1.ConditionUnknown,
-						// Node status was updated by nodecontroller 1hr ago
-						LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-						LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "node1",
+						CreationTimestamp: fakeNow,
+						Labels: map[string]string{
+							v1.LabelTopologyRegion:          "region1",
+							v1.LabelTopologyZone:            "zone1",
+							v1.LabelFailureDomainBetaRegion: "region1",
+							v1.LabelFailureDomainBetaZone:   "zone1",
+						},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:               v1.NodeReady,
+								Status:             v1.ConditionUnknown,
+								LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "node2",
+						CreationTimestamp: fakeNow,
+						Labels: map[string]string{
+							v1.LabelTopologyRegion:          "region1",
+							v1.LabelTopologyZone:            "zone1",
+							v1.LabelFailureDomainBetaRegion: "region1",
+							v1.LabelFailureDomainBetaZone:   "zone1",
+						},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:               v1.NodeReady,
+								Status:             v1.ConditionTrue,
+								LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "node3",
+						CreationTimestamp: fakeNow,
+						Labels: map[string]string{
+							v1.LabelTopologyRegion:          "region1",
+							v1.LabelTopologyZone:            "zone1",
+							v1.LabelFailureDomainBetaRegion: "region1",
+							v1.LabelFailureDomainBetaZone:   "zone1",
+						},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:               v1.NodeReady,
+								Status:             v1.ConditionTrue,
+								LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "node4",
+						CreationTimestamp: fakeNow,
+						Labels: map[string]string{
+							v1.LabelTopologyRegion:          "region1",
+							v1.LabelTopologyZone:            "zone1",
+							v1.LabelFailureDomainBetaRegion: "region1",
+							v1.LabelFailureDomainBetaZone:   "zone1",
+						},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:               v1.NodeReady,
+								Status:             v1.ConditionTrue,
+								LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							},
+						},
 					},
 				},
 			},
-			secondNodeNewStatus: healthyNodeNewStatus,
-			expectedEvictPods:   true,
-			description:         "Node created long time ago, node controller posted Unknown for a long period of time.",
+			updatedNodeStatuses: []v1.NodeStatus{
+				unhealthyNodeNewStatus,
+				unhealthyNodeNewStatus,
+				unhealthyNodeNewStatus,
+				healthyNodeNewStatus,
+				healthyNodeNewStatus,
+			},
+			expectedInitialStates: map[string]ZoneState{
+				testutil.CreateZoneID("region1", "zone1"): stateNormal,
+			},
+			expectedFollowingStates: map[string]ZoneState{
+				testutil.CreateZoneID("region1", "zone1"): statePartialDisruption,
+			},
+		},
+		"Full Disruption: the zone has less than 2 Nodes down, the last healthy Node has failed": {
+			nodeList: []*v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "node0",
+						CreationTimestamp: fakeNow,
+						Labels: map[string]string{
+							v1.LabelTopologyRegion:          "region1",
+							v1.LabelTopologyZone:            "zone1",
+							v1.LabelFailureDomainBetaRegion: "region1",
+							v1.LabelFailureDomainBetaZone:   "zone1",
+						},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:               v1.NodeReady,
+								Status:             v1.ConditionUnknown,
+								LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "node1",
+						CreationTimestamp: fakeNow,
+						Labels: map[string]string{
+							v1.LabelTopologyRegion:          "region1",
+							v1.LabelTopologyZone:            "zone1",
+							v1.LabelFailureDomainBetaRegion: "region1",
+							v1.LabelFailureDomainBetaZone:   "zone1",
+						},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:               v1.NodeReady,
+								Status:             v1.ConditionUnknown,
+								LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "node2",
+						CreationTimestamp: fakeNow,
+						Labels: map[string]string{
+							v1.LabelTopologyRegion:          "region1",
+							v1.LabelTopologyZone:            "zone1",
+							v1.LabelFailureDomainBetaRegion: "region1",
+							v1.LabelFailureDomainBetaZone:   "zone1",
+						},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:               v1.NodeReady,
+								Status:             v1.ConditionTrue,
+								LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							},
+						},
+					},
+				},
+			},
+			updatedNodeStatuses: []v1.NodeStatus{
+				unhealthyNodeNewStatus,
+				unhealthyNodeNewStatus,
+				unhealthyNodeNewStatus,
+			},
+			expectedInitialStates: map[string]ZoneState{
+				// if a zone has a number of unhealthy nodes less or equal to 2
+				// the controller will consider it normal regardless on
+				// the ration of healthy vs unhealthy nodes
+				testutil.CreateZoneID("region1", "zone1"): stateNormal,
+			},
+			expectedFollowingStates: map[string]ZoneState{
+				testutil.CreateZoneID("region1", "zone1"): stateFullDisruption,
+			},
+		},
+		"Full Disruption: all the Nodes in one zone are down": {
+			nodeList: []*v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "node0",
+						CreationTimestamp: fakeNow,
+						Labels: map[string]string{
+							v1.LabelTopologyRegion:          "region1",
+							v1.LabelTopologyZone:            "zone1",
+							v1.LabelFailureDomainBetaRegion: "region1",
+							v1.LabelFailureDomainBetaZone:   "zone1",
+						},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:               v1.NodeReady,
+								Status:             v1.ConditionUnknown,
+								LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "node1",
+						CreationTimestamp: fakeNow,
+						Labels: map[string]string{
+							v1.LabelTopologyRegion:          "region1",
+							v1.LabelTopologyZone:            "zone2",
+							v1.LabelFailureDomainBetaRegion: "region1",
+							v1.LabelFailureDomainBetaZone:   "zone2",
+						},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:               v1.NodeReady,
+								Status:             v1.ConditionTrue,
+								LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							},
+						},
+					},
+				},
+			},
+			updatedNodeStatuses: []v1.NodeStatus{
+				unhealthyNodeNewStatus,
+				healthyNodeNewStatus,
+			},
+			expectedInitialStates: map[string]ZoneState{
+				testutil.CreateZoneID("region1", "zone1"): stateFullDisruption,
+				testutil.CreateZoneID("region1", "zone2"): stateNormal,
+			},
+			expectedFollowingStates: map[string]ZoneState{
+				testutil.CreateZoneID("region1", "zone1"): stateFullDisruption,
+				testutil.CreateZoneID("region1", "zone2"): stateNormal,
+			},
+		},
+		"Full Disruption: all the Nodes in both the zones are down": {
+			nodeList: []*v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "node0",
+						CreationTimestamp: fakeNow,
+						Labels: map[string]string{
+							v1.LabelTopologyRegion:          "region1",
+							v1.LabelTopologyZone:            "zone1",
+							v1.LabelFailureDomainBetaRegion: "region1",
+							v1.LabelFailureDomainBetaZone:   "zone1",
+						},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:               v1.NodeReady,
+								Status:             v1.ConditionUnknown,
+								LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "node1",
+						CreationTimestamp: fakeNow,
+						Labels: map[string]string{
+							v1.LabelTopologyRegion:          "region2",
+							v1.LabelTopologyZone:            "zone2",
+							v1.LabelFailureDomainBetaRegion: "region2",
+							v1.LabelFailureDomainBetaZone:   "zone2",
+						},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:               v1.NodeReady,
+								Status:             v1.ConditionUnknown,
+								LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							},
+						},
+					},
+				},
+			},
+
+			updatedNodeStatuses: []v1.NodeStatus{
+				unhealthyNodeNewStatus,
+				unhealthyNodeNewStatus,
+			},
+			expectedInitialStates: map[string]ZoneState{
+				testutil.CreateZoneID("region1", "zone1"): stateFullDisruption,
+				testutil.CreateZoneID("region2", "zone2"): stateFullDisruption,
+			},
+			expectedFollowingStates: map[string]ZoneState{
+				testutil.CreateZoneID("region1", "zone1"): stateFullDisruption,
+				testutil.CreateZoneID("region2", "zone2"): stateFullDisruption,
+			},
+		},
+		"Full Disruption: Ready condition removed from the Node": {
+			nodeList: []*v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "node0",
+						CreationTimestamp: fakeNow,
+						Labels: map[string]string{
+							v1.LabelTopologyRegion:          "region1",
+							v1.LabelTopologyZone:            "zone1",
+							v1.LabelFailureDomainBetaRegion: "region1",
+							v1.LabelFailureDomainBetaZone:   "zone1",
+						},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:               v1.NodeReady,
+								Status:             v1.ConditionTrue,
+								LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							},
+						},
+					},
+				},
+			},
+
+			updatedNodeStatuses: []v1.NodeStatus{
+				{
+					Conditions: []v1.NodeCondition{},
+				},
+			},
+			expectedInitialStates: map[string]ZoneState{
+				testutil.CreateZoneID("region1", "zone1"): stateNormal,
+			},
+			expectedFollowingStates: map[string]ZoneState{
+				testutil.CreateZoneID("region1", "zone1"): stateFullDisruption,
+			},
+		},
+		"Full Disruption: the only available Node has the node.kubernetes.io/exclude-disruption label": {
+			nodeList: []*v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "node0",
+						CreationTimestamp: fakeNow,
+						Labels: map[string]string{
+							v1.LabelTopologyRegion:          "region1",
+							v1.LabelTopologyZone:            "zone1",
+							v1.LabelFailureDomainBetaRegion: "region1",
+							v1.LabelFailureDomainBetaZone:   "zone1",
+						},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:               v1.NodeReady,
+								Status:             v1.ConditionUnknown,
+								LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "node-master",
+						CreationTimestamp: fakeNow,
+						Labels: map[string]string{
+							v1.LabelTopologyRegion:          "region1",
+							v1.LabelTopologyZone:            "zone1",
+							v1.LabelFailureDomainBetaRegion: "region1",
+							v1.LabelFailureDomainBetaZone:   "zone1",
+							labelNodeDisruptionExclusion:    "",
+						},
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:               v1.NodeReady,
+								Status:             v1.ConditionTrue,
+								LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							},
+						},
+					},
+				},
+			},
+			updatedNodeStatuses: []v1.NodeStatus{
+				unhealthyNodeNewStatus,
+				healthyNodeNewStatus,
+			},
+			expectedInitialStates: map[string]ZoneState{
+				testutil.CreateZoneID("region1", "zone1"): stateFullDisruption,
+			},
+			expectedFollowingStates: map[string]ZoneState{
+				testutil.CreateZoneID("region1", "zone1"): stateFullDisruption,
+			},
 		},
 	}
 
-	_, ctx := ktesting.NewTestContext(t)
-	for _, item := range table {
-		nodeController, _ := newNodeLifecycleControllerFromClient(
-			ctx,
-			item.fakeNodeHandler,
-			testRateLimiterQPS,
-			testRateLimiterQPS,
-			testLargeClusterThreshold,
-			testUnhealthyThreshold,
-			testNodeMonitorGracePeriod,
-			testNodeStartupGracePeriod,
-			testNodeMonitorPeriod,
-		)
-		nodeController.now = func() metav1.Time { return fakeNow }
-		nodeController.recorder = testutil.NewFakeRecorder()
-		nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(item.fakeNodeHandler.Clientset)
-		for _, ds := range item.daemonSets {
-			nodeController.daemonSetInformer.Informer().GetStore().Add(&ds)
-		}
-		if err := nodeController.syncNodeStore(item.fakeNodeHandler); err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if err := nodeController.monitorNodeHealth(ctx); err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if item.timeToPass > 0 {
-			nodeController.now = func() metav1.Time { return metav1.Time{Time: fakeNow.Add(item.timeToPass)} }
-			item.fakeNodeHandler.Existing[0].Status = item.newNodeStatus
-			item.fakeNodeHandler.Existing[1].Status = item.secondNodeNewStatus
-		}
-		if len(item.fakeNodeHandler.Existing[0].Labels) == 0 && len(item.fakeNodeHandler.Existing[1].Labels) == 0 {
-			item.fakeNodeHandler.Existing[0].Labels = labels
-			item.fakeNodeHandler.Existing[1].Labels = labels
-		}
-		if err := nodeController.syncNodeStore(item.fakeNodeHandler); err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if err := nodeController.monitorNodeHealth(ctx); err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		zones := testutil.GetZones(item.fakeNodeHandler)
-		logger, _ := ktesting.NewTestContext(t)
-		for _, zone := range zones {
-			if _, ok := nodeController.zoneNoExecuteTainter[zone]; ok {
-				nodeController.zoneNoExecuteTainter[zone].Try(logger, func(value scheduler.TimedValue) (bool, time.Duration) {
-					nodeUID, _ := value.UID.(string)
-					pods, err := nodeController.getPodsAssignedToNode(value.Value)
-					if err != nil {
-						t.Errorf("unexpected error: %v", err)
-					}
-					t.Logf("listed pods %d for node %v", len(pods), value.Value)
-					controllerutil.DeletePods(ctx, item.fakeNodeHandler, pods, nodeController.recorder, value.Value, nodeUID, nodeController.daemonSetInformer.Lister())
-					return true, 0
-				})
-			} else {
-				t.Fatalf("Zone %v was uninitialized!", zone)
+	for testName, tt := range tests {
+		t.Run(testName, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			fakeNodeHandler := &testutil.FakeNodeHandler{
+				Existing:  tt.nodeList,
+				Clientset: fake.NewSimpleClientset(),
 			}
-		}
-
-		podEvicted := false
-		for _, action := range item.fakeNodeHandler.Actions() {
-			if action.GetVerb() == "delete" && action.GetResource().Resource == "pods" {
-				podEvicted = true
+			nodeController, _ := newNodeLifecycleControllerFromClient(
+				ctx,
+				fakeNodeHandler,
+				testRateLimiterQPS,
+				testRateLimiterQPS,
+				testLargeClusterThreshold,
+				testUnhealthyThreshold,
+				testNodeMonitorGracePeriod,
+				testNodeStartupGracePeriod,
+				testNodeMonitorPeriod)
+			nodeController.recorder = testutil.NewFakeRecorder()
+			nodeController.enterPartialDisruptionFunc = func(nodeNum int) float32 {
+				return testRateLimiterQPS
 			}
-		}
+			nodeController.enterFullDisruptionFunc = func(nodeNum int) float32 {
+				return testRateLimiterQPS
+			}
 
-		if item.expectedEvictPods != podEvicted {
-			t.Errorf("expected pod eviction: %+v, got %+v for %+v", item.expectedEvictPods,
-				podEvicted, item.description)
-		}
+			syncAndDiffZoneState := func(wanted map[string]ZoneState) {
+				if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if err := nodeController.monitorNodeHealth(ctx); err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if diff := cmp.Diff(wanted, nodeController.zoneStates); diff != "" {
+					t.Errorf("unexpected zone state (-want +got):\n%s", diff)
+				}
+			}
+
+			// initial zone state
+			nodeController.now = func() metav1.Time { return fakeNow }
+			syncAndDiffZoneState(tt.expectedInitialStates)
+
+			// following zone state
+			nodeController.now = func() metav1.Time { return metav1.Time{Time: fakeNow.Add(timeToPass)} }
+			for i := range tt.updatedNodeStatuses {
+				fakeNodeHandler.Existing[i].Status = tt.updatedNodeStatuses[i]
+			}
+			syncAndDiffZoneState(tt.expectedFollowingStates)
+		})
 	}
 }
 
@@ -1140,10 +1249,10 @@ func TestMonitorNodeHealthUpdateStatus(t *testing.T) {
 			t.Errorf("expected %v call, but got %v.", item.expectedRequestCount, item.fakeNodeHandler.RequestCount)
 		}
 		if len(item.fakeNodeHandler.UpdatedNodes) > 0 && !apiequality.Semantic.DeepEqual(item.expectedNodes, item.fakeNodeHandler.UpdatedNodes) {
-			t.Errorf("Case[%d] unexpected nodes: %s", i, diff.ObjectDiff(item.expectedNodes[0], item.fakeNodeHandler.UpdatedNodes[0]))
+			t.Errorf("Case[%d] unexpected nodes: %s", i, cmp.Diff(item.expectedNodes[0], item.fakeNodeHandler.UpdatedNodes[0]))
 		}
 		if len(item.fakeNodeHandler.UpdatedNodeStatuses) > 0 && !apiequality.Semantic.DeepEqual(item.expectedNodes, item.fakeNodeHandler.UpdatedNodeStatuses) {
-			t.Errorf("Case[%d] unexpected nodes: %s", i, diff.ObjectDiff(item.expectedNodes[0], item.fakeNodeHandler.UpdatedNodeStatuses[0]))
+			t.Errorf("Case[%d] unexpected nodes: %s", i, cmp.Diff(item.expectedNodes[0], item.fakeNodeHandler.UpdatedNodeStatuses[0]))
 		}
 
 		podStatusUpdated := false
@@ -1690,10 +1799,10 @@ func TestMonitorNodeHealthUpdateNodeAndPodStatusWithLease(t *testing.T) {
 				t.Errorf("expected %v call, but got %v.", item.expectedRequestCount, item.fakeNodeHandler.RequestCount)
 			}
 			if len(item.fakeNodeHandler.UpdatedNodes) > 0 && !apiequality.Semantic.DeepEqual(item.expectedNodes, item.fakeNodeHandler.UpdatedNodes) {
-				t.Errorf("unexpected nodes: %s", diff.ObjectDiff(item.expectedNodes[0], item.fakeNodeHandler.UpdatedNodes[0]))
+				t.Errorf("unexpected nodes: %s", cmp.Diff(item.expectedNodes[0], item.fakeNodeHandler.UpdatedNodes[0]))
 			}
 			if len(item.fakeNodeHandler.UpdatedNodeStatuses) > 0 && !apiequality.Semantic.DeepEqual(item.expectedNodes, item.fakeNodeHandler.UpdatedNodeStatuses) {
-				t.Errorf("unexpected nodes: %s", diff.ObjectDiff(item.expectedNodes[0], item.fakeNodeHandler.UpdatedNodeStatuses[0]))
+				t.Errorf("unexpected nodes: %s", cmp.Diff(item.expectedNodes[0], item.fakeNodeHandler.UpdatedNodeStatuses[0]))
 			}
 
 			podStatusUpdated := false

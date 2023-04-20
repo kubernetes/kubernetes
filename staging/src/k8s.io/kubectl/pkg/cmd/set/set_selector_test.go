@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 )
@@ -324,7 +325,7 @@ func TestSelectorTest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	iostreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	iostreams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	o := &SetSelectorOptions{
 		selector:       labelToSet,
 		ResourceFinder: genericclioptions.NewSimpleFakeResourceFinder(info),

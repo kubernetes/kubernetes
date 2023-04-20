@@ -21,9 +21,9 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	eventsv1 "k8s.io/api/events/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
@@ -96,7 +96,7 @@ func TestRecordEventToSink(t *testing.T) {
 
 			recordedEvent := recordedEvents.Items[0]
 			if !reflect.DeepEqual(recordedEvent, tc.expectedRecordedEvent) {
-				t.Errorf("expected to have recorded Event: %#+v, got: %#+v\n diff: %s", tc.expectedRecordedEvent, recordedEvent, diff.ObjectReflectDiff(tc.expectedRecordedEvent, recordedEvent))
+				t.Errorf("expected to have recorded Event: %#+v, got: %#+v\n diff: %s", tc.expectedRecordedEvent, recordedEvent, cmp.Diff(tc.expectedRecordedEvent, recordedEvent))
 			}
 		})
 	}

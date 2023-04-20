@@ -18,6 +18,7 @@ package networking
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -698,4 +699,56 @@ type ClusterCIDRList struct {
 
 	// items is the list of ClusterCIDRs.
 	Items []ClusterCIDR
+}
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// IPAddress represents a single IP of a single IP Family. The object is designed to be used by APIs
+// that operate on IP addresses. The object is used by the Service core API for allocation of IP addresses.
+// An IP address can be represented in different formats, to guarantee the uniqueness of the IP,
+// the name of the object is the IP address in canonical format, four decimal digits separated
+// by dots suppressing leading zeros for IPv4 and the representation defined by RFC 5952 for IPv6.
+// Valid: 192.168.1.5 or 2001:db8::1 or 2001:db8:aaaa:bbbb:cccc:dddd:eeee:1
+// Invalid: 10.01.2.3 or 2001:db8:0:0:0::1
+type IPAddress struct {
+	metav1.TypeMeta
+	// +optional
+	metav1.ObjectMeta
+	// +optional
+	Spec IPAddressSpec
+}
+
+// IPAddressSpec describe the attributes in an IP Address,
+type IPAddressSpec struct {
+	// ParentRef references the resource that an IPAddress is attached to.
+	// An IPAddress must reference a parent object.
+	// +required
+	ParentRef *ParentReference
+}
+type ParentReference struct {
+	// Group is the group of the object being referenced.
+	Group string
+	// Resource is the resource of the object being referenced.
+	Resource string
+	// Namespace is the namespace of the object being referenced.
+	Namespace string
+	// Name is the name of the object being referenced.
+	Name string
+	// UID is the uid of the object being referenced.
+	// +optional
+	UID types.UID
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// IPAddressList contains a list of IPAddress.
+type IPAddressList struct {
+	metav1.TypeMeta
+	// +optional
+	metav1.ListMeta
+
+	// Items is the list of IPAddress
+	Items []IPAddress
 }

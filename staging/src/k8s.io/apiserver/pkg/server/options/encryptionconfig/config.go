@@ -358,7 +358,7 @@ func (h *kmsv2PluginProbe) rotateDEKOnKeyIDChange(ctx context.Context, statusKey
 		return nil
 	}
 
-	transformer, resp, errGen := envelopekmsv2.GenerateTransformer(ctx, uid, h.service)
+	transformer, resp, cacheKey, errGen := envelopekmsv2.GenerateTransformer(ctx, uid, h.service)
 
 	if resp == nil {
 		resp = &kmsservice.EncryptResponse{} // avoid nil panics
@@ -374,6 +374,7 @@ func (h *kmsv2PluginProbe) rotateDEKOnKeyIDChange(ctx context.Context, statusKey
 			Annotations:         resp.Annotations,
 			UID:                 uid,
 			ExpirationTimestamp: expirationTimestamp,
+			CacheKey:            cacheKey,
 		})
 		klog.V(6).InfoS("successfully rotated DEK",
 			"uid", uid,
@@ -408,6 +409,10 @@ func (h *kmsv2PluginProbe) getCurrentState() (envelopekmsv2.State, error) {
 
 	if state.ExpirationTimestamp.IsZero() {
 		return envelopekmsv2.State{}, fmt.Errorf("got unexpected zero expirationTimestamp")
+	}
+
+	if len(state.CacheKey) == 0 {
+		return envelopekmsv2.State{}, fmt.Errorf("got unexpected empty cacheKey")
 	}
 
 	return state, nil

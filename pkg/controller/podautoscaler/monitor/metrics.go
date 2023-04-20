@@ -46,10 +46,27 @@ var (
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"action", "error"})
+	metricComputationTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      hpaControllerSubsystem,
+			Name:           "metric_computation_total",
+			Help:           "Number of metric computations. The label 'action' should be either 'scale_down', 'scale_up', or 'none'. Also, the label 'error' should be either 'spec', 'internal', or 'none'. The label 'metric_type' corresponds to HPA.spec.metrics[*].type",
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"action", "error", "metric_type"})
+	metricComputationDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      hpaControllerSubsystem,
+			Name:           "metric_computation_duration_seconds",
+			Help:           "The time(seconds) that the HPA controller takes to calculate one metric. The label 'action' should be either 'scale_down', 'scale_up', or 'none'. The label 'error' should be either 'spec', 'internal', or 'none'. The label 'metric_type' corresponds to HPA.spec.metrics[*].type",
+			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"action", "error", "metric_type"})
 
 	metricsList = []metrics.Registerable{
 		reconciliationsTotal,
 		reconciliationsDuration,
+		metricComputationTotal,
+		metricComputationDuration,
 	}
 )
 

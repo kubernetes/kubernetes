@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	goruntime "runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -42,7 +41,10 @@ import (
 )
 
 var (
-	fetchEvent = func(recorder *record.FakeRecorder) string {
+	// testHostNameserver and testHostDomain are also being used in dns_windows_test.go.
+	testHostNameserver = "8.8.8.8"
+	testHostDomain     = "host.domain"
+	fetchEvent         = func(recorder *record.FakeRecorder) string {
 		select {
 		case event := <-recorder.Events:
 			return event
@@ -457,26 +459,19 @@ func TestGetPodDNS(t *testing.T) {
 	testCases := []struct {
 		desc              string
 		expandedDNSConfig bool
-		skipOnWindows     bool
 	}{
 		{
 			desc:              "Not ExpandedDNSConfig",
 			expandedDNSConfig: false,
-			skipOnWindows:     true,
 		},
 		{
 			desc:              "ExpandedDNSConfig",
 			expandedDNSConfig: true,
-			skipOnWindows:     true,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			// Skip tests that fail on Windows, as discussed during the SIG Testing meeting from January 10, 2023
-			if tc.skipOnWindows && goruntime.GOOS == "windows" {
-				t.Skip("Skipping test that fails on Windows")
-			}
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandedDNSConfig, tc.expandedDNSConfig)()
 			testGetPodDNS(t)
 		})
@@ -541,8 +536,8 @@ func testGetPodDNS(t *testing.T) {
 		t.Errorf("expected search \".\", got %+v", options[3].DNSSearch)
 	}
 
-	testResolverConfig := "/etc/resolv.conf"
-	configurer = NewConfigurer(recorder, nodeRef, nil, testClusterDNS, testClusterDNSDomain, testResolverConfig)
+	configurer = NewConfigurer(recorder, nodeRef, nil, testClusterDNS, testClusterDNSDomain, defaultResolvConf)
+	configurer.getHostDNSConfig = fakeGetHostDNSConfigCustom
 	for i, pod := range pods {
 		var err error
 		dnsConfig, err := configurer.GetPodDNS(pod)
@@ -599,8 +594,6 @@ func TestGetPodDNSCustom(t *testing.T) {
 	testSvcDomain := fmt.Sprintf("svc.%s", testClusterDNSDomain)
 	testNsSvcDomain := fmt.Sprintf("%s.svc.%s", testPodNamespace, testClusterDNSDomain)
 	testNdotsOptionValue := "3"
-	testHostNameserver := "8.8.8.8"
-	testHostDomain := "host.domain"
 
 	testPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

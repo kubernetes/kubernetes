@@ -32,7 +32,7 @@ CODEGEN_PKG=${CODEGEN_PKG:-$(cd "${SCRIPT_ROOT}"; ls -d -1 ./vendor/k8s.io/code-
   k8s.io/metrics/pkg/client \
   k8s.io/metrics/pkg/apis \
   k8s.io/metrics/pkg/apis \
-  "metrics:v1alpha1,v1beta1 custom_metrics:v1beta1 external_metrics:v1beta1" \
+  "metrics:v1alpha1,v1beta1 custom_metrics:v1beta1,v1beta2 external_metrics:v1beta1" \
   --output-base "$(dirname "${BASH_SOURCE[0]}")/../../.." \
   --go-header-file "${SCRIPT_ROOT}/hack/boilerplate.go.txt"
 "${CODEGEN_PKG}/generate-groups.sh" "client" \

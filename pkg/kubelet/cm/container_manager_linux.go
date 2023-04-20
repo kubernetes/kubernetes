@@ -965,6 +965,41 @@ func (cm *containerManagerImpl) GetAllocatableMemory() []*podresourcesapi.Contai
 	return containerMemoryFromBlock(cm.memoryManager.GetAllocatableMemory())
 }
 
+func (cm *containerManagerImpl) GetDynamicResources(pod *v1.Pod, container *v1.Container) []*podresourcesapi.DynamicResource {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
+		return []*podresourcesapi.DynamicResource{}
+	}
+
+	var containerDynamicResources []*podresourcesapi.DynamicResource
+	containerClaimInfos, err := cm.draManager.GetContainerClaimInfos(pod, container)
+	if err != nil {
+		klog.ErrorS(err, "Unable to get container claim info state")
+		return []*podresourcesapi.DynamicResource{}
+	}
+	for _, containerClaimInfo := range containerClaimInfos {
+		var claimResources []*podresourcesapi.ClaimResource
+		// TODO: Currently  we maintain a list of ClaimResources, each of which contains
+		// a set of CDIDevices from a different kubelet plugin. In the future we may want to
+		// include the name of the kubelet plugin and/or other types of resources that are
+		// not CDIDevices (assuming the DRAmanager supports this).
+		for _, klPluginCdiDevices := range containerClaimInfo.CDIDevices {
+			var cdiDevices []*podresourcesapi.CDIDevice
+			for _, cdiDevice := range klPluginCdiDevices {
+				cdiDevices = append(cdiDevices, &podresourcesapi.CDIDevice{Name: cdiDevice})
+			}
+			claimResources = append(claimResources, &podresourcesapi.ClaimResource{CDIDevices: cdiDevices})
+		}
+		containerDynamicResource := podresourcesapi.DynamicResource{
+			ClassName:      containerClaimInfo.ClassName,
+			ClaimName:      containerClaimInfo.ClaimName,
+			ClaimNamespace: containerClaimInfo.Namespace,
+			ClaimResources: claimResources,
+		}
+		containerDynamicResources = append(containerDynamicResources, &containerDynamicResource)
+	}
+	return containerDynamicResources
+}
+
 func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity() bool {
 	return cm.deviceManager.ShouldResetExtendedResourceCapacity()
 }

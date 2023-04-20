@@ -307,7 +307,7 @@ func NewNodeLifecycleController(
 	largeClusterThreshold int32,
 	unhealthyZoneThreshold float32,
 ) (*Controller, error) {
-	logger := klog.LoggerWithName(klog.FromContext(ctx), "NodeLifecycleController")
+	logger := klog.FromContext(ctx)
 	if kubeClient == nil {
 		logger.Error(nil, "kubeClient is nil when starting nodelifecycle Controller")
 		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
@@ -653,9 +653,11 @@ func (nc *Controller) doNoExecuteTaintingPass(ctx context.Context) {
 	}
 }
 
-// monitorNodeHealth verifies node health are constantly updated by kubelet, and
-// if not, post "NodeReady==ConditionUnknown".
-// This function will taint nodes who are not ready or not reachable for a long period of time.
+// monitorNodeHealth verifies node health are constantly updated by kubelet, and if not, post "NodeReady==ConditionUnknown".
+// This function will
+//   - add nodes which are not ready or not reachable for a long period of time to a rate-limited
+//     queue so that NoExecute taints can be added by the goroutine running the doNoExecuteTaintingPass function,
+//   - update the PodReady condition Pods according to the state of the Node Ready condition.
 func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 	start := nc.now()
 	defer func() {

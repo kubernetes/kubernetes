@@ -520,7 +520,10 @@ func (c *Controller) updateNode(old, cur interface{}) {
 	oldNode := old.(*v1.Node)
 	curNode := cur.(*v1.Node)
 
-	if topologycache.NodeReady(oldNode.Status) != topologycache.NodeReady(curNode.Status) {
+	// LabelTopologyZone may be added by cloud provider asynchronously after the Node is created.
+	// The topology cache should be updated in this case.
+	if topologycache.NodeReady(oldNode.Status) != topologycache.NodeReady(curNode.Status) ||
+		oldNode.Labels[v1.LabelTopologyZone] != curNode.Labels[v1.LabelTopologyZone] {
 		c.checkNodeTopologyDistribution()
 	}
 }

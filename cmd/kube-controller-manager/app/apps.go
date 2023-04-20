@@ -34,7 +34,6 @@ import (
 )
 
 func startDaemonSetController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
-	ctx = klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), "daemonset-controller"))
 	dsc, err := daemon.NewDaemonSetsController(
 		ctx,
 		controllerContext.InformerFactory.Apps().V1().DaemonSets(),
@@ -52,7 +51,6 @@ func startDaemonSetController(ctx context.Context, controllerContext ControllerC
 }
 
 func startStatefulSetController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
-	ctx = klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), "statefulset"))
 	go statefulset.NewStatefulSetController(
 		ctx,
 		controllerContext.InformerFactory.Core().V1().Pods(),
@@ -76,7 +74,6 @@ func startReplicaSetController(ctx context.Context, controllerContext Controller
 }
 
 func startDeploymentController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
-	ctx = klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), "deployment"))
 	dc, err := deployment.NewDeploymentController(
 		ctx,
 		controllerContext.InformerFactory.Apps().V1().Deployments(),

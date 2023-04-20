@@ -19,11 +19,11 @@ package scheme
 import (
 	"testing"
 
-	"k8s.io/api/batch/v1"
+	"github.com/google/go-cmp/cmp"
+	v1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 )
 
 func TestCronJob(t *testing.T) {
@@ -48,6 +48,6 @@ func TestCronJob(t *testing.T) {
 	uncastDst.(*v1.CronJob).TypeMeta = metav1.TypeMeta{}
 
 	if !equality.Semantic.DeepEqual(src, uncastDst) {
-		t.Fatal(diff.ObjectDiff(src, uncastDst))
+		t.Fatal(cmp.Diff(src, uncastDst))
 	}
 }

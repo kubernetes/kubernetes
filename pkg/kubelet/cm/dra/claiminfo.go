@@ -26,9 +26,9 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
-// claimInfo holds information required
+// ClaimInfo holds information required
 // to prepare and unprepare a resource claim.
-type claimInfo struct {
+type ClaimInfo struct {
 	sync.RWMutex
 	state.ClaimInfoState
 	// annotations is a list of container annotations associated with
@@ -36,42 +36,24 @@ type claimInfo struct {
 	annotations []kubecontainer.Annotation
 }
 
-func (res *claimInfo) addPodReference(podUID types.UID) {
-	res.Lock()
-	defer res.Unlock()
+func (info *ClaimInfo) addPodReference(podUID types.UID) {
+	info.Lock()
+	defer info.Unlock()
 
-	res.PodUIDs.Insert(string(podUID))
+	info.PodUIDs.Insert(string(podUID))
 }
 
-func (res *claimInfo) deletePodReference(podUID types.UID) {
-	res.Lock()
-	defer res.Unlock()
+func (info *ClaimInfo) deletePodReference(podUID types.UID) {
+	info.Lock()
+	defer info.Unlock()
 
-	res.PodUIDs.Delete(string(podUID))
+	info.PodUIDs.Delete(string(podUID))
 }
 
-// claimInfoCache is a cache of processed resource claims keyed by namespace + claim name.
-type claimInfoCache struct {
-	sync.RWMutex
-	state     state.CheckpointState
-	claimInfo map[string]*claimInfo
-}
+func (info *ClaimInfo) addCDIDevices(pluginName string, cdiDevices []string) error {
+	info.Lock()
+	defer info.Unlock()
 
-func newClaimInfo(driverName string, claimUID types.UID, claimName, namespace string, podUIDs sets.Set[string]) *claimInfo {
-	claimInfoState := state.ClaimInfoState{
-		DriverName: driverName,
-		ClaimUID:   claimUID,
-		ClaimName:  claimName,
-		Namespace:  namespace,
-		PodUIDs:    podUIDs,
-	}
-	claimInfo := claimInfo{
-		ClaimInfoState: claimInfoState,
-	}
-	return &claimInfo
-}
-
-func (info *claimInfo) addCDIDevices(pluginName string, cdiDevices []string) error {
 	// NOTE: Passing CDI device names as annotations is a temporary solution
 	// It will be removed after all runtimes are updated
 	// to get CDI device names from the ContainerConfig.CDIDevices field
@@ -90,6 +72,28 @@ func (info *claimInfo) addCDIDevices(pluginName string, cdiDevices []string) err
 	return nil
 }
 
+// claimInfoCache is a cache of processed resource claims keyed by namespace + claim name.
+type claimInfoCache struct {
+	sync.RWMutex
+	state     state.CheckpointState
+	claimInfo map[string]*ClaimInfo
+}
+
+func newClaimInfo(driverName, className string, claimUID types.UID, claimName, namespace string, podUIDs sets.Set[string]) *ClaimInfo {
+	claimInfoState := state.ClaimInfoState{
+		DriverName: driverName,
+		ClassName:  className,
+		ClaimUID:   claimUID,
+		ClaimName:  claimName,
+		Namespace:  namespace,
+		PodUIDs:    podUIDs,
+	}
+	claimInfo := ClaimInfo{
+		ClaimInfoState: claimInfoState,
+	}
+	return &claimInfo
+}
+
 // newClaimInfoCache is a function that returns an instance of the claimInfoCache.
 func newClaimInfoCache(stateDir, checkpointName string) (*claimInfoCache, error) {
 	stateImpl, err := state.NewCheckpointState(stateDir, checkpointName)
@@ -104,12 +108,13 @@ func newClaimInfoCache(stateDir, checkpointName string) (*claimInfoCache, error)
 
 	cache := &claimInfoCache{
 		state:     stateImpl,
-		claimInfo: make(map[string]*claimInfo),
+		claimInfo: make(map[string]*ClaimInfo),
 	}
 
 	for _, entry := range curState {
 		info := newClaimInfo(
 			entry.DriverName,
+			entry.ClassName,
 			entry.ClaimUID,
 			entry.ClaimName,
 			entry.Namespace,
@@ -127,14 +132,14 @@ func newClaimInfoCache(stateDir, checkpointName string) (*claimInfoCache, error)
 	return cache, nil
 }
 
-func (cache *claimInfoCache) add(res *claimInfo) {
+func (cache *claimInfoCache) add(res *ClaimInfo) {
 	cache.Lock()
 	defer cache.Unlock()
 
 	cache.claimInfo[res.ClaimName+res.Namespace] = res
 }
 
-func (cache *claimInfoCache) get(claimName, namespace string) *claimInfo {
+func (cache *claimInfoCache) get(claimName, namespace string) *ClaimInfo {
 	cache.RLock()
 	defer cache.RUnlock()
 

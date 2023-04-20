@@ -22,16 +22,29 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
-// JobTrackingFinalizer is a finalizer for Job's pods. It prevents them from
-// being deleted before being accounted in the Job status.
-//
-// Additionally, the apiserver and job controller use this string as a Job
-// annotation, to mark Jobs that are being tracked using pod finalizers.
-// However, this behavior is deprecated in kubernetes 1.26. This means that, in
-// 1.27+, one release after JobTrackingWithFinalizers graduates to GA, the
-// apiserver and job controller will ignore this annotation and they will
-// always track jobs using finalizers.
-const JobTrackingFinalizer = "batch.kubernetes.io/job-tracking"
+const (
+	// Unprefixed labels are reserved for end-users
+	// so we will add a batch.kubernetes.io to designate these labels as official Kubernetes labels.
+	// See https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#label-selector-and-annotation-conventions
+	labelPrefix = "batch.kubernetes.io/"
+	// JobTrackingFinalizer is a finalizer for Job's pods. It prevents them from
+	// being deleted before being accounted in the Job status.
+	//
+	// Additionally, the apiserver and job controller use this string as a Job
+	// annotation, to mark Jobs that are being tracked using pod finalizers.
+	// However, this behavior is deprecated in kubernetes 1.26. This means that, in
+	// 1.27+, one release after JobTrackingWithFinalizers graduates to GA, the
+	// apiserver and job controller will ignore this annotation and they will
+	// always track jobs using finalizers.
+	JobTrackingFinalizer = labelPrefix + "job-tracking"
+	// LegacyJobName and LegacyControllerUid are legacy labels that were set using unprefixed labels.
+	LegacyJobNameLabel       = "job-name"
+	LegacyControllerUidLabel = "controller-uid"
+	// JobName is a user friendly way to refer to jobs and is set in the labels for jobs.
+	JobNameLabel = labelPrefix + LegacyJobNameLabel
+	// Controller UID is used for selectors and labels for jobs
+	ControllerUidLabel = labelPrefix + LegacyControllerUidLabel
+)
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 

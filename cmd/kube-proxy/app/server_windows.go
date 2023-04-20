@@ -65,7 +65,7 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, master string
 		metrics.SetShowHidden()
 	}
 
-	client, eventClient, err := createClients(config.ClientConnection, master)
+	client, err := createClient(config.ClientConnection, master)
 	if err != nil {
 		return nil, err
 	}
@@ -111,8 +111,6 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, master string
 		proxier, err = winkernel.NewDualStackProxier(
 			config.IPTables.SyncPeriod.Duration,
 			config.IPTables.MinSyncPeriod.Duration,
-			config.IPTables.MasqueradeAll,
-			int(*config.IPTables.MasqueradeBit),
 			config.ClusterCIDR,
 			hostname,
 			nodeIPTuple(config.BindAddress),
@@ -125,8 +123,6 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, master string
 		proxier, err = winkernel.NewProxier(
 			config.IPTables.SyncPeriod.Duration,
 			config.IPTables.MinSyncPeriod.Duration,
-			config.IPTables.MasqueradeAll,
-			int(*config.IPTables.MasqueradeBit),
 			config.ClusterCIDR,
 			hostname,
 			nodeIP,
@@ -143,7 +139,6 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, master string
 
 	return &ProxyServer{
 		Client:              client,
-		EventClient:         eventClient,
 		Proxier:             proxier,
 		Broadcaster:         eventBroadcaster,
 		Recorder:            recorder,

@@ -27,6 +27,11 @@ import (
 
 // GetK8sRootDir returns the root directory for kubernetes, if present in the gopath.
 func GetK8sRootDir() (string, error) {
+	dir := os.Getenv("KUBE_ROOT")
+	if len(dir) > 0 {
+		return dir, nil
+	}
+
 	dir, err := RootDir()
 	if err != nil {
 		return "", err

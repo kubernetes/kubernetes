@@ -154,6 +154,7 @@ func TestLegacyRestStorageStrategies(t *testing.T) {
 		ServiceIPRange:       apiserverCfg.ExtraConfig.ServiceIPRange,
 		ServiceNodePortRange: apiserverCfg.ExtraConfig.ServiceNodePortRange,
 		LoopbackClientConfig: apiserverCfg.GenericConfig.LoopbackClientConfig,
+		Informers:            apiserverCfg.ExtraConfig.VersionedInformers,
 	}
 
 	_, apiGroupInfo, err := storageProvider.NewLegacyRESTStorage(serverstorage.NewResourceConfig(), apiserverCfg.GenericConfig.RESTOptionsGetter)

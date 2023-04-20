@@ -171,7 +171,7 @@ var _ = SIGDescribe("Kubelet Cgroup Manager", func() {
 	ginkgo.Describe("QOS containers", func() {
 		ginkgo.Context("On enabling QOS cgroup hierarchy", func() {
 			ginkgo.It("Top level QoS containers should have been created [NodeConformance]", func(ctx context.Context) {
-				if !framework.TestContext.KubeletConfig.CgroupsPerQOS {
+				if !kubeletCfg.CgroupsPerQOS {
 					return
 				}
 				cgroupsToVerify := []string{burstableCgroup, bestEffortCgroup}
@@ -186,7 +186,7 @@ var _ = SIGDescribe("Kubelet Cgroup Manager", func() {
 	ginkgo.Describe("Pod containers [NodeConformance]", func() {
 		ginkgo.Context("On scheduling a Guaranteed Pod", func() {
 			ginkgo.It("Pod containers should have been created under the cgroup-root", func(ctx context.Context) {
-				if !framework.TestContext.KubeletConfig.CgroupsPerQOS {
+				if !kubeletCfg.CgroupsPerQOS {
 					return
 				}
 				var (
@@ -231,7 +231,7 @@ var _ = SIGDescribe("Kubelet Cgroup Manager", func() {
 		})
 		ginkgo.Context("On scheduling a BestEffort Pod", func() {
 			ginkgo.It("Pod containers should have been created under the BestEffort cgroup", func(ctx context.Context) {
-				if !framework.TestContext.KubeletConfig.CgroupsPerQOS {
+				if !kubeletCfg.CgroupsPerQOS {
 					return
 				}
 				var (
@@ -276,7 +276,7 @@ var _ = SIGDescribe("Kubelet Cgroup Manager", func() {
 		})
 		ginkgo.Context("On scheduling a Burstable Pod", func() {
 			ginkgo.It("Pod containers should have been created under the Burstable cgroup", func(ctx context.Context) {
-				if !framework.TestContext.KubeletConfig.CgroupsPerQOS {
+				if !kubeletCfg.CgroupsPerQOS {
 					return
 				}
 				var (

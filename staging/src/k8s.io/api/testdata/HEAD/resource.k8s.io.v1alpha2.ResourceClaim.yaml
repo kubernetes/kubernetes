@@ -53,7 +53,9 @@ status:
           operator: operatorValue
           values:
           - valuesValue
-    resourceHandle: resourceHandleValue
+    resourceHandles:
+    - data: dataValue
+      driverName: driverNameValue
     shareable: true
   deallocationRequested: true
   driverName: driverNameValue

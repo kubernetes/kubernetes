@@ -32,7 +32,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"k8s.io/apimachinery/pkg/util/wait"
-	kmsapi "k8s.io/kms/apis/v2alpha1"
+	kmsapi "k8s.io/kms/apis/v2"
 )
 
 const version = "v2alpha1"

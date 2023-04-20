@@ -33,7 +33,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -882,7 +881,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			}
 			resources := m.generateLinuxContainerResources(pod, &pod.Spec.Containers[0], false)
 			tc.expected.HugepageLimits = resources.HugepageLimits
-			if diff.ObjectDiff(resources, tc.expected) != "" {
+			if !cmp.Equal(resources, tc.expected) {
 				t.Errorf("Test %s: expected resources %+v, but got %+v", tc.name, tc.expected, resources)
 			}
 		})

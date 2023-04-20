@@ -29,8 +29,6 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
-var _ ExpressionAccessor = &MatchCondition{}
-
 type ExpressionAccessor interface {
 	GetExpression() string
 	ReturnTypes() []*cel.Type
@@ -42,19 +40,6 @@ type EvaluationResult struct {
 	ExpressionAccessor ExpressionAccessor
 	Elapsed            time.Duration
 	Error              error
-}
-
-// MatchCondition contains the inputs needed to compile, evaluate and match a cel expression
-type MatchCondition struct {
-	Expression string
-}
-
-func (v *MatchCondition) GetExpression() string {
-	return v.Expression
-}
-
-func (v *MatchCondition) ReturnTypes() []*cel.Type {
-	return []*cel.Type{cel.BoolType}
 }
 
 // OptionalVariableDeclarations declares which optional CEL variables

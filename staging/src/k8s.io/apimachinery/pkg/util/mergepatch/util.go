@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/davecgh/go-spew/spew"
+	"k8s.io/apimachinery/pkg/util/dump"
 	"sigs.k8s.io/yaml"
 )
 
@@ -76,7 +76,7 @@ func ToYAMLOrError(v interface{}) string {
 func toYAML(v interface{}) (string, error) {
 	y, err := yaml.Marshal(v)
 	if err != nil {
-		return "", fmt.Errorf("yaml marshal failed:%v\n%v\n", err, spew.Sdump(v))
+		return "", fmt.Errorf("yaml marshal failed:%v\n%v\n", err, dump.Pretty(v))
 	}
 
 	return string(y), nil

@@ -327,6 +327,88 @@ func TestDeltaFIFO_addUpdate(t *testing.T) {
 	}
 }
 
+type rvAndXfrm struct {
+	rv   int
+	xfrm int
+}
+
+func TestDeltaFIFO_transformer(t *testing.T) {
+	mk := func(name string, rv int) testFifoObject {
+		return mkFifoObj(name, &rvAndXfrm{rv, 0})
+	}
+	xfrm := TransformFunc(func(obj interface{}) (interface{}, error) {
+		switch v := obj.(type) {
+		case testFifoObject:
+			v.val.(*rvAndXfrm).xfrm++
+		case DeletedFinalStateUnknown:
+			if x := v.Obj.(testFifoObject).val.(*rvAndXfrm).xfrm; x != 1 {
+				return nil, fmt.Errorf("object has been transformed wrong number of times: %#v", obj)
+			}
+		default:
+			return nil, fmt.Errorf("unexpected object: %#v", obj)
+		}
+		return obj, nil
+	})
+
+	must := func(err error) {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	f := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+		KeyFunction: testFifoObjectKeyFunc,
+		Transformer: xfrm,
+	})
+	must(f.Add(mk("foo", 10)))
+	must(f.Add(mk("bar", 11)))
+	must(f.Update(mk("foo", 12)))
+	must(f.Delete(mk("foo", 15)))
+	must(f.Replace([]interface{}{}, ""))
+	must(f.Add(mk("bar", 16)))
+	must(f.Replace([]interface{}{}, ""))
+
+	// Should be empty
+	if e, a := []string{"foo", "bar"}, f.ListKeys(); !reflect.DeepEqual(e, a) {
+		t.Errorf("Expected %+v, got %+v", e, a)
+	}
+
+	for i := 0; i < 2; i++ {
+		obj, err := f.Pop(func(o interface{}, isInInitialList bool) error { return nil })
+		if err != nil {
+			t.Fatalf("got nothing on try %v?", i)
+		}
+		obj = obj.(Deltas).Newest().Object
+		switch v := obj.(type) {
+		case testFifoObject:
+			if v.name != "foo" {
+				t.Errorf("expected regular deletion of foo, got %q", v.name)
+			}
+			rx := v.val.(*rvAndXfrm)
+			if rx.rv != 15 {
+				t.Errorf("expected last message, got %#v", obj)
+			}
+			if rx.xfrm != 1 {
+				t.Errorf("obj %v transformed wrong number of times.", obj)
+			}
+		case DeletedFinalStateUnknown:
+			tf := v.Obj.(testFifoObject)
+			rx := tf.val.(*rvAndXfrm)
+			if tf.name != "bar" {
+				t.Errorf("expected tombstone deletion of bar, got %q", tf.name)
+			}
+			if rx.rv != 16 {
+				t.Errorf("expected last message, got %#v", obj)
+			}
+			if rx.xfrm != 1 {
+				t.Errorf("tombstoned obj %v transformed wrong number of times.", obj)
+			}
+		default:
+			t.Errorf("unknown item %#v", obj)
+		}
+	}
+}
+
 func TestDeltaFIFO_enqueueingNoLister(t *testing.T) {
 	f := NewDeltaFIFOWithOptions(DeltaFIFOOptions{KeyFunction: testFifoObjectKeyFunc})
 	f.Add(mkFifoObj("foo", 10))

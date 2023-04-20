@@ -19,11 +19,15 @@ package webhook
 import (
 	"sync"
 
-	"k8s.io/api/admissionregistration/v1"
+	v1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apiserver/pkg/admission/plugin/cel"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/matchconditions"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/namespace"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/object"
+	celconfig "k8s.io/apiserver/pkg/apis/cel"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/rest"
 )
@@ -43,6 +47,9 @@ type WebhookAccessor interface {
 
 	// GetRESTClient gets the webhook client
 	GetRESTClient(clientManager *webhookutil.ClientManager) (*rest.RESTClient, error)
+
+	// GetCompiledMatcher gets the compiled matcher object
+	GetCompiledMatcher(compiler cel.FilterCompiler, authorizer authorizer.Authorizer) matchconditions.Matcher
 
 	// GetName gets the webhook Name field. Note that the name is scoped to the webhook
 	// configuration and does not provide a globally unique identity, if a unique identity is
@@ -66,6 +73,9 @@ type WebhookAccessor interface {
 	GetTimeoutSeconds() *int32
 	// GetAdmissionReviewVersions gets the webhook AdmissionReviewVersions field.
 	GetAdmissionReviewVersions() []string
+
+	// GetMatchConditions gets the webhook match conditions field.
+	GetMatchConditions() []v1.MatchCondition
 
 	// GetMutatingWebhook if the accessor contains a MutatingWebhook, returns it and true, else returns false.
 	GetMutatingWebhook() (*v1.MutatingWebhook, bool)
@@ -94,6 +104,9 @@ type mutatingWebhookAccessor struct {
 	initClient sync.Once
 	client     *rest.RESTClient
 	clientErr  error
+
+	compileMatcher  sync.Once
+	compiledMatcher matchconditions.Matcher
 }
 
 func (m *mutatingWebhookAccessor) GetUID() string {
@@ -109,6 +122,28 @@ func (m *mutatingWebhookAccessor) GetRESTClient(clientManager *webhookutil.Clien
 		m.client, m.clientErr = clientManager.HookClient(hookClientConfigForWebhook(m))
 	})
 	return m.client, m.clientErr
+}
+
+// TODO: graduation to beta: resolve the fact that we rebuild ALL items whenever ANY config changes in NewMutatingWebhookConfigurationManager and NewValidatingWebhookConfigurationManager ... now that we're doing CEL compilation, we probably want to avoid that
+func (m *mutatingWebhookAccessor) GetCompiledMatcher(compiler cel.FilterCompiler, authorizer authorizer.Authorizer) matchconditions.Matcher {
+	m.compileMatcher.Do(func() {
+		expressions := make([]cel.ExpressionAccessor, len(m.MutatingWebhook.MatchConditions))
+		for i, matchCondition := range m.MutatingWebhook.MatchConditions {
+			expressions[i] = &matchconditions.MatchCondition{
+				Name:       matchCondition.Name,
+				Expression: matchCondition.Expression,
+			}
+		}
+		m.compiledMatcher = matchconditions.NewMatcher(compiler.Compile(
+			expressions,
+			cel.OptionalVariableDeclarations{
+				HasParams:     false,
+				HasAuthorizer: true,
+			},
+			celconfig.PerCallLimit,
+		), authorizer, m.FailurePolicy, "validating", m.Name)
+	})
+	return m.compiledMatcher
 }
 
 func (m *mutatingWebhookAccessor) GetParsedNamespaceSelector() (labels.Selector, error) {
@@ -165,6 +200,10 @@ func (m *mutatingWebhookAccessor) GetAdmissionReviewVersions() []string {
 	return m.AdmissionReviewVersions
 }
 
+func (m *mutatingWebhookAccessor) GetMatchConditions() []v1.MatchCondition {
+	return m.MatchConditions
+}
+
 func (m *mutatingWebhookAccessor) GetMutatingWebhook() (*v1.MutatingWebhook, bool) {
 	return m.MutatingWebhook, true
 }
@@ -194,6 +233,9 @@ type validatingWebhookAccessor struct {
 	initClient sync.Once
 	client     *rest.RESTClient
 	clientErr  error
+
+	compileMatcher  sync.Once
+	compiledMatcher matchconditions.Matcher
 }
 
 func (v *validatingWebhookAccessor) GetUID() string {
@@ -209,6 +251,27 @@ func (v *validatingWebhookAccessor) GetRESTClient(clientManager *webhookutil.Cli
 		v.client, v.clientErr = clientManager.HookClient(hookClientConfigForWebhook(v))
 	})
 	return v.client, v.clientErr
+}
+
+func (v *validatingWebhookAccessor) GetCompiledMatcher(compiler cel.FilterCompiler, authorizer authorizer.Authorizer) matchconditions.Matcher {
+	v.compileMatcher.Do(func() {
+		expressions := make([]cel.ExpressionAccessor, len(v.ValidatingWebhook.MatchConditions))
+		for i, matchCondition := range v.ValidatingWebhook.MatchConditions {
+			expressions[i] = &matchconditions.MatchCondition{
+				Name:       matchCondition.Name,
+				Expression: matchCondition.Expression,
+			}
+		}
+		v.compiledMatcher = matchconditions.NewMatcher(compiler.Compile(
+			expressions,
+			cel.OptionalVariableDeclarations{
+				HasParams:     false,
+				HasAuthorizer: true,
+			},
+			celconfig.PerCallLimit,
+		), authorizer, v.FailurePolicy, "validating", v.Name)
+	})
+	return v.compiledMatcher
 }
 
 func (v *validatingWebhookAccessor) GetParsedNamespaceSelector() (labels.Selector, error) {
@@ -263,6 +326,10 @@ func (v *validatingWebhookAccessor) GetTimeoutSeconds() *int32 {
 
 func (v *validatingWebhookAccessor) GetAdmissionReviewVersions() []string {
 	return v.AdmissionReviewVersions
+}
+
+func (v *validatingWebhookAccessor) GetMatchConditions() []v1.MatchCondition {
+	return v.MatchConditions
 }
 
 func (v *validatingWebhookAccessor) GetMutatingWebhook() (*v1.MutatingWebhook, bool) {

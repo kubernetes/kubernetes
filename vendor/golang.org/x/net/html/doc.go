@@ -92,6 +92,21 @@ example, to process each anchor node in depth-first order:
 The relevant specifications include:
 https://html.spec.whatwg.org/multipage/syntax.html and
 https://html.spec.whatwg.org/multipage/syntax.html#tokenization
+
+# Security Considerations
+
+Care should be taken when parsing and interpreting HTML, whether full documents
+or fragments, within the framework of the HTML specification, especially with
+regard to untrusted inputs.
+
+This package provides both a tokenizer and a parser. Only the parser constructs
+a DOM according to the HTML specification, resolving malformed and misplaced
+tags where appropriate. The tokenizer simply tokenizes the HTML presented to it,
+and as such does not resolve issues that may exist in the processed HTML,
+producing a literal interpretation of the input.
+
+If your use case requires semantically well-formed HTML, as defined by the
+WHATWG specification, the parser should be used rather than the tokenizer.
 */
 package html // import "golang.org/x/net/html"
 

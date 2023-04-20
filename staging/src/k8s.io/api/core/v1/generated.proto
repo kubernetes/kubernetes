@@ -228,9 +228,10 @@ message CSIPersistentVolumeSource {
   // nodeExpandSecretRef is a reference to the secret object containing
   // sensitive information to pass to the CSI driver to complete the CSI
   // NodeExpandVolume call.
-  // This is an alpha field and requires enabling CSINodeExpandSecret feature gate.
+  // This is a beta field which is enabled default by CSINodeExpandSecret feature gate.
   // This field is optional, may be omitted if no secret is required. If the
   // secret object contains more than one secret, all secrets are passed.
+  // +featureGate=CSINodeExpandSecret
   // +optional
   optional SecretReference nodeExpandSecretRef = 10;
 }
@@ -868,15 +869,15 @@ message ContainerPort {
   optional string hostIP = 5;
 }
 
-// ContainerResizePolicy represents resource resize policy for a single container.
+// ContainerResizePolicy represents resource resize policy for the container.
 message ContainerResizePolicy {
-  // Name of the resource type to which this resource resize policy applies.
+  // Name of the resource to which this resource resize policy applies.
   // Supported values: cpu, memory.
   optional string resourceName = 1;
 
-  // Resource resize policy applicable to the specified resource name.
-  // If not specified, it defaults to RestartNotRequired.
-  optional string policy = 2;
+  // Restart policy to apply when specified resource is resized.
+  // If not specified, it defaults to NotRequired.
+  optional string restartPolicy = 2;
 }
 
 // ContainerState holds a possible state of container.
@@ -1137,10 +1138,17 @@ message EndpointPort {
   optional string protocol = 3;
 
   // The application protocol for this port.
+  // This is used as a hint for implementations to offer richer behavior for protocols that they understand.
   // This field follows standard Kubernetes label syntax.
-  // Un-prefixed names are reserved for IANA standard service names (as per
+  // Valid values are either:
+  //
+  // * Un-prefixed protocol names - reserved for IANA standard service names (as per
   // RFC-6335 and https://www.iana.org/assignments/service-names).
-  // Non-standard protocols should use prefixed names such as
+  //
+  // * Kubernetes-defined prefixed names:
+  //   * 'kubernetes.io/h2c' - HTTP/2 over cleartext as described in https://www.rfc-editor.org/rfc/rfc7540
+  //
+  // * Other protocols should use implementation-defined prefixed names such as
   // mycompany.com/my-custom-protocol.
   // +optional
   optional string appProtocol = 4;
@@ -1845,7 +1853,8 @@ message HTTPGetAction {
 
 // HTTPHeader describes a custom header to be used in HTTP probes
 message HTTPHeader {
-  // The header field name
+  // The header field name.
+  // This will be canonicalized upon output, so case-variant names will be understood as the same header.
   optional string name = 1;
 
   // The header field value
@@ -5266,10 +5275,9 @@ message ServiceSpec {
   // This feature depends on whether the underlying cloud-provider supports specifying
   // the loadBalancerIP when a load balancer is created.
   // This field will be ignored if the cloud-provider does not support the feature.
-  // Deprecated: This field was under-specified and its meaning varies across implementations,
-  // and it cannot support dual-stack.
-  // As of Kubernetes v1.24, users are encouraged to use implementation-specific annotations when available.
-  // This field may be removed in a future API version.
+  // Deprecated: This field was under-specified and its meaning varies across implementations.
+  // Using it is non-portable and it may not support dual-stack.
+  // Users are encouraged to use implementation-specific annotations when available.
   // +optional
   optional string loadBalancerIP = 8;
 
@@ -5697,8 +5705,12 @@ message TopologySpreadConstraint {
   // spreading will be calculated. The keys are used to lookup values from the
   // incoming pod labels, those key-value labels are ANDed with labelSelector
   // to select the group of existing pods over which spreading will be calculated
-  // for the incoming pod. Keys that don't exist in the incoming pod labels will
+  // for the incoming pod. The same key is forbidden to exist in both MatchLabelKeys and LabelSelector.
+  // MatchLabelKeys cannot be set when LabelSelector isn't set.
+  // Keys that don't exist in the incoming pod labels will
   // be ignored. A null or empty list means only match against labelSelector.
+  //
+  // This is a beta field and requires the MatchLabelKeysInPodTopologySpread feature gate to be enabled (enabled by default).
   // +listType=atomic
   // +optional
   repeated string matchLabelKeys = 8;

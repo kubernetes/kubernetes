@@ -159,7 +159,7 @@ func (c *ExampleController) Allocate(ctx context.Context, claim *resourcev1alpha
 	return c.allocate(ctx, claim, claimParameters, class, classParameters, selectedNode)
 }
 
-// allocate simply copies parameters as JSON map into ResourceHandle.
+// allocate simply copies parameters as JSON map into a ResourceHandle.
 func (c *ExampleController) allocate(ctx context.Context, claim *resourcev1alpha2.ResourceClaim, claimParameters interface{}, class *resourcev1alpha2.ResourceClass, classParameters interface{}, selectedNode string) (result *resourcev1alpha2.AllocationResult, err error) {
 	logger := klog.LoggerWithValues(klog.LoggerWithName(klog.FromContext(ctx), "Allocate"), "claim", klog.KObj(claim), "uid", claim.UID)
 	defer func() {
@@ -223,7 +223,12 @@ func (c *ExampleController) allocate(ctx context.Context, claim *resourcev1alpha
 	if err != nil {
 		return nil, fmt.Errorf("encode parameters: %w", err)
 	}
-	allocation.ResourceHandle = string(data)
+	allocation.ResourceHandles = []resourcev1alpha2.ResourceHandle{
+		{
+			DriverName: c.driverName,
+			Data:       string(data),
+		},
+	}
 	var nodes []string
 	if node != "" {
 		nodes = append(nodes, node)

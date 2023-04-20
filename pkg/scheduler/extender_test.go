@@ -329,7 +329,7 @@ func createNode(name string) *v1.Node {
 
 func TestIsInterested(t *testing.T) {
 	mem := &HTTPExtender{
-		managedResources: sets.NewString(),
+		managedResources: sets.New[string](),
 	}
 	mem.managedResources.Insert("memory")
 
@@ -342,7 +342,7 @@ func TestIsInterested(t *testing.T) {
 		{
 			label: "Empty managed resources",
 			extender: &HTTPExtender{
-				managedResources: sets.NewString(),
+				managedResources: sets.New[string](),
 			},
 			pod:  &v1.Pod{},
 			want: true,

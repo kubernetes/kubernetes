@@ -75,6 +75,8 @@ const (
 	FailedPlacementReason = "FailedPlacement"
 	// FailedDaemonPodReason is added to an event when the status of a Pod of a DaemonSet is 'Failed'.
 	FailedDaemonPodReason = "FailedDaemonPod"
+	// SucceededDaemonPodReason is added to an event when the status of a Pod of a DaemonSet is 'Succeeded'.
+	SucceededDaemonPodReason = "SucceededDaemonPod"
 )
 
 // controllerKind contains the schema.GroupVersionKind for this controller type.
@@ -842,6 +844,12 @@ func (dsc *DaemonSetsController) podsShouldBeOnNode(
 				// Emit an event so that it's discoverable to users.
 				dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, FailedDaemonPodReason, msg)
 				podsToDelete = append(podsToDelete, pod.Name)
+			} else if pod.Status.Phase == v1.PodSucceeded {
+				msg := fmt.Sprintf("Found succeeded daemon pod %s/%s on node %s, will try to delete it", pod.Namespace, pod.Name, node.Name)
+				logger.V(2).Info("Found succeeded daemon pod on node, will try to delete it", "pod", klog.KObj(pod), "node", klog.KObj(node))
+				// Emit an event so that it's discoverable to users.
+				dsc.eventRecorder.Eventf(ds, v1.EventTypeNormal, SucceededDaemonPodReason, msg)
+				podsToDelete = append(podsToDelete, pod.Name)
 			} else {
 				daemonPodsRunning = append(daemonPodsRunning, pod)
 			}
@@ -1274,7 +1282,7 @@ func (dsc *DaemonSetsController) syncDaemonSet(ctx context.Context, key string) 
 	case err != nil && statusErr != nil:
 		// If there was an error, and we failed to update status,
 		// log it and return the original error.
-		klog.Error(statusErr, "Failed to update status", "daemonSet", klog.KObj(ds))
+		logger.Error(statusErr, "Failed to update status", "daemonSet", klog.KObj(ds))
 		return err
 	case err != nil:
 		return err
@@ -1371,7 +1379,7 @@ func failedPodsBackoffKey(ds *apps.DaemonSet, nodeName string) string {
 // Returned pods can't be deleted by PodGCController so they should be deleted by DaemonSetController.
 func getUnscheduledPodsWithoutNode(runningNodesList []*v1.Node, nodeToDaemonPods map[string][]*v1.Pod) []string {
 	var results []string
-	isNodeRunning := make(map[string]bool)
+	isNodeRunning := make(map[string]bool, len(runningNodesList))
 	for _, node := range runningNodesList {
 		isNodeRunning[node.Name] = true
 	}

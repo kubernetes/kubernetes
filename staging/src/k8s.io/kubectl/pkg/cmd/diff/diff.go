@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/klog/v2"
@@ -114,10 +114,12 @@ type DiffOptions struct {
 	EnforceNamespace bool
 	Builder          *resource.Builder
 	Diff             *DiffProgram
-	pruner           *pruner
+
+	pruner  *pruner
+	tracker *tracker
 }
 
-func NewDiffOptions(ioStreams genericclioptions.IOStreams) *DiffOptions {
+func NewDiffOptions(ioStreams genericiooptions.IOStreams) *DiffOptions {
 	return &DiffOptions{
 		Diff: &DiffProgram{
 			Exec:      exec.New(),
@@ -126,7 +128,7 @@ func NewDiffOptions(ioStreams genericclioptions.IOStreams) *DiffOptions {
 	}
 }
 
-func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdDiff(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	options := NewDiffOptions(streams)
 	cmd := &cobra.Command{
 		Use:                   "diff -f FILENAME",
@@ -177,7 +179,7 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 // program. By default, `diff(1)` will be used.
 type DiffProgram struct {
 	Exec exec.Interface
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 func (d *DiffProgram) getCommand(args ...string) (string, exec.Cmd) {
@@ -324,7 +326,7 @@ type InfoObject struct {
 	ServerSideApply bool
 	FieldManager    string
 	ForceConflicts  bool
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 var _ Object = &InfoObject{}
@@ -659,6 +661,7 @@ func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 		if err != nil {
 			return err
 		}
+		o.tracker = newTracker()
 		o.pruner = newPruner(o.DynamicClient, mapper, resources, o.Selector)
 	}
 
@@ -723,8 +726,8 @@ func (o *DiffOptions) Run() error {
 				IOStreams:       o.Diff.IOStreams,
 			}
 
-			if o.pruner != nil {
-				o.pruner.MarkVisited(info)
+			if o.tracker != nil {
+				o.tracker.MarkVisited(info)
 			}
 
 			err = differ.Diff(obj, printer, o.ShowManagedFields)
@@ -739,7 +742,7 @@ func (o *DiffOptions) Run() error {
 	})
 
 	if o.pruner != nil {
-		prunedObjs, err := o.pruner.pruneAll(o.CmdNamespace != "")
+		prunedObjs, err := o.pruner.pruneAll(o.tracker, o.CmdNamespace != "")
 		if err != nil {
 			klog.Warningf("pruning failed and could not be evaluated err: %v", err)
 		}

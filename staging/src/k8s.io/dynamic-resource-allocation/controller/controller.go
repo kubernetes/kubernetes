@@ -139,9 +139,9 @@ type controller struct {
 	rcLister            resourcev1alpha2listers.ResourceClassLister
 	rcSynced            cache.InformerSynced
 	claimCache          cache.MutationCache
-	podSchedulingLister resourcev1alpha2listers.PodSchedulingLister
+	schedulingCtxLister resourcev1alpha2listers.PodSchedulingContextLister
 	claimSynced         cache.InformerSynced
-	podSchedulingSynced cache.InformerSynced
+	schedulingCtxSynced cache.InformerSynced
 }
 
 // TODO: make it configurable
@@ -157,7 +157,7 @@ func New(
 	logger := klog.LoggerWithName(klog.FromContext(ctx), "resource controller")
 	rcInformer := informerFactory.Resource().V1alpha2().ResourceClasses()
 	claimInformer := informerFactory.Resource().V1alpha2().ResourceClaims()
-	podSchedulingInformer := informerFactory.Resource().V1alpha2().PodSchedulings()
+	schedulingCtxInformer := informerFactory.Resource().V1alpha2().PodSchedulingContexts()
 
 	eventBroadcaster := record.NewBroadcaster()
 	go func() {
@@ -177,7 +177,7 @@ func New(
 	eventRecorder := eventBroadcaster.NewRecorder(scheme.Scheme,
 		v1.EventSource{Component: fmt.Sprintf("resource driver %s", name)})
 
-	// The work queue contains either keys for claims or PodScheduling objects.
+	// The work queue contains either keys for claims or PodSchedulingContext objects.
 	queue := workqueue.NewNamedRateLimitingQueue(
 		workqueue.DefaultControllerRateLimiter(), fmt.Sprintf("%s-queue", name))
 
@@ -199,8 +199,8 @@ func New(
 		rcSynced:            rcInformer.Informer().HasSynced,
 		claimCache:          claimCache,
 		claimSynced:         claimInformer.Informer().HasSynced,
-		podSchedulingLister: podSchedulingInformer.Lister(),
-		podSchedulingSynced: podSchedulingInformer.Informer().HasSynced,
+		schedulingCtxLister: schedulingCtxInformer.Lister(),
+		schedulingCtxSynced: schedulingCtxInformer.Informer().HasSynced,
 		queue:               queue,
 		eventRecorder:       eventRecorder,
 	}
@@ -209,11 +209,11 @@ func New(
 	if loggerV6.Enabled() {
 		resourceClaimLogger := klog.LoggerWithValues(loggerV6, "type", "ResourceClaim")
 		_, _ = claimInformer.Informer().AddEventHandler(resourceEventHandlerFuncs(&resourceClaimLogger, ctrl))
-		podSchedulingLogger := klog.LoggerWithValues(loggerV6, "type", "PodScheduling")
-		_, _ = podSchedulingInformer.Informer().AddEventHandler(resourceEventHandlerFuncs(&podSchedulingLogger, ctrl))
+		schedulingCtxLogger := klog.LoggerWithValues(loggerV6, "type", "PodSchedulingContext")
+		_, _ = schedulingCtxInformer.Informer().AddEventHandler(resourceEventHandlerFuncs(&schedulingCtxLogger, ctrl))
 	} else {
 		_, _ = claimInformer.Informer().AddEventHandler(resourceEventHandlerFuncs(nil, ctrl))
-		_, _ = podSchedulingInformer.Informer().AddEventHandler(resourceEventHandlerFuncs(nil, ctrl))
+		_, _ = schedulingCtxInformer.Informer().AddEventHandler(resourceEventHandlerFuncs(nil, ctrl))
 	}
 
 	return ctrl
@@ -233,7 +233,7 @@ func resourceEventHandlerFuncs(logger *klog.Logger, ctrl *controller) cache.Reso
 
 const (
 	claimKeyPrefix         = "claim:"
-	podSchedulingKeyPrefix = "podscheduling:"
+	schedulingCtxKeyPrefix = "schedulingCtx:"
 )
 
 func (ctrl *controller) add(logger *klog.Logger, obj interface{}) {
@@ -279,8 +279,8 @@ func getKey(obj interface{}) (string, error) {
 	switch obj.(type) {
 	case *resourcev1alpha2.ResourceClaim:
 		prefix = claimKeyPrefix
-	case *resourcev1alpha2.PodScheduling:
-		prefix = podSchedulingKeyPrefix
+	case *resourcev1alpha2.PodSchedulingContext:
+		prefix = schedulingCtxKeyPrefix
 	default:
 		return "", fmt.Errorf("unexpected object: %T", obj)
 	}
@@ -297,7 +297,7 @@ func (ctrl *controller) Run(workers int) {
 
 	stopCh := ctrl.ctx.Done()
 
-	if !cache.WaitForCacheSync(stopCh, ctrl.rcSynced, ctrl.claimSynced, ctrl.podSchedulingSynced) {
+	if !cache.WaitForCacheSync(stopCh, ctrl.rcSynced, ctrl.claimSynced, ctrl.schedulingCtxSynced) {
 		ctrl.logger.Error(nil, "Cannot sync caches")
 		return
 	}
@@ -370,16 +370,16 @@ func (ctrl *controller) syncKey(ctx context.Context, key string) (obj runtime.Ob
 			return nil, err
 		}
 		obj, finalErr = claim, ctrl.syncClaim(ctx, claim)
-	case podSchedulingKeyPrefix:
-		podScheduling, err := ctrl.podSchedulingLister.PodSchedulings(namespace).Get(name)
+	case schedulingCtxKeyPrefix:
+		schedulingCtx, err := ctrl.schedulingCtxLister.PodSchedulingContexts(namespace).Get(name)
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
-				klog.FromContext(ctx).V(5).Info("PodScheduling was deleted, no need to process it")
+				klog.FromContext(ctx).V(5).Info("PodSchedulingContext was deleted, no need to process it")
 				return nil, nil
 			}
 			return nil, err
 		}
-		obj, finalErr = podScheduling, ctrl.syncPodScheduling(ctx, podScheduling)
+		obj, finalErr = schedulingCtx, ctrl.syncPodSchedulingContexts(ctx, schedulingCtx)
 	}
 	return
 }
@@ -525,9 +525,9 @@ func (ctrl *controller) allocateClaim(ctx context.Context,
 	logger := klog.FromContext(ctx)
 
 	if claim.Status.Allocation != nil {
-		// This can happen when two PodScheduling objects trigger
+		// This can happen when two PodSchedulingContext objects trigger
 		// allocation attempts (first one wins) or when we see the
-		// update of the PodScheduling object.
+		// update of the PodSchedulingContext object.
 		logger.V(5).Info("Claim already allocated, nothing to do")
 		return nil
 	}
@@ -601,19 +601,19 @@ func (ctrl *controller) checkPodClaim(ctx context.Context, pod *v1.Pod, podClaim
 	}, nil
 }
 
-// syncClaim determines which next action may be needed for a PodScheduling object
+// syncPodSchedulingContext determines which next action may be needed for a PodSchedulingContext object
 // and does it.
-func (ctrl *controller) syncPodScheduling(ctx context.Context, podScheduling *resourcev1alpha2.PodScheduling) error {
+func (ctrl *controller) syncPodSchedulingContexts(ctx context.Context, schedulingCtx *resourcev1alpha2.PodSchedulingContext) error {
 	logger := klog.FromContext(ctx)
 
 	// Ignore deleted objects.
-	if podScheduling.DeletionTimestamp != nil {
-		logger.V(5).Info("PodScheduling marked for deletion")
+	if schedulingCtx.DeletionTimestamp != nil {
+		logger.V(5).Info("PodSchedulingContext marked for deletion")
 		return nil
 	}
 
-	if podScheduling.Spec.SelectedNode == "" &&
-		len(podScheduling.Spec.PotentialNodes) == 0 {
+	if schedulingCtx.Spec.SelectedNode == "" &&
+		len(schedulingCtx.Spec.PotentialNodes) == 0 {
 		// Nothing to do? Shouldn't occur.
 		logger.V(5).Info("Waiting for scheduler to set fields")
 		return nil
@@ -621,8 +621,8 @@ func (ctrl *controller) syncPodScheduling(ctx context.Context, podScheduling *re
 
 	// Check pod.
 	// TODO (?): use an informer - only useful when many (most?) pods have claims
-	// TODO (?): let the scheduler copy all claim names + UIDs into PodScheduling - then we don't need the pod
-	pod, err := ctrl.kubeClient.CoreV1().Pods(podScheduling.Namespace).Get(ctx, podScheduling.Name, metav1.GetOptions{})
+	// TODO (?): let the scheduler copy all claim names + UIDs into PodSchedulingContext - then we don't need the pod
+	pod, err := ctrl.kubeClient.CoreV1().Pods(schedulingCtx.Namespace).Get(ctx, schedulingCtx.Name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -632,16 +632,16 @@ func (ctrl *controller) syncPodScheduling(ctx context.Context, podScheduling *re
 	}
 
 	// Still the owner?
-	if !metav1.IsControlledBy(podScheduling, pod) {
+	if !metav1.IsControlledBy(schedulingCtx, pod) {
 		// Must be obsolete object, do nothing for it.
-		logger.V(5).Info("Pod not owner, PodScheduling is obsolete")
+		logger.V(5).Info("Pod not owner, PodSchedulingContext is obsolete")
 		return nil
 	}
 
 	// Find all pending claims that are owned by us. We bail out if any of the pre-requisites
 	// for pod scheduling (claims exist, classes exist, parameters exist) are not met.
 	// The scheduler will do the same, except for checking parameters, so usually
-	// everything should be ready once the PodScheduling object exists.
+	// everything should be ready once the PodSchedulingContext object exists.
 	var claims claimAllocations
 	for _, podClaim := range pod.Spec.ResourceClaims {
 		delayed, err := ctrl.checkPodClaim(ctx, pod, podClaim)
@@ -665,12 +665,12 @@ func (ctrl *controller) syncPodScheduling(ctx context.Context, podScheduling *re
 	// and shouldn't, because those allocations might have to be undone to
 	// pick a better node. If we don't need to allocate now, then we'll
 	// simply report back the gather information.
-	if len(podScheduling.Spec.PotentialNodes) > 0 {
-		if err := ctrl.driver.UnsuitableNodes(ctx, pod, claims, podScheduling.Spec.PotentialNodes); err != nil {
+	if len(schedulingCtx.Spec.PotentialNodes) > 0 {
+		if err := ctrl.driver.UnsuitableNodes(ctx, pod, claims, schedulingCtx.Spec.PotentialNodes); err != nil {
 			return fmt.Errorf("checking potential nodes: %v", err)
 		}
 	}
-	selectedNode := podScheduling.Spec.SelectedNode
+	selectedNode := schedulingCtx.Spec.SelectedNode
 	logger.V(5).Info("pending pod claims", "claims", claims, "selectedNode", selectedNode)
 	if selectedNode != "" {
 		unsuitable := false
@@ -703,26 +703,26 @@ func (ctrl *controller) syncPodScheduling(ctx context.Context, podScheduling *re
 	// TODO: replace with patching the array. We can do that without race conditions
 	// because each driver is responsible for its own entries.
 	modified := false
-	podScheduling = podScheduling.DeepCopy()
+	schedulingCtx = schedulingCtx.DeepCopy()
 	for _, delayed := range claims {
-		i := findClaim(podScheduling.Status.ResourceClaims, delayed.PodClaimName)
+		i := findClaim(schedulingCtx.Status.ResourceClaims, delayed.PodClaimName)
 		if i < 0 {
 			// Add new entry.
-			podScheduling.Status.ResourceClaims = append(podScheduling.Status.ResourceClaims,
+			schedulingCtx.Status.ResourceClaims = append(schedulingCtx.Status.ResourceClaims,
 				resourcev1alpha2.ResourceClaimSchedulingStatus{
 					Name:            delayed.PodClaimName,
 					UnsuitableNodes: delayed.UnsuitableNodes,
 				})
 			modified = true
-		} else if stringsDiffer(podScheduling.Status.ResourceClaims[i].UnsuitableNodes, delayed.UnsuitableNodes) {
+		} else if stringsDiffer(schedulingCtx.Status.ResourceClaims[i].UnsuitableNodes, delayed.UnsuitableNodes) {
 			// Update existing entry.
-			podScheduling.Status.ResourceClaims[i].UnsuitableNodes = delayed.UnsuitableNodes
+			schedulingCtx.Status.ResourceClaims[i].UnsuitableNodes = delayed.UnsuitableNodes
 			modified = true
 		}
 	}
 	if modified {
-		logger.V(6).Info("Updating pod scheduling with modified unsuitable nodes", "podScheduling", podScheduling)
-		if _, err := ctrl.kubeClient.ResourceV1alpha2().PodSchedulings(podScheduling.Namespace).UpdateStatus(ctx, podScheduling, metav1.UpdateOptions{}); err != nil {
+		logger.V(6).Info("Updating pod scheduling with modified unsuitable nodes", "podSchedulingCtx", schedulingCtx)
+		if _, err := ctrl.kubeClient.ResourceV1alpha2().PodSchedulingContexts(schedulingCtx.Namespace).UpdateStatus(ctx, schedulingCtx, metav1.UpdateOptions{}); err != nil {
 			return fmt.Errorf("update unsuitable node status: %v", err)
 		}
 	}

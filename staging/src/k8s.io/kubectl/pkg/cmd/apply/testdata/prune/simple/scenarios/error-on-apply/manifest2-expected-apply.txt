@@ -1,2 +1,2 @@
 namespace/foo unchanged
-error: pruning /v1, Kind=Namespace objects: deleting /bar: an error on the server ("") has prevented the request from succeeding
+error: pruning Namespace bar: an error on the server ("") has prevented the request from succeeding

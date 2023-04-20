@@ -329,8 +329,8 @@ spec:
           terminationGracePeriodSeconds: 7
           timeoutSeconds: 3
         resizePolicy:
-        - policy: policyValue
-          resourceName: resourceNameValue
+        - resourceName: resourceNameValue
+          restartPolicy: restartPolicyValue
         resources:
           claims:
           - name: nameValue
@@ -535,8 +535,8 @@ spec:
           terminationGracePeriodSeconds: 7
           timeoutSeconds: 3
         resizePolicy:
-        - policy: policyValue
-          resourceName: resourceNameValue
+        - resourceName: resourceNameValue
+          restartPolicy: restartPolicyValue
         resources:
           claims:
           - name: nameValue
@@ -743,8 +743,8 @@ spec:
           terminationGracePeriodSeconds: 7
           timeoutSeconds: 3
         resizePolicy:
-        - policy: policyValue
-          resourceName: resourceNameValue
+        - resourceName: resourceNameValue
+          restartPolicy: restartPolicyValue
         resources:
           claims:
           - name: nameValue

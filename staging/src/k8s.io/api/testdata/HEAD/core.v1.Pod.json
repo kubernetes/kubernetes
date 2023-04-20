@@ -496,7 +496,7 @@
         "resizePolicy": [
           {
             "resourceName": "resourceNameValue",
-            "policy": "policyValue"
+            "restartPolicy": "restartPolicyValue"
           }
         ],
         "volumeMounts": [
@@ -779,7 +779,7 @@
         "resizePolicy": [
           {
             "resourceName": "resourceNameValue",
-            "policy": "policyValue"
+            "restartPolicy": "restartPolicyValue"
           }
         ],
         "volumeMounts": [
@@ -1062,7 +1062,7 @@
         "resizePolicy": [
           {
             "resourceName": "resourceNameValue",
-            "policy": "policyValue"
+            "restartPolicy": "restartPolicyValue"
           }
         ],
         "volumeMounts": [

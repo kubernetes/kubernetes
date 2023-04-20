@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/kubectl/pkg/scheme"
@@ -658,7 +658,7 @@ func TestRunExposeService(t *testing.T) {
 				}),
 			}
 
-			ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+			ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
 			cmd := NewCmdExposeService(tf, ioStreams)
 			cmd.SetOut(buf)
 			cmd.SetErr(buf)
@@ -834,7 +834,7 @@ status:
 				}),
 			}
 
-			ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+			ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
 			cmd := NewCmdExposeService(tf, ioStreams)
 			cmd.SetOut(buf)
 			cmd.Flags().Set("protocol", "UDP")

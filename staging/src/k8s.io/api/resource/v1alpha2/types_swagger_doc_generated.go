@@ -28,9 +28,9 @@ package v1alpha2
 
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_AllocationResult = map[string]string{
-	"":                 "AllocationResult contains attributed of an allocated resource.",
-	"resourceHandle":   "ResourceHandle contains arbitrary data returned by the driver after a successful allocation. This is opaque for Kubernetes. Driver documentation may explain to users how to interpret this data if needed.\n\nThe maximum size of this field is 16KiB. This may get increased in the future, but not reduced.",
-	"availableOnNodes": "This field will get set by the resource driver after it has allocated the resource driver to inform the scheduler where it can schedule Pods using the ResourceClaim.\n\nSetting this field is optional. If null, the resource is available everywhere.",
+	"":                 "AllocationResult contains attributes of an allocated resource.",
+	"resourceHandles":  "ResourceHandles contain the state associated with an allocation that should be maintained throughout the lifetime of a claim. Each ResourceHandle contains data that should be passed to a specific kubelet plugin once it lands on a node. This data is returned by the driver after a successful allocation and is opaque to Kubernetes. Driver documentation may explain to users how to interpret this data if needed.\n\nSetting this field is optional. It has a maximum size of 32 entries. If null (or empty), it is assumed this allocation will be processed by a single kubelet plugin with no ResourceHandle data attached. The name of the kubelet plugin invoked will match the DriverName set in the ResourceClaimStatus this AllocationResult is embedded in.",
+	"availableOnNodes": "This field will get set by the resource driver after it has allocated the resource to inform the scheduler where it can schedule Pods using the ResourceClaim.\n\nSetting this field is optional. If null, the resource is available everywhere.",
 	"shareable":        "Shareable determines whether the resource supports more than one consumer at a time.",
 }
 
@@ -38,44 +38,44 @@ func (AllocationResult) SwaggerDoc() map[string]string {
 	return map_AllocationResult
 }
 
-var map_PodScheduling = map[string]string{
-	"":         "PodScheduling objects hold information that is needed to schedule a Pod with ResourceClaims that use \"WaitForFirstConsumer\" allocation mode.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
+var map_PodSchedulingContext = map[string]string{
+	"":         "PodSchedulingContext objects hold information that is needed to schedule a Pod with ResourceClaims that use \"WaitForFirstConsumer\" allocation mode.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
 	"metadata": "Standard object metadata",
 	"spec":     "Spec describes where resources for the Pod are needed.",
 	"status":   "Status describes where resources for the Pod can be allocated.",
 }
 
-func (PodScheduling) SwaggerDoc() map[string]string {
-	return map_PodScheduling
+func (PodSchedulingContext) SwaggerDoc() map[string]string {
+	return map_PodSchedulingContext
 }
 
-var map_PodSchedulingList = map[string]string{
-	"":         "PodSchedulingList is a collection of Pod scheduling objects.",
+var map_PodSchedulingContextList = map[string]string{
+	"":         "PodSchedulingContextList is a collection of Pod scheduling objects.",
 	"metadata": "Standard list metadata",
-	"items":    "Items is the list of PodScheduling objects.",
+	"items":    "Items is the list of PodSchedulingContext objects.",
 }
 
-func (PodSchedulingList) SwaggerDoc() map[string]string {
-	return map_PodSchedulingList
+func (PodSchedulingContextList) SwaggerDoc() map[string]string {
+	return map_PodSchedulingContextList
 }
 
-var map_PodSchedulingSpec = map[string]string{
-	"":               "PodSchedulingSpec describes where resources for the Pod are needed.",
+var map_PodSchedulingContextSpec = map[string]string{
+	"":               "PodSchedulingContextSpec describes where resources for the Pod are needed.",
 	"selectedNode":   "SelectedNode is the node for which allocation of ResourceClaims that are referenced by the Pod and that use \"WaitForFirstConsumer\" allocation is to be attempted.",
 	"potentialNodes": "PotentialNodes lists nodes where the Pod might be able to run.\n\nThe size of this field is limited to 128. This is large enough for many clusters. Larger clusters may need more attempts to find a node that suits all pending resources. This may get increased in the future, but not reduced.",
 }
 
-func (PodSchedulingSpec) SwaggerDoc() map[string]string {
-	return map_PodSchedulingSpec
+func (PodSchedulingContextSpec) SwaggerDoc() map[string]string {
+	return map_PodSchedulingContextSpec
 }
 
-var map_PodSchedulingStatus = map[string]string{
-	"":               "PodSchedulingStatus describes where resources for the Pod can be allocated.",
+var map_PodSchedulingContextStatus = map[string]string{
+	"":               "PodSchedulingContextStatus describes where resources for the Pod can be allocated.",
 	"resourceClaims": "ResourceClaims describes resource availability for each pod.spec.resourceClaim entry where the corresponding ResourceClaim uses \"WaitForFirstConsumer\" allocation mode.",
 }
 
-func (PodSchedulingStatus) SwaggerDoc() map[string]string {
-	return map_PodSchedulingStatus
+func (PodSchedulingContextStatus) SwaggerDoc() map[string]string {
+	return map_PodSchedulingContextStatus
 }
 
 var map_ResourceClaim = map[string]string{
@@ -146,7 +146,7 @@ func (ResourceClaimSpec) SwaggerDoc() map[string]string {
 var map_ResourceClaimStatus = map[string]string{
 	"":                      "ResourceClaimStatus tracks whether the resource has been allocated and what the resulting attributes are.",
 	"driverName":            "DriverName is a copy of the driver name from the ResourceClass at the time when allocation started.",
-	"allocation":            "Allocation is set by the resource driver once a resource has been allocated successfully. If this is not specified, the resource is not yet allocated.",
+	"allocation":            "Allocation is set by the resource driver once a resource or set of resources has been allocated successfully. If this is not specified, the resources have not been allocated yet.",
 	"reservedFor":           "ReservedFor indicates which entities are currently allowed to use the claim. A Pod which references a ResourceClaim which is not reserved for that Pod will not be started.\n\nThere can be at most 32 such reservations. This may get increased in the future, but not reduced.",
 	"deallocationRequested": "DeallocationRequested indicates that a ResourceClaim is to be deallocated.\n\nThe driver then must deallocate this claim and reset the field together with clearing the Allocation field.\n\nWhile DeallocationRequested is set, no new consumers may be added to ReservedFor.",
 }
@@ -217,6 +217,16 @@ var map_ResourceClassParametersReference = map[string]string{
 
 func (ResourceClassParametersReference) SwaggerDoc() map[string]string {
 	return map_ResourceClassParametersReference
+}
+
+var map_ResourceHandle = map[string]string{
+	"":           "ResourceHandle holds opaque resource data for processing by a specific kubelet plugin.",
+	"driverName": "DriverName specifies the name of the resource driver whose kubelet plugin should be invoked to process this ResourceHandle's data once it lands on a node. This may differ from the DriverName set in ResourceClaimStatus this ResourceHandle is embedded in.",
+	"data":       "Data contains the opaque data associated with this ResourceHandle. It is set by the controller component of the resource driver whose name matches the DriverName set in the ResourceClaimStatus this ResourceHandle is embedded in. It is set at allocation time and is intended for processing by the kubelet plugin whose name matches the DriverName set in this ResourceHandle.\n\nThe maximum size of this field is 16KiB. This may get increased in the future, but not reduced.",
+}
+
+func (ResourceHandle) SwaggerDoc() map[string]string {
+	return map_ResourceHandle
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE

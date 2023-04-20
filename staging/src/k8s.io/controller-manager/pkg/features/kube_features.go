@@ -32,6 +32,19 @@ const (
 	// of code conflicts because changes are more likely to be scattered
 	// across the file.
 
+	// owner: @nckturner
+	// kep:  http://kep.k8s.io/2699
+	// alpha: v1.27
+	// Enable webhook in cloud controller manager
+	CloudControllerManagerWebhook featuregate.Feature = "CloudControllerManagerWebhook"
+
+	// owner: @danwinship
+	// alpha: v1.27
+	//
+	// Enables dual-stack values in the
+	// `alpha.kubernetes.io/provided-node-ip` annotation
+	CloudDualStackNodeIPs featuregate.Feature = "CloudDualStackNodeIPs"
+
 	// owner: @alexanderConstantinescu
 	// kep: http://kep.k8s.io/3458
 	// beta: v1.27
@@ -48,5 +61,7 @@ func SetupCurrentKubernetesSpecificFeatureGates(featuregates featuregate.Mutable
 // cloudPublicFeatureGates consists of cloud-specific feature keys.
 // To add a new feature, define a key for it at k8s.io/api/pkg/features and add it here.
 var cloudPublicFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	StableLoadBalancerNodeSet: {Default: true, PreRelease: featuregate.Beta},
+	CloudControllerManagerWebhook: {Default: false, PreRelease: featuregate.Alpha},
+	CloudDualStackNodeIPs:         {Default: false, PreRelease: featuregate.Alpha},
+	StableLoadBalancerNodeSet:     {Default: true, PreRelease: featuregate.Beta},
 }

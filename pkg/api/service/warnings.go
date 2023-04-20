@@ -31,6 +31,10 @@ func GetWarningsForService(service, oldService *api.Service) []string {
 	}
 	var warnings []string
 
+	if _, ok := service.Annotations[api.DeprecatedAnnotationTopologyAwareHints]; ok {
+		warnings = append(warnings, fmt.Sprintf("annotation %s is deprecated, please use %s instead", api.DeprecatedAnnotationTopologyAwareHints, api.AnnotationTopologyMode))
+	}
+
 	if helper.IsServiceIPSet(service) {
 		for i, clusterIP := range service.Spec.ClusterIPs {
 			warnings = append(warnings, getWarningsForIP(field.NewPath("spec").Child("clusterIPs").Index(i), clusterIP)...)

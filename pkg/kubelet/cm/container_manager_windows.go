@@ -253,6 +253,10 @@ func (cm *containerManagerImpl) GetNodeAllocatableAbsolute() v1.ResourceList {
 	return nil
 }
 
+func (cm *containerManagerImpl) GetDynamicResources(pod *v1.Pod, container *v1.Container) []*podresourcesapi.DynamicResource {
+	return nil
+}
+
 func (cm *containerManagerImpl) PrepareDynamicResources(pod *v1.Pod) error {
 	return nil
 }

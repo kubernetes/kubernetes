@@ -18,6 +18,7 @@ package validation
 
 import (
 	"fmt"
+	"net/netip"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -276,9 +277,9 @@ func ValidateIngressCreate(ingress *networking.Ingress) field.ErrorList {
 	}
 	allErrs = append(allErrs, validateIngress(ingress, opts)...)
 	annotationVal, annotationIsSet := ingress.Annotations[annotationIngressClass]
-	if annotationIsSet && ingress.Spec.IngressClassName != nil {
+	if annotationIsSet && ingress.Spec.IngressClassName != nil && annotationVal != *ingress.Spec.IngressClassName {
 		annotationPath := field.NewPath("annotations").Child(annotationIngressClass)
-		allErrs = append(allErrs, field.Invalid(annotationPath, annotationVal, "can not be set when the class field is also set"))
+		allErrs = append(allErrs, field.Invalid(annotationPath, annotationVal, "must match `ingressClassName` when both are specified"))
 	}
 	return allErrs
 }
@@ -598,27 +599,24 @@ func validateIngressClassParametersReference(params *networking.IngressClassPara
 		return allErrs
 	}
 
-	if params.Scope != nil || params.Namespace != nil {
-		scope := utilpointer.StringDeref(params.Scope, "")
+	scope := utilpointer.StringDeref(params.Scope, "")
 
-		if !supportedIngressClassParametersReferenceScopes.Has(scope) {
-			allErrs = append(allErrs, field.NotSupported(fldPath.Child("scope"), scope,
-				supportedIngressClassParametersReferenceScopes.List()))
-		} else {
-
-			if scope == networking.IngressClassParametersReferenceScopeNamespace {
-				if params.Namespace == nil {
-					allErrs = append(allErrs, field.Required(fldPath.Child("namespace"), "`parameters.scope` is set to 'Namespace'"))
-				} else {
-					for _, msg := range apivalidation.ValidateNamespaceName(*params.Namespace, false) {
-						allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), *params.Namespace, msg))
-					}
+	if !supportedIngressClassParametersReferenceScopes.Has(scope) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("scope"), scope,
+			supportedIngressClassParametersReferenceScopes.List()))
+	} else {
+		if scope == networking.IngressClassParametersReferenceScopeNamespace {
+			if params.Namespace == nil {
+				allErrs = append(allErrs, field.Required(fldPath.Child("namespace"), "`parameters.scope` is set to 'Namespace'"))
+			} else {
+				for _, msg := range apivalidation.ValidateNamespaceName(*params.Namespace, false) {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), *params.Namespace, msg))
 				}
 			}
+		}
 
-			if scope == networking.IngressClassParametersReferenceScopeCluster && params.Namespace != nil {
-				allErrs = append(allErrs, field.Forbidden(fldPath.Child("namespace"), "`parameters.scope` is set to 'Cluster'"))
-			}
+		if scope == networking.IngressClassParametersReferenceScopeCluster && params.Namespace != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("namespace"), "`parameters.scope` is set to 'Cluster'"))
 		}
 	}
 
@@ -739,5 +737,79 @@ func validateClusterCIDRUpdateSpec(update, old *networking.ClusterCIDRSpec, fldP
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.IPv4, old.IPv4, fldPath.Child("ipv4"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.IPv6, old.IPv6, fldPath.Child("ipv6"))...)
 
+	return allErrs
+}
+
+// ValidateIPAddressName validates that the name is the decimal representation of an IP address.
+// IPAddress does not support generating names, prefix is not considered.
+func ValidateIPAddressName(name string, prefix bool) []string {
+	var errs []string
+	ip, err := netip.ParseAddr(name)
+	if err != nil {
+		errs = append(errs, err.Error())
+	} else if ip.String() != name {
+		errs = append(errs, "not a valid ip in canonical format")
+
+	}
+	return errs
+}
+
+func ValidateIPAddress(ipAddress *networking.IPAddress) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMeta(&ipAddress.ObjectMeta, false, ValidateIPAddressName, field.NewPath("metadata"))
+	errs := validateIPAddressParentReference(ipAddress.Spec.ParentRef, field.NewPath("spec"))
+	allErrs = append(allErrs, errs...)
+	return allErrs
+
+}
+
+// validateIPAddressParentReference ensures that the IPAddress ParenteReference exists and is valid.
+func validateIPAddressParentReference(params *networking.ParentReference, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if params == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("parentRef"), ""))
+		return allErrs
+	}
+
+	fldPath = fldPath.Child("parentRef")
+	// group is required but the Core group used by Services is the empty value, so it can not be enforced
+	if params.Group != "" {
+		for _, msg := range validation.IsDNS1123Subdomain(params.Group) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("group"), params.Group, msg))
+		}
+	}
+
+	// resource is required
+	if params.Resource == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("resource"), ""))
+	} else {
+		for _, msg := range pathvalidation.IsValidPathSegmentName(params.Resource) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("resource"), params.Resource, msg))
+		}
+	}
+
+	// name is required
+	if params.Name == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+	} else {
+		for _, msg := range pathvalidation.IsValidPathSegmentName(params.Name) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), params.Name, msg))
+		}
+	}
+
+	// namespace is optional
+	if params.Namespace != "" {
+		for _, msg := range pathvalidation.IsValidPathSegmentName(params.Namespace) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), params.Namespace, msg))
+		}
+	}
+	return allErrs
+}
+
+// ValidateIPAddressUpdate tests if an update to an IPAddress is valid.
+func ValidateIPAddressUpdate(update, old *networking.IPAddress) field.ErrorList {
+	var allErrs field.ErrorList
+	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.ParentRef, old.Spec.ParentRef, field.NewPath("spec").Child("parentRef"))...)
 	return allErrs
 }
