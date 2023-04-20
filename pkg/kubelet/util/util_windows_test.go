@@ -28,6 +28,7 @@ import (
 	"testing"
 	"time"
 	"os"
+	"net"
 
 	winio "github.com/Microsoft/go-winio"
 	"github.com/stretchr/testify/assert"
