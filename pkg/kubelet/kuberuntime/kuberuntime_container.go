@@ -885,6 +885,7 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(pod *v1.Pod, pod
 		}
 
 		status := podStatus.FindContainerStatusByName(container.Name)
+		klog.V(4).InfoS("Computing init container action", "pod", klog.KObj(pod), "container", container.Name, "status", status)
 		// If the container is not found, it means it has not been started yet.
 		if status == nil {
 			if podHasInitialized || lastContainerInitialized {
@@ -907,18 +908,27 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(pod *v1.Pod, pod
 		case kubecontainer.ContainerStateRunning:
 			switch {
 			case types.IsSidecarContainer(container):
-				if startup, found := m.startupManager.Get(status.ID); found && startup == proberesults.Failure {
-					// If the sidecar container failed the startup probe, restart it.
-					changes.ContainersToKill[status.ID] = containerToKillInfo{
-						name:      container.Name,
-						container: container,
-						message:   fmt.Sprintf("Container %s failed startup probe", container.Name),
-						reason:    reasonStartupProbe,
+				if container.StartupProbe != nil {
+					startup, found := m.startupManager.Get(status.ID)
+					if !found {
+						// If the startup probe has not been run, wait for it.
+						continue
 					}
-					changes.InitContainersToStart = append(changes.InitContainersToStart, i)
-				} else {
-					lastContainerInitialized = true
+					if startup != proberesults.Success {
+						if startup == proberesults.Failure {
+							// If the sidecar container failed the startup probe, restart it.
+							changes.ContainersToKill[status.ID] = containerToKillInfo{
+								name:      container.Name,
+								container: container,
+								message:   fmt.Sprintf("Container %s failed startup probe", container.Name),
+								reason:    reasonStartupProbe,
+							}
+							changes.InitContainersToStart = append(changes.InitContainersToStart, i)
+						}
+						continue
+					}
 				}
+				lastContainerInitialized = true
 			default: // init container
 				return false
 			}
