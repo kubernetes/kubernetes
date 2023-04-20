@@ -1012,9 +1012,9 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	DefaultHostNetworkHostPortsInPodTemplates: {Default: false, PreRelease: featuregate.Deprecated},
 
-	DisableCloudProviders: {Default: false, PreRelease: featuregate.Alpha},
+	DisableCloudProviders: {Default: true, PreRelease: featuregate.Beta},
 
-	DisableKubeletCloudCredentialProviders: {Default: false, PreRelease: featuregate.Alpha},
+	DisableKubeletCloudCredentialProviders: {Default: true, PreRelease: featuregate.Beta},
 
 	DevicePluginCDIDevices: {Default: false, PreRelease: featuregate.Alpha},
 
