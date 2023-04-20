@@ -229,6 +229,7 @@ const (
 
 	// owner: @andrewsykim
 	// alpha: v1.22
+	// beta: v1.28
 	//
 	// Disable any functionality in kube-apiserver, kube-controller-manager and kubelet related to the `--cloud-provider` component flag.
 	DisableCloudProviders featuregate.Feature = "DisableCloudProviders"
