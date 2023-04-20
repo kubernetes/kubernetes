@@ -892,9 +892,6 @@ kube::golang::build_binaries() {
     IFS=" " read -ra platforms <<< "${KUBE_BUILD_PLATFORMS:-}"
     if [[ ${#platforms[@]} -eq 0 ]]; then
       platforms=("${host_platform}")
-    else
-      kube::log::status "WARNING: linux/arm will no longer be built/shipped by default, please build it explicitly if needed."
-      kube::log::status "         support for linux/arm will be removed in a subsequent release."
     fi
 
     local -a binaries
