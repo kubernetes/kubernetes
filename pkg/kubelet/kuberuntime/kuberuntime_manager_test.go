@@ -1470,8 +1470,54 @@ func TestComputePodActionsWithSidecarContainers(t *testing.T) {
 			},
 			actions: noAction,
 		},
-		"kill and recreate the sidecar container if the startup check has failed": {
+		"sidecar container has started; start the next": {
 			mutatePodFn: func(pod *v1.Pod) { pod.Spec.RestartPolicy = v1.RestartPolicyAlways },
+			mutateStatusFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
+				status.ContainerStatuses = status.ContainerStatuses[:1]
+			},
+			actions: podActions{
+				SandboxID:             baseStatus.SandboxStatuses[0].Id,
+				InitContainersToStart: []int{1},
+				ContainersToStart:     []int{},
+				ContainersToKill:      getKillMapWithInitContainers(basePod, baseStatus, []int{}),
+			},
+		},
+		"startupProbe has not been run; do nothing": {
+			mutatePodFn: func(pod *v1.Pod) { pod.Spec.RestartPolicy = v1.RestartPolicyAlways },
+			mutateStatusFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
+				m.startupManager.Remove(status.ContainerStatuses[1].ID)
+				status.ContainerStatuses = status.ContainerStatuses[:2]
+			},
+			actions: noAction,
+		},
+		"startupProbe in progress; do nothing": {
+			mutatePodFn: func(pod *v1.Pod) { pod.Spec.RestartPolicy = v1.RestartPolicyAlways },
+			mutateStatusFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
+				m.startupManager.Set(status.ContainerStatuses[1].ID, proberesults.Unknown, basePod)
+				status.ContainerStatuses = status.ContainerStatuses[:2]
+			},
+			actions: noAction,
+			resetStatusFn: func(status *kubecontainer.PodStatus) {
+				m.startupManager.Remove(status.ContainerStatuses[1].ID)
+			},
+		},
+		"startupProbe has completed; start the next": {
+			mutatePodFn: func(pod *v1.Pod) { pod.Spec.RestartPolicy = v1.RestartPolicyAlways },
+			mutateStatusFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
+				status.ContainerStatuses = status.ContainerStatuses[:2]
+			},
+			actions: podActions{
+				SandboxID:             baseStatus.SandboxStatuses[0].Id,
+				InitContainersToStart: []int{2},
+				ContainersToStart:     []int{},
+				ContainersToKill:      getKillMapWithInitContainers(basePod, baseStatus, []int{}),
+			},
+		},
+		"kill and recreate the sidecar container if the startup check has failed": {
+			mutatePodFn: func(pod *v1.Pod) {
+				pod.Spec.RestartPolicy = v1.RestartPolicyAlways
+				pod.Spec.InitContainers[2].StartupProbe = &v1.Probe{}
+			},
 			mutateStatusFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
 				m.startupManager.Set(status.ContainerStatuses[2].ID, proberesults.Failure, basePod)
 			},
@@ -1595,6 +1641,8 @@ func TestComputePodActionsWithSidecarContainers(t *testing.T) {
 		},
 	} {
 		pod, status := makeBasePodAndStatusWithSidecarContainers()
+		m.startupManager.Set(status.ContainerStatuses[1].ID, proberesults.Success, basePod)
+		m.startupManager.Set(status.ContainerStatuses[2].ID, proberesults.Success, basePod)
 		if test.mutatePodFn != nil {
 			test.mutatePodFn(pod)
 		}
@@ -1622,11 +1670,13 @@ func makeBasePodAndStatusWithSidecarContainers() (*v1.Pod, *kubecontainer.PodSta
 			Name:          "sidecar2",
 			Image:         "bar-image",
 			RestartPolicy: &containerRestartPolicyAlways,
+			StartupProbe:  &v1.Probe{},
 		},
 		{
 			Name:          "sidecar3",
 			Image:         "bar-image",
 			RestartPolicy: &containerRestartPolicyAlways,
+			StartupProbe:  &v1.Probe{},
 		},
 	}
 	// Replace the original statuses of the containers with those for the init
