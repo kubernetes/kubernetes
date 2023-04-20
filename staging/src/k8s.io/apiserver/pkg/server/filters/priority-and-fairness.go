@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"runtime"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -72,6 +73,11 @@ type priorityAndFairnessHandler struct {
 	longRunningRequestCheck apirequest.LongRunningRequestCheck
 	fcIfc                   utilflowcontrol.Interface
 	workEstimator           flowcontrolrequest.WorkEstimatorFunc
+
+	// droppedRequests tracks the history of dropped requests for
+	// the purpose of computing RetryAfter header to avoid system
+	// overload.
+	droppedRequests utilflowcontrol.DroppedRequestsTracker
 }
 
 func (h *priorityAndFairnessHandler) Handle(w http.ResponseWriter, r *http.Request) {
@@ -288,7 +294,11 @@ func (h *priorityAndFairnessHandler) Handle(w http.ResponseWriter, r *http.Reque
 
 		epmetrics.RecordDroppedRequest(r, requestInfo, epmetrics.APIServerComponent, isMutatingRequest)
 		epmetrics.RecordRequestTermination(r, requestInfo, epmetrics.APIServerComponent, http.StatusTooManyRequests)
-		tooManyRequests(r, w, retryAfter)
+		h.droppedRequests.RecordDroppedRequest(classification.PriorityLevelName)
+
+		// TODO(wojtek-t): Idea from deads2k: we can consider some jittering and in case of non-int
+		//  number, just return the truncated result and sleep the remainder server-side.
+		tooManyRequests(r, w, strconv.Itoa(int(h.droppedRequests.GetRetryAfter(classification.PriorityLevelName))))
 	}
 }
 
@@ -317,6 +327,7 @@ func WithPriorityAndFairness(
 		longRunningRequestCheck: longRunningRequestCheck,
 		fcIfc:                   fcIfc,
 		workEstimator:           workEstimator,
+		droppedRequests:         utilflowcontrol.NewDroppedRequestsTracker(),
 	}
 	return http.HandlerFunc(priorityAndFairnessHandler.Handle)
 }
