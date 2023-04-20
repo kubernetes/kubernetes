@@ -18,6 +18,7 @@ package reconcilers
 
 import (
 	"context"
+	"fmt"
 	"net"
 
 	corev1 "k8s.io/api/core/v1"
@@ -121,26 +122,26 @@ func (adapter *EndpointsAdapter) Sync(ips sets.Set[string], endpointPorts []core
 		return err
 	}
 
-	// Sync EndpointSlice
+	// Sync EndpointSlices
 	err = retry.OnError(retry.DefaultBackoff, isRetriableError, func() error {
-		currentEndpointSlice, err := adapter.endpointSliceClient.EndpointSlices(adapter.serviceNamespace).Get(context.TODO(), adapter.serviceName, metav1.GetOptions{})
+		currentEndpointSlice, otherSlices, err := adapter.listEndpointSlices()
 		if err != nil {
-			if !errors.IsNotFound(err) {
-				return err
-			}
-			currentEndpointSlice = nil
+			return err
 		}
 
-		endpointSlice := adapter.updateEndpointSlice(currentEndpointSlice, sortedIPs, endpointPorts, reconcilePorts)
-
-		// required for transition from IP to IPv4 address type.
-		if currentEndpointSlice != nil && currentEndpointSlice.AddressType != endpointSlice.AddressType {
-			err = adapter.endpointSliceClient.EndpointSlices(endpointSlice.Namespace).Delete(context.TODO(), endpointSlice.Name, metav1.DeleteOptions{})
+		// Delete all otherEndpointSlices, since as far as the current apiserver
+		// is concerned, they should not exist. (In particular, there may be a
+		// stale EndpointSlice of the wrong family left behind after downgrading
+		// from a future version of Kubernetes that supports dual-stack
+		// apiservers.)
+		for _, slice := range otherSlices {
+			err = adapter.endpointSliceClient.EndpointSlices(slice.Namespace).Delete(context.TODO(), slice.Name, metav1.DeleteOptions{})
 			if err != nil && !errors.IsNotFound(err) {
 				return err
 			}
-			currentEndpointSlice = nil
 		}
+
+		endpointSlice := adapter.updateEndpointSlice(currentEndpointSlice, sortedIPs, endpointPorts, reconcilePorts)
 
 		if currentEndpointSlice == nil {
 			_, err = adapter.endpointSliceClient.EndpointSlices(endpointSlice.Namespace).Create(context.TODO(), endpointSlice, metav1.CreateOptions{})
@@ -255,4 +256,31 @@ func convertEndpointPorts(endpointPorts []corev1.EndpointPort) []discovery.Endpo
 		endpointSlicePorts[i].Protocol = &endpointPorts[i].Protocol
 	}
 	return endpointSlicePorts
+}
+
+// listEndpointSlices returns the primary EndpointSlice (if any) and a list of any other
+// EndpointSlices for the apiserver service (or an error if one occurs).
+func (adapter *EndpointsAdapter) listEndpointSlices() (*discovery.EndpointSlice, []*discovery.EndpointSlice, error) {
+	slices, err := adapter.endpointSliceClient.EndpointSlices(adapter.serviceNamespace).List(context.TODO(),
+		metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("%s=%s", discovery.LabelServiceName, adapter.serviceName),
+		},
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var primaryEndpointSlice *discovery.EndpointSlice
+	otherEndpointSlices := make([]*discovery.EndpointSlice, 0, len(slices.Items))
+
+	for i := range slices.Items {
+		slice := &slices.Items[i]
+		if slice.Name == adapter.serviceName && slice.AddressType == adapter.addressType {
+			primaryEndpointSlice = slice
+		} else {
+			otherEndpointSlices = append(otherEndpointSlices, slice)
+		}
+	}
+
+	return primaryEndpointSlice, otherEndpointSlices, nil
 }

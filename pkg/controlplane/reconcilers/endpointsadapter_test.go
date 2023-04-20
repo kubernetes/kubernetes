@@ -96,6 +96,18 @@ func TestEndpointsAdapterSync(t *testing.T) {
 	_, epSlice1Deprecated := generateEndpointsAndSlice([]int{80}, []string{"10.1.3", "10.1.2.4"})
 	epSlice1Deprecated.AddressType = discovery.AddressType("IP")
 
+	// epSlice1 + epSlice1Secondary represent a hypothetical future dual-stack set of
+	// endpoints where epSlice1 has name "kubernetes" and epSlice1Secondary has name
+	// "kubernetes-v6" (but both have service-name "kubernetes").
+	epSlice1Secondary := epSliceV6.DeepCopy()
+	epSlice1Secondary.Name = "kubernetes-v6"
+
+	// epSlice1AltName + epSlice1Secondary represent an alternate hypothetical future
+	// dual-stack set of endpoints where both slices have service-name "kubernetes"
+	// but neither has name "kubernetes".
+	epSlice1AltName := epSlice1.DeepCopy()
+	epSlice1AltName.Name = "kubernetes-v4"
+
 	testCases := map[string]struct {
 		serviceIP    net.IP
 		initialState []runtime.Object
@@ -183,7 +195,9 @@ func TestEndpointsAdapterSync(t *testing.T) {
 		"existing-endpointslice-replaced-with-updated-ipv4-address-type": {
 			// If an EndpointSlice with deprecated "IP" address type exists,
 			// it is deleted and replaced with one that has "IPv4" address
-			// type.
+			// type. (This case should never actually happen any more, but it
+			// gets handled automatically as a side effect of handling
+			// dual-stack rollbacks.)
 			serviceIP:    testServiceIP,
 			initialState: []runtime.Object{endpoints1, epSlice1Deprecated},
 			ipsParam:     ips1,
@@ -232,6 +246,63 @@ func TestEndpointsAdapterSync(t *testing.T) {
 
 			expectUpdate: []runtime.Object{endpoints1},
 			expectCreate: []runtime.Object{epSlice1},
+		},
+		"wrong-family-endpointslice": {
+			// If the EndpointSlice has endpoints of the wrong family it will
+			// be deleted and recreated correctly.
+			serviceIP:    testServiceIP,
+			initialState: []runtime.Object{endpoints1, epSliceV6},
+			ipsParam:     ips1,
+			portsParam:   ports1,
+
+			expectDelete: []runtime.Object{epSliceV6},
+			expectCreate: []runtime.Object{epSlice1},
+		},
+		"dual-stack-rollback": {
+			// If a single-stack IPv4 apiserver starts up in a cluster with
+			// dual-stack EndpointSlices, it will delete the IPv6 slice.
+			serviceIP:    testServiceIP,
+			initialState: []runtime.Object{endpoints1, epSlice1, epSlice1Secondary},
+			ipsParam:     ips1,
+
+			portsParam:   ports1,
+			expectDelete: []runtime.Object{epSlice1Secondary},
+		},
+		"dual-stack-alt-rollback": {
+			// If a single-stack IPv4 apiserver starts up in a cluster with
+			// weirdly-named dual-stack EndpointSlices, it will delete both
+			// slices and create a new IPv4 slice.
+			serviceIP:    testServiceIP,
+			initialState: []runtime.Object{endpoints1, epSlice1AltName, epSlice1Secondary},
+			ipsParam:     ips1,
+			portsParam:   ports1,
+
+			expectDelete: []runtime.Object{epSlice1AltName, epSlice1Secondary},
+			expectCreate: []runtime.Object{epSlice1},
+		},
+		"dual-stack-rollback-and-change": {
+			// If a single-stack IPv4 apiserver starts up in a cluster with
+			// dual-stack EndpointSlices where the IPv4 slice is wrong, it
+			// will delete the IPv6 slice and update the IPv4 slice.
+			serviceIP:    testServiceIP,
+			initialState: []runtime.Object{endpoints1, epSlice1, epSlice1Secondary},
+			ipsParam:     ips2,
+			portsParam:   ports2,
+
+			expectDelete: []runtime.Object{epSlice1Secondary},
+			expectUpdate: []runtime.Object{endpoints2, epSlice2},
+		},
+		"dual-stack-alt-rollback-and-change": {
+			// If a single-stack IPv4 apiserver starts up in a cluster with
+			// weirdly-named dual-stack EndpointSlices where the IPv4 slice is
+			// wrong, it will delete both slices and create a new IPv4 slice.
+			serviceIP:    testServiceIP,
+			initialState: []runtime.Object{epSlice1AltName, epSlice1Secondary},
+			ipsParam:     ips2,
+			portsParam:   ports2,
+
+			expectDelete: []runtime.Object{epSlice1AltName, epSlice1Secondary},
+			expectCreate: []runtime.Object{endpoints2, epSlice2},
 		},
 	}
 
