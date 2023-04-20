@@ -57,7 +57,7 @@ func testClientAuthenticationClusterTypesAreSynced(t *testing.T, cluster interfa
 		t.Parallel()
 
 		// These are fields that are specific to Cluster and shouldn't be in clientcmdv1.Cluster.
-		execSkippedFieldNames := sets.NewString(
+		execSkippedFieldNames := sets.New[string](
 			// Cluster uses Config to provide its cluster-specific configuration object.
 			"Config",
 		)
@@ -98,7 +98,7 @@ func testClientAuthenticationClusterTypesAreSynced(t *testing.T, cluster interfa
 		t.Parallel()
 
 		// These are the fields that we don't want to shadow from clientcmdv1.Cluster.
-		clientcmdSkippedFieldNames := sets.NewString(
+		clientcmdSkippedFieldNames := sets.New[string](
 			// CA data will be passed via CertificateAuthorityData, so we don't need this field.
 			"CertificateAuthority",
 			// Cluster uses Config to provide its cluster-specific configuration object.
@@ -142,7 +142,7 @@ func testClientAuthenticationClusterTypesAreSynced(t *testing.T, cluster interfa
 // TestClientAuthenticationClusterTypesAreSynced for any future ExecCredential version. It should start failing
 // when someone adds support for any other ExecCredential type to this package.
 func TestAllClusterTypesAreSynced(t *testing.T) {
-	versionsThatDontNeedTests := sets.NewString(
+	versionsThatDontNeedTests := sets.New[string](
 		// The internal Cluster type should only be used...internally...and therefore doesn't
 		// necessarily need to be synced with clientcmdv1.
 		runtime.APIVersionInternal,

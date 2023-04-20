@@ -354,7 +354,7 @@ func (f *FIFO) Resync() error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
-	inQueue := sets.NewString()
+	inQueue := sets.New[string]()
 	for _, id := range f.queue {
 		inQueue.Insert(id)
 	}

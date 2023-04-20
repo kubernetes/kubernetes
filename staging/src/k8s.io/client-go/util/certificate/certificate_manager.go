@@ -617,33 +617,33 @@ func (m *manager) certSatisfiesTemplateLocked() bool {
 			return false
 		}
 
-		currentDNSNames := sets.NewString(m.cert.Leaf.DNSNames...)
-		desiredDNSNames := sets.NewString(template.DNSNames...)
+		currentDNSNames := sets.New[string](m.cert.Leaf.DNSNames...)
+		desiredDNSNames := sets.New[string](template.DNSNames...)
 		missingDNSNames := desiredDNSNames.Difference(currentDNSNames)
 		if len(missingDNSNames) > 0 {
-			m.logf("%s: Current certificate is missing requested DNS names %v", m.name, missingDNSNames.List())
+			m.logf("%s: Current certificate is missing requested DNS names %v", m.name, missingDNSNames.UnsortedList())
 			return false
 		}
 
-		currentIPs := sets.NewString()
+		currentIPs := sets.New[string]()
 		for _, ip := range m.cert.Leaf.IPAddresses {
 			currentIPs.Insert(ip.String())
 		}
-		desiredIPs := sets.NewString()
+		desiredIPs := sets.New[string]()
 		for _, ip := range template.IPAddresses {
 			desiredIPs.Insert(ip.String())
 		}
 		missingIPs := desiredIPs.Difference(currentIPs)
 		if len(missingIPs) > 0 {
-			m.logf("%s: Current certificate is missing requested IP addresses %v", m.name, missingIPs.List())
+			m.logf("%s: Current certificate is missing requested IP addresses %v", m.name, missingIPs.UnsortedList())
 			return false
 		}
 
-		currentOrgs := sets.NewString(m.cert.Leaf.Subject.Organization...)
-		desiredOrgs := sets.NewString(template.Subject.Organization...)
+		currentOrgs := sets.New[string](m.cert.Leaf.Subject.Organization...)
+		desiredOrgs := sets.New[string](template.Subject.Organization...)
 		missingOrgs := desiredOrgs.Difference(currentOrgs)
 		if len(missingOrgs) > 0 {
-			m.logf("%s: Current certificate is missing requested orgs %v", m.name, missingOrgs.List())
+			m.logf("%s: Current certificate is missing requested orgs %v", m.name, missingOrgs.UnsortedList())
 			return false
 		}
 	}

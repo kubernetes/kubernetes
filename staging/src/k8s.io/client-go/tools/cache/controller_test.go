@@ -110,12 +110,12 @@ func Example() {
 	}
 
 	// Let's wait for the controller to process the things we just added.
-	outputSet := sets.String{}
+	outputSet := sets.Set[string]{}
 	for i := 0; i < len(testIDs); i++ {
 		outputSet.Insert(<-deletionCounter)
 	}
 
-	for _, key := range outputSet.List() {
+	for _, key := range outputSet.UnsortedList() {
 		fmt.Println(key)
 	}
 	// Output:
@@ -167,12 +167,12 @@ func ExampleNewInformer() {
 	}
 
 	// Let's wait for the controller to process the things we just added.
-	outputSet := sets.String{}
+	outputSet := sets.Set[string]{}
 	for i := 0; i < len(testIDs); i++ {
 		outputSet.Insert(<-deletionCounter)
 	}
 
-	for _, key := range outputSet.List() {
+	for _, key := range outputSet.UnsortedList() {
 		fmt.Println(key)
 	}
 	// Output:
@@ -243,7 +243,7 @@ func TestHammerController(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			// Let's add a few objects to the source.
-			currentNames := sets.String{}
+			currentNames := sets.Set[string]{}
 			rs := rand.NewSource(rand.Int63())
 			f := fuzz.New().NilChance(.5).NumElements(0, 2).RandSource(rs)
 			for i := 0; i < 100; i++ {
@@ -253,7 +253,7 @@ func TestHammerController(t *testing.T) {
 					f.Fuzz(&name)
 					isNew = true
 				} else {
-					l := currentNames.List()
+					l := currentNames.UnsortedList()
 					name = l[rand.Intn(len(l))]
 				}
 

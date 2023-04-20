@@ -372,15 +372,15 @@ func TestCachedDiscoveryClientUnaggregatedServerGroups(t *testing.T) {
 		assert.Equal(t, 1, numFound,
 			"%s: expected 1 discovery cache file servergroups.json found, got %d", test.name, numFound)
 		// Test expected groups returned by server groups.
-		expectedGroupNames := sets.NewString(test.expectedGroupNames...)
-		actualGroupNames := sets.NewString(groupNamesFromList(apiGroupList)...)
+		expectedGroupNames := sets.New[string](test.expectedGroupNames...)
+		actualGroupNames := sets.New[string](groupNamesFromList(apiGroupList)...)
 		assert.True(t, expectedGroupNames.Equal(actualGroupNames),
-			"%s: Expected groups (%s), got (%s)", test.name, expectedGroupNames.List(), actualGroupNames.List())
+			"%s: Expected groups (%s), got (%s)", test.name, expectedGroupNames.UnsortedList(), actualGroupNames.UnsortedList())
 		// Test the expected group versions for the aggregated discovery is correct.
-		expectedGroupVersions := sets.NewString(test.expectedGroupVersions...)
-		actualGroupVersions := sets.NewString(groupVersionsFromGroups(apiGroupList)...)
+		expectedGroupVersions := sets.New[string](test.expectedGroupVersions...)
+		actualGroupVersions := sets.New[string](groupVersionsFromGroups(apiGroupList)...)
 		assert.True(t, expectedGroupVersions.Equal(actualGroupVersions),
-			"%s: Expected group/versions (%s), got (%s)", test.name, expectedGroupVersions.List(), actualGroupVersions.List())
+			"%s: Expected group/versions (%s), got (%s)", test.name, expectedGroupVersions.UnsortedList(), actualGroupVersions.UnsortedList())
 	}
 }
 
@@ -663,20 +663,20 @@ func TestCachedDiscoveryClientAggregatedServerGroups(t *testing.T) {
 		assert.Equal(t, 1, numFound,
 			"%s: expected 1 discovery cache file servergroups.json found, got %d", test.name, numFound)
 		// Test expected groups returned by server groups.
-		expectedGroupNames := sets.NewString(test.expectedGroupNames...)
-		actualGroupNames := sets.NewString(groupNamesFromList(apiGroupList)...)
+		expectedGroupNames := sets.New[string](test.expectedGroupNames...)
+		actualGroupNames := sets.New[string](groupNamesFromList(apiGroupList)...)
 		assert.True(t, expectedGroupNames.Equal(actualGroupNames),
-			"%s: Expected groups (%s), got (%s)", test.name, expectedGroupNames.List(), actualGroupNames.List())
+			"%s: Expected groups (%s), got (%s)", test.name, expectedGroupNames.UnsortedList(), actualGroupNames.UnsortedList())
 		// Test the expected group versions for the aggregated discovery is correct.
-		expectedGroupVersions := sets.NewString(test.expectedGroupVersions...)
-		actualGroupVersions := sets.NewString(groupVersionsFromGroups(apiGroupList)...)
+		expectedGroupVersions := sets.New[string](test.expectedGroupVersions...)
+		actualGroupVersions := sets.New[string](groupVersionsFromGroups(apiGroupList)...)
 		assert.True(t, expectedGroupVersions.Equal(actualGroupVersions),
-			"%s: Expected group/versions (%s), got (%s)", test.name, expectedGroupVersions.List(), actualGroupVersions.List())
+			"%s: Expected group/versions (%s), got (%s)", test.name, expectedGroupVersions.UnsortedList(), actualGroupVersions.UnsortedList())
 		// Test the groups preferred version is correct.
-		expectedPreferredVersions := sets.NewString(test.expectedPreferredVersions...)
-		actualPreferredVersions := sets.NewString(preferredVersionsFromList(apiGroupList)...)
+		expectedPreferredVersions := sets.New[string](test.expectedPreferredVersions...)
+		actualPreferredVersions := sets.New[string](preferredVersionsFromList(apiGroupList)...)
 		assert.True(t, expectedPreferredVersions.Equal(actualPreferredVersions),
-			"%s: Expected preferred group/version (%s), got (%s)", test.name, expectedPreferredVersions.List(), actualPreferredVersions.List())
+			"%s: Expected preferred group/version (%s), got (%s)", test.name, expectedPreferredVersions.UnsortedList(), actualPreferredVersions.UnsortedList())
 	}
 }
 

@@ -166,7 +166,7 @@ func TestFilteredBy(t *testing.T) {
 	for i, test := range tests {
 		filtered := discovery.FilteredBy(test.pred, test.input)
 
-		if expected, got := sets.NewString(test.expectedResources...), sets.NewString(stringify(filtered)...); !expected.Equal(got) {
+		if expected, got := sets.New[string](test.expectedResources...), sets.New[string](stringify(filtered)...); !expected.Equal(got) {
 			t.Errorf("[%d] unexpected group versions: expected=%v, got=%v", i, test.expectedResources, stringify(filtered))
 		}
 	}

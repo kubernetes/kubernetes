@@ -18,6 +18,7 @@ package cache
 
 import (
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"strings"
 	"testing"
 
@@ -114,7 +115,7 @@ func TestThreadSafeStoreIndexingFunctionsWithMultipleValues(t *testing.T) {
 	assert := assert.New(t)
 
 	compare := func(key string, expected []string) error {
-		values := store.index.indices[testIndexer][key].List()
+		values := sets.List[string](store.index.indices[testIndexer][key])
 		if cmp.Equal(values, expected) {
 			return nil
 		}

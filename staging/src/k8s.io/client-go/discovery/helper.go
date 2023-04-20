@@ -71,7 +71,7 @@ func ServerSupportsVersion(client DiscoveryInterface, requiredGV schema.GroupVer
 		return err
 	}
 	versions := metav1.ExtractGroupVersions(groups)
-	serverVersions := sets.String{}
+	serverVersions := sets.Set[string]{}
 	for _, v := range versions {
 		serverVersions.Insert(v)
 	}
@@ -142,5 +142,5 @@ type SupportsAllVerbs struct {
 
 // Match checks if a resource contains all the given verbs.
 func (p SupportsAllVerbs) Match(groupVersion string, r *metav1.APIResource) bool {
-	return sets.NewString([]string(r.Verbs)...).HasAll(p.Verbs...)
+	return sets.New[string]([]string(r.Verbs)...).HasAll(p.Verbs...)
 }

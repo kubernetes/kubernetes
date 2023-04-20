@@ -71,7 +71,7 @@ func (i *storeIndex) reset() {
 	i.indices = Indices{}
 }
 
-func (i *storeIndex) getKeysFromIndex(indexName string, obj interface{}) (sets.String, error) {
+func (i *storeIndex) getKeysFromIndex(indexName string, obj interface{}) (sets.Set[string], error) {
 	indexFunc := i.indexers[indexName]
 	if indexFunc == nil {
 		return nil, fmt.Errorf("Index with name %s does not exist", indexName)
@@ -83,7 +83,7 @@ func (i *storeIndex) getKeysFromIndex(indexName string, obj interface{}) (sets.S
 	}
 	index := i.indices[indexName]
 
-	var storeKeySet sets.String
+	var storeKeySet sets.Set[string]
 	if len(indexedValues) == 1 {
 		// In majority of cases, there is exactly one value matching.
 		// Optimize the most common path - deduping is not needed here.
@@ -91,7 +91,7 @@ func (i *storeIndex) getKeysFromIndex(indexName string, obj interface{}) (sets.S
 	} else {
 		// Need to de-dupe the return list.
 		// Since multiple keys are allowed, this can happen.
-		storeKeySet = sets.String{}
+		storeKeySet = sets.Set[string]{}
 		for _, indexedValue := range indexedValues {
 			for key := range index[indexedValue] {
 				storeKeySet.Insert(key)
@@ -102,7 +102,7 @@ func (i *storeIndex) getKeysFromIndex(indexName string, obj interface{}) (sets.S
 	return storeKeySet, nil
 }
 
-func (i *storeIndex) getKeysByIndex(indexName, indexedValue string) (sets.String, error) {
+func (i *storeIndex) getKeysByIndex(indexName, indexedValue string) (sets.Set[string], error) {
 	indexFunc := i.indexers[indexName]
 	if indexFunc == nil {
 		return nil, fmt.Errorf("Index with name %s does not exist", indexName)
@@ -185,7 +185,7 @@ func (i *storeIndex) updateIndices(oldObj interface{}, newObj interface{}, key s
 func (i *storeIndex) addKeyToIndex(key, indexValue string, index Index) {
 	set := index[indexValue]
 	if set == nil {
-		set = sets.String{}
+		set = sets.Set[string]{}
 		index[indexValue] = set
 	}
 	set.Insert(key)
@@ -321,7 +321,7 @@ func (c *threadSafeMap) IndexKeys(indexName, indexedValue string) ([]string, err
 	if err != nil {
 		return nil, err
 	}
-	return set.List(), nil
+	return set.UnsortedList(), nil
 }
 
 func (c *threadSafeMap) ListIndexFuncValues(indexName string) []string {
