@@ -93,13 +93,24 @@ func NewDefaultTestServerOptions() *TestServerInstanceOptions {
 	}
 }
 
-// StartTestServer starts a etcd server and kube-apiserver. A rest client config and a tear-down func,
+// StartTestServerOrDie calls StartTestServer t.Fatal if it does not succeed.
+func StartTestServerOrDie(t Logger, instanceOptions *TestServerInstanceOptions, flags []string, storageConfig *storagebackend.Config) *TestServer {
+	result, err := startTestServer(t, instanceOptions, flags, storageConfig)
+	if err == nil {
+		return &result
+	}
+
+	t.Fatalf("failed to launch server: %v", err)
+	return nil
+}
+
+// startTestServer starts a etcd server and kube-apiserver. A rest client config and a tear-down func,
 // and location of the tmpdir are returned.
 //
 // Note: we return a tear-down func instead of a stop channel because the later will leak temporary
 // files that because Golang testing's call to os.Exit will not give a stop channel go routine
 // enough time to remove temporary files.
-func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, customFlags []string, storageConfig *storagebackend.Config) (result TestServer, err error) {
+func startTestServer(t Logger, instanceOptions *TestServerInstanceOptions, customFlags []string, storageConfig *storagebackend.Config) (result TestServer, err error) {
 	if instanceOptions == nil {
 		instanceOptions = NewDefaultTestServerOptions()
 	}
@@ -353,17 +364,6 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	result.EtcdStoragePrefix = storageConfig.Prefix
 
 	return result, nil
-}
-
-// StartTestServerOrDie calls StartTestServer t.Fatal if it does not succeed.
-func StartTestServerOrDie(t Logger, instanceOptions *TestServerInstanceOptions, flags []string, storageConfig *storagebackend.Config) *TestServer {
-	result, err := StartTestServer(t, instanceOptions, flags, storageConfig)
-	if err == nil {
-		return &result
-	}
-
-	t.Fatalf("failed to launch server: %v", err)
-	return nil
 }
 
 func createLocalhostListenerOnFreePort() (net.Listener, int, error) {

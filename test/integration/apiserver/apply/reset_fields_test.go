@@ -164,10 +164,7 @@ var resetFieldsSpecData = map[schema.GroupVersionResource]string{
 func TestApplyResetFields(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, k8sfeatures.NetworkPolicyStatus, true)()
 
-	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), []string{"--disable-admission-plugins", "ServiceAccount,TaintNodesByCondition"}, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
+	server := apiservertesting.StartTestServerOrDie(t, apiservertesting.NewDefaultTestServerOptions(), []string{"--disable-admission-plugins", "ServiceAccount,TaintNodesByCondition"}, framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client, err := kubernetes.NewForConfig(server.ClientConfig)

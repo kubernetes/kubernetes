@@ -49,10 +49,7 @@ import (
 // TestApplyCRDStructuralSchema tests that when a CRD has a structural schema in its validation field,
 // it will be used to construct the CR schema used by apply.
 func TestApplyCRDStructuralSchema(t *testing.T) {
-	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
+	server := apiservertesting.StartTestServerOrDie(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
 	defer server.TearDownFn()
 	config := server.ClientConfig
 
@@ -437,10 +434,7 @@ func TestApplyCRDUnhandledSchema(t *testing.T) {
 	}
 	defer etcdclient.Close()
 
-	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, storageConfig)
-	if err != nil {
-		t.Fatal(err)
-	}
+	server := apiservertesting.StartTestServerOrDie(t, apiservertesting.NewDefaultTestServerOptions(), nil, storageConfig)
 	defer server.TearDownFn()
 	config := server.ClientConfig
 
@@ -602,10 +596,7 @@ func getManagedFields(rawResponse []byte) ([]metav1.ManagedFieldsEntry, error) {
 }
 
 func TestDefaultMissingKeyCRD(t *testing.T) {
-	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
+	server := apiservertesting.StartTestServerOrDie(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
 	defer server.TearDownFn()
 	config := server.ClientConfig
 

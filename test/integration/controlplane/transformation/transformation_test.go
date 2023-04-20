@@ -78,7 +78,7 @@ type transformTest struct {
 	storageConfig     *storagebackend.Config
 	configDir         string
 	transformerConfig string
-	kubeAPIServer     kubeapiservertesting.TestServer
+	kubeAPIServer     *kubeapiservertesting.TestServer
 	restClient        *kubernetes.Clientset
 	ns                *corev1.Namespace
 	secret            *corev1.Secret
@@ -102,9 +102,7 @@ func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML strin
 		e.configDir = configDir
 	}
 
-	if e.kubeAPIServer, err = kubeapiservertesting.StartTestServer(l, nil, e.getEncryptionOptions(reload), e.storageConfig); err != nil {
-		return nil, fmt.Errorf("failed to start KubeAPI server: %v", err)
-	}
+	e.kubeAPIServer = kubeapiservertesting.StartTestServerOrDie(l, nil, e.getEncryptionOptions(reload), e.storageConfig)
 	klog.Infof("Started kube-apiserver %v", e.kubeAPIServer.ClientConfig.Host)
 
 	if e.restClient, err = kubernetes.NewForConfig(e.kubeAPIServer.ClientConfig); err != nil {

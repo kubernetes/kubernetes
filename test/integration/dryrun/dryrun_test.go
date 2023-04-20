@@ -214,13 +214,10 @@ func TestDryRun(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DryRun, true)()
 
 	// start API server
-	s, err := kubeapiservertesting.StartTestServer(t, kubeapiservertesting.NewDefaultTestServerOptions(), []string{
+	s := kubeapiservertesting.StartTestServerOrDie(t, kubeapiservertesting.NewDefaultTestServerOptions(), []string{
 		"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection",
 		"--runtime-config=api/all=true",
 	}, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
 	defer s.TearDownFn()
 
 	client, err := kubernetes.NewForConfig(s.ClientConfig)

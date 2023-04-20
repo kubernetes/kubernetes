@@ -514,12 +514,10 @@ spec:
 )
 
 func TestFieldValidation(t *testing.T) {
-	server, err := kubeapiservertesting.StartTestServer(t, kubeapiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
-	config := server.ClientConfig
+	server := kubeapiservertesting.StartTestServerOrDie(t, kubeapiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
 	defer server.TearDownFn()
+
+	config := server.ClientConfig
 
 	// don't log warnings, tests inspect them in the responses directly
 	config.WarningHandler = rest.NoWarnings{}
@@ -2930,12 +2928,10 @@ func setupCRD(t testing.TB, config *rest.Config, apiGroup string, schemaless boo
 
 func BenchmarkFieldValidation(b *testing.B) {
 	flag.Lookup("v").Value.Set("0")
-	server, err := kubeapiservertesting.StartTestServer(b, kubeapiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
-	if err != nil {
-		b.Fatal(err)
-	}
-	config := server.ClientConfig
+	server := kubeapiservertesting.StartTestServerOrDie(b, kubeapiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
 	defer server.TearDownFn()
+
+	config := server.ClientConfig
 
 	// don't log warnings, tests inspect them in the responses directly
 	config.WarningHandler = rest.NoWarnings{}

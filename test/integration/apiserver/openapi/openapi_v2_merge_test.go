@@ -36,10 +36,7 @@ import (
 )
 
 func TestOpenAPIV2CRDMergeNoDuplicateTypes(t *testing.T) {
-	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
+	server := apiservertesting.StartTestServerOrDie(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
 	defer server.TearDownFn()
 	config := server.ClientConfig
 

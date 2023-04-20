@@ -264,12 +264,9 @@ func Test_ValidateNamespace_NoParams(t *testing.T) {
 		t.Run(testcase.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
 
-			server, err := apiservertesting.StartTestServer(t, nil, []string{
+			server := apiservertesting.StartTestServerOrDie(t, nil, []string{
 				"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 			}, framework.SharedEtcd())
-			if err != nil {
-				t.Fatal(err)
-			}
 			defer server.TearDownFn()
 
 			config := server.ClientConfig
@@ -418,16 +415,13 @@ func Test_ValidateAnnotationsAndWarnings(t *testing.T) {
 	}
 	defer os.Remove(logFile.Name())
 
-	server, err := apiservertesting.StartTestServer(t, nil, []string{
+	server := apiservertesting.StartTestServerOrDie(t, nil, []string{
 		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 		"--audit-policy-file", policyFile.Name(),
 		"--audit-log-version", "audit.k8s.io/v1",
 		"--audit-log-mode", "blocking",
 		"--audit-log-path", logFile.Name(),
 	}, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
 	defer server.TearDownFn()
 
 	config := server.ClientConfig
@@ -532,12 +526,9 @@ func Test_ValidateNamespace_WithConfigMapParams(t *testing.T) {
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
-			server, err := apiservertesting.StartTestServer(t, nil, []string{
+			server := apiservertesting.StartTestServerOrDie(t, nil, []string{
 				"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 			}, framework.SharedEtcd())
-			if err != nil {
-				t.Fatal(err)
-			}
 			defer server.TearDownFn()
 
 			config := server.ClientConfig
@@ -569,10 +560,7 @@ func Test_ValidateNamespace_WithConfigMapParams(t *testing.T) {
 
 func TestMultiplePolicyBindings(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
-	server, err := apiservertesting.StartTestServer(t, nil, nil, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
+	server := apiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	config := server.ClientConfig
@@ -696,12 +684,9 @@ func TestMultiplePolicyBindings(t *testing.T) {
 // are exempt from policy rules.
 func Test_PolicyExemption(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
-	server, err := apiservertesting.StartTestServer(t, nil, []string{
+	server := apiservertesting.StartTestServerOrDie(t, nil, []string{
 		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 	}, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
 	defer server.TearDownFn()
 
 	config := server.ClientConfig
@@ -783,12 +768,9 @@ func Test_PolicyExemption(t *testing.T) {
 // is allowed and when ParamKind is updated to v1/Secret, only namespaces prefixed with "secret" is allowed, etc.
 func Test_ValidatingAdmissionPolicy_UpdateParamKind(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
-	server, err := apiservertesting.StartTestServer(t, nil, []string{
+	server := apiservertesting.StartTestServerOrDie(t, nil, []string{
 		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 	}, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
 	defer server.TearDownFn()
 
 	config := server.ClientConfig
@@ -924,12 +906,9 @@ func Test_ValidatingAdmissionPolicy_UpdateParamKind(t *testing.T) {
 // the ParamRef set in the policy binding. The paramRef in the binding is then updated to a different object.
 func Test_ValidatingAdmissionPolicy_UpdateParamRef(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
-	server, err := apiservertesting.StartTestServer(t, nil, []string{
+	server := apiservertesting.StartTestServerOrDie(t, nil, []string{
 		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 	}, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
 	defer server.TearDownFn()
 
 	config := server.ClientConfig
@@ -1070,12 +1049,9 @@ func Test_ValidatingAdmissionPolicy_UpdateParamRef(t *testing.T) {
 // Test_ValidatingAdmissionPolicy_UpdateParamResource validates behavior of a policy after updates to the param resource.
 func Test_ValidatingAdmissionPolicy_UpdateParamResource(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
-	server, err := apiservertesting.StartTestServer(t, nil, []string{
+	server := apiservertesting.StartTestServerOrDie(t, nil, []string{
 		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 	}, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
 	defer server.TearDownFn()
 
 	config := server.ClientConfig
@@ -1203,12 +1179,9 @@ func Test_ValidatingAdmissionPolicy_UpdateParamResource(t *testing.T) {
 
 func Test_ValidatingAdmissionPolicy_MatchByObjectSelector(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
-	server, err := apiservertesting.StartTestServer(t, nil, []string{
+	server := apiservertesting.StartTestServerOrDie(t, nil, []string{
 		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 	}, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
 	defer server.TearDownFn()
 
 	config := server.ClientConfig
@@ -1271,12 +1244,9 @@ func Test_ValidatingAdmissionPolicy_MatchByObjectSelector(t *testing.T) {
 
 func Test_ValidatingAdmissionPolicy_MatchByNamespaceSelector(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
-	server, err := apiservertesting.StartTestServer(t, nil, []string{
+	server := apiservertesting.StartTestServerOrDie(t, nil, []string{
 		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 	}, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
 	defer server.TearDownFn()
 
 	config := server.ClientConfig
@@ -1363,12 +1333,9 @@ func Test_ValidatingAdmissionPolicy_MatchByNamespaceSelector(t *testing.T) {
 
 func Test_ValidatingAdmissionPolicy_MatchByResourceNames(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
-	server, err := apiservertesting.StartTestServer(t, nil, []string{
+	server := apiservertesting.StartTestServerOrDie(t, nil, []string{
 		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 	}, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
 	defer server.TearDownFn()
 
 	config := server.ClientConfig
@@ -1422,12 +1389,9 @@ func Test_ValidatingAdmissionPolicy_MatchByResourceNames(t *testing.T) {
 
 func Test_ValidatingAdmissionPolicy_MatchWithExcludeResources(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
-	server, err := apiservertesting.StartTestServer(t, nil, []string{
+	server := apiservertesting.StartTestServerOrDie(t, nil, []string{
 		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 	}, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
 	defer server.TearDownFn()
 
 	config := server.ClientConfig
@@ -1494,13 +1458,10 @@ func Test_ValidatingAdmissionPolicy_MatchWithExcludeResources(t *testing.T) {
 
 func Test_ValidatingAdmissionPolicy_MatchWithMatchPolicyEquivalent(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
-	server, err := apiservertesting.StartTestServer(t, nil, []string{
+	server := apiservertesting.StartTestServerOrDie(t, nil, []string{
 		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 	}, framework.SharedEtcd())
 	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(server.ClientConfig), false, versionedCustomResourceDefinition())
-	if err != nil {
-		t.Fatal(err)
-	}
 	defer server.TearDownFn()
 
 	config := server.ClientConfig
@@ -1586,13 +1547,10 @@ func Test_ValidatingAdmissionPolicy_MatchWithMatchPolicyEquivalent(t *testing.T)
 
 func Test_ValidatingAdmissionPolicy_MatchWithMatchPolicyExact(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
-	server, err := apiservertesting.StartTestServer(t, nil, []string{
+	server := apiservertesting.StartTestServerOrDie(t, nil, []string{
 		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 	}, framework.SharedEtcd())
 	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(server.ClientConfig), false, versionedCustomResourceDefinition())
-	if err != nil {
-		t.Fatal(err)
-	}
 	defer server.TearDownFn()
 
 	config := server.ClientConfig
@@ -1683,12 +1641,9 @@ func Test_ValidatingAdmissionPolicy_MatchWithMatchPolicyExact(t *testing.T) {
 // removes the policy from the apiserver admission chain and recreating it re-enables it.
 func Test_ValidatingAdmissionPolicy_PolicyDeletedThenRecreated(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
-	server, err := apiservertesting.StartTestServer(t, nil, []string{
+	server := apiservertesting.StartTestServerOrDie(t, nil, []string{
 		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 	}, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
 	defer server.TearDownFn()
 
 	config := server.ClientConfig
@@ -1801,12 +1756,9 @@ func Test_ValidatingAdmissionPolicy_PolicyDeletedThenRecreated(t *testing.T) {
 // removes the policy from the apiserver admission chain and recreating it re-enables it.
 func Test_ValidatingAdmissionPolicy_BindingDeletedThenRecreated(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
-	server, err := apiservertesting.StartTestServer(t, nil, []string{
+	server := apiservertesting.StartTestServerOrDie(t, nil, []string{
 		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 	}, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
 	defer server.TearDownFn()
 
 	config := server.ClientConfig
@@ -1920,12 +1872,9 @@ func Test_ValidatingAdmissionPolicy_BindingDeletedThenRecreated(t *testing.T) {
 // by a binding renders the policy as invalid. Recreating the param resource re-enables the policy.
 func Test_ValidatingAdmissionPolicy_ParamResourceDeletedThenRecreated(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
-	server, err := apiservertesting.StartTestServer(t, nil, []string{
+	server := apiservertesting.StartTestServerOrDie(t, nil, []string{
 		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 	}, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
 	defer server.TearDownFn()
 
 	config := server.ClientConfig
@@ -2110,12 +2059,9 @@ func TestCRDParams(t *testing.T) {
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
-			server, err := apiservertesting.StartTestServer(t, nil, []string{
+			server := apiservertesting.StartTestServerOrDie(t, nil, []string{
 				"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 			}, framework.SharedEtcd())
-			if err != nil {
-				t.Fatal(err)
-			}
 			defer server.TearDownFn()
 
 			config := server.ClientConfig
@@ -2162,12 +2108,9 @@ func TestCRDParams(t *testing.T) {
 
 func TestBindingRemoval(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
-	server, err := apiservertesting.StartTestServer(t, nil, []string{
+	server := apiservertesting.StartTestServerOrDie(t, nil, []string{
 		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 	}, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
 	defer server.TearDownFn()
 
 	config := server.ClientConfig
@@ -2317,14 +2260,11 @@ func Test_ValidateSecondaryAuthorization(t *testing.T) {
 			for clientName, clientFn := range clients {
 				t.Run(clientName, func(t *testing.T) {
 					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
-					server, err := apiservertesting.StartTestServer(t, nil, []string{
+					server := apiservertesting.StartTestServerOrDie(t, nil, []string{
 						"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 						"--authorization-mode=RBAC",
 						"--anonymous-auth",
 					}, framework.SharedEtcd())
-					if err != nil {
-						t.Fatal(err)
-					}
 					defer server.TearDownFn()
 
 					// For test set up such as creating policies, bindings and RBAC rules.
@@ -2368,7 +2308,7 @@ func Test_ValidateSecondaryAuthorization(t *testing.T) {
 							Name: "test-authz",
 						},
 					}
-					_, err = client.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+					_, err := client.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
 
 					var expected metav1.StatusReason = ""
 					if !testcase.allowed {
@@ -2914,12 +2854,9 @@ rules:
 
 func TestValidatingAdmissionPolicyTypeChecking(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
-	server, err := apiservertesting.StartTestServer(t, nil, []string{
+	server := apiservertesting.StartTestServerOrDie(t, nil, []string{
 		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 	}, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
 	defer server.TearDownFn()
 
 	config := server.ClientConfig

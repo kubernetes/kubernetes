@@ -316,12 +316,9 @@ func TestMatchConditions(t *testing.T) {
 		t.Run(testcase.name, func(t *testing.T) {
 			upCh := recorder.Reset()
 
-			server, err := apiservertesting.StartTestServer(t, nil, []string{
+			server := apiservertesting.StartTestServerOrDie(t, nil, []string{
 				"--disable-admission-plugins=ServiceAccount",
 			}, framework.SharedEtcd())
-			if err != nil {
-				t.Fatal(err)
-			}
 			defer server.TearDownFn()
 
 			config := server.ClientConfig

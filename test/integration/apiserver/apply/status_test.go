@@ -93,10 +93,7 @@ func createMapping(groupVersion string, resource metav1.APIResource) (*meta.REST
 
 // TestApplyStatus makes sure that applying the status works for all known types.
 func TestApplyStatus(t *testing.T) {
-	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), []string{"--disable-admission-plugins", "ServiceAccount,TaintNodesByCondition"}, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
+	server := apiservertesting.StartTestServerOrDie(t, apiservertesting.NewDefaultTestServerOptions(), []string{"--disable-admission-plugins", "ServiceAccount,TaintNodesByCondition"}, framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client, err := kubernetes.NewForConfig(server.ClientConfig)
