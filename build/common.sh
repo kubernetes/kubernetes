@@ -367,6 +367,8 @@ function kube::build::clean() {
 
   if [[ -d "${LOCAL_OUTPUT_ROOT}" ]]; then
     kube::log::status "Removing _output directory"
+    # this ensures we can clean _output/local/go/cache which is not rw by default
+    chmod -R +w "${LOCAL_OUTPUT_ROOT}"
     rm -rf "${LOCAL_OUTPUT_ROOT}"
   fi
 }

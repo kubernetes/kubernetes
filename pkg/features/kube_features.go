@@ -222,14 +222,6 @@ const (
 	// Enables support for Device Plugins
 	DevicePlugins featuregate.Feature = "DevicePlugins"
 
-	// owner: @RenaudWasTaken @dashpole
-	// alpha: v1.19
-	// beta: v1.20
-	// ga: v1.25
-	//
-	// Disables Accelerator Metrics Collected by Kubelet
-	DisableAcceleratorUsageMetrics featuregate.Feature = "DisableAcceleratorUsageMetrics"
-
 	// owner: @andrewsykim
 	// alpha: v1.22
 	//
@@ -662,14 +654,6 @@ const (
 	// Enable users to specify when a Pod is ready for scheduling.
 	PodSchedulingReadiness featuregate.Feature = "PodSchedulingReadiness"
 
-	// owner: @liggitt, @tallclair, sig-auth
-	// alpha: v1.22
-	// beta: v1.23
-	// ga: v1.25
-	//
-	// Enables the PodSecurity admission plugin
-	PodSecurity featuregate.Feature = "PodSecurity"
-
 	// owner: @ehashman
 	// alpha: v1.21
 	// beta: v1.22
@@ -977,9 +961,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	DelegateFSGroupToCSIDriver: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 
-	DevicePlugins: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.26
-
-	DisableAcceleratorUsageMetrics: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	DevicePlugins: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 
 	DisableCloudProviders: {Default: false, PreRelease: featuregate.Alpha},
 
@@ -1096,8 +1078,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	PodHasNetworkCondition: {Default: false, PreRelease: featuregate.Alpha},
 
 	PodSchedulingReadiness: {Default: true, PreRelease: featuregate.Beta},
-
-	PodSecurity: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
 	ProbeTerminationGracePeriod: {Default: true, PreRelease: featuregate.Beta}, // Default to true in beta 1.25
 
