@@ -26,21 +26,17 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
-
-kube::golang::verify_go_version
 kube::util::ensure-temp-dir
-
+kube::golang::setup_env
 
 # Creating a new repository tree 
 # Deleting vendor directory to make go-licenses fetch license URLs from go-packages source repository
-git worktree add -f "${KUBE_TEMP}"/tmp_test_licenses/kubernetes HEAD >/dev/null 2>&1 || true
-cd "${KUBE_TEMP}"/tmp_test_licenses/kubernetes && rm -rf vendor
-
-
-# Ensure that we find the binaries we build before anything else.
-export GOBIN="${KUBE_OUTPUT_BINPATH}"
-PATH="${GOBIN}:${PATH}"
-
+worktree_dir="${KUBE_TEMP}/tmp_test_licenses/kubernetes"
+git worktree add -f "${worktree_dir}" HEAD >/dev/null 2>&1 || true
+kube::util::trap_add "git worktree remove -f ${worktree_dir} && rm -rf ${worktree_dir:?}" EXIT
+# ensure we re-use _output binaries, go cache, etc
+ln -s "${KUBE_ROOT}/_output" "${worktree_dir}/_output"
+cd "${worktree_dir}" && rm -rf vendor
 
 # Explicitly opt into go modules, even though we're inside a GOPATH directory
 export GO111MODULE=on

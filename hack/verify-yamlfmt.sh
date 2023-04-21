@@ -31,7 +31,9 @@ kube::util::ensure_clean_working_dir
 
 _tmpdir="$(kube::realpath "$(mktemp -d -t "$(basename "$0").XXXXXX")")"
 git worktree add -f -q "${_tmpdir}" HEAD
-kube::util::trap_add "git worktree remove -f ${_tmpdir}" EXIT
+kube::util::trap_add "git worktree remove -f ${_tmpdir} && rm -rf ${_tmpdir:?}" EXIT
+# ensure we re-use _output binaries, go cache, etc
+ln -s "${KUBE_ROOT}/_output" "${_tmpdir}/_output"
 cd "${_tmpdir}"
 
 # Format YAML files

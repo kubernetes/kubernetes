@@ -29,7 +29,9 @@ _tmpdir="$(kube::realpath "$(mktemp -d -t verify-internal-modules.XXXXXX)")"
 _tmp_gopath="${_tmpdir}/go"
 _tmp_kuberoot="${_tmp_gopath}/src/k8s.io/kubernetes"
 git worktree add -f "${_tmp_kuberoot}" HEAD
-kube::util::trap_add "git worktree remove -f ${_tmp_kuberoot}" EXIT
+kube::util::trap_add "git worktree remove -f ${_tmp_kuberoot} && rm -rf ${_tmp_kuberoot:?}" EXIT
+# ensure we re-use _output binaries, go cache, etc
+ln -s "${KUBE_ROOT}/_output" "${_tmp_kuberoot}/_output"
 
 pushd "${_tmp_kuberoot}" >/dev/null
 ./hack/update-internal-modules.sh
