@@ -119,7 +119,7 @@ func TestFallbackQueryParamVerifier_PrimaryNoFallback(t *testing.T) {
 		},
 	}
 
-	root := openapi3.NewRoot(cached.NewClient(openapitest.NewFileClient(t)))
+	root := openapi3.NewRoot(cached.NewClient(openapitest.NewEmbeddedFileClient()))
 	for tn, tc := range tests {
 		t.Run(tn, func(t *testing.T) {
 			primary := createFakeV3Verifier(tc.crds, root, tc.queryParam)

@@ -116,7 +116,7 @@ func TestV3SupportsQueryParamBatchV1(t *testing.T) {
 		},
 	}
 
-	root := openapi3.NewRoot(cached.NewClient(openapitest.NewFileClient(t)))
+	root := openapi3.NewRoot(cached.NewClient(openapitest.NewEmbeddedFileClient()))
 	for tn, tc := range tests {
 		t.Run(tn, func(t *testing.T) {
 			verifier := &queryParamVerifierV3{
