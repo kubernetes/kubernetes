@@ -31,6 +31,8 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 export GO111MODULE=on
 
 kube::util::ensure_clean_working_dir
+# This sets up the environment, like GOCACHE, which keeps the worktree cleaner.
+kube::golang::setup_env
 
 _tmpdir="$(kube::realpath "$(mktemp -d -t "$(basename "$0").XXXXXX")")"
 git worktree add -f -q "${_tmpdir}" HEAD
