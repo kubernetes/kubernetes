@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2023 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,8 +25,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
+	"k8s.io/apimachinery/pkg/util/httpstream/spdy2"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/klog/v2"
 )
 
@@ -80,7 +80,7 @@ func (h *StreamTranslatorHandler) ServeHTTP(w http.ResponseWriter, req *http.Req
 		klog.Infof("Unable to unwrap transport %T to get at TLS config: %v", h.Transport, err)
 	}
 	spdyRoundtripper := spdy.NewRoundTripper(tlsConfig)
-	spdyExecutor, err := remotecommand.NewSPDYExecutorForTransports(spdyRoundtripper, spdyRoundtripper, "POST", h.Location)
+	spdyExecutor, err := spdy2.NewSPDYExecutorForTransports(spdyRoundtripper, spdyRoundtripper, "POST", h.Location)
 	if err != nil {
 		klog.Infof("create SPDY executor error: %v", err)
 		h.Responder.Error(w, req, err)
@@ -88,7 +88,7 @@ func (h *StreamTranslatorHandler) ServeHTTP(w http.ResponseWriter, req *http.Req
 	}
 
 	// Wire the WebSocket server stream output to the SPDY client input.
-	opts := remotecommand.StreamOptions{}
+	opts := spdy2.StreamOptions{}
 	if streamOpts.Stdin {
 		opts.Stdin = ctx.stdinStream
 	}
@@ -120,10 +120,10 @@ func (h *StreamTranslatorHandler) ServeHTTP(w http.ResponseWriter, req *http.Req
 // resizeChan into the SPDY client input. Implements TerminalSizeQueue
 // interface.
 type translatorSizeQueue struct {
-	resizeChan chan remotecommand.TerminalSize
+	resizeChan chan spdy2.TerminalSize
 }
 
-func (t *translatorSizeQueue) Next() *remotecommand.TerminalSize {
+func (t *translatorSizeQueue) Next() *spdy2.TerminalSize {
 	size, ok := <-t.resizeChan
 	if !ok {
 		return nil

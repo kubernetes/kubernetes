@@ -1,3 +1,19 @@
+/*
+Copyright 2023 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package proxy
 
 import (
@@ -10,10 +26,9 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/httpstream/spdy2"
+	"k8s.io/apimachinery/pkg/util/httpstream/websocket"
 	"k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apiserver/pkg/server/httplog"
-	"k8s.io/apiserver/pkg/util/wsstream"
-	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/klog/v2"
 )
 
@@ -24,10 +39,10 @@ const (
 	errorChannel
 	resizeChannel
 
-	preV4BinaryWebsocketProtocol = wsstream.ChannelWebSocketProtocol
-	preV4Base64WebsocketProtocol = wsstream.Base64ChannelWebSocketProtocol
-	v4BinaryWebsocketProtocol    = "v4." + wsstream.ChannelWebSocketProtocol
-	v4Base64WebsocketProtocol    = "v4." + wsstream.Base64ChannelWebSocketProtocol
+	preV4BinaryWebsocketProtocol = websocket.ChannelWebSocketProtocol
+	preV4Base64WebsocketProtocol = websocket.Base64ChannelWebSocketProtocol
+	v4BinaryWebsocketProtocol    = "v4." + websocket.ChannelWebSocketProtocol
+	v4Base64WebsocketProtocol    = "v4." + websocket.Base64ChannelWebSocketProtocol
 )
 
 // Options contains details about which streams are required for
@@ -73,7 +88,7 @@ type conns struct {
 	stderrStream io.WriteCloser
 	writeStatus  func(status *apierrors.StatusError) error
 	resizeStream io.ReadCloser
-	resizeChan   chan remotecommand.TerminalSize
+	resizeChan   chan spdy2.TerminalSize
 	tty          bool
 }
 
@@ -86,7 +101,7 @@ func webSocketServerStreams(req *http.Request, w http.ResponseWriter, opts *Opti
 	}
 
 	if ctx.resizeStream != nil {
-		ctx.resizeChan = make(chan remotecommand.TerminalSize)
+		ctx.resizeChan = make(chan spdy2.TerminalSize)
 		go handleResizeEvents(req.Context(), ctx.resizeStream, ctx.resizeChan)
 	}
 
@@ -94,13 +109,13 @@ func webSocketServerStreams(req *http.Request, w http.ResponseWriter, opts *Opti
 }
 
 // Read terminal resize events off of passed stream and queue into passed channel.
-func handleResizeEvents(ctx context.Context, stream io.Reader, channel chan<- remotecommand.TerminalSize) {
+func handleResizeEvents(ctx context.Context, stream io.Reader, channel chan<- spdy2.TerminalSize) {
 	defer runtime.HandleCrash()
 	defer close(channel)
 
 	decoder := json.NewDecoder(stream)
 	for {
-		size := remotecommand.TerminalSize{}
+		size := spdy2.TerminalSize{}
 		if err := decoder.Decode(&size); err != nil {
 			break
 		}
@@ -118,38 +133,38 @@ func handleResizeEvents(ctx context.Context, stream io.Reader, channel chan<- re
 
 // createChannels returns the standard channel types for a shell connection (STDIN 0, STDOUT 1, STDERR 2)
 // along with the approximate duplex value. It also creates the error (3) and resize (4) channels.
-func createChannels(opts *Options) []wsstream.ChannelType {
+func createChannels(opts *Options) []websocket.ChannelType {
 	// open the requested channels, and always open the error channel
-	channels := make([]wsstream.ChannelType, 5)
+	channels := make([]websocket.ChannelType, 5)
 	channels[stdinChannel] = readChannel(opts.Stdin)
 	channels[stdoutChannel] = writeChannel(opts.Stdout)
 	channels[stderrChannel] = writeChannel(opts.Stderr)
-	channels[errorChannel] = wsstream.WriteChannel
-	channels[resizeChannel] = wsstream.ReadChannel
+	channels[errorChannel] = websocket.WriteChannel
+	channels[resizeChannel] = websocket.ReadChannel
 	return channels
 }
 
-// readChannel returns wsstream.ReadChannel if real is true, or wsstream.IgnoreChannel.
-func readChannel(real bool) wsstream.ChannelType {
+// readChannel returns websocket.ReadChannel if real is true, or websocket.IgnoreChannel.
+func readChannel(real bool) websocket.ChannelType {
 	if real {
-		return wsstream.ReadChannel
+		return websocket.ReadChannel
 	}
-	return wsstream.IgnoreChannel
+	return websocket.IgnoreChannel
 }
 
-// writeChannel returns wsstream.WriteChannel if real is true, or wsstream.IgnoreChannel.
-func writeChannel(real bool) wsstream.ChannelType {
+// writeChannel returns websocket.WriteChannel if real is true, or websocket.IgnoreChannel.
+func writeChannel(real bool) websocket.ChannelType {
 	if real {
-		return wsstream.WriteChannel
+		return websocket.WriteChannel
 	}
-	return wsstream.IgnoreChannel
+	return websocket.IgnoreChannel
 }
 
 // createWebSocketStreams returns a "conns" struct containing the websocket connection and
 // streams needed to perform an exec or an attach.
 func createWebSocketStreams(req *http.Request, w http.ResponseWriter, opts *Options, idleTimeout time.Duration) (*conns, bool) {
 	channels := createChannels(opts)
-	conn := wsstream.NewConn(map[string]wsstream.ChannelProtocolConfig{
+	conn := websocket.NewConn(map[string]websocket.ChannelProtocolConfig{
 		"": {
 			Binary:   true,
 			Channels: channels,
@@ -174,7 +189,7 @@ func createWebSocketStreams(req *http.Request, w http.ResponseWriter, opts *Opti
 	conn.SetIdleTimeout(idleTimeout)
 	// Opening the connection responds to WebSocket client, negotiating
 	// the WebSocket upgrade connection and the subprotocol.
-	negotiatedProtocol, streams, err := conn.Open(httplog.Unlogged(req, w), req)
+	negotiatedProtocol, streams, err := conn.Open(w, req)
 	if err != nil {
 		runtime.HandleError(fmt.Errorf("unable to upgrade websocket connection: %v", err))
 		return nil, false

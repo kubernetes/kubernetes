@@ -563,8 +563,8 @@ var _ = SIGDescribe("Pods", func() {
 			Resource("pods").
 			Name(pod.Name).
 			Suffix("exec").
-			Param("stderr", "1").
-			Param("stdout", "1").
+			Param("stderr", "true").
+			Param("stdout", "true").
 			Param("container", pod.Spec.Containers[0].Name).
 			Param("command", "echo").
 			Param("command", "remote execution test")

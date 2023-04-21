@@ -212,7 +212,9 @@ func (r *PortForwardREST) Connect(ctx context.Context, name string, opts runtime
 	if err != nil {
 		return nil, err
 	}
-	return newThrottledUpgradeAwareProxyHandler(location, transport, responder), nil
+	handler := proxy.NewUpgradeAwareHandler(location, transport, true, false, proxy.NewErrorResponder(responder))
+	handler.MaxBytesPerSec = capabilities.Get().PerConnectionBandwidthLimitBytesPerSec
+	return handler, nil
 }
 
 func newThrottledUpgradeAwareProxyHandler(location *url.URL, transport http.RoundTripper, responder rest.Responder) *proxy.StreamTranslatorHandler {
