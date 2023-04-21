@@ -22,13 +22,13 @@ package util
 import (
 	"fmt"
 	"math/rand"
+	"net"
+	"os"
 	"reflect"
 	"runtime"
 	"sync"
 	"testing"
 	"time"
-	"os"
-	"net"
 
 	winio "github.com/Microsoft/go-winio"
 	"github.com/stretchr/testify/assert"
