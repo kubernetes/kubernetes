@@ -267,7 +267,7 @@ func (n *nodeLogQuery) Copy(w io.Writer) {
 	// set the deadline to the maximum across both runs
 	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(30*time.Second))
 	defer cancel()
-	boot := int(0)
+	boot := 0
 	if n.Boot != nil {
 		boot = *n.Boot
 	}
