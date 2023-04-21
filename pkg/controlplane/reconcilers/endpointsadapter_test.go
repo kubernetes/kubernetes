@@ -31,30 +31,32 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/fake"
+	utilnet "k8s.io/utils/net"
 )
 
 func TestEndpointsAdapterGet(t *testing.T) {
 	endpoints1, epSlice1 := generateEndpointsAndSlice([]int{80, 443}, []string{"10.1.2.3", "10.1.2.4"})
 
 	testCases := map[string]struct {
+		initialState []runtime.Object
+
 		expectedError     error
 		expectedEndpoints *corev1.Endpoints
-		initialState      []runtime.Object
 	}{
 		"single-existing-endpoints": {
-			expectedError:     nil,
+			initialState: []runtime.Object{endpoints1, epSlice1},
+
 			expectedEndpoints: endpoints1,
-			initialState:      []runtime.Object{endpoints1, epSlice1},
 		},
 		"endpoints exists, endpointslice does not": {
-			expectedError:     nil,
+			initialState: []runtime.Object{endpoints1},
+
 			expectedEndpoints: endpoints1,
-			initialState:      []runtime.Object{endpoints1},
 		},
 		"endpointslice exists, endpoints does not": {
-			expectedError:     errors.NewNotFound(schema.GroupResource{Group: "", Resource: "endpoints"}, testServiceName),
-			expectedEndpoints: nil,
-			initialState:      []runtime.Object{epSlice1},
+			initialState: []runtime.Object{epSlice1},
+
+			expectedError: errors.NewNotFound(schema.GroupResource{Group: "", Resource: "endpoints"}, testServiceName),
 		},
 	}
 
@@ -78,73 +80,79 @@ func TestEndpointsAdapterGet(t *testing.T) {
 
 func TestEndpointsAdapterCreate(t *testing.T) {
 	endpoints1, epSlice1 := generateEndpointsAndSlice([]int{80}, []string{"10.1.2.3", "10.1.2.4"})
+	endpoints2, epSlice2 := generateEndpointsAndSlice([]int{80, 443}, []string{"10.1.2.3", "10.1.2.4", "10.1.2.5"})
 
-	// even if an Endpoints resource includes an IPv6 address, it should not be
-	// included in the corresponding EndpointSlice.
-	endpoints2, _ := generateEndpointsAndSlice([]int{80}, []string{"10.1.2.5", "10.1.2.6", "1234::5678:0000:0000:9abc:def0"})
-	_, epSlice2 := generateEndpointsAndSlice([]int{80}, []string{"10.1.2.5", "10.1.2.6"})
+	endpointsV6, epSliceV6 := generateEndpointsAndSlice([]int{80}, []string{"1234::5678", "1234::abcd"})
 
-	// ensure that Endpoints with only IPv6 addresses result in EndpointSlice
-	// with an IPv6 address type.
-	endpoints3, epSlice3 := generateEndpointsAndSlice([]int{80}, []string{"1234::5678:0000:0000:9abc:def0"})
-	epSlice3.AddressType = discovery.AddressTypeIPv6
+	endpointsDual, _ := generateEndpointsAndSlice([]int{80}, []string{"10.1.2.3", "10.1.2.4", "1234::5678", "1234::abcd"})
 
 	testCases := map[string]struct {
+		initialState   []runtime.Object
+		endpointsParam *corev1.Endpoints
+
 		expectedError  error
 		expectedResult *corev1.Endpoints
 		expectCreate   []runtime.Object
 		expectUpdate   []runtime.Object
-		initialState   []runtime.Object
-		endpointsParam *corev1.Endpoints
 	}{
 		"single-endpoint": {
-			expectedError:  nil,
-			expectedResult: endpoints1,
-			expectCreate:   []runtime.Object{endpoints1, epSlice1},
+			// If the Endpoints/EndpointSlice do not exist, they will be
+			// created.
 			initialState:   []runtime.Object{},
 			endpointsParam: endpoints1,
+
+			expectedResult: endpoints1,
+			expectCreate:   []runtime.Object{endpoints1, epSlice1},
 		},
 		"single-endpoint-partial-ipv6": {
-			expectedError:  nil,
-			expectedResult: endpoints2,
-			expectCreate:   []runtime.Object{endpoints2, epSlice2},
+			// If the Endpoints/EndpointSlice do not exist, and the reconciler
+			// erroneously tries to create a dual-stack Endpoints, we will
+			// accept the erroneous Endpoints but create a single-stack IPv4
+			// EndpointSlice.
 			initialState:   []runtime.Object{},
-			endpointsParam: endpoints2,
+			endpointsParam: endpointsDual,
+
+			expectedResult: endpointsDual,
+			expectCreate:   []runtime.Object{endpointsDual, epSlice1},
 		},
 		"single-endpoint-full-ipv6": {
-			expectedError:  nil,
-			expectedResult: endpoints3,
-			expectCreate:   []runtime.Object{endpoints3, epSlice3},
+			// If the Endpoints/EndpointSlice do not exist, and the reconciler
+			// creates a single-stack IPv6 Endpoints, we will create a
+			// single-stack IPv6 EndpointSlice.
 			initialState:   []runtime.Object{},
-			endpointsParam: endpoints3,
+			endpointsParam: endpointsV6,
+
+			expectedResult: endpointsV6,
+			expectCreate:   []runtime.Object{endpointsV6, epSliceV6},
 		},
 		"existing-endpoints": {
-			expectedError:  errors.NewAlreadyExists(schema.GroupResource{Group: "", Resource: "endpoints"}, testServiceName),
-			expectedResult: nil,
+			// If the Endpoints/EndpointSlice already exist then Create will
+			// return an error, because you should have called Update.
 			initialState:   []runtime.Object{endpoints1, epSlice1},
 			endpointsParam: endpoints1,
 
-			// We expect the create to be attempted, we just also expect it to fail
+			expectedError: errors.NewAlreadyExists(schema.GroupResource{Group: "", Resource: "endpoints"}, testServiceName),
+			// (We expect the create to be attempted, we just also expect it to fail)
 			expectCreate: []runtime.Object{endpoints1},
 		},
-		"existing-endpointslice-incorrect": {
+		"existing-endpointslice-correct": {
 			// No error when we need to create the Endpoints but the correct
 			// EndpointSlice already exists
-			expectedError:  nil,
-			expectedResult: endpoints1,
-			expectCreate:   []runtime.Object{endpoints1},
 			initialState:   []runtime.Object{epSlice1},
 			endpointsParam: endpoints1,
+
+			expectedResult: endpoints1,
+			expectCreate:   []runtime.Object{endpoints1},
 		},
-		"existing-endpointslice-correct": {
+		"existing-endpointslice-incorrect": {
 			// No error when we need to create the Endpoints but an incorrect
 			// EndpointSlice already exists
-			expectedError:  nil,
+			initialState:   []runtime.Object{epSlice1},
+			endpointsParam: endpoints2,
+
 			expectedResult: endpoints2,
 			expectCreate:   []runtime.Object{endpoints2},
 			expectUpdate:   []runtime.Object{epSlice2},
-			initialState:   []runtime.Object{epSlice1},
-			endpointsParam: endpoints2,
 		},
 	}
 
@@ -175,81 +183,88 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 	endpoints1, epSlice1 := generateEndpointsAndSlice([]int{80}, []string{"10.1.2.3", "10.1.2.4"})
 	endpoints2, epSlice2 := generateEndpointsAndSlice([]int{80, 443}, []string{"10.1.2.3", "10.1.2.4", "10.1.2.5"})
 
-	// ensure that EndpointSlice with deprecated IP address type is replaced
-	// with one that has an IPv4 address type.
-	endpoints4, _ := generateEndpointsAndSlice([]int{80}, []string{"10.1.2.7", "10.1.2.8"})
-	_, epSlice4IP := generateEndpointsAndSlice([]int{80}, []string{"10.1.2.7", "10.1.2.8"})
-	// "IP" is a deprecated address type, ensuring that it is handled properly.
-	epSlice4IP.AddressType = discovery.AddressType("IP")
-	_, epSlice4IPv4 := generateEndpointsAndSlice([]int{80}, []string{"10.1.2.7", "10.1.2.8"})
+	_, epSlice1Deprecated := generateEndpointsAndSlice([]int{80}, []string{"10.1.3", "10.1.2.4"})
+	epSlice1Deprecated.AddressType = discovery.AddressType("IP")
 
 	testCases := map[string]struct {
+		initialState   []runtime.Object
+		endpointsParam *corev1.Endpoints
+
 		expectedError  error
 		expectedResult *corev1.Endpoints
 		expectCreate   []runtime.Object
 		expectUpdate   []runtime.Object
 		expectDelete   []runtime.Object
-		initialState   []runtime.Object
-		endpointsParam *corev1.Endpoints
 	}{
 		"single-existing-endpoints-no-change": {
-			expectedError:  nil,
-			expectedResult: endpoints1,
+			// If the Endpoints/EndpointSlice already exist and are correct,
+			// then Update will pointlessly update it anyway because you
+			// shouldn't have called it if you didn't want it to do that.
 			initialState:   []runtime.Object{endpoints1, epSlice1},
 			endpointsParam: endpoints1,
 
-			// Even though there's no change, we still expect Update() to be
-			// called, because this unit test ALWAYS calls Update().
-			expectUpdate: []runtime.Object{endpoints1},
+			expectedResult: endpoints1,
+			expectUpdate:   []runtime.Object{endpoints1},
 		},
 		"existing-endpointslice-replaced-with-updated-ipv4-address-type": {
-			expectedError:  nil,
-			expectedResult: endpoints4,
-			initialState:   []runtime.Object{endpoints4, epSlice4IP},
-			endpointsParam: endpoints4,
-			expectUpdate:   []runtime.Object{endpoints4},
-			expectDelete:   []runtime.Object{epSlice4IP},
-			expectCreate:   []runtime.Object{epSlice4IPv4},
+			// If an EndpointSlice with deprecated "IP" address type exists,
+			// it is deleted and replaced with one that has "IPv4" address
+			// type.
+			initialState:   []runtime.Object{endpoints1, epSlice1Deprecated},
+			endpointsParam: endpoints1,
+
+			expectedResult: endpoints1,
+			expectUpdate:   []runtime.Object{endpoints1},
+			expectDelete:   []runtime.Object{epSlice1Deprecated},
+			expectCreate:   []runtime.Object{epSlice1},
 		},
 		"add-ports-and-ips": {
-			expectedError:  nil,
-			expectedResult: endpoints2,
-			expectUpdate:   []runtime.Object{endpoints2, epSlice2},
+			// If we add ports/IPs to the Endpoints they will be added to
+			// the EndpointSlice.
 			initialState:   []runtime.Object{endpoints1, epSlice1},
 			endpointsParam: endpoints2,
-		},
-		"endpoints-correct-endpointslice-wrong": {
-			expectedError:  nil,
+
 			expectedResult: endpoints2,
 			expectUpdate:   []runtime.Object{endpoints2, epSlice2},
+		},
+		"endpoints-correct-endpointslice-wrong": {
+			// If the Endpoints is correct and the EndpointSlice is wrong,
+			// Sync will update the EndpointSlice.
 			initialState:   []runtime.Object{endpoints2, epSlice1},
 			endpointsParam: endpoints2,
+
+			expectedResult: endpoints2,
+			expectUpdate:   []runtime.Object{endpoints2, epSlice2},
 		},
 		"endpointslice-correct-endpoints-wrong": {
-			expectedError:  nil,
-			expectedResult: endpoints2,
-			expectUpdate:   []runtime.Object{endpoints2},
+			// If the EndpointSlice is correct and the Endpoints is wrong,
+			// Sync will update the Endpoints.
 			initialState:   []runtime.Object{endpoints1, epSlice2},
 			endpointsParam: endpoints2,
+
+			expectedResult: endpoints2,
+			expectUpdate:   []runtime.Object{endpoints2},
 		},
 		"missing-endpoints": {
-			expectedError:  errors.NewNotFound(schema.GroupResource{Group: "", Resource: "endpoints"}, testServiceName),
-			expectedResult: nil,
+			// If the Endpoints/EndpointSlice doesn't already exist then
+			// Update will return an error, because you should have called
+			// Create.
 			initialState:   []runtime.Object{},
 			endpointsParam: endpoints1,
 
+			expectedError: errors.NewNotFound(schema.GroupResource{Group: "", Resource: "endpoints"}, testServiceName),
 			// We expect the update to be attempted, we just also expect it to fail
 			expectUpdate: []runtime.Object{endpoints1},
 		},
 		"missing-endpointslice": {
 			// No error when we need to update the Endpoints but the
 			// EndpointSlice doesn't exist
-			expectedError:  nil,
+			initialState:   []runtime.Object{endpoints2},
+			endpointsParam: endpoints1,
+
 			expectedResult: endpoints1,
 			expectUpdate:   []runtime.Object{endpoints1},
 			expectCreate:   []runtime.Object{epSlice1},
-			initialState:   []runtime.Object{endpoints2},
-			endpointsParam: endpoints1,
 		},
 	}
 
@@ -278,13 +293,17 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 
 func generateEndpointsAndSlice(ports []int, addresses []string) (*corev1.Endpoints, *discovery.EndpointSlice) {
 	trueBool := true
+	addressType := discovery.AddressTypeIPv4
+	if len(addresses) > 0 && utilnet.IsIPv6String(addresses[0]) {
+		addressType = discovery.AddressTypeIPv6
+	}
 
 	epSlice := &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: testServiceNamespace,
 			Name:      testServiceName,
 		},
-		AddressType: discovery.AddressTypeIPv4,
+		AddressType: addressType,
 	}
 	epSlice.Labels = map[string]string{discovery.LabelServiceName: testServiceName}
 	subset := corev1.EndpointSubset{}
@@ -338,28 +357,26 @@ func TestEndpointsAdapterEnsureEndpointSliceFromEndpoints(t *testing.T) {
 	endpoints2, epSlice2 := generateEndpointsAndSlice([]int{80, 443}, []string{"10.1.2.3", "10.1.2.4", "10.1.2.5"})
 
 	testCases := map[string]struct {
+		initialState   []runtime.Object
+		endpointsParam *corev1.Endpoints
+
 		expectedError         error
 		expectedEndpointSlice *discovery.EndpointSlice
-		initialState          []runtime.Object
-		endpointsParam        *corev1.Endpoints
 	}{
 		"existing-endpointslice-no-change": {
-			expectedError:         nil,
-			expectedEndpointSlice: epSlice1,
 			initialState:          []runtime.Object{epSlice1},
 			endpointsParam:        endpoints1,
+			expectedEndpointSlice: epSlice1,
 		},
 		"existing-endpointslice-change": {
-			expectedError:         nil,
-			expectedEndpointSlice: epSlice2,
 			initialState:          []runtime.Object{epSlice1},
 			endpointsParam:        endpoints2,
+			expectedEndpointSlice: epSlice2,
 		},
 		"missing-endpointslice": {
-			expectedError:         nil,
-			expectedEndpointSlice: epSlice1,
 			initialState:          []runtime.Object{},
 			endpointsParam:        endpoints1,
+			expectedEndpointSlice: epSlice1,
 		},
 	}
 
