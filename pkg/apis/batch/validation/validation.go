@@ -465,7 +465,11 @@ func validateCronJobSpec(spec, oldSpec *batch.CronJobSpec, fldPath *field.Path, 
 	}
 
 	if spec.StartingDeadlineSeconds != nil {
-		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.StartingDeadlineSeconds), fldPath.Child("startingDeadlineSeconds"))...)
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(*spec.StartingDeadlineSeconds, fldPath.Child("startingDeadlineSeconds"))...)
+
+		if len(spec.Schedule) != 0 {
+			allErrs = append(allErrs, validateStartingDeadlineSeconds(*spec.StartingDeadlineSeconds, spec.Schedule, fldPath.Child("startingDeadlineSeconds"))...)
+		}
 	}
 
 	if oldSpec == nil || !pointer.StringEqual(oldSpec.TimeZone, spec.TimeZone) {
@@ -509,6 +513,25 @@ func validateScheduleFormat(schedule string, timeZone *string, fldPath *field.Pa
 	}
 	if strings.Contains(schedule, "TZ") && timeZone != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, schedule, "cannot use both timeZone field and TZ or CRON_TZ in schedule"))
+	}
+
+	return allErrs
+}
+
+func validateStartingDeadlineSeconds(deadline int64, schedule string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	// The schedule format error is validated in validateScheduleFormat
+	s, err := cron.ParseStandard(schedule)
+	if err != nil {
+		return allErrs
+	}
+
+	t1 := s.Next(time.Now())
+	t2 := s.Next(t1)
+
+	if interval := t2.Sub(t1); (time.Duration(deadline) * time.Second) > interval {
+		allErrs = append(allErrs, field.Invalid(fldPath, deadline, fmt.Sprintf("startingDeadlineSeconds must be shorter than the schedule interval %s", interval)))
 	}
 
 	return allErrs
