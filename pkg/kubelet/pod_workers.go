@@ -716,19 +716,17 @@ func (p *podWorkers) IsPodForMirrorPodTerminatingByFullName(podFullName string) 
 }
 
 func isPodStatusCacheTerminal(status *kubecontainer.PodStatus) bool {
-	runningContainers := 0
-	runningSandboxes := 0
 	for _, container := range status.ContainerStatuses {
 		if container.State == kubecontainer.ContainerStateRunning {
-			runningContainers++
+			return false
 		}
 	}
 	for _, sb := range status.SandboxStatuses {
 		if sb.State == runtimeapi.PodSandboxState_SANDBOX_READY {
-			runningSandboxes++
+			return false
 		}
 	}
-	return runningContainers == 0 && runningSandboxes == 0
+	return true
 }
 
 // UpdatePod carries a configuration change or termination state to a pod. A pod is either runnable,
