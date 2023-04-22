@@ -5310,6 +5310,111 @@ func TestValidateVolumes(t *testing.T) {
 
 }
 
+func TestValidateReadOnlyPersistentDisks(t *testing.T) {
+	cases := []struct {
+		name        string
+		volumes     []core.Volume
+		oldVolume   []core.Volume
+		gateValue   bool
+		expectError bool
+	}{
+		{
+			name:        "gate on, read-only disk, nil old",
+			gateValue:   true,
+			volumes:     []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: true}}}},
+			oldVolume:   []core.Volume(nil),
+			expectError: false,
+		},
+		{
+			name:        "gate off, read-only disk, nil old",
+			gateValue:   false,
+			volumes:     []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: true}}}},
+			oldVolume:   []core.Volume(nil),
+			expectError: false,
+		},
+		{
+			name:        "gate on, read-write, nil old",
+			gateValue:   true,
+			volumes:     []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: false}}}},
+			oldVolume:   []core.Volume(nil),
+			expectError: false,
+		},
+		{
+			name:        "gate off, read-write, nil old",
+			gateValue:   false,
+			volumes:     []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: false}}}},
+			oldVolume:   []core.Volume(nil),
+			expectError: true,
+		},
+		{
+			name:        "gate on, new read-only and old read-write",
+			gateValue:   true,
+			volumes:     []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: true}}}},
+			oldVolume:   []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: false}}}},
+			expectError: false,
+		},
+		{
+			name:        "gate off, new read-only and old read-write",
+			gateValue:   false,
+			volumes:     []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: true}}}},
+			oldVolume:   []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: false}}}},
+			expectError: false,
+		},
+		{
+			name:        "gate on, new read-write and old read-write",
+			gateValue:   true,
+			volumes:     []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: true}}}},
+			oldVolume:   []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: false}}}},
+			expectError: false,
+		},
+		{
+			name:        "gate off, new read-write and old read-write",
+			gateValue:   false,
+			volumes:     []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: false}}}},
+			oldVolume:   []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: false}}}},
+			expectError: false,
+		},
+		{
+			name:        "gate on, new read-only and old read-only",
+			gateValue:   true,
+			volumes:     []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: true}}}},
+			oldVolume:   []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: true}}}},
+			expectError: false,
+		},
+		{
+			name:        "gate off, new read-only and old read-only",
+			gateValue:   false,
+			volumes:     []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: true}}}},
+			oldVolume:   []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: true}}}},
+			expectError: false,
+		},
+		{
+			name:        "gate on, new read-write and old read-only",
+			gateValue:   true,
+			volumes:     []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: false}}}},
+			oldVolume:   []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: true}}}},
+			expectError: false,
+		},
+		{
+			name:        "gate off, new read-write and old read-only",
+			gateValue:   false,
+			volumes:     []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: false}}}},
+			oldVolume:   []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: true}}}},
+			expectError: true,
+		},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			fidPath := field.NewPath("testField")
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SkipReadOnlyValidationGCE, testCase.gateValue)()
+			errs := ValidateReadOnlyPersistentDisks(testCase.volumes, testCase.oldVolume, fidPath)
+			if !testCase.expectError && len(errs) != 0 {
+				t.Errorf("expected success, got:%v", errs)
+			}
+		})
+	}
+}
+
 func TestHugePagesIsolation(t *testing.T) {
 	testCases := map[string]struct {
 		pod         *core.Pod
