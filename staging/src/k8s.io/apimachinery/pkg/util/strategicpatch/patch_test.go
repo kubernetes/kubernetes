@@ -1209,6 +1209,52 @@ testCases:
 
 var strategicMergePatchRawTestCases = []StrategicMergePatchRawTestCase{
 	{
+		Description: "nested patch merge with empty list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+name: hi
+`),
+			Current: []byte(`
+name: hi
+mergingList:
+- name: hello2
+`),
+			Modified: []byte(`
+name: hi
+mergingList:
+- name: hello
+- $patch: delete
+  name: doesntexist
+`),
+			TwoWay: []byte(`
+mergingList:
+- name: hello
+- $patch: delete
+  name: doesntexist
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+- name: hello
+- name: doesntexist
+mergingList:
+- name: hello
+- $patch: delete
+  name: doesntexist
+`),
+			TwoWayResult: []byte(`
+name: hi
+mergingList:
+- name: hello
+`),
+			Result: []byte(`
+name: hi
+mergingList:
+- name: hello
+- name: hello2
+`),
+		},
+	},
+	{
 		Description: "delete items in lists of scalars",
 		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
 			Original: []byte(`
