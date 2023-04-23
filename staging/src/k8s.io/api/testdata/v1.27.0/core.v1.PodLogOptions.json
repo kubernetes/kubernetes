@@ -1,0 +1,13 @@
+{
+  "kind": "PodLogOptions",
+  "apiVersion": "v1",
+  "container": "containerValue",
+  "follow": true,
+  "previous": true,
+  "sinceSeconds": 4,
+  "sinceTime": "2005-01-01T01:01:01Z",
+  "timestamps": true,
+  "tailLines": 7,
+  "limitBytes": 8,
+  "insecureSkipTLSVerifyBackend": true
+}

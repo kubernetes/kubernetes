@@ -1,0 +1,10 @@
+apiVersion: v1
+dryRun:
+- dryRunValue
+gracePeriodSeconds: 1
+kind: DeleteOptions
+orphanDependents: true
+preconditions:
+  resourceVersion: resourceVersionValue
+  uid: uidValue
+propagationPolicy: propagationPolicyValue
