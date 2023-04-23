@@ -1242,8 +1242,6 @@ $setElementOrder/mergingList:
 - name: doesntexist
 mergingList:
 - name: hello
-- $patch: delete
-  name: doesntexist
 `),
 			TwoWayResult: []byte(`
 name: hi
