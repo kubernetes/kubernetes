@@ -199,3 +199,11 @@ func TestCategories(t *testing.T) {
 	expected := []string{"api-extensions"}
 	registrytest.AssertCategories(t, storage, expected)
 }
+
+func TestShortNames(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	expected := []string{"vwc"}
+	registrytest.AssertShortNames(t, storage, expected)
+}
