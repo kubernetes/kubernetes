@@ -102,9 +102,8 @@ func (m topologyToMatchedTermCount) clone() topologyToMatchedTermCount {
 }
 
 // update updates the count of pods that meet the matching criteria in a particular topology.
-// This function assumes the node has the label keyed with `tk`.
-func (m topologyToMatchedTermCount) update(node *v1.Node, tk string, value int64) {
-	pair := topologyPair{key: tk, value: node.Labels[tk]}
+func (m topologyToMatchedTermCount) update(topologyKey, topologyValue string, value int64) {
+	pair := topologyPair{key: topologyKey, value: topologyValue}
 	m[pair] += value
 	// value could be negative, hence we delete the entry if it is down to zero.
 	if m[pair] == 0 {
@@ -118,7 +117,7 @@ func (m topologyToMatchedTermCount) updateWithAffinityTerms(
 	terms []framework.AffinityTerm, pod *v1.Pod, node *v1.Node, value int64) {
 	if podMatchesAllAffinityTerms(node, terms, pod) {
 		for _, t := range terms {
-			m.update(node, t.TopologyKey, value)
+			m.update(t.TopologyKey, node.Labels[t.TopologyKey], value)
 		}
 	}
 }
@@ -128,11 +127,12 @@ func (m topologyToMatchedTermCount) updateWithAffinityTerms(
 func (m topologyToMatchedTermCount) updateWithAntiAffinityTerms(terms []framework.AffinityTerm, pod *v1.Pod, nsLabels labels.Set, node *v1.Node, value int64) {
 	// Check anti-affinity terms.
 	for _, t := range terms {
-		if !nodeHasTopologyKeyLabel(node, t.TopologyKey) {
+		topologyValue, ok := node.Labels[t.TopologyKey]
+		if !ok {
 			continue
 		}
 		if t.Matches(pod, nsLabels) {
-			m.update(node, t.TopologyKey, value)
+			m.update(t.TopologyKey, topologyValue, value)
 		}
 	}
 }
@@ -143,7 +143,7 @@ func podMatchesAllAffinityTerms(node *v1.Node, terms []framework.AffinityTerm, p
 		return false
 	}
 	for _, t := range terms {
-		if !nodeHasTopologyKeyLabel(node, t.TopologyKey) {
+		if _, ok := node.Labels[t.TopologyKey]; !ok {
 			continue
 		}
 		// The incoming pod NamespaceSelector was merged into the Namespaces set, and so
@@ -153,11 +153,6 @@ func podMatchesAllAffinityTerms(node *v1.Node, terms []framework.AffinityTerm, p
 		}
 	}
 	return true
-}
-
-func nodeHasTopologyKeyLabel(node *v1.Node, topologyKey string) bool {
-	_, ok := node.Labels[topologyKey]
-	return ok
 }
 
 // calculates the following for each existing pod on each node:
