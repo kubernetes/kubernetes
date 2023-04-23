@@ -189,7 +189,7 @@ func Test_nodeLogQuery_validate(t *testing.T) {
 		{name: "until", Services: []string{service1}, options: options{UntilTime: &until}},
 		{name: "since until", Services: []string{service1}, options: options{SinceTime: &until, UntilTime: &since},
 			wantErr: true},
-		{name: "boot", Services: []string{service1}, options: options{Boot: intPtr(-1)}},
+		{name: "boot", Services: []string{service1}, options: options{Boot: intPtr(-1)}, wantErr: true},
 		{name: "boot out of range", Services: []string{service1}, options: options{Boot: intPtr(1)}, wantErr: true},
 		{name: "tailLines", Services: []string{service1}, options: options{TailLines: intPtr(100)}},
 		{name: "tailLines out of range", Services: []string{service1}, options: options{TailLines: intPtr(100000)}},
