@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 	utilnet "k8s.io/utils/net"
+	"k8s.io/utils/pointer"
 )
 
 // EndpointsAdapter provides a simple interface for reading and writing both
@@ -130,7 +131,7 @@ func (adapter *EndpointsAdapter) Sync(ips sets.Set[string], endpointPorts []core
 			currentEndpointSlice = nil
 		}
 
-		endpointSlice := adapter.endpointSliceFromEndpoints(endpoints)
+		endpointSlice := adapter.updateEndpointSlice(currentEndpointSlice, sortedIPs, endpointPorts, reconcilePorts)
 
 		// required for transition from IP to IPv4 address type.
 		if currentEndpointSlice != nil && currentEndpointSlice.AddressType != endpointSlice.AddressType {
@@ -203,56 +204,55 @@ func (adapter *EndpointsAdapter) updateEndpoints(currentEndpoints *corev1.Endpoi
 	return endpoints
 }
 
-// endpointSliceFromEndpoints generates an EndpointSlice from a valid Endpoints
-// resource.
-func (adapter *EndpointsAdapter) endpointSliceFromEndpoints(endpoints *corev1.Endpoints) *discovery.EndpointSlice {
-	endpointSlice := &discovery.EndpointSlice{}
-	endpointSlice.Name = endpoints.Name
-	endpointSlice.Namespace = endpoints.Namespace
-	endpointSlice.Labels = map[string]string{discovery.LabelServiceName: endpoints.Name}
+// updateEndpointSlice takes currentEndpointSlice (which may be nil), and updates it to
+// reflect ips and (optionally) endpointPorts.
+func (adapter *EndpointsAdapter) updateEndpointSlice(currentEndpointSlice *discovery.EndpointSlice, sortedIPs []string, endpointPorts []corev1.EndpointPort, reconcilePorts bool) *discovery.EndpointSlice {
+	var endpointSlice *discovery.EndpointSlice
 
-	// TODO: Add support for dual stack here (and in the rest of
-	// EndpointsAdapter).
+	if currentEndpointSlice != nil {
+		endpointSlice = currentEndpointSlice.DeepCopy()
+	} else {
+		endpointSlice = &discovery.EndpointSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      adapter.serviceName,
+				Namespace: adapter.serviceNamespace,
+			},
+		}
+	}
+
+	// Ensure correct labels
+	endpointSlice.Labels = map[string]string{
+		discovery.LabelServiceName: adapter.serviceName,
+	}
+
+	// Ensure correct AddressType
 	endpointSlice.AddressType = adapter.addressType
 
-	if len(endpoints.Subsets) > 0 {
-		subset := endpoints.Subsets[0]
-		for i := range subset.Ports {
-			endpointSlice.Ports = append(endpointSlice.Ports, discovery.EndpointPort{
-				Port:     &subset.Ports[i].Port,
-				Name:     &subset.Ports[i].Name,
-				Protocol: &subset.Ports[i].Protocol,
-			})
+	// Set addresses
+	endpointSlice.Endpoints = make([]discovery.Endpoint, len(sortedIPs))
+	for i := range sortedIPs {
+		endpointSlice.Endpoints[i] = discovery.Endpoint{
+			Addresses:  []string{sortedIPs[i]},
+			Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 		}
+	}
 
-		endpointSlice.Endpoints = append(endpointSlice.Endpoints, getEndpointsFromAddresses(subset.Addresses, endpointSlice.AddressType, true)...)
-		endpointSlice.Endpoints = append(endpointSlice.Endpoints, getEndpointsFromAddresses(subset.NotReadyAddresses, endpointSlice.AddressType, false)...)
+	// Set ports
+	endpointSlicePorts := convertEndpointPorts(endpointPorts)
+	if len(endpointSlice.Ports) == 0 || (reconcilePorts && !apiequality.Semantic.DeepEqual(endpointSlice.Ports, endpointSlicePorts)) {
+		endpointSlice.Ports = endpointSlicePorts
 	}
 
 	return endpointSlice
 }
 
-// getEndpointsFromAddresses returns a list of Endpoints from addresses that
-// match the provided address type.
-func getEndpointsFromAddresses(addresses []corev1.EndpointAddress, addressType discovery.AddressType, ready bool) []discovery.Endpoint {
-	endpoints := []discovery.Endpoint{}
-	for _, address := range addresses {
-		endpoints = append(endpoints, endpointFromAddress(address, ready))
+// convertEndpointPorts converts an array of corev1.EndpointPort to discovery.EndpointPort
+func convertEndpointPorts(endpointPorts []corev1.EndpointPort) []discovery.EndpointPort {
+	endpointSlicePorts := make([]discovery.EndpointPort, len(endpointPorts))
+	for i := range endpointPorts {
+		endpointSlicePorts[i].Port = &endpointPorts[i].Port
+		endpointSlicePorts[i].Name = &endpointPorts[i].Name
+		endpointSlicePorts[i].Protocol = &endpointPorts[i].Protocol
 	}
-
-	return endpoints
-}
-
-// endpointFromAddress generates an Endpoint from an EndpointAddress resource.
-func endpointFromAddress(address corev1.EndpointAddress, ready bool) discovery.Endpoint {
-	ep := discovery.Endpoint{
-		Addresses:  []string{address.IP},
-		Conditions: discovery.EndpointConditions{Ready: &ready},
-	}
-
-	if address.NodeName != nil {
-		ep.NodeName = address.NodeName
-	}
-
-	return ep
+	return endpointSlicePorts
 }
