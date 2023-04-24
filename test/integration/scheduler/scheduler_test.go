@@ -51,7 +51,6 @@ type nodeStateManager struct {
 
 func TestUnschedulableNodes(t *testing.T) {
 	testCtx := initTest(t, "unschedulable-nodes")
-	defer testutils.CleanupTest(t, testCtx)
 
 	nodeLister := testCtx.InformerFactory.Core().V1().Nodes().Lister()
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
@@ -191,7 +190,6 @@ func TestMultipleSchedulers(t *testing.T) {
 
 	// 1. create and start default-scheduler
 	testCtx := initTest(t, "multi-scheduler")
-	defer testutils.CleanupTest(t, testCtx)
 
 	// 2. create a node
 	node := &v1.Node{
@@ -263,7 +261,7 @@ func TestMultipleSchedulers(t *testing.T) {
 		},
 	})
 	testCtx = testutils.InitTestSchedulerWithOptions(t, testCtx, 0, scheduler.WithProfiles(cfg.Profiles...))
-	testutils.SyncInformerFactory(testCtx)
+	testutils.SyncSchedulerInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 
 	//	6. **check point-2**:
@@ -285,7 +283,6 @@ func TestMultipleSchedulingProfiles(t *testing.T) {
 	})
 
 	testCtx := initTest(t, "multi-scheduler", scheduler.WithProfiles(cfg.Profiles...))
-	defer testutils.CleanupTest(t, testCtx)
 
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: "node-multi-scheduler-test-node"},
@@ -349,7 +346,6 @@ func TestMultipleSchedulingProfiles(t *testing.T) {
 // This test will verify scheduler can work well regardless of whether kubelet is allocatable aware or not.
 func TestAllocatable(t *testing.T) {
 	testCtx := initTest(t, "allocatable")
-	defer testutils.CleanupTest(t, testCtx)
 
 	// 2. create a node without allocatable awareness
 	nodeRes := map[v1.ResourceName]string{
@@ -423,7 +419,6 @@ func TestAllocatable(t *testing.T) {
 func TestSchedulerInformers(t *testing.T) {
 	// Initialize scheduler.
 	testCtx := initTest(t, "scheduler-informer")
-	defer testutils.CleanupTest(t, testCtx)
 	cs := testCtx.ClientSet
 
 	defaultPodRes := &v1.ResourceRequirements{Requests: v1.ResourceList{
@@ -526,7 +521,6 @@ func TestNodeEvents(t *testing.T) {
 	// 4. Remove the taint from node2; pod2 should now schedule on node2
 
 	testCtx := initTest(t, "node-events")
-	defer testutils.CleanupTest(t, testCtx)
 	defer testCtx.ClientSet.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 
 	// 1.1 create pod1

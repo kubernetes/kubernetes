@@ -104,9 +104,6 @@ func TestEvictionForNoExecuteTaintAddedByUser(t *testing.T) {
 
 			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
 			testCtx := testutils.InitTestAPIServer(t, "taint-no-execute", nil)
-
-			// Build clientset and informers for controllers.
-			defer testutils.CleanupTest(t, testCtx)
 			cs := testCtx.ClientSet
 
 			// Build clientset and informers for controllers.
@@ -263,7 +260,6 @@ func TestTaintBasedEvictions(t *testing.T) {
 			podTolerations.SetExternalKubeClientSet(externalClientset)
 			podTolerations.SetExternalKubeInformerFactory(externalInformers)
 
-			defer testutils.CleanupTest(t, testCtx)
 			cs := testCtx.ClientSet
 
 			// Start NodeLifecycleController for taint.

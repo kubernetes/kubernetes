@@ -1000,8 +1000,6 @@ func TestRescheduleProvisioning(t *testing.T) {
 	defer func() {
 		testCtx.CancelFn()
 		deleteTestObjects(clientset, ns, metav1.DeleteOptions{})
-		testCtx.ClientSet.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
-		testCtx.CloseFn()
 	}()
 
 	ctrl, informerFactory, err := initPVController(t, testCtx, 0)
@@ -1049,7 +1047,7 @@ func TestRescheduleProvisioning(t *testing.T) {
 
 func setupCluster(t *testing.T, nsName string, numberOfNodes int, resyncPeriod time.Duration, provisionDelaySeconds int) *testConfig {
 	testCtx := testutil.InitTestSchedulerWithOptions(t, testutil.InitTestAPIServer(t, nsName, nil), resyncPeriod)
-	testutil.SyncInformerFactory(testCtx)
+	testutil.SyncSchedulerInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 
 	clientset := testCtx.ClientSet
@@ -1087,7 +1085,6 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int, resyncPeriod t
 		teardown: func() {
 			klog.Infof("test cluster %q start to tear down", ns)
 			deleteTestObjects(clientset, ns, metav1.DeleteOptions{})
-			testutil.CleanupTest(t, testCtx)
 		},
 	}
 }

@@ -79,7 +79,6 @@ func TestTaintNodeByCondition(t *testing.T) {
 	admission.SetExternalKubeInformerFactory(externalInformers)
 
 	testCtx = testutils.InitTestScheduler(t, testCtx)
-	defer testutils.CleanupTest(t, testCtx)
 
 	cs := testCtx.ClientSet
 	nsName := testCtx.NS.Name
@@ -108,7 +107,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 	// Waiting for all controllers to sync
 	externalInformers.Start(testCtx.Ctx.Done())
 	externalInformers.WaitForCacheSync(testCtx.Ctx.Done())
-	testutils.SyncInformerFactory(testCtx)
+	testutils.SyncSchedulerInformerFactory(testCtx)
 
 	// Run all controllers
 	go nc.Run(testCtx.Ctx)

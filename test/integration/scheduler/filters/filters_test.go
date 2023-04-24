@@ -66,7 +66,6 @@ var (
 // anti-affinity predicate functions works correctly.
 func TestInterPodAffinity(t *testing.T) {
 	testCtx := initTest(t, "")
-	defer testutils.CleanupTest(t, testCtx)
 
 	// Add a few nodes with labels
 	nodes, err := createAndWaitForNodesInCache(testCtx, "testnode", st.MakeNode().Label("region", "r1").Label("zone", "z11"), 2)
@@ -990,7 +989,6 @@ func TestInterPodAffinityWithNamespaceSelector(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			testCtx := initTest(t, "")
-			defer testutils.CleanupTest(t, testCtx)
 
 			// Add a few nodes with labels
 			nodes, err := createAndWaitForNodesInCache(testCtx, "testnode", st.MakeNode().Label("region", "r1").Label("zone", "z11"), 2)
@@ -1492,7 +1490,6 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 			testCtx := initTest(t, "pts-predicate")
 			cs := testCtx.ClientSet
 			ns := testCtx.NS.Name
-			defer testutils.CleanupTest(t, testCtx)
 
 			for i := range tt.nodes {
 				if _, err := createNode(cs, tt.nodes[i]); err != nil {
@@ -1761,7 +1758,6 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReadWriteOncePod, tt.enableReadWriteOncePod)()
 
 			testCtx := initTest(t, "scheduler-informer")
-			defer testutils.CleanupTest(t, testCtx)
 
 			if tt.init != nil {
 				if err := tt.init(testCtx.ClientSet, testCtx.NS.Name); err != nil {

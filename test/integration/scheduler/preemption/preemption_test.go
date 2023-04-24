@@ -178,10 +178,9 @@ func TestPreemption(t *testing.T) {
 		0,
 		scheduler.WithProfiles(cfg.Profiles...),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
-	testutils.SyncInformerFactory(testCtx)
+	testutils.SyncSchedulerInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 
-	defer testutils.CleanupTest(t, testCtx)
 	cs := testCtx.ClientSet
 
 	defaultPodRes := &v1.ResourceRequirements{Requests: v1.ResourceList{
@@ -501,7 +500,6 @@ func TestNonPreemption(t *testing.T) {
 	var preemptNever = v1.PreemptNever
 	// Initialize scheduler.
 	testCtx := initTest(t, "non-preemption")
-	defer testutils.CleanupTest(t, testCtx)
 	cs := testCtx.ClientSet
 	tests := []struct {
 		name             string
@@ -579,7 +577,6 @@ func TestNonPreemption(t *testing.T) {
 func TestDisablePreemption(t *testing.T) {
 	// Initialize scheduler, and disable preemption.
 	testCtx := initTestDisablePreemption(t, "disable-preemption")
-	defer testutils.CleanupTest(t, testCtx)
 	cs := testCtx.ClientSet
 
 	tests := []struct {
@@ -659,7 +656,6 @@ func TestDisablePreemption(t *testing.T) {
 func TestPodPriorityResolution(t *testing.T) {
 	admission := priority.NewPlugin()
 	testCtx := testutils.InitTestScheduler(t, testutils.InitTestAPIServer(t, "preemption", admission))
-	defer testutils.CleanupTest(t, testCtx)
 	cs := testCtx.ClientSet
 
 	// Build clientset and informers for controllers.
@@ -671,7 +667,7 @@ func TestPodPriorityResolution(t *testing.T) {
 	admission.SetExternalKubeInformerFactory(externalInformers)
 
 	// Waiting for all controllers to sync
-	testutils.SyncInformerFactory(testCtx)
+	testutils.SyncSchedulerInformerFactory(testCtx)
 	externalInformers.Start(testCtx.Ctx.Done())
 	externalInformers.WaitForCacheSync(testCtx.Ctx.Done())
 
@@ -780,7 +776,6 @@ func mkPriorityPodWithGrace(tc *testutils.TestContext, name string, priority int
 func TestPreemptionStarvation(t *testing.T) {
 	// Initialize scheduler.
 	testCtx := initTest(t, "preemption")
-	defer testutils.CleanupTest(t, testCtx)
 	cs := testCtx.ClientSet
 
 	tests := []struct {
@@ -879,7 +874,6 @@ func TestPreemptionStarvation(t *testing.T) {
 func TestPreemptionRaces(t *testing.T) {
 	// Initialize scheduler.
 	testCtx := initTest(t, "preemption-race")
-	defer testutils.CleanupTest(t, testCtx)
 	cs := testCtx.ClientSet
 
 	tests := []struct {
@@ -1136,9 +1130,6 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 				scheduler.WithProfiles(cfg.Profiles...),
 				scheduler.WithFrameworkOutOfTreeRegistry(tt.outOfTreeRegistry),
 			)
-			t.Cleanup(func() {
-				testutils.CleanupTest(t, testCtx)
-			})
 
 			cs, ns := testCtx.ClientSet, testCtx.NS.Name
 			// Create a node with the specified capacity.
@@ -1227,7 +1218,6 @@ func addPodConditionReady(pod *v1.Pod) {
 func TestPDBInPreemption(t *testing.T) {
 	// Initialize scheduler.
 	testCtx := initTest(t, "preemption-pdb")
-	defer testutils.CleanupTest(t, testCtx)
 	cs := testCtx.ClientSet
 
 	initDisruptionController(t, testCtx)
@@ -1480,7 +1470,7 @@ func TestPDBInPreemption(t *testing.T) {
 
 func initTestPreferNominatedNode(t *testing.T, nsPrefix string, opts ...scheduler.Option) *testutils.TestContext {
 	testCtx := testutils.InitTestSchedulerWithOptions(t, testutils.InitTestAPIServer(t, nsPrefix, nil), 0, opts...)
-	testutils.SyncInformerFactory(testCtx)
+	testutils.SyncSchedulerInformerFactory(testCtx)
 	// wraps the NextPod() method to make it appear the preemption has been done already and the nominated node has been set.
 	f := testCtx.Scheduler.NextPod
 	testCtx.Scheduler.NextPod = func() (podInfo *framework.QueuedPodInfo) {
@@ -1561,9 +1551,6 @@ func TestPreferNominatedNode(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			testCtx := initTestPreferNominatedNode(t, "perfer-nominated-node")
-			t.Cleanup(func() {
-				testutils.CleanupTest(t, testCtx)
-			})
 			cs := testCtx.ClientSet
 			nsName := testCtx.NS.Name
 			var err error
@@ -1637,10 +1624,9 @@ func TestReadWriteOncePodPreemption(t *testing.T) {
 		testutils.InitTestAPIServer(t, "preemption", nil),
 		0,
 		scheduler.WithProfiles(cfg.Profiles...))
-	testutils.SyncInformerFactory(testCtx)
+	testutils.SyncSchedulerInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 
-	defer testutils.CleanupTest(t, testCtx)
 	cs := testCtx.ClientSet
 
 	storage := v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}

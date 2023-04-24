@@ -124,8 +124,7 @@ func TestSchedulingGates(t *testing.T) {
 				scheduler.WithPodInitialBackoffSeconds(0),
 				scheduler.WithPodMaxBackoffSeconds(0),
 			)
-			testutils.SyncInformerFactory(testCtx)
-			defer testutils.CleanupTest(t, testCtx)
+			testutils.SyncSchedulerInformerFactory(testCtx)
 
 			cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
 			for _, p := range tt.pods {
@@ -186,9 +185,8 @@ func TestCoreResourceEnqueue(t *testing.T) {
 		scheduler.WithPodInitialBackoffSeconds(0),
 		scheduler.WithPodMaxBackoffSeconds(0),
 	)
-	testutils.SyncInformerFactory(testCtx)
+	testutils.SyncSchedulerInformerFactory(testCtx)
 
-	defer testutils.CleanupTest(t, testCtx)
 	defer testCtx.Scheduler.SchedulingQueue.Close()
 
 	cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
@@ -371,7 +369,7 @@ func TestCustomResourceEnqueue(t *testing.T) {
 		scheduler.WithPodInitialBackoffSeconds(0),
 		scheduler.WithPodMaxBackoffSeconds(0),
 	)
-	testutils.SyncInformerFactory(testCtx)
+	testutils.SyncSchedulerInformerFactory(testCtx)
 
 	defer testutils.CleanupTest(t, testCtx)
 
