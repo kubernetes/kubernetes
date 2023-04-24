@@ -342,6 +342,12 @@ func TestPriorityQueue_Update(t *testing.T) {
 		t.Error("Expected unschedulablePods to be 1.")
 	}
 	updatedPod = medPriorityPodInfo.Pod.DeepCopy()
+
+	q.Update(medPriorityPodInfo.Pod, updatedPod)
+	if len(q.unschedulablePods.podInfoMap) != 1 {
+		t.Error("Expected unschedulablePods to be 1.")
+	}
+
 	updatedPod.Annotations["foo"] = "test1"
 	// Move clock by podInitialBackoffDuration, so that pods in the unschedulablePods would pass the backing off,
 	// and the pods will be moved into activeQ.
@@ -349,19 +355,6 @@ func TestPriorityQueue_Update(t *testing.T) {
 	q.Update(medPriorityPodInfo.Pod, updatedPod)
 	if p, err := q.Pop(); err != nil || p.Pod != updatedPod {
 		t.Errorf("Expected: %v after Pop, but got: %v", updatedPod.Name, p.Pod.Name)
-	}
-
-	// the updated pods remains in the unschedulable queue if the latest update
-	// does not contain expected changes
-	q.AddUnschedulableIfNotPresent(q.newQueuedPodInfo(medPriorityPodInfo.Pod), q.SchedulingCycle())
-	if len(q.unschedulablePods.podInfoMap) != 1 {
-		t.Error("Expected unschedulablePods to be 1.")
-	}
-
-	updatedPod = medPriorityPodInfo.Pod.DeepCopy()
-	q.Update(medPriorityPodInfo.Pod, updatedPod)
-	if len(q.unschedulablePods.podInfoMap) != 1 {
-		t.Error("Expected unschedulablePods to be 1.")
 	}
 }
 
