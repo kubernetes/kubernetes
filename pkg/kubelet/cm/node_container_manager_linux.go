@@ -71,13 +71,20 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 	// We need to update limits on node allocatable cgroup no matter what because
 	// default cpu shares on cgroups are low and can cause cpu starvation.
 	nodeAllocatable := cm.internalCapacity
+	klog.V(4).InfoS("Node Capacity: %v", nodeAllocatable)
 	// Use Node Allocatable limits instead of capacity if the user requested enforcing node allocatable.
 	if cm.CgroupsPerQOS && nc.EnforceNodeAllocatable.Has(kubetypes.NodeAllocatableEnforcementKey) {
 		nodeAllocatable = cm.getNodeAllocatableInternalAbsolute()
+		klog.V(4).InfoS("Node Allocatable: %v", nodeAllocatable)
 	}
 
 	klog.V(4).InfoS("Attempting to enforce Node Allocatable", "config", nc)
-
+	klog.V(4).InfoS("Node Allocatable: %v", nodeAllocatable)
+	klog.V(4).InfoS("Node Capacity Memory: %v", cm.internalCapacity.Memory())
+	klog.V(4).InfoS("Kube Reserved: %v", cm.NodeConfig.KubeReserved)
+	klog.V(4).InfoS("System Reserved: %v", cm.NodeConfig.SystemReserved)
+	klog.V(4).InfoS("Node Allocatable Memory: %v", nodeAllocatable.Memory())
+	klog.V(4).InfoS(cm.NodeConfig.KubeReservedCgroupName)
 	cgroupConfig := &CgroupConfig{
 		Name:               cm.cgroupRoot,
 		ResourceParameters: getCgroupConfig(nodeAllocatable),

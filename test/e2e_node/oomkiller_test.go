@@ -19,12 +19,18 @@ package e2enode
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -38,20 +44,97 @@ type testCase struct {
 
 const PodOOMKilledTimeout = 2 * time.Minute
 
-var _ = SIGDescribe("OOMKiller [LinuxOnly] [NodeConformance]", func() {
+var _ = SIGDescribe("ndixita OOMKiller [NodeConformance] [LinuxOnly]", func() {
 	f := framework.NewDefaultFramework("oomkiller-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	containerName := "oomkill-target-container"
-	oomPodSpec := getOOMTargetPod("oomkill-target-pod", containerName)
-	runOomKillerTest(f, testCase{podSpec: oomPodSpec, oomTargetContainerName: containerName})
+	runOomKillerTest(f, testCase{podSpec: nil, oomTargetContainerName: containerName})
 })
+
+func fileValue(filePath string) error {
+	out, err := os.ReadFile(filePath)
+	fmt.Printf("reading from: %s\n", filePath)
+	fmt.Println(out)
+	fmt.Println(err)
+	if err != nil {
+		return fmt.Errorf("failed to read file %q", filePath)
+	}
+
+	actual, err := strconv.ParseInt(strings.TrimSpace(string(out)), 10, 64)
+	fmt.Println("hmmm")
+	fmt.Println(err)
+	fmt.Println(actual)
+	if err != nil {
+		return fmt.Errorf("failed to parse output %v", err)
+	}
+
+	fmt.Printf("Cgroup settings: %v\n", actual)
+	return nil
+}
 
 func runOomKillerTest(f *framework.Framework, testCase testCase) {
 	ginkgo.Context("", func() {
 		ginkgo.BeforeEach(func() {
+			var oldCfg *kubeletconfig.KubeletConfiguration
+			var err error
+			oldCfg, err = getCurrentKubeletConfig(context.TODO())
+			framework.ExpectNoError(err)
+
+			newCfg := oldCfg.DeepCopy()
+			fmt.Println("Printing Kubelet Config")
+			fmt.Printf("KubeReserved: %v\n", newCfg.KubeReserved)
+			if newCfg.KubeReserved == nil {
+				fmt.Printf("Is kube reserved nil: %v", newCfg.KubeReserved == nil)
+				newCfg.KubeReserved = map[string]string{}
+			}
+
+			if newCfg.SystemReserved == nil {
+				fmt.Printf("Is system reserved nil: %v", newCfg.SystemReserved == nil)
+				newCfg.SystemReserved = map[string]string{}
+			}
+
+			fmt.Printf("oldCfg: %v\n", oldCfg)
+			fmt.Printf("newCfg: %v\n", newCfg)
+			fmt.Printf("KubeReserved: %v\n", newCfg.KubeReserved)
+			newCfg.KubeReserved["memory"] = ""
+			fmt.Printf("KubeReserved: %v\n", newCfg.KubeReserved)
+			newCfg.KubeReserved["memory"] = "500Mi"
+			newCfg.SystemReserved["memory"] = "100Mi"
+			updateKubeletConfig(context.TODO(), f, newCfg, true)
+			updatedCfg, _ := getCurrentKubeletConfig(context.TODO())
+			fmt.Printf("Updated config: %v\n", updatedCfg)
+			fmt.Println(updatedCfg.KubeReserved)
+			fmt.Println(updatedCfg.SystemReserved)
+
+			subsystems, err := cm.GetCgroupSubsystems()
+			if err != nil {
+				fmt.Print("oh no")
+			}
+
+			cgroupName := "kubepods"
+			if newCfg.CgroupDriver == "systemd" {
+				cgroupName = "kubepods.slice"
+			}
+
+			fmt.Print("Node level cgroup \n")
+			fileValue(filepath.Join(subsystems.MountPoints["memory"], cgroupName, "memory.limit_in_bytes"))
+			fileValue(filepath.Join(subsystems.MountPoints["memory"], cgroupName, "memory.max"))
+
+			containerName := "oomkill-target-container"
+			testCase.podSpec = getPodExceedsAllocatable(f, "oomkill-target-pod", containerName)
 			ginkgo.By("setting up the pod to be used in the test")
-			e2epod.NewPodClient(f).Create(context.TODO(), testCase.podSpec)
+			pod1 := e2epod.NewPodClient(f).Create(context.TODO(), testCase.podSpec)
+
+			fmt.Print("Pod level cgroup \n")
+
+			cgroupName = toCgroupFsName([]string{"kubepods", "besteffort-pod", string(pod1.UID)})
+			fileValue(filepath.Join(subsystems.MountPoints["memory"], cgroupName, "memory.limit_in_bytes"))
+			fileValue(filepath.Join(subsystems.MountPoints["memory"], cgroupName, "memory.max"))
+			fmt.Println("printing overall")
+			cgroupName = toCgroupFsName([]string{"kubepods", "besteffort"})
+			fileValue(filepath.Join(subsystems.MountPoints["memory"], cgroupName, "memory.max"))
+
 		})
 
 		ginkgo.It("The containers terminated by OOM killer should have the reason set to OOMKilled", func() {
@@ -65,17 +148,19 @@ func runOomKillerTest(f *framework.Framework, testCase testCase) {
 
 			ginkgo.By("Verifying the OOM target container has the expected reason")
 			verifyReasonForOOMKilledContainer(pod, testCase.oomTargetContainerName)
+			time.Sleep(20 * time.Minute)
 		})
 
 		ginkgo.AfterEach(func() {
-			ginkgo.By(fmt.Sprintf("deleting pod: %s", testCase.podSpec.Name))
-			e2epod.NewPodClient(f).DeleteSync(context.TODO(), testCase.podSpec.Name, metav1.DeleteOptions{}, framework.PodDeleteTimeout)
+			// ginkgo.By(fmt.Sprintf("deleting pod: %s", testCase.podSpec.Name))
+			// e2epod.NewPodClient(f).DeleteSync(context.TODO(), testCase.podSpec.Name, metav1.DeleteOptions{}, framework.PodDeleteTimeout)
 		})
 	})
 }
 
 func verifyReasonForOOMKilledContainer(pod *v1.Pod, oomTargetContainerName string) {
 	container := e2epod.FindContainerStatusInPod(pod, oomTargetContainerName)
+	fmt.Print(container)
 	if container == nil {
 		framework.Failf("OOM target pod %q, container %q does not have the expected state terminated", pod.Name, container.Name)
 	}
@@ -88,37 +173,53 @@ func verifyReasonForOOMKilledContainer(pod *v1.Pod, oomTargetContainerName strin
 		fmt.Sprintf("pod: %q, container: %q has unexpected reason: %q", pod.Name, container.Name, container.State.Terminated.Reason))
 }
 
-func getOOMTargetPod(podName string, ctnName string) *v1.Pod {
+func getPodExceedsLimits(podName string, ctnName string) *v1.Pod {
 	return &v1.Pod{
+		// ObjectMeta: metav1.ObjectMeta{
+		// 	Name: podName,
+		// },
+		// Spec: v1.PodSpec{
+		// 	RestartPolicy: v1.RestartPolicyNever,
+		// 	Containers: []v1.Container{
+		// 		// getContainerExceedsLimits(ctnName),
+		// 	},
+		// },
+	}
+}
+
+func getPodExceedsAllocatable(f *framework.Framework, podName, containerName string) *v1.Pod {
+	ctx := context.Background()
+	nodes, _ := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
+	// framework.ExpectNoError(err, "failed to get running nodes")
+	n := nodes.Items[0]
+	nodeAllocatable := n.Status.Allocatable.Memory().Value()
+	fmt.Printf("Node allocatable is: %d\n", nodeAllocatable)
+	fmt.Println(n.Name)
+	fmt.Printf("Node capacity is: %d\n", n.Status.Capacity.Memory().Value())
+	testPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,
 		},
 		Spec: v1.PodSpec{
 			RestartPolicy: v1.RestartPolicyNever,
 			Containers: []v1.Container{
-				getOOMTargetContainer(ctnName),
+				*getContainerT(containerName, nodeAllocatable),
 			},
 		},
 	}
+
+	e2epod.SetNodeAffinity(&testPod.Spec, n.Name)
+	return testPod
 }
 
-func getOOMTargetContainer(name string) v1.Container {
-	return v1.Container{
+func getContainerT(name string, nodeAllocatable int64) *v1.Container {
+	return &v1.Container{
 		Name:  name,
 		Image: busyboxImage,
 		Command: []string{
 			"sh",
 			"-c",
-			// use the dd tool to attempt to allocate 20M in a block which exceeds the limit
-			"sleep 5 && dd if=/dev/zero of=/dev/null bs=20M",
-		},
-		Resources: v1.ResourceRequirements{
-			Requests: v1.ResourceList{
-				v1.ResourceMemory: resource.MustParse("15Mi"),
-			},
-			Limits: v1.ResourceList{
-				v1.ResourceMemory: resource.MustParse("15Mi"),
-			},
+			"sleep 10 && dd if=/dev/zero of=/dev/null iflag=fullblock count=10 bs=10G",
 		},
 	}
 }
