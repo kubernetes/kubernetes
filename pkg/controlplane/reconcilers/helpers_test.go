@@ -19,6 +19,8 @@ package reconcilers
 import (
 	"fmt"
 
+	"github.com/google/go-cmp/cmp"
+
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -109,7 +111,7 @@ func verifyCreatesAndUpdates(fakeClient *fake.Clientset, expectedCreates, expect
 			expected = expectedCreates[i]
 		}
 		if !apiequality.Semantic.DeepEqual(expected, actual) {
-			errors = append(errors, fmt.Errorf("expected create %d to be:\n%#v\ngot:\n%#v\n", i, expected, actual))
+			errors = append(errors, fmt.Errorf("create %d has diff:\n%s\n", i+1, cmp.Diff(expected, actual)))
 		}
 	}
 
@@ -125,7 +127,7 @@ func verifyCreatesAndUpdates(fakeClient *fake.Clientset, expectedCreates, expect
 			expected = expectedUpdates[i]
 		}
 		if !apiequality.Semantic.DeepEqual(expected, actual) {
-			errors = append(errors, fmt.Errorf("expected update %d to be:\n%#v\ngot:\n%#v\n", i, expected, actual))
+			errors = append(errors, fmt.Errorf("update %d has diff:\n%s\n", i+1, cmp.Diff(expected, actual)))
 		}
 	}
 

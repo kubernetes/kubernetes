@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -90,7 +92,7 @@ func TestEndpointsAdapterGet(t *testing.T) {
 			}
 
 			if !apiequality.Semantic.DeepEqual(endpoints, testCase.expectedEndpoints) {
-				t.Errorf("Expected endpoints: %v, got: %v", testCase.expectedEndpoints, endpoints)
+				t.Errorf("Wrong result from Get. Diff:\n%s", cmp.Diff(testCase.expectedEndpoints, endpoints))
 			}
 		})
 	}
@@ -187,7 +189,7 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 			}
 
 			if !apiequality.Semantic.DeepEqual(endpoints, testCase.expectedResult) {
-				t.Errorf("Expected endpoints: %v, got: %v", testCase.expectedResult, endpoints)
+				t.Errorf("Wrong result from Create. Diff:\n%s", cmp.Diff(testCase.expectedResult, endpoints))
 			}
 
 			err = verifyCreatesAndUpdates(client, testCase.expectCreate, testCase.expectUpdate)
@@ -310,7 +312,7 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 			}
 
 			if !apiequality.Semantic.DeepEqual(endpoints, testCase.expectedResult) {
-				t.Errorf("Expected endpoints: %v, got: %v", testCase.expectedResult, endpoints)
+				t.Errorf("Wrong result from Update. Diff:\n%s", cmp.Diff(testCase.expectedResult, endpoints))
 			}
 
 			err = verifyCreatesAndUpdates(client, testCase.expectCreate, testCase.expectUpdate)
@@ -425,7 +427,7 @@ func TestEndpointManagerEnsureEndpointSliceFromEndpoints(t *testing.T) {
 			}
 
 			if !apiequality.Semantic.DeepEqual(endpointSlice, testCase.expectedEndpointSlice) {
-				t.Errorf("Expected Endpoint Slice: %v, got: %v", testCase.expectedEndpointSlice, endpointSlice)
+				t.Errorf("Wrong result after EnsureEndpointSliceFromEndpoints. Diff:\n%s", cmp.Diff(testCase.expectedEndpointSlice, endpointSlice))
 			}
 		})
 	}
