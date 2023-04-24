@@ -48,9 +48,6 @@ var (
 
 		The default format is YAML. To edit in JSON, specify "-o json".
 
-		Shell defaults to /bin/bash if the SHELL environment variable is not set.
-		To override the shell location set the SHELL environment variable with the desired shell location.
-
 		The flag --windows-line-endings can be used to force Windows line endings,
 		otherwise the default for your operating system will be used.
 
