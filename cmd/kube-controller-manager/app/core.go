@@ -634,7 +634,7 @@ func setNodeCIDRMaskSizes(cfg nodeipamconfig.NodeIPAMControllerConfiguration, cl
 		for idx, clusterCIDR := range clusterCIDRs {
 			if netutils.IsIPv6CIDR(clusterCIDR) {
 				nodeMaskCIDRs[idx] = maskSizeIPv6
-			} else {
+			} else if netutils.IsIPv4CIDR(clusterCIDR) {
 				nodeMaskCIDRs[idx] = maskSizeIPv4
 			}
 		}
