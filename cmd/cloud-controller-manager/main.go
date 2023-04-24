@@ -25,8 +25,10 @@ limitations under the License.
 package main
 
 import (
+	"fmt"
 	"os"
 
+	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/app"
@@ -71,6 +73,27 @@ func main() {
 	}
 
 	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer, controllerInitializers, fss, wait.NeverStop)
+
+	// TODO: remove cmd/cloud-controller-manager in a future version of kubernetes
+	deprecatedMsg := "[DEPRECATED]: The cloud-controller-manager example binary is deprecated in favor of other implementations that leverage the cloud-provider library, and will be removed in a future version of kubernetes."
+	originalUsageFunc := command.UsageFunc()
+	command.SetUsageFunc(func(cmd *cobra.Command) error {
+		_, _ = fmt.Fprintln(cmd.OutOrStderr(), deprecatedMsg+".\n")
+		return originalUsageFunc(cmd)
+	})
+	originalHelpFunc := command.HelpFunc()
+	command.SetHelpFunc(func(cmd *cobra.Command, args []string) {
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), deprecatedMsg+".\n")
+		originalHelpFunc(cmd, args)
+	})
+	originalPersistentPreRun := command.PersistentPreRun
+	command.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		klog.Warning(deprecatedMsg)
+		if originalPersistentPreRun != nil {
+			originalPersistentPreRun(cmd, args)
+		}
+	}
+
 	code := cli.Run(command)
 	os.Exit(code)
 }

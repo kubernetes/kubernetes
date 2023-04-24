@@ -1,4 +1,6 @@
-# cloud-controller-manager/example
+# [DEPRECATED] cloud-controller-manager/example
+
+The cloud-controller-manager example binary is deprecated in favor of other implementations that leverage the cloud-provider library, and will be removed in a future version of kubernetes.
 
 This directory provides an example of how to leverage CCM extension mechanism.
 
