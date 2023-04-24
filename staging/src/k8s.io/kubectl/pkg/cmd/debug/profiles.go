@@ -176,6 +176,8 @@ func (p *restrictedProfile) Apply(pod *corev1.Pod, containerName string, target 
 	clearSecurityContext(pod, containerName)
 	disallowRoot(pod, containerName)
 	dropCapabilities(pod, containerName)
+	disallowPrivilegeEscalation(pod, containerName)
+	setSeccompProfile(pod, containerName)
 
 	switch style {
 	case podCopy:
@@ -342,4 +344,32 @@ func addCapability(c *corev1.Container, capability corev1.Capability) {
 		c.SecurityContext.Capabilities = &corev1.Capabilities{}
 	}
 	c.SecurityContext.Capabilities.Add = append(c.SecurityContext.Capabilities.Add, capability)
+}
+
+// disallowPrivilegeEscalation configures the containers not allowed PrivilegeEscalation
+func disallowPrivilegeEscalation(p *corev1.Pod, containerName string) {
+	podutils.VisitContainers(&p.Spec, podutils.AllContainers, func(c *corev1.Container, _ podutils.ContainerType) bool {
+		if c.Name != containerName {
+			return true
+		}
+		if c.SecurityContext == nil {
+			c.SecurityContext = &corev1.SecurityContext{}
+		}
+		c.SecurityContext.AllowPrivilegeEscalation = pointer.Bool(false)
+		return false
+	})
+}
+
+// setSeccompProfile apply SeccompProfile to the containers
+func setSeccompProfile(p *corev1.Pod, containerName string) {
+	podutils.VisitContainers(&p.Spec, podutils.AllContainers, func(c *corev1.Container, _ podutils.ContainerType) bool {
+		if c.Name != containerName {
+			return true
+		}
+		if c.SecurityContext == nil {
+			c.SecurityContext = &corev1.SecurityContext{}
+		}
+		c.SecurityContext.SeccompProfile = &corev1.SeccompProfile{Type: "RuntimeDefault"}
+		return false
+	})
 }

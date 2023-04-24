@@ -347,6 +347,8 @@ func TestRestrictedProfile(t *testing.T) {
 								Capabilities: &corev1.Capabilities{
 									Drop: []corev1.Capability{"ALL"},
 								},
+								AllowPrivilegeEscalation: pointer.Bool(false),
+								SeccompProfile:           &corev1.SeccompProfile{Type: "RuntimeDefault"},
 							},
 						},
 					},
@@ -386,6 +388,8 @@ func TestRestrictedProfile(t *testing.T) {
 								Capabilities: &corev1.Capabilities{
 									Drop: []corev1.Capability{"ALL"},
 								},
+								AllowPrivilegeEscalation: pointer.Bool(false),
+								SeccompProfile:           &corev1.SeccompProfile{Type: "RuntimeDefault"},
 							},
 						},
 					},
@@ -404,6 +408,8 @@ func TestRestrictedProfile(t *testing.T) {
 								Capabilities: &corev1.Capabilities{
 									Add: []corev1.Capability{"ALL"},
 								},
+								AllowPrivilegeEscalation: pointer.Bool(false),
+								SeccompProfile:           &corev1.SeccompProfile{Type: "RuntimeDefault"},
 							},
 						},
 					},
@@ -423,6 +429,8 @@ func TestRestrictedProfile(t *testing.T) {
 								Capabilities: &corev1.Capabilities{
 									Drop: []corev1.Capability{"ALL"},
 								},
+								AllowPrivilegeEscalation: pointer.Bool(false),
+								SeccompProfile:           &corev1.SeccompProfile{Type: "RuntimeDefault"},
 							},
 						},
 					},
