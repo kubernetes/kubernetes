@@ -17,6 +17,8 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
+
 	"github.com/spf13/pflag"
 
 	cronjobconfig "k8s.io/kubernetes/pkg/controller/cronjob/config"
@@ -32,6 +34,8 @@ func (o *CronJobControllerOptions) AddFlags(fs *pflag.FlagSet) {
 	if o == nil {
 		return
 	}
+
+	fs.Int32Var(&o.ConcurrentCronJobSyncs, "concurrent-cron-job-syncs", o.ConcurrentCronJobSyncs, "The number of cron job objects that are allowed to sync concurrently. Larger number = more responsive jobs, but more CPU (and network) load")
 }
 
 // ApplyTo fills up JobController config with options.
@@ -52,5 +56,9 @@ func (o *CronJobControllerOptions) Validate() []error {
 	}
 
 	errs := []error{}
+	if o.ConcurrentCronJobSyncs < 1 {
+		errs = append(errs, fmt.Errorf("concurrent-cron-job-syncs must be greater than 0, but got %d", o.ConcurrentCronJobSyncs))
+	}
+
 	return errs
 }
