@@ -926,7 +926,7 @@ func (c *linuxContainer) criuSupportsExtNS(t configs.NamespaceType) bool {
 }
 
 func criuNsToKey(t configs.NamespaceType) string {
-	return "extRoot" + strings.Title(configs.NsName(t)) + "NS"
+	return "extRoot" + strings.Title(configs.NsName(t)) + "NS" //nolint:staticcheck // SA1019: strings.Title is deprecated
 }
 
 func (c *linuxContainer) handleCheckpointingExternalNamespaces(rpcOpts *criurpc.CriuOpts, t configs.NamespaceType) error {
