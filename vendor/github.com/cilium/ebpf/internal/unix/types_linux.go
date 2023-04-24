@@ -4,7 +4,6 @@
 package unix
 
 import (
-	"bytes"
 	"syscall"
 
 	linux "golang.org/x/sys/unix"
@@ -23,6 +22,8 @@ const (
 	ENODEV  = linux.ENODEV
 	EBADF   = linux.EBADF
 	E2BIG   = linux.E2BIG
+	EFAULT  = linux.EFAULT
+	EACCES  = linux.EACCES
 	// ENOTSUPP is not the same as ENOTSUP or EOPNOTSUP
 	ENOTSUPP = syscall.Errno(0x20c)
 
@@ -66,10 +67,15 @@ const (
 	PERF_RECORD_SAMPLE       = linux.PERF_RECORD_SAMPLE
 	AT_FDCWD                 = linux.AT_FDCWD
 	RENAME_NOREPLACE         = linux.RENAME_NOREPLACE
+	SO_ATTACH_BPF            = linux.SO_ATTACH_BPF
+	SO_DETACH_BPF            = linux.SO_DETACH_BPF
+	SOL_SOCKET               = linux.SOL_SOCKET
 )
 
 // Statfs_t is a wrapper
 type Statfs_t = linux.Statfs_t
+
+type Stat_t = linux.Stat_t
 
 // Rlimit is a wrapper
 type Rlimit = linux.Rlimit
@@ -191,18 +197,14 @@ func Renameat2(olddirfd int, oldpath string, newdirfd int, newpath string, flags
 	return linux.Renameat2(olddirfd, oldpath, newdirfd, newpath, flags)
 }
 
-func KernelRelease() (string, error) {
-	var uname Utsname
-	err := Uname(&uname)
-	if err != nil {
-		return "", err
-	}
-
-	end := bytes.IndexByte(uname.Release[:], 0)
-	release := string(uname.Release[:end])
-	return release, nil
-}
-
 func Prlimit(pid, resource int, new, old *Rlimit) error {
 	return linux.Prlimit(pid, resource, new, old)
+}
+
+func Open(path string, mode int, perm uint32) (int, error) {
+	return linux.Open(path, mode, perm)
+}
+
+func Fstat(fd int, stat *Stat_t) error {
+	return linux.Fstat(fd, stat)
 }

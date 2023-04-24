@@ -1,4 +1,4 @@
-package internal
+package sys
 
 import (
 	"unsafe"
@@ -18,6 +18,13 @@ func NewSlicePointer(buf []byte) Pointer {
 	}
 
 	return Pointer{ptr: unsafe.Pointer(&buf[0])}
+}
+
+// NewSlicePointer creates a 64-bit pointer from a byte slice.
+//
+// Useful to assign both the pointer and the length in one go.
+func NewSlicePointerLen(buf []byte) (Pointer, uint32) {
+	return NewSlicePointer(buf), uint32(len(buf))
 }
 
 // NewStringPointer creates a 64-bit pointer from a string.
