@@ -108,6 +108,7 @@ var nameSuffixFunc = utilrand.String
 
 // DebugOptions holds the options for an invocation of kubectl debug.
 type DebugOptions struct {
+	Name            string
 	Args            []string
 	ArgsOnly        bool
 	Attach          bool
@@ -176,6 +177,7 @@ func NewCmdDebug(restClientGetter genericclioptions.RESTClientGetter, streams ge
 func (o *DebugOptions) AddFlags(cmd *cobra.Command) {
 	cmdutil.AddJsonFilenameFlag(cmd.Flags(), &o.FilenameOptions.Filenames, "identifying the resource to debug")
 
+	cmd.Flags().StringVarP(&o.Name, "name", "", o.Name, i18n.T("Debug container name, if specified debug container will use it as container name, default debug container name is debugger-< 5 bit random character >. "))
 	cmd.Flags().BoolVar(&o.ArgsOnly, "arguments-only", o.ArgsOnly, i18n.T("If specified, everything after -- will be passed to the new container as Args instead of Command."))
 	cmd.Flags().BoolVar(&o.Attach, "attach", o.Attach, i18n.T("If true, wait for the container to start running, and then attach as if 'kubectl attach ...' were called.  Default false, unless '-i/--stdin' is set, in which case the default is true."))
 	cmd.Flags().StringVarP(&o.Container, "container", "c", o.Container, i18n.T("Container name to use for debug container."))
@@ -713,7 +715,7 @@ func (o *DebugOptions) computeDebugContainerName(pod *corev1.Pod) string {
 		return o.Container
 	}
 
-	cn, containerByName := "", containerNameToRef(pod)
+	cn, containerByName := o.Name, containerNameToRef(pod)
 	for len(cn) == 0 || (containerByName[cn] != nil) {
 		cn = fmt.Sprintf("debugger-%s", nameSuffixFunc(5))
 	}
