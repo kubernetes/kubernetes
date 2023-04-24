@@ -1917,9 +1917,9 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 				continue
 			}
 			klog.V(5).InfoS("new ep is in graceful delete list", "uniqueRealServer", uniqueRS)
-			err := proxier.gracefuldeleteManager.MoveRSOutofGracefulDeleteList(uniqueRS)
+			err := proxier.gracefuldeleteManager.RevokeGracefulTermination(uniqueRS)
 			if err != nil {
-				klog.ErrorS(err, "Failed to delete endpoint in gracefulDeleteQueue", "endpoint", ep)
+				klog.ErrorS(err, "Failed to revoke graceful deletion of  endpoint", "endpoint", ep)
 				continue
 			}
 		}

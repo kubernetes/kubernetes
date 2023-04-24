@@ -197,17 +197,21 @@ func (m *GracefulTerminationManager) tryDeleteRs() {
 	}
 }
 
-// MoveRSOutofGracefulDeleteList to delete an rs and remove it from the rsList immediately
-func (m *GracefulTerminationManager) MoveRSOutofGracefulDeleteList(uniqueRS string) error {
-	rsToDelete, find := m.rsList.exist(uniqueRS)
-	if !find || rsToDelete == nil {
+// RevokeGracefulTermination revokes graceful termination by:
+// 1. removing rs from the delete queue
+// 2. setting rs weight to 1
+func (m *GracefulTerminationManager) RevokeGracefulTermination(uniqueRS string) error {
+	rs, find := m.rsList.exist(uniqueRS)
+	if !find || rs == nil {
 		return fmt.Errorf("failed to find rs: %q", uniqueRS)
 	}
-	err := m.ipvs.DeleteRealServer(rsToDelete.VirtualServer, rsToDelete.RealServer)
+
+	rs.RealServer.Weight = 1
+	err := m.ipvs.UpdateRealServer(rs.VirtualServer, rs.RealServer)
 	if err != nil {
 		return err
 	}
-	m.rsList.remove(rsToDelete)
+	m.rsList.remove(rs)
 	return nil
 }
 
