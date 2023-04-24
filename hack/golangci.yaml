@@ -16,6 +16,12 @@ issues:
     - path: (pkg/volume/*|test/*|azure/*|pkg/cmd/wait*|request/bearertoken/*|metrics/*|filters/*) # not in golangci-strict.yaml
       linters:                                                                                    # not in golangci-strict.yaml
         - gocritic                                                                                # not in golangci-strict.yaml
+    # The Kubernetes naming convention for conversion functions uses underscores
+    # and intentionally deviates from normal Go conventions to make those function
+    # names more readable. Same for SetDefaults_*.
+    - linters:
+        - stylecheck
+      text: "ST1003: should not use underscores in Go names; func (Convert_.*_To_.*|SetDefaults_)"
 
 linters:
   disable-all: true # not disabled in golangci-strict.yaml
