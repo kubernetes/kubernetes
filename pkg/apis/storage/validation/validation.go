@@ -352,11 +352,6 @@ func validateCSINodeDriverNodeID(nodeID string, fldPath *field.Path, validationO
 	return allErrs
 }
 
-// CSINodeLongerID will check if the nodeID is longer than csiNodeIDMaxLength
-func CSINodeLongerID(nodeID string) bool {
-	return len(nodeID) > csiNodeIDMaxLength
-}
-
 // validateCSINodeDriverAllocatable tests if Allocatable in CSINodeDriver has valid volume limits.
 func validateCSINodeDriverAllocatable(a *storage.VolumeNodeResources, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
