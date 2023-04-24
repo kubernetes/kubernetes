@@ -164,7 +164,6 @@ func endpointFromAddress(address corev1.EndpointAddress, ready bool) discovery.E
 	ep := discovery.Endpoint{
 		Addresses:  []string{address.IP},
 		Conditions: discovery.EndpointConditions{Ready: &ready},
-		TargetRef:  address.TargetRef,
 	}
 
 	if address.NodeName != nil {

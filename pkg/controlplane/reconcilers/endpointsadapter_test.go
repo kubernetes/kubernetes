@@ -320,20 +320,15 @@ func generateEndpointsAndSlice(ports []int, addresses []string) (*corev1.Endpoin
 		})
 	}
 
-	for i, address := range addresses {
+	for _, address := range addresses {
 		endpointAddress := corev1.EndpointAddress{
 			IP: address,
-			TargetRef: &corev1.ObjectReference{
-				Kind: "Pod",
-				Name: fmt.Sprintf("pod-%d", i),
-			},
 		}
 
 		subset.Addresses = append(subset.Addresses, endpointAddress)
 
 		epSlice.Endpoints = append(epSlice.Endpoints, discovery.Endpoint{
 			Addresses:  []string{endpointAddress.IP},
-			TargetRef:  endpointAddress.TargetRef,
 			Conditions: discovery.EndpointConditions{Ready: &trueBool},
 		})
 	}
