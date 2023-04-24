@@ -608,4 +608,10 @@ export CLOUD_PROVIDER_FLAG="${CLOUD_PROVIDER_FLAG:-external}"
 # --image-credential-provider-bin-dir=${path-to-auth-provider-binary}
 # Also, it is required that DisableKubeletCloudCredentialProviders and KubeletCredentialProviders
 # feature gates are set to true for kubelet to use external credential provider.
-ENABLE_AUTH_PROVIDER_GCP="${ENABLE_AUTH_PROVIDER_GCP:-true}"
+export ENABLE_AUTH_PROVIDER_GCP="${ENABLE_AUTH_PROVIDER_GCP:-true}"
+if [[ "${ENABLE_AUTH_PROVIDER_GCP}" == "true" ]]; then
+  if [[ ! "${FEATURE_GATES:-DisableKubeletCloudCredentialProviders=True}" =~ "DisableKubeletCloudCredentialProviders" ]]; then
+    FEATURE_GATES="${FEATURE_GATES},DisableKubeletCloudCredentialProviders=True"
+  fi
+  export FEATURE_GATES
+fi
