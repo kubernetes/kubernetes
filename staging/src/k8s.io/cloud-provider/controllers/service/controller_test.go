@@ -111,6 +111,12 @@ func tweakAddFinalizers(finalizers ...string) serviceTweak {
 	}
 }
 
+func tweakAddDeletionTimestamp(time time.Time) serviceTweak {
+	return func(s *v1.Service) {
+		s.ObjectMeta.DeletionTimestamp = &metav1.Time{Time: time}
+	}
+}
+
 // Wrap newService so that you don't have to call default arguments again and again.
 func defaultExternalService() *v1.Service {
 	return newService("external-balancer", v1.ServiceTypeLoadBalancer)
@@ -239,30 +245,7 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 		},
 		{
 			desc: "service that needs cleanup",
-			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "basic-service1",
-					Namespace: "default",
-					DeletionTimestamp: &metav1.Time{
-						Time: time.Now(),
-					},
-					Finalizers: []string{servicehelper.LoadBalancerCleanupFinalizer},
-				},
-				Spec: v1.ServiceSpec{
-					Ports: []v1.ServicePort{{
-						Port:     80,
-						Protocol: v1.ProtocolTCP,
-					}},
-					Type: v1.ServiceTypeLoadBalancer,
-				},
-				Status: v1.ServiceStatus{
-					LoadBalancer: v1.LoadBalancerStatus{
-						Ingress: []v1.LoadBalancerIngress{
-							{IP: "8.8.8.8"},
-						},
-					},
-				},
-			},
+			service:              newService("basic-service1", v1.ServiceTypeLoadBalancer, tweakAddLBIngress("8.8.8.8"), tweakAddPorts(v1.ProtocolTCP, 0), tweakAddFinalizers(servicehelper.LoadBalancerCleanupFinalizer), tweakAddDeletionTimestamp(time.Now())),
 			lbExists:             true,
 			expectOp:             deleteLoadBalancer,
 			expectDeleteAttempt:  true,
