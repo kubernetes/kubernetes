@@ -31,6 +31,12 @@ import (
 // be no easy way to opt-out. Instead, if you want to use this defaulting method
 // run it in your wrapper struct of this type in its `SetDefaults_` method.
 func RecommendedDefaultGarbageCollectorControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.GarbageCollectorControllerConfiguration) {
+	if obj.GCLimitBurst == 0 {
+		obj.GCLimitBurst = 20
+	}
+	if obj.GCLimitRate == 0 {
+		obj.GCLimitRate = 20
+	}
 	if obj.EnableGarbageCollector == nil {
 		obj.EnableGarbageCollector = utilpointer.BoolPtr(true)
 	}

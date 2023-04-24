@@ -44,6 +44,16 @@ func DefaultControllerRateLimiter() RateLimiter {
 	)
 }
 
+// BuildControllerRateLimiter is a no-arg constructor for a customer rate limiter for a workqueue.  It has
+// both overall and per-item rate limiting.  The overall is a token bucket and the per-item is exponential
+func BuildControllerRateLimiter(rateValue int32, sizeValue int32) RateLimiter {
+	return NewMaxOfRateLimiter(
+		NewItemExponentialFailureRateLimiter(5*time.Millisecond, 1000*time.Second),
+		// rateValue qps, sizeValue bucket size.  This is only for retry speed and its only the overall factor (not per item)
+		&BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(rateValue),int(sizeValue))},
+	)
+}
+
 // BucketRateLimiter adapts a standard bucket to the workqueue ratelimiter API
 type BucketRateLimiter struct {
 	*rate.Limiter

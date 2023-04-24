@@ -292,6 +292,8 @@ func TestAddFlags(t *testing.T) {
 		GarbageCollectorController: &GarbageCollectorControllerOptions{
 			&garbagecollectorconfig.GarbageCollectorControllerConfiguration{
 				ConcurrentGCSyncs: 30,
+				GCLimitRate: 200,
+				GCLimitBurst: 300,
 				GCIgnoredResources: []garbagecollectorconfig.GroupResource{
 					{Group: "", Resource: "events"},
 				},

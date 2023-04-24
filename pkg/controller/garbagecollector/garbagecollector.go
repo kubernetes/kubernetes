@@ -86,15 +86,15 @@ func NewGarbageCollector(
 	ignoredResources map[schema.GroupResource]struct{},
 	sharedInformers informerfactory.InformerFactory,
 	informersStarted <-chan struct{},
+	burst int32,
+	rate int32,
 ) (*GarbageCollector, error) {
-
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartStructuredLogging(0)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	eventRecorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "garbage-collector-controller"})
-
-	attemptToDelete := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_delete")
-	attemptToOrphan := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_orphan")
+	attemptToDelete := workqueue.NewNamedRateLimitingQueue(workqueue.BuildControllerRateLimiter(burst,rate), "garbage_collector_attempt_to_delete")
+	attemptToOrphan := workqueue.NewNamedRateLimitingQueue(workqueue.BuildControllerRateLimiter(burst,rate), "garbage_collector_attempt_to_orphan")
 	absentOwnerCache := NewReferenceCache(500)
 	gc := &GarbageCollector{
 		metadataClient:   metadataClient,

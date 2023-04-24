@@ -32,7 +32,8 @@ func (o *GarbageCollectorControllerOptions) AddFlags(fs *pflag.FlagSet) {
 	if o == nil {
 		return
 	}
-
+	fs.Int32Var(&o.GCLimitBurst, "go-limit-burst", o.GCLimitBurst, "The burst value of garbage collector queue.")
+	fs.Int32Var(&o.GCLimitRate, "gc-limit-rate" ,o.GCLimitRate, "The rate value of garbage collector queue.")
 	fs.Int32Var(&o.ConcurrentGCSyncs, "concurrent-gc-syncs", o.ConcurrentGCSyncs, "The number of garbage collector workers that are allowed to sync concurrently.")
 	fs.BoolVar(&o.EnableGarbageCollector, "enable-garbage-collector", o.EnableGarbageCollector, "Enables the generic garbage collector. MUST be synced with the corresponding flag of the kube-apiserver.")
 }
@@ -42,7 +43,8 @@ func (o *GarbageCollectorControllerOptions) ApplyTo(cfg *garbagecollectorconfig.
 	if o == nil {
 		return nil
 	}
-
+	cfg.GCLimitRate = o.GCLimitRate
+	cfg.GCLimitBurst = o.GCLimitBurst
 	cfg.ConcurrentGCSyncs = o.ConcurrentGCSyncs
 	cfg.GCIgnoredResources = o.GCIgnoredResources
 	cfg.EnableGarbageCollector = o.EnableGarbageCollector

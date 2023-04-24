@@ -309,6 +309,10 @@ type GarbageCollectorControllerConfiguration struct {
 	// concurrentGCSyncs is the number of garbage collector workers that are
 	// allowed to sync concurrently.
 	ConcurrentGCSyncs int32
+	// GCLimitRate is the rate of garbage collect queue
+	GCLimitRate int32
+	// GCLimitRate is the burst of garbage collect queue
+	GCLimitBurst int32
 	// gcIgnoredResources is the list of GroupResources that garbage collection should ignore.
 	GCIgnoredResources []GroupResource
 }
