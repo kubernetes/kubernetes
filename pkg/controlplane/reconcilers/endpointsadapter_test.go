@@ -18,6 +18,7 @@ package reconcilers
 
 import (
 	"fmt"
+	"net"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -62,7 +63,7 @@ func TestEndpointsAdapterGet(t *testing.T) {
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
 			client := fake.NewSimpleClientset(testCase.initialState...)
-			epAdapter := NewEndpointsAdapter(client.CoreV1(), client.DiscoveryV1(), testServiceNamespace, testServiceName)
+			epAdapter := NewEndpointsAdapter(client.CoreV1(), client.DiscoveryV1(), testServiceNamespace, testServiceName, testServiceIP)
 
 			ips, err := epAdapter.Get()
 
@@ -96,6 +97,7 @@ func TestEndpointsAdapterSync(t *testing.T) {
 	epSlice1Deprecated.AddressType = discovery.AddressType("IP")
 
 	testCases := map[string]struct {
+		serviceIP    net.IP
 		initialState []runtime.Object
 		ipsParam     sets.Set[string]
 		portsParam   []corev1.EndpointPort
@@ -108,27 +110,41 @@ func TestEndpointsAdapterSync(t *testing.T) {
 		"single-endpoint": {
 			// If the Endpoints/EndpointSlice do not exist, they will be
 			// created.
+			serviceIP:    testServiceIP,
 			initialState: []runtime.Object{},
 			ipsParam:     ips1,
 			portsParam:   ports1,
 
 			expectCreate: []runtime.Object{endpoints1, epSlice1},
 		},
-		"single-endpoint-partial-ipv6": {
-			// If the Endpoints/EndpointSlice do not exist, and the reconciler
-			// erroneously tries to create a dual-stack Endpoints, we will
-			// accept the erroneous Endpoints but create a single-stack IPv4
-			// EndpointSlice.
+		"ipv4-cluster-no-create-ipv6": {
+			// In a single-stack IPv4 cluster, if the Endpoints/EndpointSlice
+			// do not exist, and the reconciler erroneously tries to create a
+			// dual-stack Endpoints we will ignore the IPv6 endpoints
+			serviceIP:    testServiceIP,
 			initialState: []runtime.Object{},
 			ipsParam:     ipsDual,
 			portsParam:   ports1,
 
-			expectCreate: []runtime.Object{endpointsDual, epSlice1},
+			expectCreate: []runtime.Object{endpoints1, epSlice1},
+		},
+		"ipv4-cluster-no-update-ipv6": {
+			// In a single-stack IPv4 cluster, if the existing Endpoints
+			// object contains both IPv4 and IPv6 addresses, we should
+			// overwrite it without the IPv6 addresses.
+			serviceIP:    testServiceIP,
+			initialState: []runtime.Object{endpointsDual},
+			ipsParam:     ipsDual,
+			portsParam:   ports1,
+
+			expectUpdate: []runtime.Object{endpoints1},
+			expectCreate: []runtime.Object{epSlice1},
 		},
 		"single-endpoint-full-ipv6": {
-			// If the Endpoints/EndpointSlice do not exist, and the reconciler
-			// creates a single-stack IPv6 Endpoints, we will create a
-			// single-stack IPv6 EndpointSlice.
+			// In a single-stack IPv6 cluster, if the Endpoints/EndpointSlice
+			// do not exist, and the reconciler creates a single-stack IPv6
+			// Endpoints, we will create a single-stack IPv6 EndpointSlice.
+			serviceIP:    testServiceIPv6,
 			initialState: []runtime.Object{},
 			ipsParam:     ipsV6,
 			portsParam:   ports1,
@@ -138,6 +154,7 @@ func TestEndpointsAdapterSync(t *testing.T) {
 		"existing-endpointslice-correct": {
 			// No error when we need to create the Endpoints but the correct
 			// EndpointSlice already exists
+			serviceIP:    testServiceIP,
 			initialState: []runtime.Object{epSlice1},
 			ipsParam:     ips1,
 			portsParam:   ports1,
@@ -147,6 +164,7 @@ func TestEndpointsAdapterSync(t *testing.T) {
 		"existing-endpointslice-incorrect": {
 			// No error when we need to create the Endpoints but an incorrect
 			// EndpointSlice already exists
+			serviceIP:    testServiceIP,
 			initialState: []runtime.Object{epSlice1},
 			ipsParam:     ips2,
 			portsParam:   ports2,
@@ -157,6 +175,7 @@ func TestEndpointsAdapterSync(t *testing.T) {
 		"single-existing-endpoints-no-change": {
 			// If the Endpoints/EndpointSlice already exist and are correct,
 			// then Sync will do nothing
+			serviceIP:    testServiceIP,
 			initialState: []runtime.Object{endpoints1, epSlice1},
 			ipsParam:     ips1,
 			portsParam:   ports1,
@@ -165,6 +184,7 @@ func TestEndpointsAdapterSync(t *testing.T) {
 			// If an EndpointSlice with deprecated "IP" address type exists,
 			// it is deleted and replaced with one that has "IPv4" address
 			// type.
+			serviceIP:    testServiceIP,
 			initialState: []runtime.Object{endpoints1, epSlice1Deprecated},
 			ipsParam:     ips1,
 			portsParam:   ports1,
@@ -175,6 +195,7 @@ func TestEndpointsAdapterSync(t *testing.T) {
 		"add-ports-and-ips": {
 			// If we add ports/IPs to the Endpoints they will be added to
 			// the EndpointSlice.
+			serviceIP:    testServiceIP,
 			initialState: []runtime.Object{endpoints1, epSlice1},
 			ipsParam:     ips2,
 			portsParam:   ports2,
@@ -184,6 +205,7 @@ func TestEndpointsAdapterSync(t *testing.T) {
 		"endpoints-correct-endpointslice-wrong": {
 			// If the Endpoints is correct and the EndpointSlice is wrong,
 			// Sync will update the EndpointSlice.
+			serviceIP:    testServiceIP,
 			initialState: []runtime.Object{endpoints2, epSlice1},
 			ipsParam:     ips2,
 			portsParam:   ports2,
@@ -193,6 +215,7 @@ func TestEndpointsAdapterSync(t *testing.T) {
 		"endpointslice-correct-endpoints-wrong": {
 			// If the EndpointSlice is correct and the Endpoints is wrong,
 			// Sync will update the Endpoints.
+			serviceIP:    testServiceIP,
 			initialState: []runtime.Object{endpoints1, epSlice2},
 			ipsParam:     ips2,
 			portsParam:   ports2,
@@ -202,6 +225,7 @@ func TestEndpointsAdapterSync(t *testing.T) {
 		"missing-endpointslice": {
 			// No error when we need to update the Endpoints but the
 			// EndpointSlice doesn't exist
+			serviceIP:    testServiceIP,
 			initialState: []runtime.Object{endpoints2},
 			ipsParam:     ips1,
 			portsParam:   ports1,
@@ -214,7 +238,7 @@ func TestEndpointsAdapterSync(t *testing.T) {
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
 			client := fake.NewSimpleClientset(testCase.initialState...)
-			epAdapter := NewEndpointsAdapter(client.CoreV1(), client.DiscoveryV1(), testServiceNamespace, testServiceName)
+			epAdapter := NewEndpointsAdapter(client.CoreV1(), client.DiscoveryV1(), testServiceNamespace, testServiceName, testCase.serviceIP)
 
 			err := epAdapter.Sync(testCase.ipsParam, testCase.portsParam, true)
 			if !apiequality.Semantic.DeepEqual(testCase.expectedError, err) {

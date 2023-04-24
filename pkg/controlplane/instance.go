@@ -289,7 +289,8 @@ func (c *Config) createEndpointReconciler() reconcilers.EndpointReconciler {
 	endpointsAdapter := reconcilers.NewEndpointsAdapter(
 		endpointClient, endpointSliceClient,
 		kubernetesservice.KubernetesServiceNamespace,
-		kubernetesservice.KubernetesServiceName)
+		kubernetesservice.KubernetesServiceName,
+		c.ExtraConfig.APIServerServiceIP)
 
 	klog.Infof("Using reconciler: %v", c.ExtraConfig.EndpointReconcilerType)
 	switch c.ExtraConfig.EndpointReconcilerType {

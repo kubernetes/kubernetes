@@ -321,7 +321,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			clientset := fake.NewSimpleClientset(test.initialState...)
 
 			epAdapter := NewEndpointsAdapter(clientset.CoreV1(), clientset.DiscoveryV1(),
-				testServiceNamespace, testServiceName)
+				testServiceNamespace, testServiceName, testServiceIP)
 			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
 			err = r.ReconcileEndpoints(netutils.ParseIPSloppy(test.ip), test.endpointPorts, true)
 			if err != nil {
@@ -396,7 +396,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			}
 			clientset := fake.NewSimpleClientset(test.initialState...)
 			epAdapter := NewEndpointsAdapter(clientset.CoreV1(), clientset.DiscoveryV1(),
-				testServiceNamespace, testServiceName)
+				testServiceNamespace, testServiceName, testServiceIP)
 			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
 			err = r.ReconcileEndpoints(netutils.ParseIPSloppy(test.ip), test.endpointPorts, false)
 			if err != nil {
@@ -501,7 +501,7 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 			}
 			clientset := fake.NewSimpleClientset(test.initialState...)
 			epAdapter := NewEndpointsAdapter(clientset.CoreV1(), clientset.DiscoveryV1(),
-				testServiceNamespace, testServiceName)
+				testServiceNamespace, testServiceName, testServiceIP)
 			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
 			if !test.apiServerStartup {
 				r.StopReconciling()
@@ -619,7 +619,7 @@ func TestApiserverShutdown(t *testing.T) {
 			clientset := fake.NewSimpleClientset(test.initialState...)
 
 			epAdapter := NewEndpointsAdapter(clientset.CoreV1(), clientset.DiscoveryV1(),
-				testServiceNamespace, testServiceName)
+				testServiceNamespace, testServiceName, testServiceIP)
 			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
 
 			if test.shutDownBeforeReconcile {

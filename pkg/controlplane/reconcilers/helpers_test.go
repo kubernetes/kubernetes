@@ -29,11 +29,17 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
+	utilnet "k8s.io/utils/net"
 )
 
 const (
 	testServiceNamespace = metav1.NamespaceDefault
 	testServiceName      = "kubernetes"
+)
+
+var (
+	testServiceIP   = utilnet.ParseIPSloppy("172.30.0.1")
+	testServiceIPv6 = utilnet.ParseIPSloppy("fd02:1234::1")
 )
 
 func makeEndpointsArray(ips []string, ports []corev1.EndpointPort) []runtime.Object {

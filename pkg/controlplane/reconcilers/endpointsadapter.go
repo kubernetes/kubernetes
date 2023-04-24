@@ -18,6 +18,7 @@ package reconcilers
 
 import (
 	"context"
+	"net"
 
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
@@ -40,16 +41,23 @@ type EndpointsAdapter struct {
 
 	serviceNamespace string
 	serviceName      string
+	addressType      discovery.AddressType
 }
 
 // NewEndpointsAdapter returns a new EndpointsAdapter
-func NewEndpointsAdapter(endpointClient corev1client.EndpointsGetter, endpointSliceClient discoveryclient.EndpointSlicesGetter, serviceNamespace, serviceName string) *EndpointsAdapter {
+func NewEndpointsAdapter(endpointClient corev1client.EndpointsGetter, endpointSliceClient discoveryclient.EndpointSlicesGetter, serviceNamespace, serviceName string, serviceIP net.IP) *EndpointsAdapter {
+	addressType := discovery.AddressTypeIPv4
+	if utilnet.IsIPv6(serviceIP) {
+		addressType = discovery.AddressTypeIPv6
+	}
+
 	return &EndpointsAdapter{
 		endpointClient:      endpointClient,
 		endpointSliceClient: endpointSliceClient,
 
 		serviceNamespace: serviceNamespace,
 		serviceName:      serviceName,
+		addressType:      addressType,
 	}
 }
 
@@ -78,6 +86,15 @@ func (adapter *EndpointsAdapter) Get() (sets.Set[string], error) {
 // reconcilePorts is true it will also ensure that the objects have the correct ports. If
 // an error occurs while updating, that error will be returned.
 func (adapter *EndpointsAdapter) Sync(ips sets.Set[string], endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
+	var sortedIPs []string
+	for _, ip := range sets.List(ips) {
+		if adapter.addressType == discovery.AddressTypeIPv4 && utilnet.IsIPv4String(ip) {
+			sortedIPs = append(sortedIPs, ip)
+		} else if adapter.addressType == discovery.AddressTypeIPv6 && utilnet.IsIPv6String(ip) {
+			sortedIPs = append(sortedIPs, ip)
+		}
+	}
+
 	// Sync Endpoints
 	var endpoints *corev1.Endpoints
 	err := retry.OnError(retry.DefaultBackoff, isRetriableError, func() error {
@@ -88,7 +105,7 @@ func (adapter *EndpointsAdapter) Sync(ips sets.Set[string], endpointPorts []core
 			}
 			currentEndpoints = nil
 		}
-		endpoints = adapter.updateEndpoints(currentEndpoints, ips, endpointPorts, reconcilePorts)
+		endpoints = adapter.updateEndpoints(currentEndpoints, sortedIPs, endpointPorts, reconcilePorts)
 
 		if currentEndpoints == nil {
 			_, err = adapter.endpointClient.Endpoints(endpoints.Namespace).Create(context.TODO(), endpoints, metav1.CreateOptions{})
@@ -113,7 +130,7 @@ func (adapter *EndpointsAdapter) Sync(ips sets.Set[string], endpointPorts []core
 			currentEndpointSlice = nil
 		}
 
-		endpointSlice := endpointSliceFromEndpoints(endpoints)
+		endpointSlice := adapter.endpointSliceFromEndpoints(endpoints)
 
 		// required for transition from IP to IPv4 address type.
 		if currentEndpointSlice != nil && currentEndpointSlice.AddressType != endpointSlice.AddressType {
@@ -148,8 +165,8 @@ func isRetriableError(err error) bool {
 	return errors.IsConflict(err) || errors.IsAlreadyExists(err)
 }
 
-// updateEndpoints updates endpoints to reflect ips and (optionally) endpointPorts
-func (adapter *EndpointsAdapter) updateEndpoints(currentEndpoints *corev1.Endpoints, ips sets.Set[string], endpointPorts []corev1.EndpointPort, reconcilePorts bool) *corev1.Endpoints {
+// updateEndpoints updates endpoints to reflect sortedIPs and (optionally) endpointPorts
+func (adapter *EndpointsAdapter) updateEndpoints(currentEndpoints *corev1.Endpoints, sortedIPs []string, endpointPorts []corev1.EndpointPort, reconcilePorts bool) *corev1.Endpoints {
 	var endpoints *corev1.Endpoints
 
 	if currentEndpoints != nil {
@@ -173,7 +190,6 @@ func (adapter *EndpointsAdapter) updateEndpoints(currentEndpoints *corev1.Endpoi
 	}
 
 	// Set addresses
-	sortedIPs := sets.List(ips)
 	endpoints.Subsets[0].Addresses = make([]corev1.EndpointAddress, len(sortedIPs))
 	for i := range sortedIPs {
 		endpoints.Subsets[0].Addresses[i].IP = sortedIPs[i]
@@ -187,9 +203,9 @@ func (adapter *EndpointsAdapter) updateEndpoints(currentEndpoints *corev1.Endpoi
 	return endpoints
 }
 
-// endpointSliceFromEndpoints generates an EndpointSlice from an Endpoints
+// endpointSliceFromEndpoints generates an EndpointSlice from a valid Endpoints
 // resource.
-func endpointSliceFromEndpoints(endpoints *corev1.Endpoints) *discovery.EndpointSlice {
+func (adapter *EndpointsAdapter) endpointSliceFromEndpoints(endpoints *corev1.Endpoints) *discovery.EndpointSlice {
 	endpointSlice := &discovery.EndpointSlice{}
 	endpointSlice.Name = endpoints.Name
 	endpointSlice.Namespace = endpoints.Namespace
@@ -197,7 +213,7 @@ func endpointSliceFromEndpoints(endpoints *corev1.Endpoints) *discovery.Endpoint
 
 	// TODO: Add support for dual stack here (and in the rest of
 	// EndpointsAdapter).
-	endpointSlice.AddressType = discovery.AddressTypeIPv4
+	endpointSlice.AddressType = adapter.addressType
 
 	if len(endpoints.Subsets) > 0 {
 		subset := endpoints.Subsets[0]
@@ -207,10 +223,6 @@ func endpointSliceFromEndpoints(endpoints *corev1.Endpoints) *discovery.Endpoint
 				Name:     &subset.Ports[i].Name,
 				Protocol: &subset.Ports[i].Protocol,
 			})
-		}
-
-		if allAddressesIPv6(append(subset.Addresses, subset.NotReadyAddresses...)) {
-			endpointSlice.AddressType = discovery.AddressTypeIPv6
 		}
 
 		endpointSlice.Endpoints = append(endpointSlice.Endpoints, getEndpointsFromAddresses(subset.Addresses, endpointSlice.AddressType, true)...)
@@ -224,12 +236,8 @@ func endpointSliceFromEndpoints(endpoints *corev1.Endpoints) *discovery.Endpoint
 // match the provided address type.
 func getEndpointsFromAddresses(addresses []corev1.EndpointAddress, addressType discovery.AddressType, ready bool) []discovery.Endpoint {
 	endpoints := []discovery.Endpoint{}
-	isIPv6AddressType := addressType == discovery.AddressTypeIPv6
-
 	for _, address := range addresses {
-		if utilnet.IsIPv6String(address.IP) == isIPv6AddressType {
-			endpoints = append(endpoints, endpointFromAddress(address, ready))
-		}
+		endpoints = append(endpoints, endpointFromAddress(address, ready))
 	}
 
 	return endpoints
@@ -247,19 +255,4 @@ func endpointFromAddress(address corev1.EndpointAddress, ready bool) discovery.E
 	}
 
 	return ep
-}
-
-// allAddressesIPv6 returns true if all provided addresses are IPv6.
-func allAddressesIPv6(addresses []corev1.EndpointAddress) bool {
-	if len(addresses) == 0 {
-		return false
-	}
-
-	for _, address := range addresses {
-		if !utilnet.IsIPv6String(address.IP) {
-			return false
-		}
-	}
-
-	return true
 }
