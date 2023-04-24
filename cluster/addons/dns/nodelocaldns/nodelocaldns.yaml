@@ -67,7 +67,7 @@ data:
                 force_tcp
         }
         prometheus :9253
-        health __PILLAR__LOCAL__DNS__:8080
+        health __PILLAR__LOCAL__DNS__:9053
         }
     in-addr.arpa:53 {
         errors
@@ -162,7 +162,7 @@ spec:
           httpGet:
             host: __PILLAR__LOCAL__DNS__
             path: /health
-            port: 8080
+            port: 9053
           initialDelaySeconds: 60
           timeoutSeconds: 5
         volumeMounts:
