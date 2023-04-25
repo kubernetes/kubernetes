@@ -228,19 +228,16 @@ func Example_minifyAndShorten() {
 	// Output:
 	// clusters:
 	//   cow-cluster:
-	//     LocationOfOrigin: ""
 	//     certificate-authority-data: DATA+OMITTED
 	//     server: http://cow.org:8080
 	// contexts:
 	//   federal-context:
-	//     LocationOfOrigin: ""
 	//     cluster: cow-cluster
 	//     user: red-user
 	// current-context: federal-context
 	// preferences: {}
 	// users:
 	//   red-user:
-	//     LocationOfOrigin: ""
 	//     client-certificate-data: DATA+OMITTED
 	//     client-key-data: DATA+OMITTED
 	//     token: REDACTED
