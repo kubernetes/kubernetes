@@ -96,7 +96,7 @@
               }
             ],
             "default": {},
-            "description": "RoleRef can only reference a ClusterRole in the global namespace. If the RoleRef cannot be resolved, the Authorizer must return an error."
+            "description": "RoleRef can only reference a ClusterRole in the global namespace. If the RoleRef cannot be resolved, the Authorizer must return an error. This field is immutable."
           },
           "subjects": {
             "description": "Subjects holds references to the objects the role applies to.",
@@ -331,7 +331,7 @@
               }
             ],
             "default": {},
-            "description": "RoleRef can reference a Role in the current namespace or a ClusterRole in the global namespace. If the RoleRef cannot be resolved, the Authorizer must return an error."
+            "description": "RoleRef can reference a Role in the current namespace or a ClusterRole in the global namespace. If the RoleRef cannot be resolved, the Authorizer must return an error. This field is immutable."
           },
           "subjects": {
             "description": "Subjects holds references to the objects the role applies to.",
