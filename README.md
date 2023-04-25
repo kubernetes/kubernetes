@@ -7,7 +7,7 @@
 ----
 
 Kubernetes, also known as K8s, is an open source system for managing [containerized applications]
-across multiple hosts. It provides basic mechanisms for deployment, maintenance,
+across multiple hosts. It provides basic mechanisms for the deployment, maintenance,
 and scaling of applications.
 
 Kubernetes builds upon a decade and a half of experience at Google running
@@ -83,7 +83,7 @@ That said, if you have questions, reach out to us
 
 ## Community Meetings 
 
-The [Calendar](https://www.kubernetes.dev/resources/calendar/) has the list of all the meetings in Kubernetes community in a single location.
+The [Calendar](https://www.kubernetes.dev/resources/calendar/) has the list of all the meetings in the Kubernetes community in a single location.
 
 ## Adopters
 
