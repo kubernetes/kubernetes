@@ -123,6 +123,12 @@ func tweakAddAppProtocol(appProtocol string) serviceTweak {
 	}
 }
 
+func tweakAddIPFamilies(families ...v1.IPFamily) serviceTweak {
+	return func(s *v1.Service) {
+		s.Spec.IPFamilies = families
+	}
+}
+
 // Wrap newService so that you don't have to call default arguments again and again.
 func defaultExternalService() *v1.Service {
 	return newService("external-balancer", v1.ServiceTypeLoadBalancer)
@@ -1366,23 +1372,7 @@ func TestNeedsUpdate(t *testing.T) {
 	}, {
 		testName: "If service IPFamilies from single stack to dual stack",
 		updateFn: func() {
-			protocol := "http"
-			oldSvc = &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "tcp-service",
-					Namespace: "default",
-				},
-				Spec: v1.ServiceSpec{
-					Ports: []v1.ServicePort{{
-						Port:        80,
-						Protocol:    v1.ProtocolTCP,
-						TargetPort:  intstr.Parse("22"),
-						AppProtocol: &protocol,
-					}},
-					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
-					Type:       v1.ServiceTypeLoadBalancer,
-				},
-			}
+			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 22), tweakAddAppProtocol("http"), tweakAddIPFamilies(v1.IPv4Protocol))
 			newSvc = oldSvc.DeepCopy()
 			newSvc.Spec.IPFamilies = []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol}
 		},
@@ -1390,23 +1380,7 @@ func TestNeedsUpdate(t *testing.T) {
 	}, {
 		testName: "If service IPFamilies from dual stack to single stack",
 		updateFn: func() {
-			protocol := "http"
-			oldSvc = &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "tcp-service",
-					Namespace: "default",
-				},
-				Spec: v1.ServiceSpec{
-					Ports: []v1.ServicePort{{
-						Port:        80,
-						Protocol:    v1.ProtocolTCP,
-						TargetPort:  intstr.Parse("22"),
-						AppProtocol: &protocol,
-					}},
-					IPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-					Type:       v1.ServiceTypeLoadBalancer,
-				},
-			}
+			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 22), tweakAddAppProtocol("http"), tweakAddIPFamilies(v1.IPv4Protocol, v1.IPv6Protocol))
 			newSvc = oldSvc.DeepCopy()
 			newSvc.Spec.IPFamilies = []v1.IPFamily{v1.IPv4Protocol}
 		},
@@ -1414,23 +1388,7 @@ func TestNeedsUpdate(t *testing.T) {
 	}, {
 		testName: "If service IPFamilies not change",
 		updateFn: func() {
-			protocol := "http"
-			oldSvc = &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "tcp-service",
-					Namespace: "default",
-				},
-				Spec: v1.ServiceSpec{
-					Ports: []v1.ServicePort{{
-						Port:        80,
-						Protocol:    v1.ProtocolTCP,
-						TargetPort:  intstr.Parse("22"),
-						AppProtocol: &protocol,
-					}},
-					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
-					Type:       v1.ServiceTypeLoadBalancer,
-				},
-			}
+			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 22), tweakAddAppProtocol("http"), tweakAddIPFamilies(v1.IPv4Protocol))
 			newSvc = oldSvc.DeepCopy()
 		},
 		expectedNeedsUpdate: false,
