@@ -78,12 +78,10 @@ func AuthorizationAttributesFrom(spec authorizationapi.SubjectAccessReviewSpec) 
 	return authorizationAttributes
 }
 
-const AllVersion = "*"
-
 // matchAllVersionIfEmpty returns a "*" if the version is unspecified
 func matchAllVersionIfEmpty(version string) string {
 	if len(version) == 0 {
-		return AllVersion
+		return "*"
 	}
 	return version
 }
