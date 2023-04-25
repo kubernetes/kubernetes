@@ -1384,6 +1384,7 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal bool) v1.Pod
 	spec := pod.Spec
 	pendingInitialization := 0
 	failedInitialization := 0
+
 	for _, container := range spec.InitContainers {
 		containerStatus, ok := podutil.GetContainerStatus(info, container.Name)
 		if !ok {
@@ -1393,13 +1394,23 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal bool) v1.Pod
 
 		switch {
 		case containerStatus.State.Running != nil:
+			if kubetypes.IsSidecarContainer(&container) &&
+				containerStatus.Started != nil && *containerStatus.Started {
+				continue
+			}
 			pendingInitialization++
 		case containerStatus.State.Terminated != nil:
 			if containerStatus.State.Terminated.ExitCode != 0 {
+				if kubetypes.IsSidecarContainer(&container) {
+					continue
+				}
 				failedInitialization++
 			}
 		case containerStatus.State.Waiting != nil:
 			if containerStatus.LastTerminationState.Terminated != nil {
+				if kubetypes.IsSidecarContainer(&container) {
+					continue
+				}
 				if containerStatus.LastTerminationState.Terminated.ExitCode != 0 {
 					failedInitialization++
 				}
@@ -1411,43 +1422,68 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal bool) v1.Pod
 		}
 	}
 
+	// counters for sidecar and main containers
 	unknown := 0
 	running := 0
 	waiting := 0
 	stopped := 0
 	succeeded := 0
-	for _, container := range spec.Containers {
-		containerStatus, ok := podutil.GetContainerStatus(info, container.Name)
-		if !ok {
-			unknown++
-			continue
-		}
+	terminatedSidecar := 0
+	crashedSidecar := 0
+	hasInitialized := false
 
-		switch {
-		case containerStatus.State.Running != nil:
-			running++
-		case containerStatus.State.Terminated != nil:
-			stopped++
-			if containerStatus.State.Terminated.ExitCode == 0 {
-				succeeded++
+	checkContainers := func(containers []v1.Container, isInitContainers bool) {
+		for _, container := range containers {
+			if isInitContainers && !kubetypes.IsSidecarContainer(&container) {
+				continue
 			}
-		case containerStatus.State.Waiting != nil:
-			if containerStatus.LastTerminationState.Terminated != nil {
+
+			containerStatus, ok := podutil.GetContainerStatus(info, container.Name)
+			if !ok {
+				unknown++
+				continue
+			}
+
+			if !isInitContainers {
+				if containerStatus.State.Running != nil || containerStatus.State.Terminated != nil {
+					hasInitialized = true
+				}
+			}
+
+			switch {
+			case containerStatus.State.Running != nil:
+				running++
+			case containerStatus.State.Terminated != nil:
 				stopped++
-			} else {
-				waiting++
+				if containerStatus.State.Terminated.ExitCode == 0 {
+					succeeded++
+				} else if isInitContainers && kubetypes.IsSidecarContainer(&container) {
+					terminatedSidecar++
+				}
+			case containerStatus.State.Waiting != nil:
+				if containerStatus.LastTerminationState.Terminated != nil {
+					stopped++
+					if isInitContainers && kubetypes.IsSidecarContainer(&container) {
+						crashedSidecar++
+					}
+				} else {
+					waiting++
+				}
+			default:
+				unknown++
 			}
-		default:
-			unknown++
 		}
 	}
+
+	checkContainers(spec.Containers, false)
+	checkContainers(spec.InitContainers, true)
 
 	if failedInitialization > 0 && spec.RestartPolicy == v1.RestartPolicyNever {
 		return v1.PodFailed
 	}
 
 	switch {
-	case pendingInitialization > 0:
+	case pendingInitialization > 0 && !hasInitialized:
 		fallthrough
 	case waiting > 0:
 		klog.V(5).InfoS("Pod waiting > 0, pending")
@@ -1464,7 +1500,9 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal bool) v1.Pod
 			// TODO(#116484): Also assign terminal phase to static pods.
 			if !kubetypes.IsStaticPod(pod) {
 				// All containers are terminated in success
-				if stopped == succeeded {
+				// We don't have to take the exit status of the sidecar container into
+				// account.
+				if stopped == succeeded+terminatedSidecar+crashedSidecar {
 					return v1.PodSucceeded
 				}
 				// There is at least one failure
@@ -1476,7 +1514,11 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal bool) v1.Pod
 			// All containers are in the process of restarting
 			return v1.PodRunning
 		}
-		if stopped == succeeded {
+		// When regular containers are all complete,
+		// if a sidecar container is still running -> it will be terminated.
+		// else if a sidecar container is waiting to restart -> it will be stopped
+		// in waiting state.
+		if stopped == succeeded+terminatedSidecar+crashedSidecar {
 			// RestartPolicy is not Always, and all
 			// containers are terminated in success
 			return v1.PodSucceeded
@@ -1583,7 +1625,7 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	}
 
 	// ensure the probe managers have up to date status for containers
-	kl.probeManager.UpdatePodStatus(pod.UID, s)
+	kl.probeManager.UpdatePodStatus(pod, s)
 
 	// preserve all conditions not owned by the kubelet
 	s.Conditions = make([]v1.PodCondition, 0, len(pod.Status.Conditions)+1)

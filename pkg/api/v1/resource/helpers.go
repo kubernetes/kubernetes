@@ -35,6 +35,8 @@ type PodResourcesOptions struct {
 	Reuse v1.ResourceList
 	// InPlacePodVerticalScalingEnabled indicates that the in-place pod vertical scaling feature gate is enabled.
 	InPlacePodVerticalScalingEnabled bool
+	// SidecarContainersEnabled indicates that the sidecar containers feature gate is enabled
+	SidecarContainersEnabled bool
 	// ExcludeOverhead controls if pod overhead is excluded from the calculation.
 	ExcludeOverhead bool
 	// ContainerFn is called with the effective resources required for each container within the pod.
@@ -65,7 +67,7 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 			cs, found := containerStatuses[container.Name]
 			if found {
 				if pod.Status.Resize == v1.PodResizeStatusInfeasible {
-					containerReqs = cs.AllocatedResources
+					containerReqs = cs.AllocatedResources.DeepCopy()
 				} else {
 					containerReqs = max(container.Resources.Requests, cs.AllocatedResources)
 				}
@@ -83,19 +85,42 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 		addResourceList(reqs, containerReqs)
 	}
 
+	var sidecarResources v1.ResourceList
+	if opts.SidecarContainersEnabled {
+		sidecarResources = make(v1.ResourceList)
+	}
+	initContainerReqs := v1.ResourceList{}
 	// init containers define the minimum of any resource
 	// Note: In-place resize is not allowed for InitContainers, so no need to check for ResizeStatus value
 	for _, container := range pod.Spec.InitContainers {
-		containerReqs := container.Resources.Requests
+		containerReqs := container.Resources.Requests.DeepCopy()
 		if len(opts.NonMissingContainerRequests) > 0 {
 			containerReqs = applyNonMissing(containerReqs, opts.NonMissingContainerRequests)
+		}
+
+		if opts.SidecarContainersEnabled {
+			if container.RestartPolicy != nil && *container.RestartPolicy == v1.ContainerRestartPolicyAlways {
+				// and add them to the resulting cumulative container requests
+				addResourceList(reqs, containerReqs)
+
+				// track our cumulative sidecar resources
+				addResourceList(sidecarResources, containerReqs)
+				containerReqs = sidecarResources
+			} else {
+				tmp := v1.ResourceList{}
+				addResourceList(tmp, containerReqs)
+				addResourceList(tmp, sidecarResources)
+				containerReqs = tmp
+			}
 		}
 
 		if opts.ContainerFn != nil {
 			opts.ContainerFn(containerReqs, podutil.InitContainers)
 		}
-		maxResourceList(reqs, containerReqs)
+		maxResourceList(initContainerReqs, containerReqs)
 	}
+
+	maxResourceList(reqs, initContainerReqs)
 
 	// Add overhead for running a pod to the sum of requests if requested:
 	if !opts.ExcludeOverhead && pod.Spec.Overhead != nil {
@@ -111,7 +136,6 @@ func applyNonMissing(reqs v1.ResourceList, nonMissing v1.ResourceList) v1.Resour
 	for k, v := range reqs {
 		cp[k] = v.DeepCopy()
 	}
-
 	for k, v := range nonMissing {
 		if _, found := reqs[k]; !found {
 			rk := cp[k]
@@ -135,13 +159,38 @@ func PodLimits(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 		}
 		addResourceList(limits, container.Resources.Limits)
 	}
+
+	var sidecarResources v1.ResourceList
+	if opts.SidecarContainersEnabled {
+		sidecarResources = make(v1.ResourceList)
+	}
+	initContainerLimits := v1.ResourceList{}
 	// init containers define the minimum of any resource
 	for _, container := range pod.Spec.InitContainers {
-		if opts.ContainerFn != nil {
-			opts.ContainerFn(container.Resources.Limits, podutil.InitContainers)
+		containerLimits := container.Resources.Limits
+		// Is the sidecar feature gate enabled and the init container marked as a sidecar?
+		if opts.SidecarContainersEnabled {
+			if container.RestartPolicy != nil && *container.RestartPolicy == v1.ContainerRestartPolicyAlways {
+				addResourceList(limits, containerLimits)
+
+				// track our cumulative sidecar resources
+				addResourceList(sidecarResources, containerLimits)
+				containerLimits = sidecarResources
+			} else {
+				tmp := v1.ResourceList{}
+				addResourceList(tmp, containerLimits)
+				addResourceList(tmp, sidecarResources)
+				containerLimits = tmp
+			}
 		}
-		maxResourceList(limits, container.Resources.Limits)
+
+		if opts.ContainerFn != nil {
+			opts.ContainerFn(containerLimits, podutil.InitContainers)
+		}
+		maxResourceList(initContainerLimits, containerLimits)
 	}
+
+	maxResourceList(limits, initContainerLimits)
 
 	// Add overhead to non-zero limits if requested:
 	if !opts.ExcludeOverhead && pod.Spec.Overhead != nil {

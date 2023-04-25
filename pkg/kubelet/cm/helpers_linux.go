@@ -123,6 +123,7 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, 
 	// sum requests and limits.
 	reqs := resource.PodRequests(pod, resource.PodResourcesOptions{
 		InPlacePodVerticalScalingEnabled: inPlacePodVerticalScalingEnabled,
+		SidecarContainersEnabled:         utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SidecarContainers),
 	})
 	// track if limits were applied for each resource.
 	memoryLimitsDeclared := true
@@ -130,6 +131,7 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, 
 
 	limits := resource.PodLimits(pod, resource.PodResourcesOptions{
 		InPlacePodVerticalScalingEnabled: inPlacePodVerticalScalingEnabled,
+		SidecarContainersEnabled:         utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SidecarContainers),
 		ContainerFn: func(res v1.ResourceList, containerType podutil.ContainerType) {
 			if res.Cpu().IsZero() {
 				cpuLimitsDeclared = false

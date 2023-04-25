@@ -25,10 +25,12 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 )
@@ -219,7 +221,14 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		return false
 	}
 
-	c, ok := podutil.GetContainerStatus(status.ContainerStatuses, w.container.Name)
+	containerStatuses := status.ContainerStatuses
+	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+		containerStatuses = make([]v1.ContainerStatus, 0, len(status.ContainerStatuses)+len(status.InitContainerStatuses))
+		containerStatuses = append(containerStatuses, status.ContainerStatuses...)
+		containerStatuses = append(containerStatuses, status.InitContainerStatuses...)
+	}
+
+	c, ok := podutil.GetContainerStatus(containerStatuses, w.container.Name)
 	if !ok || len(c.ContainerID) == 0 {
 		// Either the container has not been created yet, or it was deleted.
 		klog.V(3).InfoS("Probe target container not found",

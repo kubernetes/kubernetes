@@ -526,21 +526,43 @@ func initializedContainers(containers []v1.ContainerStatus) []v1.ContainerStatus
 // checkContainerStateTransition ensures that no container is trying to transition
 // from a terminated to non-terminated state, which is illegal and indicates a
 // logical error in the kubelet.
-func checkContainerStateTransition(oldStatuses, newStatuses []v1.ContainerStatus, restartPolicy v1.RestartPolicy) error {
+func checkContainerStateTransition(oldStatuses, newStatuses *v1.PodStatus, podSpec *v1.PodSpec) error {
 	// If we should always restart, containers are allowed to leave the terminated state
-	if restartPolicy == v1.RestartPolicyAlways {
+	if podSpec.RestartPolicy == v1.RestartPolicyAlways {
 		return nil
 	}
-	for _, oldStatus := range oldStatuses {
+	for _, oldStatus := range oldStatuses.ContainerStatuses {
 		// Skip any container that wasn't terminated
 		if oldStatus.State.Terminated == nil {
 			continue
 		}
 		// Skip any container that failed but is allowed to restart
-		if oldStatus.State.Terminated.ExitCode != 0 && restartPolicy == v1.RestartPolicyOnFailure {
+		if oldStatus.State.Terminated.ExitCode != 0 && podSpec.RestartPolicy == v1.RestartPolicyOnFailure {
 			continue
 		}
-		for _, newStatus := range newStatuses {
+		for _, newStatus := range newStatuses.ContainerStatuses {
+			if oldStatus.Name == newStatus.Name && newStatus.State.Terminated == nil {
+				return fmt.Errorf("terminated container %v attempted illegal transition to non-terminated state", newStatus.Name)
+			}
+		}
+	}
+
+	initContainers := make(map[string]*v1.Container, len(podSpec.InitContainers))
+	for i := range podSpec.InitContainers {
+		initContainers[podSpec.InitContainers[i].Name] = &podSpec.InitContainers[i]
+	}
+	for _, oldStatus := range oldStatuses.InitContainerStatuses {
+		// Skip any container that wasn't terminated
+		if oldStatus.State.Terminated == nil {
+			continue
+		}
+		// Skip any container that failed but is allowed to restart
+		if oldStatus.State.Terminated.ExitCode != 0 &&
+			(podSpec.RestartPolicy == v1.RestartPolicyOnFailure ||
+				kubetypes.IsSidecarContainer(initContainers[oldStatus.Name])) {
+			continue
+		}
+		for _, newStatus := range newStatuses.InitContainerStatuses {
 			if oldStatus.Name == newStatus.Name && newStatus.State.Terminated == nil {
 				return fmt.Errorf("terminated container %v attempted illegal transition to non-terminated state", newStatus.Name)
 			}
@@ -571,11 +593,7 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 	}
 
 	// Check for illegal state transition in containers
-	if err := checkContainerStateTransition(oldStatus.ContainerStatuses, status.ContainerStatuses, pod.Spec.RestartPolicy); err != nil {
-		klog.ErrorS(err, "Status update on pod aborted", "pod", klog.KObj(pod))
-		return
-	}
-	if err := checkContainerStateTransition(oldStatus.InitContainerStatuses, status.InitContainerStatuses, pod.Spec.RestartPolicy); err != nil {
+	if err := checkContainerStateTransition(&oldStatus, &status, &pod.Spec); err != nil {
 		klog.ErrorS(err, "Status update on pod aborted", "pod", klog.KObj(pod))
 		return
 	}

@@ -21,7 +21,9 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // Annotation keys for annotations used in this package.
@@ -191,4 +193,18 @@ func IsCriticalPodBasedOnPriority(priority int32) bool {
 // IsNodeCriticalPod checks if the given pod is a system-node-critical
 func IsNodeCriticalPod(pod *v1.Pod) bool {
 	return IsCriticalPod(pod) && (pod.Spec.PriorityClassName == scheduling.SystemNodeCritical)
+}
+
+// IsSidecarContainer returns true, if the SidecarContainers feature gate
+// is enabled and the container has ContainerRestartPolicyAlways.
+func IsSidecarContainer(initContainer *v1.Container) bool {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+		return false
+	}
+
+	if initContainer.RestartPolicy == nil {
+		return false
+	}
+
+	return *initContainer.RestartPolicy == v1.ContainerRestartPolicyAlways
 }

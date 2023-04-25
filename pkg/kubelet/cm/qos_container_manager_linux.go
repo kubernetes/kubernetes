@@ -178,7 +178,10 @@ func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]
 			// we only care about the burstable qos tier
 			continue
 		}
-		req := resource.PodRequests(pod, resource.PodResourcesOptions{Reuse: reuseReqs})
+		req := resource.PodRequests(pod, resource.PodResourcesOptions{
+			Reuse:                    reuseReqs,
+			SidecarContainersEnabled: utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SidecarContainers),
+		})
 		if request, found := req[v1.ResourceCPU]; found {
 			burstablePodCPURequest += request.MilliValue()
 		}
@@ -212,7 +215,11 @@ func (m *qosContainerManagerImpl) getQoSMemoryRequests() map[v1.PodQOSClass]int6
 			// limits are not set for Best Effort pods
 			continue
 		}
-		req := resource.PodRequests(pod, resource.PodResourcesOptions{Reuse: reuseReqs})
+		req := resource.PodRequests(pod,
+			resource.PodResourcesOptions{
+				Reuse:                    reuseReqs,
+				SidecarContainersEnabled: utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SidecarContainers),
+			})
 		if request, found := req[v1.ResourceMemory]; found {
 			podMemoryRequest += request.Value()
 		}
