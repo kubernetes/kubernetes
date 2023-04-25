@@ -948,17 +948,14 @@ var (
 		nodeIncludedPredicate,
 		nodeUnTaintedPredicate,
 		nodeReadyPredicate,
-		nodeHasProviderIDPredicate,
 	}
 	etpLocalNodePredicates []NodeConditionPredicate = []NodeConditionPredicate{
 		nodeIncludedPredicate,
 		nodeUnTaintedPredicate,
-		nodeHasProviderIDPredicate,
 	}
 	stableNodeSetPredicates []NodeConditionPredicate = []NodeConditionPredicate{
 		nodeNotDeletedPredicate,
 		nodeIncludedPredicate,
-		nodeHasProviderIDPredicate,
 		// This is not perfect, but probably good enough. We won't update the
 		// LBs just because the taint was added (see shouldSyncUpdatedNode) but
 		// if any other situation causes an LB sync, tainted nodes will be
@@ -978,14 +975,17 @@ func getNodePredicatesForService(service *v1.Service) []NodeConditionPredicate {
 	return allNodePredicates
 }
 
+// This predicate just validates if the providerID has been set and triggers a
+// node sync. It is _not_ used when determining which nodes to use when
+// configuring the load balancer's backend pool.
+func nodeHasProviderIDPredicate(node *v1.Node) bool {
+	return node.Spec.ProviderID != ""
+}
+
 // We consider the node for load balancing only when the node is not labelled for exclusion.
 func nodeIncludedPredicate(node *v1.Node) bool {
 	_, hasExcludeBalancerLabel := node.Labels[v1.LabelNodeExcludeBalancers]
 	return !hasExcludeBalancerLabel
-}
-
-func nodeHasProviderIDPredicate(node *v1.Node) bool {
-	return node.Spec.ProviderID != ""
 }
 
 // We consider the node for load balancing only when its not tainted for deletion by the cluster autoscaler.
