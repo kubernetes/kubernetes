@@ -26,6 +26,7 @@ import (
 	coordinationv1 "k8s.io/api/coordination/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -102,49 +103,57 @@ func Test_StorageVersionUpdatedWithAllEncodingVersionsEqualOnLeaseDeletion(t *te
 		t.Fatalf("error deleting lease object: %v", err)
 	}
 
-	// add a delay to ensure controller had a chance to reconcile
-	time.Sleep(5 * time.Second)
+	// active loop to wait for the storage versions to be updated
+	err := wait.PollImmediate(3*time.Second, 30*time.Second, func() (bool, error) {
+		storageVersion, err := clientset.InternalV1alpha1().StorageVersions().Get(context.Background(), "k8s.test.resources", metav1.GetOptions{})
+		if err != nil {
+			t.Logf("error getting StorageVersion: %v", err)
+			return false, nil
+		}
 
-	storageVersion, err := clientset.InternalV1alpha1().StorageVersions().Get(context.Background(), "k8s.test.resources", metav1.GetOptions{})
+		expectedServerStorageVersions := []apiserverinternalv1alpha1.ServerStorageVersion{
+			{
+				APIServerID:       "kube-apiserver-2",
+				EncodingVersion:   "v2",
+				DecodableVersions: []string{"v2"},
+			},
+			{
+				APIServerID:       "kube-apiserver-3",
+				EncodingVersion:   "v2",
+				DecodableVersions: []string{"v2"},
+			},
+		}
+
+		if !reflect.DeepEqual(storageVersion.Status.StorageVersions, expectedServerStorageVersions) {
+			t.Logf("expected storage versions object: %+v, got: %+v", expectedServerStorageVersions, storageVersion)
+			return false, nil
+		}
+
+		if *storageVersion.Status.CommonEncodingVersion != "v2" {
+			t.Logf("expected common encoding version 'v2', got: %q", *storageVersion.Status.CommonEncodingVersion)
+			return false, nil
+		}
+
+		if len(storageVersion.Status.Conditions) != 1 {
+			t.Logf("expected 1 condition, got: %d", len(storageVersion.Status.Conditions))
+			return false, nil
+		}
+
+		if storageVersion.Status.Conditions[0].Type != apiserverinternalv1alpha1.AllEncodingVersionsEqual {
+			t.Logf("expected condition type 'AllEncodingVersionsEqual', got: %q", storageVersion.Status.Conditions[0].Type)
+			return false, nil
+		}
+
+		if storageVersion.Status.Conditions[0].Status != apiserverinternalv1alpha1.ConditionTrue {
+			t.Logf("expected condition status 'True', got: %q", storageVersion.Status.Conditions[0].Status)
+			return false, nil
+		}
+
+		return true, nil
+	})
+
 	if err != nil {
-		t.Fatalf("error getting StorageVersion: %v", err)
-	}
-
-	expectedServerStorageVersions := []apiserverinternalv1alpha1.ServerStorageVersion{
-		{
-			APIServerID:       "kube-apiserver-2",
-			EncodingVersion:   "v2",
-			DecodableVersions: []string{"v2"},
-		},
-		{
-			APIServerID:       "kube-apiserver-3",
-			EncodingVersion:   "v2",
-			DecodableVersions: []string{"v2"},
-		},
-	}
-
-	if !reflect.DeepEqual(storageVersion.Status.StorageVersions, expectedServerStorageVersions) {
-		t.Error("unexpected storage version object")
-		t.Logf("got: %+v", storageVersion)
-		t.Logf("expected: %+v", expectedServerStorageVersions)
-	}
-
-	if *storageVersion.Status.CommonEncodingVersion != "v2" {
-		t.Errorf("unexpected common encoding version")
-		t.Logf("got: %q", *storageVersion.Status.CommonEncodingVersion)
-		t.Logf("expected: %q", "v2")
-	}
-
-	if len(storageVersion.Status.Conditions) != 1 {
-		t.Fatalf("expected 1 condition, got: %d", len(storageVersion.Status.Conditions))
-	}
-
-	if storageVersion.Status.Conditions[0].Type != apiserverinternalv1alpha1.AllEncodingVersionsEqual {
-		t.Errorf("expected condition type 'AllEncodingVersionsEqual', got: %q", storageVersion.Status.Conditions[0].Type)
-	}
-
-	if storageVersion.Status.Conditions[0].Status != apiserverinternalv1alpha1.ConditionTrue {
-		t.Errorf("expected condition status 'True', got: %q", storageVersion.Status.Conditions[0].Status)
+		t.Errorf("failed to update storage version status: %v", err)
 	}
 }
 
@@ -187,37 +196,42 @@ func Test_StorageVersionUpdatedWithDifferentEncodingVersionsOnLeaseDeletion(t *t
 		t.Fatalf("error deleting lease object: %v", err)
 	}
 
-	// add a delay to ensure controller had a chance to reconcile
-	time.Sleep(2 * time.Second)
+	// active loop to wait for the storage versions to be updated
+	err := wait.PollImmediate(3*time.Second, 30*time.Second, func() (bool, error) {
+		storageVersion, err := clientset.InternalV1alpha1().StorageVersions().Get(context.Background(), "k8s.test.resources", metav1.GetOptions{})
+		if err != nil {
+			t.Logf("error getting StorageVersion: %v", err)
+			return false, nil
+		}
 
-	storageVersion, err := clientset.InternalV1alpha1().StorageVersions().Get(context.Background(), "k8s.test.resources", metav1.GetOptions{})
+		expectedServerStorageVersions := []apiserverinternalv1alpha1.ServerStorageVersion{
+			{
+				APIServerID:       "kube-apiserver-1",
+				EncodingVersion:   "v1",
+				DecodableVersions: []string{"v1"},
+			},
+			{
+				APIServerID:       "kube-apiserver-3",
+				EncodingVersion:   "v2",
+				DecodableVersions: []string{"v2"},
+			},
+		}
+
+		if !reflect.DeepEqual(storageVersion.Status.StorageVersions, expectedServerStorageVersions) {
+			t.Logf("expected storage versions object: %+v, got: %+v", expectedServerStorageVersions, storageVersion)
+			return false, nil
+		}
+
+		if *storageVersion.Status.CommonEncodingVersion != "v1" {
+			t.Logf("expected common encoding version 'v1', got: %q", *storageVersion.Status.CommonEncodingVersion)
+			return false, nil
+		}
+
+		return true, nil
+	})
+
 	if err != nil {
-		t.Fatalf("error getting StorageVersion: %v", err)
-	}
-
-	expectedServerStorageVersions := []apiserverinternalv1alpha1.ServerStorageVersion{
-		{
-			APIServerID:       "kube-apiserver-1",
-			EncodingVersion:   "v1",
-			DecodableVersions: []string{"v1"},
-		},
-		{
-			APIServerID:       "kube-apiserver-3",
-			EncodingVersion:   "v2",
-			DecodableVersions: []string{"v2"},
-		},
-	}
-
-	if !reflect.DeepEqual(storageVersion.Status.StorageVersions, expectedServerStorageVersions) {
-		t.Error("unexpected storage version object")
-		t.Logf("got: %+v", storageVersion)
-		t.Logf("expected: %+v", expectedServerStorageVersions)
-	}
-
-	if *storageVersion.Status.CommonEncodingVersion != "v1" {
-		t.Errorf("unexpected common encoding version")
-		t.Logf("got: %q", *storageVersion.Status.CommonEncodingVersion)
-		t.Logf("expected: %q", "v1")
+		t.Errorf("failed to update storage version status: %v", err)
 	}
 }
 
@@ -263,48 +277,57 @@ func Test_StorageVersionContainsInvalidLeaseID(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	setupController(ctx, clientset)
 
-	// add a delay to ensure controller had a chance to reconcile
-	time.Sleep(2 * time.Second)
+	// active loop to wait for the storage versions to be updated
+	err := wait.PollImmediate(3*time.Second, 30*time.Second, func() (bool, error) {
+		storageVersion, err := clientset.InternalV1alpha1().StorageVersions().Get(context.Background(), "k8s.test.resources", metav1.GetOptions{})
+		if err != nil {
+			t.Logf("error getting StorageVersion: %v", err)
+			return false, nil
+		}
 
-	storageVersion, err := clientset.InternalV1alpha1().StorageVersions().Get(context.Background(), "k8s.test.resources", metav1.GetOptions{})
+		expectedServerStorageVersions := []apiserverinternalv1alpha1.ServerStorageVersion{
+			{
+				APIServerID:       "kube-apiserver-1",
+				EncodingVersion:   "v1",
+				DecodableVersions: []string{"v1"},
+			},
+			{
+				APIServerID:       "kube-apiserver-2",
+				EncodingVersion:   "v2",
+				DecodableVersions: []string{"v2"},
+			},
+			{
+				APIServerID:       "kube-apiserver-3",
+				EncodingVersion:   "v2",
+				DecodableVersions: []string{"v2"},
+			},
+		}
+
+		if !reflect.DeepEqual(storageVersion.Status.StorageVersions, expectedServerStorageVersions) {
+			t.Logf("expected storage version object: %+v, got: %+v", expectedServerStorageVersions, storageVersion)
+			return false, nil
+		}
+
+		if len(storageVersion.Status.Conditions) != 1 {
+			t.Logf("expected 1 condition, got: %d", len(storageVersion.Status.Conditions))
+			return false, nil
+		}
+
+		if storageVersion.Status.Conditions[0].Type != apiserverinternalv1alpha1.AllEncodingVersionsEqual {
+			t.Logf("expected condition type 'AllEncodingVersionsEqual', got: %q", storageVersion.Status.Conditions[0].Type)
+			return false, nil
+		}
+
+		if storageVersion.Status.Conditions[0].Status != apiserverinternalv1alpha1.ConditionFalse {
+			t.Logf("expected condition status 'True', got: %q", storageVersion.Status.Conditions[0].Status)
+			return false, nil
+		}
+
+		return true, nil
+	})
+
 	if err != nil {
-		t.Fatalf("error getting StorageVersion: %v", err)
-	}
-
-	expectedServerStorageVersions := []apiserverinternalv1alpha1.ServerStorageVersion{
-		{
-			APIServerID:       "kube-apiserver-1",
-			EncodingVersion:   "v1",
-			DecodableVersions: []string{"v1"},
-		},
-		{
-			APIServerID:       "kube-apiserver-2",
-			EncodingVersion:   "v2",
-			DecodableVersions: []string{"v2"},
-		},
-		{
-			APIServerID:       "kube-apiserver-3",
-			EncodingVersion:   "v2",
-			DecodableVersions: []string{"v2"},
-		},
-	}
-
-	if !reflect.DeepEqual(storageVersion.Status.StorageVersions, expectedServerStorageVersions) {
-		t.Error("unexpected storage version object")
-		t.Logf("got: %+v", storageVersion)
-		t.Logf("expected: %+v", expectedServerStorageVersions)
-	}
-
-	if len(storageVersion.Status.Conditions) != 1 {
-		t.Errorf("expected 1 condition, got: %d", len(storageVersion.Status.Conditions))
-	}
-
-	if storageVersion.Status.Conditions[0].Type != apiserverinternalv1alpha1.AllEncodingVersionsEqual {
-		t.Errorf("expected condition type 'AllEncodingVersionsEqual', got: %q", storageVersion.Status.Conditions[0].Type)
-	}
-
-	if storageVersion.Status.Conditions[0].Status != apiserverinternalv1alpha1.ConditionFalse {
-		t.Errorf("expected condition status 'True', got: %q", storageVersion.Status.Conditions[0].Status)
+		t.Errorf("failed to update storage version status: %v", err)
 	}
 }
 
@@ -337,12 +360,18 @@ func Test_StorageVersionDeletedOnLeaseDeletion(t *testing.T) {
 		t.Fatalf("error deleting lease object: %v", err)
 	}
 
-	// add a delay to ensure controller had a chance to reconcile
-	time.Sleep(2 * time.Second)
+	err := wait.PollImmediate(3*time.Second, 30*time.Second, func() (bool, error) {
+		// expect deleted
+		_, err := clientset.InternalV1alpha1().StorageVersions().Get(context.Background(), "k8s.test.resources", metav1.GetOptions{})
+		if !apierrors.IsNotFound(err) {
+			t.Logf("expected IsNotFound error, got: %v", err)
+			return false, nil
+		}
 
-	// expect deleted
-	_, err := clientset.InternalV1alpha1().StorageVersions().Get(context.Background(), "k8s.test.resources", metav1.GetOptions{})
-	if !apierrors.IsNotFound(err) {
-		t.Fatalf("expected IsNotFound error, got: %v", err)
+		return true, nil
+	})
+
+	if err != nil {
+		t.Errorf("failed to delete storage version: %v", err)
 	}
 }
