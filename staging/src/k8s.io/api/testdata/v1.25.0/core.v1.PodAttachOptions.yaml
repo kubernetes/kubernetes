@@ -1,7 +1,0 @@
-apiVersion: v1
-container: containerValue
-kind: PodAttachOptions
-stderr: true
-stdin: true
-stdout: true
-tty: true
