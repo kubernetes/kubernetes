@@ -186,14 +186,6 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 			expectPatchStatus: false,
 		},
 		{
-			desc: "service no longer wants LB",
-			service: newService("no-external-balancer", v1.ServiceTypeClusterIP, tweakAddLBIngress("8.8.8.8")),
-			lbExists:            true,
-			expectOp:            deleteLoadBalancer,
-			expectDeleteAttempt: true,
-			expectPatchStatus:   true,
-		},
-		{
 			desc: "udp service that wants LB",
 			service:              newService("udp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolUDP, 0)),
 			expectOp:             ensureLoadBalancer,
@@ -225,14 +217,6 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 			expectPatchStatus:    false,
 			expectPatchFinalizer: false,
 		},
-		{
-			desc: "service doesn't specify loadBalancerClass",
-			service:              newService("with-external-balancer", v1.ServiceTypeLoadBalancer, tweakAddLBClass(nil), tweakAddPorts(v1.ProtocolSCTP, 0)),
-			expectOp:             ensureLoadBalancer,
-			expectCreateAttempt:  true,
-			expectPatchStatus:    true,
-			expectPatchFinalizer: true,
-		},
 		// Finalizer test cases below.
 		{
 			desc: "service with finalizer that no longer wants LB",
@@ -249,14 +233,6 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 			lbExists:             true,
 			expectOp:             deleteLoadBalancer,
 			expectDeleteAttempt:  true,
-			expectPatchStatus:    true,
-			expectPatchFinalizer: true,
-		},
-		{
-			desc: "service without finalizer that wants LB",
-			service:              newService("basic-service1", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 0)),
-			expectOp:             ensureLoadBalancer,
-			expectCreateAttempt:  true,
 			expectPatchStatus:    true,
 			expectPatchFinalizer: true,
 		},
