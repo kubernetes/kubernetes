@@ -55,36 +55,77 @@ import (
 
 const region = "us-central"
 
-func newService(name string, uid types.UID, serviceType v1.ServiceType) *v1.Service {
-	return &v1.Service{
+type serviceTweak func(s *v1.Service)
+
+func newService(name string, serviceType v1.ServiceType, tweaks ...serviceTweak) *v1.Service {
+	s := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: "default",
-			UID:       uid,
 		},
 		Spec: v1.ServiceSpec{
 			Type: serviceType,
 		},
 	}
+	for _, tw := range tweaks {
+		tw(s)
+	}
+	return s
 }
 
-func newETPLocalService(name string, serviceType v1.ServiceType) *v1.Service {
-	return &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: "default",
-			UID:       "777",
-		},
-		Spec: v1.ServiceSpec{
-			Type:                  serviceType,
-			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
-		},
+func tweakAddETP(etpType v1.ServiceExternalTrafficPolicyType) serviceTweak {
+	return func(s *v1.Service) {
+		s.Spec.ExternalTrafficPolicy = etpType
+	}
+}
+
+func tweakAddLBIngress(ip string) serviceTweak {
+	return func(s *v1.Service) {
+		s.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{IP: ip}}
+	}
+}
+
+func makeServicePort(protocol v1.Protocol, targetPort int) []v1.ServicePort {
+	sp := v1.ServicePort{Port: 80, Protocol: protocol}
+	if targetPort > 0 {
+		sp.TargetPort = intstr.FromInt(targetPort)
+	}
+	return []v1.ServicePort{sp}
+}
+
+func tweakAddPorts(protocol v1.Protocol, targetPort int) serviceTweak {
+	return func(s *v1.Service) {
+		s.Spec.Ports = makeServicePort(protocol, targetPort)
+	}
+}
+
+func tweakAddLBClass(loadBalancerClass *string) serviceTweak {
+	return func(s *v1.Service) {
+		s.Spec.LoadBalancerClass = loadBalancerClass
+	}
+}
+
+func tweakAddFinalizers(finalizers ...string) serviceTweak {
+	return func(s *v1.Service) {
+		s.ObjectMeta.Finalizers = finalizers
+	}
+}
+
+func tweakAddDeletionTimestamp(time time.Time) serviceTweak {
+	return func(s *v1.Service) {
+		s.ObjectMeta.DeletionTimestamp = &metav1.Time{Time: time}
+	}
+}
+
+func tweakAddAppProtocol(appProtocol string) serviceTweak {
+	return func(s *v1.Service) {
+		s.Spec.Ports[0].AppProtocol = &appProtocol
 	}
 }
 
 // Wrap newService so that you don't have to call default arguments again and again.
 func defaultExternalService() *v1.Service {
-	return newService("external-balancer", types.UID("123"), v1.ServiceTypeLoadBalancer)
+	return newService("external-balancer", v1.ServiceTypeLoadBalancer)
 }
 
 func alwaysReady() bool { return true }
@@ -143,242 +184,64 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 		expectDeleteAttempt  bool
 		expectPatchStatus    bool
 		expectPatchFinalizer bool
-	}{
-		{
-			desc: "service doesn't want LB",
-			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "no-external-balancer",
-					Namespace: "default",
-				},
-				Spec: v1.ServiceSpec{
-					Type: v1.ServiceTypeClusterIP,
-				},
-			},
-			expectOp:          deleteLoadBalancer,
-			expectPatchStatus: false,
-		},
-		{
-			desc: "service no longer wants LB",
-			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "no-external-balancer",
-					Namespace: "default",
-				},
-				Spec: v1.ServiceSpec{
-					Type: v1.ServiceTypeClusterIP,
-				},
-				Status: v1.ServiceStatus{
-					LoadBalancer: v1.LoadBalancerStatus{
-						Ingress: []v1.LoadBalancerIngress{
-							{IP: "8.8.8.8"},
-						},
-					},
-				},
-			},
-			lbExists:            true,
-			expectOp:            deleteLoadBalancer,
-			expectDeleteAttempt: true,
-			expectPatchStatus:   true,
-		},
-		{
-			desc: "udp service that wants LB",
-			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "udp-service",
-					Namespace: "default",
-				},
-				Spec: v1.ServiceSpec{
-					Ports: []v1.ServicePort{{
-						Port:     80,
-						Protocol: v1.ProtocolUDP,
-					}},
-					Type: v1.ServiceTypeLoadBalancer,
-				},
-			},
-			expectOp:             ensureLoadBalancer,
-			expectCreateAttempt:  true,
-			expectPatchStatus:    true,
-			expectPatchFinalizer: true,
-		},
-		{
-			desc: "tcp service that wants LB",
-			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "basic-service1",
-					Namespace: "default",
-				},
-				Spec: v1.ServiceSpec{
-					Ports: []v1.ServicePort{{
-						Port:     80,
-						Protocol: v1.ProtocolTCP,
-					}},
-					Type: v1.ServiceTypeLoadBalancer,
-				},
-			},
-			expectOp:             ensureLoadBalancer,
-			expectCreateAttempt:  true,
-			expectPatchStatus:    true,
-			expectPatchFinalizer: true,
-		},
-		{
-			desc: "sctp service that wants LB",
-			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "sctp-service",
-					Namespace: "default",
-				},
-				Spec: v1.ServiceSpec{
-					Ports: []v1.ServicePort{{
-						Port:     80,
-						Protocol: v1.ProtocolSCTP,
-					}},
-					Type: v1.ServiceTypeLoadBalancer,
-				},
-			},
-			expectOp:             ensureLoadBalancer,
-			expectCreateAttempt:  true,
-			expectPatchStatus:    true,
-			expectPatchFinalizer: true,
-		},
-		{
-			desc: "service specifies loadBalancerClass",
-			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "with-external-balancer",
-					Namespace: "default",
-				},
-				Spec: v1.ServiceSpec{
-					Type:              v1.ServiceTypeLoadBalancer,
-					LoadBalancerClass: utilpointer.StringPtr("custom-loadbalancer"),
-				},
-			},
-			expectOp:             deleteLoadBalancer,
-			expectCreateAttempt:  false,
-			expectPatchStatus:    false,
-			expectPatchFinalizer: false,
-		},
-		{
-			desc: "service doesn't specify loadBalancerClass",
-			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "with-external-balancer",
-					Namespace: "default",
-				},
-				Spec: v1.ServiceSpec{
-					Ports: []v1.ServicePort{{
-						Port:     80,
-						Protocol: v1.ProtocolSCTP,
-					}},
-					Type:              v1.ServiceTypeLoadBalancer,
-					LoadBalancerClass: nil,
-				},
-			},
-			expectOp:             ensureLoadBalancer,
-			expectCreateAttempt:  true,
-			expectPatchStatus:    true,
-			expectPatchFinalizer: true,
-		},
+	}{{
+		desc:              "service doesn't want LB",
+		service:           newService("no-external-balancer", v1.ServiceTypeClusterIP),
+		expectOp:          deleteLoadBalancer,
+		expectPatchStatus: false,
+	}, {
+		desc:                 "udp service that wants LB",
+		service:              newService("udp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolUDP, 0)),
+		expectOp:             ensureLoadBalancer,
+		expectCreateAttempt:  true,
+		expectPatchStatus:    true,
+		expectPatchFinalizer: true,
+	}, {
+		desc:                 "tcp service that wants LB",
+		service:              newService("basic-service1", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 0)),
+		expectOp:             ensureLoadBalancer,
+		expectCreateAttempt:  true,
+		expectPatchStatus:    true,
+		expectPatchFinalizer: true,
+	}, {
+		desc:                 "sctp service that wants LB",
+		service:              newService("sctp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolSCTP, 0)),
+		expectOp:             ensureLoadBalancer,
+		expectCreateAttempt:  true,
+		expectPatchStatus:    true,
+		expectPatchFinalizer: true,
+	}, {
+		desc:                 "service specifies loadBalancerClass",
+		service:              newService("with-external-balancer", v1.ServiceTypeLoadBalancer, tweakAddLBClass(utilpointer.String("custom-loadbalancer"))),
+		expectOp:             deleteLoadBalancer,
+		expectCreateAttempt:  false,
+		expectPatchStatus:    false,
+		expectPatchFinalizer: false,
+	}, {
 		// Finalizer test cases below.
-		{
-			desc: "service with finalizer that no longer wants LB",
-			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:       "no-external-balancer",
-					Namespace:  "default",
-					Finalizers: []string{servicehelper.LoadBalancerCleanupFinalizer},
-				},
-				Spec: v1.ServiceSpec{
-					Type: v1.ServiceTypeClusterIP,
-				},
-				Status: v1.ServiceStatus{
-					LoadBalancer: v1.LoadBalancerStatus{
-						Ingress: []v1.LoadBalancerIngress{
-							{IP: "8.8.8.8"},
-						},
-					},
-				},
-			},
-			lbExists:             true,
-			expectOp:             deleteLoadBalancer,
-			expectDeleteAttempt:  true,
-			expectPatchStatus:    true,
-			expectPatchFinalizer: true,
-		},
-		{
-			desc: "service that needs cleanup",
-			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "basic-service1",
-					Namespace: "default",
-					DeletionTimestamp: &metav1.Time{
-						Time: time.Now(),
-					},
-					Finalizers: []string{servicehelper.LoadBalancerCleanupFinalizer},
-				},
-				Spec: v1.ServiceSpec{
-					Ports: []v1.ServicePort{{
-						Port:     80,
-						Protocol: v1.ProtocolTCP,
-					}},
-					Type: v1.ServiceTypeLoadBalancer,
-				},
-				Status: v1.ServiceStatus{
-					LoadBalancer: v1.LoadBalancerStatus{
-						Ingress: []v1.LoadBalancerIngress{
-							{IP: "8.8.8.8"},
-						},
-					},
-				},
-			},
-			lbExists:             true,
-			expectOp:             deleteLoadBalancer,
-			expectDeleteAttempt:  true,
-			expectPatchStatus:    true,
-			expectPatchFinalizer: true,
-		},
-		{
-			desc: "service without finalizer that wants LB",
-			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "basic-service1",
-					Namespace: "default",
-				},
-				Spec: v1.ServiceSpec{
-					Ports: []v1.ServicePort{{
-						Port:     80,
-						Protocol: v1.ProtocolTCP,
-					}},
-					Type: v1.ServiceTypeLoadBalancer,
-				},
-			},
-			expectOp:             ensureLoadBalancer,
-			expectCreateAttempt:  true,
-			expectPatchStatus:    true,
-			expectPatchFinalizer: true,
-		},
-		{
-			desc: "service with finalizer that wants LB",
-			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:       "basic-service1",
-					Namespace:  "default",
-					Finalizers: []string{servicehelper.LoadBalancerCleanupFinalizer},
-				},
-				Spec: v1.ServiceSpec{
-					Ports: []v1.ServicePort{{
-						Port:     80,
-						Protocol: v1.ProtocolTCP,
-					}},
-					Type: v1.ServiceTypeLoadBalancer,
-				},
-			},
-			expectOp:             ensureLoadBalancer,
-			expectCreateAttempt:  true,
-			expectPatchStatus:    true,
-			expectPatchFinalizer: false,
-		},
-	}
+		desc:                 "service with finalizer that no longer wants LB",
+		service:              newService("no-external-balancer", v1.ServiceTypeClusterIP, tweakAddLBIngress("8.8.8.8"), tweakAddFinalizers(servicehelper.LoadBalancerCleanupFinalizer)),
+		lbExists:             true,
+		expectOp:             deleteLoadBalancer,
+		expectDeleteAttempt:  true,
+		expectPatchStatus:    true,
+		expectPatchFinalizer: true,
+	}, {
+		desc:                 "service that needs cleanup",
+		service:              newService("basic-service1", v1.ServiceTypeLoadBalancer, tweakAddLBIngress("8.8.8.8"), tweakAddPorts(v1.ProtocolTCP, 0), tweakAddFinalizers(servicehelper.LoadBalancerCleanupFinalizer), tweakAddDeletionTimestamp(time.Now())),
+		lbExists:             true,
+		expectOp:             deleteLoadBalancer,
+		expectDeleteAttempt:  true,
+		expectPatchStatus:    true,
+		expectPatchFinalizer: true,
+	}, {
+		desc:                 "service with finalizer that wants LB",
+		service:              newService("basic-service1", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 0), tweakAddFinalizers(servicehelper.LoadBalancerCleanupFinalizer)),
+		expectOp:             ensureLoadBalancer,
+		expectCreateAttempt:  true,
+		expectPatchStatus:    true,
+		expectPatchFinalizer: false,
+	}}
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
@@ -480,88 +343,80 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 		services            []*v1.Service
 		expectedUpdateCalls []fakecloud.UpdateBalancerCall
 		workers             int
-	}{
-		{
-			desc:                "No services present: no calls should be made.",
-			services:            []*v1.Service{},
-			expectedUpdateCalls: nil,
-			workers:             1,
+	}{{
+		desc:                "No services present: no calls should be made.",
+		services:            []*v1.Service{},
+		expectedUpdateCalls: nil,
+		workers:             1,
+	}, {
+		desc: "Services do not have external load balancers: no calls should be made.",
+		services: []*v1.Service{
+			newService("s0", v1.ServiceTypeClusterIP),
+			newService("s1", v1.ServiceTypeNodePort),
 		},
-		{
-			desc: "Services do not have external load balancers: no calls should be made.",
-			services: []*v1.Service{
-				newService("s0", "111", v1.ServiceTypeClusterIP),
-				newService("s1", "222", v1.ServiceTypeNodePort),
-			},
-			expectedUpdateCalls: nil,
-			workers:             2,
+		expectedUpdateCalls: nil,
+		workers:             2,
+	}, {
+		desc: "Services does have an external load balancer: one call should be made.",
+		services: []*v1.Service{
+			newService("s0", v1.ServiceTypeLoadBalancer),
 		},
-		{
-			desc: "Services does have an external load balancer: one call should be made.",
-			services: []*v1.Service{
-				newService("s0", "333", v1.ServiceTypeLoadBalancer),
-			},
-			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
-				{Service: newService("s0", "333", v1.ServiceTypeLoadBalancer), Hosts: nodes},
-			},
-			workers: 3,
+		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+			{Service: newService("s0", v1.ServiceTypeLoadBalancer), Hosts: nodes},
 		},
-		{
-			desc: "Three services have an external load balancer: three calls.",
-			services: []*v1.Service{
-				newService("s0", "444", v1.ServiceTypeLoadBalancer),
-				newService("s1", "555", v1.ServiceTypeLoadBalancer),
-				newService("s2", "666", v1.ServiceTypeLoadBalancer),
-			},
-			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
-				{Service: newService("s0", "444", v1.ServiceTypeLoadBalancer), Hosts: nodes},
-				{Service: newService("s1", "555", v1.ServiceTypeLoadBalancer), Hosts: nodes},
-				{Service: newService("s2", "666", v1.ServiceTypeLoadBalancer), Hosts: nodes},
-			},
-			workers: 4,
+		workers: 3,
+	}, {
+		desc: "Three services have an external load balancer: three calls.",
+		services: []*v1.Service{
+			newService("s0", v1.ServiceTypeLoadBalancer),
+			newService("s1", v1.ServiceTypeLoadBalancer),
+			newService("s2", v1.ServiceTypeLoadBalancer),
 		},
-		{
-			desc: "Two services have an external load balancer and two don't: two calls.",
-			services: []*v1.Service{
-				newService("s0", "777", v1.ServiceTypeNodePort),
-				newService("s1", "888", v1.ServiceTypeLoadBalancer),
-				newService("s3", "999", v1.ServiceTypeLoadBalancer),
-				newService("s4", "123", v1.ServiceTypeClusterIP),
-			},
-			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
-				{Service: newService("s1", "888", v1.ServiceTypeLoadBalancer), Hosts: nodes},
-				{Service: newService("s3", "999", v1.ServiceTypeLoadBalancer), Hosts: nodes},
-			},
-			workers: 5,
+		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+			{Service: newService("s0", v1.ServiceTypeLoadBalancer), Hosts: nodes},
+			{Service: newService("s1", v1.ServiceTypeLoadBalancer), Hosts: nodes},
+			{Service: newService("s2", v1.ServiceTypeLoadBalancer), Hosts: nodes},
 		},
-		{
-			desc: "One service has an external load balancer and one is nil: one call.",
-			services: []*v1.Service{
-				newService("s0", "234", v1.ServiceTypeLoadBalancer),
-				nil,
-			},
-			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
-				{Service: newService("s0", "234", v1.ServiceTypeLoadBalancer), Hosts: nodes},
-			},
-			workers: 6,
+		workers: 4,
+	}, {
+		desc: "Two services have an external load balancer and two don't: two calls.",
+		services: []*v1.Service{
+			newService("s0", v1.ServiceTypeNodePort),
+			newService("s1", v1.ServiceTypeLoadBalancer),
+			newService("s3", v1.ServiceTypeLoadBalancer),
+			newService("s4", v1.ServiceTypeClusterIP),
 		},
-		{
-			desc: "Four services have external load balancer with only 2 workers",
-			services: []*v1.Service{
-				newService("s0", "777", v1.ServiceTypeLoadBalancer),
-				newService("s1", "888", v1.ServiceTypeLoadBalancer),
-				newService("s3", "999", v1.ServiceTypeLoadBalancer),
-				newService("s4", "123", v1.ServiceTypeLoadBalancer),
-			},
-			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
-				{Service: newService("s0", "777", v1.ServiceTypeLoadBalancer), Hosts: nodes},
-				{Service: newService("s1", "888", v1.ServiceTypeLoadBalancer), Hosts: nodes},
-				{Service: newService("s3", "999", v1.ServiceTypeLoadBalancer), Hosts: nodes},
-				{Service: newService("s4", "123", v1.ServiceTypeLoadBalancer), Hosts: nodes},
-			},
-			workers: 2,
+		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+			{Service: newService("s1", v1.ServiceTypeLoadBalancer), Hosts: nodes},
+			{Service: newService("s3", v1.ServiceTypeLoadBalancer), Hosts: nodes},
 		},
-	}
+		workers: 5,
+	}, {
+		desc: "One service has an external load balancer and one is nil: one call.",
+		services: []*v1.Service{
+			newService("s0", v1.ServiceTypeLoadBalancer),
+			nil,
+		},
+		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+			{Service: newService("s0", v1.ServiceTypeLoadBalancer), Hosts: nodes},
+		},
+		workers: 6,
+	}, {
+		desc: "Four services have external load balancer with only 2 workers",
+		services: []*v1.Service{
+			newService("s0", v1.ServiceTypeLoadBalancer),
+			newService("s1", v1.ServiceTypeLoadBalancer),
+			newService("s3", v1.ServiceTypeLoadBalancer),
+			newService("s4", v1.ServiceTypeLoadBalancer),
+		},
+		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+			{Service: newService("s0", v1.ServiceTypeLoadBalancer), Hosts: nodes},
+			{Service: newService("s1", v1.ServiceTypeLoadBalancer), Hosts: nodes},
+			{Service: newService("s3", v1.ServiceTypeLoadBalancer), Hosts: nodes},
+			{Service: newService("s4", v1.ServiceTypeLoadBalancer), Hosts: nodes},
+		},
+		workers: 2,
+	}}
 	for _, item := range table {
 		t.Run(item.desc, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
@@ -591,8 +446,8 @@ func TestNodeChangesForExternalTrafficPolicyLocalServices(t *testing.T) {
 		syncCallErr bool
 	}
 
-	etpLocalservice1 := newETPLocalService("s0", v1.ServiceTypeLoadBalancer)
-	etpLocalservice2 := newETPLocalService("s1", v1.ServiceTypeLoadBalancer)
+	etpLocalservice1 := newService("s0", v1.ServiceTypeLoadBalancer, tweakAddETP(v1.ServiceExternalTrafficPolicyLocal))
+	etpLocalservice2 := newService("s1", v1.ServiceTypeLoadBalancer, tweakAddETP(v1.ServiceExternalTrafficPolicyLocal))
 	service3 := defaultExternalService()
 
 	services := []*v1.Service{etpLocalservice1, etpLocalservice2, service3}
@@ -602,126 +457,116 @@ func TestNodeChangesForExternalTrafficPolicyLocalServices(t *testing.T) {
 		expectedUpdateCalls []fakecloud.UpdateBalancerCall
 		stateChanges        []stateChanges
 		initialState        []*v1.Node
-	}{
-		{
-			desc:         "No node changes",
-			initialState: []*v1.Node{node1, node2, node3},
-			stateChanges: []stateChanges{
-				{
-					nodes: []*v1.Node{node1, node2, node3},
-				},
-			},
-			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{},
-		},
-		{
-			desc:         "1 new node gets added",
-			initialState: []*v1.Node{node1, node2},
-			stateChanges: []stateChanges{
-				{
-					nodes: []*v1.Node{node1, node2, node3},
-				},
-			},
-			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
-				{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node2, node3}},
-				{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node2, node3}},
-				{Service: service3, Hosts: []*v1.Node{node1, node2, node3}},
+	}{{
+		desc:         "No node changes",
+		initialState: []*v1.Node{node1, node2, node3},
+		stateChanges: []stateChanges{
+			{
+				nodes: []*v1.Node{node1, node2, node3},
 			},
 		},
-		{
-			desc:         "1 new node gets added - with retries",
-			initialState: []*v1.Node{node1, node2},
-			stateChanges: []stateChanges{
-				{
-					nodes:       []*v1.Node{node1, node2, node3},
-					syncCallErr: true,
-				},
-				{
-					nodes: []*v1.Node{node1, node2, node3},
-				},
-			},
-			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
-				{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node2, node3}},
-				{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node2, node3}},
-				{Service: service3, Hosts: []*v1.Node{node1, node2, node3}},
+		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{},
+	}, {
+		desc:         "1 new node gets added",
+		initialState: []*v1.Node{node1, node2},
+		stateChanges: []stateChanges{
+			{
+				nodes: []*v1.Node{node1, node2, node3},
 			},
 		},
-		{
-			desc:         "1 node goes NotReady",
-			initialState: []*v1.Node{node1, node2, node3},
-			stateChanges: []stateChanges{
-				{
-					nodes: []*v1.Node{node1, node2NotReady, node3},
-				},
+		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+			{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node2, node3}},
+			{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node2, node3}},
+			{Service: service3, Hosts: []*v1.Node{node1, node2, node3}},
+		},
+	}, {
+		desc:         "1 new node gets added - with retries",
+		initialState: []*v1.Node{node1, node2},
+		stateChanges: []stateChanges{
+			{
+				nodes:       []*v1.Node{node1, node2, node3},
+				syncCallErr: true,
 			},
-			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
-				{Service: service3, Hosts: []*v1.Node{node1, node3}},
+			{
+				nodes: []*v1.Node{node1, node2, node3},
 			},
 		},
-		{
-			desc:         "1 node gets Tainted",
-			initialState: []*v1.Node{node1, node2, node3},
-			stateChanges: []stateChanges{
-				{
-					nodes: []*v1.Node{node1, node2Tainted, node3},
-				},
-			},
-			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
-				{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node3}},
-				{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node3}},
-				{Service: service3, Hosts: []*v1.Node{node1, node3}},
+		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+			{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node2, node3}},
+			{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node2, node3}},
+			{Service: service3, Hosts: []*v1.Node{node1, node2, node3}},
+		},
+	}, {
+		desc:         "1 node goes NotReady",
+		initialState: []*v1.Node{node1, node2, node3},
+		stateChanges: []stateChanges{
+			{
+				nodes: []*v1.Node{node1, node2NotReady, node3},
 			},
 		},
-		{
-			desc:         "1 node goes Ready",
-			initialState: []*v1.Node{node1, node2NotReady, node3},
-			stateChanges: []stateChanges{
-				{
-					nodes: []*v1.Node{node1, node2, node3},
-				},
-			},
-			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
-				{Service: service3, Hosts: []*v1.Node{node1, node2, node3}},
+		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+			{Service: service3, Hosts: []*v1.Node{node1, node3}},
+		},
+	}, {
+		desc:         "1 node gets Tainted",
+		initialState: []*v1.Node{node1, node2, node3},
+		stateChanges: []stateChanges{
+			{
+				nodes: []*v1.Node{node1, node2Tainted, node3},
 			},
 		},
-		{
-			desc:         "1 node get excluded",
-			initialState: []*v1.Node{node1, node2, node3},
-			stateChanges: []stateChanges{
-				{
-					nodes: []*v1.Node{node1, node2Exclude, node3},
-				},
-			},
-			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
-				{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node3}},
-				{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node3}},
-				{Service: service3, Hosts: []*v1.Node{node1, node3}},
+		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+			{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node3}},
+			{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node3}},
+			{Service: service3, Hosts: []*v1.Node{node1, node3}},
+		},
+	}, {
+		desc:         "1 node goes Ready",
+		initialState: []*v1.Node{node1, node2NotReady, node3},
+		stateChanges: []stateChanges{
+			{
+				nodes: []*v1.Node{node1, node2, node3},
 			},
 		},
-		{
-			desc:         "1 old node gets deleted",
-			initialState: []*v1.Node{node1, node2, node3},
-			stateChanges: []stateChanges{
-				{
-					nodes: []*v1.Node{node1, node2},
-				},
-			},
-			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
-				{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node2}},
-				{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node2}},
-				{Service: service3, Hosts: []*v1.Node{node1, node2}},
+		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+			{Service: service3, Hosts: []*v1.Node{node1, node2, node3}},
+		},
+	}, {
+		desc:         "1 node get excluded",
+		initialState: []*v1.Node{node1, node2, node3},
+		stateChanges: []stateChanges{
+			{
+				nodes: []*v1.Node{node1, node2Exclude, node3},
 			},
 		},
-		{
-			desc:         "1 spurious node update",
-			initialState: []*v1.Node{node1, node2, node3},
-			stateChanges: []stateChanges{
-				{
-					nodes: []*v1.Node{node1, node2SpuriousChange, node3},
-				},
-			},
-			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{},
+		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+			{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node3}},
+			{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node3}},
+			{Service: service3, Hosts: []*v1.Node{node1, node3}},
 		},
-	} {
+	}, {
+		desc:         "1 old node gets deleted",
+		initialState: []*v1.Node{node1, node2, node3},
+		stateChanges: []stateChanges{
+			{
+				nodes: []*v1.Node{node1, node2},
+			},
+		},
+		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+			{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node2}},
+			{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node2}},
+			{Service: service3, Hosts: []*v1.Node{node1, node2}},
+		},
+	}, {
+		desc:         "1 spurious node update",
+		initialState: []*v1.Node{node1, node2, node3},
+		stateChanges: []stateChanges{
+			{
+				nodes: []*v1.Node{node1, node2SpuriousChange, node3},
+			},
+		},
+		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{},
+	}} {
 		t.Run(tc.desc, func(t *testing.T) {
 			controller, cloud, _ := newController()
 			ctx, cancel := context.WithCancel(context.Background())
@@ -764,8 +609,8 @@ func TestNodeChangesForStableNodeSetEnabled(t *testing.T) {
 		syncCallErr bool
 	}
 
-	etpLocalservice1 := newETPLocalService("s0", v1.ServiceTypeLoadBalancer)
-	etpLocalservice2 := newETPLocalService("s1", v1.ServiceTypeLoadBalancer)
+	etpLocalservice1 := newService("s0", v1.ServiceTypeLoadBalancer, tweakAddETP(v1.ServiceExternalTrafficPolicyLocal))
+	etpLocalservice2 := newService("s1", v1.ServiceTypeLoadBalancer, tweakAddETP(v1.ServiceExternalTrafficPolicyLocal))
 	service3 := defaultExternalService()
 
 	services := []*v1.Service{etpLocalservice1, etpLocalservice2, service3}
@@ -775,136 +620,125 @@ func TestNodeChangesForStableNodeSetEnabled(t *testing.T) {
 		expectedUpdateCalls []fakecloud.UpdateBalancerCall
 		stateChanges        []stateChanges
 		initialState        []*v1.Node
-	}{
-		{
-			desc:         "No node changes",
-			initialState: []*v1.Node{node1, node2, node3},
-			stateChanges: []stateChanges{
-				{
-					nodes: []*v1.Node{node1, node2, node3},
-				},
-			},
-			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{},
-		},
-		{
-			desc:         "1 new node gets added",
-			initialState: []*v1.Node{node1, node2},
-			stateChanges: []stateChanges{
-				{
-					nodes: []*v1.Node{node1, node2, node3},
-				},
-			},
-			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
-				{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node2, node3}},
-				{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node2, node3}},
-				{Service: service3, Hosts: []*v1.Node{node1, node2, node3}},
+	}{{
+		desc:         "No node changes",
+		initialState: []*v1.Node{node1, node2, node3},
+		stateChanges: []stateChanges{
+			{
+				nodes: []*v1.Node{node1, node2, node3},
 			},
 		},
-		{
-			desc:         "1 new node gets added - with retries",
-			initialState: []*v1.Node{node1, node2},
-			stateChanges: []stateChanges{
-				{
-					nodes:       []*v1.Node{node1, node2, node3},
-					syncCallErr: true,
-				},
-				{
-					nodes: []*v1.Node{node1, node2, node3},
-				},
-			},
-			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
-				{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node2, node3}},
-				{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node2, node3}},
-				{Service: service3, Hosts: []*v1.Node{node1, node2, node3}},
+		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{},
+	}, {
+		desc:         "1 new node gets added",
+		initialState: []*v1.Node{node1, node2},
+		stateChanges: []stateChanges{
+			{
+				nodes: []*v1.Node{node1, node2, node3},
 			},
 		},
-		{
-			desc:         "1 node goes NotReady",
-			initialState: []*v1.Node{node1, node2, node3},
-			stateChanges: []stateChanges{
-				{
-					nodes: []*v1.Node{node1, node2NotReady, node3},
-				},
-			},
-			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{},
+		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+			{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node2, node3}},
+			{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node2, node3}},
+			{Service: service3, Hosts: []*v1.Node{node1, node2, node3}},
 		},
-		{
-			desc:         "1 node gets Tainted",
-			initialState: []*v1.Node{node1, node2, node3},
-			stateChanges: []stateChanges{
-				{
-					nodes: []*v1.Node{node1, node2Tainted, node3},
-				},
+	}, {
+		desc:         "1 new node gets added - with retries",
+		initialState: []*v1.Node{node1, node2},
+		stateChanges: []stateChanges{
+			{
+				nodes:       []*v1.Node{node1, node2, node3},
+				syncCallErr: true,
 			},
-			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
-				{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node3}},
-				{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node3}},
-				{Service: service3, Hosts: []*v1.Node{node1, node3}},
+			{
+				nodes: []*v1.Node{node1, node2, node3},
 			},
 		},
-		{
-			desc:         "1 node goes Ready",
-			initialState: []*v1.Node{node1, node2NotReady, node3},
-			stateChanges: []stateChanges{
-				{
-					nodes: []*v1.Node{node1, node2, node3},
-				},
-			},
-			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{},
+		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+			{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node2, node3}},
+			{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node2, node3}},
+			{Service: service3, Hosts: []*v1.Node{node1, node2, node3}},
 		},
-		{
-			desc:         "1 node get excluded",
-			initialState: []*v1.Node{node1, node2, node3},
-			stateChanges: []stateChanges{
-				{
-					nodes: []*v1.Node{node1, node2Exclude, node3},
-				},
-			},
-			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
-				{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node3}},
-				{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node3}},
-				{Service: service3, Hosts: []*v1.Node{node1, node3}},
+	}, {
+		desc:         "1 node goes NotReady",
+		initialState: []*v1.Node{node1, node2, node3},
+		stateChanges: []stateChanges{
+			{
+				nodes: []*v1.Node{node1, node2NotReady, node3},
 			},
 		},
-		{
-			desc:         "1 old node gets deleted",
-			initialState: []*v1.Node{node1, node2, node3},
-			stateChanges: []stateChanges{
-				{
-					nodes: []*v1.Node{node1, node2},
-				},
-			},
-			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
-				{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node2}},
-				{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node2}},
-				{Service: service3, Hosts: []*v1.Node{node1, node2}},
+		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{},
+	}, {
+		desc:         "1 node gets Tainted",
+		initialState: []*v1.Node{node1, node2, node3},
+		stateChanges: []stateChanges{
+			{
+				nodes: []*v1.Node{node1, node2Tainted, node3},
 			},
 		},
-		{
-			desc:         "1 node marked for deletion",
-			initialState: []*v1.Node{node1, node2, node3},
-			stateChanges: []stateChanges{
-				{
-					nodes: []*v1.Node{node1, node2Deleted, node3},
-				},
-			},
-			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
-				{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node3}},
-				{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node3}},
-				{Service: service3, Hosts: []*v1.Node{node1, node3}},
+		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+			{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node3}},
+			{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node3}},
+			{Service: service3, Hosts: []*v1.Node{node1, node3}},
+		},
+	}, {
+		desc:         "1 node goes Ready",
+		initialState: []*v1.Node{node1, node2NotReady, node3},
+		stateChanges: []stateChanges{
+			{
+				nodes: []*v1.Node{node1, node2, node3},
 			},
 		},
-		{
-			desc:         "1 spurious node update",
-			initialState: []*v1.Node{node1, node2, node3},
-			stateChanges: []stateChanges{
-				{
-					nodes: []*v1.Node{node1, node2SpuriousChange, node3},
-				},
+		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{},
+	}, {
+		desc:         "1 node get excluded",
+		initialState: []*v1.Node{node1, node2, node3},
+		stateChanges: []stateChanges{
+			{
+				nodes: []*v1.Node{node1, node2Exclude, node3},
 			},
-			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{},
 		},
-	} {
+		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+			{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node3}},
+			{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node3}},
+			{Service: service3, Hosts: []*v1.Node{node1, node3}},
+		},
+	}, {
+		desc:         "1 old node gets deleted",
+		initialState: []*v1.Node{node1, node2, node3},
+		stateChanges: []stateChanges{
+			{
+				nodes: []*v1.Node{node1, node2},
+			},
+		},
+		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+			{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node2}},
+			{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node2}},
+			{Service: service3, Hosts: []*v1.Node{node1, node2}},
+		},
+	}, {
+		desc:         "1 node marked for deletion",
+		initialState: []*v1.Node{node1, node2, node3},
+		stateChanges: []stateChanges{
+			{
+				nodes: []*v1.Node{node1, node2Deleted, node3},
+			},
+		},
+		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+			{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node3}},
+			{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node3}},
+			{Service: service3, Hosts: []*v1.Node{node1, node3}},
+		},
+	}, {
+		desc:         "1 spurious node update",
+		initialState: []*v1.Node{node1, node2, node3},
+		stateChanges: []stateChanges{
+			{
+				nodes: []*v1.Node{node1, node2SpuriousChange, node3},
+			},
+		},
+		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{},
+	}} {
 		t.Run(tc.desc, func(t *testing.T) {
 			controller, cloud, _ := newController()
 			ctx, cancel := context.WithCancel(context.Background())
@@ -939,10 +773,10 @@ func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
 	node4 := makeNode(tweakName("node4"))
 
 	services := []*v1.Service{
-		newService("s0", "777", v1.ServiceTypeLoadBalancer),
-		newService("s1", "888", v1.ServiceTypeLoadBalancer),
-		newService("s3", "999", v1.ServiceTypeLoadBalancer),
-		newService("s4", "123", v1.ServiceTypeLoadBalancer),
+		newService("s0", v1.ServiceTypeLoadBalancer),
+		newService("s1", v1.ServiceTypeLoadBalancer),
+		newService("s3", v1.ServiceTypeLoadBalancer),
+		newService("s4", v1.ServiceTypeLoadBalancer),
 	}
 
 	serviceNames := sets.NewString()
@@ -958,63 +792,57 @@ func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
 		worker                int
 		nodeListerErr         error
 		expectedRetryServices sets.String
-	}{
-		{
-			desc:  "only 1 node",
-			nodes: []*v1.Node{node1},
-			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
-				{Service: newService("s0", "777", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1}},
-				{Service: newService("s1", "888", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1}},
-				{Service: newService("s3", "999", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1}},
-				{Service: newService("s4", "123", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1}},
-			},
-			worker:                3,
-			nodeListerErr:         nil,
-			expectedRetryServices: sets.NewString(),
+	}{{
+		desc:  "only 1 node",
+		nodes: []*v1.Node{node1},
+		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+			{Service: newService("s0", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1}},
+			{Service: newService("s1", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1}},
+			{Service: newService("s3", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1}},
+			{Service: newService("s4", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1}},
 		},
-		{
-			desc:  "2 nodes",
-			nodes: []*v1.Node{node1, node2},
-			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
-				{Service: newService("s0", "777", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2}},
-				{Service: newService("s1", "888", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2}},
-				{Service: newService("s3", "999", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2}},
-				{Service: newService("s4", "123", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2}},
-			},
-			worker:                1,
-			nodeListerErr:         nil,
-			expectedRetryServices: sets.NewString(),
+		worker:                3,
+		nodeListerErr:         nil,
+		expectedRetryServices: sets.NewString(),
+	}, {
+		desc:  "2 nodes",
+		nodes: []*v1.Node{node1, node2},
+		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+			{Service: newService("s0", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2}},
+			{Service: newService("s1", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2}},
+			{Service: newService("s3", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2}},
+			{Service: newService("s4", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2}},
 		},
-		{
-			desc:  "4 nodes",
-			nodes: []*v1.Node{node1, node2, node3, node4},
-			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
-				{Service: newService("s0", "777", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2, node3, node4}},
-				{Service: newService("s1", "888", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2, node3, node4}},
-				{Service: newService("s3", "999", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2, node3, node4}},
-				{Service: newService("s4", "123", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2, node3, node4}},
-			},
-			worker:                3,
-			nodeListerErr:         nil,
-			expectedRetryServices: sets.NewString(),
+		worker:                1,
+		nodeListerErr:         nil,
+		expectedRetryServices: sets.NewString(),
+	}, {
+		desc:  "4 nodes",
+		nodes: []*v1.Node{node1, node2, node3, node4},
+		expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+			{Service: newService("s0", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2, node3, node4}},
+			{Service: newService("s1", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2, node3, node4}},
+			{Service: newService("s3", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2, node3, node4}},
+			{Service: newService("s4", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2, node3, node4}},
 		},
-		{
-			desc:                  "error occur during sync",
-			nodes:                 []*v1.Node{node1, node2, node3, node4},
-			expectedUpdateCalls:   []fakecloud.UpdateBalancerCall{},
-			worker:                3,
-			nodeListerErr:         fmt.Errorf("random error"),
-			expectedRetryServices: serviceNames,
-		},
-		{
-			desc:                  "error occur during sync with 1 workers",
-			nodes:                 []*v1.Node{node1, node2, node3, node4},
-			expectedUpdateCalls:   []fakecloud.UpdateBalancerCall{},
-			worker:                1,
-			nodeListerErr:         fmt.Errorf("random error"),
-			expectedRetryServices: serviceNames,
-		},
-	} {
+		worker:                3,
+		nodeListerErr:         nil,
+		expectedRetryServices: sets.NewString(),
+	}, {
+		desc:                  "error occur during sync",
+		nodes:                 []*v1.Node{node1, node2, node3, node4},
+		expectedUpdateCalls:   []fakecloud.UpdateBalancerCall{},
+		worker:                3,
+		nodeListerErr:         fmt.Errorf("random error"),
+		expectedRetryServices: serviceNames,
+	}, {
+		desc:                  "error occur during sync with 1 workers",
+		nodes:                 []*v1.Node{node1, node2, node3, node4},
+		expectedUpdateCalls:   []fakecloud.UpdateBalancerCall{},
+		worker:                1,
+		nodeListerErr:         fmt.Errorf("random error"),
+		expectedRetryServices: serviceNames,
+	}} {
 		t.Run(tc.desc, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -1064,68 +892,65 @@ func TestProcessServiceCreateOrUpdate(t *testing.T) {
 		updateFn   func(*v1.Service) *v1.Service //Manipulate the structure
 		svc        *v1.Service
 		expectedFn func(*v1.Service, error) error //Error comparison function
-	}{
-		{
-			testName: "If updating a valid service",
-			key:      "validKey",
-			svc:      defaultExternalService(),
-			updateFn: func(svc *v1.Service) *v1.Service {
+	}{{
+		testName: "If updating a valid service",
+		key:      "validKey",
+		svc:      defaultExternalService(),
+		updateFn: func(svc *v1.Service) *v1.Service {
 
-				controller.cache.getOrCreate("validKey")
-				return svc
+			controller.cache.getOrCreate("validKey")
+			return svc
 
-			},
-			expectedFn: func(svc *v1.Service, err error) error {
+		},
+		expectedFn: func(svc *v1.Service, err error) error {
+			return err
+		},
+	}, {
+		testName: "If Updating Loadbalancer IP",
+		key:      "default/sync-test-name",
+		svc:      newService("sync-test-name", v1.ServiceTypeLoadBalancer),
+		updateFn: func(svc *v1.Service) *v1.Service {
+
+			svc.Spec.LoadBalancerIP = oldLBIP
+
+			keyExpected := svc.GetObjectMeta().GetNamespace() + "/" + svc.GetObjectMeta().GetName()
+			controller.enqueueService(svc)
+			cachedServiceTest := controller.cache.getOrCreate(keyExpected)
+			cachedServiceTest.state = svc
+			controller.cache.set(keyExpected, cachedServiceTest)
+
+			keyGot, quit := controller.serviceQueue.Get()
+			if quit {
+				t.Fatalf("get no queue element")
+			}
+			if keyExpected != keyGot.(string) {
+				t.Fatalf("get service key error, expected: %s, got: %s", keyExpected, keyGot.(string))
+			}
+
+			newService := svc.DeepCopy()
+
+			newService.Spec.LoadBalancerIP = newLBIP
+			return newService
+
+		},
+		expectedFn: func(svc *v1.Service, err error) error {
+
+			if err != nil {
 				return err
-			},
+			}
+
+			keyExpected := svc.GetObjectMeta().GetNamespace() + "/" + svc.GetObjectMeta().GetName()
+
+			cachedServiceGot, exist := controller.cache.get(keyExpected)
+			if !exist {
+				return fmt.Errorf("update service error, queue should contain service: %s", keyExpected)
+			}
+			if cachedServiceGot.state.Spec.LoadBalancerIP != newLBIP {
+				return fmt.Errorf("update LoadBalancerIP error, expected: %s, got: %s", newLBIP, cachedServiceGot.state.Spec.LoadBalancerIP)
+			}
+			return nil
 		},
-		{
-			testName: "If Updating Loadbalancer IP",
-			key:      "default/sync-test-name",
-			svc:      newService("sync-test-name", types.UID("sync-test-uid"), v1.ServiceTypeLoadBalancer),
-			updateFn: func(svc *v1.Service) *v1.Service {
-
-				svc.Spec.LoadBalancerIP = oldLBIP
-
-				keyExpected := svc.GetObjectMeta().GetNamespace() + "/" + svc.GetObjectMeta().GetName()
-				controller.enqueueService(svc)
-				cachedServiceTest := controller.cache.getOrCreate(keyExpected)
-				cachedServiceTest.state = svc
-				controller.cache.set(keyExpected, cachedServiceTest)
-
-				keyGot, quit := controller.serviceQueue.Get()
-				if quit {
-					t.Fatalf("get no queue element")
-				}
-				if keyExpected != keyGot.(string) {
-					t.Fatalf("get service key error, expected: %s, got: %s", keyExpected, keyGot.(string))
-				}
-
-				newService := svc.DeepCopy()
-
-				newService.Spec.LoadBalancerIP = newLBIP
-				return newService
-
-			},
-			expectedFn: func(svc *v1.Service, err error) error {
-
-				if err != nil {
-					return err
-				}
-
-				keyExpected := svc.GetObjectMeta().GetNamespace() + "/" + svc.GetObjectMeta().GetName()
-
-				cachedServiceGot, exist := controller.cache.get(keyExpected)
-				if !exist {
-					return fmt.Errorf("update service error, queue should contain service: %s", keyExpected)
-				}
-				if cachedServiceGot.state.Spec.LoadBalancerIP != newLBIP {
-					return fmt.Errorf("update LoadBalancerIP error, expected: %s, got: %s", newLBIP, cachedServiceGot.state.Spec.LoadBalancerIP)
-				}
-				return nil
-			},
-		},
-	}
+	}}
 
 	for _, tc := range testCases {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -1153,24 +978,21 @@ func TestProcessServiceCreateOrUpdateK8sError(t *testing.T) {
 		desc      string
 		k8sErr    error
 		expectErr error
-	}{
-		{
-			desc:      "conflict error",
-			k8sErr:    conflictErr,
-			expectErr: fmt.Errorf("failed to update load balancer status: %v", conflictErr),
-		},
-		{
-			desc:      "not found error",
-			k8sErr:    notFoundErr,
-			expectErr: nil,
-		},
-	}
+	}{{
+		desc:      "conflict error",
+		k8sErr:    conflictErr,
+		expectErr: fmt.Errorf("failed to update load balancer status: %v", conflictErr),
+	}, {
+		desc:      "not found error",
+		k8sErr:    notFoundErr,
+		expectErr: nil,
+	}}
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			svc := newService(svcName, types.UID("123"), v1.ServiceTypeLoadBalancer)
+			svc := newService(svcName, v1.ServiceTypeLoadBalancer)
 			// Preset finalizer so k8s error only happens when patching status.
 			svc.Finalizers = []string{servicehelper.LoadBalancerCleanupFinalizer}
 			controller, _, client := newController()
@@ -1295,62 +1117,58 @@ func TestProcessServiceDeletion(t *testing.T) {
 		testName   string
 		updateFn   func(*Controller)        // Update function used to manipulate srv and controller values
 		expectedFn func(svcErr error) error // Function to check if the returned value is expected
-	}{
-		{
-			testName: "If a non-existent service is deleted",
-			updateFn: func(controller *Controller) {
-				// Does not do anything
-			},
-			expectedFn: func(svcErr error) error {
-				return svcErr
-			},
+	}{{
+		testName: "If a non-existent service is deleted",
+		updateFn: func(controller *Controller) {
+			// Does not do anything
 		},
-		{
-			testName: "If cloudprovided failed to delete the service",
-			updateFn: func(controller *Controller) {
-
-				svc := controller.cache.getOrCreate(svcKey)
-				svc.state = defaultExternalService()
-				cloud.Err = fmt.Errorf("error Deleting the Loadbalancer")
-
-			},
-			expectedFn: func(svcErr error) error {
-
-				expectedError := "error Deleting the Loadbalancer"
-
-				if svcErr == nil || svcErr.Error() != expectedError {
-					return fmt.Errorf("Expected=%v Obtained=%v", expectedError, svcErr)
-				}
-
-				return nil
-			},
+		expectedFn: func(svcErr error) error {
+			return svcErr
 		},
-		{
-			testName: "If delete was successful",
-			updateFn: func(controller *Controller) {
+	}, {
+		testName: "If cloudprovided failed to delete the service",
+		updateFn: func(controller *Controller) {
 
-				testSvc := defaultExternalService()
-				controller.enqueueService(testSvc)
-				svc := controller.cache.getOrCreate(svcKey)
-				svc.state = testSvc
-				controller.cache.set(svcKey, svc)
+			svc := controller.cache.getOrCreate(svcKey)
+			svc.state = defaultExternalService()
+			cloud.Err = fmt.Errorf("error Deleting the Loadbalancer")
 
-			},
-			expectedFn: func(svcErr error) error {
-				if svcErr != nil {
-					return fmt.Errorf("Expected=nil Obtained=%v", svcErr)
-				}
-
-				// It should no longer be in the workqueue.
-				_, exist := controller.cache.get(svcKey)
-				if exist {
-					return fmt.Errorf("delete service error, queue should not contain service: %s any more", svcKey)
-				}
-
-				return nil
-			},
 		},
-	}
+		expectedFn: func(svcErr error) error {
+
+			expectedError := "error Deleting the Loadbalancer"
+
+			if svcErr == nil || svcErr.Error() != expectedError {
+				return fmt.Errorf("Expected=%v Obtained=%v", expectedError, svcErr)
+			}
+
+			return nil
+		},
+	}, {
+		testName: "If delete was successful",
+		updateFn: func(controller *Controller) {
+
+			testSvc := defaultExternalService()
+			controller.enqueueService(testSvc)
+			svc := controller.cache.getOrCreate(svcKey)
+			svc.state = testSvc
+			controller.cache.set(svcKey, svc)
+
+		},
+		expectedFn: func(svcErr error) error {
+			if svcErr != nil {
+				return fmt.Errorf("Expected=nil Obtained=%v", svcErr)
+			}
+
+			// It should no longer be in the workqueue.
+			_, exist := controller.cache.get(svcKey)
+			if exist {
+				return fmt.Errorf("delete service error, queue should not contain service: %s any more", svcKey)
+			}
+
+			return nil
+		},
+	}}
 
 	for _, tc := range testCases {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -1383,49 +1201,44 @@ func TestNeedsCleanup(t *testing.T) {
 		desc               string
 		svc                *v1.Service
 		expectNeedsCleanup bool
-	}{
-		{
-			desc:               "service without finalizer",
-			svc:                &v1.Service{},
-			expectNeedsCleanup: false,
+	}{{
+		desc:               "service without finalizer",
+		svc:                &v1.Service{},
+		expectNeedsCleanup: false,
+	}, {
+		desc: "service with finalizer without timestamp without LB",
+		svc: &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Finalizers: []string{servicehelper.LoadBalancerCleanupFinalizer},
+			},
+			Spec: v1.ServiceSpec{
+				Type: v1.ServiceTypeNodePort,
+			},
 		},
-		{
-			desc: "service with finalizer without timestamp without LB",
-			svc: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Finalizers: []string{servicehelper.LoadBalancerCleanupFinalizer},
-				},
-				Spec: v1.ServiceSpec{
-					Type: v1.ServiceTypeNodePort,
+		expectNeedsCleanup: true,
+	}, {
+		desc: "service with finalizer without timestamp with LB",
+		svc: &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Finalizers: []string{servicehelper.LoadBalancerCleanupFinalizer},
+			},
+			Spec: v1.ServiceSpec{
+				Type: v1.ServiceTypeLoadBalancer,
+			},
+		},
+		expectNeedsCleanup: false,
+	}, {
+		desc: "service with finalizer with timestamp",
+		svc: &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Finalizers: []string{servicehelper.LoadBalancerCleanupFinalizer},
+				DeletionTimestamp: &metav1.Time{
+					Time: time.Now(),
 				},
 			},
-			expectNeedsCleanup: true,
 		},
-		{
-			desc: "service with finalizer without timestamp with LB",
-			svc: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Finalizers: []string{servicehelper.LoadBalancerCleanupFinalizer},
-				},
-				Spec: v1.ServiceSpec{
-					Type: v1.ServiceTypeLoadBalancer,
-				},
-			},
-			expectNeedsCleanup: false,
-		},
-		{
-			desc: "service with finalizer with timestamp",
-			svc: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Finalizers: []string{servicehelper.LoadBalancerCleanupFinalizer},
-					DeletionTimestamp: &metav1.Time{
-						Time: time.Now(),
-					},
-				},
-			},
-			expectNeedsCleanup: true,
-		},
-	}
+		expectNeedsCleanup: true,
+	}}
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
@@ -1446,283 +1259,200 @@ func TestNeedsUpdate(t *testing.T) {
 		updateFn            func() //Function to update the service object
 		expectedNeedsUpdate bool   //needsupdate always returns bool
 
-	}{
-		{
-			testName: "If the service type is changed from LoadBalancer to ClusterIP",
-			updateFn: func() {
-				oldSvc = defaultExternalService()
-				newSvc = defaultExternalService()
-				newSvc.Spec.Type = v1.ServiceTypeClusterIP
-			},
-			expectedNeedsUpdate: true,
+	}{{
+		testName: "If the service type is changed from LoadBalancer to ClusterIP",
+		updateFn: func() {
+			oldSvc = defaultExternalService()
+			newSvc = defaultExternalService()
+			newSvc.Spec.Type = v1.ServiceTypeClusterIP
 		},
-		{
-			testName: "If the Ports are different",
-			updateFn: func() {
-				oldSvc = defaultExternalService()
-				newSvc = defaultExternalService()
-				oldSvc.Spec.Ports = []v1.ServicePort{
-					{
-						Port: 8000,
-					},
-					{
-						Port: 9000,
-					},
-					{
-						Port: 10000,
-					},
-				}
-				newSvc.Spec.Ports = []v1.ServicePort{
-					{
-						Port: 8001,
-					},
-					{
-						Port: 9001,
-					},
-					{
-						Port: 10001,
-					},
-				}
+		expectedNeedsUpdate: true,
+	}, {
+		testName: "If the Ports are different",
+		updateFn: func() {
+			oldSvc = defaultExternalService()
+			newSvc = defaultExternalService()
+			oldSvc.Spec.Ports = []v1.ServicePort{
+				{
+					Port: 8000,
+				},
+				{
+					Port: 9000,
+				},
+				{
+					Port: 10000,
+				},
+			}
+			newSvc.Spec.Ports = []v1.ServicePort{
+				{
+					Port: 8001,
+				},
+				{
+					Port: 9001,
+				},
+				{
+					Port: 10001,
+				},
+			}
 
-			},
-			expectedNeedsUpdate: true,
 		},
-		{
-			testName: "If external ip counts are different",
-			updateFn: func() {
-				oldSvc = defaultExternalService()
-				newSvc = defaultExternalService()
-				oldSvc.Spec.ExternalIPs = []string{"old.IP.1"}
-				newSvc.Spec.ExternalIPs = []string{"new.IP.1", "new.IP.2"}
-			},
-			expectedNeedsUpdate: true,
+		expectedNeedsUpdate: true,
+	}, {
+		testName: "If external ip counts are different",
+		updateFn: func() {
+			oldSvc = defaultExternalService()
+			newSvc = defaultExternalService()
+			oldSvc.Spec.ExternalIPs = []string{"old.IP.1"}
+			newSvc.Spec.ExternalIPs = []string{"new.IP.1", "new.IP.2"}
 		},
-		{
-			testName: "If external ips are different",
-			updateFn: func() {
-				oldSvc = defaultExternalService()
-				newSvc = defaultExternalService()
-				oldSvc.Spec.ExternalIPs = []string{"old.IP.1", "old.IP.2"}
-				newSvc.Spec.ExternalIPs = []string{"new.IP.1", "new.IP.2"}
-			},
-			expectedNeedsUpdate: true,
+		expectedNeedsUpdate: true,
+	}, {
+		testName: "If external ips are different",
+		updateFn: func() {
+			oldSvc = defaultExternalService()
+			newSvc = defaultExternalService()
+			oldSvc.Spec.ExternalIPs = []string{"old.IP.1", "old.IP.2"}
+			newSvc.Spec.ExternalIPs = []string{"new.IP.1", "new.IP.2"}
 		},
-		{
-			testName: "If UID is different",
-			updateFn: func() {
-				oldSvc = defaultExternalService()
-				newSvc = defaultExternalService()
-				oldSvc.UID = types.UID("UID old")
-				newSvc.UID = types.UID("UID new")
-			},
-			expectedNeedsUpdate: true,
+		expectedNeedsUpdate: true,
+	}, {
+		testName: "If UID is different",
+		updateFn: func() {
+			oldSvc = defaultExternalService()
+			newSvc = defaultExternalService()
+			oldSvc.UID = types.UID("UID old")
+			newSvc.UID = types.UID("UID new")
 		},
-		{
-			testName: "If ExternalTrafficPolicy is different",
-			updateFn: func() {
-				oldSvc = defaultExternalService()
-				newSvc = defaultExternalService()
-				newSvc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
-			},
-			expectedNeedsUpdate: true,
+		expectedNeedsUpdate: true,
+	}, {
+		testName: "If ExternalTrafficPolicy is different",
+		updateFn: func() {
+			oldSvc = defaultExternalService()
+			newSvc = defaultExternalService()
+			newSvc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 		},
-		{
-			testName: "If HealthCheckNodePort is different",
-			updateFn: func() {
-				oldSvc = defaultExternalService()
-				newSvc = defaultExternalService()
-				newSvc.Spec.HealthCheckNodePort = 30123
-			},
-			expectedNeedsUpdate: true,
+		expectedNeedsUpdate: true,
+	}, {
+		testName: "If HealthCheckNodePort is different",
+		updateFn: func() {
+			oldSvc = defaultExternalService()
+			newSvc = defaultExternalService()
+			newSvc.Spec.HealthCheckNodePort = 30123
 		},
-		{
-			testName: "If TargetGroup is different 1",
-			updateFn: func() {
-				oldSvc = &v1.Service{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "tcp-service",
-						Namespace: "default",
-					},
-					Spec: v1.ServiceSpec{
-						Ports: []v1.ServicePort{{
-							Port:       80,
-							Protocol:   v1.ProtocolTCP,
-							TargetPort: intstr.Parse("20"),
-						}},
-						Type: v1.ServiceTypeLoadBalancer,
-					},
-				}
-				newSvc = oldSvc.DeepCopy()
-				newSvc.Spec.Ports[0].TargetPort = intstr.Parse("21")
-			},
-			expectedNeedsUpdate: true,
+		expectedNeedsUpdate: true,
+	}, {
+		testName: "If TargetGroup is different 1",
+		updateFn: func() {
+			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 20))
+			newSvc = oldSvc.DeepCopy()
+			newSvc.Spec.Ports[0].TargetPort = intstr.Parse("21")
 		},
-		{
-			testName: "If TargetGroup is different 2",
-			updateFn: func() {
-				oldSvc = &v1.Service{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "tcp-service",
-						Namespace: "default",
-					},
-					Spec: v1.ServiceSpec{
-						Ports: []v1.ServicePort{{
-							Port:       80,
-							Protocol:   v1.ProtocolTCP,
-							TargetPort: intstr.Parse("22"),
-						}},
-						Type: v1.ServiceTypeLoadBalancer,
-					},
-				}
-				newSvc = oldSvc.DeepCopy()
-				newSvc.Spec.Ports[0].TargetPort = intstr.Parse("dns")
-			},
-			expectedNeedsUpdate: true,
+		expectedNeedsUpdate: true,
+	}, {
+		testName: "If TargetGroup is different 2",
+		updateFn: func() {
+			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 22))
+			newSvc = oldSvc.DeepCopy()
+			newSvc.Spec.Ports[0].TargetPort = intstr.Parse("dns")
 		},
-		{
-			testName: "If appProtocol is the same",
-			updateFn: func() {
-				oldSvc = &v1.Service{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "tcp-service",
-						Namespace: "default",
-					},
-					Spec: v1.ServiceSpec{
-						Ports: []v1.ServicePort{{
-							Port:       80,
-							Protocol:   v1.ProtocolTCP,
-							TargetPort: intstr.Parse("22"),
-						}},
-						Type: v1.ServiceTypeLoadBalancer,
-					},
-				}
-				newSvc = oldSvc.DeepCopy()
-			},
-			expectedNeedsUpdate: false,
+		expectedNeedsUpdate: true,
+	}, {
+		testName: "If appProtocol is the same",
+		updateFn: func() {
+			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 22))
+			newSvc = oldSvc.DeepCopy()
 		},
-		{
-			testName: "If appProtocol is set when previously unset",
-			updateFn: func() {
-				oldSvc = &v1.Service{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "tcp-service",
-						Namespace: "default",
-					},
-					Spec: v1.ServiceSpec{
-						Ports: []v1.ServicePort{{
-							Port:       80,
-							Protocol:   v1.ProtocolTCP,
-							TargetPort: intstr.Parse("22"),
-						}},
-						Type: v1.ServiceTypeLoadBalancer,
-					},
-				}
-				newSvc = oldSvc.DeepCopy()
-				protocol := "http"
-				newSvc.Spec.Ports[0].AppProtocol = &protocol
-			},
-			expectedNeedsUpdate: true,
+		expectedNeedsUpdate: false,
+	}, {
+		testName: "If service IPFamilies from single stack to dual stack",
+		updateFn: func() {
+			protocol := "http"
+			oldSvc = &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "tcp-service",
+					Namespace: "default",
+				},
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{{
+						Port:        80,
+						Protocol:    v1.ProtocolTCP,
+						TargetPort:  intstr.Parse("22"),
+						AppProtocol: &protocol,
+					}},
+					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+					Type:       v1.ServiceTypeLoadBalancer,
+				},
+			}
+			newSvc = oldSvc.DeepCopy()
+			newSvc.Spec.IPFamilies = []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol}
 		},
-		{
-			testName: "If appProtocol is set to a different value",
-			updateFn: func() {
-				protocol := "http"
-				oldSvc = &v1.Service{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "tcp-service",
-						Namespace: "default",
-					},
-					Spec: v1.ServiceSpec{
-						Ports: []v1.ServicePort{{
-							Port:        80,
-							Protocol:    v1.ProtocolTCP,
-							TargetPort:  intstr.Parse("22"),
-							AppProtocol: &protocol,
-						}},
-						Type: v1.ServiceTypeLoadBalancer,
-					},
-				}
-				newSvc = oldSvc.DeepCopy()
-				newProtocol := "tcp"
-				newSvc.Spec.Ports[0].AppProtocol = &newProtocol
-			},
-			expectedNeedsUpdate: true,
+		expectedNeedsUpdate: true,
+	}, {
+		testName: "If service IPFamilies from dual stack to single stack",
+		updateFn: func() {
+			protocol := "http"
+			oldSvc = &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "tcp-service",
+					Namespace: "default",
+				},
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{{
+						Port:        80,
+						Protocol:    v1.ProtocolTCP,
+						TargetPort:  intstr.Parse("22"),
+						AppProtocol: &protocol,
+					}},
+					IPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+					Type:       v1.ServiceTypeLoadBalancer,
+				},
+			}
+			newSvc = oldSvc.DeepCopy()
+			newSvc.Spec.IPFamilies = []v1.IPFamily{v1.IPv4Protocol}
 		},
-		{
-			testName: "If service IPFamilies from single stack to dual stack",
-			updateFn: func() {
-				protocol := "http"
-				oldSvc = &v1.Service{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "tcp-service",
-						Namespace: "default",
-					},
-					Spec: v1.ServiceSpec{
-						Ports: []v1.ServicePort{{
-							Port:        80,
-							Protocol:    v1.ProtocolTCP,
-							TargetPort:  intstr.Parse("22"),
-							AppProtocol: &protocol,
-						}},
-						IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
-						Type:       v1.ServiceTypeLoadBalancer,
-					},
-				}
-				newSvc = oldSvc.DeepCopy()
-				newSvc.Spec.IPFamilies = []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol}
-			},
-			expectedNeedsUpdate: true,
+		expectedNeedsUpdate: true,
+	}, {
+		testName: "If service IPFamilies not change",
+		updateFn: func() {
+			protocol := "http"
+			oldSvc = &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "tcp-service",
+					Namespace: "default",
+				},
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{{
+						Port:        80,
+						Protocol:    v1.ProtocolTCP,
+						TargetPort:  intstr.Parse("22"),
+						AppProtocol: &protocol,
+					}},
+					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+					Type:       v1.ServiceTypeLoadBalancer,
+				},
+			}
+			newSvc = oldSvc.DeepCopy()
 		},
-		{
-			testName: "If service IPFamilies from dual stack to single stack",
-			updateFn: func() {
-				protocol := "http"
-				oldSvc = &v1.Service{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "tcp-service",
-						Namespace: "default",
-					},
-					Spec: v1.ServiceSpec{
-						Ports: []v1.ServicePort{{
-							Port:        80,
-							Protocol:    v1.ProtocolTCP,
-							TargetPort:  intstr.Parse("22"),
-							AppProtocol: &protocol,
-						}},
-						IPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-						Type:       v1.ServiceTypeLoadBalancer,
-					},
-				}
-				newSvc = oldSvc.DeepCopy()
-				newSvc.Spec.IPFamilies = []v1.IPFamily{v1.IPv4Protocol}
-			},
-			expectedNeedsUpdate: true,
+		expectedNeedsUpdate: false,
+	}, {
+		testName: "If appProtocol is set when previously unset",
+		updateFn: func() {
+			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 22))
+			newSvc = oldSvc.DeepCopy()
+			protocol := "http"
+			newSvc.Spec.Ports[0].AppProtocol = &protocol
 		},
-		{
-			testName: "If service IPFamilies not change",
-			updateFn: func() {
-				protocol := "http"
-				oldSvc = &v1.Service{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "tcp-service",
-						Namespace: "default",
-					},
-					Spec: v1.ServiceSpec{
-						Ports: []v1.ServicePort{{
-							Port:        80,
-							Protocol:    v1.ProtocolTCP,
-							TargetPort:  intstr.Parse("22"),
-							AppProtocol: &protocol,
-						}},
-						IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
-						Type:       v1.ServiceTypeLoadBalancer,
-					},
-				}
-				newSvc = oldSvc.DeepCopy()
-			},
-			expectedNeedsUpdate: false,
+		expectedNeedsUpdate: true,
+	}, {
+		testName: "If appProtocol is set to a different value",
+		updateFn: func() {
+			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 22), tweakAddAppProtocol("http"))
+			newSvc = oldSvc.DeepCopy()
+			newProtocol := "tcp"
+			newSvc.Spec.Ports[0].AppProtocol = &newProtocol
 		},
-	}
+		expectedNeedsUpdate: true,
+	}}
 
 	controller, _, _ := newController()
 	for _, tc := range testCases {
@@ -1747,92 +1477,85 @@ func TestServiceCache(t *testing.T) {
 		testName     string
 		setCacheFn   func()
 		checkCacheFn func() error
-	}{
-		{
-			testName: "Add",
-			setCacheFn: func() {
-				cS := sc.getOrCreate("addTest")
-				cS.state = defaultExternalService()
-			},
-			checkCacheFn: func() error {
-				//There must be exactly one element
-				if len(sc.serviceMap) != 1 {
-					return fmt.Errorf("Expected=1 Obtained=%d", len(sc.serviceMap))
-				}
-				return nil
-			},
+	}{{
+		testName: "Add",
+		setCacheFn: func() {
+			cS := sc.getOrCreate("addTest")
+			cS.state = defaultExternalService()
 		},
-		{
-			testName: "Del",
-			setCacheFn: func() {
-				sc.delete("addTest")
+		checkCacheFn: func() error {
+			//There must be exactly one element
+			if len(sc.serviceMap) != 1 {
+				return fmt.Errorf("Expected=1 Obtained=%d", len(sc.serviceMap))
+			}
+			return nil
+		},
+	}, {
+		testName: "Del",
+		setCacheFn: func() {
+			sc.delete("addTest")
 
-			},
-			checkCacheFn: func() error {
-				//Now it should have no element
-				if len(sc.serviceMap) != 0 {
-					return fmt.Errorf("Expected=0 Obtained=%d", len(sc.serviceMap))
-				}
-				return nil
-			},
 		},
-		{
-			testName: "Set and Get",
-			setCacheFn: func() {
-				sc.set("addTest", &cachedService{state: defaultExternalService()})
-			},
-			checkCacheFn: func() error {
-				//Now it should have one element
-				Cs, bool := sc.get("addTest")
-				if !bool {
-					return fmt.Errorf("is Available Expected=true Obtained=%v", bool)
-				}
-				if Cs == nil {
-					return fmt.Errorf("cachedService expected:non-nil Obtained=nil")
-				}
-				return nil
-			},
+		checkCacheFn: func() error {
+			//Now it should have no element
+			if len(sc.serviceMap) != 0 {
+				return fmt.Errorf("Expected=0 Obtained=%d", len(sc.serviceMap))
+			}
+			return nil
 		},
-		{
-			testName: "ListKeys",
-			setCacheFn: func() {
-				//Add one more entry here
-				sc.set("addTest1", &cachedService{state: defaultExternalService()})
-			},
-			checkCacheFn: func() error {
-				//It should have two elements
-				keys := sc.ListKeys()
-				if len(keys) != 2 {
-					return fmt.Errorf("elements Expected=2 Obtained=%v", len(keys))
-				}
-				return nil
-			},
+	}, {
+		testName: "Set and Get",
+		setCacheFn: func() {
+			sc.set("addTest", &cachedService{state: defaultExternalService()})
 		},
-		{
-			testName:   "GetbyKeys",
-			setCacheFn: nil, //Nothing to set
-			checkCacheFn: func() error {
-				//It should have two elements
-				svc, isKey, err := sc.GetByKey("addTest")
-				if svc == nil || isKey == false || err != nil {
-					return fmt.Errorf("Expected(non-nil, true, nil) Obtained(%v,%v,%v)", svc, isKey, err)
-				}
-				return nil
-			},
+		checkCacheFn: func() error {
+			//Now it should have one element
+			Cs, bool := sc.get("addTest")
+			if !bool {
+				return fmt.Errorf("is Available Expected=true Obtained=%v", bool)
+			}
+			if Cs == nil {
+				return fmt.Errorf("cachedService expected:non-nil Obtained=nil")
+			}
+			return nil
 		},
-		{
-			testName:   "allServices",
-			setCacheFn: nil, //Nothing to set
-			checkCacheFn: func() error {
-				//It should return two elements
-				svcArray := sc.allServices()
-				if len(svcArray) != 2 {
-					return fmt.Errorf("Expected(2) Obtained(%v)", len(svcArray))
-				}
-				return nil
-			},
+	}, {
+		testName: "ListKeys",
+		setCacheFn: func() {
+			//Add one more entry here
+			sc.set("addTest1", &cachedService{state: defaultExternalService()})
 		},
-	}
+		checkCacheFn: func() error {
+			//It should have two elements
+			keys := sc.ListKeys()
+			if len(keys) != 2 {
+				return fmt.Errorf("elements Expected=2 Obtained=%v", len(keys))
+			}
+			return nil
+		},
+	}, {
+		testName:   "GetbyKeys",
+		setCacheFn: nil, //Nothing to set
+		checkCacheFn: func() error {
+			//It should have two elements
+			svc, isKey, err := sc.GetByKey("addTest")
+			if svc == nil || isKey == false || err != nil {
+				return fmt.Errorf("Expected(non-nil, true, nil) Obtained(%v,%v,%v)", svc, isKey, err)
+			}
+			return nil
+		},
+	}, {
+		testName:   "allServices",
+		setCacheFn: nil, //Nothing to set
+		checkCacheFn: func() error {
+			//It should return two elements
+			svcArray := sc.allServices()
+			if len(svcArray) != 2 {
+				return fmt.Errorf("Expected(2) Obtained(%v)", len(svcArray))
+			}
+			return nil
+		},
+	}}
 
 	for _, tc := range testCases {
 		if tc.setCacheFn != nil {
@@ -1851,27 +1574,24 @@ func TestAddFinalizer(t *testing.T) {
 		desc        string
 		svc         *v1.Service
 		expectPatch bool
-	}{
-		{
-			desc: "no-op add finalizer",
-			svc: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:       "test-patch-finalizer",
-					Finalizers: []string{servicehelper.LoadBalancerCleanupFinalizer},
-				},
+	}{{
+		desc: "no-op add finalizer",
+		svc: &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       "test-patch-finalizer",
+				Finalizers: []string{servicehelper.LoadBalancerCleanupFinalizer},
 			},
-			expectPatch: false,
 		},
-		{
-			desc: "add finalizer",
-			svc: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-patch-finalizer",
-				},
+		expectPatch: false,
+	}, {
+		desc: "add finalizer",
+		svc: &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-patch-finalizer",
 			},
-			expectPatch: true,
 		},
-	}
+		expectPatch: true,
+	}}
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
@@ -1907,27 +1627,24 @@ func TestRemoveFinalizer(t *testing.T) {
 		desc        string
 		svc         *v1.Service
 		expectPatch bool
-	}{
-		{
-			desc: "no-op remove finalizer",
-			svc: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-patch-finalizer",
-				},
+	}{{
+		desc: "no-op remove finalizer",
+		svc: &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-patch-finalizer",
 			},
-			expectPatch: false,
 		},
-		{
-			desc: "remove finalizer",
-			svc: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:       "test-patch-finalizer",
-					Finalizers: []string{servicehelper.LoadBalancerCleanupFinalizer},
-				},
+		expectPatch: false,
+	}, {
+		desc: "remove finalizer",
+		svc: &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       "test-patch-finalizer",
+				Finalizers: []string{servicehelper.LoadBalancerCleanupFinalizer},
 			},
-			expectPatch: true,
 		},
-	}
+		expectPatch: true,
+	}}
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
@@ -1964,72 +1681,67 @@ func TestPatchStatus(t *testing.T) {
 		svc         *v1.Service
 		newStatus   *v1.LoadBalancerStatus
 		expectPatch bool
-	}{
-		{
-			desc: "no-op add status",
-			svc: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-patch-status",
-				},
-				Status: v1.ServiceStatus{
-					LoadBalancer: v1.LoadBalancerStatus{
-						Ingress: []v1.LoadBalancerIngress{
-							{IP: "8.8.8.8"},
-						},
+	}{{
+		desc: "no-op add status",
+		svc: &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-patch-status",
+			},
+			Status: v1.ServiceStatus{
+				LoadBalancer: v1.LoadBalancerStatus{
+					Ingress: []v1.LoadBalancerIngress{
+						{IP: "8.8.8.8"},
 					},
 				},
 			},
-			newStatus: &v1.LoadBalancerStatus{
-				Ingress: []v1.LoadBalancerIngress{
-					{IP: "8.8.8.8"},
-				},
-			},
-			expectPatch: false,
 		},
-		{
-			desc: "add status",
-			svc: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-patch-status",
-				},
-				Status: v1.ServiceStatus{},
+		newStatus: &v1.LoadBalancerStatus{
+			Ingress: []v1.LoadBalancerIngress{
+				{IP: "8.8.8.8"},
 			},
-			newStatus: &v1.LoadBalancerStatus{
-				Ingress: []v1.LoadBalancerIngress{
-					{IP: "8.8.8.8"},
-				},
-			},
-			expectPatch: true,
 		},
-		{
-			desc: "no-op clear status",
-			svc: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-patch-status",
-				},
-				Status: v1.ServiceStatus{},
+		expectPatch: false,
+	}, {
+		desc: "add status",
+		svc: &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-patch-status",
 			},
-			newStatus:   &v1.LoadBalancerStatus{},
-			expectPatch: false,
+			Status: v1.ServiceStatus{},
 		},
-		{
-			desc: "clear status",
-			svc: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-patch-status",
-				},
-				Status: v1.ServiceStatus{
-					LoadBalancer: v1.LoadBalancerStatus{
-						Ingress: []v1.LoadBalancerIngress{
-							{IP: "8.8.8.8"},
-						},
+		newStatus: &v1.LoadBalancerStatus{
+			Ingress: []v1.LoadBalancerIngress{
+				{IP: "8.8.8.8"},
+			},
+		},
+		expectPatch: true,
+	}, {
+		desc: "no-op clear status",
+		svc: &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-patch-status",
+			},
+			Status: v1.ServiceStatus{},
+		},
+		newStatus:   &v1.LoadBalancerStatus{},
+		expectPatch: false,
+	}, {
+		desc: "clear status",
+		svc: &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-patch-status",
+			},
+			Status: v1.ServiceStatus{
+				LoadBalancer: v1.LoadBalancerStatus{
+					Ingress: []v1.LoadBalancerIngress{
+						{IP: "8.8.8.8"},
 					},
 				},
 			},
-			newStatus:   &v1.LoadBalancerStatus{},
-			expectPatch: true,
 		},
-	}
+		newStatus:   &v1.LoadBalancerStatus{},
+		expectPatch: true,
+	}}
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
@@ -2110,29 +1822,25 @@ func TestListWithPredicate(t *testing.T) {
 		name      string
 		predicate NodeConditionPredicate
 		expect    []*v1.Node
-	}{
-		{
-			name: "ListWithPredicate filter Running node",
-			predicate: func(node *v1.Node) bool {
-				return node.Status.Phase == v1.NodeRunning
-			},
-			expect: []*v1.Node{nodes[1], nodes[3]},
+	}{{
+		name: "ListWithPredicate filter Running node",
+		predicate: func(node *v1.Node) bool {
+			return node.Status.Phase == v1.NodeRunning
 		},
-		{
-			name: "ListWithPredicate filter Pending node",
-			predicate: func(node *v1.Node) bool {
-				return node.Status.Phase == v1.NodePending
-			},
-			expect: []*v1.Node{nodes[0], nodes[2], nodes[4]},
+		expect: []*v1.Node{nodes[1], nodes[3]},
+	}, {
+		name: "ListWithPredicate filter Pending node",
+		predicate: func(node *v1.Node) bool {
+			return node.Status.Phase == v1.NodePending
 		},
-		{
-			name: "ListWithPredicate filter Terminated node",
-			predicate: func(node *v1.Node) bool {
-				return node.Status.Phase == v1.NodeTerminated
-			},
-			expect: nil,
+		expect: []*v1.Node{nodes[0], nodes[2], nodes[4]},
+	}, {
+		name: "ListWithPredicate filter Terminated node",
+		predicate: func(node *v1.Node) bool {
+			return node.Status.Phase == v1.NodeTerminated
 		},
-	}
+		expect: nil,
+	}}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			get, err := listWithPredicates(fakeInformerFactory.Core().V1().Nodes().Lister(), test.predicate)
