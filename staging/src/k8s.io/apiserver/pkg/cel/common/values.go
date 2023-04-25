@@ -434,7 +434,7 @@ func (t *unstructuredList) ConvertToNative(typeDesc reflect.Type) (interface{}, 
 			for _, e := range t.elements {
 				s, ok := e.(string)
 				if !ok {
-					return nil, fmt.Errorf("unexpected all elements to be of type string, but got %T", e)
+					return nil, fmt.Errorf("expected all elements to be of type string, but got %T", e)
 				}
 				result = append(result, s)
 			}
