@@ -487,7 +487,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 				proxyLogs.Reset()
 				ginkgo.By("Running kubectl via an HTTP proxy using " + proxyVar)
 				output := e2ekubectl.NewKubectlCommand(ns, "exec", podRunningTimeoutArg, simplePodName, "--", "echo", "running", "in", "container").
-					WithEnv(append(os.Environ(), fmt.Sprintf("%s=%s", proxyVar, proxyAddr))).
+					AppendEnv(append(os.Environ(), fmt.Sprintf("%s=%s", proxyVar, proxyAddr))).
 					ExecOrDie(ns)
 
 				// Verify we got the normal output captured by the exec server
@@ -868,7 +868,7 @@ metadata:
 
 			manifest1 = strings.ReplaceAll(manifest1, "{{ns}}", ns)
 			args := []string{"apply", "--prune", "--applyset=applyset1", "-f", "-"}
-			e2ekubectl.NewKubectlCommand(ns, args...).WithEnv([]string{"KUBECTL_APPLYSET=true"}).WithStdinData(manifest1).ExecOrDie(ns)
+			e2ekubectl.NewKubectlCommand(ns, args...).AppendEnv([]string{"KUBECTL_APPLYSET=true"}).WithStdinData(manifest1).ExecOrDie(ns)
 
 			framework.Logf("checking which objects exist")
 			objects := mustListObjectsInNamespace(ctx, c, ns)
@@ -887,7 +887,7 @@ metadata:
 `
 			manifest2 = strings.ReplaceAll(manifest2, "{{ns}}", ns)
 
-			e2ekubectl.NewKubectlCommand(ns, args...).WithEnv([]string{"KUBECTL_APPLYSET=true"}).WithStdinData(manifest2).ExecOrDie(ns)
+			e2ekubectl.NewKubectlCommand(ns, args...).AppendEnv([]string{"KUBECTL_APPLYSET=true"}).WithStdinData(manifest2).ExecOrDie(ns)
 
 			framework.Logf("checking which objects exist")
 			objects = mustListObjectsInNamespace(ctx, c, ns)
@@ -897,7 +897,7 @@ metadata:
 			}
 
 			framework.Logf("applying manifest2 (again)")
-			e2ekubectl.NewKubectlCommand(ns, args...).WithEnv([]string{"KUBECTL_APPLYSET=true"}).WithStdinData(manifest2).ExecOrDie(ns)
+			e2ekubectl.NewKubectlCommand(ns, args...).AppendEnv([]string{"KUBECTL_APPLYSET=true"}).WithStdinData(manifest2).ExecOrDie(ns)
 
 			framework.Logf("checking which objects exist")
 			objects = mustListObjectsInNamespace(ctx, c, ns)
