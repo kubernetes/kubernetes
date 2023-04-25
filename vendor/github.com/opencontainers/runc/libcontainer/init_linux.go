@@ -411,8 +411,9 @@ func fixStdioPermissions(u *user.ExecUser) error {
 			return &os.PathError{Op: "fstat", Path: file.Name(), Err: err}
 		}
 
-		// Skip chown if uid is already the one we want.
-		if int(s.Uid) == u.Uid {
+		// Skip chown if uid is already the one we want or any of the STDIO descriptors
+		// were redirected to /dev/null.
+		if int(s.Uid) == u.Uid || s.Rdev == null.Rdev {
 			continue
 		}
 
