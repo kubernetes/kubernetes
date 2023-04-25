@@ -18,7 +18,8 @@
 
 # The golang package that we are building.
 readonly KUBE_GO_PACKAGE=k8s.io/kubernetes
-readonly KUBE_GOPATH="${KUBE_OUTPUT}/go"
+readonly KUBE_GOPATH="${KUBE_GOPATH:-"${KUBE_OUTPUT}/go"}"
+export KUBE_GOPATH
 
 # The server platform we are building on.
 readonly KUBE_SUPPORTED_SERVER_PLATFORMS=(
@@ -892,9 +893,6 @@ kube::golang::build_binaries() {
     IFS=" " read -ra platforms <<< "${KUBE_BUILD_PLATFORMS:-}"
     if [[ ${#platforms[@]} -eq 0 ]]; then
       platforms=("${host_platform}")
-    else
-      kube::log::status "WARNING: linux/arm will no longer be built/shipped by default, please build it explicitly if needed."
-      kube::log::status "         support for linux/arm will be removed in a subsequent release."
     fi
 
     local -a binaries

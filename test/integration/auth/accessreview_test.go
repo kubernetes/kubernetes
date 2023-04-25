@@ -21,6 +21,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 
 	authorizationapi "k8s.io/api/authorization/v1"
@@ -148,8 +149,12 @@ func TestSubjectAccessReview(t *testing.T) {
 }
 
 func TestSelfSubjectAccessReview(t *testing.T) {
+	var mutex sync.Mutex
 	username := "alice"
 	authenticatorFunc := func(req *http.Request) (*authenticator.Response, bool, error) {
+		mutex.Lock()
+		defer mutex.Unlock()
+
 		return &authenticator.Response{
 			User: &user.DefaultInfo{
 				Name:   username,
@@ -216,7 +221,9 @@ func TestSelfSubjectAccessReview(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		mutex.Lock()
 		username = test.username
+		mutex.Unlock()
 
 		response, err := clientset.AuthorizationV1().SelfSubjectAccessReviews().Create(context.TODO(), test.sar, metav1.CreateOptions{})
 		switch {

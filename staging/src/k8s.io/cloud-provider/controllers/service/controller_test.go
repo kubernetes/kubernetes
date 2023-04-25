@@ -1648,6 +1648,80 @@ func TestNeedsUpdate(t *testing.T) {
 			},
 			expectedNeedsUpdate: true,
 		},
+		{
+			testName: "If service IPFamilies from single stack to dual stack",
+			updateFn: func() {
+				protocol := "http"
+				oldSvc = &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "tcp-service",
+						Namespace: "default",
+					},
+					Spec: v1.ServiceSpec{
+						Ports: []v1.ServicePort{{
+							Port:        80,
+							Protocol:    v1.ProtocolTCP,
+							TargetPort:  intstr.Parse("22"),
+							AppProtocol: &protocol,
+						}},
+						IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+						Type:       v1.ServiceTypeLoadBalancer,
+					},
+				}
+				newSvc = oldSvc.DeepCopy()
+				newSvc.Spec.IPFamilies = []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol}
+			},
+			expectedNeedsUpdate: true,
+		},
+		{
+			testName: "If service IPFamilies from dual stack to single stack",
+			updateFn: func() {
+				protocol := "http"
+				oldSvc = &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "tcp-service",
+						Namespace: "default",
+					},
+					Spec: v1.ServiceSpec{
+						Ports: []v1.ServicePort{{
+							Port:        80,
+							Protocol:    v1.ProtocolTCP,
+							TargetPort:  intstr.Parse("22"),
+							AppProtocol: &protocol,
+						}},
+						IPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+						Type:       v1.ServiceTypeLoadBalancer,
+					},
+				}
+				newSvc = oldSvc.DeepCopy()
+				newSvc.Spec.IPFamilies = []v1.IPFamily{v1.IPv4Protocol}
+			},
+			expectedNeedsUpdate: true,
+		},
+		{
+			testName: "If service IPFamilies not change",
+			updateFn: func() {
+				protocol := "http"
+				oldSvc = &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "tcp-service",
+						Namespace: "default",
+					},
+					Spec: v1.ServiceSpec{
+						Ports: []v1.ServicePort{{
+							Port:        80,
+							Protocol:    v1.ProtocolTCP,
+							TargetPort:  intstr.Parse("22"),
+							AppProtocol: &protocol,
+						}},
+						IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+						Type:       v1.ServiceTypeLoadBalancer,
+					},
+				}
+				newSvc = oldSvc.DeepCopy()
+			},
+			expectedNeedsUpdate: false,
+		},
 	}
 
 	controller, _, _ := newController()

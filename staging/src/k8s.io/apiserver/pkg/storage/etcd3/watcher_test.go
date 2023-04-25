@@ -36,12 +36,12 @@ func TestWatch(t *testing.T) {
 
 func TestClusterScopedWatch(t *testing.T) {
 	ctx, store, _ := testSetup(t)
-	storagetesting.TestClusterScopedWatch(ctx, t, store)
+	storagetesting.RunTestClusterScopedWatch(ctx, t, store)
 }
 
 func TestNamespaceScopedWatch(t *testing.T) {
 	ctx, store, _ := testSetup(t)
-	storagetesting.TestNamespaceScopedWatch(ctx, t, store)
+	storagetesting.RunTestNamespaceScopedWatch(ctx, t, store)
 }
 
 func TestDeleteTriggerWatch(t *testing.T) {
@@ -61,6 +61,11 @@ func TestWatchFromNoneZero(t *testing.T) {
 	storagetesting.RunTestWatchFromNoneZero(ctx, t, store)
 }
 
+func TestDelayedWatchDelivery(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestDelayedWatchDelivery(ctx, t, store)
+}
+
 func TestWatchError(t *testing.T) {
 	ctx, store, _ := testSetup(t)
 	storagetesting.RunTestWatchError(ctx, t, &storeWithPrefixTransformer{store})
@@ -69,6 +74,11 @@ func TestWatchError(t *testing.T) {
 func TestWatchContextCancel(t *testing.T) {
 	ctx, store, _ := testSetup(t)
 	storagetesting.RunTestWatchContextCancel(ctx, t, store)
+}
+
+func TestWatcherTimeout(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestWatcherTimeout(ctx, t, store)
 }
 
 func TestWatchDeleteEventObjectHaveLatestRV(t *testing.T) {

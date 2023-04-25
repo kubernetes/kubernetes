@@ -136,7 +136,6 @@ func calcRestartCountByLogDir(path string) (int, error) {
 	if _, err := os.Stat(path); err != nil {
 		return 0, nil
 	}
-	restartCount := int(0)
 	files, err := os.ReadDir(path)
 	if err != nil {
 		return 0, err
@@ -144,6 +143,7 @@ func calcRestartCountByLogDir(path string) (int, error) {
 	if len(files) == 0 {
 		return 0, nil
 	}
+	restartCount := 0
 	restartCountLogFileRegex := regexp.MustCompile(`^(\d+)\.log(\..*)?`)
 	for _, file := range files {
 		if file.IsDir() {
