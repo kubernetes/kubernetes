@@ -117,6 +117,12 @@ func tweakAddDeletionTimestamp(time time.Time) serviceTweak {
 	}
 }
 
+func tweakAddAppProtocol(appProtocol string) serviceTweak {
+	return func(s *v1.Service) {
+		s.Spec.Ports[0].AppProtocol = &appProtocol
+	}
+}
+
 // Wrap newService so that you don't have to call default arguments again and again.
 func defaultExternalService() *v1.Service {
 	return newService("external-balancer", v1.ServiceTypeLoadBalancer)
@@ -1440,9 +1446,7 @@ func TestNeedsUpdate(t *testing.T) {
 	}, {
 		testName: "If appProtocol is set to a different value",
 		updateFn: func() {
-			protocol := "http"
-			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 22))
-			oldSvc.Spec.Ports[0].AppProtocol = &protocol
+			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 22), tweakAddAppProtocol("http"))
 			newSvc = oldSvc.DeepCopy()
 			newProtocol := "tcp"
 			newSvc.Spec.Ports[0].AppProtocol = &newProtocol
