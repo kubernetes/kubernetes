@@ -400,7 +400,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 
 	watchCache := newWatchCache(
 		config.KeyFunc, cacher.processEvent, config.GetAttrsFunc, config.Versioner, config.Indexers, config.Clock, config.GroupResource)
-	listerWatcher := NewCacherListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
+	listerWatcher := NewListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
 	reflectorName := "storage/cacher.go:" + config.ResourcePrefix
 
 	reflector := cache.NewNamedReflector(reflectorName, listerWatcher, obj, watchCache, 0)
@@ -1334,54 +1334,6 @@ func (c *Cacher) waitUntilWatchCacheFreshAndForceAllEvents(ctx context.Context, 
 		return err == nil, err
 	}
 	return false, nil
-}
-
-// cacherListerWatcher opaques storage.Interface to expose cache.ListerWatcher.
-type cacherListerWatcher struct {
-	storage        storage.Interface
-	resourcePrefix string
-	newListFunc    func() runtime.Object
-}
-
-// NewCacherListerWatcher returns a storage.Interface backed ListerWatcher.
-func NewCacherListerWatcher(storage storage.Interface, resourcePrefix string, newListFunc func() runtime.Object) cache.ListerWatcher {
-	return &cacherListerWatcher{
-		storage:        storage,
-		resourcePrefix: resourcePrefix,
-		newListFunc:    newListFunc,
-	}
-}
-
-// Implements cache.ListerWatcher interface.
-func (lw *cacherListerWatcher) List(options metav1.ListOptions) (runtime.Object, error) {
-	list := lw.newListFunc()
-	pred := storage.SelectionPredicate{
-		Label:    labels.Everything(),
-		Field:    fields.Everything(),
-		Limit:    options.Limit,
-		Continue: options.Continue,
-	}
-
-	storageOpts := storage.ListOptions{
-		ResourceVersionMatch: options.ResourceVersionMatch,
-		Predicate:            pred,
-		Recursive:            true,
-	}
-	if err := lw.storage.GetList(context.TODO(), lw.resourcePrefix, storageOpts, list); err != nil {
-		return nil, err
-	}
-	return list, nil
-}
-
-// Implements cache.ListerWatcher interface.
-func (lw *cacherListerWatcher) Watch(options metav1.ListOptions) (watch.Interface, error) {
-	opts := storage.ListOptions{
-		ResourceVersion: options.ResourceVersion,
-		Predicate:       storage.Everything,
-		Recursive:       true,
-		ProgressNotify:  true,
-	}
-	return lw.storage.Watch(context.TODO(), lw.resourcePrefix, opts)
 }
 
 // errWatcher implements watch.Interface to return a single error
