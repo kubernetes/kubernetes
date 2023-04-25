@@ -441,8 +441,10 @@ func RunTestValidateDeletionWithSuggestion(ctx context.Context, t *testing.T, st
 		t.Errorf("Unexpected failure during deletion: %v", err)
 	}
 
-	if calls != 2 {
-		t.Errorf("validate function should have been called twice, called %d", calls)
+	// Implementations of the storage interface are allowed to ignore the suggestion,
+	// in which case just one validation call is possible.
+	if calls > 2 {
+		t.Errorf("validate function should have been called at most twice, called %d", calls)
 	}
 
 	if err := store.Get(ctx, key, storage.GetOptions{}, &example.Pod{}); !storage.IsNotFound(err) {

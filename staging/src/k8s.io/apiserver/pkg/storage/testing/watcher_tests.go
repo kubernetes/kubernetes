@@ -256,7 +256,7 @@ func RunTestDeleteTriggerWatch(ctx context.Context, t *testing.T, store storage.
 	testCheckEventType(t, watch.Deleted, w)
 }
 
-func RunTestWatchFromNoneZero(ctx context.Context, t *testing.T, store storage.Interface) {
+func RunTestWatchFromNonZero(ctx context.Context, t *testing.T, store storage.Interface) {
 	key, storedObj := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}})
 
 	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: storedObj.ResourceVersion, Predicate: storage.Everything})
@@ -463,13 +463,7 @@ func RunTestWatchDeleteEventObjectHaveLatestRV(ctx context.Context, t *testing.T
 		t.Fatalf("ResourceVersion didn't changed on deletion: %s", deletedObj.ResourceVersion)
 	}
 
-	select {
-	case event := <-w.ResultChan():
-		watchedDeleteObj := event.Object.(*example.Pod)
-		if e, a := deletedObj.ResourceVersion, watchedDeleteObj.ResourceVersion; e != a {
-			t.Errorf("Unexpected resource version: %v, expected %v", a, e)
-		}
-	}
+	testCheckResult(t, watch.Deleted, w, deletedObj)
 }
 
 func RunTestWatchInitializationSignal(ctx context.Context, t *testing.T, store storage.Interface) {

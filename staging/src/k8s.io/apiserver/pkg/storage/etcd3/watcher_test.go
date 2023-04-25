@@ -54,11 +54,11 @@ func TestWatchFromZero(t *testing.T) {
 	storagetesting.RunTestWatchFromZero(ctx, t, store, compactStorage(client))
 }
 
-// TestWatchFromNoneZero tests that
+// TestWatchFromNonZero tests that
 // - watch from non-0 should just watch changes after given version
 func TestWatchFromNoneZero(t *testing.T) {
 	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestWatchFromNoneZero(ctx, t, store)
+	storagetesting.RunTestWatchFromNonZero(ctx, t, store)
 }
 
 func TestDelayedWatchDelivery(t *testing.T) {
