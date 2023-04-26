@@ -36,7 +36,7 @@ type ActualCostEstimator interface {
 
 // CostObserver provides an observer that tracks runtime cost.
 func CostObserver(tracker *CostTracker) EvalObserver {
-	observer := func(id int64, programStep interface{}, val ref.Val) {
+	observer := func(id int64, programStep any, val ref.Val) {
 		switch t := programStep.(type) {
 		case ConstantQualifier:
 			// TODO: Push identifiers on to the stack before observing constant qualifiers that apply to them
@@ -69,6 +69,8 @@ func CostObserver(tracker *CostTracker) EvalObserver {
 			tracker.stack.drop(t.rhs.ID(), t.lhs.ID())
 		case *evalFold:
 			tracker.stack.drop(t.iterRange.ID())
+		case *evalTestOnly:
+			tracker.cost += common.SelectAndIdentCost
 		case Qualifier:
 			tracker.cost++
 		case InterpretableCall:
@@ -122,7 +124,7 @@ func (c CostTracker) costCall(call InterpretableCall, argValues []ref.Val, resul
 	// if user has their own implementation of ActualCostEstimator, make sure to cover the mapping between overloadId and cost calculation
 	switch call.OverloadID() {
 	// O(n) functions
-	case overloads.StartsWithString, overloads.EndsWithString, overloads.StringToBytes, overloads.BytesToString:
+	case overloads.StartsWithString, overloads.EndsWithString, overloads.StringToBytes, overloads.BytesToString, overloads.ExtQuoteString, overloads.ExtFormatString:
 		cost += uint64(math.Ceil(float64(c.actualSize(argValues[0])) * common.StringTraversalCostFactor))
 	case overloads.InList:
 		// If a list is composed entirely of constant values this is O(1), but we don't account for that here.

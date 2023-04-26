@@ -23,6 +23,7 @@ type options struct {
 	expressionSizeCodePointLimit     int
 	macros                           map[string]Macro
 	populateMacroCalls               bool
+	enableOptionalSyntax             bool
 }
 
 // Option configures the behavior of the parser.
@@ -99,6 +100,14 @@ func Macros(macros ...Macro) Option {
 func PopulateMacroCalls(populateMacroCalls bool) Option {
 	return func(opts *options) error {
 		opts.populateMacroCalls = populateMacroCalls
+		return nil
+	}
+}
+
+// EnableOptionalSyntax enables syntax for optional field and index selection.
+func EnableOptionalSyntax(optionalSyntax bool) Option {
+	return func(opts *options) error {
+		opts.enableOptionalSyntax = optionalSyntax
 		return nil
 	}
 }

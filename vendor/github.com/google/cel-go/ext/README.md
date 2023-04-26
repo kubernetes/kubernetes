@@ -31,6 +31,102 @@ Example:
 
     base64.encode(b'hello') // return 'aGVsbG8='
 
+## Math
+
+Math returns a cel.EnvOption to configure namespaced math helper macros and
+functions.
+
+Note, all macros use the 'math' namespace; however, at the time of macro
+expansion the namespace looks just like any other identifier. If you are
+currently using a variable named 'math', the macro will likely work just as
+intended; however, there is some chance for collision.
+
+### Math.Greatest
+
+Returns the greatest valued number present in the arguments to the macro.
+
+Greatest is a variable argument count macro which must take at least one
+argument. Simple numeric and list literals are supported as valid argument
+types; however, other literals will be flagged as errors during macro
+expansion. If the argument expression does not resolve to a numeric or
+list(numeric) type during type-checking, or during runtime then an error
+will be produced. If a list argument is empty, this too will produce an
+error.
+
+    math.greatest(<arg>, ...) -> <double|int|uint>
+
+Examples:
+
+    math.greatest(1)      // 1
+    math.greatest(1u, 2u) // 2u
+    math.greatest(-42.0, -21.5, -100.0)   // -21.5
+    math.greatest([-42.0, -21.5, -100.0]) // -21.5
+    math.greatest(numbers) // numbers must be list(numeric)
+
+    math.greatest()         // parse error
+    math.greatest('string') // parse error
+    math.greatest(a, b)     // check-time error if a or b is non-numeric
+    math.greatest(dyn('string')) // runtime error
+
+### Math.Least
+
+Returns the least valued number present in the arguments to the macro.
+
+Least is a variable argument count macro which must take at least one
+argument. Simple numeric and list literals are supported as valid argument
+types; however, other literals will be flagged as errors during macro
+expansion. If the argument expression does not resolve to a numeric or
+list(numeric) type during type-checking, or during runtime then an error
+will be produced. If a list argument is empty, this too will produce an error.
+
+    math.least(<arg>, ...) -> <double|int|uint>
+
+Examples:
+
+    math.least(1)      // 1
+    math.least(1u, 2u) // 1u
+    math.least(-42.0, -21.5, -100.0)   // -100.0
+    math.least([-42.0, -21.5, -100.0]) // -100.0
+    math.least(numbers) // numbers must be list(numeric)
+
+    math.least()         // parse error
+    math.least('string') // parse error
+    math.least(a, b)     // check-time error if a or b is non-numeric
+    math.least(dyn('string')) // runtime error
+
+## Protos
+
+Protos returns a cel.EnvOption to configure extended macros and functions for
+proto manipulation.
+
+Note, all macros use the 'proto' namespace; however, at the time of macro
+expansion the namespace looks just like any other identifier. If you are
+currently using a variable named 'proto', the macro will likely work just as
+you intend; however, there is some chance for collision.
+
+### Protos.GetExt
+
+Macro which generates a select expression that retrieves an extension field
+from the input proto2 syntax message. If the field is not set, the default
+value forthe extension field is returned according to safe-traversal semantics.
+
+    proto.getExt(<msg>, <fully.qualified.extension.name>) -> <field-type>
+
+Example:
+
+    proto.getExt(msg, google.expr.proto2.test.int32_ext) // returns int value
+
+### Protos.HasExt
+
+Macro which generates a test-only select expression that determines whether
+an extension field is set on a proto2 syntax message.
+
+    proto.hasExt(<msg>, <fully.qualified.extension.name>) -> <bool>
+
+Example:
+
+    proto.hasExt(msg, google.expr.proto2.test.int32_ext) // returns true || false
+
 ## Strings
 
 Extended functions for string manipulation. As a general note, all indices are
@@ -70,6 +166,23 @@ Examples:
     'hello mellow'.indexOf('ello', 2)  // returns 7
     'hello mellow'.indexOf('ello', 20) // error
 
+### Join
+
+Returns a new string where the elements of string list are concatenated.
+
+The function also accepts an optional separator which is placed between
+elements in the resulting string.
+
+    <list<string>>.join() -> <string>
+    <list<string>>.join(<string>) -> <string>
+
+Examples:
+
+	['hello', 'mellow'].join() // returns 'hellomellow'
+	['hello', 'mellow'].join(' ') // returns 'hello mellow'
+	[].join() // returns ''
+	[].join('/') // returns ''
+
 ### LastIndexOf
 
 Returns the integer index of the last occurrence of the search string. If the
@@ -104,6 +217,20 @@ Examples:
 
      'TacoCat'.lowerAscii()      // returns 'tacocat'
      'TacoCÆt Xii'.lowerAscii()  // returns 'tacocÆt xii'
+
+### Quote
+
+**Introduced in version 1**
+
+Takes the given string and makes it safe to print (without any formatting due to escape sequences).
+If any invalid UTF-8 characters are encountered, they are replaced with \uFFFD.
+
+    strings.quote(<string>)
+
+Examples:
+
+    strings.quote('single-quote with "double quote"') // returns '"single-quote with \"double quote\""'
+    strings.quote("two escape sequences \a\n") // returns '"two escape sequences \\a\\n"'
 
 ### Replace
 

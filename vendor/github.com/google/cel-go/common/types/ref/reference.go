@@ -37,7 +37,7 @@ type Type interface {
 type Val interface {
 	// ConvertToNative converts the Value to a native Go struct according to the
 	// reflected type description, or error if the conversion is not feasible.
-	ConvertToNative(typeDesc reflect.Type) (interface{}, error)
+	ConvertToNative(typeDesc reflect.Type) (any, error)
 
 	// ConvertToType supports type conversions between value types supported by the expression language.
 	ConvertToType(typeValue Type) Val
@@ -50,5 +50,5 @@ type Val interface {
 
 	// Value returns the raw value of the instance which may not be directly compatible with the expression
 	// language types.
-	Value() interface{}
+	Value() any
 }
