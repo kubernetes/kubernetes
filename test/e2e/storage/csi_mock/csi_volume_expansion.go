@@ -43,7 +43,6 @@ type expansionStatus int
 
 const (
 	expansionSuccess = iota
-	expansionFailed
 	expansionFailedOnController
 	expansionFailedOnNode
 	expansionFailedMissingStagingPath
