@@ -313,8 +313,12 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 					CountSampleDeviceAllocatable(node) == expectedSampleDevsAmount
 			}, 30*time.Second, framework.Poll).Should(gomega.BeTrue())
 
-			err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, f.ClientSet, pod1.Name, f.Namespace.Name, 1*time.Minute)
-			framework.ExpectNoError(err)
+			ginkgo.By("Waiting for the pod to fail with admission error as device plugin hasn't re-registered yet")
+			gomega.Eventually(ctx, getPod).
+				WithArguments(f, pod1.Name).
+				WithTimeout(time.Minute).
+				Should(HaveFailedWithAdmissionError(),
+					"the pod succeeded to start, when it should fail with the admission error")
 
 			// crosscheck from the device assignment is preserved and stable from perspective of the kubelet.
 			// note we don't check again the logs of the container: the check is done at startup, the container
@@ -351,6 +355,26 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			ginkgo.By("Wait for node to be ready again")
 			e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute)
 
+			ginkgo.By("Waiting for the pod to fail with admission error as device plugin hasn't re-registered yet")
+			gomega.Eventually(ctx, getPod).
+				WithArguments(f, pod1.Name).
+				WithTimeout(time.Minute).
+				Should(HaveFailedWithAdmissionError(),
+					"the pod succeeded to start, when it should fail with the admission error")
+
+			// crosscheck from the device assignment is preserved and stable from perspective of the kubelet.
+			// note we don't check again the logs of the container: the check is done at startup, the container
+			// never restarted (runs "forever" from this test timescale perspective) hence re-doing this check
+			// is useless.
+			ginkgo.By("Verifying the device assignment after kubelet restart using podresources API")
+			gomega.Eventually(ctx, func() error {
+				v1PodResources, err = getV1NodeDevices(ctx)
+				return err
+			}, 30*time.Second, framework.Poll).ShouldNot(gomega.HaveOccurred(), "cannot fetch the compute resource assignment after kubelet restart")
+
+			err = checkPodResourcesAssignment(v1PodResources, pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name, SampleDeviceResourceName, []string{devID1})
+			framework.ExpectNoError(err, "inconsistent device assignment after pod restart")
+
 			ginkgo.By("Re-Register resources by deleting the plugin pod")
 			gp := int64(0)
 			deleteOptions := metav1.DeleteOptions{
@@ -370,27 +394,12 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 					CountSampleDeviceAllocatable(node) == expectedSampleDevsAmount
 			}, 30*time.Second, framework.Poll).Should(gomega.BeTrue())
 
-			// crosscheck from the device assignment is preserved and stable from perspective of the kubelet.
-			// note we don't check again the logs of the container: the check is done at startup, the container
-			// never restarted (runs "forever" from this test timescale perspective) hence re-doing this check
-			// is useless.
-			ginkgo.By("Verifying the device assignment after kubelet and device plugin restart using podresources API")
-			gomega.Eventually(ctx, func() error {
-				v1PodResources, err = getV1NodeDevices(ctx)
-				return err
-			}, 30*time.Second, framework.Poll).ShouldNot(gomega.HaveOccurred(), "cannot fetch the compute resource assignment after kubelet and device plugin restart")
-
-			err = checkPodResourcesAssignment(v1PodResources, pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name, SampleDeviceResourceName, []string{devID1})
-			framework.ExpectNoError(err, "inconsistent device assignment after pod restart")
-
 			ginkgo.By("Creating another pod")
 			pod2 := e2epod.NewPodClient(f).CreateSync(ctx, makeBusyboxPod(SampleDeviceResourceName, podRECMD))
 
-			ginkgo.By("Checking that pod got a different fake device")
+			ginkgo.By("Checking that pod got a fake device")
 			devID2, err := parseLog(ctx, f, pod2.Name, pod2.Name, deviceIDRE)
 			framework.ExpectNoError(err, "getting logs for pod %q", pod2.Name)
-
-			gomega.Expect(devID1).To(gomega.Not(gomega.Equal(devID2)), "pod2 requested a device but started successfully without")
 
 			ginkgo.By("Verifying the device assignment after kubelet restart and device plugin re-registration using podresources API")
 			// note we don't use eventually: the kubelet is supposed to be running and stable by now, so the call should just succeed
@@ -398,8 +407,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			if err != nil {
 				framework.ExpectNoError(err, "getting pod resources assignment after pod restart")
 			}
-			err = checkPodResourcesAssignment(v1PodResources, pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name, SampleDeviceResourceName, []string{devID1})
-			framework.ExpectNoError(err, "inconsistent device assignment after extra container restart - pod1")
+
 			err = checkPodResourcesAssignment(v1PodResources, pod2.Namespace, pod2.Name, pod2.Spec.Containers[0].Name, SampleDeviceResourceName, []string{devID2})
 			framework.ExpectNoError(err, "inconsistent device assignment after extra container restart - pod2")
 		})
