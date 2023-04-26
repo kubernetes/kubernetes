@@ -90,7 +90,7 @@ func ComponentPod(container v1.Container, volumes map[string]v1.Volume, annotati
 func ComponentResources(cpu string) v1.ResourceRequirements {
 	return v1.ResourceRequirements{
 		Requests: v1.ResourceList{
-			v1.ResourceName(v1.ResourceCPU): resource.MustParse(cpu),
+			v1.ResourceCPU: resource.MustParse(cpu),
 		},
 	}
 }

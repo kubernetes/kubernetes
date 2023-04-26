@@ -207,9 +207,9 @@ func deleteHealthCheckJob(client clientset.Interface, ns, jobName string) error 
 
 // controlPlaneNodesReady checks whether all control-plane Nodes in the cluster are in the Running state
 func controlPlaneNodesReady(client clientset.Interface, _ *kubeadmapi.ClusterConfiguration) error {
-	selectorControlPlane := labels.SelectorFromSet(labels.Set(map[string]string{
+	selectorControlPlane := labels.SelectorFromSet(map[string]string{
 		constants.LabelNodeRoleControlPlane: "",
-	}))
+	})
 	nodes, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
 		LabelSelector: selectorControlPlane.String(),
 	})

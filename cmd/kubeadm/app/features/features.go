@@ -78,17 +78,17 @@ func ValidateVersion(allFeatures FeatureList, requestedFeatures map[string]bool,
 
 // Enabled indicates whether a feature name has been enabled
 func Enabled(featureList map[string]bool, featureName string) bool {
-	if enabled, ok := featureList[string(featureName)]; ok {
+	if enabled, ok := featureList[featureName]; ok {
 		return enabled
 	}
-	return InitFeatureGates[string(featureName)].Default
+	return InitFeatureGates[featureName].Default
 }
 
 // Supports indicates whether a feature name is supported on the given
 // feature set
 func Supports(featureList FeatureList, featureName string) bool {
 	for k, v := range featureList {
-		if featureName == string(k) {
+		if featureName == k {
 			return v.PreRelease != featuregate.Deprecated
 		}
 	}
@@ -99,7 +99,7 @@ func Supports(featureList FeatureList, featureName string) bool {
 func Keys(featureList FeatureList) []string {
 	var list []string
 	for k := range featureList {
-		list = append(list, string(k))
+		list = append(list, k)
 	}
 	return list
 }

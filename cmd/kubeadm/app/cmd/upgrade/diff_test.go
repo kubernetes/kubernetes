@@ -33,7 +33,7 @@ func createTestRunDiffFile(contents []byte) (string, error) {
 	if err != nil {
 		return "", errors.Wrap(err, "failed to create temporary test file")
 	}
-	if _, err := file.Write([]byte(contents)); err != nil {
+	if _, err := file.Write(contents); err != nil {
 		return "", errors.Wrap(err, "failed to write to temporary test file")
 	}
 	if err := file.Close(); err != nil {

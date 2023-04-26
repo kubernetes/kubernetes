@@ -35,7 +35,7 @@ import (
 )
 
 const (
-	getReleaseVersionTimeout = time.Duration(10 * time.Second)
+	getReleaseVersionTimeout = 10 * time.Second
 )
 
 var (

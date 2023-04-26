@@ -173,7 +173,7 @@ var legacyKindToGroupMap = map[string]string{
 func getSupportedComponentConfigKinds() []string {
 	objects := []string{}
 	for componentType := range legacyKindToGroupMap {
-		objects = append(objects, string(componentType))
+		objects = append(objects, componentType)
 	}
 	sort.Strings(objects)
 	return objects

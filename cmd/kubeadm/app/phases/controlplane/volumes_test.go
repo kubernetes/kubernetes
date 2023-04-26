@@ -631,7 +631,7 @@ func TestAddExtraHostPathMounts(t *testing.T) {
 			if _, ok := mounts.volumeMounts["component"][volumeName]; !ok {
 				t.Errorf("Expected to find volume mount %q", volumeName)
 			}
-			if *vol.HostPath.Type != v1.HostPathType(hostMount.PathType) {
+			if *vol.HostPath.Type != hostMount.PathType {
 				t.Errorf("Expected to host path type %q", hostMount.PathType)
 			}
 			volMount := mounts.volumeMounts["component"][volumeName]
