@@ -1070,6 +1070,9 @@ func TestJoinIPCheck(t *testing.T) {
 		t.Skip("not a privileged user")
 	}
 	internalcfg, err := configutil.DefaultedJoinConfiguration(&kubeadmapiv1.JoinConfiguration{
+		NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{
+			CRISocket: constants.UnknownCRISocket,
+		},
 		Discovery: kubeadmapiv1.Discovery{
 			BootstrapToken: &kubeadmapiv1.BootstrapTokenDiscovery{
 				Token:                    configutil.PlaceholderToken.Token.String(),

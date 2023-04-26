@@ -82,10 +82,14 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 				constants.CurrentKubernetesVersion.String(),
 			},
 			configContents: []byte(dedent.Dedent(fmt.Sprintf(`
-				apiVersion: %s
-				kind: ClusterConfiguration
-				kubernetesVersion: %s
-			`, kubeadmapiv1.SchemeGroupVersion.String(), constants.CurrentKubernetesVersion))),
+apiVersion: %s
+kind: InitConfiguration
+nodeRegistration:
+  criSocket: %s
+---
+apiVersion: %[1]s
+kind: ClusterConfiguration
+kubernetesVersion: %[3]s`, kubeadmapiv1.SchemeGroupVersion.String(), constants.UnknownCRISocket, constants.CurrentKubernetesVersion))),
 		},
 		{
 			name:               "use coredns",
@@ -94,10 +98,14 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 				"coredns",
 			},
 			configContents: []byte(dedent.Dedent(fmt.Sprintf(`
-				apiVersion: %s
-				kind: ClusterConfiguration
-				kubernetesVersion: %s
-			`, kubeadmapiv1.SchemeGroupVersion.String(), constants.MinimumControlPlaneVersion))),
+apiVersion: %s
+kind: InitConfiguration
+nodeRegistration:
+  criSocket: %s
+---
+apiVersion: %[1]s
+kind: ClusterConfiguration
+kubernetesVersion: %[3]s`, kubeadmapiv1.SchemeGroupVersion.String(), constants.UnknownCRISocket, constants.MinimumControlPlaneVersion))),
 		},
 	}
 
@@ -384,10 +392,12 @@ func TestImagesPull(t *testing.T) {
 
 func TestMigrate(t *testing.T) {
 	cfg := []byte(dedent.Dedent(fmt.Sprintf(`
-		# This is intentionally testing an old API version. Sometimes this may be the latest version (if no old configs are supported).
-		apiVersion: %s
-		kind: InitConfiguration
-	`, kubeadmapiv1.SchemeGroupVersion.String())))
+        # This is intentionally testing an old API version. Sometimes this may be the latest version (if no old configs are supported).
+        apiVersion: %s
+        kind: InitConfiguration
+        nodeRegistration:
+          criSocket: %s
+	`, kubeadmapiv1.SchemeGroupVersion.String(), constants.UnknownCRISocket)))
 	configFile, cleanup := tempConfig(t, cfg)
 	defer cleanup()
 
