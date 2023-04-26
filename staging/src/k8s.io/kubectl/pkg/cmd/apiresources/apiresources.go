@@ -117,7 +117,7 @@ func NewCmdAPIResources(restClientGetter genericclioptions.RESTClientGetter, ioS
 	cmd.Flags().StringSliceVar(&o.Verbs, "verbs", o.Verbs, "Limit to resources that support the specified verbs.")
 	cmd.Flags().StringVar(&o.SortBy, "sort-by", o.SortBy, "If non-empty, sort list of resources using specified field. The field can be either 'name' or 'kind'.")
 	cmd.Flags().BoolVar(&o.Cached, "cached", o.Cached, "Use the cached list of resources if available.")
-	cmd.Flags().StringSliceVar(&o.Categories, "categories", o.Categories, "Limit to resources that belong the the specified categories.")
+	cmd.Flags().StringSliceVar(&o.Categories, "categories", o.Categories, "Limit to resources that belong to the specified categories.")
 	return cmd
 }
 
