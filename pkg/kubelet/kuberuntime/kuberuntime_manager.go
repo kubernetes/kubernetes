@@ -930,7 +930,11 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 			if kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus) {
 				klog.V(3).InfoS("Container of pod is not in the desired state and shall be started", "containerName", container.Name, "pod", klog.KObj(pod))
 				changes.ContainersToStart = append(changes.ContainersToStart, idx)
-				if containerStatus != nil && containerStatus.State == kubecontainer.ContainerStateUnknown {
+				if containerStatus != nil {
+					if containerStatus.State != kubecontainer.ContainerStateUnknown {
+						klog.InfoS("Container of pod is in an unexpected state", "containerName", container.Name, "pod", klog.KObj(pod), "state", containerStatus.State, "id", containerStatus.ID.ID)
+						continue
+					}
 					// If container is in unknown state, we don't know whether it
 					// is actually running or not, always try killing it before
 					// restart to avoid having 2 running instances of the same container.
