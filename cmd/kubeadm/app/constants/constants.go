@@ -422,15 +422,15 @@ const (
 	// CgroupDriverSystemd holds the systemd driver type
 	CgroupDriverSystemd = "systemd"
 
-	// The username of the user that kube-controller-manager runs as.
+	// KubeControllerManagerUserName is the username of the user that kube-controller-manager runs as.
 	KubeControllerManagerUserName string = "kubeadm-kcm"
-	// The username of the user that kube-apiserver runs as.
+	// KubeAPIServerUserName is the username of the user that kube-apiserver runs as.
 	KubeAPIServerUserName string = "kubeadm-kas"
-	// The username of the user that kube-scheduler runs as.
+	// KubeSchedulerUserName is the username of the user that kube-scheduler runs as.
 	KubeSchedulerUserName string = "kubeadm-ks"
-	// The username of the user that etcd runs as.
+	// EtcdUserName is the username of the user that etcd runs as.
 	EtcdUserName string = "kubeadm-etcd"
-	// The group of users that are allowed to read the service account private key.
+	// ServiceAccountKeyReadersGroupName is the group of users that are allowed to read the service account private key.
 	ServiceAccountKeyReadersGroupName string = "kubeadm-sa-key-readers"
 )
 

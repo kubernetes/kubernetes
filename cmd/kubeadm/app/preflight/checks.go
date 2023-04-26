@@ -58,9 +58,9 @@ const (
 	bridgenf6                   = "/proc/sys/net/bridge/bridge-nf-call-ip6tables"
 	ipv4Forward                 = "/proc/sys/net/ipv4/ip_forward"
 	ipv6DefaultForwarding       = "/proc/sys/net/ipv6/conf/default/forwarding"
-	externalEtcdRequestTimeout  = time.Duration(10 * time.Second)
+	externalEtcdRequestTimeout  = 10 * time.Second
 	externalEtcdRequestRetries  = 3
-	externalEtcdRequestInterval = time.Duration(5 * time.Second)
+	externalEtcdRequestInterval = 5 * time.Second
 )
 
 var (
@@ -384,7 +384,7 @@ func (ipc InPathCheck) Check() (warnings, errs []error) {
 	return nil, nil
 }
 
-// HostnameCheck checks if hostname match dns sub domain regex.
+// HostnameCheck checks if hostname match dns subdomain regex.
 // If hostname doesn't match this regex, kubelet will not launch static pods like kube-apiserver/kube-controller-manager and so on.
 type HostnameCheck struct {
 	nodeName string
@@ -395,7 +395,7 @@ func (HostnameCheck) Name() string {
 	return "Hostname"
 }
 
-// Check validates if hostname match dns sub domain regex.
+// Check validates if hostname match dns subdomain regex.
 // Check hostname length and format
 func (hc HostnameCheck) Check() (warnings, errorList []error) {
 	klog.V(1).Infoln("checking whether the given node name is valid and reachable using net.LookupHost")
@@ -578,8 +578,8 @@ func (kubever KubernetesVersionCheck) Check() (warnings, errorList []error) {
 
 	// Checks if k8sVersion greater or equal than the first unsupported versions by current version of kubeadm,
 	// that is major.minor+1 (all patch and pre-releases versions included)
-	// NB. in semver patches number is a numeric, while prerelease is a string where numeric identifiers always have lower precedence than non-numeric identifiers.
-	//     thus setting the value to x.y.0-0 we are defining the very first patch - prereleases within x.y minor release.
+	// NB. in semver patches number is a numeric, while pre-release is a string where numeric identifiers always have lower precedence than non-numeric identifiers.
+	//     thus setting the value to x.y.0-0 we are defining the very first patch - pre-releases within x.y minor release.
 	firstUnsupportedVersion := versionutil.MustParseSemantic(fmt.Sprintf("%d.%d.%s", kadmVersion.Major(), kadmVersion.Minor()+1, "0-0"))
 	if k8sVersion.AtLeast(firstUnsupportedVersion) {
 		return []error{errors.Errorf("Kubernetes version is greater than kubeadm version. Please consider to upgrade kubeadm. Kubernetes version: %s. Kubeadm version: %d.%d.x", k8sVersion, kadmVersion.Components()[0], kadmVersion.Components()[1])}, nil
@@ -920,10 +920,10 @@ func InitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguratio
 	}
 
 	// File content check for IPV4 and IPV6 are needed if it is:
-	// (dual stack)  `--service-cidr` or `--pod-network-cidr` is set with an IPV4 and IPV6 CIDR, `--apiserver-advertise-address` is optional as it can be auto detected.
+	// (dual stack)  `--service-cidr` or `--pod-network-cidr` is set with an IPV4 and IPV6 CIDR, `--apiserver-advertise-address` is optional as it can be auto-detected.
 	// (single stack) which is decided by the `--apiserver-advertise-address`.
 	// Note that for the case of dual stack, user might only give IPV6 CIDR for `--service-cidr` and leave the `--apiserver-advertise-address` a default value which will be
-	// auto detected and properly bound to an IPV4 address, this will make the cluster non-functional eventually. The case like this should be avoided by the validation instead,
+	// auto-detected and properly bound to an IPV4 address, this will make the cluster non-functional eventually. The case like this should be avoided by the validation instead,
 	// i.e. We don't care whether the input values for those parameters are set correctly here but if it's an IPV4 scoped CIDR or address we will add the file content check for IPV4,
 	// as does the IPV6.
 	IPV4Check := false
@@ -1105,7 +1105,7 @@ func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigur
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
 }
 
-// RunChecks runs each check, displays it's warnings/errors, and once all
+// RunChecks runs each check, displays its warnings/errors, and once all
 // are processed will exit if any errors occurred.
 func RunChecks(checks []Checker, ww io.Writer, ignorePreflightErrors sets.Set[string]) error {
 	var errsBuffer bytes.Buffer
@@ -1133,7 +1133,7 @@ func RunChecks(checks []Checker, ww io.Writer, ignorePreflightErrors sets.Set[st
 	return nil
 }
 
-// setHasItemOrAll is helper function that return true if item is present in the set (case insensitive) or special key 'all' is present
+// setHasItemOrAll is helper function that return true if item is present in the set (case-insensitive) or special key 'all' is present
 func setHasItemOrAll(s sets.Set[string], item string) bool {
 	if s.Has("all") || s.Has(strings.ToLower(item)) {
 		return true
@@ -1142,7 +1142,7 @@ func setHasItemOrAll(s sets.Set[string], item string) bool {
 }
 
 // normalizeURLString returns the normalized string, or an error if it can't be parsed into an URL object.
-// It takes an URL string as input.
+// It takes a URL string as input.
 func normalizeURLString(s string) (string, error) {
 	u, err := url.Parse(s)
 	if err != nil {
