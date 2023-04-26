@@ -1,1 +1,10 @@
+.vscode/
+
 *.exe
+
+# testing
+testdata
+
+# go workspaces
+go.work
+go.work.sum
