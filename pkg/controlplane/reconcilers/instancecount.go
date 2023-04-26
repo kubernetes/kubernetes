@@ -24,7 +24,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog/v2"
 	endpointsv1 "k8s.io/kubernetes/pkg/api/v1/endpoints"
 )
 
@@ -78,7 +77,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(ip net.IP, endpointPo
 
 	// Don't use the EndpointSliceMirroring controller to mirror this to
 	// EndpointSlices. This may change in the future.
-	skipMirrorChanged := setSkipMirrorTrue(e)
+	setSkipMirrorTrue(e)
 
 	if errors.IsNotFound(err) {
 		// Simply create non-existing endpoints for the service.
@@ -86,7 +85,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(ip net.IP, endpointPo
 			Addresses: []corev1.EndpointAddress{{IP: ip.String()}},
 			Ports:     endpointPorts,
 		}}
-		return r.epAdapter.Create(e)
+		return r.epAdapter.Sync(e)
 	}
 
 	// First, determine if the endpoint is in the format we expect (one
@@ -98,13 +97,9 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(ip net.IP, endpointPo
 			Addresses: []corev1.EndpointAddress{{IP: ip.String()}},
 			Ports:     endpointPorts,
 		}}
-		klog.Warningf("Resetting endpoints for master service %q to %#v", e.Name, e)
-		return r.epAdapter.Update(e)
+		return r.epAdapter.Sync(e)
 	}
 
-	if !skipMirrorChanged && ipCorrect && portsCorrect {
-		return r.epAdapter.EnsureEndpointSliceFromEndpoints(e)
-	}
 	if !ipCorrect {
 		// We *always* add our own IP address.
 		e.Subsets[0].Addresses = append(e.Subsets[0].Addresses, corev1.EndpointAddress{IP: ip.String()})
@@ -134,8 +129,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(ip net.IP, endpointPo
 		// Reset ports.
 		e.Subsets[0].Ports = endpointPorts
 	}
-	klog.Warningf("Resetting endpoints for master service %q to %v", e.Name, e)
-	return r.epAdapter.Update(e)
+	return r.epAdapter.Sync(e)
 }
 
 func (r *masterCountEndpointReconciler) RemoveEndpoints(ip net.IP, endpointPorts []corev1.EndpointPort) error {
@@ -164,7 +158,7 @@ func (r *masterCountEndpointReconciler) RemoveEndpoints(ip net.IP, endpointPorts
 	}
 	e.Subsets[0].Addresses = new
 	e.Subsets = endpointsv1.RepackSubsets(e.Subsets)
-	return r.epAdapter.Update(e)
+	return r.epAdapter.Sync(e)
 }
 
 func (r *masterCountEndpointReconciler) StopReconciling() {

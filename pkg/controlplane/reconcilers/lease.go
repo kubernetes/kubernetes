@@ -193,7 +193,6 @@ func (r *leaseEndpointReconciler) ReconcileEndpoints(ip net.IP, endpointPorts []
 // it is NOT SAFE to call it from multiple goroutines.
 func (r *leaseEndpointReconciler) doReconcile(endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
 	e, err := r.epAdapter.Get()
-	shouldCreate := false
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			return err
@@ -204,7 +203,6 @@ func (r *leaseEndpointReconciler) doReconcile(endpointPorts []corev1.EndpointPor
 			return nil
 		}
 
-		shouldCreate = true
 		e = &corev1.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      r.epAdapter.serviceName,
@@ -230,13 +228,10 @@ func (r *leaseEndpointReconciler) doReconcile(endpointPorts []corev1.EndpointPor
 
 	// Don't use the EndpointSliceMirroring controller to mirror this to
 	// EndpointSlices. This may change in the future.
-	skipMirrorChanged := setSkipMirrorTrue(e)
+	setSkipMirrorTrue(e)
 
 	// Next, we compare the current list of endpoints with the list of master IP keys
 	formatCorrect, ipCorrect, portsCorrect := checkEndpointSubsetFormatWithLease(e, masterIPs, endpointPorts, reconcilePorts)
-	if !skipMirrorChanged && formatCorrect && ipCorrect && portsCorrect {
-		return r.epAdapter.EnsureEndpointSliceFromEndpoints(e)
-	}
 
 	if !formatCorrect {
 		// Something is egregiously wrong, just re-make the endpoints record.
@@ -262,15 +257,7 @@ func (r *leaseEndpointReconciler) doReconcile(endpointPorts []corev1.EndpointPor
 		e.Subsets[0].Ports = endpointPorts
 	}
 
-	klog.Warningf("Resetting endpoints for master service %q to %v", e.Name, masterIPs)
-	if shouldCreate {
-		if err = r.epAdapter.Create(e); errors.IsAlreadyExists(err) {
-			err = nil
-		}
-	} else {
-		err = r.epAdapter.Update(e)
-	}
-	return err
+	return r.epAdapter.Sync(e)
 }
 
 // checkEndpointSubsetFormatWithLease determines if the endpoint is in the

@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1"
+	"k8s.io/klog/v2"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -55,59 +56,50 @@ func (adapter *EndpointsAdapter) Get() (*corev1.Endpoints, error) {
 	return adapter.endpointClient.Endpoints(adapter.serviceNamespace).Get(context.TODO(), adapter.serviceName, metav1.GetOptions{})
 }
 
-// Create accepts an Endpoints object and creates it and the matching EndpointSlice.
-// Any error will be returned.
-func (adapter *EndpointsAdapter) Create(endpoints *corev1.Endpoints) error {
-	endpoints, err := adapter.endpointClient.Endpoints(endpoints.Namespace).Create(context.TODO(), endpoints, metav1.CreateOptions{})
-	if err == nil {
-		err = adapter.EnsureEndpointSliceFromEndpoints(endpoints)
-	}
-	return err
-}
-
-// Update accepts an Endpoints object and updates it and its matching EndpointSlice.
-// Any error will be returned.
-func (adapter *EndpointsAdapter) Update(endpoints *corev1.Endpoints) error {
-	endpoints, err := adapter.endpointClient.Endpoints(endpoints.Namespace).Update(context.TODO(), endpoints, metav1.UpdateOptions{})
-	if err == nil {
-		err = adapter.EnsureEndpointSliceFromEndpoints(endpoints)
-	}
-	return err
-}
-
-// EnsureEndpointSliceFromEndpoints accepts an Endpoints resource and creates or updates a
-// corresponding EndpointSlice. An error will be returned if it fails to sync the
-// EndpointSlice.
-func (adapter *EndpointsAdapter) EnsureEndpointSliceFromEndpoints(endpoints *corev1.Endpoints) error {
-	endpointSlice := endpointSliceFromEndpoints(endpoints)
-	currentEndpointSlice, err := adapter.endpointSliceClient.EndpointSlices(endpointSlice.Namespace).Get(context.TODO(), endpointSlice.Name, metav1.GetOptions{})
-
-	if err != nil {
-		if errors.IsNotFound(err) {
-			if _, err = adapter.endpointSliceClient.EndpointSlices(endpointSlice.Namespace).Create(context.TODO(), endpointSlice, metav1.CreateOptions{}); errors.IsAlreadyExists(err) {
-				err = nil
-			}
-		}
+// Sync creates or updates the Endpoints and EndpointSlice objects. If an error occurs it
+// will be returned.
+func (adapter *EndpointsAdapter) Sync(endpoints *corev1.Endpoints) error {
+	// Sync Endpoints
+	currentEndpoints, err := adapter.endpointClient.Endpoints(adapter.serviceNamespace).Get(context.TODO(), adapter.serviceName, metav1.GetOptions{})
+	if err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 
+	if currentEndpoints == nil {
+		_, err = adapter.endpointClient.Endpoints(endpoints.Namespace).Create(context.TODO(), endpoints, metav1.CreateOptions{})
+	} else if !apiequality.Semantic.DeepEqual(currentEndpoints.Subsets, endpoints.Subsets) ||
+		!apiequality.Semantic.DeepEqual(currentEndpoints.Labels, endpoints.Labels) {
+		klog.Warningf("Resetting endpoints for master service %q to %v", endpoints.Name, endpoints)
+		_, err = adapter.endpointClient.Endpoints(endpoints.Namespace).Update(context.TODO(), endpoints, metav1.UpdateOptions{})
+	}
+	if err != nil {
+		return err
+	}
+
+	// Sync EndpointSlice
+	currentEndpointSlice, err := adapter.endpointSliceClient.EndpointSlices(adapter.serviceNamespace).Get(context.TODO(), adapter.serviceName, metav1.GetOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		return err
+	}
+
+	endpointSlice := endpointSliceFromEndpoints(endpoints)
+
 	// required for transition from IP to IPv4 address type.
-	if currentEndpointSlice.AddressType != endpointSlice.AddressType {
+	if currentEndpointSlice != nil && currentEndpointSlice.AddressType != endpointSlice.AddressType {
 		err = adapter.endpointSliceClient.EndpointSlices(endpointSlice.Namespace).Delete(context.TODO(), endpointSlice.Name, metav1.DeleteOptions{})
 		if err != nil {
 			return err
 		}
+		currentEndpointSlice = nil
+	}
+
+	if currentEndpointSlice == nil {
 		_, err = adapter.endpointSliceClient.EndpointSlices(endpointSlice.Namespace).Create(context.TODO(), endpointSlice, metav1.CreateOptions{})
-		return err
+	} else if !apiequality.Semantic.DeepEqual(currentEndpointSlice.Endpoints, endpointSlice.Endpoints) ||
+		!apiequality.Semantic.DeepEqual(currentEndpointSlice.Ports, endpointSlice.Ports) ||
+		!apiequality.Semantic.DeepEqual(currentEndpointSlice.Labels, endpointSlice.Labels) {
+		_, err = adapter.endpointSliceClient.EndpointSlices(endpointSlice.Namespace).Update(context.TODO(), endpointSlice, metav1.UpdateOptions{})
 	}
-
-	if apiequality.Semantic.DeepEqual(currentEndpointSlice.Endpoints, endpointSlice.Endpoints) &&
-		apiequality.Semantic.DeepEqual(currentEndpointSlice.Ports, endpointSlice.Ports) &&
-		apiequality.Semantic.DeepEqual(currentEndpointSlice.Labels, endpointSlice.Labels) {
-		return nil
-	}
-
-	_, err = adapter.endpointSliceClient.EndpointSlices(endpointSlice.Namespace).Update(context.TODO(), endpointSlice, metav1.UpdateOptions{})
 	return err
 }
 

@@ -17,7 +17,6 @@ limitations under the License.
 package reconcilers
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
@@ -78,13 +77,16 @@ func TestEndpointsAdapterGet(t *testing.T) {
 	}
 }
 
-func TestEndpointsAdapterCreate(t *testing.T) {
+func TestEndpointsAdapterSync(t *testing.T) {
 	endpoints1, epSlice1 := generateEndpointsAndSlice([]int{80}, []string{"10.1.2.3", "10.1.2.4"})
 	endpoints2, epSlice2 := generateEndpointsAndSlice([]int{80, 443}, []string{"10.1.2.3", "10.1.2.4", "10.1.2.5"})
 
 	endpointsV6, epSliceV6 := generateEndpointsAndSlice([]int{80}, []string{"1234::5678", "1234::abcd"})
 
 	endpointsDual, _ := generateEndpointsAndSlice([]int{80}, []string{"10.1.2.3", "10.1.2.4", "1234::5678", "1234::abcd"})
+
+	_, epSlice1Deprecated := generateEndpointsAndSlice([]int{80}, []string{"10.1.3", "10.1.2.4"})
+	epSlice1Deprecated.AddressType = discovery.AddressType("IP")
 
 	testCases := map[string]struct {
 		initialState   []runtime.Object
@@ -93,6 +95,7 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 		expectedError error
 		expectCreate  []runtime.Object
 		expectUpdate  []runtime.Object
+		expectDelete  []runtime.Object
 	}{
 		"single-endpoint": {
 			// If the Endpoints/EndpointSlice do not exist, they will be
@@ -121,16 +124,6 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 
 			expectCreate: []runtime.Object{endpointsV6, epSliceV6},
 		},
-		"existing-endpoints": {
-			// If the Endpoints/EndpointSlice already exist then Create will
-			// return an error, because you should have called Update.
-			initialState:   []runtime.Object{endpoints1, epSlice1},
-			endpointsParam: endpoints1,
-
-			expectedError: errors.NewAlreadyExists(schema.GroupResource{Group: "", Resource: "endpoints"}, testServiceName),
-			// (We expect the create to be attempted, we just also expect it to fail)
-			expectCreate: []runtime.Object{endpoints1},
-		},
 		"existing-endpointslice-correct": {
 			// No error when we need to create the Endpoints but the correct
 			// EndpointSlice already exists
@@ -148,50 +141,11 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 			expectCreate: []runtime.Object{endpoints2},
 			expectUpdate: []runtime.Object{epSlice2},
 		},
-	}
-
-	for name, testCase := range testCases {
-		t.Run(name, func(t *testing.T) {
-			client := fake.NewSimpleClientset(testCase.initialState...)
-			epAdapter := NewEndpointsAdapter(client.CoreV1(), client.DiscoveryV1(), testServiceNamespace, testServiceName)
-
-			err := epAdapter.Create(testCase.endpointsParam)
-			if !apiequality.Semantic.DeepEqual(testCase.expectedError, err) {
-				t.Errorf("Expected error: %v, got: %v", testCase.expectedError, err)
-			}
-
-			err = verifyActions(client, testCase.expectCreate, testCase.expectUpdate, nil)
-			if err != nil {
-				t.Errorf("unexpected error in side effects: %v", err)
-			}
-		})
-	}
-}
-
-func TestEndpointsAdapterUpdate(t *testing.T) {
-	endpoints1, epSlice1 := generateEndpointsAndSlice([]int{80}, []string{"10.1.2.3", "10.1.2.4"})
-	endpoints2, epSlice2 := generateEndpointsAndSlice([]int{80, 443}, []string{"10.1.2.3", "10.1.2.4", "10.1.2.5"})
-
-	_, epSlice1Deprecated := generateEndpointsAndSlice([]int{80}, []string{"10.1.3", "10.1.2.4"})
-	epSlice1Deprecated.AddressType = discovery.AddressType("IP")
-
-	testCases := map[string]struct {
-		initialState   []runtime.Object
-		endpointsParam *corev1.Endpoints
-
-		expectedError error
-		expectCreate  []runtime.Object
-		expectUpdate  []runtime.Object
-		expectDelete  []runtime.Object
-	}{
 		"single-existing-endpoints-no-change": {
 			// If the Endpoints/EndpointSlice already exist and are correct,
-			// then Update will pointlessly update it anyway because you
-			// shouldn't have called it if you didn't want it to do that.
+			// then Sync will do nothing
 			initialState:   []runtime.Object{endpoints1, epSlice1},
 			endpointsParam: endpoints1,
-
-			expectUpdate: []runtime.Object{endpoints1},
 		},
 		"existing-endpointslice-replaced-with-updated-ipv4-address-type": {
 			// If an EndpointSlice with deprecated "IP" address type exists,
@@ -200,7 +154,6 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 			initialState:   []runtime.Object{endpoints1, epSlice1Deprecated},
 			endpointsParam: endpoints1,
 
-			expectUpdate: []runtime.Object{endpoints1},
 			expectDelete: []runtime.Object{epSlice1Deprecated},
 			expectCreate: []runtime.Object{epSlice1},
 		},
@@ -218,7 +171,7 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 			initialState:   []runtime.Object{endpoints2, epSlice1},
 			endpointsParam: endpoints2,
 
-			expectUpdate: []runtime.Object{endpoints2, epSlice2},
+			expectUpdate: []runtime.Object{epSlice2},
 		},
 		"endpointslice-correct-endpoints-wrong": {
 			// If the EndpointSlice is correct and the Endpoints is wrong,
@@ -227,17 +180,6 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 			endpointsParam: endpoints2,
 
 			expectUpdate: []runtime.Object{endpoints2},
-		},
-		"missing-endpoints": {
-			// If the Endpoints/EndpointSlice doesn't already exist then
-			// Update will return an error, because you should have called
-			// Create.
-			initialState:   []runtime.Object{},
-			endpointsParam: endpoints1,
-
-			expectedError: errors.NewNotFound(schema.GroupResource{Group: "", Resource: "endpoints"}, testServiceName),
-			// We expect the update to be attempted, we just also expect it to fail
-			expectUpdate: []runtime.Object{endpoints1},
 		},
 		"missing-endpointslice": {
 			// No error when we need to update the Endpoints but the
@@ -255,7 +197,7 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 			client := fake.NewSimpleClientset(testCase.initialState...)
 			epAdapter := NewEndpointsAdapter(client.CoreV1(), client.DiscoveryV1(), testServiceNamespace, testServiceName)
 
-			err := epAdapter.Update(testCase.endpointsParam)
+			err := epAdapter.Sync(testCase.endpointsParam)
 			if !apiequality.Semantic.DeepEqual(testCase.expectedError, err) {
 				t.Errorf("Expected error: %v, got: %v", testCase.expectedError, err)
 			}
@@ -322,54 +264,4 @@ func generateEndpointsAndSlice(ports []int, addresses []string) (*corev1.Endpoin
 		},
 		Subsets: []corev1.EndpointSubset{subset},
 	}, epSlice
-}
-
-func TestEndpointsAdapterEnsureEndpointSliceFromEndpoints(t *testing.T) {
-	endpoints1, epSlice1 := generateEndpointsAndSlice([]int{80, 443}, []string{"10.1.2.3", "10.1.2.4"})
-	endpoints2, epSlice2 := generateEndpointsAndSlice([]int{80, 443}, []string{"10.1.2.3", "10.1.2.4", "10.1.2.5"})
-
-	testCases := map[string]struct {
-		initialState   []runtime.Object
-		endpointsParam *corev1.Endpoints
-
-		expectedError         error
-		expectedEndpointSlice *discovery.EndpointSlice
-	}{
-		"existing-endpointslice-no-change": {
-			initialState:          []runtime.Object{epSlice1},
-			endpointsParam:        endpoints1,
-			expectedEndpointSlice: epSlice1,
-		},
-		"existing-endpointslice-change": {
-			initialState:          []runtime.Object{epSlice1},
-			endpointsParam:        endpoints2,
-			expectedEndpointSlice: epSlice2,
-		},
-		"missing-endpointslice": {
-			initialState:          []runtime.Object{},
-			endpointsParam:        endpoints1,
-			expectedEndpointSlice: epSlice1,
-		},
-	}
-
-	for name, testCase := range testCases {
-		t.Run(name, func(t *testing.T) {
-			client := fake.NewSimpleClientset(testCase.initialState...)
-			epAdapter := NewEndpointsAdapter(client.CoreV1(), client.DiscoveryV1(), testServiceNamespace, testServiceName)
-
-			err := epAdapter.EnsureEndpointSliceFromEndpoints(testCase.endpointsParam)
-			if !apiequality.Semantic.DeepEqual(testCase.expectedError, err) {
-				t.Errorf("Expected error: %v, got: %v", testCase.expectedError, err)
-			}
-
-			endpointSlice, err := client.DiscoveryV1().EndpointSlices(testServiceNamespace).Get(context.TODO(), testCase.endpointsParam.Name, metav1.GetOptions{})
-			if err != nil && !errors.IsNotFound(err) {
-				t.Fatalf("Error getting Endpoint Slice: %v", err)
-			}
-
-			if !apiequality.Semantic.DeepEqual(endpointSlice, testCase.expectedEndpointSlice) {
-				t.Errorf("Wrong result after EnsureEndpointSliceFromEndpoints. Diff:\n%s", cmp.Diff(testCase.expectedEndpointSlice, endpointSlice))
-			}
-		})
-	}
 }
