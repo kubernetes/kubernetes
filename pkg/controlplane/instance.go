@@ -262,6 +262,9 @@ type Instance struct {
 }
 
 func (c *Config) createMasterCountReconciler(endpointsAdapter *reconcilers.EndpointsAdapter) reconcilers.EndpointReconciler {
+	if c.ExtraConfig.SecondaryAPIServerServiceIP != nil {
+		klog.Warningf("%s reconciler does not support dual-stack apiservers", reconcilers.MasterCountReconcilerType)
+	}
 	return reconcilers.NewMasterCountEndpointReconciler(c.ExtraConfig.MasterCount, endpointsAdapter)
 }
 
@@ -290,7 +293,8 @@ func (c *Config) createEndpointReconciler() reconcilers.EndpointReconciler {
 		endpointClient, endpointSliceClient,
 		kubernetesservice.KubernetesServiceNamespace,
 		kubernetesservice.KubernetesServiceName,
-		c.ExtraConfig.APIServerServiceIP)
+		c.ExtraConfig.APIServerServiceIP,
+		c.ExtraConfig.SecondaryAPIServerServiceIP)
 
 	klog.Infof("Using reconciler: %v", c.ExtraConfig.EndpointReconcilerType)
 	switch c.ExtraConfig.EndpointReconcilerType {

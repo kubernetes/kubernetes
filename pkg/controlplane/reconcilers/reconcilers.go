@@ -35,9 +35,9 @@ type EndpointReconciler interface {
 	//  * All apiservers MUST use ReconcileEndpoints and only ReconcileEndpoints to manage the
 	//      endpoints for their {rw, ro} services.
 	//  * ReconcileEndpoints is called periodically from all apiservers.
-	ReconcileEndpoints(ip net.IP, endpointPorts []corev1.EndpointPort, reconcilePorts bool) error
+	ReconcileEndpoints(ips []net.IP, endpointPorts []corev1.EndpointPort, reconcilePorts bool) error
 	// RemoveEndpoints removes this apiserver's lease.
-	RemoveEndpoints(ip net.IP, endpointPorts []corev1.EndpointPort) error
+	RemoveEndpoints(ips []net.IP, endpointPorts []corev1.EndpointPort) error
 	// StopReconciling turns any later ReconcileEndpoints call into a noop.
 	StopReconciling()
 	// Destroy shuts down all internal structures.

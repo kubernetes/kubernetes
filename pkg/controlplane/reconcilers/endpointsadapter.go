@@ -41,60 +41,87 @@ type EndpointsAdapter struct {
 	endpointClient      corev1client.EndpointsGetter
 	endpointSliceClient discoveryclient.EndpointSlicesGetter
 
-	serviceNamespace string
-	serviceName      string
-	addressType      discovery.AddressType
+	serviceNamespace   string
+	serviceName        string
+	secondarySliceName string
+	addressTypes       []discovery.AddressType
 }
 
 // NewEndpointsAdapter returns a new EndpointsAdapter
-func NewEndpointsAdapter(endpointClient corev1client.EndpointsGetter, endpointSliceClient discoveryclient.EndpointSlicesGetter, serviceNamespace, serviceName string, serviceIP net.IP) *EndpointsAdapter {
-	addressType := discovery.AddressTypeIPv4
-	if utilnet.IsIPv6(serviceIP) {
-		addressType = discovery.AddressTypeIPv6
+func NewEndpointsAdapter(endpointClient corev1client.EndpointsGetter, endpointSliceClient discoveryclient.EndpointSlicesGetter,
+	serviceNamespace, serviceName string,
+	primaryServiceIP, secondaryServiceIP net.IP) *EndpointsAdapter {
+
+	var addressTypes []discovery.AddressType
+	var secondarySliceName string
+	if utilnet.IsIPv4(primaryServiceIP) {
+		addressTypes = append(addressTypes, discovery.AddressTypeIPv4)
+	} else {
+		addressTypes = append(addressTypes, discovery.AddressTypeIPv6)
+	}
+	if secondaryServiceIP != nil {
+		if utilnet.IsIPv4(secondaryServiceIP) {
+			addressTypes = append(addressTypes, discovery.AddressTypeIPv4)
+			secondarySliceName = serviceName + "-v4"
+		} else {
+			addressTypes = append(addressTypes, discovery.AddressTypeIPv6)
+			secondarySliceName = serviceName + "-v6"
+		}
 	}
 
 	return &EndpointsAdapter{
 		endpointClient:      endpointClient,
 		endpointSliceClient: endpointSliceClient,
 
-		serviceNamespace: serviceNamespace,
-		serviceName:      serviceName,
-		addressType:      addressType,
+		serviceNamespace:   serviceNamespace,
+		serviceName:        serviceName,
+		secondarySliceName: secondarySliceName,
+		addressTypes:       addressTypes,
 	}
 }
 
-// Get returns the IPs from the existing apiserver Endpoints/EndpointSlice objects. If an
-// error (beside "not found") occurs fetching the data, that error will be returned.
-func (adapter *EndpointsAdapter) Get() (sets.Set[string], error) {
-	ips := sets.New[string]()
-
-	endpoints, err := adapter.endpointClient.Endpoints(adapter.serviceNamespace).Get(context.TODO(), adapter.serviceName, metav1.GetOptions{})
+// Get returns the primary and secondary IPs from the existing apiserver
+// Endpoints/EndpointSlice objects. If an error (beside "not found") occurs fetching the
+// data, that error will be returned.
+func (adapter *EndpointsAdapter) Get() (sets.Set[string], sets.Set[string], error) {
+	endpointSlices, _, err := adapter.listEndpointSlices()
 	if err != nil {
-		if errors.IsNotFound(err) {
-			return ips, nil
-		}
-		return nil, err
+		return nil, nil, err
 	}
 
-	if len(endpoints.Subsets) == 1 {
-		for _, addr := range endpoints.Subsets[0].Addresses {
-			ips.Insert(addr.IP)
+	primaryIPs := sets.New[string]()
+	if endpointSlices[0] != nil {
+		for _, ep := range endpointSlices[0].Endpoints {
+			primaryIPs.Insert(ep.Addresses...)
 		}
 	}
-	return ips, nil
+
+	secondaryIPs := sets.New[string]()
+	if endpointSlices[1] != nil {
+		for _, ep := range endpointSlices[1].Endpoints {
+			secondaryIPs.Insert(ep.Addresses...)
+		}
+	}
+
+	return primaryIPs, secondaryIPs, nil
 }
 
 // Sync updates the apiserver Endpoints/EndpointSlice objects with the new set of IPs. If
 // reconcilePorts is true it will also ensure that the objects have the correct ports. If
 // an error occurs while updating, that error will be returned.
 func (adapter *EndpointsAdapter) Sync(ips sets.Set[string], endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
-	var sortedIPs []string
+	var sortedIPs [2][]string
 	for _, ip := range sets.List(ips) {
-		if adapter.addressType == discovery.AddressTypeIPv4 && utilnet.IsIPv4String(ip) {
-			sortedIPs = append(sortedIPs, ip)
-		} else if adapter.addressType == discovery.AddressTypeIPv6 && utilnet.IsIPv6String(ip) {
-			sortedIPs = append(sortedIPs, ip)
+		if (adapter.addressTypes[0] == discovery.AddressTypeIPv4) == utilnet.IsIPv4String(ip) {
+			sortedIPs[0] = append(sortedIPs[0], ip)
+		} else {
+			sortedIPs[1] = append(sortedIPs[1], ip)
 		}
+	}
+	// Only use the dual-stack endpoints if all of the apiservers have dual-stack
+	// endpoints.
+	if len(sortedIPs[0]) != len(sortedIPs[1]) {
+		sortedIPs[1] = nil
 	}
 
 	// Sync Endpoints
@@ -107,7 +134,7 @@ func (adapter *EndpointsAdapter) Sync(ips sets.Set[string], endpointPorts []core
 			}
 			currentEndpoints = nil
 		}
-		endpoints = adapter.updateEndpoints(currentEndpoints, sortedIPs, endpointPorts, reconcilePorts)
+		endpoints = adapter.updateEndpoints(currentEndpoints, sortedIPs[0], endpointPorts, reconcilePorts)
 
 		if currentEndpoints == nil {
 			_, err = adapter.endpointClient.Endpoints(endpoints.Namespace).Create(context.TODO(), endpoints, metav1.CreateOptions{})
@@ -124,7 +151,7 @@ func (adapter *EndpointsAdapter) Sync(ips sets.Set[string], endpointPorts []core
 
 	// Sync EndpointSlices
 	err = retry.OnError(retry.DefaultBackoff, isRetriableError, func() error {
-		currentEndpointSlice, otherSlices, err := adapter.listEndpointSlices()
+		currentEndpointSlices, otherSlices, err := adapter.listEndpointSlices()
 		if err != nil {
 			return err
 		}
@@ -132,8 +159,7 @@ func (adapter *EndpointsAdapter) Sync(ips sets.Set[string], endpointPorts []core
 		// Delete all otherEndpointSlices, since as far as the current apiserver
 		// is concerned, they should not exist. (In particular, there may be a
 		// stale EndpointSlice of the wrong family left behind after downgrading
-		// from a future version of Kubernetes that supports dual-stack
-		// apiservers.)
+		// from dual-stack apiservers.)
 		for _, slice := range otherSlices {
 			err = adapter.endpointSliceClient.EndpointSlices(slice.Namespace).Delete(context.TODO(), slice.Name, metav1.DeleteOptions{})
 			if err != nil && !errors.IsNotFound(err) {
@@ -141,16 +167,20 @@ func (adapter *EndpointsAdapter) Sync(ips sets.Set[string], endpointPorts []core
 			}
 		}
 
-		endpointSlice := adapter.updateEndpointSlice(currentEndpointSlice, sortedIPs, endpointPorts, reconcilePorts)
-
-		if currentEndpointSlice == nil {
-			_, err = adapter.endpointSliceClient.EndpointSlices(endpointSlice.Namespace).Create(context.TODO(), endpointSlice, metav1.CreateOptions{})
-		} else if !apiequality.Semantic.DeepEqual(currentEndpointSlice.Endpoints, endpointSlice.Endpoints) ||
-			!apiequality.Semantic.DeepEqual(currentEndpointSlice.Ports, endpointSlice.Ports) ||
-			!apiequality.Semantic.DeepEqual(currentEndpointSlice.Labels, endpointSlice.Labels) {
-			_, err = adapter.endpointSliceClient.EndpointSlices(endpointSlice.Namespace).Update(context.TODO(), endpointSlice, metav1.UpdateOptions{})
+		for i, addressType := range adapter.addressTypes {
+			endpointSlice := adapter.updateEndpointSlice(currentEndpointSlices[i], addressType, sortedIPs[i], endpointPorts, reconcilePorts)
+			if currentEndpointSlices[i] == nil {
+				_, err = adapter.endpointSliceClient.EndpointSlices(endpointSlice.Namespace).Create(context.TODO(), endpointSlice, metav1.CreateOptions{})
+			} else if !apiequality.Semantic.DeepEqual(currentEndpointSlices[i].Endpoints, endpointSlice.Endpoints) ||
+				!apiequality.Semantic.DeepEqual(currentEndpointSlices[i].Ports, endpointSlice.Ports) ||
+				!apiequality.Semantic.DeepEqual(currentEndpointSlices[i].Labels, endpointSlice.Labels) {
+				_, err = adapter.endpointSliceClient.EndpointSlices(endpointSlice.Namespace).Update(context.TODO(), endpointSlice, metav1.UpdateOptions{})
+			}
+			if err != nil {
+				return err
+			}
 		}
-		return err
+		return nil
 	})
 	return err
 }
@@ -207,15 +237,19 @@ func (adapter *EndpointsAdapter) updateEndpoints(currentEndpoints *corev1.Endpoi
 
 // updateEndpointSlice takes currentEndpointSlice (which may be nil), and updates it to
 // reflect ips and (optionally) endpointPorts.
-func (adapter *EndpointsAdapter) updateEndpointSlice(currentEndpointSlice *discovery.EndpointSlice, sortedIPs []string, endpointPorts []corev1.EndpointPort, reconcilePorts bool) *discovery.EndpointSlice {
+func (adapter *EndpointsAdapter) updateEndpointSlice(currentEndpointSlice *discovery.EndpointSlice, addressType discovery.AddressType, sortedIPs []string, endpointPorts []corev1.EndpointPort, reconcilePorts bool) *discovery.EndpointSlice {
 	var endpointSlice *discovery.EndpointSlice
 
 	if currentEndpointSlice != nil {
 		endpointSlice = currentEndpointSlice.DeepCopy()
 	} else {
+		name := adapter.serviceName
+		if addressType != adapter.addressTypes[0] {
+			name = adapter.secondarySliceName
+		}
 		endpointSlice = &discovery.EndpointSlice{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      adapter.serviceName,
+				Name:      name,
 				Namespace: adapter.serviceNamespace,
 			},
 		}
@@ -227,7 +261,7 @@ func (adapter *EndpointsAdapter) updateEndpointSlice(currentEndpointSlice *disco
 	}
 
 	// Ensure correct AddressType
-	endpointSlice.AddressType = adapter.addressType
+	endpointSlice.AddressType = addressType
 
 	// Set addresses
 	endpointSlice.Endpoints = make([]discovery.Endpoint, len(sortedIPs))
@@ -258,29 +292,33 @@ func convertEndpointPorts(endpointPorts []corev1.EndpointPort) []discovery.Endpo
 	return endpointSlicePorts
 }
 
-// listEndpointSlices returns the primary EndpointSlice (if any) and a list of any other
-// EndpointSlices for the apiserver service (or an error if one occurs).
-func (adapter *EndpointsAdapter) listEndpointSlices() (*discovery.EndpointSlice, []*discovery.EndpointSlice, error) {
+// listEndpointSlices returns the primary and secondary EndpointSlices (if any) and a list
+// of any other EndpointSlices for the apiserver service (or an error if one occurs).
+func (adapter *EndpointsAdapter) listEndpointSlices() ([2]*discovery.EndpointSlice, []*discovery.EndpointSlice, error) {
+	var endpointSlices [2]*discovery.EndpointSlice
+
 	slices, err := adapter.endpointSliceClient.EndpointSlices(adapter.serviceNamespace).List(context.TODO(),
 		metav1.ListOptions{
 			LabelSelector: fmt.Sprintf("%s=%s", discovery.LabelServiceName, adapter.serviceName),
 		},
 	)
 	if err != nil {
-		return nil, nil, err
+		return endpointSlices, nil, err
 	}
 
-	var primaryEndpointSlice *discovery.EndpointSlice
 	otherEndpointSlices := make([]*discovery.EndpointSlice, 0, len(slices.Items))
 
 	for i := range slices.Items {
 		slice := &slices.Items[i]
-		if slice.Name == adapter.serviceName && slice.AddressType == adapter.addressType {
-			primaryEndpointSlice = slice
+
+		if slice.Name == adapter.serviceName && slice.AddressType == adapter.addressTypes[0] {
+			endpointSlices[0] = slice
+		} else if len(adapter.addressTypes) > 1 && slice.Name == adapter.secondarySliceName && slice.AddressType == adapter.addressTypes[1] {
+			endpointSlices[1] = slice
 		} else {
 			otherEndpointSlices = append(otherEndpointSlices, slice)
 		}
 	}
 
-	return primaryEndpointSlice, otherEndpointSlices, nil
+	return endpointSlices, otherEndpointSlices, nil
 }

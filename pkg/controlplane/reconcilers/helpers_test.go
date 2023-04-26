@@ -80,9 +80,13 @@ func makeEndpointSlice(ips []string, ports []corev1.EndpointPort) *discoveryv1.E
 				discoveryv1.LabelServiceName: testServiceName,
 			},
 		},
-		AddressType: discoveryv1.AddressTypeIPv4,
-		Endpoints:   make([]discoveryv1.Endpoint, len(ips)),
-		Ports:       make([]discoveryv1.EndpointPort, len(ports)),
+		Endpoints: make([]discoveryv1.Endpoint, len(ips)),
+		Ports:     make([]discoveryv1.EndpointPort, len(ports)),
+	}
+	if len(ips) == 0 || utilnet.IsIPv4String(ips[0]) {
+		slice.AddressType = discoveryv1.AddressTypeIPv4
+	} else {
+		slice.AddressType = discoveryv1.AddressTypeIPv6
 	}
 	ready := true
 	for i := range ips {
@@ -93,6 +97,17 @@ func makeEndpointSlice(ips []string, ports []corev1.EndpointPort) *discoveryv1.E
 		slice.Ports[i].Name = &ports[i].Name
 		slice.Ports[i].Protocol = &ports[i].Protocol
 		slice.Ports[i].Port = &ports[i].Port
+	}
+	return slice
+}
+
+// Creates an EndpointSlice with an alternate name based on its address type
+func makeEndpointSliceSecondary(ips []string, ports []corev1.EndpointPort) *discoveryv1.EndpointSlice {
+	slice := makeEndpointSlice(ips, ports)
+	if slice.AddressType == discoveryv1.AddressTypeIPv4 {
+		slice.Name += "-v4"
+	} else {
+		slice.Name += "-v6"
 	}
 	return slice
 }

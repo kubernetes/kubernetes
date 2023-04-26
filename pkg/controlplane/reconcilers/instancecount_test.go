@@ -17,9 +17,11 @@ limitations under the License.
 package reconcilers
 
 import (
+	"net"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 	netutils "k8s.io/utils/net"
@@ -204,9 +206,9 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 		t.Run(test.testName, func(t *testing.T) {
 			fakeClient := fake.NewSimpleClientset(test.initialState...)
 			epAdapter := NewEndpointsAdapter(fakeClient.CoreV1(), fakeClient.DiscoveryV1(),
-				testServiceNamespace, testServiceName, testServiceIP)
+				testServiceNamespace, testServiceName, testServiceIP, nil)
 			reconciler := NewMasterCountEndpointReconciler(test.additionalMasters+1, epAdapter)
-			err := reconciler.ReconcileEndpoints(netutils.ParseIPSloppy(test.ip), test.endpointPorts, true)
+			err := reconciler.ReconcileEndpoints([]net.IP{netutils.ParseIPSloppy(test.ip)}, test.endpointPorts, true)
 			if err != nil {
 				t.Errorf("unexpected error reconciling: %v", err)
 			}
@@ -259,9 +261,9 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 		t.Run(test.testName, func(t *testing.T) {
 			fakeClient := fake.NewSimpleClientset(test.initialState...)
 			epAdapter := NewEndpointsAdapter(fakeClient.CoreV1(), fakeClient.DiscoveryV1(),
-				testServiceNamespace, testServiceName, testServiceIP)
+				testServiceNamespace, testServiceName, testServiceIP, nil)
 			reconciler := NewMasterCountEndpointReconciler(test.additionalMasters+1, epAdapter)
-			err := reconciler.ReconcileEndpoints(netutils.ParseIPSloppy(test.ip), test.endpointPorts, false)
+			err := reconciler.ReconcileEndpoints([]net.IP{netutils.ParseIPSloppy(test.ip)}, test.endpointPorts, false)
 			if err != nil {
 				t.Errorf("unexpected error reconciling: %v", err)
 			}
@@ -274,16 +276,140 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 	}
 }
 
+// masterCountEndpointReconciler does not support dual-stack, so this should really only
+// happen during rollouts/rollbacks or misconfiguration.
+func TestMasterCountEndpointReconcilerDualStack(t *testing.T) {
+	endpointPorts := []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}
+
+	emptyV6Slice := makeEndpointSliceSecondary([]string{"1234::5678"}, endpointPorts)
+	emptyV6Slice.Endpoints = []discoveryv1.Endpoint{}
+
+	reconcileTests := []struct {
+		testName     string
+		ips          []net.IP
+		initialState []runtime.Object
+		expectUpdate []runtime.Object
+		expectCreate []runtime.Object
+		expectDelete []runtime.Object
+	}{
+		{
+			testName: "no existing endpoints (secondary IP ignored)",
+			ips: []net.IP{
+				netutils.ParseIPSloppy("1.2.3.4"),
+				netutils.ParseIPSloppy("1234::5678"),
+			},
+			initialState: nil,
+			expectCreate: []runtime.Object{
+				makeEndpoints([]string{"1.2.3.4"}, endpointPorts),
+				makeEndpointSlice([]string{"1.2.3.4"}, endpointPorts),
+				emptyV6Slice,
+			},
+		},
+		{
+			testName: "existing endpoints satisfy (secondary IP ignored)",
+			ips: []net.IP{
+				netutils.ParseIPSloppy("1.2.3.4"),
+				netutils.ParseIPSloppy("1234::5678"),
+			},
+			initialState: []runtime.Object{
+				makeEndpoints([]string{"1.2.3.4"}, endpointPorts),
+				makeEndpointSlice([]string{"1.2.3.4"}, endpointPorts),
+				emptyV6Slice,
+			},
+		},
+		{
+			testName: "existing endpoints satisfy, no endpointslices (secondary IP ignored)",
+			ips: []net.IP{
+				netutils.ParseIPSloppy("1.2.3.4"),
+				netutils.ParseIPSloppy("1234::5678"),
+			},
+			initialState: []runtime.Object{
+				makeEndpoints([]string{"1.2.3.4"}, endpointPorts),
+			},
+			expectCreate: []runtime.Object{
+				makeEndpointSlice([]string{"1.2.3.4"}, endpointPorts),
+				emptyV6Slice,
+			},
+		},
+		{
+			testName: "existing endpointslices satisfy, no endpoints (secondary slice emptied)",
+			ips: []net.IP{
+				netutils.ParseIPSloppy("1.2.3.4"),
+				netutils.ParseIPSloppy("1234::5678"),
+			},
+			initialState: []runtime.Object{
+				makeEndpointSlice([]string{"1.2.3.4"}, endpointPorts),
+				makeEndpointSliceSecondary([]string{"1234::5678"}, endpointPorts),
+			},
+			expectCreate: []runtime.Object{
+				makeEndpoints([]string{"1.2.3.4"}, endpointPorts),
+			},
+			expectUpdate: []runtime.Object{
+				emptyV6Slice,
+			},
+		},
+		{
+			testName: "existing endpoints satisfy, only v4 endpointslice (secondary IPs ignored)",
+			ips: []net.IP{
+				netutils.ParseIPSloppy("1.2.3.4"),
+				netutils.ParseIPSloppy("1234::5678"),
+			},
+			initialState: []runtime.Object{
+				makeEndpoints([]string{"1.2.3.4"}, endpointPorts),
+				makeEndpointSlice([]string{"1.2.3.4"}, endpointPorts),
+			},
+			expectCreate: []runtime.Object{
+				emptyV6Slice,
+			},
+		},
+		{
+			testName: "existing endpoints satisfy, only v6 endpointslice (emptied)",
+			ips: []net.IP{
+				netutils.ParseIPSloppy("1.2.3.4"),
+				netutils.ParseIPSloppy("1234::5678"),
+			},
+			initialState: []runtime.Object{
+				makeEndpoints([]string{"1.2.3.4"}, endpointPorts),
+				makeEndpointSliceSecondary([]string{"1234::5678"}, endpointPorts),
+			},
+			expectCreate: []runtime.Object{
+				makeEndpointSlice([]string{"1.2.3.4"}, endpointPorts),
+			},
+			expectUpdate: []runtime.Object{
+				emptyV6Slice,
+			},
+		},
+	}
+	for _, test := range reconcileTests {
+		t.Run(test.testName, func(t *testing.T) {
+			fakeClient := fake.NewSimpleClientset(test.initialState...)
+			epAdapter := NewEndpointsAdapter(fakeClient.CoreV1(), fakeClient.DiscoveryV1(),
+				testServiceNamespace, testServiceName,
+				testServiceIP, testServiceIPv6)
+			reconciler := NewMasterCountEndpointReconciler(3, epAdapter)
+			err := reconciler.ReconcileEndpoints(test.ips, endpointPorts, true)
+			if err != nil {
+				t.Errorf("unexpected error reconciling: %v", err)
+			}
+
+			err = verifyActions(fakeClient, test.expectCreate, test.expectUpdate, test.expectDelete)
+			if err != nil {
+				t.Errorf("unexpected error in side effects: %v", err)
+			}
+		})
+	}
+}
+
 func TestEmptySubsets(t *testing.T) {
 	endpoints := makeEndpointsArray(nil, nil)
 	fakeClient := fake.NewSimpleClientset(endpoints...)
 	epAdapter := NewEndpointsAdapter(fakeClient.CoreV1(), fakeClient.DiscoveryV1(),
-		testServiceNamespace, testServiceName, testServiceIP)
+		testServiceNamespace, testServiceName, testServiceIP, nil)
 	reconciler := NewMasterCountEndpointReconciler(1, epAdapter)
 	endpointPorts := []corev1.EndpointPort{
 		{Name: "foo", Port: 8080, Protocol: "TCP"},
 	}
-	err := reconciler.RemoveEndpoints(netutils.ParseIPSloppy("1.2.3.4"), endpointPorts)
+	err := reconciler.RemoveEndpoints([]net.IP{netutils.ParseIPSloppy("1.2.3.4")}, endpointPorts)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

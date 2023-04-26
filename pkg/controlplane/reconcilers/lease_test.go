@@ -22,6 +22,7 @@ https://github.com/openshift/origin/blob/bb340c5dd5ff72718be86fb194dedc0faed7f4c
 */
 
 import (
+	"net"
 	"reflect"
 	"sort"
 	"testing"
@@ -81,7 +82,20 @@ func newFakeLeases(t *testing.T, s storage.Interface) *fakeLeases {
 
 func (f *fakeLeases) SetKeys(keys []string) error {
 	for _, ip := range keys {
-		if err := f.UpdateLease(ip); err != nil {
+		if err := f.UpdateLease([]net.IP{netutils.ParseIPSloppy(ip)}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (f *fakeLeases) SetKeysDualStack(keys [][]string) error {
+	for _, ipStrs := range keys {
+		ips := make([]net.IP, len(ipStrs))
+		for i := range ipStrs {
+			ips[i] = netutils.ParseIPSloppy(ipStrs[i])
+		}
+		if err := f.UpdateLease(ips); err != nil {
 			return err
 		}
 	}
@@ -321,9 +335,9 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			clientset := fake.NewSimpleClientset(test.initialState...)
 
 			epAdapter := NewEndpointsAdapter(clientset.CoreV1(), clientset.DiscoveryV1(),
-				testServiceNamespace, testServiceName, testServiceIP)
+				testServiceNamespace, testServiceName, testServiceIP, nil)
 			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
-			err = r.ReconcileEndpoints(netutils.ParseIPSloppy(test.ip), test.endpointPorts, true)
+			err = r.ReconcileEndpoints([]net.IP{netutils.ParseIPSloppy(test.ip)}, test.endpointPorts, true)
 			if err != nil {
 				t.Errorf("unexpected error reconciling: %v", err)
 			}
@@ -396,14 +410,274 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			}
 			clientset := fake.NewSimpleClientset(test.initialState...)
 			epAdapter := NewEndpointsAdapter(clientset.CoreV1(), clientset.DiscoveryV1(),
-				testServiceNamespace, testServiceName, testServiceIP)
+				testServiceNamespace, testServiceName, testServiceIP, nil)
 			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
-			err = r.ReconcileEndpoints(netutils.ParseIPSloppy(test.ip), test.endpointPorts, false)
+			err = r.ReconcileEndpoints([]net.IP{netutils.ParseIPSloppy(test.ip)}, test.endpointPorts, false)
 			if err != nil {
 				t.Errorf("unexpected error reconciling: %v", err)
 			}
 
 			err = verifyActions(clientset, test.expectCreate, test.expectUpdate, nil)
+			if err != nil {
+				t.Errorf("unexpected error in side effects: %v", err)
+			}
+
+			leases, err := fakeLeases.ListLeases()
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			// sort for comparison
+			sort.Strings(leases)
+			sort.Strings(test.expectLeases)
+			if !reflect.DeepEqual(leases, test.expectLeases) {
+				t.Errorf("expected %v got: %v", test.expectLeases, leases)
+			}
+		})
+	}
+}
+
+func TestLeaseEndpointReconcilerDualStack(t *testing.T) {
+	server, sc := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
+	t.Cleanup(func() { server.Terminate(t) })
+
+	newFunc := func() runtime.Object { return &corev1.Endpoints{} }
+	newListFunc := func() runtime.Object { return &corev1.EndpointsList{} }
+	sc.Codec = apitesting.TestStorageCodec(codecs, corev1.SchemeGroupVersion)
+
+	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "endpoints"}), newFunc, newListFunc, "")
+	if err != nil {
+		t.Fatalf("Error creating storage: %v", err)
+	}
+	t.Cleanup(dFunc)
+
+	endpointPorts := []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}
+
+	reconcileTests := []struct {
+		testName     string
+		ips          []net.IP
+		endpointKeys [][]string
+		initialState []runtime.Object
+		expectUpdate []runtime.Object
+		expectCreate []runtime.Object
+		expectDelete []runtime.Object
+		expectLeases []string
+	}{
+		{
+			testName: "no existing endpoints",
+			ips: []net.IP{
+				netutils.ParseIPSloppy("1.2.3.4"),
+				netutils.ParseIPSloppy("1234::5678"),
+			},
+			initialState: nil,
+			expectCreate: []runtime.Object{
+				makeEndpoints([]string{"1.2.3.4"}, endpointPorts),
+				makeEndpointSlice([]string{"1.2.3.4"}, endpointPorts),
+				makeEndpointSliceSecondary([]string{"1234::5678"}, endpointPorts),
+			},
+			expectLeases: []string{"1.2.3.4", "1234::5678"},
+		},
+		{
+			testName: "existing endpoints satisfy",
+			ips: []net.IP{
+				netutils.ParseIPSloppy("1.2.3.4"),
+				netutils.ParseIPSloppy("1234::5678"),
+			},
+			initialState: []runtime.Object{
+				makeEndpoints([]string{"1.2.3.4"}, endpointPorts),
+				makeEndpointSlice([]string{"1.2.3.4"}, endpointPorts),
+				makeEndpointSliceSecondary([]string{"1234::5678"}, endpointPorts),
+			},
+			expectLeases: []string{"1.2.3.4", "1234::5678"},
+		},
+		{
+			testName: "existing endpoints satisfy, no endpointslices",
+			ips: []net.IP{
+				netutils.ParseIPSloppy("1.2.3.4"),
+				netutils.ParseIPSloppy("1234::5678"),
+			},
+			initialState: []runtime.Object{
+				makeEndpoints([]string{"1.2.3.4"}, endpointPorts),
+			},
+			expectCreate: []runtime.Object{
+				makeEndpointSlice([]string{"1.2.3.4"}, endpointPorts),
+				makeEndpointSliceSecondary([]string{"1234::5678"}, endpointPorts),
+			},
+			expectLeases: []string{"1.2.3.4", "1234::5678"},
+		},
+		{
+			testName: "existing endpointslices satisfy, no endpoints",
+			ips: []net.IP{
+				netutils.ParseIPSloppy("1.2.3.4"),
+				netutils.ParseIPSloppy("1234::5678"),
+			},
+			initialState: []runtime.Object{
+				makeEndpointSlice([]string{"1.2.3.4"}, endpointPorts),
+				makeEndpointSliceSecondary([]string{"1234::5678"}, endpointPorts),
+			},
+			expectCreate: []runtime.Object{
+				makeEndpoints([]string{"1.2.3.4"}, endpointPorts),
+			},
+			expectLeases: []string{"1.2.3.4", "1234::5678"},
+		},
+		{
+			testName: "existing endpoints satisfy, only v4 endpointslice",
+			ips: []net.IP{
+				netutils.ParseIPSloppy("1.2.3.4"),
+				netutils.ParseIPSloppy("1234::5678"),
+			},
+			initialState: []runtime.Object{
+				makeEndpoints([]string{"1.2.3.4"}, endpointPorts),
+				makeEndpointSlice([]string{"1.2.3.4"}, endpointPorts),
+			},
+			expectCreate: []runtime.Object{
+				makeEndpointSliceSecondary([]string{"1234::5678"}, endpointPorts),
+			},
+			expectLeases: []string{"1.2.3.4", "1234::5678"},
+		},
+		{
+			testName: "existing endpoints satisfy, only v6 endpointslice",
+			ips: []net.IP{
+				netutils.ParseIPSloppy("1.2.3.4"),
+				netutils.ParseIPSloppy("1234::5678"),
+			},
+			initialState: []runtime.Object{
+				makeEndpoints([]string{"1.2.3.4"}, endpointPorts),
+				makeEndpointSliceSecondary([]string{"1234::5678"}, endpointPorts),
+			},
+			expectCreate: []runtime.Object{
+				makeEndpointSlice([]string{"1.2.3.4"}, endpointPorts),
+			},
+			expectLeases: []string{"1.2.3.4", "1234::5678"},
+		},
+		{
+			testName: "existing endpoints satisfy, endpointslices are wrong",
+			ips: []net.IP{
+				netutils.ParseIPSloppy("1.2.3.4"),
+				netutils.ParseIPSloppy("1234::5678"),
+			},
+			initialState: []runtime.Object{
+				makeEndpoints([]string{"1.2.3.4"}, endpointPorts),
+				makeEndpointSlice([]string{"5.6.7.8"}, endpointPorts),
+				makeEndpointSliceSecondary([]string{"5.6.7.8"}, endpointPorts),
+				makeEndpointSliceSecondary([]string{"1234::5678"}, endpointPorts),
+			},
+			expectDelete: []runtime.Object{
+				makeEndpointSliceSecondary([]string{"5.6.7.8"}, endpointPorts),
+			},
+			expectUpdate: []runtime.Object{
+				makeEndpointSlice([]string{"1.2.3.4"}, endpointPorts),
+			},
+			expectLeases: []string{"1.2.3.4", "1234::5678"},
+		},
+		{
+			testName: "existing endpoints satisfy + refresh existing key",
+			ips: []net.IP{
+				netutils.ParseIPSloppy("1.2.3.4"),
+				netutils.ParseIPSloppy("1234::5678"),
+			},
+			endpointKeys: [][]string{{"1.2.3.4", "1234::5678"}},
+			initialState: []runtime.Object{
+				makeEndpoints([]string{"1.2.3.4"}, endpointPorts),
+				makeEndpointSlice([]string{"1.2.3.4"}, endpointPorts),
+				makeEndpointSliceSecondary([]string{"1234::5678"}, endpointPorts),
+			},
+			expectLeases: []string{"1.2.3.4", "1234::5678"},
+		},
+		{
+			testName: "existing endpoints satisfy but too many + extra masters",
+			ips: []net.IP{
+				netutils.ParseIPSloppy("1.2.3.4"),
+				netutils.ParseIPSloppy("1234::5678"),
+			},
+			endpointKeys: [][]string{{"1.2.3.4", "1234::5678"}, {"4.3.2.2", "4322::5678"}, {"4.3.2.3", "4323::5678"}, {"4.3.2.4", "4324::5678"}},
+			initialState: []runtime.Object{
+				makeEndpoints([]string{"1.2.3.4", "4.3.2.1", "4.3.2.2", "4.3.2.3", "4.3.2.4"}, endpointPorts),
+				makeEndpointSlice([]string{"1.2.3.4", "4.3.2.1", "4.3.2.2", "4.3.2.3", "4.3.2.4"}, endpointPorts),
+				makeEndpointSliceSecondary([]string{"1234::5678", "4321::5678", "4322::5678", "4323::5678", "4324::5678"}, endpointPorts),
+			},
+			expectUpdate: []runtime.Object{
+				makeEndpoints([]string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"}, endpointPorts),
+				makeEndpointSlice([]string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"}, endpointPorts),
+				makeEndpointSliceSecondary([]string{"1234::5678", "4322::5678", "4323::5678", "4324::5678"}, endpointPorts),
+			},
+			expectLeases: []string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4", "1234::5678", "4322::5678", "4323::5678", "4324::5678"},
+		},
+		{
+			testName: "existing endpoints satisfy but too many + extra masters + delete first",
+			ips: []net.IP{
+				netutils.ParseIPSloppy("4.3.2.4"),
+				netutils.ParseIPSloppy("4324::5678"),
+			},
+			endpointKeys: [][]string{{"4.3.2.1", "4321::5678"}, {"4.3.2.2", "4322::5678"}, {"4.3.2.3", "4323::5678"}, {"4.3.2.4", "4324::5678"}},
+			initialState: []runtime.Object{
+				makeEndpoints([]string{"1.2.3.4", "4.3.2.1", "4.3.2.2", "4.3.2.3", "4.3.2.4"}, endpointPorts),
+				makeEndpointSlice([]string{"1.2.3.4", "4.3.2.1", "4.3.2.2", "4.3.2.3", "4.3.2.4"}, endpointPorts),
+				makeEndpointSliceSecondary([]string{"1234::5678", "4321::5678", "4322::5678", "4323::5678", "4324::5678"}, endpointPorts),
+			},
+			expectUpdate: []runtime.Object{
+				makeEndpoints([]string{"4.3.2.1", "4.3.2.2", "4.3.2.3", "4.3.2.4"}, endpointPorts),
+				makeEndpointSlice([]string{"4.3.2.1", "4.3.2.2", "4.3.2.3", "4.3.2.4"}, endpointPorts),
+				makeEndpointSliceSecondary([]string{"4321::5678", "4322::5678", "4323::5678", "4324::5678"}, endpointPorts),
+			},
+			expectLeases: []string{"4.3.2.1", "4.3.2.2", "4.3.2.3", "4.3.2.4", "4321::5678", "4322::5678", "4323::5678", "4324::5678"},
+		},
+		{
+			testName: "existing endpoints current IP missing",
+			ips: []net.IP{
+				netutils.ParseIPSloppy("4.3.2.2"),
+				netutils.ParseIPSloppy("4322::5678"),
+			},
+			endpointKeys: [][]string{{"4.3.2.1", "4321::5678"}},
+			initialState: []runtime.Object{
+				makeEndpoints([]string{"4.3.2.1"}, endpointPorts),
+				makeEndpointSlice([]string{"4.3.2.1"}, endpointPorts),
+				makeEndpointSliceSecondary([]string{"4321::5678"}, endpointPorts),
+			},
+			expectUpdate: []runtime.Object{
+				makeEndpoints([]string{"4.3.2.1", "4.3.2.2"}, endpointPorts),
+				makeEndpointSlice([]string{"4.3.2.1", "4.3.2.2"}, endpointPorts),
+				makeEndpointSliceSecondary([]string{"4321::5678", "4322::5678"}, endpointPorts),
+			},
+			expectLeases: []string{"4.3.2.1", "4.3.2.2", "4321::5678", "4322::5678"},
+		},
+		{
+			testName: "existing endpoints, no lease, wrong IPs",
+			ips: []net.IP{
+				netutils.ParseIPSloppy("1.2.3.4"),
+				netutils.ParseIPSloppy("1234::5678"),
+			},
+			initialState: []runtime.Object{
+				makeEndpoints([]string{"4.3.2.1"}, endpointPorts),
+				makeEndpointSlice([]string{"4.3.2.1"}, endpointPorts),
+				makeEndpointSliceSecondary([]string{"4321::5678"}, endpointPorts),
+			},
+			expectUpdate: []runtime.Object{
+				makeEndpoints([]string{"1.2.3.4"}, endpointPorts),
+				makeEndpointSlice([]string{"1.2.3.4"}, endpointPorts),
+				makeEndpointSliceSecondary([]string{"1234::5678"}, endpointPorts),
+			},
+			expectLeases: []string{"1.2.3.4", "1234::5678"},
+		},
+	}
+	for _, test := range reconcileTests {
+		t.Run(test.testName, func(t *testing.T) {
+			fakeLeases := newFakeLeases(t, s)
+			err := fakeLeases.SetKeysDualStack(test.endpointKeys)
+			if err != nil {
+				t.Errorf("unexpected error creating keys: %v", err)
+			}
+			clientset := fake.NewSimpleClientset(test.initialState...)
+
+			epAdapter := NewEndpointsAdapter(clientset.CoreV1(), clientset.DiscoveryV1(),
+				testServiceNamespace, testServiceName,
+				testServiceIP, testServiceIPv6)
+			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
+			err = r.ReconcileEndpoints(test.ips, endpointPorts, true)
+			if err != nil {
+				t.Errorf("unexpected error reconciling: %v", err)
+			}
+
+			err = verifyActions(clientset, test.expectCreate, test.expectUpdate, test.expectDelete)
 			if err != nil {
 				t.Errorf("unexpected error in side effects: %v", err)
 			}
@@ -501,12 +775,12 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 			}
 			clientset := fake.NewSimpleClientset(test.initialState...)
 			epAdapter := NewEndpointsAdapter(clientset.CoreV1(), clientset.DiscoveryV1(),
-				testServiceNamespace, testServiceName, testServiceIP)
+				testServiceNamespace, testServiceName, testServiceIP, nil)
 			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
 			if !test.apiServerStartup {
 				r.StopReconciling()
 			}
-			err = r.RemoveEndpoints(netutils.ParseIPSloppy(test.ip), test.endpointPorts)
+			err = r.RemoveEndpoints([]net.IP{netutils.ParseIPSloppy(test.ip)}, test.endpointPorts)
 			// if the ip is not on the endpoints, it must return an storage error and stop reconciling
 			if !contains(test.endpointKeys, test.ip) {
 				if !storage.IsNotFound(err) {
@@ -619,31 +893,31 @@ func TestApiserverShutdown(t *testing.T) {
 			clientset := fake.NewSimpleClientset(test.initialState...)
 
 			epAdapter := NewEndpointsAdapter(clientset.CoreV1(), clientset.DiscoveryV1(),
-				testServiceNamespace, testServiceName, testServiceIP)
+				testServiceNamespace, testServiceName, testServiceIP, nil)
 			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
 
 			if test.shutDownBeforeReconcile {
 				// shutdown apiserver first
 				r.StopReconciling()
-				err = r.RemoveEndpoints(netutils.ParseIPSloppy(test.ip), test.endpointPorts)
+				err = r.RemoveEndpoints([]net.IP{netutils.ParseIPSloppy(test.ip)}, test.endpointPorts)
 				if err != nil {
 					t.Errorf("unexpected error remove endpoints: %v", err)
 				}
 
 				// reconcile endpoints in another goroutine
-				err = r.ReconcileEndpoints(netutils.ParseIPSloppy(test.ip), test.endpointPorts, false)
+				err = r.ReconcileEndpoints([]net.IP{netutils.ParseIPSloppy(test.ip)}, test.endpointPorts, false)
 				if err != nil {
 					t.Errorf("unexpected error reconciling: %v", err)
 				}
 			} else {
 				// reconcile endpoints first
-				err = r.ReconcileEndpoints(netutils.ParseIPSloppy(test.ip), test.endpointPorts, false)
+				err = r.ReconcileEndpoints([]net.IP{netutils.ParseIPSloppy(test.ip)}, test.endpointPorts, false)
 				if err != nil {
 					t.Errorf("unexpected error reconciling: %v", err)
 				}
 
 				r.StopReconciling()
-				err = r.RemoveEndpoints(netutils.ParseIPSloppy(test.ip), test.endpointPorts)
+				err = r.RemoveEndpoints([]net.IP{netutils.ParseIPSloppy(test.ip)}, test.endpointPorts)
 				if err != nil {
 					t.Errorf("unexpected error remove endpoints: %v", err)
 				}

@@ -37,42 +37,88 @@ func TestEndpointsAdapterGet(t *testing.T) {
 	endpoints1, epSlice1 := generateEndpointsAndSlice([]int{80, 443}, []string{"10.1.2.3", "10.1.2.4"})
 	ips1 := sets.New("10.1.2.3", "10.1.2.4")
 
-	testCases := map[string]struct {
-		initialState []runtime.Object
+	endpoints1v6, epSlice1v6 := generateEndpointsAndSlice([]int{80, 443}, []string{"1234::5678:0000:0000:9abc:def0"})
+	epSlice1v6.AddressType = discovery.AddressTypeIPv6
+	ipsV6 := sets.New("1234::5678:0000:0000:9abc:def0")
 
-		expectedError error
-		expectedIPs   sets.Set[string]
+	epSlice1AltName := epSlice1.DeepCopy()
+	epSlice1AltName.Name = testServiceName + "-v4"
+	epSlice1Secondary := epSlice1v6.DeepCopy()
+	epSlice1Secondary.Name = testServiceName + "-v6"
+
+	testCases := map[string]struct {
+		initialState       []runtime.Object
+		serviceIP          net.IP
+		secondaryServiceIP net.IP
+
+		expectedError        error
+		expectedIPs          sets.Set[string]
+		expectedSecondaryIPs sets.Set[string]
 	}{
 		"single-existing-endpoints": {
 			initialState: []runtime.Object{endpoints1, epSlice1},
+			serviceIP:    testServiceIP,
 
 			expectedIPs: ips1,
 		},
 		"endpoints exists, endpointslice does not": {
 			initialState: []runtime.Object{endpoints1},
+			serviceIP:    testServiceIP,
 
-			expectedIPs: ips1,
+			expectedIPs: sets.New[string](),
 		},
 		"endpointslice exists, endpoints does not": {
 			initialState: []runtime.Object{epSlice1},
+			serviceIP:    testServiceIP,
 
-			expectedIPs: sets.New[string](),
+			expectedIPs: ips1,
+		},
+		"endpoints is ignored in favor of endpointslice": {
+			initialState: []runtime.Object{endpoints1v6, epSlice1},
+			serviceIP:    testServiceIP,
+
+			expectedIPs: ips1,
+		},
+		"IPv6 endpoints ignored in IPv4 cluster": {
+			initialState: []runtime.Object{epSlice1, epSlice1Secondary},
+			serviceIP:    testServiceIP,
+
+			expectedIPs: ips1,
+		},
+		"IPv4 endpoints ignored in IPv6 cluster": {
+			initialState: []runtime.Object{epSlice1AltName, epSlice1v6},
+			serviceIP:    testServiceIPv6,
+
+			expectedIPs: ipsV6,
+		},
+		"All endpoints used in dual-stack cluster": {
+			initialState:       []runtime.Object{epSlice1, epSlice1Secondary},
+			serviceIP:          testServiceIP,
+			secondaryServiceIP: testServiceIPv6,
+
+			expectedIPs:          ips1,
+			expectedSecondaryIPs: ipsV6,
 		},
 	}
 
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
 			client := fake.NewSimpleClientset(testCase.initialState...)
-			epAdapter := NewEndpointsAdapter(client.CoreV1(), client.DiscoveryV1(), testServiceNamespace, testServiceName, testServiceIP)
+			epAdapter := NewEndpointsAdapter(client.CoreV1(), client.DiscoveryV1(),
+				testServiceNamespace, testServiceName,
+				testCase.serviceIP, testCase.secondaryServiceIP)
 
-			ips, err := epAdapter.Get()
+			primaryIPs, secondaryIPs, err := epAdapter.Get()
 
 			if !apiequality.Semantic.DeepEqual(testCase.expectedError, err) {
 				t.Errorf("Expected error: %v, got: %v", testCase.expectedError, err)
 			}
 
-			if !apiequality.Semantic.DeepEqual(ips, testCase.expectedIPs) {
-				t.Errorf("Wrong result from Get. Diff:\n%s", cmp.Diff(testCase.expectedIPs, ips))
+			if !apiequality.Semantic.DeepEqual(primaryIPs, testCase.expectedIPs) {
+				t.Errorf("Wrong primary IPs:\n%s", cmp.Diff(testCase.expectedIPs, primaryIPs))
+			}
+			if !apiequality.Semantic.DeepEqual(secondaryIPs, testCase.expectedSecondaryIPs) {
+				t.Errorf("Wrong secondary IPs:\n%s", cmp.Diff(testCase.expectedSecondaryIPs, secondaryIPs))
 			}
 		})
 	}
@@ -108,11 +154,17 @@ func TestEndpointsAdapterSync(t *testing.T) {
 	epSlice1AltName := epSlice1.DeepCopy()
 	epSlice1AltName.Name = "kubernetes-v4"
 
+	// For testing when some but not all apiservers are dual-stack
+	ipsDualPartial := sets.New("10.1.2.3", "10.1.2.4", "1234::5678")
+	epSlice1SecondaryEmpty := epSlice1Secondary.DeepCopy()
+	epSlice1SecondaryEmpty.Endpoints = []discovery.Endpoint{}
+
 	testCases := map[string]struct {
-		serviceIP    net.IP
-		initialState []runtime.Object
-		ipsParam     sets.Set[string]
-		portsParam   []corev1.EndpointPort
+		serviceIP          net.IP
+		secondaryServiceIP net.IP
+		initialState       []runtime.Object
+		ipsParam           sets.Set[string]
+		portsParam         []corev1.EndpointPort
 
 		expectedError error
 		expectCreate  []runtime.Object
@@ -258,15 +310,49 @@ func TestEndpointsAdapterSync(t *testing.T) {
 			expectDelete: []runtime.Object{epSliceV6},
 			expectCreate: []runtime.Object{epSlice1},
 		},
-		"dual-stack-rollback": {
-			// If a single-stack IPv4 apiserver starts up in a cluster with
-			// dual-stack EndpointSlices, it will delete the IPv6 slice.
-			serviceIP:    testServiceIP,
-			initialState: []runtime.Object{endpoints1, epSlice1, epSlice1Secondary},
-			ipsParam:     ips1,
+		"dual-stack-partial-rollout": {
+			// When the first apiserver in a formerly single-stack IPv4
+			// cluster switches to dual-stack, the endpoints will initially
+			// stay single-stack.
+			serviceIP:          testServiceIP,
+			secondaryServiceIP: testServiceIPv6,
+			initialState:       []runtime.Object{endpoints1, epSlice1},
+			ipsParam:           ipsDualPartial,
+			portsParam:         ports1,
 
+			expectCreate: []runtime.Object{epSlice1SecondaryEmpty},
+		},
+		"dual-stack-finished-rollout": {
+			// When the last apiserver in a formerly single-stack IPv4 cluster
+			// switches to dual-stack, the endpoints become dual-stack.
+			serviceIP:          testServiceIP,
+			secondaryServiceIP: testServiceIPv6,
+			initialState:       []runtime.Object{endpoints1, epSlice1, epSlice1SecondaryEmpty},
+			ipsParam:           ipsDual,
+			portsParam:         ports1,
+
+			expectUpdate: []runtime.Object{epSlice1Secondary},
+		},
+		"dual-stack-partial-rollback": {
+			// When the first apiserver in a formerly dual-stack cluster
+			// switches to single-stack IPv4, the endpoints immediately become
+			// single-stack.
+			serviceIP:          testServiceIP,
+			secondaryServiceIP: testServiceIPv6,
+			initialState:       []runtime.Object{endpoints1, epSlice1, epSlice1Secondary},
+			ipsParam:           ipsDualPartial,
+			portsParam:         ports1,
+
+			expectUpdate: []runtime.Object{epSlice1SecondaryEmpty},
+		},
+		"dual-stack-finished-rollback": {
+			// When the last apiserver in a formerly dual-stack cluster
+			// switches to single-stack IPv4, the empty IPv6 slice is deleted.
+			serviceIP:    testServiceIP,
+			initialState: []runtime.Object{endpoints1, epSlice1, epSlice1SecondaryEmpty},
+			ipsParam:     ips1,
 			portsParam:   ports1,
-			expectDelete: []runtime.Object{epSlice1Secondary},
+			expectDelete: []runtime.Object{epSlice1SecondaryEmpty},
 		},
 		"dual-stack-alt-rollback": {
 			// If a single-stack IPv4 apiserver starts up in a cluster with
@@ -309,7 +395,9 @@ func TestEndpointsAdapterSync(t *testing.T) {
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
 			client := fake.NewSimpleClientset(testCase.initialState...)
-			epAdapter := NewEndpointsAdapter(client.CoreV1(), client.DiscoveryV1(), testServiceNamespace, testServiceName, testCase.serviceIP)
+			epAdapter := NewEndpointsAdapter(client.CoreV1(), client.DiscoveryV1(),
+				testServiceNamespace, testServiceName,
+				testCase.serviceIP, testCase.secondaryServiceIP)
 
 			err := epAdapter.Sync(testCase.ipsParam, testCase.portsParam, true)
 			if !apiequality.Semantic.DeepEqual(testCase.expectedError, err) {

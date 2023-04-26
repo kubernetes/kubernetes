@@ -55,7 +55,7 @@ func NewMasterCountEndpointReconciler(masterCount int, epAdapter *EndpointsAdapt
 //   - All apiservers MUST know and agree on the number of apiservers expected
 //     to be running (c.masterCount).
 //   - ReconcileEndpoints is called periodically from all apiservers.
-func (r *masterCountEndpointReconciler) ReconcileEndpoints(ip net.IP, endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
+func (r *masterCountEndpointReconciler) ReconcileEndpoints(ips []net.IP, endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
 	r.reconcilingLock.Lock()
 	defer r.reconcilingLock.Unlock()
 
@@ -63,13 +63,13 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(ip net.IP, endpointPo
 		return nil
 	}
 
-	endpointIPs, err := r.epAdapter.Get()
+	endpointIPs, _, err := r.epAdapter.Get()
 	if err != nil {
 		return err
 	}
 
 	// We *always* add our own IP address.
-	ipStr := ip.String()
+	ipStr := ips[0].String()
 	endpointIPs.Insert(ipStr)
 
 	// If we want M IPs and have N where N>M, then remove the (N-M) IPs immediately
@@ -93,16 +93,16 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(ip net.IP, endpointPo
 	return r.epAdapter.Sync(endpointIPs, endpointPorts, reconcilePorts)
 }
 
-func (r *masterCountEndpointReconciler) RemoveEndpoints(ip net.IP, endpointPorts []corev1.EndpointPort) error {
+func (r *masterCountEndpointReconciler) RemoveEndpoints(ips []net.IP, endpointPorts []corev1.EndpointPort) error {
 	r.reconcilingLock.Lock()
 	defer r.reconcilingLock.Unlock()
 
-	endpointIPs, err := r.epAdapter.Get()
+	endpointIPs, _, err := r.epAdapter.Get()
 	if err != nil {
 		return err
 	}
 
-	ipStr := ip.String()
+	ipStr := ips[0].String()
 	if len(endpointIPs) == 0 || !endpointIPs.Has(ipStr) {
 		// Nothing to do
 		return nil
