@@ -2208,13 +2208,8 @@ func (kl *Kubelet) canAdmitPod(pods []*v1.Pod, pod *v1.Pod) (bool, string, strin
 		otherPods := make([]*v1.Pod, 0, len(pods))
 		for _, p := range pods {
 			op := p.DeepCopy()
-			for _, c := range op.Spec.Containers {
-				allocatedResources, found := kl.statusManager.GetContainerResourceAllocation(string(p.UID), c.Name)
-				if c.Resources.Requests != nil && found {
-					c.Resources.Requests[v1.ResourceCPU] = allocatedResources[v1.ResourceCPU]
-					c.Resources.Requests[v1.ResourceMemory] = allocatedResources[v1.ResourceMemory]
-				}
-			}
+			kl.updateContainerResourceAllocation(op)
+
 			otherPods = append(otherPods, op)
 		}
 		attrs.OtherPods = otherPods
@@ -2505,13 +2500,8 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 				// To handle kubelet restarts, test pod admissibility using AllocatedResources values
 				// (for cpu & memory) from checkpoint store. If found, that is the source of truth.
 				podCopy := pod.DeepCopy()
-				for _, c := range podCopy.Spec.Containers {
-					allocatedResources, found := kl.statusManager.GetContainerResourceAllocation(string(pod.UID), c.Name)
-					if c.Resources.Requests != nil && found {
-						c.Resources.Requests[v1.ResourceCPU] = allocatedResources[v1.ResourceCPU]
-						c.Resources.Requests[v1.ResourceMemory] = allocatedResources[v1.ResourceMemory]
-					}
-				}
+				kl.updateContainerResourceAllocation(podCopy)
+
 				// Check if we can admit the pod; if not, reject it.
 				if ok, reason, message := kl.canAdmitPod(activePods, podCopy); !ok {
 					kl.rejectPod(pod, reason, message)
@@ -2532,6 +2522,22 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 		}
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
 		kl.dispatchWork(pod, kubetypes.SyncPodCreate, mirrorPod, start)
+	}
+}
+
+// updateContainerResourceAllocation updates AllocatedResources values
+// (for cpu & memory) from checkpoint store
+func (kl *Kubelet) updateContainerResourceAllocation(pod *v1.Pod) {
+	for _, c := range pod.Spec.Containers {
+		allocatedResources, found := kl.statusManager.GetContainerResourceAllocation(string(pod.UID), c.Name)
+		if c.Resources.Requests != nil && found {
+			if _, ok := allocatedResources[v1.ResourceCPU]; ok {
+				c.Resources.Requests[v1.ResourceCPU] = allocatedResources[v1.ResourceCPU]
+			}
+			if _, ok := allocatedResources[v1.ResourceMemory]; ok {
+				c.Resources.Requests[v1.ResourceMemory] = allocatedResources[v1.ResourceMemory]
+			}
+		}
 	}
 }
 

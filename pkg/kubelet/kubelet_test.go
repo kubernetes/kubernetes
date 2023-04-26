@@ -83,6 +83,7 @@ import (
 	serverstats "k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/stats"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	"k8s.io/kubernetes/pkg/kubelet/status/state"
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	"k8s.io/kubernetes/pkg/kubelet/token"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -2435,6 +2436,190 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, podToReject, v1.PodFailed)
 	checkPodStatus(t, kl, podToAdmit, v1.PodPending)
+}
+
+func TestPodResourceAllocationReset(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+	testKubelet := newTestKubelet(t, false)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+	kubelet.statusManager = status.NewFakeManager()
+
+	nodes := []*v1.Node{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+			Status: v1.NodeStatus{
+				Capacity: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("8"),
+					v1.ResourceMemory: resource.MustParse("8Gi"),
+				},
+				Allocatable: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("4"),
+					v1.ResourceMemory: resource.MustParse("4Gi"),
+					v1.ResourcePods:   *resource.NewQuantity(40, resource.DecimalSI),
+				},
+			},
+		},
+	}
+	kubelet.nodeLister = testNodeLister{nodes: nodes}
+
+	cpu500m := resource.MustParse("500m")
+	cpu800m := resource.MustParse("800m")
+	mem500M := resource.MustParse("500Mi")
+	mem800M := resource.MustParse("800Mi")
+	cpu500mMem500MPodSpec := &v1.PodSpec{
+		Containers: []v1.Container{
+			{
+				Name: "c1",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+				},
+			},
+		},
+	}
+	cpu800mMem800MPodSpec := cpu500mMem500MPodSpec.DeepCopy()
+	cpu800mMem800MPodSpec.Containers[0].Resources.Requests = v1.ResourceList{v1.ResourceCPU: cpu800m, v1.ResourceMemory: mem800M}
+	cpu800mPodSpec := cpu500mMem500MPodSpec.DeepCopy()
+	cpu800mPodSpec.Containers[0].Resources.Requests = v1.ResourceList{v1.ResourceCPU: cpu800m}
+	mem800MPodSpec := cpu500mMem500MPodSpec.DeepCopy()
+	mem800MPodSpec.Containers[0].Resources.Requests = v1.ResourceList{v1.ResourceMemory: mem800M}
+
+	cpu500mPodSpec := cpu500mMem500MPodSpec.DeepCopy()
+	cpu500mPodSpec.Containers[0].Resources.Requests = v1.ResourceList{v1.ResourceCPU: cpu500m}
+	mem500MPodSpec := cpu500mMem500MPodSpec.DeepCopy()
+	mem500MPodSpec.Containers[0].Resources.Requests = v1.ResourceList{v1.ResourceMemory: mem500M}
+	emptyPodSpec := cpu500mMem500MPodSpec.DeepCopy()
+	emptyPodSpec.Containers[0].Resources.Requests = v1.ResourceList{}
+
+	tests := []struct {
+		name                          string
+		pod                           *v1.Pod
+		existingPodAllocation         *v1.Pod
+		expectedPodResourceAllocation state.PodResourceAllocation
+	}{
+		{
+			name: "Having both memory and cpu, resource allocation not exists",
+			pod:  podWithUIDNameNsSpec("1", "pod1", "foo", *cpu500mMem500MPodSpec),
+			expectedPodResourceAllocation: state.PodResourceAllocation{
+				"1": map[string]v1.ResourceList{
+					cpu500mMem500MPodSpec.Containers[0].Name: cpu500mMem500MPodSpec.Containers[0].Resources.Requests,
+				},
+			},
+		},
+		{
+			name:                  "Having both memory and cpu, resource allocation exists",
+			pod:                   podWithUIDNameNsSpec("2", "pod2", "foo", *cpu500mMem500MPodSpec),
+			existingPodAllocation: podWithUIDNameNsSpec("2", "pod2", "foo", *cpu500mMem500MPodSpec),
+			expectedPodResourceAllocation: state.PodResourceAllocation{
+				"2": map[string]v1.ResourceList{
+					cpu500mMem500MPodSpec.Containers[0].Name: cpu500mMem500MPodSpec.Containers[0].Resources.Requests,
+				},
+			},
+		},
+		{
+			name:                  "Having both memory and cpu, resource allocation exists (with different value)",
+			pod:                   podWithUIDNameNsSpec("3", "pod3", "foo", *cpu500mMem500MPodSpec),
+			existingPodAllocation: podWithUIDNameNsSpec("3", "pod3", "foo", *cpu800mMem800MPodSpec),
+			expectedPodResourceAllocation: state.PodResourceAllocation{
+				"3": map[string]v1.ResourceList{
+					cpu800mMem800MPodSpec.Containers[0].Name: cpu800mMem800MPodSpec.Containers[0].Resources.Requests,
+				},
+			},
+		},
+		{
+			name: "Only has cpu, resource allocation not exists",
+			pod:  podWithUIDNameNsSpec("4", "pod5", "foo", *cpu500mPodSpec),
+			expectedPodResourceAllocation: state.PodResourceAllocation{
+				"4": map[string]v1.ResourceList{
+					cpu500mPodSpec.Containers[0].Name: cpu500mPodSpec.Containers[0].Resources.Requests,
+				},
+			},
+		},
+		{
+			name:                  "Only has cpu, resource allocation exists",
+			pod:                   podWithUIDNameNsSpec("5", "pod5", "foo", *cpu500mPodSpec),
+			existingPodAllocation: podWithUIDNameNsSpec("5", "pod5", "foo", *cpu500mPodSpec),
+			expectedPodResourceAllocation: state.PodResourceAllocation{
+				"5": map[string]v1.ResourceList{
+					cpu500mPodSpec.Containers[0].Name: cpu500mPodSpec.Containers[0].Resources.Requests,
+				},
+			},
+		},
+		{
+			name:                  "Only has cpu, resource allocation exists (with different value)",
+			pod:                   podWithUIDNameNsSpec("6", "pod6", "foo", *cpu500mPodSpec),
+			existingPodAllocation: podWithUIDNameNsSpec("6", "pod6", "foo", *cpu800mPodSpec),
+			expectedPodResourceAllocation: state.PodResourceAllocation{
+				"6": map[string]v1.ResourceList{
+					cpu800mPodSpec.Containers[0].Name: cpu800mPodSpec.Containers[0].Resources.Requests,
+				},
+			},
+		},
+		{
+			name: "Only has memory, resource allocation not exists",
+			pod:  podWithUIDNameNsSpec("7", "pod7", "foo", *mem500MPodSpec),
+			expectedPodResourceAllocation: state.PodResourceAllocation{
+				"7": map[string]v1.ResourceList{
+					mem500MPodSpec.Containers[0].Name: mem500MPodSpec.Containers[0].Resources.Requests,
+				},
+			},
+		},
+		{
+			name:                  "Only has memory, resource allocation exists",
+			pod:                   podWithUIDNameNsSpec("8", "pod8", "foo", *mem500MPodSpec),
+			existingPodAllocation: podWithUIDNameNsSpec("8", "pod8", "foo", *mem500MPodSpec),
+			expectedPodResourceAllocation: state.PodResourceAllocation{
+				"8": map[string]v1.ResourceList{
+					mem500MPodSpec.Containers[0].Name: mem500MPodSpec.Containers[0].Resources.Requests,
+				},
+			},
+		},
+		{
+			name:                  "Only has memory, resource allocation exists (with different value)",
+			pod:                   podWithUIDNameNsSpec("9", "pod9", "foo", *mem500MPodSpec),
+			existingPodAllocation: podWithUIDNameNsSpec("9", "pod9", "foo", *mem800MPodSpec),
+			expectedPodResourceAllocation: state.PodResourceAllocation{
+				"9": map[string]v1.ResourceList{
+					mem800MPodSpec.Containers[0].Name: mem800MPodSpec.Containers[0].Resources.Requests,
+				},
+			},
+		},
+		{
+			name: "No CPU and memory, resource allocation not exists",
+			pod:  podWithUIDNameNsSpec("10", "pod10", "foo", *emptyPodSpec),
+			expectedPodResourceAllocation: state.PodResourceAllocation{
+				"10": map[string]v1.ResourceList{
+					emptyPodSpec.Containers[0].Name: emptyPodSpec.Containers[0].Resources.Requests,
+				},
+			},
+		},
+		{
+			name:                  "No CPU and memory, resource allocation exists",
+			pod:                   podWithUIDNameNsSpec("11", "pod11", "foo", *emptyPodSpec),
+			existingPodAllocation: podWithUIDNameNsSpec("11", "pod11", "foo", *emptyPodSpec),
+			expectedPodResourceAllocation: state.PodResourceAllocation{
+				"11": map[string]v1.ResourceList{
+					emptyPodSpec.Containers[0].Name: emptyPodSpec.Containers[0].Resources.Requests,
+				},
+			},
+		},
+	}
+	for _, tc := range tests {
+		if tc.existingPodAllocation != nil {
+			// when kubelet restarts, AllocatedResources has already existed before adding pod
+			err := kubelet.statusManager.SetPodAllocation(tc.existingPodAllocation)
+			if err != nil {
+				t.Fatalf("failed to set pod allocation: %v", err)
+			}
+		}
+		kubelet.HandlePodAdditions([]*v1.Pod{tc.pod})
+
+		allocatedResources, found := kubelet.statusManager.GetContainerResourceAllocation(string(tc.pod.UID), tc.pod.Spec.Containers[0].Name)
+		if !found {
+			t.Fatalf("resource allocation should exist: (pod: %#v, container: %s)", tc.pod, tc.pod.Spec.Containers[0].Name)
+		}
+		assert.Equal(t, tc.expectedPodResourceAllocation[string(tc.pod.UID)][tc.pod.Spec.Containers[0].Name], allocatedResources, tc.name)
+	}
 }
 
 func TestHandlePodResourcesResize(t *testing.T) {
