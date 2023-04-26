@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 	utilnet "k8s.io/utils/net"
 )
@@ -78,54 +79,73 @@ func (adapter *EndpointsAdapter) Get() (sets.Set[string], error) {
 // an error occurs while updating, that error will be returned.
 func (adapter *EndpointsAdapter) Sync(ips sets.Set[string], endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
 	// Sync Endpoints
-	currentEndpoints, err := adapter.endpointClient.Endpoints(adapter.serviceNamespace).Get(context.TODO(), adapter.serviceName, metav1.GetOptions{})
-	if err != nil {
-		if !errors.IsNotFound(err) {
-			return err
+	var endpoints *corev1.Endpoints
+	err := retry.OnError(retry.DefaultBackoff, isRetriableError, func() error {
+		currentEndpoints, err := adapter.endpointClient.Endpoints(adapter.serviceNamespace).Get(context.TODO(), adapter.serviceName, metav1.GetOptions{})
+		if err != nil {
+			if !errors.IsNotFound(err) {
+				return err
+			}
+			currentEndpoints = nil
 		}
-		currentEndpoints = nil
-	}
-	endpoints := adapter.updateEndpoints(currentEndpoints, ips, endpointPorts, reconcilePorts)
+		endpoints = adapter.updateEndpoints(currentEndpoints, ips, endpointPorts, reconcilePorts)
 
-	if currentEndpoints == nil {
-		_, err = adapter.endpointClient.Endpoints(endpoints.Namespace).Create(context.TODO(), endpoints, metav1.CreateOptions{})
-	} else if !apiequality.Semantic.DeepEqual(currentEndpoints.Subsets, endpoints.Subsets) ||
-		!apiequality.Semantic.DeepEqual(currentEndpoints.Labels, endpoints.Labels) {
-		klog.Warningf("Resetting endpoints for master service %q to %v", endpoints.Name, endpoints)
-		_, err = adapter.endpointClient.Endpoints(endpoints.Namespace).Update(context.TODO(), endpoints, metav1.UpdateOptions{})
-	}
+		if currentEndpoints == nil {
+			_, err = adapter.endpointClient.Endpoints(endpoints.Namespace).Create(context.TODO(), endpoints, metav1.CreateOptions{})
+		} else if !apiequality.Semantic.DeepEqual(currentEndpoints.Subsets, endpoints.Subsets) ||
+			!apiequality.Semantic.DeepEqual(currentEndpoints.Labels, endpoints.Labels) {
+			klog.Warningf("Resetting endpoints for master service %q to %v", endpoints.Name, endpoints)
+			_, err = adapter.endpointClient.Endpoints(endpoints.Namespace).Update(context.TODO(), endpoints, metav1.UpdateOptions{})
+		}
+		return err
+	})
 	if err != nil {
 		return err
 	}
 
 	// Sync EndpointSlice
-	currentEndpointSlice, err := adapter.endpointSliceClient.EndpointSlices(adapter.serviceNamespace).Get(context.TODO(), adapter.serviceName, metav1.GetOptions{})
-	if err != nil {
-		if !errors.IsNotFound(err) {
-			return err
-		}
-		currentEndpointSlice = nil
-	}
-
-	endpointSlice := endpointSliceFromEndpoints(endpoints)
-
-	// required for transition from IP to IPv4 address type.
-	if currentEndpointSlice != nil && currentEndpointSlice.AddressType != endpointSlice.AddressType {
-		err = adapter.endpointSliceClient.EndpointSlices(endpointSlice.Namespace).Delete(context.TODO(), endpointSlice.Name, metav1.DeleteOptions{})
+	err = retry.OnError(retry.DefaultBackoff, isRetriableError, func() error {
+		currentEndpointSlice, err := adapter.endpointSliceClient.EndpointSlices(adapter.serviceNamespace).Get(context.TODO(), adapter.serviceName, metav1.GetOptions{})
 		if err != nil {
-			return err
+			if !errors.IsNotFound(err) {
+				return err
+			}
+			currentEndpointSlice = nil
 		}
-		currentEndpointSlice = nil
-	}
 
-	if currentEndpointSlice == nil {
-		_, err = adapter.endpointSliceClient.EndpointSlices(endpointSlice.Namespace).Create(context.TODO(), endpointSlice, metav1.CreateOptions{})
-	} else if !apiequality.Semantic.DeepEqual(currentEndpointSlice.Endpoints, endpointSlice.Endpoints) ||
-		!apiequality.Semantic.DeepEqual(currentEndpointSlice.Ports, endpointSlice.Ports) ||
-		!apiequality.Semantic.DeepEqual(currentEndpointSlice.Labels, endpointSlice.Labels) {
-		_, err = adapter.endpointSliceClient.EndpointSlices(endpointSlice.Namespace).Update(context.TODO(), endpointSlice, metav1.UpdateOptions{})
-	}
+		endpointSlice := endpointSliceFromEndpoints(endpoints)
+
+		// required for transition from IP to IPv4 address type.
+		if currentEndpointSlice != nil && currentEndpointSlice.AddressType != endpointSlice.AddressType {
+			err = adapter.endpointSliceClient.EndpointSlices(endpointSlice.Namespace).Delete(context.TODO(), endpointSlice.Name, metav1.DeleteOptions{})
+			if err != nil && !errors.IsNotFound(err) {
+				return err
+			}
+			currentEndpointSlice = nil
+		}
+
+		if currentEndpointSlice == nil {
+			_, err = adapter.endpointSliceClient.EndpointSlices(endpointSlice.Namespace).Create(context.TODO(), endpointSlice, metav1.CreateOptions{})
+		} else if !apiequality.Semantic.DeepEqual(currentEndpointSlice.Endpoints, endpointSlice.Endpoints) ||
+			!apiequality.Semantic.DeepEqual(currentEndpointSlice.Ports, endpointSlice.Ports) ||
+			!apiequality.Semantic.DeepEqual(currentEndpointSlice.Labels, endpointSlice.Labels) {
+			_, err = adapter.endpointSliceClient.EndpointSlices(endpointSlice.Namespace).Update(context.TODO(), endpointSlice, metav1.UpdateOptions{})
+		}
+		return err
+	})
 	return err
+}
+
+// isRetriableError is used by the call to retry.RetryOnError in Sync; we want to retry if
+// an Update() call returns Conflict (another apiserver updated the object we were about
+// to update), or if a Create() call returns Exists (another apiserver created the object
+// we were about to create). (OTOH if a Delete() call returns Not Found (another apiserver
+// deleted the object we were about to delete), Sync just ignores the error and continues
+// since the new state is correct anyway). Any other errors are fatal. (In particular, a
+// Not Found in response to an Update() call can't occur in a correctly-configured
+// cluster, so it's better to let it be logged as an error.)
+func isRetriableError(err error) bool {
+	return errors.IsConflict(err) || errors.IsAlreadyExists(err)
 }
 
 // updateEndpoints updates endpoints to reflect ips and (optionally) endpointPorts
