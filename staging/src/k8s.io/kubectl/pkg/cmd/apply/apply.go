@@ -330,6 +330,13 @@ func (flags *ApplyFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, baseNa
 		if err != nil {
 			return nil, err
 		}
+	} else {
+		if len(flags.PruneAllowlist) > 0 {
+			klog.Warningln("--prune-allowlist requires --prune")
+		}
+		if len(flags.PruneWhitelist) > 0 {
+			klog.Warningln("--prune-whitelist requires --prune")
+		}
 	}
 
 	o := &ApplyOptions{
