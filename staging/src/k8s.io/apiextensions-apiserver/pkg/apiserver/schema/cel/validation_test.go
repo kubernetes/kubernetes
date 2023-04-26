@@ -338,6 +338,21 @@ func TestValidationExpressions(t *testing.T) {
 				"self.val1 + self.val2 == [1, 2, 3, 1, 2, 3]",
 				"self.val1 + [4, 5] == [1, 2, 3, 4, 5]",
 			},
+			errors: map[string]string{
+				// Mixed type lists are not allowed since we have HomogeneousAggregateLiterals enabled
+				"[1, 'a', false].filter(x, string(x) == 'a')": "expected type 'int' but found 'string'",
+			},
+		},
+		{name: "string lists",
+			obj:    objs([]interface{}{"a", "b", "c"}),
+			schema: schemas(listType(&stringType)),
+			valid: []string{
+				// Join function
+				"self.val1.join('-') == 'a-b-c'",
+				"['a', 'b', 'c'].join('-') == 'a-b-c'",
+				"self.val1.join() == 'abc'",
+				"['a', 'b', 'c'].join() == 'abc'",
+			},
 		},
 		{name: "listSets",
 			obj:    objs([]interface{}{"a", "b", "c"}, []interface{}{"a", "c", "b"}),
@@ -351,6 +366,12 @@ func TestValidationExpressions(t *testing.T) {
 				"!('x' in self.val1)",
 				"self.val1 + self.val2 == ['a', 'b', 'c']",
 				"self.val1 + ['c', 'd'] == ['a', 'b', 'c', 'd']",
+
+				// Join function
+				"self.val1.join('-') == 'a-b-c'",
+				"['a', 'b', 'c'].join('-') == 'a-b-c'",
+				"self.val1.join() == 'abc'",
+				"['a', 'b', 'c'].join() == 'abc'",
 			},
 		},
 		{name: "listMaps",
@@ -402,6 +423,10 @@ func TestValidationExpressions(t *testing.T) {
 				"'k1' in self.val1",
 				"!('k3' in self.val1)",
 				"self.val1 == {'k1': 'a', 'k2': 'b'}",
+			},
+			errors: map[string]string{
+				// Mixed type maps are not allowed since we have HomogeneousAggregateLiterals enabled
+				"{'k1': 'a', 'k2': 1, 'k2': false}": "expected type 'string' but found 'int'",
 			},
 		},
 		{name: "objects",
