@@ -29,10 +29,11 @@
         "cpu": "{{cpurequest}}"
       }
     },
-    "command": ["/cloud-controller-manager"],
     "args": [
       "--log-file=/var/log/cloud-controller-manager.log",
-      "--logtostderr=false",
+      "--also-stdout=false",
+      "--redirect-stderr=true",
+      "/cloud-controller-manager",
       {{params}}
     ],
     {{container_env}}
