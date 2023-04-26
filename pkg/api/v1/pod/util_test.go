@@ -913,6 +913,18 @@ func TestUpdatePodCondition(t *testing.T) {
 			expected: true,
 			desc:     "not equal Status, should get updated",
 		},
+		{
+			status: &podStatus,
+			conditions: v1.PodCondition{
+				Type:               v1.PodReady,
+				Status:             v1.ConditionFalse,
+				Reason:             "successfully",
+				Message:            "sync pod successfully",
+				LastProbeTime:      metav1.NewTime(time.Add(1000)),
+				LastTransitionTime: metav1.NewTime(time.Add(1000))},
+			expected: true,
+			desc:     "not equal LastProbeTime, should get updated",
+		},
 	}
 
 	for _, test := range tests {
