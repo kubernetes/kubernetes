@@ -1,4 +1,4 @@
-// Copyright (c) 2020 Uber Technologies, Inc.
+// Copyright (c) 2022 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -18,10 +18,43 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+//go:build go1.18 && !go1.19
+// +build go1.18,!go1.19
+
 package atomic
 
-//go:generate bin/gen-atomicint -name=Int32 -wrapped=int32 -file=int32.go
-//go:generate bin/gen-atomicint -name=Int64 -wrapped=int64 -file=int64.go
-//go:generate bin/gen-atomicint -name=Uint32 -wrapped=uint32 -unsigned -file=uint32.go
-//go:generate bin/gen-atomicint -name=Uint64 -wrapped=uint64 -unsigned -file=uint64.go
-//go:generate bin/gen-atomicint -name=Uintptr -wrapped=uintptr -unsigned -file=uintptr.go
+import "unsafe"
+
+type Pointer[T any] struct {
+	_ nocmp // disallow non-atomic comparison
+	p UnsafePointer
+}
+
+// NewPointer creates a new Pointer.
+func NewPointer[T any](v *T) *Pointer[T] {
+	var p Pointer[T]
+	if v != nil {
+		p.p.Store(unsafe.Pointer(v))
+	}
+	return &p
+}
+
+// Load atomically loads the wrapped value.
+func (p *Pointer[T]) Load() *T {
+	return (*T)(p.p.Load())
+}
+
+// Store atomically stores the passed value.
+func (p *Pointer[T]) Store(val *T) {
+	p.p.Store(unsafe.Pointer(val))
+}
+
+// Swap atomically swaps the wrapped pointer and returns the old value.
+func (p *Pointer[T]) Swap(val *T) (old *T) {
+	return (*T)(p.p.Swap(unsafe.Pointer(val)))
+}
+
+// CompareAndSwap is an atomic compare-and-swap.
+func (p *Pointer[T]) CompareAndSwap(old, new *T) (swapped bool) {
+	return p.p.CompareAndSwap(unsafe.Pointer(old), unsafe.Pointer(new))
+}

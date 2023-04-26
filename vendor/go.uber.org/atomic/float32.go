@@ -27,48 +27,48 @@ import (
 	"math"
 )
 
-// Float64 is an atomic type-safe wrapper for float64 values.
-type Float64 struct {
+// Float32 is an atomic type-safe wrapper for float32 values.
+type Float32 struct {
 	_ nocmp // disallow non-atomic comparison
 
-	v Uint64
+	v Uint32
 }
 
-var _zeroFloat64 float64
+var _zeroFloat32 float32
 
-// NewFloat64 creates a new Float64.
-func NewFloat64(val float64) *Float64 {
-	x := &Float64{}
-	if val != _zeroFloat64 {
+// NewFloat32 creates a new Float32.
+func NewFloat32(val float32) *Float32 {
+	x := &Float32{}
+	if val != _zeroFloat32 {
 		x.Store(val)
 	}
 	return x
 }
 
-// Load atomically loads the wrapped float64.
-func (x *Float64) Load() float64 {
-	return math.Float64frombits(x.v.Load())
+// Load atomically loads the wrapped float32.
+func (x *Float32) Load() float32 {
+	return math.Float32frombits(x.v.Load())
 }
 
-// Store atomically stores the passed float64.
-func (x *Float64) Store(val float64) {
-	x.v.Store(math.Float64bits(val))
+// Store atomically stores the passed float32.
+func (x *Float32) Store(val float32) {
+	x.v.Store(math.Float32bits(val))
 }
 
-// Swap atomically stores the given float64 and returns the old
+// Swap atomically stores the given float32 and returns the old
 // value.
-func (x *Float64) Swap(val float64) (old float64) {
-	return math.Float64frombits(x.v.Swap(math.Float64bits(val)))
+func (x *Float32) Swap(val float32) (old float32) {
+	return math.Float32frombits(x.v.Swap(math.Float32bits(val)))
 }
 
-// MarshalJSON encodes the wrapped float64 into JSON.
-func (x *Float64) MarshalJSON() ([]byte, error) {
+// MarshalJSON encodes the wrapped float32 into JSON.
+func (x *Float32) MarshalJSON() ([]byte, error) {
 	return json.Marshal(x.Load())
 }
 
-// UnmarshalJSON decodes a float64 from JSON.
-func (x *Float64) UnmarshalJSON(b []byte) error {
-	var v float64
+// UnmarshalJSON decodes a float32 from JSON.
+func (x *Float32) UnmarshalJSON(b []byte) error {
+	var v float32
 	if err := json.Unmarshal(b, &v); err != nil {
 		return err
 	}

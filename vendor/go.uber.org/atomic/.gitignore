@@ -10,3 +10,6 @@ lint.log
 
 # Profiling output
 *.prof
+
+# Output of fossa analyzer
+/fossa
