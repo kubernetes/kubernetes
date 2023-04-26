@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Uber Technologies, Inc.
+// Copyright (c) 2017-2023 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -18,11 +18,18 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-// +build go1.13
+//go:build !go1.20
+// +build !go1.20
 
 package multierr
 
 import "errors"
+
+// Versions of Go before 1.20 did not support the Unwrap() []error method.
+// This provides a similar behavior by implementing the Is(..) and As(..)
+// methods.
+// See the errors.Join proposal for details:
+// https://github.com/golang/go/issues/53435
 
 // As attempts to find the first error in the error list that matches the type
 // of the value that target points to.
@@ -49,4 +56,24 @@ func (merr *multiError) Is(target error) bool {
 		}
 	}
 	return false
+}
+
+func extractErrors(err error) []error {
+	if err == nil {
+		return nil
+	}
+
+	// Note that we're casting to multiError, not errorGroup. Our contract is
+	// that returned errors MAY implement errorGroup. Errors, however, only
+	// has special behavior for multierr-specific error objects.
+	//
+	// This behavior can be expanded in the future but I think it's prudent to
+	// start with as little as possible in terms of contract and possibility
+	// of misuse.
+	eg, ok := err.(*multiError)
+	if !ok {
+		return []error{err}
+	}
+
+	return append(([]error)(nil), eg.Errors()...)
 }
