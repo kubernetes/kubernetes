@@ -129,18 +129,25 @@ func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDri
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.AfterEach(func(ctx context.Context) {
-		ginkgo.By("Closing informer channel")
-		close(l.stopCh)
-		ginkgo.By("Deleting all PVCs")
-		for _, pvc := range l.pvcs {
-			err := e2epv.DeletePersistentVolumeClaim(ctx, l.cs, pvc.Name, pvc.Namespace)
+		if l != nil {
+			if l.stopCh != nil {
+				ginkgo.By("Closing informer channel")
+				close(l.stopCh)
+			}
+
+			ginkgo.By("Deleting all PVCs")
+			for _, pvc := range l.pvcs {
+				err := e2epv.DeletePersistentVolumeClaim(ctx, l.cs, pvc.Name, pvc.Namespace)
+				framework.ExpectNoError(err)
+				err = e2epv.WaitForPersistentVolumeDeleted(ctx, l.cs, pvc.Spec.VolumeName, 1*time.Second, 5*time.Minute)
+				framework.ExpectNoError(err)
+			}
+			ginkgo.By(fmt.Sprintf("Deleting Storage Class %s", l.scName))
+			err := l.cs.StorageV1().StorageClasses().Delete(ctx, l.scName, metav1.DeleteOptions{})
 			framework.ExpectNoError(err)
-			err = e2epv.WaitForPersistentVolumeDeleted(ctx, l.cs, pvc.Spec.VolumeName, 1*time.Second, 5*time.Minute)
-			framework.ExpectNoError(err)
+		} else {
+			ginkgo.By("Local l setup is nil")
 		}
-		ginkgo.By(fmt.Sprintf("Deleting Storage Class %s", l.scName))
-		err := l.cs.StorageV1().StorageClasses().Delete(ctx, l.scName, metav1.DeleteOptions{})
-		framework.ExpectNoError(err)
 	})
 
 	ginkgo.It("should provision volumes at scale within performance constraints [Slow] [Serial]", func(ctx context.Context) {
