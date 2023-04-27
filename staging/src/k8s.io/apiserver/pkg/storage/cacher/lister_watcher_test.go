@@ -35,6 +35,10 @@ import (
 
 func newPod() runtime.Object { return &example.Pod{} }
 
+func computePodKey(obj *example.Pod) string {
+	return fmt.Sprintf("/pods/%s/%s", obj.Namespace, obj.Name)
+}
+
 func newEtcdTestStorage(t *testing.T, prefix string) (*etcd3testing.EtcdTestServer, storage.Interface) {
 	server, _ := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	storage := etcd3.New(
@@ -61,7 +65,7 @@ func TestCacherListerWatcher(t *testing.T) {
 	}
 	for _, obj := range objects {
 		out := &example.Pod{}
-		key := fmt.Sprintf("/pods/%s/%s", obj.Namespace, obj.Name)
+		key := computePodKey(obj)
 		if err := store.Create(context.Background(), key, obj, out, 0); err != nil {
 			t.Fatalf("Create failed: %v", err)
 		}
@@ -97,7 +101,7 @@ func TestCacherListerWatcherPagination(t *testing.T) {
 	}
 	for _, obj := range objects {
 		out := &example.Pod{}
-		key := fmt.Sprintf("/pods/%s/%s", obj.Namespace, obj.Name)
+		key := computePodKey(obj)
 		if err := store.Create(context.Background(), key, obj, out, 0); err != nil {
 			t.Fatalf("Create failed: %v", err)
 		}

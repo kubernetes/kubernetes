@@ -112,10 +112,6 @@ func newEtcdTestStorage(t *testing.T, prefix string, pagingEnabled bool) (*etcd3
 	return server, storage
 }
 
-func newTestCacher(s storage.Interface) (*cacherstorage.Cacher, storage.Versioner, error) {
-	return newTestCacherWithClock(s, clock.RealClock{})
-}
-
 func newTestCacherWithClock(s storage.Interface, clock clock.Clock) (*cacherstorage.Cacher, storage.Versioner, error) {
 	prefix := "pods"
 	v := storage.APIObjectVersioner{}
@@ -488,73 +484,6 @@ func TestWatchDeprecated(t *testing.T) {
 	// Ensure we get a "Gone" error.
 	expectedResourceExpiredError := errors.NewResourceExpired("").ErrStatus
 	verifyWatchEvent(t, tooOldWatcher, watch.Error, &expectedResourceExpiredError)
-}
-
-func TestEmptyWatchEventCache(t *testing.T) {
-	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix(), true)
-	defer server.Terminate(t)
-
-	// add a few objects
-	updatePod(t, etcdStorage, makeTestPod("pod1"), nil)
-	updatePod(t, etcdStorage, makeTestPod("pod2"), nil)
-	updatePod(t, etcdStorage, makeTestPod("pod3"), nil)
-	updatePod(t, etcdStorage, makeTestPod("pod4"), nil)
-	updatePod(t, etcdStorage, makeTestPod("pod5"), nil)
-
-	fooCreated := updatePod(t, etcdStorage, makeTestPod("foo"), nil)
-
-	cacher, v, err := newTestCacher(etcdStorage)
-	if err != nil {
-		t.Fatalf("Couldn't create cacher: %v", err)
-	}
-	defer cacher.Stop()
-
-	// get rv of last pod created
-	rv, err := v.ParseResourceVersion(fooCreated.ResourceVersion)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	// We now have a cacher with an empty cache of watch events and a resourceVersion of rv.
-	// It should support establishing watches from rv and higher, but not older.
-
-	{
-		watcher, err := cacher.Watch(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: strconv.Itoa(int(rv - 1)), Predicate: storage.Everything})
-		if err != nil {
-			t.Fatalf("Unexpected error: %v", err)
-		}
-		defer watcher.Stop()
-		expectedResourceExpiredError := errors.NewResourceExpired("").ErrStatus
-		verifyWatchEvent(t, watcher, watch.Error, &expectedResourceExpiredError)
-	}
-
-	{
-		watcher, err := cacher.Watch(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: strconv.Itoa(int(rv + 1)), Predicate: storage.Everything})
-		if err != nil {
-			t.Fatalf("Unexpected error: %v", err)
-		}
-		defer watcher.Stop()
-		select {
-		case e := <-watcher.ResultChan():
-			t.Errorf("unexpected event %#v", e)
-		case <-time.After(3 * time.Second):
-			// watch from rv+1 remained established successfully
-		}
-	}
-
-	{
-		watcher, err := cacher.Watch(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: strconv.Itoa(int(rv)), Predicate: storage.Everything})
-		if err != nil {
-			t.Fatalf("Unexpected error: %v", err)
-		}
-		defer watcher.Stop()
-		select {
-		case e := <-watcher.ResultChan():
-			t.Errorf("unexpected event %#v", e)
-		case <-time.After(3 * time.Second):
-			// watch from rv remained established successfully
-		}
-	}
 }
 
 func TestWatchDispatchBookmarkEvents(t *testing.T) {
