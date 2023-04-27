@@ -48,7 +48,7 @@ directory permissions and 0644 file permissions.
 
 For `amd64`, official `etcd` and `etcdctl` binaries are downloaded from Github
 to maintain official support.  For other architectures, `etcd` is cross-compiled
-from source. Arch-specific `busybox` images serve as base images.
+from source. Arch-specific `debian` images serve as base images.
 
 Windows images can be built on Linux nodes due to `docker buildx`, but they will
 only be created and pushed when using the `all-push` make target.
