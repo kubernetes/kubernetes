@@ -191,6 +191,11 @@ func TestHTTPHeaders(t *testing.T) {
 			{Name: "X-Muffins-Or-Cupcakes", Value: "Muffins"},
 			{Name: "X-Muffins-Or-Cupcakes", Value: "Cupcakes, too"},
 		}, http.Header{"X-Muffins-Or-Cupcakes": {"Muffins", "Cupcakes, too"}}},
+		{[]v1.HTTPHeader{
+			{Name: "HOST", Value: "example.com"},
+			{Name: "FOO-bAR", Value: "value"},
+		}, http.Header{"Host": {"example.com"},
+			"Foo-Bar": {"value"}}},
 	}
 	for _, test := range testCases {
 		headers := buildHeader(test.input)
