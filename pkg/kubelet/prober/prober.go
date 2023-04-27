@@ -152,7 +152,7 @@ func (pb *prober) runProbeWithRetries(probeType probeType, p *v1.Probe, pod *v1.
 func buildHeader(headerList []v1.HTTPHeader) http.Header {
 	headers := make(http.Header)
 	for _, header := range headerList {
-		headers[header.Name] = append(headers[header.Name], header.Value)
+		headers.Add(header.Name, header.Value)
 	}
 	return headers
 }
