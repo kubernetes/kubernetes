@@ -990,11 +990,10 @@ func (proxier *Proxier) syncProxyRules() {
 		klog.ErrorS(err, "Error listing addresses binded to dummy interface")
 	}
 	// nodeAddressSet All addresses *except* those on the dummy interface
-	nodeAddressSet, err := proxier.netlinkHandle.GetAllLocalAddresses()
+	nodeAddressSet, err := proxier.netlinkHandle.GetAllLocalAddressesExcept(defaultDummyDevice)
 	if err != nil {
 		klog.ErrorS(err, "Error listing node addresses")
 	}
-	nodeAddressSet = nodeAddressSet.Difference(alreadyBoundAddrs)
 
 	hasNodePort := false
 	for _, svc := range proxier.svcPortMap {
