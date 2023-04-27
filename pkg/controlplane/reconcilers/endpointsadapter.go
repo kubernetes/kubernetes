@@ -55,24 +55,24 @@ func (adapter *EndpointsAdapter) Get() (*corev1.Endpoints, error) {
 	return adapter.endpointClient.Endpoints(adapter.serviceNamespace).Get(context.TODO(), adapter.serviceName, metav1.GetOptions{})
 }
 
-// Create accepts an Endpoints object and creates it and the matching EndpointSlice. The
-// created Endpoints object or an error will be returned.
-func (adapter *EndpointsAdapter) Create(endpoints *corev1.Endpoints) (*corev1.Endpoints, error) {
+// Create accepts an Endpoints object and creates it and the matching EndpointSlice.
+// Any error will be returned.
+func (adapter *EndpointsAdapter) Create(endpoints *corev1.Endpoints) error {
 	endpoints, err := adapter.endpointClient.Endpoints(endpoints.Namespace).Create(context.TODO(), endpoints, metav1.CreateOptions{})
 	if err == nil {
 		err = adapter.EnsureEndpointSliceFromEndpoints(endpoints)
 	}
-	return endpoints, err
+	return err
 }
 
 // Update accepts an Endpoints object and updates it and its matching EndpointSlice.
-// The updated Endpoints object or an error will be returned.
-func (adapter *EndpointsAdapter) Update(endpoints *corev1.Endpoints) (*corev1.Endpoints, error) {
+// Any error will be returned.
+func (adapter *EndpointsAdapter) Update(endpoints *corev1.Endpoints) error {
 	endpoints, err := adapter.endpointClient.Endpoints(endpoints.Namespace).Update(context.TODO(), endpoints, metav1.UpdateOptions{})
 	if err == nil {
 		err = adapter.EnsureEndpointSliceFromEndpoints(endpoints)
 	}
-	return endpoints, err
+	return err
 }
 
 // EnsureEndpointSliceFromEndpoints accepts an Endpoints resource and creates or updates a

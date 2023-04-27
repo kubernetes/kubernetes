@@ -24,7 +24,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 	endpointsv1 "k8s.io/kubernetes/pkg/api/v1/endpoints"
 )
@@ -87,8 +86,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(ip net.IP, endpointPo
 			Addresses: []corev1.EndpointAddress{{IP: ip.String()}},
 			Ports:     endpointPorts,
 		}}
-		_, err = r.epAdapter.Create(e)
-		return err
+		return r.epAdapter.Create(e)
 	}
 
 	// First, determine if the endpoint is in the format we expect (one
@@ -101,8 +99,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(ip net.IP, endpointPo
 			Ports:     endpointPorts,
 		}}
 		klog.Warningf("Resetting endpoints for master service %q to %#v", e.Name, e)
-		_, err = r.epAdapter.Update(e)
-		return err
+		return r.epAdapter.Update(e)
 	}
 
 	if !skipMirrorChanged && ipCorrect && portsCorrect {
@@ -138,8 +135,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(ip net.IP, endpointPo
 		e.Subsets[0].Ports = endpointPorts
 	}
 	klog.Warningf("Resetting endpoints for master service %q to %v", e.Name, e)
-	_, err = r.epAdapter.Update(e)
-	return err
+	return r.epAdapter.Update(e)
 }
 
 func (r *masterCountEndpointReconciler) RemoveEndpoints(ip net.IP, endpointPorts []corev1.EndpointPort) error {
@@ -168,11 +164,7 @@ func (r *masterCountEndpointReconciler) RemoveEndpoints(ip net.IP, endpointPorts
 	}
 	e.Subsets[0].Addresses = new
 	e.Subsets = endpointsv1.RepackSubsets(e.Subsets)
-	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		_, err := r.epAdapter.Update(e)
-		return err
-	})
-	return err
+	return r.epAdapter.Update(e)
 }
 
 func (r *masterCountEndpointReconciler) StopReconciling() {

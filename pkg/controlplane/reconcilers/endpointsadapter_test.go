@@ -90,10 +90,9 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 		initialState   []runtime.Object
 		endpointsParam *corev1.Endpoints
 
-		expectedError  error
-		expectedResult *corev1.Endpoints
-		expectCreate   []runtime.Object
-		expectUpdate   []runtime.Object
+		expectedError error
+		expectCreate  []runtime.Object
+		expectUpdate  []runtime.Object
 	}{
 		"single-endpoint": {
 			// If the Endpoints/EndpointSlice do not exist, they will be
@@ -101,8 +100,7 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 			initialState:   []runtime.Object{},
 			endpointsParam: endpoints1,
 
-			expectedResult: endpoints1,
-			expectCreate:   []runtime.Object{endpoints1, epSlice1},
+			expectCreate: []runtime.Object{endpoints1, epSlice1},
 		},
 		"single-endpoint-partial-ipv6": {
 			// If the Endpoints/EndpointSlice do not exist, and the reconciler
@@ -112,8 +110,7 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 			initialState:   []runtime.Object{},
 			endpointsParam: endpointsDual,
 
-			expectedResult: endpointsDual,
-			expectCreate:   []runtime.Object{endpointsDual, epSlice1},
+			expectCreate: []runtime.Object{endpointsDual, epSlice1},
 		},
 		"single-endpoint-full-ipv6": {
 			// If the Endpoints/EndpointSlice do not exist, and the reconciler
@@ -122,8 +119,7 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 			initialState:   []runtime.Object{},
 			endpointsParam: endpointsV6,
 
-			expectedResult: endpointsV6,
-			expectCreate:   []runtime.Object{endpointsV6, epSliceV6},
+			expectCreate: []runtime.Object{endpointsV6, epSliceV6},
 		},
 		"existing-endpoints": {
 			// If the Endpoints/EndpointSlice already exist then Create will
@@ -141,8 +137,7 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 			initialState:   []runtime.Object{epSlice1},
 			endpointsParam: endpoints1,
 
-			expectedResult: endpoints1,
-			expectCreate:   []runtime.Object{endpoints1},
+			expectCreate: []runtime.Object{endpoints1},
 		},
 		"existing-endpointslice-incorrect": {
 			// No error when we need to create the Endpoints but an incorrect
@@ -150,9 +145,8 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 			initialState:   []runtime.Object{epSlice1},
 			endpointsParam: endpoints2,
 
-			expectedResult: endpoints2,
-			expectCreate:   []runtime.Object{endpoints2},
-			expectUpdate:   []runtime.Object{epSlice2},
+			expectCreate: []runtime.Object{endpoints2},
+			expectUpdate: []runtime.Object{epSlice2},
 		},
 	}
 
@@ -161,13 +155,9 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 			client := fake.NewSimpleClientset(testCase.initialState...)
 			epAdapter := NewEndpointsAdapter(client.CoreV1(), client.DiscoveryV1(), testServiceNamespace, testServiceName)
 
-			endpoints, err := epAdapter.Create(testCase.endpointsParam)
+			err := epAdapter.Create(testCase.endpointsParam)
 			if !apiequality.Semantic.DeepEqual(testCase.expectedError, err) {
 				t.Errorf("Expected error: %v, got: %v", testCase.expectedError, err)
-			}
-
-			if !apiequality.Semantic.DeepEqual(endpoints, testCase.expectedResult) {
-				t.Errorf("Wrong result from Create. Diff:\n%s", cmp.Diff(testCase.expectedResult, endpoints))
 			}
 
 			err = verifyActions(client, testCase.expectCreate, testCase.expectUpdate, nil)
@@ -189,11 +179,10 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 		initialState   []runtime.Object
 		endpointsParam *corev1.Endpoints
 
-		expectedError  error
-		expectedResult *corev1.Endpoints
-		expectCreate   []runtime.Object
-		expectUpdate   []runtime.Object
-		expectDelete   []runtime.Object
+		expectedError error
+		expectCreate  []runtime.Object
+		expectUpdate  []runtime.Object
+		expectDelete  []runtime.Object
 	}{
 		"single-existing-endpoints-no-change": {
 			// If the Endpoints/EndpointSlice already exist and are correct,
@@ -202,8 +191,7 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 			initialState:   []runtime.Object{endpoints1, epSlice1},
 			endpointsParam: endpoints1,
 
-			expectedResult: endpoints1,
-			expectUpdate:   []runtime.Object{endpoints1},
+			expectUpdate: []runtime.Object{endpoints1},
 		},
 		"existing-endpointslice-replaced-with-updated-ipv4-address-type": {
 			// If an EndpointSlice with deprecated "IP" address type exists,
@@ -212,10 +200,9 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 			initialState:   []runtime.Object{endpoints1, epSlice1Deprecated},
 			endpointsParam: endpoints1,
 
-			expectedResult: endpoints1,
-			expectUpdate:   []runtime.Object{endpoints1},
-			expectDelete:   []runtime.Object{epSlice1Deprecated},
-			expectCreate:   []runtime.Object{epSlice1},
+			expectUpdate: []runtime.Object{endpoints1},
+			expectDelete: []runtime.Object{epSlice1Deprecated},
+			expectCreate: []runtime.Object{epSlice1},
 		},
 		"add-ports-and-ips": {
 			// If we add ports/IPs to the Endpoints they will be added to
@@ -223,8 +210,7 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 			initialState:   []runtime.Object{endpoints1, epSlice1},
 			endpointsParam: endpoints2,
 
-			expectedResult: endpoints2,
-			expectUpdate:   []runtime.Object{endpoints2, epSlice2},
+			expectUpdate: []runtime.Object{endpoints2, epSlice2},
 		},
 		"endpoints-correct-endpointslice-wrong": {
 			// If the Endpoints is correct and the EndpointSlice is wrong,
@@ -232,8 +218,7 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 			initialState:   []runtime.Object{endpoints2, epSlice1},
 			endpointsParam: endpoints2,
 
-			expectedResult: endpoints2,
-			expectUpdate:   []runtime.Object{endpoints2, epSlice2},
+			expectUpdate: []runtime.Object{endpoints2, epSlice2},
 		},
 		"endpointslice-correct-endpoints-wrong": {
 			// If the EndpointSlice is correct and the Endpoints is wrong,
@@ -241,8 +226,7 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 			initialState:   []runtime.Object{endpoints1, epSlice2},
 			endpointsParam: endpoints2,
 
-			expectedResult: endpoints2,
-			expectUpdate:   []runtime.Object{endpoints2},
+			expectUpdate: []runtime.Object{endpoints2},
 		},
 		"missing-endpoints": {
 			// If the Endpoints/EndpointSlice doesn't already exist then
@@ -261,9 +245,8 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 			initialState:   []runtime.Object{endpoints2},
 			endpointsParam: endpoints1,
 
-			expectedResult: endpoints1,
-			expectUpdate:   []runtime.Object{endpoints1},
-			expectCreate:   []runtime.Object{epSlice1},
+			expectUpdate: []runtime.Object{endpoints1},
+			expectCreate: []runtime.Object{epSlice1},
 		},
 	}
 
@@ -272,13 +255,9 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 			client := fake.NewSimpleClientset(testCase.initialState...)
 			epAdapter := NewEndpointsAdapter(client.CoreV1(), client.DiscoveryV1(), testServiceNamespace, testServiceName)
 
-			endpoints, err := epAdapter.Update(testCase.endpointsParam)
+			err := epAdapter.Update(testCase.endpointsParam)
 			if !apiequality.Semantic.DeepEqual(testCase.expectedError, err) {
 				t.Errorf("Expected error: %v, got: %v", testCase.expectedError, err)
-			}
-
-			if !apiequality.Semantic.DeepEqual(endpoints, testCase.expectedResult) {
-				t.Errorf("Wrong result from Update. Diff:\n%s", cmp.Diff(testCase.expectedResult, endpoints))
 			}
 
 			err = verifyActions(client, testCase.expectCreate, testCase.expectUpdate, testCase.expectDelete)

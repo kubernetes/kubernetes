@@ -264,11 +264,11 @@ func (r *leaseEndpointReconciler) doReconcile(endpointPorts []corev1.EndpointPor
 
 	klog.Warningf("Resetting endpoints for master service %q to %v", e.Name, masterIPs)
 	if shouldCreate {
-		if _, err = r.epAdapter.Create(e); errors.IsAlreadyExists(err) {
+		if err = r.epAdapter.Create(e); errors.IsAlreadyExists(err) {
 			err = nil
 		}
 	} else {
-		_, err = r.epAdapter.Update(e)
+		err = r.epAdapter.Update(e)
 	}
 	return err
 }
