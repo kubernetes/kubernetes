@@ -35,11 +35,13 @@ import (
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 type execCommand struct {
-	ExitCode int
-	Delay    int
+	ExitCode   int
+	Delay      int
+	StartDelay int
 }
 
 func ExecCommand(name string, c execCommand) []string {
@@ -55,7 +57,13 @@ func ExecCommand(name string, c execCommand) []string {
 	fmt.Fprintf(&cmd, "touch %s; ", containerLog)
 	fmt.Fprintf(&cmd, "cat %s >> /dev/termination-log; ", containerLog)
 
-	fmt.Fprintf(&cmd, "echo %s '%s Starting' | tee -a %s >> /dev/termination-log; ", timeCmd, name, containerLog)
+	fmt.Fprintf(&cmd, "echo %s '%s Starting %d' | tee -a %s >> /dev/termination-log; ", timeCmd, name, c.StartDelay, containerLog)
+	if c.StartDelay != 0 {
+		fmt.Fprintf(&cmd, "sleep %d; ", c.StartDelay)
+	}
+	// You can check started file to see if the container has started
+	fmt.Fprintf(&cmd, "touch started; ")
+	fmt.Fprintf(&cmd, "echo %s '%s Started' | tee -a %s >> /dev/termination-log; ", timeCmd, name, containerLog)
 	fmt.Fprintf(&cmd, "echo %s '%s Delaying %d' | tee -a %s >> /dev/termination-log; ", timeCmd, name, c.Delay, containerLog)
 	if c.Delay != 0 {
 		fmt.Fprintf(&cmd, "sleep %d; ", c.Delay)
@@ -63,6 +71,19 @@ func ExecCommand(name string, c execCommand) []string {
 	fmt.Fprintf(&cmd, "echo %s '%s Exiting'  | tee -a %s >> /dev/termination-log; ", timeCmd, name, containerLog)
 	fmt.Fprintf(&cmd, "exit %d", c.ExitCode)
 	return []string{"sh", "-c", cmd.String()}
+}
+
+// WaitForPodInitContainerRestartCount waits for the given Pod init container
+// to achieve at least a given restartCount
+func WaitForPodInitContainerRestartCount(ctx context.Context, c clientset.Interface, namespace, podName string, initContainerIndex int, desiredRestartCount int32, timeout time.Duration) error {
+	conditionDesc := fmt.Sprintf("init container %d started", initContainerIndex)
+	return e2epod.WaitForPodCondition(ctx, c, namespace, podName, conditionDesc, timeout, func(pod *v1.Pod) (bool, error) {
+		if initContainerIndex > len(pod.Status.InitContainerStatuses)-1 {
+			return false, nil
+		}
+		containerStatus := pod.Status.InitContainerStatuses[initContainerIndex]
+		return containerStatus.RestartCount >= desiredRestartCount, nil
+	})
 }
 
 // WaitForPodContainerRestartCount waits for the given Pod container to achieve at least a given restartCount
@@ -74,6 +95,29 @@ func WaitForPodContainerRestartCount(ctx context.Context, c clientset.Interface,
 		}
 		containerStatus := pod.Status.ContainerStatuses[containerIndex]
 		return containerStatus.RestartCount >= desiredRestartCount, nil
+	})
+}
+
+// WaitForPodInitContainerToFail waits for the given Pod init container to fail with the given reason, specifically due to
+// invalid container configuration. In this case, the container will remain in a waiting state with a specific
+// reason set, which should match the given reason.
+func WaitForPodInitContainerToFail(ctx context.Context, c clientset.Interface, namespace, podName string, containerIndex int, reason string, timeout time.Duration) error {
+	conditionDesc := fmt.Sprintf("container %d failed with reason %s", containerIndex, reason)
+	return e2epod.WaitForPodCondition(ctx, c, namespace, podName, conditionDesc, timeout, func(pod *v1.Pod) (bool, error) {
+		switch pod.Status.Phase {
+		case v1.PodPending:
+			if len(pod.Status.InitContainerStatuses) == 0 {
+				return false, nil
+			}
+			containerStatus := pod.Status.InitContainerStatuses[containerIndex]
+			if containerStatus.State.Waiting != nil && containerStatus.State.Waiting.Reason == reason {
+				return true, nil
+			}
+			return false, nil
+		case v1.PodFailed, v1.PodRunning, v1.PodSucceeded:
+			return false, fmt.Errorf("pod was expected to be pending, but it is in the state: %s", pod.Status.Phase)
+		}
+		return false, nil
 	})
 }
 
@@ -133,9 +177,21 @@ var _ = SIGDescribe("[NodeConformance] Containers Lifecycle ", func() {
 						Name:  regular1,
 						Image: busyboxImage,
 						Command: ExecCommand(regular1, execCommand{
-							Delay:    1,
-							ExitCode: 0,
+							StartDelay: 5,
+							Delay:      1,
+							ExitCode:   0,
 						}),
+						StartupProbe: &v1.Probe{
+							ProbeHandler: v1.ProbeHandler{
+								Exec: &v1.ExecAction{
+									Command: []string{
+										"test",
+										"-f",
+										"started",
+									},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -145,18 +201,22 @@ var _ = SIGDescribe("[NodeConformance] Containers Lifecycle ", func() {
 
 		/// generates an out file output like:
 		//
-		// 1678337827 45930.43 init-1 Starting
-		// 1678337827 45930.43 init-1 Delaying 1
-		// 1678337828 45931.43 init-1 Exiting
-		// 1678337829 45932.52 init-2 Starting
-		// 1678337829 45932.53 init-2 Delaying 1
-		// 1678337830 45933.53 init-2 Exiting
-		// 1678337831 45934.47 init-3 Starting
-		// 1678337831 45934.47 init-3 Delaying 1
-		// 1678337832 45935.47 init-3 Exiting
-		// 1678337833 45936.58 regular-1 Starting
-		// 1678337833 45936.58 regular-1 Delaying 1
-		// 1678337834 45937.58 regular-1 Exiting
+		// 1682076093 4905.79 init-1 Starting 0
+		// 1682076093 4905.80 init-1 Started
+		// 1682076093 4905.80 init-1 Delaying 1
+		// 1682076094 4906.80 init-1 Exiting
+		// 1682076095 4907.70 init-2 Starting 0
+		// 1682076095 4907.71 init-2 Started
+		// 1682076095 4907.71 init-2 Delaying 1
+		// 1682076096 4908.71 init-2 Exiting
+		// 1682076097 4909.74 init-3 Starting 0
+		// 1682076097 4909.74 init-3 Started
+		// 1682076097 4909.74 init-3 Delaying 1
+		// 1682076098 4910.75 init-3 Exiting
+		// 1682076099 4911.70 regular-1 Starting 5
+		// 1682076104 4916.71 regular-1 Started
+		// 1682076104 4916.71 regular-1 Delaying 1
+		// 1682076105 4917.72 regular-1 Exiting
 
 		client := e2epod.NewPodClient(f)
 		podSpec = client.Create(context.TODO(), podSpec)
@@ -404,6 +464,66 @@ var _ = SIGDescribe("[NodeConformance] Containers Lifecycle ", func() {
 		framework.ExpectNoError(results.ExitsBefore(prefixedName(PostStartPrefix, regular1), regular2))
 	})
 
+	ginkgo.When("have init container in a Pod with restartPolicy=Never", func() {
+
+		ginkgo.When("an init container fails to start because of a bad image", ginkgo.Ordered, func() {
+
+			init1 := "init1-1"
+			regular1 := "regular-1"
+
+			podSpec := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "sidecar-runs-with-pod",
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					InitContainers: []v1.Container{
+						{
+							Name:  init1,
+							Image: imageutils.GetE2EImage(imageutils.InvalidRegistryImage),
+							Command: ExecCommand(init1, execCommand{
+								Delay:    600,
+								ExitCode: 0,
+							}),
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name:  regular1,
+							Image: busyboxImage,
+							Command: ExecCommand(regular1, execCommand{
+								Delay:    1,
+								ExitCode: 0,
+							}),
+						},
+					},
+				},
+			}
+
+			preparePod(podSpec)
+			var results containerOutputList
+
+			ginkgo.It("should mark a Pod as failed and produce log", func() {
+				client := e2epod.NewPodClient(f)
+				podSpec = client.Create(context.TODO(), podSpec)
+
+				// sidecar should be in image pull backoff
+				err := WaitForPodInitContainerToFail(context.TODO(), f.ClientSet, podSpec.Namespace, podSpec.Name, 0, "ImagePullBackOff", f.Timeouts.PodStart)
+				framework.ExpectNoError(err)
+
+				podSpec, err = client.Get(context.Background(), podSpec.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				results = parseOutput(podSpec)
+			})
+			ginkgo.It("should not start an init container", func() {
+				framework.ExpectNoError(results.DoesntStart(init1))
+			})
+			ginkgo.It("should not start a regular container", func() {
+				framework.ExpectNoError(results.DoesntStart(regular1))
+			})
+		})
+	})
+
 })
 
 type containerOutput struct {
@@ -426,8 +546,8 @@ func (o containerOutputList) String() string {
 
 // RunTogether returns an error the lhs and rhs run together
 func (o containerOutputList) RunTogether(lhs, rhs string) error {
-	lhsStart := o.findIndex(lhs, "Starting", 0)
-	rhsStart := o.findIndex(rhs, "Starting", 0)
+	lhsStart := o.findIndex(lhs, "Started", 0)
+	rhsStart := o.findIndex(rhs, "Started", 0)
 
 	lhsFinish := o.findIndex(lhs, "Finishing", 0)
 	rhsFinish := o.findIndex(rhs, "Finishing", 0)
@@ -452,7 +572,7 @@ func (o containerOutputList) RunTogether(lhs, rhs string) error {
 
 // StartsBefore returns an error if lhs did not start before rhs
 func (o containerOutputList) StartsBefore(lhs, rhs string) error {
-	lhsStart := o.findIndex(lhs, "Starting", 0)
+	lhsStart := o.findIndex(lhs, "Started", 0)
 
 	if lhsStart == -1 {
 		return fmt.Errorf("couldn't find that %s ever started, got %v", lhs, o)
@@ -464,6 +584,24 @@ func (o containerOutputList) StartsBefore(lhs, rhs string) error {
 	if rhsStart == -1 {
 		return fmt.Errorf("couldn't find that %s started after %s, got %v", rhs, lhs, o)
 	}
+	return nil
+}
+
+// DoesntStartAfter returns an error if lhs started after rhs
+func (o containerOutputList) DoesntStartAfter(lhs, rhs string) error {
+	rhsStart := o.findIndex(rhs, "Starting", 0)
+
+	if rhsStart == -1 {
+		return fmt.Errorf("couldn't find that %s ever started, got %v", rhs, o)
+	}
+
+	// this works even for the same names (restart case)
+	lhsStart := o.findIndex(lhs, "Started", rhsStart+1)
+
+	if lhsStart != -1 {
+		return fmt.Errorf("expected %s to not start after %s, got %v", lhs, rhs, o)
+	}
+
 	return nil
 }
 
@@ -486,7 +624,7 @@ func (o containerOutputList) ExitsBefore(lhs, rhs string) error {
 
 // Starts returns an error if the container was not found to have started
 func (o containerOutputList) Starts(name string) error {
-	if idx := o.findIndex(name, "Starting", 0); idx == -1 {
+	if idx := o.findIndex(name, "Started", 0); idx == -1 {
 		return fmt.Errorf("couldn't find that %s ever started, got %v", name, o)
 	}
 	return nil
@@ -494,7 +632,7 @@ func (o containerOutputList) Starts(name string) error {
 
 // DoesntStart returns an error if the container was found to have started
 func (o containerOutputList) DoesntStart(name string) error {
-	if idx := o.findIndex(name, "Starting", 0); idx != -1 {
+	if idx := o.findIndex(name, "Started", 0); idx != -1 {
 		return fmt.Errorf("find %s started, but didn't expect to, got %v", name, o)
 	}
 	return nil
@@ -505,6 +643,22 @@ func (o containerOutputList) Exits(name string) error {
 	if idx := o.findIndex(name, "Exiting", 0); idx == -1 {
 		return fmt.Errorf("couldn't find that %s ever exited, got %v", name, o)
 	}
+	return nil
+}
+
+// HasRestarted returns an error if the container was not found to have restarted
+func (o containerOutputList) HasRestarted(name string) error {
+	idx := o.findIndex(name, "Starting", 0)
+	if idx == -1 {
+		return fmt.Errorf("couldn't find that %s ever started, got %v", name, o)
+	}
+
+	idx = o.findIndex(name, "Starting", idx+1)
+
+	if idx == -1 {
+		return fmt.Errorf("couldn't find that %s ever restarted, got %v", name, o)
+	}
+
 	return nil
 }
 
@@ -529,7 +683,10 @@ func parseOutput(pod *v1.Pod) containerOutputList {
 	statuses = append(statuses, pod.Status.ContainerStatuses...)
 	var buf bytes.Buffer
 	for _, cs := range statuses {
-		if cs.State.Terminated != nil {
+		// If the container is terminated but the reason is ContainerStatusUnknown,
+		// it means that the kubelet has overwritten the termination message. Read
+		// the LastTerminationState instead.
+		if cs.State.Terminated != nil && cs.State.Terminated.Reason != "ContainerStatusUnknown" {
 			buf.WriteString(cs.State.Terminated.Message)
 		} else if cs.LastTerminationState.Terminated != nil {
 			buf.WriteString(cs.LastTerminationState.Terminated.Message)
