@@ -18,7 +18,7 @@
 # 	[GOLANG_VERSION=1.8.3] [REGISTRY=staging-k8s.gcr.io] [TAG=test] make (build|push)
 # TODO(shyamjvs): Support architectures other than amd64 if needed.
 ARCH:=amd64
-GOLANG_VERSION?=1.8.3
+GOLANG_VERSION?=1.19.8
 REGISTRY?=staging-k8s.gcr.io
 TAG?=0.1.3
 IMAGE:=$(REGISTRY)/etcd-version-monitor:$(TAG)
