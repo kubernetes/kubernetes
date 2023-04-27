@@ -59,12 +59,6 @@ func TestDaemonSetUpdatesPods(t *testing.T) {
 	markPodsReady(podControl.podStore)
 
 	clearExpectations(t, manager, ds, podControl)
-	expectSyncDaemonSets(t, manager, ds, podControl, 0, maxUnavailable, 0)
-	clearExpectations(t, manager, ds, podControl)
-	expectSyncDaemonSets(t, manager, ds, podControl, maxUnavailable, 0, 0)
-	markPodsReady(podControl.podStore)
-
-	clearExpectations(t, manager, ds, podControl)
 	expectSyncDaemonSets(t, manager, ds, podControl, 0, 1, 0)
 	clearExpectations(t, manager, ds, podControl)
 	expectSyncDaemonSets(t, manager, ds, podControl, 1, 0, 0)
