@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/apitesting"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -58,42 +57,6 @@ import (
 	"k8s.io/utils/pointer"
 )
 
-type testVersioner struct{}
-
-func (testVersioner) UpdateObject(obj runtime.Object, resourceVersion uint64) error {
-	return meta.NewAccessor().SetResourceVersion(obj, strconv.FormatUint(resourceVersion, 10))
-}
-func (testVersioner) UpdateList(obj runtime.Object, resourceVersion uint64, continueValue string, count *int64) error {
-	listAccessor, err := meta.ListAccessor(obj)
-	if err != nil || listAccessor == nil {
-		return err
-	}
-	listAccessor.SetResourceVersion(strconv.FormatUint(resourceVersion, 10))
-	listAccessor.SetContinue(continueValue)
-	listAccessor.SetRemainingItemCount(count)
-	return nil
-}
-func (testVersioner) PrepareObjectForStorage(obj runtime.Object) error {
-	return fmt.Errorf("unimplemented")
-}
-func (testVersioner) ObjectResourceVersion(obj runtime.Object) (uint64, error) {
-	accessor, err := meta.Accessor(obj)
-	if err != nil {
-		return 0, err
-	}
-	version := accessor.GetResourceVersion()
-	if len(version) == 0 {
-		return 0, nil
-	}
-	return strconv.ParseUint(version, 10, 64)
-}
-func (testVersioner) ParseResourceVersion(resourceVersion string) (uint64, error) {
-	if len(resourceVersion) == 0 {
-		return 0, nil
-	}
-	return strconv.ParseUint(resourceVersion, 10, 64)
-}
-
 var (
 	scheme   = runtime.NewScheme()
 	codecs   = serializer.NewCodecFactory(scheme)
@@ -111,7 +74,7 @@ func newTestCacher(s storage.Interface) (*Cacher, storage.Versioner, error) {
 	prefix := "pods"
 	config := Config{
 		Storage:        s,
-		Versioner:      testVersioner{},
+		Versioner:      storage.APIObjectVersioner{},
 		GroupResource:  schema.GroupResource{Resource: "pods"},
 		ResourcePrefix: prefix,
 		KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) },
@@ -133,7 +96,7 @@ func newTestCacher(s storage.Interface) (*Cacher, storage.Versioner, error) {
 		Clock:       clock.RealClock{},
 	}
 	cacher, err := NewCacherFromConfig(config)
-	return cacher, testVersioner{}, err
+	return cacher, storage.APIObjectVersioner{}, err
 }
 
 type dummyStorage struct {
@@ -348,6 +311,90 @@ func TestWatchCacheBypass(t *testing.T) {
 	}
 }
 
+func TestEmptyWatchEventCache(t *testing.T) {
+	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
+	defer server.Terminate(t)
+
+	// add a few objects
+	v := storage.APIObjectVersioner{}
+	lastRV := uint64(0)
+	for i := 0; i < 5; i++ {
+		pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("foo-%d", i), Namespace: "test-ns"}}
+		out := &example.Pod{}
+		key := computePodKey(pod)
+		if err := etcdStorage.Create(context.Background(), key, pod, out, 0); err != nil {
+			t.Fatalf("Create failed: %v", err)
+		}
+		var err error
+		if lastRV, err = v.ParseResourceVersion(out.ResourceVersion); err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+	}
+
+	cacher, _, err := newTestCacher(etcdStorage)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
+	defer cacher.Stop()
+
+	// Given that cacher is always initialized from the "current" version of etcd,
+	// we now have a cacher with an empty cache of watch events and a resourceVersion of rv.
+	// It should support establishing watches from rv and higher, but not older.
+
+	expectedResourceExpiredError := apierrors.NewResourceExpired("").ErrStatus
+	tests := []struct {
+		name            string
+		resourceVersion uint64
+		expectedEvent   *watch.Event
+	}{
+		{
+			name:            "RV-1",
+			resourceVersion: lastRV - 1,
+			expectedEvent:   &watch.Event{Type: watch.Error, Object: &expectedResourceExpiredError},
+		},
+		{
+			name:            "RV",
+			resourceVersion: lastRV,
+		},
+		{
+			name:            "RV+1",
+			resourceVersion: lastRV + 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := storage.ListOptions{
+				ResourceVersion: strconv.Itoa(int(tt.resourceVersion)),
+				Predicate:       storage.Everything,
+			}
+			watcher, err := cacher.Watch(context.Background(), "/pods/test-ns", opts)
+			if err != nil {
+				t.Fatalf("Failed to create watch: %v", err)
+			}
+			defer watcher.Stop()
+			select {
+			case event := <-watcher.ResultChan():
+				if tt.expectedEvent == nil {
+					t.Errorf("Unexpected event: type=%#v, object=%#v", event.Type, event.Object)
+					break
+				}
+				if e, a := tt.expectedEvent.Type, event.Type; e != a {
+					t.Errorf("Expected: %s, got: %s", e, a)
+				}
+				if e, a := tt.expectedEvent.Object, event.Object; !apiequality.Semantic.DeepDerivative(e, a) {
+					t.Errorf("Expected: %#v, got: %#v", e, a)
+				}
+			case <-time.After(3 * time.Second):
+				if tt.expectedEvent != nil {
+					t.Errorf("Failed to get an event")
+				}
+				// watch remained established successfully
+			}
+		})
+	}
+}
+
 func TestWatchNotHangingOnStartupFailure(t *testing.T) {
 	// Configure cacher so that it can't initialize, because of
 	// constantly failing lists to the underlying storage.
@@ -378,7 +425,7 @@ func TestWatchNotHangingOnStartupFailure(t *testing.T) {
 
 func TestWatcherNotGoingBackInTime(t *testing.T) {
 	backingStorage := &dummyStorage{}
-	cacher, _, err := newTestCacher(backingStorage)
+	cacher, v, err := newTestCacher(backingStorage)
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
 	}
@@ -448,7 +495,7 @@ func TestWatcherNotGoingBackInTime(t *testing.T) {
 				shouldContinue = false
 				break
 			}
-			rv, err := testVersioner{}.ParseResourceVersion(event.Object.(metaRuntimeInterface).GetResourceVersion())
+			rv, err := v.ParseResourceVersion(event.Object.(metaRuntimeInterface).GetResourceVersion())
 			if err != nil {
 				t.Errorf("unexpected parsing error: %v", err)
 			} else {
