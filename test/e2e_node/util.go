@@ -540,7 +540,11 @@ func waitForAllContainerRemoval(ctx context.Context, podName, podNS string) {
 	}, 2*time.Minute, 1*time.Second).Should(gomega.Succeed())
 }
 
-func getPidsForProcess(name, pidFile string) ([]int, error) {
+func getPidsForProcess(name, pidFile string) (pids []int, _ error) {
+	framework.Logf("getting pids given name %s and pidFile %s", name, pidFile)
+	defer func() {
+		framework.Logf("found pids %+v", pids)
+	}()
 	if len(pidFile) > 0 {
 		pid, err := getPidFromPidFile(pidFile)
 		if err == nil {
