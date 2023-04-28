@@ -140,22 +140,6 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		},
 		// --
 
-		// k8s.io/kubernetes/pkg/apis/autoscaling/v2beta1
-		gvr("autoscaling", "v2beta1", "horizontalpodautoscalers"): {
-			Stub:             `{"metadata": {"name": "hpa1"}, "spec": {"maxReplicas": 3, "scaleTargetRef": {"kind": "something", "name": "cross"}}}`,
-			ExpectedEtcdPath: "/registry/horizontalpodautoscalers/" + namespace + "/hpa1",
-			ExpectedGVK:      gvkP("autoscaling", "v2", "HorizontalPodAutoscaler"),
-		},
-		// --
-
-		// k8s.io/kubernetes/pkg/apis/autoscaling/v2beta2
-		gvr("autoscaling", "v2beta2", "horizontalpodautoscalers"): {
-			Stub:             `{"metadata": {"name": "hpa3"}, "spec": {"maxReplicas": 3, "scaleTargetRef": {"kind": "something", "name": "cross"}}}`,
-			ExpectedEtcdPath: "/registry/horizontalpodautoscalers/" + namespace + "/hpa3",
-			ExpectedGVK:      gvkP("autoscaling", "v2", "HorizontalPodAutoscaler"),
-		},
-		// --
-
 		// k8s.io/kubernetes/pkg/apis/batch/v1
 		gvr("batch", "v1", "jobs"): {
 			Stub:             `{"metadata": {"name": "job1"}, "spec": {"manualSelector": true, "selector": {"matchLabels": {"controller-uid": "uid1"}}, "template": {"metadata": {"labels": {"controller-uid": "uid1"}}, "spec": {"containers": [{"image": "` + image + `", "name": "container1"}], "dnsPolicy": "ClusterFirst", "restartPolicy": "Never"}}}}`,
