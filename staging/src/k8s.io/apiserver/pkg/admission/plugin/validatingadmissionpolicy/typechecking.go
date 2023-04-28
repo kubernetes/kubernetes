@@ -21,20 +21,20 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"sync"
+	"time"
 
 	"github.com/google/cel-go/cel"
-	"github.com/google/cel-go/common/types/ref"
 
 	"k8s.io/api/admissionregistration/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apimachinery/pkg/util/version"
 	plugincel "k8s.io/apiserver/pkg/admission/plugin/cel"
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/common"
-	"k8s.io/apiserver/pkg/cel/library"
+	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/apiserver/pkg/cel/openapi"
 	"k8s.io/apiserver/pkg/cel/openapi/resolver"
 	"k8s.io/klog/v2"
@@ -128,7 +128,7 @@ func (c *TypeChecker) CheckExpressions(expressions []string, hasParams bool, pol
 		for i, gvk := range gvks {
 			s := schemas[i]
 			issues, err := c.checkExpression(exp, hasParams, typeOverwrite{
-				object: common.SchemaDeclType(s, true),
+				object: common.SchemaDeclType(s, true).MaybeAssignTypeName(generateUniqueTypeName(gvk.Kind)),
 				params: paramsDeclType,
 			})
 			// save even if no issues are found, for the sake of formatting.
@@ -142,6 +142,10 @@ func (c *TypeChecker) CheckExpressions(expressions []string, hasParams bool, pol
 	}
 
 	return allWarnings
+}
+
+func generateUniqueTypeName(kind string) string {
+	return fmt.Sprintf("%s%d", kind, time.Now().Nanosecond())
 }
 
 // formatWarning converts the resulting issues and possible error during
@@ -169,7 +173,7 @@ func (c *TypeChecker) declType(gvk schema.GroupVersionKind) (*apiservercel.DeclT
 	if err != nil {
 		return nil, err
 	}
-	return common.SchemaDeclType(&openapi.Schema{Schema: s}, true), nil
+	return common.SchemaDeclType(&openapi.Schema{Schema: s}, true).MaybeAssignTypeName(generateUniqueTypeName(gvk.Kind)), nil
 }
 
 func (c *TypeChecker) paramsType(policy *v1alpha1.ValidatingAdmissionPolicy) schema.GroupVersionKind {
@@ -314,122 +318,51 @@ func sortGVKList(list []schema.GroupVersionKind) []schema.GroupVersionKind {
 }
 
 func buildEnv(hasParams bool, types typeOverwrite) (*cel.Env, error) {
-	baseEnv, err := getBaseEnv()
-	if err != nil {
-		return nil, err
-	}
-	reg := apiservercel.NewRegistry(baseEnv)
+	baseEnv := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())
 	requestType := plugincel.BuildRequestType()
 
 	var varOpts []cel.EnvOption
-	var rts []*apiservercel.RuleTypes
+	var declTypes []*apiservercel.DeclType
 
 	// request, hand-crafted type
-	rt, opts, err := createRuleTypesAndOptions(reg, requestType, plugincel.RequestVarName)
-	if err != nil {
-		return nil, err
-	}
-	rts = append(rts, rt)
-	varOpts = append(varOpts, opts...)
+	declTypes = append(declTypes, requestType)
+	varOpts = append(varOpts, createVariableOpts(requestType, plugincel.RequestVarName)...)
 
 	// object and oldObject, same type, type(s) resolved from constraints
-	rt, opts, err = createRuleTypesAndOptions(reg, types.object, plugincel.ObjectVarName, plugincel.OldObjectVarName)
-	if err != nil {
-		return nil, err
-	}
-	rts = append(rts, rt)
-	varOpts = append(varOpts, opts...)
+	declTypes = append(declTypes, types.object)
+	varOpts = append(varOpts, createVariableOpts(types.object, plugincel.ObjectVarName, plugincel.OldObjectVarName)...)
 
 	// params, defined by ParamKind
-	if hasParams {
-		rt, opts, err := createRuleTypesAndOptions(reg, types.params, plugincel.ParamsVarName)
-		if err != nil {
-			return nil, err
-		}
-		rts = append(rts, rt)
-		varOpts = append(varOpts, opts...)
+	if hasParams && types.params != nil {
+		declTypes = append(declTypes, types.params)
+		varOpts = append(varOpts, createVariableOpts(types.params, plugincel.ParamsVarName)...)
 	}
-
-	opts, err = ruleTypesOpts(rts, baseEnv.TypeProvider())
+	env, err := baseEnv.Extend(
+		environment.VersionedOptions{
+			// Feature epoch was actually 1.26, but we artificially set it to 1.0 because these
+			// options should always be present.
+			IntroducedVersion: version.MajorMinor(1, 0),
+			EnvOptions:        varOpts,
+			DeclTypes:         declTypes,
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
-	opts = append(opts, varOpts...) // add variables after ruleTypes.
-	env, err := baseEnv.Extend(opts...)
-	if err != nil {
-		return nil, err
-	}
-	return env, nil
+	return env.Env(environment.StoredExpressions)
 }
 
-// createRuleTypeAndOptions creates the cel RuleTypes and a slice of EnvOption
+// createVariableOpts creates a slice of EnvOption
 // that can be used for creating a CEL env containing variables of declType.
 // declType can be nil, in which case the variables will be of DynType.
-func createRuleTypesAndOptions(registry *apiservercel.Registry, declType *apiservercel.DeclType, variables ...string) (*apiservercel.RuleTypes, []cel.EnvOption, error) {
+func createVariableOpts(declType *apiservercel.DeclType, variables ...string) []cel.EnvOption {
 	opts := make([]cel.EnvOption, 0, len(variables))
-	// untyped, use DynType
-	if declType == nil {
-		for _, v := range variables {
-			opts = append(opts, cel.Variable(v, cel.DynType))
-		}
-		return nil, opts, nil
-	}
-	// create a RuleType for the given type
-	rt, err := apiservercel.NewRuleTypes(declType.TypeName(), declType, registry)
-	if err != nil {
-		return nil, nil, err
-	}
-	if rt == nil {
-		return nil, nil, nil
+	t := cel.DynType
+	if declType != nil {
+		t = declType.CelType()
 	}
 	for _, v := range variables {
-		opts = append(opts, cel.Variable(v, declType.CelType()))
+		opts = append(opts, cel.Variable(v, t))
 	}
-	return rt, opts, nil
+	return opts
 }
-
-func ruleTypesOpts(ruleTypes []*apiservercel.RuleTypes, underlyingTypeProvider ref.TypeProvider) ([]cel.EnvOption, error) {
-	var providers []ref.TypeProvider // may be unused, too small to matter
-	var adapters []ref.TypeAdapter
-	for _, rt := range ruleTypes {
-		if rt != nil {
-			withTP, err := rt.WithTypeProvider(underlyingTypeProvider)
-			if err != nil {
-				return nil, err
-			}
-			providers = append(providers, withTP)
-			adapters = append(adapters, withTP)
-		}
-	}
-	var tp ref.TypeProvider
-	var ta ref.TypeAdapter
-	switch len(providers) {
-	case 0:
-		return nil, nil
-	case 1:
-		tp = providers[0]
-		ta = adapters[0]
-	default:
-		tp = &apiservercel.CompositedTypeProvider{Providers: providers}
-		ta = &apiservercel.CompositedTypeAdapter{Adapters: adapters}
-	}
-	return []cel.EnvOption{cel.CustomTypeProvider(tp), cel.CustomTypeAdapter(ta)}, nil
-}
-
-func getBaseEnv() (*cel.Env, error) {
-	typeCheckingBaseEnvInit.Do(func() {
-		var opts []cel.EnvOption
-		opts = append(opts, cel.HomogeneousAggregateLiterals())
-		// Validate function declarations once during base env initialization,
-		// so they don't need to be evaluated each time a CEL rule is compiled.
-		// This is a relatively expensive operation.
-		opts = append(opts, cel.EagerlyValidateDeclarations(true), cel.DefaultUTCTimeZone(true))
-		opts = append(opts, library.ExtensionLibs...)
-		typeCheckingBaseEnv, typeCheckingBaseEnvError = cel.NewEnv(opts...)
-	})
-	return typeCheckingBaseEnv, typeCheckingBaseEnvError
-}
-
-var typeCheckingBaseEnv *cel.Env
-var typeCheckingBaseEnvError error
-var typeCheckingBaseEnvInit sync.Once

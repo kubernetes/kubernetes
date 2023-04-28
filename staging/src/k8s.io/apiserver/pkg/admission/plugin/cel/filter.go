@@ -32,15 +32,17 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/cel"
+	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/apiserver/pkg/cel/library"
 )
 
 // filterCompiler implement the interface FilterCompiler.
 type filterCompiler struct {
+	compiler Compiler
 }
 
-func NewFilterCompiler() FilterCompiler {
-	return &filterCompiler{}
+func NewFilterCompiler(env *environment.EnvSet) FilterCompiler {
+	return &filterCompiler{compiler: NewCompiler(env)}
 }
 
 type evaluationActivation struct {
@@ -75,13 +77,13 @@ func (a *evaluationActivation) Parent() interpreter.Activation {
 }
 
 // Compile compiles the cel expressions defined in the ExpressionAccessors into a Filter
-func (c *filterCompiler) Compile(expressionAccessors []ExpressionAccessor, options OptionalVariableDeclarations, perCallLimit uint64) Filter {
+func (c *filterCompiler) Compile(expressionAccessors []ExpressionAccessor, options OptionalVariableDeclarations, mode environment.Type) Filter {
 	compilationResults := make([]CompilationResult, len(expressionAccessors))
 	for i, expressionAccessor := range expressionAccessors {
 		if expressionAccessor == nil {
 			continue
 		}
-		compilationResults[i] = CompileCELExpression(expressionAccessor, options, perCallLimit)
+		compilationResults[i] = c.compiler.CompileCELExpression(expressionAccessor, options, mode)
 	}
 	return NewFilter(compilationResults)
 }

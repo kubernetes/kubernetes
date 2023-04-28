@@ -21,12 +21,12 @@ import (
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
-	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/interpreter"
 
+	"k8s.io/apimachinery/pkg/util/version"
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/common"
-	"k8s.io/apiserver/pkg/cel/library"
+	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
@@ -103,43 +103,26 @@ func TestMultipleTypes(t *testing.T) {
 // foo is an object with a string field "foo", an integer field "common", and a string field "confusion"
 // bar is an object with a string field "bar", an integer field "common", and an integer field "confusion"
 func buildTestEnv() (*cel.Env, error) {
-	var opts []cel.EnvOption
-	opts = append(opts, cel.HomogeneousAggregateLiterals())
-	opts = append(opts, cel.EagerlyValidateDeclarations(true), cel.DefaultUTCTimeZone(true))
-	opts = append(opts, library.ExtensionLibs...)
-	env, err := cel.NewEnv(opts...)
-	if err != nil {
-		return nil, err
-	}
-	reg := apiservercel.NewRegistry(env)
+	fooType := common.SchemaDeclType(simpleMapSchema("foo", spec.StringProperty()), true).MaybeAssignTypeName("fooType")
+	barType := common.SchemaDeclType(simpleMapSchema("bar", spec.Int64Property()), true).MaybeAssignTypeName("barType")
 
-	declType := common.SchemaDeclType(simpleMapSchema("foo", spec.StringProperty()), true)
-	fooRT, err := apiservercel.NewRuleTypes("fooType", declType, reg)
+	env, err := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()).Extend(
+		environment.VersionedOptions{
+			IntroducedVersion: version.MajorMinor(1, 26),
+			EnvOptions: []cel.EnvOption{
+				cel.Variable("foo", fooType.CelType()),
+				cel.Variable("bar", barType.CelType()),
+			},
+			DeclTypes: []*apiservercel.DeclType{
+				fooType,
+				barType,
+			},
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
-	fooRT, err = fooRT.WithTypeProvider(env.TypeProvider())
-	if err != nil {
-		return nil, err
-	}
-	fooType, _ := fooRT.FindDeclType("fooType")
-
-	declType = common.SchemaDeclType(simpleMapSchema("bar", spec.Int64Property()), true)
-	barRT, err := apiservercel.NewRuleTypes("barType", declType, reg)
-	if err != nil {
-		return nil, err
-	}
-	barRT, err = barRT.WithTypeProvider(env.TypeProvider())
-	if err != nil {
-		return nil, err
-	}
-	barType, _ := barRT.FindDeclType("barType")
-
-	opts = append(opts, cel.CustomTypeProvider(&apiservercel.CompositedTypeProvider{Providers: []ref.TypeProvider{fooRT, barRT}}))
-	opts = append(opts, cel.CustomTypeAdapter(&apiservercel.CompositedTypeAdapter{Adapters: []ref.TypeAdapter{fooRT, barRT}}))
-	opts = append(opts, cel.Variable("foo", fooType.CelType()))
-	opts = append(opts, cel.Variable("bar", barType.CelType()))
-	return env.Extend(opts...)
+	return env.Env(environment.NewExpressions)
 }
 
 func simpleMapSchema(fieldName string, confusionSchema *spec.Schema) common.Schema {
