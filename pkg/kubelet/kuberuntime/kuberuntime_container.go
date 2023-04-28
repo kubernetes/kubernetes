@@ -446,17 +446,17 @@ func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerO
 			}
 
 			var containerUid, containerGid int
-			if container.SecurityContext.RunAsUser != nil {
+			if container.SecurityContext != nil && container.SecurityContext.RunAsUser != nil {
 				containerUid = int(*container.SecurityContext.RunAsUser)
-			} else if pod.Spec.SecurityContext.RunAsUser != nil {
+			} else if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.RunAsUser != nil {
 				containerUid = int(*pod.Spec.SecurityContext.RunAsUser)
 			} else {
 				containerUid = 0
 			}
 
-			if container.SecurityContext.RunAsGroup != nil {
+			if container.SecurityContext != nil && container.SecurityContext.RunAsGroup != nil {
 				containerGid = int(*container.SecurityContext.RunAsGroup)
-			} else if pod.Spec.SecurityContext.RunAsGroup != nil {
+			} else if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.RunAsGroup != nil {
 				containerGid = int(*pod.Spec.SecurityContext.RunAsGroup)
 			} else {
 				containerGid = 0
