@@ -46,9 +46,15 @@ func TestRunDiff(t *testing.T) {
 	currentVersion := "v" + constants.CurrentKubernetesVersion.String()
 
 	// create a temporary file with valid ClusterConfiguration
-	testUpgradeDiffConfigContents := []byte(fmt.Sprintf("apiVersion: %s\n"+
-		"kind: ClusterConfiguration\n"+
-		"kubernetesVersion: %s", kubeadmapiv1.SchemeGroupVersion.String(), currentVersion))
+	testUpgradeDiffConfigContents := []byte(fmt.Sprintf(`
+apiVersion: %s
+kind: InitConfiguration
+nodeRegistration:
+  criSocket: %s
+---
+apiVersion: %[1]s
+kind: ClusterConfiguration
+kubernetesVersion: %[3]s`, kubeadmapiv1.SchemeGroupVersion.String(), constants.UnknownCRISocket, currentVersion))
 	testUpgradeDiffConfig, err := createTestRunDiffFile(testUpgradeDiffConfigContents)
 	if err != nil {
 		t.Fatal(err)

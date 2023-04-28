@@ -56,6 +56,8 @@ func TestLoadJoinConfigurationFromFile(t *testing.T) {
 				apiVersion: kubeadm.k8s.io/v1beta3
 				kind: JoinConfiguration
 				caCertPath: /etc/kubernetes/pki/ca.crt
+				nodeRegistration:
+				  criSocket: "unix:///var/run/unknown.sock"
 				discovery:
 				  bootstrapToken:
 				    apiServerEndpoint: kube-apiserver:6443

@@ -18,6 +18,7 @@ package config
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -26,11 +27,19 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/yaml"
 
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 func TestLoadInitConfigurationFromFile(t *testing.T) {
+	certDir := "/tmp/foo"
+	clusterCfg := []byte(fmt.Sprintf(`
+apiVersion: %s
+kind: ClusterConfiguration
+certificatesDir: %s
+kubernetesVersion: %s`, kubeadmapiv1.SchemeGroupVersion.String(), certDir, constants.MinimumControlPlaneVersion.String()))
+
 	// Create temp folder for the test case
 	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
@@ -43,14 +52,23 @@ func TestLoadInitConfigurationFromFile(t *testing.T) {
 		name         string
 		fileContents []byte
 		expectErr    bool
+		validate     func(*testing.T, *kubeadm.InitConfiguration)
 	}{
 		{
 			name:         "v1beta3.partial1",
 			fileContents: cfgFiles["InitConfiguration_v1beta3"],
 		},
 		{
-			name:         "v1beta3.partial2",
-			fileContents: cfgFiles["ClusterConfiguration_v1beta3"],
+			name: "v1beta3.partial2",
+			fileContents: bytes.Join([][]byte{
+				cfgFiles["InitConfiguration_v1beta3"],
+				clusterCfg,
+			}, []byte(constants.YAMLDocumentSeparator)),
+			validate: func(t *testing.T, cfg *kubeadm.InitConfiguration) {
+				if cfg.ClusterConfiguration.CertificatesDir != certDir {
+					t.Errorf("CertificatesDir from ClusterConfiguration holds the wrong value, Expected: %v. Actual: %v", certDir, cfg.ClusterConfiguration.CertificatesDir)
+				}
+			},
 		},
 		{
 			name: "v1beta3.full",
@@ -87,6 +105,10 @@ func TestLoadInitConfigurationFromFile(t *testing.T) {
 					t.Error("Unexpected nil return value")
 				}
 			}
+			// exec additional validation on the returned value
+			if rt.validate != nil {
+				rt.validate(t, obj)
+			}
 		})
 	}
 }
@@ -104,6 +126,9 @@ func TestDefaultTaintsMarshaling(t *testing.T) {
 					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
 					Kind:       constants.InitConfigurationKind,
 				},
+				NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{
+					CRISocket: constants.UnknownCRISocket,
+				},
 			},
 			expectedTaintCnt: 1,
 		},
@@ -114,7 +139,9 @@ func TestDefaultTaintsMarshaling(t *testing.T) {
 					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
 					Kind:       constants.InitConfigurationKind,
 				},
-				NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{},
+				NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{
+					CRISocket: constants.UnknownCRISocket,
+				},
 			},
 			expectedTaintCnt: 1,
 		},
@@ -126,7 +153,8 @@ func TestDefaultTaintsMarshaling(t *testing.T) {
 					Kind:       constants.InitConfigurationKind,
 				},
 				NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{
-					Taints: []v1.Taint{},
+					Taints:    []v1.Taint{},
+					CRISocket: constants.UnknownCRISocket,
 				},
 			},
 			expectedTaintCnt: 0,
@@ -143,6 +171,7 @@ func TestDefaultTaintsMarshaling(t *testing.T) {
 						{Key: "taint1"},
 						{Key: "taint2"},
 					},
+					CRISocket: constants.UnknownCRISocket,
 				},
 			},
 			expectedTaintCnt: 2,
