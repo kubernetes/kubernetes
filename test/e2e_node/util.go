@@ -33,6 +33,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/util/procfs"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
 	oteltrace "go.opentelemetry.io/otel/trace"
 
@@ -570,4 +571,55 @@ func getPidFromPidFile(pidFile string) (int, error) {
 	}
 
 	return pid, nil
+}
+
+// WaitForPodInitContainerRestartCount waits for the given Pod init container
+// to achieve at least a given restartCount
+// TODO: eventually look at moving to test/e2e/framework/pod
+func WaitForPodInitContainerRestartCount(ctx context.Context, c clientset.Interface, namespace, podName string, initContainerIndex int, desiredRestartCount int32, timeout time.Duration) error {
+	conditionDesc := fmt.Sprintf("init container %d started", initContainerIndex)
+	return e2epod.WaitForPodCondition(ctx, c, namespace, podName, conditionDesc, timeout, func(pod *v1.Pod) (bool, error) {
+		if initContainerIndex > len(pod.Status.InitContainerStatuses)-1 {
+			return false, nil
+		}
+		containerStatus := pod.Status.InitContainerStatuses[initContainerIndex]
+		return containerStatus.RestartCount >= desiredRestartCount, nil
+	})
+}
+
+// WaitForPodContainerRestartCount waits for the given Pod container to achieve at least a given restartCount
+// TODO: eventually look at moving to test/e2e/framework/pod
+func WaitForPodContainerRestartCount(ctx context.Context, c clientset.Interface, namespace, podName string, containerIndex int, desiredRestartCount int32, timeout time.Duration) error {
+	conditionDesc := fmt.Sprintf("container %d started", containerIndex)
+	return e2epod.WaitForPodCondition(ctx, c, namespace, podName, conditionDesc, timeout, func(pod *v1.Pod) (bool, error) {
+		if containerIndex > len(pod.Status.ContainerStatuses)-1 {
+			return false, nil
+		}
+		containerStatus := pod.Status.ContainerStatuses[containerIndex]
+		return containerStatus.RestartCount >= desiredRestartCount, nil
+	})
+}
+
+// WaitForPodInitContainerToFail waits for the given Pod init container to fail with the given reason, specifically due to
+// invalid container configuration. In this case, the container will remain in a waiting state with a specific
+// reason set, which should match the given reason.
+// TODO: eventually look at moving to test/e2e/framework/pod
+func WaitForPodInitContainerToFail(ctx context.Context, c clientset.Interface, namespace, podName string, containerIndex int, reason string, timeout time.Duration) error {
+	conditionDesc := fmt.Sprintf("container %d failed with reason %s", containerIndex, reason)
+	return e2epod.WaitForPodCondition(ctx, c, namespace, podName, conditionDesc, timeout, func(pod *v1.Pod) (bool, error) {
+		switch pod.Status.Phase {
+		case v1.PodPending:
+			if len(pod.Status.InitContainerStatuses) == 0 {
+				return false, nil
+			}
+			containerStatus := pod.Status.InitContainerStatuses[containerIndex]
+			if containerStatus.State.Waiting != nil && containerStatus.State.Waiting.Reason == reason {
+				return true, nil
+			}
+			return false, nil
+		case v1.PodFailed, v1.PodRunning, v1.PodSucceeded:
+			return false, fmt.Errorf("pod was expected to be pending, but it is in the state: %s", pod.Status.Phase)
+		}
+		return false, nil
+	})
 }
