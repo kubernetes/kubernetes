@@ -593,7 +593,7 @@ func (jm *ControllerV2) syncCronJob(
 		}
 	}
 
-	jobReq, err := getJobFromTemplate2(cronJob, *scheduledTime)
+	jobReq, err := getJobFromTemplate2(ctx, cronJob, *scheduledTime)
 	if err != nil {
 		logger.Error(err, "Unable to make Job from template", "cronjob", klog.KObj(cronJob))
 		return cronJob, nil, updateStatus, err

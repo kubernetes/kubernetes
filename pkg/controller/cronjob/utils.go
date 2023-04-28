@@ -17,10 +17,14 @@ limitations under the License.
 package cronjob
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"github.com/robfig/cron/v3"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/pointer"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -205,11 +209,31 @@ func copyAnnotations(template *batchv1.JobTemplateSpec) labels.Set {
 // getJobFromTemplate2 makes a Job from a CronJob. It converts the unix time into minutes from
 // epoch time and concatenates that to the job name, because the cronjob_controller v2 has the lowest
 // granularity of 1 minute for scheduling job.
-func getJobFromTemplate2(cj *batchv1.CronJob, scheduledTime time.Time) (*batchv1.Job, error) {
+func getJobFromTemplate2(ctx context.Context, cj *batchv1.CronJob, scheduledTime time.Time) (*batchv1.Job, error) {
+	logger := klog.FromContext(ctx)
 	labels := copyLabels(&cj.Spec.JobTemplate)
 	annotations := copyAnnotations(&cj.Spec.JobTemplate)
 	// We want job names for a given nominal start time to have a deterministic name to avoid the same job being created twice
 	name := getJobName(cj, scheduledTime)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.CronJobsScheduledAnnotation) {
+		// Get the job timeZone, default will match the kube-controller-manager time zone.
+		var timezone string
+		if cj.Spec.TimeZone != nil {
+			timezone = pointer.StringDeref(cj.Spec.TimeZone, "")
+		}
+		timeZoneLocation, err := time.LoadLocation(timezone)
+		if err != nil {
+			logger.V(4).Info("Cannot use job timeZone because it is invalid", "cronjob", klog.KObj(cj), "timezone", timezone, "err", err)
+			timezone = "UTC"
+			if timeZoneLocation, err = time.LoadLocation(timezone); err != nil {
+				logger.V(4).Info("Cannot get the timezone location", "cronjob", klog.KObj(cj), "timezone", timezone, "err", err)
+				return nil, err
+			}
+		}
+		// Append cronjob creation timestamp to the job annotations. The time will be in RFC3339 form.
+		annotations[batchv1.CronJobScheduledTimestampAnnotation] = cj.CreationTimestamp.Time.In(timeZoneLocation).Format(time.RFC3339)
+	}
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
