@@ -24,6 +24,7 @@ import (
 	"net"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	netutils "k8s.io/utils/net"
 
@@ -163,4 +164,31 @@ func (h *netlinkHandle) isValidForSet(ip net.IP) bool {
 		return false
 	}
 	return true
+}
+
+// GetAllLocalAddressesExcept return all local addresses on the node,
+// except from the passed dev.  This is not the same as to take the
+// diff between GetAllLocalAddresses and GetLocalAddresses since an
+// address can be assigned to many interfaces. This problem raised
+// https://github.com/kubernetes/kubernetes/issues/114815
+func (h *netlinkHandle) GetAllLocalAddressesExcept(dev string) (sets.Set[string], error) {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return nil, err
+	}
+	var addr []net.Addr
+	for _, iface := range ifaces {
+		if iface.Name == dev {
+			continue
+		}
+		ifadr, err := iface.Addrs()
+		if err != nil {
+			// This may happen if the interface was deleted. Ignore
+			// but log the error.
+			klog.ErrorS(err, "Reading addresses", "interface", iface.Name)
+			continue
+		}
+		addr = append(addr, ifadr...)
+	}
+	return utilproxy.AddressSet(h.isValidForSet, addr), nil
 }

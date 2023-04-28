@@ -990,11 +990,10 @@ func (proxier *Proxier) syncProxyRules() {
 		klog.ErrorS(err, "Error listing addresses binded to dummy interface")
 	}
 	// nodeAddressSet All addresses *except* those on the dummy interface
-	nodeAddressSet, err := proxier.netlinkHandle.GetAllLocalAddresses()
+	nodeAddressSet, err := proxier.netlinkHandle.GetAllLocalAddressesExcept(defaultDummyDevice)
 	if err != nil {
 		klog.ErrorS(err, "Error listing node addresses")
 	}
-	nodeAddressSet = nodeAddressSet.Difference(alreadyBoundAddrs)
 
 	hasNodePort := false
 	for _, svc := range proxier.svcPortMap {
@@ -1170,9 +1169,13 @@ func (proxier *Proxier) syncProxyRules() {
 			if proxier.ipvsScheduler == "mh" {
 				serv.Flags |= utilipvs.FlagSourceHash
 			}
-			if err := proxier.syncService(svcPortNameString, serv, true, alreadyBoundAddrs); err == nil {
+			// We must not add the address to the dummy device if it exist on another interface
+			shouldBind := !nodeAddressSet.Has(serv.Address.String())
+			if err := proxier.syncService(svcPortNameString, serv, shouldBind, alreadyBoundAddrs); err == nil {
 				activeIPVSServices.Insert(serv.String())
-				activeBindAddrs.Insert(serv.Address.String())
+				if shouldBind {
+					activeBindAddrs.Insert(serv.Address.String())
+				}
 				if err := proxier.syncEndpoint(svcPortName, svcInfo.ExternalPolicyLocal(), serv); err != nil {
 					klog.ErrorS(err, "Failed to sync endpoint for service", "servicePortName", svcPortName, "virtualServer", serv)
 				}
@@ -1273,9 +1276,13 @@ func (proxier *Proxier) syncProxyRules() {
 			if proxier.ipvsScheduler == "mh" {
 				serv.Flags |= utilipvs.FlagSourceHash
 			}
-			if err := proxier.syncService(svcPortNameString, serv, true, alreadyBoundAddrs); err == nil {
+			// We must not add the address to the dummy device if it exist on another interface
+			shouldBind := !nodeAddressSet.Has(serv.Address.String())
+			if err := proxier.syncService(svcPortNameString, serv, shouldBind, alreadyBoundAddrs); err == nil {
 				activeIPVSServices.Insert(serv.String())
-				activeBindAddrs.Insert(serv.Address.String())
+				if shouldBind {
+					activeBindAddrs.Insert(serv.Address.String())
+				}
 				if err := proxier.syncEndpoint(svcPortName, svcInfo.ExternalPolicyLocal(), serv); err != nil {
 					klog.ErrorS(err, "Failed to sync endpoint for service", "servicePortName", svcPortName, "virtualServer", serv)
 				}
