@@ -71,6 +71,13 @@ func (dsc *DaemonSetsController) rollingUpdate(ctx context.Context, ds *apps.Dae
 		var allowedReplacementPods []string
 		var candidatePodsToDelete []string
 		for nodeName, pods := range nodeToDaemonPods {
+
+			// skip this loop, if node is not Ready
+			if !dsc.checkNodeReady(nodeName) {
+				logger.V(3).Info(nodeName, "is not Ready, skipping to allow the core loop to process")
+				continue
+			}
+
 			newPod, oldPod, ok := findUpdatedPodsOnNode(ds, pods, hash)
 			if !ok {
 				// let the manage loop clean up this node, and treat it as an unavailable node
@@ -203,6 +210,20 @@ func (dsc *DaemonSetsController) rollingUpdate(ctx context.Context, ds *apps.Dae
 	newNodesToCreate := append(allowedNewNodes, candidateNewNodes[:remainingSurge]...)
 
 	return dsc.syncNodes(ctx, ds, oldPodsToDelete, newNodesToCreate, hash)
+}
+
+// check node status.
+func (dsc *DaemonSetsController) checkNodeReady(nodeName string) bool {
+	node, err := dsc.nodeLister.Get(nodeName)
+	if err != nil {
+		return false
+	}
+	for _, condition := range node.Status.Conditions {
+		if condition.Type == v1.NodeReady && condition.Status == v1.ConditionTrue {
+			return true
+		}
+	}
+	return false
 }
 
 // findUpdatedPodsOnNode looks at non-deleted pods on a given node and returns true if there
