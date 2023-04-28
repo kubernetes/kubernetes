@@ -123,6 +123,12 @@ func tweakAddAppProtocol(appProtocol string) serviceTweak {
 	}
 }
 
+func tweakAddIPFamilies(families ...v1.IPFamily) serviceTweak {
+	return func(s *v1.Service) {
+		s.Spec.IPFamilies = families
+	}
+}
+
 // Wrap newService so that you don't have to call default arguments again and again.
 func defaultExternalService() *v1.Service {
 	return newService("external-balancer", v1.ServiceTypeLoadBalancer)
@@ -1252,24 +1258,23 @@ func TestNeedsCleanup(t *testing.T) {
 
 func TestNeedsUpdate(t *testing.T) {
 
-	var oldSvc, newSvc *v1.Service
-
 	testCases := []struct {
-		testName            string //Name of the test case
-		updateFn            func() //Function to update the service object
-		expectedNeedsUpdate bool   //needsupdate always returns bool
+		testName            string                            //Name of the test case
+		updateFn            func() (*v1.Service, *v1.Service) //Function to update the service object
+		expectedNeedsUpdate bool                              //needsupdate always returns bool
 
 	}{{
 		testName: "If the service type is changed from LoadBalancer to ClusterIP",
-		updateFn: func() {
+		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
 			oldSvc = defaultExternalService()
 			newSvc = defaultExternalService()
 			newSvc.Spec.Type = v1.ServiceTypeClusterIP
+			return
 		},
 		expectedNeedsUpdate: true,
 	}, {
 		testName: "If the Ports are different",
-		updateFn: func() {
+		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
 			oldSvc = defaultExternalService()
 			newSvc = defaultExternalService()
 			oldSvc.Spec.Ports = []v1.ServicePort{
@@ -1294,169 +1299,134 @@ func TestNeedsUpdate(t *testing.T) {
 					Port: 10001,
 				},
 			}
-
+			return
 		},
 		expectedNeedsUpdate: true,
 	}, {
 		testName: "If external ip counts are different",
-		updateFn: func() {
+		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
 			oldSvc = defaultExternalService()
 			newSvc = defaultExternalService()
 			oldSvc.Spec.ExternalIPs = []string{"old.IP.1"}
 			newSvc.Spec.ExternalIPs = []string{"new.IP.1", "new.IP.2"}
+			return
 		},
 		expectedNeedsUpdate: true,
 	}, {
 		testName: "If external ips are different",
-		updateFn: func() {
+		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
 			oldSvc = defaultExternalService()
 			newSvc = defaultExternalService()
 			oldSvc.Spec.ExternalIPs = []string{"old.IP.1", "old.IP.2"}
 			newSvc.Spec.ExternalIPs = []string{"new.IP.1", "new.IP.2"}
+			return
 		},
 		expectedNeedsUpdate: true,
 	}, {
 		testName: "If UID is different",
-		updateFn: func() {
+		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
 			oldSvc = defaultExternalService()
 			newSvc = defaultExternalService()
 			oldSvc.UID = types.UID("UID old")
 			newSvc.UID = types.UID("UID new")
+			return
 		},
 		expectedNeedsUpdate: true,
 	}, {
 		testName: "If ExternalTrafficPolicy is different",
-		updateFn: func() {
+		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
 			oldSvc = defaultExternalService()
 			newSvc = defaultExternalService()
 			newSvc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
+			return
 		},
 		expectedNeedsUpdate: true,
 	}, {
 		testName: "If HealthCheckNodePort is different",
-		updateFn: func() {
+		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
 			oldSvc = defaultExternalService()
 			newSvc = defaultExternalService()
 			newSvc.Spec.HealthCheckNodePort = 30123
+			return
 		},
 		expectedNeedsUpdate: true,
 	}, {
 		testName: "If TargetGroup is different 1",
-		updateFn: func() {
+		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
 			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 20))
 			newSvc = oldSvc.DeepCopy()
 			newSvc.Spec.Ports[0].TargetPort = intstr.Parse("21")
+			return
 		},
 		expectedNeedsUpdate: true,
 	}, {
 		testName: "If TargetGroup is different 2",
-		updateFn: func() {
+		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
 			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 22))
 			newSvc = oldSvc.DeepCopy()
 			newSvc.Spec.Ports[0].TargetPort = intstr.Parse("dns")
+			return
 		},
 		expectedNeedsUpdate: true,
 	}, {
 		testName: "If appProtocol is the same",
-		updateFn: func() {
+		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
 			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 22))
 			newSvc = oldSvc.DeepCopy()
+			return
 		},
 		expectedNeedsUpdate: false,
 	}, {
 		testName: "If service IPFamilies from single stack to dual stack",
-		updateFn: func() {
-			protocol := "http"
-			oldSvc = &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "tcp-service",
-					Namespace: "default",
-				},
-				Spec: v1.ServiceSpec{
-					Ports: []v1.ServicePort{{
-						Port:        80,
-						Protocol:    v1.ProtocolTCP,
-						TargetPort:  intstr.Parse("22"),
-						AppProtocol: &protocol,
-					}},
-					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
-					Type:       v1.ServiceTypeLoadBalancer,
-				},
-			}
+		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
+			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 22), tweakAddAppProtocol("http"), tweakAddIPFamilies(v1.IPv4Protocol))
 			newSvc = oldSvc.DeepCopy()
 			newSvc.Spec.IPFamilies = []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol}
+			return
 		},
 		expectedNeedsUpdate: true,
 	}, {
 		testName: "If service IPFamilies from dual stack to single stack",
-		updateFn: func() {
-			protocol := "http"
-			oldSvc = &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "tcp-service",
-					Namespace: "default",
-				},
-				Spec: v1.ServiceSpec{
-					Ports: []v1.ServicePort{{
-						Port:        80,
-						Protocol:    v1.ProtocolTCP,
-						TargetPort:  intstr.Parse("22"),
-						AppProtocol: &protocol,
-					}},
-					IPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-					Type:       v1.ServiceTypeLoadBalancer,
-				},
-			}
+		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
+			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 22), tweakAddAppProtocol("http"), tweakAddIPFamilies(v1.IPv4Protocol, v1.IPv6Protocol))
 			newSvc = oldSvc.DeepCopy()
 			newSvc.Spec.IPFamilies = []v1.IPFamily{v1.IPv4Protocol}
+			return
 		},
 		expectedNeedsUpdate: true,
 	}, {
 		testName: "If service IPFamilies not change",
-		updateFn: func() {
-			protocol := "http"
-			oldSvc = &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "tcp-service",
-					Namespace: "default",
-				},
-				Spec: v1.ServiceSpec{
-					Ports: []v1.ServicePort{{
-						Port:        80,
-						Protocol:    v1.ProtocolTCP,
-						TargetPort:  intstr.Parse("22"),
-						AppProtocol: &protocol,
-					}},
-					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
-					Type:       v1.ServiceTypeLoadBalancer,
-				},
-			}
+		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
+			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 22), tweakAddAppProtocol("http"), tweakAddIPFamilies(v1.IPv4Protocol))
 			newSvc = oldSvc.DeepCopy()
+			return
 		},
 		expectedNeedsUpdate: false,
 	}, {
 		testName: "If appProtocol is set when previously unset",
-		updateFn: func() {
+		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
 			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 22))
 			newSvc = oldSvc.DeepCopy()
 			protocol := "http"
 			newSvc.Spec.Ports[0].AppProtocol = &protocol
+			return
 		},
 		expectedNeedsUpdate: true,
 	}, {
 		testName: "If appProtocol is set to a different value",
-		updateFn: func() {
+		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
 			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 22), tweakAddAppProtocol("http"))
 			newSvc = oldSvc.DeepCopy()
 			newProtocol := "tcp"
 			newSvc.Spec.Ports[0].AppProtocol = &newProtocol
+			return
 		},
 		expectedNeedsUpdate: true,
 	}}
 
 	controller, _, _ := newController()
 	for _, tc := range testCases {
-		tc.updateFn()
+		oldSvc, newSvc := tc.updateFn()
 		obtainedResult := controller.needsUpdate(oldSvc, newSvc)
 		if obtainedResult != tc.expectedNeedsUpdate {
 			t.Errorf("%v needsUpdate() should have returned %v but returned %v", tc.testName, tc.expectedNeedsUpdate, obtainedResult)
