@@ -354,10 +354,10 @@ func (rc *ResourceConsumer) makeConsumeCustomMetric(ctx context.Context) {
 }
 
 func (rc *ResourceConsumer) sendConsumeCPURequest(ctx context.Context, millicores int) {
-	ctx, cancel := context.WithTimeout(ctx, framework.SingleCallTimeout)
+	ctx, cancel := context.WithTimeout(ctx, serviceInitializationTimeout)
 	defer cancel()
 
-	err := wait.PollImmediateWithContext(ctx, serviceInitializationInterval, serviceInitializationTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextCancel(ctx, serviceInitializationInterval, true, func(ctx context.Context) (bool, error) {
 		proxyRequest, err := e2eservice.GetServicesProxyRequest(rc.clientSet, rc.clientSet.CoreV1().RESTClient().Post())
 		framework.ExpectNoError(err)
 		req := proxyRequest.Namespace(rc.nsName).
@@ -375,15 +375,18 @@ func (rc *ResourceConsumer) sendConsumeCPURequest(ctx context.Context, millicore
 		return true, nil
 	})
 
-	framework.ExpectNoError(err)
+	// consuming resources is a repeating background operation, getting cancelled is not a failure
+	if err != context.Canceled {
+		framework.ExpectNoError(err)
+	}
 }
 
 // sendConsumeMemRequest sends POST request for memory consumption
 func (rc *ResourceConsumer) sendConsumeMemRequest(ctx context.Context, megabytes int) {
-	ctx, cancel := context.WithTimeout(ctx, framework.SingleCallTimeout)
+	ctx, cancel := context.WithTimeout(ctx, serviceInitializationTimeout)
 	defer cancel()
 
-	err := wait.PollImmediateWithContext(ctx, serviceInitializationInterval, serviceInitializationTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextCancel(ctx, serviceInitializationInterval, true, func(ctx context.Context) (bool, error) {
 		proxyRequest, err := e2eservice.GetServicesProxyRequest(rc.clientSet, rc.clientSet.CoreV1().RESTClient().Post())
 		framework.ExpectNoError(err)
 		req := proxyRequest.Namespace(rc.nsName).
@@ -401,15 +404,18 @@ func (rc *ResourceConsumer) sendConsumeMemRequest(ctx context.Context, megabytes
 		return true, nil
 	})
 
-	framework.ExpectNoError(err)
+	// consuming resources is a repeating background operation, getting cancelled is not a failure
+	if err != context.Canceled {
+		framework.ExpectNoError(err)
+	}
 }
 
 // sendConsumeCustomMetric sends POST request for custom metric consumption
 func (rc *ResourceConsumer) sendConsumeCustomMetric(ctx context.Context, delta int) {
-	ctx, cancel := context.WithTimeout(ctx, framework.SingleCallTimeout)
+	ctx, cancel := context.WithTimeout(ctx, serviceInitializationTimeout)
 	defer cancel()
 
-	err := wait.PollImmediateWithContext(ctx, serviceInitializationInterval, serviceInitializationTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextCancel(ctx, serviceInitializationInterval, true, func(ctx context.Context) (bool, error) {
 		proxyRequest, err := e2eservice.GetServicesProxyRequest(rc.clientSet, rc.clientSet.CoreV1().RESTClient().Post())
 		framework.ExpectNoError(err)
 		req := proxyRequest.Namespace(rc.nsName).
@@ -427,7 +433,11 @@ func (rc *ResourceConsumer) sendConsumeCustomMetric(ctx context.Context, delta i
 		}
 		return true, nil
 	})
-	framework.ExpectNoError(err)
+
+	// consuming resources is a repeating background operation, getting cancelled is not a failure
+	if err != context.Canceled {
+		framework.ExpectNoError(err)
+	}
 }
 
 // GetReplicas get the replicas
