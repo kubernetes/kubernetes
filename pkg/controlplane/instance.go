@@ -45,7 +45,6 @@ import (
 	discoveryv1 "k8s.io/api/discovery/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	eventsv1 "k8s.io/api/events/v1"
-	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
 	networkingapiv1 "k8s.io/api/networking/v1"
 	networkingapiv1alpha1 "k8s.io/api/networking/v1alpha1"
@@ -718,7 +717,6 @@ var (
 		autoscalingapiv2beta1.SchemeGroupVersion,
 		autoscalingapiv2beta2.SchemeGroupVersion,
 		discoveryv1beta1.SchemeGroupVersion,
-		eventsv1beta1.SchemeGroupVersion,
 		nodev1beta1.SchemeGroupVersion, // remove in 1.26
 		policyapiv1beta1.SchemeGroupVersion,
 		storageapiv1beta1.SchemeGroupVersion,
