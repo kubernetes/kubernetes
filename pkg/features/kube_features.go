@@ -250,15 +250,6 @@ const (
 	// that is independent of a Pod.
 	DynamicResourceAllocation featuregate.Feature = "DynamicResourceAllocation"
 
-	// owner: @andrewsykim
-	// kep: https://kep.k8s.io/1672
-	// alpha: v1.20
-	// beta: v1.22
-	// GA: v1.26
-	//
-	// Enable Terminating condition in Endpoint Slices.
-	EndpointSliceTerminatingCondition featuregate.Feature = "EndpointSliceTerminatingCondition"
-
 	// owner: @harche
 	// kep: http://kep.k8s.io/3386
 	// alpha: v1.25
@@ -549,15 +540,6 @@ const (
 	// Enables new performance-improving code in kube-proxy iptables mode
 	MinimizeIPTablesRestore featuregate.Feature = "MinimizeIPTablesRestore"
 
-	// owner: @janosi @bridgetkromhout
-	// kep: https://kep.k8s.io/1435
-	// alpha: v1.20
-	// beta: v1.24
-	// ga: v1.26
-	//
-	// Enables the usage of different protocols in the same Service with type=LoadBalancer
-	MixedProtocolLBService featuregate.Feature = "MixedProtocolLBService"
-
 	// owner: @sarveshr7
 	// kep: https://kep.k8s.io/2593
 	// alpha: v1.25
@@ -738,24 +720,6 @@ const (
 	// deprecation process. For details about the removal see:
 	// https://github.com/kubernetes/kubernetes/issues/111516
 	SecurityContextDeny featuregate.Feature = "SecurityContextDeny"
-
-	// owner: @maplain @andrewsykim
-	// kep: https://kep.k8s.io/2086
-	// alpha: v1.21
-	// beta: v1.22
-	// GA: v1.26
-	//
-	// Enables node-local routing for Service internal traffic
-	ServiceInternalTrafficPolicy featuregate.Feature = "ServiceInternalTrafficPolicy"
-
-	// owner: @aojea
-	// kep: https://kep.k8s.io/3070
-	// alpha: v1.24
-	// beta: v1.25
-	// ga: v1.26
-	//
-	// Subdivide the ClusterIP range for dynamic and static IP allocation.
-	ServiceIPStaticSubrange featuregate.Feature = "ServiceIPStaticSubrange"
 
 	// owner: @xuzhenglun
 	// kep: http://kep.k8s.io/3682
@@ -969,8 +933,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	DownwardAPIHugePages: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in v1.29
 
-	EndpointSliceTerminatingCondition: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in v1.28
-
 	DynamicResourceAllocation: {Default: false, PreRelease: featuregate.Alpha},
 
 	EventedPLEG: {Default: false, PreRelease: featuregate.Beta}, // off by default, requires CRI Runtime support
@@ -1051,8 +1013,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	MinimizeIPTablesRestore: {Default: true, PreRelease: featuregate.Beta},
 
-	MixedProtocolLBService: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
-
 	MultiCIDRRangeAllocator: {Default: false, PreRelease: featuregate.Alpha},
 
 	MultiCIDRServiceAllocator: {Default: false, PreRelease: featuregate.Alpha},
@@ -1100,10 +1060,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	SeccompDefault: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 
 	SecurityContextDeny: {Default: false, PreRelease: featuregate.Alpha},
-
-	ServiceIPStaticSubrange: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
-
-	ServiceInternalTrafficPolicy: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 
 	ServiceNodePortStaticSubrange: {Default: false, PreRelease: featuregate.Alpha},
 
