@@ -37,7 +37,6 @@ import (
 	apitypes "k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubectl/pkg/util/podutils"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 	"k8s.io/kubernetes/test/utils/format"
@@ -332,7 +331,7 @@ func WaitForPods(ctx context.Context, c clientset.Interface, ns string, opts met
 // RunningReady checks whether pod p's phase is running and it has a ready
 // condition of status true.
 func RunningReady(p *v1.Pod) bool {
-	return p.Status.Phase == v1.PodRunning && podutil.IsPodReady(p)
+	return p.Status.Phase == v1.PodRunning && podutils.IsPodReady(p)
 }
 
 // WaitForPodsRunning waits for a given `timeout` to evaluate if a certain amount of pods in given `ns` are running.

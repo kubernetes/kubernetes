@@ -6,8 +6,7 @@
 # dependencies more careful.
 rules:
   - selectorRegexp: "^k8s[.]io/kubernetes/pkg"
-    allowedPrefixes:
-    - k8s.io/kubernetes/pkg/api/v1/pod
+    allowedPrefixes: []
 
   - selectorRegexp: ""
     allowedPrefixes: [ "" ]
