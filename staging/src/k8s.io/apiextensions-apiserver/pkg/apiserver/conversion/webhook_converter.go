@@ -289,43 +289,11 @@ func (c *webhookConverter) Convert(in runtime.Object, toGV schema.GroupVersion) 
 	}
 
 	if isList {
-		// start a deepcopy of the input and fill in the converted objects from the response at the right spots.
-		// The response list might be sparse because objects had the right version already.
-		convertedList := listObj.DeepCopy()
-		convertedIndex := 0
-		for i := range convertedList.Items {
-			original := &convertedList.Items[i]
-			if original.GetAPIVersion() == toGV.String() {
-				// This item has not been sent for conversion, and therefore does not show up in the response.
-				// convertedList has the right item already.
-				continue
-			}
-			converted, err := getRawExtensionObject(convertedObjects[convertedIndex])
-			if err != nil {
-				return nil, fmt.Errorf("conversion webhook for %v returned invalid converted object at index %v: %v", in.GetObjectKind().GroupVersionKind(), convertedIndex, err)
-			}
-			convertedIndex++
-			if expected, got := toGV, converted.GetObjectKind().GroupVersionKind().GroupVersion(); expected != got {
-				return nil, fmt.Errorf("conversion webhook for %v returned invalid converted object at index %v: invalid groupVersion (expected %v, received %v)", in.GetObjectKind().GroupVersionKind(), convertedIndex, expected, got)
-			}
-			if expected, got := original.GetObjectKind().GroupVersionKind().Kind, converted.GetObjectKind().GroupVersionKind().Kind; expected != got {
-				return nil, fmt.Errorf("conversion webhook for %v returned invalid converted object at index %v: invalid kind (expected %v, received %v)", in.GetObjectKind().GroupVersionKind(), convertedIndex, expected, got)
-			}
-			unstructConverted, ok := converted.(*unstructured.Unstructured)
-			if !ok {
-				// this should not happened
-				return nil, fmt.Errorf("conversion webhook for %v returned invalid converted object at index %v: invalid type, expected=Unstructured, got=%T", in.GetObjectKind().GroupVersionKind(), convertedIndex, converted)
-			}
-			if err := validateConvertedObject(original, unstructConverted); err != nil {
-				return nil, fmt.Errorf("conversion webhook for %v returned invalid converted object at index %v: %v", in.GetObjectKind().GroupVersionKind(), convertedIndex, err)
-			}
-			if err := restoreObjectMeta(original, unstructConverted); err != nil {
-				return nil, fmt.Errorf("conversion webhook for %v returned invalid metadata in object at index %v: %v", in.GetObjectKind().GroupVersionKind(), convertedIndex, err)
-			}
-			convertedList.Items[i] = *unstructConverted
+		outConvertedList, err := convertRawExtensionToObject(convertedObjects, toGV, listObj)
+		if err != nil {
+			return nil, fmt.Errorf("conversion webhook for %v %v", in.GetObjectKind().GroupVersionKind(), err)
 		}
-		convertedList.SetAPIVersion(toGV.String())
-		return convertedList, nil
+		return outConvertedList, nil
 	}
 
 	if len(convertedObjects) != 1 {
@@ -359,6 +327,49 @@ func (c *webhookConverter) Convert(in runtime.Object, toGV schema.GroupVersion) 
 		return nil, fmt.Errorf("conversion webhook for %v returned invalid metadata: %v", in.GetObjectKind().GroupVersionKind(), err)
 	}
 	return converted, nil
+}
+
+// convertRawExtensionToObject takes a list of runtime.RawExtension objects and converts them to the specified
+// GroupVersion. The converted objects are then inserted into an UnstructuredList.
+func convertRawExtensionToObject(rawExtensionObjects []runtime.RawExtension, toGV schema.GroupVersion, listObj *unstructured.UnstructuredList) (runtime.Object, error) {
+	// start a deepcopy of the input and fill in the converted objects from the response at the right spots.
+	// The response list might be sparse because objects had the right version already.
+	convertedList := listObj.DeepCopy()
+	convertedIndex := 0
+	for i := range convertedList.Items {
+		original := &convertedList.Items[i]
+		if original.GetAPIVersion() == toGV.String() {
+			// This item has not been sent for conversion, and therefore does not show up in the response.
+			// convertedList has the right item already.
+			continue
+		}
+
+		converted, err := getRawExtensionObject(rawExtensionObjects[convertedIndex])
+		if err != nil {
+			return nil, fmt.Errorf("returned invalid converted object at index %v: %v", convertedIndex, err)
+		}
+		convertedIndex++
+		if expected, got := toGV, converted.GetObjectKind().GroupVersionKind().GroupVersion(); expected != got {
+			return nil, fmt.Errorf("returned invalid converted object at index %v: invalid groupVersion (expected %v, received %v)", convertedIndex, expected, got)
+		}
+		if expected, got := original.GetObjectKind().GroupVersionKind().Kind, converted.GetObjectKind().GroupVersionKind().Kind; expected != got {
+			return nil, fmt.Errorf("returned invalid converted object at index %v: invalid kind (expected %v, received %v)", convertedIndex, expected, got)
+		}
+		unstructConverted, ok := converted.(*unstructured.Unstructured)
+		if !ok {
+			// this should not happened
+			return nil, fmt.Errorf("returned invalid converted object at index %v: invalid type, expected=Unstructured, got=%T", convertedIndex, converted)
+		}
+		if err := validateConvertedObject(original, unstructConverted); err != nil {
+			return nil, fmt.Errorf("returned invalid converted object at index %v: %v", convertedIndex, err)
+		}
+		if err := restoreObjectMeta(original, unstructConverted); err != nil {
+			return nil, fmt.Errorf("returned invalid metadata in object at index %v: %v", convertedIndex, err)
+		}
+		convertedList.Items[i] = *unstructConverted
+	}
+	convertedList.SetAPIVersion(toGV.String())
+	return convertedList, nil
 }
 
 // validateConvertedObject checks that ObjectMeta fields match, with the exception of

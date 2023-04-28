@@ -22,10 +22,10 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation"
 
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -333,6 +333,238 @@ func TestCreateConversionReviewObjects(t *testing.T) {
 			}
 			if e, a := tc.ExpectResponse, response; !reflect.DeepEqual(e, a) {
 				t.Errorf("unexpected diff: %s", cmp.Diff(e, a))
+			}
+		})
+	}
+}
+
+func TestConvertRawExtensionToObject(t *testing.T) {
+	testCases := []struct {
+		name                 string
+		rawExtensions        []runtime.RawExtension
+		toGV                 schema.GroupVersion
+		convertedList        *unstructured.UnstructuredList
+		expectedOutput       runtime.Object
+		expectedErrSubstring string
+	}{
+		{
+			name:                 "empty rawExtensionObjects and convertedList",
+			rawExtensions:        []runtime.RawExtension{},
+			toGV:                 schema.GroupVersion{Group: "", Version: "v1"},
+			convertedList:        &unstructured.UnstructuredList{},
+			expectedOutput:       &unstructured.UnstructuredList{Object: map[string]interface{}{"apiVersion": "v1"}, Items: []unstructured.Unstructured{}},
+			expectedErrSubstring: "",
+		},
+		{
+			name: "missing object at index",
+			rawExtensions: []runtime.RawExtension{
+				{
+					Raw: []byte(`{"apiVersion":"v1","kind":"Service","metadata":{"name":"test-service-1"}}`),
+				},
+				{
+					Raw: []byte(`{"apiVersion":"v1","kind":"Service","metadata":{"name":"test-service-2"}}`),
+				},
+			},
+			toGV: schema.GroupVersion{Group: "apps", Version: "v1"},
+			convertedList: &unstructured.UnstructuredList{
+				Items: []unstructured.Unstructured{
+					{
+						Object: map[string]interface{}{
+							"apiVersion": "v1",
+							"kind":       "Service",
+							"metadata": map[string]interface{}{
+								"name": "test-service-1",
+							},
+						},
+					},
+					{
+						Object: map[string]interface{}{
+							"apiVersion": "v1",
+							"kind":       "Service",
+							"metadata": map[string]interface{}{
+								"name": "test-service-2",
+							},
+						},
+					},
+				},
+			},
+			expectedOutput:       nil,
+			expectedErrSubstring: "returned invalid converted object at index 1: invalid groupVersion (expected apps/v1, received v1)",
+		},
+		{
+			name: "restore object metadata correctly",
+			rawExtensions: []runtime.RawExtension{
+				{Raw: []byte(`{"apiVersion":"apps/v1","kind":"Deployment","metadata":{"name":"test1"}}`)},
+				{Raw: []byte(`{"apiVersion":"apps/v1","kind":"Deployment","metadata":{"name":"test2"}}`)},
+			},
+			convertedList: &unstructured.UnstructuredList{
+				Items: []unstructured.Unstructured{
+					{
+						Object: map[string]interface{}{
+							"apiVersion": "apps/v1",
+							"kind":       "Deployment",
+							"metadata": map[string]interface{}{
+								"name":      "test1",
+								"namespace": "test1",
+							},
+						},
+					},
+					{
+						Object: map[string]interface{}{
+							"apiVersion": "apps/v1",
+							"kind":       "Deployment",
+							"metadata": map[string]interface{}{
+								"name":      "test2",
+								"namespace": "test2",
+							},
+						},
+					},
+				},
+			},
+			toGV: schema.GroupVersion{Group: "apps", Version: "v1"},
+			expectedOutput: &unstructured.UnstructuredList{
+				Object: map[string]interface{}{
+					"apiVersion": "apps/v1",
+				},
+				Items: []unstructured.Unstructured{
+					{
+						Object: map[string]interface{}{
+							"apiVersion": "apps/v1",
+							"kind":       "Deployment",
+							"metadata": map[string]interface{}{
+								"name":      "test1",
+								"namespace": "test1",
+							},
+						},
+					},
+					{
+						Object: map[string]interface{}{
+							"apiVersion": "apps/v1",
+							"kind":       "Deployment",
+							"metadata": map[string]interface{}{
+								"name":      "test2",
+								"namespace": "test2",
+							},
+						},
+					},
+				},
+			},
+			expectedErrSubstring: "",
+		},
+		{
+			name: "Conversion succeeds",
+			rawExtensions: []runtime.RawExtension{
+				{
+					Raw: []byte(`{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"test-cm"}}`),
+				},
+				{
+					Raw: []byte(`{"apiVersion":"apps/v1","kind":"Deployment","metadata":{"name":"test-deployment"}}`),
+				},
+			},
+			toGV: schema.GroupVersion{Group: "", Version: "v1"},
+			convertedList: &unstructured.UnstructuredList{
+				Object: map[string]interface{}{
+					"apiVersion": "v1",
+				},
+				Items: []unstructured.Unstructured{
+					{
+						Object: map[string]interface{}{
+							"apiVersion": "v1",
+							"kind":       "ConfigMap",
+							"metadata": map[string]interface{}{
+								"name": "test-cm",
+							},
+						},
+					},
+				},
+			},
+			expectedOutput: &unstructured.UnstructuredList{
+				Object: map[string]interface{}{
+					"apiVersion": "v1",
+				},
+				Items: []unstructured.Unstructured{
+					{
+						Object: map[string]interface{}{
+							"apiVersion": "v1",
+							"kind":       "ConfigMap",
+							"metadata": map[string]interface{}{
+								"name": "test-cm",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "convert rawExtensionObjects to a different API version",
+			rawExtensions: []runtime.RawExtension{
+				{
+					Raw: []byte(`{"apiVersion": "apps/v1beta1", "kind": "Deployment", "metadata": {"name": "test1"}}`),
+				},
+				{
+					Raw: []byte(`{"apiVersion": "apps/v1beta1", "kind": "Deployment", "metadata": {"name": "test2"}}`),
+				},
+			},
+			toGV: schema.GroupVersion{Group: "apps", Version: "v1"},
+			convertedList: &unstructured.UnstructuredList{
+				Items: []unstructured.Unstructured{
+					{
+						Object: map[string]interface{}{
+							"apiVersion": "apps/v1",
+							"kind":       "Deployment",
+							"metadata": map[string]interface{}{
+								"name": "test1",
+							},
+						},
+					},
+					{
+						Object: map[string]interface{}{
+							"apiVersion": "apps/v1",
+							"kind":       "Deployment",
+							"metadata": map[string]interface{}{
+								"name": "test2",
+							},
+						},
+					},
+				},
+			},
+			expectedOutput: &unstructured.UnstructuredList{
+				Items: []unstructured.Unstructured{
+					{
+						Object: map[string]interface{}{
+							"apiVersion": "apps/v1",
+							"kind":       "Deployment",
+							"metadata": map[string]interface{}{
+								"name": "test1",
+							},
+						},
+					},
+					{
+						Object: map[string]interface{}{
+							"apiVersion": "apps/v1",
+							"kind":       "Deployment",
+							"metadata": map[string]interface{}{
+								"name": "test2",
+							},
+						},
+					},
+				},
+				Object: map[string]interface{}{
+					"apiVersion": "apps/v1",
+				},
+			},
+			expectedErrSubstring: "",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			convertedObj, err := convertRawExtensionToObject(tc.rawExtensions, tc.toGV, tc.convertedList)
+			if err != nil && err.Error() != tc.expectedErrSubstring {
+				t.Errorf("Unexpected error: %v", err)
+			}
+
+			if !reflect.DeepEqual(convertedObj, tc.expectedOutput) {
+				t.Errorf("Unexpected result:\nexpected: %+v\nactual:   %+v", tc.expectedOutput, convertedObj)
 			}
 		})
 	}
