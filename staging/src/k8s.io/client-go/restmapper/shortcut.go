@@ -17,6 +17,7 @@ limitations under the License.
 package restmapper
 
 import (
+	"fmt"
 	"strings"
 
 	"k8s.io/klog/v2"
@@ -32,13 +33,15 @@ type shortcutExpander struct {
 	RESTMapper meta.RESTMapper
 
 	discoveryClient discovery.DiscoveryInterface
+
+	warningHandler func(any)
 }
 
 var _ meta.ResettableRESTMapper = shortcutExpander{}
 
 // NewShortcutExpander wraps a restmapper in a layer that expands shortcuts found via discovery
-func NewShortcutExpander(delegate meta.RESTMapper, client discovery.DiscoveryInterface) meta.RESTMapper {
-	return shortcutExpander{RESTMapper: delegate, discoveryClient: client}
+func NewShortcutExpander(delegate meta.RESTMapper, client discovery.DiscoveryInterface, warningHandler func(any)) meta.RESTMapper {
+	return shortcutExpander{RESTMapper: delegate, discoveryClient: client, warningHandler: warningHandler}
 }
 
 // KindFor fulfills meta.RESTMapper
@@ -145,15 +148,26 @@ func (e shortcutExpander) expandResourceShortcut(resource schema.GroupVersionRes
 			}
 		}
 
+		found := false
+		var rsc schema.GroupVersionResource
 		for _, item := range shortcutResources {
 			if len(resource.Group) != 0 && resource.Group != item.ShortForm.Group {
 				continue
 			}
 			if resource.Resource == item.ShortForm.Resource {
-				resource.Resource = item.LongForm.Resource
-				resource.Group = item.LongForm.Group
-				return resource
+				if found {
+					if e.warningHandler != nil {
+						e.warningHandler(fmt.Sprintf("ambiguous resource %q for %s is skipped", item.LongForm, resource))
+					}
+					continue
+				}
+				rsc.Resource = item.LongForm.Resource
+				rsc.Group = item.LongForm.Group
+				found = true
 			}
+		}
+		if found {
+			return rsc
 		}
 
 		// we didn't find exact match so match on group prefixing. This allows autoscal to match autoscaling

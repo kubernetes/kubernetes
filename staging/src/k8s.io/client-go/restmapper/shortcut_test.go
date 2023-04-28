@@ -133,7 +133,7 @@ func TestReplaceAliases(t *testing.T) {
 		ds.serverResourcesHandler = func() ([]*metav1.APIResourceList, error) {
 			return test.srvRes, nil
 		}
-		mapper := NewShortcutExpander(&fakeRESTMapper{}, ds).(shortcutExpander)
+		mapper := NewShortcutExpander(&fakeRESTMapper{}, ds, nil).(shortcutExpander)
 
 		actual := mapper.expandResourceShortcut(schema.GroupVersionResource{Resource: test.arg})
 		if actual != test.expected {
@@ -187,7 +187,9 @@ func TestKindFor(t *testing.T) {
 		}
 
 		delegate := &fakeRESTMapper{}
-		mapper := NewShortcutExpander(delegate, ds)
+		mapper := NewShortcutExpander(delegate, ds, func(a any) {
+			t.Fatalf("unexpected warning message %s", a)
+		})
 
 		mapper.KindFor(test.in)
 		if delegate.kindForInput != test.expected {
@@ -242,7 +244,9 @@ func TestKindForWithNewCRDs(t *testing.T) {
 			// will answer the initial request, only failure to match will trigger
 			// the cache invalidation and live discovery call
 			delegate := NewDeferredDiscoveryRESTMapper(fakeCachedDiscovery)
-			mapper := NewShortcutExpander(delegate, fakeCachedDiscovery)
+			mapper := NewShortcutExpander(delegate, fakeCachedDiscovery, func(a any) {
+				t.Fatalf("unexpected warning message %s", a)
+			})
 
 			gvk, err := mapper.KindFor(test.in)
 			if err != nil {
@@ -252,6 +256,91 @@ func TestKindForWithNewCRDs(t *testing.T) {
 				t.Errorf("unexpected data returned %#v, expected %#v", gvk, test.expected)
 			}
 		})
+	}
+}
+
+func TestWarnAmbigious(t *testing.T) {
+	tests := []struct {
+		name        string
+		arg         string
+		expected    schema.GroupVersionResource
+		expectedLog string
+		srvRes      []*metav1.APIResourceList
+	}{
+		{
+			name:        "warn ambiguity",
+			arg:         "hpa",
+			expected:    schema.GroupVersionResource{Resource: "superhorizontalpodautoscalers", Group: "autoscaling"},
+			expectedLog: `Skipping ambiguous resource "horizontalpodautoscalers.autoscaling" for /, Resource=hpa. Continuing with autoscaling/, Resource=superhorizontalpodautoscalers. Please specify the fully qualified resource name.`,
+			srvRes: []*metav1.APIResourceList{
+				{
+					GroupVersion: "autoscaling/v1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "superhorizontalpodautoscalers",
+							ShortNames: []string{"hpa"},
+						},
+					},
+				},
+				{
+					GroupVersion: "autoscaling/v1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "horizontalpodautoscalers",
+							ShortNames: []string{"hpa"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:        "warn-builtin-shortname-ambugity",
+			arg:         "po",
+			expected:    schema.GroupVersionResource{Resource: "pods", Group: ""},
+			expectedLog: `Skipping ambiguous resource "poddlers.acme.com" for /, Resource=po. Continuing with /, Resource=pods. Please specify the fully qualified resource name.`,
+			srvRes: []*metav1.APIResourceList{
+				{
+					GroupVersion: "v1",
+					APIResources: []metav1.APIResource{{Name: "pods", SingularName: "pod", ShortNames: []string{"po"}}},
+				},
+				{
+					GroupVersion: "acme.com/v1",
+					APIResources: []metav1.APIResource{{Name: "poddlers", ShortNames: []string{"po"}}},
+				},
+			},
+		},
+		{
+			name:     "resource-match-singular-preferred",
+			arg:      "pod",
+			expected: schema.GroupVersionResource{Resource: "pod", Group: ""},
+			srvRes: []*metav1.APIResourceList{
+				{
+					GroupVersion: "v1",
+					APIResources: []metav1.APIResource{{Name: "pods", SingularName: "pod"}},
+				},
+				{
+					GroupVersion: "acme.com/v1",
+					APIResources: []metav1.APIResource{{Name: "poddlers", ShortNames: []string{"pods", "pod"}}},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		ds := &fakeDiscoveryClient{}
+		ds.serverResourcesHandler = func() ([]*metav1.APIResourceList, error) {
+			return test.srvRes, nil
+		}
+		mapper := NewShortcutExpander(&fakeRESTMapper{}, ds, func(a any) {
+			if test.expectedLog == "" {
+				t.Fatalf("unexpected warning message %s", a)
+			}
+		}).(shortcutExpander)
+
+		actual := mapper.expandResourceShortcut(schema.GroupVersionResource{Resource: test.arg})
+		if actual != test.expected {
+			t.Errorf("%s: unexpected argument: expected %s, got %s", test.name, test.expected, actual)
+		}
 	}
 }
 

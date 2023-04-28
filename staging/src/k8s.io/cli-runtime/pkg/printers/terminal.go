@@ -18,7 +18,11 @@ package printers
 
 import (
 	"io"
+	"os"
+	"runtime"
 	"strings"
+
+	"github.com/moby/term"
 )
 
 // terminalEscaper replaces ANSI escape sequences and other terminal special
@@ -36,4 +40,36 @@ func WriteEscaped(writer io.Writer, output string) error {
 // non-reversible) format.
 func EscapeTerminal(in string) string {
 	return terminalEscaper.Replace(in)
+}
+
+// IsTerminal returns whether the passed object is a terminal or not
+func IsTerminal(i interface{}) bool {
+	_, terminal := term.GetFdInfo(i)
+	return terminal
+}
+
+// AllowsColorOutput returns true if the specified writer is a terminal and
+// the process environment indicates color output is supported and desired.
+func AllowsColorOutput(w io.Writer) bool {
+	if !IsTerminal(w) {
+		return false
+	}
+
+	// https://en.wikipedia.org/wiki/Computer_terminal#Dumb_terminals
+	if os.Getenv("TERM") == "dumb" {
+		return false
+	}
+
+	// https://no-color.org/
+	if _, nocolor := os.LookupEnv("NO_COLOR"); nocolor {
+		return false
+	}
+
+	// On Windows WT_SESSION is set by the modern terminal component.
+	// Older terminals have poor support for UTF-8, VT escape codes, etc.
+	if runtime.GOOS == "windows" && os.Getenv("WT_SESSION") == "" {
+		return false
+	}
+
+	return true
 }
