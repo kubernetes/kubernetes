@@ -26,8 +26,8 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/matchconditions"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/namespace"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/object"
-	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/cel/environment"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/rest"
 )
@@ -140,7 +140,7 @@ func (m *mutatingWebhookAccessor) GetCompiledMatcher(compiler cel.FilterCompiler
 				HasParams:     false,
 				HasAuthorizer: true,
 			},
-			celconfig.PerCallLimit,
+			environment.StoredExpressions,
 		), authorizer, m.FailurePolicy, "validating", m.Name)
 	})
 	return m.compiledMatcher
@@ -268,7 +268,7 @@ func (v *validatingWebhookAccessor) GetCompiledMatcher(compiler cel.FilterCompil
 				HasParams:     false,
 				HasAuthorizer: true,
 			},
-			celconfig.PerCallLimit,
+			environment.StoredExpressions,
 		), authorizer, v.FailurePolicy, "validating", v.Name)
 	})
 	return v.compiledMatcher

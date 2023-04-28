@@ -19,7 +19,6 @@ package cel
 import (
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/google/cel-go/cel"
@@ -27,8 +26,10 @@ import (
 
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
+	"k8s.io/apimachinery/pkg/util/version"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	apiservercel "k8s.io/apiserver/pkg/cel"
+	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/apiserver/pkg/cel/library"
 	"k8s.io/apiserver/pkg/cel/metrics"
 )
@@ -66,27 +67,41 @@ type CompilationResult struct {
 	MessageExpressionMaxCost uint64
 }
 
-var (
-	initEnvOnce sync.Once
-	initEnv     *cel.Env
-	initEnvErr  error
-)
+// EnvLoader delegates the decision of which CEL environment to use for each expression.
+// Callers should return the appropriate CEL environment based on the guidelines from
+// environment.NewExpressions and environment.StoredExpressions.
+type EnvLoader interface {
+	// RuleEnv returns the appropriate environment from the EnvSet for the given CEL rule.
+	RuleEnv(envSet *environment.EnvSet, expression string) *cel.Env
+	// MessageExpressionEnv returns the appropriate environment from the EnvSet for the given
+	// CEL messageExpressions.
+	MessageExpressionEnv(envSet *environment.EnvSet, expression string) *cel.Env
+}
 
-// This func is duplicated in k8s.io/apiserver/pkg/admission/plugin/cel/validator.go
-// If any changes are made here, consider to make the same changes there as well.
-func getBaseEnv() (*cel.Env, error) {
-	initEnvOnce.Do(func() {
-		var opts []cel.EnvOption
-		opts = append(opts, cel.HomogeneousAggregateLiterals())
-		// Validate function declarations once during base env initialization,
-		// so they don't need to be evaluated each time a CEL rule is compiled.
-		// This is a relatively expensive operation.
-		opts = append(opts, cel.EagerlyValidateDeclarations(true), cel.DefaultUTCTimeZone(true))
-		opts = append(opts, library.ExtensionLibs...)
+// NewExpressionsEnvLoader creates an EnvLoader that always uses the NewExpressions environment type.
+func NewExpressionsEnvLoader() EnvLoader {
+	return alwaysNewEnvLoader{loadFn: func(envSet *environment.EnvSet) *cel.Env {
+		return envSet.NewExpressionsEnv()
+	}}
+}
 
-		initEnv, initEnvErr = cel.NewEnv(opts...)
-	})
-	return initEnv, initEnvErr
+// StoredExpressionsEnvLoader creates an EnvLoader that always uses the StoredExpressions environment type.
+func StoredExpressionsEnvLoader() EnvLoader {
+	return alwaysNewEnvLoader{loadFn: func(envSet *environment.EnvSet) *cel.Env {
+		return envSet.StoredExpressionsEnv()
+	}}
+}
+
+type alwaysNewEnvLoader struct {
+	loadFn func(envSet *environment.EnvSet) *cel.Env
+}
+
+func (pe alwaysNewEnvLoader) RuleEnv(envSet *environment.EnvSet, _ string) *cel.Env {
+	return pe.loadFn(envSet)
+}
+
+func (pe alwaysNewEnvLoader) MessageExpressionEnv(envSet *environment.EnvSet, _ string) *cel.Env {
+	return pe.loadFn(envSet)
 }
 
 // Compile compiles all the XValidations rules (without recursing into the schema) and returns a slice containing a
@@ -98,7 +113,8 @@ func getBaseEnv() (*cel.Env, error) {
 //   - nil Program, nil Error: The provided rule was empty so compilation was not attempted
 //
 // perCallLimit was added for testing purpose only. Callers should always use const PerCallLimit from k8s.io/apiserver/pkg/apis/cel/config.go as input.
-func Compile(s *schema.Structural, declType *apiservercel.DeclType, perCallLimit uint64) ([]CompilationResult, error) {
+// baseEnv is used as the base CEL environment, see common.BaseEnvironment.
+func Compile(s *schema.Structural, declType *apiservercel.DeclType, perCallLimit uint64, baseEnvSet *environment.EnvSet, envLoader EnvLoader) ([]CompilationResult, error) {
 	t := time.Now()
 	defer func() {
 		metrics.Metrics.ObserveCompilation(time.Since(t))
@@ -109,58 +125,52 @@ func Compile(s *schema.Structural, declType *apiservercel.DeclType, perCallLimit
 	}
 	celRules := s.Extensions.XValidations
 
-	var propDecls []cel.EnvOption
-	var root *apiservercel.DeclType
-	var ok bool
-	baseEnv, err := getBaseEnv()
+	envSet, err := prepareEnvSet(baseEnvSet, declType)
 	if err != nil {
 		return nil, err
 	}
-	reg := apiservercel.NewRegistry(baseEnv)
-	scopedTypeName := generateUniqueSelfTypeName()
-	rt, err := apiservercel.NewRuleTypes(scopedTypeName, declType, reg)
-	if err != nil {
-		return nil, err
-	}
-	if rt == nil {
-		return nil, nil
-	}
-	opts, err := rt.EnvOptions(baseEnv.TypeProvider())
-	if err != nil {
-		return nil, err
-	}
-	root, ok = rt.FindDeclType(scopedTypeName)
-	if !ok {
-		if declType == nil {
-			return nil, fmt.Errorf("rule declared on schema that does not support validation rules type: '%s' x-kubernetes-preserve-unknown-fields: '%t'", s.Type, s.XPreserveUnknownFields)
-		}
-		root = declType.MaybeAssignTypeName(scopedTypeName)
-	}
-	propDecls = append(propDecls, cel.Variable(ScopedVarName, root.CelType()))
-	propDecls = append(propDecls, cel.Variable(OldScopedVarName, root.CelType()))
-	opts = append(opts, propDecls...)
-	env, err := baseEnv.Extend(opts...)
-	if err != nil {
-		return nil, err
-	}
-	estimator := newCostEstimator(root)
+	estimator := newCostEstimator(declType)
 	// compResults is the return value which saves a list of compilation results in the same order as x-kubernetes-validations rules.
 	compResults := make([]CompilationResult, len(celRules))
-	maxCardinality := maxCardinality(root.MinSerializedSize)
+	maxCardinality := maxCardinality(declType.MinSerializedSize)
 	for i, rule := range celRules {
-		compResults[i] = compileRule(rule, env, perCallLimit, estimator, maxCardinality)
+		compResults[i] = compileRule(rule, envSet, envLoader, estimator, maxCardinality, perCallLimit)
 	}
 
 	return compResults, nil
 }
 
-func compileRule(rule apiextensions.ValidationRule, env *cel.Env, perCallLimit uint64, estimator *library.CostEstimator, maxCardinality uint64) (compilationResult CompilationResult) {
+func prepareEnvSet(baseEnvSet *environment.EnvSet, declType *apiservercel.DeclType) (*environment.EnvSet, error) {
+	scopedType := declType.MaybeAssignTypeName(generateUniqueSelfTypeName())
+	return baseEnvSet.Extend(
+		environment.VersionedOptions{
+			// Feature epoch was actually 1.23, but we artificially set it to 1.0 because these
+			// options should always be present.
+			IntroducedVersion: version.MajorMinor(1, 0),
+			EnvOptions: []cel.EnvOption{
+				cel.Variable(ScopedVarName, scopedType.CelType()),
+			},
+			DeclTypes: []*apiservercel.DeclType{
+				scopedType,
+			},
+		},
+		environment.VersionedOptions{
+			IntroducedVersion: version.MajorMinor(1, 24),
+			EnvOptions: []cel.EnvOption{
+				cel.Variable(OldScopedVarName, scopedType.CelType()),
+			},
+		},
+	)
+}
+
+func compileRule(rule apiextensions.ValidationRule, envSet *environment.EnvSet, envLoader EnvLoader, estimator *library.CostEstimator, maxCardinality uint64, perCallLimit uint64) (compilationResult CompilationResult) {
 	if len(strings.TrimSpace(rule.Rule)) == 0 {
 		// include a compilation result, but leave both program and error nil per documented return semantics of this
 		// function
 		return
 	}
-	ast, issues := env.Compile(rule.Rule)
+	ruleEnv := envLoader.RuleEnv(envSet, rule.Rule)
+	ast, issues := ruleEnv.Compile(rule.Rule)
 	if issues != nil {
 		compilationResult.Error = &apiservercel.Error{Type: apiservercel.ErrorTypeInvalid, Detail: "compilation failed: " + issues.String()}
 		return
@@ -184,18 +194,16 @@ func compileRule(rule apiextensions.ValidationRule, env *cel.Env, perCallLimit u
 	}
 
 	// TODO: Ideally we could configure the per expression limit at validation time and set it to the remaining overall budget, but we would either need a way to pass in a limit at evaluation time or move program creation to validation time
-	prog, err := env.Program(ast,
-		cel.EvalOptions(cel.OptOptimize, cel.OptTrackCost),
+	prog, err := ruleEnv.Program(ast,
 		cel.CostLimit(perCallLimit),
 		cel.CostTracking(estimator),
-		cel.OptimizeRegex(library.ExtensionLibRegexOptimizations...),
 		cel.InterruptCheckFrequency(celconfig.CheckFrequency),
 	)
 	if err != nil {
 		compilationResult.Error = &apiservercel.Error{Type: apiservercel.ErrorTypeInvalid, Detail: "program instantiation failed: " + err.Error()}
 		return
 	}
-	costEst, err := env.EstimateCost(ast, estimator)
+	costEst, err := ruleEnv.EstimateCost(ast, estimator)
 	if err != nil {
 		compilationResult.Error = &apiservercel.Error{Type: apiservercel.ErrorTypeInternal, Detail: "cost estimation failed: " + err.Error()}
 		return
@@ -204,7 +212,8 @@ func compileRule(rule apiextensions.ValidationRule, env *cel.Env, perCallLimit u
 	compilationResult.MaxCardinality = maxCardinality
 	compilationResult.Program = prog
 	if rule.MessageExpression != "" {
-		ast, issues := env.Compile(rule.MessageExpression)
+		messageEnv := envLoader.MessageExpressionEnv(envSet, rule.MessageExpression)
+		ast, issues := messageEnv.Compile(rule.MessageExpression)
 		if issues != nil {
 			compilationResult.MessageExpressionError = &apiservercel.Error{Type: apiservercel.ErrorTypeInvalid, Detail: "messageExpression compilation failed: " + issues.String()}
 			return
@@ -220,18 +229,16 @@ func compileRule(rule apiextensions.ValidationRule, env *cel.Env, perCallLimit u
 			return
 		}
 
-		msgProg, err := env.Program(ast,
-			cel.EvalOptions(cel.OptOptimize, cel.OptTrackCost),
+		msgProg, err := messageEnv.Program(ast,
 			cel.CostLimit(perCallLimit),
 			cel.CostTracking(estimator),
-			cel.OptimizeRegex(library.ExtensionLibRegexOptimizations...),
 			cel.InterruptCheckFrequency(celconfig.CheckFrequency),
 		)
 		if err != nil {
 			compilationResult.MessageExpressionError = &apiservercel.Error{Type: apiservercel.ErrorTypeInvalid, Detail: "messageExpression instantiation failed: " + err.Error()}
 			return
 		}
-		costEst, err := env.EstimateCost(ast, estimator)
+		costEst, err := messageEnv.EstimateCost(ast, estimator)
 		if err != nil {
 			compilationResult.MessageExpressionError = &apiservercel.Error{Type: apiservercel.ErrorTypeInternal, Detail: "cost estimation failed for messageExpression: " + err.Error()}
 			return
