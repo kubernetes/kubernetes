@@ -12,7 +12,7 @@ and scaling of applications.
 
 Kubernetes builds upon a decade and a half of experience at Google running
 production workloads at scale using a system called [Borg],
-combined with best-of-breed ideas and practices from the community.
+combined with best-of-breed ideas and practises from the community.
 
 Kubernetes is hosted by the Cloud Native Computing Foundation ([CNCF]).
 If your company wants to help shape the evolution of
