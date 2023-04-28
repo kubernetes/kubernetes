@@ -477,6 +477,11 @@ func (f *TestFactory) WithDiscoveryClient(discoveryClient discovery.CachedDiscov
 	return f
 }
 
+func (f *TestFactory) WithRESTMapper(mapper meta.RESTMapper) *TestFactory {
+	f.kubeConfigFlags.WithRESTMapper(mapper)
+	return f
+}
+
 // Cleanup cleans up TestFactory temp config file
 func (f *TestFactory) Cleanup() {
 	if f.tempConfigFile == nil {

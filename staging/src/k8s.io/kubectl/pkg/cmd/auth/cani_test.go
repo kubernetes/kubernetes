@@ -25,12 +25,18 @@ import (
 	"testing"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
+	"k8s.io/client-go/discovery"
+	discoveryfake "k8s.io/client-go/discovery/fake"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/client-go/restmapper"
+	kubetesting "k8s.io/client-go/testing"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/kubectl/pkg/scheme"
 )
@@ -125,7 +131,11 @@ func TestRunAccessCheck(t *testing.T) {
 			test.o.Out = io.Discard
 			test.o.ErrOut = io.Discard
 
-			tf := cmdtesting.NewTestFactory().WithNamespace("test")
+			// discovery should not influence access checks, mapper is supplied by TestFactory
+			noopDiscovery := cmdtesting.NewFakeCachedDiscoveryClient()
+			noopDiscovery.DiscoveryInterface = &discoveryfake.FakeDiscovery{Fake: &kubetesting.Fake{}}
+
+			tf := cmdtesting.NewTestFactory().WithNamespace("test").WithDiscoveryClient(noopDiscovery)
 			defer tf.Cleanup()
 
 			ns := scheme.Codecs.WithoutConversion()
@@ -236,7 +246,7 @@ func TestRunResourceFor(t *testing.T) {
 		name           string
 		o              *CanIOptions
 		resourceArg    string
-		subResourceArg string
+		subresourceArg string
 
 		expectGVR      schema.GroupVersionResource
 		expectedErrOut string
@@ -269,11 +279,76 @@ func TestRunResourceFor(t *testing.T) {
 			},
 		},
 		{
+			name:        "server-supported standard resources with version and a group specified",
+			o:           &CanIOptions{},
+			resourceArg: "jobs.v1beta1.batch",
+			expectGVR: schema.GroupVersionResource{
+				Group:    "batch",
+				Version:  "v1beta1",
+				Resource: "jobs",
+			},
+		},
+		// replicasets.apps have a priority over replicasets.extensions because they are declared first in testAPIResources which is an input to a fake discovery
+		{
+			name:        "server-supported partial conflicting standard resources resolve to the highest priority one",
+			o:           &CanIOptions{},
+			resourceArg: "replicasets",
+			expectGVR: schema.GroupVersionResource{
+				Group:    "apps",
+				Version:  "v1",
+				Resource: "replicasets",
+			},
+		},
+		{
 			name:        "server-supported nonstandard resources",
 			o:           &CanIOptions{},
 			resourceArg: "users",
 			expectGVR: schema.GroupVersionResource{
 				Resource: "users",
+			},
+		},
+		{
+			name:        "server-supported nonstandard resources is not overridden by a custom one",
+			o:           &CanIOptions{},
+			resourceArg: "groups",
+			expectGVR: schema.GroupVersionResource{
+				Resource: "groups",
+			},
+		},
+		{
+			name:        "server-supported resource can be still used when fully specified",
+			o:           &CanIOptions{},
+			resourceArg: "groups.customgrouping.abcd.io",
+			expectGVR: schema.GroupVersionResource{
+				Group:    "customgrouping.abcd.io",
+				Version:  "v1",
+				Resource: "groups",
+			},
+		},
+		{
+			name:        "server-supported nonstandard resources singular",
+			o:           &CanIOptions{},
+			resourceArg: "user",
+			expectGVR: schema.GroupVersionResource{
+				Resource: "users",
+			},
+		},
+		{
+			name:        "server-supported nonstandard resources with group",
+			o:           &CanIOptions{},
+			resourceArg: "uids.authentication.k8s.io",
+			expectGVR: schema.GroupVersionResource{
+				Group:    "authentication.k8s.io",
+				Resource: "uids",
+			},
+		},
+		{
+			name:        "server-supported nonstandard partial resources resolves to group",
+			o:           &CanIOptions{},
+			resourceArg: "uids",
+			expectGVR: schema.GroupVersionResource{
+				Group:    "authentication.k8s.io",
+				Resource: "uids",
 			},
 		},
 		{
@@ -285,12 +360,110 @@ func TestRunResourceFor(t *testing.T) {
 			},
 			expectedErrOut: "Warning: the server doesn't have a resource type 'invalid'\n\n",
 		},
+		{
+			name:        "invalid resources with a group",
+			o:           &CanIOptions{},
+			resourceArg: "jobs.missing.group.com",
+			expectGVR: schema.GroupVersionResource{
+				Group:    "missing.group.com",
+				Resource: "jobs",
+			},
+			expectedErrOut: "Warning: the server doesn't have a resource type 'jobs' in group 'missing.group.com'\n\n",
+		},
+		// test subresources
+		{
+			name:           "server-supported standard resources with a subresource without group",
+			o:              &CanIOptions{},
+			resourceArg:    "pods",
+			subresourceArg: "status",
+			expectGVR: schema.GroupVersionResource{
+				Version:  "v1",
+				Resource: "pods",
+			},
+		},
+		{
+			name:           "server-supported standard resources with invalid subresource without group",
+			o:              &CanIOptions{},
+			resourceArg:    "pods",
+			subresourceArg: "nonexistent",
+			expectGVR: schema.GroupVersionResource{
+				Version:  "v1",
+				Resource: "pods",
+			},
+			expectedErrOut: "Warning: the server doesn't have a subresource 'pods/nonexistent'\n\n",
+		},
+		{
+			name:           "server-supported nonstandard resources with a subresource without a group",
+			o:              &CanIOptions{},
+			resourceArg:    "userextra",
+			subresourceArg: "scopes",
+			expectGVR: schema.GroupVersionResource{
+				Group:    "authentication.k8s.io",
+				Resource: "userextras",
+			},
+		},
+		{
+			name:           "server-supported nonstandard resources with invalid subresource without group",
+			o:              &CanIOptions{},
+			resourceArg:    "users",
+			subresourceArg: "nonexistent",
+			expectGVR: schema.GroupVersionResource{
+				Resource: "users",
+			},
+			expectedErrOut: "Warning: the server doesn't have a subresource 'users/nonexistent'\n\n",
+		},
+		{
+			name:           "server-supported standard resources + subresource with group",
+			o:              &CanIOptions{},
+			resourceArg:    "jobs",
+			subresourceArg: "status",
+			expectGVR: schema.GroupVersionResource{
+				Group:    "batch",
+				Version:  "v1",
+				Resource: "jobs",
+			},
+		},
+		{
+			name:           "server-supported standard resources + invalid subresource with group",
+			o:              &CanIOptions{},
+			resourceArg:    "jobs",
+			subresourceArg: "nonexistent",
+			expectGVR: schema.GroupVersionResource{
+				Group:    "batch",
+				Version:  "v1",
+				Resource: "jobs",
+			},
+			expectedErrOut: "Warning: the server doesn't have a subresource 'jobs/nonexistent' in group 'batch'\n\n",
+		},
+		{
+			name:           "invalid resource + subresource",
+			o:              &CanIOptions{},
+			resourceArg:    "invalid",
+			subresourceArg: "status",
+			expectGVR: schema.GroupVersionResource{
+				Resource: "invalid",
+			},
+			expectedErrOut: "Warning: the server doesn't have a resource type 'invalid'\n\n",
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory().WithNamespace("test")
+			mapper, cachedDiscovery, err := testRESTMapperAndDiscovery()
+			if err != nil {
+				t.Errorf("got unexpected error when do testRESTMapperAndDiscovery(): %v", err)
+				return
+			}
+
+			tf := cmdtesting.NewTestFactory().WithNamespace("test").WithDiscoveryClient(cachedDiscovery).WithRESTMapper(mapper)
 			defer tf.Cleanup()
+
+			discoveryClient, err := tf.ToDiscoveryClient()
+			if err != nil {
+				t.Errorf("got unexpected error when do tf.ToDiscoveryClient(): %v", err)
+				return
+			}
+			test.o.DiscoveryClient = discoveryClient
 
 			ioStreams, _, _, buf := genericiooptions.NewTestIOStreams()
 			test.o.IOStreams = ioStreams
@@ -301,7 +474,7 @@ func TestRunResourceFor(t *testing.T) {
 				t.Errorf("got unexpected error when do tf.ToRESTMapper(): %v", err)
 				return
 			}
-			gvr := test.o.resourceFor(restMapper, test.resourceArg, test.subResourceArg)
+			gvr := test.o.resourceFor(restMapper, test.resourceArg, test.subresourceArg)
 			if gvr != test.expectGVR {
 				t.Errorf("expected %v\n but got %v\n", test.expectGVR, gvr)
 			}
@@ -328,6 +501,80 @@ func getSelfSubjectRulesReview() *authorizationv1.SelfSubjectRulesReview {
 					Verbs:           []string{"get"},
 					NonResourceURLs: []string{"/apis/*", "/version"},
 				},
+			},
+		},
+	}
+}
+
+func testRESTMapperAndDiscovery() (meta.RESTMapper, discovery.CachedDiscoveryInterface, error) {
+	fakeClient := &kubetesting.Fake{Resources: testAPIResources()}
+	discoveryClient := &discoveryfake.FakeDiscovery{Fake: fakeClient}
+	cachedDiscoveryClient := cmdtesting.NewFakeCachedDiscoveryClient()
+	cachedDiscoveryClient.DiscoveryInterface = discoveryClient
+
+	apiGroupResources, err := restmapper.GetAPIGroupResources(discoveryClient)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	mapper := restmapper.NewDiscoveryRESTMapper(apiGroupResources)
+
+	expander := restmapper.NewShortcutExpander(mapper, cachedDiscoveryClient)
+	return expander, cachedDiscoveryClient, nil
+}
+
+func testAPIResources() []*metav1.APIResourceList {
+	return []*metav1.APIResourceList{
+		{
+			GroupVersion: "v1",
+			APIResources: []metav1.APIResource{
+				{Name: "pods", Namespaced: true, Kind: "Pod"},
+				{Name: "pods/log", Namespaced: true, Kind: "Pod"},
+				{Name: "pods/status", Namespaced: true, Kind: "Pod"},
+				{Name: "services", Namespaced: true, Kind: "Service"},
+				{Name: "replicationcontrollers", Namespaced: true, Kind: "ReplicationController"},
+				{Name: "componentstatuses", Namespaced: false, Kind: "ComponentStatus"},
+				{Name: "nodes", Namespaced: false, Kind: "Node"},
+				{Name: "secrets", Namespaced: true, Kind: "Secret"},
+				{Name: "configmaps", Namespaced: true, Kind: "ConfigMap"},
+				{Name: "namespacedtype", Namespaced: true, Kind: "NamespacedType"},
+				{Name: "namespaces", Namespaced: false, Kind: "Namespace"},
+				{Name: "resourcequotas", Namespaced: true, Kind: "ResourceQuota"},
+			},
+		},
+		{
+			GroupVersion: "apps/v1",
+			APIResources: []metav1.APIResource{
+				{Name: "replicasets", Namespaced: true, Kind: "ReplicaSet"},
+				{Name: "deployments", Namespaced: true, Kind: "Deployment"},
+			},
+		},
+		{
+			GroupVersion: "extensions/v1",
+			APIResources: []metav1.APIResource{
+				{Name: "replicasets", Namespaced: true, Kind: "ReplicaSet"},
+				{Name: "deployments", Namespaced: true, Kind: "Deployment"},
+			},
+		},
+		{
+			GroupVersion: "batch/v1",
+			APIResources: []metav1.APIResource{
+				{Name: "jobs", Namespaced: true, Kind: "Job"},
+				{Name: "jobs/status", Namespaced: true, Kind: "Job"},
+			},
+		},
+		{
+			GroupVersion: "batch/v1beta1",
+			APIResources: []metav1.APIResource{
+				{Name: "jobs", Namespaced: true, Kind: "Job"},
+				{Name: "jobs/status", Namespaced: true, Kind: "Job"},
+				{Name: "cronjobs", Namespaced: true, Kind: "CronJob"},
+			},
+		},
+		{
+			GroupVersion: "customgrouping.abcd.io/v1",
+			APIResources: []metav1.APIResource{
+				{Name: "groups", Namespaced: false, Kind: "Group"},
 			},
 		},
 	}

@@ -832,6 +832,7 @@ runTests() {
 
     output_message=$(kubectl auth can-i get pods --subresource=log 2>&1 "${kube_flags[@]}")
     kube::test::if_has_string "${output_message}" "yes"
+    kube::test::if_has_not_string "${output_message}" "Warning"
 
     output_message=$(kubectl auth can-i get invalid_resource 2>&1 "${kube_flags[@]}")
     kube::test::if_has_string "${output_message}" "the server doesn't have a resource type"
@@ -871,6 +872,11 @@ runTests() {
     # kubectl auth can-i get nodes --all-namespaces does not print a namespaced warning message
     output_message=$(kubectl auth can-i get nodes --all-namespaces 2>&1 "${kube_flags[@]}")
     kube::test::if_has_not_string "${output_message}" "Warning: resource 'nodes' is not namespace scoped"
+
+    # kubectl auth can-i get pods --subresource=invalid prints a warning message
+    output_message=$(kubectl auth can-i get pods --subresource=invalid 2>&1 "${kube_flags[@]}")
+    kube::test::if_has_string "${output_message}" "yes"
+    kube::test::if_has_string "${output_message}" "Warning: the server doesn't have a subresource 'pods/invalid'"
   fi
 
   # kubectl auth reconcile
