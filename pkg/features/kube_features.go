@@ -212,14 +212,6 @@ const (
 	// Enables support for time zones in CronJobs.
 	CronJobTimeZone featuregate.Feature = "CronJobTimeZone"
 
-	// owner: @jiayingz, @swatisehgal (for GA graduation)
-	// alpha: v1.8
-	// beta: v1.10
-	// GA: v1.26
-	//
-	// Enables support for Device Plugins
-	DevicePlugins featuregate.Feature = "DevicePlugins"
-
 	// owner: @andrewsykim
 	// alpha: v1.22
 	//
@@ -908,8 +900,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ConsistentHTTPGetHandlers: {Default: true, PreRelease: featuregate.GA},
 
 	CronJobTimeZone: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
-
-	DevicePlugins: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 
 	DisableCloudProviders: {Default: false, PreRelease: featuregate.Alpha},
 
