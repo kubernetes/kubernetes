@@ -452,6 +452,8 @@ func (o *Options) ApplyDefaults(in *kubeproxyconfig.KubeProxyConfiguration) (*ku
 
 	out := internal.(*kubeproxyconfig.KubeProxyConfiguration)
 
+	o.platformApplyDefaults(out)
+
 	return out, nil
 }
 
@@ -522,21 +524,16 @@ with the apiserver API to configure the proxy.`,
 // ProxyServer represents all the parameters required to start the Kubernetes proxy server. All
 // fields are required.
 type ProxyServer struct {
-	Client                 clientset.Interface
-	Proxier                proxy.Provider
-	Broadcaster            events.EventBroadcaster
-	Recorder               events.EventRecorder
-	ConntrackConfiguration kubeproxyconfig.KubeProxyConntrackConfiguration
-	Conntracker            Conntracker // if nil, ignored
-	ProxyMode              kubeproxyconfig.ProxyMode
-	NodeRef                *v1.ObjectReference
-	MetricsBindAddress     string
-	BindAddressHardFail    bool
-	EnableProfiling        bool
-	OOMScoreAdj            *int32
-	ConfigSyncPeriod       time.Duration
-	HealthzServer          healthcheck.ProxierHealthUpdater
-	localDetectorMode      kubeproxyconfig.LocalMode
+	Config *kubeproxyconfig.KubeProxyConfiguration
+
+	Client        clientset.Interface
+	Broadcaster   events.EventBroadcaster
+	Recorder      events.EventRecorder
+	Conntracker   Conntracker // if nil, ignored
+	NodeRef       *v1.ObjectReference
+	HealthzServer healthcheck.ProxierHealthUpdater
+
+	Proxier proxy.Provider
 }
 
 // createClient creates a kube client from the given config and masterOverride.
@@ -645,9 +642,9 @@ func (s *ProxyServer) Run() error {
 
 	// TODO(vmarmol): Use container config for this.
 	var oomAdjuster *oom.OOMAdjuster
-	if s.OOMScoreAdj != nil {
+	if s.Config.OOMScoreAdj != nil {
 		oomAdjuster = oom.NewOOMAdjuster()
-		if err := oomAdjuster.ApplyOOMScoreAdj(0, int(*s.OOMScoreAdj)); err != nil {
+		if err := oomAdjuster.ApplyOOMScoreAdj(0, int(*s.Config.OOMScoreAdj)); err != nil {
 			klog.V(2).InfoS("Failed to apply OOMScore", "err", err)
 		}
 	}
@@ -660,7 +657,7 @@ func (s *ProxyServer) Run() error {
 	// TODO(thockin): make it possible for healthz and metrics to be on the same port.
 
 	var errCh chan error
-	if s.BindAddressHardFail {
+	if s.Config.BindAddressHardFail {
 		errCh = make(chan error)
 	}
 
@@ -668,12 +665,12 @@ func (s *ProxyServer) Run() error {
 	serveHealthz(s.HealthzServer, errCh)
 
 	// Start up a metrics server if requested
-	serveMetrics(s.MetricsBindAddress, s.ProxyMode, s.EnableProfiling, errCh)
+	serveMetrics(s.Config.MetricsBindAddress, s.Config.Mode, s.Config.EnableProfiling, errCh)
 
 	// Tune conntrack, if requested
 	// Conntracker is always nil for windows
 	if s.Conntracker != nil {
-		max, err := getConntrackMax(s.ConntrackConfiguration)
+		max, err := getConntrackMax(s.Config.Conntrack)
 		if err != nil {
 			return err
 		}
@@ -696,15 +693,15 @@ func (s *ProxyServer) Run() error {
 			}
 		}
 
-		if s.ConntrackConfiguration.TCPEstablishedTimeout != nil && s.ConntrackConfiguration.TCPEstablishedTimeout.Duration > 0 {
-			timeout := int(s.ConntrackConfiguration.TCPEstablishedTimeout.Duration / time.Second)
+		if s.Config.Conntrack.TCPEstablishedTimeout != nil && s.Config.Conntrack.TCPEstablishedTimeout.Duration > 0 {
+			timeout := int(s.Config.Conntrack.TCPEstablishedTimeout.Duration / time.Second)
 			if err := s.Conntracker.SetTCPEstablishedTimeout(timeout); err != nil {
 				return err
 			}
 		}
 
-		if s.ConntrackConfiguration.TCPCloseWaitTimeout != nil && s.ConntrackConfiguration.TCPCloseWaitTimeout.Duration > 0 {
-			timeout := int(s.ConntrackConfiguration.TCPCloseWaitTimeout.Duration / time.Second)
+		if s.Config.Conntrack.TCPCloseWaitTimeout != nil && s.Config.Conntrack.TCPCloseWaitTimeout.Duration > 0 {
+			timeout := int(s.Config.Conntrack.TCPCloseWaitTimeout.Duration / time.Second)
 			if err := s.Conntracker.SetTCPCloseWaitTimeout(timeout); err != nil {
 				return err
 			}
@@ -725,7 +722,7 @@ func (s *ProxyServer) Run() error {
 	labelSelector = labelSelector.Add(*noProxyName, *noHeadlessEndpoints)
 
 	// Make informers that filter out objects that want a non-default service proxy.
-	informerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.ConfigSyncPeriod,
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.Config.ConfigSyncPeriod.Duration,
 		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
 			options.LabelSelector = labelSelector.String()
 		}))
@@ -734,11 +731,11 @@ func (s *ProxyServer) Run() error {
 	// Note: RegisterHandler() calls need to happen before creation of Sources because sources
 	// only notify on changes, and the initial update (on process start) may be lost if no handlers
 	// are registered yet.
-	serviceConfig := config.NewServiceConfig(informerFactory.Core().V1().Services(), s.ConfigSyncPeriod)
+	serviceConfig := config.NewServiceConfig(informerFactory.Core().V1().Services(), s.Config.ConfigSyncPeriod.Duration)
 	serviceConfig.RegisterEventHandler(s.Proxier)
 	go serviceConfig.Run(wait.NeverStop)
 
-	endpointSliceConfig := config.NewEndpointSliceConfig(informerFactory.Discovery().V1().EndpointSlices(), s.ConfigSyncPeriod)
+	endpointSliceConfig := config.NewEndpointSliceConfig(informerFactory.Discovery().V1().EndpointSlices(), s.Config.ConfigSyncPeriod.Duration)
 	endpointSliceConfig.RegisterEventHandler(s.Proxier)
 	go endpointSliceConfig.Run(wait.NeverStop)
 
@@ -747,13 +744,13 @@ func (s *ProxyServer) Run() error {
 	informerFactory.Start(wait.NeverStop)
 
 	// Make an informer that selects for our nodename.
-	currentNodeInformerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.ConfigSyncPeriod,
+	currentNodeInformerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.Config.ConfigSyncPeriod.Duration,
 		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
 			options.FieldSelector = fields.OneTermEqualSelector("metadata.name", s.NodeRef.Name).String()
 		}))
-	nodeConfig := config.NewNodeConfig(currentNodeInformerFactory.Core().V1().Nodes(), s.ConfigSyncPeriod)
+	nodeConfig := config.NewNodeConfig(currentNodeInformerFactory.Core().V1().Nodes(), s.Config.ConfigSyncPeriod.Duration)
 	// https://issues.k8s.io/111321
-	if s.localDetectorMode == kubeproxyconfig.LocalModeNodeCIDR {
+	if s.Config.DetectLocalMode == kubeproxyconfig.LocalModeNodeCIDR {
 		nodeConfig.RegisterEventHandler(&proxy.NodePodCIDRHandler{})
 	}
 	nodeConfig.RegisterEventHandler(s.Proxier)

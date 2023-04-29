@@ -95,6 +95,8 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 
 	allErrs = append(allErrs, validateKubeProxyNodePortAddress(config.NodePortAddresses, newPath.Child("NodePortAddresses"))...)
 	allErrs = append(allErrs, validateShowHiddenMetricsVersion(config.ShowHiddenMetricsForVersion, newPath.Child("ShowHiddenMetricsForVersion"))...)
+
+	allErrs = append(allErrs, validateDetectLocalMode(config.DetectLocalMode, newPath.Child("DetectLocalMode"))...)
 	if config.DetectLocalMode == kubeproxyconfig.LocalModeBridgeInterface {
 		allErrs = append(allErrs, validateInterface(config.DetectLocal.BridgeInterface, newPath.Child("InterfaceName"))...)
 	}
@@ -203,6 +205,22 @@ func validateProxyModeWindows(mode kubeproxyconfig.ProxyMode, fldPath *field.Pat
 
 	errMsg := fmt.Sprintf("must be %s or blank (blank means the most-available proxy [currently 'kernelspace'])", strings.Join(validModes.List(), ","))
 	return field.ErrorList{field.Invalid(fldPath.Child("ProxyMode"), string(mode), errMsg)}
+}
+
+func validateDetectLocalMode(mode kubeproxyconfig.LocalMode, fldPath *field.Path) field.ErrorList {
+	validModes := []string{
+		string(kubeproxyconfig.LocalModeClusterCIDR),
+		string(kubeproxyconfig.LocalModeNodeCIDR),
+		string(kubeproxyconfig.LocalModeBridgeInterface),
+		string(kubeproxyconfig.LocalModeInterfaceNamePrefix),
+		"",
+	}
+
+	if sets.New(validModes...).Has(string(mode)) {
+		return nil
+	}
+
+	return field.ErrorList{field.NotSupported(fldPath, string(mode), validModes)}
 }
 
 func validateClientConnectionConfiguration(config componentbaseconfig.ClientConnectionConfiguration, fldPath *field.Path) field.ErrorList {
