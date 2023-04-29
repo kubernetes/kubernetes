@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -942,8 +941,6 @@ func TestGCEPDLimits(t *testing.T) {
 }
 
 func TestGetMaxVols(t *testing.T) {
-	previousValue := os.Getenv(KubeMaxPDVols)
-
 	tests := []struct {
 		rawMaxVols string
 		expected   int
@@ -968,17 +965,12 @@ func TestGetMaxVols(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			os.Setenv(KubeMaxPDVols, test.rawMaxVols)
+			t.Setenv(KubeMaxPDVols, test.rawMaxVols)
 			result := getMaxVolLimitFromEnv()
 			if result != test.expected {
 				t.Errorf("expected %v got %v", test.expected, result)
 			}
 		})
-	}
-
-	os.Unsetenv(KubeMaxPDVols)
-	if previousValue != "" {
-		os.Setenv(KubeMaxPDVols, previousValue)
 	}
 }
 
