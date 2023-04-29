@@ -5238,14 +5238,14 @@ func ValidateServiceStatusUpdate(service, oldService *core.Service) field.ErrorL
 // ValidateReplicationController tests if required fields in the replication controller are set.
 func ValidateReplicationController(controller *core.ReplicationController, opts PodValidationOptions) field.ErrorList {
 	allErrs := ValidateObjectMeta(&controller.ObjectMeta, true, ValidateReplicationControllerName, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateReplicationControllerSpec(&controller.Spec, field.NewPath("spec"), opts)...)
+	allErrs = append(allErrs, ValidateReplicationControllerSpec(&controller.Spec, nil, field.NewPath("spec"), opts)...)
 	return allErrs
 }
 
 // ValidateReplicationControllerUpdate tests if required fields in the replication controller are set.
 func ValidateReplicationControllerUpdate(controller, oldController *core.ReplicationController, opts PodValidationOptions) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&controller.ObjectMeta, &oldController.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateReplicationControllerSpec(&controller.Spec, field.NewPath("spec"), opts)...)
+	allErrs = append(allErrs, ValidateReplicationControllerSpec(&controller.Spec, &oldController.Spec, field.NewPath("spec"), opts)...)
 	return allErrs
 }
 
@@ -5290,7 +5290,7 @@ func ValidateNonEmptySelector(selectorMap map[string]string, fldPath *field.Path
 }
 
 // Validates the given template and ensures that it is in accordance with the desired selector and replicas.
-func ValidatePodTemplateSpecForRC(template *core.PodTemplateSpec, selectorMap map[string]string, replicas int32, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+func ValidatePodTemplateSpecForRC(template, oldTemplate *core.PodTemplateSpec, selectorMap map[string]string, replicas int32, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if template == nil {
 		allErrs = append(allErrs, field.Required(fldPath, ""))
@@ -5304,8 +5304,13 @@ func ValidatePodTemplateSpecForRC(template *core.PodTemplateSpec, selectorMap ma
 			}
 		}
 		allErrs = append(allErrs, ValidatePodTemplateSpec(template, fldPath, opts)...)
+		// get rid of apivalidation.ValidateReadOnlyPersistentDisks,stop passing oldTemplate to this function
+		var oldVols []core.Volume
+		if oldTemplate != nil {
+			oldVols = oldTemplate.Spec.Volumes // +k8s:verify-mutation:reason=clone
+		}
 		if replicas > 1 {
-			allErrs = append(allErrs, ValidateReadOnlyPersistentDisks(template.Spec.Volumes, fldPath.Child("spec", "volumes"))...)
+			allErrs = append(allErrs, ValidateReadOnlyPersistentDisks(template.Spec.Volumes, oldVols, fldPath.Child("spec", "volumes"))...)
 		}
 		// RestartPolicy has already been first-order validated as per ValidatePodTemplateSpec().
 		if template.Spec.RestartPolicy != core.RestartPolicyAlways {
@@ -5319,12 +5324,17 @@ func ValidatePodTemplateSpecForRC(template *core.PodTemplateSpec, selectorMap ma
 }
 
 // ValidateReplicationControllerSpec tests if required fields in the replication controller spec are set.
-func ValidateReplicationControllerSpec(spec *core.ReplicationControllerSpec, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+func ValidateReplicationControllerSpec(spec, oldSpec *core.ReplicationControllerSpec, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateNonnegativeField(int64(spec.MinReadySeconds), fldPath.Child("minReadySeconds"))...)
 	allErrs = append(allErrs, ValidateNonEmptySelector(spec.Selector, fldPath.Child("selector"))...)
 	allErrs = append(allErrs, ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)
-	allErrs = append(allErrs, ValidatePodTemplateSpecForRC(spec.Template, spec.Selector, spec.Replicas, fldPath.Child("template"), opts)...)
+	// oldSpec is not empty, pass oldSpec.template.
+	var oldTemplate *core.PodTemplateSpec
+	if oldSpec != nil {
+		oldTemplate = oldSpec.Template // +k8s:verify-mutation:reason=clone
+	}
+	allErrs = append(allErrs, ValidatePodTemplateSpecForRC(spec.Template, oldTemplate, spec.Selector, spec.Replicas, fldPath.Child("template"), opts)...)
 	return allErrs
 }
 
@@ -5344,17 +5354,29 @@ func ValidatePodTemplateSpec(spec *core.PodTemplateSpec, fldPath *field.Path, op
 	return allErrs
 }
 
-func ValidateReadOnlyPersistentDisks(volumes []core.Volume, fldPath *field.Path) field.ErrorList {
+// ValidateReadOnlyPersistentDisks stick this AFTER the short-circuit checks
+func ValidateReadOnlyPersistentDisks(volumes, oldVolumes []core.Volume, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	for i := range volumes {
-		vol := &volumes[i]
-		idxPath := fldPath.Index(i)
-		if vol.GCEPersistentDisk != nil {
-			if !vol.GCEPersistentDisk.ReadOnly {
-				allErrs = append(allErrs, field.Invalid(idxPath.Child("gcePersistentDisk", "readOnly"), false, "must be true for replicated pods > 1; GCE PD can only be mounted on multiple machines if it is read-only"))
-			}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.SkipReadOnlyValidationGCE) {
+		return field.ErrorList{}
+	}
+
+	isWriteablePD := func(vol *core.Volume) bool {
+		return vol.GCEPersistentDisk != nil && !vol.GCEPersistentDisk.ReadOnly
+	}
+
+	for i := range oldVolumes {
+		if isWriteablePD(&oldVolumes[i]) {
+			return field.ErrorList{}
 		}
-		// TODO: What to do for AWS?  It doesn't support replicas
+	}
+
+	for i := range volumes {
+		idxPath := fldPath.Index(i)
+		if isWriteablePD(&volumes[i]) {
+			allErrs = append(allErrs, field.Invalid(idxPath.Child("gcePersistentDisk", "readOnly"), false, "must be true for replicated pods > 1; GCE PD can only be mounted on multiple machines if it is read-only"))
+		}
 	}
 	return allErrs
 }

@@ -1618,11 +1618,11 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			Spec: validPodSpecVolume,
 		},
 	}
-
 	type dsUpdateTest struct {
-		old            apps.DaemonSet
-		update         apps.DaemonSet
-		expectedErrNum int
+		old                             apps.DaemonSet
+		update                          apps.DaemonSet
+		expectedErrNum                  int
+		enableSkipReadOnlyValidationGCE bool
 	}
 	successCases := map[string]dsUpdateTest{
 		"no change": {
@@ -1775,21 +1775,49 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 				},
 			},
 		},
+		"Read-write volume verification": {
+			enableSkipReadOnlyValidationGCE: true,
+			old: apps.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: apps.DaemonSetSpec{
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 1,
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: apps.DaemonSetUpdateStrategy{
+						Type: apps.OnDeleteDaemonSetStrategyType,
+					},
+				},
+			},
+			update: apps.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: apps.DaemonSetSpec{
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 2,
+					Template:           readWriteVolumePodTemplate.Template,
+					UpdateStrategy: apps.DaemonSetUpdateStrategy{
+						Type: apps.OnDeleteDaemonSetStrategyType,
+					},
+				},
+			},
+		},
 	}
 	for testName, successCase := range successCases {
-		// ResourceVersion is required for updates.
-		successCase.old.ObjectMeta.ResourceVersion = "1"
-		successCase.update.ObjectMeta.ResourceVersion = "2"
-		// Check test setup
-		if successCase.expectedErrNum > 0 {
-			t.Errorf("%q has incorrect test setup with expectedErrNum %d, expected no error", testName, successCase.expectedErrNum)
-		}
-		if len(successCase.old.ObjectMeta.ResourceVersion) == 0 || len(successCase.update.ObjectMeta.ResourceVersion) == 0 {
-			t.Errorf("%q has incorrect test setup with no resource version set", testName)
-		}
-		if errs := ValidateDaemonSetUpdate(&successCase.update, &successCase.old, corevalidation.PodValidationOptions{}); len(errs) != 0 {
-			t.Errorf("%q expected no error, but got: %v", testName, errs)
-		}
+		t.Run(testName, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SkipReadOnlyValidationGCE, successCase.enableSkipReadOnlyValidationGCE)()
+			// ResourceVersion is required for updates.
+			successCase.old.ObjectMeta.ResourceVersion = "1"
+			successCase.update.ObjectMeta.ResourceVersion = "2"
+			// Check test setup
+			if successCase.expectedErrNum > 0 {
+				t.Errorf("%q has incorrect test setup with expectedErrNum %d, expected no error", testName, successCase.expectedErrNum)
+			}
+			if len(successCase.old.ObjectMeta.ResourceVersion) == 0 || len(successCase.update.ObjectMeta.ResourceVersion) == 0 {
+				t.Errorf("%q has incorrect test setup with no resource version set", testName)
+			}
+			if errs := ValidateDaemonSetUpdate(&successCase.update, &successCase.old, corevalidation.PodValidationOptions{}); len(errs) != 0 {
+				t.Errorf("%q expected no error, but got: %v", testName, errs)
+			}
+		})
 	}
 	errorCases := map[string]dsUpdateTest{
 		"change daemon name": {
@@ -1868,6 +1896,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			expectedErrNum: 1,
 		},
 		"invalid read-write volume": {
+			enableSkipReadOnlyValidationGCE: false,
 			old: apps.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.DaemonSetSpec{
@@ -1994,22 +2023,25 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 		},
 	}
 	for testName, errorCase := range errorCases {
-		// ResourceVersion is required for updates.
-		errorCase.old.ObjectMeta.ResourceVersion = "1"
-		errorCase.update.ObjectMeta.ResourceVersion = "2"
-		// Check test setup
-		if errorCase.expectedErrNum <= 0 {
-			t.Errorf("%q has incorrect test setup with expectedErrNum %d, expected at least one error", testName, errorCase.expectedErrNum)
-		}
-		if len(errorCase.old.ObjectMeta.ResourceVersion) == 0 || len(errorCase.update.ObjectMeta.ResourceVersion) == 0 {
-			t.Errorf("%q has incorrect test setup with no resource version set", testName)
-		}
-		// Run the tests
-		if errs := ValidateDaemonSetUpdate(&errorCase.update, &errorCase.old, corevalidation.PodValidationOptions{}); len(errs) != errorCase.expectedErrNum {
-			t.Errorf("%q expected %d errors, but got %d error: %v", testName, errorCase.expectedErrNum, len(errs), errs)
-		} else {
-			t.Logf("(PASS) %q got errors %v", testName, errs)
-		}
+		t.Run(testName, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SkipReadOnlyValidationGCE, errorCase.enableSkipReadOnlyValidationGCE)()
+			// ResourceVersion is required for updates.
+			errorCase.old.ObjectMeta.ResourceVersion = "1"
+			errorCase.update.ObjectMeta.ResourceVersion = "2"
+			// Check test setup
+			if errorCase.expectedErrNum <= 0 {
+				t.Errorf("%q has incorrect test setup with expectedErrNum %d, expected at least one error", testName, errorCase.expectedErrNum)
+			}
+			if len(errorCase.old.ObjectMeta.ResourceVersion) == 0 || len(errorCase.update.ObjectMeta.ResourceVersion) == 0 {
+				t.Errorf("%q has incorrect test setup with no resource version set", testName)
+			}
+			// Run the tests
+			if errs := ValidateDaemonSetUpdate(&errorCase.update, &errorCase.old, corevalidation.PodValidationOptions{}); len(errs) != errorCase.expectedErrNum {
+				t.Errorf("%q expected %d errors, but got %d error: %v", testName, errorCase.expectedErrNum, len(errs), errs)
+			} else {
+				t.Logf("(PASS) %q got errors %v", testName, errs)
+			}
+		})
 	}
 }
 
@@ -2590,6 +2622,217 @@ func validDeploymentRollback() *apps.DeploymentRollback {
 	}
 }
 
+func TestValidateDeploymentUpdate(t *testing.T) {
+	validLabels := map[string]string{"a": "b"}
+	validPodTemplate := api.PodTemplate{
+		Template: api.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: validLabels,
+			},
+			Spec: api.PodSpec{
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+			},
+		},
+	}
+	readWriteVolumePodTemplate := api.PodTemplate{
+		Template: api.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: validLabels,
+			},
+			Spec: api.PodSpec{
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+				Volumes:       []api.Volume{{Name: "gcepd", VolumeSource: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{PDName: "my-PD", FSType: "ext4", Partition: 1, ReadOnly: false}}}},
+			},
+		},
+	}
+	invalidLabels := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
+	invalidPodTemplate := api.PodTemplate{
+		Template: api.PodTemplateSpec{
+			Spec: api.PodSpec{
+				// no containers specified
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: invalidLabels,
+			},
+		},
+	}
+	type depUpdateTest struct {
+		old                             apps.Deployment
+		update                          apps.Deployment
+		expectedErrNum                  int
+		enableSkipReadOnlyValidationGCE bool
+	}
+	successCases := map[string]depUpdateTest{
+		"positive replicas": {
+			old: apps.Deployment{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: apps.DeploymentSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+					Template: validPodTemplate.Template,
+					Strategy: apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType},
+				},
+			},
+			update: apps.Deployment{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: apps.DeploymentSpec{
+					Replicas: 1,
+					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+					Template: readWriteVolumePodTemplate.Template,
+					Strategy: apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType},
+				},
+			},
+		},
+		"Read-write volume verification": {
+			enableSkipReadOnlyValidationGCE: true,
+			old: apps.Deployment{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: apps.DeploymentSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+					Template: validPodTemplate.Template,
+					Strategy: apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType},
+				},
+			},
+			update: apps.Deployment{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: apps.DeploymentSpec{
+					Replicas: 2,
+					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+					Template: readWriteVolumePodTemplate.Template,
+					Strategy: apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType},
+				},
+			},
+		},
+	}
+	for testName, successCase := range successCases {
+		t.Run(testName, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SkipReadOnlyValidationGCE, successCase.enableSkipReadOnlyValidationGCE)()
+			// ResourceVersion is required for updates.
+			successCase.old.ObjectMeta.ResourceVersion = "1"
+			successCase.update.ObjectMeta.ResourceVersion = "2"
+			// Check test setup
+			if successCase.expectedErrNum > 0 {
+				t.Errorf("%q has incorrect test setup with expectedErrNum %d, expected no error", testName, successCase.expectedErrNum)
+			}
+			if len(successCase.old.ObjectMeta.ResourceVersion) == 0 || len(successCase.update.ObjectMeta.ResourceVersion) == 0 {
+				t.Errorf("%q has incorrect test setup with no resource version set", testName)
+			}
+			// Run the tests
+			if errs := ValidateDeploymentUpdate(&successCase.update, &successCase.old, corevalidation.PodValidationOptions{}); len(errs) != 0 {
+				t.Errorf("%q expected no error, but got: %v", testName, errs)
+			}
+		})
+		errorCases := map[string]depUpdateTest{
+			"more than one read/write": {
+				old: apps.Deployment{
+					ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
+					Spec: apps.DeploymentSpec{
+						Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+						Template: validPodTemplate.Template,
+						Strategy: apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType},
+					},
+				},
+				update: apps.Deployment{
+					ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+					Spec: apps.DeploymentSpec{
+						Replicas: 2,
+						Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+						Template: readWriteVolumePodTemplate.Template,
+						Strategy: apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType},
+					},
+				},
+				expectedErrNum: 2,
+			},
+			"invalid selector": {
+				old: apps.Deployment{
+					ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
+					Spec: apps.DeploymentSpec{
+						Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+						Template: validPodTemplate.Template,
+						Strategy: apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType},
+					},
+				},
+				update: apps.Deployment{
+					ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+					Spec: apps.DeploymentSpec{
+						Replicas: 2,
+						Selector: &metav1.LabelSelector{MatchLabels: invalidLabels},
+						Template: validPodTemplate.Template,
+						Strategy: apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType},
+					},
+				},
+				expectedErrNum: 3,
+			},
+			"invalid pod": {
+				old: apps.Deployment{
+					ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
+					Spec: apps.DeploymentSpec{
+						Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+						Template: validPodTemplate.Template,
+						Strategy: apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType},
+					},
+				},
+				update: apps.Deployment{
+					ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+					Spec: apps.DeploymentSpec{
+						Replicas: 2,
+						Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+						Template: invalidPodTemplate.Template,
+						Strategy: apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType},
+					},
+				},
+				expectedErrNum: 4,
+			},
+			"negative replicas": {
+				old: apps.Deployment{
+					ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+					Spec: apps.DeploymentSpec{
+						Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+						Template: validPodTemplate.Template,
+						Strategy: apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType},
+					},
+				},
+				update: apps.Deployment{
+					ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+					Spec: apps.DeploymentSpec{
+						Replicas: -1,
+						Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+						Template: readWriteVolumePodTemplate.Template,
+						Strategy: apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType},
+					},
+				},
+				expectedErrNum: 1,
+			},
+		}
+		for testName, errorCase := range errorCases {
+			t.Run(testName, func(t *testing.T) {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SkipReadOnlyValidationGCE, errorCase.enableSkipReadOnlyValidationGCE)()
+				// ResourceVersion is required for updates.
+				errorCase.old.ObjectMeta.ResourceVersion = "1"
+				errorCase.update.ObjectMeta.ResourceVersion = "2"
+				// Check test setup
+				if errorCase.expectedErrNum <= 0 {
+					t.Errorf("%q has incorrect test setup with expectedErrNum %d, expected at least one error", testName, errorCase.expectedErrNum)
+				}
+				if len(errorCase.old.ObjectMeta.ResourceVersion) == 0 || len(errorCase.update.ObjectMeta.ResourceVersion) == 0 {
+					t.Errorf("%q has incorrect test setup with no resource version set", testName)
+				}
+				// Run the tests
+				if errs := ValidateDeploymentUpdate(&errorCase.update, &errorCase.old, corevalidation.PodValidationOptions{}); len(errs) != errorCase.expectedErrNum {
+					t.Errorf("%q expected %d errors, but got %d error: %v", testName, errorCase.expectedErrNum, len(errs), errs)
+				} else {
+					t.Logf("(PASS) %q got errors %v", testName, errs)
+				}
+			})
+		}
+	}
+}
+
 func TestValidateDeploymentRollback(t *testing.T) {
 	noAnnotation := validDeploymentRollback()
 	noAnnotation.UpdatedAnnotations = nil
@@ -2860,11 +3103,13 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 		},
 	}
 	type rcUpdateTest struct {
-		old    apps.ReplicaSet
-		update apps.ReplicaSet
+		old                             apps.ReplicaSet
+		update                          apps.ReplicaSet
+		expectedErrNum                  int
+		enableSkipReadOnlyValidationGCE bool
 	}
-	successCases := []rcUpdateTest{
-		{
+	successCases := map[string]rcUpdateTest{
+		"positive replicas": {
 			old: apps.ReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.ReplicaSetSpec{
@@ -2881,7 +3126,8 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 				},
 			},
 		},
-		{
+		"Read-write volume verification": {
+			enableSkipReadOnlyValidationGCE: true,
 			old: apps.ReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.ReplicaSetSpec{
@@ -2892,19 +3138,31 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 			update: apps.ReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.ReplicaSetSpec{
-					Replicas: 1,
+					Replicas: 3,
 					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: readWriteVolumePodTemplate.Template,
 				},
 			},
 		},
 	}
-	for _, successCase := range successCases {
-		successCase.old.ObjectMeta.ResourceVersion = "1"
-		successCase.update.ObjectMeta.ResourceVersion = "1"
-		if errs := ValidateReplicaSetUpdate(&successCase.update, &successCase.old, corevalidation.PodValidationOptions{}); len(errs) != 0 {
-			t.Errorf("expected success: %v", errs)
-		}
+	for testName, successCase := range successCases {
+		t.Run(testName, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SkipReadOnlyValidationGCE, successCase.enableSkipReadOnlyValidationGCE)()
+			// ResourceVersion is required for updates.
+			successCase.old.ObjectMeta.ResourceVersion = "1"
+			successCase.update.ObjectMeta.ResourceVersion = "2"
+			// Check test setup
+			if successCase.expectedErrNum > 0 {
+				t.Errorf("%q has incorrect test setup with expectedErrNum %d, expected no error", testName, successCase.expectedErrNum)
+			}
+			if len(successCase.old.ObjectMeta.ResourceVersion) == 0 || len(successCase.update.ObjectMeta.ResourceVersion) == 0 {
+				t.Errorf("%q has incorrect test setup with no resource version set", testName)
+			}
+			// Run the tests
+			if errs := ValidateReplicaSetUpdate(&successCase.update, &successCase.old, corevalidation.PodValidationOptions{}); len(errs) != 0 {
+				t.Errorf("%q expected no error, but got: %v", testName, errs)
+			}
+		})
 	}
 	errorCases := map[string]rcUpdateTest{
 		"more than one read/write": {
@@ -2923,6 +3181,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 					Template: readWriteVolumePodTemplate.Template,
 				},
 			},
+			expectedErrNum: 2,
 		},
 		"invalid selector": {
 			old: apps.ReplicaSet{
@@ -2940,6 +3199,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 					Template: validPodTemplate.Template,
 				},
 			},
+			expectedErrNum: 3,
 		},
 		"invalid pod": {
 			old: apps.ReplicaSet{
@@ -2957,6 +3217,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 					Template: invalidPodTemplate.Template,
 				},
 			},
+			expectedErrNum: 4,
 		},
 		"negative replicas": {
 			old: apps.ReplicaSet{
@@ -2974,12 +3235,29 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 					Template: validPodTemplate.Template,
 				},
 			},
+			expectedErrNum: 1,
 		},
 	}
 	for testName, errorCase := range errorCases {
-		if errs := ValidateReplicaSetUpdate(&errorCase.update, &errorCase.old, corevalidation.PodValidationOptions{}); len(errs) == 0 {
-			t.Errorf("expected failure: %s", testName)
-		}
+		t.Run(testName, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SkipReadOnlyValidationGCE, errorCase.enableSkipReadOnlyValidationGCE)()
+			// ResourceVersion is required for updates.
+			errorCase.old.ObjectMeta.ResourceVersion = "1"
+			errorCase.update.ObjectMeta.ResourceVersion = "2"
+			// Check test setup
+			if errorCase.expectedErrNum <= 0 {
+				t.Errorf("%q has incorrect test setup with expectedErrNum %d, expected at least one error", testName, errorCase.expectedErrNum)
+			}
+			if len(errorCase.old.ObjectMeta.ResourceVersion) == 0 || len(errorCase.update.ObjectMeta.ResourceVersion) == 0 {
+				t.Errorf("%q has incorrect test setup with no resource version set", testName)
+			}
+			// Run the tests
+			if errs := ValidateReplicaSetUpdate(&errorCase.update, &errorCase.old, corevalidation.PodValidationOptions{}); len(errs) != errorCase.expectedErrNum {
+				t.Errorf("%q expected %d errors, but got %d error: %v", testName, errorCase.expectedErrNum, len(errs), errs)
+			} else {
+				t.Logf("(PASS) %q got errors %v", testName, errs)
+			}
+		})
 	}
 }
 

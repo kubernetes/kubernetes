@@ -137,6 +137,12 @@ const (
 	// Enables the GCE PD in-tree driver to GCE CSI Driver migration feature.
 	CSIMigrationGCE featuregate.Feature = "CSIMigrationGCE"
 
+	// owner: @mfordjody
+	// alpha: v1.26
+	//
+	// Skip validation Enable in next version
+	SkipReadOnlyValidationGCE featuregate.Feature = "SkipReadOnlyValidationGCE"
+
 	// owner: @trierra
 	// alpha: v1.23
 	//
@@ -914,6 +920,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIStorageCapacity: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 
 	CSIVolumeHealth: {Default: false, PreRelease: featuregate.Alpha},
+
+	SkipReadOnlyValidationGCE: {Default: false, PreRelease: featuregate.Alpha},
 
 	CloudControllerManagerWebhook: {Default: false, PreRelease: featuregate.Alpha},
 
