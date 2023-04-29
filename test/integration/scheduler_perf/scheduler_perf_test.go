@@ -845,7 +845,7 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload) [
 			if concreteOp.CollectMetrics {
 				collectorCtx, collectorCancel = context.WithCancel(ctx)
 				defer collectorCancel()
-				collectors = getTestDataCollectors(podInformer, fmt.Sprintf("%s/%s", b.Name(), namespace), namespace, tc.MetricsCollectorConfig)
+				collectors = getTestDataCollectors(b, podInformer, fmt.Sprintf("%s/%s", b.Name(), namespace), namespace, tc.MetricsCollectorConfig)
 				for _, collector := range collectors {
 					// Need loop-local variable for function below.
 					collector := collector
@@ -1035,12 +1035,12 @@ type testDataCollector interface {
 	collect() []DataItem
 }
 
-func getTestDataCollectors(podInformer coreinformers.PodInformer, name, namespace string, mcc *metricsCollectorConfig) []testDataCollector {
+func getTestDataCollectors(tb testing.TB, podInformer coreinformers.PodInformer, name, namespace string, mcc *metricsCollectorConfig) []testDataCollector {
 	if mcc == nil {
 		mcc = &defaultMetricsCollectorConfig
 	}
 	return []testDataCollector{
-		newThroughputCollector(podInformer, map[string]string{"Name": name}, []string{namespace}),
+		newThroughputCollector(tb, podInformer, map[string]string{"Name": name}, []string{namespace}),
 		newMetricsCollector(mcc, map[string]string{"Name": name}),
 	}
 }
