@@ -76,6 +76,7 @@ func TestPreFilterState(t *testing.T) {
 		objs                      []runtime.Object
 		defaultConstraints        []v1.TopologySpreadConstraint
 		want                      *preFilterState
+		wantPrefilterStatus       *framework.Status
 		enableMinDomains          bool
 		enableNodeInclusionPolicy bool
 		enableMatchLabelKeys      bool
@@ -573,7 +574,7 @@ func TestPreFilterState(t *testing.T) {
 			objs: []runtime.Object{
 				&v1.Service{Spec: v1.ServiceSpec{Selector: map[string]string{"baz": "kep"}}},
 			},
-			want: &preFilterState{},
+			wantPrefilterStatus: framework.NewStatus(framework.Skip),
 		},
 		{
 			name: "default constraints and a service, but pod has constraints",
@@ -613,7 +614,7 @@ func TestPreFilterState(t *testing.T) {
 			objs: []runtime.Object{
 				&v1.Service{Spec: v1.ServiceSpec{Selector: map[string]string{"foo": "bar"}}},
 			},
-			want: &preFilterState{},
+			wantPrefilterStatus: framework.NewStatus(framework.Skip),
 		},
 		{
 			name: "TpKeyToDomainsNum is calculated when MinDomains is enabled",
@@ -1453,6 +1454,14 @@ func TestPreFilterState(t *testing.T) {
 			},
 			enableMatchLabelKeys: true,
 		},
+		{
+			name: "skip if not specified",
+			pod:  st.MakePod().Name("p").Label("foo", "").Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+			},
+			wantPrefilterStatus: framework.NewStatus(framework.Skip),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1469,15 +1478,21 @@ func TestPreFilterState(t *testing.T) {
 			p.(*PodTopologySpread).enableMatchLabelKeysInPodTopologySpread = tt.enableMatchLabelKeys
 
 			cs := framework.NewCycleState()
-			if _, s := p.(*PodTopologySpread).PreFilter(ctx, cs, tt.pod); !s.IsSuccess() {
-				t.Fatal(s.AsError())
+			_, s := p.(*PodTopologySpread).PreFilter(ctx, cs, tt.pod)
+			if !tt.wantPrefilterStatus.Equal(s) {
+				t.Errorf("PodTopologySpread#PreFilter() returned unexpected status. got: %v, want: %v", s, tt.wantPrefilterStatus)
 			}
+
+			if !s.IsSuccess() {
+				return
+			}
+
 			got, err := getPreFilterState(cs)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatalf("failed to get PreFilterState from cyclestate: %v", err)
 			}
 			if diff := cmp.Diff(tt.want, got, cmpOpts...); diff != "" {
-				t.Errorf("PodTopologySpread#PreFilter() returned diff (-want,+got):\n%s", diff)
+				t.Errorf("PodTopologySpread#PreFilter() returned unexpected prefilter status: diff (-want,+got):\n%s", diff)
 			}
 		})
 	}
