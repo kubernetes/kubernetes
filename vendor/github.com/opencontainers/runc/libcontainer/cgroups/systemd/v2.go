@@ -284,7 +284,7 @@ func (m *unifiedManager) Apply(pid int) error {
 
 	properties = append(properties, c.SystemdProps...)
 
-	if err := startUnit(m.dbus, unitName, properties); err != nil {
+	if err := startUnit(m.dbus, unitName, properties, pid == -1); err != nil {
 		return fmt.Errorf("unable to start unit %q (properties %+v): %w", unitName, properties, err)
 	}
 
