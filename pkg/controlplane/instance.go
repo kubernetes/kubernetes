@@ -35,8 +35,6 @@ import (
 	authorizationapiv1 "k8s.io/api/authorization/v1"
 	autoscalingapiv1 "k8s.io/api/autoscaling/v1"
 	autoscalingapiv2 "k8s.io/api/autoscaling/v2"
-	autoscalingapiv2beta1 "k8s.io/api/autoscaling/v2beta1"
-	autoscalingapiv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	batchapiv1 "k8s.io/api/batch/v1"
 	certificatesapiv1 "k8s.io/api/certificates/v1"
 	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
@@ -714,8 +712,6 @@ var (
 	// betaAPIGroupVersionsDisabledByDefault is for all future beta groupVersions.
 	betaAPIGroupVersionsDisabledByDefault = []schema.GroupVersion{
 		authenticationv1beta1.SchemeGroupVersion,
-		autoscalingapiv2beta1.SchemeGroupVersion,
-		autoscalingapiv2beta2.SchemeGroupVersion,
 		discoveryv1beta1.SchemeGroupVersion,
 		nodev1beta1.SchemeGroupVersion, // remove in 1.26
 		policyapiv1beta1.SchemeGroupVersion,
