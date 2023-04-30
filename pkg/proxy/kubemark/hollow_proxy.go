@@ -22,7 +22,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -30,7 +29,6 @@ import (
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	proxyapp "k8s.io/kubernetes/cmd/kube-proxy/app"
 	"k8s.io/kubernetes/pkg/proxy"
-	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/iptables"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
@@ -126,17 +124,14 @@ func NewHollowProxyOrDie(
 	}
 	return &HollowProxy{
 		ProxyServer: &proxyapp.ProxyServer{
-			Config: &proxyconfigapi.KubeProxyConfiguration{
-				Mode:             proxyconfigapi.ProxyMode("fake"),
-				ConfigSyncPeriod: metav1.Duration{Duration: 30 * time.Second},
-				OOMScoreAdj:      utilpointer.Int32Ptr(0),
-			},
-
-			Client:      client,
-			Proxier:     proxier,
-			Broadcaster: broadcaster,
-			Recorder:    recorder,
-			NodeRef:     nodeRef,
+			Client:           client,
+			Proxier:          proxier,
+			Broadcaster:      broadcaster,
+			Recorder:         recorder,
+			ProxyMode:        "fake",
+			NodeRef:          nodeRef,
+			OOMScoreAdj:      utilpointer.Int32Ptr(0),
+			ConfigSyncPeriod: 30 * time.Second,
 		},
 	}, nil
 }

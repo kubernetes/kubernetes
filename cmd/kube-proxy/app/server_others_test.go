@@ -44,66 +44,54 @@ import (
 	utiliptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
 )
 
-func Test_platformApplyDefaults(t *testing.T) {
-	testCases := []struct {
-		name                string
-		mode                proxyconfigapi.ProxyMode
-		expectedMode        proxyconfigapi.ProxyMode
-		detectLocal         proxyconfigapi.LocalMode
-		expectedDetectLocal proxyconfigapi.LocalMode
+func Test_getDetectLocalMode(t *testing.T) {
+	cases := []struct {
+		detectLocal string
+		expected    proxyconfigapi.LocalMode
+		errExpected bool
 	}{
 		{
-			name:                "defaults",
-			mode:                "",
-			expectedMode:        proxyconfigapi.ProxyModeIPTables,
-			detectLocal:         "",
-			expectedDetectLocal: proxyconfigapi.LocalModeClusterCIDR,
+			detectLocal: "",
+			expected:    proxyconfigapi.LocalModeClusterCIDR,
+			errExpected: false,
 		},
 		{
-			name:                "explicit",
-			mode:                proxyconfigapi.ProxyModeIPTables,
-			expectedMode:        proxyconfigapi.ProxyModeIPTables,
-			detectLocal:         proxyconfigapi.LocalModeClusterCIDR,
-			expectedDetectLocal: proxyconfigapi.LocalModeClusterCIDR,
+			detectLocal: string(proxyconfigapi.LocalModeClusterCIDR),
+			expected:    proxyconfigapi.LocalModeClusterCIDR,
+			errExpected: false,
 		},
 		{
-			name:                "override mode",
-			mode:                "ipvs",
-			expectedMode:        proxyconfigapi.ProxyModeIPVS,
-			detectLocal:         "",
-			expectedDetectLocal: proxyconfigapi.LocalModeClusterCIDR,
+			detectLocal: string(proxyconfigapi.LocalModeInterfaceNamePrefix),
+			expected:    proxyconfigapi.LocalModeInterfaceNamePrefix,
+			errExpected: false,
 		},
 		{
-			name:                "override detect-local",
-			mode:                "",
-			expectedMode:        proxyconfigapi.ProxyModeIPTables,
-			detectLocal:         "NodeCIDR",
-			expectedDetectLocal: proxyconfigapi.LocalModeNodeCIDR,
+			detectLocal: string(proxyconfigapi.LocalModeBridgeInterface),
+			expected:    proxyconfigapi.LocalModeBridgeInterface,
+			errExpected: false,
 		},
 		{
-			name:                "override both",
-			mode:                "ipvs",
-			expectedMode:        proxyconfigapi.ProxyModeIPVS,
-			detectLocal:         "NodeCIDR",
-			expectedDetectLocal: proxyconfigapi.LocalModeNodeCIDR,
+			detectLocal: "abcd",
+			expected:    proxyconfigapi.LocalMode("abcd"),
+			errExpected: true,
 		},
 	}
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			options := NewOptions()
-			config := &proxyconfigapi.KubeProxyConfiguration{
-				Mode:            tc.mode,
-				DetectLocalMode: tc.detectLocal,
+	for i, c := range cases {
+		proxyConfig := &proxyconfigapi.KubeProxyConfiguration{DetectLocalMode: proxyconfigapi.LocalMode(c.detectLocal)}
+		r, err := getDetectLocalMode(proxyConfig)
+		if c.errExpected {
+			if err == nil {
+				t.Errorf("Expected error, but did not fail for mode %v", c.detectLocal)
 			}
-
-			options.platformApplyDefaults(config)
-			if config.Mode != tc.expectedMode {
-				t.Fatalf("expected mode: %s, but got: %s", tc.expectedMode, config.Mode)
-			}
-			if config.DetectLocalMode != tc.expectedDetectLocal {
-				t.Fatalf("expected detect-local: %s, but got: %s", tc.expectedDetectLocal, config.DetectLocalMode)
-			}
-		})
+			continue
+		}
+		if err != nil {
+			t.Errorf("Got error parsing mode: %v", err)
+			continue
+		}
+		if r != c.expected {
+			t.Errorf("Case[%d] Expected %q got %q", i, c.expected, r)
+		}
 	}
 }
 
@@ -238,6 +226,20 @@ func Test_getLocalDetector(t *testing.T) {
 		},
 		{
 			mode:        proxyconfigapi.LocalModeClusterCIDR,
+			config:      &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: "10.0.0.0"},
+			ipt:         utiliptablestest.NewFake(),
+			expected:    nil,
+			errExpected: true,
+		},
+		{
+			mode:        proxyconfigapi.LocalModeClusterCIDR,
+			config:      &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: "2002::1234:abcd:ffff:c0a8:101"},
+			ipt:         utiliptablestest.NewIPv6Fake(),
+			expected:    nil,
+			errExpected: true,
+		},
+		{
+			mode:        proxyconfigapi.LocalModeClusterCIDR,
 			config:      &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: "10.0.0.0/14"},
 			ipt:         utiliptablestest.NewIPv6Fake(),
 			expected:    nil,
@@ -273,6 +275,22 @@ func Test_getLocalDetector(t *testing.T) {
 			expected:    resolveLocalDetector(t)(proxyutiliptables.NewDetectLocalByCIDR("2002::1234:abcd:ffff:c0a8:101/96", utiliptablestest.NewIPv6Fake())),
 			nodeInfo:    makeNodeWithPodCIDRs("2002::1234:abcd:ffff:c0a8:101/96"),
 			errExpected: false,
+		},
+		{
+			mode:        proxyconfigapi.LocalModeNodeCIDR,
+			config:      &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: "10.0.0.0"},
+			ipt:         utiliptablestest.NewFake(),
+			expected:    nil,
+			nodeInfo:    makeNodeWithPodCIDRs("10.0.0.0"),
+			errExpected: true,
+		},
+		{
+			mode:        proxyconfigapi.LocalModeNodeCIDR,
+			config:      &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: "2002::1234:abcd:ffff:c0a8:101"},
+			ipt:         utiliptablestest.NewIPv6Fake(),
+			expected:    nil,
+			nodeInfo:    makeNodeWithPodCIDRs("2002::1234:abcd:ffff:c0a8:101"),
+			errExpected: true,
 		},
 		{
 			mode:        proxyconfigapi.LocalModeNodeCIDR,
@@ -318,6 +336,13 @@ func Test_getLocalDetector(t *testing.T) {
 		{
 			mode: proxyconfigapi.LocalModeBridgeInterface,
 			config: &proxyconfigapi.KubeProxyConfiguration{
+				DetectLocal: proxyconfigapi.DetectLocalConfiguration{BridgeInterface: ""},
+			},
+			errExpected: true,
+		},
+		{
+			mode: proxyconfigapi.LocalModeBridgeInterface,
+			config: &proxyconfigapi.KubeProxyConfiguration{
 				DetectLocal: proxyconfigapi.DetectLocalConfiguration{BridgeInterface: "1234567890123456789"},
 			},
 			expected:    resolveLocalDetector(t)(proxyutiliptables.NewDetectLocalByBridgeInterface("1234567890123456789")),
@@ -331,6 +356,13 @@ func Test_getLocalDetector(t *testing.T) {
 			},
 			expected:    resolveLocalDetector(t)(proxyutiliptables.NewDetectLocalByInterfaceNamePrefix("eth")),
 			errExpected: false,
+		},
+		{
+			mode: proxyconfigapi.LocalModeInterfaceNamePrefix,
+			config: &proxyconfigapi.KubeProxyConfiguration{
+				DetectLocal: proxyconfigapi.DetectLocalConfiguration{InterfaceNamePrefix: ""},
+			},
+			errExpected: true,
 		},
 		{
 			mode: proxyconfigapi.LocalModeInterfaceNamePrefix,
@@ -461,6 +493,22 @@ func Test_getDualStackLocalDetectorTuple(t *testing.T) {
 			nodeInfo:    makeNodeWithPodCIDRs(),
 			errExpected: false,
 		},
+		{
+			mode:        proxyconfigapi.LocalModeNodeCIDR,
+			config:      &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: ""},
+			ipt:         [2]utiliptables.Interface{utiliptablestest.NewFake(), utiliptablestest.NewIPv6Fake()},
+			expected:    [2]proxyutiliptables.LocalTrafficDetector{proxyutiliptables.NewNoOpLocalDetector(), proxyutiliptables.NewNoOpLocalDetector()},
+			nodeInfo:    nil,
+			errExpected: false,
+		},
+		// unknown mode, nodeInfo would be nil for these cases
+		{
+			mode:        proxyconfigapi.LocalMode("abcd"),
+			config:      &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: ""},
+			ipt:         [2]utiliptables.Interface{utiliptablestest.NewFake(), utiliptablestest.NewIPv6Fake()},
+			expected:    [2]proxyutiliptables.LocalTrafficDetector{proxyutiliptables.NewNoOpLocalDetector(), proxyutiliptables.NewNoOpLocalDetector()},
+			errExpected: false,
+		},
 		// LocalModeBridgeInterface, nodeInfo and ipt are not needed for these cases
 		{
 			mode: proxyconfigapi.LocalModeBridgeInterface,
@@ -472,6 +520,13 @@ func Test_getDualStackLocalDetectorTuple(t *testing.T) {
 				proxyutiliptables.NewDetectLocalByBridgeInterface("eth")),
 			errExpected: false,
 		},
+		{
+			mode: proxyconfigapi.LocalModeBridgeInterface,
+			config: &proxyconfigapi.KubeProxyConfiguration{
+				DetectLocal: proxyconfigapi.DetectLocalConfiguration{BridgeInterface: ""},
+			},
+			errExpected: true,
+		},
 		// LocalModeInterfaceNamePrefix, nodeInfo and ipt are not needed for these cases
 		{
 			mode: proxyconfigapi.LocalModeInterfaceNamePrefix,
@@ -482,6 +537,13 @@ func Test_getDualStackLocalDetectorTuple(t *testing.T) {
 				proxyutiliptables.NewDetectLocalByInterfaceNamePrefix("veth"))(
 				proxyutiliptables.NewDetectLocalByInterfaceNamePrefix("veth")),
 			errExpected: false,
+		},
+		{
+			mode: proxyconfigapi.LocalModeInterfaceNamePrefix,
+			config: &proxyconfigapi.KubeProxyConfiguration{
+				DetectLocal: proxyconfigapi.DetectLocalConfiguration{InterfaceNamePrefix: ""},
+			},
+			errExpected: true,
 		},
 	}
 	for i, c := range cases {
