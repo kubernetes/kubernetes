@@ -1204,7 +1204,7 @@ gopkg.in/square/go-jose.v2
 gopkg.in/square/go-jose.v2/cipher
 gopkg.in/square/go-jose.v2/json
 gopkg.in/square/go-jose.v2/jwt
-# gopkg.in/warnings.v0 v0.1.1
+# gopkg.in/warnings.v0 v0.1.2
 ## explicit
 gopkg.in/warnings.v0
 # gopkg.in/yaml.v2 v2.4.0
