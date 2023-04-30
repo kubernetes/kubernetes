@@ -79,7 +79,7 @@ func runControlPlane() func(c workflow.RunData) error {
 			return errors.Wrap(err, "couldn't complete the static pod upgrade")
 		}
 
-		if features.Enabled(cfg.FeatureGates, features.UpgradeAddonsAfterControlPlane) {
+		if !features.Enabled(cfg.FeatureGates, features.UpgradeAddonsBeforeControlPlane) {
 			if err := upgrade.PerformAddonsUpgrade(client, cfg, data.OutputWriter()); err != nil {
 				return errors.Wrap(err, "failed to perform addons upgrade")
 			}

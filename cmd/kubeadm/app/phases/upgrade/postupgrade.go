@@ -114,28 +114,28 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 }
 
 // PerformAddonsUpgrade performs the upgrade of the coredns and kube-proxy addons.
-// When UpgradeAddonsAfterControlPlane feature gate is disabled, the addons will be upgraded immediately.
-// When UpgradeAddonsAfterControlPlane feature gate is enabled, the addons will only get updated after all the control plane instances have been upgraded.
+// When UpgradeAddonsBeforeControlPlane feature gate is enabled, the addons will be upgraded immediately.
+// When UpgradeAddonsBeforeControlPlane feature gate is disabled, the addons will only get updated after all the control plane instances have been upgraded.
 func PerformAddonsUpgrade(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, out io.Writer) error {
 	unupgradedControlPlanes, err := unupgradedControlPlaneInstances(client, cfg.NodeRegistration.Name)
 	if err != nil {
 		err = errors.Wrapf(err, "failed to determine whether all the control plane instances have been upgraded")
-		if features.Enabled(cfg.FeatureGates, features.UpgradeAddonsAfterControlPlane) {
+		if !features.Enabled(cfg.FeatureGates, features.UpgradeAddonsBeforeControlPlane) {
 			return err
 		}
 
-		// when UpgradeAddonsAfterControlPlane feature gate is disabled, just throw a warning
+		// when UpgradeAddonsBeforeControlPlane feature gate is enabled, just throw a warning
 		klog.V(1).Info(err)
 	}
 	if len(unupgradedControlPlanes) > 0 {
-		if features.Enabled(cfg.FeatureGates, features.UpgradeAddonsAfterControlPlane) {
+		if !features.Enabled(cfg.FeatureGates, features.UpgradeAddonsBeforeControlPlane) {
 			fmt.Fprintf(out, "[upgrade/addons] skip upgrade addons because control plane instances %v have not been upgraded\n", unupgradedControlPlanes)
 			return nil
 		}
 
-		// when UpgradeAddonsAfterControlPlane feature gate is disabled, just throw a warning
+		// when UpgradeAddonsBeforeControlPlane feature gate is enabled, just throw a warning
 		klog.V(1).Infof("upgrading addons when control plane instances %v have not been upgraded "+
-			"may lead to incompatibility problems. You can enable the UpgradeAddonsAfterControlPlane feature gate to"+
+			"may lead to incompatibility problems. You can disable the UpgradeAddonsBeforeControlPlane feature gate to"+
 			"ensure that the addons upgrade is executed only when all the control plane instances have been upgraded.", unupgradedControlPlanes)
 	}
 
