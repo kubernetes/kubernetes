@@ -328,6 +328,10 @@ func podMatchesScopeFunc(selector corev1.ScopedResourceSelectorRequirement, obje
 	case corev1.ResourceQuotaScopeNotBestEffort:
 		return !isBestEffort(pod), nil
 	case corev1.ResourceQuotaScopePriorityClass:
+		if len(selector.Operator) == 0 && selector.Values == nil {
+			// this is just checking for existence of a priorityClass on the pod
+			return len(pod.Spec.PriorityClassName) != 0, nil
+		}
 		return podMatchesSelector(pod, selector)
 	case corev1.ResourceQuotaScopeCrossNamespacePodAffinity:
 		return usesCrossNamespacePodAffinity(pod), nil
