@@ -118,8 +118,8 @@ func SetDefaults_Service(obj *v1.Service) {
 		if sp.Protocol == "" {
 			sp.Protocol = v1.ProtocolTCP
 		}
-		if sp.TargetPort == intstr.FromInt(0) || sp.TargetPort == intstr.FromString("") {
-			sp.TargetPort = intstr.FromInt(int(sp.Port))
+		if sp.TargetPort == intstr.FromInt32(0) || sp.TargetPort == intstr.FromString("") {
+			sp.TargetPort = intstr.FromInt32(sp.Port)
 		}
 	}
 	// Defaults ExternalTrafficPolicy field for NodePort / LoadBalancer service

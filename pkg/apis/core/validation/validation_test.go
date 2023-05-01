@@ -7040,8 +7040,8 @@ func Test_validateProbe(t *testing.T) {
 func TestValidateHandler(t *testing.T) {
 	successCases := []core.ProbeHandler{
 		{Exec: &core.ExecAction{Command: []string{"echo"}}},
-		{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromInt(1), Host: "", Scheme: "HTTP"}},
-		{HTTPGet: &core.HTTPGetAction{Path: "/foo", Port: intstr.FromInt(65535), Host: "host", Scheme: "HTTP"}},
+		{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromInt32(1), Host: "", Scheme: "HTTP"}},
+		{HTTPGet: &core.HTTPGetAction{Path: "/foo", Port: intstr.FromInt32(65535), Host: "host", Scheme: "HTTP"}},
 		{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromString("port"), Host: "", Scheme: "HTTP"}},
 		{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromString("port"), Host: "", Scheme: "HTTP", HTTPHeaders: []core.HTTPHeader{{Name: "Host", Value: "foo.example.com"}}}},
 		{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromString("port"), Host: "", Scheme: "HTTP", HTTPHeaders: []core.HTTPHeader{{Name: "X-Forwarded-For", Value: "1.2.3.4"}, {Name: "X-Forwarded-For", Value: "5.6.7.8"}}}},
@@ -7055,8 +7055,8 @@ func TestValidateHandler(t *testing.T) {
 	errorCases := []core.ProbeHandler{
 		{},
 		{Exec: &core.ExecAction{Command: []string{}}},
-		{HTTPGet: &core.HTTPGetAction{Path: "", Port: intstr.FromInt(0), Host: ""}},
-		{HTTPGet: &core.HTTPGetAction{Path: "/foo", Port: intstr.FromInt(65536), Host: "host"}},
+		{HTTPGet: &core.HTTPGetAction{Path: "", Port: intstr.FromInt32(0), Host: ""}},
+		{HTTPGet: &core.HTTPGetAction{Path: "/foo", Port: intstr.FromInt32(65536), Host: "host"}},
 		{HTTPGet: &core.HTTPGetAction{Path: "", Port: intstr.FromString(""), Host: ""}},
 		{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromString("port"), Host: "", Scheme: "HTTP", HTTPHeaders: []core.HTTPHeader{{Name: "Host:", Value: "foo.example.com"}}}},
 		{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromString("port"), Host: "", Scheme: "HTTP", HTTPHeaders: []core.HTTPHeader{{Name: "X_Forwarded_For", Value: "foo.example.com"}}}},
@@ -7423,7 +7423,7 @@ func TestValidateEphemeralContainers(t *testing.T) {
 						TerminationMessagePolicy: "File",
 						LivenessProbe: &core.Probe{
 							ProbeHandler: core.ProbeHandler{
-								TCPSocket: &core.TCPSocketAction{Port: intstr.FromInt(80)},
+								TCPSocket: &core.TCPSocketAction{Port: intstr.FromInt32(80)},
 							},
 							SuccessThreshold: 1,
 						},
@@ -7462,7 +7462,7 @@ func TestValidateEphemeralContainers(t *testing.T) {
 						TerminationMessagePolicy: "File",
 						ReadinessProbe: &core.Probe{
 							ProbeHandler: core.ProbeHandler{
-								TCPSocket: &core.TCPSocketAction{Port: intstr.FromInt(80)},
+								TCPSocket: &core.TCPSocketAction{Port: intstr.FromInt32(80)},
 							},
 						},
 					},
@@ -7482,7 +7482,7 @@ func TestValidateEphemeralContainers(t *testing.T) {
 						TerminationMessagePolicy: "File",
 						StartupProbe: &core.Probe{
 							ProbeHandler: core.ProbeHandler{
-								TCPSocket: &core.TCPSocketAction{Port: intstr.FromInt(80)},
+								TCPSocket: &core.TCPSocketAction{Port: intstr.FromInt32(80)},
 							},
 							SuccessThreshold: 1,
 						},
@@ -7857,7 +7857,7 @@ func TestValidateContainers(t *testing.T) {
 			LivenessProbe: &core.Probe{
 				ProbeHandler: core.ProbeHandler{
 					TCPSocket: &core.TCPSocketAction{
-						Port: intstr.FromInt(80),
+						Port: intstr.FromInt32(80),
 					},
 				},
 				SuccessThreshold: 1,
@@ -7871,7 +7871,7 @@ func TestValidateContainers(t *testing.T) {
 			StartupProbe: &core.Probe{
 				ProbeHandler: core.ProbeHandler{
 					TCPSocket: &core.TCPSocketAction{
-						Port: intstr.FromInt(80),
+						Port: intstr.FromInt32(80),
 					},
 				},
 				SuccessThreshold: 1,
@@ -8015,7 +8015,7 @@ func TestValidateContainers(t *testing.T) {
 					Lifecycle: &core.Lifecycle{
 						PreStop: &core.LifecycleHandler{
 							HTTPGet: &core.HTTPGetAction{
-								Port:   intstr.FromInt(80),
+								Port:   intstr.FromInt32(80),
 								Scheme: "HTTP",
 							},
 						},
@@ -8058,7 +8058,7 @@ func TestValidateContainers(t *testing.T) {
 						PreStop: &core.LifecycleHandler{
 							HTTPGet: &core.HTTPGetAction{
 								Path: "/",
-								Port: intstr.FromInt(80),
+								Port: intstr.FromInt32(80),
 							},
 						},
 					},
@@ -8096,7 +8096,7 @@ func TestValidateContainers(t *testing.T) {
 					Lifecycle: &core.Lifecycle{
 						PreStop: &core.LifecycleHandler{
 							TCPSocket: &core.TCPSocketAction{
-								Port: intstr.FromInt(0),
+								Port: intstr.FromInt32(0),
 							},
 						},
 					},
@@ -8132,7 +8132,7 @@ func TestValidateContainers(t *testing.T) {
 					ReadinessProbe: &core.Probe{
 						ProbeHandler: core.ProbeHandler{
 							TCPSocket: &core.TCPSocketAction{
-								Port: intstr.FromInt(80),
+								Port: intstr.FromInt32(80),
 							},
 						},
 						TerminationGracePeriodSeconds: utilpointer.Int64(10),
@@ -8189,7 +8189,7 @@ func TestValidateContainers(t *testing.T) {
 					LivenessProbe: &core.Probe{
 						ProbeHandler: core.ProbeHandler{
 							TCPSocket: &core.TCPSocketAction{
-								Port: intstr.FromInt(80),
+								Port: intstr.FromInt32(80),
 							},
 						},
 						SuccessThreshold: 2,
@@ -8210,7 +8210,7 @@ func TestValidateContainers(t *testing.T) {
 					StartupProbe: &core.Probe{
 						ProbeHandler: core.ProbeHandler{
 							TCPSocket: &core.TCPSocketAction{
-								Port: intstr.FromInt(80),
+								Port: intstr.FromInt32(80),
 							},
 						},
 						SuccessThreshold: 2,
@@ -8231,7 +8231,7 @@ func TestValidateContainers(t *testing.T) {
 					LivenessProbe: &core.Probe{
 						ProbeHandler: core.ProbeHandler{
 							TCPSocket: &core.TCPSocketAction{
-								Port: intstr.FromInt(80),
+								Port: intstr.FromInt32(80),
 							},
 						},
 						InitialDelaySeconds:           -1,
@@ -8265,7 +8265,7 @@ func TestValidateContainers(t *testing.T) {
 					ReadinessProbe: &core.Probe{
 						ProbeHandler: core.ProbeHandler{
 							TCPSocket: &core.TCPSocketAction{
-								Port: intstr.FromInt(80),
+								Port: intstr.FromInt32(80),
 							},
 						},
 						InitialDelaySeconds:           -1,
@@ -8302,7 +8302,7 @@ func TestValidateContainers(t *testing.T) {
 					StartupProbe: &core.Probe{
 						ProbeHandler: core.ProbeHandler{
 							TCPSocket: &core.TCPSocketAction{
-								Port: intstr.FromInt(80),
+								Port: intstr.FromInt32(80),
 							},
 						},
 						InitialDelaySeconds:           -1,
@@ -8734,7 +8734,7 @@ func TestValidateInitContainers(t *testing.T) {
 					TerminationMessagePolicy: "File",
 					LivenessProbe: &core.Probe{
 						ProbeHandler: core.ProbeHandler{
-							TCPSocket: &core.TCPSocketAction{Port: intstr.FromInt(80)},
+							TCPSocket: &core.TCPSocketAction{Port: intstr.FromInt32(80)},
 						},
 						SuccessThreshold: 1,
 					},
@@ -8753,7 +8753,7 @@ func TestValidateInitContainers(t *testing.T) {
 					TerminationMessagePolicy: "File",
 					ReadinessProbe: &core.Probe{
 						ProbeHandler: core.ProbeHandler{
-							TCPSocket: &core.TCPSocketAction{Port: intstr.FromInt(80)},
+							TCPSocket: &core.TCPSocketAction{Port: intstr.FromInt32(80)},
 						},
 					},
 				},
@@ -8771,7 +8771,7 @@ func TestValidateInitContainers(t *testing.T) {
 					TerminationMessagePolicy: "File",
 					StartupProbe: &core.Probe{
 						ProbeHandler: core.ProbeHandler{
-							TCPSocket: &core.TCPSocketAction{Port: intstr.FromInt(80)},
+							TCPSocket: &core.TCPSocketAction{Port: intstr.FromInt32(80)},
 						},
 						SuccessThreshold: 1,
 					},
@@ -8790,7 +8790,7 @@ func TestValidateInitContainers(t *testing.T) {
 					TerminationMessagePolicy: "File",
 					StartupProbe: &core.Probe{
 						ProbeHandler: core.ProbeHandler{
-							TCPSocket: &core.TCPSocketAction{Port: intstr.FromInt(80)},
+							TCPSocket: &core.TCPSocketAction{Port: intstr.FromInt32(80)},
 						},
 						InitialDelaySeconds:           -1,
 						TimeoutSeconds:                -1,
@@ -14475,7 +14475,7 @@ func makeValidService() core.Service {
 			Selector:              map[string]string{"key": "val"},
 			SessionAffinity:       "None",
 			Type:                  core.ServiceTypeClusterIP,
-			Ports:                 []core.ServicePort{{Name: "p", Protocol: "TCP", Port: 8675, TargetPort: intstr.FromInt(8675)}},
+			Ports:                 []core.ServicePort{{Name: "p", Protocol: "TCP", Port: 8675, TargetPort: intstr.FromInt32(8675)}},
 			InternalTrafficPolicy: &clusterInternalTrafficPolicy,
 		},
 	}
@@ -15001,7 +15001,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		{
 			name: "empty port[1] name",
 			tweakSvc: func(s *core.Service) {
-				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "", Protocol: "TCP", Port: 12345, TargetPort: intstr.FromInt(12345)})
+				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "", Protocol: "TCP", Port: 12345, TargetPort: intstr.FromInt32(12345)})
 			},
 			numErrs: 1,
 		},
@@ -15009,7 +15009,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "empty multi-port port[0] name",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Ports[0].Name = ""
-				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "p", Protocol: "TCP", Port: 12345, TargetPort: intstr.FromInt(12345)})
+				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "p", Protocol: "TCP", Port: 12345, TargetPort: intstr.FromInt32(12345)})
 			},
 			numErrs: 1,
 		},
@@ -15059,7 +15059,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		{
 			name: "invalid TargetPort int",
 			tweakSvc: func(s *core.Service) {
-				s.Spec.Ports[0].TargetPort = intstr.FromInt(65536)
+				s.Spec.Ports[0].TargetPort = intstr.FromInt32(65536)
 			},
 			numErrs: 1,
 		},
@@ -15067,7 +15067,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid port headless",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Ports[0].Port = 11722
-				s.Spec.Ports[0].TargetPort = intstr.FromInt(11722)
+				s.Spec.Ports[0].TargetPort = intstr.FromInt32(11722)
 				s.Spec.ClusterIP = core.ClusterIPNone
 				s.Spec.ClusterIPs = []string{core.ClusterIPNone}
 			},
@@ -15077,7 +15077,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "invalid port headless 1",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Ports[0].Port = 11722
-				s.Spec.Ports[0].TargetPort = intstr.FromInt(11721)
+				s.Spec.Ports[0].TargetPort = intstr.FromInt32(11721)
 				s.Spec.ClusterIP = core.ClusterIPNone
 				s.Spec.ClusterIPs = []string{core.ClusterIPNone}
 			},
@@ -15131,7 +15131,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "dup port name",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Ports[0].Name = "p"
-				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "p", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt(12345)})
+				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "p", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt32(12345)})
 			},
 			numErrs: 1,
 		},
@@ -15151,7 +15151,7 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
 				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-				s.Spec.Ports[0] = core.ServicePort{Name: "q", Port: 12345, Protocol: "UDP", TargetPort: intstr.FromInt(12345)}
+				s.Spec.Ports[0] = core.ServicePort{Name: "q", Port: 12345, Protocol: "UDP", TargetPort: intstr.FromInt32(12345)}
 			},
 			numErrs: 0,
 		},
@@ -15161,7 +15161,7 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
 				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "UDP", TargetPort: intstr.FromInt(12345)})
+				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "UDP", TargetPort: intstr.FromInt32(12345)})
 			},
 			numErrs: 0,
 		},
@@ -15176,7 +15176,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid 2",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Ports[0].Protocol = "UDP"
-				s.Spec.Ports[0].TargetPort = intstr.FromInt(12345)
+				s.Spec.Ports[0].TargetPort = intstr.FromInt32(12345)
 			},
 			numErrs: 0,
 		},
@@ -15242,7 +15242,7 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
 				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt(12345)})
+				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt32(12345)})
 			},
 			numErrs: 0,
 		},
@@ -15252,7 +15252,7 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
 				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt(12345)})
+				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt32(12345)})
 			},
 			numErrs: 0,
 		},
@@ -15261,8 +15261,8 @@ func TestValidateServiceCreate(t *testing.T) {
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeNodePort
 				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 1, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt(1)})
-				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "r", Port: 2, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt(2)})
+				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 1, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt32(1)})
+				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "r", Port: 2, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt32(2)})
 			},
 			numErrs: 1,
 		},
@@ -15271,9 +15271,9 @@ func TestValidateServiceCreate(t *testing.T) {
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeNodePort
 				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 1, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt(1)})
-				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "r", Port: 2, Protocol: "UDP", NodePort: 1, TargetPort: intstr.FromInt(2)})
-				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "s", Port: 3, Protocol: "SCTP", NodePort: 1, TargetPort: intstr.FromInt(3)})
+				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 1, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt32(1)})
+				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "r", Port: 2, Protocol: "UDP", NodePort: 1, TargetPort: intstr.FromInt32(2)})
+				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "s", Port: 3, Protocol: "SCTP", NodePort: 1, TargetPort: intstr.FromInt32(3)})
 			},
 			numErrs: 0,
 		},
@@ -15281,8 +15281,8 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "invalid duplicate ports (with same protocol)",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeClusterIP
-				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt(8080)})
-				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "r", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt(80)})
+				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)})
+				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "r", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt32(80)})
 			},
 			numErrs: 1,
 		},
@@ -15290,9 +15290,9 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid duplicate ports (with different protocols)",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeClusterIP
-				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt(8080)})
-				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "r", Port: 12345, Protocol: "UDP", TargetPort: intstr.FromInt(80)})
-				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "s", Port: 12345, Protocol: "SCTP", TargetPort: intstr.FromInt(8088)})
+				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)})
+				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "r", Port: 12345, Protocol: "UDP", TargetPort: intstr.FromInt32(80)})
+				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "s", Port: 12345, Protocol: "SCTP", TargetPort: intstr.FromInt32(8088)})
 			},
 			numErrs: 0,
 		},
@@ -15326,7 +15326,7 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
 				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt(12345)})
+				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt32(12345)})
 			},
 			numErrs: 0,
 		},
@@ -15336,7 +15336,7 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
 				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", NodePort: 12345, TargetPort: intstr.FromInt(12345)})
+				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", NodePort: 12345, TargetPort: intstr.FromInt32(12345)})
 			},
 			numErrs: 0,
 		},
@@ -15345,7 +15345,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeNodePort
 				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", NodePort: 12345, TargetPort: intstr.FromInt(12345)})
+				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", NodePort: 12345, TargetPort: intstr.FromInt32(12345)})
 			},
 			numErrs: 0,
 		},
@@ -15354,7 +15354,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeNodePort
 				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt(12345)})
+				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt32(12345)})
 			},
 			numErrs: 0,
 		},
@@ -15362,7 +15362,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid cluster service without NodePort",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeClusterIP
-				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt(12345)})
+				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt32(12345)})
 			},
 			numErrs: 0,
 		},
@@ -15370,7 +15370,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "invalid cluster service with NodePort",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeClusterIP
-				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", NodePort: 12345, TargetPort: intstr.FromInt(12345)})
+				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", NodePort: 12345, TargetPort: intstr.FromInt32(12345)})
 			},
 			numErrs: 1,
 		},
@@ -15379,8 +15379,8 @@ func TestValidateServiceCreate(t *testing.T) {
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeNodePort
 				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "p1", Port: 1, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt(1)})
-				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "p2", Port: 2, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt(2)})
+				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "p1", Port: 1, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt32(1)})
+				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "p2", Port: 2, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt32(2)})
 			},
 			numErrs: 1,
 		},
@@ -15390,7 +15390,7 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
 				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt(12345)})
+				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt32(12345)})
 			},
 			numErrs: 0,
 		},
@@ -15402,7 +15402,7 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
 				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "kubelet", Port: 10250, Protocol: "TCP", TargetPort: intstr.FromInt(12345)})
+				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "kubelet", Port: 10250, Protocol: "TCP", TargetPort: intstr.FromInt32(12345)})
 			},
 			numErrs: 1,
 		},
@@ -15540,7 +15540,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeNodePort
 				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 1, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt(1)})
+				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 1, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt32(1)})
 				s.Spec.ClusterIP = "None"
 				s.Spec.ClusterIPs = []string{"None"}
 			},
@@ -16042,7 +16042,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Ports = []core.ServicePort{{
 					Port:        12345,
-					TargetPort:  intstr.FromInt(12345),
+					TargetPort:  intstr.FromInt32(12345),
 					Protocol:    "TCP",
 					AppProtocol: utilpointer.String("HTTP"),
 				}}
@@ -16054,7 +16054,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Ports = []core.ServicePort{{
 					Port:        12345,
-					TargetPort:  intstr.FromInt(12345),
+					TargetPort:  intstr.FromInt32(12345),
 					Protocol:    "TCP",
 					AppProtocol: utilpointer.String("example.com/protocol"),
 				}}
@@ -16066,7 +16066,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Ports = []core.ServicePort{{
 					Port:        12345,
-					TargetPort:  intstr.FromInt(12345),
+					TargetPort:  intstr.FromInt32(12345),
 					Protocol:    "TCP",
 					AppProtocol: utilpointer.String("example.com/protocol_with{invalid}[characters]"),
 				}}
@@ -18145,8 +18145,8 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.Type = core.ServiceTypeNodePort
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 
-				oldSvc.Spec.Ports = append(oldSvc.Spec.Ports, core.ServicePort{Name: "q", Port: 1, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt(1)})
-				newSvc.Spec.Ports = append(newSvc.Spec.Ports, core.ServicePort{Name: "q", Port: 1, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt(1)})
+				oldSvc.Spec.Ports = append(oldSvc.Spec.Ports, core.ServicePort{Name: "q", Port: 1, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt32(1)})
+				newSvc.Spec.Ports = append(newSvc.Spec.Ports, core.ServicePort{Name: "q", Port: 1, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt32(1)})
 
 				oldSvc.Spec.ClusterIP = ""
 				oldSvc.Spec.ClusterIPs = nil
@@ -18568,16 +18568,16 @@ func TestValidateServiceUpdate(t *testing.T) {
 		{
 			name: "update to valid app protocol",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
-				oldSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt(3000), Protocol: "TCP"}}
-				newSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt(3000), Protocol: "TCP", AppProtocol: utilpointer.String("https")}}
+				oldSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt32(3000), Protocol: "TCP"}}
+				newSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt32(3000), Protocol: "TCP", AppProtocol: utilpointer.String("https")}}
 			},
 			numErrs: 0,
 		},
 		{
 			name: "update to invalid app protocol",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
-				oldSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt(3000), Protocol: "TCP"}}
-				newSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt(3000), Protocol: "TCP", AppProtocol: utilpointer.String("~https")}}
+				oldSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt32(3000), Protocol: "TCP"}}
+				newSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt32(3000), Protocol: "TCP", AppProtocol: utilpointer.String("~https")}}
 			},
 			numErrs: 1,
 		},

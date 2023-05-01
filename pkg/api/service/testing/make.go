@@ -47,7 +47,7 @@ func MakeService(name string, tweaks ...Tweak) *api.Service {
 	// Default to ClusterIP
 	SetTypeClusterIP(svc)
 	// Default to 1 port
-	SetPorts(MakeServicePort("", 93, intstr.FromInt(76), api.ProtocolTCP))(svc)
+	SetPorts(MakeServicePort("", 93, intstr.FromInt32(76), api.ProtocolTCP))(svc)
 
 	for _, tweak := range tweaks {
 		tweak(svc)

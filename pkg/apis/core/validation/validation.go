@@ -2970,7 +2970,7 @@ func validateTCPSocketAction(tcp *core.TCPSocketAction, fldPath *field.Path) fie
 	return ValidatePortNumOrName(tcp.Port, fldPath.Child("port"))
 }
 func validateGRPCAction(grpc *core.GRPCAction, fldPath *field.Path) field.ErrorList {
-	return ValidatePortNumOrName(intstr.FromInt(int(grpc.Port)), fldPath.Child("port"))
+	return ValidatePortNumOrName(intstr.FromInt32(grpc.Port), fldPath.Child("port"))
 }
 func validateHandler(handler commonHandler, fldPath *field.Path) field.ErrorList {
 	numHandlers := 0
