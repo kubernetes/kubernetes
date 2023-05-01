@@ -71,6 +71,11 @@ func (h *netlinkHandle) GetLocalAddresses(dev string) (sets.Set[string], error) 
 	return nil, fmt.Errorf("netlink is not supported in this platform")
 }
 
+// GetAllLocalAddressesExcept is part of interface.
+func (h *netlinkHandle) GetAllLocalAddressesExcept(dev string) (sets.Set[string], error) {
+	return nil, fmt.Errorf("netlink is not supported in this platform")
+}
+
 // Must match the one in proxier_test.go
 func (h *netlinkHandle) isValidForSet(ip net.IP) bool {
 	return false
