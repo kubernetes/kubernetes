@@ -1465,7 +1465,7 @@ func TestDoRequestNewWay(t *testing.T) {
 	expectedObj := &v1.Service{Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
-		TargetPort: intstr.FromInt(12345),
+		TargetPort: intstr.FromInt32(12345),
 	}}}}
 	expectedBody, _ := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), expectedObj)
 	fakeHandler := utiltesting.FakeHandler{
@@ -1708,7 +1708,7 @@ func TestDoRequestNewWayReader(t *testing.T) {
 	expectedObj := &v1.Service{Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
-		TargetPort: intstr.FromInt(12345),
+		TargetPort: intstr.FromInt32(12345),
 	}}}}
 	expectedBody, _ := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), expectedObj)
 	fakeHandler := utiltesting.FakeHandler{
@@ -1747,7 +1747,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 	expectedObj := &v1.Service{Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
-		TargetPort: intstr.FromInt(12345),
+		TargetPort: intstr.FromInt32(12345),
 	}}}}
 	expectedBody, _ := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), expectedObj)
 	fakeHandler := utiltesting.FakeHandler{
@@ -1802,7 +1802,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 	expectedObj := &v1.Service{Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
-		TargetPort: intstr.FromInt(12345),
+		TargetPort: intstr.FromInt32(12345),
 	}}}}
 	expectedBody, _ := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), expectedObj)
 	fakeHandler := utiltesting.FakeHandler{
@@ -1847,7 +1847,7 @@ func TestWasCreated(t *testing.T) {
 	expectedObj := &v1.Service{Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{
 		Protocol:   "TCP",
 		Port:       12345,
-		TargetPort: intstr.FromInt(12345),
+		TargetPort: intstr.FromInt32(12345),
 	}}}}
 	expectedBody, _ := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), expectedObj)
 	fakeHandler := utiltesting.FakeHandler{
