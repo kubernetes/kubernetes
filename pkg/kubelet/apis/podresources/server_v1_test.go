@@ -251,8 +251,6 @@ func TestListPodResourcesV1(t *testing.T) {
 }
 
 func TestAllocatableResources(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.KubeletPodResourcesGetAllocatable, true)()
-
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
