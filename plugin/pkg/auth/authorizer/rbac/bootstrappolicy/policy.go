@@ -231,10 +231,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 
 	basicUserRules := []rbacv1.PolicyRule{
 		rbacv1helpers.NewRule("create").Groups(authorizationGroup).Resources("selfsubjectaccessreviews", "selfsubjectrulesreviews").RuleOrDie(),
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.APISelfSubjectReview) {
-		basicUserRules = append(basicUserRules, rbacv1helpers.NewRule("create").Groups(authenticationGroup).Resources("selfsubjectreviews").RuleOrDie())
+		rbacv1helpers.NewRule("create").Groups(authenticationGroup).Resources("selfsubjectreviews").RuleOrDie(),
 	}
 
 	roles = append(roles, []rbacv1.ClusterRole{
