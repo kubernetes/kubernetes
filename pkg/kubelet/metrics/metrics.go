@@ -613,7 +613,7 @@ var (
 		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           StartedHostProcessContainersTotalKey,
-			Help:           "Cumulative number of hostprocess containers started. This metric will only be collected on Windows and requires WindowsHostProcessContainers feature gate to be enabled.",
+			Help:           "Cumulative number of hostprocess containers started. This metric will only be collected on Windows.",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"container_type"},
@@ -623,7 +623,7 @@ var (
 		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           StartedHostProcessContainersErrorsTotalKey,
-			Help:           "Cumulative number of errors when starting hostprocess containers. This metric will only be collected on Windows and requires WindowsHostProcessContainers feature gate to be enabled.",
+			Help:           "Cumulative number of errors when starting hostprocess containers. This metric will only be collected on Windows.",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"container_type", "code"},
