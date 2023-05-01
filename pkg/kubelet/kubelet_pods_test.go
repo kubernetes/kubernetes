@@ -2578,6 +2578,26 @@ func TestPodPhaseWithRestartNeverInitContainers(t *testing.T) {
 			v1.PodRunning,
 			"init container succeeded",
 		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						{
+							Name: "containerX",
+							State: v1.ContainerState{
+								Terminated: &v1.ContainerStateTerminated{
+									ExitCode: 0,
+									Reason:   "OOMKilled",
+								},
+							},
+						},
+					},
+				},
+			},
+			v1.PodFailed,
+			"init container terminated with OOMkilled and exit-code zero",
+		},
 	}
 	for _, test := range tests {
 		statusInfo := append(test.pod.Status.InitContainerStatuses[:], test.pod.Status.ContainerStatuses[:]...)

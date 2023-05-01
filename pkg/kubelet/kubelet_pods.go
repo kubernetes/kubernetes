@@ -1395,7 +1395,7 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal bool) v1.Pod
 		case containerStatus.State.Running != nil:
 			pendingInitialization++
 		case containerStatus.State.Terminated != nil:
-			if containerStatus.State.Terminated.ExitCode != 0 {
+			if containerStatus.State.Terminated.ExitCode != 0 || containerStatus.State.Terminated.Reason == "OOMKilled" {
 				failedInitialization++
 			}
 		case containerStatus.State.Waiting != nil:
