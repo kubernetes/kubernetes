@@ -1,11 +1,11 @@
 package btf
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
 	"reflect"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -17,50 +17,58 @@ import (
 
 // COREFixup is the result of computing a CO-RE relocation for a target.
 type COREFixup struct {
-	Kind   COREKind
-	Local  uint32
-	Target uint32
-	Poison bool
+	kind   coreKind
+	local  uint32
+	target uint32
+	// True if there is no valid fixup. The instruction is replaced with an
+	// invalid dummy.
+	poison bool
+	// True if the validation of the local value should be skipped. Used by
+	// some kinds of bitfield relocations.
+	skipLocalValidation bool
 }
 
-func (f COREFixup) equal(other COREFixup) bool {
-	return f.Local == other.Local && f.Target == other.Target
+func (f *COREFixup) equal(other COREFixup) bool {
+	return f.local == other.local && f.target == other.target
 }
 
-func (f COREFixup) String() string {
-	if f.Poison {
-		return fmt.Sprintf("%s=poison", f.Kind)
+func (f *COREFixup) String() string {
+	if f.poison {
+		return fmt.Sprintf("%s=poison", f.kind)
 	}
-	return fmt.Sprintf("%s=%d->%d", f.Kind, f.Local, f.Target)
+	return fmt.Sprintf("%s=%d->%d", f.kind, f.local, f.target)
 }
 
-func (f COREFixup) apply(ins *asm.Instruction) error {
-	if f.Poison {
-		return errors.New("can't poison individual instruction")
+func (f *COREFixup) Apply(ins *asm.Instruction) error {
+	if f.poison {
+		const badRelo = 0xbad2310
+
+		*ins = asm.BuiltinFunc(badRelo).Call()
+		return nil
 	}
 
 	switch class := ins.OpCode.Class(); class {
 	case asm.LdXClass, asm.StClass, asm.StXClass:
-		if want := int16(f.Local); want != ins.Offset {
-			return fmt.Errorf("invalid offset %d, expected %d", ins.Offset, want)
+		if want := int16(f.local); !f.skipLocalValidation && want != ins.Offset {
+			return fmt.Errorf("invalid offset %d, expected %d", ins.Offset, f.local)
 		}
 
-		if f.Target > math.MaxInt16 {
-			return fmt.Errorf("offset %d exceeds MaxInt16", f.Target)
+		if f.target > math.MaxInt16 {
+			return fmt.Errorf("offset %d exceeds MaxInt16", f.target)
 		}
 
-		ins.Offset = int16(f.Target)
+		ins.Offset = int16(f.target)
 
 	case asm.LdClass:
 		if !ins.IsConstantLoad(asm.DWord) {
 			return fmt.Errorf("not a dword-sized immediate load")
 		}
 
-		if want := int64(f.Local); want != ins.Constant {
-			return fmt.Errorf("invalid immediate %d, expected %d", ins.Constant, want)
+		if want := int64(f.local); !f.skipLocalValidation && want != ins.Constant {
+			return fmt.Errorf("invalid immediate %d, expected %d (fixup: %v)", ins.Constant, want, f)
 		}
 
-		ins.Constant = int64(f.Target)
+		ins.Constant = int64(f.target)
 
 	case asm.ALUClass:
 		if ins.OpCode.ALUOp() == asm.Swap {
@@ -74,15 +82,15 @@ func (f COREFixup) apply(ins *asm.Instruction) error {
 			return fmt.Errorf("invalid source %s", src)
 		}
 
-		if want := int64(f.Local); want != ins.Constant {
-			return fmt.Errorf("invalid immediate %d, expected %d", ins.Constant, want)
+		if want := int64(f.local); !f.skipLocalValidation && want != ins.Constant {
+			return fmt.Errorf("invalid immediate %d, expected %d (fixup: %v, kind: %v, ins: %v)", ins.Constant, want, f, f.kind, ins)
 		}
 
-		if f.Target > math.MaxInt32 {
-			return fmt.Errorf("immediate %d exceeds MaxInt32", f.Target)
+		if f.target > math.MaxInt32 {
+			return fmt.Errorf("immediate %d exceeds MaxInt32", f.target)
 		}
 
-		ins.Constant = int64(f.Target)
+		ins.Constant = int64(f.target)
 
 	default:
 		return fmt.Errorf("invalid class %s", class)
@@ -92,57 +100,14 @@ func (f COREFixup) apply(ins *asm.Instruction) error {
 }
 
 func (f COREFixup) isNonExistant() bool {
-	return f.Kind.checksForExistence() && f.Target == 0
+	return f.kind.checksForExistence() && f.target == 0
 }
 
-type COREFixups map[uint64]COREFixup
-
-// Apply a set of CO-RE relocations to a BPF program.
-func (fs COREFixups) Apply(insns asm.Instructions) (asm.Instructions, error) {
-	if len(fs) == 0 {
-		cpy := make(asm.Instructions, len(insns))
-		copy(cpy, insns)
-		return insns, nil
-	}
-
-	cpy := make(asm.Instructions, 0, len(insns))
-	iter := insns.Iterate()
-	for iter.Next() {
-		fixup, ok := fs[iter.Offset.Bytes()]
-		if !ok {
-			cpy = append(cpy, *iter.Ins)
-			continue
-		}
-
-		ins := *iter.Ins
-		if fixup.Poison {
-			const badRelo = asm.BuiltinFunc(0xbad2310)
-
-			cpy = append(cpy, badRelo.Call())
-			if ins.OpCode.IsDWordLoad() {
-				// 64 bit constant loads occupy two raw bpf instructions, so
-				// we need to add another instruction as padding.
-				cpy = append(cpy, badRelo.Call())
-			}
-
-			continue
-		}
-
-		if err := fixup.apply(&ins); err != nil {
-			return nil, fmt.Errorf("instruction %d, offset %d: %s: %w", iter.Index, iter.Offset.Bytes(), fixup.Kind, err)
-		}
-
-		cpy = append(cpy, ins)
-	}
-
-	return cpy, nil
-}
-
-// COREKind is the type of CO-RE relocation
-type COREKind uint32
+// coreKind is the type of CO-RE relocation as specified in BPF source code.
+type coreKind uint32
 
 const (
-	reloFieldByteOffset COREKind = iota /* field byte offset */
+	reloFieldByteOffset coreKind = iota /* field byte offset */
 	reloFieldByteSize                   /* field size in bytes */
 	reloFieldExists                     /* field existence in target kernel */
 	reloFieldSigned                     /* field signedness (0 - unsigned, 1 - signed) */
@@ -156,7 +121,11 @@ const (
 	reloEnumvalValue                    /* enum value integer value */
 )
 
-func (k COREKind) String() string {
+func (k coreKind) checksForExistence() bool {
+	return k == reloEnumvalExists || k == reloTypeExists || k == reloFieldExists
+}
+
+func (k coreKind) String() string {
 	switch k {
 	case reloFieldByteOffset:
 		return "byte_off"
@@ -187,19 +156,28 @@ func (k COREKind) String() string {
 	}
 }
 
-func (k COREKind) checksForExistence() bool {
-	return k == reloEnumvalExists || k == reloTypeExists || k == reloFieldExists
-}
-
-func coreRelocate(local, target *Spec, relos coreRelos) (COREFixups, error) {
+// CORERelocate calculates the difference in types between local and target.
+//
+// Returns a list of fixups which can be applied to instructions to make them
+// match the target type(s).
+//
+// Fixups are returned in the order of relos, e.g. fixup[i] is the solution
+// for relos[i].
+func CORERelocate(local, target *Spec, relos []*CORERelocation) ([]COREFixup, error) {
 	if local.byteOrder != target.byteOrder {
 		return nil, fmt.Errorf("can't relocate %s against %s", local.byteOrder, target.byteOrder)
 	}
 
-	var ids []TypeID
-	relosByID := make(map[TypeID]coreRelos)
-	result := make(COREFixups, len(relos))
-	for _, relo := range relos {
+	type reloGroup struct {
+		relos []*CORERelocation
+		// Position of each relocation in relos.
+		indices []int
+	}
+
+	// Split relocations into per Type lists.
+	relosByType := make(map[Type]*reloGroup)
+	result := make([]COREFixup, len(relos))
+	for i, relo := range relos {
 		if relo.kind == reloTypeIDLocal {
 			// Filtering out reloTypeIDLocal here makes our lives a lot easier
 			// down the line, since it doesn't have a target at all.
@@ -207,47 +185,42 @@ func coreRelocate(local, target *Spec, relos coreRelos) (COREFixups, error) {
 				return nil, fmt.Errorf("%s: unexpected accessor %v", relo.kind, relo.accessor)
 			}
 
-			result[uint64(relo.insnOff)] = COREFixup{
-				relo.kind,
-				uint32(relo.typeID),
-				uint32(relo.typeID),
-				false,
+			id, err := local.TypeID(relo.typ)
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", relo.kind, err)
+			}
+
+			result[i] = COREFixup{
+				kind:   relo.kind,
+				local:  uint32(id),
+				target: uint32(id),
 			}
 			continue
 		}
 
-		relos, ok := relosByID[relo.typeID]
+		group, ok := relosByType[relo.typ]
 		if !ok {
-			ids = append(ids, relo.typeID)
+			group = &reloGroup{}
+			relosByType[relo.typ] = group
 		}
-		relosByID[relo.typeID] = append(relos, relo)
+		group.relos = append(group.relos, relo)
+		group.indices = append(group.indices, i)
 	}
 
-	// Ensure we work on relocations in a deterministic order.
-	sort.Slice(ids, func(i, j int) bool {
-		return ids[i] < ids[j]
-	})
-
-	for _, id := range ids {
-		if int(id) >= len(local.types) {
-			return nil, fmt.Errorf("invalid type id %d", id)
-		}
-
-		localType := local.types[id]
-		named, ok := localType.(NamedType)
-		if !ok || named.TypeName() == "" {
+	for localType, group := range relosByType {
+		localTypeName := localType.TypeName()
+		if localTypeName == "" {
 			return nil, fmt.Errorf("relocate unnamed or anonymous type %s: %w", localType, ErrNotSupported)
 		}
 
-		relos := relosByID[id]
-		targets := target.namedTypes[essentialName(named.TypeName())]
-		fixups, err := coreCalculateFixups(localType, targets, relos)
+		targets := target.namedTypes[newEssentialName(localTypeName)]
+		fixups, err := coreCalculateFixups(local, target, localType, targets, group.relos)
 		if err != nil {
 			return nil, fmt.Errorf("relocate %s: %w", localType, err)
 		}
 
-		for i, relo := range relos {
-			result[uint64(relo.insnOff)] = fixups[i]
+		for j, index := range group.indices {
+			result[index] = fixups[j]
 		}
 	}
 
@@ -262,30 +235,30 @@ var errImpossibleRelocation = errors.New("impossible relocation")
 //
 // The best target is determined by scoring: the less poisoning we have to do
 // the better the target is.
-func coreCalculateFixups(local Type, targets []NamedType, relos coreRelos) ([]COREFixup, error) {
-	localID := local.ID()
-	local, err := copyType(local, skipQualifierAndTypedef)
+func coreCalculateFixups(localSpec, targetSpec *Spec, local Type, targets []Type, relos []*CORERelocation) ([]COREFixup, error) {
+	localID, err := localSpec.TypeID(local)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("local type ID: %w", err)
 	}
+	local = Copy(local, UnderlyingType)
 
 	bestScore := len(relos)
 	var bestFixups []COREFixup
 	for i := range targets {
-		targetID := targets[i].ID()
-		target, err := copyType(targets[i], skipQualifierAndTypedef)
+		targetID, err := targetSpec.TypeID(targets[i])
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("target type ID: %w", err)
 		}
+		target := Copy(targets[i], UnderlyingType)
 
 		score := 0 // lower is better
 		fixups := make([]COREFixup, 0, len(relos))
 		for _, relo := range relos {
-			fixup, err := coreCalculateFixup(local, localID, target, targetID, relo)
+			fixup, err := coreCalculateFixup(localSpec.byteOrder, local, localID, target, targetID, relo)
 			if err != nil {
 				return nil, fmt.Errorf("target %s: %w", target, err)
 			}
-			if fixup.Poison || fixup.isNonExistant() {
+			if fixup.poison || fixup.isNonExistant() {
 				score++
 			}
 			fixups = append(fixups, fixup)
@@ -307,17 +280,23 @@ func coreCalculateFixups(local Type, targets []NamedType, relos coreRelos) ([]CO
 		// the fixups agree with each other.
 		for i, fixup := range bestFixups {
 			if !fixup.equal(fixups[i]) {
-				return nil, fmt.Errorf("%s: multiple types match: %w", fixup.Kind, errAmbiguousRelocation)
+				return nil, fmt.Errorf("%s: multiple types match: %w", fixup.kind, errAmbiguousRelocation)
 			}
 		}
 	}
 
 	if bestFixups == nil {
 		// Nothing at all matched, probably because there are no suitable
-		// targets at all. Poison everything!
+		// targets at all.
+		//
+		// Poison everything except checksForExistence.
 		bestFixups = make([]COREFixup, len(relos))
 		for i, relo := range relos {
-			bestFixups[i] = COREFixup{Kind: relo.kind, Poison: true}
+			if relo.kind.checksForExistence() {
+				bestFixups[i] = COREFixup{kind: relo.kind, local: 1, target: 0}
+			} else {
+				bestFixups[i] = COREFixup{kind: relo.kind, poison: true}
+			}
 		}
 	}
 
@@ -326,15 +305,18 @@ func coreCalculateFixups(local Type, targets []NamedType, relos coreRelos) ([]CO
 
 // coreCalculateFixup calculates the fixup for a single local type, target type
 // and relocation.
-func coreCalculateFixup(local Type, localID TypeID, target Type, targetID TypeID, relo coreRelo) (COREFixup, error) {
+func coreCalculateFixup(byteOrder binary.ByteOrder, local Type, localID TypeID, target Type, targetID TypeID, relo *CORERelocation) (COREFixup, error) {
 	fixup := func(local, target uint32) (COREFixup, error) {
-		return COREFixup{relo.kind, local, target, false}, nil
+		return COREFixup{kind: relo.kind, local: local, target: target}, nil
+	}
+	fixupWithoutValidation := func(local, target uint32) (COREFixup, error) {
+		return COREFixup{kind: relo.kind, local: local, target: target, skipLocalValidation: true}, nil
 	}
 	poison := func() (COREFixup, error) {
 		if relo.kind.checksForExistence() {
 			return fixup(1, 0)
 		}
-		return COREFixup{relo.kind, 0, 0, true}, nil
+		return COREFixup{kind: relo.kind, poison: true}, nil
 	}
 	zero := COREFixup{}
 
@@ -390,7 +372,20 @@ func coreCalculateFixup(local Type, localID TypeID, target Type, targetID TypeID
 			return fixup(uint32(localValue.Value), uint32(targetValue.Value))
 		}
 
-	case reloFieldByteOffset, reloFieldByteSize, reloFieldExists:
+	case reloFieldSigned:
+		switch local.(type) {
+		case *Enum:
+			return fixup(1, 1)
+		case *Int:
+			return fixup(
+				uint32(local.(*Int).Encoding&Signed),
+				uint32(target.(*Int).Encoding&Signed),
+			)
+		default:
+			return fixupWithoutValidation(0, 0)
+		}
+
+	case reloFieldByteOffset, reloFieldByteSize, reloFieldExists, reloFieldLShiftU64, reloFieldRShiftU64:
 		if _, ok := target.(*Fwd); ok {
 			// We can't relocate fields using a forward declaration, so
 			// skip it. If a non-forward declaration is present in the BTF
@@ -406,12 +401,17 @@ func coreCalculateFixup(local Type, localID TypeID, target Type, targetID TypeID
 			return zero, fmt.Errorf("target %s: %w", target, err)
 		}
 
+		maybeSkipValidation := func(f COREFixup, err error) (COREFixup, error) {
+			f.skipLocalValidation = localField.bitfieldSize > 0
+			return f, err
+		}
+
 		switch relo.kind {
 		case reloFieldExists:
 			return fixup(1, 1)
 
 		case reloFieldByteOffset:
-			return fixup(localField.offset/8, targetField.offset/8)
+			return maybeSkipValidation(fixup(localField.offset, targetField.offset))
 
 		case reloFieldByteSize:
 			localSize, err := Sizeof(localField.Type)
@@ -423,9 +423,34 @@ func coreCalculateFixup(local Type, localID TypeID, target Type, targetID TypeID
 			if err != nil {
 				return zero, err
 			}
+			return maybeSkipValidation(fixup(uint32(localSize), uint32(targetSize)))
 
-			return fixup(uint32(localSize), uint32(targetSize))
+		case reloFieldLShiftU64:
+			var target uint32
+			if byteOrder == binary.LittleEndian {
+				targetSize, err := targetField.sizeBits()
+				if err != nil {
+					return zero, err
+				}
 
+				target = uint32(64 - targetField.bitfieldOffset - targetSize)
+			} else {
+				loadWidth, err := Sizeof(targetField.Type)
+				if err != nil {
+					return zero, err
+				}
+
+				target = uint32(64 - Bits(loadWidth*8) + targetField.bitfieldOffset)
+			}
+			return fixupWithoutValidation(0, target)
+
+		case reloFieldRShiftU64:
+			targetSize, err := targetField.sizeBits()
+			if err != nil {
+				return zero, err
+			}
+
+			return fixupWithoutValidation(0, uint32(64-targetSize))
 		}
 	}
 
@@ -462,7 +487,7 @@ func coreCalculateFixup(local Type, localID TypeID, target Type, targetID TypeID
  */
 type coreAccessor []int
 
-func parseCoreAccessor(accessor string) (coreAccessor, error) {
+func parseCOREAccessor(accessor string) (coreAccessor, error) {
 	if accessor == "" {
 		return nil, fmt.Errorf("empty accessor")
 	}
@@ -508,18 +533,73 @@ func (ca coreAccessor) enumValue(t Type) (*EnumValue, error) {
 	return &e.Values[i], nil
 }
 
+// coreField represents the position of a "child" of a composite type from the
+// start of that type.
+//
+//     /- start of composite
+//     | offset * 8 | bitfieldOffset | bitfieldSize | ... |
+//                  \- start of field       end of field -/
 type coreField struct {
-	Type   Type
+	Type Type
+
+	// The position of the field from the start of the composite type in bytes.
 	offset uint32
+
+	// The offset of the bitfield in bits from the start of the field.
+	bitfieldOffset Bits
+
+	// The size of the bitfield in bits.
+	//
+	// Zero if the field is not a bitfield.
+	bitfieldSize Bits
 }
 
-func adjustOffset(base uint32, t Type, n int) (uint32, error) {
-	size, err := Sizeof(t)
+func (cf *coreField) adjustOffsetToNthElement(n int) error {
+	size, err := Sizeof(cf.Type)
 	if err != nil {
-		return 0, err
+		return err
 	}
 
-	return base + (uint32(n) * uint32(size) * 8), nil
+	cf.offset += uint32(n) * uint32(size)
+	return nil
+}
+
+func (cf *coreField) adjustOffsetBits(offset Bits) error {
+	align, err := alignof(cf.Type)
+	if err != nil {
+		return err
+	}
+
+	// We can compute the load offset by:
+	// 1) converting the bit offset to bytes with a flooring division.
+	// 2) dividing and multiplying that offset by the alignment, yielding the
+	//    load size aligned offset.
+	offsetBytes := uint32(offset/8) / uint32(align) * uint32(align)
+
+	// The number of bits remaining is the bit offset less the number of bits
+	// we can "skip" with the aligned offset.
+	cf.bitfieldOffset = offset - Bits(offsetBytes*8)
+
+	// We know that cf.offset is aligned at to at least align since we get it
+	// from the compiler via BTF. Adding an aligned offsetBytes preserves the
+	// alignment.
+	cf.offset += offsetBytes
+	return nil
+}
+
+func (cf *coreField) sizeBits() (Bits, error) {
+	if cf.bitfieldSize > 0 {
+		return cf.bitfieldSize, nil
+	}
+
+	// Someone is trying to access a non-bitfield via a bit shift relocation.
+	// This happens when a field changes from a bitfield to a regular field
+	// between kernel versions. Synthesise the size to make the shifts work.
+	size, err := Sizeof(cf.Type)
+	if err != nil {
+		return 0, nil
+	}
+	return Bits(size * 8), nil
 }
 
 // coreFindField descends into the local type using the accessor and tries to
@@ -527,32 +607,33 @@ func adjustOffset(base uint32, t Type, n int) (uint32, error) {
 //
 // Returns the field and the offset of the field from the start of
 // target in bits.
-func coreFindField(local Type, localAcc coreAccessor, target Type) (_, _ coreField, _ error) {
+func coreFindField(localT Type, localAcc coreAccessor, targetT Type) (coreField, coreField, error) {
+	local := coreField{Type: localT}
+	target := coreField{Type: targetT}
+
 	// The first index is used to offset a pointer of the base type like
 	// when accessing an array.
-	localOffset, err := adjustOffset(0, local, localAcc[0])
-	if err != nil {
+	if err := local.adjustOffsetToNthElement(localAcc[0]); err != nil {
 		return coreField{}, coreField{}, err
 	}
 
-	targetOffset, err := adjustOffset(0, target, localAcc[0])
-	if err != nil {
+	if err := target.adjustOffsetToNthElement(localAcc[0]); err != nil {
 		return coreField{}, coreField{}, err
 	}
 
-	if err := coreAreMembersCompatible(local, target); err != nil {
+	if err := coreAreMembersCompatible(local.Type, target.Type); err != nil {
 		return coreField{}, coreField{}, fmt.Errorf("fields: %w", err)
 	}
 
 	var localMaybeFlex, targetMaybeFlex bool
-	for _, acc := range localAcc[1:] {
-		switch localType := local.(type) {
+	for i, acc := range localAcc[1:] {
+		switch localType := local.Type.(type) {
 		case composite:
 			// For composite types acc is used to find the field in the local type,
 			// and then we try to find a field in target with the same name.
 			localMembers := localType.members()
 			if acc >= len(localMembers) {
-				return coreField{}, coreField{}, fmt.Errorf("invalid accessor %d for %s", acc, local)
+				return coreField{}, coreField{}, fmt.Errorf("invalid accessor %d for %s", acc, localType)
 			}
 
 			localMember := localMembers[acc]
@@ -563,13 +644,15 @@ func coreFindField(local Type, localAcc coreAccessor, target Type) (_, _ coreFie
 				}
 
 				// This is an anonymous struct or union, ignore it.
-				local = localMember.Type
-				localOffset += localMember.OffsetBits
+				local = coreField{
+					Type:   localMember.Type,
+					offset: local.offset + localMember.Offset.Bytes(),
+				}
 				localMaybeFlex = false
 				continue
 			}
 
-			targetType, ok := target.(composite)
+			targetType, ok := target.Type.(composite)
 			if !ok {
 				return coreField{}, coreField{}, fmt.Errorf("target not composite: %w", errImpossibleRelocation)
 			}
@@ -579,20 +662,43 @@ func coreFindField(local Type, localAcc coreAccessor, target Type) (_, _ coreFie
 				return coreField{}, coreField{}, err
 			}
 
-			if targetMember.BitfieldSize > 0 {
-				return coreField{}, coreField{}, fmt.Errorf("field %q is a bitfield: %w", targetMember.Name, ErrNotSupported)
+			local = coreField{
+				Type:         localMember.Type,
+				offset:       local.offset,
+				bitfieldSize: localMember.BitfieldSize,
+			}
+			localMaybeFlex = acc == len(localMembers)-1
+
+			target = coreField{
+				Type:         targetMember.Type,
+				offset:       target.offset,
+				bitfieldSize: targetMember.BitfieldSize,
+			}
+			targetMaybeFlex = last
+
+			if local.bitfieldSize == 0 && target.bitfieldSize == 0 {
+				local.offset += localMember.Offset.Bytes()
+				target.offset += targetMember.Offset.Bytes()
+				break
 			}
 
-			local = localMember.Type
-			localMaybeFlex = acc == len(localMembers)-1
-			localOffset += localMember.OffsetBits
-			target = targetMember.Type
-			targetMaybeFlex = last
-			targetOffset += targetMember.OffsetBits
+			// Either of the members is a bitfield. Make sure we're at the
+			// end of the accessor.
+			if next := i + 1; next < len(localAcc[1:]) {
+				return coreField{}, coreField{}, fmt.Errorf("can't descend into bitfield")
+			}
+
+			if err := local.adjustOffsetBits(localMember.Offset); err != nil {
+				return coreField{}, coreField{}, err
+			}
+
+			if err := target.adjustOffsetBits(targetMember.Offset); err != nil {
+				return coreField{}, coreField{}, err
+			}
 
 		case *Array:
 			// For arrays, acc is the index in the target.
-			targetType, ok := target.(*Array)
+			targetType, ok := target.Type.(*Array)
 			if !ok {
 				return coreField{}, coreField{}, fmt.Errorf("target not array: %w", errImpossibleRelocation)
 			}
@@ -611,17 +717,23 @@ func coreFindField(local Type, localAcc coreAccessor, target Type) (_, _ coreFie
 				return coreField{}, coreField{}, fmt.Errorf("out of bounds access of target: %w", errImpossibleRelocation)
 			}
 
-			local = localType.Type
+			local = coreField{
+				Type:   localType.Type,
+				offset: local.offset,
+			}
 			localMaybeFlex = false
-			localOffset, err = adjustOffset(localOffset, local, acc)
-			if err != nil {
+
+			if err := local.adjustOffsetToNthElement(acc); err != nil {
 				return coreField{}, coreField{}, err
 			}
 
-			target = targetType.Type
+			target = coreField{
+				Type:   targetType.Type,
+				offset: target.offset,
+			}
 			targetMaybeFlex = false
-			targetOffset, err = adjustOffset(targetOffset, target, acc)
-			if err != nil {
+
+			if err := target.adjustOffsetToNthElement(acc); err != nil {
 				return coreField{}, coreField{}, err
 			}
 
@@ -629,12 +741,12 @@ func coreFindField(local Type, localAcc coreAccessor, target Type) (_, _ coreFie
 			return coreField{}, coreField{}, fmt.Errorf("relocate field of %T: %w", localType, ErrNotSupported)
 		}
 
-		if err := coreAreMembersCompatible(local, target); err != nil {
+		if err := coreAreMembersCompatible(local.Type, target.Type); err != nil {
 			return coreField{}, coreField{}, err
 		}
 	}
 
-	return coreField{local, localOffset}, coreField{target, targetOffset}, nil
+	return local, target, nil
 }
 
 // coreFindMember finds a member in a composite type while handling anonymous
@@ -646,7 +758,7 @@ func coreFindMember(typ composite, name string) (Member, bool, error) {
 
 	type offsetTarget struct {
 		composite
-		offset uint32
+		offset Bits
 	}
 
 	targets := []offsetTarget{{typ, 0}}
@@ -670,7 +782,7 @@ func coreFindMember(typ composite, name string) (Member, bool, error) {
 		for j, member := range members {
 			if member.Name == name {
 				// NB: This is safe because member is a copy.
-				member.OffsetBits += target.offset
+				member.Offset += target.offset
 				return member, j == len(members)-1, nil
 			}
 
@@ -685,7 +797,7 @@ func coreFindMember(typ composite, name string) (Member, bool, error) {
 				return Member{}, false, fmt.Errorf("anonymous non-composite type %T not allowed", member.Type)
 			}
 
-			targets = append(targets, offsetTarget{comp, target.offset + member.OffsetBits})
+			targets = append(targets, offsetTarget{comp, target.offset + member.Offset})
 		}
 	}
 
@@ -704,9 +816,9 @@ func coreFindEnumValue(local Type, localAcc coreAccessor, target Type) (localVal
 		return nil, nil, errImpossibleRelocation
 	}
 
-	localName := essentialName(localValue.Name)
+	localName := newEssentialName(localValue.Name)
 	for i, targetValue := range targetEnum.Values {
-		if essentialName(targetValue.Name) != localName {
+		if newEssentialName(targetValue.Name) != localName {
 			continue
 		}
 
@@ -759,14 +871,8 @@ func coreAreTypesCompatible(localType Type, targetType Type) error {
 		}
 
 		switch lv := (localType).(type) {
-		case *Void, *Struct, *Union, *Enum, *Fwd:
+		case *Void, *Struct, *Union, *Enum, *Fwd, *Int:
 			// Nothing to do here
-
-		case *Int:
-			tv := targetType.(*Int)
-			if lv.isBitfield() || tv.isBitfield() {
-				return fmt.Errorf("bitfield: %w", errImpossibleRelocation)
-			}
 
 		case *Pointer, *Array:
 			depth++
@@ -831,7 +937,7 @@ func coreAreMembersCompatible(localType Type, targetType Type) error {
 			return nil
 		}
 
-		if essentialName(a) == essentialName(b) {
+		if newEssentialName(a) == newEssentialName(b) {
 			return nil
 		}
 
@@ -849,7 +955,7 @@ func coreAreMembersCompatible(localType Type, targetType Type) error {
 	}
 
 	switch lv := localType.(type) {
-	case *Array, *Pointer, *Float:
+	case *Array, *Pointer, *Float, *Int:
 		return nil
 
 	case *Enum:
@@ -860,29 +966,7 @@ func coreAreMembersCompatible(localType Type, targetType Type) error {
 		tv := targetType.(*Fwd)
 		return doNamesMatch(lv.Name, tv.Name)
 
-	case *Int:
-		tv := targetType.(*Int)
-		if lv.isBitfield() || tv.isBitfield() {
-			return fmt.Errorf("bitfield: %w", errImpossibleRelocation)
-		}
-		return nil
-
 	default:
 		return fmt.Errorf("type %s: %w", localType, ErrNotSupported)
 	}
-}
-
-func skipQualifierAndTypedef(typ Type) (Type, error) {
-	result := typ
-	for depth := 0; depth <= maxTypeDepth; depth++ {
-		switch v := (result).(type) {
-		case qualifier:
-			result = v.qualify()
-		case *Typedef:
-			result = v.Type
-		default:
-			return result, nil
-		}
-	}
-	return nil, errors.New("exceeded type depth")
 }

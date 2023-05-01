@@ -11,7 +11,7 @@ import (
 type MapType uint32
 
 // Max returns the latest supported MapType.
-func (_ MapType) Max() MapType {
+func (MapType) Max() MapType {
 	return maxMapType - 1
 }
 
@@ -103,12 +103,6 @@ const (
 	maxMapType
 )
 
-// Deprecated: StructOpts was a typo, use StructOpsMap instead.
-//
-// Declared as a variable to prevent stringer from picking it up
-// as an enum value.
-var StructOpts MapType = StructOpsMap
-
 // hasPerCPUValue returns true if the Map stores a value per CPU.
 func (mt MapType) hasPerCPUValue() bool {
 	return mt == PerCPUHash || mt == PerCPUArray || mt == LRUCPUHash || mt == PerCPUCGroupStorage
@@ -126,11 +120,22 @@ func (mt MapType) canStoreProgram() bool {
 	return mt == ProgramArray
 }
 
+// hasBTF returns true if the map type supports BTF key/value metadata.
+func (mt MapType) hasBTF() bool {
+	switch mt {
+	case PerfEventArray, CGroupArray, StackTrace, ArrayOfMaps, HashOfMaps, DevMap,
+		DevMapHash, CPUMap, XSKMap, SockMap, SockHash, Queue, Stack, RingBuf:
+		return false
+	default:
+		return true
+	}
+}
+
 // ProgramType of the eBPF program
 type ProgramType uint32
 
 // Max return the latest supported ProgramType.
-func (_ ProgramType) Max() ProgramType {
+func (ProgramType) Max() ProgramType {
 	return maxProgramType - 1
 }
 
@@ -167,6 +172,7 @@ const (
 	Extension
 	LSM
 	SkLookup
+	Syscall
 	maxProgramType
 )
 

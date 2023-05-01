@@ -1,7 +1,7 @@
 //go:build !386 && !amd64p32 && !arm && !mipsle && !mips64p32le && !armbe && !mips && !mips64p32
 // +build !386,!amd64p32,!arm,!mipsle,!mips64p32le,!armbe,!mips,!mips64p32
 
-package internal
+package sys
 
 import (
 	"unsafe"
