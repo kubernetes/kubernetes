@@ -720,6 +720,46 @@ foo:
 `),
 		},
 	},
+	{
+		Description: "$deleteFromPrimitiveList should delete item from a list with merge patch strategy",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingIntList:
+  - 1
+  - 2
+  - 3
+`),
+			TwoWay: []byte(`
+$deleteFromPrimitiveList/mergingIntList:
+  - 2
+`),
+			Modified: []byte(`
+mergingIntList:
+  - 1
+  - 3
+`),
+		},
+	},
+	{
+		Description: "$deleteFromPrimitiveList should delete item from a list without merge patch strategy",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+nonMergingIntList:
+  - 1
+  - 2
+  - 3
+`),
+			TwoWay: []byte(`
+$deleteFromPrimitiveList/nonMergingIntList:
+  - 2
+`),
+			Modified: []byte(`
+nonMergingIntList:
+  - 1
+  - 3
+`),
+		},
+	},
 }
 
 func TestCustomStrategicMergePatch(t *testing.T) {
