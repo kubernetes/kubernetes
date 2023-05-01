@@ -2233,7 +2233,7 @@ parameters:
 * CNI is the same as v1.9: v0.6.0 ([#51250](https://github.com/kubernetes/kubernetes/pull/51250))
 * CSI is updated to 0.2.0 as compared to 0.1.0 in v1.9. ([#60736](https://github.com/kubernetes/kubernetes/pull/60736))
 * The dashboard add-on has been updated to v1.8.3, as compared to 1.8.0 in v1.9. ([#57326](https://github.com/kubernetes/kubernetes/pull/57326))
-* Heapster has is the same as v1.9: v1.5.0. It will be upgraded in v1.11. ([ref](https://github.com/kubernetes/kubernetes/blob/master/cluster/addons/cluster-monitoring/google/heapster-controller.yaml))
+* Heapster has is the same as v1.9: v1.5.0. It will be upgraded in v1.11. ([ref](https://github.com/kubernetes/kubernetes/blob/release-1.10/cluster/addons/cluster-monitoring/google/heapster-controller.yaml))
 * Cluster Autoscaler has been updated to v1.2.0. ([#60842](https://github.com/kubernetes/kubernetes/pull/60842), [@mwielgus](https://github.com/mwielgus))
 * Updates kube-dns to v1.14.8 ([#57918](https://github.com/kubernetes/kubernetes/pull/57918), [@rramkumar1](https://github.com/rramkumar1))
 * Influxdb is unchanged from v1.9: v1.3.3 ([#53319](https://github.com/kubernetes/kubernetes/pull/53319))
