@@ -19,6 +19,7 @@ package polymorphichelpers
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -223,5 +224,78 @@ func newPodList(count, isUnready, isUnhealthy int, labels map[string]string) *co
 	}
 	return &corev1.PodList{
 		Items: pods,
+	}
+}
+
+func TestGetPodCondition(t *testing.T) {
+	tests := []struct {
+		name string
+		pod  *corev1.Pod
+		cond corev1.PodConditionType
+		err  string
+	}{
+		{
+			name: "pod nil",
+			pod:  nil,
+			err:  "cannot be nil",
+			cond: "",
+		},
+		{
+			name: "happy path",
+			pod: &corev1.Pod{
+				Status: corev1.PodStatus{
+					Conditions: []corev1.PodCondition{
+						{
+							Type: corev1.PodReady,
+						},
+					},
+				},
+			},
+			cond: corev1.PodReady,
+			err:  "",
+		},
+		{
+			name: "not found",
+			pod: &corev1.Pod{
+				Status: corev1.PodStatus{
+					Conditions: []corev1.PodCondition{
+						{
+							Type: corev1.PodReady,
+						},
+					},
+				},
+			},
+			cond: corev1.ContainersReady,
+			err:  "not found",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			pc, err := GetPodCondition(tc.pod, tc.cond)
+
+			if tc.err != "" {
+				if err == nil {
+					t.Fatalf("expected error but did not produce")
+				}
+				if m := err.Error(); !strings.Contains(m, tc.err) {
+					t.Fatalf("expected err to contain: %s got: %v", tc.err, m)
+				}
+				if pc != nil {
+					t.Fatalf("got err: %v but pc not nil: %v", err, pc)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if tc.cond != "" {
+				if tc.cond != pc.Type {
+					t.Fatalf("expected type: %s got: %s", tc.cond, pc.Type)
+				}
+			}
+		})
 	}
 }

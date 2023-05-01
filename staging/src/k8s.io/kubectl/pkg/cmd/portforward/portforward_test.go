@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -54,7 +55,8 @@ func testPortForward(t *testing.T, flags map[string]string, args []string) {
 		name            string
 		podPath, pfPath string
 		pod             *corev1.Pod
-		pfErr           bool
+		hasErr          bool
+		pfErr           string
 	}{
 		{
 			name:    "pod portforward",
@@ -67,7 +69,35 @@ func testPortForward(t *testing.T, flags map[string]string, args []string) {
 			podPath: "/api/" + version + "/namespaces/test/pods/foo",
 			pfPath:  "/api/" + version + "/namespaces/test/pods/foo/portforward",
 			pod:     execPod(),
-			pfErr:   true,
+			hasErr:  true,
+			pfErr:   "pf error",
+		},
+		{
+			name:    "pod not ready",
+			podPath: "/api/" + version + "/namespaces/test/pods/foo",
+			pfPath:  "/api/" + version + "/namespaces/test/pods/foo/portforward",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
+				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyAlways,
+					DNSPolicy:     corev1.DNSClusterFirst,
+					Containers: []corev1.Container{
+						{
+							Name: "bar",
+						},
+					},
+				},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodRunning,
+					Conditions: []corev1.PodCondition{
+						{
+							Type: corev1.PodInitialized,
+						},
+					},
+				},
+			},
+			hasErr: true,
+			pfErr:  "not found",
 		},
 	}
 	for _, test := range tests {
@@ -96,8 +126,8 @@ func testPortForward(t *testing.T, flags map[string]string, args []string) {
 			}
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 			ff := &fakePortForwarder{}
-			if test.pfErr {
-				ff.pfErr = fmt.Errorf("pf error")
+			if test.hasErr {
+				ff.pfErr = fmt.Errorf(test.pfErr)
 			}
 
 			opts := &PortForwardOptions{}
@@ -118,13 +148,13 @@ func testPortForward(t *testing.T, flags map[string]string, args []string) {
 			}
 			cmd.Run(cmd, args)
 
-			if test.pfErr && err != ff.pfErr {
+			if test.hasErr && !strings.Contains(err.Error(), ff.pfErr.Error()) {
 				t.Errorf("%s: Unexpected port-forward error: %v", test.name, err)
 			}
-			if !test.pfErr && err != nil {
+			if !test.hasErr && err != nil {
 				t.Errorf("%s: Unexpected error: %v", test.name, err)
 			}
-			if test.pfErr {
+			if test.hasErr {
 				return
 			}
 
@@ -653,6 +683,11 @@ func execPod() *corev1.Pod {
 		},
 		Status: corev1.PodStatus{
 			Phase: corev1.PodRunning,
+			Conditions: []corev1.PodCondition{
+				{
+					Type: corev1.PodReady,
+				},
+			},
 		},
 	}
 }

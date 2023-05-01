@@ -18,6 +18,7 @@ package polymorphichelpers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"time"
@@ -78,6 +79,22 @@ func GetFirstPod(client coreclient.PodsGetter, namespace string, selector string
 		return nil, 0, fmt.Errorf("%#v is not a pod event", event)
 	}
 	return pod, 1, nil
+}
+
+// GetPodCondition returns the condition for the passed in pod and condition type.
+// It returns an error if the condition is not found.
+func GetPodCondition(pod *corev1.Pod, condition corev1.PodConditionType) (*corev1.PodCondition, error) {
+	if pod == nil {
+		return nil, errors.New("pod cannot be nil")
+	}
+
+	for _, c := range pod.Status.Conditions {
+		if c.Type == condition {
+			return &c, nil
+		}
+	}
+
+	return nil, fmt.Errorf("condition '%s' not found", condition)
 }
 
 // SelectorsForObject returns the pod label selector for a given object

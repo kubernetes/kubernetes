@@ -393,7 +393,16 @@ func (o PortForwardOptions) RunPortForward() error {
 	}
 
 	if pod.Status.Phase != corev1.PodRunning {
-		return fmt.Errorf("unable to forward port because pod is not running. Current status=%v", pod.Status.Phase)
+		return fmt.Errorf("unable to forward port because pod phase is not running. Current phase=%v", pod.Status.Phase)
+	}
+
+	readyCondition, err := polymorphichelpers.GetPodCondition(pod, corev1.PodReady)
+	if err != nil {
+		return fmt.Errorf("unable to fetch Ready condition for pod %s: %w", pod.Name, err)
+	}
+
+	if readyCondition.Status == corev1.ConditionFalse {
+		return fmt.Errorf("unable to forward port because chosen pod '%s' Ready condition is False.", pod.Name)
 	}
 
 	signals := make(chan os.Signal, 1)
