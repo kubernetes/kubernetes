@@ -1605,8 +1605,8 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	}
 
 	// set all Kubelet-owned conditions
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodHasNetworkCondition) {
-		s.Conditions = append(s.Conditions, status.GeneratePodHasNetworkCondition(pod, podStatus))
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodReadyToStartContainersCondition) {
+		s.Conditions = append(s.Conditions, status.GeneratePodReadyToStartContainersCondition(pod, podStatus))
 	}
 	s.Conditions = append(s.Conditions, status.GeneratePodInitializedCondition(&pod.Spec, s.InitContainerStatuses, s.Phase))
 	s.Conditions = append(s.Conditions, status.GeneratePodReadyCondition(&pod.Spec, s.Conditions, s.ContainerStatuses, s.Phase))
