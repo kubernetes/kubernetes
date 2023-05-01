@@ -260,6 +260,7 @@ RUN_CCM_CONTROLLERS="${RUN_CCM_CONTROLLERS:-*,-gkenetworkparamset}"
 
 # List of the set of feature gates recognized by the GCP CCM
 export CCM_FEATURE_GATES="APIListChunking,APIPriorityAndFairness,APIResponseCompression,APIServerIdentity,APIServerTracing,AllAlpha,AllBeta,CustomResourceValidationExpressions,KMSv2,OpenAPIEnums,OpenAPIV3,RemainingItemCount,ServerSideFieldValidation,StorageVersionAPI,StorageVersionHash"
+export KUBELET_FEATURE_GATES="DisableKubeletCloudCredentialProviders"
 
 # Optional: set feature gates
 # shellcheck disable=SC2034 # Variables sourced in other scripts.

@@ -1632,7 +1632,29 @@ function start-kubelet {
     kubelet_cgroup_driver="--cgroup-driver=systemd"
   fi
 
-  local kubelet_opts="${KUBELET_ARGS} ${KUBELET_CONFIG_FILE_ARG:-} ${kubelet_cgroup_driver:-}"
+
+  if [[ -n "${FEATURE_GATES:-}" ]]; then
+    # remove non-kubelet feature gates
+    # if given a feature gate it doesn't recognize
+    echo "Setting feature gates for kubelet from ${KUBELET_FEATURE_GATES}"
+    local KUBELET_FEATURE_GATES_FILTER
+    KUBELET_FEATURE_GATES_FILTER=$(echo "${KUBELET_FEATURE_GATES}" | sed "s/^/(/" | sed "s/,/=[^,]*|/g" | sed "s/$/=[^,]*)/")
+    echo "Computing safe feature gates for kubelet from ${FEATURE_GATES} and filter ${KUBELET_FEATURE_GATES_FILTER}"
+    local safe_feature_gates
+    safe_feature_gates=$(echo "${FEATURE_GATES}" | { grep -E -o "(${KUBELET_FEATURE_GATES_FILTER})" || true; } | tr "\n" "," | sed "s/,$//")
+    echo "Setting safe feature gates for kubelet with ${safe_feature_gates}"
+    if [[ -n "${safe_feature_gates:-}" ]]; then
+      feature_gates=("--feature-gates=${safe_feature_gates}")
+      echo "Computing unsafe feature gates for kubelet from ${KUBELET_FEATURE_GATES_FILTER}"
+      local filtered_feature_gates
+      filtered_feature_gates=$(echo "${FEATURE_GATES}" | sed "s/,/\n/g" | { grep -E -v "(${KUBELET_FEATURE_GATES_FILTER})" || true; } | sed -z "s/\n/,/g;s/,$/\n/")
+      echo "Feature gates that did not pass through the GCP filter:" "${filtered_feature_gates}"
+    else
+      echo "None of the given feature gates (${FEATURE_GATES}) were found to be safe to pass to the kubelet"
+    fi
+  fi
+
+  local kubelet_opts="${KUBELET_ARGS} ${KUBELET_CONFIG_FILE_ARG:-} ${kubelet_cgroup_driver:-} ${feature_gates:-}"
   echo "KUBELET_OPTS=\"${kubelet_opts}\"" > "${kubelet_env_file}"
   echo "KUBE_COVERAGE_FILE=\"/var/log/kubelet.cov\"" >> "${kubelet_env_file}"
 
