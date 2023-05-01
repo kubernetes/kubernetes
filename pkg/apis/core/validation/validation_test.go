@@ -8895,7 +8895,6 @@ func TestValidatePodSpec(t *testing.T) {
 		"bad supplementalGroups large than math.MaxInt32": {
 			Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &core.PodSecurityContext{
-				HostNetwork:        false,
 				SupplementalGroups: []int64{maxGroupID, 1234},
 			},
 			RestartPolicy: core.RestartPolicyAlways,
@@ -8904,7 +8903,6 @@ func TestValidatePodSpec(t *testing.T) {
 		"bad supplementalGroups less than 0": {
 			Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &core.PodSecurityContext{
-				HostNetwork:        false,
 				SupplementalGroups: []int64{minGroupID, 1234},
 			},
 			RestartPolicy: core.RestartPolicyAlways,
@@ -8913,8 +8911,7 @@ func TestValidatePodSpec(t *testing.T) {
 		"bad runAsUser large than math.MaxInt32": {
 			Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &core.PodSecurityContext{
-				HostNetwork: false,
-				RunAsUser:   &maxUserID,
+				RunAsUser: &maxUserID,
 			},
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
@@ -8922,8 +8919,7 @@ func TestValidatePodSpec(t *testing.T) {
 		"bad runAsUser less than 0": {
 			Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &core.PodSecurityContext{
-				HostNetwork: false,
-				RunAsUser:   &minUserID,
+				RunAsUser: &minUserID,
 			},
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
@@ -8931,8 +8927,7 @@ func TestValidatePodSpec(t *testing.T) {
 		"bad fsGroup large than math.MaxInt32": {
 			Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &core.PodSecurityContext{
-				HostNetwork: false,
-				FSGroup:     &maxGroupID,
+				FSGroup: &maxGroupID,
 			},
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
@@ -8940,8 +8935,7 @@ func TestValidatePodSpec(t *testing.T) {
 		"bad fsGroup less than 0": {
 			Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &core.PodSecurityContext{
-				HostNetwork: false,
-				FSGroup:     &minGroupID,
+				FSGroup: &minGroupID,
 			},
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
@@ -15381,6 +15375,30 @@ func TestValidateReplicationController(t *testing.T) {
 			},
 		},
 	}
+	hostnetPodTemplate := core.PodTemplate{
+		Template: core.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: validSelector,
+			},
+			Spec: core.PodSpec{
+				SecurityContext: &core.PodSecurityContext{
+					HostNetwork: true,
+				},
+				RestartPolicy: core.RestartPolicyAlways,
+				DNSPolicy:     core.DNSClusterFirst,
+				Containers: []core.Container{{
+					Name:                     "abc",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+					Ports: []core.ContainerPort{{
+						ContainerPort: 12345,
+						Protocol:      core.ProtocolTCP,
+					}},
+				}},
+			},
+		},
+	}
 	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	invalidPodTemplate := core.PodTemplate{
 		Template: core.PodTemplateSpec{
@@ -15412,8 +15430,14 @@ func TestValidateReplicationController(t *testing.T) {
 			Selector: validSelector,
 			Template: &readWriteVolumePodTemplate.Template,
 		},
-	},
-	}
+	}, {
+		ObjectMeta: metav1.ObjectMeta{Name: "hostnet", Namespace: metav1.NamespaceDefault},
+		Spec: core.ReplicationControllerSpec{
+			Replicas: 1,
+			Selector: validSelector,
+			Template: &hostnetPodTemplate.Template,
+		},
+	}}
 	for _, successCase := range successCases {
 		if errs := ValidateReplicationController(&successCase, PodValidationOptions{}); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)

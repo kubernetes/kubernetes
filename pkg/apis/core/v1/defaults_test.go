@@ -47,14 +47,12 @@ func TestWorkloadDefaults(t *testing.T) {
 	t.Run("disabled_features", func(t *testing.T) { testWorkloadDefaults(t, false) })
 }
 func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
-	features := utilfeature.DefaultFeatureGate.DeepCopy().GetAll()
-	for feature, featureSpec := range features {
+	allFeatures := utilfeature.DefaultFeatureGate.DeepCopy().GetAll()
+	for feature, featureSpec := range allFeatures {
 		if !featureSpec.LockToDefault {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, featuresEnabled)()
 		}
 	}
-	rc := &v1.ReplicationController{Spec: v1.ReplicationControllerSpec{Template: &v1.PodTemplateSpec{}}}
-	template := rc.Spec.Template
 	// New defaults under PodTemplateSpec are only acceptable if they would not be applied when reading data from a previous release.
 	// Forbidden: adding a new field `MyField *bool` and defaulting it to a non-nil value
 	// Forbidden: defaulting an existing field `MyField *bool` when it was previously not defaulted
@@ -177,11 +175,59 @@ func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
 		".Spec.Volumes[0].VolumeSource.ScaleIO.StorageMode":                                           `"ThinProvisioned"`,
 		".Spec.Volumes[0].VolumeSource.Secret.DefaultMode":                                            `420`,
 	}
-	defaults := detectDefaults(t, rc, reflect.ValueOf(template))
-	if !reflect.DeepEqual(expectedDefaults, defaults) {
-		t.Errorf("Defaults for PodTemplateSpec changed. This can cause spurious rollouts of workloads on API server upgrade.")
-		t.Logf(cmp.Diff(expectedDefaults, defaults))
-	}
+	t.Run("empty PodTemplateSpec", func(t *testing.T) {
+		rc := &v1.ReplicationController{Spec: v1.ReplicationControllerSpec{Template: &v1.PodTemplateSpec{}}}
+		template := rc.Spec.Template
+		defaults := detectDefaults(t, rc, reflect.ValueOf(template))
+		if !reflect.DeepEqual(expectedDefaults, defaults) {
+			t.Errorf("Defaults for PodTemplateSpec changed. This can cause spurious rollouts of workloads on API server upgrade.")
+			t.Logf(cmp.Diff(expectedDefaults, defaults))
+		}
+	})
+	t.Run("hostnet PodTemplateSpec with ports", func(t *testing.T) {
+		rc := &v1.ReplicationController{
+			Spec: v1.ReplicationControllerSpec{
+				Template: &v1.PodTemplateSpec{
+					Spec: v1.PodSpec{
+						HostNetwork: true,
+						Containers: []v1.Container{{
+							Ports: []v1.ContainerPort{{
+								ContainerPort: 12345,
+								Protocol:      v1.ProtocolTCP,
+							}},
+						}},
+					},
+				},
+			},
+		}
+		template := rc.Spec.Template
+		defaults := detectDefaults(t, rc, reflect.ValueOf(template))
+		expected := func() map[string]string {
+			// Set values that are known inputs
+			m := map[string]string{
+				".Spec.HostNetwork":                          "true",
+				".Spec.Containers[0].Ports[0].ContainerPort": "12345",
+			}
+			if utilfeature.DefaultFeatureGate.Enabled(features.DefaultHostNetworkHostPortsInPodTemplates) {
+				m[".Spec.Containers"] = `[{"name":"","ports":[{"hostPort":12345,"containerPort":12345,"protocol":"TCP"}],"resources":{},"terminationMessagePath":"/dev/termination-log","terminationMessagePolicy":"File","imagePullPolicy":"IfNotPresent"}]`
+				m[".Spec.Containers[0].Ports"] = `[{"hostPort":12345,"containerPort":12345,"protocol":"TCP"}]`
+				m[".Spec.Containers[0].Ports[0].HostPort"] = "12345"
+			} else {
+				m[".Spec.Containers"] = `[{"name":"","ports":[{"containerPort":12345,"protocol":"TCP"}],"resources":{},"terminationMessagePath":"/dev/termination-log","terminationMessagePolicy":"File","imagePullPolicy":"IfNotPresent"}]`
+				m[".Spec.Containers[0].Ports"] = `[{"containerPort":12345,"protocol":"TCP"}]`
+			}
+			for k, v := range expectedDefaults {
+				if _, found := m[k]; !found {
+					m[k] = v
+				}
+			}
+			return m
+		}()
+		if !reflect.DeepEqual(expected, defaults) {
+			t.Errorf("Defaults for PodTemplateSpec changed. This can cause spurious rollouts of workloads on API server upgrade.")
+			t.Logf(cmp.Diff(expected, defaults))
+		}
+	})
 }
 
 // TestPodDefaults detects changes to defaults within PodSpec.
@@ -330,6 +376,78 @@ func testPodDefaults(t *testing.T, featuresEnabled bool) {
 	}
 }
 
+func TestPodHostNetworkDefaults(t *testing.T) {
+	cases := []struct {
+		name                 string
+		gate                 bool
+		hostNet              bool
+		expectPodDefault     bool
+		expectPodSpecDefault bool
+	}{{
+		name:                 "gate disabled, hostNetwork=false",
+		gate:                 false,
+		hostNet:              false,
+		expectPodDefault:     false,
+		expectPodSpecDefault: false,
+	}, {
+		name:                 "gate disabled, hostNetwork=true",
+		gate:                 false,
+		hostNet:              true,
+		expectPodDefault:     true,
+		expectPodSpecDefault: false,
+	}, {
+		name:                 "gate enabled, hostNetwork=false",
+		gate:                 true,
+		hostNet:              false,
+		expectPodDefault:     false,
+		expectPodSpecDefault: false,
+	}, {
+		name:                 "gate enabled, hostNetwork=true",
+		gate:                 true,
+		hostNet:              true,
+		expectPodDefault:     true,
+		expectPodSpecDefault: true,
+	}}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DefaultHostNetworkHostPortsInPodTemplates, tc.gate)()
+
+			const portNum = 12345
+			spec := v1.PodSpec{
+				HostNetwork: tc.hostNet,
+				Containers: []v1.Container{{
+					Ports: []v1.ContainerPort{{
+						ContainerPort: portNum,
+						Protocol:      v1.ProtocolTCP,
+						// Note: HostPort is not set
+					}},
+				}},
+			}
+
+			// Test Pod defaulting.
+			p := v1.Pod{Spec: *spec.DeepCopy()}
+			corev1.SetDefaults_Pod(&p)
+			if got := p.Spec.Containers[0].Ports[0].HostPort; tc.expectPodDefault && got == 0 {
+				t.Errorf("expected Pod HostPort to be defaulted, got %v", got)
+			}
+			if got := p.Spec.Containers[0].Ports[0].HostPort; !tc.expectPodDefault && got != 0 {
+				t.Errorf("expected Pod HostPort to be 0, got %v", got)
+			}
+
+			// Test PodSpec defaulting.
+			s := spec.DeepCopy()
+			corev1.SetDefaults_PodSpec(s)
+			if got := s.Containers[0].Ports[0].HostPort; tc.expectPodSpecDefault && got == 0 {
+				t.Errorf("expected PodSpec HostPort to be defaulted, got %v", got)
+			}
+			if got := s.Containers[0].Ports[0].HostPort; !tc.expectPodSpecDefault && got != 0 {
+				t.Errorf("expected PodSpec HostPort to be 0, got %v", got)
+			}
+		})
+	}
+}
+
 type testPath struct {
 	path  string
 	value reflect.Value
@@ -359,9 +477,12 @@ func detectDefaults(t *testing.T, obj runtime.Object, v reflect.Value) map[strin
 
 		case visit.value.Kind() == reflect.Slice:
 			if !visit.value.IsNil() {
-				// if we already have a value, we got defaulted
+				// if we already have a value, we either got defaulted or there
+				// was a fixed input - flag it and see if we can descend
+				// anyway.
 				marshaled, _ := json.Marshal(defaultedV.Interface())
 				defaults[visit.path] = string(marshaled)
+				toVisit = append(toVisit, testPath{path: visit.path + "[0]", value: visit.value.Index(0)})
 			} else if visit.value.Type().Elem().Kind() == reflect.Struct {
 				if strings.HasPrefix(visit.path, ".ObjectMeta.ManagedFields[") {
 					break
