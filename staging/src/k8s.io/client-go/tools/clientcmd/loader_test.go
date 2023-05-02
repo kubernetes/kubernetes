@@ -26,6 +26,8 @@ import (
 	"strings"
 	"testing"
 
+	utiltesting "k8s.io/client-go/util/testing"
+
 	"github.com/google/go-cmp/cmp"
 	"sigs.k8s.io/yaml"
 
@@ -132,7 +134,7 @@ func TestToleratingMissingFiles(t *testing.T) {
 
 func TestErrorReadingFile(t *testing.T) {
 	commandLineFile, _ := os.CreateTemp("", "")
-	defer os.Remove(commandLineFile.Name())
+	defer utiltesting.CloseAndRemove(t, commandLineFile)
 
 	if err := os.WriteFile(commandLineFile.Name(), []byte("bogus value"), 0644); err != nil {
 		t.Fatalf("Error creating tempfile: %v", err)
@@ -173,9 +175,8 @@ func TestErrorReadingNonFile(t *testing.T) {
 
 func TestConflictingCurrentContext(t *testing.T) {
 	commandLineFile, _ := os.CreateTemp("", "")
-	defer os.Remove(commandLineFile.Name())
 	envVarFile, _ := os.CreateTemp("", "")
-	defer os.Remove(envVarFile.Name())
+	defer utiltesting.CloseAndRemove(t, commandLineFile, envVarFile)
 
 	mockCommandLineConfig := clientcmdapi.Config{
 		CurrentContext: "any-context-value",
@@ -254,7 +255,7 @@ users: null
 
 func TestLoadingEmptyMaps(t *testing.T) {
 	configFile, _ := os.CreateTemp("", "")
-	defer os.Remove(configFile.Name())
+	defer utiltesting.CloseAndRemove(t, configFile)
 
 	mockConfig := clientcmdapi.Config{
 		CurrentContext: "any-context-value",
@@ -280,7 +281,7 @@ func TestLoadingEmptyMaps(t *testing.T) {
 
 func TestDuplicateClusterName(t *testing.T) {
 	configFile, _ := os.CreateTemp("", "")
-	defer os.Remove(configFile.Name())
+	defer utiltesting.CloseAndRemove(t, configFile)
 
 	err := os.WriteFile(configFile.Name(), []byte(`
 kind: Config
@@ -322,7 +323,7 @@ users:
 
 func TestDuplicateContextName(t *testing.T) {
 	configFile, _ := os.CreateTemp("", "")
-	defer os.Remove(configFile.Name())
+	defer utiltesting.CloseAndRemove(t, configFile)
 
 	err := os.WriteFile(configFile.Name(), []byte(`
 kind: Config
@@ -364,7 +365,7 @@ users:
 
 func TestDuplicateUserName(t *testing.T) {
 	configFile, _ := os.CreateTemp("", "")
-	defer os.Remove(configFile.Name())
+	defer utiltesting.CloseAndRemove(t, configFile)
 
 	err := os.WriteFile(configFile.Name(), []byte(`
 kind: Config
@@ -404,7 +405,7 @@ users:
 
 func TestDuplicateExtensionName(t *testing.T) {
 	configFile, _ := os.CreateTemp("", "")
-	defer os.Remove(configFile.Name())
+	defer utiltesting.CloseAndRemove(t, configFile)
 
 	err := os.WriteFile(configFile.Name(), []byte(`
 kind: Config
@@ -560,7 +561,7 @@ func TestResolveRelativePaths(t *testing.T) {
 
 func TestMigratingFile(t *testing.T) {
 	sourceFile, _ := os.CreateTemp("", "")
-	defer os.Remove(sourceFile.Name())
+	defer utiltesting.CloseAndRemove(t, sourceFile)
 	destinationFile, _ := os.CreateTemp("", "")
 	// delete the file so that we'll write to it
 	os.Remove(destinationFile.Name())
@@ -574,9 +575,8 @@ func TestMigratingFile(t *testing.T) {
 	if _, err := loadingRules.Load(); err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
-
 	// the load should have recreated this file
-	defer os.Remove(destinationFile.Name())
+	defer utiltesting.CloseAndRemove(t, destinationFile)
 
 	sourceContent, err := os.ReadFile(sourceFile.Name())
 	if err != nil {
@@ -594,9 +594,8 @@ func TestMigratingFile(t *testing.T) {
 
 func TestMigratingFileLeaveExistingFileAlone(t *testing.T) {
 	sourceFile, _ := os.CreateTemp("", "")
-	defer os.Remove(sourceFile.Name())
 	destinationFile, _ := os.CreateTemp("", "")
-	defer os.Remove(destinationFile.Name())
+	defer utiltesting.CloseAndRemove(t, sourceFile, destinationFile)
 
 	WriteToFile(testConfigAlfa, sourceFile.Name())
 
@@ -622,7 +621,7 @@ func TestMigratingFileSourceMissingSkip(t *testing.T) {
 	sourceFilename := "some-missing-file"
 	destinationFile, _ := os.CreateTemp("", "")
 	// delete the file so that we'll write to it
-	os.Remove(destinationFile.Name())
+	utiltesting.CloseAndRemove(t, destinationFile)
 
 	loadingRules := ClientConfigLoadingRules{
 		MigrationRules: map[string]string{destinationFile.Name(): sourceFilename},
@@ -639,7 +638,7 @@ func TestMigratingFileSourceMissingSkip(t *testing.T) {
 
 func TestFileLocking(t *testing.T) {
 	f, _ := os.CreateTemp("", "")
-	defer os.Remove(f.Name())
+	defer utiltesting.CloseAndRemove(t, f)
 
 	err := lockFile(f.Name())
 	if err != nil {
@@ -655,9 +654,8 @@ func TestFileLocking(t *testing.T) {
 
 func Example_noMergingOnExplicitPaths() {
 	commandLineFile, _ := os.CreateTemp("", "")
-	defer os.Remove(commandLineFile.Name())
 	envVarFile, _ := os.CreateTemp("", "")
-	defer os.Remove(envVarFile.Name())
+	defer utiltesting.CloseAndRemove(&testing.T{}, commandLineFile, envVarFile)
 
 	WriteToFile(testConfigAlfa, commandLineFile.Name())
 	WriteToFile(testConfigConflictAlfa, envVarFile.Name())
@@ -704,9 +702,8 @@ func Example_noMergingOnExplicitPaths() {
 
 func Example_mergingSomeWithConflict() {
 	commandLineFile, _ := os.CreateTemp("", "")
-	defer os.Remove(commandLineFile.Name())
 	envVarFile, _ := os.CreateTemp("", "")
-	defer os.Remove(envVarFile.Name())
+	defer utiltesting.CloseAndRemove(&testing.T{}, commandLineFile, envVarFile)
 
 	WriteToFile(testConfigAlfa, commandLineFile.Name())
 	WriteToFile(testConfigConflictAlfa, envVarFile.Name())
@@ -760,13 +757,10 @@ func Example_mergingSomeWithConflict() {
 
 func Example_mergingEverythingNoConflicts() {
 	commandLineFile, _ := os.CreateTemp("", "")
-	defer os.Remove(commandLineFile.Name())
 	envVarFile, _ := os.CreateTemp("", "")
-	defer os.Remove(envVarFile.Name())
 	currentDirFile, _ := os.CreateTemp("", "")
-	defer os.Remove(currentDirFile.Name())
 	homeDirFile, _ := os.CreateTemp("", "")
-	defer os.Remove(homeDirFile.Name())
+	defer utiltesting.CloseAndRemove(&testing.T{}, commandLineFile, envVarFile, currentDirFile, homeDirFile)
 
 	WriteToFile(testConfigAlfa, commandLineFile.Name())
 	WriteToFile(testConfigBravo, envVarFile.Name())
