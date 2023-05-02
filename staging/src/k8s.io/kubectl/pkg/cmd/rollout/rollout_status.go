@@ -176,7 +176,7 @@ func (o *RolloutStatusOptions) Run() error {
 
 	resourceFound := false
 
-	return r.Visit(func(info *resource.Info, _ error) error {
+	r.Visit(func(info *resource.Info, _ error) error {
 		resourceFound = true
 		mapping := info.ResourceMapping()
 		statusViewer, err := o.StatusViewerFn(mapping)
