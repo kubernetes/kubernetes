@@ -235,6 +235,9 @@ type MemoryStats struct {
 	// Cumulative number of major page faults.
 	// +optional
 	MajorPageFaults *uint64 `json:"majorPageFaults,omitempty"`
+	// The amount of swap used
+	// +optional: enabled by feature gate NodeSwap
+	SwapBytes *uint64 `json:"swapBytes,omitempty"`
 }
 
 // AcceleratorStats contains stats for accelerators attached to the container.

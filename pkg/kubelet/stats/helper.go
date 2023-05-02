@@ -65,6 +65,7 @@ func cadvisorInfoToCPUandMemoryStats(info *cadvisorapiv2.ContainerInfo) (*statsa
 			RSSBytes:        &cstat.Memory.RSS,
 			PageFaults:      &pageFaults,
 			MajorPageFaults: &majorPageFaults,
+			SwapBytes:       &cstat.Memory.Swap,
 		}
 		// availableBytes = memory limit (if known) - workingset
 		if !isMemoryUnlimited(info.Spec.Memory.Limit) {
