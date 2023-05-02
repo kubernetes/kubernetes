@@ -22,10 +22,10 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -277,7 +277,7 @@ func getTLSConfig(t *apiserver.TLSConfig) (*tls.Config, error) {
 	}
 	certPool := x509.NewCertPool()
 	if caCert != "" {
-		certBytes, err := ioutil.ReadFile(caCert)
+		certBytes, err := os.ReadFile(caCert)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read cert file %s, got %v", caCert, err)
 		}

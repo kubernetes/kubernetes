@@ -20,7 +20,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"sync/atomic"
 	"time"
 
@@ -80,11 +80,11 @@ func (c *DynamicCertKeyPairContent) AddListener(listener Listener) {
 
 // loadCertKeyPair determines the next set of content for the file.
 func (c *DynamicCertKeyPairContent) loadCertKeyPair() error {
-	cert, err := ioutil.ReadFile(c.certFile)
+	cert, err := os.ReadFile(c.certFile)
 	if err != nil {
 		return err
 	}
-	key, err := ioutil.ReadFile(c.keyFile)
+	key, err := os.ReadFile(c.keyFile)
 	if err != nil {
 		return err
 	}
