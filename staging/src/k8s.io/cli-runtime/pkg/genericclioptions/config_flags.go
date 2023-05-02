@@ -338,7 +338,11 @@ func (f *ConfigFlags) toRESTMapper() (meta.RESTMapper, error) {
 	}
 
 	mapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
-	expander := restmapper.NewShortcutExpander(mapper, discoveryClient, nil)
+	expander := restmapper.NewShortcutExpander(mapper, discoveryClient, func(a string) {
+		if f.warningPrinter != nil {
+			f.warningPrinter.Print(a)
+		}
+	})
 	return expander, nil
 }
 

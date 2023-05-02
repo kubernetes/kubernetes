@@ -187,7 +187,7 @@ func TestKindFor(t *testing.T) {
 		}
 
 		delegate := &fakeRESTMapper{}
-		mapper := NewShortcutExpander(delegate, ds, func(a any) {
+		mapper := NewShortcutExpander(delegate, ds, func(a string) {
 			t.Fatalf("unexpected warning message %s", a)
 		})
 
@@ -244,7 +244,7 @@ func TestKindForWithNewCRDs(t *testing.T) {
 			// will answer the initial request, only failure to match will trigger
 			// the cache invalidation and live discovery call
 			delegate := NewDeferredDiscoveryRESTMapper(fakeCachedDiscovery)
-			mapper := NewShortcutExpander(delegate, fakeCachedDiscovery, func(a any) {
+			mapper := NewShortcutExpander(delegate, fakeCachedDiscovery, func(a string) {
 				t.Fatalf("unexpected warning message %s", a)
 			})
 
@@ -331,7 +331,7 @@ func TestWarnAmbigious(t *testing.T) {
 		ds.serverResourcesHandler = func() ([]*metav1.APIResourceList, error) {
 			return test.srvRes, nil
 		}
-		mapper := NewShortcutExpander(&fakeRESTMapper{}, ds, func(a any) {
+		mapper := NewShortcutExpander(&fakeRESTMapper{}, ds, func(a string) {
 			if test.expectedLog == "" {
 				t.Fatalf("unexpected warning message %s", a)
 			}

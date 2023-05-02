@@ -34,13 +34,13 @@ type shortcutExpander struct {
 
 	discoveryClient discovery.DiscoveryInterface
 
-	warningHandler func(any)
+	warningHandler func(string)
 }
 
 var _ meta.ResettableRESTMapper = shortcutExpander{}
 
 // NewShortcutExpander wraps a restmapper in a layer that expands shortcuts found via discovery
-func NewShortcutExpander(delegate meta.RESTMapper, client discovery.DiscoveryInterface, warningHandler func(any)) meta.RESTMapper {
+func NewShortcutExpander(delegate meta.RESTMapper, client discovery.DiscoveryInterface, warningHandler func(string)) meta.RESTMapper {
 	return shortcutExpander{RESTMapper: delegate, discoveryClient: client, warningHandler: warningHandler}
 }
 
