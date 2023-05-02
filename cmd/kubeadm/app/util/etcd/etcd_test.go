@@ -423,7 +423,7 @@ func TestClient_GetMemberID(t *testing.T) {
 		fields  fields
 		args    args
 		want    uint64
-		wantErr bool
+		wantErr error
 	}{
 		{
 			name: "member ID found",
@@ -447,7 +447,7 @@ func TestClient_GetMemberID(t *testing.T) {
 			args: args{
 				peerURL: "https://member1:2380",
 			},
-			wantErr: false,
+			wantErr: nil,
 			want:    1,
 		},
 		{
@@ -472,7 +472,7 @@ func TestClient_GetMemberID(t *testing.T) {
 			args: args{
 				peerURL: "https://member2:2380",
 			},
-			wantErr: false,
+			wantErr: ErrNoMemberIDForPeerURL,
 			want:    0,
 		},
 	}
@@ -484,7 +484,7 @@ func TestClient_GetMemberID(t *testing.T) {
 			}
 
 			got, err := c.GetMemberID(tt.args.peerURL)
-			if (err != nil) != tt.wantErr {
+			if !errors.Is(tt.wantErr, err) {
 				t.Errorf("Client.GetMemberID() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
