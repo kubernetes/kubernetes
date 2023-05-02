@@ -704,6 +704,7 @@ func bootstrapTestDir(t *testing.T) string {
 	// Write the certificate files to disk or fail
 	for fileName, fileData := range files {
 		if err := ioutil.WriteFile(filepath.Join(dir, fileName), fileData, 0400); err != nil {
+			os.RemoveAll(dir)
 			t.Fatal(err)
 		}
 	}
@@ -713,6 +714,10 @@ func bootstrapTestDir(t *testing.T) string {
 
 func newKubeConfigFile(config v1.Config) (string, error) {
 	configFile, err := ioutil.TempFile("", "")
+	if err != nil {
+		return "", err
+	}
+	defer configFile.Close()
 
 	if err != nil {
 		return "", fmt.Errorf("unable to create the Kubernetes client config file: %v", err)

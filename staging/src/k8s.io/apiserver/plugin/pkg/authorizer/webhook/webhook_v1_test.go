@@ -34,6 +34,8 @@ import (
 	"text/template"
 	"time"
 
+	utiltesting "k8s.io/client-go/util/testing"
+
 	"github.com/google/go-cmp/cmp"
 	authorizationv1 "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -185,7 +187,7 @@ current-context: default
 				return err
 			}
 			p := tempfile.Name()
-			defer os.Remove(p)
+			defer utiltesting.CloseAndRemove(t, tempfile)
 
 			tmpl, err := template.New("test").Parse(tt.configTmpl)
 			if err != nil {
