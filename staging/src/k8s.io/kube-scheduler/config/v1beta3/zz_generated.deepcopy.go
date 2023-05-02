@@ -40,6 +40,11 @@ func (in *DefaultPreemptionArgs) DeepCopyInto(out *DefaultPreemptionArgs) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.DisableRandomOffset != nil {
+		in, out := &in.DisableRandomOffset, &out.DisableRandomOffset
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

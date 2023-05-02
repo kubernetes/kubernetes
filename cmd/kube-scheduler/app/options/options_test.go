@@ -898,6 +898,7 @@ profiles:
 								Args: &kubeschedulerconfig.DefaultPreemptionArgs{
 									MinCandidateNodesPercentage: 10,
 									MinCandidateNodesAbsolute:   100,
+									DisableRandomOffset:         false,
 								},
 							},
 							{
@@ -1020,6 +1021,7 @@ profiles:
 								Args: &kubeschedulerconfig.DefaultPreemptionArgs{
 									MinCandidateNodesPercentage: 10,
 									MinCandidateNodesAbsolute:   100,
+									DisableRandomOffset:         false,
 								},
 							},
 							{
@@ -1135,6 +1137,7 @@ profiles:
 								Args: &kubeschedulerconfig.DefaultPreemptionArgs{
 									MinCandidateNodesPercentage: 10,
 									MinCandidateNodesAbsolute:   100,
+									DisableRandomOffset:         false,
 								},
 							},
 							{
@@ -1243,6 +1246,7 @@ profiles:
 								Args: &kubeschedulerconfig.DefaultPreemptionArgs{
 									MinCandidateNodesPercentage: 10,
 									MinCandidateNodesAbsolute:   100,
+									DisableRandomOffset:         false,
 								},
 							},
 							{
@@ -1357,6 +1361,7 @@ profiles:
 								Args: &kubeschedulerconfig.DefaultPreemptionArgs{
 									MinCandidateNodesPercentage: 10,
 									MinCandidateNodesAbsolute:   100,
+									DisableRandomOffset:         false,
 								},
 							},
 							{
@@ -1464,6 +1469,7 @@ profiles:
 								Args: &kubeschedulerconfig.DefaultPreemptionArgs{
 									MinCandidateNodesPercentage: 10,
 									MinCandidateNodesAbsolute:   100,
+									DisableRandomOffset:         false,
 								},
 							},
 							{
@@ -1599,6 +1605,7 @@ profiles:
 								Args: &kubeschedulerconfig.DefaultPreemptionArgs{
 									MinCandidateNodesPercentage: 10,
 									MinCandidateNodesAbsolute:   100,
+									DisableRandomOffset:         false,
 								},
 							},
 							{

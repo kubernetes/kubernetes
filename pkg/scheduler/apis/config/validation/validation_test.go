@@ -71,7 +71,7 @@ func TestValidateKubeSchedulerConfigurationV1beta2(t *testing.T) {
 				PluginConfig: []config.PluginConfig{
 					{
 						Name: "DefaultPreemption",
-						Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 10, MinCandidateNodesAbsolute: 100},
+						Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 10, MinCandidateNodesAbsolute: 100, DisableRandomOffset: false},
 					},
 				},
 			},
@@ -148,7 +148,7 @@ func TestValidateKubeSchedulerConfigurationV1beta2(t *testing.T) {
 	invalidNodePercentage.Profiles[0].PluginConfig = []config.PluginConfig{
 		{
 			Name: "DefaultPreemption",
-			Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 200, MinCandidateNodesAbsolute: 100},
+			Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 200, MinCandidateNodesAbsolute: 100, DisableRandomOffset: false},
 		},
 	}
 
@@ -469,7 +469,7 @@ func TestValidateKubeSchedulerConfigurationV1beta3(t *testing.T) {
 				PluginConfig: []config.PluginConfig{
 					{
 						Name: "DefaultPreemption",
-						Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 10, MinCandidateNodesAbsolute: 100},
+						Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 10, MinCandidateNodesAbsolute: 100, DisableRandomOffset: false},
 					},
 				},
 			},
@@ -546,7 +546,7 @@ func TestValidateKubeSchedulerConfigurationV1beta3(t *testing.T) {
 	invalidNodePercentage.Profiles[0].PluginConfig = []config.PluginConfig{
 		{
 			Name: "DefaultPreemption",
-			Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 200, MinCandidateNodesAbsolute: 100},
+			Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 200, MinCandidateNodesAbsolute: 100, DisableRandomOffset: false},
 		},
 	}
 
@@ -873,7 +873,7 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 				PluginConfig: []config.PluginConfig{
 					{
 						Name: "DefaultPreemption",
-						Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 10, MinCandidateNodesAbsolute: 100},
+						Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 10, MinCandidateNodesAbsolute: 100, DisableRandomOffset: false},
 					},
 				},
 			},
@@ -951,7 +951,7 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 	invalidNodePercentage.Profiles[0].PluginConfig = []config.PluginConfig{
 		{
 			Name: "DefaultPreemption",
-			Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 200, MinCandidateNodesAbsolute: 100},
+			Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 200, MinCandidateNodesAbsolute: 100, DisableRandomOffset: false},
 		},
 	}
 

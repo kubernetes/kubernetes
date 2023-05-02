@@ -121,6 +121,9 @@ func (pl *DefaultPreemption) calculateNumCandidates(numNodes int32) int32 {
 // GetOffsetAndNumCandidates chooses a random offset and calculates the number
 // of candidates that should be shortlisted for dry running preemption.
 func (pl *DefaultPreemption) GetOffsetAndNumCandidates(numNodes int32) (int32, int32) {
+	if pl.args.DisableRandomOffset {
+		return 0, pl.calculateNumCandidates(numNodes)
+	}
 	return rand.Int31n(numNodes), pl.calculateNumCandidates(numNodes)
 }
 

@@ -55,6 +55,7 @@ profiles:
     args:
       minCandidateNodesPercentage: 50
       minCandidateNodesAbsolute: 500
+      disableRandomOffset: true
   - name: InterPodAffinity
     args:
       hardPodAffinityWeight: 5
@@ -101,7 +102,7 @@ profiles:
 					PluginConfig: []config.PluginConfig{
 						{
 							Name: "DefaultPreemption",
-							Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 50, MinCandidateNodesAbsolute: 500},
+							Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 50, MinCandidateNodesAbsolute: 500, DisableRandomOffset: true},
 						},
 						{
 							Name: "InterPodAffinity",
@@ -207,7 +208,7 @@ profiles:
 					PluginConfig: []config.PluginConfig{
 						{
 							Name: "DefaultPreemption",
-							Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 50, MinCandidateNodesAbsolute: 100},
+							Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 50, MinCandidateNodesAbsolute: 100, DisableRandomOffset: false},
 						},
 						{
 							Name: "InterPodAffinity",
@@ -354,7 +355,7 @@ profiles:
 					PluginConfig: []config.PluginConfig{
 						{
 							Name: "DefaultPreemption",
-							Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 10, MinCandidateNodesAbsolute: 100},
+							Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 10, MinCandidateNodesAbsolute: 100, DisableRandomOffset: false},
 						},
 						{
 							Name: "InterPodAffinity",
@@ -413,6 +414,7 @@ profiles:
     args:
       minCandidateNodesPercentage: 50
       minCandidateNodesAbsolute: 500
+      disableRandomOffset: true
   - name: InterPodAffinity
     args:
       hardPodAffinityWeight: 5
@@ -458,7 +460,7 @@ profiles:
 					PluginConfig: []config.PluginConfig{
 						{
 							Name: "DefaultPreemption",
-							Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 50, MinCandidateNodesAbsolute: 500},
+							Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 50, MinCandidateNodesAbsolute: 500, DisableRandomOffset: true},
 						},
 						{
 							Name: "InterPodAffinity",
@@ -564,7 +566,7 @@ profiles:
 					PluginConfig: []config.PluginConfig{
 						{
 							Name: "DefaultPreemption",
-							Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 50, MinCandidateNodesAbsolute: 100},
+							Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 50, MinCandidateNodesAbsolute: 100, DisableRandomOffset: false},
 						},
 						{
 							Name: "InterPodAffinity",
@@ -711,7 +713,7 @@ profiles:
 					PluginConfig: []config.PluginConfig{
 						{
 							Name: "DefaultPreemption",
-							Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 10, MinCandidateNodesAbsolute: 100},
+							Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 10, MinCandidateNodesAbsolute: 100, DisableRandomOffset: false},
 						},
 						{
 							Name: "InterPodAffinity",
@@ -770,6 +772,7 @@ profiles:
     args:
       minCandidateNodesPercentage: 50
       minCandidateNodesAbsolute: 500
+      disableRandomOffset: true
   - name: InterPodAffinity
     args:
       hardPodAffinityWeight: 5
@@ -816,7 +819,7 @@ profiles:
 					PluginConfig: []config.PluginConfig{
 						{
 							Name: "DefaultPreemption",
-							Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 50, MinCandidateNodesAbsolute: 500},
+							Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 50, MinCandidateNodesAbsolute: 500, DisableRandomOffset: true},
 						},
 						{
 							Name: "InterPodAffinity",
@@ -940,7 +943,7 @@ profiles:
 					PluginConfig: []config.PluginConfig{
 						{
 							Name: "DefaultPreemption",
-							Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 50, MinCandidateNodesAbsolute: 100},
+							Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 50, MinCandidateNodesAbsolute: 100, DisableRandomOffset: false},
 						},
 						{
 							Name: "InterPodAffinity",
@@ -1087,7 +1090,7 @@ profiles:
 					PluginConfig: []config.PluginConfig{
 						{
 							Name: "DefaultPreemption",
-							Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 10, MinCandidateNodesAbsolute: 100},
+							Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 10, MinCandidateNodesAbsolute: 100, DisableRandomOffset: false},
 						},
 						{
 							Name: "InterPodAffinity",
@@ -1159,7 +1162,7 @@ profiles:
 						},
 						{
 							Name: "DefaultPreemption",
-							Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 10, MinCandidateNodesAbsolute: 100},
+							Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 10, MinCandidateNodesAbsolute: 100, DisableRandomOffset: false},
 						},
 						{
 							Name: "NodeAffinity",

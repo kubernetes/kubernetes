@@ -250,6 +250,9 @@ func autoConvert_v1_DefaultPreemptionArgs_To_config_DefaultPreemptionArgs(in *v1
 	if err := metav1.Convert_Pointer_int32_To_int32(&in.MinCandidateNodesAbsolute, &out.MinCandidateNodesAbsolute, s); err != nil {
 		return err
 	}
+	if err := metav1.Convert_Pointer_bool_To_bool(&in.DisableRandomOffset, &out.DisableRandomOffset, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -263,6 +266,9 @@ func autoConvert_config_DefaultPreemptionArgs_To_v1_DefaultPreemptionArgs(in *co
 		return err
 	}
 	if err := metav1.Convert_int32_To_Pointer_int32(&in.MinCandidateNodesAbsolute, &out.MinCandidateNodesAbsolute, s); err != nil {
+		return err
+	}
+	if err := metav1.Convert_bool_To_Pointer_bool(&in.DisableRandomOffset, &out.DisableRandomOffset, s); err != nil {
 		return err
 	}
 	return nil

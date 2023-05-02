@@ -122,6 +122,7 @@ var PluginConfigsV1beta2 = []config.PluginConfig{
 		Args: &config.DefaultPreemptionArgs{
 			MinCandidateNodesPercentage: 10,
 			MinCandidateNodesAbsolute:   100,
+			DisableRandomOffset:         false,
 		},
 	},
 	{
@@ -305,6 +306,7 @@ var PluginConfigsV1beta3 = []config.PluginConfig{
 		Args: &config.DefaultPreemptionArgs{
 			MinCandidateNodesPercentage: 10,
 			MinCandidateNodesAbsolute:   100,
+			DisableRandomOffset:         false,
 		},
 	},
 	{
@@ -488,6 +490,7 @@ var PluginConfigsV1 = []config.PluginConfig{
 		Args: &config.DefaultPreemptionArgs{
 			MinCandidateNodesPercentage: 10,
 			MinCandidateNodesAbsolute:   100,
+			DisableRandomOffset:         false,
 		},
 	},
 	{
