@@ -18,13 +18,14 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -39,6 +40,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/cloud-provider/api"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/component-base/featuregate"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
@@ -288,8 +290,15 @@ func (c *Controller) processNextServiceItem(ctx context.Context) bool {
 		return true
 	}
 
-	runtime.HandleError(fmt.Errorf("error processing service %v (will retry): %v", key, err))
-	c.serviceQueue.AddRateLimited(key)
+	var re *api.RetryError
+	if errors.As(err, &re) {
+		klog.Warningf("error processing service %v (retrying in %s): %v", key, re.RetryAfter(), err)
+		c.serviceQueue.AddAfter(key, re.RetryAfter())
+	} else {
+		runtime.HandleError(fmt.Errorf("error processing service %v (retrying with exponential backoff): %v", key, err))
+		c.serviceQueue.AddRateLimited(key)
+	}
+
 	return true
 }
 
@@ -401,7 +410,8 @@ func (c *Controller) syncLoadBalancerIfNeeded(ctx context.Context, service *v1.S
 				klog.V(4).Infof("LoadBalancer for service %s implemented by a different controller %s, Ignoring error", key, c.cloud.ProviderName())
 				return op, nil
 			}
-			return op, fmt.Errorf("failed to ensure load balancer: %v", err)
+			// Use %w deliberately so that a returned RetryError can be handled.
+			return op, fmt.Errorf("failed to ensure load balancer: %w", err)
 		}
 		if newStatus == nil {
 			return op, fmt.Errorf("service status returned by EnsureLoadBalancer is nil")
@@ -415,7 +425,7 @@ func (c *Controller) syncLoadBalancerIfNeeded(ctx context.Context, service *v1.S
 		// - Not found error mostly happens when service disappears right after
 		//   we remove the finalizer.
 		// - We can't patch status on non-exist service anyway.
-		if !errors.IsNotFound(err) {
+		if !apierrors.IsNotFound(err) {
 			return op, fmt.Errorf("failed to update load balancer status: %v", err)
 		}
 	}
@@ -837,7 +847,7 @@ func (c *Controller) syncService(ctx context.Context, key string) error {
 	// service holds the latest service info from apiserver
 	service, err := c.serviceLister.Services(namespace).Get(name)
 	switch {
-	case errors.IsNotFound(err):
+	case apierrors.IsNotFound(err):
 		// service absence in store means watcher caught the deletion, ensure LB info is cleaned
 		err = c.processServiceDeletion(ctx, key)
 	case err != nil:

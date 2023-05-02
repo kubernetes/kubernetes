@@ -41,9 +41,12 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	core "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/cloud-provider/api"
 	fakecloud "k8s.io/cloud-provider/fake"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -1093,22 +1096,24 @@ func TestSyncService(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		t.Run(tc.testName, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
-		tc.updateFn()
-		obtainedErr := controller.syncService(ctx, tc.key)
+			tc.updateFn()
+			obtainedErr := controller.syncService(ctx, tc.key)
 
-		//expected matches obtained ??.
-		if exp := tc.expectedFn(obtainedErr); exp != nil {
-			t.Errorf("%v Error:%v", tc.testName, exp)
-		}
+			//expected matches obtained ??.
+			if exp := tc.expectedFn(obtainedErr); exp != nil {
+				t.Errorf("%v Error:%v", tc.testName, exp)
+			}
 
-		//Post processing, the element should not be in the sync queue.
-		_, exist := controller.cache.get(tc.key)
-		if exist {
-			t.Fatalf("%v working Queue should be empty, but contains %s", tc.testName, tc.key)
-		}
+			//Post processing, the element should not be in the sync queue.
+			_, exist := controller.cache.get(tc.key)
+			if exist {
+				t.Fatalf("%v working Queue should be empty, but contains %s", tc.testName, tc.key)
+			}
+		})
 	}
 }
 
@@ -2253,6 +2258,87 @@ func Test_shouldSyncUpdatedNode_compoundedPredicates(t *testing.T) {
 	}
 }
 
+func TestServiceQueueDelay(t *testing.T) {
+	const ns = metav1.NamespaceDefault
+
+	tests := []struct {
+		name           string
+		lbCloudErr     error
+		wantRetryDelay time.Duration
+	}{
+		{
+			name:       "processing successful",
+			lbCloudErr: nil,
+		},
+		{
+			name:       "regular error",
+			lbCloudErr: errors.New("something went wrong"),
+		},
+		{
+			name:           "retry error",
+			lbCloudErr:     api.NewRetryError("LB create in progress", 42*time.Second),
+			wantRetryDelay: 42 * time.Second,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			controller, cloud, client := newController()
+			queue := &spyWorkQueue{RateLimitingInterface: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-service-queue-delay")}
+			controller.serviceQueue = queue
+			cloud.Err = tc.lbCloudErr
+
+			serviceCache := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+			controller.serviceLister = corelisters.NewServiceLister(serviceCache)
+
+			svc := defaultExternalService()
+			if err := serviceCache.Add(svc); err != nil {
+				t.Fatalf("adding service %s to cache: %s", svc.Name, err)
+			}
+
+			ctx := context.Background()
+			_, err := client.CoreV1().Services(ns).Create(ctx, svc, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			key, err := cache.MetaNamespaceKeyFunc(svc)
+			if err != nil {
+				t.Fatalf("creating meta namespace key: %s", err)
+			}
+			queue.Add(key)
+
+			done := controller.processNextServiceItem(ctx)
+			if !done {
+				t.Fatal("processNextServiceItem stopped prematurely")
+			}
+
+			// Expect no requeues unless we hit an error that is not a retry
+			// error.
+			wantNumRequeues := 0
+			var re *api.RetryError
+			isRetryError := errors.As(tc.lbCloudErr, &re)
+			if tc.lbCloudErr != nil && !isRetryError {
+				wantNumRequeues = 1
+			}
+
+			if gotNumRequeues := queue.NumRequeues(key); gotNumRequeues != wantNumRequeues {
+				t.Fatalf("got %d requeue(s), want %d", gotNumRequeues, wantNumRequeues)
+			}
+
+			if tc.wantRetryDelay > 0 {
+				items := queue.getItems()
+				if len(items) != 1 {
+					t.Fatalf("got %d item(s), want 1", len(items))
+				}
+				if gotDelay := items[0].Delay; gotDelay != tc.wantRetryDelay {
+					t.Fatalf("got delay %s, want %s", gotDelay, tc.wantRetryDelay)
+				}
+			}
+		})
+	}
+}
+
 type fakeNodeLister struct {
 	cache []*v1.Node
 	err   error
@@ -2280,4 +2366,34 @@ func (l *fakeNodeLister) Get(name string) (*v1.Node, error) {
 		}
 	}
 	return nil, nil
+}
+
+// spyWorkQueue implements a work queue and adds the ability to inspect processed
+// items for testing purposes.
+type spyWorkQueue struct {
+	workqueue.RateLimitingInterface
+	items []spyQueueItem
+}
+
+// spyQueueItem represents an item that was being processed.
+type spyQueueItem struct {
+	Key interface{}
+	// Delay represents the delayed duration if and only if AddAfter was invoked.
+	Delay time.Duration
+}
+
+// AddAfter is like workqueue.RateLimitingInterface.AddAfter but records the
+// added key and delay internally.
+func (f *spyWorkQueue) AddAfter(key interface{}, delay time.Duration) {
+	f.items = append(f.items, spyQueueItem{
+		Key:   key,
+		Delay: delay,
+	})
+
+	f.RateLimitingInterface.AddAfter(key, delay)
+}
+
+// getItems returns all items that were recorded.
+func (f *spyWorkQueue) getItems() []spyQueueItem {
+	return f.items
 }
