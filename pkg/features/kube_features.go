@@ -560,13 +560,6 @@ const (
 	// Enables the dynamic configuration of Service IP ranges
 	MultiCIDRServiceAllocator featuregate.Feature = "MultiCIDRServiceAllocator"
 
-	// owner: @rikatz
-	// kep: https://kep.k8s.io/2943
-	// alpha: v1.24
-	//
-	// Enables NetworkPolicy status subresource
-	NetworkPolicyStatus featuregate.Feature = "NetworkPolicyStatus"
-
 	// owner: @jsafrane
 	// kep: https://kep.k8s.io/3756
 	// alpha: v1.25 (as part of SELinuxMountReadWriteOncePod)
@@ -1016,8 +1009,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	MultiCIDRRangeAllocator: {Default: false, PreRelease: featuregate.Alpha},
 
 	MultiCIDRServiceAllocator: {Default: false, PreRelease: featuregate.Alpha},
-
-	NetworkPolicyStatus: {Default: false, PreRelease: featuregate.Alpha},
 
 	NewVolumeManagerReconstruction: {Default: true, PreRelease: featuregate.Beta},
 

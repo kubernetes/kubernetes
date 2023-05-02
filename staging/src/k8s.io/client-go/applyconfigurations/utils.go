@@ -1019,8 +1019,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsextensionsv1beta1.NetworkPolicyPortApplyConfiguration{}
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("NetworkPolicySpec"):
 		return &applyconfigurationsextensionsv1beta1.NetworkPolicySpecApplyConfiguration{}
-	case extensionsv1beta1.SchemeGroupVersion.WithKind("NetworkPolicyStatus"):
-		return &applyconfigurationsextensionsv1beta1.NetworkPolicyStatusApplyConfiguration{}
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("ReplicaSet"):
 		return &applyconfigurationsextensionsv1beta1.ReplicaSetApplyConfiguration{}
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("ReplicaSetCondition"):
@@ -1293,8 +1291,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsnetworkingv1.NetworkPolicyPortApplyConfiguration{}
 	case networkingv1.SchemeGroupVersion.WithKind("NetworkPolicySpec"):
 		return &applyconfigurationsnetworkingv1.NetworkPolicySpecApplyConfiguration{}
-	case networkingv1.SchemeGroupVersion.WithKind("NetworkPolicyStatus"):
-		return &applyconfigurationsnetworkingv1.NetworkPolicyStatusApplyConfiguration{}
 	case networkingv1.SchemeGroupVersion.WithKind("ServiceBackendPort"):
 		return &applyconfigurationsnetworkingv1.ServiceBackendPortApplyConfiguration{}
 
