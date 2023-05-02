@@ -2288,8 +2288,13 @@ func TestServiceQueueDelay(t *testing.T) {
 			controller.serviceQueue = queue
 			cloud.Err = tc.lbCloudErr
 
+			serviceCache := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+			controller.serviceLister = corelisters.NewServiceLister(serviceCache)
+
 			svc := defaultExternalService()
-			controller.serviceLister = newFakeServiceLister(svc)
+			if err := serviceCache.Add(svc); err != nil {
+				t.Fatalf("adding service %s to cache: %s", svc.Name, err)
+			}
 
 			ctx := context.Background()
 			_, err := client.CoreV1().Services(ns).Create(ctx, svc, metav1.CreateOptions{})
@@ -2361,39 +2366,6 @@ func (l *fakeNodeLister) Get(name string) (*v1.Node, error) {
 		}
 	}
 	return nil, nil
-}
-
-type fakeServiceLister struct {
-	cache []*v1.Service
-}
-
-func newFakeServiceLister(services ...*v1.Service) *fakeServiceLister {
-	ret := &fakeServiceLister{}
-	ret.cache = services
-	return ret
-}
-
-// List lists all Nodes in the indexer.
-// Objects returned here must be treated as read-only.
-func (l *fakeServiceLister) List(_ labels.Selector) ([]*v1.Service, error) {
-	return l.cache, nil
-}
-
-// Get retrieves the Service from the index for a given name.
-// Objects returned here must be treated as read-only.
-func (l *fakeServiceLister) Get(name string) (*v1.Service, error) {
-	for _, svc := range l.cache {
-		if svc.Name == name {
-			return svc, nil
-		}
-	}
-	return nil, nil
-}
-
-// Services returns an object that can list and get Services.
-// This is fakeServiceLister itself.
-func (l *fakeServiceLister) Services(_ string) corelisters.ServiceNamespaceLister {
-	return l
 }
 
 // spyWorkQueue implements a work queue and adds the ability to inspect processed
