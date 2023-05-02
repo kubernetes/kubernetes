@@ -1957,9 +1957,9 @@ func tweakDeleted() nodeTweak {
 	}
 }
 
-func tweakUnsetProviderID() nodeTweak {
+func tweakProviderID(id string) nodeTweak {
 	return func(n *v1.Node) {
-		n.Spec.ProviderID = ""
+		n.Spec.ProviderID = id
 	}
 }
 
@@ -2122,13 +2122,35 @@ func Test_shouldSyncUpdatedNode_individualPredicates(t *testing.T) {
 		stableNodeSetEnabled: true,
 	}, {
 		name:       "providerID set F -> T",
-		oldNode:    makeNode(tweakUnsetProviderID()),
+		oldNode:    makeNode(tweakProviderID("")),
 		newNode:    makeNode(),
 		shouldSync: true,
 	}, {
 		name:                 "providerID set F -> T",
-		oldNode:              makeNode(tweakUnsetProviderID()),
+		oldNode:              makeNode(tweakProviderID("")),
 		newNode:              makeNode(),
+		shouldSync:           true,
+		stableNodeSetEnabled: true,
+	}, {
+		name:       "providerID set T-> F",
+		oldNode:    makeNode(),
+		newNode:    makeNode(tweakProviderID("")),
+		shouldSync: true,
+	}, {
+		name:                 "providerID set T-> F",
+		oldNode:              makeNode(),
+		newNode:              makeNode(tweakProviderID("")),
+		shouldSync:           true,
+		stableNodeSetEnabled: true,
+	}, {
+		name:       "providerID change",
+		oldNode:    makeNode(),
+		newNode:    makeNode(tweakProviderID(providerID + "-2")),
+		shouldSync: true,
+	}, {
+		name:                 "providerID change",
+		oldNode:              makeNode(),
+		newNode:              makeNode(tweakProviderID(providerID + "-2")),
 		shouldSync:           true,
 		stableNodeSetEnabled: true,
 	}}
@@ -2168,14 +2190,20 @@ func Test_shouldSyncUpdatedNode_compoundedPredicates(t *testing.T) {
 				fgEnabled:  fgEnabled,
 			}, {
 				name:       "tainted T, providerID set F->T",
-				oldNode:    makeNode(tweakAddTaint(ToBeDeletedTaint), tweakUnsetProviderID()),
+				oldNode:    makeNode(tweakAddTaint(ToBeDeletedTaint), tweakProviderID("")),
 				newNode:    makeNode(tweakAddTaint(ToBeDeletedTaint)),
 				shouldSync: true,
 				fgEnabled:  fgEnabled,
 			}, {
 				name:       "tainted T, providerID set T->F",
 				oldNode:    makeNode(tweakAddTaint(ToBeDeletedTaint)),
-				newNode:    makeNode(tweakAddTaint(ToBeDeletedTaint), tweakUnsetProviderID()),
+				newNode:    makeNode(tweakAddTaint(ToBeDeletedTaint), tweakProviderID("")),
+				shouldSync: true,
+				fgEnabled:  fgEnabled,
+			}, {
+				name:       "tainted T, providerID change",
+				oldNode:    makeNode(tweakAddTaint(ToBeDeletedTaint)),
+				newNode:    makeNode(tweakAddTaint(ToBeDeletedTaint), tweakProviderID(providerID+"-2")),
 				shouldSync: true,
 				fgEnabled:  fgEnabled,
 			}, {
@@ -2216,14 +2244,20 @@ func Test_shouldSyncUpdatedNode_compoundedPredicates(t *testing.T) {
 				fgEnabled:  fgEnabled,
 			}, {
 				name:       "excluded T, providerID set F->T",
-				oldNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, ""), tweakUnsetProviderID()),
+				oldNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, ""), tweakProviderID("")),
 				newNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
 				shouldSync: true,
 				fgEnabled:  fgEnabled,
 			}, {
 				name:       "excluded T, providerID set T->F",
 				oldNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
-				newNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, ""), tweakUnsetProviderID()),
+				newNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, ""), tweakProviderID("")),
+				shouldSync: true,
+				fgEnabled:  fgEnabled,
+			}, {
+				name:       "excluded T, providerID change",
+				oldNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
+				newNode:    makeNode(tweakSetLabel(v1.LabelNodeExcludeBalancers, ""), tweakProviderID(providerID+"-2")),
 				shouldSync: true,
 				fgEnabled:  fgEnabled,
 			}, {
@@ -2252,32 +2286,38 @@ func Test_shouldSyncUpdatedNode_compoundedPredicates(t *testing.T) {
 				fgEnabled:  fgEnabled,
 			}, {
 				name:       "ready F, providerID set F->T",
-				oldNode:    makeNode(tweakSetReady(false), tweakUnsetProviderID()),
+				oldNode:    makeNode(tweakSetReady(false), tweakProviderID("")),
 				newNode:    makeNode(tweakSetReady(false)),
 				shouldSync: true,
 				fgEnabled:  fgEnabled,
 			}, {
 				name:       "ready F, providerID set T->F",
 				oldNode:    makeNode(tweakSetReady(false)),
-				newNode:    makeNode(tweakSetReady(false), tweakUnsetProviderID()),
+				newNode:    makeNode(tweakSetReady(false), tweakProviderID("")),
+				shouldSync: true,
+				fgEnabled:  fgEnabled,
+			}, {
+				name:       "ready F, providerID change",
+				oldNode:    makeNode(tweakSetReady(false)),
+				newNode:    makeNode(tweakSetReady(false), tweakProviderID(providerID+"-2")),
 				shouldSync: true,
 				fgEnabled:  fgEnabled,
 			}, {
 				name:       "providerID unset, excluded F->T",
-				oldNode:    makeNode(tweakUnsetProviderID()),
-				newNode:    makeNode(tweakUnsetProviderID(), tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
+				oldNode:    makeNode(tweakProviderID("")),
+				newNode:    makeNode(tweakProviderID(""), tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
 				shouldSync: true,
 				fgEnabled:  fgEnabled,
 			}, {
 				name:       "providerID unset, excluded T->F",
-				oldNode:    makeNode(tweakUnsetProviderID(), tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
-				newNode:    makeNode(tweakUnsetProviderID()),
+				oldNode:    makeNode(tweakProviderID(""), tweakSetLabel(v1.LabelNodeExcludeBalancers, "")),
+				newNode:    makeNode(tweakProviderID("")),
 				shouldSync: true,
 				fgEnabled:  fgEnabled,
 			}, {
 				name:       "providerID unset, ready T->F",
-				oldNode:    makeNode(tweakUnsetProviderID()),
-				newNode:    makeNode(tweakUnsetProviderID(), tweakSetReady(true)),
+				oldNode:    makeNode(tweakProviderID("")),
+				newNode:    makeNode(tweakProviderID(""), tweakSetReady(true)),
 				shouldSync: false,
 				fgEnabled:  fgEnabled,
 			},
@@ -2286,40 +2326,40 @@ func Test_shouldSyncUpdatedNode_compoundedPredicates(t *testing.T) {
 	testcases = append(testcases, []testCase{
 		{
 			name:       "providerID unset, ready F->T",
-			oldNode:    makeNode(tweakUnsetProviderID()),
-			newNode:    makeNode(tweakUnsetProviderID(), tweakSetReady(false)),
+			oldNode:    makeNode(tweakProviderID("")),
+			newNode:    makeNode(tweakProviderID(""), tweakSetReady(false)),
 			shouldSync: false,
 			fgEnabled:  true,
 		},
 		{
 			name:       "providerID unset, ready F->T",
-			oldNode:    makeNode(tweakUnsetProviderID()),
-			newNode:    makeNode(tweakUnsetProviderID(), tweakSetReady(false)),
+			oldNode:    makeNode(tweakProviderID("")),
+			newNode:    makeNode(tweakProviderID(""), tweakSetReady(false)),
 			shouldSync: true,
 			fgEnabled:  false,
 		}, {
 			name:       "providerID unset, tainted T->F",
-			oldNode:    makeNode(tweakUnsetProviderID(), tweakAddTaint(ToBeDeletedTaint)),
-			newNode:    makeNode(tweakUnsetProviderID()),
+			oldNode:    makeNode(tweakProviderID(""), tweakAddTaint(ToBeDeletedTaint)),
+			newNode:    makeNode(tweakProviderID("")),
 			shouldSync: false,
 			fgEnabled:  true,
 		},
 		{
 			name:       "providerID unset, tainted T->F",
-			oldNode:    makeNode(tweakUnsetProviderID(), tweakAddTaint(ToBeDeletedTaint)),
-			newNode:    makeNode(tweakUnsetProviderID()),
+			oldNode:    makeNode(tweakProviderID(""), tweakAddTaint(ToBeDeletedTaint)),
+			newNode:    makeNode(tweakProviderID("")),
 			shouldSync: true,
 			fgEnabled:  false,
 		}, {
 			name:       "providerID unset, tainted F->T",
-			oldNode:    makeNode(tweakUnsetProviderID()),
-			newNode:    makeNode(tweakUnsetProviderID(), tweakAddTaint(ToBeDeletedTaint)),
+			oldNode:    makeNode(tweakProviderID("")),
+			newNode:    makeNode(tweakProviderID(""), tweakAddTaint(ToBeDeletedTaint)),
 			shouldSync: false,
 			fgEnabled:  true,
 		}, {
 			name:       "providerID unset, tainted F->T",
-			oldNode:    makeNode(tweakUnsetProviderID()),
-			newNode:    makeNode(tweakUnsetProviderID(), tweakAddTaint(ToBeDeletedTaint)),
+			oldNode:    makeNode(tweakProviderID("")),
+			newNode:    makeNode(tweakProviderID(""), tweakAddTaint(ToBeDeletedTaint)),
 			shouldSync: true,
 			fgEnabled:  false,
 		},

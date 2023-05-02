@@ -683,8 +683,8 @@ func shouldSyncUpdatedNode(oldNode, newNode *v1.Node) bool {
 	if respectsPredicates(oldNode, nodeIncludedPredicate) != respectsPredicates(newNode, nodeIncludedPredicate) {
 		return true
 	}
-	// For the same reason as above, also check for changes to the providerID
-	if respectsPredicates(oldNode, nodeHasProviderIDPredicate) != respectsPredicates(newNode, nodeHasProviderIDPredicate) {
+	// For the same reason as above, also check for any change to the providerID
+	if oldNode.Spec.ProviderID != newNode.Spec.ProviderID {
 		return true
 	}
 	if !utilfeature.DefaultFeatureGate.Enabled(features.StableLoadBalancerNodeSet) {
@@ -973,13 +973,6 @@ func getNodePredicatesForService(service *v1.Service) []NodeConditionPredicate {
 		return etpLocalNodePredicates
 	}
 	return allNodePredicates
-}
-
-// This predicate just validates if the providerID has been set and triggers a
-// node sync. It is _not_ used when determining which nodes to use when
-// configuring the load balancer's backend pool.
-func nodeHasProviderIDPredicate(node *v1.Node) bool {
-	return node.Spec.ProviderID != ""
 }
 
 // We consider the node for load balancing only when the node is not labelled for exclusion.
