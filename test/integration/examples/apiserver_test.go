@@ -522,6 +522,7 @@ func writeKubeConfigForWardleServerToKASConnection(t *testing.T, kubeClientConfi
 		t.Fatal(err)
 	}
 
+	defer wardleToKASKubeConfigFile.Close()
 	return wardleToKASKubeConfigFile.Name()
 }
 
