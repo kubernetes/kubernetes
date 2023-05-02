@@ -18,15 +18,12 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# Runs tests for kubectl diff
-run_kubectl_events_tests() {
+run_kubectl_auth_whoami_tests() {
     set -o nounset
     set -o errexit
 
-    create_and_use_new_namespace
     kube::log::status "Testing kubectl auth whoami"
 
-    ### Create a new namespace
     # Command
     output_message=$(kubectl auth whoami -o json 2>&1)
 

@@ -29,6 +29,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 # source "${KUBE_ROOT}/hack/lib/test.sh"
 source "${KUBE_ROOT}/test/cmd/apply.sh"
 source "${KUBE_ROOT}/test/cmd/apps.sh"
+source "${KUBE_ROOT}/test/cmd/auth_whoami.sh"
 source "${KUBE_ROOT}/test/cmd/authentication.sh"
 source "${KUBE_ROOT}/test/cmd/authorization.sh"
 source "${KUBE_ROOT}/test/cmd/batch.sh"
@@ -98,6 +99,7 @@ replicasets="replicasets"
 replicationcontrollers="replicationcontrollers"
 roles="roles"
 secrets="secrets"
+selfsubjectreviews="selfsubjectreviews"
 serviceaccounts="serviceaccounts"
 services="services"
 statefulsets="statefulsets"
@@ -816,6 +818,10 @@ runTests() {
   record_command run_exec_credentials_tests
   record_command run_exec_credentials_interactive_tests
 
+  if kube::test::if_supports_resource "${selfsubjectreviews}" ; then
+    record_command run_kubectl_auth_whoami_tests
+  fi
+
   ########################
   # authorization.k8s.io #
   ########################
@@ -894,6 +900,8 @@ runTests() {
 
     kubectl delete "${kube_flags[@]}" rolebindings,role,clusterroles,clusterrolebindings -n some-other-random -l test-cmd=auth
   fi
+
+
 
   #####################
   # Retrieve multiple #
