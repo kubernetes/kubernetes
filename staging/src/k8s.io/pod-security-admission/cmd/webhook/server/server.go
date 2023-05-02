@@ -23,7 +23,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -182,7 +181,7 @@ func (s *Server) HandleValidate(w http.ResponseWriter, r *http.Request) {
 
 	defer r.Body.Close()
 	limitedReader := &io.LimitedReader{R: r.Body, N: maxRequestSize}
-	if body, err = ioutil.ReadAll(limitedReader); err != nil {
+	if body, err = io.ReadAll(limitedReader); err != nil {
 		logger.Error(err, "unable to read the body from the incoming request")
 		http.Error(w, "unable to read the body from the incoming request", http.StatusBadRequest)
 		return
