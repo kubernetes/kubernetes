@@ -195,9 +195,6 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 	validPlugins := validConfig.DeepCopy()
 	validPlugins.Profiles[0].Plugins.Score.Enabled = append(validPlugins.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "PodTopologySpread", Weight: 2})
 
-	invalidPlugins := validConfig.DeepCopy()
-	invalidPlugins.Profiles[0].Plugins.Score.Enabled = append(invalidPlugins.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "SelectorSpread"})
-
 	scenarios := map[string]struct {
 		config   *config.KubeSchedulerConfiguration
 		wantErrs field.ErrorList
@@ -391,15 +388,6 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 				&field.Error{
 					Type:  field.ErrorTypeInvalid,
 					Field: "profiles[1].plugins.queueSort",
-				},
-			},
-		},
-		"invalid-plugins": {
-			config: invalidPlugins,
-			wantErrs: field.ErrorList{
-				&field.Error{
-					Type:  field.ErrorTypeInvalid,
-					Field: "profiles[0].plugins.score.enabled[0]",
 				},
 			},
 		},
