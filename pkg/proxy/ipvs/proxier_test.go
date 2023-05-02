@@ -4376,7 +4376,7 @@ func TestEndpointSliceE2E(t *testing.T) {
 		Spec: v1.ServiceSpec{
 			ClusterIP: "172.20.1.1",
 			Selector:  map[string]string{"foo": "bar"},
-			Ports:     []v1.ServicePort{{Name: "", TargetPort: intstr.FromInt(80), Protocol: v1.ProtocolTCP}},
+			Ports:     []v1.ServicePort{{Name: "", TargetPort: intstr.FromInt32(80), Protocol: v1.ProtocolTCP}},
 		},
 	})
 
@@ -4463,7 +4463,7 @@ func TestHealthCheckNodePortE2E(t *testing.T) {
 		Spec: v1.ServiceSpec{
 			ClusterIP:             "172.20.1.1",
 			Selector:              map[string]string{"foo": "bar"},
-			Ports:                 []v1.ServicePort{{Name: "", TargetPort: intstr.FromInt(80), Protocol: v1.ProtocolTCP}},
+			Ports:                 []v1.ServicePort{{Name: "", TargetPort: intstr.FromInt32(80), Protocol: v1.ProtocolTCP}},
 			Type:                  "LoadBalancer",
 			HealthCheckNodePort:   30000,
 			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
@@ -4517,7 +4517,7 @@ func Test_HealthCheckNodePortWhenTerminating(t *testing.T) {
 		Spec: v1.ServiceSpec{
 			ClusterIP: "172.20.1.1",
 			Selector:  map[string]string{"foo": "bar"},
-			Ports:     []v1.ServicePort{{Name: "", TargetPort: intstr.FromInt(80), Protocol: v1.ProtocolTCP}},
+			Ports:     []v1.ServicePort{{Name: "", TargetPort: intstr.FromInt32(80), Protocol: v1.ProtocolTCP}},
 		},
 	})
 
@@ -4768,7 +4768,7 @@ func TestTestInternalTrafficPolicyE2E(t *testing.T) {
 			Spec: v1.ServiceSpec{
 				ClusterIP: "172.20.1.1",
 				Selector:  map[string]string{"foo": "bar"},
-				Ports:     []v1.ServicePort{{Name: "", TargetPort: intstr.FromInt(80), Protocol: v1.ProtocolTCP}},
+				Ports:     []v1.ServicePort{{Name: "", TargetPort: intstr.FromInt32(80), Protocol: v1.ProtocolTCP}},
 			},
 		}
 		if tc.internalTrafficPolicy != nil {
@@ -4878,7 +4878,7 @@ func Test_EndpointSliceReadyAndTerminatingCluster(t *testing.T) {
 				{
 					Name:       "",
 					Port:       80,
-					TargetPort: intstr.FromInt(80),
+					TargetPort: intstr.FromInt32(80),
 					Protocol:   v1.ProtocolTCP,
 				},
 			},
@@ -5055,7 +5055,7 @@ func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
 				{
 					Name:       "",
 					Port:       80,
-					TargetPort: intstr.FromInt(80),
+					TargetPort: intstr.FromInt32(80),
 					Protocol:   v1.ProtocolTCP,
 				},
 			},
@@ -5231,7 +5231,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingCluster(t *testing.T) {
 				{
 					Name:       "",
 					Port:       80,
-					TargetPort: intstr.FromInt(80),
+					TargetPort: intstr.FromInt32(80),
 					Protocol:   v1.ProtocolTCP,
 				},
 			},
@@ -5407,7 +5407,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocal(t *testing.T) {
 				{
 					Name:       "",
 					Port:       80,
-					TargetPort: intstr.FromInt(80),
+					TargetPort: intstr.FromInt32(80),
 					Protocol:   v1.ProtocolTCP,
 				},
 			},
@@ -5580,7 +5580,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocalWithFeatureGateDisabled(t *te
 				{
 					Name:       "",
 					Port:       80,
-					TargetPort: intstr.FromInt(80),
+					TargetPort: intstr.FromInt32(80),
 					Protocol:   v1.ProtocolTCP,
 				},
 			},
@@ -5915,7 +5915,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 			Spec: v1.ServiceSpec{
 				ClusterIP: "172.20.1.1",
 				Selector:  map[string]string{"foo": "bar"},
-				Ports:     []v1.ServicePort{{Name: "p80", Port: 80, TargetPort: intstr.FromInt(80), Protocol: v1.ProtocolTCP, NodePort: 30000}},
+				Ports:     []v1.ServicePort{{Name: "p80", Port: 80, TargetPort: intstr.FromInt32(80), Protocol: v1.ProtocolTCP, NodePort: 30000}},
 			},
 		}
 		if tc.internalTrafficPolicy != nil {

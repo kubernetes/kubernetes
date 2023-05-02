@@ -126,7 +126,7 @@ func TestSyncServiceNoSelector(t *testing.T) {
 	esController.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: ns},
 		Spec: v1.ServiceSpec{
-			Ports: []v1.ServicePort{{TargetPort: intstr.FromInt(80)}},
+			Ports: []v1.ServicePort{{TargetPort: intstr.FromInt32(80)}},
 		},
 	})
 
@@ -217,7 +217,7 @@ func TestSyncServicePendingDeletion(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: ns, DeletionTimestamp: &deletionTimestamp},
 		Spec: v1.ServiceSpec{
 			Selector: map[string]string{"foo": "bar"},
-			Ports:    []v1.ServicePort{{TargetPort: intstr.FromInt(80)}},
+			Ports:    []v1.ServicePort{{TargetPort: intstr.FromInt32(80)}},
 		},
 	})
 
@@ -259,7 +259,7 @@ func TestSyncServiceMissing(t *testing.T) {
 	esController.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: existingServiceName, Namespace: namespace},
 		Spec: v1.ServiceSpec{
-			Ports:    []v1.ServicePort{{TargetPort: intstr.FromInt(80)}},
+			Ports:    []v1.ServicePort{{TargetPort: intstr.FromInt32(80)}},
 			Selector: map[string]string{"foo": "bar"},
 		},
 	})
@@ -504,9 +504,9 @@ func TestSyncService(t *testing.T) {
 				},
 				Spec: v1.ServiceSpec{
 					Ports: []v1.ServicePort{
-						{Name: "tcp-example", TargetPort: intstr.FromInt(80), Protocol: v1.ProtocolTCP},
-						{Name: "udp-example", TargetPort: intstr.FromInt(161), Protocol: v1.ProtocolUDP},
-						{Name: "sctp-example", TargetPort: intstr.FromInt(3456), Protocol: v1.ProtocolSCTP},
+						{Name: "tcp-example", TargetPort: intstr.FromInt32(80), Protocol: v1.ProtocolTCP},
+						{Name: "udp-example", TargetPort: intstr.FromInt32(161), Protocol: v1.ProtocolUDP},
+						{Name: "sctp-example", TargetPort: intstr.FromInt32(3456), Protocol: v1.ProtocolSCTP},
 					},
 					Selector:   map[string]string{"foo": "bar"},
 					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
@@ -621,9 +621,9 @@ func TestSyncService(t *testing.T) {
 				},
 				Spec: v1.ServiceSpec{
 					Ports: []v1.ServicePort{
-						{Name: "tcp-example", TargetPort: intstr.FromInt(80), Protocol: v1.ProtocolTCP},
-						{Name: "udp-example", TargetPort: intstr.FromInt(161), Protocol: v1.ProtocolUDP},
-						{Name: "sctp-example", TargetPort: intstr.FromInt(3456), Protocol: v1.ProtocolSCTP},
+						{Name: "tcp-example", TargetPort: intstr.FromInt32(80), Protocol: v1.ProtocolTCP},
+						{Name: "udp-example", TargetPort: intstr.FromInt32(161), Protocol: v1.ProtocolUDP},
+						{Name: "sctp-example", TargetPort: intstr.FromInt32(3456), Protocol: v1.ProtocolSCTP},
 					},
 					Selector:   map[string]string{"foo": "bar"},
 					IPFamilies: []v1.IPFamily{v1.IPv6Protocol},
@@ -728,9 +728,9 @@ func TestSyncService(t *testing.T) {
 				},
 				Spec: v1.ServiceSpec{
 					Ports: []v1.ServicePort{
-						{Name: "tcp-example", TargetPort: intstr.FromInt(80), Protocol: v1.ProtocolTCP},
-						{Name: "udp-example", TargetPort: intstr.FromInt(161), Protocol: v1.ProtocolUDP},
-						{Name: "sctp-example", TargetPort: intstr.FromInt(3456), Protocol: v1.ProtocolSCTP},
+						{Name: "tcp-example", TargetPort: intstr.FromInt32(80), Protocol: v1.ProtocolTCP},
+						{Name: "udp-example", TargetPort: intstr.FromInt32(161), Protocol: v1.ProtocolUDP},
+						{Name: "sctp-example", TargetPort: intstr.FromInt32(3456), Protocol: v1.ProtocolSCTP},
 					},
 					Selector:   map[string]string{"foo": "bar"},
 					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
@@ -843,9 +843,9 @@ func TestSyncService(t *testing.T) {
 				},
 				Spec: v1.ServiceSpec{
 					Ports: []v1.ServicePort{
-						{Name: "tcp-example", TargetPort: intstr.FromInt(80), Protocol: v1.ProtocolTCP},
-						{Name: "udp-example", TargetPort: intstr.FromInt(161), Protocol: v1.ProtocolUDP},
-						{Name: "sctp-example", TargetPort: intstr.FromInt(3456), Protocol: v1.ProtocolSCTP},
+						{Name: "tcp-example", TargetPort: intstr.FromInt32(80), Protocol: v1.ProtocolTCP},
+						{Name: "udp-example", TargetPort: intstr.FromInt32(161), Protocol: v1.ProtocolUDP},
+						{Name: "sctp-example", TargetPort: intstr.FromInt32(3456), Protocol: v1.ProtocolSCTP},
 					},
 					Selector:   map[string]string{"foo": "bar"},
 					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
@@ -958,9 +958,9 @@ func TestSyncService(t *testing.T) {
 				},
 				Spec: v1.ServiceSpec{
 					Ports: []v1.ServicePort{
-						{Name: "tcp-example", TargetPort: intstr.FromInt(80), Protocol: v1.ProtocolTCP},
-						{Name: "udp-example", TargetPort: intstr.FromInt(161), Protocol: v1.ProtocolUDP},
-						{Name: "sctp-example", TargetPort: intstr.FromInt(3456), Protocol: v1.ProtocolSCTP},
+						{Name: "tcp-example", TargetPort: intstr.FromInt32(80), Protocol: v1.ProtocolTCP},
+						{Name: "udp-example", TargetPort: intstr.FromInt32(161), Protocol: v1.ProtocolUDP},
+						{Name: "sctp-example", TargetPort: intstr.FromInt32(3456), Protocol: v1.ProtocolSCTP},
 					},
 					Selector:   map[string]string{"foo": "bar"},
 					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
@@ -1090,9 +1090,9 @@ func TestSyncService(t *testing.T) {
 				},
 				Spec: v1.ServiceSpec{
 					Ports: []v1.ServicePort{
-						{Name: "tcp-example", TargetPort: intstr.FromInt(80), Protocol: v1.ProtocolTCP},
-						{Name: "udp-example", TargetPort: intstr.FromInt(161), Protocol: v1.ProtocolUDP},
-						{Name: "sctp-example", TargetPort: intstr.FromInt(3456), Protocol: v1.ProtocolSCTP},
+						{Name: "tcp-example", TargetPort: intstr.FromInt32(80), Protocol: v1.ProtocolTCP},
+						{Name: "udp-example", TargetPort: intstr.FromInt32(161), Protocol: v1.ProtocolUDP},
+						{Name: "sctp-example", TargetPort: intstr.FromInt32(3456), Protocol: v1.ProtocolSCTP},
 					},
 					Selector:   map[string]string{"foo": "bar"},
 					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
@@ -1664,7 +1664,7 @@ func TestSyncServiceStaleInformer(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: ns},
 				Spec: v1.ServiceSpec{
 					Selector: map[string]string{"foo": "bar"},
-					Ports:    []v1.ServicePort{{TargetPort: intstr.FromInt(80)}},
+					Ports:    []v1.ServicePort{{TargetPort: intstr.FromInt32(80)}},
 				},
 			})
 
@@ -1979,7 +1979,7 @@ func createService(t *testing.T, esController *endpointSliceController, namespac
 			UID:               types.UID(namespace + "-" + serviceName),
 		},
 		Spec: v1.ServiceSpec{
-			Ports:      []v1.ServicePort{{TargetPort: intstr.FromInt(80)}},
+			Ports:      []v1.ServicePort{{TargetPort: intstr.FromInt32(80)}},
 			Selector:   map[string]string{"foo": "bar"},
 			IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 		},

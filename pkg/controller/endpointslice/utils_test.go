@@ -525,7 +525,7 @@ func TestGetEndpointPorts(t *testing.T) {
 					Ports: []v1.ServicePort{{
 						Name:        "http",
 						Port:        80,
-						TargetPort:  intstr.FromInt(80),
+						TargetPort:  intstr.FromInt32(80),
 						Protocol:    protoTCP,
 						AppProtocol: pointer.String("example.com/custom-protocol"),
 					}},
@@ -551,7 +551,7 @@ func TestGetEndpointPorts(t *testing.T) {
 					Ports: []v1.ServicePort{{
 						Name:       "http",
 						Port:       80,
-						TargetPort: intstr.FromInt(80),
+						TargetPort: intstr.FromInt32(80),
 						Protocol:   protoTCP,
 					}, {
 						Name:        "https",
