@@ -34,6 +34,9 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 	utilpointer "k8s.io/utils/pointer"
+
+	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/cli-runtime/pkg/printers"
 )
 
 const (
@@ -122,6 +125,9 @@ type ConfigFlags struct {
 	// Allows increasing qps used for discovery, this is useful
 	// in clusters with many registered resources
 	discoveryQPS float32
+	// Allows all possible warnings are printed in a standardized
+	// format.
+	warningPrinter *printers.WarningPrinter
 }
 
 // ToRESTConfig implements RESTClientGetter.
@@ -425,6 +431,12 @@ func (f *ConfigFlags) WithDiscoveryQPS(discoveryQPS float32) *ConfigFlags {
 // WithWrapConfigFn allows providing a wrapper function for the client Config.
 func (f *ConfigFlags) WithWrapConfigFn(wrapConfigFn func(*rest.Config) *rest.Config) *ConfigFlags {
 	f.WrapConfigFn = wrapConfigFn
+	return f
+}
+
+// WithWarningPrinter initializes WarningPrinter with the given IOStreams
+func (f *ConfigFlags) WithWarningPrinter(ioStreams genericiooptions.IOStreams) *ConfigFlags {
+	f.warningPrinter = printers.NewWarningPrinter(ioStreams.ErrOut, printers.WarningPrinterOptions{Color: printers.AllowsColorOutput(ioStreams.ErrOut)})
 	return f
 }
 
