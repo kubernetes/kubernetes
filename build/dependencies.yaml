@@ -46,7 +46,7 @@ dependencies:
 
   # CRI Tools
   - name: "crictl"
-    version: 1.26.1
+    version: 1.27.0
     refPaths:
     - path: cluster/gce/windows/k8s-node-setup.psm1
       match: CRICTL_VERSION =
