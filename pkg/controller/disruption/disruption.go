@@ -617,7 +617,7 @@ func (dc *DisruptionController) getPdbForPodLabels(podNamespace string, podLabel
 	}
 
 	if len(pdbs) > 1 {
-		msg := fmt.Sprintf("Pod labels %q/%q matche multiple PodDisruptionBudgets. Chose %q arbitrarily.", podNamespace, podLabels.String(), pdbs[0].Name)
+		msg := fmt.Sprintf("Pod labels %q/%q match multiple PodDisruptionBudgets. Chose %q arbitrarily.", podNamespace, podLabels.String(), pdbs[0].Name)
 		klog.Warning(msg)
 		// FIXME(oleg): how to emit events?
 		//dc.recorder.Event(pod, v1.EventTypeWarning, "MultiplePodDisruptionBudgets", msg)
