@@ -74,6 +74,12 @@ var (
 	anotherUnboundPVCPod = st.MakePod().PVC("anotherUnboundPVC").Obj()
 )
 
+var cmpOpts = []cmp.Option{
+	cmp.Comparer(func(a, b *framework.Status) bool {
+		return reflect.DeepEqual(a, b)
+	}),
+}
+
 func TestEphemeralLimits(t *testing.T) {
 	// We have to specify a valid filter and arbitrarily pick Cinder here.
 	// It doesn't matter for the test cases.
@@ -191,8 +197,8 @@ func TestEphemeralLimits(t *testing.T) {
 
 			if gotPreFilterStatus.Code() != framework.Skip {
 				gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
-				if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-					t.Errorf("Filter status does not match: %v, want: %v", gotStatus, test.wantStatus)
+				if diff := cmp.Diff(test.wantStatus, gotStatus, cmpOpts...); diff != "" {
+					t.Errorf("Filter status does not match (-want, +got): %s", diff)
 				}
 			}
 		})
@@ -421,8 +427,8 @@ func TestAzureDiskLimits(t *testing.T) {
 
 			if gotPreFilterStatus.Code() != framework.Skip {
 				gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
-				if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-					t.Errorf("Filter status does not match: %v, want: %v", gotStatus, test.wantStatus)
+				if diff := cmp.Diff(test.wantStatus, gotStatus, cmpOpts...); diff != "" {
+					t.Errorf("Filter status does not match (-want, +got): %s", diff)
 				}
 			}
 		})
@@ -702,8 +708,8 @@ func TestEBSLimits(t *testing.T) {
 
 			if gotPreFilterStatus.Code() != framework.Skip {
 				gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
-				if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-					t.Errorf("Filter status does not match: %v, want: %v", gotStatus, test.wantStatus)
+				if diff := cmp.Diff(test.wantStatus, gotStatus, cmpOpts...); diff != "" {
+					t.Errorf("Filter status does not match (-want, +got): %s", diff)
 				}
 			}
 		})
@@ -932,8 +938,8 @@ func TestGCEPDLimits(t *testing.T) {
 
 			if gotPreFilterStatus.Code() != framework.Skip {
 				gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
-				if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-					t.Errorf("Filter status does not match: %v, want: %v", gotStatus, test.wantStatus)
+				if diff := cmp.Diff(test.wantStatus, gotStatus, cmpOpts...); diff != "" {
+					t.Errorf("Filter status does not match (-want, +got): %s", diff)
 				}
 			}
 		})
