@@ -57,42 +57,35 @@ func TestValidateKubeSchedulerConfigurationV1beta2(t *testing.T) {
 		PodInitialBackoffSeconds: podInitialBackoffSeconds,
 		PodMaxBackoffSeconds:     podMaxBackoffSeconds,
 		PercentageOfNodesToScore: pointer.Int32(35),
-		Profiles: []config.KubeSchedulerProfile{
-			{
-				SchedulerName: "me",
-				Plugins: &config.Plugins{
-					QueueSort: config.PluginSet{
-						Enabled: []config.Plugin{{Name: "CustomSort"}},
-					},
-					Score: config.PluginSet{
-						Disabled: []config.Plugin{{Name: "*"}},
-					},
+		Profiles: []config.KubeSchedulerProfile{{
+			SchedulerName: "me",
+			Plugins: &config.Plugins{
+				QueueSort: config.PluginSet{
+					Enabled: []config.Plugin{{Name: "CustomSort"}},
 				},
-				PluginConfig: []config.PluginConfig{
-					{
-						Name: "DefaultPreemption",
-						Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 10, MinCandidateNodesAbsolute: 100},
-					},
+				Score: config.PluginSet{
+					Disabled: []config.Plugin{{Name: "*"}},
 				},
 			},
-			{
-				SchedulerName: "other",
-				Plugins: &config.Plugins{
-					QueueSort: config.PluginSet{
-						Enabled: []config.Plugin{{Name: "CustomSort"}},
-					},
-					Bind: config.PluginSet{
-						Enabled: []config.Plugin{{Name: "CustomBind"}},
-					},
+			PluginConfig: []config.PluginConfig{{
+				Name: "DefaultPreemption",
+				Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 10, MinCandidateNodesAbsolute: 100},
+			}},
+		}, {
+			SchedulerName: "other",
+			Plugins: &config.Plugins{
+				QueueSort: config.PluginSet{
+					Enabled: []config.Plugin{{Name: "CustomSort"}},
+				},
+				Bind: config.PluginSet{
+					Enabled: []config.Plugin{{Name: "CustomBind"}},
 				},
 			},
-		},
-		Extenders: []config.Extender{
-			{
-				PrioritizeVerb: "prioritize",
-				Weight:         1,
-			},
-		},
+		}},
+		Extenders: []config.Extender{{
+			PrioritizeVerb: "prioritize",
+			Weight:         1,
+		}},
 	}
 
 	invalidParallelismValue := validConfig.DeepCopy()
@@ -145,60 +138,46 @@ func TestValidateKubeSchedulerConfigurationV1beta2(t *testing.T) {
 	extenderNegativeWeight.Extenders[0].Weight = -1
 
 	invalidNodePercentage := validConfig.DeepCopy()
-	invalidNodePercentage.Profiles[0].PluginConfig = []config.PluginConfig{
-		{
-			Name: "DefaultPreemption",
-			Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 200, MinCandidateNodesAbsolute: 100},
-		},
-	}
+	invalidNodePercentage.Profiles[0].PluginConfig = []config.PluginConfig{{
+		Name: "DefaultPreemption",
+		Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 200, MinCandidateNodesAbsolute: 100},
+	}}
 
 	invalidPluginArgs := validConfig.DeepCopy()
-	invalidPluginArgs.Profiles[0].PluginConfig = []config.PluginConfig{
-		{
-			Name: "DefaultPreemption",
-			Args: &config.InterPodAffinityArgs{},
-		},
-	}
+	invalidPluginArgs.Profiles[0].PluginConfig = []config.PluginConfig{{
+		Name: "DefaultPreemption",
+		Args: &config.InterPodAffinityArgs{},
+	}}
 
 	duplicatedPluginConfig := validConfig.DeepCopy()
-	duplicatedPluginConfig.Profiles[0].PluginConfig = []config.PluginConfig{
-		{
-			Name: "config",
-		},
-		{
-			Name: "config",
-		},
-	}
+	duplicatedPluginConfig.Profiles[0].PluginConfig = []config.PluginConfig{{
+		Name: "config",
+	}, {
+		Name: "config",
+	}}
 
 	mismatchQueueSort := validConfig.DeepCopy()
-	mismatchQueueSort.Profiles = []config.KubeSchedulerProfile{
-		{
-			SchedulerName: "me",
-			Plugins: &config.Plugins{
-				QueueSort: config.PluginSet{
-					Enabled: []config.Plugin{{Name: "PrioritySort"}},
-				},
-			},
-			PluginConfig: []config.PluginConfig{
-				{
-					Name: "PrioritySort",
-				},
+	mismatchQueueSort.Profiles = []config.KubeSchedulerProfile{{
+		SchedulerName: "me",
+		Plugins: &config.Plugins{
+			QueueSort: config.PluginSet{
+				Enabled: []config.Plugin{{Name: "PrioritySort"}},
 			},
 		},
-		{
-			SchedulerName: "other",
-			Plugins: &config.Plugins{
-				QueueSort: config.PluginSet{
-					Enabled: []config.Plugin{{Name: "CustomSort"}},
-				},
-			},
-			PluginConfig: []config.PluginConfig{
-				{
-					Name: "CustomSort",
-				},
+		PluginConfig: []config.PluginConfig{{
+			Name: "PrioritySort",
+		}},
+	}, {
+		SchedulerName: "other",
+		Plugins: &config.Plugins{
+			QueueSort: config.PluginSet{
+				Enabled: []config.Plugin{{Name: "CustomSort"}},
 			},
 		},
-	}
+		PluginConfig: []config.PluginConfig{{
+			Name: "CustomSort",
+		}},
+	}}
 
 	extenderDuplicateManagedResource := validConfig.DeepCopy()
 	extenderDuplicateManagedResource.Extenders[0].ManagedResources = []config.ExtenderManagedResource{
@@ -455,42 +434,35 @@ func TestValidateKubeSchedulerConfigurationV1beta3(t *testing.T) {
 		PodInitialBackoffSeconds: podInitialBackoffSeconds,
 		PodMaxBackoffSeconds:     podMaxBackoffSeconds,
 		PercentageOfNodesToScore: pointer.Int32(35),
-		Profiles: []config.KubeSchedulerProfile{
-			{
-				SchedulerName: "me",
-				Plugins: &config.Plugins{
-					QueueSort: config.PluginSet{
-						Enabled: []config.Plugin{{Name: "CustomSort"}},
-					},
-					Score: config.PluginSet{
-						Disabled: []config.Plugin{{Name: "*"}},
-					},
+		Profiles: []config.KubeSchedulerProfile{{
+			SchedulerName: "me",
+			Plugins: &config.Plugins{
+				QueueSort: config.PluginSet{
+					Enabled: []config.Plugin{{Name: "CustomSort"}},
 				},
-				PluginConfig: []config.PluginConfig{
-					{
-						Name: "DefaultPreemption",
-						Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 10, MinCandidateNodesAbsolute: 100},
-					},
+				Score: config.PluginSet{
+					Disabled: []config.Plugin{{Name: "*"}},
 				},
 			},
-			{
-				SchedulerName: "other",
-				Plugins: &config.Plugins{
-					QueueSort: config.PluginSet{
-						Enabled: []config.Plugin{{Name: "CustomSort"}},
-					},
-					Bind: config.PluginSet{
-						Enabled: []config.Plugin{{Name: "CustomBind"}},
-					},
+			PluginConfig: []config.PluginConfig{{
+				Name: "DefaultPreemption",
+				Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 10, MinCandidateNodesAbsolute: 100},
+			}},
+		}, {
+			SchedulerName: "other",
+			Plugins: &config.Plugins{
+				QueueSort: config.PluginSet{
+					Enabled: []config.Plugin{{Name: "CustomSort"}},
+				},
+				Bind: config.PluginSet{
+					Enabled: []config.Plugin{{Name: "CustomBind"}},
 				},
 			},
-		},
-		Extenders: []config.Extender{
-			{
-				PrioritizeVerb: "prioritize",
-				Weight:         1,
-			},
-		},
+		}},
+		Extenders: []config.Extender{{
+			PrioritizeVerb: "prioritize",
+			Weight:         1,
+		}},
 	}
 
 	invalidParallelismValue := validConfig.DeepCopy()
@@ -543,20 +515,16 @@ func TestValidateKubeSchedulerConfigurationV1beta3(t *testing.T) {
 	extenderNegativeWeight.Extenders[0].Weight = -1
 
 	invalidNodePercentage := validConfig.DeepCopy()
-	invalidNodePercentage.Profiles[0].PluginConfig = []config.PluginConfig{
-		{
-			Name: "DefaultPreemption",
-			Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 200, MinCandidateNodesAbsolute: 100},
-		},
-	}
+	invalidNodePercentage.Profiles[0].PluginConfig = []config.PluginConfig{{
+		Name: "DefaultPreemption",
+		Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 200, MinCandidateNodesAbsolute: 100},
+	}}
 
 	invalidPluginArgs := validConfig.DeepCopy()
-	invalidPluginArgs.Profiles[0].PluginConfig = []config.PluginConfig{
-		{
-			Name: "DefaultPreemption",
-			Args: &config.InterPodAffinityArgs{},
-		},
-	}
+	invalidPluginArgs.Profiles[0].PluginConfig = []config.PluginConfig{{
+		Name: "DefaultPreemption",
+		Args: &config.InterPodAffinityArgs{},
+	}}
 
 	duplicatedPlugins := validConfig.DeepCopy()
 	duplicatedPlugins.Profiles[0].Plugins.PreEnqueue.Enabled = []config.Plugin{
@@ -565,44 +533,34 @@ func TestValidateKubeSchedulerConfigurationV1beta3(t *testing.T) {
 	}
 
 	duplicatedPluginConfig := validConfig.DeepCopy()
-	duplicatedPluginConfig.Profiles[0].PluginConfig = []config.PluginConfig{
-		{
-			Name: "config",
-		},
-		{
-			Name: "config",
-		},
-	}
+	duplicatedPluginConfig.Profiles[0].PluginConfig = []config.PluginConfig{{
+		Name: "config",
+	}, {
+		Name: "config",
+	}}
 
 	mismatchQueueSort := validConfig.DeepCopy()
-	mismatchQueueSort.Profiles = []config.KubeSchedulerProfile{
-		{
-			SchedulerName: "me",
-			Plugins: &config.Plugins{
-				QueueSort: config.PluginSet{
-					Enabled: []config.Plugin{{Name: "PrioritySort"}},
-				},
-			},
-			PluginConfig: []config.PluginConfig{
-				{
-					Name: "PrioritySort",
-				},
+	mismatchQueueSort.Profiles = []config.KubeSchedulerProfile{{
+		SchedulerName: "me",
+		Plugins: &config.Plugins{
+			QueueSort: config.PluginSet{
+				Enabled: []config.Plugin{{Name: "PrioritySort"}},
 			},
 		},
-		{
-			SchedulerName: "other",
-			Plugins: &config.Plugins{
-				QueueSort: config.PluginSet{
-					Enabled: []config.Plugin{{Name: "CustomSort"}},
-				},
-			},
-			PluginConfig: []config.PluginConfig{
-				{
-					Name: "CustomSort",
-				},
+		PluginConfig: []config.PluginConfig{{
+			Name: "PrioritySort",
+		}},
+	}, {
+		SchedulerName: "other",
+		Plugins: &config.Plugins{
+			QueueSort: config.PluginSet{
+				Enabled: []config.Plugin{{Name: "CustomSort"}},
 			},
 		},
-	}
+		PluginConfig: []config.PluginConfig{{
+			Name: "CustomSort",
+		}},
+	}}
 
 	extenderDuplicateManagedResource := validConfig.DeepCopy()
 	extenderDuplicateManagedResource.Extenders[0].ManagedResources = []config.ExtenderManagedResource{
@@ -858,44 +816,37 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 		},
 		PodInitialBackoffSeconds: podInitialBackoffSeconds,
 		PodMaxBackoffSeconds:     podMaxBackoffSeconds,
-		Profiles: []config.KubeSchedulerProfile{
-			{
-				SchedulerName:            "me",
-				PercentageOfNodesToScore: pointer.Int32(35),
-				Plugins: &config.Plugins{
-					QueueSort: config.PluginSet{
-						Enabled: []config.Plugin{{Name: "CustomSort"}},
-					},
-					Score: config.PluginSet{
-						Disabled: []config.Plugin{{Name: "*"}},
-					},
+		Profiles: []config.KubeSchedulerProfile{{
+			SchedulerName:            "me",
+			PercentageOfNodesToScore: pointer.Int32(35),
+			Plugins: &config.Plugins{
+				QueueSort: config.PluginSet{
+					Enabled: []config.Plugin{{Name: "CustomSort"}},
 				},
-				PluginConfig: []config.PluginConfig{
-					{
-						Name: "DefaultPreemption",
-						Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 10, MinCandidateNodesAbsolute: 100},
-					},
+				Score: config.PluginSet{
+					Disabled: []config.Plugin{{Name: "*"}},
 				},
 			},
-			{
-				SchedulerName:            "other",
-				PercentageOfNodesToScore: pointer.Int32(35),
-				Plugins: &config.Plugins{
-					QueueSort: config.PluginSet{
-						Enabled: []config.Plugin{{Name: "CustomSort"}},
-					},
-					Bind: config.PluginSet{
-						Enabled: []config.Plugin{{Name: "CustomBind"}},
-					},
+			PluginConfig: []config.PluginConfig{{
+				Name: "DefaultPreemption",
+				Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 10, MinCandidateNodesAbsolute: 100},
+			}},
+		}, {
+			SchedulerName:            "other",
+			PercentageOfNodesToScore: pointer.Int32(35),
+			Plugins: &config.Plugins{
+				QueueSort: config.PluginSet{
+					Enabled: []config.Plugin{{Name: "CustomSort"}},
+				},
+				Bind: config.PluginSet{
+					Enabled: []config.Plugin{{Name: "CustomBind"}},
 				},
 			},
-		},
-		Extenders: []config.Extender{
-			{
-				PrioritizeVerb: "prioritize",
-				Weight:         1,
-			},
-		},
+		}},
+		Extenders: []config.Extender{{
+			PrioritizeVerb: "prioritize",
+			Weight:         1,
+		}},
 	}
 
 	invalidParallelismValue := validConfig.DeepCopy()
@@ -948,60 +899,46 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 	extenderNegativeWeight.Extenders[0].Weight = -1
 
 	invalidNodePercentage := validConfig.DeepCopy()
-	invalidNodePercentage.Profiles[0].PluginConfig = []config.PluginConfig{
-		{
-			Name: "DefaultPreemption",
-			Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 200, MinCandidateNodesAbsolute: 100},
-		},
-	}
+	invalidNodePercentage.Profiles[0].PluginConfig = []config.PluginConfig{{
+		Name: "DefaultPreemption",
+		Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 200, MinCandidateNodesAbsolute: 100},
+	}}
 
 	invalidPluginArgs := validConfig.DeepCopy()
-	invalidPluginArgs.Profiles[0].PluginConfig = []config.PluginConfig{
-		{
-			Name: "DefaultPreemption",
-			Args: &config.InterPodAffinityArgs{},
-		},
-	}
+	invalidPluginArgs.Profiles[0].PluginConfig = []config.PluginConfig{{
+		Name: "DefaultPreemption",
+		Args: &config.InterPodAffinityArgs{},
+	}}
 
 	duplicatedPluginConfig := validConfig.DeepCopy()
-	duplicatedPluginConfig.Profiles[0].PluginConfig = []config.PluginConfig{
-		{
-			Name: "config",
-		},
-		{
-			Name: "config",
-		},
-	}
+	duplicatedPluginConfig.Profiles[0].PluginConfig = []config.PluginConfig{{
+		Name: "config",
+	}, {
+		Name: "config",
+	}}
 
 	mismatchQueueSort := validConfig.DeepCopy()
-	mismatchQueueSort.Profiles = []config.KubeSchedulerProfile{
-		{
-			SchedulerName: "me",
-			Plugins: &config.Plugins{
-				QueueSort: config.PluginSet{
-					Enabled: []config.Plugin{{Name: "PrioritySort"}},
-				},
-			},
-			PluginConfig: []config.PluginConfig{
-				{
-					Name: "PrioritySort",
-				},
+	mismatchQueueSort.Profiles = []config.KubeSchedulerProfile{{
+		SchedulerName: "me",
+		Plugins: &config.Plugins{
+			QueueSort: config.PluginSet{
+				Enabled: []config.Plugin{{Name: "PrioritySort"}},
 			},
 		},
-		{
-			SchedulerName: "other",
-			Plugins: &config.Plugins{
-				QueueSort: config.PluginSet{
-					Enabled: []config.Plugin{{Name: "CustomSort"}},
-				},
-			},
-			PluginConfig: []config.PluginConfig{
-				{
-					Name: "CustomSort",
-				},
+		PluginConfig: []config.PluginConfig{{
+			Name: "PrioritySort",
+		}},
+	}, {
+		SchedulerName: "other",
+		Plugins: &config.Plugins{
+			QueueSort: config.PluginSet{
+				Enabled: []config.Plugin{{Name: "CustomSort"}},
 			},
 		},
-	}
+		PluginConfig: []config.PluginConfig{{
+			Name: "CustomSort",
+		}},
+	}}
 
 	extenderDuplicateManagedResource := validConfig.DeepCopy()
 	extenderDuplicateManagedResource.Extenders[0].ManagedResources = []config.ExtenderManagedResource{

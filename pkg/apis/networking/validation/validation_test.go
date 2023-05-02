@@ -477,22 +477,18 @@ func TestValidateIngress(t *testing.T) {
 		},
 		Spec: networking.IngressSpec{
 			DefaultBackend: &defaultBackend,
-			Rules: []networking.IngressRule{
-				{
-					Host: "foo.bar.com",
-					IngressRuleValue: networking.IngressRuleValue{
-						HTTP: &networking.HTTPIngressRuleValue{
-							Paths: []networking.HTTPIngressPath{
-								{
-									Path:     "/foo",
-									PathType: &pathTypeImplementationSpecific,
-									Backend:  defaultBackend,
-								},
-							},
-						},
+			Rules: []networking.IngressRule{{
+				Host: "foo.bar.com",
+				IngressRuleValue: networking.IngressRuleValue{
+					HTTP: &networking.HTTPIngressRuleValue{
+						Paths: []networking.HTTPIngressPath{{
+							Path:     "/foo",
+							PathType: &pathTypeImplementationSpecific,
+							Backend:  defaultBackend,
+						}},
 					},
 				},
-			},
+			}},
 		},
 		Status: networking.IngressStatus{
 			LoadBalancer: networking.IngressLoadBalancerStatus{
@@ -595,20 +591,18 @@ func TestValidateIngress(t *testing.T) {
 			tweakIngress: func(ing *networking.Ingress) {
 				ing.Spec.Rules[0].IngressRuleValue = networking.IngressRuleValue{
 					HTTP: &networking.HTTPIngressRuleValue{
-						Paths: []networking.HTTPIngressPath{
-							{
-								Path:     "/foo",
-								PathType: &pathTypeImplementationSpecific,
-								Backend: networking.IngressBackend{
-									Service: serviceBackend,
-									Resource: &api.TypedLocalObjectReference{
-										APIGroup: utilpointer.String("example.com"),
-										Kind:     "foo",
-										Name:     "bar",
-									},
+						Paths: []networking.HTTPIngressPath{{
+							Path:     "/foo",
+							PathType: &pathTypeImplementationSpecific,
+							Backend: networking.IngressBackend{
+								Service: serviceBackend,
+								Resource: &api.TypedLocalObjectReference{
+									APIGroup: utilpointer.String("example.com"),
+									Kind:     "foo",
+									Name:     "bar",
 								},
 							},
-						},
+						}},
 					},
 				}
 			},
@@ -620,20 +614,18 @@ func TestValidateIngress(t *testing.T) {
 			tweakIngress: func(ing *networking.Ingress) {
 				ing.Spec.Rules[0].IngressRuleValue = networking.IngressRuleValue{
 					HTTP: &networking.HTTPIngressRuleValue{
-						Paths: []networking.HTTPIngressPath{
-							{
-								Path:     "/foo",
-								PathType: &pathTypeImplementationSpecific,
-								Backend: networking.IngressBackend{
-									Service: serviceBackend,
-									Resource: &api.TypedLocalObjectReference{
-										APIGroup: utilpointer.String("example.com"),
-										Kind:     "foo",
-										Name:     "bar",
-									},
+						Paths: []networking.HTTPIngressPath{{
+							Path:     "/foo",
+							PathType: &pathTypeImplementationSpecific,
+							Backend: networking.IngressBackend{
+								Service: serviceBackend,
+								Resource: &api.TypedLocalObjectReference{
+									APIGroup: utilpointer.String("example.com"),
+									Kind:     "foo",
+									Name:     "bar",
 								},
 							},
-						},
+						}},
 					},
 				}
 			},
@@ -790,15 +782,13 @@ func TestValidateIngressRuleValue(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			irv := &networking.IngressRuleValue{
 				HTTP: &networking.HTTPIngressRuleValue{
-					Paths: []networking.HTTPIngressPath{
-						{
-							Path:     testCase.path,
-							PathType: &testCase.pathType,
-							Backend: networking.IngressBackend{
-								Service: &serviceBackend,
-							},
+					Paths: []networking.HTTPIngressPath{{
+						Path:     testCase.path,
+						PathType: &testCase.pathType,
+						Backend: networking.IngressBackend{
+							Service: &serviceBackend,
 						},
-					},
+					}},
 				},
 			}
 			errs := validateIngressRuleValue(irv, field.NewPath("testing"), IngressValidationOptions{})
@@ -1638,22 +1628,18 @@ func TestValidateIngressTLS(t *testing.T) {
 			},
 			Spec: networking.IngressSpec{
 				DefaultBackend: &defaultBackend,
-				Rules: []networking.IngressRule{
-					{
-						Host: "foo.bar.com",
-						IngressRuleValue: networking.IngressRuleValue{
-							HTTP: &networking.HTTPIngressRuleValue{
-								Paths: []networking.HTTPIngressPath{
-									{
-										Path:     "/foo",
-										PathType: &pathTypeImplementationSpecific,
-										Backend:  defaultBackend,
-									},
-								},
-							},
+				Rules: []networking.IngressRule{{
+					Host: "foo.bar.com",
+					IngressRuleValue: networking.IngressRuleValue{
+						HTTP: &networking.HTTPIngressRuleValue{
+							Paths: []networking.HTTPIngressPath{{
+								Path:     "/foo",
+								PathType: &pathTypeImplementationSpecific,
+								Backend:  defaultBackend,
+							}},
 						},
 					},
-				},
+				}},
 			},
 			Status: networking.IngressStatus{
 				LoadBalancer: networking.IngressLoadBalancerStatus{
@@ -1670,11 +1656,9 @@ func TestValidateIngressTLS(t *testing.T) {
 	wildcardHost := "foo.*.bar.com"
 	badWildcardTLS := newValid()
 	badWildcardTLS.Spec.Rules[0].Host = "*.foo.bar.com"
-	badWildcardTLS.Spec.TLS = []networking.IngressTLS{
-		{
-			Hosts: []string{wildcardHost},
-		},
-	}
+	badWildcardTLS.Spec.TLS = []networking.IngressTLS{{
+		Hosts: []string{wildcardHost},
+	}}
 	badWildcardTLSErr := fmt.Sprintf("spec.tls[0].hosts[0]: Invalid value: '%v'", wildcardHost)
 	errorCases[badWildcardTLSErr] = badWildcardTLS
 
@@ -1696,11 +1680,9 @@ func TestValidateIngressTLS(t *testing.T) {
 	wildHost := "*.bar.com"
 	goodWildcardTLS := newValid()
 	goodWildcardTLS.Spec.Rules[0].Host = "*.bar.com"
-	goodWildcardTLS.Spec.TLS = []networking.IngressTLS{
-		{
-			Hosts: []string{wildHost},
-		},
-	}
+	goodWildcardTLS.Spec.TLS = []networking.IngressTLS{{
+		Hosts: []string{wildHost},
+	}}
 	validCases[fmt.Sprintf("spec.tls[0].hosts: Valid value: '%v'", wildHost)] = goodWildcardTLS
 	for k, v := range validCases {
 		errs := validateIngress(&v, IngressValidationOptions{})
@@ -1731,21 +1713,17 @@ func TestValidateEmptyIngressTLS(t *testing.T) {
 				Namespace: metav1.NamespaceDefault,
 			},
 			Spec: networking.IngressSpec{
-				Rules: []networking.IngressRule{
-					{
-						Host: "foo.bar.com",
-						IngressRuleValue: networking.IngressRuleValue{
-							HTTP: &networking.HTTPIngressRuleValue{
-								Paths: []networking.HTTPIngressPath{
-									{
-										PathType: &pathTypeImplementationSpecific,
-										Backend:  defaultBackend,
-									},
-								},
-							},
+				Rules: []networking.IngressRule{{
+					Host: "foo.bar.com",
+					IngressRuleValue: networking.IngressRuleValue{
+						HTTP: &networking.HTTPIngressRuleValue{
+							Paths: []networking.HTTPIngressPath{{
+								PathType: &pathTypeImplementationSpecific,
+								Backend:  defaultBackend,
+							}},
 						},
 					},
-				},
+				}},
 			},
 		}
 	}
@@ -1757,11 +1735,9 @@ func TestValidateEmptyIngressTLS(t *testing.T) {
 	}
 	validCases[fmt.Sprintf("spec.tls[0]: Valid value: %v", goodEmptyTLS.Spec.TLS[0])] = goodEmptyTLS
 	goodEmptyHosts := newValid()
-	goodEmptyHosts.Spec.TLS = []networking.IngressTLS{
-		{
-			Hosts: []string{},
-		},
-	}
+	goodEmptyHosts.Spec.TLS = []networking.IngressTLS{{
+		Hosts: []string{},
+	}}
 	validCases[fmt.Sprintf("spec.tls[0]: Valid value: %v", goodEmptyHosts.Spec.TLS[0])] = goodEmptyHosts
 	for k, v := range validCases {
 		errs := validateIngress(&v, IngressValidationOptions{})
@@ -1791,21 +1767,17 @@ func TestValidateIngressStatusUpdate(t *testing.T) {
 			},
 			Spec: networking.IngressSpec{
 				DefaultBackend: &defaultBackend,
-				Rules: []networking.IngressRule{
-					{
-						Host: "foo.bar.com",
-						IngressRuleValue: networking.IngressRuleValue{
-							HTTP: &networking.HTTPIngressRuleValue{
-								Paths: []networking.HTTPIngressPath{
-									{
-										Path:    "/foo",
-										Backend: defaultBackend,
-									},
-								},
-							},
+				Rules: []networking.IngressRule{{
+					Host: "foo.bar.com",
+					IngressRuleValue: networking.IngressRuleValue{
+						HTTP: &networking.HTTPIngressRuleValue{
+							Paths: []networking.HTTPIngressPath{{
+								Path:    "/foo",
+								Backend: defaultBackend,
+							}},
 						},
 					},
-				},
+				}},
 			},
 			Status: networking.IngressStatus{
 				LoadBalancer: networking.IngressLoadBalancerStatus{
@@ -1867,17 +1839,13 @@ func TestValidateIngressStatusUpdate(t *testing.T) {
 
 func makeNodeSelector(key string, op api.NodeSelectorOperator, values []string) *api.NodeSelector {
 	return &api.NodeSelector{
-		NodeSelectorTerms: []api.NodeSelectorTerm{
-			{
-				MatchExpressions: []api.NodeSelectorRequirement{
-					{
-						Key:      key,
-						Operator: op,
-						Values:   values,
-					},
-				},
-			},
-		},
+		NodeSelectorTerms: []api.NodeSelectorTerm{{
+			MatchExpressions: []api.NodeSelectorRequirement{{
+				Key:      key,
+				Operator: op,
+				Values:   values,
+			}},
+		}},
 	}
 }
 
@@ -1901,59 +1869,49 @@ func TestValidateClusterCIDR(t *testing.T) {
 		name      string
 		cc        *networking.ClusterCIDR
 		expectErr bool
-	}{
-		{
-			name:      "valid SingleStack IPv4 ClusterCIDR",
-			cc:        makeClusterCIDR(8, "10.1.0.0/16", "", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
-			expectErr: false,
-		},
-		{
-			name:      "valid SingleStack IPv4 ClusterCIDR, perNodeHostBits = maxPerNodeHostBits",
-			cc:        makeClusterCIDR(16, "10.1.0.0/16", "", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
-			expectErr: false,
-		},
-		{
-			name:      "valid SingleStack IPv4 ClusterCIDR, perNodeHostBits > minPerNodeHostBits",
-			cc:        makeClusterCIDR(4, "10.1.0.0/16", "", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
-			expectErr: false,
-		},
-		{
-			name:      "valid SingleStack IPv6 ClusterCIDR",
-			cc:        makeClusterCIDR(8, "", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
-			expectErr: false,
-		},
-		{
-			name:      "valid SingleStack IPv6 ClusterCIDR, perNodeHostBits = maxPerNodeHostBit",
-			cc:        makeClusterCIDR(64, "", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
-			expectErr: false,
-		},
-		{
-			name:      "valid SingleStack IPv6 ClusterCIDR, perNodeHostBits > minPerNodeHostBit",
-			cc:        makeClusterCIDR(4, "", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
-			expectErr: false,
-		},
-		{
-			name:      "valid SingleStack IPv6 ClusterCIDR perNodeHostBits=100",
-			cc:        makeClusterCIDR(100, "", "fd00:1:1::/16", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
-			expectErr: false,
-		},
-		{
-			name:      "valid DualStack ClusterCIDR",
-			cc:        makeClusterCIDR(8, "10.1.0.0/16", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
-			expectErr: false,
-		},
-		{
-			name:      "valid DualStack ClusterCIDR, no NodeSelector",
-			cc:        makeClusterCIDR(8, "10.1.0.0/16", "fd00:1:1::/64", nil),
-			expectErr: false,
-		},
+	}{{
+		name:      "valid SingleStack IPv4 ClusterCIDR",
+		cc:        makeClusterCIDR(8, "10.1.0.0/16", "", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+		expectErr: false,
+	}, {
+		name:      "valid SingleStack IPv4 ClusterCIDR, perNodeHostBits = maxPerNodeHostBits",
+		cc:        makeClusterCIDR(16, "10.1.0.0/16", "", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+		expectErr: false,
+	}, {
+		name:      "valid SingleStack IPv4 ClusterCIDR, perNodeHostBits > minPerNodeHostBits",
+		cc:        makeClusterCIDR(4, "10.1.0.0/16", "", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+		expectErr: false,
+	}, {
+		name:      "valid SingleStack IPv6 ClusterCIDR",
+		cc:        makeClusterCIDR(8, "", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+		expectErr: false,
+	}, {
+		name:      "valid SingleStack IPv6 ClusterCIDR, perNodeHostBits = maxPerNodeHostBit",
+		cc:        makeClusterCIDR(64, "", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+		expectErr: false,
+	}, {
+		name:      "valid SingleStack IPv6 ClusterCIDR, perNodeHostBits > minPerNodeHostBit",
+		cc:        makeClusterCIDR(4, "", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+		expectErr: false,
+	}, {
+		name:      "valid SingleStack IPv6 ClusterCIDR perNodeHostBits=100",
+		cc:        makeClusterCIDR(100, "", "fd00:1:1::/16", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+		expectErr: false,
+	}, {
+		name:      "valid DualStack ClusterCIDR",
+		cc:        makeClusterCIDR(8, "10.1.0.0/16", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+		expectErr: false,
+	}, {
+		name:      "valid DualStack ClusterCIDR, no NodeSelector",
+		cc:        makeClusterCIDR(8, "10.1.0.0/16", "fd00:1:1::/64", nil),
+		expectErr: false,
+	},
 		// Failure cases.
 		{
 			name:      "invalid ClusterCIDR, no IPv4 or IPv6 CIDR",
 			cc:        makeClusterCIDR(8, "", "", nil),
 			expectErr: true,
-		},
-		{
+		}, {
 			name:      "invalid ClusterCIDR, invalid nodeSelector",
 			cc:        makeClusterCIDR(8, "10.1.0.0/16", "fd00:1:1::/64", makeNodeSelector("NoUppercaseOrSpecialCharsLike=Equals", api.NodeSelectorOpIn, []string{"bar"})),
 			expectErr: true,
@@ -1963,13 +1921,11 @@ func TestValidateClusterCIDR(t *testing.T) {
 			name:      "invalid SingleStack IPv4 ClusterCIDR, invalid spec.IPv4",
 			cc:        makeClusterCIDR(8, "test", "", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
 			expectErr: true,
-		},
-		{
+		}, {
 			name:      "invalid Singlestack IPv4 ClusterCIDR, perNodeHostBits > maxPerNodeHostBits",
 			cc:        makeClusterCIDR(100, "10.1.0.0/16", "", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
 			expectErr: true,
-		},
-		{
+		}, {
 			name:      "invalid SingleStack IPv4 ClusterCIDR, perNodeHostBits < minPerNodeHostBits",
 			cc:        makeClusterCIDR(2, "10.1.0.0/16", "", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
 			expectErr: true,
@@ -1979,18 +1935,15 @@ func TestValidateClusterCIDR(t *testing.T) {
 			name:      "invalid SingleStack IPv6 ClusterCIDR, invalid spec.IPv6",
 			cc:        makeClusterCIDR(8, "", "testv6", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
 			expectErr: true,
-		},
-		{
+		}, {
 			name:      "invalid SingleStack IPv6 ClusterCIDR, valid IPv4 CIDR in spec.IPv6",
 			cc:        makeClusterCIDR(8, "", "10.2.0.0/16", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
 			expectErr: true,
-		},
-		{
+		}, {
 			name:      "invalid SingleStack IPv6 ClusterCIDR, invalid perNodeHostBits > maxPerNodeHostBits",
 			cc:        makeClusterCIDR(12, "", "fd00::/120", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
 			expectErr: true,
-		},
-		{
+		}, {
 			name:      "invalid SingleStack IPv6 ClusterCIDR, invalid perNodeHostBits < minPerNodeHostBits",
 			cc:        makeClusterCIDR(3, "", "fd00::/120", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
 			expectErr: true,
@@ -2000,18 +1953,15 @@ func TestValidateClusterCIDR(t *testing.T) {
 			name:      "invalid DualStack ClusterCIDR, valid spec.IPv4, invalid spec.IPv6",
 			cc:        makeClusterCIDR(8, "10.1.0.0/16", "testv6", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
 			expectErr: true,
-		},
-		{
+		}, {
 			name:      "invalid DualStack ClusterCIDR, valid spec.IPv6, invalid spec.IPv4",
 			cc:        makeClusterCIDR(8, "testv4", "fd00::/120", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
 			expectErr: true,
-		},
-		{
+		}, {
 			name:      "invalid DualStack ClusterCIDR, invalid perNodeHostBits > maxPerNodeHostBits",
 			cc:        makeClusterCIDR(24, "10.1.0.0/16", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
 			expectErr: true,
-		},
-		{
+		}, {
 			name:      "invalid DualStack ClusterCIDR, valid IPv6 CIDR in spec.IPv4",
 			cc:        makeClusterCIDR(8, "fd00::/120", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
 			expectErr: true,
@@ -2038,33 +1988,27 @@ func TestValidateClusterConfigUpdate(t *testing.T) {
 		name      string
 		cc        *networking.ClusterCIDR
 		expectErr bool
-	}{
-		{
-			name:      "Successful update, no changes to ClusterCIDR.Spec",
-			cc:        makeClusterCIDR(8, "10.1.0.0/16", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
-			expectErr: false,
-		},
-		{
-			name:      "Failed update, update spec.PerNodeHostBits",
-			cc:        makeClusterCIDR(12, "10.1.0.0/16", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
-			expectErr: true,
-		},
-		{
-			name:      "Failed update, update spec.IPv4",
-			cc:        makeClusterCIDR(8, "10.2.0.0/16", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
-			expectErr: true,
-		},
-		{
-			name:      "Failed update, update spec.IPv6",
-			cc:        makeClusterCIDR(8, "10.1.0.0/16", "fd00:2:/112", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
-			expectErr: true,
-		},
-		{
-			name:      "Failed update, update spec.NodeSelector",
-			cc:        makeClusterCIDR(8, "10.1.0.0/16", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar2"})),
-			expectErr: true,
-		},
-	}
+	}{{
+		name:      "Successful update, no changes to ClusterCIDR.Spec",
+		cc:        makeClusterCIDR(8, "10.1.0.0/16", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+		expectErr: false,
+	}, {
+		name:      "Failed update, update spec.PerNodeHostBits",
+		cc:        makeClusterCIDR(12, "10.1.0.0/16", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+		expectErr: true,
+	}, {
+		name:      "Failed update, update spec.IPv4",
+		cc:        makeClusterCIDR(8, "10.2.0.0/16", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+		expectErr: true,
+	}, {
+		name:      "Failed update, update spec.IPv6",
+		cc:        makeClusterCIDR(8, "10.1.0.0/16", "fd00:2:/112", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+		expectErr: true,
+	}, {
+		name:      "Failed update, update spec.NodeSelector",
+		cc:        makeClusterCIDR(8, "10.1.0.0/16", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar2"})),
+		expectErr: true,
+	}}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			err := ValidateClusterCIDRUpdate(testCase.cc, oldCCC)
@@ -2244,15 +2188,14 @@ func TestValidateIPAddressUpdate(t *testing.T) {
 		name      string
 		new       func(svc *networking.IPAddress) *networking.IPAddress
 		expectErr bool
-	}{
-		{
-			name: "Successful update, no changes",
-			new: func(old *networking.IPAddress) *networking.IPAddress {
-				out := old.DeepCopy()
-				return out
-			},
-			expectErr: false,
+	}{{
+		name: "Successful update, no changes",
+		new: func(old *networking.IPAddress) *networking.IPAddress {
+			out := old.DeepCopy()
+			return out
 		},
+		expectErr: false,
+	},
 
 		{
 			name: "Failed update, update spec.ParentRef",
@@ -2267,8 +2210,7 @@ func TestValidateIPAddressUpdate(t *testing.T) {
 
 				return out
 			}, expectErr: true,
-		},
-		{
+		}, {
 			name: "Failed update, delete spec.ParentRef",
 			new: func(svc *networking.IPAddress) *networking.IPAddress {
 				out := svc.DeepCopy()
