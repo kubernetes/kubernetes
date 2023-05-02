@@ -112,49 +112,39 @@ func TestValidateJob(t *testing.T) {
 					Selector: validGeneratedSelector,
 					Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
 					PodFailurePolicy: &batch.PodFailurePolicy{
-						Rules: []batch.PodFailurePolicyRule{
-							{
-								Action: batch.PodFailurePolicyActionIgnore,
-								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
-									{
-										Type:   api.DisruptionTarget,
-										Status: api.ConditionTrue,
-									},
-								},
+						Rules: []batch.PodFailurePolicyRule{{
+							Action: batch.PodFailurePolicyActionIgnore,
+							OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{{
+								Type:   api.DisruptionTarget,
+								Status: api.ConditionTrue,
+							}},
+						}, {
+							Action: batch.PodFailurePolicyActionFailJob,
+							OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{{
+								Type:   api.PodConditionType("CustomConditionType"),
+								Status: api.ConditionFalse,
+							}},
+						}, {
+							Action: batch.PodFailurePolicyActionCount,
+							OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+								ContainerName: pointer.String("abc"),
+								Operator:      batch.PodFailurePolicyOnExitCodesOpIn,
+								Values:        []int32{1, 2, 3},
 							},
-							{
-								Action: batch.PodFailurePolicyActionFailJob,
-								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
-									{
-										Type:   api.PodConditionType("CustomConditionType"),
-										Status: api.ConditionFalse,
-									},
-								},
+						}, {
+							Action: batch.PodFailurePolicyActionIgnore,
+							OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+								ContainerName: pointer.String("def"),
+								Operator:      batch.PodFailurePolicyOnExitCodesOpIn,
+								Values:        []int32{4},
 							},
-							{
-								Action: batch.PodFailurePolicyActionCount,
-								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
-									ContainerName: pointer.String("abc"),
-									Operator:      batch.PodFailurePolicyOnExitCodesOpIn,
-									Values:        []int32{1, 2, 3},
-								},
+						}, {
+							Action: batch.PodFailurePolicyActionFailJob,
+							OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+								Operator: batch.PodFailurePolicyOnExitCodesOpNotIn,
+								Values:   []int32{5, 6, 7},
 							},
-							{
-								Action: batch.PodFailurePolicyActionIgnore,
-								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
-									ContainerName: pointer.String("def"),
-									Operator:      batch.PodFailurePolicyOnExitCodesOpIn,
-									Values:        []int32{4},
-								},
-							},
-							{
-								Action: batch.PodFailurePolicyActionFailJob,
-								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
-									Operator: batch.PodFailurePolicyOnExitCodesOpNotIn,
-									Values:   []int32{5, 6, 7},
-								},
-							},
-						},
+						}},
 					},
 				},
 			},
@@ -314,11 +304,9 @@ func TestValidateJob(t *testing.T) {
 					Selector: validGeneratedSelector,
 					Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
 					PodFailurePolicy: &batch.PodFailurePolicy{
-						Rules: []batch.PodFailurePolicyRule{
-							{
-								Action: batch.PodFailurePolicyActionFailJob,
-							},
-						},
+						Rules: []batch.PodFailurePolicyRule{{
+							Action: batch.PodFailurePolicyActionFailJob,
+						}},
 					},
 				},
 			},
@@ -331,15 +319,13 @@ func TestValidateJob(t *testing.T) {
 					Selector: validGeneratedSelector,
 					Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
 					PodFailurePolicy: &batch.PodFailurePolicy{
-						Rules: []batch.PodFailurePolicyRule{
-							{
-								Action: batch.PodFailurePolicyActionFailJob,
-								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
-									Operator: batch.PodFailurePolicyOnExitCodesOpIn,
-									Values:   []int32{11, 11},
-								},
+						Rules: []batch.PodFailurePolicyRule{{
+							Action: batch.PodFailurePolicyActionFailJob,
+							OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+								Operator: batch.PodFailurePolicyOnExitCodesOpIn,
+								Values:   []int32{11, 11},
 							},
-						},
+						}},
 					},
 				},
 			},
@@ -352,21 +338,19 @@ func TestValidateJob(t *testing.T) {
 					Selector: validGeneratedSelector,
 					Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
 					PodFailurePolicy: &batch.PodFailurePolicy{
-						Rules: []batch.PodFailurePolicyRule{
-							{
-								Action: batch.PodFailurePolicyActionFailJob,
-								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
-									Operator: batch.PodFailurePolicyOnExitCodesOpIn,
-									Values: func() (values []int32) {
-										tooManyValues := make([]int32, maxPodFailurePolicyOnExitCodesValues+1)
-										for i := range tooManyValues {
-											tooManyValues[i] = int32(i)
-										}
-										return tooManyValues
-									}(),
-								},
+						Rules: []batch.PodFailurePolicyRule{{
+							Action: batch.PodFailurePolicyActionFailJob,
+							OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+								Operator: batch.PodFailurePolicyOnExitCodesOpIn,
+								Values: func() (values []int32) {
+									tooManyValues := make([]int32, maxPodFailurePolicyOnExitCodesValues+1)
+									for i := range tooManyValues {
+										tooManyValues[i] = int32(i)
+									}
+									return tooManyValues
+								}(),
 							},
-						},
+						}},
 					},
 				},
 			},
@@ -404,21 +388,19 @@ func TestValidateJob(t *testing.T) {
 					Selector: validGeneratedSelector,
 					Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
 					PodFailurePolicy: &batch.PodFailurePolicy{
-						Rules: []batch.PodFailurePolicyRule{
-							{
-								Action: batch.PodFailurePolicyActionFailJob,
-								OnPodConditions: func() []batch.PodFailurePolicyOnPodConditionsPattern {
-									tooManyPatterns := make([]batch.PodFailurePolicyOnPodConditionsPattern, maxPodFailurePolicyOnPodConditionsPatterns+1)
-									for i := range tooManyPatterns {
-										tooManyPatterns[i] = batch.PodFailurePolicyOnPodConditionsPattern{
-											Type:   api.PodConditionType(fmt.Sprintf("CustomType_%d", i)),
-											Status: api.ConditionTrue,
-										}
+						Rules: []batch.PodFailurePolicyRule{{
+							Action: batch.PodFailurePolicyActionFailJob,
+							OnPodConditions: func() []batch.PodFailurePolicyOnPodConditionsPattern {
+								tooManyPatterns := make([]batch.PodFailurePolicyOnPodConditionsPattern, maxPodFailurePolicyOnPodConditionsPatterns+1)
+								for i := range tooManyPatterns {
+									tooManyPatterns[i] = batch.PodFailurePolicyOnPodConditionsPattern{
+										Type:   api.PodConditionType(fmt.Sprintf("CustomType_%d", i)),
+										Status: api.ConditionTrue,
 									}
-									return tooManyPatterns
-								}(),
-							},
-						},
+								}
+								return tooManyPatterns
+							}(),
+						}},
 					},
 				},
 			},
@@ -431,15 +413,13 @@ func TestValidateJob(t *testing.T) {
 					Selector: validGeneratedSelector,
 					Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
 					PodFailurePolicy: &batch.PodFailurePolicy{
-						Rules: []batch.PodFailurePolicyRule{
-							{
-								Action: batch.PodFailurePolicyActionFailJob,
-								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
-									Operator: batch.PodFailurePolicyOnExitCodesOpIn,
-									Values:   []int32{12, 13, 13, 13},
-								},
+						Rules: []batch.PodFailurePolicyRule{{
+							Action: batch.PodFailurePolicyActionFailJob,
+							OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+								Operator: batch.PodFailurePolicyOnExitCodesOpIn,
+								Values:   []int32{12, 13, 13, 13},
 							},
-						},
+						}},
 					},
 				},
 			},
@@ -452,15 +432,13 @@ func TestValidateJob(t *testing.T) {
 					Selector: validGeneratedSelector,
 					Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
 					PodFailurePolicy: &batch.PodFailurePolicy{
-						Rules: []batch.PodFailurePolicyRule{
-							{
-								Action: batch.PodFailurePolicyActionFailJob,
-								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
-									Operator: batch.PodFailurePolicyOnExitCodesOpIn,
-									Values:   []int32{19, 11},
-								},
+						Rules: []batch.PodFailurePolicyRule{{
+							Action: batch.PodFailurePolicyActionFailJob,
+							OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+								Operator: batch.PodFailurePolicyOnExitCodesOpIn,
+								Values:   []int32{19, 11},
 							},
-						},
+						}},
 					},
 				},
 			},
@@ -473,15 +451,13 @@ func TestValidateJob(t *testing.T) {
 					Selector: validGeneratedSelector,
 					Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
 					PodFailurePolicy: &batch.PodFailurePolicy{
-						Rules: []batch.PodFailurePolicyRule{
-							{
-								Action: batch.PodFailurePolicyActionFailJob,
-								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
-									Operator: batch.PodFailurePolicyOnExitCodesOpIn,
-									Values:   []int32{},
-								},
+						Rules: []batch.PodFailurePolicyRule{{
+							Action: batch.PodFailurePolicyActionFailJob,
+							OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+								Operator: batch.PodFailurePolicyOnExitCodesOpIn,
+								Values:   []int32{},
 							},
-						},
+						}},
 					},
 				},
 			},
@@ -494,15 +470,13 @@ func TestValidateJob(t *testing.T) {
 					Selector: validGeneratedSelector,
 					Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
 					PodFailurePolicy: &batch.PodFailurePolicy{
-						Rules: []batch.PodFailurePolicyRule{
-							{
-								Action: "",
-								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
-									Operator: batch.PodFailurePolicyOnExitCodesOpIn,
-									Values:   []int32{1, 2, 3},
-								},
+						Rules: []batch.PodFailurePolicyRule{{
+							Action: "",
+							OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+								Operator: batch.PodFailurePolicyOnExitCodesOpIn,
+								Values:   []int32{1, 2, 3},
 							},
-						},
+						}},
 					},
 				},
 			},
@@ -515,15 +489,13 @@ func TestValidateJob(t *testing.T) {
 					Selector: validGeneratedSelector,
 					Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
 					PodFailurePolicy: &batch.PodFailurePolicy{
-						Rules: []batch.PodFailurePolicyRule{
-							{
-								Action: batch.PodFailurePolicyActionFailJob,
-								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
-									Operator: "",
-									Values:   []int32{1, 2, 3},
-								},
+						Rules: []batch.PodFailurePolicyRule{{
+							Action: batch.PodFailurePolicyActionFailJob,
+							OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+								Operator: "",
+								Values:   []int32{1, 2, 3},
 							},
-						},
+						}},
 					},
 				},
 			},
@@ -536,22 +508,18 @@ func TestValidateJob(t *testing.T) {
 					Selector: validGeneratedSelector,
 					Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
 					PodFailurePolicy: &batch.PodFailurePolicy{
-						Rules: []batch.PodFailurePolicyRule{
-							{
-								Action: batch.PodFailurePolicyActionFailJob,
-								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
-									ContainerName: pointer.String("abc"),
-									Operator:      batch.PodFailurePolicyOnExitCodesOpIn,
-									Values:        []int32{1, 2, 3},
-								},
-								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
-									{
-										Type:   api.DisruptionTarget,
-										Status: api.ConditionTrue,
-									},
-								},
+						Rules: []batch.PodFailurePolicyRule{{
+							Action: batch.PodFailurePolicyActionFailJob,
+							OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+								ContainerName: pointer.String("abc"),
+								Operator:      batch.PodFailurePolicyOnExitCodesOpIn,
+								Values:        []int32{1, 2, 3},
 							},
-						},
+							OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{{
+								Type:   api.DisruptionTarget,
+								Status: api.ConditionTrue,
+							}},
+						}},
 					},
 				},
 			},
@@ -564,15 +532,13 @@ func TestValidateJob(t *testing.T) {
 					Selector: validGeneratedSelector,
 					Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
 					PodFailurePolicy: &batch.PodFailurePolicy{
-						Rules: []batch.PodFailurePolicyRule{
-							{
-								Action: batch.PodFailurePolicyActionIgnore,
-								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
-									Operator: batch.PodFailurePolicyOnExitCodesOpIn,
-									Values:   []int32{1, 0, 2},
-								},
+						Rules: []batch.PodFailurePolicyRule{{
+							Action: batch.PodFailurePolicyActionIgnore,
+							OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+								Operator: batch.PodFailurePolicyOnExitCodesOpIn,
+								Values:   []int32{1, 0, 2},
 							},
-						},
+						}},
 					},
 				},
 			},
@@ -585,24 +551,21 @@ func TestValidateJob(t *testing.T) {
 					Selector: validGeneratedSelector,
 					Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
 					PodFailurePolicy: &batch.PodFailurePolicy{
-						Rules: []batch.PodFailurePolicyRule{
-							{
-								Action: batch.PodFailurePolicyActionIgnore,
-								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
-									ContainerName: pointer.String("abc"),
-									Operator:      batch.PodFailurePolicyOnExitCodesOpIn,
-									Values:        []int32{1, 2, 3},
-								},
+						Rules: []batch.PodFailurePolicyRule{{
+							Action: batch.PodFailurePolicyActionIgnore,
+							OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+								ContainerName: pointer.String("abc"),
+								Operator:      batch.PodFailurePolicyOnExitCodesOpIn,
+								Values:        []int32{1, 2, 3},
 							},
-							{
-								Action: batch.PodFailurePolicyActionFailJob,
-								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
-									ContainerName: pointer.String("xyz"),
-									Operator:      batch.PodFailurePolicyOnExitCodesOpIn,
-									Values:        []int32{5, 6, 7},
-								},
+						}, {
+							Action: batch.PodFailurePolicyActionFailJob,
+							OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+								ContainerName: pointer.String("xyz"),
+								Operator:      batch.PodFailurePolicyOnExitCodesOpIn,
+								Values:        []int32{5, 6, 7},
 							},
-						},
+						}},
 					},
 				},
 			},
@@ -615,16 +578,14 @@ func TestValidateJob(t *testing.T) {
 					Selector: validGeneratedSelector,
 					Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
 					PodFailurePolicy: &batch.PodFailurePolicy{
-						Rules: []batch.PodFailurePolicyRule{
-							{
-								Action: "UnknownAction",
-								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
-									ContainerName: pointer.String("abc"),
-									Operator:      batch.PodFailurePolicyOnExitCodesOpIn,
-									Values:        []int32{1, 2, 3},
-								},
+						Rules: []batch.PodFailurePolicyRule{{
+							Action: "UnknownAction",
+							OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+								ContainerName: pointer.String("abc"),
+								Operator:      batch.PodFailurePolicyOnExitCodesOpIn,
+								Values:        []int32{1, 2, 3},
 							},
-						},
+						}},
 					},
 				},
 			},
@@ -637,15 +598,13 @@ func TestValidateJob(t *testing.T) {
 					Selector: validGeneratedSelector,
 					Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
 					PodFailurePolicy: &batch.PodFailurePolicy{
-						Rules: []batch.PodFailurePolicyRule{
-							{
-								Action: batch.PodFailurePolicyActionIgnore,
-								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
-									Operator: "UnknownOperator",
-									Values:   []int32{1, 2, 3},
-								},
+						Rules: []batch.PodFailurePolicyRule{{
+							Action: batch.PodFailurePolicyActionIgnore,
+							OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+								Operator: "UnknownOperator",
+								Values:   []int32{1, 2, 3},
 							},
-						},
+						}},
 					},
 				},
 			},
@@ -658,16 +617,12 @@ func TestValidateJob(t *testing.T) {
 					Selector: validGeneratedSelector,
 					Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
 					PodFailurePolicy: &batch.PodFailurePolicy{
-						Rules: []batch.PodFailurePolicyRule{
-							{
-								Action: batch.PodFailurePolicyActionIgnore,
-								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
-									{
-										Type: api.DisruptionTarget,
-									},
-								},
-							},
-						},
+						Rules: []batch.PodFailurePolicyRule{{
+							Action: batch.PodFailurePolicyActionIgnore,
+							OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{{
+								Type: api.DisruptionTarget,
+							}},
+						}},
 					},
 				},
 			},
@@ -680,17 +635,13 @@ func TestValidateJob(t *testing.T) {
 					Selector: validGeneratedSelector,
 					Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
 					PodFailurePolicy: &batch.PodFailurePolicy{
-						Rules: []batch.PodFailurePolicyRule{
-							{
-								Action: batch.PodFailurePolicyActionIgnore,
-								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
-									{
-										Type:   api.DisruptionTarget,
-										Status: "UnknownStatus",
-									},
-								},
-							},
-						},
+						Rules: []batch.PodFailurePolicyRule{{
+							Action: batch.PodFailurePolicyActionIgnore,
+							OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{{
+								Type:   api.DisruptionTarget,
+								Status: "UnknownStatus",
+							}},
+						}},
 					},
 				},
 			},
@@ -703,16 +654,12 @@ func TestValidateJob(t *testing.T) {
 					Selector: validGeneratedSelector,
 					Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
 					PodFailurePolicy: &batch.PodFailurePolicy{
-						Rules: []batch.PodFailurePolicyRule{
-							{
-								Action: batch.PodFailurePolicyActionIgnore,
-								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
-									{
-										Status: api.ConditionTrue,
-									},
-								},
-							},
-						},
+						Rules: []batch.PodFailurePolicyRule{{
+							Action: batch.PodFailurePolicyActionIgnore,
+							OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{{
+								Status: api.ConditionTrue,
+							}},
+						}},
 					},
 				},
 			},
@@ -725,17 +672,13 @@ func TestValidateJob(t *testing.T) {
 					Selector: validGeneratedSelector,
 					Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
 					PodFailurePolicy: &batch.PodFailurePolicy{
-						Rules: []batch.PodFailurePolicyRule{
-							{
-								Action: batch.PodFailurePolicyActionIgnore,
-								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
-									{
-										Type:   api.PodConditionType("Invalid Condition Type"),
-										Status: api.ConditionTrue,
-									},
-								},
-							},
-						},
+						Rules: []batch.PodFailurePolicyRule{{
+							Action: batch.PodFailurePolicyActionIgnore,
+							OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{{
+								Type:   api.PodConditionType("Invalid Condition Type"),
+								Status: api.ConditionTrue,
+							}},
+						}},
 					},
 				},
 			},
@@ -1116,17 +1059,13 @@ func TestValidateJobUpdate(t *testing.T) {
 	validNodeAffinity := &api.Affinity{
 		NodeAffinity: &api.NodeAffinity{
 			RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
-				NodeSelectorTerms: []api.NodeSelectorTerm{
-					{
-						MatchExpressions: []api.NodeSelectorRequirement{
-							{
-								Key:      "foo",
-								Operator: api.NodeSelectorOpIn,
-								Values:   []string{"bar", "value2"},
-							},
-						},
-					},
-				},
+				NodeSelectorTerms: []api.NodeSelectorTerm{{
+					MatchExpressions: []api.NodeSelectorRequirement{{
+						Key:      "foo",
+						Operator: api.NodeSelectorOpIn,
+						Values:   []string{"bar", "value2"},
+					}},
+				}},
 			},
 		},
 	}
@@ -1134,17 +1073,13 @@ func TestValidateJobUpdate(t *testing.T) {
 	validPodTemplateWithAffinity.Spec.Affinity = &api.Affinity{
 		NodeAffinity: &api.NodeAffinity{
 			RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
-				NodeSelectorTerms: []api.NodeSelectorTerm{
-					{
-						MatchExpressions: []api.NodeSelectorRequirement{
-							{
-								Key:      "foo",
-								Operator: api.NodeSelectorOpIn,
-								Values:   []string{"bar", "value"},
-							},
-						},
-					},
-				},
+				NodeSelectorTerms: []api.NodeSelectorTerm{{
+					MatchExpressions: []api.NodeSelectorRequirement{{
+						Key:      "foo",
+						Operator: api.NodeSelectorOpIn,
+						Values:   []string{"bar", "value"},
+					}},
+				}},
 			},
 		},
 	}
@@ -1242,17 +1177,13 @@ func TestValidateJobUpdate(t *testing.T) {
 			},
 			update: func(job *batch.Job) {
 				job.Spec.PodFailurePolicy = &batch.PodFailurePolicy{
-					Rules: []batch.PodFailurePolicyRule{
-						{
-							Action: batch.PodFailurePolicyActionIgnore,
-							OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
-								{
-									Type:   api.DisruptionTarget,
-									Status: api.ConditionTrue,
-								},
-							},
-						},
-					},
+					Rules: []batch.PodFailurePolicyRule{{
+						Action: batch.PodFailurePolicyActionIgnore,
+						OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{{
+							Type:   api.DisruptionTarget,
+							Status: api.ConditionTrue,
+						}},
+					}},
 				}
 			},
 			err: &field.Error{
@@ -1267,29 +1198,23 @@ func TestValidateJobUpdate(t *testing.T) {
 					Selector: validGeneratedSelector,
 					Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
 					PodFailurePolicy: &batch.PodFailurePolicy{
-						Rules: []batch.PodFailurePolicyRule{
-							{
-								Action: batch.PodFailurePolicyActionIgnore,
-								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
-									{
-										Type:   api.DisruptionTarget,
-										Status: api.ConditionTrue,
-									},
-								},
-							},
-						},
+						Rules: []batch.PodFailurePolicyRule{{
+							Action: batch.PodFailurePolicyActionIgnore,
+							OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{{
+								Type:   api.DisruptionTarget,
+								Status: api.ConditionTrue,
+							}},
+						}},
 					},
 				},
 			},
 			update: func(job *batch.Job) {
 				job.Spec.PodFailurePolicy.Rules = append(job.Spec.PodFailurePolicy.Rules, batch.PodFailurePolicyRule{
 					Action: batch.PodFailurePolicyActionCount,
-					OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
-						{
-							Type:   api.DisruptionTarget,
-							Status: api.ConditionTrue,
-						},
-					},
+					OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{{
+						Type:   api.DisruptionTarget,
+						Status: api.ConditionTrue,
+					}},
 				})
 			},
 			err: &field.Error{
@@ -1304,17 +1229,13 @@ func TestValidateJobUpdate(t *testing.T) {
 					Selector: validGeneratedSelector,
 					Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
 					PodFailurePolicy: &batch.PodFailurePolicy{
-						Rules: []batch.PodFailurePolicyRule{
-							{
-								Action: batch.PodFailurePolicyActionIgnore,
-								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
-									{
-										Type:   api.DisruptionTarget,
-										Status: api.ConditionTrue,
-									},
-								},
-							},
-						},
+						Rules: []batch.PodFailurePolicyRule{{
+							Action: batch.PodFailurePolicyActionIgnore,
+							OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{{
+								Type:   api.DisruptionTarget,
+								Status: api.ConditionTrue,
+							}},
+						}},
 					},
 				},
 			},

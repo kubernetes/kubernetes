@@ -248,291 +248,257 @@ func TestValidateStatefulSet(t *testing.T) {
 		errs field.ErrorList
 	}
 
-	successCases := []testCase{
-		{
-			name: "alpha name",
-			set:  mkStatefulSet(&validPodTemplate, tweakName("abc")),
-		},
-		{
-			name: "alphanumeric name",
-			set:  mkStatefulSet(&validPodTemplate, tweakName("abc-123")),
-		},
-		{
-			name: "parallel pod management",
-			set:  mkStatefulSet(&validPodTemplate, tweakPodManagementPolicy(apps.ParallelPodManagement)),
-		},
-		{
-			name: "ordered ready pod management",
-			set:  mkStatefulSet(&validPodTemplate, tweakPodManagementPolicy(apps.OrderedReadyPodManagement)),
-		},
-		{
-			name: "update strategy",
-			set: mkStatefulSet(&validPodTemplate,
-				tweakReplicas(3),
-				tweakUpdateStrategyType(apps.RollingUpdateStatefulSetStrategyType),
-				tweakRollingUpdatePartition(2),
-			),
-		},
-		{
-			name: "PVC policy " + enableStatefulSetAutoDeletePVC,
-			set: mkStatefulSet(&validPodTemplate,
-				tweakPVCPolicy(mkPVCPolicy(
-					tweakPVCDeletedPolicy(apps.DeletePersistentVolumeClaimRetentionPolicyType),
-					tweakPVCScalePolicy(apps.RetainPersistentVolumeClaimRetentionPolicyType),
-				)),
-			),
-		},
-		{
-			name: "maxUnavailable with parallel pod management",
-			set: mkStatefulSet(&validPodTemplate,
-				tweakReplicas(3),
-				tweakUpdateStrategyType(apps.RollingUpdateStatefulSetStrategyType),
-				tweakRollingUpdatePartition(2),
-				tweakMaxUnavailable(intstr.FromInt32(2)),
-			),
-		},
-		{
-			name: "ordinals.start positive value",
-			set: mkStatefulSet(&validPodTemplate,
-				tweakReplicas(3),
-				tweakOrdinalsStart(2),
-			),
-		},
+	successCases := []testCase{{
+		name: "alpha name",
+		set:  mkStatefulSet(&validPodTemplate, tweakName("abc")),
+	}, {
+		name: "alphanumeric name",
+		set:  mkStatefulSet(&validPodTemplate, tweakName("abc-123")),
+	}, {
+		name: "parallel pod management",
+		set:  mkStatefulSet(&validPodTemplate, tweakPodManagementPolicy(apps.ParallelPodManagement)),
+	}, {
+		name: "ordered ready pod management",
+		set:  mkStatefulSet(&validPodTemplate, tweakPodManagementPolicy(apps.OrderedReadyPodManagement)),
+	}, {
+		name: "update strategy",
+		set: mkStatefulSet(&validPodTemplate,
+			tweakReplicas(3),
+			tweakUpdateStrategyType(apps.RollingUpdateStatefulSetStrategyType),
+			tweakRollingUpdatePartition(2),
+		),
+	}, {
+		name: "PVC policy " + enableStatefulSetAutoDeletePVC,
+		set: mkStatefulSet(&validPodTemplate,
+			tweakPVCPolicy(mkPVCPolicy(
+				tweakPVCDeletedPolicy(apps.DeletePersistentVolumeClaimRetentionPolicyType),
+				tweakPVCScalePolicy(apps.RetainPersistentVolumeClaimRetentionPolicyType),
+			)),
+		),
+	}, {
+		name: "maxUnavailable with parallel pod management",
+		set: mkStatefulSet(&validPodTemplate,
+			tweakReplicas(3),
+			tweakUpdateStrategyType(apps.RollingUpdateStatefulSetStrategyType),
+			tweakRollingUpdatePartition(2),
+			tweakMaxUnavailable(intstr.FromInt32(2)),
+		),
+	}, {
+		name: "ordinals.start positive value",
+		set: mkStatefulSet(&validPodTemplate,
+			tweakReplicas(3),
+			tweakOrdinalsStart(2),
+		),
+	},
 	}
 
-	errorCases := []testCase{
-		{
-			name: "zero-length name",
-			set:  mkStatefulSet(&validPodTemplate, tweakName("")),
-			errs: field.ErrorList{
-				field.Required(field.NewPath("metadata", "name"), ""),
-			},
+	errorCases := []testCase{{
+		name: "zero-length name",
+		set:  mkStatefulSet(&validPodTemplate, tweakName("")),
+		errs: field.ErrorList{
+			field.Required(field.NewPath("metadata", "name"), ""),
 		},
-		{
-			name: "name-with-dots",
-			set:  mkStatefulSet(&validPodTemplate, tweakName("abc.123")),
-			errs: field.ErrorList{
-				field.Invalid(field.NewPath("metadata", "name"), "abc.123", ""),
-			},
+	}, {
+		name: "name-with-dots",
+		set:  mkStatefulSet(&validPodTemplate, tweakName("abc.123")),
+		errs: field.ErrorList{
+			field.Invalid(field.NewPath("metadata", "name"), "abc.123", ""),
 		},
-		{
-			name: "long name",
-			set:  mkStatefulSet(&validPodTemplate, tweakName(strings.Repeat("a", 64))),
-			errs: field.ErrorList{
-				field.Invalid(field.NewPath("metadata", "name"), strings.Repeat("a", 64), ""),
-			},
+	}, {
+		name: "long name",
+		set:  mkStatefulSet(&validPodTemplate, tweakName(strings.Repeat("a", 64))),
+		errs: field.ErrorList{
+			field.Invalid(field.NewPath("metadata", "name"), strings.Repeat("a", 64), ""),
 		},
-		{
-			name: "missing-namespace",
-			set:  mkStatefulSet(&validPodTemplate, tweakNamespace("")),
-			errs: field.ErrorList{
-				field.Required(field.NewPath("metadata", "namespace"), ""),
-			},
+	}, {
+		name: "missing-namespace",
+		set:  mkStatefulSet(&validPodTemplate, tweakNamespace("")),
+		errs: field.ErrorList{
+			field.Required(field.NewPath("metadata", "namespace"), ""),
 		},
-		{
-			name: "empty selector",
-			set:  mkStatefulSet(&validPodTemplate, tweakSelectorLabels(nil)),
-			errs: field.ErrorList{
-				field.Required(field.NewPath("spec", "selector"), ""),
-				field.Invalid(field.NewPath("spec", "template", "metadata", "labels"), nil, ""), // selector is empty, labels are not, so select doesn't match labels
-			},
+	}, {
+		name: "empty selector",
+		set:  mkStatefulSet(&validPodTemplate, tweakSelectorLabels(nil)),
+		errs: field.ErrorList{
+			field.Required(field.NewPath("spec", "selector"), ""),
+			field.Invalid(field.NewPath("spec", "template", "metadata", "labels"), nil, ""), // selector is empty, labels are not, so select doesn't match labels
 		},
-		{
-			name: "selector_doesnt_match",
-			set:  mkStatefulSet(&validPodTemplate, tweakSelectorLabels(map[string]string{"foo": "bar"})),
-			errs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "template", "metadata", "labels"), nil, ""),
-			},
+	}, {
+		name: "selector_doesnt_match",
+		set:  mkStatefulSet(&validPodTemplate, tweakSelectorLabels(map[string]string{"foo": "bar"})),
+		errs: field.ErrorList{
+			field.Invalid(field.NewPath("spec", "template", "metadata", "labels"), nil, ""),
 		},
-		{
-			name: "negative_replicas",
-			set:  mkStatefulSet(&validPodTemplate, tweakReplicas(-1)),
-			errs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "replicas"), nil, ""),
-			},
+	}, {
+		name: "negative_replicas",
+		set:  mkStatefulSet(&validPodTemplate, tweakReplicas(-1)),
+		errs: field.ErrorList{
+			field.Invalid(field.NewPath("spec", "replicas"), nil, ""),
 		},
-		{
-			name: "invalid_label",
-			set: mkStatefulSet(&validPodTemplate,
-				tweakLabels("NoUppercaseOrSpecialCharsLike=Equals", "bar"),
-			),
-			errs: field.ErrorList{
-				field.Invalid(field.NewPath("metadata", "labels"), nil, ""),
-			},
+	}, {
+		name: "invalid_label",
+		set: mkStatefulSet(&validPodTemplate,
+			tweakLabels("NoUppercaseOrSpecialCharsLike=Equals", "bar"),
+		),
+		errs: field.ErrorList{
+			field.Invalid(field.NewPath("metadata", "labels"), nil, ""),
 		},
-		{
-			name: "invalid_label 2",
-			set: mkStatefulSet(&invalidPodTemplate,
-				tweakLabels("NoUppercaseOrSpecialCharsLike=Equals", "bar"),
-				tweakSelectorLabels(invalidLabels),
-			),
-			errs: field.ErrorList{
-				field.Invalid(field.NewPath("metadata", "labels"), nil, ""),
-				field.Invalid(field.NewPath("spec", "selector"), nil, ""),
-				field.Invalid(field.NewPath("spec", "selector", "matchLabels"), nil, ""),
-			},
+	}, {
+		name: "invalid_label 2",
+		set: mkStatefulSet(&invalidPodTemplate,
+			tweakLabels("NoUppercaseOrSpecialCharsLike=Equals", "bar"),
+			tweakSelectorLabels(invalidLabels),
+		),
+		errs: field.ErrorList{
+			field.Invalid(field.NewPath("metadata", "labels"), nil, ""),
+			field.Invalid(field.NewPath("spec", "selector"), nil, ""),
+			field.Invalid(field.NewPath("spec", "selector", "matchLabels"), nil, ""),
 		},
-		{
-			name: "invalid_annotation",
-			set: mkStatefulSet(&validPodTemplate,
-				tweakAnnotations("NoUppercaseOrSpecialCharsLike=Equals", "bar"),
-			),
-			errs: field.ErrorList{
-				field.Invalid(field.NewPath("metadata", "annotations"), nil, ""),
-			},
+	}, {
+		name: "invalid_annotation",
+		set: mkStatefulSet(&validPodTemplate,
+			tweakAnnotations("NoUppercaseOrSpecialCharsLike=Equals", "bar"),
+		),
+		errs: field.ErrorList{
+			field.Invalid(field.NewPath("metadata", "annotations"), nil, ""),
 		},
-		{
-			name: "invalid restart policy 1",
-			set:  mkStatefulSet(&validPodTemplate, tweakTemplateRestartPolicy(api.RestartPolicyOnFailure)),
-			errs: field.ErrorList{
-				field.NotSupported(field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil),
-			},
+	}, {
+		name: "invalid restart policy 1",
+		set:  mkStatefulSet(&validPodTemplate, tweakTemplateRestartPolicy(api.RestartPolicyOnFailure)),
+		errs: field.ErrorList{
+			field.NotSupported(field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil),
 		},
-		{
-			name: "invalid restart policy 2",
-			set:  mkStatefulSet(&validPodTemplate, tweakTemplateRestartPolicy(api.RestartPolicyNever)),
-			errs: field.ErrorList{
-				field.NotSupported(field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil),
-			},
+	}, {
+		name: "invalid restart policy 2",
+		set:  mkStatefulSet(&validPodTemplate, tweakTemplateRestartPolicy(api.RestartPolicyNever)),
+		errs: field.ErrorList{
+			field.NotSupported(field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil),
 		},
-		{
-			name: "empty restart policy",
-			set:  mkStatefulSet(&validPodTemplate, tweakTemplateRestartPolicy("")),
-			errs: field.ErrorList{
-				field.NotSupported(field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil),
-			},
+	}, {
+		name: "empty restart policy",
+		set:  mkStatefulSet(&validPodTemplate, tweakTemplateRestartPolicy("")),
+		errs: field.ErrorList{
+			field.NotSupported(field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil),
 		},
-		{
-			name: "invalid update strategy",
-			set: mkStatefulSet(&validPodTemplate,
-				tweakReplicas(3),
-				tweakUpdateStrategyType("foo"),
-			),
-			errs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "updateStrategy"), nil, ""),
-			},
+	}, {
+		name: "invalid update strategy",
+		set: mkStatefulSet(&validPodTemplate,
+			tweakReplicas(3),
+			tweakUpdateStrategyType("foo"),
+		),
+		errs: field.ErrorList{
+			field.Invalid(field.NewPath("spec", "updateStrategy"), nil, ""),
 		},
-		{
-			name: "empty update strategy",
-			set: mkStatefulSet(&validPodTemplate,
-				tweakReplicas(3),
-				tweakUpdateStrategyType(""),
-			),
-			errs: field.ErrorList{
-				field.Required(field.NewPath("spec", "updateStrategy"), ""),
-			},
+	}, {
+		name: "empty update strategy",
+		set: mkStatefulSet(&validPodTemplate,
+			tweakReplicas(3),
+			tweakUpdateStrategyType(""),
+		),
+		errs: field.ErrorList{
+			field.Required(field.NewPath("spec", "updateStrategy"), ""),
 		},
-		{
-			name: "invalid rolling update",
-			set: mkStatefulSet(&validPodTemplate,
-				tweakReplicas(3),
-				tweakUpdateStrategyType(apps.OnDeleteStatefulSetStrategyType),
-				tweakRollingUpdatePartition(1),
-			),
-			errs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "updateStrategy", "rollingUpdate"), nil, ""),
-			},
+	}, {
+		name: "invalid rolling update",
+		set: mkStatefulSet(&validPodTemplate,
+			tweakReplicas(3),
+			tweakUpdateStrategyType(apps.OnDeleteStatefulSetStrategyType),
+			tweakRollingUpdatePartition(1),
+		),
+		errs: field.ErrorList{
+			field.Invalid(field.NewPath("spec", "updateStrategy", "rollingUpdate"), nil, ""),
 		},
-		{
-			name: "negative parition",
-			set: mkStatefulSet(&validPodTemplate,
-				tweakReplicas(3),
-				tweakRollingUpdatePartition(-1),
-			),
-			errs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "updateStrategy", "rollingUpdate", "partition"), nil, ""),
-			},
+	}, {
+		name: "negative parition",
+		set: mkStatefulSet(&validPodTemplate,
+			tweakReplicas(3),
+			tweakRollingUpdatePartition(-1),
+		),
+		errs: field.ErrorList{
+			field.Invalid(field.NewPath("spec", "updateStrategy", "rollingUpdate", "partition"), nil, ""),
 		},
-		{
-			name: "empty pod management policy",
-			set: mkStatefulSet(&validPodTemplate,
-				tweakPodManagementPolicy(""),
-				tweakReplicas(3),
-			),
-			errs: field.ErrorList{
-				field.Required(field.NewPath("spec", "podManagementPolicy"), ""),
-			},
+	}, {
+		name: "empty pod management policy",
+		set: mkStatefulSet(&validPodTemplate,
+			tweakPodManagementPolicy(""),
+			tweakReplicas(3),
+		),
+		errs: field.ErrorList{
+			field.Required(field.NewPath("spec", "podManagementPolicy"), ""),
 		},
-		{
-			name: "invalid pod management policy",
-			set:  mkStatefulSet(&validPodTemplate, tweakPodManagementPolicy("foo")),
-			errs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "podManagementPolicy"), nil, ""),
-			},
+	}, {
+		name: "invalid pod management policy",
+		set:  mkStatefulSet(&validPodTemplate, tweakPodManagementPolicy("foo")),
+		errs: field.ErrorList{
+			field.Invalid(field.NewPath("spec", "podManagementPolicy"), nil, ""),
 		},
-		{
-			name: "set active deadline seconds",
-			set:  mkStatefulSet(&invalidPodTemplate2, tweakReplicas(3)),
-			errs: field.ErrorList{
-				field.Forbidden(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), ""),
-			},
+	}, {
+		name: "set active deadline seconds",
+		set:  mkStatefulSet(&invalidPodTemplate2, tweakReplicas(3)),
+		errs: field.ErrorList{
+			field.Forbidden(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), ""),
 		},
-		{
-			name: "empty PersistentVolumeClaimRetentionPolicy " + enableStatefulSetAutoDeletePVC,
-			set: mkStatefulSet(&validPodTemplate,
-				tweakPVCPolicy(mkPVCPolicy()),
-			),
-			errs: field.ErrorList{
-				field.NotSupported(field.NewPath("spec", "persistentVolumeClaimRetentionPolicy", "whenDeleted"), nil, nil),
-				field.NotSupported(field.NewPath("spec", "persistentVolumeClaimRetentionPolicy", "whenScaled"), nil, nil),
-			},
+	}, {
+		name: "empty PersistentVolumeClaimRetentionPolicy " + enableStatefulSetAutoDeletePVC,
+		set: mkStatefulSet(&validPodTemplate,
+			tweakPVCPolicy(mkPVCPolicy()),
+		),
+		errs: field.ErrorList{
+			field.NotSupported(field.NewPath("spec", "persistentVolumeClaimRetentionPolicy", "whenDeleted"), nil, nil),
+			field.NotSupported(field.NewPath("spec", "persistentVolumeClaimRetentionPolicy", "whenScaled"), nil, nil),
 		},
-		{
-			name: "invalid PersistentVolumeClaimRetentionPolicy " + enableStatefulSetAutoDeletePVC,
-			set: mkStatefulSet(&validPodTemplate,
-				tweakPVCPolicy(mkPVCPolicy(
-					tweakPVCDeletedPolicy("invalid-retention-policy"),
-					tweakPVCScalePolicy("invalid-retention-policy"),
-				)),
-			),
-			errs: field.ErrorList{
-				field.NotSupported(field.NewPath("spec", "persistentVolumeClaimRetentionPolicy", "whenDeleted"), nil, nil),
-				field.NotSupported(field.NewPath("spec", "persistentVolumeClaimRetentionPolicy", "whenScaled"), nil, nil),
-			},
+	}, {
+		name: "invalid PersistentVolumeClaimRetentionPolicy " + enableStatefulSetAutoDeletePVC,
+		set: mkStatefulSet(&validPodTemplate,
+			tweakPVCPolicy(mkPVCPolicy(
+				tweakPVCDeletedPolicy("invalid-retention-policy"),
+				tweakPVCScalePolicy("invalid-retention-policy"),
+			)),
+		),
+		errs: field.ErrorList{
+			field.NotSupported(field.NewPath("spec", "persistentVolumeClaimRetentionPolicy", "whenDeleted"), nil, nil),
+			field.NotSupported(field.NewPath("spec", "persistentVolumeClaimRetentionPolicy", "whenScaled"), nil, nil),
 		},
-		{
-			name: "zero maxUnavailable",
-			set: mkStatefulSet(&validPodTemplate,
-				tweakReplicas(3),
-				tweakUpdateStrategyType(apps.RollingUpdateStatefulSetStrategyType),
-				tweakMaxUnavailable(intstr.FromInt32(0)),
-			),
-			errs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "updateStrategy", "rollingUpdate", "maxUnavailable"), nil, ""),
-			},
+	}, {
+		name: "zero maxUnavailable",
+		set: mkStatefulSet(&validPodTemplate,
+			tweakReplicas(3),
+			tweakUpdateStrategyType(apps.RollingUpdateStatefulSetStrategyType),
+			tweakMaxUnavailable(intstr.FromInt32(0)),
+		),
+		errs: field.ErrorList{
+			field.Invalid(field.NewPath("spec", "updateStrategy", "rollingUpdate", "maxUnavailable"), nil, ""),
 		},
-		{
-			name: "zero percent maxUnavailable",
-			set: mkStatefulSet(&validPodTemplate,
-				tweakReplicas(3),
-				tweakUpdateStrategyType(apps.RollingUpdateStatefulSetStrategyType),
-				tweakMaxUnavailable(intstr.FromString("0%")),
-			),
-			errs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "updateStrategy", "rollingUpdate", "maxUnavailable"), nil, ""),
-			},
+	}, {
+		name: "zero percent maxUnavailable",
+		set: mkStatefulSet(&validPodTemplate,
+			tweakReplicas(3),
+			tweakUpdateStrategyType(apps.RollingUpdateStatefulSetStrategyType),
+			tweakMaxUnavailable(intstr.FromString("0%")),
+		),
+		errs: field.ErrorList{
+			field.Invalid(field.NewPath("spec", "updateStrategy", "rollingUpdate", "maxUnavailable"), nil, ""),
 		},
-		{
-			name: "greater than 100 percent maxUnavailable",
-			set: mkStatefulSet(&validPodTemplate,
-				tweakReplicas(3),
-				tweakUpdateStrategyType(apps.RollingUpdateStatefulSetStrategyType),
-				tweakMaxUnavailable(intstr.FromString("101%")),
-			),
-			errs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "updateStrategy", "rollingUpdate", "maxUnavailable"), nil, ""),
-			},
+	}, {
+		name: "greater than 100 percent maxUnavailable",
+		set: mkStatefulSet(&validPodTemplate,
+			tweakReplicas(3),
+			tweakUpdateStrategyType(apps.RollingUpdateStatefulSetStrategyType),
+			tweakMaxUnavailable(intstr.FromString("101%")),
+		),
+		errs: field.ErrorList{
+			field.Invalid(field.NewPath("spec", "updateStrategy", "rollingUpdate", "maxUnavailable"), nil, ""),
 		},
-		{
-			name: "invalid ordinals.start",
-			set: mkStatefulSet(&validPodTemplate,
-				tweakReplicas(3),
-				tweakOrdinalsStart(-2),
-			),
-			errs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "ordinals.start"), nil, ""),
-			},
+	}, {
+		name: "invalid ordinals.start",
+		set: mkStatefulSet(&validPodTemplate,
+			tweakReplicas(3),
+			tweakOrdinalsStart(-2),
+		),
+		errs: field.ErrorList{
+			field.Invalid(field.NewPath("spec", "ordinals.start"), nil, ""),
 		},
+	},
 	}
 
 	cmpOpts := []cmp.Option{cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail"), cmpopts.SortSlices(func(a, b *field.Error) bool { return a.Error() < b.Error() })}
@@ -635,113 +601,100 @@ func TestValidateStatefulSetStatus(t *testing.T) {
 		observedGeneration *int64
 		collisionCount     *int32
 		expectedErr        bool
-	}{
-		{
-			name:            "valid status",
-			replicas:        3,
-			readyReplicas:   3,
-			currentReplicas: 2,
-			updatedReplicas: 1,
-			expectedErr:     false,
-		},
-		{
-			name:            "invalid replicas",
-			replicas:        -1,
-			readyReplicas:   3,
-			currentReplicas: 2,
-			updatedReplicas: 1,
-			expectedErr:     true,
-		},
-		{
-			name:            "invalid readyReplicas",
-			replicas:        3,
-			readyReplicas:   -1,
-			currentReplicas: 2,
-			updatedReplicas: 1,
-			expectedErr:     true,
-		},
-		{
-			name:            "invalid currentReplicas",
-			replicas:        3,
-			readyReplicas:   3,
-			currentReplicas: -1,
-			updatedReplicas: 1,
-			expectedErr:     true,
-		},
-		{
-			name:            "invalid updatedReplicas",
-			replicas:        3,
-			readyReplicas:   3,
-			currentReplicas: 2,
-			updatedReplicas: -1,
-			expectedErr:     true,
-		},
-		{
-			name:               "invalid observedGeneration",
-			replicas:           3,
-			readyReplicas:      3,
-			currentReplicas:    2,
-			updatedReplicas:    1,
-			observedGeneration: &observedGenerationMinusOne,
-			expectedErr:        true,
-		},
-		{
-			name:            "invalid collisionCount",
-			replicas:        3,
-			readyReplicas:   3,
-			currentReplicas: 2,
-			updatedReplicas: 1,
-			collisionCount:  &collisionCountMinusOne,
-			expectedErr:     true,
-		},
-		{
-			name:            "readyReplicas greater than replicas",
-			replicas:        3,
-			readyReplicas:   4,
-			currentReplicas: 2,
-			updatedReplicas: 1,
-			expectedErr:     true,
-		},
-		{
-			name:            "currentReplicas greater than replicas",
-			replicas:        3,
-			readyReplicas:   3,
-			currentReplicas: 4,
-			updatedReplicas: 1,
-			expectedErr:     true,
-		},
-		{
-			name:            "updatedReplicas greater than replicas",
-			replicas:        3,
-			readyReplicas:   3,
-			currentReplicas: 2,
-			updatedReplicas: 4,
-			expectedErr:     true,
-		},
-		{
-			name:              "invalid: number of available replicas",
-			replicas:          3,
-			readyReplicas:     3,
-			currentReplicas:   2,
-			availableReplicas: int32(-1),
-			expectedErr:       true,
-		},
-		{
-			name:              "invalid: available replicas greater than replicas",
-			replicas:          3,
-			readyReplicas:     3,
-			currentReplicas:   2,
-			availableReplicas: int32(4),
-			expectedErr:       true,
-		},
-		{
-			name:              "invalid: available replicas greater than ready replicas",
-			replicas:          3,
-			readyReplicas:     2,
-			currentReplicas:   2,
-			availableReplicas: int32(3),
-			expectedErr:       true,
-		},
+	}{{
+		name:            "valid status",
+		replicas:        3,
+		readyReplicas:   3,
+		currentReplicas: 2,
+		updatedReplicas: 1,
+		expectedErr:     false,
+	}, {
+		name:            "invalid replicas",
+		replicas:        -1,
+		readyReplicas:   3,
+		currentReplicas: 2,
+		updatedReplicas: 1,
+		expectedErr:     true,
+	}, {
+		name:            "invalid readyReplicas",
+		replicas:        3,
+		readyReplicas:   -1,
+		currentReplicas: 2,
+		updatedReplicas: 1,
+		expectedErr:     true,
+	}, {
+		name:            "invalid currentReplicas",
+		replicas:        3,
+		readyReplicas:   3,
+		currentReplicas: -1,
+		updatedReplicas: 1,
+		expectedErr:     true,
+	}, {
+		name:            "invalid updatedReplicas",
+		replicas:        3,
+		readyReplicas:   3,
+		currentReplicas: 2,
+		updatedReplicas: -1,
+		expectedErr:     true,
+	}, {
+		name:               "invalid observedGeneration",
+		replicas:           3,
+		readyReplicas:      3,
+		currentReplicas:    2,
+		updatedReplicas:    1,
+		observedGeneration: &observedGenerationMinusOne,
+		expectedErr:        true,
+	}, {
+		name:            "invalid collisionCount",
+		replicas:        3,
+		readyReplicas:   3,
+		currentReplicas: 2,
+		updatedReplicas: 1,
+		collisionCount:  &collisionCountMinusOne,
+		expectedErr:     true,
+	}, {
+		name:            "readyReplicas greater than replicas",
+		replicas:        3,
+		readyReplicas:   4,
+		currentReplicas: 2,
+		updatedReplicas: 1,
+		expectedErr:     true,
+	}, {
+		name:            "currentReplicas greater than replicas",
+		replicas:        3,
+		readyReplicas:   3,
+		currentReplicas: 4,
+		updatedReplicas: 1,
+		expectedErr:     true,
+	}, {
+		name:            "updatedReplicas greater than replicas",
+		replicas:        3,
+		readyReplicas:   3,
+		currentReplicas: 2,
+		updatedReplicas: 4,
+		expectedErr:     true,
+	}, {
+		name:              "invalid: number of available replicas",
+		replicas:          3,
+		readyReplicas:     3,
+		currentReplicas:   2,
+		availableReplicas: int32(-1),
+		expectedErr:       true,
+	}, {
+		name:              "invalid: available replicas greater than replicas",
+		replicas:          3,
+		readyReplicas:     3,
+		currentReplicas:   2,
+		availableReplicas: int32(4),
+		expectedErr:       true,
+	}, {
+		name:              "invalid: available replicas greater than ready replicas",
+		replicas:          3,
+		readyReplicas:     2,
+		currentReplicas:   2,
+		availableReplicas: int32(3),
+		expectedErr:       true,
+	},
 	}
 
 	for _, test := range tests {
@@ -842,145 +795,126 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 		errs   field.ErrorList
 	}
 
-	successCases := []testCase{
-		{
-			name:   "update replica count",
-			old:    mkStatefulSet(&validPodTemplate),
-			update: mkStatefulSet(&validPodTemplate, tweakReplicas(3)),
-		},
-		{
-			name:   "update containers 1",
-			old:    mkStatefulSet(&validPodTemplate),
-			update: mkStatefulSet(addContainersValidTemplate),
-		},
-		{
-			name:   "update containers 2",
-			old:    mkStatefulSet(addContainersValidTemplate),
-			update: mkStatefulSet(&validPodTemplate),
-		},
-		{
-			name: "update containers and pvc retention policy 1",
-			old:  mkStatefulSet(addContainersValidTemplate),
-			update: mkStatefulSet(&validPodTemplate,
-				tweakPVCPolicy(mkPVCPolicy(
-					tweakPVCDeletedPolicy(apps.RetainPersistentVolumeClaimRetentionPolicyType),
-					tweakPVCScalePolicy(apps.RetainPersistentVolumeClaimRetentionPolicyType),
-				)),
-			),
-		},
-		{
-			name: "update containers and pvc retention policy 2",
-			old: mkStatefulSet(&validPodTemplate,
-				tweakPVCPolicy(mkPVCPolicy(
-					tweakPVCScalePolicy(apps.RetainPersistentVolumeClaimRetentionPolicyType),
-				)),
-			),
-			update: mkStatefulSet(&validPodTemplate),
-		},
-		{
-			name: "update update strategy",
-			old:  mkStatefulSet(&validPodTemplate),
-			update: mkStatefulSet(&validPodTemplate,
-				tweakUpdateStrategyType(apps.OnDeleteStatefulSetStrategyType),
-			),
-		},
-		{
-			name:   "update min ready seconds 1",
-			old:    mkStatefulSet(&validPodTemplate),
-			update: mkStatefulSet(&validPodTemplate, tweakMinReadySeconds(10)),
-		},
-		{
-			name:   "update min ready seconds 2",
-			old:    mkStatefulSet(&validPodTemplate, tweakMinReadySeconds(5)),
-			update: mkStatefulSet(&validPodTemplate, tweakMinReadySeconds(10)),
-		},
-		{
-			name:   "update existing instance with now-invalid name",
-			old:    mkStatefulSet(&validPodTemplate, tweakFinalizers("final")),
-			update: mkStatefulSet(&validPodTemplate, tweakFinalizers()),
-		},
-		{
-			name:   "update existing instance with .spec.ordinals.start",
-			old:    mkStatefulSet(&validPodTemplate),
-			update: mkStatefulSet(&validPodTemplate, tweakOrdinalsStart(3)),
-		},
+	successCases := []testCase{{
+		name:   "update replica count",
+		old:    mkStatefulSet(&validPodTemplate),
+		update: mkStatefulSet(&validPodTemplate, tweakReplicas(3)),
+	}, {
+		name:   "update containers 1",
+		old:    mkStatefulSet(&validPodTemplate),
+		update: mkStatefulSet(addContainersValidTemplate),
+	}, {
+		name:   "update containers 2",
+		old:    mkStatefulSet(addContainersValidTemplate),
+		update: mkStatefulSet(&validPodTemplate),
+	}, {
+		name: "update containers and pvc retention policy 1",
+		old:  mkStatefulSet(addContainersValidTemplate),
+		update: mkStatefulSet(&validPodTemplate,
+			tweakPVCPolicy(mkPVCPolicy(
+				tweakPVCDeletedPolicy(apps.RetainPersistentVolumeClaimRetentionPolicyType),
+				tweakPVCScalePolicy(apps.RetainPersistentVolumeClaimRetentionPolicyType),
+			)),
+		),
+	}, {
+		name: "update containers and pvc retention policy 2",
+		old: mkStatefulSet(&validPodTemplate,
+			tweakPVCPolicy(mkPVCPolicy(
+				tweakPVCScalePolicy(apps.RetainPersistentVolumeClaimRetentionPolicyType),
+			)),
+		),
+		update: mkStatefulSet(&validPodTemplate),
+	}, {
+		name: "update update strategy",
+		old:  mkStatefulSet(&validPodTemplate),
+		update: mkStatefulSet(&validPodTemplate,
+			tweakUpdateStrategyType(apps.OnDeleteStatefulSetStrategyType),
+		),
+	}, {
+		name:   "update min ready seconds 1",
+		old:    mkStatefulSet(&validPodTemplate),
+		update: mkStatefulSet(&validPodTemplate, tweakMinReadySeconds(10)),
+	}, {
+		name:   "update min ready seconds 2",
+		old:    mkStatefulSet(&validPodTemplate, tweakMinReadySeconds(5)),
+		update: mkStatefulSet(&validPodTemplate, tweakMinReadySeconds(10)),
+	}, {
+		name:   "update existing instance with now-invalid name",
+		old:    mkStatefulSet(&validPodTemplate, tweakFinalizers("final")),
+		update: mkStatefulSet(&validPodTemplate, tweakFinalizers()),
+	}, {
+		name:   "update existing instance with .spec.ordinals.start",
+		old:    mkStatefulSet(&validPodTemplate),
+		update: mkStatefulSet(&validPodTemplate, tweakOrdinalsStart(3)),
+	},
 	}
 
-	errorCases := []testCase{
-		{
-			name:   "update name",
-			old:    mkStatefulSet(&validPodTemplate, tweakName("abc")),
-			update: mkStatefulSet(&validPodTemplate, tweakName("abc2")),
-			errs: field.ErrorList{
-				field.Invalid(field.NewPath("metadata", "name"), nil, ""),
-			},
+	errorCases := []testCase{{
+		name:   "update name",
+		old:    mkStatefulSet(&validPodTemplate, tweakName("abc")),
+		update: mkStatefulSet(&validPodTemplate, tweakName("abc2")),
+		errs: field.ErrorList{
+			field.Invalid(field.NewPath("metadata", "name"), nil, ""),
 		},
-		{
-			name:   "update namespace",
-			old:    mkStatefulSet(&validPodTemplate, tweakNamespace(metav1.NamespaceDefault)),
-			update: mkStatefulSet(&validPodTemplate, tweakNamespace(metav1.NamespaceDefault+"1")),
-			errs: field.ErrorList{
-				field.Invalid(field.NewPath("metadata", "namespace"), nil, ""),
-			},
+	}, {
+		name:   "update namespace",
+		old:    mkStatefulSet(&validPodTemplate, tweakNamespace(metav1.NamespaceDefault)),
+		update: mkStatefulSet(&validPodTemplate, tweakNamespace(metav1.NamespaceDefault+"1")),
+		errs: field.ErrorList{
+			field.Invalid(field.NewPath("metadata", "namespace"), nil, ""),
 		},
-		{
-			name: "update selector",
-			old:  mkStatefulSet(&validPodTemplate, tweakSelectorLabels(validLabels)),
-			update: mkStatefulSet(&validPodTemplate2,
-				tweakSelectorLabels(validLabels2),
-			),
-			errs: field.ErrorList{
-				field.Forbidden(field.NewPath("spec"), ""),
-			},
+	}, {
+		name: "update selector",
+		old:  mkStatefulSet(&validPodTemplate, tweakSelectorLabels(validLabels)),
+		update: mkStatefulSet(&validPodTemplate2,
+			tweakSelectorLabels(validLabels2),
+		),
+		errs: field.ErrorList{
+			field.Forbidden(field.NewPath("spec"), ""),
 		},
-		{
-			name:   "update pod management policy 1",
-			old:    mkStatefulSet(&validPodTemplate, tweakPodManagementPolicy("")),
-			update: mkStatefulSet(&validPodTemplate, tweakPodManagementPolicy(apps.OrderedReadyPodManagement)),
-			errs: field.ErrorList{
-				field.Forbidden(field.NewPath("spec"), ""),
-			},
+	}, {
+		name:   "update pod management policy 1",
+		old:    mkStatefulSet(&validPodTemplate, tweakPodManagementPolicy("")),
+		update: mkStatefulSet(&validPodTemplate, tweakPodManagementPolicy(apps.OrderedReadyPodManagement)),
+		errs: field.ErrorList{
+			field.Forbidden(field.NewPath("spec"), ""),
 		},
-		{
-			name:   "update pod management policy 2",
-			old:    mkStatefulSet(&validPodTemplate, tweakPodManagementPolicy(apps.ParallelPodManagement)),
-			update: mkStatefulSet(&validPodTemplate, tweakPodManagementPolicy(apps.OrderedReadyPodManagement)),
-			errs: field.ErrorList{
-				field.Forbidden(field.NewPath("spec"), ""),
-			},
+	}, {
+		name:   "update pod management policy 2",
+		old:    mkStatefulSet(&validPodTemplate, tweakPodManagementPolicy(apps.ParallelPodManagement)),
+		update: mkStatefulSet(&validPodTemplate, tweakPodManagementPolicy(apps.OrderedReadyPodManagement)),
+		errs: field.ErrorList{
+			field.Forbidden(field.NewPath("spec"), ""),
 		},
-		{
-			name:   "update to negative replicas",
-			old:    mkStatefulSet(&validPodTemplate),
-			update: mkStatefulSet(&validPodTemplate, tweakReplicas(-1)),
-			errs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "replicas"), nil, ""),
-			},
+	}, {
+		name:   "update to negative replicas",
+		old:    mkStatefulSet(&validPodTemplate),
+		update: mkStatefulSet(&validPodTemplate, tweakReplicas(-1)),
+		errs: field.ErrorList{
+			field.Invalid(field.NewPath("spec", "replicas"), nil, ""),
 		},
-		{
-			name:   "update pvc template size",
-			old:    mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplate)),
-			update: mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplateChangedSize)),
-			errs: field.ErrorList{
-				field.Forbidden(field.NewPath("spec"), ""),
-			},
+	}, {
+		name:   "update pvc template size",
+		old:    mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplate)),
+		update: mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplateChangedSize)),
+		errs: field.ErrorList{
+			field.Forbidden(field.NewPath("spec"), ""),
 		},
-		{
-			name:   "update pvc template storage class",
-			old:    mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplate)),
-			update: mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplateChangedClass)),
-			errs: field.ErrorList{
-				field.Forbidden(field.NewPath("spec"), ""),
-			},
+	}, {
+		name:   "update pvc template storage class",
+		old:    mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplate)),
+		update: mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplateChangedClass)),
+		errs: field.ErrorList{
+			field.Forbidden(field.NewPath("spec"), ""),
 		},
-		{
-			name:   "add new pvc template",
-			old:    mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplate)),
-			update: mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplate, validPVCTemplate2)),
-			errs: field.ErrorList{
-				field.Forbidden(field.NewPath("spec"), ""),
-			},
+	}, {
+		name:   "add new pvc template",
+		old:    mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplate)),
+		update: mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplate, validPVCTemplate2)),
+		errs: field.ErrorList{
+			field.Forbidden(field.NewPath("spec"), ""),
 		},
+	},
 	}
 
 	cmpOpts := []cmp.Option{
@@ -1112,31 +1046,27 @@ func TestValidateControllerRevisionUpdate(t *testing.T) {
 		newHistory apps.ControllerRevision
 		oldHistory apps.ControllerRevision
 		isValid    bool
-	}{
-		{
-			name:       "valid",
-			newHistory: valid,
-			oldHistory: valid,
-			isValid:    true,
-		},
-		{
-			name:       "invalid",
-			newHistory: noVersion,
-			oldHistory: valid,
-			isValid:    false,
-		},
-		{
-			name:       "changed data",
-			newHistory: changedData,
-			oldHistory: valid,
-			isValid:    false,
-		},
-		{
-			name:       "changed revision",
-			newHistory: changedRevision,
-			oldHistory: valid,
-			isValid:    true,
-		},
+	}{{
+		name:       "valid",
+		newHistory: valid,
+		oldHistory: valid,
+		isValid:    true,
+	}, {
+		name:       "invalid",
+		newHistory: noVersion,
+		oldHistory: valid,
+		isValid:    false,
+	}, {
+		name:       "changed data",
+		newHistory: changedData,
+		oldHistory: valid,
+		isValid:    false,
+	}, {
+		name:       "changed revision",
+		newHistory: changedRevision,
+		oldHistory: valid,
+		isValid:    true,
+	},
 	}
 
 	for _, tc := range cases {
@@ -1158,33 +1088,32 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 		update apps.DaemonSet
 	}
 
-	successCases := []dsUpdateTest{
-		{
-			old: apps.DaemonSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Status: apps.DaemonSetStatus{
-					CurrentNumberScheduled: 1,
-					NumberMisscheduled:     2,
-					DesiredNumberScheduled: 3,
-					NumberReady:            1,
-					UpdatedNumberScheduled: 1,
-					NumberAvailable:        1,
-					NumberUnavailable:      2,
-				},
-			},
-			update: apps.DaemonSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Status: apps.DaemonSetStatus{
-					CurrentNumberScheduled: 1,
-					NumberMisscheduled:     1,
-					DesiredNumberScheduled: 3,
-					NumberReady:            1,
-					UpdatedNumberScheduled: 1,
-					NumberAvailable:        1,
-					NumberUnavailable:      2,
-				},
+	successCases := []dsUpdateTest{{
+		old: apps.DaemonSet{
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+			Status: apps.DaemonSetStatus{
+				CurrentNumberScheduled: 1,
+				NumberMisscheduled:     2,
+				DesiredNumberScheduled: 3,
+				NumberReady:            1,
+				UpdatedNumberScheduled: 1,
+				NumberAvailable:        1,
+				NumberUnavailable:      2,
 			},
 		},
+		update: apps.DaemonSet{
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+			Status: apps.DaemonSetStatus{
+				CurrentNumberScheduled: 1,
+				NumberMisscheduled:     1,
+				DesiredNumberScheduled: 3,
+				NumberReady:            1,
+				UpdatedNumberScheduled: 1,
+				NumberAvailable:        1,
+				NumberUnavailable:      2,
+			},
+		},
+	},
 	}
 
 	for _, successCase := range successCases {
@@ -2071,27 +2000,25 @@ func TestValidateDaemonSet(t *testing.T) {
 			},
 		},
 	}
-	successCases := []apps.DaemonSet{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-			Spec: apps.DaemonSetSpec{
-				Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-				Template: validPodTemplate.Template,
-				UpdateStrategy: apps.DaemonSetUpdateStrategy{
-					Type: apps.OnDeleteDaemonSetStrategyType,
-				},
+	successCases := []apps.DaemonSet{{
+		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+		Spec: apps.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{MatchLabels: validSelector},
+			Template: validPodTemplate.Template,
+			UpdateStrategy: apps.DaemonSetUpdateStrategy{
+				Type: apps.OnDeleteDaemonSetStrategyType,
 			},
 		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
-			Spec: apps.DaemonSetSpec{
-				Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-				Template: validPodTemplate.Template,
-				UpdateStrategy: apps.DaemonSetUpdateStrategy{
-					Type: apps.OnDeleteDaemonSetStrategyType,
-				},
+	}, {
+		ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
+		Spec: apps.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{MatchLabels: validSelector},
+			Template: validPodTemplate.Template,
+			UpdateStrategy: apps.DaemonSetUpdateStrategy{
+				Type: apps.OnDeleteDaemonSetStrategyType,
 			},
 		},
+	},
 	}
 	for _, successCase := range successCases {
 		if errs := ValidateDaemonSet(&successCase, corevalidation.PodValidationOptions{}); len(errs) != 0 {
@@ -2290,14 +2217,12 @@ func validDeployment() *apps.Deployment {
 				Spec: api.PodSpec{
 					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSDefault,
-					Containers: []api.Container{
-						{
-							Name:                     "nginx",
-							Image:                    "image",
-							ImagePullPolicy:          api.PullNever,
-							TerminationMessagePolicy: api.TerminationMessageReadFile,
-						},
-					},
+					Containers: []api.Container{{
+						Name:                     "nginx",
+						Image:                    "image",
+						ImagePullPolicy:          api.PullNever,
+						TerminationMessagePolicy: api.TerminationMessageReadFile,
+					}},
 				},
 			},
 			RollbackTo: &apps.RollbackConfig{
@@ -2427,98 +2352,87 @@ func TestValidateDeploymentStatus(t *testing.T) {
 		collisionCount     *int32
 
 		expectedErr bool
-	}{
-		{
-			name:               "valid status",
-			replicas:           3,
-			updatedReplicas:    3,
-			readyReplicas:      2,
-			availableReplicas:  1,
-			observedGeneration: 2,
-			expectedErr:        false,
-		},
-		{
-			name:               "invalid replicas",
-			replicas:           -1,
-			updatedReplicas:    2,
-			readyReplicas:      2,
-			availableReplicas:  1,
-			observedGeneration: 2,
-			expectedErr:        true,
-		},
-		{
-			name:               "invalid updatedReplicas",
-			replicas:           2,
-			updatedReplicas:    -1,
-			readyReplicas:      2,
-			availableReplicas:  1,
-			observedGeneration: 2,
-			expectedErr:        true,
-		},
-		{
-			name:               "invalid readyReplicas",
-			replicas:           3,
-			readyReplicas:      -1,
-			availableReplicas:  1,
-			observedGeneration: 2,
-			expectedErr:        true,
-		},
-		{
-			name:               "invalid availableReplicas",
-			replicas:           3,
-			readyReplicas:      3,
-			availableReplicas:  -1,
-			observedGeneration: 2,
-			expectedErr:        true,
-		},
-		{
-			name:               "invalid observedGeneration",
-			replicas:           3,
-			readyReplicas:      3,
-			availableReplicas:  3,
-			observedGeneration: -1,
-			expectedErr:        true,
-		},
-		{
-			name:               "updatedReplicas greater than replicas",
-			replicas:           3,
-			updatedReplicas:    4,
-			readyReplicas:      3,
-			availableReplicas:  3,
-			observedGeneration: 1,
-			expectedErr:        true,
-		},
-		{
-			name:               "readyReplicas greater than replicas",
-			replicas:           3,
-			readyReplicas:      4,
-			availableReplicas:  3,
-			observedGeneration: 1,
-			expectedErr:        true,
-		},
-		{
-			name:               "availableReplicas greater than replicas",
-			replicas:           3,
-			readyReplicas:      3,
-			availableReplicas:  4,
-			observedGeneration: 1,
-			expectedErr:        true,
-		},
-		{
-			name:               "availableReplicas greater than readyReplicas",
-			replicas:           3,
-			readyReplicas:      2,
-			availableReplicas:  3,
-			observedGeneration: 1,
-			expectedErr:        true,
-		},
-		{
-			name:               "invalid collisionCount",
-			replicas:           3,
-			observedGeneration: 1,
-			collisionCount:     &collisionCount,
-			expectedErr:        true,
-		},
+	}{{
+		name:               "valid status",
+		replicas:           3,
+		updatedReplicas:    3,
+		readyReplicas:      2,
+		availableReplicas:  1,
+		observedGeneration: 2,
+		expectedErr:        false,
+	}, {
+		name:               "invalid replicas",
+		replicas:           -1,
+		updatedReplicas:    2,
+		readyReplicas:      2,
+		availableReplicas:  1,
+		observedGeneration: 2,
+		expectedErr:        true,
+	}, {
+		name:               "invalid updatedReplicas",
+		replicas:           2,
+		updatedReplicas:    -1,
+		readyReplicas:      2,
+		availableReplicas:  1,
+		observedGeneration: 2,
+		expectedErr:        true,
+	}, {
+		name:               "invalid readyReplicas",
+		replicas:           3,
+		readyReplicas:      -1,
+		availableReplicas:  1,
+		observedGeneration: 2,
+		expectedErr:        true,
+	}, {
+		name:               "invalid availableReplicas",
+		replicas:           3,
+		readyReplicas:      3,
+		availableReplicas:  -1,
+		observedGeneration: 2,
+		expectedErr:        true,
+	}, {
+		name:               "invalid observedGeneration",
+		replicas:           3,
+		readyReplicas:      3,
+		availableReplicas:  3,
+		observedGeneration: -1,
+		expectedErr:        true,
+	}, {
+		name:               "updatedReplicas greater than replicas",
+		replicas:           3,
+		updatedReplicas:    4,
+		readyReplicas:      3,
+		availableReplicas:  3,
+		observedGeneration: 1,
+		expectedErr:        true,
+	}, {
+		name:               "readyReplicas greater than replicas",
+		replicas:           3,
+		readyReplicas:      4,
+		availableReplicas:  3,
+		observedGeneration: 1,
+		expectedErr:        true,
+	}, {
+		name:               "availableReplicas greater than replicas",
+		replicas:           3,
+		readyReplicas:      3,
+		availableReplicas:  4,
+		observedGeneration: 1,
+		expectedErr:        true,
+	}, {
+		name:               "availableReplicas greater than readyReplicas",
+		replicas:           3,
+		readyReplicas:      2,
+		availableReplicas:  3,
+		observedGeneration: 1,
+		expectedErr:        true,
+	}, {
+		name:               "invalid collisionCount",
+		replicas:           3,
+		observedGeneration: 1,
+		collisionCount:     &collisionCount,
+		expectedErr:        true,
+	},
 	}
 
 	for _, test := range tests {
@@ -2548,47 +2462,43 @@ func TestValidateDeploymentStatusUpdate(t *testing.T) {
 		from, to apps.DeploymentStatus
 
 		expectedErr bool
-	}{
-		{
-			name: "increase: valid update",
-			from: apps.DeploymentStatus{
-				CollisionCount: nil,
-			},
-			to: apps.DeploymentStatus{
-				CollisionCount: &collisionCount,
-			},
-			expectedErr: false,
+	}{{
+		name: "increase: valid update",
+		from: apps.DeploymentStatus{
+			CollisionCount: nil,
 		},
-		{
-			name: "stable: valid update",
-			from: apps.DeploymentStatus{
-				CollisionCount: &collisionCount,
-			},
-			to: apps.DeploymentStatus{
-				CollisionCount: &collisionCount,
-			},
-			expectedErr: false,
+		to: apps.DeploymentStatus{
+			CollisionCount: &collisionCount,
 		},
-		{
-			name: "unset: invalid update",
-			from: apps.DeploymentStatus{
-				CollisionCount: &collisionCount,
-			},
-			to: apps.DeploymentStatus{
-				CollisionCount: nil,
-			},
-			expectedErr: true,
+		expectedErr: false,
+	}, {
+		name: "stable: valid update",
+		from: apps.DeploymentStatus{
+			CollisionCount: &collisionCount,
 		},
-		{
-			name: "decrease: invalid update",
-			from: apps.DeploymentStatus{
-				CollisionCount: &otherCollisionCount,
-			},
-			to: apps.DeploymentStatus{
-				CollisionCount: &collisionCount,
-			},
-			expectedErr: true,
+		to: apps.DeploymentStatus{
+			CollisionCount: &collisionCount,
 		},
+		expectedErr: false,
+	}, {
+		name: "unset: invalid update",
+		from: apps.DeploymentStatus{
+			CollisionCount: &collisionCount,
+		},
+		to: apps.DeploymentStatus{
+			CollisionCount: nil,
+		},
+		expectedErr: true,
+	}, {
+		name: "decrease: invalid update",
+		from: apps.DeploymentStatus{
+			CollisionCount: &otherCollisionCount,
+		},
+		to: apps.DeploymentStatus{
+			CollisionCount: &collisionCount,
+		},
+		expectedErr: true,
+	},
 	}
 
 	for _, test := range tests {
@@ -2872,97 +2782,87 @@ func TestValidateReplicaSetStatus(t *testing.T) {
 		observedGeneration   int64
 
 		expectedErr bool
-	}{
-		{
-			name:                 "valid status",
-			replicas:             3,
-			fullyLabeledReplicas: 3,
-			readyReplicas:        2,
-			availableReplicas:    1,
-			observedGeneration:   2,
-			expectedErr:          false,
-		},
-		{
-			name:                 "invalid replicas",
-			replicas:             -1,
-			fullyLabeledReplicas: 3,
-			readyReplicas:        2,
-			availableReplicas:    1,
-			observedGeneration:   2,
-			expectedErr:          true,
-		},
-		{
-			name:                 "invalid fullyLabeledReplicas",
-			replicas:             3,
-			fullyLabeledReplicas: -1,
-			readyReplicas:        2,
-			availableReplicas:    1,
-			observedGeneration:   2,
-			expectedErr:          true,
-		},
-		{
-			name:                 "invalid readyReplicas",
-			replicas:             3,
-			fullyLabeledReplicas: 3,
-			readyReplicas:        -1,
-			availableReplicas:    1,
-			observedGeneration:   2,
-			expectedErr:          true,
-		},
-		{
-			name:                 "invalid availableReplicas",
-			replicas:             3,
-			fullyLabeledReplicas: 3,
-			readyReplicas:        3,
-			availableReplicas:    -1,
-			observedGeneration:   2,
-			expectedErr:          true,
-		},
-		{
-			name:                 "invalid observedGeneration",
-			replicas:             3,
-			fullyLabeledReplicas: 3,
-			readyReplicas:        3,
-			availableReplicas:    3,
-			observedGeneration:   -1,
-			expectedErr:          true,
-		},
-		{
-			name:                 "fullyLabeledReplicas greater than replicas",
-			replicas:             3,
-			fullyLabeledReplicas: 4,
-			readyReplicas:        3,
-			availableReplicas:    3,
-			observedGeneration:   1,
-			expectedErr:          true,
-		},
-		{
-			name:                 "readyReplicas greater than replicas",
-			replicas:             3,
-			fullyLabeledReplicas: 3,
-			readyReplicas:        4,
-			availableReplicas:    3,
-			observedGeneration:   1,
-			expectedErr:          true,
-		},
-		{
-			name:                 "availableReplicas greater than replicas",
-			replicas:             3,
-			fullyLabeledReplicas: 3,
-			readyReplicas:        3,
-			availableReplicas:    4,
-			observedGeneration:   1,
-			expectedErr:          true,
-		},
-		{
-			name:                 "availableReplicas greater than readyReplicas",
-			replicas:             3,
-			fullyLabeledReplicas: 3,
-			readyReplicas:        2,
-			availableReplicas:    3,
-			observedGeneration:   1,
-			expectedErr:          true,
-		},
+	}{{
+		name:                 "valid status",
+		replicas:             3,
+		fullyLabeledReplicas: 3,
+		readyReplicas:        2,
+		availableReplicas:    1,
+		observedGeneration:   2,
+		expectedErr:          false,
+	}, {
+		name:                 "invalid replicas",
+		replicas:             -1,
+		fullyLabeledReplicas: 3,
+		readyReplicas:        2,
+		availableReplicas:    1,
+		observedGeneration:   2,
+		expectedErr:          true,
+	}, {
+		name:                 "invalid fullyLabeledReplicas",
+		replicas:             3,
+		fullyLabeledReplicas: -1,
+		readyReplicas:        2,
+		availableReplicas:    1,
+		observedGeneration:   2,
+		expectedErr:          true,
+	}, {
+		name:                 "invalid readyReplicas",
+		replicas:             3,
+		fullyLabeledReplicas: 3,
+		readyReplicas:        -1,
+		availableReplicas:    1,
+		observedGeneration:   2,
+		expectedErr:          true,
+	}, {
+		name:                 "invalid availableReplicas",
+		replicas:             3,
+		fullyLabeledReplicas: 3,
+		readyReplicas:        3,
+		availableReplicas:    -1,
+		observedGeneration:   2,
+		expectedErr:          true,
+	}, {
+		name:                 "invalid observedGeneration",
+		replicas:             3,
+		fullyLabeledReplicas: 3,
+		readyReplicas:        3,
+		availableReplicas:    3,
+		observedGeneration:   -1,
+		expectedErr:          true,
+	}, {
+		name:                 "fullyLabeledReplicas greater than replicas",
+		replicas:             3,
+		fullyLabeledReplicas: 4,
+		readyReplicas:        3,
+		availableReplicas:    3,
+		observedGeneration:   1,
+		expectedErr:          true,
+	}, {
+		name:                 "readyReplicas greater than replicas",
+		replicas:             3,
+		fullyLabeledReplicas: 3,
+		readyReplicas:        4,
+		availableReplicas:    3,
+		observedGeneration:   1,
+		expectedErr:          true,
+	}, {
+		name:                 "availableReplicas greater than replicas",
+		replicas:             3,
+		fullyLabeledReplicas: 3,
+		readyReplicas:        3,
+		availableReplicas:    4,
+		observedGeneration:   1,
+		expectedErr:          true,
+	}, {
+		name:                 "availableReplicas greater than readyReplicas",
+		replicas:             3,
+		fullyLabeledReplicas: 3,
+		readyReplicas:        2,
+		availableReplicas:    3,
+		observedGeneration:   1,
+		expectedErr:          true,
+	},
 	}
 
 	for _, test := range tests {
@@ -2998,30 +2898,29 @@ func TestValidateReplicaSetStatusUpdate(t *testing.T) {
 		old    apps.ReplicaSet
 		update apps.ReplicaSet
 	}
-	successCases := []rcUpdateTest{
-		{
-			old: apps.ReplicaSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.ReplicaSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
-					Template: validPodTemplate.Template,
-				},
-				Status: apps.ReplicaSetStatus{
-					Replicas: 2,
-				},
+	successCases := []rcUpdateTest{{
+		old: apps.ReplicaSet{
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+			Spec: apps.ReplicaSetSpec{
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: validPodTemplate.Template,
 			},
-			update: apps.ReplicaSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.ReplicaSetSpec{
-					Replicas: 3,
-					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
-					Template: validPodTemplate.Template,
-				},
-				Status: apps.ReplicaSetStatus{
-					Replicas: 4,
-				},
+			Status: apps.ReplicaSetStatus{
+				Replicas: 2,
 			},
 		},
+		update: apps.ReplicaSet{
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+			Spec: apps.ReplicaSetSpec{
+				Replicas: 3,
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: validPodTemplate.Template,
+			},
+			Status: apps.ReplicaSetStatus{
+				Replicas: 4,
+			},
+		},
+	},
 	}
 	for _, successCase := range successCases {
 		successCase.old.ObjectMeta.ResourceVersion = "1"
@@ -3300,29 +3199,26 @@ func TestValidateReplicaSet(t *testing.T) {
 			},
 		},
 	}
-	successCases := []apps.ReplicaSet{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-			Spec: apps.ReplicaSetSpec{
-				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
-				Template: validPodTemplate.Template,
-			},
+	successCases := []apps.ReplicaSet{{
+		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+		Spec: apps.ReplicaSetSpec{
+			Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+			Template: validPodTemplate.Template,
 		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
-			Spec: apps.ReplicaSetSpec{
-				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
-				Template: validPodTemplate.Template,
-			},
+	}, {
+		ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
+		Spec: apps.ReplicaSetSpec{
+			Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+			Template: validPodTemplate.Template,
 		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
-			Spec: apps.ReplicaSetSpec{
-				Replicas: 1,
-				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
-				Template: readWriteVolumePodTemplate.Template,
-			},
+	}, {
+		ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
+		Spec: apps.ReplicaSetSpec{
+			Replicas: 1,
+			Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+			Template: readWriteVolumePodTemplate.Template,
 		},
+	},
 	}
 	for _, successCase := range successCases {
 		if errs := ValidateReplicaSet(&successCase, corevalidation.PodValidationOptions{}); len(errs) != 0 {
