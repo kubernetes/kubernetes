@@ -24,10 +24,8 @@ import (
 	"sync"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	internalapi "k8s.io/cri-api/pkg/apis"
@@ -246,29 +244,6 @@ func getContainerImageFromE2ETestDaemonset(dsYamlPath string) (string, error) {
 		return "", fmt.Errorf("failed to parse the container image: cannot extract the container from YAML")
 	}
 	return ds.Spec.Template.Spec.Containers[0].Image, nil
-}
-
-// getSampleDevicePluginPod returns the Sample Device Plugin pod to be used e2e tests.
-func getSampleDevicePluginPod(pluginSockDir string) *v1.Pod {
-	data, err := e2etestfiles.Read(SampleDevicePluginDSYAML)
-	if err != nil {
-		framework.Fail(err.Error())
-	}
-
-	ds := readDaemonSetV1OrDie(data)
-	dp := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: SampleDevicePluginName,
-		},
-		Spec: ds.Spec.Template.Spec,
-	}
-	for i := range dp.Spec.Containers[0].Env {
-		if dp.Spec.Containers[0].Env[i].Name == SampleDeviceEnvVarNamePluginSockDir {
-			dp.Spec.Containers[0].Env[i].Value = pluginSockDir
-		}
-	}
-
-	return dp
 }
 
 // getSRIOVDevicePluginImage returns the image of SRIOV device plugin.
