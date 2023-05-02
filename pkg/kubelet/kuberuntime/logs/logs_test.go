@@ -22,7 +22,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"testing"
 	"time"
@@ -407,7 +406,7 @@ func TestReadLogsLimitsWithTimestamps(t *testing.T) {
 	logLineFmt := "2022-10-29T16:10:22.592603036-05:00 stdout P %v\n"
 	logLineNewLine := "2022-10-29T16:10:22.592603036-05:00 stdout F \n"
 
-	tmpfile, err := ioutil.TempFile("", "log.*.txt")
+	tmpfile, err := os.CreateTemp("", "log.*.txt")
 	assert.NoError(t, err)
 
 	count := 10000

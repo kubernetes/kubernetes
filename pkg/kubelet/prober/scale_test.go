@@ -19,9 +19,9 @@ package prober
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
+	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -82,7 +82,7 @@ func TestTCPPortExhaustion(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf(tt.name), func(t *testing.T) {
 			testRootDir := ""
-			if tempDir, err := ioutil.TempDir("", "kubelet_test."); err != nil {
+			if tempDir, err := os.MkdirTemp("", "kubelet_test."); err != nil {
 				t.Fatalf("can't make a temp rootdir: %v", err)
 			} else {
 				testRootDir = tempDir
