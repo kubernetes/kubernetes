@@ -550,7 +550,7 @@ func (dc *DisruptionController) updatePod(oldObj, newObj interface{}) {
 	dc.enqueuePod(newPod)
 
 	oldPod := oldObj.(*v1.Pod)
-	if labels.Equals(oldPod.Labels, newPod.Labels) {
+	if !labels.Equals(oldPod.Labels, newPod.Labels) {
 		dc.enqueuePod(oldPod)
 	}
 }
