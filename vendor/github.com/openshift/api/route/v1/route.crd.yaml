@@ -1,0 +1,298 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    api-approved.openshift.io: https://github.com/openshift/api/pull/1228
+  name: routes.route.openshift.io
+spec:
+  group: route.openshift.io
+  names:
+    kind: Route
+    plural: routes
+    singular: route
+  scope: Namespaced
+  versions:
+    - additionalPrinterColumns:
+        - jsonPath: .status.ingress[0].host
+          name: Host
+          type: string
+        - jsonPath: .status.ingress[0].conditions[?(@.type=="Admitted")].status
+          name: Admitted
+          type: string
+        - jsonPath: .spec.to.name
+          name: Service
+          type: string
+        - jsonPath: .spec.tls.type
+          name: TLS
+          type: string
+      name: v1
+      schema:
+        openAPIV3Schema:
+          description: "A route allows developers to expose services through an HTTP(S) aware load balancing and proxy layer via a public DNS entry. The route may further specify TLS options and a certificate, or specify a public CNAME that the router should also accept for HTTP and HTTPS traffic. An administrator typically configures their router to be visible outside the cluster firewall, and may also add additional security, caching, or traffic controls on the service content. Routers usually talk directly to the service endpoints. \n Once a route is created, the `host` field may not be changed. Generally, routers use the oldest route with a given host when resolving conflicts. \n Routers are subject to additional customization and may support additional controls via the annotations field. \n Because administrators may configure multiple routers, the route status field is used to return information to clients about the names and states of the route under each router. If a client chooses a duplicate name, for instance, the route status conditions are used to indicate the route cannot be chosen. \n To enable HTTP/2 ALPN on a route it requires a custom (non-wildcard) certificate. This prevents connection coalescing by clients, notably web browsers. We do not support HTTP/2 ALPN on routes that use the default certificate because of the risk of connection re-use/coalescing. Routes that do not have their own custom certificate will not be HTTP/2 ALPN-enabled on either the frontend or the backend. \n Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer)."
+          properties:
+            apiVersion:
+              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              type: string
+            kind:
+              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              type: string
+            metadata:
+              type: object
+            spec:
+              allOf:
+                - anyOf:
+                    - properties:
+                        path:
+                          maxLength: 0
+                    - properties:
+                        tls:
+                          enum:
+                            - null
+                    - not:
+                        properties:
+                          tls:
+                            properties:
+                              termination:
+                                enum:
+                                  - passthrough
+                - anyOf:
+                    - not:
+                        properties:
+                          host:
+                            maxLength: 0
+                    - not:
+                        properties:
+                          wildcardPolicy:
+                            enum:
+                              - Subdomain
+              description: spec is the desired state of the route
+              properties:
+                alternateBackends:
+                  description: alternateBackends allows up to 3 additional backends to be assigned to the route. Only the Service kind is allowed, and it will be defaulted to Service. Use the weight field in RouteTargetReference object to specify relative preference.
+                  items:
+                    description: RouteTargetReference specifies the target that resolve into endpoints. Only the 'Service' kind is allowed. Use 'weight' field to emphasize one over others.
+                    properties:
+                      kind:
+                        default: Service
+                        description: The kind of target that the route is referring to. Currently, only 'Service' is allowed
+                        enum:
+                          - Service
+                          - ""
+                        type: string
+                      name:
+                        description: name of the service/target that is being referred to. e.g. name of the service
+                        minLength: 1
+                        type: string
+                      weight:
+                        default: 100
+                        description: weight as an integer between 0 and 256, default 100, that specifies the target's relative weight against other target reference objects. 0 suppresses requests to this backend.
+                        format: int32
+                        maximum: 256
+                        minimum: 0
+                        type: integer
+                    required:
+                      - kind
+                      - name
+                    type: object
+                  maxItems: 3
+                  type: array
+                host:
+                  description: host is an alias/DNS that points to the service. Optional. If not specified a route name will typically be automatically chosen. Must follow DNS952 subdomain conventions.
+                  maxLength: 253
+                  pattern: ^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$
+                  type: string
+                path:
+                  description: path that the router watches for, to route traffic for to the service. Optional
+                  pattern: ^/
+                  type: string
+                port:
+                  description: If specified, the port to be used by the router. Most routers will use all endpoints exposed by the service by default - set this value to instruct routers which port to use.
+                  properties:
+                    targetPort:
+                      allOf:
+                        - not:
+                            enum:
+                              - 0
+                        - not:
+                            enum:
+                              - ""
+                      x-kubernetes-int-or-string: true
+                  required:
+                    - targetPort
+                  type: object
+                subdomain:
+                  description: "subdomain is a DNS subdomain that is requested within the ingress controller's domain (as a subdomain). If host is set this field is ignored. An ingress controller may choose to ignore this suggested name, in which case the controller will report the assigned name in the status.ingress array or refuse to admit the route. If this value is set and the server does not support this field host will be populated automatically. Otherwise host is left empty. The field may have multiple parts separated by a dot, but not all ingress controllers may honor the request. This field may not be changed after creation except by a user with the update routes/custom-host permission. \n Example: subdomain `frontend` automatically receives the router subdomain `apps.mycluster.com` to have a full hostname `frontend.apps.mycluster.com`."
+                  maxLength: 253
+                  pattern: ^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$
+                  type: string
+                tls:
+                  allOf:
+                    - anyOf:
+                        - properties:
+                            caCertificate:
+                              maxLength: 0
+                            certificate:
+                              maxLength: 0
+                            destinationCACertificate:
+                              maxLength: 0
+                            key:
+                              maxLength: 0
+                        - not:
+                            properties:
+                              termination:
+                                enum:
+                                  - passthrough
+                    - anyOf:
+                        - properties:
+                            destinationCACertificate:
+                              maxLength: 0
+                        - not:
+                            properties:
+                              termination:
+                                enum:
+                                  - edge
+                    - anyOf:
+                        - properties:
+                            insecureEdgeTerminationPolicy:
+                              enum:
+                                - ""
+                                - None
+                                - Allow
+                                - Redirect
+                        - not:
+                            properties:
+                              termination:
+                                enum:
+                                  - edge
+                                  - reencrypt
+                    - anyOf:
+                        - properties:
+                            insecureEdgeTerminationPolicy:
+                              enum:
+                                - ""
+                                - None
+                                - Redirect
+                        - not:
+                            properties:
+                              termination:
+                                enum:
+                                  - passthrough
+                  description: The tls field provides the ability to configure certificates and termination for the route.
+                  properties:
+                    caCertificate:
+                      description: caCertificate provides the cert authority certificate contents
+                      type: string
+                    certificate:
+                      description: certificate provides certificate contents. This should be a single serving certificate, not a certificate chain. Do not include a CA certificate.
+                      type: string
+                    destinationCACertificate:
+                      description: destinationCACertificate provides the contents of the ca certificate of the final destination.  When using reencrypt termination this file should be provided in order to have routers use it for health checks on the secure connection. If this field is not specified, the router may provide its own destination CA and perform hostname validation using the short service name (service.namespace.svc), which allows infrastructure generated certificates to automatically verify.
+                      type: string
+                    insecureEdgeTerminationPolicy:
+                      description: "insecureEdgeTerminationPolicy indicates the desired behavior for insecure connections to a route. While each router may make its own decisions on which ports to expose, this is normally port 80. \n * Allow - traffic is sent to the server on the insecure port (default) * Disable - no traffic is allowed on the insecure port. * Redirect - clients are redirected to the secure port."
+                      type: string
+                    key:
+                      description: key provides key file contents
+                      type: string
+                    termination:
+                      description: "termination indicates termination type. \n * edge - TLS termination is done by the router and http is used to communicate with the backend (default) * passthrough - Traffic is sent straight to the destination without the router providing TLS termination * reencrypt - TLS termination is done by the router and https is used to communicate with the backend"
+                      enum:
+                        - edge
+                        - reencrypt
+                        - passthrough
+                      type: string
+                  required:
+                    - termination
+                  type: object
+                to:
+                  description: to is an object the route should use as the primary backend. Only the Service kind is allowed, and it will be defaulted to Service. If the weight field (0-256 default 100) is set to zero, no traffic will be sent to this backend.
+                  properties:
+                    kind:
+                      default: Service
+                      description: The kind of target that the route is referring to. Currently, only 'Service' is allowed
+                      enum:
+                        - Service
+                        - ""
+                      type: string
+                    name:
+                      description: name of the service/target that is being referred to. e.g. name of the service
+                      minLength: 1
+                      type: string
+                    weight:
+                      default: 100
+                      description: weight as an integer between 0 and 256, default 100, that specifies the target's relative weight against other target reference objects. 0 suppresses requests to this backend.
+                      format: int32
+                      maximum: 256
+                      minimum: 0
+                      type: integer
+                  required:
+                    - kind
+                    - name
+                  type: object
+                wildcardPolicy:
+                  default: None
+                  description: Wildcard policy if any for the route. Currently only 'Subdomain' or 'None' is allowed.
+                  enum:
+                    - None
+                    - Subdomain
+                    - ""
+                  type: string
+              required:
+                - to
+              type: object
+            status:
+              description: status is the current state of the route
+              properties:
+                ingress:
+                  description: ingress describes the places where the route may be exposed. The list of ingress points may contain duplicate Host or RouterName values. Routes are considered live once they are `Ready`
+                  items:
+                    description: RouteIngress holds information about the places where a route is exposed.
+                    properties:
+                      conditions:
+                        description: Conditions is the state of the route, may be empty.
+                        items:
+                          description: RouteIngressCondition contains details for the current condition of this route on a particular router.
+                          properties:
+                            lastTransitionTime:
+                              description: RFC 3339 date and time when this condition last transitioned
+                              format: date-time
+                              type: string
+                            message:
+                              description: Human readable message indicating details about last transition.
+                              type: string
+                            reason:
+                              description: (brief) reason for the condition's last transition, and is usually a machine and human readable constant
+                              type: string
+                            status:
+                              description: Status is the status of the condition. Can be True, False, Unknown.
+                              type: string
+                            type:
+                              description: Type is the type of the condition. Currently only Admitted.
+                              type: string
+                          required:
+                            - status
+                            - type
+                          type: object
+                        type: array
+                      host:
+                        description: Host is the host string under which the route is exposed; this value is required
+                        type: string
+                      routerCanonicalHostname:
+                        description: CanonicalHostname is the external host name for the router that can be used as a CNAME for the host requested for this route. This value is optional and may not be set in all cases.
+                        type: string
+                      routerName:
+                        description: Name is a name chosen by the router to identify itself; this value is required
+                        type: string
+                      wildcardPolicy:
+                        description: Wildcard policy is the wildcard policy that was allowed where this route is exposed.
+                        type: string
+                    type: object
+                  type: array
+              type: object
+          required:
+            - spec
+          type: object
+      served: true
+      storage: true
+      subresources:
+        status: {}

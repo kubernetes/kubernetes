@@ -1,0 +1,157 @@
+apiVersion: apiextensions.k8s.io/v1 # Hack because controller-gen complains if we don't have this
+name: "[Stable] Console"
+crd: 0000_70_console-operator.crd.yaml
+tests:
+  onCreate:
+  - name: Should be able to create a minimal Console
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: Console
+      spec: {} # No spec is required for a Console
+    expected: |
+      apiVersion: operator.openshift.io/v1
+      kind: Console
+      spec:
+        logLevel: Normal
+        operatorLogLevel: Normal
+  - name: Should be able to customize perspectives
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: Console
+      spec:
+        customization:
+          perspectives:
+          - id: dev
+            visibility: 
+              state: Enabled
+          - id: admin
+            visibility: 
+              state: Disabled
+    expected: |
+      apiVersion: operator.openshift.io/v1
+      kind: Console
+      spec:
+        logLevel: Normal
+        operatorLogLevel: Normal
+        customization:
+          perspectives:
+          - id: dev
+            visibility: 
+              state: Enabled
+          - id: admin
+            visibility: 
+              state: Disabled
+  - name: Should throw an error for incorrect value of state in perspectives
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: Console
+      spec:
+        customization:
+          perspectives:
+          - id: dev
+            visibility: 
+              state: Enables
+    expectedError: "spec.customization.perspectives[0].visibility.state: Unsupported value: \"Enables\": supported values: \"Enabled\", \"Disabled\", \"AccessReview\""
+  - name: Should be able to add pinned resources to a perspective
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: Console
+      spec:
+        customization:
+          perspectives:
+          - id: dev
+            visibility: 
+              state: Enabled
+            pinnedResources:
+            - group: ""
+              resource: configmaps
+              version: v1
+    expected: |
+      apiVersion: operator.openshift.io/v1
+      kind: Console
+      spec:
+        logLevel: Normal
+        operatorLogLevel: Normal
+        customization:
+          perspectives:
+          - id: dev
+            visibility: 
+              state: Enabled
+            pinnedResources:
+            - group: ""
+              resource: configmaps
+              version: v1
+  - name: Should not be able to add pinned resources to "admin" perspective
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: Console
+      spec:
+        customization:
+          perspectives:
+          - id: admin
+            visibility: 
+              state: Enabled
+            pinnedResources:
+            - group: ""
+              resource: configmaps
+              version: v1
+    expectedError: "pinnedResources is allowed only for dev and forbidden for other perspectives"
+  - name: Should throw an error if "group" is missing from the pinnedResources
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: Console
+      spec:
+        customization:
+          perspectives:
+          - id: dev
+            visibility: 
+              state: Enabled
+            pinnedResources:
+            - resource: configmaps
+              version: v1
+    expectedError: "spec.customization.perspectives[0].pinnedResources[0].group: Required value"
+  - name: Should throw an error if the value of "version" in the pinnedResources doesnot match the required regex
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: Console
+      spec:
+        customization:
+          perspectives:
+          - id: dev
+            visibility: 
+              state: Enabled
+            pinnedResources:
+            - group: ""
+              resource: configmaps
+              version: v'
+    expectedError: "spec.customization.perspectives[0].pinnedResources[0].version in body should match '^[a-z0-9]+$'"
+  - name: Should throw an error if the value of "group" in the pinnedResources doesnot match the required regex
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: Console
+      spec:
+        customization:
+          perspectives:
+          - id: dev
+            visibility: 
+              state: Enabled
+            pinnedResources:
+            - group: .apps.
+              resource: deployments
+              version: v1
+    expectedError: "spec.customization.perspectives[0].pinnedResources[0].group in body should match '^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$'"
+  - name: Should throw an error if the value of "resource" in the pinnedResources doesnot match the required regex
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: Console
+      spec:
+        customization:
+          perspectives:
+          - id: dev
+            visibility: 
+              state: Enabled
+            pinnedResources:
+            - group: apps
+              resource: Deployment
+              version: v1
+    expectedError: "spec.customization.perspectives[0].pinnedResources[0].resource in body should match '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'"

@@ -1,0 +1,36 @@
+apiVersion: apiextensions.k8s.io/v1 # Hack because controller-gen complains if we don't have this
+name: "[Stable] SecurityContextConstraints"
+crd: 0000_03_security-openshift_01_scc.crd.yaml
+tests:
+  onCreate:
+  - name: Should be able to create a minimal SecurityContextConstraints
+    initial: |
+      apiVersion: security.openshift.io/v1
+      kind: SecurityContextConstraints
+      allowHostDirVolumePlugin: false
+      allowHostIPC: false
+      allowHostNetwork: false
+      allowHostPID: false
+      allowHostPorts: false
+      allowPrivilegedContainer: false
+      allowedCapabilities: []
+      defaultAddCapabilities: []
+      priority: 0
+      readOnlyRootFilesystem: false
+      requiredDropCapabilities: []
+      volumes: []
+    expected: |
+      apiVersion: security.openshift.io/v1
+      kind: SecurityContextConstraints
+      allowHostDirVolumePlugin: false
+      allowHostIPC: false
+      allowHostNetwork: false
+      allowHostPID: false
+      allowHostPorts: false
+      allowPrivilegedContainer: false
+      allowedCapabilities: []
+      defaultAddCapabilities: []
+      priority: 0
+      readOnlyRootFilesystem: false
+      requiredDropCapabilities: []
+      volumes: []

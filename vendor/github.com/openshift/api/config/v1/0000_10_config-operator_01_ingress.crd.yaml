@@ -1,0 +1,334 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    api-approved.openshift.io: https://github.com/openshift/api/pull/470
+    include.release.openshift.io/ibm-cloud-managed: "true"
+    include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
+  name: ingresses.config.openshift.io
+spec:
+  group: config.openshift.io
+  names:
+    kind: Ingress
+    listKind: IngressList
+    plural: ingresses
+    singular: ingress
+  scope: Cluster
+  versions:
+    - name: v1
+      schema:
+        openAPIV3Schema:
+          description: "Ingress holds cluster-wide information about ingress, including the default ingress domain used for routes. The canonical name is `cluster`. \n Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer)."
+          type: object
+          required:
+            - spec
+          properties:
+            apiVersion:
+              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              type: string
+            kind:
+              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: spec holds user settable values for configuration
+              type: object
+              properties:
+                appsDomain:
+                  description: appsDomain is an optional domain to use instead of the one specified in the domain field when a Route is created without specifying an explicit host. If appsDomain is nonempty, this value is used to generate default host values for Route. Unlike domain, appsDomain may be modified after installation. This assumes a new ingresscontroller has been setup with a wildcard certificate.
+                  type: string
+                componentRoutes:
+                  description: "componentRoutes is an optional list of routes that are managed by OpenShift components that a cluster-admin is able to configure the hostname and serving certificate for. The namespace and name of each route in this list should match an existing entry in the status.componentRoutes list. \n To determine the set of configurable Routes, look at namespace and name of entries in the .status.componentRoutes list, where participating operators write the status of configurable routes."
+                  type: array
+                  items:
+                    description: ComponentRouteSpec allows for configuration of a route's hostname and serving certificate.
+                    type: object
+                    required:
+                      - hostname
+                      - name
+                      - namespace
+                    properties:
+                      hostname:
+                        description: hostname is the hostname that should be used by the route.
+                        type: string
+                        pattern: ^([a-zA-Z0-9\p{S}\p{L}]((-?[a-zA-Z0-9\p{S}\p{L}]{0,62})?)|([a-zA-Z0-9\p{S}\p{L}](([a-zA-Z0-9-\p{S}\p{L}]{0,61}[a-zA-Z0-9\p{S}\p{L}])?)(\.)){1,}([a-zA-Z\p{L}]){2,63})$|^(([a-z0-9][-a-z0-9]{0,61}[a-z0-9]|[a-z0-9]{1,63})[\.]){0,}([a-z0-9][-a-z0-9]{0,61}[a-z0-9]|[a-z0-9]{1,63})$
+                      name:
+                        description: "name is the logical name of the route to customize. \n The namespace and name of this componentRoute must match a corresponding entry in the list of status.componentRoutes if the route is to be customized."
+                        type: string
+                        maxLength: 256
+                        minLength: 1
+                      namespace:
+                        description: "namespace is the namespace of the route to customize. \n The namespace and name of this componentRoute must match a corresponding entry in the list of status.componentRoutes if the route is to be customized."
+                        type: string
+                        maxLength: 63
+                        minLength: 1
+                        pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                      servingCertKeyPairSecret:
+                        description: servingCertKeyPairSecret is a reference to a secret of type `kubernetes.io/tls` in the openshift-config namespace. The serving cert/key pair must match and will be used by the operator to fulfill the intent of serving with this name. If the custom hostname uses the default routing suffix of the cluster, the Secret specification for a serving certificate will not be needed.
+                        type: object
+                        required:
+                          - name
+                        properties:
+                          name:
+                            description: name is the metadata.name of the referenced secret
+                            type: string
+                  x-kubernetes-list-map-keys:
+                    - namespace
+                    - name
+                  x-kubernetes-list-type: map
+                domain:
+                  description: "domain is used to generate a default host name for a route when the route's host name is empty. The generated host name will follow this pattern: \"<route-name>.<route-namespace>.<domain>\". \n It is also used as the default wildcard domain suffix for ingress. The default ingresscontroller domain will follow this pattern: \"*.<domain>\". \n Once set, changing domain is not currently supported."
+                  type: string
+                loadBalancer:
+                  description: loadBalancer contains the load balancer details in general which are not only specific to the underlying infrastructure provider of the current cluster and are required for Ingress Controller to work on OpenShift.
+                  type: object
+                  properties:
+                    platform:
+                      description: platform holds configuration specific to the underlying infrastructure provider for the ingress load balancers. When omitted, this means the user has no opinion and the platform is left to choose reasonable defaults. These defaults are subject to change over time.
+                      type: object
+                      properties:
+                        aws:
+                          description: aws contains settings specific to the Amazon Web Services infrastructure provider.
+                          type: object
+                          required:
+                            - type
+                          properties:
+                            type:
+                              description: "type allows user to set a load balancer type. When this field is set the default ingresscontroller will get created using the specified LBType. If this field is not set then the default ingress controller of LBType Classic will be created. Valid values are: \n * \"Classic\": A Classic Load Balancer that makes routing decisions at either the transport layer (TCP/SSL) or the application layer (HTTP/HTTPS). See the following for additional details: \n https://docs.aws.amazon.com/AmazonECS/latest/developerguide/load-balancer-types.html#clb \n * \"NLB\": A Network Load Balancer that makes routing decisions at the transport layer (TCP/SSL). See the following for additional details: \n https://docs.aws.amazon.com/AmazonECS/latest/developerguide/load-balancer-types.html#nlb"
+                              type: string
+                              enum:
+                                - NLB
+                                - Classic
+                        type:
+                          description: type is the underlying infrastructure provider for the cluster. Allowed values are "AWS", "Azure", "BareMetal", "GCP", "Libvirt", "OpenStack", "VSphere", "oVirt", "KubeVirt", "EquinixMetal", "PowerVS", "AlibabaCloud", "Nutanix" and "None". Individual components may not support all platforms, and must handle unrecognized platforms as None if they do not support that platform.
+                          type: string
+                          enum:
+                            - ""
+                            - AWS
+                            - Azure
+                            - BareMetal
+                            - GCP
+                            - Libvirt
+                            - OpenStack
+                            - None
+                            - VSphere
+                            - oVirt
+                            - IBMCloud
+                            - KubeVirt
+                            - EquinixMetal
+                            - PowerVS
+                            - AlibabaCloud
+                            - Nutanix
+                            - External
+                requiredHSTSPolicies:
+                  description: "requiredHSTSPolicies specifies HSTS policies that are required to be set on newly created  or updated routes matching the domainPattern/s and namespaceSelector/s that are specified in the policy. Each requiredHSTSPolicy must have at least a domainPattern and a maxAge to validate a route HSTS Policy route annotation, and affect route admission. \n A candidate route is checked for HSTS Policies if it has the HSTS Policy route annotation: \"haproxy.router.openshift.io/hsts_header\" E.g. haproxy.router.openshift.io/hsts_header: max-age=31536000;preload;includeSubDomains \n - For each candidate route, if it matches a requiredHSTSPolicy domainPattern and optional namespaceSelector, then the maxAge, preloadPolicy, and includeSubdomainsPolicy must be valid to be admitted.  Otherwise, the route is rejected. - The first match, by domainPattern and optional namespaceSelector, in the ordering of the RequiredHSTSPolicies determines the route's admission status. - If the candidate route doesn't match any requiredHSTSPolicy domainPattern and optional namespaceSelector, then it may use any HSTS Policy annotation. \n The HSTS policy configuration may be changed after routes have already been created. An update to a previously admitted route may then fail if the updated route does not conform to the updated HSTS policy configuration. However, changing the HSTS policy configuration will not cause a route that is already admitted to stop working. \n Note that if there are no RequiredHSTSPolicies, any HSTS Policy annotation on the route is valid."
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - domainPatterns
+                    properties:
+                      domainPatterns:
+                        description: "domainPatterns is a list of domains for which the desired HSTS annotations are required. If domainPatterns is specified and a route is created with a spec.host matching one of the domains, the route must specify the HSTS Policy components described in the matching RequiredHSTSPolicy. \n The use of wildcards is allowed like this: *.foo.com matches everything under foo.com. foo.com only matches foo.com, so to cover foo.com and everything under it, you must specify *both*."
+                        type: array
+                        minItems: 1
+                        items:
+                          type: string
+                      includeSubDomainsPolicy:
+                        description: 'includeSubDomainsPolicy means the HSTS Policy should apply to any subdomains of the host''s domain name.  Thus, for the host bar.foo.com, if includeSubDomainsPolicy was set to RequireIncludeSubDomains: - the host app.bar.foo.com would inherit the HSTS Policy of bar.foo.com - the host bar.foo.com would inherit the HSTS Policy of bar.foo.com - the host foo.com would NOT inherit the HSTS Policy of bar.foo.com - the host def.foo.com would NOT inherit the HSTS Policy of bar.foo.com'
+                        type: string
+                        enum:
+                          - RequireIncludeSubDomains
+                          - RequireNoIncludeSubDomains
+                          - NoOpinion
+                      maxAge:
+                        description: maxAge is the delta time range in seconds during which hosts are regarded as HSTS hosts. If set to 0, it negates the effect, and hosts are removed as HSTS hosts. If set to 0 and includeSubdomains is specified, all subdomains of the host are also removed as HSTS hosts. maxAge is a time-to-live value, and if this policy is not refreshed on a client, the HSTS policy will eventually expire on that client.
+                        type: object
+                        properties:
+                          largestMaxAge:
+                            description: The largest allowed value (in seconds) of the RequiredHSTSPolicy max-age This value can be left unspecified, in which case no upper limit is enforced.
+                            type: integer
+                            format: int32
+                            maximum: 2147483647
+                            minimum: 0
+                          smallestMaxAge:
+                            description: The smallest allowed value (in seconds) of the RequiredHSTSPolicy max-age Setting max-age=0 allows the deletion of an existing HSTS header from a host.  This is a necessary tool for administrators to quickly correct mistakes. This value can be left unspecified, in which case no lower limit is enforced.
+                            type: integer
+                            format: int32
+                            maximum: 2147483647
+                            minimum: 0
+                      namespaceSelector:
+                        description: namespaceSelector specifies a label selector such that the policy applies only to those routes that are in namespaces with labels that match the selector, and are in one of the DomainPatterns. Defaults to the empty LabelSelector, which matches everything.
+                        type: object
+                        properties:
+                          matchExpressions:
+                            description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
+                            type: array
+                            items:
+                              description: A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+                              type: object
+                              required:
+                                - key
+                                - operator
+                              properties:
+                                key:
+                                  description: key is the label key that the selector applies to.
+                                  type: string
+                                operator:
+                                  description: operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.
+                                  type: string
+                                values:
+                                  description: values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.
+                                  type: array
+                                  items:
+                                    type: string
+                          matchLabels:
+                            description: matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.
+                            type: object
+                            additionalProperties:
+                              type: string
+                        x-kubernetes-map-type: atomic
+                      preloadPolicy:
+                        description: preloadPolicy directs the client to include hosts in its host preload list so that it never needs to do an initial load to get the HSTS header (note that this is not defined in RFC 6797 and is therefore client implementation-dependent).
+                        type: string
+                        enum:
+                          - RequirePreload
+                          - RequireNoPreload
+                          - NoOpinion
+            status:
+              description: status holds observed values from the cluster. They may not be overridden.
+              type: object
+              properties:
+                componentRoutes:
+                  description: componentRoutes is where participating operators place the current route status for routes whose hostnames and serving certificates can be customized by the cluster-admin.
+                  type: array
+                  items:
+                    description: ComponentRouteStatus contains information allowing configuration of a route's hostname and serving certificate.
+                    type: object
+                    required:
+                      - defaultHostname
+                      - name
+                      - namespace
+                      - relatedObjects
+                    properties:
+                      conditions:
+                        description: "conditions are used to communicate the state of the componentRoutes entry. \n Supported conditions include Available, Degraded and Progressing. \n If available is true, the content served by the route can be accessed by users. This includes cases where a default may continue to serve content while the customized route specified by the cluster-admin is being configured. \n If Degraded is true, that means something has gone wrong trying to handle the componentRoutes entry. The currentHostnames field may or may not be in effect. \n If Progressing is true, that means the component is taking some action related to the componentRoutes entry."
+                        type: array
+                        items:
+                          description: "Condition contains details for one aspect of the current state of this API Resource. --- This struct is intended for direct use as an array at the field path .status.conditions.  For example, \n type FooStatus struct{ // Represents the observations of a foo's current state. // Known .status.conditions.type are: \"Available\", \"Progressing\", and \"Degraded\" // +patchMergeKey=type // +patchStrategy=merge // +listType=map // +listMapKey=type Conditions []metav1.Condition `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"` \n // other fields }"
+                          type: object
+                          required:
+                            - lastTransitionTime
+                            - message
+                            - reason
+                            - status
+                            - type
+                          properties:
+                            lastTransitionTime:
+                              description: lastTransitionTime is the last time the condition transitioned from one status to another. This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                              type: string
+                              format: date-time
+                            message:
+                              description: message is a human readable message indicating details about the transition. This may be an empty string.
+                              type: string
+                              maxLength: 32768
+                            observedGeneration:
+                              description: observedGeneration represents the .metadata.generation that the condition was set based upon. For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date with respect to the current state of the instance.
+                              type: integer
+                              format: int64
+                              minimum: 0
+                            reason:
+                              description: reason contains a programmatic identifier indicating the reason for the condition's last transition. Producers of specific condition types may define expected values and meanings for this field, and whether the values are considered a guaranteed API. The value should be a CamelCase string. This field may not be empty.
+                              type: string
+                              maxLength: 1024
+                              minLength: 1
+                              pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                            status:
+                              description: status of the condition, one of True, False, Unknown.
+                              type: string
+                              enum:
+                                - "True"
+                                - "False"
+                                - Unknown
+                            type:
+                              description: type of condition in CamelCase or in foo.example.com/CamelCase. --- Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be useful (see .node.status.conditions), the ability to deconflict is important. The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                              type: string
+                              maxLength: 316
+                              pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                        x-kubernetes-list-map-keys:
+                          - type
+                        x-kubernetes-list-type: map
+                      consumingUsers:
+                        description: consumingUsers is a slice of ServiceAccounts that need to have read permission on the servingCertKeyPairSecret secret.
+                        type: array
+                        maxItems: 5
+                        items:
+                          description: ConsumingUser is an alias for string which we add validation to. Currently only service accounts are supported.
+                          type: string
+                          maxLength: 512
+                          minLength: 1
+                          pattern: ^system:serviceaccount:[a-z0-9]([-a-z0-9]*[a-z0-9])?:[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                      currentHostnames:
+                        description: currentHostnames is the list of current names used by the route. Typically, this list should consist of a single hostname, but if multiple hostnames are supported by the route the operator may write multiple entries to this list.
+                        type: array
+                        minItems: 1
+                        items:
+                          description: "Hostname is an alias for hostname string validation. \n The left operand of the | is the original kubebuilder hostname validation format, which is incorrect because it allows upper case letters, disallows hyphen or number in the TLD, and allows labels to start/end in non-alphanumeric characters.  See https://bugzilla.redhat.com/show_bug.cgi?id=2039256. ^([a-zA-Z0-9\\p{S}\\p{L}]((-?[a-zA-Z0-9\\p{S}\\p{L}]{0,62})?)|([a-zA-Z0-9\\p{S}\\p{L}](([a-zA-Z0-9-\\p{S}\\p{L}]{0,61}[a-zA-Z0-9\\p{S}\\p{L}])?)(\\.)){1,}([a-zA-Z\\p{L}]){2,63})$ \n The right operand of the | is a new pattern that mimics the current API route admission validation on hostname, except that it allows hostnames longer than the maximum length: ^(([a-z0-9][-a-z0-9]{0,61}[a-z0-9]|[a-z0-9]{1,63})[\\.]){0,}([a-z0-9][-a-z0-9]{0,61}[a-z0-9]|[a-z0-9]{1,63})$ \n Both operand patterns are made available so that modifications on ingress spec can still happen after an invalid hostname was saved via validation by the incorrect left operand of the | operator."
+                          type: string
+                          pattern: ^([a-zA-Z0-9\p{S}\p{L}]((-?[a-zA-Z0-9\p{S}\p{L}]{0,62})?)|([a-zA-Z0-9\p{S}\p{L}](([a-zA-Z0-9-\p{S}\p{L}]{0,61}[a-zA-Z0-9\p{S}\p{L}])?)(\.)){1,}([a-zA-Z\p{L}]){2,63})$|^(([a-z0-9][-a-z0-9]{0,61}[a-z0-9]|[a-z0-9]{1,63})[\.]){0,}([a-z0-9][-a-z0-9]{0,61}[a-z0-9]|[a-z0-9]{1,63})$
+                      defaultHostname:
+                        description: defaultHostname is the hostname of this route prior to customization.
+                        type: string
+                        pattern: ^([a-zA-Z0-9\p{S}\p{L}]((-?[a-zA-Z0-9\p{S}\p{L}]{0,62})?)|([a-zA-Z0-9\p{S}\p{L}](([a-zA-Z0-9-\p{S}\p{L}]{0,61}[a-zA-Z0-9\p{S}\p{L}])?)(\.)){1,}([a-zA-Z\p{L}]){2,63})$|^(([a-z0-9][-a-z0-9]{0,61}[a-z0-9]|[a-z0-9]{1,63})[\.]){0,}([a-z0-9][-a-z0-9]{0,61}[a-z0-9]|[a-z0-9]{1,63})$
+                      name:
+                        description: "name is the logical name of the route to customize. It does not have to be the actual name of a route resource but it cannot be renamed. \n The namespace and name of this componentRoute must match a corresponding entry in the list of spec.componentRoutes if the route is to be customized."
+                        type: string
+                        maxLength: 256
+                        minLength: 1
+                      namespace:
+                        description: "namespace is the namespace of the route to customize. It must be a real namespace. Using an actual namespace ensures that no two components will conflict and the same component can be installed multiple times. \n The namespace and name of this componentRoute must match a corresponding entry in the list of spec.componentRoutes if the route is to be customized."
+                        type: string
+                        maxLength: 63
+                        minLength: 1
+                        pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                      relatedObjects:
+                        description: relatedObjects is a list of resources which are useful when debugging or inspecting how spec.componentRoutes is applied.
+                        type: array
+                        minItems: 1
+                        items:
+                          description: ObjectReference contains enough information to let you inspect or modify the referred object.
+                          type: object
+                          required:
+                            - group
+                            - name
+                            - resource
+                          properties:
+                            group:
+                              description: group of the referent.
+                              type: string
+                            name:
+                              description: name of the referent.
+                              type: string
+                            namespace:
+                              description: namespace of the referent.
+                              type: string
+                            resource:
+                              description: resource of the referent.
+                              type: string
+                  x-kubernetes-list-map-keys:
+                    - namespace
+                    - name
+                  x-kubernetes-list-type: map
+                defaultPlacement:
+                  description: "defaultPlacement is set at installation time to control which nodes will host the ingress router pods by default. The options are control-plane nodes or worker nodes. \n This field works by dictating how the Cluster Ingress Operator will consider unset replicas and nodePlacement fields in IngressController resources when creating the corresponding Deployments. \n See the documentation for the IngressController replicas and nodePlacement fields for more information. \n When omitted, the default value is Workers"
+                  type: string
+                  enum:
+                    - ControlPlane
+                    - Workers
+                    - ""
+      served: true
+      storage: true
+      subresources:
+        status: {}

@@ -1,0 +1,260 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    api-approved.openshift.io: https://github.com/openshift/api/pull/1237
+    include.release.openshift.io/ibm-cloud-managed: "true"
+    include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
+  name: insightsoperators.operator.openshift.io
+spec:
+  group: operator.openshift.io
+  names:
+    kind: InsightsOperator
+    listKind: InsightsOperatorList
+    plural: insightsoperators
+    singular: insightsoperator
+  scope: Cluster
+  versions:
+    - name: v1
+      schema:
+        openAPIV3Schema:
+          description: "InsightsOperator holds cluster-wide information about the Insights Operator. \n Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer)."
+          type: object
+          required:
+            - spec
+          properties:
+            apiVersion:
+              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              type: string
+            kind:
+              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: spec is the specification of the desired behavior of the Insights.
+              type: object
+              properties:
+                logLevel:
+                  description: "logLevel is an intent based logging for an overall component.  It does not give fine grained control, but it is a simple way to manage coarse grained logging choices that operators have to interpret for their operands. \n Valid values are: \"Normal\", \"Debug\", \"Trace\", \"TraceAll\". Defaults to \"Normal\"."
+                  type: string
+                  default: Normal
+                  enum:
+                    - ""
+                    - Normal
+                    - Debug
+                    - Trace
+                    - TraceAll
+                managementState:
+                  description: managementState indicates whether and how the operator should manage the component
+                  type: string
+                  pattern: ^(Managed|Unmanaged|Force|Removed)$
+                observedConfig:
+                  description: observedConfig holds a sparse config that controller has observed from the cluster state.  It exists in spec because it is an input to the level for the operator
+                  type: object
+                  nullable: true
+                  x-kubernetes-preserve-unknown-fields: true
+                operatorLogLevel:
+                  description: "operatorLogLevel is an intent based logging for the operator itself.  It does not give fine grained control, but it is a simple way to manage coarse grained logging choices that operators have to interpret for themselves. \n Valid values are: \"Normal\", \"Debug\", \"Trace\", \"TraceAll\". Defaults to \"Normal\"."
+                  type: string
+                  default: Normal
+                  enum:
+                    - ""
+                    - Normal
+                    - Debug
+                    - Trace
+                    - TraceAll
+                unsupportedConfigOverrides:
+                  description: unsupportedConfigOverrides overrides the final configuration that was computed by the operator. Red Hat does not support the use of this field. Misuse of this field could lead to unexpected behavior or conflict with other configuration options. Seek guidance from the Red Hat support before using this field. Use of this property blocks cluster upgrades, it must be removed before upgrading your cluster.
+                  type: object
+                  nullable: true
+                  x-kubernetes-preserve-unknown-fields: true
+            status:
+              description: status is the most recently observed status of the Insights operator.
+              type: object
+              properties:
+                conditions:
+                  description: conditions is a list of conditions and their status
+                  type: array
+                  items:
+                    description: OperatorCondition is just the standard condition fields.
+                    type: object
+                    properties:
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                      message:
+                        type: string
+                      reason:
+                        type: string
+                      status:
+                        type: string
+                      type:
+                        type: string
+                gatherStatus:
+                  description: gatherStatus provides basic information about the last Insights data gathering. When omitted, this means no data gathering has taken place yet.
+                  type: object
+                  properties:
+                    gatherers:
+                      description: gatherers is a list of active gatherers (and their statuses) in the last gathering.
+                      type: array
+                      items:
+                        description: gathererStatus represents information about a particular data gatherer.
+                        type: object
+                        required:
+                          - conditions
+                          - lastGatherDuration
+                          - name
+                        properties:
+                          conditions:
+                            description: conditions provide details on the status of each gatherer.
+                            type: array
+                            minItems: 1
+                            items:
+                              description: "Condition contains details for one aspect of the current state of this API Resource. --- This struct is intended for direct use as an array at the field path .status.conditions.  For example, \n type FooStatus struct{ // Represents the observations of a foo's current state. // Known .status.conditions.type are: \"Available\", \"Progressing\", and \"Degraded\" // +patchMergeKey=type // +patchStrategy=merge // +listType=map // +listMapKey=type Conditions []metav1.Condition `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"` \n // other fields }"
+                              type: object
+                              required:
+                                - lastTransitionTime
+                                - message
+                                - reason
+                                - status
+                                - type
+                              properties:
+                                lastTransitionTime:
+                                  description: lastTransitionTime is the last time the condition transitioned from one status to another. This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                                  type: string
+                                  format: date-time
+                                message:
+                                  description: message is a human readable message indicating details about the transition. This may be an empty string.
+                                  type: string
+                                  maxLength: 32768
+                                observedGeneration:
+                                  description: observedGeneration represents the .metadata.generation that the condition was set based upon. For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date with respect to the current state of the instance.
+                                  type: integer
+                                  format: int64
+                                  minimum: 0
+                                reason:
+                                  description: reason contains a programmatic identifier indicating the reason for the condition's last transition. Producers of specific condition types may define expected values and meanings for this field, and whether the values are considered a guaranteed API. The value should be a CamelCase string. This field may not be empty.
+                                  type: string
+                                  maxLength: 1024
+                                  minLength: 1
+                                  pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                                status:
+                                  description: status of the condition, one of True, False, Unknown.
+                                  type: string
+                                  enum:
+                                    - "True"
+                                    - "False"
+                                    - Unknown
+                                type:
+                                  description: type of condition in CamelCase or in foo.example.com/CamelCase. --- Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be useful (see .node.status.conditions), the ability to deconflict is important. The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                                  type: string
+                                  maxLength: 316
+                                  pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                            x-kubernetes-list-type: atomic
+                          lastGatherDuration:
+                            description: lastGatherDuration represents the time spent gathering.
+                            type: string
+                            pattern: ^([1-9][0-9]*(\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$
+                          name:
+                            description: name is the name of the gatherer.
+                            type: string
+                            maxLength: 256
+                            minLength: 5
+                      x-kubernetes-list-type: atomic
+                    lastGatherDuration:
+                      description: lastGatherDuration is the total time taken to process all gatherers during the last gather event.
+                      type: string
+                      pattern: ^0|([1-9][0-9]*(\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$
+                    lastGatherTime:
+                      description: lastGatherTime is the last time when Insights data gathering finished. An empty value means that no data has been gathered yet.
+                      type: string
+                      format: date-time
+                generations:
+                  description: generations are used to determine when an item needs to be reconciled or has changed in a way that needs a reaction.
+                  type: array
+                  items:
+                    description: GenerationStatus keeps track of the generation for a given resource so that decisions about forced updates can be made.
+                    type: object
+                    properties:
+                      group:
+                        description: group is the group of the thing you're tracking
+                        type: string
+                      hash:
+                        description: hash is an optional field set for resources without generation that are content sensitive like secrets and configmaps
+                        type: string
+                      lastGeneration:
+                        description: lastGeneration is the last generation of the workload controller involved
+                        type: integer
+                        format: int64
+                      name:
+                        description: name is the name of the thing you're tracking
+                        type: string
+                      namespace:
+                        description: namespace is where the thing you're tracking is
+                        type: string
+                      resource:
+                        description: resource is the resource type of the thing you're tracking
+                        type: string
+                insightsReport:
+                  description: insightsReport provides general Insights analysis results. When omitted, this means no data gathering has taken place yet.
+                  type: object
+                  properties:
+                    downloadedAt:
+                      description: downloadedAt is the time when the last Insights report was downloaded. An empty value means that there has not been any Insights report downloaded yet and it usually appears in disconnected clusters (or clusters when the Insights data gathering is disabled).
+                      type: string
+                      format: date-time
+                    healthChecks:
+                      description: healthChecks provides basic information about active Insights health checks in a cluster.
+                      type: array
+                      items:
+                        description: healthCheck represents an Insights health check attributes.
+                        type: object
+                        required:
+                          - advisorURI
+                          - description
+                          - state
+                          - totalRisk
+                        properties:
+                          advisorURI:
+                            description: advisorURI provides the URL link to the Insights Advisor.
+                            type: string
+                            pattern: ^https:\/\/\S+
+                          description:
+                            description: description provides basic description of the healtcheck.
+                            type: string
+                            maxLength: 2048
+                            minLength: 10
+                          state:
+                            description: state determines what the current state of the health check is. Health check is enabled by default and can be disabled by the user in the Insights advisor user interface.
+                            type: string
+                            enum:
+                              - Enabled
+                              - Disabled
+                          totalRisk:
+                            description: totalRisk of the healthcheck. Indicator of the total risk posed by the detected issue; combination of impact and likelihood. The values can be from 1 to 4, and the higher the number, the more important the issue.
+                            type: integer
+                            format: int32
+                            maximum: 4
+                            minimum: 1
+                      x-kubernetes-list-type: atomic
+                observedGeneration:
+                  description: observedGeneration is the last generation change you've dealt with
+                  type: integer
+                  format: int64
+                readyReplicas:
+                  description: readyReplicas indicates how many replicas are ready and at the desired state
+                  type: integer
+                  format: int32
+                version:
+                  description: version is the level this availability applies to
+                  type: string
+      served: true
+      storage: true
+      subresources:
+        scale:
+          labelSelectorPath: .status.selector
+          specReplicasPath: .spec.replicas
+          statusReplicasPath: .status.availableReplicas
+        status: {}
