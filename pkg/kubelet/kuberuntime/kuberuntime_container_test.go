@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	goruntime "runtime"
 	"strings"
 	"testing"
 	"time"
@@ -234,6 +235,10 @@ func TestToKubeContainerStatus(t *testing.T) {
 // TestToKubeContainerStatusWithResources tests the converting the CRI container status to
 // the internal type (i.e., toKubeContainerStatus()) for containers that returns Resources.
 func TestToKubeContainerStatusWithResources(t *testing.T) {
+	// TODO: remove this check on this PR merges: https://github.com/kubernetes/kubernetes/pull/112599
+	if goruntime.GOOS == "windows" {
+		t.Skip("Updating Pod Container Resources is not supported on Windows.")
+	}
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
 	cid := &kubecontainer.ContainerID{Type: "testRuntime", ID: "dummyid"}
 	meta := &runtimeapi.ContainerMetadata{Name: "cname", Attempt: 3}
@@ -805,6 +810,10 @@ func TestKillContainerGracePeriod(t *testing.T) {
 
 // TestUpdateContainerResources tests updating a container in a Pod.
 func TestUpdateContainerResources(t *testing.T) {
+	// TODO: remove this check on this PR merges: https://github.com/kubernetes/kubernetes/pull/112599
+	if goruntime.GOOS == "windows" {
+		t.Skip("Updating Pod Container Resources is not supported on Windows.")
+	}
 	fakeRuntime, _, m, errCreate := createTestRuntimeManager()
 	require.NoError(t, errCreate)
 	pod := &v1.Pod{
