@@ -75,7 +75,6 @@ DNS_SERVER_IP=${KUBE_DNS_SERVER_IP:-10.0.0.10}
 LOCAL_DNS_IP=${KUBE_LOCAL_DNS_IP:-169.254.20.10}
 DNS_MEMORY_LIMIT=${KUBE_DNS_MEMORY_LIMIT:-170Mi}
 DNS_DOMAIN=${KUBE_DNS_NAME:-"cluster.local"}
-KUBECTL=${KUBECTL:-"${KUBE_ROOT}/cluster/kubectl.sh"}
 WAIT_FOR_URL_API_SERVER=${WAIT_FOR_URL_API_SERVER:-60}
 MAX_TIME_FOR_URL_API_SERVER=${MAX_TIME_FOR_URL_API_SERVER:-1}
 ENABLE_DAEMON=${ENABLE_DAEMON:-false}
@@ -686,6 +685,10 @@ function wait_node_ready(){
   local system_node_wait_time=60
   local interval_time=2
   kube::util::wait_for_success "$system_node_wait_time" "$interval_time" "$nodes_stats | grep $node_name"
+
+  local system_node_ready_time=300
+  local node_ready="${KUBECTL} --kubeconfig '${CERT_DIR}/admin.kubeconfig' wait --for=condition=Ready --timeout=60s nodes $node_name"
+  kube::util::wait_for_success "$system_node_ready_time" "$interval_time" "$node_ready"
   if [ $? == "1" ]; then
     echo "time out on waiting $node_name info"
     exit 1
@@ -1160,6 +1163,8 @@ if [[ "${ENABLE_DAEMON}" = false ]]; then
   trap cleanup EXIT
   trap cleanup INT
 fi
+
+KUBECTL=${KUBECTL:-"${GO_OUT}/kubectl"}
 
 echo "Starting services now!"
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
