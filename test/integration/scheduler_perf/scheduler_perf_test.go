@@ -22,7 +22,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 	"os"
 	"path"
@@ -602,7 +601,7 @@ func initTestOutput(tb testing.TB) io.Writer {
 			if err := fileOutput.Close(); err != nil {
 				tb.Fatalf("close log file: %v", err)
 			}
-			log, err := ioutil.ReadFile(logfileName)
+			log, err := os.ReadFile(logfileName)
 			if err != nil {
 				tb.Fatalf("read log file: %v", err)
 			}
