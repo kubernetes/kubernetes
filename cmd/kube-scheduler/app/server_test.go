@@ -160,43 +160,6 @@ profiles:
 		t.Fatal(err)
 	}
 
-	// plugin config
-	pluginConfigFilev1beta2 := filepath.Join(tmpDir, "pluginv1beta2.yaml")
-	if err := os.WriteFile(pluginConfigFilev1beta2, []byte(fmt.Sprintf(`
-apiVersion: kubescheduler.config.k8s.io/v1beta2
-kind: KubeSchedulerConfiguration
-clientConnection:
-  kubeconfig: '%s'
-profiles:
-- plugins:
-    preFilter:
-      enabled:
-      - name: NodeResourcesFit
-      - name: NodePorts
-      disabled:
-      - name: "*"
-    filter:
-      enabled:
-      - name: NodeResourcesFit
-      - name: NodePorts
-      disabled:
-      - name: "*"
-    preScore:
-      enabled:
-      - name: InterPodAffinity
-      - name: TaintToleration
-      disabled:
-      - name: "*"
-    score:
-      enabled:
-      - name: InterPodAffinity
-      - name: TaintToleration
-      disabled:
-      - name: "*"
-`, configKubeconfig)), os.FileMode(0600)); err != nil {
-		t.Fatal(err)
-	}
-
 	// out-of-tree plugin config v1
 	outOfTreePluginConfigFilev1 := filepath.Join(tmpDir, "outOfTreePluginv1.yaml")
 	if err := os.WriteFile(outOfTreePluginConfigFilev1, []byte(fmt.Sprintf(`
@@ -220,25 +183,6 @@ profiles:
 	outOfTreePluginConfigFilev1beta3 := filepath.Join(tmpDir, "outOfTreePluginv1beta3.yaml")
 	if err := os.WriteFile(outOfTreePluginConfigFilev1beta3, []byte(fmt.Sprintf(`
 apiVersion: kubescheduler.config.k8s.io/v1beta3
-kind: KubeSchedulerConfiguration
-clientConnection:
-  kubeconfig: '%s'
-profiles:
-- plugins:
-    preFilter:
-      enabled:
-      - name: Foo
-    filter:
-      enabled:
-      - name: Foo
-`, configKubeconfig)), os.FileMode(0600)); err != nil {
-		t.Fatal(err)
-	}
-
-	// out-of-tree plugin config v1beta2
-	outOfTreePluginConfigFilev1beta2 := filepath.Join(tmpDir, "outOfTreePluginv1beta2.yaml")
-	if err := os.WriteFile(outOfTreePluginConfigFilev1beta2, []byte(fmt.Sprintf(`
-apiVersion: kubescheduler.config.k8s.io/v1beta2
 kind: KubeSchedulerConfiguration
 clientConnection:
   kubeconfig: '%s'
@@ -356,35 +300,6 @@ leaderElection:
 			},
 		},
 		{
-			name: "component configuration v1beta2",
-			flags: []string{
-				"--config", pluginConfigFilev1beta2,
-				"--kubeconfig", configKubeconfig,
-			},
-			wantPlugins: map[string]*config.Plugins{
-				"default-scheduler": func() *config.Plugins {
-					plugins := defaults.PluginsV1beta2.DeepCopy()
-					plugins.Filter.Enabled = []config.Plugin{
-						{Name: "NodeResourcesFit"},
-						{Name: "NodePorts"},
-					}
-					plugins.PreFilter.Enabled = []config.Plugin{
-						{Name: "NodeResourcesFit"},
-						{Name: "NodePorts"},
-					}
-					plugins.PreScore.Enabled = []config.Plugin{
-						{Name: "InterPodAffinity"},
-						{Name: "TaintToleration"},
-					}
-					plugins.Score.Enabled = []config.Plugin{
-						{Name: "InterPodAffinity", Weight: 1},
-						{Name: "TaintToleration", Weight: 1},
-					}
-					return plugins
-				}(),
-			},
-		},
-		{
 			name: "component configuration v1beta3",
 			flags: []string{
 				"--config", pluginConfigFilev1beta3,
@@ -440,22 +355,6 @@ leaderElection:
 						{Name: "InterPodAffinity", Weight: 1},
 						{Name: "TaintToleration", Weight: 1},
 					}
-					return plugins
-				}(),
-			},
-		},
-		{
-			name: "out-of-tree component configuration v1beta2",
-			flags: []string{
-				"--config", outOfTreePluginConfigFilev1beta2,
-				"--kubeconfig", configKubeconfig,
-			},
-			registryOptions: []Option{WithPlugin("Foo", newFoo)},
-			wantPlugins: map[string]*config.Plugins{
-				"default-scheduler": func() *config.Plugins {
-					plugins := defaults.PluginsV1beta2.DeepCopy()
-					plugins.PreFilter.Enabled = append(plugins.PreFilter.Enabled, config.Plugin{Name: "Foo"})
-					plugins.Filter.Enabled = append(plugins.Filter.Enabled, config.Plugin{Name: "Foo"})
 					return plugins
 				}(),
 			},

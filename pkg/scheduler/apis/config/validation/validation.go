@@ -33,7 +33,6 @@ import (
 	componentbasevalidation "k8s.io/component-base/config/validation"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta2"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta3"
 )
 
@@ -142,10 +141,6 @@ type invalidPlugins struct {
 // Remember to add an entry to that list when creating a new component config
 // version (even if the list of invalid plugins is empty).
 var invalidPluginsByVersion = []invalidPlugins{
-	{
-		schemeGroupVersion: v1beta2.SchemeGroupVersion.String(),
-		plugins:            []string{},
-	},
 	{
 		schemeGroupVersion: v1beta3.SchemeGroupVersion.String(),
 		plugins:            []string{},
