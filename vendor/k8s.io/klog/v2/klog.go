@@ -1228,6 +1228,19 @@ func CopyStandardLogTo(name string) {
 	stdLog.SetOutput(logBridge(sev))
 }
 
+// NewStandardLogger returns a Logger that writes to the klog logs for the
+// named and lower severities.
+//
+// Valid names are "INFO", "WARNING", "ERROR", and "FATAL". If the name is not
+// recognized, NewStandardLogger panics.
+func NewStandardLogger(name string) *stdLog.Logger {
+	sev, ok := severity.ByName(name)
+	if !ok {
+		panic(fmt.Sprintf("klog.NewStandardLogger(%q): unknown severity", name))
+	}
+	return stdLog.New(logBridge(sev), "", stdLog.Lshortfile)
+}
+
 // logBridge provides the Write method that enables CopyStandardLogTo to connect
 // Go's standard logs to the logs provided by this package.
 type logBridge severity.Severity
