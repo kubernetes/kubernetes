@@ -39,11 +39,6 @@ import (
 // ProcFS provides a helper for getting container name via pid.
 type ProcFS struct{}
 
-// NewProcFS returns a ProcFS object.
-func NewProcFS() ProcFSInterface {
-	return &ProcFS{}
-}
-
 func containerNameFromProcCgroup(content string) (string, error) {
 	lines := strings.Split(content, "\n")
 	for _, line := range lines {

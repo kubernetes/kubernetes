@@ -18,11 +18,12 @@ package volumezone
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -42,26 +43,134 @@ type VolumeZone struct {
 }
 
 var _ framework.FilterPlugin = &VolumeZone{}
+var _ framework.PreFilterPlugin = &VolumeZone{}
 var _ framework.EnqueueExtensions = &VolumeZone{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
 	Name = names.VolumeZone
 
+	preFilterStateKey framework.StateKey = "PreFilter" + Name
+
 	// ErrReasonConflict is used for NoVolumeZoneConflict predicate error.
 	ErrReasonConflict = "node(s) had no available volume zone"
 )
 
-var volumeZoneLabels = sets.NewString(
+// pvTopology holds the value of a pv's topologyLabel
+type pvTopology struct {
+	pvName string
+	key    string
+	values sets.String
+}
+
+// the state is initialized in PreFilter phase. because we save the pointer in
+// framework.CycleState, in the later phases we don't need to call Write method
+// to update the value
+type stateData struct {
+	// podPVTopologies holds the pv information we need
+	// it's initialized in the PreFilter phase
+	podPVTopologies []pvTopology
+}
+
+func (d *stateData) Clone() framework.StateData {
+	return d
+}
+
+var topologyLabels = []string{
 	v1.LabelFailureDomainBetaZone,
 	v1.LabelFailureDomainBetaRegion,
 	v1.LabelTopologyZone,
 	v1.LabelTopologyRegion,
-)
+}
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *VolumeZone) Name() string {
 	return Name
+}
+
+// PreFilter invoked at the prefilter extension point
+//
+// # It finds the topology of the PersistentVolumes corresponding to the volumes a pod requests
+//
+// Currently, this is only supported with PersistentVolumeClaims,
+// and only looks for the bound PersistentVolume.
+func (pl *VolumeZone) PreFilter(ctx context.Context, cs *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+	podPVTopologies, status := pl.getPVbyPod(ctx, pod)
+	if !status.IsSuccess() {
+		return nil, status
+	}
+	if len(podPVTopologies) == 0 {
+		return nil, framework.NewStatus(framework.Skip)
+	}
+	cs.Write(preFilterStateKey, &stateData{podPVTopologies: podPVTopologies})
+	return nil, nil
+}
+
+func (pl *VolumeZone) getPVbyPod(ctx context.Context, pod *v1.Pod) ([]pvTopology, *framework.Status) {
+	podPVTopologies := make([]pvTopology, 0)
+
+	for i := range pod.Spec.Volumes {
+		volume := pod.Spec.Volumes[i]
+		if volume.PersistentVolumeClaim == nil {
+			continue
+		}
+		pvcName := volume.PersistentVolumeClaim.ClaimName
+		if pvcName == "" {
+			return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolumeClaim had no name")
+		}
+		pvc, err := pl.pvcLister.PersistentVolumeClaims(pod.Namespace).Get(pvcName)
+		if s := getErrorAsStatus(err); !s.IsSuccess() {
+			return nil, s
+		}
+
+		pvName := pvc.Spec.VolumeName
+		if pvName == "" {
+			scName := storagehelpers.GetPersistentVolumeClaimClass(pvc)
+			if len(scName) == 0 {
+				return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolumeClaim had no pv name and storageClass name")
+			}
+
+			class, err := pl.scLister.Get(scName)
+			if s := getErrorAsStatus(err); !s.IsSuccess() {
+				return nil, s
+			}
+			if class.VolumeBindingMode == nil {
+				return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("VolumeBindingMode not set for StorageClass %q", scName))
+			}
+			if *class.VolumeBindingMode == storage.VolumeBindingWaitForFirstConsumer {
+				// Skip unbound volumes
+				continue
+			}
+
+			return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolume had no name")
+		}
+
+		pv, err := pl.pvLister.Get(pvName)
+		if s := getErrorAsStatus(err); !s.IsSuccess() {
+			return nil, s
+		}
+
+		for _, key := range topologyLabels {
+			if value, ok := pv.ObjectMeta.Labels[key]; ok {
+				volumeVSet, err := volumehelpers.LabelZonesToSet(value)
+				if err != nil {
+					klog.InfoS("Failed to parse label, ignoring the label", "label", fmt.Sprintf("%s:%s", key, value), "err", err)
+					continue
+				}
+				podPVTopologies = append(podPVTopologies, pvTopology{
+					pvName: pv.Name,
+					key:    key,
+					values: volumeVSet,
+				})
+			}
+		}
+	}
+	return podPVTopologies, nil
+}
+
+// PreFilterExtensions returns prefilter extensions, pod add and remove.
+func (pl *VolumeZone) PreFilterExtensions() framework.PreFilterExtensions {
+	return nil
 }
 
 // Filter invoked at the filter extension point.
@@ -80,94 +189,66 @@ func (pl *VolumeZone) Name() string {
 // determining the zone of a volume during scheduling, and that is likely to
 // require calling out to the cloud provider.  It seems that we are moving away
 // from inline volume declarations anyway.
-func (pl *VolumeZone) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *VolumeZone) Filter(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	// If a pod doesn't have any volume attached to it, the predicate will always be true.
 	// Thus we make a fast path for it, to avoid unnecessary computations in this case.
 	if len(pod.Spec.Volumes) == 0 {
 		return nil
 	}
-	node := nodeInfo.Node()
-	if node == nil {
-		return framework.NewStatus(framework.Error, "node not found")
-	}
-	nodeConstraints := make(map[string]string)
-	for k, v := range node.ObjectMeta.Labels {
-		if !volumeZoneLabels.Has(k) {
-			continue
+	var podPVTopologies []pvTopology
+	state, err := getStateData(cs)
+	if err != nil {
+		// Fallback to calculate pv list here
+		var status *framework.Status
+		podPVTopologies, status = pl.getPVbyPod(ctx, pod)
+		if !status.IsSuccess() {
+			return status
 		}
-		nodeConstraints[k] = v
+	} else {
+		podPVTopologies = state.podPVTopologies
 	}
-	if len(nodeConstraints) == 0 {
+
+	node := nodeInfo.Node()
+	hasAnyNodeConstraint := false
+	for _, topologyLabel := range topologyLabels {
+		if _, ok := node.Labels[topologyLabel]; ok {
+			hasAnyNodeConstraint = true
+			break
+		}
+	}
+
+	if !hasAnyNodeConstraint {
 		// The node has no zone constraints, so we're OK to schedule.
-		// In practice, when using zones, all nodes must be labeled with zone labels.
-		// We want to fast-path this case though.
+		// This is to handle a single-zone cluster scenario where the node may not have any topology labels.
 		return nil
 	}
 
-	for i := range pod.Spec.Volumes {
-		volume := pod.Spec.Volumes[i]
-		if volume.PersistentVolumeClaim == nil {
-			continue
-		}
-		pvcName := volume.PersistentVolumeClaim.ClaimName
-		if pvcName == "" {
-			return framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolumeClaim had no name")
-		}
-		pvc, err := pl.pvcLister.PersistentVolumeClaims(pod.Namespace).Get(pvcName)
-		if s := getErrorAsStatus(err); !s.IsSuccess() {
-			return s
-		}
-
-		pvName := pvc.Spec.VolumeName
-		if pvName == "" {
-			scName := storagehelpers.GetPersistentVolumeClaimClass(pvc)
-			if len(scName) == 0 {
-				return framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolumeClaim had no pv name and storageClass name")
-			}
-
-			class, err := pl.scLister.Get(scName)
-			if s := getErrorAsStatus(err); !s.IsSuccess() {
-				return s
-			}
-			if class.VolumeBindingMode == nil {
-				return framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("VolumeBindingMode not set for StorageClass %q", scName))
-			}
-			if *class.VolumeBindingMode == storage.VolumeBindingWaitForFirstConsumer {
-				// Skip unbound volumes
-				continue
-			}
-
-			return framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolume had no name")
-		}
-
-		pv, err := pl.pvLister.Get(pvName)
-		if s := getErrorAsStatus(err); !s.IsSuccess() {
-			return s
-		}
-
-		for k, v := range pv.ObjectMeta.Labels {
-			if !volumeZoneLabels.Has(k) {
-				continue
-			}
-			nodeV := nodeConstraints[k]
-			volumeVSet, err := volumehelpers.LabelZonesToSet(v)
-			if err != nil {
-				klog.InfoS("Failed to parse label, ignoring the label", "label", fmt.Sprintf("%s:%s", k, v), "err", err)
-				continue
-			}
-
-			if !volumeVSet.Has(nodeV) {
-				klog.V(10).InfoS("Won't schedule pod onto node due to volume (mismatch on label key)", "pod", klog.KObj(pod), "node", klog.KObj(node), "PV", klog.KRef("", pvName), "PVLabelKey", k)
-				return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict)
-			}
+	for _, pvTopology := range podPVTopologies {
+		v, ok := node.Labels[pvTopology.key]
+		if !ok || !pvTopology.values.Has(v) {
+			klog.V(10).InfoS("Won't schedule pod onto node due to volume (mismatch on label key)", "pod", klog.KObj(pod), "node", klog.KObj(node), "PV", klog.KRef("", pvTopology.pvName), "PVLabelKey", pvTopology.key)
+			return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict)
 		}
 	}
+
 	return nil
+}
+
+func getStateData(cs *framework.CycleState) (*stateData, error) {
+	state, err := cs.Read(preFilterStateKey)
+	if err != nil {
+		return nil, err
+	}
+	s, ok := state.(*stateData)
+	if !ok {
+		return nil, errors.New("unable to convert state into stateData")
+	}
+	return s, nil
 }
 
 func getErrorAsStatus(err error) *framework.Status {
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return framework.NewStatus(framework.UnschedulableAndUnresolvable, err.Error())
 		}
 		return framework.AsStatus(err)

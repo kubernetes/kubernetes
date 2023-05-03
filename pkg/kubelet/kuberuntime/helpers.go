@@ -94,12 +94,13 @@ func (m *kubeGenericRuntimeManager) toKubeContainer(c *runtimeapi.Container) (*k
 
 	annotatedInfo := getContainerInfoFromAnnotations(c.Annotations)
 	return &kubecontainer.Container{
-		ID:      kubecontainer.ContainerID{Type: m.runtimeName, ID: c.Id},
-		Name:    c.GetMetadata().GetName(),
-		ImageID: c.ImageRef,
-		Image:   c.Image.Image,
-		Hash:    annotatedInfo.Hash,
-		State:   toKubeContainerState(c.State),
+		ID:                   kubecontainer.ContainerID{Type: m.runtimeName, ID: c.Id},
+		Name:                 c.GetMetadata().GetName(),
+		ImageID:              c.ImageRef,
+		Image:                c.Image.Image,
+		Hash:                 annotatedInfo.Hash,
+		HashWithoutResources: annotatedInfo.HashWithoutResources,
+		State:                toKubeContainerState(c.State),
 	}, nil
 }
 

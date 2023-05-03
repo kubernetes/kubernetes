@@ -364,6 +364,12 @@ func writeFile(t *testing.T, dir string, gvk schema.GroupVersionKind, suffix, ex
 	}
 }
 
+func deleteFile(t *testing.T, dir string, gvk schema.GroupVersionKind, suffix, extension string) {
+	if err := os.Remove(filepath.Join(dir, makeName(gvk)+suffix+"."+extension)); err != nil {
+		t.Fatalf("error removing %s: %v", extension, err)
+	}
+}
+
 func (c *CompatibilityTestOptions) runPreviousVersionTest(t *testing.T, gvk schema.GroupVersionKind, previousVersionDir string, usedFiles sets.String) {
 	jsonBeforeRoundTrip, yamlBeforeRoundTrip, protoBeforeRoundTrip, err := read(previousVersionDir, gvk, "", usedFiles)
 	if os.IsNotExist(err) || (len(jsonBeforeRoundTrip) == 0 && len(yamlBeforeRoundTrip) == 0 && len(protoBeforeRoundTrip) == 0) {
@@ -422,15 +428,28 @@ func (c *CompatibilityTestOptions) runPreviousVersionTest(t *testing.T, gvk sche
 	}
 	protoAfterRoundTrip := protoBytes.Bytes()
 
+	jsonNeedsRemove := false
+	yamlNeedsRemove := false
+	protoNeedsRemove := false
+
 	expectedJSONAfterRoundTrip, expectedYAMLAfterRoundTrip, expectedProtoAfterRoundTrip, _ := read(previousVersionDir, gvk, ".after_roundtrip", usedFiles)
 	if len(expectedJSONAfterRoundTrip) == 0 {
 		expectedJSONAfterRoundTrip = jsonBeforeRoundTrip
+	} else if bytes.Equal(jsonBeforeRoundTrip, expectedJSONAfterRoundTrip) {
+		t.Errorf("JSON after_roundtrip file is identical and should be removed")
+		jsonNeedsRemove = true
 	}
 	if len(expectedYAMLAfterRoundTrip) == 0 {
 		expectedYAMLAfterRoundTrip = yamlBeforeRoundTrip
+	} else if bytes.Equal(yamlBeforeRoundTrip, expectedYAMLAfterRoundTrip) {
+		t.Errorf("YAML after_roundtrip file is identical and should be removed")
+		yamlNeedsRemove = true
 	}
 	if len(expectedProtoAfterRoundTrip) == 0 {
 		expectedProtoAfterRoundTrip = protoBeforeRoundTrip
+	} else if bytes.Equal(protoBeforeRoundTrip, expectedProtoAfterRoundTrip) {
+		t.Errorf("Proto after_roundtrip file is identical and should be removed")
+		protoNeedsRemove = true
 	}
 
 	jsonNeedsUpdate := false
@@ -456,17 +475,25 @@ func (c *CompatibilityTestOptions) runPreviousVersionTest(t *testing.T, gvk sche
 		// t.Logf("json (for locating the offending field based on surrounding data): %s", string(expectedJSON))
 	}
 
-	if jsonNeedsUpdate || yamlNeedsUpdate || protoNeedsUpdate {
+	if jsonNeedsUpdate || yamlNeedsUpdate || protoNeedsUpdate || jsonNeedsRemove || yamlNeedsRemove || protoNeedsRemove {
 		const updateEnvVar = "UPDATE_COMPATIBILITY_FIXTURE_DATA"
 		if os.Getenv(updateEnvVar) == "true" {
 			if jsonNeedsUpdate {
 				writeFile(t, previousVersionDir, gvk, ".after_roundtrip", "json", jsonAfterRoundTrip)
+			} else if jsonNeedsRemove {
+				deleteFile(t, previousVersionDir, gvk, ".after_roundtrip", "json")
 			}
+
 			if yamlNeedsUpdate {
 				writeFile(t, previousVersionDir, gvk, ".after_roundtrip", "yaml", yamlAfterRoundTrip)
+			} else if yamlNeedsRemove {
+				deleteFile(t, previousVersionDir, gvk, ".after_roundtrip", "yaml")
 			}
+
 			if protoNeedsUpdate {
 				writeFile(t, previousVersionDir, gvk, ".after_roundtrip", "pb", protoAfterRoundTrip)
+			} else if protoNeedsRemove {
+				deleteFile(t, previousVersionDir, gvk, ".after_roundtrip", "pb")
 			}
 			t.Logf("wrote expected compatibility data... verify, commit, and rerun tests")
 		} else {

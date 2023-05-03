@@ -197,6 +197,9 @@ type MachineInfo struct {
 	// The amount of memory (in bytes) in this machine
 	MemoryCapacity uint64 `json:"memory_capacity"`
 
+	// The amount of swap (in bytes) in this machine
+	SwapCapacity uint64 `json:"swap_capacity"`
+
 	// Memory capacity and number of DIMMs by memory type
 	MemoryByType map[string]*MemoryInfo `json:"memory_by_type"`
 

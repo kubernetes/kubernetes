@@ -12,7 +12,10 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
 // +openshift:compatibility-gen:level=1
 type Infrastructure struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
+
+	// metadata is the standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// spec holds user settable values for configuration
@@ -227,36 +230,6 @@ const (
 	IBMCloudProviderTypeUPI IBMCloudProviderType = "UPI"
 )
 
-// CloudControllerManagerState defines whether Cloud Controller Manager presence is expected or not
-type CloudControllerManagerState string
-
-const (
-	// Cloud Controller Manager is enabled and expected to be installed.
-	// This value indicates that new nodes should be tainted as uninitialized when created,
-	// preventing them from running workloads until they are initialized by the cloud controller manager.
-	CloudControllerManagerExternal CloudControllerManagerState = "External"
-
-	// Cloud Controller Manager is disabled and not expected to be installed.
-	// This value indicates that new nodes should not be tainted
-	// and no extra node initialization is expected from the cloud controller manager.
-	CloudControllerManagerNone CloudControllerManagerState = "None"
-)
-
-// CloudControllerManagerSpec holds Cloud Controller Manager (a.k.a. CCM or CPI) related settings
-type CloudControllerManagerSpec struct {
-	// state determines whether or not an external Cloud Controller Manager is expected to
-	// be installed within the cluster.
-	// https://kubernetes.io/docs/tasks/administer-cluster/running-cloud-controller/#running-cloud-controller-manager
-	//
-	// When set to "External", new nodes will be tainted as uninitialized when created,
-	// preventing them from running workloads until they are initialized by the cloud controller manager.
-	// When omitted or set to "None", new nodes will be not tainted
-	// and no extra initialization from the cloud controller manager is expected.
-	// +kubebuilder:validation:Enum="";External;None
-	// +optional
-	State CloudControllerManagerState `json:"state"`
-}
-
 // ExternalPlatformSpec holds the desired state for the generic External infrastructure provider.
 type ExternalPlatformSpec struct {
 	// PlatformName holds the arbitrary string representing the infrastructure provider name, expected to be set at the installation time.
@@ -266,9 +239,6 @@ type ExternalPlatformSpec struct {
 	// +kubebuilder:validation:XValidation:rule="oldSelf == 'Unknown' || self == oldSelf",message="platform name cannot be changed once set"
 	// +optional
 	PlatformName string `json:"platformName,omitempty"`
-	// CloudControllerManager contains settings specific to the external Cloud Controller Manager (a.k.a. CCM or CPI)
-	// +optional
-	CloudControllerManager CloudControllerManagerSpec `json:"cloudControllerManager"`
 }
 
 // PlatformSpec holds the desired state specific to the underlying infrastructure provider
@@ -731,7 +701,6 @@ type OpenStackPlatformStatus struct {
 	// loadBalancer defines how the load balancer used by the cluster is configured.
 	// +default={"type": "OpenShiftManagedDefault"}
 	// +kubebuilder:default={"type": "OpenShiftManagedDefault"}
-	// +openshift:enable:FeatureSets=TechPreviewNoUpgrade
 	// +optional
 	LoadBalancer *OpenStackPlatformLoadBalancer `json:"loadBalancer,omitempty"`
 }
@@ -1167,6 +1136,7 @@ type PowerVSPlatformSpec struct {
 }
 
 // PowerVSPlatformStatus holds the current status of the IBM Power Systems Virtual Servers infrastrucutre provider.
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.resourceGroup) || has(self.resourceGroup)",message="cannot unset resourceGroup once set"
 type PowerVSPlatformStatus struct {
 	// region holds the default Power VS region for new Power VS resources created by the cluster.
 	Region string `json:"region"`
@@ -1174,6 +1144,18 @@ type PowerVSPlatformStatus struct {
 	// zone holds the default zone for the new Power VS resources created by the cluster.
 	// Note: Currently only single-zone OCP clusters are supported
 	Zone string `json:"zone"`
+
+	// resourceGroup is the resource group name for new IBMCloud resources created for a cluster.
+	// The resource group specified here will be used by cluster-image-registry-operator to set up a COS Instance in IBMCloud for the cluster registry.
+	// More about resource groups can be found here: https://cloud.ibm.com/docs/account?topic=account-rgs.
+	// When omitted, the image registry operator won't be able to configure storage,
+	// which results in the image registry cluster operator not being in an available state.
+	//
+	// +kubebuilder:validation:Pattern=^[a-zA-Z0-9-_ ]+$
+	// +kubebuilder:validation:MaxLength=40
+	// +kubebuilder:validation:XValidation:rule="oldSelf == '' || self == oldSelf",message="resourceGroup is immutable once set"
+	// +optional
+	ResourceGroup string `json:"resourceGroup"`
 
 	// serviceEndpoints is a list of custom endpoints which will override the default
 	// service endpoints of a Power VS service.
@@ -1351,6 +1333,9 @@ type NutanixPlatformStatus struct {
 // +openshift:compatibility-gen:level=1
 type InfrastructureList struct {
 	metav1.TypeMeta `json:",inline"`
+
+	// metadata is the standard list's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ListMeta `json:"metadata"`
 
 	Items []Infrastructure `json:"items"`

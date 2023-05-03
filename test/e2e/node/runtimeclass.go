@@ -30,6 +30,7 @@ import (
 	runtimeclasstest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2eruntimeclass "k8s.io/kubernetes/test/e2e/framework/node/runtimeclass"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/scheduling"
@@ -40,9 +41,9 @@ import (
 
 var _ = SIGDescribe("RuntimeClass", func() {
 	f := framework.NewDefaultFramework("runtimeclass")
-	f.NamespacePodSecurityEnforceLevel = api.LevelBaseline
+	f.NamespacePodSecurityEnforceLevel = api.LevelPrivileged
 
-	ginkgo.It("should reject a Pod requesting a RuntimeClass with conflicting node selector", func() {
+	ginkgo.It("should reject a Pod requesting a RuntimeClass with conflicting node selector", func(ctx context.Context) {
 		labelFooName := "foo-" + string(uuid.NewUUID())
 
 		scheduling := &nodev1.Scheduling{
@@ -53,24 +54,24 @@ var _ = SIGDescribe("RuntimeClass", func() {
 
 		runtimeClass := newRuntimeClass(f.Namespace.Name, "conflict-runtimeclass")
 		runtimeClass.Scheduling = scheduling
-		rc, err := f.ClientSet.NodeV1().RuntimeClasses().Create(context.TODO(), runtimeClass, metav1.CreateOptions{})
+		rc, err := f.ClientSet.NodeV1().RuntimeClasses().Create(ctx, runtimeClass, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create RuntimeClass resource")
 
-		pod := e2enode.NewRuntimeClassPod(rc.GetName())
+		pod := e2eruntimeclass.NewRuntimeClassPod(rc.GetName())
 		pod.Spec.NodeSelector = map[string]string{
 			labelFooName: "bar",
 		}
-		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
+		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
 		if !apierrors.IsForbidden(err) {
 			framework.Failf("expected 'forbidden' as error, got instead: %v", err)
 		}
 	})
 
-	ginkgo.It("should run a Pod requesting a RuntimeClass with scheduling with taints [Serial] ", func() {
+	ginkgo.It("should run a Pod requesting a RuntimeClass with scheduling with taints [Serial] ", func(ctx context.Context) {
 		labelFooName := "foo-" + string(uuid.NewUUID())
 		labelFizzName := "fizz-" + string(uuid.NewUUID())
 
-		nodeName := scheduling.GetNodeThatCanRunPod(f)
+		nodeName := scheduling.GetNodeThatCanRunPod(ctx, f)
 		nodeSelector := map[string]string{
 			labelFooName:  "bar",
 			labelFizzName: "buzz",
@@ -91,8 +92,8 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		ginkgo.By("Trying to apply a label on the found node.")
 		for key, value := range nodeSelector {
 			e2enode.AddOrUpdateLabelOnNode(f.ClientSet, nodeName, key, value)
-			e2enode.ExpectNodeHasLabel(f.ClientSet, nodeName, key, value)
-			defer e2enode.RemoveLabelOffNode(f.ClientSet, nodeName, key)
+			e2enode.ExpectNodeHasLabel(ctx, f.ClientSet, nodeName, key, value)
+			ginkgo.DeferCleanup(e2enode.RemoveLabelOffNode, f.ClientSet, nodeName, key)
 		}
 
 		ginkgo.By("Trying to apply taint on the found node.")
@@ -101,41 +102,41 @@ var _ = SIGDescribe("RuntimeClass", func() {
 			Value:  "bar",
 			Effect: v1.TaintEffectNoSchedule,
 		}
-		e2enode.AddOrUpdateTaintOnNode(f.ClientSet, nodeName, taint)
-		e2enode.ExpectNodeHasTaint(f.ClientSet, nodeName, &taint)
-		defer e2enode.RemoveTaintOffNode(f.ClientSet, nodeName, taint)
+		e2enode.AddOrUpdateTaintOnNode(ctx, f.ClientSet, nodeName, taint)
+		e2enode.ExpectNodeHasTaint(ctx, f.ClientSet, nodeName, &taint)
+		ginkgo.DeferCleanup(e2enode.RemoveTaintOffNode, f.ClientSet, nodeName, taint)
 
 		ginkgo.By("Trying to create runtimeclass and pod")
 		runtimeClass := newRuntimeClass(f.Namespace.Name, "non-conflict-runtimeclass")
 		runtimeClass.Scheduling = scheduling
-		rc, err := f.ClientSet.NodeV1().RuntimeClasses().Create(context.TODO(), runtimeClass, metav1.CreateOptions{})
+		rc, err := f.ClientSet.NodeV1().RuntimeClasses().Create(ctx, runtimeClass, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create RuntimeClass resource")
 
-		pod := e2enode.NewRuntimeClassPod(rc.GetName())
+		pod := e2eruntimeclass.NewRuntimeClassPod(rc.GetName())
 		pod.Spec.NodeSelector = map[string]string{
 			labelFooName: "bar",
 		}
-		pod = e2epod.NewPodClient(f).Create(pod)
+		pod = e2epod.NewPodClient(f).Create(ctx, pod)
 
-		framework.ExpectNoError(e2epod.WaitForPodNotPending(f.ClientSet, f.Namespace.Name, pod.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNotPending(ctx, f.ClientSet, f.Namespace.Name, pod.Name))
 
 		// check that pod got scheduled on specified node.
-		scheduledPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+		scheduledPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(nodeName, scheduledPod.Spec.NodeName)
 		framework.ExpectEqual(nodeSelector, pod.Spec.NodeSelector)
 		gomega.Expect(pod.Spec.Tolerations).To(gomega.ContainElement(tolerations[0]))
 	})
 
-	ginkgo.It("should run a Pod requesting a RuntimeClass with scheduling without taints ", func() {
-		// Requires special setup of test-handler which is only done in GCE kube-up environment
-		// see https://github.com/kubernetes/kubernetes/blob/eb729620c522753bc7ae61fc2c7b7ea19d4aad2f/cluster/gce/gci/configure-helper.sh#L3069-L3076
-		e2eskipper.SkipUnlessProviderIs("gce")
+	ginkgo.It("should run a Pod requesting a RuntimeClass with scheduling without taints ", func(ctx context.Context) {
+		if err := e2eruntimeclass.NodeSupportsPreconfiguredRuntimeClassHandler(ctx, f); err != nil {
+			e2eskipper.Skipf("Skipping test as node does not have E2E runtime class handler preconfigured in container runtime config: %v", err)
+		}
 
 		labelFooName := "foo-" + string(uuid.NewUUID())
 		labelFizzName := "fizz-" + string(uuid.NewUUID())
 
-		nodeName := scheduling.GetNodeThatCanRunPod(f)
+		nodeName := scheduling.GetNodeThatCanRunPod(ctx, f)
 		nodeSelector := map[string]string{
 			labelFooName:  "bar",
 			labelFizzName: "buzz",
@@ -147,26 +148,26 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		ginkgo.By("Trying to apply a label on the found node.")
 		for key, value := range nodeSelector {
 			e2enode.AddOrUpdateLabelOnNode(f.ClientSet, nodeName, key, value)
-			e2enode.ExpectNodeHasLabel(f.ClientSet, nodeName, key, value)
-			defer e2enode.RemoveLabelOffNode(f.ClientSet, nodeName, key)
+			e2enode.ExpectNodeHasLabel(ctx, f.ClientSet, nodeName, key, value)
+			ginkgo.DeferCleanup(e2enode.RemoveLabelOffNode, f.ClientSet, nodeName, key)
 		}
 
 		ginkgo.By("Trying to create runtimeclass and pod")
 		runtimeClass := newRuntimeClass(f.Namespace.Name, "non-conflict-runtimeclass")
 		runtimeClass.Scheduling = scheduling
-		rc, err := f.ClientSet.NodeV1().RuntimeClasses().Create(context.TODO(), runtimeClass, metav1.CreateOptions{})
+		rc, err := f.ClientSet.NodeV1().RuntimeClasses().Create(ctx, runtimeClass, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create RuntimeClass resource")
 
-		pod := e2enode.NewRuntimeClassPod(rc.GetName())
+		pod := e2eruntimeclass.NewRuntimeClassPod(rc.GetName())
 		pod.Spec.NodeSelector = map[string]string{
 			labelFooName: "bar",
 		}
-		pod = e2epod.NewPodClient(f).Create(pod)
+		pod = e2epod.NewPodClient(f).Create(ctx, pod)
 
-		framework.ExpectNoError(e2epod.WaitForPodNotPending(f.ClientSet, f.Namespace.Name, pod.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNotPending(ctx, f.ClientSet, f.Namespace.Name, pod.Name))
 
 		// check that pod got scheduled on specified node.
-		scheduledPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+		scheduledPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(nodeName, scheduledPod.Spec.NodeName)
 		framework.ExpectEqual(nodeSelector, pod.Spec.NodeSelector)
@@ -176,5 +177,5 @@ var _ = SIGDescribe("RuntimeClass", func() {
 // newRuntimeClass returns a test runtime class.
 func newRuntimeClass(namespace, name string) *nodev1.RuntimeClass {
 	uniqueName := fmt.Sprintf("%s-%s", namespace, name)
-	return runtimeclasstest.NewRuntimeClass(uniqueName, e2enode.PreconfiguredRuntimeClassHandler)
+	return runtimeclasstest.NewRuntimeClass(uniqueName, e2eruntimeclass.PreconfiguredRuntimeClassHandler)
 }

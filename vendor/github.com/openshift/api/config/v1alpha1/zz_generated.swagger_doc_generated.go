@@ -22,9 +22,10 @@ func (GatherConfig) SwaggerDoc() map[string]string {
 }
 
 var map_InsightsDataGather = map[string]string{
-	"":       "\n\nInsightsDataGather provides data gather configuration options for the the Insights Operator.\n\nCompatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.",
-	"spec":   "spec holds user settable values for configuration",
-	"status": "status holds observed values from the cluster. They may not be overridden.",
+	"":         "\n\nInsightsDataGather provides data gather configuration options for the the Insights Operator.\n\nCompatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "spec holds user settable values for configuration",
+	"status":   "status holds observed values from the cluster. They may not be overridden.",
 }
 
 func (InsightsDataGather) SwaggerDoc() map[string]string {
@@ -32,7 +33,8 @@ func (InsightsDataGather) SwaggerDoc() map[string]string {
 }
 
 var map_InsightsDataGatherList = map[string]string{
-	"": "InsightsDataGatherList is a collection of items\n\nCompatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.",
+	"":         "InsightsDataGatherList is a collection of items\n\nCompatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 }
 
 func (InsightsDataGatherList) SwaggerDoc() map[string]string {

@@ -325,8 +325,8 @@ func TestNodeAuthorizer(t *testing.T) {
 					Name: "node1",
 				},
 				Spec: coordination.LeaseSpec{
-					HolderIdentity:       pointer.StringPtr("node1"),
-					LeaseDurationSeconds: pointer.Int32Ptr(node1LeaseDurationSeconds),
+					HolderIdentity:       pointer.String("node1"),
+					LeaseDurationSeconds: pointer.Int32(node1LeaseDurationSeconds),
 					RenewTime:            &metav1.MicroTime{Time: time.Now()},
 				},
 			}
@@ -524,7 +524,6 @@ func TestNodeAuthorizer(t *testing.T) {
 	// re-create a pod as an admin to add object references
 	expectAllowed(t, createNode2NormalPod(superuserClient))
 
-	// ExpandPersistentVolumes feature enabled
 	expectForbidden(t, updatePVCCapacity(node1Client))
 	expectAllowed(t, updatePVCCapacity(node2Client))
 	expectForbidden(t, updatePVCPhase(node2Client))

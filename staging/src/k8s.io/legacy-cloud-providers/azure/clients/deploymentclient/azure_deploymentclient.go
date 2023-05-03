@@ -28,7 +28,6 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2017-05-10/resources"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
-	"github.com/Azure/go-autorest/autorest/to"
 
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/klog/v2"
@@ -36,6 +35,7 @@ import (
 	"k8s.io/legacy-cloud-providers/azure/clients/armclient"
 	"k8s.io/legacy-cloud-providers/azure/metrics"
 	"k8s.io/legacy-cloud-providers/azure/retry"
+	"k8s.io/utils/pointer"
 )
 
 var _ Interface = &Client{}
@@ -197,7 +197,7 @@ func (c *Client) listDeployment(ctx context.Context, resourceGroupName string) (
 		result = append(result, page.Values()...)
 
 		// Abort the loop when there's no nextLink in the response.
-		if to.String(page.Response().NextLink) == "" {
+		if pointer.StringDeref(page.Response().NextLink, "") == "" {
 			break
 		}
 
@@ -223,12 +223,12 @@ func (c *Client) listResponder(resp *http.Response) (result resources.Deployment
 // deploymentListResultPreparer prepares a request to retrieve the next set of results.
 // It returns nil if no more results exist.
 func (c *Client) deploymentListResultPreparer(ctx context.Context, dplr resources.DeploymentListResult) (*http.Request, error) {
-	if dplr.NextLink == nil || len(to.String(dplr.NextLink)) < 1 {
+	if dplr.NextLink == nil || len(pointer.StringDeref(dplr.NextLink, "")) < 1 {
 		return nil, nil
 	}
 
 	decorators := []autorest.PrepareDecorator{
-		autorest.WithBaseURL(to.String(dplr.NextLink)),
+		autorest.WithBaseURL(pointer.StringDeref(dplr.NextLink, "")),
 	}
 	return c.armClient.PrepareGetRequest(ctx, decorators...)
 }

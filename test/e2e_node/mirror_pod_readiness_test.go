@@ -53,7 +53,7 @@ var _ = SIGDescribe("MirrorPod", func() {
 
 			ginkgo.By("wait for the mirror pod to be running")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
-				return checkMirrorPodRunning(f.ClientSet, mirrorPodName, ns)
+				return checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns)
 			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 
 			ginkgo.By("wait for pod to be ready")

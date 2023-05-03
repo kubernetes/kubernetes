@@ -139,6 +139,12 @@ var schemaYAML = typed.YAMLObject(`types:
         discriminatorValue: Modern
       - fieldName: old
         discriminatorValue: Old
+- name: com.github.openshift.api.operator.v1.AWSCSIDriverConfigSpec
+  map:
+    fields:
+    - name: kmsKeyARN
+      type:
+        scalar: string
 - name: com.github.openshift.api.operator.v1.AWSClassicLoadBalancerParameters
   map:
     fields:
@@ -300,19 +306,55 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: version
       type:
         scalar: string
+- name: com.github.openshift.api.operator.v1.AzureCSIDriverConfigSpec
+  map:
+    fields:
+    - name: diskEncryptionSet
+      type:
+        namedType: com.github.openshift.api.operator.v1.AzureDiskEncryptionSet
+- name: com.github.openshift.api.operator.v1.AzureDiskEncryptionSet
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: resourceGroup
+      type:
+        scalar: string
+      default: ""
+    - name: subscriptionID
+      type:
+        scalar: string
+      default: ""
 - name: com.github.openshift.api.operator.v1.CSIDriverConfigSpec
   map:
     fields:
+    - name: aws
+      type:
+        namedType: com.github.openshift.api.operator.v1.AWSCSIDriverConfigSpec
+    - name: azure
+      type:
+        namedType: com.github.openshift.api.operator.v1.AzureCSIDriverConfigSpec
     - name: driverType
       type:
         scalar: string
       default: ""
+    - name: gcp
+      type:
+        namedType: com.github.openshift.api.operator.v1.GCPCSIDriverConfigSpec
     - name: vSphere
       type:
         namedType: com.github.openshift.api.operator.v1.VSphereCSIDriverConfigSpec
     unions:
     - discriminator: driverType
       fields:
+      - fieldName: aws
+        discriminatorValue: AWS
+      - fieldName: azure
+        discriminatorValue: Azure
+      - fieldName: gcp
+        discriminatorValue: GCP
       - fieldName: vSphere
         discriminatorValue: VSphere
 - name: com.github.openshift.api.operator.v1.CSISnapshotController
@@ -1154,6 +1196,30 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             scalar: string
           elementRelationship: atomic
+- name: com.github.openshift.api.operator.v1.GCPCSIDriverConfigSpec
+  map:
+    fields:
+    - name: kmsKey
+      type:
+        namedType: com.github.openshift.api.operator.v1.GCPKMSKeyReference
+- name: com.github.openshift.api.operator.v1.GCPKMSKeyReference
+  map:
+    fields:
+    - name: keyRing
+      type:
+        scalar: string
+      default: ""
+    - name: location
+      type:
+        scalar: string
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: projectID
+      type:
+        scalar: string
+      default: ""
 - name: com.github.openshift.api.operator.v1.GCPLoadBalancerParameters
   map:
     fields:
@@ -1281,6 +1347,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: hybridOverlayVXLANPort
       type:
         scalar: numeric
+- name: com.github.openshift.api.operator.v1.IBMLoadBalancerParameters
+  map:
+    fields:
+    - name: protocol
+      type:
+        scalar: string
 - name: com.github.openshift.api.operator.v1.IPAMConfig
   map:
     fields:
@@ -2478,6 +2550,12 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: pinnedResources
+      type:
+        list:
+          elementType:
+            namedType: com.github.openshift.api.operator.v1.PinnedResourceReference
+          elementRelationship: atomic
     - name: visibility
       type:
         namedType: com.github.openshift.api.operator.v1.PerspectiveVisibility
@@ -2497,6 +2575,21 @@ var schemaYAML = typed.YAMLObject(`types:
       fields:
       - fieldName: accessReview
         discriminatorValue: AccessReview
+- name: com.github.openshift.api.operator.v1.PinnedResourceReference
+  map:
+    fields:
+    - name: group
+      type:
+        scalar: string
+      default: ""
+    - name: resource
+      type:
+        scalar: string
+      default: ""
+    - name: version
+      type:
+        scalar: string
+      default: ""
 - name: com.github.openshift.api.operator.v1.PolicyAuditConfig
   map:
     fields:
@@ -2536,6 +2629,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: gcp
       type:
         namedType: com.github.openshift.api.operator.v1.GCPLoadBalancerParameters
+    - name: ibm
+      type:
+        namedType: com.github.openshift.api.operator.v1.IBMLoadBalancerParameters
     - name: type
       type:
         scalar: string
@@ -2547,6 +2643,8 @@ var schemaYAML = typed.YAMLObject(`types:
         discriminatorValue: AWS
       - fieldName: gcp
         discriminatorValue: GCP
+      - fieldName: ibm
+        discriminatorValue: IBM
 - name: com.github.openshift.api.operator.v1.ProxyConfig
   map:
     fields:
@@ -2954,6 +3052,10 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: __untyped_atomic_
       default: {}
+    - name: vsphereStorageDriver
+      type:
+        scalar: string
+      default: ""
 - name: com.github.openshift.api.operator.v1.StorageStatus
   map:
     fields:

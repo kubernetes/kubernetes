@@ -33,6 +33,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 
 	// ensure types are installed
@@ -582,7 +583,7 @@ func TestSetDefaultReplicationControllerReplicas(t *testing.T) {
 		{
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
-					Replicas: utilpointer.Int32Ptr(0),
+					Replicas: utilpointer.Int32(0),
 					Template: &v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
@@ -597,7 +598,7 @@ func TestSetDefaultReplicationControllerReplicas(t *testing.T) {
 		{
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
-					Replicas: utilpointer.Int32Ptr(3),
+					Replicas: utilpointer.Int32(3),
 					Template: &v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
@@ -1431,15 +1432,15 @@ func TestSetDefaultServiceExternalTraffic(t *testing.T) {
 	in = &v1.Service{Spec: v1.ServiceSpec{Type: v1.ServiceTypeNodePort}}
 	obj = roundTrip(t, runtime.Object(in))
 	out = obj.(*v1.Service)
-	if out.Spec.ExternalTrafficPolicy != v1.ServiceExternalTrafficPolicyTypeCluster {
-		t.Errorf("Expected ExternalTrafficPolicy to be %v, got %v", v1.ServiceExternalTrafficPolicyTypeCluster, out.Spec.ExternalTrafficPolicy)
+	if out.Spec.ExternalTrafficPolicy != v1.ServiceExternalTrafficPolicyCluster {
+		t.Errorf("Expected ExternalTrafficPolicy to be %v, got %v", v1.ServiceExternalTrafficPolicyCluster, out.Spec.ExternalTrafficPolicy)
 	}
 
 	in = &v1.Service{Spec: v1.ServiceSpec{Type: v1.ServiceTypeLoadBalancer}}
 	obj = roundTrip(t, runtime.Object(in))
 	out = obj.(*v1.Service)
-	if out.Spec.ExternalTrafficPolicy != v1.ServiceExternalTrafficPolicyTypeCluster {
-		t.Errorf("Expected ExternalTrafficPolicy to be %v, got %v", v1.ServiceExternalTrafficPolicyTypeCluster, out.Spec.ExternalTrafficPolicy)
+	if out.Spec.ExternalTrafficPolicy != v1.ServiceExternalTrafficPolicyCluster {
+		t.Errorf("Expected ExternalTrafficPolicy to be %v, got %v", v1.ServiceExternalTrafficPolicyCluster, out.Spec.ExternalTrafficPolicy)
 	}
 }
 
@@ -1730,7 +1731,7 @@ func TestDefaultRequestIsNotSetForReplicationController(t *testing.T) {
 	}
 	rc := &v1.ReplicationController{
 		Spec: v1.ReplicationControllerSpec{
-			Replicas: utilpointer.Int32Ptr(3),
+			Replicas: utilpointer.Int32(3),
 			Template: &v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
@@ -1859,7 +1860,7 @@ func TestSetDefaultServiceInternalTrafficPolicy(t *testing.T) {
 	local := v1.ServiceInternalTrafficPolicyLocal
 	testCases := []struct {
 		name                          string
-		expectedInternalTrafficPolicy *v1.ServiceInternalTrafficPolicyType
+		expectedInternalTrafficPolicy *v1.ServiceInternalTrafficPolicy
 		svc                           v1.Service
 	}{
 		{
@@ -1902,6 +1903,218 @@ func TestSetDefaultServiceInternalTrafficPolicy(t *testing.T) {
 
 			if !reflect.DeepEqual(svc.Spec.InternalTrafficPolicy, test.expectedInternalTrafficPolicy) {
 				t.Errorf("expected .spec.internalTrafficPolicy: %v got %v", test.expectedInternalTrafficPolicy, svc.Spec.InternalTrafficPolicy)
+			}
+		})
+	}
+}
+
+func TestSetDefaultResizePolicy(t *testing.T) {
+	// verify we default to NotRequired restart policy for resize when resources are specified
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+
+	for desc, tc := range map[string]struct {
+		testContainer        v1.Container
+		expectedResizePolicy []v1.ContainerResizePolicy
+	}{
+		"CPU and memory limits are specified": {
+			testContainer: v1.Container{
+				Resources: v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("100m"),
+						v1.ResourceMemory: resource.MustParse("200Mi"),
+					},
+				},
+			},
+			expectedResizePolicy: []v1.ContainerResizePolicy{
+				{
+					ResourceName:  v1.ResourceCPU,
+					RestartPolicy: v1.NotRequired,
+				},
+				{
+					ResourceName:  v1.ResourceMemory,
+					RestartPolicy: v1.NotRequired,
+				},
+			},
+		},
+		"CPU requests are specified": {
+			testContainer: v1.Container{
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU: resource.MustParse("100m"),
+					},
+				},
+			},
+			expectedResizePolicy: []v1.ContainerResizePolicy{
+				{
+					ResourceName:  v1.ResourceCPU,
+					RestartPolicy: v1.NotRequired,
+				},
+			},
+		},
+		"Memory limits are specified": {
+			testContainer: v1.Container{
+				Resources: v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("200Mi"),
+					},
+				},
+			},
+			expectedResizePolicy: []v1.ContainerResizePolicy{
+				{
+					ResourceName:  v1.ResourceMemory,
+					RestartPolicy: v1.NotRequired,
+				},
+			},
+		},
+		"No resources are specified": {
+			testContainer:        v1.Container{Name: "besteffort"},
+			expectedResizePolicy: nil,
+		},
+		"CPU and memory limits are specified with restartContainer resize policy for memory": {
+			testContainer: v1.Container{
+				Resources: v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("100m"),
+						v1.ResourceMemory: resource.MustParse("200Mi"),
+					},
+				},
+				ResizePolicy: []v1.ContainerResizePolicy{
+					{
+						ResourceName:  v1.ResourceMemory,
+						RestartPolicy: v1.RestartContainer,
+					},
+				},
+			},
+			expectedResizePolicy: []v1.ContainerResizePolicy{
+				{
+					ResourceName:  v1.ResourceMemory,
+					RestartPolicy: v1.RestartContainer,
+				},
+				{
+					ResourceName:  v1.ResourceCPU,
+					RestartPolicy: v1.NotRequired,
+				},
+			},
+		},
+		"CPU requests and memory limits are specified with restartContainer resize policy for CPU": {
+			testContainer: v1.Container{
+				Resources: v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("200Mi"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceCPU: resource.MustParse("100m"),
+					},
+				},
+				ResizePolicy: []v1.ContainerResizePolicy{
+					{
+						ResourceName:  v1.ResourceCPU,
+						RestartPolicy: v1.RestartContainer,
+					},
+				},
+			},
+			expectedResizePolicy: []v1.ContainerResizePolicy{
+				{
+					ResourceName:  v1.ResourceCPU,
+					RestartPolicy: v1.RestartContainer,
+				},
+				{
+					ResourceName:  v1.ResourceMemory,
+					RestartPolicy: v1.NotRequired,
+				},
+			},
+		},
+		"CPU and memory requests are specified with restartContainer resize policy for both": {
+			testContainer: v1.Container{
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("100m"),
+						v1.ResourceMemory: resource.MustParse("200Mi"),
+					},
+				},
+				ResizePolicy: []v1.ContainerResizePolicy{
+					{
+						ResourceName:  v1.ResourceCPU,
+						RestartPolicy: v1.RestartContainer,
+					},
+					{
+						ResourceName:  v1.ResourceMemory,
+						RestartPolicy: v1.RestartContainer,
+					},
+				},
+			},
+			expectedResizePolicy: []v1.ContainerResizePolicy{
+				{
+					ResourceName:  v1.ResourceCPU,
+					RestartPolicy: v1.RestartContainer,
+				},
+				{
+					ResourceName:  v1.ResourceMemory,
+					RestartPolicy: v1.RestartContainer,
+				},
+			},
+		},
+		"Ephemeral storage limits are specified": {
+			testContainer: v1.Container{
+				Resources: v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceEphemeralStorage: resource.MustParse("500Mi"),
+					},
+				},
+			},
+			expectedResizePolicy: nil,
+		},
+		"Ephemeral storage requests and CPU limits are specified": {
+			testContainer: v1.Container{
+				Resources: v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU: resource.MustParse("100m"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceEphemeralStorage: resource.MustParse("500Mi"),
+					},
+				},
+			},
+			expectedResizePolicy: []v1.ContainerResizePolicy{
+				{
+					ResourceName:  v1.ResourceCPU,
+					RestartPolicy: v1.NotRequired,
+				},
+			},
+		},
+		"Ephemeral storage requests and limits, memory requests with restartContainer policy are specified": {
+			testContainer: v1.Container{
+				Resources: v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceEphemeralStorage: resource.MustParse("500Mi"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceEphemeralStorage: resource.MustParse("500Mi"),
+						v1.ResourceMemory:           resource.MustParse("200Mi"),
+					},
+				},
+				ResizePolicy: []v1.ContainerResizePolicy{
+					{
+						ResourceName:  v1.ResourceMemory,
+						RestartPolicy: v1.RestartContainer,
+					},
+				},
+			},
+			expectedResizePolicy: []v1.ContainerResizePolicy{
+				{
+					ResourceName:  v1.ResourceMemory,
+					RestartPolicy: v1.RestartContainer,
+				},
+			},
+		},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			testPod := v1.Pod{}
+			testPod.Spec.Containers = append(testPod.Spec.Containers, tc.testContainer)
+			output := roundTrip(t, runtime.Object(&testPod))
+			pod2 := output.(*v1.Pod)
+			if diff.ObjectDiff(pod2.Spec.Containers[0].ResizePolicy, tc.expectedResizePolicy) != "" {
+				t.Errorf("expected resize policy %+v, but got %+v", tc.expectedResizePolicy, pod2.Spec.Containers[0].ResizePolicy)
 			}
 		})
 	}

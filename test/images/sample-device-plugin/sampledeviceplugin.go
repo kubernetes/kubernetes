@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"k8s.io/klog/v2"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	plugin "k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/plugin/v1beta1"
@@ -84,6 +85,7 @@ func main() {
 		klog.Errorf("Empty pluginSocksDir")
 		return
 	}
+
 	socketPath := pluginSocksDir + "/dp." + fmt.Sprintf("%d", time.Now().Unix())
 
 	dp1 := plugin.NewDevicePluginStub(devs, socketPath, resourceName, false, false)
@@ -92,8 +94,70 @@ func main() {
 
 	}
 	dp1.SetAllocFunc(stubAllocFunc)
+
+	if registerControlFile := os.Getenv("REGISTER_CONTROL_FILE"); registerControlFile != "" {
+		if err := handleRegistrationProcess(registerControlFile); err != nil {
+			panic(err)
+		}
+	}
+
 	if err := dp1.Register(pluginapi.KubeletSocket, resourceName, pluginapi.DevicePluginPath); err != nil {
 		panic(err)
 	}
 	select {}
+}
+
+func handleRegistrationProcess(registerControlFile string) error {
+	triggerPath := filepath.Dir(registerControlFile)
+
+	klog.InfoS("Registration process will be managed explicitly", "triggerPath", triggerPath, "triggerEntry", registerControlFile)
+
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		klog.Errorf("Watcher creation failed: %v ", err)
+		return err
+	}
+
+	defer watcher.Close()
+	updateCh := make(chan bool)
+	defer close(updateCh)
+
+	go func() {
+		klog.Infof("Starting watching routine")
+		for {
+			select {
+			case event, ok := <-watcher.Events:
+				if !ok {
+					return
+				}
+				klog.InfoS("Received event", "name", event.Name, "operation", event.Op)
+				switch {
+				case event.Op&fsnotify.Remove == fsnotify.Remove:
+					if event.Name == registerControlFile {
+						klog.InfoS("Expected delete", "name", event.Name, "operation", event.Op)
+						updateCh <- true
+						return
+					}
+					klog.InfoS("Spurious delete", "name", event.Name, "operation", event.Op)
+				}
+			case err, ok := <-watcher.Errors:
+				if !ok {
+					return
+				}
+				klog.Errorf("error: %w", err)
+				panic(err)
+			}
+		}
+	}()
+
+	err = watcher.Add(triggerPath)
+	if err != nil {
+		klog.Errorf("Failed to add watch to %q: %w", triggerPath, err)
+		return err
+	}
+
+	klog.InfoS("Waiting for control file to be deleted", "path", registerControlFile)
+	<-updateCh
+	klog.InfoS("Control file was deleted, connecting!")
+	return nil
 }

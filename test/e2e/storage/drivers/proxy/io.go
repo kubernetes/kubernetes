@@ -75,7 +75,7 @@ func (p PodDirIO) CreateFile(path string, content io.Reader) error {
 	// Therefore the content is now encoded inside the command itself.
 	data, err := io.ReadAll(content)
 	if err != nil {
-		return fmt.Errorf("read content: %v", err)
+		return fmt.Errorf("read content: %w", err)
 	}
 	encoded := make([]byte, base64.StdEncoding.EncodedLen(len(data)))
 	base64.StdEncoding.Encode(encoded, data)

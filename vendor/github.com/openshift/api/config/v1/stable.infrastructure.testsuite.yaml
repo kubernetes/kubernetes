@@ -214,3 +214,263 @@ tests:
               resourceGroupName: bar
               resourceTags:
                 - {key: "key", value: "value"}
+    - name: PowerVS platform status's resourceGroup length should not exceed the max length set
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: PowerVS
+        status:
+          platform: PowerVS
+          platformStatus:
+            powervs:
+              resourceGroup: resource-group
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: PowerVS
+        status:
+          platform: PowerVS
+          platformStatus:
+            powervs:
+              resourceGroup: resource-group-should-not-accept-the-string-that-exceeds-max-length-set
+      expectedStatusError: "status.platformStatus.powervs.resourceGroup: Too long: may not be longer than 40"
+    - name: PowerVS platform status's resourceGroup should match the regex configured
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: PowerVS
+        status:
+          platform: PowerVS
+          platformStatus:
+            powervs:
+              resourceGroup: resource-group
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: PowerVS
+        status:
+          platform: PowerVS
+          platformStatus:
+            powervs:
+              resourceGroup: re$ource-group
+      expectedStatusError: "status.platformStatus.powervs.resourceGroup in body should match '^[a-zA-Z0-9-_ ]+$'"
+    - name: Should not be able to change PowerVS platform status's resourceGroup once it was set
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: PowerVS
+        status:
+          platform: PowerVS
+          platformStatus:
+            powervs:
+              resourceGroup: resource-group
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: PowerVS
+        status:
+          platform: PowerVS
+          platformStatus:
+            powervs:
+              resourceGroup: other-resource-group-name
+      expectedStatusError: "status.platformStatus.powervs.resourceGroup: Invalid value: \"string\": resourceGroup is immutable once set"
+    - name: Should not be able to unset PowerVS platform status's resourceGroup once it was set
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: PowerVS
+        status:
+          platform: PowerVS
+          platformStatus:
+            powervs:
+              region: some-region
+              resourceGroup: resource-group
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: PowerVS
+        status:
+          platform: PowerVS
+          platformStatus:
+            powervs:
+              region: some-region
+      expectedStatusError: "status.platformStatus.powervs: Invalid value: \"object\": cannot unset resourceGroup once set"
+    - name: Should set load balancer type to OpenShiftManagedDefault if not specified
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            openstack: {}
+            type: OpenStack
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            openstack: {}
+            type: OpenStack
+        status:
+          platform: OpenStack
+          platformStatus:
+            openstack: {}
+            type: OpenStack
+      expected: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            openstack: {}
+            type: OpenStack
+        status:
+          controlPlaneTopology: HighlyAvailable
+          infrastructureTopology: HighlyAvailable
+          platform: OpenStack
+          platformStatus:
+            openstack:
+              loadBalancer:
+                type: OpenShiftManagedDefault
+            type: OpenStack
+    - name: Should be able to override the default load balancer with a valid value
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            openstack: {}
+            type: OpenStack
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            openstack: {}
+            type: OpenStack
+        status:
+          platform: OpenStack
+          platformStatus:
+            openstack:
+              loadBalancer:
+                type: UserManaged
+            type: OpenStack
+      expected: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            openstack: {}
+            type: OpenStack
+        status:
+          controlPlaneTopology: HighlyAvailable
+          infrastructureTopology: HighlyAvailable
+          platform: OpenStack
+          platformStatus:
+            openstack:
+              loadBalancer:
+                type: UserManaged
+            type: OpenStack
+    - name: Should not allow changing the immutable load balancer type field
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            openstack: {}
+            type: OpenStack
+        status:
+          controlPlaneTopology: HighlyAvailable
+          infrastructureTopology: HighlyAvailable
+          platform: OpenStack
+          platformStatus:
+            openstack:
+              loadBalancer:
+                type: OpenShiftManagedDefault
+            type: OpenStack
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: OpenStack
+            openstack: {}
+        status:
+          controlPlaneTopology: HighlyAvailable
+          infrastructureTopology: HighlyAvailable
+          platform: OpenStack
+          platformStatus:
+            openstack:
+              loadBalancer:
+                type: UserManaged
+            type: OpenStack
+      expectedStatusError: "status.platformStatus.openstack.loadBalancer.type: Invalid value: \"string\": type is immutable once set"
+    - name: Should not allow removing the immutable load balancer type field that was initially set
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            openstack: {}
+            type: OpenStack
+        status:
+          controlPlaneTopology: HighlyAvailable
+          infrastructureTopology: HighlyAvailable
+          platform: OpenStack
+          platformStatus:
+            openstack:
+              loadBalancer:
+                type: UserManaged
+            type: OpenStack
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: OpenStack
+            openstack: {}
+        status:
+          controlPlaneTopology: HighlyAvailable
+          infrastructureTopology: HighlyAvailable
+          platform: OpenStack
+          platformStatus:
+            openstack: {}
+            type: OpenStack
+      expectedStatusError: "status.platformStatus.openstack.loadBalancer.type: Invalid value: \"string\": type is immutable once set"
+    - name: Should not allow setting the load balancer type to a wrong value
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            openstack: {}
+            type: OpenStack
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            openstack: {}
+            type: OpenStack
+        status:
+          platform: OpenStack
+          platformStatus:
+            openstack:
+              loadBalancer:
+                type: FooBar
+            type: OpenStack
+      expectedStatusError: "status.platformStatus.openstack.loadBalancer.type: Unsupported value: \"FooBar\": supported values: \"OpenShiftManagedDefault\", \"UserManaged\""

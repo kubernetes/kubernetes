@@ -1,6 +1,10 @@
 package v1
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	"fmt"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
 
 // +genclient
 // +genclient:nonNamespaced
@@ -11,7 +15,10 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
 // +openshift:compatibility-gen:level=1
 type FeatureGate struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
+
+	// metadata is the standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// spec holds user settable values for configuration
@@ -65,13 +72,57 @@ type FeatureGateSelection struct {
 type CustomFeatureGates struct {
 	// enabled is a list of all feature gates that you want to force on
 	// +optional
-	Enabled []string `json:"enabled,omitempty"`
+	Enabled []FeatureGateName `json:"enabled,omitempty"`
 	// disabled is a list of all feature gates that you want to force off
 	// +optional
-	Disabled []string `json:"disabled,omitempty"`
+	Disabled []FeatureGateName `json:"disabled,omitempty"`
 }
 
+// FeatureGateName is a string to enforce patterns on the name of a FeatureGate
+// +kubebuilder:validation:Pattern=`^([A-Za-z0-9-]+\.)*[A-Za-z0-9-]+\.?$`
+type FeatureGateName string
+
 type FeatureGateStatus struct {
+	// conditions represent the observations of the current state.
+	// Known .status.conditions.type are: "DeterminationDegraded"
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
+	// featureGates contains a list of enabled and disabled featureGates that are keyed by payloadVersion.
+	// Operators other than the CVO and cluster-config-operator, must read the .status.featureGates, locate
+	// the version they are managing, find the enabled/disabled featuregates and make the operand and operator match.
+	// The enabled/disabled values for a particular version may change during the life of the cluster as various
+	// .spec.featureSet values are selected.
+	// Operators may choose to restart their processes to pick up these changes, but remembering past enable/disable
+	// lists is beyond the scope of this API and is the responsibility of individual operators.
+	// Only featureGates with .version in the ClusterVersion.status will be present in this list.
+	// +listType=map
+	// +listMapKey=version
+	FeatureGates []FeatureGateDetails `json:"featureGates"`
+}
+
+type FeatureGateDetails struct {
+	// version matches the version provided by the ClusterVersion and in the ClusterOperator.Status.Versions field.
+	// +kubebuilder:validation:Required
+	// +required
+	Version string `json:"version"`
+	// enabled is a list of all feature gates that are enabled in the cluster for the named version.
+	// +optional
+	Enabled []FeatureGateAttributes `json:"enabled"`
+	// disabled is a list of all feature gates that are disabled in the cluster for the named version.
+	// +optional
+	Disabled []FeatureGateAttributes `json:"disabled"`
+}
+
+type FeatureGateAttributes struct {
+	// name is the name of the FeatureGate.
+	// +kubebuilder:validation:Required
+	Name FeatureGateName `json:"name"`
+
+	// possible (probable?) future additions include
+	// 1. support level (Stable, ServiceDeliveryOnly, TechPreview, DevPreview)
+	// 2. description
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -80,14 +131,17 @@ type FeatureGateStatus struct {
 // +openshift:compatibility-gen:level=1
 type FeatureGateList struct {
 	metav1.TypeMeta `json:",inline"`
+
+	// metadata is the standard list's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ListMeta `json:"metadata"`
 
 	Items []FeatureGate `json:"items"`
 }
 
 type FeatureGateEnabledDisabled struct {
-	Enabled  []string
-	Disabled []string
+	Enabled  []FeatureGateDescription
+	Disabled []FeatureGateDescription
 }
 
 // FeatureSets Contains a map of Feature names to Enabled/Disabled Feature.
@@ -105,81 +159,89 @@ type FeatureGateEnabledDisabled struct {
 var FeatureSets = map[FeatureSet]*FeatureGateEnabledDisabled{
 	Default: defaultFeatures,
 	CustomNoUpgrade: {
-		Enabled:  []string{},
-		Disabled: []string{},
+		Enabled:  []FeatureGateDescription{},
+		Disabled: []FeatureGateDescription{},
 	},
 	TechPreviewNoUpgrade: newDefaultFeatures().
-		with("ExternalCloudProvider").             // sig-cloud-provider, jspeed, OCP specific
-		with("CSIDriverSharedResource").           // sig-build, adkaplan, OCP specific
-		with("BuildCSIVolumes").                   // sig-build, adkaplan, OCP specific
-		with("NodeSwap").                          // sig-node, ehashman, Kubernetes feature gate
-		with("MachineAPIProviderOpenStack").       // openstack, egarcia (#forum-openstack), OCP specific
-		with("CGroupsV2").                         // sig-node, harche, OCP specific
-		with("Crun").                              // sig-node, haircommander, OCP specific
-		with("InsightsConfigAPI").                 // insights, tremes (#ccx), OCP specific
-		with("CSIInlineVolumeAdmission").          // sig-storage, jdobson, OCP specific
-		with("MatchLabelKeysInPodTopologySpread"). // sig-scheduling, ingvagabund (#forum-workloads), Kubernetes feature gate
-		with("RetroactiveDefaultStorageClass").    // sig-storage, RomanBednar, Kubernetes feature gate
-		toFeatures(),
+		with(externalCloudProvider).
+		with(externalCloudProviderAzure).
+		with(externalCloudProviderGCP).
+		with(csiDriverSharedResource).
+		with(buildCSIVolumes).
+		with(nodeSwap).
+		with(machineAPIProviderOpenStack).
+		with(insightsConfigAPI).
+		with(matchLabelKeysInPodTopologySpread).
+		with(retroactiveDefaultStorageClass).
+		with(pdbUnhealthyPodEvictionPolicy).
+		with(dynamicResourceAllocation).
+		with(admissionWebhookMatchConditions).
+		with(azureWorkloadIdentity).
+		with(gateGatewayAPI).
+		toFeatures(defaultFeatures),
 	LatencySensitive: newDefaultFeatures().
-		with(
-			"TopologyManager", // sig-pod, sjenning
-		).
-		toFeatures(),
+		toFeatures(defaultFeatures),
 }
 
 var defaultFeatures = &FeatureGateEnabledDisabled{
-	Enabled: []string{
-		"APIPriorityAndFairness",         // sig-apimachinery, deads2k
-		"RotateKubeletServerCertificate", // sig-pod, sjenning
-		"DownwardAPIHugePages",           // sig-node, rphillips
-		"OpenShiftPodSecurityAdmission",     // bz-auth, stlaz, OCP specific
+	Enabled: []FeatureGateDescription{
+		openShiftPodSecurityAdmission,
 	},
-	Disabled: []string{
-		"RetroactiveDefaultStorageClass", // sig-storage, RomanBednar, Kubernetes feature gate
+	Disabled: []FeatureGateDescription{
+		retroactiveDefaultStorageClass,
 	},
 }
 
 type featureSetBuilder struct {
-	forceOn  []string
-	forceOff []string
+	forceOn  []FeatureGateDescription
+	forceOff []FeatureGateDescription
 }
 
 func newDefaultFeatures() *featureSetBuilder {
 	return &featureSetBuilder{}
 }
 
-func (f *featureSetBuilder) with(forceOn ...string) *featureSetBuilder {
-	f.forceOn = append(f.forceOn, forceOn...)
+func (f *featureSetBuilder) with(forceOn FeatureGateDescription) *featureSetBuilder {
+	for _, curr := range f.forceOn {
+		if curr.FeatureGateAttributes.Name == forceOn.FeatureGateAttributes.Name {
+			panic(fmt.Errorf("coding error: %q enabled twice", forceOn.FeatureGateAttributes.Name))
+		}
+	}
+	f.forceOn = append(f.forceOn, forceOn)
 	return f
 }
 
-func (f *featureSetBuilder) without(forceOff ...string) *featureSetBuilder {
-	f.forceOff = append(f.forceOff, forceOff...)
+func (f *featureSetBuilder) without(forceOff FeatureGateDescription) *featureSetBuilder {
+	for _, curr := range f.forceOff {
+		if curr.FeatureGateAttributes.Name == forceOff.FeatureGateAttributes.Name {
+			panic(fmt.Errorf("coding error: %q disabled twice", forceOff.FeatureGateAttributes.Name))
+		}
+	}
+	f.forceOff = append(f.forceOff, forceOff)
 	return f
 }
 
-func (f *featureSetBuilder) isForcedOff(needle string) bool {
+func (f *featureSetBuilder) isForcedOff(needle FeatureGateDescription) bool {
 	for _, forcedOff := range f.forceOff {
-		if needle == forcedOff {
+		if needle.FeatureGateAttributes.Name == forcedOff.FeatureGateAttributes.Name {
 			return true
 		}
 	}
 	return false
 }
 
-func (f *featureSetBuilder) isForcedOn(needle string) bool {
+func (f *featureSetBuilder) isForcedOn(needle FeatureGateDescription) bool {
 	for _, forceOn := range f.forceOn {
-		if needle == forceOn {
+		if needle.FeatureGateAttributes.Name == forceOn.FeatureGateAttributes.Name {
 			return true
 		}
 	}
 	return false
 }
 
-func (f *featureSetBuilder) toFeatures() *FeatureGateEnabledDisabled {
-	finalOn := []string{}
-	finalOff := []string{}
+func (f *featureSetBuilder) toFeatures(defaultFeatures *FeatureGateEnabledDisabled) *FeatureGateEnabledDisabled {
+	finalOn := []FeatureGateDescription{}
+	finalOff := []FeatureGateDescription{}
 
 	// only add the default enabled features if they haven't been explicitly set off
 	for _, defaultOn := range defaultFeatures.Enabled {
@@ -191,6 +253,16 @@ func (f *featureSetBuilder) toFeatures() *FeatureGateEnabledDisabled {
 		if f.isForcedOff(currOn) {
 			panic("coding error, you can't have features both on and off")
 		}
+		found := false
+		for _, alreadyOn := range finalOn {
+			if alreadyOn.FeatureGateAttributes.Name == currOn.FeatureGateAttributes.Name {
+				found = true
+			}
+		}
+		if found {
+			continue
+		}
+
 		finalOn = append(finalOn, currOn)
 	}
 

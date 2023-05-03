@@ -24,7 +24,49 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// EncryptionConfiguration stores the complete configuration for encryption providers.
+/*
+EncryptionConfiguration stores the complete configuration for encryption providers.
+It also allows the use of wildcards to specify the resources that should be encrypted.
+Use '*.<group>' to encrypt all resources within a group or '*.*' to encrypt all resources.
+'*.' can be used to encrypt all resource in the core group.  '*.*' will encrypt all
+resources, even custom resources that are added after API server start.
+Use of wildcards that overlap within the same resource list or across multiple
+entries are not allowed since part of the configuration would be ineffective.
+Resource lists are processed in order, with earlier lists taking precedence.
+
+Example:
+
+	kind: EncryptionConfiguration
+	apiVersion: apiserver.config.k8s.io/v1
+	resources:
+	- resources:
+	  - events
+	  providers:
+	  - identity: {}  # do not encrypt events even though *.* is specified below
+	- resources:
+	  - secrets
+	  - configmaps
+	  - pandas.awesome.bears.example
+	  providers:
+	  - aescbc:
+	      keys:
+	      - name: key1
+	        secret: c2VjcmV0IGlzIHNlY3VyZQ==
+	- resources:
+	  - '*.apps'
+	  providers:
+	  - aescbc:
+	      keys:
+	      - name: key2
+	        secret: c2VjcmV0IGlzIHNlY3VyZSwgb3IgaXMgaXQ/Cg==
+	- resources:
+	  - '*.*'
+	  providers:
+	  - aescbc:
+	      keys:
+	      - name: key3
+	        secret: c2VjcmV0IGlzIHNlY3VyZSwgSSB0aGluaw==
+*/
 type EncryptionConfiguration struct {
 	metav1.TypeMeta
 	// resources is a list containing resources, and their corresponding encryption providers.
@@ -33,10 +75,14 @@ type EncryptionConfiguration struct {
 
 // ResourceConfiguration stores per resource configuration.
 type ResourceConfiguration struct {
-	// resources is a list of kubernetes resources which have to be encrypted.
+	// resources is a list of kubernetes resources which have to be encrypted. The resource names are derived from `resource` or `resource.group` of the group/version/resource.
+	// eg: pandas.awesome.bears.example is a custom resource with 'group': awesome.bears.example, 'resource': pandas.
+	// Use '*.*' to encrypt all resources and '*.<group>' to encrypt all resources in a specific group.
+	// eg: '*.awesome.bears.example' will encrypt all resources in the group 'awesome.bears.example'.
+	// eg: '*.' will encrypt all resources in the core group (such as pods, configmaps, etc).
 	Resources []string `json:"resources"`
 	// providers is a list of transformers to be used for reading and writing the resources to disk.
-	// eg: aesgcm, aescbc, secretbox, identity.
+	// eg: aesgcm, aescbc, secretbox, identity, kms.
 	Providers []ProviderConfiguration `json:"providers"`
 }
 
@@ -92,7 +138,7 @@ type KMSConfiguration struct {
 	// name is the name of the KMS plugin to be used.
 	Name string `json:"name"`
 	// cachesize is the maximum number of secrets which are cached in memory. The default value is 1000.
-	// Set to a negative value to disable caching.
+	// Set to a negative value to disable caching. This field is only allowed for KMS v1 providers.
 	// +optional
 	CacheSize *int32 `json:"cachesize,omitempty"`
 	// endpoint is the gRPC server listening address, for example "unix:///var/run/kms-provider.sock".

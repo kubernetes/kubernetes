@@ -17,7 +17,6 @@ limitations under the License.
 package fixtures
 
 import (
-	"io/ioutil"
 	"os"
 	"strings"
 	"time"
@@ -55,7 +54,7 @@ func StartDefaultServerWithConfigAccess(t servertesting.Logger, flags ...string)
 
 func startDefaultServer(t servertesting.Logger, flags ...string) (func(), servertesting.TestServer, error) {
 	// create kubeconfig which will not actually be used. But authz/authn needs it to startup.
-	fakeKubeConfig, err := ioutil.TempFile("", "kubeconfig")
+	fakeKubeConfig, err := os.CreateTemp("", "kubeconfig")
 	if err != nil {
 		return nil, servertesting.TestServer{}, err
 	}
@@ -87,6 +86,8 @@ users:
 		"--authentication-kubeconfig", fakeKubeConfig.Name(),
 		"--authorization-kubeconfig", fakeKubeConfig.Name(),
 		"--kubeconfig", fakeKubeConfig.Name(),
+		// disable admission and filters that require talking to kube-apiserver
+		"--enable-priority-and-fairness=false",
 		"--disable-admission-plugins", "NamespaceLifecycle,MutatingAdmissionWebhook,ValidatingAdmissionWebhook"},
 		flags...,
 	), nil)

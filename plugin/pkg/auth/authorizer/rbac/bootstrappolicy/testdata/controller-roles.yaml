@@ -762,15 +762,6 @@ items:
     verbs:
     - list
   - apiGroups:
-    - ""
-    resourceNames:
-    - 'http:heapster:'
-    - 'https:heapster:'
-    resources:
-    - services/proxy
-    verbs:
-    - get
-  - apiGroups:
     - metrics.k8s.io
     resources:
     - pods
@@ -1509,6 +1500,13 @@ items:
     verbs:
     - create
     - patch
+    - update
+  - apiGroups:
+    - ""
+    resources:
+    - persistentvolumeclaims
+    verbs:
+    - delete
     - update
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole

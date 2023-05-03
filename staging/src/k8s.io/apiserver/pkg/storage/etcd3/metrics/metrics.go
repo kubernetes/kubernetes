@@ -64,6 +64,15 @@ var (
 		},
 		[]string{"endpoint"},
 	)
+	etcdEventsReceivedCounts = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Subsystem:      "apiserver",
+			Name:           "storage_events_received_total",
+			Help:           "Number of etcd events received split by kind.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"resource"},
+	)
 	etcdBookmarkCounts = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
 			Name:           "etcd_bookmark_counts",
@@ -113,6 +122,15 @@ var (
 		},
 		[]string{"resource"},
 	)
+	decodeErrorCounts = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Namespace:      "apiserver",
+			Name:           "storage_decode_errors_total",
+			Help:           "Number of stored object decode errors split by object type",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"resource"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -130,6 +148,7 @@ func Register() {
 		legacyregistry.MustRegister(listStorageNumFetched)
 		legacyregistry.MustRegister(listStorageNumSelectorEvals)
 		legacyregistry.MustRegister(listStorageNumReturned)
+		legacyregistry.MustRegister(decodeErrorCounts)
 	})
 }
 
@@ -143,9 +162,19 @@ func RecordEtcdRequestLatency(verb, resource string, startTime time.Time) {
 	etcdRequestLatency.WithLabelValues(verb, resource).Observe(sinceInSeconds(startTime))
 }
 
+// RecordEtcdEvent updated the etcd_events_received_total metric.
+func RecordEtcdEvent(resource string) {
+	etcdEventsReceivedCounts.WithLabelValues(resource).Inc()
+}
+
 // RecordEtcdBookmark updates the etcd_bookmark_counts metric.
 func RecordEtcdBookmark(resource string) {
 	etcdBookmarkCounts.WithLabelValues(resource).Inc()
+}
+
+// RecordDecodeError sets the storage_decode_errors metrics.
+func RecordDecodeError(resource string) {
+	decodeErrorCounts.WithLabelValues(resource).Inc()
 }
 
 // Reset resets the etcd_request_duration_seconds metric.

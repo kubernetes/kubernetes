@@ -22,6 +22,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"net"
 	"net/http"
@@ -75,6 +76,7 @@ import (
 	tracing "k8s.io/component-base/tracing"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
+	nodeutil "k8s.io/component-helpers/node/util"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -102,7 +104,6 @@ import (
 	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	"k8s.io/kubernetes/pkg/util/flock"
-	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/rlimit"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
@@ -321,6 +322,8 @@ func kubeletConfigFlagPrecedence(kc *kubeletconfiginternal.KubeletConfiguration,
 	options.AddKubeletConfigFlags(fs, kc)
 	// Remember original feature gates, so we can merge with flag gates later
 	original := kc.FeatureGates
+	// avoid duplicate printing the flag deprecation warnings during re-parsing
+	fs.SetOutput(io.Discard)
 	// re-parse flags
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -465,7 +468,7 @@ func makeEventRecorder(kubeDeps *kubelet.Dependencies, nodeName types.NodeName) 
 }
 
 func getReservedCPUs(machineInfo *cadvisorapi.MachineInfo, cpus string) (cpuset.CPUSet, error) {
-	emptyCPUSet := cpuset.NewCPUSet()
+	emptyCPUSet := cpuset.New()
 
 	if cpus == "" {
 		return emptyCPUSet, nil
@@ -644,8 +647,8 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	}
 
 	if kubeDeps.CAdvisorInterface == nil {
-		imageFsInfoProvider := cadvisor.NewImageFsInfoProvider(s.RemoteRuntimeEndpoint)
-		kubeDeps.CAdvisorInterface, err = cadvisor.New(imageFsInfoProvider, s.RootDirectory, cgroupRoots, cadvisor.UsingLegacyCadvisorStats(s.RemoteRuntimeEndpoint), s.LocalStorageCapacityIsolation)
+		imageFsInfoProvider := cadvisor.NewImageFsInfoProvider(s.ContainerRuntimeEndpoint)
+		kubeDeps.CAdvisorInterface, err = cadvisor.New(imageFsInfoProvider, s.RootDirectory, cgroupRoots, cadvisor.UsingLegacyCadvisorStats(s.ContainerRuntimeEndpoint), s.LocalStorageCapacityIsolation)
 		if err != nil {
 			return err
 		}
@@ -683,11 +686,11 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 
 		kubeReserved, err := parseResourceList(s.KubeReserved)
 		if err != nil {
-			return err
+			return fmt.Errorf("--kube-reserved value failed to parse: %w", err)
 		}
 		systemReserved, err := parseResourceList(s.SystemReserved)
 		if err != nil {
-			return err
+			return fmt.Errorf("--system-reserved value failed to parse: %w", err)
 		}
 		var hardEvictionThresholds []evictionapi.Threshold
 		// If the user requested to ignore eviction thresholds, then do not set valid values for hardEvictionThresholds here.
@@ -699,7 +702,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		}
 		experimentalQOSReserved, err := cm.ParseQOSReserved(s.QOSReserved)
 		if err != nil {
-			return err
+			return fmt.Errorf("--qos-reserved value failed to parse: %w", err)
 		}
 
 		var cpuManagerPolicyOptions map[string]string
@@ -711,13 +714,11 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		}
 
 		var topologyManagerPolicyOptions map[string]string
-		if utilfeature.DefaultFeatureGate.Enabled(features.TopologyManager) {
-			if utilfeature.DefaultFeatureGate.Enabled(features.TopologyManagerPolicyOptions) {
-				topologyManagerPolicyOptions = s.TopologyManagerPolicyOptions
-			} else if s.TopologyManagerPolicyOptions != nil {
-				return fmt.Errorf("topology manager policy options %v require feature gates %q, %q enabled",
-					s.TopologyManagerPolicyOptions, features.TopologyManager, features.TopologyManagerPolicyOptions)
-			}
+		if utilfeature.DefaultFeatureGate.Enabled(features.TopologyManagerPolicyOptions) {
+			topologyManagerPolicyOptions = s.TopologyManagerPolicyOptions
+		} else if s.TopologyManagerPolicyOptions != nil {
+			return fmt.Errorf("topology manager policy options %v require feature gates %q enabled",
+				s.TopologyManagerPolicyOptions, features.TopologyManagerPolicyOptions)
 		}
 
 		kubeDeps.ContainerManager, err = cm.NewContainerManager(
@@ -748,11 +749,11 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 				CPUManagerReconcilePeriod:                s.CPUManagerReconcilePeriod.Duration,
 				ExperimentalMemoryManagerPolicy:          s.MemoryManagerPolicy,
 				ExperimentalMemoryManagerReservedMemory:  s.ReservedMemory,
-				ExperimentalPodPidsLimit:                 s.PodPidsLimit,
+				PodPidsLimit:                             s.PodPidsLimit,
 				EnforceCPULimits:                         s.CPUCFSQuota,
 				CPUCFSQuotaPeriod:                        s.CPUCFSQuotaPeriod.Duration,
-				ExperimentalTopologyManagerPolicy:        s.TopologyManagerPolicy,
-				ExperimentalTopologyManagerScope:         s.TopologyManagerScope,
+				TopologyManagerPolicy:                    s.TopologyManagerPolicy,
+				TopologyManagerScope:                     s.TopologyManagerScope,
 				ExperimentalTopologyManagerPolicyOptions: topologyManagerPolicyOptions,
 			},
 			s.FailSwapOn,
@@ -775,7 +776,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		klog.InfoS("Failed to ApplyOOMScoreAdj", "err", err)
 	}
 
-	err = kubelet.PreInitRuntimeService(&s.KubeletConfiguration, kubeDeps, s.RemoteRuntimeEndpoint, s.RemoteImageEndpoint)
+	err = kubelet.PreInitRuntimeService(&s.KubeletConfiguration, kubeDeps)
 	if err != nil {
 		return err
 	}
@@ -1119,24 +1120,9 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 	// Setup event recorder if required.
 	makeEventRecorder(kubeDeps, nodeName)
 
-	var nodeIPs []net.IP
-	if kubeServer.NodeIP != "" {
-		for _, ip := range strings.Split(kubeServer.NodeIP, ",") {
-			parsedNodeIP := netutils.ParseIPSloppy(strings.TrimSpace(ip))
-			if parsedNodeIP == nil {
-				klog.InfoS("Could not parse --node-ip ignoring", "IP", ip)
-			} else {
-				nodeIPs = append(nodeIPs, parsedNodeIP)
-			}
-		}
-	}
-
-	if len(nodeIPs) > 2 || (len(nodeIPs) == 2 && netutils.IsIPv6(nodeIPs[0]) == netutils.IsIPv6(nodeIPs[1])) {
-		return fmt.Errorf("bad --node-ip %q; must contain either a single IP or a dual-stack pair of IPs", kubeServer.NodeIP)
-	} else if len(nodeIPs) == 2 && kubeServer.CloudProvider != "" {
-		return fmt.Errorf("dual-stack --node-ip %q not supported when using a cloud provider", kubeServer.NodeIP)
-	} else if len(nodeIPs) == 2 && (nodeIPs[0].IsUnspecified() || nodeIPs[1].IsUnspecified()) {
-		return fmt.Errorf("dual-stack --node-ip %q cannot include '0.0.0.0' or '::'", kubeServer.NodeIP)
+	nodeIPs, err := nodeutil.ParseNodeIPArgument(kubeServer.NodeIP, kubeServer.CloudProvider, utilfeature.DefaultFeatureGate.Enabled(features.CloudDualStackNodeIPs))
+	if err != nil {
+		return fmt.Errorf("bad --node-ip %q: %v", kubeServer.NodeIP, err)
 	}
 
 	capabilities.Initialize(capabilities.Capabilities{
@@ -1148,10 +1134,6 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 
 	if kubeDeps.OSInterface == nil {
 		kubeDeps.OSInterface = kubecontainer.RealOS{}
-	}
-
-	if kubeServer.KubeletConfiguration.SeccompDefault && !utilfeature.DefaultFeatureGate.Enabled(features.SeccompDefault) {
-		return fmt.Errorf("the SeccompDefault feature gate must be enabled in order to use the SeccompDefault configuration")
 	}
 
 	k, err := createAndInitKubelet(kubeServer,
@@ -1235,7 +1217,6 @@ func createAndInitKubelet(kubeServer *options.KubeletServer,
 		kubeServer.MinimumGCAge,
 		kubeServer.MaxPerPodContainerCount,
 		kubeServer.MaxContainerCount,
-		kubeServer.MasterServiceNamespace,
 		kubeServer.RegisterSchedulable,
 		kubeServer.KeepTerminatedPodVolumes,
 		kubeServer.NodeLabels,
@@ -1265,7 +1246,7 @@ func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 		case v1.ResourceCPU, v1.ResourceMemory, v1.ResourceEphemeralStorage, pidlimit.PIDs:
 			q, err := resource.ParseQuantity(v)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse quantity %q for %q resource: %w", v, k, err)
 			}
 			if q.Sign() == -1 {
 				return nil, fmt.Errorf("resource quantity for %q cannot be negative: %v", k, v)
@@ -1284,7 +1265,7 @@ func newTracerProvider(s *options.KubeletServer) (oteltrace.TracerProvider, erro
 	}
 	hostname, err := nodeutil.GetHostname(s.HostnameOverride)
 	if err != nil {
-		return nil, fmt.Errorf("could not determine hostname for tracer provider: %v", err)
+		return nil, fmt.Errorf("could not determine hostname for tracer provider: %w", err)
 	}
 	resourceOpts := []otelsdkresource.Option{
 		otelsdkresource.WithAttributes(
@@ -1294,7 +1275,7 @@ func newTracerProvider(s *options.KubeletServer) (oteltrace.TracerProvider, erro
 	}
 	tp, err := tracing.NewProvider(context.Background(), s.KubeletConfiguration.Tracing, []otlptracegrpc.Option{}, resourceOpts)
 	if err != nil {
-		return nil, fmt.Errorf("could not configure tracer provider: %v", err)
+		return nil, fmt.Errorf("could not configure tracer provider: %w", err)
 	}
 	return tp, nil
 }

@@ -270,17 +270,46 @@
   - 128
   - 256
   - 512
-- name: attachdetach_controller_forced_detaches
-  help: Number of times the A/D Controller performed a forced detach
-  type: Counter
-  stabilityLevel: ALPHA
-- name: attachdetach_controller_total_volumes
-  help: Number of volumes in A/D Controller
-  type: Custom
+- name: reconciliation_duration_seconds
+  subsystem: horizontal_pod_autoscaler_controller
+  help: The time(seconds) that the HPA controller takes to reconcile once. The label
+    'action' should be either 'scale_down', 'scale_up', or 'none'. Also, the label
+    'error' should be either 'spec', 'internal', or 'none'. Note that if both spec
+    and internal errors happen during a reconciliation, the first one to occur is
+    reported in `error` label.
+  type: Histogram
   stabilityLevel: ALPHA
   labels:
-  - plugin_name
-  - state
+  - action
+  - error
+  buckets:
+  - 0.001
+  - 0.002
+  - 0.004
+  - 0.008
+  - 0.016
+  - 0.032
+  - 0.064
+  - 0.128
+  - 0.256
+  - 0.512
+  - 1.024
+  - 2.048
+  - 4.096
+  - 8.192
+  - 16.384
+- name: reconciliations_total
+  subsystem: horizontal_pod_autoscaler_controller
+  help: Number of reconciliations of HPA controller. The label 'action' should be
+    either 'scale_down', 'scale_up', or 'none'. Also, the label 'error' should be
+    either 'spec', 'internal', or 'none'. Note that if both spec and internal errors
+    happen during a reconciliation, the first one to occur is reported in `error`
+    label.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - action
+  - error
 - name: pod_failures_handled_by_failure_policy_total
   subsystem: job_controller
   help: "`The number of failed Pods handled by failure policy with\n\t\t\trespect
@@ -301,15 +330,6 @@
   stabilityLevel: ALPHA
   labels:
   - event
-- name: evictions_number
-  subsystem: node_collector
-  help: Number of Node evictions that happened since current instance of NodeController
-    started, This metric is replaced by node_collector_evictions_total.
-  type: Counter
-  deprecatedVersion: 1.24.0
-  stabilityLevel: ALPHA
-  labels:
-  - zone
 - name: unhealthy_nodes_in_zone
   subsystem: node_collector
   help: Gauge measuring number of not Ready Nodes per zones.
@@ -317,6 +337,34 @@
   stabilityLevel: ALPHA
   labels:
   - zone
+- name: update_all_nodes_health_duration_seconds
+  subsystem: node_collector
+  help: Duration in seconds for NodeController to update the health of all nodes.
+  type: Histogram
+  stabilityLevel: ALPHA
+  buckets:
+  - 0.01
+  - 0.04
+  - 0.16
+  - 0.64
+  - 2.56
+  - 10.24
+  - 40.96
+  - 163.84
+- name: update_node_health_duration_seconds
+  subsystem: node_collector
+  help: Duration in seconds for NodeController to update the health of a single node.
+  type: Histogram
+  stabilityLevel: ALPHA
+  buckets:
+  - 0.001
+  - 0.004
+  - 0.016
+  - 0.064
+  - 0.256
+  - 1.024
+  - 4.096
+  - 16.384
 - name: zone_health
   subsystem: node_collector
   help: Gauge measuring percentage of healthy nodes per zone.
@@ -365,6 +413,13 @@
   stabilityLevel: ALPHA
   labels:
   - clusterCIDR
+- name: cirdset_max_cidrs
+  subsystem: node_ipam_controller
+  help: Maximum number of CIDRs that can be allocated.
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - clusterCIDR
 - name: multicidrset_allocation_tries_per_request
   subsystem: node_ipam_controller
   help: Histogram measuring CIDR allocation tries per request.
@@ -399,6 +454,13 @@
   stabilityLevel: ALPHA
   labels:
   - clusterCIDR
+- name: multicirdset_max_cidrs
+  subsystem: node_ipam_controller
+  help: Maximum number of CIDRs that can be allocated.
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - clusterCIDR
 - name: force_delete_pod_errors_total
   subsystem: pod_gc_collector
   help: Number of errors encountered when forcefully deleting the pods since the Pod
@@ -427,13 +489,16 @@
   - 2
   - 4
   - 8
-- name: storage_count_attachable_volumes_in_use
-  help: Measure number of volumes in use
-  type: Custom
+- name: create_attempts_total
+  subsystem: resourceclaim_controller
+  help: Number of ResourceClaims creation requests
+  type: Counter
   stabilityLevel: ALPHA
-  labels:
-  - node
-  - volume_plugin
+- name: create_failures_total
+  subsystem: resourceclaim_controller
+  help: Number of ResourceClaims creation request failures
+  type: Counter
+  stabilityLevel: ALPHA
 - name: job_deletion_duration_seconds
   subsystem: ttl_after_finished_controller
   help: The time it took to delete the job since it became eligible for deletion
@@ -513,6 +578,17 @@
   stabilityLevel: STABLE
   labels:
   - zone
+- name: attachdetach_controller_forced_detaches
+  help: Number of times the A/D Controller performed a forced detach
+  type: Counter
+  stabilityLevel: ALPHA
+- name: attachdetach_controller_total_volumes
+  help: Number of volumes in A/D Controller
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - plugin_name
+  - state
 - name: create_failures_total
   subsystem: ephemeral_volume_controller
   help: Number of PersistenVolumeClaims creation requests
@@ -625,6 +701,13 @@
     claim
   type: Counter
   stabilityLevel: ALPHA
+- name: storage_count_attachable_volumes_in_use
+  help: Measure number of volumes in use
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - node
+  - volume_plugin
 - name: volume_operation_total_errors
   help: Total volume operation errors
   type: Counter
@@ -656,6 +739,14 @@
   - container
   - pod
   - namespace
+- name: active_pods
+  subsystem: kubelet
+  help: The number of pods the kubelet considers active and which are being considered
+    when admitting new pods. static is true if the pod is not from the apiserver.
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - static
 - name: cgroup_manager_duration_seconds
   subsystem: kubelet
   help: Duration in seconds for cgroup manager operations. Broken down by method.
@@ -705,6 +796,14 @@
   help: The number of cpu core allocations which required pinning.
   type: Counter
   stabilityLevel: ALPHA
+- name: desired_pods
+  subsystem: kubelet
+  help: The number of pods the kubelet is being instructed to run. static is true
+    if the pod is not from the apiserver.
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - static
 - name: device_plugin_alloc_duration_seconds
   subsystem: kubelet
   help: Duration in seconds to serve a device plugin Allocation request. Broken down
@@ -733,6 +832,34 @@
   stabilityLevel: ALPHA
   labels:
   - resource_name
+- name: evented_pleg_connection_error_count
+  subsystem: kubelet
+  help: The number of errors encountered during the establishment of streaming connection
+    with the CRI runtime.
+  type: Counter
+  stabilityLevel: ALPHA
+- name: evented_pleg_connection_latency_seconds
+  subsystem: kubelet
+  help: The latency of streaming connection with the CRI runtime, measured in seconds.
+  type: Histogram
+  stabilityLevel: ALPHA
+  buckets:
+  - 0.005
+  - 0.01
+  - 0.025
+  - 0.05
+  - 0.1
+  - 0.25
+  - 0.5
+  - 1
+  - 2.5
+  - 5
+  - 10
+- name: evented_pleg_connection_success_count
+  subsystem: kubelet
+  help: The number of times a streaming client was obtained to receive CRI Events.
+  type: Counter
+  stabilityLevel: ALPHA
 - name: eviction_stats_age_seconds
   subsystem: kubelet
   help: Time between when stats are collected, and when pod is evicted based on those
@@ -778,9 +905,13 @@
   stabilityLevel: ALPHA
 - name: managed_ephemeral_containers
   subsystem: kubelet
-  help: Current number of ephemeral containers in pods managed by this kubelet. Ephemeral
-    containers will be ignored if disabled by the EphemeralContainers feature gate,
-    and this number will be 0.
+  help: Current number of ephemeral containers in pods managed by this kubelet.
+  type: Gauge
+  stabilityLevel: ALPHA
+- name: mirror_pods
+  subsystem: kubelet
+  help: The number of mirror pods the kubelet will try to create (one per admitted
+    static pod)
   type: Gauge
   stabilityLevel: ALPHA
 - name: node_name
@@ -790,6 +921,26 @@
   stabilityLevel: ALPHA
   labels:
   - node
+- name: orphan_pod_cleaned_volumes
+  subsystem: kubelet
+  help: The total number of orphaned Pods whose volumes were cleaned in the last periodic
+    sweep.
+  type: Gauge
+  stabilityLevel: ALPHA
+- name: orphan_pod_cleaned_volumes_errors
+  subsystem: kubelet
+  help: The number of orphaned Pods whose volumes failed to be cleaned in the last
+    periodic sweep.
+  type: Gauge
+  stabilityLevel: ALPHA
+- name: orphaned_runtime_pods_total
+  subsystem: kubelet
+  help: Number of pods that have been detected in the container runtime without being
+    already known to the pod worker. This typically indicates the kubelet was restarted
+    while a pod was force deleted in the API or in the local configuration, which
+    is unusual.
+  type: Counter
+  stabilityLevel: ALPHA
 - name: pleg_discard_events
   subsystem: kubelet
   help: The number of discard events in PLEG.
@@ -834,6 +985,14 @@
   - 2.5
   - 5
   - 10
+- name: pod_resources_endpoint_errors_get
+  subsystem: kubelet
+  help: Number of requests to the PodResource Get endpoint which returned error. Broken
+    down by server api version.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - server_api_version
 - name: pod_resources_endpoint_errors_get_allocatable
   subsystem: kubelet
   help: Number of requests to the PodResource GetAllocatableResources endpoint which
@@ -846,6 +1005,14 @@
   subsystem: kubelet
   help: Number of requests to the PodResource List endpoint which returned error.
     Broken down by server api version.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - server_api_version
+- name: pod_resources_endpoint_requests_get
+  subsystem: kubelet
+  help: Number of requests to the PodResource Get endpoint. Broken down by server
+    api version.
   type: Counter
   stabilityLevel: ALPHA
   labels:
@@ -988,6 +1155,15 @@
   stabilityLevel: ALPHA
   labels:
   - preemption_signal
+- name: restarted_pods_total
+  subsystem: kubelet
+  help: Number of pods that have been restarted because they were deleted and recreated
+    with the same UID while the kubelet was watching them (common for static pods,
+    extremely uncommon for API pods)
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - static
 - name: run_podsandbox_duration_seconds
   subsystem: kubelet
   help: Duration in seconds of the run_podsandbox operations. Broken down by RuntimeClass.Handler.
@@ -1106,6 +1282,37 @@
   help: Cumulative number of pods started
   type: Counter
   stabilityLevel: ALPHA
+- name: topology_manager_admission_duration_ms
+  subsystem: kubelet
+  help: Duration in milliseconds to serve a pod admission request.
+  type: Histogram
+  stabilityLevel: ALPHA
+  buckets:
+  - 0.05
+  - 0.1
+  - 0.2
+  - 0.4
+  - 0.8
+  - 1.6
+  - 3.2
+  - 6.4
+  - 12.8
+  - 25.6
+  - 51.2
+  - 102.4
+  - 204.8
+  - 409.6
+  - 819.2
+- name: topology_manager_admission_errors_total
+  subsystem: kubelet
+  help: The number of admission request failures where resources could not be aligned.
+  type: Counter
+  stabilityLevel: ALPHA
+- name: topology_manager_admission_requests_total
+  subsystem: kubelet
+  help: The number of admission requests where resources have to be aligned.
+  type: Counter
+  stabilityLevel: ALPHA
 - name: kubelet_volume_stats_available_bytes
   help: Number of available bytes in the volume
   type: Custom
@@ -1156,6 +1363,18 @@
   labels:
   - namespace
   - persistentvolumeclaim
+- name: working_pods
+  subsystem: kubelet
+  help: Number of pods the kubelet is actually running, broken down by lifecycle phase,
+    whether the pod is desired, orphaned, or runtime only (also orphaned), and whether
+    the pod is static. An orphaned pod has been removed from local configuration or
+    force deleted in the API and consumes resources that are not otherwise visible.
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - config
+  - lifecycle
+  - static
 - name: node_cpu_usage_seconds_total
   help: Cumulative cpu time consumed by the node in core-seconds
   type: Custom
@@ -1185,32 +1404,19 @@
   labels:
   - pod
   - namespace
-- name: probe_duration_seconds
-  subsystem: prober
-  help: Duration in seconds for a probe response.
-  type: Histogram
-  stabilityLevel: ALPHA
-  labels:
-  - container
-  - namespace
-  - pod
-  - probe_type
-- name: probe_total
-  subsystem: prober
-  help: Cumulative number of a liveness, readiness or startup probe for a container
-    by result.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - container
-  - namespace
-  - pod
-  - pod_uid
-  - probe_type
-  - result
 - name: scrape_error
   help: 1 if there was an error while getting container metrics, 0 otherwise
   type: Custom
+  stabilityLevel: ALPHA
+- name: force_cleaned_failed_volume_operation_errors_total
+  help: The number of volumes that failed force cleanup after their reconstruction
+    failed during kubelet startup.
+  type: Counter
+  stabilityLevel: ALPHA
+- name: force_cleaned_failed_volume_operations_total
+  help: The number of volumes that were force cleaned after their reconstruction failed
+    during kubelet startup. This includes both successful and failed cleanups.
+  type: Counter
   stabilityLevel: ALPHA
 - name: http_inflight_requests
   subsystem: kubelet
@@ -1434,6 +1640,39 @@
   help: Cumulative proxy rules Service changes
   type: Counter
   stabilityLevel: ALPHA
+- name: probe_duration_seconds
+  subsystem: prober
+  help: Duration in seconds for a probe response.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - container
+  - namespace
+  - pod
+  - probe_type
+- name: probe_total
+  subsystem: prober
+  help: Cumulative number of a liveness, readiness or startup probe for a container
+    by result.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - container
+  - namespace
+  - pod
+  - pod_uid
+  - probe_type
+  - result
+- name: reconstruct_volume_operations_errors_total
+  help: The number of volumes that failed reconstruction from the operating system
+    during kubelet startup.
+  type: Counter
+  stabilityLevel: ALPHA
+- name: reconstruct_volume_operations_total
+  help: The number of volumes that were attempted to be reconstructed from the operating
+    system during kubelet startup. This includes both successful and failed reconstruction.
+  type: Counter
+  stabilityLevel: ALPHA
 - name: volume_manager_selinux_container_errors_total
   help: Number of errors when kubelet cannot compute SELinux context for a container.
     Kubelet can't start such a Pod then and it will retry, therefore value of this
@@ -1536,14 +1775,42 @@
   stabilityLevel: ALPHA
   labels:
   - cidr
-- name: pods_logs_backend_tls_failure_total
+- name: allocated_ports
+  subsystem: nodeport_allocator
+  namespace: kube_apiserver
+  help: Gauge measuring the number of allocated NodePorts for Services
+  type: Gauge
+  stabilityLevel: ALPHA
+- name: allocation_errors_total
+  subsystem: nodeport_allocator
+  namespace: kube_apiserver
+  help: Number of errors trying to allocate NodePort
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - scope
+- name: allocation_total
+  subsystem: nodeport_allocator
+  namespace: kube_apiserver
+  help: Number of NodePort allocations
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - scope
+- name: available_ports
+  subsystem: nodeport_allocator
+  namespace: kube_apiserver
+  help: Gauge measuring the number of available NodePorts for Services
+  type: Gauge
+  stabilityLevel: ALPHA
+- name: backend_tls_failure_total
   subsystem: pod_logs
   namespace: kube_apiserver
   help: Total number of requests for pods/logs that failed due to kubelet server TLS
     verification
   type: Counter
   stabilityLevel: ALPHA
-- name: pods_logs_insecure_backend_total
+- name: insecure_backend_total
   subsystem: pod_logs
   namespace: kube_apiserver
   help: 'Total number of requests for pods/logs sliced by usage type: enforce_tls,
@@ -1552,60 +1819,24 @@
   stabilityLevel: ALPHA
   labels:
   - usage
-- name: kube_pod_resource_limit
-  help: Resources limit for workloads on the cluster, broken down by pod. This shows
-    the resource usage the scheduler and kubelet expect per pod for resources along
-    with the unit for the resource if any.
-  type: Custom
+- name: pods_logs_backend_tls_failure_total
+  subsystem: pod_logs
+  namespace: kube_apiserver
+  help: Total number of requests for pods/logs that failed due to kubelet server TLS
+    verification
+  type: Counter
+  deprecatedVersion: 1.27.0
+  stabilityLevel: ALPHA
+- name: pods_logs_insecure_backend_total
+  subsystem: pod_logs
+  namespace: kube_apiserver
+  help: 'Total number of requests for pods/logs sliced by usage type: enforce_tls,
+    skip_tls_allowed, skip_tls_denied'
+  type: Counter
+  deprecatedVersion: 1.27.0
   stabilityLevel: ALPHA
   labels:
-  - namespace
-  - pod
-  - node
-  - scheduler
-  - priority
-  - resource
-  - unit
-- name: kube_pod_resource_request
-  help: Resources requested by workloads on the cluster, broken down by pod. This
-    shows the resource usage the scheduler and kubelet expect per pod for resources
-    along with the unit for the resource if any.
-  type: Custom
-  stabilityLevel: ALPHA
-  labels:
-  - namespace
-  - pod
-  - node
-  - scheduler
-  - priority
-  - resource
-  - unit
-- name: e2e_scheduling_duration_seconds
-  subsystem: scheduler
-  help: E2e scheduling latency in seconds (scheduling algorithm + binding). This metric
-    is replaced by scheduling_attempt_duration_seconds.
-  type: Histogram
-  deprecatedVersion: 1.23.0
-  stabilityLevel: ALPHA
-  labels:
-  - profile
-  - result
-  buckets:
-  - 0.001
-  - 0.002
-  - 0.004
-  - 0.008
-  - 0.016
-  - 0.032
-  - 0.064
-  - 0.128
-  - 0.256
-  - 0.512
-  - 1.024
-  - 2.048
-  - 4.096
-  - 8.192
-  - 16.384
+  - usage
 - name: goroutines
   subsystem: scheduler
   help: Number of running goroutines split by the work they do such as binding.
@@ -1636,6 +1867,16 @@
   - 4.096
   - 8.192
   - 16.384
+- name: plugin_evaluation_total
+  subsystem: scheduler
+  help: Number of attempts to schedule pods by each plugin and the extension point
+    (available only in PreFilter and Filter.).
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - extension_point
+  - plugin
+  - profile
 - name: plugin_execution_duration_seconds
   subsystem: scheduler
   help: Duration for running a plugin at a specific extension point.
@@ -1742,6 +1983,34 @@
   help: Cumulative valid projected service account tokens used
   type: Counter
   stabilityLevel: ALPHA
+- name: kube_pod_resource_limit
+  help: Resources limit for workloads on the cluster, broken down by pod. This shows
+    the resource usage the scheduler and kubelet expect per pod for resources along
+    with the unit for the resource if any.
+  type: Custom
+  stabilityLevel: STABLE
+  labels:
+  - namespace
+  - pod
+  - node
+  - scheduler
+  - priority
+  - resource
+  - unit
+- name: kube_pod_resource_request
+  help: Resources requested by workloads on the cluster, broken down by pod. This
+    shows the resource usage the scheduler and kubelet expect per pod for resources
+    along with the unit for the resource if any.
+  type: Custom
+  stabilityLevel: STABLE
+  labels:
+  - namespace
+  - pod
+  - node
+  - scheduler
+  - priority
+  - resource
+  - unit
 - name: framework_extension_point_duration_seconds
   subsystem: scheduler
   help: Latency for running all plugins of a specific extension point.
@@ -2006,6 +2275,17 @@
   - 4.096
   - 8.192
   - 16.384
+- name: admission_match_condition_evaluation_errors_total
+  subsystem: admission
+  namespace: apiserver
+  help: Admission match condition evaluation errors count, identified by name of resource
+    containing the match condition and broken out for each admission type (validating
+    or mutating).
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - name
+  - type
 - name: step_admission_duration_seconds_summary
   subsystem: admission
   namespace: apiserver
@@ -2158,6 +2438,12 @@
   - 0.5
   - 1
   - 2.5
+  - 10
+  - 25
+- name: aggregator_discovery_aggregation_count_total
+  help: Counter of number of times discovery was aggregated
+  type: Counter
+  stabilityLevel: ALPHA
 - name: error_total
   subsystem: apiserver_audit
   help: Counter of audit events that failed to be audited properly. Plugin identifies
@@ -2186,11 +2472,13 @@
 - name: compilation_duration_seconds
   subsystem: cel
   namespace: apiserver
+  help: CEL compilation time in seconds.
   type: Histogram
   stabilityLevel: ALPHA
 - name: evaluation_duration_seconds
   subsystem: cel
   namespace: apiserver
+  help: CEL evaluation time in seconds.
   type: Histogram
   stabilityLevel: ALPHA
 - name: certificate_expiration_seconds
@@ -2347,8 +2635,9 @@
   - status
 - name: request_sli_duration_seconds
   subsystem: apiserver
-  help: Response latency distribution (not counting webhook duration) in seconds for
-    each verb, group, version, resource, subresource, scope and component.
+  help: Response latency distribution (not counting webhook duration and priority
+    & fairness queue wait times) in seconds for each verb, group, version, resource,
+    subresource, scope and component.
   type: Histogram
   stabilityLevel: ALPHA
   labels:
@@ -2383,8 +2672,9 @@
   - 60
 - name: request_slo_duration_seconds
   subsystem: apiserver
-  help: Response latency distribution (not counting webhook duration) in seconds for
-    each verb, group, version, resource, subresource, scope and component.
+  help: Response latency distribution (not counting webhook duration and priority
+    & fairness queue wait times) in seconds for each verb, group, version, resource,
+    subresource, scope and component.
   type: Histogram
   deprecatedVersion: 1.27.0
   stabilityLevel: ALPHA
@@ -2555,12 +2845,10 @@
   labels:
   - status
 - name: field_validation_request_duration_seconds
-  help: Response latency distribution in seconds for each field validation value and
-    whether field validation is enabled or not
+  help: Response latency distribution in seconds for each field validation value
   type: Histogram
   stabilityLevel: ALPHA
   labels:
-  - enabled
   - field_validation
   buckets:
   - 0.05
@@ -2782,6 +3070,313 @@
   - 7680
   - 15360
   - 30720
+- name: invalid_key_id_from_status_total
+  subsystem: envelope_encryption
+  namespace: apiserver
+  help: Number of times an invalid keyID is returned by the Status RPC call split
+    by error.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - error
+  - provider_name
+- name: key_id_hash_last_timestamp_seconds
+  subsystem: envelope_encryption
+  namespace: apiserver
+  help: The last time in seconds when a keyID was used.
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - key_id_hash
+  - provider_name
+  - transformation_type
+- name: key_id_hash_status_last_timestamp_seconds
+  subsystem: envelope_encryption
+  namespace: apiserver
+  help: The last time in seconds when a keyID was returned by the Status RPC call.
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - key_id_hash
+  - provider_name
+- name: key_id_hash_total
+  subsystem: envelope_encryption
+  namespace: apiserver
+  help: Number of times a keyID is used split by transformation type and provider.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - key_id_hash
+  - provider_name
+  - transformation_type
+- name: kms_operations_latency_seconds
+  subsystem: envelope_encryption
+  namespace: apiserver
+  help: KMS operation duration with gRPC error code status total.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - grpc_status_code
+  - method_name
+  - provider_name
+  buckets:
+  - 0.0001
+  - 0.0002
+  - 0.0004
+  - 0.0008
+  - 0.0016
+  - 0.0032
+  - 0.0064
+  - 0.0128
+  - 0.0256
+  - 0.0512
+  - 0.1024
+  - 0.2048
+  - 0.4096
+  - 0.8192
+  - 1.6384
+  - 3.2768
+  - 6.5536
+  - 13.1072
+  - 26.2144
+  - 52.4288
+- name: init_events_total
+  namespace: apiserver
+  help: Counter of init events processed in watch cache broken by resource type.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - resource
+- name: data_key_generation_duration_seconds
+  subsystem: storage
+  namespace: apiserver
+  help: Latencies in seconds of data encryption key(DEK) generation operations.
+  type: Histogram
+  stabilityLevel: ALPHA
+  buckets:
+  - 5e-06
+  - 1e-05
+  - 2e-05
+  - 4e-05
+  - 8e-05
+  - 0.00016
+  - 0.00032
+  - 0.00064
+  - 0.00128
+  - 0.00256
+  - 0.00512
+  - 0.01024
+  - 0.02048
+  - 0.04096
+- name: data_key_generation_failures_total
+  subsystem: storage
+  namespace: apiserver
+  help: Total number of failed data encryption key(DEK) generation operations.
+  type: Counter
+  stabilityLevel: ALPHA
+- name: storage_db_total_size_in_bytes
+  subsystem: apiserver
+  help: Total size of the storage database file physically allocated in bytes.
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - endpoint
+- name: storage_decode_errors_total
+  namespace: apiserver
+  help: Number of stored object decode errors split by object type
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - resource
+- name: envelope_transformation_cache_misses_total
+  subsystem: storage
+  namespace: apiserver
+  help: Total number of cache misses while accessing key decryption key(KEK).
+  type: Counter
+  stabilityLevel: ALPHA
+- name: storage_events_received_total
+  subsystem: apiserver
+  help: Number of etcd events received split by kind.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - resource
+- name: apiserver_storage_list_evaluated_objects_total
+  help: Number of objects tested in the course of serving a LIST request from storage
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - resource
+- name: apiserver_storage_list_fetched_objects_total
+  help: Number of objects read from storage in the course of serving a LIST request
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - resource
+- name: apiserver_storage_list_returned_objects_total
+  help: Number of objects returned for a LIST request from storage
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - resource
+- name: apiserver_storage_list_total
+  help: Number of LIST requests served from storage
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - resource
+- name: transformation_duration_seconds
+  subsystem: storage
+  namespace: apiserver
+  help: Latencies in seconds of value transformation operations.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - transformation_type
+  - transformer_prefix
+  buckets:
+  - 5e-06
+  - 1e-05
+  - 2e-05
+  - 4e-05
+  - 8e-05
+  - 0.00016
+  - 0.00032
+  - 0.00064
+  - 0.00128
+  - 0.00256
+  - 0.00512
+  - 0.01024
+  - 0.02048
+  - 0.04096
+  - 0.08192
+  - 0.16384
+  - 0.32768
+  - 0.65536
+  - 1.31072
+  - 2.62144
+  - 5.24288
+  - 10.48576
+  - 20.97152
+  - 41.94304
+  - 83.88608
+- name: transformation_operations_total
+  subsystem: storage
+  namespace: apiserver
+  help: Total number of transformations.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - status
+  - transformation_type
+  - transformer_prefix
+- name: terminated_watchers_total
+  namespace: apiserver
+  help: Counter of watchers closed due to unresponsiveness broken by resource type.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - resource
+- name: events_dispatched_total
+  subsystem: watch_cache
+  namespace: apiserver
+  help: Counter of events dispatched in watch cache broken by resource type.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - resource
+- name: events_received_total
+  subsystem: watch_cache
+  namespace: apiserver
+  help: Counter of events received in watch cache broken by resource type.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - resource
+- name: initializations_total
+  subsystem: watch_cache
+  namespace: apiserver
+  help: Counter of watch cache initializations broken by resource type.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - resource
+- name: etcd_bookmark_counts
+  help: Number of etcd bookmarks (progress notify events) split by kind.
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - resource
+- name: etcd_lease_object_counts
+  help: Number of objects attached to a single etcd lease.
+  type: Histogram
+  stabilityLevel: ALPHA
+  buckets:
+  - 10
+  - 50
+  - 100
+  - 500
+  - 1000
+  - 2500
+  - 5000
+- name: etcd_request_duration_seconds
+  help: Etcd request latency in seconds for each operation and object type.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - operation
+  - type
+  buckets:
+  - 0.005
+  - 0.025
+  - 0.05
+  - 0.1
+  - 0.2
+  - 0.4
+  - 0.6
+  - 0.8
+  - 1
+  - 1.25
+  - 1.5
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 8
+  - 10
+  - 15
+  - 20
+  - 30
+  - 45
+  - 60
+- name: capacity
+  subsystem: watch_cache
+  help: Total capacity of watch cache broken by resource type.
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - resource
+- name: capacity_decrease_total
+  subsystem: watch_cache
+  help: Total number of watch cache capacity decrease events broken by resource type.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - resource
+- name: capacity_increase_total
+  subsystem: watch_cache
+  help: Total number of watch cache capacity increase events broken by resource type.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - resource
+- name: apiserver_storage_objects
+  help: Number of stored objects at the time of last check split by kind.
+  type: Gauge
+  stabilityLevel: STABLE
+  labels:
+  - resource
 - name: current_executing_requests
   subsystem: flowcontrol
   namespace: apiserver
@@ -3175,144 +3770,6 @@
   - 2
   - 4
   - 10
-- name: init_events_total
-  namespace: apiserver
-  help: Counter of init events processed in watch cache broken by resource type.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - resource
-- name: data_key_generation_duration_seconds
-  subsystem: storage
-  namespace: apiserver
-  help: Latencies in seconds of data encryption key(DEK) generation operations.
-  type: Histogram
-  stabilityLevel: ALPHA
-  buckets:
-  - 5e-06
-  - 1e-05
-  - 2e-05
-  - 4e-05
-  - 8e-05
-  - 0.00016
-  - 0.00032
-  - 0.00064
-  - 0.00128
-  - 0.00256
-  - 0.00512
-  - 0.01024
-  - 0.02048
-  - 0.04096
-- name: data_key_generation_failures_total
-  subsystem: storage
-  namespace: apiserver
-  help: Total number of failed data encryption key(DEK) generation operations.
-  type: Counter
-  stabilityLevel: ALPHA
-- name: storage_db_total_size_in_bytes
-  subsystem: apiserver
-  help: Total size of the storage database file physically allocated in bytes.
-  type: Gauge
-  stabilityLevel: ALPHA
-  labels:
-  - endpoint
-- name: envelope_transformation_cache_misses_total
-  subsystem: storage
-  namespace: apiserver
-  help: Total number of cache misses while accessing key decryption key(KEK).
-  type: Counter
-  stabilityLevel: ALPHA
-- name: apiserver_storage_list_evaluated_objects_total
-  help: Number of objects tested in the course of serving a LIST request from storage
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - resource
-- name: apiserver_storage_list_fetched_objects_total
-  help: Number of objects read from storage in the course of serving a LIST request
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - resource
-- name: apiserver_storage_list_returned_objects_total
-  help: Number of objects returned for a LIST request from storage
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - resource
-- name: apiserver_storage_list_total
-  help: Number of LIST requests served from storage
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - resource
-- name: transformation_duration_seconds
-  subsystem: storage
-  namespace: apiserver
-  help: Latencies in seconds of value transformation operations.
-  type: Histogram
-  stabilityLevel: ALPHA
-  labels:
-  - transformation_type
-  buckets:
-  - 5e-06
-  - 1e-05
-  - 2e-05
-  - 4e-05
-  - 8e-05
-  - 0.00016
-  - 0.00032
-  - 0.00064
-  - 0.00128
-  - 0.00256
-  - 0.00512
-  - 0.01024
-  - 0.02048
-  - 0.04096
-  - 0.08192
-  - 0.16384
-  - 0.32768
-  - 0.65536
-  - 1.31072
-  - 2.62144
-  - 5.24288
-  - 10.48576
-  - 20.97152
-  - 41.94304
-  - 83.88608
-- name: transformation_operations_total
-  subsystem: storage
-  namespace: apiserver
-  help: Total number of transformations.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - status
-  - transformation_type
-  - transformer_prefix
-- name: terminated_watchers_total
-  namespace: apiserver
-  help: Counter of watchers closed due to unresponsiveness broken by resource type.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - resource
-- name: events_dispatched_total
-  subsystem: watch_cache
-  namespace: apiserver
-  help: Counter of events dispatched in watch cache broken by resource type.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - resource
-- name: initializations_total
-  subsystem: watch_cache
-  namespace: apiserver
-  help: Counter of watch cache initializations broken by resource type.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - resource
 - name: x509_insecure_sha1_total
   subsystem: webhooks
   namespace: apiserver
@@ -3329,82 +3786,43 @@
     SAN extension missing (either/or, based on the runtime environment)
   type: Counter
   stabilityLevel: ALPHA
-- name: etcd_bookmark_counts
-  help: Number of etcd bookmarks (progress notify events) split by kind.
-  type: Gauge
-  stabilityLevel: ALPHA
-  labels:
-  - resource
-- name: etcd_lease_object_counts
-  help: Number of objects attached to a single etcd lease.
-  type: Histogram
-  stabilityLevel: ALPHA
-  buckets:
-  - 10
-  - 50
-  - 100
-  - 500
-  - 1000
-  - 2500
-  - 5000
-- name: etcd_request_duration_seconds
-  help: Etcd request latency in seconds for each operation and object type.
+- name: request_duration_seconds
+  subsystem: cloud_provider_webhook
+  help: Request latency in seconds. Broken down by status code.
   type: Histogram
   stabilityLevel: ALPHA
   labels:
-  - operation
-  - type
+  - code
+  - webhook
   buckets:
-  - 0.005
-  - 0.025
-  - 0.05
-  - 0.1
-  - 0.2
-  - 0.4
-  - 0.6
-  - 0.8
+  - 0.25
+  - 0.5
+  - 0.7
   - 1
-  - 1.25
   - 1.5
-  - 2
   - 3
-  - 4
   - 5
-  - 6
-  - 8
   - 10
-  - 15
-  - 20
-  - 30
-  - 45
-  - 60
-- name: capacity
-  subsystem: watch_cache
-  help: Total capacity of watch cache broken by resource type.
-  type: Gauge
-  stabilityLevel: ALPHA
-  labels:
-  - resource
-- name: capacity_decrease_total
-  subsystem: watch_cache
-  help: Total number of watch cache capacity decrease events broken by resource type.
+- name: request_total
+  subsystem: cloud_provider_webhook
+  help: Number of HTTP requests partitioned by status code.
   type: Counter
   stabilityLevel: ALPHA
   labels:
-  - resource
-- name: capacity_increase_total
-  subsystem: watch_cache
-  help: Total number of watch cache capacity increase events broken by resource type.
+  - code
+  - webhook
+- name: loadbalancer_sync_total
+  subsystem: service_controller
+  help: A metric counting the amount of times any load balancer has been configured,
+    as an effect of service/node changes on the cluster
   type: Counter
   stabilityLevel: ALPHA
-  labels:
-  - resource
-- name: apiserver_storage_objects
-  help: Number of stored objects at the time of last check split by kind.
-  type: Gauge
-  stabilityLevel: STABLE
-  labels:
-  - resource
+- name: nodesync_error_total
+  subsystem: service_controller
+  help: A metric counting the amount of times any load balancer has been configured
+    and errored, as an effect of node changes on the cluster
+  type: Counter
+  stabilityLevel: ALPHA
 - name: nodesync_latency_seconds
   subsystem: service_controller
   help: A metric measuring the latency for nodesync which updates loadbalancer hosts
@@ -3572,6 +3990,14 @@
   - 15
   - 30
   - 60
+- name: rest_client_request_retries_total
+  help: Number of request retries, partitioned by status code, verb, and host.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - code
+  - host
+  - verb
 - name: rest_client_request_size_bytes
   help: Request size in bytes. Broken down by verb and host.
   type: Histogram
@@ -3743,24 +4169,6 @@
     SAN extension missing (either/or, based on the runtime environment)
   type: Counter
   stabilityLevel: ALPHA
-- name: cloudprovider_aws_api_request_duration_seconds
-  help: Latency of AWS API calls
-  type: Histogram
-  stabilityLevel: ALPHA
-  labels:
-  - request
-- name: cloudprovider_aws_api_request_errors
-  help: AWS API errors
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - request
-- name: cloudprovider_aws_api_throttled_requests_total
-  help: AWS API throttled requests
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - operation_name
 - name: api_request_duration_seconds
   namespace: cloudprovider_azure
   help: Latency of an Azure API call

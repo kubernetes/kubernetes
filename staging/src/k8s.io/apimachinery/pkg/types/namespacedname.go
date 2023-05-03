@@ -37,3 +37,13 @@ const (
 func (n NamespacedName) String() string {
 	return n.Namespace + string(Separator) + n.Name
 }
+
+// MarshalLog emits a struct containing required key/value pair
+func (n NamespacedName) MarshalLog() interface{} {
+	return struct {
+		Name, Namespace string
+	}{
+		Name:      n.Name,
+		Namespace: n.Namespace,
+	}
+}

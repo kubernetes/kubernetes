@@ -562,7 +562,7 @@ type informerSpy struct {
 	deletes []interface{}
 }
 
-func (is *informerSpy) OnAdd(obj interface{}) {
+func (is *informerSpy) OnAdd(obj interface{}, isInInitialList bool) {
 	is.mu.Lock()
 	defer is.mu.Unlock()
 	is.adds = append(is.adds, obj)

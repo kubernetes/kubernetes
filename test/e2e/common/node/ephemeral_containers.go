@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -42,9 +43,9 @@ var _ = SIGDescribe("Ephemeral Containers [NodeConformance]", func() {
 	// Release: 1.25
 	// Testname: Ephemeral Container Creation
 	// Description: Adding an ephemeral container to pod.spec MUST result in the container running.
-	framework.ConformanceIt("will start an ephemeral container in an existing pod", func() {
+	framework.ConformanceIt("will start an ephemeral container in an existing pod", func(ctx context.Context) {
 		ginkgo.By("creating a target pod")
-		pod := podClient.CreateSync(&v1.Pod{
+		pod := podClient.CreateSync(ctx, &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "ephemeral-containers-target-pod"},
 			Spec: v1.PodSpec{
 				Containers: []v1.Container{
@@ -69,14 +70,14 @@ var _ = SIGDescribe("Ephemeral Containers [NodeConformance]", func() {
 				TTY:     true,
 			},
 		}
-		err := podClient.AddEphemeralContainerSync(pod, ec, time.Minute)
+		err := podClient.AddEphemeralContainerSync(ctx, pod, ec, time.Minute)
 		framework.ExpectNoError(err, "Failed to patch ephemeral containers in pod %q", format.Pod(pod))
 
 		ginkgo.By("checking pod container endpoints")
 		// Can't use anything depending on kubectl here because it's not available in the node test environment
 		output := e2epod.ExecCommandInContainer(f, pod.Name, ecName, "/bin/echo", "marco")
 		gomega.Expect(output).To(gomega.ContainSubstring("marco"))
-		log, err := e2epod.GetPodLogs(f.ClientSet, pod.Namespace, pod.Name, ecName)
+		log, err := e2epod.GetPodLogs(ctx, f.ClientSet, pod.Namespace, pod.Name, ecName)
 		framework.ExpectNoError(err, "Failed to get logs for pod %q ephemeral container %q", format.Pod(pod), ecName)
 		gomega.Expect(log).To(gomega.ContainSubstring("polo"))
 	})

@@ -32,6 +32,7 @@ import (
 	"k8s.io/kube-openapi/pkg/aggregator"
 	"k8s.io/kube-openapi/pkg/builder"
 	"k8s.io/kube-openapi/pkg/common"
+	"k8s.io/kube-openapi/pkg/common/restfuladapter"
 	"k8s.io/kube-openapi/pkg/handler"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
@@ -81,7 +82,7 @@ func BuildAndRegisterAggregator(downloader *Downloader, delegationTarget server.
 
 	i := 0
 	// Build Aggregator's spec
-	aggregatorOpenAPISpec, err := builder.BuildOpenAPISpec(webServices, config)
+	aggregatorOpenAPISpec, err := builder.BuildOpenAPISpecFromRoutes(restfuladapter.AdaptWebServices(webServices), config)
 	if err != nil {
 		return nil, err
 	}
@@ -126,10 +127,7 @@ func BuildAndRegisterAggregator(downloader *Downloader, delegationTarget server.
 	}
 
 	// Install handler
-	s.openAPIVersionedService, err = handler.NewOpenAPIService(specToServe)
-	if err != nil {
-		return nil, err
-	}
+	s.openAPIVersionedService = handler.NewOpenAPIService(specToServe)
 	err = s.openAPIVersionedService.RegisterOpenAPIVersionedService("/openapi/v2", pathHandler)
 	if err != nil {
 		return nil, err

@@ -29,7 +29,7 @@ const (
 
 func featureGates() map[featuregate.Feature]featuregate.FeatureSpec {
 	return map[featuregate.Feature]featuregate.FeatureSpec{
-		ComponentSLIs: {Default: false, PreRelease: featuregate.Alpha},
+		ComponentSLIs: {Default: true, PreRelease: featuregate.Beta},
 	}
 }
 

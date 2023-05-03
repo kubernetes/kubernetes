@@ -32,21 +32,26 @@ const (
 	// of code conflicts because changes are more likely to be scattered
 	// across the file.
 
-	// owner: @jiahuif
-	// alpha: v1.21
-	// beta:  v1.22
-	// GA:    v1.24
-	//
-	// Enables Leader Migration for kube-controller-manager and cloud-controller-manager
-	// copied and sync'ed from k8s.io/kubernetes/pkg/features/kube_features.go
-	ControllerManagerLeaderMigration featuregate.Feature = "ControllerManagerLeaderMigration"
+	// owner: @nckturner
+	// kep:  http://kep.k8s.io/2699
+	// alpha: v1.27
+	// Enable webhook in cloud controller manager
+	CloudControllerManagerWebhook featuregate.Feature = "CloudControllerManagerWebhook"
 
-	// owner: @khenidak
-	// alpha: v1.15
+	// owner: @danwinship
+	// alpha: v1.27
 	//
-	// Enables ipv6 dual stack
-	// Original copy from k8s.io/kubernetes/pkg/features/kube_features.go
-	IPv6DualStack featuregate.Feature = "IPv6DualStack"
+	// Enables dual-stack values in the
+	// `alpha.kubernetes.io/provided-node-ip` annotation
+	CloudDualStackNodeIPs featuregate.Feature = "CloudDualStackNodeIPs"
+
+	// owner: @alexanderConstantinescu
+	// kep: http://kep.k8s.io/3458
+	// beta: v1.27
+	//
+	// Enables less load balancer re-configurations by the service controller
+	// (KCCM) as an effect of changing node state.
+	StableLoadBalancerNodeSet featuregate.Feature = "StableLoadBalancerNodeSet"
 )
 
 func SetupCurrentKubernetesSpecificFeatureGates(featuregates featuregate.MutableFeatureGate) error {
@@ -56,7 +61,7 @@ func SetupCurrentKubernetesSpecificFeatureGates(featuregates featuregate.Mutable
 // cloudPublicFeatureGates consists of cloud-specific feature keys.
 // To add a new feature, define a key for it at k8s.io/api/pkg/features and add it here.
 var cloudPublicFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	ControllerManagerLeaderMigration: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
-
-	IPv6DualStack: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	CloudControllerManagerWebhook: {Default: false, PreRelease: featuregate.Alpha},
+	CloudDualStackNodeIPs:         {Default: false, PreRelease: featuregate.Alpha},
+	StableLoadBalancerNodeSet:     {Default: true, PreRelease: featuregate.Beta},
 }

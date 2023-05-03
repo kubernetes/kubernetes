@@ -18,6 +18,7 @@ package deployment
 
 import (
 	"context"
+	"fmt"
 
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
@@ -25,6 +26,7 @@ import (
 	apivalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -32,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/apps"
-	"k8s.io/kubernetes/pkg/apis/apps/validation"
+	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -84,13 +86,18 @@ func (deploymentStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obje
 func (deploymentStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	deployment := obj.(*apps.Deployment)
 	opts := pod.GetValidationOptionsFromPodTemplate(&deployment.Spec.Template, nil)
-	return validation.ValidateDeployment(deployment, opts)
+	return appsvalidation.ValidateDeployment(deployment, opts)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
 func (deploymentStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
 	newDeployment := obj.(*apps.Deployment)
-	return pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), &newDeployment.Spec.Template, nil)
+	var warnings []string
+	if msgs := utilvalidation.IsDNS1123Label(newDeployment.Name); len(msgs) != 0 {
+		warnings = append(warnings, fmt.Sprintf("metadata.name: this is used in Pod names and hostnames, which can result in surprising behavior; a DNS label is recommended: %v", msgs))
+	}
+	warnings = append(warnings, pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), &newDeployment.Spec.Template, nil)...)
+	return warnings
 }
 
 // Canonicalize normalizes the object after validation.
@@ -125,7 +132,7 @@ func (deploymentStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.O
 	oldDeployment := old.(*apps.Deployment)
 
 	opts := pod.GetValidationOptionsFromPodTemplate(&newDeployment.Spec.Template, &oldDeployment.Spec.Template)
-	allErrs := validation.ValidateDeploymentUpdate(newDeployment, oldDeployment, opts)
+	allErrs := appsvalidation.ValidateDeploymentUpdate(newDeployment, oldDeployment, opts)
 
 	// Update is not allowed to set Spec.Selector for all groups/versions except extensions/v1beta1.
 	// If RequestInfo is nil, it is better to revert to old behavior (i.e. allow update to set Spec.Selector)
@@ -189,7 +196,7 @@ func (deploymentStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old r
 
 // ValidateUpdate is the default update validation for an end user updating status
 func (deploymentStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateDeploymentStatusUpdate(obj.(*apps.Deployment), old.(*apps.Deployment))
+	return appsvalidation.ValidateDeploymentStatusUpdate(obj.(*apps.Deployment), old.(*apps.Deployment))
 }
 
 // WarningsOnUpdate returns warnings for the given update.

@@ -12,6 +12,7 @@ type ProviderLoadBalancerParametersApplyConfiguration struct {
 	Type *v1.LoadBalancerProviderType                 `json:"type,omitempty"`
 	AWS  *AWSLoadBalancerParametersApplyConfiguration `json:"aws,omitempty"`
 	GCP  *GCPLoadBalancerParametersApplyConfiguration `json:"gcp,omitempty"`
+	IBM  *IBMLoadBalancerParametersApplyConfiguration `json:"ibm,omitempty"`
 }
 
 // ProviderLoadBalancerParametersApplyConfiguration constructs an declarative configuration of the ProviderLoadBalancerParameters type for use with
@@ -41,5 +42,13 @@ func (b *ProviderLoadBalancerParametersApplyConfiguration) WithAWS(value *AWSLoa
 // If called multiple times, the GCP field is set to the value of the last call.
 func (b *ProviderLoadBalancerParametersApplyConfiguration) WithGCP(value *GCPLoadBalancerParametersApplyConfiguration) *ProviderLoadBalancerParametersApplyConfiguration {
 	b.GCP = value
+	return b
+}
+
+// WithIBM sets the IBM field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the IBM field is set to the value of the last call.
+func (b *ProviderLoadBalancerParametersApplyConfiguration) WithIBM(value *IBMLoadBalancerParametersApplyConfiguration) *ProviderLoadBalancerParametersApplyConfiguration {
+	b.IBM = value
 	return b
 }

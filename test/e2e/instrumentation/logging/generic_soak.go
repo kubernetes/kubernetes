@@ -17,6 +17,7 @@ limitations under the License.
 package logging
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -55,7 +56,7 @@ var _ = instrumentation.SIGDescribe("Logging soak [Performance] [Slow] [Disrupti
 	// This can expose problems in your docker configuration (logging), log searching infrastructure, to tune deployments to match high load
 	// scenarios.  TODO jayunit100 add this to the kube CI in a follow on infra patch.
 
-	ginkgo.It(fmt.Sprintf("should survive logging 1KB every %v seconds, for a duration of %v", kbRateInSeconds, totalLogTime), func() {
+	ginkgo.It(fmt.Sprintf("should survive logging 1KB every %v seconds, for a duration of %v", kbRateInSeconds, totalLogTime), func(ctx context.Context) {
 		ginkgo.By(fmt.Sprintf("scaling up to %v pods per node", loggingSoak.Scale))
 		defer ginkgo.GinkgoRecover()
 		var wg sync.WaitGroup
@@ -66,7 +67,7 @@ var _ = instrumentation.SIGDescribe("Logging soak [Performance] [Slow] [Disrupti
 				defer ginkgo.GinkgoRecover()
 				wave := fmt.Sprintf("wave%v", strconv.Itoa(i))
 				framework.Logf("Starting logging soak, wave = %v", wave)
-				RunLogPodsWithSleepOf(f, kbRateInSeconds, wave, totalLogTime)
+				RunLogPodsWithSleepOf(ctx, f, kbRateInSeconds, wave, totalLogTime)
 				framework.Logf("Completed logging soak, wave %v", i)
 			}(i)
 			// Niceness.
@@ -79,9 +80,9 @@ var _ = instrumentation.SIGDescribe("Logging soak [Performance] [Slow] [Disrupti
 
 // RunLogPodsWithSleepOf creates a pod on every node, logs continuously (with "sleep" pauses), and verifies that the log string
 // was produced in each and every pod at least once.  The final arg is the timeout for the test to verify all the pods got logs.
-func RunLogPodsWithSleepOf(f *framework.Framework, sleep time.Duration, podname string, timeout time.Duration) {
+func RunLogPodsWithSleepOf(ctx context.Context, f *framework.Framework, sleep time.Duration, podname string, timeout time.Duration) {
 
-	nodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+	nodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
 	framework.ExpectNoError(err)
 	totalPods := len(nodes.Items)
 	framework.ExpectNotEqual(totalPods, 0)
@@ -90,6 +91,7 @@ func RunLogPodsWithSleepOf(f *framework.Framework, sleep time.Duration, podname 
 
 	appName := "logging-soak" + podname
 	podlables := e2enode.CreatePodsPerNodeForSimpleApp(
+		ctx,
 		f.ClientSet,
 		f.Namespace.Name,
 		appName,
@@ -126,7 +128,7 @@ func RunLogPodsWithSleepOf(f *framework.Framework, sleep time.Duration, podname 
 	)
 
 	largeClusterForgiveness := time.Duration(len(nodes.Items)/5) * time.Second // i.e. a 100 node cluster gets an extra 20 seconds to complete.
-	pods, err := logSoakVerification.WaitFor(totalPods, timeout+largeClusterForgiveness)
+	pods, err := logSoakVerification.WaitFor(ctx, totalPods, timeout+largeClusterForgiveness)
 
 	if err != nil {
 		framework.Failf("Error in wait... %v", err)

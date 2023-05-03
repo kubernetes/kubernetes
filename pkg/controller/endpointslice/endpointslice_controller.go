@@ -145,7 +145,6 @@ func NewController(podInformer coreinformers.PodInformer,
 	c.eventRecorder = recorder
 
 	c.endpointUpdatesBatchPeriod = endpointUpdatesBatchPeriod
-	c.serviceSelectorCache = endpointutil.NewServiceSelectorCache()
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints) {
 		nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -234,10 +233,6 @@ type Controller struct {
 	// This can be used to reduce overall number of all endpoint slice updates.
 	endpointUpdatesBatchPeriod time.Duration
 
-	// serviceSelectorCache is a cache of service selectors to avoid high CPU consumption caused by frequent calls
-	// to AsSelectorPreValidated (see #73527)
-	serviceSelectorCache *endpointutil.ServiceSelectorCache
-
 	// topologyCache tracks the distribution of Nodes and endpoints across zones
 	// to enable TopologyAwareHints.
 	topologyCache *topologycache.TopologyCache
@@ -322,14 +317,21 @@ func (c *Controller) syncService(key string) error {
 
 	service, err := c.serviceLister.Services(namespace).Get(name)
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			c.triggerTimeTracker.DeleteService(namespace, name)
-			c.reconciler.deleteService(namespace, name)
-			c.endpointSliceTracker.DeleteService(namespace, name)
-			// The service has been deleted, return nil so that it won't be retried.
-			return nil
+		if !apierrors.IsNotFound(err) {
+			return err
 		}
-		return err
+
+		c.triggerTimeTracker.DeleteService(namespace, name)
+		c.reconciler.deleteService(namespace, name)
+		c.endpointSliceTracker.DeleteService(namespace, name)
+		// The service has been deleted, return nil so that it won't be retried.
+		return nil
+	}
+
+	if service.Spec.Type == v1.ServiceTypeExternalName {
+		// services with Type ExternalName receive no endpoints from this controller;
+		// Ref: https://issues.k8s.io/105986
+		return nil
 	}
 
 	if service.Spec.Selector == nil {
@@ -395,7 +397,6 @@ func (c *Controller) onServiceUpdate(obj interface{}) {
 		return
 	}
 
-	_ = c.serviceSelectorCache.Update(key, obj.(*v1.Service).Spec.Selector)
 	c.queue.Add(key)
 }
 
@@ -407,7 +408,6 @@ func (c *Controller) onServiceDelete(obj interface{}) {
 		return
 	}
 
-	c.serviceSelectorCache.Delete(key)
 	c.queue.Add(key)
 }
 
@@ -486,7 +486,7 @@ func (c *Controller) queueServiceForEndpointSlice(endpointSlice *discovery.Endpo
 
 func (c *Controller) addPod(obj interface{}) {
 	pod := obj.(*v1.Pod)
-	services, err := c.serviceSelectorCache.GetPodServiceMemberships(c.serviceLister, pod)
+	services, err := endpointutil.GetPodServiceMemberships(c.serviceLister, pod)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Unable to get pod %s/%s's service memberships: %v", pod.Namespace, pod.Name, err))
 		return
@@ -497,7 +497,7 @@ func (c *Controller) addPod(obj interface{}) {
 }
 
 func (c *Controller) updatePod(old, cur interface{}) {
-	services := endpointutil.GetServicesToUpdateOnPodChange(c.serviceLister, c.serviceSelectorCache, old, cur)
+	services := endpointutil.GetServicesToUpdateOnPodChange(c.serviceLister, old, cur)
 	for key := range services {
 		c.queue.AddAfter(key, c.endpointUpdatesBatchPeriod)
 	}

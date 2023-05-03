@@ -27,6 +27,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
 )
 
@@ -35,7 +36,10 @@ import (
 func validateClusterIPFlags(options *ServerRunOptions) []error {
 	var errs []error
 	// maxCIDRBits is used to define the maximum CIDR size for the cluster ip(s)
-	const maxCIDRBits = 20
+	maxCIDRBits := 20
+	if utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
+		maxCIDRBits = 64
+	}
 
 	// validate that primary has been processed by user provided values or it has been defaulted
 	if options.PrimaryServiceClusterIPRange.IP == nil {

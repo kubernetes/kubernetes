@@ -322,6 +322,9 @@ spec:
             port: portValue
           terminationGracePeriodSeconds: 7
           timeoutSeconds: 3
+        resizePolicy:
+        - resourceName: resourceNameValue
+          restartPolicy: restartPolicyValue
         resources:
           claims:
           - name: nameValue
@@ -525,6 +528,9 @@ spec:
             port: portValue
           terminationGracePeriodSeconds: 7
           timeoutSeconds: 3
+        resizePolicy:
+        - resourceName: resourceNameValue
+          restartPolicy: restartPolicyValue
         resources:
           claims:
           - name: nameValue
@@ -730,6 +736,9 @@ spec:
             port: portValue
           terminationGracePeriodSeconds: 7
           timeoutSeconds: 3
+        resizePolicy:
+        - resourceName: resourceNameValue
+          restartPolicy: restartPolicyValue
         resources:
           claims:
           - name: nameValue

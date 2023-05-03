@@ -42,6 +42,14 @@ func ValidateKubeSchedulerConfiguration(cc *config.KubeSchedulerConfiguration) u
 	var errs []error
 	errs = append(errs, componentbasevalidation.ValidateClientConnectionConfiguration(&cc.ClientConnection, field.NewPath("clientConnection")).ToAggregate())
 	errs = append(errs, componentbasevalidation.ValidateLeaderElectionConfiguration(&cc.LeaderElection, field.NewPath("leaderElection")).ToAggregate())
+
+	// TODO: This can be removed when ResourceLock is not available
+	// Only ResourceLock values with leases are allowed
+	if cc.LeaderElection.LeaderElect && cc.LeaderElection.ResourceLock != "leases" {
+		leaderElectionPath := field.NewPath("leaderElection")
+		errs = append(errs, field.Invalid(leaderElectionPath.Child("resourceLock"), cc.LeaderElection.ResourceLock, `resourceLock value must be "leases"`))
+	}
+
 	profilesPath := field.NewPath("profiles")
 	if cc.Parallelism <= 0 {
 		errs = append(errs, field.Invalid(field.NewPath("parallelism"), cc.Parallelism, "should be an integer value greater than zero"))

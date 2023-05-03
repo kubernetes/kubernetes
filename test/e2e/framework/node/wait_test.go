@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -167,12 +168,12 @@ func TestCheckReadyForTests(t *testing.T) {
 				nodeList := &v1.NodeList{Items: tc.nodes}
 				return true, nodeList, tc.nodeListErr
 			})
-			checkFunc := CheckReadyForTests(c, tc.nonblockingTaints, tc.allowedNotReadyNodes, testLargeClusterThreshold)
+			checkFunc := CheckReadyForTests(context.Background(), c, tc.nonblockingTaints, tc.allowedNotReadyNodes, testLargeClusterThreshold)
 			// The check function returns "false, nil" during its
 			// first two calls, therefore we have to try several
 			// times until we get the expected error.
 			for attempt := 0; attempt <= 3; attempt++ {
-				out, err := checkFunc()
+				out, err := checkFunc(context.Background())
 				expected := tc.expected
 				expectedErr := tc.expectedErr
 				if tc.nodeListErr != nil && attempt < 2 {

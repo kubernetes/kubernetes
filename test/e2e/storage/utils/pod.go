@@ -43,8 +43,8 @@ import (
 //
 // The output goes to log files (when using --report-dir, as in the
 // CI) or the output stream (otherwise).
-func StartPodLogs(f *framework.Framework, driverNamespace *v1.Namespace) func() {
-	ctx, cancel := context.WithCancel(context.Background())
+func StartPodLogs(ctx context.Context, f *framework.Framework, driverNamespace *v1.Namespace) func() {
+	ctx, cancel := context.WithCancel(ctx)
 	cs := f.ClientSet
 
 	ns := driverNamespace.Name
@@ -103,17 +103,17 @@ func StartPodLogs(f *framework.Framework, driverNamespace *v1.Namespace) func() 
 // - If `systemctl` returns stderr "command not found, issues the command via `service`
 // - If `service` also returns stderr "command not found", the test is aborted.
 // Allowed kubeletOps are `KStart`, `KStop`, and `KRestart`
-func KubeletCommand(kOp KubeletOpt, c clientset.Interface, pod *v1.Pod) {
+func KubeletCommand(ctx context.Context, kOp KubeletOpt, c clientset.Interface, pod *v1.Pod) {
 	command := ""
 	systemctlPresent := false
 	kubeletPid := ""
 
-	nodeIP, err := getHostAddress(c, pod)
+	nodeIP, err := getHostAddress(ctx, c, pod)
 	framework.ExpectNoError(err)
 	nodeIP = nodeIP + ":22"
 
 	framework.Logf("Checking if systemctl command is present")
-	sshResult, err := e2essh.SSH("systemctl --version", nodeIP, framework.TestContext.Provider)
+	sshResult, err := e2essh.SSH(ctx, "systemctl --version", nodeIP, framework.TestContext.Provider)
 	framework.ExpectNoError(err, fmt.Sprintf("SSH to Node %q errored.", pod.Spec.NodeName))
 	if !strings.Contains(sshResult.Stderr, "command not found") {
 		command = fmt.Sprintf("systemctl %s kubelet", string(kOp))
@@ -122,23 +122,23 @@ func KubeletCommand(kOp KubeletOpt, c clientset.Interface, pod *v1.Pod) {
 		command = fmt.Sprintf("service kubelet %s", string(kOp))
 	}
 
-	sudoPresent := isSudoPresent(nodeIP, framework.TestContext.Provider)
+	sudoPresent := isSudoPresent(ctx, nodeIP, framework.TestContext.Provider)
 	if sudoPresent {
 		command = fmt.Sprintf("sudo %s", command)
 	}
 
 	if kOp == KRestart {
-		kubeletPid = getKubeletMainPid(nodeIP, sudoPresent, systemctlPresent)
+		kubeletPid = getKubeletMainPid(ctx, nodeIP, sudoPresent, systemctlPresent)
 	}
 
 	framework.Logf("Attempting `%s`", command)
-	sshResult, err = e2essh.SSH(command, nodeIP, framework.TestContext.Provider)
+	sshResult, err = e2essh.SSH(ctx, command, nodeIP, framework.TestContext.Provider)
 	framework.ExpectNoError(err, fmt.Sprintf("SSH to Node %q errored.", pod.Spec.NodeName))
 	e2essh.LogResult(sshResult)
 	gomega.Expect(sshResult.Code).To(gomega.BeZero(), "Failed to [%s] kubelet:\n%#v", string(kOp), sshResult)
 
 	if kOp == KStop {
-		if ok := e2enode.WaitForNodeToBeNotReady(c, pod.Spec.NodeName, NodeStateTimeout); !ok {
+		if ok := e2enode.WaitForNodeToBeNotReady(ctx, c, pod.Spec.NodeName, NodeStateTimeout); !ok {
 			framework.Failf("Node %s failed to enter NotReady state", pod.Spec.NodeName)
 		}
 	}
@@ -146,7 +146,10 @@ func KubeletCommand(kOp KubeletOpt, c clientset.Interface, pod *v1.Pod) {
 		// Wait for a minute to check if kubelet Pid is getting changed
 		isPidChanged := false
 		for start := time.Now(); time.Since(start) < 1*time.Minute; time.Sleep(2 * time.Second) {
-			kubeletPidAfterRestart := getKubeletMainPid(nodeIP, sudoPresent, systemctlPresent)
+			if ctx.Err() != nil {
+				framework.Fail("timed out waiting for Kubelet POD change")
+			}
+			kubeletPidAfterRestart := getKubeletMainPid(ctx, nodeIP, sudoPresent, systemctlPresent)
 			if kubeletPid != kubeletPidAfterRestart {
 				isPidChanged = true
 				break
@@ -161,7 +164,7 @@ func KubeletCommand(kOp KubeletOpt, c clientset.Interface, pod *v1.Pod) {
 	}
 	if kOp == KStart || kOp == KRestart {
 		// For kubelet start and restart operations, Wait until Node becomes Ready
-		if ok := e2enode.WaitForNodeToBeReady(c, pod.Spec.NodeName, NodeStateTimeout); !ok {
+		if ok := e2enode.WaitForNodeToBeReady(ctx, c, pod.Spec.NodeName, NodeStateTimeout); !ok {
 			framework.Failf("Node %s failed to enter Ready state", pod.Spec.NodeName)
 		}
 	}
@@ -170,8 +173,8 @@ func KubeletCommand(kOp KubeletOpt, c clientset.Interface, pod *v1.Pod) {
 // getHostAddress gets the node for a pod and returns the first
 // address. Returns an error if the node the pod is on doesn't have an
 // address.
-func getHostAddress(client clientset.Interface, p *v1.Pod) (string, error) {
-	node, err := client.CoreV1().Nodes().Get(context.TODO(), p.Spec.NodeName, metav1.GetOptions{})
+func getHostAddress(ctx context.Context, client clientset.Interface, p *v1.Pod) (string, error) {
+	node, err := client.CoreV1().Nodes().Get(ctx, p.Spec.NodeName, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}

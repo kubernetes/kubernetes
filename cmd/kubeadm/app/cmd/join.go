@@ -147,7 +147,7 @@ type joinData struct {
 	initCfg               *kubeadmapi.InitConfiguration
 	tlsBootstrapCfg       *clientcmdapi.Config
 	client                clientset.Interface
-	ignorePreflightErrors sets.String
+	ignorePreflightErrors sets.Set[string]
 	outputWriter          io.Writer
 	patchesDir            string
 	dryRun                bool
@@ -156,8 +156,7 @@ type joinData struct {
 
 // newCmdJoin returns "kubeadm join" command.
 // NB. joinOptions is exposed as parameter for allowing unit testing of
-//
-//	the newJoinData method, that implements all the command options validation logic
+// the newJoinData method, that implements all the command options validation logic
 func newCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 	if joinOptions == nil {
 		joinOptions = newJoinOptions()
@@ -221,6 +220,11 @@ func newCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 	// sets the data builder function, that will be used by the runner
 	// both when running the entire workflow or single phases
 	joinRunner.SetDataInitializer(func(cmd *cobra.Command, args []string) (workflow.RunData, error) {
+		if cmd.Flags().Lookup(options.NodeCRISocket) == nil {
+			// avoid CRI detection
+			// assume that the command execution does not depend on CRISocket when --cri-socket flag is not set
+			joinOptions.externalcfg.NodeRegistration.CRISocket = kubeadmconstants.UnknownCRISocket
+		}
 		data, err := newJoinData(cmd, args, joinOptions, out, kubeadmconstants.GetAdminKubeConfigPath())
 		if err != nil {
 			return nil, err
@@ -432,7 +436,7 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 		return nil, err
 	}
 	// Also set the union of pre-flight errors to JoinConfiguration, to provide a consistent view of the runtime configuration:
-	cfg.NodeRegistration.IgnorePreflightErrors = ignorePreflightErrorsSet.List()
+	cfg.NodeRegistration.IgnorePreflightErrors = sets.List(ignorePreflightErrorsSet)
 
 	// override node name and CRI socket from the command line opt
 	if opt.externalcfg.NodeRegistration.Name != "" {
@@ -558,7 +562,7 @@ func (j *joinData) Client() (clientset.Interface, error) {
 }
 
 // IgnorePreflightErrors returns the list of preflight errors to ignore.
-func (j *joinData) IgnorePreflightErrors() sets.String {
+func (j *joinData) IgnorePreflightErrors() sets.Set[string] {
 	return j.ignorePreflightErrors
 }
 
@@ -589,7 +593,7 @@ func fetchInitConfigurationFromJoinConfiguration(cfg *kubeadmapi.JoinConfigurati
 	}
 
 	// Create the final KubeConfig file with the cluster name discovered after fetching the cluster configuration
-	clusterinfo := kubeconfigutil.GetClusterFromKubeConfig(tlsBootstrapCfg)
+	_, clusterinfo := kubeconfigutil.GetClusterFromKubeConfig(tlsBootstrapCfg)
 	tlsBootstrapCfg.Clusters = map[string]*clientcmdapi.Cluster{
 		initConfiguration.ClusterName: clusterinfo,
 	}

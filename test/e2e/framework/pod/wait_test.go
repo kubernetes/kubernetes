@@ -17,18 +17,24 @@ limitations under the License.
 package pod_test
 
 import (
-	"strings"
+	"context"
+	"fmt"
+	"regexp"
 	"testing"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2/reporters"
+	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/internal/output"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	_ "k8s.io/kubernetes/test/utils/format" // activate YAML object dumps
 )
 
 // The line number of the following code is checked in TestFailureOutput below.
@@ -41,50 +47,112 @@ import (
 //
 //
 //
-//
-//
-//
-//
-//
-//
-//
-//
-// This must be line #52.
+// This must be line #50.
 
 var _ = ginkgo.Describe("pod", func() {
-	ginkgo.It("not found", func() {
-		framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(clientSet, "no-such-pod", "default", timeout /* no explanation here to cover that code path */))
+	ginkgo.It("not found, must exist", func(ctx context.Context) {
+		gomega.Eventually(ctx, framework.HandleRetry(getNoSuchPod)).WithTimeout(timeout).Should(e2epod.BeInPhase(v1.PodRunning))
 	})
 
-	ginkgo.It("not running", func() {
-		framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(clientSet, podName, podNamespace, timeout), "wait for pod %s running", podName /* tests printf formatting */)
+	ginkgo.It("not found, retry", func(ctx context.Context) {
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(ctx, clientSet, "no-such-pod", "default", timeout))
+	})
+
+	ginkgo.It("not found, retry with wrappers", func(ctx context.Context) {
+		gomega.Eventually(ctx, framework.RetryNotFound(framework.HandleRetry(getNoSuchPod))).WithTimeout(timeout).Should(e2epod.BeInPhase(v1.PodRunning))
+	})
+
+	ginkgo.It("not found, retry with inverted wrappers", func(ctx context.Context) {
+		gomega.Eventually(ctx, framework.HandleRetry(framework.RetryNotFound(getNoSuchPod))).WithTimeout(timeout).Should(e2epod.BeInPhase(v1.PodRunning))
+	})
+
+	ginkgo.It("not running", func(ctx context.Context) {
+		ginkgo.By(fmt.Sprintf("waiting for pod %s to run", podName))
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(ctx, clientSet, podName, podNamespace, timeout))
+	})
+
+	ginkgo.It("failed", func(ctx context.Context) {
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(ctx, clientSet, failedPodName, podNamespace, timeout))
+	})
+
+	ginkgo.It("gets reported with API error", func(ctx context.Context) {
+		called := false
+		getPod := func(ctx context.Context) (*v1.Pod, error) {
+			if called {
+				ginkgo.By("returning fake API error")
+				return nil, apierrors.NewTooManyRequests("fake API error", 10)
+			}
+			called = true
+			pod, err := clientSet.CoreV1().Pods(podNamespace).Get(ctx, podName, metav1.GetOptions{})
+			if err != nil {
+				return nil, err
+			}
+			ginkgo.By("returning pod")
+			return pod, err
+		}
+		gomega.Eventually(ctx, framework.HandleRetry(getPod)).WithTimeout(5 * timeout).Should(e2epod.BeInPhase(v1.PodRunning))
 	})
 })
 
+func getNoSuchPod(ctx context.Context) (*v1.Pod, error) {
+	return clientSet.CoreV1().Pods("default").Get(ctx, "no-such-pod", metav1.GetOptions{})
+}
+
 const (
-	podName      = "pending-pod"
-	podNamespace = "default"
-	timeout      = 5 * time.Second
+	podName       = "pending-pod"
+	podNamespace  = "default"
+	failedPodName = "failed-pod"
+	timeout       = time.Second
 )
 
 var (
-	clientSet = fake.NewSimpleClientset(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: podName, Namespace: podNamespace}})
+	clientSet = fake.NewSimpleClientset(
+		&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: podName, Namespace: podNamespace}, Status: v1.PodStatus{Phase: v1.PodPending}},
+		&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: failedPodName, Namespace: podNamespace}, Status: v1.PodStatus{Phase: v1.PodFailed}},
+	)
 )
 
 func TestFailureOutput(t *testing.T) {
-	// Sorted by name!
-	expected := output.SuiteResults{
-		output.TestResult{
-			Name: "pod not found",
-			// "Ignoring NotFound..." will normally occur every two seconds,
-			// but we reduce it to one line because it might occur less often
-			// on a loaded system.
-			Output: `INFO: Waiting up to 5s for pod "no-such-pod" in namespace "default" to be "running"
-INFO: Ignoring NotFound error while getting pod default/no-such-pod
-INFO: Unexpected error: 
-    <*fmt.wrapError>: {
-        msg: "error while waiting for pod default/no-such-pod to be running: pods \"no-such-pod\" not found",
-        err: <*errors.StatusError>{
+
+	expected := output.TestResult{
+		NormalizeOutput: func(in string) string {
+			return regexp.MustCompile(`wait.go:[[:digit:]]*`).ReplaceAllString(in, `wait.go`)
+		},
+		Suite: reporters.JUnitTestSuite{
+			Tests:    7,
+			Failures: 7,
+			Errors:   0,
+			Disabled: 0,
+			Skipped:  0,
+			TestCases: []reporters.JUnitTestCase{
+				{
+					Name:   "[It] pod not found, must exist",
+					Status: "failed",
+					Failure: &reporters.JUnitFailure{
+						Type: "failed",
+						Description: `[FAILED] Told to stop trying after <after>.
+Unexpected final error while getting *v1.Pod: pods "no-such-pod" not found
+In [It] at: wait_test.go:54 <time>
+`,
+					},
+					SystemErr: `> Enter [It] not found, must exist - wait_test.go:53 <time>
+[FAILED] Told to stop trying after <after>.
+Unexpected final error while getting *v1.Pod: pods "no-such-pod" not found
+In [It] at: wait_test.go:54 <time>
+< Exit [It] not found, must exist - wait_test.go:53 <time>
+`,
+				},
+				{
+					Name:   "[It] pod not found, retry",
+					Status: "failed",
+					Failure: &reporters.JUnitFailure{
+						Type: "failed",
+						Description: `[FAILED] Timed out after <after>.
+The function passed to Eventually returned the following error:
+    <framework.transientError>: 
+    pods "no-such-pod" not found
+    {
+        error: <*errors.StatusError>{
             ErrStatus: {
                 TypeMeta: {Kind: "", APIVersion: ""},
                 ListMeta: {
@@ -101,145 +169,291 @@ INFO: Unexpected error:
             },
         },
     }
-FAIL: error while waiting for pod default/no-such-pod to be running: pods "no-such-pod" not found
-
-Full Stack Trace
-k8s.io/kubernetes/test/e2e/framework/pod_test.glob..func1.1()
-	wait_test.go:56
+In [It] at: wait_test.go:58 <time>
 `,
-			NormalizeOutput: func(output string) string {
-				return trimDuplicateLines(output, "INFO: Ignoring NotFound error while getting pod default/no-such-pod")
-			},
-			Failure: `error while waiting for pod default/no-such-pod to be running: pods "no-such-pod" not found`,
-			Stack: `k8s.io/kubernetes/test/e2e/framework/pod_test.glob..func1.1()
-	wait_test.go:56`,
-		},
-		output.TestResult{
-			Name: "pod not running",
-			// "INFO: Pod ..." will normally occur every two seconds,
-			// but we reduce it to one line because it might occur less often
-			// on a loaded system.
-			Output: `INFO: Waiting up to 5s for pod "pending-pod" in namespace "default" to be "running"
-INFO: Pod "pending-pod": Phase="", Reason="", readiness=false. Elapsed: <elapsed>
-INFO: Unexpected error: wait for pod pending-pod running: 
-    <*pod.timeoutError>: {
-        msg: "timed out while waiting for pod default/pending-pod to be running",
-        observedObjects: [
-            <*v1.Pod>{
+					},
+					SystemErr: `> Enter [It] not found, retry - wait_test.go:57 <time>
+INFO: Failed inside E2E framework:
+    k8s.io/kubernetes/test/e2e/framework/pod.WaitTimeoutForPodRunningInNamespace()
+    	wait.go
+    k8s.io/kubernetes/test/e2e/framework/pod_test.glob..func1.2()
+    	wait_test.go:58
+[FAILED] Timed out after <after>.
+The function passed to Eventually returned the following error:
+    <framework.transientError>: 
+    pods "no-such-pod" not found
+    {
+        error: <*errors.StatusError>{
+            ErrStatus: {
                 TypeMeta: {Kind: "", APIVersion: ""},
-                ObjectMeta: {
-                    Name: "pending-pod",
-                    GenerateName: "",
-                    Namespace: "default",
+                ListMeta: {
                     SelfLink: "",
-                    UID: "",
                     ResourceVersion: "",
-                    Generation: 0,
-                    CreationTimestamp: {
-                        Time: {wall: 0, ext: 0, loc: nil},
-                    },
-                    DeletionTimestamp: nil,
-                    DeletionGracePeriodSeconds: nil,
-                    Labels: nil,
-                    Annotations: nil,
-                    OwnerReferences: nil,
-                    Finalizers: nil,
-                    ManagedFields: nil,
+                    Continue: "",
+                    RemainingItemCount: nil,
                 },
-                Spec: {
-                    Volumes: nil,
-                    InitContainers: nil,
-                    Containers: nil,
-                    EphemeralContainers: nil,
-                    RestartPolicy: "",
-                    TerminationGracePeriodSeconds: nil,
-                    ActiveDeadlineSeconds: nil,
-                    DNSPolicy: "",
-                    NodeSelector: nil,
-                    ServiceAccountName: "",
-                    DeprecatedServiceAccount: "",
-                    AutomountServiceAccountToken: nil,
-                    NodeName: "",
-                    HostNetwork: false,
-                    HostPID: false,
-                    HostIPC: false,
-                    ShareProcessNamespace: nil,
-                    SecurityContext: nil,
-                    ImagePullSecrets: nil,
-                    Hostname: "",
-                    Subdomain: "",
-                    Affinity: nil,
-                    SchedulerName: "",
-                    Tolerations: nil,
-                    HostAliases: nil,
-                    PriorityClassName: "",
-                    Priority: nil,
-                    DNSConfig: nil,
-                    ReadinessGates: nil,
-                    RuntimeClassName: nil,
-                    EnableServiceLinks: nil,
-                    PreemptionPolicy: nil,
-                    Overhead: nil,
-                    TopologySpreadConstraints: nil,
-                    SetHostnameAsFQDN: nil,
-                    OS: nil,
-                    HostUsers: nil,
-                    SchedulingGates: nil,
-                    ResourceClaims: nil,
-                },
-                Status: {
-                    Phase: "",
-                    Conditions: nil,
-                    Message: "",
-                    Reason: "",
-                    NominatedNodeName: "",
-                    HostIP: "",
-                    PodIP: "",
-                    PodIPs: nil,
-                    StartTime: nil,
-                    InitContainerStatuses: nil,
-                    ContainerStatuses: nil,
-                    QOSClass: "",
-                    EphemeralContainerStatuses: nil,
-                },
+                Status: "Failure",
+                Message: "pods \"no-such-pod\" not found",
+                Reason: "NotFound",
+                Details: {Name: "no-such-pod", Group: "", Kind: "pods", UID: "", Causes: nil, RetryAfterSeconds: 0},
+                Code: 404,
             },
-        ],
+        },
     }
-FAIL: wait for pod pending-pod running: timed out while waiting for pod default/pending-pod to be running
-
-Full Stack Trace
-k8s.io/kubernetes/test/e2e/framework/pod_test.glob..func1.2()
-	wait_test.go:60
+In [It] at: wait_test.go:58 <time>
+< Exit [It] not found, retry - wait_test.go:57 <time>
 `,
-			NormalizeOutput: func(output string) string {
-				return trimDuplicateLines(output, `INFO: Pod "pending-pod": Phase="", Reason="", readiness=false. Elapsed: <elapsed>`)
+				},
+				{
+					Name:   "[It] pod not found, retry with wrappers",
+					Status: "failed",
+					Failure: &reporters.JUnitFailure{
+						Type: "failed",
+						Description: `[FAILED] Timed out after <after>.
+The function passed to Eventually returned the following error:
+    <framework.transientError>: 
+    pods "no-such-pod" not found
+    {
+        error: <*errors.StatusError>{
+            ErrStatus: {
+                TypeMeta: {Kind: "", APIVersion: ""},
+                ListMeta: {
+                    SelfLink: "",
+                    ResourceVersion: "",
+                    Continue: "",
+                    RemainingItemCount: nil,
+                },
+                Status: "Failure",
+                Message: "pods \"no-such-pod\" not found",
+                Reason: "NotFound",
+                Details: {Name: "no-such-pod", Group: "", Kind: "pods", UID: "", Causes: nil, RetryAfterSeconds: 0},
+                Code: 404,
+            },
+        },
+    }
+In [It] at: wait_test.go:62 <time>
+`,
+					},
+					SystemErr: `> Enter [It] not found, retry with wrappers - wait_test.go:61 <time>
+[FAILED] Timed out after <after>.
+The function passed to Eventually returned the following error:
+    <framework.transientError>: 
+    pods "no-such-pod" not found
+    {
+        error: <*errors.StatusError>{
+            ErrStatus: {
+                TypeMeta: {Kind: "", APIVersion: ""},
+                ListMeta: {
+                    SelfLink: "",
+                    ResourceVersion: "",
+                    Continue: "",
+                    RemainingItemCount: nil,
+                },
+                Status: "Failure",
+                Message: "pods \"no-such-pod\" not found",
+                Reason: "NotFound",
+                Details: {Name: "no-such-pod", Group: "", Kind: "pods", UID: "", Causes: nil, RetryAfterSeconds: 0},
+                Code: 404,
+            },
+        },
+    }
+In [It] at: wait_test.go:62 <time>
+< Exit [It] not found, retry with wrappers - wait_test.go:61 <time>
+`,
+				},
+				{
+					Name:   "[It] pod not found, retry with inverted wrappers",
+					Status: "failed",
+					Failure: &reporters.JUnitFailure{
+						Type: "failed",
+						Description: `[FAILED] Timed out after <after>.
+The function passed to Eventually returned the following error:
+    <framework.transientError>: 
+    pods "no-such-pod" not found
+    {
+        error: <*errors.StatusError>{
+            ErrStatus: {
+                TypeMeta: {Kind: "", APIVersion: ""},
+                ListMeta: {
+                    SelfLink: "",
+                    ResourceVersion: "",
+                    Continue: "",
+                    RemainingItemCount: nil,
+                },
+                Status: "Failure",
+                Message: "pods \"no-such-pod\" not found",
+                Reason: "NotFound",
+                Details: {Name: "no-such-pod", Group: "", Kind: "pods", UID: "", Causes: nil, RetryAfterSeconds: 0},
+                Code: 404,
+            },
+        },
+    }
+In [It] at: wait_test.go:66 <time>
+`,
+					},
+					SystemErr: `> Enter [It] not found, retry with inverted wrappers - wait_test.go:65 <time>
+[FAILED] Timed out after <after>.
+The function passed to Eventually returned the following error:
+    <framework.transientError>: 
+    pods "no-such-pod" not found
+    {
+        error: <*errors.StatusError>{
+            ErrStatus: {
+                TypeMeta: {Kind: "", APIVersion: ""},
+                ListMeta: {
+                    SelfLink: "",
+                    ResourceVersion: "",
+                    Continue: "",
+                    RemainingItemCount: nil,
+                },
+                Status: "Failure",
+                Message: "pods \"no-such-pod\" not found",
+                Reason: "NotFound",
+                Details: {Name: "no-such-pod", Group: "", Kind: "pods", UID: "", Causes: nil, RetryAfterSeconds: 0},
+                Code: 404,
+            },
+        },
+    }
+In [It] at: wait_test.go:66 <time>
+< Exit [It] not found, retry with inverted wrappers - wait_test.go:65 <time>
+`,
+				},
+				{
+					Name:   "[It] pod not running",
+					Status: "failed",
+					Failure: &reporters.JUnitFailure{
+						Description: `[FAILED] Timed out after <after>.
+Expected Pod to be in <v1.PodPhase>: "Running"
+Got instead:
+    <*v1.Pod>: 
+        metadata:
+          creationTimestamp: null
+          name: pending-pod
+          namespace: default
+        spec:
+          containers: null
+        status:
+          phase: Pending
+In [It] at: wait_test.go:71 <time>
+`,
+						Type: "failed",
+					},
+					SystemErr: `> Enter [It] not running - wait_test.go:69 <time>
+STEP: waiting for pod pending-pod to run - wait_test.go:70 <time>
+INFO: Failed inside E2E framework:
+    k8s.io/kubernetes/test/e2e/framework/pod.WaitTimeoutForPodRunningInNamespace()
+    	wait.go
+    k8s.io/kubernetes/test/e2e/framework/pod_test.glob..func1.5()
+    	wait_test.go:71
+[FAILED] Timed out after <after>.
+Expected Pod to be in <v1.PodPhase>: "Running"
+Got instead:
+    <*v1.Pod>: 
+        metadata:
+          creationTimestamp: null
+          name: pending-pod
+          namespace: default
+        spec:
+          containers: null
+        status:
+          phase: Pending
+In [It] at: wait_test.go:71 <time>
+< Exit [It] not running - wait_test.go:69 <time>
+`,
+				},
+				{
+					Name:   "[It] pod failed",
+					Status: "failed",
+					Failure: &reporters.JUnitFailure{
+						Description: `[FAILED] Told to stop trying after <after>.
+Expected pod to reach phase "Running", got final phase "Failed" instead.
+In [It] at: wait_test.go:75 <time>
+`,
+						Type: "failed",
+					},
+					SystemErr: `> Enter [It] failed - wait_test.go:74 <time>
+INFO: Failed inside E2E framework:
+    k8s.io/kubernetes/test/e2e/framework/pod.WaitTimeoutForPodRunningInNamespace()
+    	wait.go
+    k8s.io/kubernetes/test/e2e/framework/pod_test.glob..func1.6()
+    	wait_test.go:75
+[FAILED] Told to stop trying after <after>.
+Expected pod to reach phase "Running", got final phase "Failed" instead.
+In [It] at: wait_test.go:75 <time>
+< Exit [It] failed - wait_test.go:74 <time>
+`,
+				},
+				{
+					Name:   "[It] pod gets reported with API error",
+					Status: "failed",
+					Failure: &reporters.JUnitFailure{
+						Description: `[FAILED] Timed out after <after>.
+The function passed to Eventually returned the following error:
+    <*errors.StatusError>: 
+    fake API error
+    {
+        ErrStatus: 
+            code: 429
+            details:
+              retryAfterSeconds: 10
+            message: fake API error
+            metadata: {}
+            reason: TooManyRequests
+            status: Failure,
+    }
+At one point, however, the function did return successfully.
+Yet, Eventually failed because the matcher was not satisfied:
+Expected Pod to be in <v1.PodPhase>: "Running"
+Got instead:
+    <*v1.Pod>: 
+        metadata:
+          creationTimestamp: null
+          name: pending-pod
+          namespace: default
+        spec:
+          containers: null
+        status:
+          phase: Pending
+In [It] at: wait_test.go:93 <time>
+`,
+						Type: "failed",
+					},
+					SystemErr: `> Enter [It] gets reported with API error - wait_test.go:78 <time>
+STEP: returning pod - wait_test.go:90 <time>
+STEP: returning fake API error - wait_test.go:82 <time>
+[FAILED] Timed out after <after>.
+The function passed to Eventually returned the following error:
+    <*errors.StatusError>: 
+    fake API error
+    {
+        ErrStatus: 
+            code: 429
+            details:
+              retryAfterSeconds: 10
+            message: fake API error
+            metadata: {}
+            reason: TooManyRequests
+            status: Failure,
+    }
+At one point, however, the function did return successfully.
+Yet, Eventually failed because the matcher was not satisfied:
+Expected Pod to be in <v1.PodPhase>: "Running"
+Got instead:
+    <*v1.Pod>: 
+        metadata:
+          creationTimestamp: null
+          name: pending-pod
+          namespace: default
+        spec:
+          containers: null
+        status:
+          phase: Pending
+In [It] at: wait_test.go:93 <time>
+< Exit [It] gets reported with API error - wait_test.go:78 <time>
+`,
+				},
 			},
-			Failure: `wait for pod pending-pod running: timed out while waiting for pod default/pending-pod to be running`,
-			Stack: `k8s.io/kubernetes/test/e2e/framework/pod_test.glob..func1.2()
-	wait_test.go:60`,
 		},
 	}
-
 	output.TestGinkgoOutput(t, expected)
-}
-
-func trimDuplicateLines(output, prefix string) string {
-	lines := strings.Split(output, "\n")
-	trimming := false
-	validLines := 0
-	for i := 0; i < len(lines); i++ {
-		if strings.HasPrefix(lines[i], prefix) {
-			// Keep the first line, and only that one.
-			if !trimming {
-				trimming = true
-				lines[validLines] = lines[i]
-				validLines++
-			}
-		} else {
-			trimming = false
-			lines[validLines] = lines[i]
-			validLines++
-		}
-	}
-	return strings.Join(lines[0:validLines], "\n")
 }

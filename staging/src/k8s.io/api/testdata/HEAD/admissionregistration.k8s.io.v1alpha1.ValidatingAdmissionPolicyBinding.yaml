@@ -79,3 +79,5 @@ spec:
     name: nameValue
     namespace: namespaceValue
   policyName: policyNameValue
+  validationActions:
+  - validationActionsValue

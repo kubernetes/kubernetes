@@ -360,6 +360,23 @@ func (rt *RuleTypes) EnvOptions(tp ref.TypeProvider) ([]cel.EnvOption, error) {
 	if rt == nil {
 		return []cel.EnvOption{}, nil
 	}
+	rtWithTypes, err := rt.WithTypeProvider(tp)
+	if err != nil {
+		return nil, err
+	}
+	return []cel.EnvOption{
+		cel.CustomTypeProvider(rtWithTypes),
+		cel.CustomTypeAdapter(rtWithTypes),
+		cel.Variable("rule", rt.ruleSchemaDeclTypes.root.CelType()),
+	}, nil
+}
+
+// WithTypeProvider returns a new RuleTypes that sets the given TypeProvider
+// If the original RuleTypes is nil, the returned RuleTypes is still nil.
+func (rt *RuleTypes) WithTypeProvider(tp ref.TypeProvider) (*RuleTypes, error) {
+	if rt == nil {
+		return nil, nil
+	}
 	var ta ref.TypeAdapter = types.DefaultTypeAdapter
 	tpa, ok := tp.(ref.TypeAdapter)
 	if ok {
@@ -382,11 +399,7 @@ func (rt *RuleTypes) EnvOptions(tp ref.TypeProvider) ([]cel.EnvOption, error) {
 				"type %s definition differs between CEL environment and rule", name)
 		}
 	}
-	return []cel.EnvOption{
-		cel.CustomTypeProvider(rtWithTypes),
-		cel.CustomTypeAdapter(rtWithTypes),
-		cel.Variable("rule", rt.ruleSchemaDeclTypes.root.CelType()),
-	}, nil
+	return rtWithTypes, nil
 }
 
 // FindType attempts to resolve the typeName provided from the rule's rule-schema, or if not

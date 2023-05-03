@@ -19,7 +19,6 @@ package util
 import (
 	goerrors "errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"strings"
@@ -339,7 +338,7 @@ func TestCheckInvalidErr(t *testing.T) {
 			DefaultErrorExitCode,
 		},
 		{
-			&errors.StatusError{metav1.Status{
+			&errors.StatusError{ErrStatus: metav1.Status{
 				Status: metav1.StatusFailure,
 				Code:   http.StatusUnprocessableEntity,
 				Reason: metav1.StatusReasonInvalid,
@@ -350,7 +349,7 @@ func TestCheckInvalidErr(t *testing.T) {
 		},
 		// invalid error that that includes a message but no details
 		{
-			&errors.StatusError{metav1.Status{
+			&errors.StatusError{ErrStatus: metav1.Status{
 				Status: metav1.StatusFailure,
 				Code:   http.StatusUnprocessableEntity,
 				Reason: metav1.StatusReasonInvalid,
@@ -362,7 +361,7 @@ func TestCheckInvalidErr(t *testing.T) {
 		},
 		// webhook response that sets code=422 with no reason
 		{
-			&errors.StatusError{metav1.Status{
+			&errors.StatusError{ErrStatus: metav1.Status{
 				Status:  "Failure",
 				Message: `admission webhook "my.webhook" denied the request without explanation`,
 				Code:    422,
@@ -372,7 +371,7 @@ func TestCheckInvalidErr(t *testing.T) {
 		},
 		// webhook response that sets code=422 with no reason and non-nil details
 		{
-			&errors.StatusError{metav1.Status{
+			&errors.StatusError{ErrStatus: metav1.Status{
 				Status:  "Failure",
 				Message: `admission webhook "my.webhook" denied the request without explanation`,
 				Code:    422,
@@ -383,7 +382,7 @@ func TestCheckInvalidErr(t *testing.T) {
 		},
 		// source-wrapped webhook response that sets code=422 with no reason
 		{
-			AddSourceToErr("creating", "configmap.yaml", &errors.StatusError{metav1.Status{
+			AddSourceToErr("creating", "configmap.yaml", &errors.StatusError{ErrStatus: metav1.Status{
 				Status:  "Failure",
 				Message: `admission webhook "my.webhook" denied the request without explanation`,
 				Code:    422,
@@ -393,7 +392,7 @@ func TestCheckInvalidErr(t *testing.T) {
 		},
 		// webhook response that sets reason=Invalid and code=422 and a message
 		{
-			&errors.StatusError{metav1.Status{
+			&errors.StatusError{ErrStatus: metav1.Status{
 				Status:  "Failure",
 				Reason:  "Invalid",
 				Message: `admission webhook "my.webhook" denied the request without explanation`,
@@ -462,7 +461,7 @@ func testCheckError(t *testing.T, tests []checkErrTestCase) {
 
 func TestDumpReaderToFile(t *testing.T) {
 	testString := "TEST STRING"
-	tempFile, err := ioutil.TempFile(os.TempDir(), "hlpers_test_dump_")
+	tempFile, err := os.CreateTemp(os.TempDir(), "hlpers_test_dump_")
 	if err != nil {
 		t.Errorf("unexpected error setting up a temporary file %v", err)
 	}
@@ -477,7 +476,7 @@ func TestDumpReaderToFile(t *testing.T) {
 	if err != nil {
 		t.Errorf("error in DumpReaderToFile: %v", err)
 	}
-	data, err := ioutil.ReadFile(tempFile.Name())
+	data, err := os.ReadFile(tempFile.Name())
 	if err != nil {
 		t.Errorf("error when reading %s: %v", tempFile.Name(), err)
 	}

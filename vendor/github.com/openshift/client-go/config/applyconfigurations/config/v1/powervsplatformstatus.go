@@ -7,6 +7,7 @@ package v1
 type PowerVSPlatformStatusApplyConfiguration struct {
 	Region           *string                                    `json:"region,omitempty"`
 	Zone             *string                                    `json:"zone,omitempty"`
+	ResourceGroup    *string                                    `json:"resourceGroup,omitempty"`
 	ServiceEndpoints []PowerVSServiceEndpointApplyConfiguration `json:"serviceEndpoints,omitempty"`
 	CISInstanceCRN   *string                                    `json:"cisInstanceCRN,omitempty"`
 	DNSInstanceCRN   *string                                    `json:"dnsInstanceCRN,omitempty"`
@@ -31,6 +32,14 @@ func (b *PowerVSPlatformStatusApplyConfiguration) WithRegion(value string) *Powe
 // If called multiple times, the Zone field is set to the value of the last call.
 func (b *PowerVSPlatformStatusApplyConfiguration) WithZone(value string) *PowerVSPlatformStatusApplyConfiguration {
 	b.Zone = &value
+	return b
+}
+
+// WithResourceGroup sets the ResourceGroup field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ResourceGroup field is set to the value of the last call.
+func (b *PowerVSPlatformStatusApplyConfiguration) WithResourceGroup(value string) *PowerVSPlatformStatusApplyConfiguration {
+	b.ResourceGroup = &value
 	return b
 }
 

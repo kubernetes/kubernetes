@@ -19,7 +19,6 @@ package simulator
 import (
 	"strings"
 
-	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
@@ -38,13 +37,8 @@ type UserDirectory struct {
 	userGroup []*types.UserSearchResult
 }
 
-func NewUserDirectory(ref types.ManagedObjectReference) object.Reference {
-	u := &UserDirectory{}
-
-	u.Self = ref
-	u.userGroup = DefaultUserGroup
-
-	return u
+func (m *UserDirectory) init(*Registry) {
+	m.userGroup = DefaultUserGroup
 }
 
 func (u *UserDirectory) RetrieveUserGroups(req *types.RetrieveUserGroups) soap.HasFault {

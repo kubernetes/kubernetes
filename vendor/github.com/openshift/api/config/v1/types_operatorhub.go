@@ -43,7 +43,10 @@ type OperatorHubStatus struct {
 // +genclient:nonNamespaced
 // +openshift:compatibility-gen:level=1
 type OperatorHub struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
+
+	// metadata is the standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata"`
 
 	Spec   OperatorHubSpec   `json:"spec"`
@@ -58,6 +61,9 @@ type OperatorHub struct {
 // +openshift:compatibility-gen:level=1
 type OperatorHubList struct {
 	metav1.TypeMeta `json:",inline"`
+
+	// metadata is the standard list's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ListMeta `json:"metadata"`
 	Items           []OperatorHub `json:"items"`
 }

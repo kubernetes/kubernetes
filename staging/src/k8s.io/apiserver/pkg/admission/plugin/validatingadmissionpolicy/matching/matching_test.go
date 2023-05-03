@@ -53,6 +53,14 @@ func (fc *fakeCriteria) GetParsedObjectSelector() (labels.Selector, error) {
 	return metav1.LabelSelectorAsSelector(fc.matchResources.ObjectSelector)
 }
 
+func gvr(group, version, resource string) schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: group, Version: version, Resource: resource}
+}
+
+func gvk(group, version, kind string) schema.GroupVersionKind {
+	return schema.GroupVersionKind{Group: group, Version: version, Kind: kind}
+}
+
 func TestMatcher(t *testing.T) {
 	a := &Matcher{namespaceMatcher: &namespace.Matcher{}, objectMatcher: &object.Matcher{}}
 
@@ -67,19 +75,19 @@ func TestMatcher(t *testing.T) {
 		}
 		return ""
 	})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"extensions", "v1beta1", "deployments"}, "", schema.GroupVersionKind{"extensions", "v1beta1", "Deployment"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "deployments"}, "", schema.GroupVersionKind{"apps", "v1", "Deployment"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "deployments"}, "", schema.GroupVersionKind{"apps", "v1beta1", "Deployment"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1alpha1", "deployments"}, "", schema.GroupVersionKind{"apps", "v1alpha1", "Deployment"})
+	mapper.RegisterKindFor(gvr("extensions", "v1beta1", "deployments"), "", gvk("extensions", "v1beta1", "Deployment"))
+	mapper.RegisterKindFor(gvr("apps", "v1", "deployments"), "", gvk("apps", "v1", "Deployment"))
+	mapper.RegisterKindFor(gvr("apps", "v1beta1", "deployments"), "", gvk("apps", "v1beta1", "Deployment"))
+	mapper.RegisterKindFor(gvr("apps", "v1alpha1", "deployments"), "", gvk("apps", "v1alpha1", "Deployment"))
 
-	mapper.RegisterKindFor(schema.GroupVersionResource{"extensions", "v1beta1", "deployments"}, "scale", schema.GroupVersionKind{"extensions", "v1beta1", "Scale"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", schema.GroupVersionKind{"autoscaling", "v1", "Scale"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "deployments"}, "scale", schema.GroupVersionKind{"apps", "v1beta1", "Scale"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1alpha1", "deployments"}, "scale", schema.GroupVersionKind{"apps", "v1alpha1", "Scale"})
+	mapper.RegisterKindFor(gvr("extensions", "v1beta1", "deployments"), "scale", gvk("extensions", "v1beta1", "Scale"))
+	mapper.RegisterKindFor(gvr("apps", "v1", "deployments"), "scale", gvk("autoscaling", "v1", "Scale"))
+	mapper.RegisterKindFor(gvr("apps", "v1beta1", "deployments"), "scale", gvk("apps", "v1beta1", "Scale"))
+	mapper.RegisterKindFor(gvr("apps", "v1alpha1", "deployments"), "scale", gvk("apps", "v1alpha1", "Scale"))
 
 	// register invalid kinds to trigger an error
-	mapper.RegisterKindFor(schema.GroupVersionResource{"example.com", "v1", "widgets"}, "", schema.GroupVersionKind{"", "", ""})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"example.com", "v2", "widgets"}, "", schema.GroupVersionKind{"", "", ""})
+	mapper.RegisterKindFor(gvr("example.com", "v1", "widgets"), "", gvk("", "", ""))
+	mapper.RegisterKindFor(gvr("example.com", "v2", "widgets"), "", gvk("", "", ""))
 
 	interfaces := &admission.RuntimeObjectInterfaces{EquivalentResourceMapper: mapper}
 
@@ -91,13 +99,13 @@ func TestMatcher(t *testing.T) {
 		attrs    admission.Attributes
 
 		expectMatches   bool
-		expectMatchKind *schema.GroupVersionKind
+		expectMatchKind schema.GroupVersionKind
 		expectErr       string
 	}{
 		{
 			name:          "no rules (just write)",
 			criteria:      &v1alpha1.MatchResources{NamespaceSelector: &metav1.LabelSelector{}, ResourceRules: []v1alpha1.NamedRuleWithOperations{}},
-			attrs:         admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:         admission.NewAttributesRecord(nil, nil, gvk("apps", "v1", "Deployment"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches: false,
 		},
 		{
@@ -111,9 +119,9 @@ func TestMatcher(t *testing.T) {
 						Rule:       v1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:           admission.NewAttributesRecord(nil, nil, gvk("apps", "v1", "Deployment"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches:   true,
-			expectMatchKind: &schema.GroupVersionKind{"apps", "v1", "Deployment"},
+			expectMatchKind: gvk("apps", "v1", "Deployment"),
 		},
 		{
 			name: "specific rules, prefer exact match",
@@ -136,9 +144,9 @@ func TestMatcher(t *testing.T) {
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:           admission.NewAttributesRecord(nil, nil, gvk("apps", "v1", "Deployment"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches:   true,
-			expectMatchKind: &schema.GroupVersionKind{"apps", "v1", "Deployment"},
+			expectMatchKind: gvk("apps", "v1", "Deployment"),
 		},
 		{
 			name: "specific rules, match miss",
@@ -156,7 +164,7 @@ func TestMatcher(t *testing.T) {
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:         admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:         admission.NewAttributesRecord(nil, nil, gvk("apps", "v1", "Deployment"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches: false,
 		},
 		{
@@ -176,7 +184,7 @@ func TestMatcher(t *testing.T) {
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:         admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:         admission.NewAttributesRecord(nil, nil, gvk("apps", "v1", "Deployment"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches: false,
 		},
 		{
@@ -196,9 +204,9 @@ func TestMatcher(t *testing.T) {
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:           admission.NewAttributesRecord(nil, nil, gvk("apps", "v1", "Deployment"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches:   true,
-			expectMatchKind: &schema.GroupVersionKind{"extensions", "v1beta1", "Deployment"},
+			expectMatchKind: gvk("extensions", "v1beta1", "Deployment"),
 		},
 		{
 			name: "specific rules, equivalent match, prefer apps",
@@ -217,9 +225,9 @@ func TestMatcher(t *testing.T) {
 						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:           admission.NewAttributesRecord(nil, nil, gvk("apps", "v1", "Deployment"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches:   true,
-			expectMatchKind: &schema.GroupVersionKind{"apps", "v1beta1", "Deployment"},
+			expectMatchKind: gvk("apps", "v1beta1", "Deployment"),
 		},
 
 		{
@@ -243,9 +251,9 @@ func TestMatcher(t *testing.T) {
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:           admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches:   true,
-			expectMatchKind: &schema.GroupVersionKind{"autoscaling", "v1", "Scale"},
+			expectMatchKind: gvk("autoscaling", "v1", "Scale"),
 		},
 		{
 			name: "specific rules, subresource match miss",
@@ -263,7 +271,7 @@ func TestMatcher(t *testing.T) {
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:         admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:         admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches: false,
 		},
 		{
@@ -283,7 +291,7 @@ func TestMatcher(t *testing.T) {
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:         admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:         admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches: false,
 		},
 		{
@@ -303,9 +311,9 @@ func TestMatcher(t *testing.T) {
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:           admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches:   true,
-			expectMatchKind: &schema.GroupVersionKind{"extensions", "v1beta1", "Scale"},
+			expectMatchKind: gvk("extensions", "v1beta1", "Scale"),
 		},
 		{
 			name: "specific rules, subresource equivalent match, prefer apps",
@@ -324,9 +332,9 @@ func TestMatcher(t *testing.T) {
 						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:           admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches:   true,
-			expectMatchKind: &schema.GroupVersionKind{"apps", "v1beta1", "Scale"},
+			expectMatchKind: gvk("apps", "v1beta1", "Scale"),
 		},
 		{
 			name: "specific rules, prefer exact match and name match",
@@ -340,9 +348,9 @@ func TestMatcher(t *testing.T) {
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:           admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches:   true,
-			expectMatchKind: &schema.GroupVersionKind{"autoscaling", "v1", "Scale"},
+			expectMatchKind: gvk("autoscaling", "v1", "Scale"),
 		},
 		{
 			name: "specific rules, prefer exact match and name match miss",
@@ -356,7 +364,7 @@ func TestMatcher(t *testing.T) {
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:         admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:         admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches: false,
 		},
 		{
@@ -372,9 +380,9 @@ func TestMatcher(t *testing.T) {
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"extensions", "v1beta1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:           admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("extensions", "v1beta1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches:   true,
-			expectMatchKind: &schema.GroupVersionKind{"autoscaling", "v1", "Scale"},
+			expectMatchKind: gvk("autoscaling", "v1", "Scale"),
 		},
 		{
 			name: "specific rules, subresource equivalent match, prefer extensions and name match miss",
@@ -389,7 +397,7 @@ func TestMatcher(t *testing.T) {
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:         admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"extensions", "v1beta1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:         admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("extensions", "v1beta1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches: false,
 		},
 		{
@@ -410,9 +418,9 @@ func TestMatcher(t *testing.T) {
 					},
 				}},
 			},
-			attrs:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:           admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches:   true,
-			expectMatchKind: &schema.GroupVersionKind{"autoscaling", "v1", "Scale"},
+			expectMatchKind: gvk("autoscaling", "v1", "Scale"),
 		},
 		{
 			name: "exclude resource miss on match",
@@ -432,7 +440,7 @@ func TestMatcher(t *testing.T) {
 					},
 				}},
 			},
-			attrs:         admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"extensions", "v1beta1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:         admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("extensions", "v1beta1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches: false,
 		},
 		{
@@ -447,7 +455,7 @@ func TestMatcher(t *testing.T) {
 					},
 				}},
 			},
-			attrs:         admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:         admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches: true,
 		},
 		{
@@ -457,7 +465,7 @@ func TestMatcher(t *testing.T) {
 				ObjectSelector:    &metav1.LabelSelector{},
 				ResourceRules:     []v1alpha1.NamedRuleWithOperations{{}},
 			},
-			attrs:         admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:         admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches: false,
 		},
 		{
@@ -472,7 +480,7 @@ func TestMatcher(t *testing.T) {
 					},
 				}},
 			},
-			attrs:         admission.NewAttributesRecord(&example.Pod{}, nil, schema.GroupVersionKind{"example.apiserver.k8s.io", "v1", "Pod"}, "ns", "name", schema.GroupVersionResource{"example.apiserver.k8s.io", "v1", "pods"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:         admission.NewAttributesRecord(&example.Pod{}, nil, gvk("example.apiserver.k8s.io", "v1", "Pod"), "ns", "name", gvr("example.apiserver.k8s.io", "v1", "pods"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches: false,
 			expectErr:     "",
 		},
@@ -488,7 +496,7 @@ func TestMatcher(t *testing.T) {
 					},
 				}},
 			},
-			attrs:         admission.NewAttributesRecord(&example.Pod{}, nil, schema.GroupVersionKind{"example.apiserver.k8s.io", "v1", "Pod"}, "ns", "name", schema.GroupVersionResource{"example.apiserver.k8s.io", "v1", "pods"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:         admission.NewAttributesRecord(&example.Pod{}, nil, gvk("example.apiserver.k8s.io", "v1", "Pod"), "ns", "name", gvr("example.apiserver.k8s.io", "v1", "pods"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches: false,
 			expectErr:     "bad value",
 		},
@@ -504,7 +512,7 @@ func TestMatcher(t *testing.T) {
 					},
 				}},
 			},
-			attrs:         admission.NewAttributesRecord(&example.Pod{}, nil, schema.GroupVersionKind{"example.apiserver.k8s.io", "v1", "Pod"}, "ns", "name", schema.GroupVersionResource{"example.apiserver.k8s.io", "v1", "pods"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:         admission.NewAttributesRecord(&example.Pod{}, nil, gvk("example.apiserver.k8s.io", "v1", "Pod"), "ns", "name", gvr("example.apiserver.k8s.io", "v1", "pods"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches: false,
 			expectErr:     "",
 		},
@@ -520,7 +528,7 @@ func TestMatcher(t *testing.T) {
 					},
 				}},
 			},
-			attrs:         admission.NewAttributesRecord(&example.Pod{}, nil, schema.GroupVersionKind{"example.apiserver.k8s.io", "v1", "Pod"}, "ns", "name", schema.GroupVersionResource{"example.apiserver.k8s.io", "v1", "pods"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:         admission.NewAttributesRecord(&example.Pod{}, nil, gvk("example.apiserver.k8s.io", "v1", "Pod"), "ns", "name", gvr("example.apiserver.k8s.io", "v1", "pods"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches: false,
 			expectErr:     "bad value",
 		},
@@ -540,8 +548,9 @@ func TestMatcher(t *testing.T) {
 			} else if len(testcase.expectErr) > 0 {
 				t.Fatalf("expected error %q, got no error", testcase.expectErr)
 			}
-			if testcase.expectMatchKind != nil {
-				if *testcase.expectMatchKind != matchKind {
+			var emptyGVK schema.GroupVersionKind
+			if testcase.expectMatchKind != emptyGVK {
+				if testcase.expectMatchKind != matchKind {
 					t.Fatalf("expected matchKind %v, got %v", testcase.expectMatchKind, matchKind)
 				}
 			}
@@ -588,23 +597,23 @@ func BenchmarkMatcher(b *testing.B) {
 		}
 		return ""
 	})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"extensions", "v1beta1", "deployments"}, "", schema.GroupVersionKind{"extensions", "v1beta1", "Deployment"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "deployments"}, "", schema.GroupVersionKind{"apps", "v1", "Deployment"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "deployments"}, "", schema.GroupVersionKind{"apps", "v1beta1", "Deployment"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1alpha1", "deployments"}, "", schema.GroupVersionKind{"apps", "v1alpha1", "Deployment"})
+	mapper.RegisterKindFor(gvr("extensions", "v1beta1", "deployments"), "", gvk("extensions", "v1beta1", "Deployment"))
+	mapper.RegisterKindFor(gvr("apps", "v1", "deployments"), "", gvk("apps", "v1", "Deployment"))
+	mapper.RegisterKindFor(gvr("apps", "v1beta1", "deployments"), "", gvk("apps", "v1beta1", "Deployment"))
+	mapper.RegisterKindFor(gvr("apps", "v1alpha1", "deployments"), "", gvk("apps", "v1alpha1", "Deployment"))
 
-	mapper.RegisterKindFor(schema.GroupVersionResource{"extensions", "v1beta1", "deployments"}, "scale", schema.GroupVersionKind{"extensions", "v1beta1", "Scale"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", schema.GroupVersionKind{"autoscaling", "v1", "Scale"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "deployments"}, "scale", schema.GroupVersionKind{"apps", "v1beta1", "Scale"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1alpha1", "deployments"}, "scale", schema.GroupVersionKind{"apps", "v1alpha1", "Scale"})
+	mapper.RegisterKindFor(gvr("extensions", "v1beta1", "deployments"), "scale", gvk("extensions", "v1beta1", "Scale"))
+	mapper.RegisterKindFor(gvr("apps", "v1", "deployments"), "scale", gvk("autoscaling", "v1", "Scale"))
+	mapper.RegisterKindFor(gvr("apps", "v1beta1", "deployments"), "scale", gvk("apps", "v1beta1", "Scale"))
+	mapper.RegisterKindFor(gvr("apps", "v1alpha1", "deployments"), "scale", gvk("apps", "v1alpha1", "Scale"))
 
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "statefulset"}, "", schema.GroupVersionKind{"apps", "v1", "StatefulSet"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "statefulset"}, "", schema.GroupVersionKind{"apps", "v1beta1", "StatefulSet"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta2", "statefulset"}, "", schema.GroupVersionKind{"apps", "v1beta2", "StatefulSet"})
+	mapper.RegisterKindFor(gvr("apps", "v1", "statefulset"), "", gvk("apps", "v1", "StatefulSet"))
+	mapper.RegisterKindFor(gvr("apps", "v1beta1", "statefulset"), "", gvk("apps", "v1beta1", "StatefulSet"))
+	mapper.RegisterKindFor(gvr("apps", "v1beta2", "statefulset"), "", gvk("apps", "v1beta2", "StatefulSet"))
 
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "statefulset"}, "scale", schema.GroupVersionKind{"apps", "v1", "Scale"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "statefulset"}, "scale", schema.GroupVersionKind{"apps", "v1beta1", "Scale"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1alpha2", "statefulset"}, "scale", schema.GroupVersionKind{"apps", "v1beta2", "Scale"})
+	mapper.RegisterKindFor(gvr("apps", "v1", "statefulset"), "scale", gvk("apps", "v1", "Scale"))
+	mapper.RegisterKindFor(gvr("apps", "v1beta1", "statefulset"), "scale", gvk("apps", "v1beta1", "Scale"))
+	mapper.RegisterKindFor(gvr("apps", "v1alpha2", "statefulset"), "scale", gvk("apps", "v1beta2", "Scale"))
 
 	nsSelector := make(map[string]string)
 	for i := 0; i < 100; i++ {
@@ -632,7 +641,7 @@ func BenchmarkMatcher(b *testing.B) {
 	}
 
 	criteria := &fakeCriteria{matchResources: mr}
-	attrs := admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil)
+	attrs := admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil)
 	interfaces := &admission.RuntimeObjectInterfaces{EquivalentResourceMapper: mapper}
 	matcher := &Matcher{namespaceMatcher: &namespace.Matcher{NamespaceLister: namespaceLister}, objectMatcher: &object.Matcher{}}
 
@@ -661,23 +670,23 @@ func BenchmarkShouldCallHookWithComplexRule(b *testing.B) {
 		}
 		return ""
 	})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"extensions", "v1beta1", "deployments"}, "", schema.GroupVersionKind{"extensions", "v1beta1", "Deployment"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "deployments"}, "", schema.GroupVersionKind{"apps", "v1", "Deployment"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "deployments"}, "", schema.GroupVersionKind{"apps", "v1beta1", "Deployment"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1alpha1", "deployments"}, "", schema.GroupVersionKind{"apps", "v1alpha1", "Deployment"})
+	mapper.RegisterKindFor(gvr("extensions", "v1beta1", "deployments"), "", gvk("extensions", "v1beta1", "Deployment"))
+	mapper.RegisterKindFor(gvr("apps", "v1", "deployments"), "", gvk("apps", "v1", "Deployment"))
+	mapper.RegisterKindFor(gvr("apps", "v1beta1", "deployments"), "", gvk("apps", "v1beta1", "Deployment"))
+	mapper.RegisterKindFor(gvr("apps", "v1alpha1", "deployments"), "", gvk("apps", "v1alpha1", "Deployment"))
 
-	mapper.RegisterKindFor(schema.GroupVersionResource{"extensions", "v1beta1", "deployments"}, "scale", schema.GroupVersionKind{"extensions", "v1beta1", "Scale"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", schema.GroupVersionKind{"autoscaling", "v1", "Scale"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "deployments"}, "scale", schema.GroupVersionKind{"apps", "v1beta1", "Scale"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1alpha1", "deployments"}, "scale", schema.GroupVersionKind{"apps", "v1alpha1", "Scale"})
+	mapper.RegisterKindFor(gvr("extensions", "v1beta1", "deployments"), "scale", gvk("extensions", "v1beta1", "Scale"))
+	mapper.RegisterKindFor(gvr("apps", "v1", "deployments"), "scale", gvk("autoscaling", "v1", "Scale"))
+	mapper.RegisterKindFor(gvr("apps", "v1beta1", "deployments"), "scale", gvk("apps", "v1beta1", "Scale"))
+	mapper.RegisterKindFor(gvr("apps", "v1alpha1", "deployments"), "scale", gvk("apps", "v1alpha1", "Scale"))
 
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "statefulset"}, "", schema.GroupVersionKind{"apps", "v1", "StatefulSet"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "statefulset"}, "", schema.GroupVersionKind{"apps", "v1beta1", "StatefulSet"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta2", "statefulset"}, "", schema.GroupVersionKind{"apps", "v1beta2", "StatefulSet"})
+	mapper.RegisterKindFor(gvr("apps", "v1", "statefulset"), "", gvk("apps", "v1", "StatefulSet"))
+	mapper.RegisterKindFor(gvr("apps", "v1beta1", "statefulset"), "", gvk("apps", "v1beta1", "StatefulSet"))
+	mapper.RegisterKindFor(gvr("apps", "v1beta2", "statefulset"), "", gvk("apps", "v1beta2", "StatefulSet"))
 
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "statefulset"}, "scale", schema.GroupVersionKind{"apps", "v1", "Scale"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "statefulset"}, "scale", schema.GroupVersionKind{"apps", "v1beta1", "Scale"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1alpha2", "statefulset"}, "scale", schema.GroupVersionKind{"apps", "v1beta2", "Scale"})
+	mapper.RegisterKindFor(gvr("apps", "v1", "statefulset"), "scale", gvk("apps", "v1", "Scale"))
+	mapper.RegisterKindFor(gvr("apps", "v1beta1", "statefulset"), "scale", gvk("apps", "v1beta1", "Scale"))
+	mapper.RegisterKindFor(gvr("apps", "v1alpha2", "statefulset"), "scale", gvk("apps", "v1beta2", "Scale"))
 
 	mr := v1alpha1.MatchResources{
 		MatchPolicy:       &equivalentMatch,
@@ -702,7 +711,7 @@ func BenchmarkShouldCallHookWithComplexRule(b *testing.B) {
 	}
 
 	criteria := &fakeCriteria{matchResources: mr}
-	attrs := admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil)
+	attrs := admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil)
 	interfaces := &admission.RuntimeObjectInterfaces{EquivalentResourceMapper: mapper}
 	matcher := &Matcher{namespaceMatcher: &namespace.Matcher{NamespaceLister: namespaceLister}, objectMatcher: &object.Matcher{}}
 
@@ -731,23 +740,23 @@ func BenchmarkShouldCallHookWithComplexSelectorAndRule(b *testing.B) {
 		}
 		return ""
 	})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"extensions", "v1beta1", "deployments"}, "", schema.GroupVersionKind{"extensions", "v1beta1", "Deployment"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "deployments"}, "", schema.GroupVersionKind{"apps", "v1", "Deployment"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "deployments"}, "", schema.GroupVersionKind{"apps", "v1beta1", "Deployment"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1alpha1", "deployments"}, "", schema.GroupVersionKind{"apps", "v1alpha1", "Deployment"})
+	mapper.RegisterKindFor(gvr("extensions", "v1beta1", "deployments"), "", gvk("extensions", "v1beta1", "Deployment"))
+	mapper.RegisterKindFor(gvr("apps", "v1", "deployments"), "", gvk("apps", "v1", "Deployment"))
+	mapper.RegisterKindFor(gvr("apps", "v1beta1", "deployments"), "", gvk("apps", "v1beta1", "Deployment"))
+	mapper.RegisterKindFor(gvr("apps", "v1alpha1", "deployments"), "", gvk("apps", "v1alpha1", "Deployment"))
 
-	mapper.RegisterKindFor(schema.GroupVersionResource{"extensions", "v1beta1", "deployments"}, "scale", schema.GroupVersionKind{"extensions", "v1beta1", "Scale"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", schema.GroupVersionKind{"autoscaling", "v1", "Scale"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "deployments"}, "scale", schema.GroupVersionKind{"apps", "v1beta1", "Scale"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1alpha1", "deployments"}, "scale", schema.GroupVersionKind{"apps", "v1alpha1", "Scale"})
+	mapper.RegisterKindFor(gvr("extensions", "v1beta1", "deployments"), "scale", gvk("extensions", "v1beta1", "Scale"))
+	mapper.RegisterKindFor(gvr("apps", "v1", "deployments"), "scale", gvk("autoscaling", "v1", "Scale"))
+	mapper.RegisterKindFor(gvr("apps", "v1beta1", "deployments"), "scale", gvk("apps", "v1beta1", "Scale"))
+	mapper.RegisterKindFor(gvr("apps", "v1alpha1", "deployments"), "scale", gvk("apps", "v1alpha1", "Scale"))
 
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "statefulset"}, "", schema.GroupVersionKind{"apps", "v1", "StatefulSet"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "statefulset"}, "", schema.GroupVersionKind{"apps", "v1beta1", "StatefulSet"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta2", "statefulset"}, "", schema.GroupVersionKind{"apps", "v1beta2", "StatefulSet"})
+	mapper.RegisterKindFor(gvr("apps", "v1", "statefulset"), "", gvk("apps", "v1", "StatefulSet"))
+	mapper.RegisterKindFor(gvr("apps", "v1beta1", "statefulset"), "", gvk("apps", "v1beta1", "StatefulSet"))
+	mapper.RegisterKindFor(gvr("apps", "v1beta2", "statefulset"), "", gvk("apps", "v1beta2", "StatefulSet"))
 
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "statefulset"}, "scale", schema.GroupVersionKind{"apps", "v1", "Scale"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "statefulset"}, "scale", schema.GroupVersionKind{"apps", "v1beta1", "Scale"})
-	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1alpha2", "statefulset"}, "scale", schema.GroupVersionKind{"apps", "v1beta2", "Scale"})
+	mapper.RegisterKindFor(gvr("apps", "v1", "statefulset"), "scale", gvk("apps", "v1", "Scale"))
+	mapper.RegisterKindFor(gvr("apps", "v1beta1", "statefulset"), "scale", gvk("apps", "v1beta1", "Scale"))
+	mapper.RegisterKindFor(gvr("apps", "v1alpha2", "statefulset"), "scale", gvk("apps", "v1beta2", "Scale"))
 
 	nsSelector := make(map[string]string)
 	for i := 0; i < 100; i++ {
@@ -777,7 +786,7 @@ func BenchmarkShouldCallHookWithComplexSelectorAndRule(b *testing.B) {
 	}
 
 	criteria := &fakeCriteria{matchResources: mr}
-	attrs := admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil)
+	attrs := admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil)
 	interfaces := &admission.RuntimeObjectInterfaces{EquivalentResourceMapper: mapper}
 	matcher := &Matcher{namespaceMatcher: &namespace.Matcher{NamespaceLister: namespaceLister}, objectMatcher: &object.Matcher{}}
 

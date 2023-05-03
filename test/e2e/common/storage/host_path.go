@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -48,7 +49,7 @@ var _ = SIGDescribe("HostPath", func() {
 	   Create a Pod with host volume mounted. The volume mounted MUST be a directory with permissions mode -rwxrwxrwx and that is has the sticky bit (mode flag t) set.
 	   This test is marked LinuxOnly since Windows does not support setting the sticky bit (mode flag t).
 	*/
-	ginkgo.It("should give a volume the correct mode [LinuxOnly] [NodeConformance]", func() {
+	ginkgo.It("should give a volume the correct mode [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
 		source := &v1.HostPathVolumeSource{
 			Path: "/tmp",
 		}
@@ -59,13 +60,13 @@ var _ = SIGDescribe("HostPath", func() {
 			fmt.Sprintf("--fs_type=%v", volumePath),
 			fmt.Sprintf("--file_mode=%v", volumePath),
 		}
-		e2epodoutput.TestContainerOutputRegexp(f, "hostPath mode", pod, 0, []string{
+		e2epodoutput.TestContainerOutputRegexp(ctx, f, "hostPath mode", pod, 0, []string{
 			"mode of file \"/test-volume\": dg?trwxrwx", // we expect the sticky bit (mode flag t) to be set for the dir
 		})
 	})
 
 	// This test requires mounting a folder into a container with write privileges.
-	ginkgo.It("should support r/w [NodeConformance]", func() {
+	ginkgo.It("should support r/w [NodeConformance]", func(ctx context.Context) {
 		filePath := path.Join(volumePath, "test-file")
 		retryDuration := 180
 		source := &v1.HostPathVolumeSource{
@@ -88,12 +89,12 @@ var _ = SIGDescribe("HostPath", func() {
 		}
 		//Read the content of the file with the second container to
 		//verify volumes  being shared properly among containers within the pod.
-		e2epodoutput.TestContainerOutput(f, "hostPath r/w", pod, 1, []string{
+		e2epodoutput.TestContainerOutput(ctx, f, "hostPath r/w", pod, 1, []string{
 			"content of file \"/test-volume/test-file\": mount-tester new file",
 		})
 	})
 
-	ginkgo.It("should support subPath [NodeConformance]", func() {
+	ginkgo.It("should support subPath [NodeConformance]", func(ctx context.Context) {
 		subPath := "sub-path"
 		fileName := "test-file"
 		retryDuration := 180
@@ -125,7 +126,7 @@ var _ = SIGDescribe("HostPath", func() {
 			fmt.Sprintf("--retry_time=%d", retryDuration),
 		}
 
-		e2epodoutput.TestContainerOutput(f, "hostPath subPath", pod, 1, []string{
+		e2epodoutput.TestContainerOutput(ctx, f, "hostPath subPath", pod, 1, []string{
 			"content of file \"" + filePathInReader + "\": mount-tester new file",
 		})
 	})

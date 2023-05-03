@@ -108,8 +108,8 @@ Please ensure all assertions are inside leaf nodes such as {{bold}}BeforeEach{{/
 
 func (g ginkgoErrors) SuiteNodeInNestedContext(nodeType NodeType, cl CodeLocation) error {
 	docLink := "suite-setup-and-cleanup-beforesuite-and-aftersuite"
-	if nodeType.Is(NodeTypeReportAfterSuite) {
-		docLink = "reporting-nodes---reportaftersuite"
+	if nodeType.Is(NodeTypeReportBeforeSuite | NodeTypeReportAfterSuite) {
+		docLink = "reporting-nodes---reportbeforesuite-and-reportaftersuite"
 	}
 
 	return GinkgoError{
@@ -125,8 +125,8 @@ func (g ginkgoErrors) SuiteNodeInNestedContext(nodeType NodeType, cl CodeLocatio
 
 func (g ginkgoErrors) SuiteNodeDuringRunPhase(nodeType NodeType, cl CodeLocation) error {
 	docLink := "suite-setup-and-cleanup-beforesuite-and-aftersuite"
-	if nodeType.Is(NodeTypeReportAfterSuite) {
-		docLink = "reporting-nodes---reportaftersuite"
+	if nodeType.Is(NodeTypeReportBeforeSuite | NodeTypeReportAfterSuite) {
+		docLink = "reporting-nodes---reportbeforesuite-and-reportaftersuite"
 	}
 
 	return GinkgoError{
@@ -298,6 +298,15 @@ func (g ginkgoErrors) SetupNodeNotInOrderedContainer(cl CodeLocation, nodeType N
 	}
 }
 
+func (g ginkgoErrors) InvalidContinueOnFailureDecoration(cl CodeLocation) error {
+	return GinkgoError{
+		Heading:      "ContinueOnFailure not decorating an outermost Ordered Container",
+		Message:      "ContinueOnFailure can only decorate an Ordered container, and this Ordered container must be the outermost Ordered container.",
+		CodeLocation: cl,
+		DocLink:      "ordered-containers",
+	}
+}
+
 /* DeferCleanup errors */
 func (g ginkgoErrors) DeferCleanupInvalidFunction(cl CodeLocation) error {
 	return GinkgoError{
@@ -320,7 +329,7 @@ func (g ginkgoErrors) PushingCleanupNodeDuringTreeConstruction(cl CodeLocation) 
 func (g ginkgoErrors) PushingCleanupInReportingNode(cl CodeLocation, nodeType NodeType) error {
 	return GinkgoError{
 		Heading:      fmt.Sprintf("DeferCleanup cannot be called in %s", nodeType),
-		Message:      "Please inline your cleanup code - Ginkgo won't run cleanup code after a ReportAfterEach or ReportAfterSuite.",
+		Message:      "Please inline your cleanup code - Ginkgo won't run cleanup code after a Reporting node.",
 		CodeLocation: cl,
 		DocLink:      "cleaning-up-our-cleanup-code-defercleanup",
 	}

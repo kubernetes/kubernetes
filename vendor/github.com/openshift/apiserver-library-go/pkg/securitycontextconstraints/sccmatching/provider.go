@@ -9,7 +9,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/securitycontext"
-	"k8s.io/kubernetes/pkg/util/maps"
 
 	securityv1 "github.com/openshift/api/security/v1"
 	"github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/capabilities"
@@ -102,7 +101,7 @@ func NewSimpleProvider(scc *securityv1.SecurityContextConstraints) (SecurityCont
 func (s *simpleProvider) CreatePodSecurityContext(pod *api.Pod) (*api.PodSecurityContext, map[string]string, error) {
 	sc := NewPodSecurityContextMutator(pod.Spec.SecurityContext)
 
-	annotationsCopy := maps.CopySS(pod.Annotations)
+	annotationsCopy := copySS(pod.Annotations)
 
 	if sc.SupplementalGroups() == nil {
 		supGroups, err := s.supplementalGroupStrategy.Generate(pod)
@@ -534,4 +533,16 @@ func seccompFieldForAnnotation(annotation string) *api.SeccompProfile {
 	// we can only reach this code path if the localhostProfile name has a zero
 	// length or if the annotation has an unrecognized value
 	return nil
+}
+
+// CopySS makes a shallow copy of a map.
+func copySS(m map[string]string) map[string]string {
+	if m == nil {
+		return nil
+	}
+	copy := make(map[string]string, len(m))
+	for k, v := range m {
+		copy[k] = v
+	}
+	return copy
 }

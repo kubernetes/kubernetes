@@ -1,7 +1,11 @@
 package options
 
-import kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+import (
+	"k8s.io/klog/v2"
 
-func LoadKubeSchedulerConfiguration(file string) (*kubeschedulerconfig.KubeSchedulerConfiguration, error) {
-	return loadConfigFromFile(file)
+	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+)
+
+func LoadKubeSchedulerConfiguration(logger klog.Logger, file string) (*kubeschedulerconfig.KubeSchedulerConfiguration, error) {
+	return loadConfigFromFile(logger, file)
 }

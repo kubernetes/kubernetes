@@ -1064,13 +1064,13 @@ func TestValidateRuntimeClassStrategy(t *testing.T) {
 	}, {
 		name: "valid defaulting & allow all",
 		strategy: &policy.RuntimeClassStrategyOptions{
-			DefaultRuntimeClassName:  pointer.StringPtr("native"),
+			DefaultRuntimeClassName:  pointer.String("native"),
 			AllowedRuntimeClassNames: []string{"*"},
 		},
 	}, {
 		name: "valid defaulting & allow explicit",
 		strategy: &policy.RuntimeClassStrategyOptions{
-			DefaultRuntimeClassName:  pointer.StringPtr("native"),
+			DefaultRuntimeClassName:  pointer.String("native"),
 			AllowedRuntimeClassNames: []string{"foo", "native", "sandboxed"},
 		},
 	}, {
@@ -1081,20 +1081,20 @@ func TestValidateRuntimeClassStrategy(t *testing.T) {
 	}, {
 		name: "invalid default name",
 		strategy: &policy.RuntimeClassStrategyOptions{
-			DefaultRuntimeClassName: pointer.StringPtr("foo bar"),
+			DefaultRuntimeClassName: pointer.String("foo bar"),
 		},
 		expectErrors: true,
 	}, {
 		name: "disallowed default",
 		strategy: &policy.RuntimeClassStrategyOptions{
-			DefaultRuntimeClassName:  pointer.StringPtr("foo"),
+			DefaultRuntimeClassName:  pointer.String("foo"),
 			AllowedRuntimeClassNames: []string{"native", "sandboxed"},
 		},
 		expectErrors: true,
 	}, {
 		name: "nothing allowed default",
 		strategy: &policy.RuntimeClassStrategyOptions{
-			DefaultRuntimeClassName: pointer.StringPtr("foo"),
+			DefaultRuntimeClassName: pointer.String("foo"),
 		},
 		expectErrors: true,
 	}, {

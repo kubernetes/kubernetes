@@ -18,7 +18,7 @@ package state
 
 import (
 	"fmt"
-	"path"
+	"path/filepath"
 	"sync"
 
 	"k8s.io/klog/v2"
@@ -52,7 +52,7 @@ func NewCheckpointState(stateDir, checkpointName, policyName string) (State, err
 	if err := stateCheckpoint.restoreState(); err != nil {
 		//nolint:staticcheck // ST1005 user-facing error message
 		return nil, fmt.Errorf("could not restore state from checkpoint: %v, please drain this node and delete the memory manager checkpoint file %q before restarting Kubelet",
-			err, path.Join(stateDir, checkpointName))
+			err, filepath.Join(stateDir, checkpointName))
 	}
 
 	return stateCheckpoint, nil

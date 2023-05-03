@@ -86,7 +86,7 @@ func TestEndpointSliceMirroring(t *testing.T) {
 		testName                     string
 		service                      *corev1.Service
 		customEndpoints              *corev1.Endpoints
-		expectEndpointSlice          bool
+		expectEndpointSlice          int
 		expectEndpointSliceManagedBy string
 	}{{
 		testName: "Service with selector",
@@ -103,7 +103,7 @@ func TestEndpointSliceMirroring(t *testing.T) {
 				},
 			},
 		},
-		expectEndpointSlice:          true,
+		expectEndpointSlice:          1,
 		expectEndpointSliceManagedBy: "endpointslice-controller.k8s.io",
 	}, {
 		testName: "Service without selector",
@@ -130,7 +130,85 @@ func TestEndpointSliceMirroring(t *testing.T) {
 				}},
 			}},
 		},
-		expectEndpointSlice:          true,
+		expectEndpointSlice:          1,
+		expectEndpointSliceManagedBy: "endpointslicemirroring-controller.k8s.io",
+	}, {
+		testName: "Service without selector Endpoint multiple subsets and same address",
+		service: &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-123",
+			},
+			Spec: corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{{
+					Port: int32(80),
+				}},
+			},
+		},
+		customEndpoints: &corev1.Endpoints{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-123",
+			},
+			Subsets: []corev1.EndpointSubset{
+				{
+					Ports: []corev1.EndpointPort{{
+						Name: "port1",
+						Port: 80,
+					}},
+					Addresses: []corev1.EndpointAddress{{
+						IP: "10.0.0.1",
+					}},
+				},
+				{
+					Ports: []corev1.EndpointPort{{
+						Name: "port2",
+						Port: 90,
+					}},
+					Addresses: []corev1.EndpointAddress{{
+						IP: "10.0.0.1",
+					}},
+				},
+			},
+		},
+		expectEndpointSlice:          1,
+		expectEndpointSliceManagedBy: "endpointslicemirroring-controller.k8s.io",
+	}, {
+		testName: "Service without selector Endpoint multiple subsets",
+		service: &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-123",
+			},
+			Spec: corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{{
+					Port: int32(80),
+				}},
+			},
+		},
+		customEndpoints: &corev1.Endpoints{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-123",
+			},
+			Subsets: []corev1.EndpointSubset{
+				{
+					Ports: []corev1.EndpointPort{{
+						Name: "port1",
+						Port: 80,
+					}},
+					Addresses: []corev1.EndpointAddress{{
+						IP: "10.0.0.1",
+					}},
+				},
+				{
+					Ports: []corev1.EndpointPort{{
+						Name: "port2",
+						Port: 90,
+					}},
+					Addresses: []corev1.EndpointAddress{{
+						IP: "10.0.0.2",
+					}},
+				},
+			},
+		},
+		expectEndpointSlice:          2,
 		expectEndpointSliceManagedBy: "endpointslicemirroring-controller.k8s.io",
 	}, {
 		testName: "Service without Endpoints",
@@ -148,7 +226,7 @@ func TestEndpointSliceMirroring(t *testing.T) {
 			},
 		},
 		customEndpoints:              nil,
-		expectEndpointSlice:          true,
+		expectEndpointSlice:          1,
 		expectEndpointSliceManagedBy: "endpointslice-controller.k8s.io",
 	}, {
 		testName: "Endpoints without Service",
@@ -166,7 +244,7 @@ func TestEndpointSliceMirroring(t *testing.T) {
 				}},
 			}},
 		},
-		expectEndpointSlice: false,
+		expectEndpointSlice: 0,
 	}}
 
 	for i, tc := range testCases {
@@ -201,13 +279,13 @@ func TestEndpointSliceMirroring(t *testing.T) {
 					return false, err
 				}
 
-				if tc.expectEndpointSlice {
-					if len(esList.Items) == 0 {
+				if tc.expectEndpointSlice > 0 {
+					if len(esList.Items) < tc.expectEndpointSlice {
 						t.Logf("Waiting for EndpointSlice to be created")
 						return false, nil
 					}
-					if len(esList.Items) > 1 {
-						return false, fmt.Errorf("Only expected 1 EndpointSlice, got %d", len(esList.Items))
+					if len(esList.Items) != tc.expectEndpointSlice {
+						return false, fmt.Errorf("Only expected %d EndpointSlice, got %d", tc.expectEndpointSlice, len(esList.Items))
 					}
 					endpointSlice := esList.Items[0]
 					if tc.expectEndpointSliceManagedBy != "" {

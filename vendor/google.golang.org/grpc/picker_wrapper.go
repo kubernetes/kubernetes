@@ -26,6 +26,7 @@ import (
 	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/internal/channelz"
+	istatus "google.golang.org/grpc/internal/status"
 	"google.golang.org/grpc/internal/transport"
 	"google.golang.org/grpc/status"
 )
@@ -129,8 +130,12 @@ func (pw *pickerWrapper) pick(ctx context.Context, failfast bool, info balancer.
 			if err == balancer.ErrNoSubConnAvailable {
 				continue
 			}
-			if _, ok := status.FromError(err); ok {
+			if st, ok := status.FromError(err); ok {
 				// Status error: end the RPC unconditionally with this status.
+				// First restrict the code to the list allowed by gRFC A54.
+				if istatus.IsRestrictedControlPlaneCode(st) {
+					err = status.Errorf(codes.Internal, "received picker error with illegal status: %v", err)
+				}
 				return nil, nil, dropError{error: err}
 			}
 			// For all other errors, wait for ready RPCs should block and other

@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/conversion"
@@ -156,7 +157,12 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 		return storage.NewInternalError(err.Error())
 	}
 
-	return decode(s.codec, s.versioner, data, out, kv.ModRevision)
+	err = decode(s.codec, s.versioner, data, out, kv.ModRevision)
+	if err != nil {
+		recordDecodeError(s.groupResourceString, preparedKey)
+		return err
+	}
+	return nil
 }
 
 // Create implements storage.Interface.Create.
@@ -220,6 +226,7 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 		err = decode(s.codec, s.versioner, data, out, putResp.Header.Revision)
 		if err != nil {
 			span.AddEvent("decode failed", attribute.Int("len", len(data)), attribute.String("err", err.Error()))
+			recordDecodeError(s.groupResourceString, preparedKey)
 			return err
 		}
 		span.AddEvent("decode succeeded", attribute.Int("len", len(data)))
@@ -352,7 +359,12 @@ func (s *store) conditionalDelete(
 		if deleteResp.Header == nil {
 			return errors.New("invalid DeleteRange response - nil header")
 		}
-		return decode(s.codec, s.versioner, origState.data, out, deleteResp.Header.Revision)
+		err = decode(s.codec, s.versioner, origState.data, out, deleteResp.Header.Revision)
+		if err != nil {
+			recordDecodeError(s.groupResourceString, key)
+			return err
+		}
+		return nil
 	}
 }
 
@@ -470,7 +482,12 @@ func (s *store) GuaranteedUpdate(
 			}
 			// recheck that the data from etcd is not stale before short-circuiting a write
 			if !origState.stale {
-				return decode(s.codec, s.versioner, origState.data, destination, origState.rev)
+				err = decode(s.codec, s.versioner, origState.data, destination, origState.rev)
+				if err != nil {
+					recordDecodeError(s.groupResourceString, preparedKey)
+					return err
+				}
+				return nil
 			}
 		}
 
@@ -518,6 +535,7 @@ func (s *store) GuaranteedUpdate(
 		err = decode(s.codec, s.versioner, data, destination, putResp.Header.Revision)
 		if err != nil {
 			span.AddEvent("decode failed", attribute.Int("len", len(data)), attribute.String("err", err.Error()))
+			recordDecodeError(s.groupResourceString, preparedKey)
 			return err
 		}
 		span.AddEvent("decode succeeded", attribute.Int("len", len(data)))
@@ -745,6 +763,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			}
 
 			if err := appendListItem(v, data, uint64(kv.ModRevision), pred, s.codec, s.versioner, newItemFunc); err != nil {
+				recordDecodeError(s.groupResourceString, string(kv.Key))
 				return err
 			}
 			numEvald++
@@ -781,6 +800,10 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			withRev = returnedRV
 			options = append(options, clientv3.WithRev(withRev))
 		}
+	}
+	if v.IsNil() {
+		// Ensure that we never return a nil Items pointer in the result for consistency.
+		v.Set(reflect.MakeSlice(v.Type(), 0, 0))
 	}
 
 	// instruct the client to begin querying from immediately after the last key we returned
@@ -841,6 +864,13 @@ func growSlice(v reflect.Value, maxCapacity int, sizes ...int) {
 
 // Watch implements storage.Interface.Watch.
 func (s *store) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
+	if opts.SendInitialEvents != nil {
+		return nil, apierrors.NewInvalid(
+			schema.GroupKind{Group: s.groupResource.Group, Kind: s.groupResource.Resource},
+			"",
+			field.ErrorList{field.Forbidden(field.NewPath("sendInitialEvents"), "for watch is unsupported by an etcd cluster")},
+		)
+	}
 	preparedKey, err := s.prepareKey(key)
 	if err != nil {
 		return nil, err
@@ -880,6 +910,7 @@ func (s *store) getState(ctx context.Context, getResp *clientv3.GetResponse, key
 		state.data = data
 		state.stale = stale
 		if err := decode(s.codec, s.versioner, state.data, state.obj, state.rev); err != nil {
+			recordDecodeError(s.groupResourceString, key)
 			return nil, err
 		}
 	}
@@ -1016,6 +1047,12 @@ func appendListItem(v reflect.Value, data []byte, rev uint64, pred storage.Selec
 		v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
 	}
 	return nil
+}
+
+// recordDecodeError record decode error split by object type.
+func recordDecodeError(resource string, key string) {
+	metrics.RecordDecodeError(resource)
+	klog.V(4).Infof("Decoding %s \"%s\" failed", resource, key)
 }
 
 func notFound(key string) clientv3.Cmp {

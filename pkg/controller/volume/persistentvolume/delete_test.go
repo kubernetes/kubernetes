@@ -18,15 +18,16 @@ package persistentvolume
 
 import (
 	"errors"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-helpers/storage/volume"
+	"k8s.io/klog/v2/ktesting"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // Test single call to syncVolume, expecting recycling to happen.
@@ -37,6 +38,7 @@ func TestDeleteSync(t *testing.T) {
 	const gceDriver = "pd.csi.storage.gke.io"
 	// Default enable the HonorPVReclaimPolicy feature gate.
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)()
+	_, ctx := ktesting.NewTestContext(t)
 	tests := []controllerTest{
 		{
 			// delete volume bound by controller
@@ -106,7 +108,7 @@ func TestDeleteSync(t *testing.T) {
 			expectedClaims:  noclaims,
 			expectedEvents:  noevents,
 			errors:          noerrors,
-			test: wrapTestWithInjectedOperation(wrapTestWithReclaimCalls(operationDelete, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
+			test: wrapTestWithInjectedOperation(ctx, wrapTestWithReclaimCalls(operationDelete, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
 				// Delete the volume before delete operation starts
 				reactor.DeleteVolume("volume8-6")
 			}),
@@ -122,7 +124,7 @@ func TestDeleteSync(t *testing.T) {
 			expectedClaims:  newClaimArray("claim8-7", "uid8-7", "10Gi", "volume8-7", v1.ClaimBound, nil),
 			expectedEvents:  noevents,
 			errors:          noerrors,
-			test: wrapTestWithInjectedOperation(wrapTestWithReclaimCalls(operationDelete, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
+			test: wrapTestWithInjectedOperation(ctx, wrapTestWithReclaimCalls(operationDelete, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
 				// Bind the volume to resurrected claim (this should never
 				// happen)
 				claim := newClaim("claim8-7", "uid8-7", "10Gi", "volume8-7", v1.ClaimBound, nil)
@@ -217,7 +219,7 @@ func TestDeleteSync(t *testing.T) {
 			test:            wrapTestWithReclaimCalls(operationDelete, []error{nil}, testSyncVolume),
 		},
 	}
-	runSyncTests(t, tests, []*storage.StorageClass{}, []*v1.Pod{})
+	runSyncTests(t, ctx, tests, []*storage.StorageClass{}, []*v1.Pod{})
 }
 
 // Test multiple calls to syncClaim/syncVolume and periodic sync of all
@@ -250,6 +252,6 @@ func TestDeleteMultiSync(t *testing.T) {
 			test:            wrapTestWithReclaimCalls(operationDelete, []error{errors.New("Mock delete error"), nil}, testSyncVolume),
 		},
 	}
-
-	runMultisyncTests(t, tests, []*storage.StorageClass{}, "")
+	_, ctx := ktesting.NewTestContext(t)
+	runMultisyncTests(t, ctx, tests, []*storage.StorageClass{}, "")
 }

@@ -22,9 +22,11 @@ import (
 	"github.com/onsi/ginkgo/v2"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	errors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -45,9 +47,10 @@ var _ storageframework.TestSuite = &readWriteOncePodTestSuite{}
 type readWriteOncePodTest struct {
 	config *storageframework.PerTestConfig
 
-	cs     clientset.Interface
-	volume *storageframework.VolumeResource
-	pods   []*v1.Pod
+	cs            clientset.Interface
+	volume        *storageframework.VolumeResource
+	pods          []*v1.Pod
+	priorityClass *schedulingv1.PriorityClass
 
 	migrationCheck *migrationOpCheck
 }
@@ -57,7 +60,6 @@ func InitCustomReadWriteOncePodTestSuite(patterns []storageframework.TestPattern
 		tsInfo: storageframework.TestSuiteInfo{
 			Name:         "read-write-once-pod",
 			TestPatterns: patterns,
-			FeatureTag:   "[Feature:ReadWriteOncePod]",
 		},
 	}
 }
@@ -92,39 +94,52 @@ func (t *readWriteOncePodTestSuite) DefineTests(driver storageframework.TestDriv
 	f := framework.NewFrameworkWithCustomTimeouts("read-write-once-pod", storageframework.GetDriverTimeouts(driver))
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
-	init := func() {
+	init := func(ctx context.Context) {
 		l = readWriteOncePodTest{}
-		l.config = driver.PrepareTest(f)
+		l.config = driver.PrepareTest(ctx, f)
 		l.cs = f.ClientSet
 		l.pods = []*v1.Pod{}
-		l.migrationCheck = newMigrationOpCheck(f.ClientSet, f.ClientConfig(), driverInfo.InTreePluginName)
+		l.migrationCheck = newMigrationOpCheck(ctx, f.ClientSet, f.ClientConfig(), driverInfo.InTreePluginName)
 	}
 
-	cleanup := func() {
+	cleanup := func(ctx context.Context) {
 		var errs []error
 		for _, pod := range l.pods {
 			framework.Logf("Deleting pod %v", pod.Name)
-			err := e2epod.DeletePodWithWait(l.cs, pod)
+			err := e2epod.DeletePodWithWait(ctx, l.cs, pod)
 			errs = append(errs, err)
 		}
 
 		framework.Logf("Deleting volume %s", l.volume.Pvc.GetName())
-		err := l.volume.CleanupResource()
+		err := l.volume.CleanupResource(ctx)
 		errs = append(errs, err)
 
+		if l.priorityClass != nil {
+			framework.Logf("Deleting PriorityClass %v", l.priorityClass.Name)
+			err := l.cs.SchedulingV1().PriorityClasses().Delete(ctx, l.priorityClass.Name, metav1.DeleteOptions{})
+			errs = append(errs, err)
+		}
+
 		framework.ExpectNoError(errors.NewAggregate(errs), "while cleaning up resource")
-		l.migrationCheck.validateMigrationVolumeOpCounts()
+		l.migrationCheck.validateMigrationVolumeOpCounts(ctx)
 	}
 
-	ginkgo.BeforeEach(func() {
-		init()
+	ginkgo.BeforeEach(func(ctx context.Context) {
+		init(ctx)
 		ginkgo.DeferCleanup(cleanup)
 	})
 
-	ginkgo.It("should block a second pod from using an in-use ReadWriteOncePod volume", func() {
+	ginkgo.It("should preempt lower priority pods using ReadWriteOncePod volumes", func(ctx context.Context) {
 		// Create the ReadWriteOncePod PVC.
 		accessModes := []v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}
-		l.volume = storageframework.CreateVolumeResourceWithAccessModes(driver, l.config, pattern, t.GetTestSuiteInfo().SupportedSizeRange, accessModes)
+		l.volume = storageframework.CreateVolumeResourceWithAccessModes(ctx, driver, l.config, pattern, t.GetTestSuiteInfo().SupportedSizeRange, accessModes)
+
+		l.priorityClass = &schedulingv1.PriorityClass{
+			ObjectMeta: metav1.ObjectMeta{Name: "e2e-test-read-write-once-pod-" + string(uuid.NewUUID())},
+			Value:      int32(1000),
+		}
+		_, err := l.cs.SchedulingV1().PriorityClasses().Create(ctx, l.priorityClass, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "failed to create priority class")
 
 		podConfig := e2epod.Config{
 			NS:           f.Namespace.Name,
@@ -135,32 +150,45 @@ func (t *readWriteOncePodTestSuite) DefineTests(driver storageframework.TestDriv
 		// Create the first pod, which will take ownership of the ReadWriteOncePod PVC.
 		pod1, err := e2epod.MakeSecPod(&podConfig)
 		framework.ExpectNoError(err, "failed to create spec for pod1")
-		_, err = l.cs.CoreV1().Pods(pod1.Namespace).Create(context.TODO(), pod1, metav1.CreateOptions{})
+		_, err = l.cs.CoreV1().Pods(pod1.Namespace).Create(ctx, pod1, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create pod1")
-		err = e2epod.WaitTimeoutForPodRunningInNamespace(l.cs, pod1.Name, pod1.Namespace, f.Timeouts.PodStart)
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, l.cs, pod1.Name, pod1.Namespace, f.Timeouts.PodStart)
 		framework.ExpectNoError(err, "failed to wait for pod1 running status")
 		l.pods = append(l.pods, pod1)
 
-		// Create the second pod, which will fail scheduling because the ReadWriteOncePod PVC is already in use.
+		// Create the second pod, which will preempt the first pod because it's using the
+		// ReadWriteOncePod PVC and has higher priority.
 		pod2, err := e2epod.MakeSecPod(&podConfig)
 		framework.ExpectNoError(err, "failed to create spec for pod2")
-		_, err = l.cs.CoreV1().Pods(pod2.Namespace).Create(context.TODO(), pod2, metav1.CreateOptions{})
+		pod2.Spec.PriorityClassName = l.priorityClass.Name
+		_, err = l.cs.CoreV1().Pods(pod2.Namespace).Create(ctx, pod2, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create pod2")
-		err = e2epod.WaitForPodNameUnschedulableInNamespace(l.cs, pod2.Name, pod2.Namespace)
-		framework.ExpectNoError(err, "failed to wait for pod2 unschedulable status")
 		l.pods = append(l.pods, pod2)
 
-		// Delete the first pod and observe the second pod can now start.
-		err = e2epod.DeletePodWithWait(l.cs, pod1)
-		framework.ExpectNoError(err, "failed to delete pod1")
-		err = e2epod.WaitTimeoutForPodRunningInNamespace(l.cs, pod2.Name, pod2.Namespace, f.Timeouts.PodStart)
+		// Wait for the first pod to be preempted and the second pod to start.
+		err = e2epod.WaitForPodNotFoundInNamespace(ctx, l.cs, pod1.Name, pod1.Namespace, f.Timeouts.PodStart)
+		framework.ExpectNoError(err, "failed to wait for pod1 to be preempted")
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, l.cs, pod2.Name, pod2.Namespace, f.Timeouts.PodStart)
 		framework.ExpectNoError(err, "failed to wait for pod2 running status")
+
+		// Recreate the first pod, which will fail to schedule because the second pod
+		// is using the ReadWriteOncePod PVC and has higher priority.
+		_, err = l.cs.CoreV1().Pods(pod1.Namespace).Create(ctx, pod1, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "failed to create pod1")
+		err = e2epod.WaitForPodNameUnschedulableInNamespace(ctx, l.cs, pod1.Name, pod1.Namespace)
+		framework.ExpectNoError(err, "failed to wait for pod1 unschedulable status")
+
+		// Delete the second pod with higher priority and observe the first pod can now start.
+		err = e2epod.DeletePodWithWait(ctx, l.cs, pod2)
+		framework.ExpectNoError(err, "failed to delete pod2")
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, l.cs, pod1.Name, pod1.Namespace, f.Timeouts.PodStart)
+		framework.ExpectNoError(err, "failed to wait for pod1 running status")
 	})
 
-	ginkgo.It("should block a second pod from using an in-use ReadWriteOncePod volume on the same node", func() {
+	ginkgo.It("should block a second pod from using an in-use ReadWriteOncePod volume on the same node", func(ctx context.Context) {
 		// Create the ReadWriteOncePod PVC.
 		accessModes := []v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}
-		l.volume = storageframework.CreateVolumeResourceWithAccessModes(driver, l.config, pattern, t.GetTestSuiteInfo().SupportedSizeRange, accessModes)
+		l.volume = storageframework.CreateVolumeResourceWithAccessModes(ctx, driver, l.config, pattern, t.GetTestSuiteInfo().SupportedSizeRange, accessModes)
 
 		podConfig := e2epod.Config{
 			NS:           f.Namespace.Name,
@@ -171,14 +199,14 @@ func (t *readWriteOncePodTestSuite) DefineTests(driver storageframework.TestDriv
 		// Create the first pod, which will take ownership of the ReadWriteOncePod PVC.
 		pod1, err := e2epod.MakeSecPod(&podConfig)
 		framework.ExpectNoError(err, "failed to create spec for pod1")
-		_, err = l.cs.CoreV1().Pods(pod1.Namespace).Create(context.TODO(), pod1, metav1.CreateOptions{})
+		_, err = l.cs.CoreV1().Pods(pod1.Namespace).Create(ctx, pod1, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create pod1")
-		err = e2epod.WaitTimeoutForPodRunningInNamespace(l.cs, pod1.Name, pod1.Namespace, f.Timeouts.PodStart)
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, l.cs, pod1.Name, pod1.Namespace, f.Timeouts.PodStart)
 		framework.ExpectNoError(err, "failed to wait for pod1 running status")
 		l.pods = append(l.pods, pod1)
 
 		// Get the node name for the first pod now that it's running.
-		pod1, err = l.cs.CoreV1().Pods(pod1.Namespace).Get(context.TODO(), pod1.Name, metav1.GetOptions{})
+		pod1, err = l.cs.CoreV1().Pods(pod1.Namespace).Get(ctx, pod1.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get pod1")
 		nodeName := pod1.Spec.NodeName
 
@@ -188,7 +216,7 @@ func (t *readWriteOncePodTestSuite) DefineTests(driver storageframework.TestDriv
 		// Set the node name to that of the first pod.
 		// Node name is set to bypass scheduling, which would enforce the access mode otherwise.
 		pod2.Spec.NodeName = nodeName
-		_, err = l.cs.CoreV1().Pods(pod2.Namespace).Create(context.TODO(), pod2, metav1.CreateOptions{})
+		_, err = l.cs.CoreV1().Pods(pod2.Namespace).Create(ctx, pod2, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create pod2")
 		l.pods = append(l.pods, pod2)
 
@@ -200,18 +228,18 @@ func (t *readWriteOncePodTestSuite) DefineTests(driver storageframework.TestDriv
 			"reason":                   events.FailedMountVolume,
 		}.AsSelector().String()
 		msg := "volume uses the ReadWriteOncePod access mode and is already in use by another pod"
-		err = e2eevents.WaitTimeoutForEvent(l.cs, pod2.Namespace, eventSelector, msg, f.Timeouts.PodStart)
+		err = e2eevents.WaitTimeoutForEvent(ctx, l.cs, pod2.Namespace, eventSelector, msg, f.Timeouts.PodStart)
 		framework.ExpectNoError(err, "failed to wait for FailedMount event for pod2")
 
 		// Wait for the second pod to fail because it is stuck at container creating.
 		reason := "ContainerCreating"
-		err = e2epod.WaitForPodContainerToFail(l.cs, pod2.Namespace, pod2.Name, 0, reason, f.Timeouts.PodStart)
+		err = e2epod.WaitForPodContainerToFail(ctx, l.cs, pod2.Namespace, pod2.Name, 0, reason, f.Timeouts.PodStart)
 		framework.ExpectNoError(err, "failed to wait for pod2 container to fail")
 
 		// Delete the first pod and observe the second pod can now start.
-		err = e2epod.DeletePodWithWait(l.cs, pod1)
+		err = e2epod.DeletePodWithWait(ctx, l.cs, pod1)
 		framework.ExpectNoError(err, "failed to delete pod1")
-		err = e2epod.WaitTimeoutForPodRunningInNamespace(l.cs, pod2.Name, pod2.Namespace, f.Timeouts.PodStart)
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, l.cs, pod2.Name, pod2.Namespace, f.Timeouts.PodStart)
 		framework.ExpectNoError(err, "failed to wait for pod2 running status")
 	})
 }

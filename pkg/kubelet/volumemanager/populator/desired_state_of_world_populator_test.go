@@ -17,6 +17,7 @@ limitations under the License.
 package populator
 
 import (
+	"k8s.io/klog/v2/ktesting"
 	"testing"
 	"time"
 
@@ -34,11 +35,9 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
-	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
@@ -91,8 +90,7 @@ func prepareDswpWithVolume(t *testing.T) (*desiredStateOfWorldPopulator, kubepod
 
 func TestFindAndAddNewPods_WithRescontructedVolume(t *testing.T) {
 	// Outer volume spec replacement is needed only when the old volume reconstruction is used
-	// (i.e. with SELinuxMountReadWriteOncePod disabled)
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NewVolumeManagerReconstruction, false)()
 	// create dswp
 	dswp, fakePodManager, _ := prepareDswpWithVolume(t)
 
@@ -137,7 +135,8 @@ func TestFindAndAddNewPods_WithRescontructedVolume(t *testing.T) {
 		VolumeSpec:          volume.NewSpecFromPersistentVolume(pv, false),
 		VolumeMountState:    operationexecutor.VolumeMounted,
 	}
-	dswp.actualStateOfWorld.MarkVolumeAsAttached(opts.VolumeName, opts.VolumeSpec, "fake-node", "")
+	logger, _ := ktesting.NewTestContext(t)
+	dswp.actualStateOfWorld.MarkVolumeAsAttached(logger, opts.VolumeName, opts.VolumeSpec, "fake-node", "")
 	dswp.actualStateOfWorld.MarkVolumeAsMounted(opts)
 
 	dswp.findAndAddNewPods()
@@ -1396,8 +1395,9 @@ func volumeCapacity(size int) v1.ResourceList {
 }
 
 func reconcileASW(asw cache.ActualStateOfWorld, dsw cache.DesiredStateOfWorld, t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	for _, volumeToMount := range dsw.GetVolumesToMount() {
-		err := asw.MarkVolumeAsAttached(volumeToMount.VolumeName, volumeToMount.VolumeSpec, "", "")
+		err := asw.MarkVolumeAsAttached(logger, volumeToMount.VolumeName, volumeToMount.VolumeSpec, "", "")
 		if err != nil {
 			t.Fatalf("Unexpected error when MarkVolumeAsAttached: %v", err)
 		}
@@ -1604,10 +1604,8 @@ func createDswpWithVolumeWithCustomPluginMgr(t *testing.T, pv *v1.PersistentVolu
 		return true, pv, nil
 	})
 
-	fakeSecretManager := secret.NewFakeManager()
-	fakeConfigMapManager := configmap.NewFakeManager()
 	fakePodManager := kubepod.NewBasicPodManager(
-		podtest.NewFakeMirrorClient(), fakeSecretManager, fakeConfigMapManager)
+		podtest.NewFakeMirrorClient())
 
 	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
 	fakesDSW := cache.NewDesiredStateOfWorld(fakeVolumePluginMgr, seLinuxTranslator)
@@ -1617,13 +1615,12 @@ func createDswpWithVolumeWithCustomPluginMgr(t *testing.T, pv *v1.PersistentVolu
 
 	csiTranslator := csitrans.New()
 	dswp := &desiredStateOfWorldPopulator{
-		kubeClient:                fakeClient,
-		loopSleepDuration:         100 * time.Millisecond,
-		getPodStatusRetryDuration: 2 * time.Second,
-		podManager:                fakePodManager,
-		podStateProvider:          fakeStateProvider,
-		desiredStateOfWorld:       fakesDSW,
-		actualStateOfWorld:        fakeASW,
+		kubeClient:          fakeClient,
+		loopSleepDuration:   100 * time.Millisecond,
+		podManager:          fakePodManager,
+		podStateProvider:    fakeStateProvider,
+		desiredStateOfWorld: fakesDSW,
+		actualStateOfWorld:  fakeASW,
 		pods: processedPods{
 			processedPods: make(map[types.UniquePodName]bool)},
 		kubeContainerRuntime:     fakeRuntime,

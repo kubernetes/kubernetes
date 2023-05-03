@@ -285,7 +285,7 @@ func TestDropTypeDependentFields(t *testing.T) {
 		svc.Spec.Ports[0].Protocol = "UDP"
 	}
 	setHCNodePort := func(svc *api.Service) {
-		svc.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeLocal
+		svc.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyLocal
 		svc.Spec.HealthCheckNodePort = int32(32000)
 	}
 	changeHCNodePort := func(svc *api.Service) {
@@ -308,13 +308,13 @@ func TestDropTypeDependentFields(t *testing.T) {
 		svc.Spec.AllocateLoadBalancerNodePorts = nil
 	}
 	setLoadBalancerClass := func(svc *api.Service) {
-		svc.Spec.LoadBalancerClass = utilpointer.StringPtr("test-load-balancer-class")
+		svc.Spec.LoadBalancerClass = utilpointer.String("test-load-balancer-class")
 	}
 	clearLoadBalancerClass := func(svc *api.Service) {
 		svc.Spec.LoadBalancerClass = nil
 	}
 	changeLoadBalancerClass := func(svc *api.Service) {
-		svc.Spec.LoadBalancerClass = utilpointer.StringPtr("test-load-balancer-class-changed")
+		svc.Spec.LoadBalancerClass = utilpointer.String("test-load-balancer-class-changed")
 	}
 
 	testCases := []struct {

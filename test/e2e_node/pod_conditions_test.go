@@ -48,7 +48,7 @@ var _ = SIGDescribe("Pod conditions managed by Kubelet", func() {
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	ginkgo.Context("including PodHasNetwork condition [Serial] [Feature:PodHasNetwork]", func() {
-		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			initialConfig.FeatureGates = map[string]bool{
 				string(features.PodHasNetworkCondition): true,
 			}
@@ -67,8 +67,8 @@ var _ = SIGDescribe("Pod conditions managed by Kubelet", func() {
 	})
 })
 
-func runPodFailingConditionsTest(f *framework.Framework, hasInitContainers, checkPodHasNetwork bool) func() {
-	return func() {
+func runPodFailingConditionsTest(f *framework.Framework, hasInitContainers, checkPodHasNetwork bool) func(ctx context.Context) {
+	return func(ctx context.Context) {
 		ginkgo.By("creating a pod whose sandbox creation is blocked due to a missing volume")
 
 		p := webserverPodSpec("pod-"+string(uuid.NewUUID()), "web1", "init1", hasInitContainers)
@@ -89,7 +89,7 @@ func runPodFailingConditionsTest(f *framework.Framework, hasInitContainers, chec
 			},
 		}
 
-		p = e2epod.NewPodClient(f).Create(p)
+		p = e2epod.NewPodClient(f).Create(ctx, p)
 
 		ginkgo.By("waiting until kubelet has started trying to set up the pod and started to fail")
 
@@ -99,9 +99,9 @@ func runPodFailingConditionsTest(f *framework.Framework, hasInitContainers, chec
 			"involvedObject.namespace": f.Namespace.Name,
 			"reason":                   events.FailedMountVolume,
 		}.AsSelector().String()
-		e2eevents.WaitTimeoutForEvent(f.ClientSet, f.Namespace.Name, eventSelector, "MountVolume.SetUp failed for volume", framework.PodEventTimeout)
+		framework.ExpectNoError(e2eevents.WaitTimeoutForEvent(ctx, f.ClientSet, f.Namespace.Name, eventSelector, "MountVolume.SetUp failed for volume", framework.PodEventTimeout))
 
-		p, err := e2epod.NewPodClient(f).Get(context.TODO(), p.Name, metav1.GetOptions{})
+		p, err := e2epod.NewPodClient(f).Get(ctx, p.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("checking pod condition for a pod whose sandbox creation is blocked")
@@ -135,14 +135,14 @@ func runPodFailingConditionsTest(f *framework.Framework, hasInitContainers, chec
 	}
 }
 
-func runPodReadyConditionsTest(f *framework.Framework, hasInitContainers, checkPodHasNetwork bool) func() {
-	return func() {
+func runPodReadyConditionsTest(f *framework.Framework, hasInitContainers, checkPodHasNetwork bool) func(ctx context.Context) {
+	return func(ctx context.Context) {
 		ginkgo.By("creating a pod that successfully comes up in a ready/running state")
 
-		p := e2epod.NewPodClient(f).Create(webserverPodSpec("pod-"+string(uuid.NewUUID()), "web1", "init1", hasInitContainers))
-		e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, p.Name, f.Namespace.Name, framework.PodStartTimeout)
+		p := e2epod.NewPodClient(f).Create(ctx, webserverPodSpec("pod-"+string(uuid.NewUUID()), "web1", "init1", hasInitContainers))
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, p.Name, f.Namespace.Name, framework.PodStartTimeout))
 
-		p, err := e2epod.NewPodClient(f).Get(context.TODO(), p.Name, metav1.GetOptions{})
+		p, err := e2epod.NewPodClient(f).Get(ctx, p.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		isReady, err := testutils.PodRunningReady(p)
 		framework.ExpectNoError(err)

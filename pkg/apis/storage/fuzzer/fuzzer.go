@@ -96,6 +96,10 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 					storage.VolumeLifecyclePersistent,
 				}
 			}
+			if obj.Spec.SELinuxMount == nil {
+				obj.Spec.SELinuxMount = new(bool)
+				*(obj.Spec.SELinuxMount) = false
+			}
 		},
 	}
 }

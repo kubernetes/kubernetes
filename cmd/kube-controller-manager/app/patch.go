@@ -31,7 +31,7 @@ func SetUpCustomRoundTrippersForOpenShift(controllerManagerOptions *options.Kube
 		return nil
 	}
 
-	config, err := clientcmd.BuildConfigFromFlags(controllerManagerOptions.Master, controllerManagerOptions.Kubeconfig)
+	config, err := clientcmd.BuildConfigFromFlags(controllerManagerOptions.Master, controllerManagerOptions.Generic.ClientConnection.Kubeconfig)
 	if err != nil {
 		return err
 	}
@@ -163,4 +163,18 @@ func (rt *rejectIfNotReadyHeaderRT) RoundTrip(r *http.Request) (*http.Response, 
 		}
 	}
 	return rt.baseRT.RoundTrip(r)
+}
+
+// mergeCh takes two stop channels and return a single one that
+// closes as soon as one of the inputs closes or receives data.
+func mergeCh(stopCh1, stopCh2 <-chan struct{}) <-chan struct{} {
+	merged := make(chan struct{})
+	go func() {
+		defer close(merged)
+		select {
+		case <-stopCh1:
+		case <-stopCh2:
+		}
+	}()
+	return merged
 }

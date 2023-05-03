@@ -17,6 +17,7 @@ type InfrastructureStatusApplyConfiguration struct {
 	APIServerInternalURL   *string                           `json:"apiServerInternalURI,omitempty"`
 	ControlPlaneTopology   *v1.TopologyMode                  `json:"controlPlaneTopology,omitempty"`
 	InfrastructureTopology *v1.TopologyMode                  `json:"infrastructureTopology,omitempty"`
+	CPUPartitioning        *v1.CPUPartitioningMode           `json:"cpuPartitioning,omitempty"`
 }
 
 // InfrastructureStatusApplyConfiguration constructs an declarative configuration of the InfrastructureStatus type for use with
@@ -86,5 +87,13 @@ func (b *InfrastructureStatusApplyConfiguration) WithControlPlaneTopology(value 
 // If called multiple times, the InfrastructureTopology field is set to the value of the last call.
 func (b *InfrastructureStatusApplyConfiguration) WithInfrastructureTopology(value v1.TopologyMode) *InfrastructureStatusApplyConfiguration {
 	b.InfrastructureTopology = &value
+	return b
+}
+
+// WithCPUPartitioning sets the CPUPartitioning field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the CPUPartitioning field is set to the value of the last call.
+func (b *InfrastructureStatusApplyConfiguration) WithCPUPartitioning(value v1.CPUPartitioningMode) *InfrastructureStatusApplyConfiguration {
+	b.CPUPartitioning = &value
 	return b
 }

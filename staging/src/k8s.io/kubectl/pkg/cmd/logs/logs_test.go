@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strings"
 	"sync"
@@ -839,12 +838,12 @@ type responseWrapperMock struct {
 }
 
 func (r *responseWrapperMock) DoRaw(context.Context) ([]byte, error) {
-	data, _ := ioutil.ReadAll(r.data)
+	data, _ := io.ReadAll(r.data)
 	return data, r.err
 }
 
 func (r *responseWrapperMock) Stream(context.Context) (io.ReadCloser, error) {
-	return ioutil.NopCloser(r.data), r.err
+	return io.NopCloser(r.data), r.err
 }
 
 type logTestMock struct {

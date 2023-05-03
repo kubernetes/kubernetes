@@ -24,6 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/dynamic"
@@ -35,8 +36,8 @@ type pruner struct {
 	mapper        meta.RESTMapper
 	dynamicClient dynamic.Interface
 
-	visitedUids       sets.String
-	visitedNamespaces sets.String
+	visitedUids       sets.Set[types.UID]
+	visitedNamespaces sets.Set[string]
 	labelSelector     string
 	fieldSelector     string
 
@@ -119,7 +120,7 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping) error {
 			continue
 		}
 		uid := metadata.GetUID()
-		if p.visitedUids.Has(string(uid)) {
+		if p.visitedUids.Has(uid) {
 			continue
 		}
 		name := metadata.GetName()
@@ -139,15 +140,16 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping) error {
 }
 
 func (p *pruner) delete(namespace, name string, mapping *meta.RESTMapping) error {
-	return runDelete(namespace, name, mapping, p.dynamicClient, p.cascadingStrategy, p.gracePeriod, p.dryRunStrategy == cmdutil.DryRunServer)
+	ctx := context.TODO()
+	return runDelete(ctx, namespace, name, mapping, p.dynamicClient, p.cascadingStrategy, p.gracePeriod, p.dryRunStrategy == cmdutil.DryRunServer)
 }
 
-func runDelete(namespace, name string, mapping *meta.RESTMapping, c dynamic.Interface, cascadingStrategy metav1.DeletionPropagation, gracePeriod int, serverDryRun bool) error {
+func runDelete(ctx context.Context, namespace, name string, mapping *meta.RESTMapping, c dynamic.Interface, cascadingStrategy metav1.DeletionPropagation, gracePeriod int, serverDryRun bool) error {
 	options := asDeleteOptions(cascadingStrategy, gracePeriod)
 	if serverDryRun {
 		options.DryRun = []string{metav1.DryRunAll}
 	}
-	return c.Resource(mapping.Resource).Namespace(namespace).Delete(context.TODO(), name, options)
+	return c.Resource(mapping.Resource).Namespace(namespace).Delete(ctx, name, options)
 }
 
 func asDeleteOptions(cascadingStrategy metav1.DeletionPropagation, gracePeriod int) metav1.DeleteOptions {

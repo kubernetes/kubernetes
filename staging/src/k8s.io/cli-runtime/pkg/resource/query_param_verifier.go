@@ -38,16 +38,10 @@ func NewQueryParamVerifier(dynamicClient dynamic.Interface, openAPIGetter discov
 // QueryParamVerifier verifies if a given group-version-kind supports a
 // given VerifiableQueryParam against the current server.
 //
-// Currently supported query params are:
-// 1. dryRun
-// 2. fieldValidation
+// Currently supported query params are: fieldValidation
 //
-// Support for each of these query params needs to be verified because:
-//
-// 1. Sending dryRun requests to apiserver that
-// don't support it will result in objects being unwillingly persisted.
-//
-// 2. We determine whether or not to perform server-side or client-side
+// Support for each of these query params needs to be verified because
+// we determine whether or not to perform server-side or client-side
 // schema validation based on whether the fieldValidation query param is
 // supported or not.
 //
@@ -73,12 +67,15 @@ type Verifier interface {
 type VerifiableQueryParam string
 
 const (
-	QueryParamDryRun          VerifiableQueryParam = "dryRun"
 	QueryParamFieldValidation VerifiableQueryParam = "fieldValidation"
 )
 
 // HasSupport checks if the given gvk supports the query param configured on v
 func (v *QueryParamVerifier) HasSupport(gvk schema.GroupVersionKind) error {
+	if (gvk == schema.GroupVersionKind{Version: "v1", Kind: "List"}) {
+		return NewParamUnsupportedError(gvk, v.queryParam)
+	}
+
 	oapi, err := v.openAPIGetter.OpenAPISchema()
 	if err != nil {
 		return fmt.Errorf("failed to download openapi: %v", err)

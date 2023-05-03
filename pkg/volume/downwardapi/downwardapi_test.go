@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -72,6 +73,11 @@ func TestCanSupport(t *testing.T) {
 }
 
 func TestDownwardAPI(t *testing.T) {
+	// Skip tests that fail on Windows, as discussed during the SIG Testing meeting from January 10, 2023
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping test that fails on Windows")
+	}
+
 	labels1 := map[string]string{
 		"key1": "value1",
 		"key2": "value2",

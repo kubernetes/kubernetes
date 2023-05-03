@@ -110,8 +110,6 @@ func NewEndpointController(podInformer coreinformers.PodInformer, serviceInforme
 
 	e.endpointUpdatesBatchPeriod = endpointUpdatesBatchPeriod
 
-	e.serviceSelectorCache = endpointutil.NewServiceSelectorCache()
-
 	return e
 }
 
@@ -157,10 +155,6 @@ type Controller struct {
 	triggerTimeTracker *endpointutil.TriggerTimeTracker
 
 	endpointUpdatesBatchPeriod time.Duration
-
-	// serviceSelectorCache is a cache of service selectors to avoid high CPU consumption caused by frequent calls
-	// to AsSelectorPreValidated (see #73527)
-	serviceSelectorCache *endpointutil.ServiceSelectorCache
 }
 
 // Run will not return until stopCh is closed. workers determines how many
@@ -198,7 +192,7 @@ func (e *Controller) Run(ctx context.Context, workers int) {
 // enqueue them. obj must have *v1.Pod type.
 func (e *Controller) addPod(obj interface{}) {
 	pod := obj.(*v1.Pod)
-	services, err := e.serviceSelectorCache.GetPodServiceMemberships(e.serviceLister, pod)
+	services, err := endpointutil.GetPodServiceMemberships(e.serviceLister, pod)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Unable to get pod %s/%s's service memberships: %v", pod.Namespace, pod.Name, err))
 		return
@@ -267,7 +261,7 @@ func podToEndpointAddressForService(svc *v1.Service, pod *v1.Pod) (*v1.EndpointA
 // and what services it will be a member of, and enqueue the union of these.
 // old and cur must be *v1.Pod types.
 func (e *Controller) updatePod(old, cur interface{}) {
-	services := endpointutil.GetServicesToUpdateOnPodChange(e.serviceLister, e.serviceSelectorCache, old, cur)
+	services := endpointutil.GetServicesToUpdateOnPodChange(e.serviceLister, old, cur)
 	for key := range services {
 		e.queue.AddAfter(key, e.endpointUpdatesBatchPeriod)
 	}
@@ -289,8 +283,6 @@ func (e *Controller) onServiceUpdate(obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
 		return
 	}
-
-	_ = e.serviceSelectorCache.Update(key, obj.(*v1.Service).Spec.Selector)
 	e.queue.Add(key)
 }
 
@@ -301,8 +293,6 @@ func (e *Controller) onServiceDelete(obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
 		return
 	}
-
-	e.serviceSelectorCache.Delete(key)
 	e.queue.Add(key)
 }
 
@@ -388,6 +378,12 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 		return nil
 	}
 
+	if service.Spec.Type == v1.ServiceTypeExternalName {
+		// services with Type ExternalName receive no endpoints from this controller;
+		// Ref: https://issues.k8s.io/105986
+		return nil
+	}
+
 	if service.Spec.Selector == nil {
 		// services without a selector receive no endpoints from this controller;
 		// these services will receive the endpoints that are created out-of-band via the REST API.
@@ -459,15 +455,14 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 	// See if there's actually an update here.
 	currentEndpoints, err := e.endpointsLister.Endpoints(service.Namespace).Get(service.Name)
 	if err != nil {
-		if errors.IsNotFound(err) {
-			currentEndpoints = &v1.Endpoints{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   service.Name,
-					Labels: service.Labels,
-				},
-			}
-		} else {
+		if !errors.IsNotFound(err) {
 			return err
+		}
+		currentEndpoints = &v1.Endpoints{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   service.Name,
+				Labels: service.Labels,
+			},
 		}
 	}
 
@@ -614,13 +609,12 @@ func addEndpointSubset(subsets []v1.EndpointSubset, pod *v1.Pod, epa v1.Endpoint
 }
 
 func endpointPortFromServicePort(servicePort *v1.ServicePort, portNum int) *v1.EndpointPort {
-	epp := &v1.EndpointPort{
+	return &v1.EndpointPort{
 		Name:        servicePort.Name,
 		Port:        int32(portNum),
 		Protocol:    servicePort.Protocol,
 		AppProtocol: servicePort.AppProtocol,
 	}
-	return epp
 }
 
 // capacityAnnotationSetCorrectly returns false if number of endpoints is greater than maxCapacity or

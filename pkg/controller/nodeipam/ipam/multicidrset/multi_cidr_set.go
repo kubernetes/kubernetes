@@ -135,15 +135,19 @@ func NewMultiCIDRSet(cidrConfig *net.IPNet, perNodeHostBits int) (*MultiCIDRSet,
 	// Register MultiCIDRSet metrics.
 	registerCidrsetMetrics()
 
-	return &MultiCIDRSet{
+	maxCIDRs := getMaxCIDRs(subNetMaskSize, clusterMaskSize)
+	multiCIDRSet := &MultiCIDRSet{
 		ClusterCIDR:      cidrConfig,
 		nodeMask:         net.CIDRMask(subNetMaskSize, bits),
 		clusterMaskSize:  clusterMaskSize,
-		MaxCIDRs:         1 << uint32(subNetMaskSize-clusterMaskSize),
+		MaxCIDRs:         maxCIDRs,
 		NodeMaskSize:     subNetMaskSize,
 		Label:            cidrConfig.String(),
 		AllocatedCIDRMap: make(map[string]bool, 0),
-	}, nil
+	}
+	cidrSetMaxCidrs.WithLabelValues(multiCIDRSet.Label).Set(float64(maxCIDRs))
+
+	return multiCIDRSet, nil
 }
 
 func (s *MultiCIDRSet) indexToCIDRBlock(index int) (*net.IPNet, error) {
@@ -358,4 +362,10 @@ func (s *MultiCIDRSet) getIndexForIP(ip net.IP) (int, error) {
 // UpdateEvaluatedCount increments the evaluated count.
 func (s *MultiCIDRSet) UpdateEvaluatedCount(evaluated int) {
 	cidrSetAllocationTriesPerRequest.WithLabelValues(s.Label).Observe(float64(evaluated))
+}
+
+// getMaxCIDRs returns the max number of CIDRs that can be obtained by subdividing a mask of size `clusterMaskSize`
+// into subnets with mask of size `subNetMaskSize`.
+func getMaxCIDRs(subNetMaskSize, clusterMaskSize int) int {
+	return 1 << uint32(subNetMaskSize-clusterMaskSize)
 }

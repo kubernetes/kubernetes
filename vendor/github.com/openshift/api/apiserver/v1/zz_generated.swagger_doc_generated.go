@@ -12,9 +12,10 @@ package v1
 
 // AUTO-GENERATED FUNCTIONS START HERE
 var map_APIRequestCount = map[string]string{
-	"":       "APIRequestCount tracks requests made to an API. The instance name must be of the form `resource.version.group`, matching the resource.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
-	"spec":   "spec defines the characteristics of the resource.",
-	"status": "status contains the observed state of the resource.",
+	"":         "APIRequestCount tracks requests made to an API. The instance name must be of the form `resource.version.group`, matching the resource.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "spec defines the characteristics of the resource.",
+	"status":   "status contains the observed state of the resource.",
 }
 
 func (APIRequestCount) SwaggerDoc() map[string]string {
@@ -22,7 +23,8 @@ func (APIRequestCount) SwaggerDoc() map[string]string {
 }
 
 var map_APIRequestCountList = map[string]string{
-	"": "APIRequestCountList is a list of APIRequestCount resources.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"":         "APIRequestCountList is a list of APIRequestCount resources.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 }
 
 func (APIRequestCountList) SwaggerDoc() map[string]string {

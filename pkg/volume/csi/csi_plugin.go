@@ -220,13 +220,13 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationGCE)
 		},
 		csitranslationplugins.AWSEBSInTreePluginName: func() bool {
-			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAWS)
+			return true
 		},
 		csitranslationplugins.CinderInTreePluginName: func() bool {
 			return true
 		},
 		csitranslationplugins.AzureDiskInTreePluginName: func() bool {
-			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureDisk)
+			return true
 		},
 		csitranslationplugins.AzureFileInTreePluginName: func() bool {
 			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureFile)

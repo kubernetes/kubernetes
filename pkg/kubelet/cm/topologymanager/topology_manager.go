@@ -18,12 +18,14 @@ package topologymanager
 
 import (
 	"fmt"
+	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 const (
@@ -208,7 +210,11 @@ func (m *manager) RemoveContainer(containerID string) error {
 
 func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	klog.InfoS("Topology Admit Handler")
-	pod := attrs.Pod
+	metrics.TopologyManagerAdmissionRequestsTotal.Inc()
 
-	return m.scope.Admit(pod)
+	startTime := time.Now()
+	podAdmitResult := m.scope.Admit(attrs.Pod)
+	metrics.TopologyManagerAdmissionDuration.Observe(float64(time.Since(startTime).Milliseconds()))
+
+	return podAdmitResult
 }

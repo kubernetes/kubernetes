@@ -268,6 +268,9 @@ spec:
         port: portValue
       terminationGracePeriodSeconds: 7
       timeoutSeconds: 3
+    resizePolicy:
+    - resourceName: resourceNameValue
+      restartPolicy: restartPolicyValue
     resources:
       claims:
       - name: nameValue
@@ -471,6 +474,9 @@ spec:
         port: portValue
       terminationGracePeriodSeconds: 7
       timeoutSeconds: 3
+    resizePolicy:
+    - resourceName: resourceNameValue
+      restartPolicy: restartPolicyValue
     resources:
       claims:
       - name: nameValue
@@ -676,6 +682,9 @@ spec:
         port: portValue
       terminationGracePeriodSeconds: 7
       timeoutSeconds: 3
+    resizePolicy:
+    - resourceName: resourceNameValue
+      restartPolicy: restartPolicyValue
     resources:
       claims:
       - name: nameValue
@@ -1106,7 +1115,9 @@ status:
     status: statusValue
     type: typeValue
   containerStatuses:
-  - containerID: containerIDValue
+  - allocatedResources:
+      allocatedResourcesKey: "0"
+    containerID: containerIDValue
     image: imageValue
     imageID: imageIDValue
     lastState:
@@ -1125,6 +1136,13 @@ status:
         reason: reasonValue
     name: nameValue
     ready: true
+    resources:
+      claims:
+      - name: nameValue
+      limits:
+        limitsKey: "0"
+      requests:
+        requestsKey: "0"
     restartCount: 5
     started: true
     state:
@@ -1142,7 +1160,9 @@ status:
         message: messageValue
         reason: reasonValue
   ephemeralContainerStatuses:
-  - containerID: containerIDValue
+  - allocatedResources:
+      allocatedResourcesKey: "0"
+    containerID: containerIDValue
     image: imageValue
     imageID: imageIDValue
     lastState:
@@ -1161,6 +1181,13 @@ status:
         reason: reasonValue
     name: nameValue
     ready: true
+    resources:
+      claims:
+      - name: nameValue
+      limits:
+        limitsKey: "0"
+      requests:
+        requestsKey: "0"
     restartCount: 5
     started: true
     state:
@@ -1179,7 +1206,9 @@ status:
         reason: reasonValue
   hostIP: hostIPValue
   initContainerStatuses:
-  - containerID: containerIDValue
+  - allocatedResources:
+      allocatedResourcesKey: "0"
+    containerID: containerIDValue
     image: imageValue
     imageID: imageIDValue
     lastState:
@@ -1198,6 +1227,13 @@ status:
         reason: reasonValue
     name: nameValue
     ready: true
+    resources:
+      claims:
+      - name: nameValue
+      limits:
+        limitsKey: "0"
+      requests:
+        requestsKey: "0"
     restartCount: 5
     started: true
     state:
@@ -1222,4 +1258,5 @@ status:
   - ip: ipValue
   qosClass: qosClassValue
   reason: reasonValue
+  resize: resizeValue
   startTime: "2007-01-01T01:01:01Z"

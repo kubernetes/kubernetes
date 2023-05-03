@@ -109,6 +109,20 @@ var Annotations = map[string]string{
 
 	"[sig-api-machinery] Etcd failure [Disruptive] should recover from network partition with master": " [Serial] [Suite:k8s]",
 
+	"[sig-api-machinery] FieldValidation should create/apply a CR with unknown fields for CRD with no validation schema [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[sig-api-machinery] FieldValidation should create/apply a valid CR for CRD with validation schema [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[sig-api-machinery] FieldValidation should create/apply an invalid CR with extra properties for CRD with validation schema [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[sig-api-machinery] FieldValidation should detect duplicates in a CR when preserving unknown fields [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[sig-api-machinery] FieldValidation should detect unknown and duplicate fields of a typed object [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[sig-api-machinery] FieldValidation should detect unknown metadata fields in both the root and embedded object of a CR [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[sig-api-machinery] FieldValidation should detect unknown metadata fields of a typed object [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
 	"[sig-api-machinery] Garbage collector should delete RS created by deployment when not orphaning [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[sig-api-machinery] Garbage collector should delete jobs and pods created by cronjob": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
@@ -150,6 +164,12 @@ var Annotations = map[string]string{
 	"[sig-api-machinery] Namespaces [Serial] should ensure that all services are removed when a namespace is deleted [Conformance]": " [Suite:openshift/conformance/serial/minimal] [Suite:k8s]",
 
 	"[sig-api-machinery] Namespaces [Serial] should patch a Namespace [Conformance]": " [Suite:openshift/conformance/serial/minimal] [Suite:k8s]",
+
+	"[sig-api-machinery] OpenAPIV3 should contain OpenAPI V3 for Aggregated APIServer": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-api-machinery] OpenAPIV3 should publish OpenAPI V3 for CustomResourceDefinition": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-api-machinery] OpenAPIV3 should round trip OpenAPI V3 for all built-in group versions": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-api-machinery] ResourceQuota [Feature:PodPriority] should verify ResourceQuota's multiple priority class scope (quota set to pod count: 2) against 2 pods with same priority classes.": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -427,6 +447,8 @@ var Annotations = map[string]string{
 
 	"[sig-apps] ReplicationController should test the lifecycle of a ReplicationController [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
+	"[sig-apps] StatefulSet Automatically recreate PVC for pending pod when PVC is missing PVC should be recreated when pod is pending due to missing PVC [Disruptive][Serial]": " [Suite:k8s]",
+
 	"[sig-apps] StatefulSet AvailableReplicas should get updated accordingly when MinReadySeconds is enabled": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] Burst scaling should run to completion even with unhealthy pods [Slow] [Conformance]": " [Suite:k8s]",
@@ -465,13 +487,21 @@ var Annotations = map[string]string{
 
 	"[sig-apps] StatefulSet MinReadySeconds should be honored when enabled": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-apps] StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy [Feature:StatefulSetAutoDeletePVC] should delete PVCs after adopting pod (WhenDeleted)": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-apps] StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy should delete PVCs after adopting pod (WhenDeleted)": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-apps] StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy [Feature:StatefulSetAutoDeletePVC] should delete PVCs after adopting pod (WhenScaled) [Feature:StatefulSetAutoDeletePVC]": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-apps] StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy should delete PVCs after adopting pod (WhenScaled)": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-apps] StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy [Feature:StatefulSetAutoDeletePVC] should delete PVCs with a OnScaledown policy": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-apps] StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy should delete PVCs with a OnScaledown policy": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-apps] StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy [Feature:StatefulSetAutoDeletePVC] should delete PVCs with a WhenDeleted policy": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-apps] StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy should delete PVCs with a WhenDeleted policy": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-apps] StatefulSet Scaling StatefulSetStartOrdinal [Feature:StatefulSetStartOrdinal] Decreasing .start.ordinal": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-apps] StatefulSet Scaling StatefulSetStartOrdinal [Feature:StatefulSetStartOrdinal] Increasing .start.ordinal": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-apps] StatefulSet Scaling StatefulSetStartOrdinal [Feature:StatefulSetStartOrdinal] Removing .start.ordinal": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-apps] StatefulSet Scaling StatefulSetStartOrdinal [Feature:StatefulSetStartOrdinal] Setting .start.ordinal": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-apps] TTLAfterFinished job should be deleted once it finishes after TTL seconds": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -480,6 +510,8 @@ var Annotations = map[string]string{
 	"[sig-auth] Certificates API [Privileged:ClusterAdmin] should support building a client with a CSR": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-auth] SelfSubjectReview [Feature:APISelfSubjectReview] should support SelfSubjectReview API operations": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-auth] SelfSubjectReview [Feature:APISelfSubjectReview] testing SSR in different API groups authentication/v1beta1": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-auth] ServiceAccounts ServiceAccountIssuerDiscovery should support OIDC discovery of service account issuer [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -500,6 +532,8 @@ var Annotations = map[string]string{
 	"[sig-auth] ServiceAccounts should support InClusterConfig with token rotation [Slow]": " [Suite:k8s]",
 
 	"[sig-auth] ServiceAccounts should update a ServiceAccount [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[sig-auth] SubjectReview should support SubjectReview API operations [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[sig-auth] [Feature:NodeAuthenticator] The kubelet can delegate ServiceAccount tokens to the API server": " [Skipped:ibmroks] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -723,7 +757,7 @@ var Annotations = map[string]string{
 
 	"[sig-cli] Kubectl client Kubectl diff should check if kubectl diff finds a difference for Deployments [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[sig-cli] Kubectl client Kubectl events should show event when pod is created": " [Disabled:RebaseInProgress] [Suite:k8s]",
+	"[sig-cli] Kubectl client Kubectl events should show event when pod is created": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-cli] Kubectl client Kubectl expose should create services for rc  [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -731,9 +765,9 @@ var Annotations = map[string]string{
 
 	"[sig-cli] Kubectl client Kubectl label should update the label on a resource  [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[sig-cli] Kubectl client Kubectl logs should be able to retrieve and filter logs  [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
 	"[sig-cli] Kubectl client Kubectl patch should add annotations for pods in rc  [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[sig-cli] Kubectl client Kubectl prune with applyset should apply and prune objects": " [Disabled:RebaseInProgress] [Suite:k8s]",
 
 	"[sig-cli] Kubectl client Kubectl replace should update a single-container pod's image  [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -761,23 +795,25 @@ var Annotations = map[string]string{
 
 	"[sig-cli] Kubectl client Proxy server should support proxy with --port 0  [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
+	"[sig-cli] Kubectl client Simple pod Kubectl run [Slow] running a failing command with --leave-stdin-open": " [Suite:k8s]",
+
+	"[sig-cli] Kubectl client Simple pod Kubectl run [Slow] running a failing command without --restart=Never": " [Suite:k8s]",
+
+	"[sig-cli] Kubectl client Simple pod Kubectl run [Slow] running a failing command without --restart=Never, but with --rm": " [Suite:k8s]",
+
+	"[sig-cli] Kubectl client Simple pod Kubectl run running a failing command": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-cli] Kubectl client Simple pod Kubectl run running a successful command": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[sig-cli] Kubectl client Simple pod should contain last line of the log": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-cli] Kubectl client Simple pod should handle in-cluster config": " [Disabled:Broken] [Suite:k8s]",
-
-	"[sig-cli] Kubectl client Simple pod should return command exit codes [Slow] running a failing command with --leave-stdin-open": " [Suite:k8s]",
-
-	"[sig-cli] Kubectl client Simple pod should return command exit codes [Slow] running a failing command without --restart=Never": " [Suite:k8s]",
-
-	"[sig-cli] Kubectl client Simple pod should return command exit codes [Slow] running a failing command without --restart=Never, but with --rm": " [Suite:k8s]",
 
 	"[sig-cli] Kubectl client Simple pod should return command exit codes execing into a container with a failing command": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-cli] Kubectl client Simple pod should return command exit codes execing into a container with a successful command": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-cli] Kubectl client Simple pod should return command exit codes running a failing command": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-cli] Kubectl client Simple pod should return command exit codes should handle in-cluster config": " [Disabled:Broken] [Suite:k8s]",
 
-	"[sig-cli] Kubectl client Simple pod should return command exit codes running a successful command": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-cli] Kubectl client Simple pod should return command exit codes should support port-forward": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-cli] Kubectl client Simple pod should support exec through an HTTP proxy": " [Skipped:Proxy] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -789,13 +825,19 @@ var Annotations = map[string]string{
 
 	"[sig-cli] Kubectl client Simple pod should support inline execution and attach": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-cli] Kubectl client Simple pod should support port-forward": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
 	"[sig-cli] Kubectl client Update Demo should create and stop a replication controller  [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[sig-cli] Kubectl client Update Demo should scale a replication controller  [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
+	"[sig-cli] Kubectl client kubectl subresource flag GET on status subresource of built-in type (node) returns identical info as GET on the built-in type": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-cli] Kubectl client kubectl subresource flag should not be used in a bulk GET": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[sig-cli] Kubectl client kubectl wait should ignore not found error with --for=delete": " [Disabled:Broken] [Suite:k8s]",
+
+	"[sig-cli] Kubectl logs default container logs the second container is the default-container by annotation should log default container if not specified": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-cli] Kubectl logs logs should be able to retrieve and filter logs  [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[sig-instrumentation] Events API should delete a collection of events [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -815,6 +857,8 @@ var Annotations = map[string]string{
 
 	"[sig-instrumentation] MetricsGrabber should grab all metrics from a Scheduler.": " [Disabled:Broken] [Suite:k8s]",
 
+	"[sig-instrumentation] MetricsGrabber should grab all metrics slis from API server.": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[sig-instrumentation] Stackdriver Monitoring should have accelerator metrics [Feature:StackdriverAcceleratorMonitoring]": " [Disabled:Unimplemented] [Suite:k8s]",
 
 	"[sig-instrumentation] Stackdriver Monitoring should have cluster metrics [Feature:StackdriverMonitoring]": " [Disabled:Unimplemented] [Suite:k8s]",
@@ -830,6 +874,10 @@ var Annotations = map[string]string{
 	"[sig-network] CVE-2021-29923 IPv4 Service Type ClusterIP with leading zeros should work interpreted as decimal": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-network] ClusterDns [Feature:Example] should create pod that uses dns": " [Disabled:Broken] [Suite:k8s]",
+
+	"[sig-network] Connectivity Pod Lifecycle should be able to connect from a Pod to a terminating Pod": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-network] Connectivity Pod Lifecycle should be able to connect to other Pod from a terminating Pod": " [Disabled:RebaseInProgress] [Suite:k8s]",
 
 	"[sig-network] Conntrack should be able to preserve UDP traffic when initial unready endpoints get ready": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -877,7 +925,13 @@ var Annotations = map[string]string{
 
 	"[sig-network] EndpointSlice should have Endpoints and EndpointSlices pointing to API Server [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
+	"[sig-network] EndpointSlice should support a Service with multiple endpoint IPs specified in multiple EndpointSlices": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-network] EndpointSlice should support a Service with multiple ports specified in multiple EndpointSlices": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[sig-network] EndpointSlice should support creating EndpointSlice API operations [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[sig-network] EndpointSliceMirroring should mirror a custom Endpoint with multiple subsets and same IP address": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-network] EndpointSliceMirroring should mirror a custom Endpoints resource through create update and delete [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -935,25 +989,29 @@ var Annotations = map[string]string{
 
 	"[sig-network] LoadBalancers should have session affinity work for LoadBalancer service with ESIPP on [Slow] [LinuxOnly]": " [Suite:k8s]",
 
+	"[sig-network] LoadBalancers should not have connectivity disruption during rolling update with externalTrafficPolicy=Cluster [Slow]": " [Suite:k8s]",
+
+	"[sig-network] LoadBalancers should not have connectivity disruption during rolling update with externalTrafficPolicy=Local [Slow]": " [Suite:k8s]",
+
 	"[sig-network] LoadBalancers should only allow access from service loadbalancer source ranges [Slow]": " [Suite:k8s]",
 
 	"[sig-network] LoadBalancers should reconcile LB health check interval [Slow][Serial][Disruptive]": " [Suite:k8s]",
 
 	"[sig-network] Loadbalancing: L7 GCE [Slow] [Feature:Ingress] should conform to Ingress spec": " [Suite:k8s]",
 
-	"[sig-network] Loadbalancing: L7 GCE [Slow] [Feature:NEG] [Flaky] rolling update backend pods should not cause service disruption": " [Suite:k8s]",
+	"[sig-network] Loadbalancing: L7 GCE [Slow] [Feature:NEG] rolling update backend pods should not cause service disruption": " [Suite:k8s]",
 
-	"[sig-network] Loadbalancing: L7 GCE [Slow] [Feature:NEG] [Flaky] should be able to create a ClusterIP service": " [Suite:k8s]",
+	"[sig-network] Loadbalancing: L7 GCE [Slow] [Feature:NEG] should be able to create a ClusterIP service": " [Suite:k8s]",
 
-	"[sig-network] Loadbalancing: L7 GCE [Slow] [Feature:NEG] [Flaky] should be able to switch between IG and NEG modes": " [Suite:k8s]",
+	"[sig-network] Loadbalancing: L7 GCE [Slow] [Feature:NEG] should be able to switch between IG and NEG modes": " [Suite:k8s]",
 
-	"[sig-network] Loadbalancing: L7 GCE [Slow] [Feature:NEG] [Flaky] should conform to Ingress spec": " [Suite:k8s]",
+	"[sig-network] Loadbalancing: L7 GCE [Slow] [Feature:NEG] should conform to Ingress spec": " [Suite:k8s]",
 
-	"[sig-network] Loadbalancing: L7 GCE [Slow] [Feature:NEG] [Flaky] should create NEGs for all ports with the Ingress annotation, and NEGs for the standalone annotation otherwise": " [Suite:k8s]",
+	"[sig-network] Loadbalancing: L7 GCE [Slow] [Feature:NEG] should create NEGs for all ports with the Ingress annotation, and NEGs for the standalone annotation otherwise": " [Suite:k8s]",
 
-	"[sig-network] Loadbalancing: L7 GCE [Slow] [Feature:NEG] [Flaky] should sync endpoints for both Ingress-referenced NEG and standalone NEG": " [Suite:k8s]",
+	"[sig-network] Loadbalancing: L7 GCE [Slow] [Feature:NEG] should sync endpoints for both Ingress-referenced NEG and standalone NEG": " [Suite:k8s]",
 
-	"[sig-network] Loadbalancing: L7 GCE [Slow] [Feature:NEG] [Flaky] should sync endpoints to NEG": " [Suite:k8s]",
+	"[sig-network] Loadbalancing: L7 GCE [Slow] [Feature:NEG] should sync endpoints to NEG": " [Suite:k8s]",
 
 	"[sig-network] Loadbalancing: L7 Scalability GCE [Slow] [Serial] [Feature:IngressScale] Creating and updating ingresses should happen promptly with small/medium/large amount of ingresses": " [Suite:k8s]",
 
@@ -1047,11 +1105,11 @@ var Annotations = map[string]string{
 
 	"[sig-network] Netpol NetworkPolicy between server and client should work with Ingress, Egress specified together [Feature:NetworkPolicy]": " [Disabled:Broken] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:k8s]",
 
-	"[sig-network] Netpol [Feature:SCTPConnectivity][LinuxOnly][Disruptive] NetworkPolicy between server and client using SCTP should enforce policy based on Ports [Feature:NetworkPolicy]": " [Disabled:Broken] [Serial] [Skipped:Network/OpenShiftSDN/Multitenant] [Suite:k8s]",
+	"[sig-network] Netpol [Feature:SCTPConnectivity][LinuxOnly] NetworkPolicy between server and client using SCTP should enforce policy based on Ports [Feature:NetworkPolicy]": " [Disabled:Broken] [Skipped:Network/OpenShiftSDN/Multitenant] [Suite:k8s]",
 
-	"[sig-network] Netpol [Feature:SCTPConnectivity][LinuxOnly][Disruptive] NetworkPolicy between server and client using SCTP should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]": " [Disabled:Broken] [Serial] [Skipped:Network/OpenShiftSDN/Multitenant] [Suite:k8s]",
+	"[sig-network] Netpol [Feature:SCTPConnectivity][LinuxOnly] NetworkPolicy between server and client using SCTP should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]": " [Disabled:Broken] [Skipped:Network/OpenShiftSDN/Multitenant] [Suite:k8s]",
 
-	"[sig-network] Netpol [Feature:SCTPConnectivity][LinuxOnly][Disruptive] NetworkPolicy between server and client using SCTP should support a 'default-deny-ingress' policy [Feature:NetworkPolicy]": " [Disabled:Broken] [Serial] [Skipped:Network/OpenShiftSDN/Multitenant] [Suite:k8s]",
+	"[sig-network] Netpol [Feature:SCTPConnectivity][LinuxOnly] NetworkPolicy between server and client using SCTP should support a 'default-deny-ingress' policy [Feature:NetworkPolicy]": " [Disabled:Broken] [Skipped:Network/OpenShiftSDN/Multitenant] [Suite:k8s]",
 
 	"[sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client using UDP should enforce policy based on Ports [Feature:NetworkPolicy]": " [Disabled:Broken] [Skipped:Network/OpenShiftSDN/Multitenant] [Suite:k8s]",
 
@@ -1061,11 +1119,11 @@ var Annotations = map[string]string{
 
 	"[sig-network] NetworkPolicy API should support creating NetworkPolicy API operations": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-network] NetworkPolicy [Feature:SCTPConnectivity][LinuxOnly][Disruptive] NetworkPolicy between server and client using SCTP should enforce policy based on Ports [Feature:NetworkPolicy]": " [Serial] [Skipped:Network/OpenShiftSDN/Multitenant] [Suite:k8s]",
+	"[sig-network] NetworkPolicy [Feature:SCTPConnectivity][LinuxOnly] NetworkPolicy between server and client using SCTP should enforce policy based on Ports [Feature:NetworkPolicy]": " [Skipped:Network/OpenShiftSDN/Multitenant] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-network] NetworkPolicy [Feature:SCTPConnectivity][LinuxOnly][Disruptive] NetworkPolicy between server and client using SCTP should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]": " [Serial] [Skipped:Network/OpenShiftSDN/Multitenant] [Suite:k8s]",
+	"[sig-network] NetworkPolicy [Feature:SCTPConnectivity][LinuxOnly] NetworkPolicy between server and client using SCTP should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]": " [Skipped:Network/OpenShiftSDN/Multitenant] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-network] NetworkPolicy [Feature:SCTPConnectivity][LinuxOnly][Disruptive] NetworkPolicy between server and client using SCTP should support a 'default-deny' policy [Feature:NetworkPolicy]": " [Serial] [Skipped:Network/OpenShiftSDN/Multitenant] [Suite:k8s]",
+	"[sig-network] NetworkPolicy [Feature:SCTPConnectivity][LinuxOnly] NetworkPolicy between server and client using SCTP should support a 'default-deny' policy [Feature:NetworkPolicy]": " [Skipped:Network/OpenShiftSDN/Multitenant] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-network] NetworkPolicyLegacy [LinuxOnly] NetworkPolicy between server and client should allow egress access on one named port [Feature:NetworkPolicy]": " [Skipped:Network/OVNKubernetes] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -1113,7 +1171,7 @@ var Annotations = map[string]string{
 
 	"[sig-network] NetworkPolicyLegacy [LinuxOnly] NetworkPolicy between server and client should ensure an IP overlapping both IPBlock.CIDR and IPBlock.Except is allowed [Feature:NetworkPolicy]": " [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-network] NetworkPolicyLegacy [LinuxOnly] NetworkPolicy between server and client should not allow access by TCP when a policy specifies only SCTP [Feature:NetworkPolicy]": " [Skipped:Network/OpenShiftSDN/Multitenant] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-network] NetworkPolicyLegacy [LinuxOnly] NetworkPolicy between server and client should not allow access by TCP when a policy specifies only SCTP [Feature:NetworkPolicy] [Serial]": " [Skipped:Network/OpenShiftSDN/Multitenant] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-network] NetworkPolicyLegacy [LinuxOnly] NetworkPolicy between server and client should stop enforcing policies after they are deleted [Feature:NetworkPolicy]": " [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -1127,13 +1185,13 @@ var Annotations = map[string]string{
 
 	"[sig-network] Networking Granular Checks: Pods should function for intra-pod communication: http [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[sig-network] Networking Granular Checks: Pods should function for intra-pod communication: sctp [LinuxOnly][Feature:SCTPConnectivity][Disruptive]": " [Serial] [Suite:k8s]",
+	"[sig-network] Networking Granular Checks: Pods should function for intra-pod communication: sctp [LinuxOnly][Feature:SCTPConnectivity]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-network] Networking Granular Checks: Pods should function for intra-pod communication: udp [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[sig-network] Networking Granular Checks: Pods should function for node-pod communication: http [LinuxOnly] [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[sig-network] Networking Granular Checks: Pods should function for node-pod communication: sctp [LinuxOnly][Feature:SCTPConnectivity][Disruptive]": " [Serial] [Suite:k8s]",
+	"[sig-network] Networking Granular Checks: Pods should function for node-pod communication: sctp [LinuxOnly][Feature:SCTPConnectivity]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-network] Networking Granular Checks: Pods should function for node-pod communication: udp [LinuxOnly] [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -1147,7 +1205,7 @@ var Annotations = map[string]string{
 
 	"[sig-network] Networking Granular Checks: Services should function for endpoint-Service: http": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-network] Networking Granular Checks: Services should function for endpoint-Service: sctp [Feature:SCTPConnectivity][Disruptive]": " [Serial] [Suite:k8s]",
+	"[sig-network] Networking Granular Checks: Services should function for endpoint-Service: sctp [Feature:SCTPConnectivity]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-network] Networking Granular Checks: Services should function for endpoint-Service: udp": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -1155,13 +1213,13 @@ var Annotations = map[string]string{
 
 	"[sig-network] Networking Granular Checks: Services should function for node-Service: http": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-network] Networking Granular Checks: Services should function for node-Service: sctp [Feature:SCTPConnectivity][Disruptive]": " [Serial] [Suite:k8s]",
+	"[sig-network] Networking Granular Checks: Services should function for node-Service: sctp [Feature:SCTPConnectivity]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-network] Networking Granular Checks: Services should function for node-Service: udp": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-network] Networking Granular Checks: Services should function for pod-Service: http": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-network] Networking Granular Checks: Services should function for pod-Service: sctp [Feature:SCTPConnectivity][Disruptive]": " [Serial] [Suite:k8s]",
+	"[sig-network] Networking Granular Checks: Services should function for pod-Service: sctp [Feature:SCTPConnectivity]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-network] Networking Granular Checks: Services should function for pod-Service: udp": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -1178,6 +1236,8 @@ var Annotations = map[string]string{
 	"[sig-network] Networking Granular Checks: Services should update nodePort: udp [Slow]": " [Suite:k8s]",
 
 	"[sig-network] Networking IPerf2 [Feature:Networking-Performance] should run iperf2": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-network] Networking should allow creating a Pod with an SCTP HostPort [LinuxOnly] [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-network] Networking should check kube-proxy urls": " [Disabled:Broken] [Suite:k8s]",
 
@@ -1203,15 +1263,11 @@ var Annotations = map[string]string{
 
 	"[sig-network] Proxy version v1 should proxy through a service and a pod  [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[sig-network] SCTP [LinuxOnly] should allow creating a basic SCTP service with pod and endpoints": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-network] SCTP [LinuxOnly] should create a ClusterIP Service with SCTP ports": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-network] SCTP [LinuxOnly] should create a Pod with SCTP HostPort": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
 	"[sig-network] Service endpoints latency should not be very high  [Conformance]": " [Serial] [Suite:openshift/conformance/serial/minimal] [Suite:k8s]",
 
 	"[sig-network] Services GCE [Slow] should be able to create and tear down a standard-tier load balancer [Slow]": " [Suite:k8s]",
+
+	"[sig-network] Services should allow creating a basic SCTP service with pod and endpoints [LinuxOnly] [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-network] Services should allow pods to hairpin back to themselves through services": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -1295,6 +1351,8 @@ var Annotations = map[string]string{
 
 	"[sig-network] Services should serve endpoints on same port and different protocol for internal traffic on Type LoadBalancer ": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
+	"[sig-network] Services should serve endpoints on same port and different protocols": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[sig-network] Services should serve multiport endpoints from pods  [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[sig-network] Services should test the lifecycle of an Endpoint [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
@@ -1323,7 +1381,7 @@ var Annotations = map[string]string{
 
 	"[sig-network] [Feature:IPv6DualStack] Granular Checks: Services Secondary IP Family [LinuxOnly] should function for pod-Service: http": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-network] [Feature:IPv6DualStack] Granular Checks: Services Secondary IP Family [LinuxOnly] should function for pod-Service: sctp [Feature:SCTPConnectivity][Disruptive]": " [Serial] [Suite:k8s]",
+	"[sig-network] [Feature:IPv6DualStack] Granular Checks: Services Secondary IP Family [LinuxOnly] should function for pod-Service: sctp [Feature:SCTPConnectivity]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-network] [Feature:IPv6DualStack] Granular Checks: Services Secondary IP Family [LinuxOnly] should function for pod-Service: udp": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -1479,6 +1537,72 @@ var Annotations = map[string]string{
 
 	"[sig-node] NodeProblemDetector should run without error": " [Disabled:SpecialConfig] [Suite:k8s]",
 
+	"[sig-node] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling] BestEffort pod - try requesting memory, expect error": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling] Burstable QoS pod, one container - decrease CPU (RestartContainer) & memory (NotRequired)": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - decrease CPU limits only": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - decrease CPU requests and increase CPU limits": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - decrease CPU requests and increase memory limits": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - decrease CPU requests and limits": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - decrease CPU requests only": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - decrease memory limits only": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - decrease memory requests and increase CPU limits": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - decrease memory requests and increase memory limits": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - decrease memory requests and limits": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - decrease memory requests only": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - increase CPU limits only": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - increase CPU requests and decrease CPU limits": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - increase CPU requests and decrease memory limits": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - increase CPU requests and limits": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - increase CPU requests only": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - increase memory limits only": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - increase memory requests and decrease CPU limits": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - increase memory requests and decrease memory limits": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - increase memory requests and limits": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - increase memory requests only": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests - decrease memory request": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling] Burstable QoS pod, three containers - decrease c1 resources, increase c2 resources, no change for c3 (net increase for pod)": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling] Burstable QoS pod, three containers - increase c1 resources, no change for c2, decrease c3 resources (no net change for pod)": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling] Burstable QoS pod, three containers - no change for c1, increase c2 resources, decrease c3 (net decrease for pod)": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling] Guaranteed QoS pod, one container - decrease CPU & increase memory": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling] Guaranteed QoS pod, one container - decrease CPU & memory": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling] Guaranteed QoS pod, one container - increase CPU & decrease memory": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling] Guaranteed QoS pod, one container - increase CPU & memory": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling] Guaranteed QoS pod, one container - increase CPU (NotRequired) & memory (RestartContainer)": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling] Guaranteed QoS pod, three containers (c1, c2, c3) - increase: CPU (c1,c3), memory (c2) ; decrease: CPU (c2), memory (c1,c3)": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling] pod-resize-resource-quota-test": " [Disabled:Alpha] [Suite:k8s]",
+
 	"[sig-node] Pod garbage collector [Feature:PodGarbageCollector] [Slow] should handle the creation of 1000 pods": " [Suite:k8s]",
 
 	"[sig-node] PodOSRejection [NodeConformance] Kubelet should reject pod when the node OS doesn't match pod's OS": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
@@ -1498,6 +1622,8 @@ var Annotations = map[string]string{
 	"[sig-node] Pods Extended Pod Container lifecycle evicted pods should be terminal": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-node] Pods Extended Pod Container lifecycle should not create extra sandbox if all containers are done": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-node] Pods Extended Pod TerminationGracePeriodSeconds is negative pod with negative grace period": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-node] Pods Extended Pods Set QOS Class should be set on Pods with matching resource requests and limits for memory and cpu [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -1537,7 +1663,7 @@ var Annotations = map[string]string{
 
 	"[sig-node] Probing container should *not* be restarted with a /healthz http liveness probe [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[sig-node] Probing container should *not* be restarted with a GRPC liveness probe [NodeConformance]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] Probing container should *not* be restarted with a GRPC liveness probe [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[sig-node] Probing container should *not* be restarted with a exec \"cat /tmp/health\" liveness probe [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -1553,7 +1679,7 @@ var Annotations = map[string]string{
 
 	"[sig-node] Probing container should be restarted with a /healthz http liveness probe [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[sig-node] Probing container should be restarted with a GRPC liveness probe [NodeConformance]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] Probing container should be restarted with a GRPC liveness probe [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[sig-node] Probing container should be restarted with a exec \"cat /tmp/health\" liveness probe [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -1699,6 +1825,8 @@ var Annotations = map[string]string{
 
 	"[sig-node] [Feature:Example] Secret should create a pod that reads a secret": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
+	"[sig-node] [Serial] Pod InPlace Resize Container (scheduler-focused) [Feature:InPlacePodVerticalScaling] pod-resize-scheduler-tests": " [Disabled:Alpha] [Suite:k8s]",
+
 	"[sig-node] crictl should be able to run crictl on the node": " [Disabled:Broken] [Suite:k8s]",
 
 	"[sig-node] kubelet Clean up pods on node kubelet should be able to delete 10 pods per node in 1m0s.": " [Serial] [Suite:openshift/conformance/serial] [Suite:k8s]",
@@ -1706,12 +1834,6 @@ var Annotations = map[string]string{
 	"[sig-node] kubelet host cleanup with volume mounts [HostCleanup][Flaky] Host cleanup after disrupting NFS volume [NFS] after stopping the nfs-server and deleting the (active) client pod, the NFS mount and the pod's UID directory should be removed.": " [Suite:k8s]",
 
 	"[sig-node] kubelet host cleanup with volume mounts [HostCleanup][Flaky] Host cleanup after disrupting NFS volume [NFS] after stopping the nfs-server and deleting the (sleeping) client pod, the NFS mount and the pod's UID directory should be removed.": " [Suite:k8s]",
-
-	"[sig-node] kubelet kubectl node-logs <node-name> [Feature:add node log viewer] should return the logs ": " [Disabled:Alpha] [Suite:k8s]",
-
-	"[sig-node] kubelet kubectl node-logs <node-name> [Feature:add node log viewer] should return the logs for the provided path": " [Disabled:Alpha] [Suite:k8s]",
-
-	"[sig-node] kubelet kubectl node-logs <node-name> [Feature:add node log viewer] should return the logs for the requested service": " [Disabled:Alpha] [Suite:k8s]",
 
 	"[sig-scheduling] GPUDevicePluginAcrossRecreate [Feature:Recreate] run Nvidia GPU Device Plugin tests with a recreation": " [Disabled:SpecialConfig] [Suite:k8s]",
 
@@ -1725,7 +1847,7 @@ var Annotations = map[string]string{
 
 	"[sig-scheduling] SchedulerPredicates [Serial] PodTopologySpread Filtering validates 4 pods with MaxSkew=1 are evenly distributed into 2 nodes": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[sig-scheduling] SchedulerPredicates [Serial] validates Pods with non-empty schedulingGates are blocked on scheduling [Feature:PodSchedulingReadiness] [alpha]": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-scheduling] SchedulerPredicates [Serial] validates Pods with non-empty schedulingGates are blocked on scheduling": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-scheduling] SchedulerPredicates [Serial] validates local ephemeral storage resource limits of pods that are allowed to run [Feature:LocalStorageCapacityIsolation]": " [Disabled:SpecialConfig] [Suite:k8s]",
 
@@ -1809,6 +1931,8 @@ var Annotations = map[string]string{
 
 	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (block volmode)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
+	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (block volmode)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with mount options": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
@@ -1849,6 +1973,8 @@ var Annotations = map[string]string{
 
 	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
+	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with mount options": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
@@ -1859,9 +1985,9 @@ var Annotations = map[string]string{
 
 	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)] read-write-once-pod[Feature:ReadWriteOncePod] should block a second pod from using an in-use ReadWriteOncePod volume on the same node": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)] read-write-once-pod should block a second pod from using an in-use ReadWriteOncePod volume on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)] read-write-once-pod[Feature:ReadWriteOncePod] should block a second pod from using an in-use ReadWriteOncePod volume": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)] read-write-once-pod should preempt lower priority pods using ReadWriteOncePod volumes": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -1939,13 +2065,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ext4)] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
 	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
 
@@ -2004,6 +2130,8 @@ var Annotations = map[string]string{
 	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] multiVolume [Slow] should concurrently access the volume and restored snapshot from pods on the same node [LinuxOnly][Feature:VolumeSnapshotDataSource][Feature:VolumeSourceXFS]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
 	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -2273,13 +2401,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Pre-provisioned PV (ext4)] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
 	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
 
@@ -2361,6 +2489,8 @@ var Annotations = map[string]string{
 
 	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (block volmode)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
+	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (block volmode)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+
 	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with any volume data source [Serial]": " [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with mount options": " [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
@@ -2401,6 +2531,8 @@ var Annotations = map[string]string{
 
 	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (default fs)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
+	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (default fs)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+
 	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with any volume data source [Serial]": " [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with mount options": " [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
@@ -2411,9 +2543,9 @@ var Annotations = map[string]string{
 
 	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (default fs)] read-write-once-pod[Feature:ReadWriteOncePod] should block a second pod from using an in-use ReadWriteOncePod volume on the same node": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (default fs)] read-write-once-pod should block a second pod from using an in-use ReadWriteOncePod volume on the same node": " [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (default fs)] read-write-once-pod[Feature:ReadWriteOncePod] should block a second pod from using an in-use ReadWriteOncePod volume": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (default fs)] read-write-once-pod should preempt lower priority pods using ReadWriteOncePod volumes": " [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (default fs)] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": " [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -2491,13 +2623,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ext4)] volumes should store data": " [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Skipped:gce] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Skipped:gce] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Skipped:gce] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Skipped:gce] [Suite:k8s]",
 
 	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Skipped:gce] [Suite:k8s]",
 
@@ -2556,6 +2688,8 @@ var Annotations = map[string]string{
 	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] multiVolume [Slow] should concurrently access the volume and restored snapshot from pods on the same node [LinuxOnly][Feature:VolumeSnapshotDataSource][Feature:VolumeSourceXFS]": " [Skipped:NoOptionalCapabilities] [Skipped:gce] [Suite:k8s]",
 
 	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should mount multiple PV pointing to the same storage on the same node": " [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+
+	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with any volume data source [Serial]": " [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -2825,13 +2959,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Pre-provisioned PV (ext4)] volumes should store data": " [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Skipped:gce] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Skipped:gce] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Skipped:gce] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Skipped:gce] [Suite:k8s]",
 
 	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Skipped:gce] [Suite:k8s]",
 
@@ -2872,112 +3006,6 @@ var Annotations = map[string]string{
 	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Pre-provisioned Snapshot (retain policy)] snapshottable[Feature:VolumeSnapshotDataSource] volume snapshot controller should check snapshot fields, check restore correctly works after modifying source data, check deletion (persistent)": " [Skipped:NoOptionalCapabilities] [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Pre-provisioned Snapshot (retain policy)] snapshottable[Feature:VolumeSnapshotDataSource] volume snapshot controller should check snapshot fields, check restore correctly works, check deletion (ephemeral)": " [Skipped:NoOptionalCapabilities] [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSI CSIDriver deployment after pod creation using non-attachable mock driver should bringup pod after deploying CSIDriver attach=false [Slow]": " [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSI FSGroupPolicy [LinuxOnly] should modify fsGroup if fsGroupPolicy=File": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSI FSGroupPolicy [LinuxOnly] should modify fsGroup if fsGroupPolicy=default": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSI FSGroupPolicy [LinuxOnly] should not modify fsGroup if fsGroupPolicy=None": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSI NodeStage error cases [Slow] should call NodeUnstage after NodeStage ephemeral error": " [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSI NodeStage error cases [Slow] should call NodeUnstage after NodeStage success": " [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSI NodeStage error cases [Slow] should not call NodeUnstage after NodeStage final error": " [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSI NodeStage error cases [Slow] should retry NodeStage after NodeStage ephemeral error": " [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSI NodeStage error cases [Slow] should retry NodeStage after NodeStage final error": " [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSI NodeUnstage error cases [Slow] should call NodeStage after NodeUnstage success": " [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSI NodeUnstage error cases [Slow] two pods: should call NodeStage after previous NodeUnstage final error": " [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSI NodeUnstage error cases [Slow] two pods: should call NodeStage after previous NodeUnstage transient error": " [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSI Snapshot Controller metrics [Feature:VolumeSnapshotDataSource] snapshot controller should emit dynamic CreateSnapshot, CreateSnapshotAndReady, and DeleteSnapshot metrics": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSI Snapshot Controller metrics [Feature:VolumeSnapshotDataSource] snapshot controller should emit pre-provisioned CreateSnapshot, CreateSnapshotAndReady, and DeleteSnapshot metrics": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSI Volume Snapshots [Feature:VolumeSnapshotDataSource] volumesnapshotcontent and pvc in Bound state with deletion timestamp set should not get deleted while snapshot finalizer exists": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSI Volume Snapshots secrets [Feature:VolumeSnapshotDataSource] volume snapshot create/delete with secrets": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSI Volume expansion should expand volume by restarting pod if attach=off, nodeExpansion=on": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSI Volume expansion should expand volume by restarting pod if attach=on, nodeExpansion=on": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSI Volume expansion should expand volume without restarting pod if nodeExpansion=off": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSI Volume expansion should not expand volume if resizingOnDriver=off, resizingOnSC=on": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSI attach test using mock driver should not require VolumeAttach for drivers without attachment": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSI attach test using mock driver should preserve attachment policy when no CSIDriver present": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSI attach test using mock driver should require VolumeAttach for drivers with attachment": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSI attach test using mock driver should require VolumeAttach for ephemermal volume and drivers with attachment": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSI online volume expansion should expand volume without restarting pod if attach=off, nodeExpansion=on": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSI online volume expansion should expand volume without restarting pod if attach=on, nodeExpansion=on": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSI volume limit information using mock driver should report attach limit for generic ephemeral volume when persistent volume is attached [Slow]": " [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSI volume limit information using mock driver should report attach limit for persistent volume when generic ephemeral volume is attached [Slow]": " [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSI volume limit information using mock driver should report attach limit when limit is bigger than 0 [Slow]": " [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSI workload information using mock driver contain ephemeral=true when using inline volume": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSI workload information using mock driver should be passed when podInfoOnMount=true": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSI workload information using mock driver should not be passed when CSIDriver does not exist": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSI workload information using mock driver should not be passed when podInfoOnMount=false": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSI workload information using mock driver should not be passed when podInfoOnMount=nil": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSIServiceAccountToken token should be plumbed down when csiServiceAccountTokenEnabled=true": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSIServiceAccountToken token should not be plumbed down when CSIDriver is not deployed": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSIServiceAccountToken token should not be plumbed down when csiServiceAccountTokenEnabled=false": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSIStorageCapacity CSIStorageCapacity disabled": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSIStorageCapacity CSIStorageCapacity unused": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSIStorageCapacity CSIStorageCapacity used, have capacity": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSIStorageCapacity CSIStorageCapacity used, insufficient capacity": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume CSIStorageCapacity CSIStorageCapacity used, no capacity": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume Delegate FSGroup to CSI driver [LinuxOnly] should not pass FSGroup to CSI driver if it is set in pod and driver supports VOLUME_MOUNT_GROUP": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume Delegate FSGroup to CSI driver [LinuxOnly] should pass FSGroup to CSI driver if it is set in pod and driver supports VOLUME_MOUNT_GROUP": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume SELinuxMount [LinuxOnly][Feature:SELinux][Feature:SELinuxMountReadWriteOncePod] should add SELinux mount option to existing mount options": " [Disabled:Alpha] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume SELinuxMount [LinuxOnly][Feature:SELinux][Feature:SELinuxMountReadWriteOncePod] should not pass SELinux mount option for CSI driver that does not support SELinux mount": " [Disabled:Alpha] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume SELinuxMount [LinuxOnly][Feature:SELinux][Feature:SELinuxMountReadWriteOncePod] should not pass SELinux mount option for Pod without SELinux context": " [Disabled:Alpha] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume SELinuxMount [LinuxOnly][Feature:SELinux][Feature:SELinuxMountReadWriteOncePod] should not pass SELinux mount option for RWO volume": " [Disabled:Alpha] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume SELinuxMount [LinuxOnly][Feature:SELinux][Feature:SELinuxMountReadWriteOncePod] should pass SELinux mount option for RWOP volume and Pod with SELinux context set": " [Disabled:Alpha] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume storage capacity exhausted, immediate binding": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume storage capacity exhausted, late binding, no topology": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume storage capacity exhausted, late binding, with topology": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-storage] CSI mock volume storage capacity unlimited": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] CSIInlineVolumes should support CSIVolumeSource in Pod API [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -3125,8 +3153,6 @@ var Annotations = map[string]string{
 
 	"[sig-storage] Flexvolumes should be mountable when non-attachable": " [Skipped:gce] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] GKE local SSD [Feature:GKELocalSSD] should write and read from node local SSD [Feature:GKELocalSSD]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
 	"[sig-storage] GenericPersistentVolume[Disruptive] When kubelet restarts Should test that a file written to the mount before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
 
 	"[sig-storage] GenericPersistentVolume[Disruptive] When kubelet restarts Should test that a volume mounted to a pod that is deleted while the kubelet is down unmounts when the kubelet returns.": " [Serial] [Suite:k8s]",
@@ -3239,6 +3265,8 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (block volmode)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
+	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (block volmode)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with any volume data source [Serial]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with mount options": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
@@ -3278,6 +3306,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (OnRootMismatch)[LinuxOnly], pod created with an initial fsgroup, volume contents ownership changed via chgrp in first pod, new pod with same fsgroup skips ownership changes to the volume contents": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with any volume data source [Serial]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -3365,13 +3395,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ext4)] volumes should store data": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
@@ -3428,6 +3458,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] multiVolume [Slow] should concurrently access the volume and restored snapshot from pods on the same node [LinuxOnly][Feature:VolumeSnapshotDataSource][Feature:VolumeSourceXFS]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should mount multiple PV pointing to the same storage on the same node": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with any volume data source [Serial]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -3677,13 +3709,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (ext4)] volumes should store data": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
@@ -3747,6 +3779,8 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (block volmode)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (block volmode)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with mount options": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
@@ -3786,6 +3820,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (OnRootMismatch)[LinuxOnly], pod created with an initial fsgroup, volume contents ownership changed via chgrp in first pod, new pod with same fsgroup skips ownership changes to the volume contents": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (default fs)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (default fs)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -3873,13 +3909,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ext4)] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
 
@@ -3936,6 +3972,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] multiVolume [Slow] should concurrently access the volume and restored snapshot from pods on the same node [LinuxOnly][Feature:VolumeSnapshotDataSource][Feature:VolumeSourceXFS]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -4185,13 +4223,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (ext4)] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
 
@@ -4255,6 +4293,8 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Dynamic PV (block volmode)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
+	"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Dynamic PV (block volmode)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with mount options": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
@@ -4296,6 +4336,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (OnRootMismatch)[LinuxOnly], pod created with an initial fsgroup, volume contents ownership changed via chgrp in first pod, new pod with same fsgroup skips ownership changes to the volume contents": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Dynamic PV (default fs)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Dynamic PV (default fs)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -4383,13 +4425,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Dynamic PV (ext4)] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
 
@@ -4446,6 +4488,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] multiVolume [Slow] should concurrently access the volume and restored snapshot from pods on the same node [LinuxOnly][Feature:VolumeSnapshotDataSource][Feature:VolumeSourceXFS]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -4697,13 +4741,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Pre-provisioned PV (ext4)] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
 
@@ -4767,6 +4811,8 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (block volmode)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Disabled:Unsupported] [Suite:k8s]",
 
+	"[sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (block volmode)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Disabled:Unsupported] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
+
 	"[sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with any volume data source [Serial]": " [Disabled:Unsupported] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with mount options": " [Disabled:Unsupported] [Suite:k8s]",
@@ -4808,6 +4854,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (OnRootMismatch)[LinuxOnly], pod created with an initial fsgroup, volume contents ownership changed via chgrp in first pod, new pod with same fsgroup skips ownership changes to the volume contents": " [Disabled:Unsupported] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (default fs)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Disabled:Unsupported] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (default fs)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Disabled:Unsupported] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with any volume data source [Serial]": " [Disabled:Unsupported] [Suite:k8s]",
 
@@ -4895,13 +4943,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ext4)] volumes should store data": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Disabled:Unsupported] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Disabled:Unsupported] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Disabled:Unsupported] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Disabled:Unsupported] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Disabled:Unsupported] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Disabled:Unsupported] [Suite:k8s]",
 
@@ -4958,6 +5006,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] multiVolume [Slow] should concurrently access the volume and restored snapshot from pods on the same node [LinuxOnly][Feature:VolumeSnapshotDataSource][Feature:VolumeSourceXFS]": " [Disabled:Unsupported] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should mount multiple PV pointing to the same storage on the same node": " [Disabled:Unsupported] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Disabled:Unsupported] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with any volume data source [Serial]": " [Disabled:Unsupported] [Suite:k8s]",
 
@@ -5209,13 +5259,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Pre-provisioned PV (ext4)] volumes should store data": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Disabled:Unsupported] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Disabled:Unsupported] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Disabled:Unsupported] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Disabled:Unsupported] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Disabled:Unsupported] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Disabled:Unsupported] [Suite:k8s]",
 
@@ -5279,6 +5329,8 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (block volmode)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
+	"[sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (block volmode)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with mount options": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
@@ -5318,6 +5370,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (OnRootMismatch)[LinuxOnly], pod created with an initial fsgroup, volume contents ownership changed via chgrp in first pod, new pod with same fsgroup skips ownership changes to the volume contents": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (default fs)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (default fs)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -5405,13 +5459,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ext4)] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
 
@@ -5468,6 +5522,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] multiVolume [Slow] should concurrently access the volume and restored snapshot from pods on the same node [LinuxOnly][Feature:VolumeSnapshotDataSource][Feature:VolumeSourceXFS]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -5717,13 +5773,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Pre-provisioned PV (ext4)] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
 
@@ -5787,6 +5843,8 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (block volmode)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
+	"[sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (block volmode)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with mount options": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
@@ -5828,6 +5886,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (OnRootMismatch)[LinuxOnly], pod created with an initial fsgroup, volume contents ownership changed via chgrp in first pod, new pod with same fsgroup skips ownership changes to the volume contents": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (default fs)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (default fs)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -5915,13 +5975,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ext4)] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
 
@@ -5978,6 +6038,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] multiVolume [Slow] should concurrently access the volume and restored snapshot from pods on the same node [LinuxOnly][Feature:VolumeSnapshotDataSource][Feature:VolumeSourceXFS]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -6229,13 +6291,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Pre-provisioned PV (ext4)] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
 
@@ -6299,6 +6361,8 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (block volmode)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
+	"[sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (block volmode)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with mount options": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
@@ -6340,6 +6404,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (OnRootMismatch)[LinuxOnly], pod created with an initial fsgroup, volume contents ownership changed via chgrp in first pod, new pod with same fsgroup skips ownership changes to the volume contents": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (default fs)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (default fs)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -6427,13 +6493,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ext4)] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
 
@@ -6490,6 +6556,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] multiVolume [Slow] should concurrently access the volume and restored snapshot from pods on the same node [LinuxOnly][Feature:VolumeSnapshotDataSource][Feature:VolumeSourceXFS]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -6741,13 +6809,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Pre-provisioned PV (ext4)] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
 
@@ -6811,6 +6879,8 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (block volmode)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
+	"[sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (block volmode)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with mount options": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
@@ -6852,6 +6922,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (OnRootMismatch)[LinuxOnly], pod created with an initial fsgroup, volume contents ownership changed via chgrp in first pod, new pod with same fsgroup skips ownership changes to the volume contents": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (default fs)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (default fs)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -6939,13 +7011,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ext4)] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
 
@@ -7002,6 +7074,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] multiVolume [Slow] should concurrently access the volume and restored snapshot from pods on the same node [LinuxOnly][Feature:VolumeSnapshotDataSource][Feature:VolumeSourceXFS]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -7253,13 +7327,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Pre-provisioned PV (ext4)] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
 
@@ -7323,6 +7397,8 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (block volmode)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Disabled:Broken] [Suite:k8s]",
 
+	"[sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (block volmode)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Disabled:Broken] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
+
 	"[sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with any volume data source [Serial]": " [Disabled:Broken] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with mount options": " [Disabled:Broken] [Suite:k8s]",
@@ -7362,6 +7438,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (OnRootMismatch)[LinuxOnly], pod created with an initial fsgroup, volume contents ownership changed via chgrp in first pod, new pod with same fsgroup skips ownership changes to the volume contents": " [Disabled:Broken] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (default fs)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Disabled:Broken] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (default fs)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Disabled:Broken] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with any volume data source [Serial]": " [Disabled:Broken] [Suite:k8s]",
 
@@ -7449,13 +7527,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ext4)] volumes should store data": " [Disabled:Broken] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Disabled:Broken] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Disabled:Broken] [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Disabled:Broken] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Disabled:Broken] [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Disabled:Broken] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Disabled:Broken] [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Disabled:Broken] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Disabled:Broken] [Serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Disabled:Broken] [Serial] [Suite:k8s]",
 
@@ -7512,6 +7590,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] multiVolume [Slow] should concurrently access the volume and restored snapshot from pods on the same node [LinuxOnly][Feature:VolumeSnapshotDataSource][Feature:VolumeSourceXFS]": " [Disabled:Broken] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should mount multiple PV pointing to the same storage on the same node": " [Disabled:Broken] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Disabled:Broken] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with any volume data source [Serial]": " [Disabled:Broken] [Suite:k8s]",
 
@@ -7761,13 +7841,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Pre-provisioned PV (ext4)] volumes should store data": " [Disabled:Broken] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Disabled:Broken] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Disabled:Broken] [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Disabled:Broken] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Disabled:Broken] [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Disabled:Broken] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Disabled:Broken] [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Disabled:Broken] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Disabled:Broken] [Serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Disabled:Broken] [Serial] [Suite:k8s]",
 
@@ -7831,6 +7911,8 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (block volmode)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (block volmode)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with mount options": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
@@ -7870,6 +7952,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (OnRootMismatch)[LinuxOnly], pod created with an initial fsgroup, volume contents ownership changed via chgrp in first pod, new pod with same fsgroup skips ownership changes to the volume contents": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (default fs)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (default fs)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -7957,13 +8041,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ext4)] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
 
@@ -8020,6 +8104,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] multiVolume [Slow] should concurrently access the volume and restored snapshot from pods on the same node [LinuxOnly][Feature:VolumeSnapshotDataSource][Feature:VolumeSourceXFS]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -8269,13 +8355,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Pre-provisioned PV (ext4)] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
 
@@ -8339,6 +8425,8 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (block volmode)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (block volmode)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with mount options": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
@@ -8380,6 +8468,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (OnRootMismatch)[LinuxOnly], pod created with an initial fsgroup, volume contents ownership changed via chgrp in first pod, new pod with same fsgroup skips ownership changes to the volume contents": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (default fs)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (default fs)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -8467,13 +8557,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ext4)] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
 
@@ -8530,6 +8620,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] multiVolume [Slow] should concurrently access the volume and restored snapshot from pods on the same node [LinuxOnly][Feature:VolumeSnapshotDataSource][Feature:VolumeSourceXFS]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -8781,13 +8873,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Pre-provisioned PV (ext4)] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
 
@@ -8851,6 +8943,8 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (block volmode)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (block volmode)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with mount options": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
@@ -8892,6 +8986,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (OnRootMismatch)[LinuxOnly], pod created with an initial fsgroup, volume contents ownership changed via chgrp in first pod, new pod with same fsgroup skips ownership changes to the volume contents": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (default fs)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (default fs)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -8979,13 +9075,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ext4)] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
 
@@ -9042,6 +9138,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] multiVolume [Slow] should concurrently access the volume and restored snapshot from pods on the same node [LinuxOnly][Feature:VolumeSnapshotDataSource][Feature:VolumeSourceXFS]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -9293,13 +9391,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Pre-provisioned PV (ext4)] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
 
@@ -9363,6 +9461,8 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (block volmode)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (block volmode)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with mount options": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
@@ -9404,6 +9504,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (OnRootMismatch)[LinuxOnly], pod created with an initial fsgroup, volume contents ownership changed via chgrp in first pod, new pod with same fsgroup skips ownership changes to the volume contents": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (default fs)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (default fs)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -9491,13 +9593,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ext4)] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
 
@@ -9554,6 +9656,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] multiVolume [Slow] should concurrently access the volume and restored snapshot from pods on the same node [LinuxOnly][Feature:VolumeSnapshotDataSource][Feature:VolumeSourceXFS]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -9805,13 +9909,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Pre-provisioned PV (ext4)] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
 
@@ -9875,6 +9979,8 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (block volmode)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (block volmode)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with mount options": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
@@ -9916,6 +10022,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (OnRootMismatch)[LinuxOnly], pod created with an initial fsgroup, volume contents ownership changed via chgrp in first pod, new pod with same fsgroup skips ownership changes to the volume contents": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (default fs)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (default fs)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -10003,13 +10111,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ext4)] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
 
@@ -10066,6 +10174,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] multiVolume [Slow] should concurrently access the volume and restored snapshot from pods on the same node [LinuxOnly][Feature:VolumeSnapshotDataSource][Feature:VolumeSourceXFS]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -10317,13 +10427,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Pre-provisioned PV (ext4)] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
 
@@ -10387,6 +10497,8 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (block volmode)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (block volmode)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with mount options": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
@@ -10428,6 +10540,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (OnRootMismatch)[LinuxOnly], pod created with an initial fsgroup, volume contents ownership changed via chgrp in first pod, new pod with same fsgroup skips ownership changes to the volume contents": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (default fs)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (default fs)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -10515,13 +10629,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ext4)] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
 
@@ -10578,6 +10692,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] multiVolume [Slow] should concurrently access the volume and restored snapshot from pods on the same node [LinuxOnly][Feature:VolumeSnapshotDataSource][Feature:VolumeSourceXFS]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -10829,13 +10945,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Pre-provisioned PV (ext4)] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
 
@@ -10899,6 +11015,8 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (block volmode)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (block volmode)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with any volume data source [Serial]": " [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with mount options": " [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
@@ -10940,6 +11058,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (OnRootMismatch)[LinuxOnly], pod created with an initial fsgroup, volume contents ownership changed via chgrp in first pod, new pod with same fsgroup skips ownership changes to the volume contents": " [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (default fs)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (default fs)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with any volume data source [Serial]": " [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -11027,13 +11147,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ext4)] volumes should store data": " [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Skipped:gce] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Skipped:gce] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Skipped:gce] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Skipped:gce] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Skipped:gce] [Suite:k8s]",
 
@@ -11090,6 +11210,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] multiVolume [Slow] should concurrently access the volume and restored snapshot from pods on the same node [LinuxOnly][Feature:VolumeSnapshotDataSource][Feature:VolumeSourceXFS]": " [Skipped:NoOptionalCapabilities] [Skipped:gce] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should mount multiple PV pointing to the same storage on the same node": " [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with any volume data source [Serial]": " [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -11341,13 +11463,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Pre-provisioned PV (ext4)] volumes should store data": " [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Skipped:gce] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Skipped:gce] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Skipped:gce] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Skipped:gce] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Skipped:gce] [Suite:k8s]",
 
@@ -11411,6 +11533,8 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (block volmode)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (block volmode)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with mount options": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
@@ -11452,6 +11576,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (OnRootMismatch)[LinuxOnly], pod created with an initial fsgroup, volume contents ownership changed via chgrp in first pod, new pod with same fsgroup skips ownership changes to the volume contents": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (default fs)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (default fs)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -11539,13 +11665,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ext4)] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
 
@@ -11602,6 +11728,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] multiVolume [Slow] should concurrently access the volume and restored snapshot from pods on the same node [LinuxOnly][Feature:VolumeSnapshotDataSource][Feature:VolumeSourceXFS]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -11853,13 +11981,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Pre-provisioned PV (ext4)] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
 
@@ -11923,6 +12051,8 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (block volmode)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
+	"[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (block volmode)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with mount options": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
@@ -11964,6 +12094,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (OnRootMismatch)[LinuxOnly], pod created with an initial fsgroup, volume contents ownership changed via chgrp in first pod, new pod with same fsgroup skips ownership changes to the volume contents": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -12051,13 +12183,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ext4)] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
 
@@ -12114,6 +12246,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] multiVolume [Slow] should concurrently access the volume and restored snapshot from pods on the same node [LinuxOnly][Feature:VolumeSnapshotDataSource][Feature:VolumeSourceXFS]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -12365,13 +12499,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (ext4)] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
 
@@ -12435,6 +12569,8 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (block volmode)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Disabled:Unsupported] [Suite:k8s]",
 
+	"[sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (block volmode)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Disabled:Unsupported] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
+
 	"[sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with any volume data source [Serial]": " [Disabled:Unsupported] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with mount options": " [Disabled:Unsupported] [Suite:k8s]",
@@ -12474,6 +12610,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (OnRootMismatch)[LinuxOnly], pod created with an initial fsgroup, volume contents ownership changed via chgrp in first pod, new pod with same fsgroup skips ownership changes to the volume contents": " [Disabled:Unsupported] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (default fs)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Disabled:Unsupported] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (default fs)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Disabled:Unsupported] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with any volume data source [Serial]": " [Disabled:Unsupported] [Suite:k8s]",
 
@@ -12561,13 +12699,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ext4)] volumes should store data": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Disabled:Unsupported] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Disabled:Unsupported] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Disabled:Unsupported] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Disabled:Unsupported] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Disabled:Unsupported] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Disabled:Unsupported] [Suite:k8s]",
 
@@ -12624,6 +12762,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] multiVolume [Slow] should concurrently access the volume and restored snapshot from pods on the same node [LinuxOnly][Feature:VolumeSnapshotDataSource][Feature:VolumeSourceXFS]": " [Disabled:Unsupported] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should mount multiple PV pointing to the same storage on the same node": " [Disabled:Unsupported] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Disabled:Unsupported] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with any volume data source [Serial]": " [Disabled:Unsupported] [Suite:k8s]",
 
@@ -12873,13 +13013,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Pre-provisioned PV (ext4)] volumes should store data": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Disabled:Unsupported] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Disabled:Unsupported] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Disabled:Unsupported] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Disabled:Unsupported] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Disabled:Unsupported] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Disabled:Unsupported] [Suite:k8s]",
 
@@ -12943,6 +13083,8 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (block volmode)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
+	"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (block volmode)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with mount options": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
@@ -12982,6 +13124,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (OnRootMismatch)[LinuxOnly], pod created with an initial fsgroup, volume contents ownership changed via chgrp in first pod, new pod with same fsgroup skips ownership changes to the volume contents": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (default fs)] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (default fs)] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -13069,13 +13213,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ext4)] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
 
@@ -13132,6 +13276,8 @@ var Annotations = map[string]string{
 	"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] multiVolume [Slow] should concurrently access the volume and restored snapshot from pods on the same node [LinuxOnly][Feature:VolumeSnapshotDataSource][Feature:VolumeSourceXFS]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should mount multiple PV pointing to the same storage on the same node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with any volume data source [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -13381,13 +13527,13 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Pre-provisioned PV (ext4)] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].": " [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].": " [Serial] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive[Disruptive][LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
 

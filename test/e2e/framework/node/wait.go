@@ -40,21 +40,21 @@ var requiredPerNodePods = []*regexp.Regexp{
 
 // WaitForReadyNodes waits up to timeout for cluster to has desired size and
 // there is no not-ready nodes in it. By cluster size we mean number of schedulable Nodes.
-func WaitForReadyNodes(c clientset.Interface, size int, timeout time.Duration) error {
-	_, err := CheckReady(c, size, timeout)
+func WaitForReadyNodes(ctx context.Context, c clientset.Interface, size int, timeout time.Duration) error {
+	_, err := CheckReady(ctx, c, size, timeout)
 	return err
 }
 
 // WaitForTotalHealthy checks whether all registered nodes are ready and all required Pods are running on them.
-func WaitForTotalHealthy(c clientset.Interface, timeout time.Duration) error {
+func WaitForTotalHealthy(ctx context.Context, c clientset.Interface, timeout time.Duration) error {
 	framework.Logf("Waiting up to %v for all nodes to be ready", timeout)
 
 	var notReady []v1.Node
 	var missingPodsPerNode map[string][]string
-	err := wait.PollImmediate(poll, timeout, func() (bool, error) {
+	err := wait.PollImmediateWithContext(ctx, poll, timeout, func(ctx context.Context) (bool, error) {
 		notReady = nil
 		// It should be OK to list unschedulable Nodes here.
-		nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{ResourceVersion: "0"})
+		nodes, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{ResourceVersion: "0"})
 		if err != nil {
 			return false, err
 		}
@@ -63,7 +63,7 @@ func WaitForTotalHealthy(c clientset.Interface, timeout time.Duration) error {
 				notReady = append(notReady, node)
 			}
 		}
-		pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{ResourceVersion: "0"})
+		pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{ResourceVersion: "0"})
 		if err != nil {
 			return false, err
 		}
@@ -114,10 +114,10 @@ func WaitForTotalHealthy(c clientset.Interface, timeout time.Duration) error {
 // within timeout. If wantTrue is true, it will ensure the node condition status
 // is ConditionTrue; if it's false, it ensures the node condition is in any state
 // other than ConditionTrue (e.g. not true or unknown).
-func WaitConditionToBe(c clientset.Interface, name string, conditionType v1.NodeConditionType, wantTrue bool, timeout time.Duration) bool {
+func WaitConditionToBe(ctx context.Context, c clientset.Interface, name string, conditionType v1.NodeConditionType, wantTrue bool, timeout time.Duration) bool {
 	framework.Logf("Waiting up to %v for node %s condition %s to be %t", timeout, name, conditionType, wantTrue)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
-		node, err := c.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
+		node, err := c.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			framework.Logf("Couldn't get node %s", name)
 			continue
@@ -134,20 +134,37 @@ func WaitConditionToBe(c clientset.Interface, name string, conditionType v1.Node
 // WaitForNodeToBeNotReady returns whether node name is not ready (i.e. the
 // readiness condition is anything but ready, e.g false or unknown) within
 // timeout.
-func WaitForNodeToBeNotReady(c clientset.Interface, name string, timeout time.Duration) bool {
-	return WaitConditionToBe(c, name, v1.NodeReady, false, timeout)
+func WaitForNodeToBeNotReady(ctx context.Context, c clientset.Interface, name string, timeout time.Duration) bool {
+	return WaitConditionToBe(ctx, c, name, v1.NodeReady, false, timeout)
 }
 
 // WaitForNodeToBeReady returns whether node name is ready within timeout.
-func WaitForNodeToBeReady(c clientset.Interface, name string, timeout time.Duration) bool {
-	return WaitConditionToBe(c, name, v1.NodeReady, true, timeout)
+func WaitForNodeToBeReady(ctx context.Context, c clientset.Interface, name string, timeout time.Duration) bool {
+	return WaitConditionToBe(ctx, c, name, v1.NodeReady, true, timeout)
+}
+
+func WaitForNodeSchedulable(ctx context.Context, c clientset.Interface, name string, timeout time.Duration, wantSchedulable bool) bool {
+	framework.Logf("Waiting up to %v for node %s to be schedulable: %t", timeout, name, wantSchedulable)
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
+		node, err := c.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			framework.Logf("Couldn't get node %s", name)
+			continue
+		}
+
+		if IsNodeSchedulable(node) == wantSchedulable {
+			return true
+		}
+	}
+	framework.Logf("Node %s didn't reach desired schedulable status (%t) within %v", name, wantSchedulable, timeout)
+	return false
 }
 
 // CheckReady waits up to timeout for cluster to has desired size and
 // there is no not-ready nodes in it. By cluster size we mean number of schedulable Nodes.
-func CheckReady(c clientset.Interface, size int, timeout time.Duration) ([]v1.Node, error) {
+func CheckReady(ctx context.Context, c clientset.Interface, size int, timeout time.Duration) ([]v1.Node, error) {
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(sleepTime) {
-		nodes, err := waitListSchedulableNodes(c)
+		nodes, err := waitListSchedulableNodes(ctx, c)
 		if err != nil {
 			framework.Logf("Failed to list nodes: %v", err)
 			continue
@@ -172,11 +189,11 @@ func CheckReady(c clientset.Interface, size int, timeout time.Duration) ([]v1.No
 }
 
 // waitListSchedulableNodes is a wrapper around listing nodes supporting retries.
-func waitListSchedulableNodes(c clientset.Interface) (*v1.NodeList, error) {
+func waitListSchedulableNodes(ctx context.Context, c clientset.Interface) (*v1.NodeList, error) {
 	var nodes *v1.NodeList
 	var err error
-	if wait.PollImmediate(poll, singleCallTimeout, func() (bool, error) {
-		nodes, err = c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{FieldSelector: fields.Set{
+	if wait.PollImmediateWithContext(ctx, poll, singleCallTimeout, func(ctx context.Context) (bool, error) {
+		nodes, err = c.CoreV1().Nodes().List(ctx, metav1.ListOptions{FieldSelector: fields.Set{
 			"spec.unschedulable": "false",
 		}.AsSelector().String()})
 		if err != nil {
@@ -190,8 +207,8 @@ func waitListSchedulableNodes(c clientset.Interface) (*v1.NodeList, error) {
 }
 
 // checkWaitListSchedulableNodes is a wrapper around listing nodes supporting retries.
-func checkWaitListSchedulableNodes(c clientset.Interface) (*v1.NodeList, error) {
-	nodes, err := waitListSchedulableNodes(c)
+func checkWaitListSchedulableNodes(ctx context.Context, c clientset.Interface) (*v1.NodeList, error) {
+	nodes, err := waitListSchedulableNodes(ctx, c)
 	if err != nil {
 		return nil, fmt.Errorf("error: %s. Non-retryable failure or timed out while listing nodes for e2e cluster", err)
 	}
@@ -199,9 +216,9 @@ func checkWaitListSchedulableNodes(c clientset.Interface) (*v1.NodeList, error) 
 }
 
 // CheckReadyForTests returns a function which will return 'true' once the number of ready nodes is above the allowedNotReadyNodes threshold (i.e. to be used as a global gate for starting the tests).
-func CheckReadyForTests(c clientset.Interface, nonblockingTaints string, allowedNotReadyNodes, largeClusterThreshold int) func() (bool, error) {
+func CheckReadyForTests(ctx context.Context, c clientset.Interface, nonblockingTaints string, allowedNotReadyNodes, largeClusterThreshold int) func(ctx context.Context) (bool, error) {
 	attempt := 0
-	return func() (bool, error) {
+	return func(ctx context.Context) (bool, error) {
 		if allowedNotReadyNodes == -1 {
 			return true, nil
 		}
@@ -212,7 +229,7 @@ func CheckReadyForTests(c clientset.Interface, nonblockingTaints string, allowed
 			// remove uncordoned nodes from our calculation, TODO refactor if node v2 API removes that semantic.
 			FieldSelector: fields.Set{"spec.unschedulable": "false"}.AsSelector().String(),
 		}
-		allNodes, err := c.CoreV1().Nodes().List(context.TODO(), opts)
+		allNodes, err := c.CoreV1().Nodes().List(ctx, opts)
 		if err != nil {
 			var terminalListNodesErr error
 			framework.Logf("Unexpected error listing nodes: %v", err)

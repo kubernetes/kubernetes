@@ -443,6 +443,7 @@ func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in 
 	if err := v1.Convert_Pointer_bool_To_bool(&in.SerializeImagePulls, &out.SerializeImagePulls, s); err != nil {
 		return err
 	}
+	out.MaxParallelImagePulls = (*int32)(unsafe.Pointer(in.MaxParallelImagePulls))
 	out.EvictionHard = *(*map[string]string)(unsafe.Pointer(&in.EvictionHard))
 	out.EvictionSoft = *(*map[string]string)(unsafe.Pointer(&in.EvictionSoft))
 	out.EvictionSoftGracePeriod = *(*map[string]string)(unsafe.Pointer(&in.EvictionSoftGracePeriod))
@@ -490,6 +491,9 @@ func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in 
 	if err := v1.Convert_Pointer_bool_To_bool(&in.EnableSystemLogHandler, &out.EnableSystemLogHandler, s); err != nil {
 		return err
 	}
+	if err := v1.Convert_Pointer_bool_To_bool(&in.EnableSystemLogQuery, &out.EnableSystemLogQuery, s); err != nil {
+		return err
+	}
 	out.ShutdownGracePeriod = in.ShutdownGracePeriod
 	out.ShutdownGracePeriodCriticalPods = in.ShutdownGracePeriodCriticalPods
 	out.ShutdownGracePeriodByPodPriority = *(*[]config.ShutdownGracePeriodByPodPriority)(unsafe.Pointer(&in.ShutdownGracePeriodByPodPriority))
@@ -512,6 +516,8 @@ func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in 
 	if err := v1.Convert_Pointer_bool_To_bool(&in.LocalStorageCapacityIsolation, &out.LocalStorageCapacityIsolation, s); err != nil {
 		return err
 	}
+	out.ContainerRuntimeEndpoint = in.ContainerRuntimeEndpoint
+	out.ImageServiceEndpoint = in.ImageServiceEndpoint
 	return nil
 }
 
@@ -624,6 +630,7 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 	if err := v1.Convert_bool_To_Pointer_bool(&in.SerializeImagePulls, &out.SerializeImagePulls, s); err != nil {
 		return err
 	}
+	out.MaxParallelImagePulls = (*int32)(unsafe.Pointer(in.MaxParallelImagePulls))
 	out.EvictionHard = *(*map[string]string)(unsafe.Pointer(&in.EvictionHard))
 	out.EvictionSoft = *(*map[string]string)(unsafe.Pointer(&in.EvictionSoft))
 	out.EvictionSoftGracePeriod = *(*map[string]string)(unsafe.Pointer(&in.EvictionSoftGracePeriod))
@@ -669,6 +676,9 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 	if err := v1.Convert_bool_To_Pointer_bool(&in.EnableSystemLogHandler, &out.EnableSystemLogHandler, s); err != nil {
 		return err
 	}
+	if err := v1.Convert_bool_To_Pointer_bool(&in.EnableSystemLogQuery, &out.EnableSystemLogQuery, s); err != nil {
+		return err
+	}
 	out.ShutdownGracePeriod = in.ShutdownGracePeriod
 	out.ShutdownGracePeriodCriticalPods = in.ShutdownGracePeriodCriticalPods
 	out.ShutdownGracePeriodByPodPriority = *(*[]v1beta1.ShutdownGracePeriodByPodPriority)(unsafe.Pointer(&in.ShutdownGracePeriodByPodPriority))
@@ -691,6 +701,8 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 	if err := v1.Convert_bool_To_Pointer_bool(&in.LocalStorageCapacityIsolation, &out.LocalStorageCapacityIsolation, s); err != nil {
 		return err
 	}
+	out.ContainerRuntimeEndpoint = in.ContainerRuntimeEndpoint
+	out.ImageServiceEndpoint = in.ImageServiceEndpoint
 	return nil
 }
 

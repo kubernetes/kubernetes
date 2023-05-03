@@ -26,7 +26,6 @@ import (
 	v1beta3 "k8s.io/api/flowcontrol/v1beta3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	flowcontrolv1beta3 "k8s.io/client-go/applyconfigurations/flowcontrol/v1beta3"
@@ -38,9 +37,9 @@ type FakePriorityLevelConfigurations struct {
 	Fake *FakeFlowcontrolV1beta3
 }
 
-var prioritylevelconfigurationsResource = schema.GroupVersionResource{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta3", Resource: "prioritylevelconfigurations"}
+var prioritylevelconfigurationsResource = v1beta3.SchemeGroupVersion.WithResource("prioritylevelconfigurations")
 
-var prioritylevelconfigurationsKind = schema.GroupVersionKind{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta3", Kind: "PriorityLevelConfiguration"}
+var prioritylevelconfigurationsKind = v1beta3.SchemeGroupVersion.WithKind("PriorityLevelConfiguration")
 
 // Get takes name of the priorityLevelConfiguration, and returns the corresponding priorityLevelConfiguration object, and an error if there is any.
 func (c *FakePriorityLevelConfigurations) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta3.PriorityLevelConfiguration, err error) {

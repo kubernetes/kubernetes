@@ -4,9 +4,9 @@ metadata:
   name: hostnamespaces0
 spec:
   containers:
-  - image: k8s.gcr.io/pause
+  - image: registry.k8s.io/pause
     name: container1
   hostIPC: true
   initContainers:
-  - image: k8s.gcr.io/pause
+  - image: registry.k8s.io/pause
     name: initcontainer1

@@ -20,12 +20,16 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
+	"k8s.io/apiserver/pkg/endpoints/metrics"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/mux"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/kube-openapi/pkg/handler3"
 )
@@ -164,6 +168,66 @@ func TestV3APIService(t *testing.T) {
 
 	apiServiceNames := specProxier.GetAPIServiceNames()
 	assert.ElementsMatch(t, []string{openAPIV2Converter, apiService.Name}, apiServiceNames)
+}
+
+func TestOpenAPIRequestMetrics(t *testing.T) {
+	metrics.Register()
+	metrics.Reset()
+
+	downloader := Downloader{}
+
+	pathHandler := mux.NewPathRecorderMux("aggregator_metrics_test")
+	var serveHandler http.Handler = pathHandler
+	specProxier, err := BuildAndRegisterAggregator(downloader, genericapiserver.NewEmptyDelegate(), pathHandler)
+	if err != nil {
+		t.Error(err)
+	}
+	specJSON := []byte(`{"openapi":"3.0.0","info":{"title":"Kubernetes","version":"unversioned"}}`)
+	handler := testV3APIService{
+		etag: "6E8F849B434D4B98A569B9D7718876E9-356ECAB19D7FBE1336BABB1E70F8F3025050DE218BE78256BE81620681CFC9A268508E542B8B55974E17B2184BBFC8FFFAA577E51BE195D32B3CA2547818ABE4",
+		data: specJSON,
+	}
+	apiService := &v1.APIService{
+		Spec: v1.APIServiceSpec{
+			Group:   "group.example.com",
+			Version: "v1",
+		},
+	}
+	apiService.Name = "v1.group.example.com"
+	specProxier.AddUpdateAPIService(handler, apiService)
+	specProxier.UpdateAPIServiceSpec("v1.group.example.com")
+
+	data := sendReq(t, serveHandler, "/openapi/v3")
+	groupVersionList := handler3.OpenAPIV3Discovery{}
+	if err := json.Unmarshal(data, &groupVersionList); err != nil {
+		t.Fatal(err)
+	}
+	_, ok := groupVersionList.Paths["apis/group.example.com/v1"]
+	if !ok {
+		t.Error("Expected group.example.com/v1 to be in group version list")
+	}
+
+	// Metrics should be updated after requesting the root document.
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(`
+# HELP apiserver_request_total [STABLE] Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response code.
+# TYPE apiserver_request_total counter
+apiserver_request_total{code="200",component="",dry_run="",group="",resource="",scope="",subresource="openapi/v3",system_client="",verb="GET",version=""} 1
+`), "apiserver_request_total"); err != nil {
+		t.Fatal(err)
+	}
+
+	_ = sendReq(t, serveHandler, "/openapi/v3/apis/group.example.com/v1")
+
+	// Metrics should be updated after requesting OpenAPI for a group version.
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(`
+# HELP apiserver_request_total [STABLE] Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response code.
+# TYPE apiserver_request_total counter
+apiserver_request_total{code="200",component="",dry_run="",group="",resource="",scope="",subresource="openapi/v3",system_client="",verb="GET",version=""} 1
+apiserver_request_total{code="200",component="",dry_run="",group="",resource="",scope="",subresource="openapi/v3/",system_client="",verb="GET",version=""} 1
+`), "apiserver_request_total"); err != nil {
+		t.Fatal(err)
+	}
+
 }
 
 func sendReq(t *testing.T, handler http.Handler, path string) []byte {

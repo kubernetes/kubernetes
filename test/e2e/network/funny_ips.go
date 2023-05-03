@@ -90,19 +90,19 @@ var _ = common.SIGDescribe("CVE-2021-29923", func() {
 		IMPORTANT: CoreDNS since version 1.8.5 discard IPs with leading zeros so Services are not resolvable, and is probably that
 		most of the ecosystem has done the same, however, Kubernetes doesn't impose any restriction, users should migrate their IPs.
 	*/
-	ginkgo.It("IPv4 Service Type ClusterIP with leading zeros should work interpreted as decimal", func() {
+	ginkgo.It("IPv4 Service Type ClusterIP with leading zeros should work interpreted as decimal", func(ctx context.Context) {
 		serviceName := "funny-ip"
 		// Use a very uncommon port to reduce the risk of conflicts with other tests that create services.
 		servicePort := 7180
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 
-		clusterIPZero, clusterIPOctal := getServiceIPWithLeadingZeros(cs)
+		clusterIPZero, clusterIPOctal := getServiceIPWithLeadingZeros(ctx, cs)
 		if clusterIPZero == "" {
 			e2eskipper.Skipf("Couldn't find a free ClusterIP")
 		}
 
 		ginkgo.By("creating service " + serviceName + " with type=ClusterIP and ip " + clusterIPZero + " in namespace " + ns)
-		_, err := jig.CreateTCPService(func(svc *v1.Service) {
+		_, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
 			svc.Spec.ClusterIP = clusterIPZero // IP with a leading zero
 			svc.Spec.Type = v1.ServiceTypeClusterIP
 			svc.Spec.Ports = []v1.ServicePort{
@@ -111,10 +111,10 @@ var _ = common.SIGDescribe("CVE-2021-29923", func() {
 		})
 		framework.ExpectNoError(err)
 
-		err = jig.CreateServicePods(1)
+		err = jig.CreateServicePods(ctx, 1)
 		framework.ExpectNoError(err)
 
-		execPod := e2epod.CreateExecPodOrFail(cs, ns, "execpod", nil)
+		execPod := e2epod.CreateExecPodOrFail(ctx, cs, ns, "execpod", nil)
 		ip := netutils.ParseIPSloppy(clusterIPZero)
 		cmd := fmt.Sprintf("echo hostName | nc -v -t -w 2 %s %v", ip.String(), servicePort)
 		err = wait.PollImmediate(1*time.Second, e2eservice.ServiceReachabilityShortPollTimeout, func() (bool, error) {
@@ -160,11 +160,11 @@ var _ = common.SIGDescribe("CVE-2021-29923", func() {
 // Try to get a free IP that has different decimal and binary interpretation with leading zeros.
 // Return both IPs, the one interpretad as binary and the one interpreted as decimal.
 // Return empty if not IPs are found.
-func getServiceIPWithLeadingZeros(cs clientset.Interface) (string, string) {
+func getServiceIPWithLeadingZeros(ctx context.Context, cs clientset.Interface) (string, string) {
 	clusterIPMap := map[string]struct{}{}
 	var clusterIPPrefix string
 	// Dump all the IPs and look for the ones we want.
-	list, err := cs.CoreV1().Services(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
+	list, err := cs.CoreV1().Services(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
 	framework.ExpectNoError(err)
 	for _, svc := range list.Items {
 		if len(svc.Spec.ClusterIP) == 0 || svc.Spec.ClusterIP == v1.ClusterIPNone {

@@ -5,11 +5,12 @@ package v1
 // VSpherePlatformStatusApplyConfiguration represents an declarative configuration of the VSpherePlatformStatus type for use
 // with apply.
 type VSpherePlatformStatusApplyConfiguration struct {
-	APIServerInternalIP  *string  `json:"apiServerInternalIP,omitempty"`
-	APIServerInternalIPs []string `json:"apiServerInternalIPs,omitempty"`
-	IngressIP            *string  `json:"ingressIP,omitempty"`
-	IngressIPs           []string `json:"ingressIPs,omitempty"`
-	NodeDNSIP            *string  `json:"nodeDNSIP,omitempty"`
+	APIServerInternalIP  *string                                        `json:"apiServerInternalIP,omitempty"`
+	APIServerInternalIPs []string                                       `json:"apiServerInternalIPs,omitempty"`
+	IngressIP            *string                                        `json:"ingressIP,omitempty"`
+	IngressIPs           []string                                       `json:"ingressIPs,omitempty"`
+	NodeDNSIP            *string                                        `json:"nodeDNSIP,omitempty"`
+	LoadBalancer         *VSpherePlatformLoadBalancerApplyConfiguration `json:"loadBalancer,omitempty"`
 }
 
 // VSpherePlatformStatusApplyConfiguration constructs an declarative configuration of the VSpherePlatformStatus type for use with
@@ -59,5 +60,13 @@ func (b *VSpherePlatformStatusApplyConfiguration) WithIngressIPs(values ...strin
 // If called multiple times, the NodeDNSIP field is set to the value of the last call.
 func (b *VSpherePlatformStatusApplyConfiguration) WithNodeDNSIP(value string) *VSpherePlatformStatusApplyConfiguration {
 	b.NodeDNSIP = &value
+	return b
+}
+
+// WithLoadBalancer sets the LoadBalancer field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the LoadBalancer field is set to the value of the last call.
+func (b *VSpherePlatformStatusApplyConfiguration) WithLoadBalancer(value *VSpherePlatformLoadBalancerApplyConfiguration) *VSpherePlatformStatusApplyConfiguration {
+	b.LoadBalancer = value
 	return b
 }

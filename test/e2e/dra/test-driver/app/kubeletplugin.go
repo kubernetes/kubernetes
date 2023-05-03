@@ -26,7 +26,7 @@ import (
 
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/klog/v2"
-	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1alpha1"
+	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1alpha2"
 )
 
 type ExamplePlugin struct {
@@ -97,7 +97,7 @@ func StartPlugin(logger klog.Logger, cdiDir, driverName string, nodeName string,
 	)
 	d, err := kubeletplugin.Start(ex, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("start kubelet plugin: %v", err)
+		return nil, fmt.Errorf("start kubelet plugin: %w", err)
 	}
 	ex.d = d
 
@@ -127,7 +127,7 @@ func (ex *ExamplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1.N
 	// Determine environment variables.
 	var p parameters
 	if err := json.Unmarshal([]byte(req.ResourceHandle), &p); err != nil {
-		return nil, fmt.Errorf("unmarshal resource handle: %v", err)
+		return nil, fmt.Errorf("unmarshal resource handle: %w", err)
 	}
 
 	// Sanity check scheduling.
@@ -145,7 +145,7 @@ func (ex *ExamplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1.N
 	vendor := ex.driverName
 	class := "test"
 	spec := &spec{
-		Version: "0.2.0", // This has to be a version accepted by the runtimes.
+		Version: "0.3.0", // This has to be a version accepted by the runtimes.
 		Kind:    vendor + "/" + class,
 		// At least one device is required and its entry must have more
 		// than just the name.
@@ -161,7 +161,7 @@ func (ex *ExamplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1.N
 	filePath := ex.getJSONFilePath(req.ClaimUid)
 	buffer, err := json.Marshal(spec)
 	if err != nil {
-		return nil, fmt.Errorf("marshal spec: %v", err)
+		return nil, fmt.Errorf("marshal spec: %w", err)
 	}
 	if err := ex.fileOps.Create(filePath, buffer); err != nil {
 		return nil, fmt.Errorf("failed to write CDI file %v", err)
@@ -186,7 +186,7 @@ func (ex *ExamplePlugin) NodeUnprepareResource(ctx context.Context, req *drapbv1
 
 	filePath := ex.getJSONFilePath(req.ClaimUid)
 	if err := ex.fileOps.Remove(filePath); err != nil {
-		return nil, fmt.Errorf("error removing CDI file: %v", err)
+		return nil, fmt.Errorf("error removing CDI file: %w", err)
 	}
 	logger.V(3).Info("CDI file removed", "path", filePath)
 

@@ -58,6 +58,12 @@ func (rs *REST) New() runtime.Object {
 	return &api.ComponentStatus{}
 }
 
+var _ rest.SingularNameProvider = &REST{}
+
+func (rs *REST) GetSingularName() string {
+	return "componentstatus"
+}
+
 // Destroy cleans up resources on shutdown.
 func (r *REST) Destroy() {
 	// Given no underlying store, we don't destroy anything
@@ -102,10 +108,9 @@ func (rs *REST) List(ctx context.Context, options *metainternalversion.ListOptio
 
 func componentStatusPredicate(options *metainternalversion.ListOptions) storage.SelectionPredicate {
 	pred := storage.SelectionPredicate{
-		Label:       labels.Everything(),
-		Field:       fields.Everything(),
-		GetAttrs:    nil,
-		IndexFields: []string{},
+		Label:    labels.Everything(),
+		Field:    fields.Everything(),
+		GetAttrs: nil,
 	}
 	if options != nil {
 		if options.LabelSelector != nil {

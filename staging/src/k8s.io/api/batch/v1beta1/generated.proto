@@ -73,7 +73,6 @@ message CronJobSpec {
   // configuration, the controller will stop creating new new Jobs and will create a system event with the
   // reason UnknownTimeZone.
   // More information can be found in https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#time-zones
-  // This is beta field and must be enabled via the `CronJobTimeZone` feature gate.
   // +optional
   optional string timeZone = 8;
 
@@ -84,6 +83,7 @@ message CronJobSpec {
 
   // Specifies how to treat concurrent executions of a Job.
   // Valid values are:
+  //
   // - "Allow" (default): allows CronJobs to run concurrently;
   // - "Forbid": forbids concurrent runs, skipping next run if previous run hasn't finished yet;
   // - "Replace": cancels currently running job and replaces it with a new one
@@ -125,19 +125,6 @@ message CronJobStatus {
   // Information when was the last time the job successfully completed.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastSuccessfulTime = 5;
-}
-
-// JobTemplate describes a template for creating copies of a predefined pod.
-message JobTemplate {
-  // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
-
-  // Defines jobs that will be created from this template.
-  // https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-  // +optional
-  optional JobTemplateSpec template = 2;
 }
 
 // JobTemplateSpec describes the data a Job should have when created from a template

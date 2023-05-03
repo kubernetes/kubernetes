@@ -87,6 +87,7 @@ func ExecWithOptions(f *framework.Framework, options ExecOptions) (string, strin
 // ExecCommandInContainerWithFullOutput executes a command in the
 // specified container and return stdout, stderr and error
 func ExecCommandInContainerWithFullOutput(f *framework.Framework, podName, containerName string, cmd ...string) (string, string, error) {
+	// TODO (pohly): add context support
 	return ExecWithOptions(f, ExecOptions{
 		Command:            cmd,
 		Namespace:          f.Namespace.Name,
@@ -114,28 +115,28 @@ func ExecShellInContainer(f *framework.Framework, podName, containerName string,
 	return ExecCommandInContainer(f, podName, containerName, "/bin/sh", "-c", cmd)
 }
 
-func execCommandInPod(f *framework.Framework, podName string, cmd ...string) string {
-	pod, err := NewPodClient(f).Get(context.TODO(), podName, metav1.GetOptions{})
+func execCommandInPod(ctx context.Context, f *framework.Framework, podName string, cmd ...string) string {
+	pod, err := NewPodClient(f).Get(ctx, podName, metav1.GetOptions{})
 	framework.ExpectNoError(err, "failed to get pod %v", podName)
 	gomega.Expect(pod.Spec.Containers).NotTo(gomega.BeEmpty())
 	return ExecCommandInContainer(f, podName, pod.Spec.Containers[0].Name, cmd...)
 }
 
-func execCommandInPodWithFullOutput(f *framework.Framework, podName string, cmd ...string) (string, string, error) {
-	pod, err := NewPodClient(f).Get(context.TODO(), podName, metav1.GetOptions{})
+func execCommandInPodWithFullOutput(ctx context.Context, f *framework.Framework, podName string, cmd ...string) (string, string, error) {
+	pod, err := NewPodClient(f).Get(ctx, podName, metav1.GetOptions{})
 	framework.ExpectNoError(err, "failed to get pod %v", podName)
 	gomega.Expect(pod.Spec.Containers).NotTo(gomega.BeEmpty())
 	return ExecCommandInContainerWithFullOutput(f, podName, pod.Spec.Containers[0].Name, cmd...)
 }
 
 // ExecShellInPod executes the specified command on the pod.
-func ExecShellInPod(f *framework.Framework, podName string, cmd string) string {
-	return execCommandInPod(f, podName, "/bin/sh", "-c", cmd)
+func ExecShellInPod(ctx context.Context, f *framework.Framework, podName string, cmd string) string {
+	return execCommandInPod(ctx, f, podName, "/bin/sh", "-c", cmd)
 }
 
 // ExecShellInPodWithFullOutput executes the specified command on the Pod and returns stdout, stderr and error.
-func ExecShellInPodWithFullOutput(f *framework.Framework, podName string, cmd string) (string, string, error) {
-	return execCommandInPodWithFullOutput(f, podName, "/bin/sh", "-c", cmd)
+func ExecShellInPodWithFullOutput(ctx context.Context, f *framework.Framework, podName string, cmd string) (string, string, error) {
+	return execCommandInPodWithFullOutput(ctx, f, podName, "/bin/sh", "-c", cmd)
 }
 
 func execute(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {

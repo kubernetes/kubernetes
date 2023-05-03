@@ -41,7 +41,7 @@ type SecretUpgradeTest struct {
 func (SecretUpgradeTest) Name() string { return "[sig-storage] [sig-api-machinery] secret-upgrade" }
 
 // Setup creates a secret and then verifies that a pod can consume it.
-func (t *SecretUpgradeTest) Setup(f *framework.Framework) {
+func (t *SecretUpgradeTest) Setup(ctx context.Context, f *framework.Framework) {
 	secretName := "upgrade-secret"
 
 	ns := f.Namespace
@@ -58,30 +58,30 @@ func (t *SecretUpgradeTest) Setup(f *framework.Framework) {
 
 	ginkgo.By("Creating a secret")
 	var err error
-	if t.secret, err = f.ClientSet.CoreV1().Secrets(ns.Name).Create(context.TODO(), t.secret, metav1.CreateOptions{}); err != nil {
+	if t.secret, err = f.ClientSet.CoreV1().Secrets(ns.Name).Create(ctx, t.secret, metav1.CreateOptions{}); err != nil {
 		framework.Failf("unable to create test secret %s: %v", t.secret.Name, err)
 	}
 
 	ginkgo.By("Making sure the secret is consumable")
-	t.testPod(f)
+	t.testPod(ctx, f)
 }
 
 // Test waits for the upgrade to complete, and then verifies that a
 // pod can still consume the secret.
-func (t *SecretUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
+func (t *SecretUpgradeTest) Test(ctx context.Context, f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
 	<-done
 	ginkgo.By("Consuming the secret after upgrade")
-	t.testPod(f)
+	t.testPod(ctx, f)
 }
 
 // Teardown cleans up any remaining resources.
-func (t *SecretUpgradeTest) Teardown(f *framework.Framework) {
+func (t *SecretUpgradeTest) Teardown(ctx context.Context, f *framework.Framework) {
 	// rely on the namespace deletion to clean up everything
 }
 
 // testPod creates a pod that consumes a secret and prints it out. The
 // output is then verified.
-func (t *SecretUpgradeTest) testPod(f *framework.Framework) {
+func (t *SecretUpgradeTest) testPod(ctx context.Context, f *framework.Framework) {
 	volumeName := "secret-volume"
 	volumeMountPath := "/etc/secret-volume"
 
@@ -145,8 +145,8 @@ func (t *SecretUpgradeTest) testPod(f *framework.Framework) {
 		"mode of file \"/etc/secret-volume/data\": -rw-r--r--",
 	}
 
-	e2eoutput.TestContainerOutput(f, "volume consume secrets", pod, 0, expectedOutput)
+	e2eoutput.TestContainerOutput(ctx, f, "volume consume secrets", pod, 0, expectedOutput)
 
 	expectedOutput = []string{"SECRET_DATA=keep it secret"}
-	e2eoutput.TestContainerOutput(f, "env consume secrets", pod, 1, expectedOutput)
+	e2eoutput.TestContainerOutput(ctx, f, "env consume secrets", pod, 1, expectedOutput)
 }

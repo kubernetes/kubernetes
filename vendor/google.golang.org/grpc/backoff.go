@@ -48,7 +48,7 @@ type BackoffConfig struct {
 // here for more details:
 // https://github.com/grpc/grpc/blob/master/doc/connection-backoff.md.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This type is EXPERIMENTAL and may be changed or removed in a
 // later release.

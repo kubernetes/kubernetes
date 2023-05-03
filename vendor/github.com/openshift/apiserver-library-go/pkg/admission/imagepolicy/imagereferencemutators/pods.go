@@ -44,8 +44,6 @@ func GetPodSpec(obj runtime.Object) (*core.PodSpec, *field.Path, error) {
 		return &r.Spec.Template.Spec, field.NewPath("spec", "template", "spec"), nil
 	case *batch.CronJob:
 		return &r.Spec.JobTemplate.Spec.Template.Spec, field.NewPath("spec", "jobTemplate", "spec", "template", "spec"), nil
-	case *batch.JobTemplate:
-		return &r.Template.Spec.Template.Spec, field.NewPath("template", "spec", "template", "spec"), nil
 	case *apps.StatefulSet:
 		return &r.Spec.Template.Spec, field.NewPath("spec", "template", "spec"), nil
 	}
@@ -99,9 +97,6 @@ func GetPodSpecV1(obj runtime.Object) (*corev1.PodSpec, *field.Path, error) {
 		return &r.Spec.JobTemplate.Spec.Template.Spec, field.NewPath("spec", "jobTemplate", "spec", "template", "spec"), nil
 	case *batchv1.CronJob:
 		return &r.Spec.JobTemplate.Spec.Template.Spec, field.NewPath("spec", "jobTemplate", "spec", "template", "spec"), nil
-
-	case *batchv1beta1.JobTemplate:
-		return &r.Template.Spec.Template.Spec, field.NewPath("template", "spec", "template", "spec"), nil
 
 	case *kappsv1.StatefulSet:
 		return &r.Spec.Template.Spec, field.NewPath("spec", "template", "spec"), nil
@@ -157,9 +152,6 @@ func GetTemplateMetaObject(obj runtime.Object) (metav1.Object, bool) {
 	case *batchv1.CronJob:
 		return &r.Spec.JobTemplate.Spec.Template.ObjectMeta, true
 
-	case *batchv1beta1.JobTemplate:
-		return &r.Template.Spec.Template.ObjectMeta, true
-
 	case *kappsv1.StatefulSet:
 		return &r.Spec.Template.ObjectMeta, true
 	case *kappsv1beta1.StatefulSet:
@@ -183,8 +175,6 @@ func GetTemplateMetaObject(obj runtime.Object) (metav1.Object, bool) {
 		return &r.Spec.Template.ObjectMeta, true
 	case *batch.CronJob:
 		return &r.Spec.JobTemplate.Spec.Template.ObjectMeta, true
-	case *batch.JobTemplate:
-		return &r.Template.Spec.Template.ObjectMeta, true
 	case *apps.StatefulSet:
 		return &r.Spec.Template.ObjectMeta, true
 	}

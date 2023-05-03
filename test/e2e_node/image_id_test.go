@@ -37,7 +37,7 @@ var _ = SIGDescribe("ImageID [NodeFeature: ImageID]", func() {
 	f := framework.NewDefaultFramework("image-id-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
-	ginkgo.It("should be set to the manifest digest (from RepoDigests) when available", func() {
+	ginkgo.It("should be set to the manifest digest (from RepoDigests) when available", func(ctx context.Context) {
 		podDesc := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "pod-with-repodigest",
@@ -52,11 +52,11 @@ var _ = SIGDescribe("ImageID [NodeFeature: ImageID]", func() {
 			},
 		}
 
-		pod := e2epod.NewPodClient(f).Create(podDesc)
+		pod := e2epod.NewPodClient(f).Create(ctx, podDesc)
 
-		framework.ExpectNoError(e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(ctx,
 			f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout))
-		runningPod, err := e2epod.NewPodClient(f).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+		runningPod, err := e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		status := runningPod.Status

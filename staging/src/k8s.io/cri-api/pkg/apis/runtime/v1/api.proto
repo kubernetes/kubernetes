@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// To regenerate api.pb.go run hack/update-generated-runtime.sh
+// To regenerate api.pb.go run `hack/update-codegen.sh protobindings`
 syntax = "proto3";
 
 package runtime.v1;
@@ -222,6 +222,10 @@ message Mount {
     bool selinux_relabel = 4;
     // Requested propagation mode.
     MountPropagation propagation = 5;
+    // UidMappings specifies the runtime UID mappings for the mount.
+    repeated IDMapping uidMappings = 6;
+    // GidMappings specifies the runtime GID mappings for the mount.
+    repeated IDMapping gidMappings = 7;
 }
 
 // IDMapping describes host to container ID mappings for a pod sandbox.
@@ -324,10 +328,10 @@ message LinuxSandboxSecurityContext {
     // If set, the root filesystem of the sandbox is read-only.
     bool readonly_rootfs = 4;
     // List of groups applied to the first process run in the sandbox, in
-    // addition to the sandbox's primary GID, and group memberships defined 
+    // addition to the sandbox's primary GID, and group memberships defined
     // in the container image for the sandbox's primary UID of the container process.
     // If the list is empty, no additional groups are added to any container.
-    // Note that group memberships defined in the container image for the sandbox's primary UID 
+    // Note that group memberships defined in the container image for the sandbox's primary UID
     // of the container process are still effective, even if they are not included in this list.
     repeated int64 supplemental_groups = 5;
     // Indicates whether the sandbox will be asked to run a privileged
@@ -420,7 +424,7 @@ message PodSandboxConfig {
     // containers. For example, the files might be newline separated JSON
     // structured logs, systemd-journald journal files, gRPC trace files, etc.
     // E.g.,
-    //     PodSandboxConfig.LogDirectory = `/var/log/pods/<podUID>/`
+    //     PodSandboxConfig.LogDirectory = `/var/log/pods/<NAMESPACE>_<NAME>_<UID>/`
     //     ContainerConfig.LogPath = `containerName/Instance#.log`
     string log_directory = 3;
     // DNS config for the sandbox.
@@ -877,10 +881,10 @@ message LinuxContainerSecurityContext {
     // If set, the root filesystem of the container is read-only.
     bool readonly_rootfs = 7;
     // List of groups applied to the first process run in the container, in
-    // addition to the container's primary GID, and group memberships defined 
+    // addition to the container's primary GID, and group memberships defined
     // in the container image for the container's primary UID of the container process.
     // If the list is empty, no additional groups are added to any container.
-    // Note that group memberships defined in the container image for the container's primary UID 
+    // Note that group memberships defined in the container image for the container's primary UID
     // of the container process are still effective, even if they are not included in this list.
     repeated int64 supplemental_groups = 8;
     // no_new_privs defines if the flag for no_new_privs should be set on the
@@ -1017,6 +1021,15 @@ message Device {
     string permissions = 3;
 }
 
+// CDIDevice specifies a CDI device information.
+message CDIDevice {
+    // Fully qualified CDI device name
+    // for example: vendor.com/gpu=gpudevice1
+    // see more details in the CDI specification:
+    // https://github.com/container-orchestrated-devices/container-device-interface/blob/main/SPEC.md
+    string name = 1;
+}
+
 // ContainerConfig holds all the required and optional fields for creating a
 // container.
 message ContainerConfig {
@@ -1060,13 +1073,8 @@ message ContainerConfig {
     // Path relative to PodSandboxConfig.LogDirectory for container to store
     // the log (STDOUT and STDERR) on the host.
     // E.g.,
-    //     PodSandboxConfig.LogDirectory = `/var/log/pods/<podUID>/`
+    //     PodSandboxConfig.LogDirectory = `/var/log/pods/<NAMESPACE>_<NAME>_<UID>/`
     //     ContainerConfig.LogPath = `containerName/Instance#.log`
-    //
-    // WARNING: Log management and how kubelet should interface with the
-    // container logs are under active discussion in
-    // https://issues.k8s.io/24677. There *may* be future change of direction
-    // for logging as the discussion carries on.
     string log_path = 11;
 
     // Variables for interactive containers, these have very specialized
@@ -1079,6 +1087,9 @@ message ContainerConfig {
     LinuxContainerConfig linux = 15;
     // Configuration specific to Windows containers.
     WindowsContainerConfig windows = 16;
+
+    // CDI devices for the container.
+    repeated CDIDevice CDI_devices = 17;
 }
 
 message CreateContainerRequest {
@@ -1216,6 +1227,7 @@ message ContainerStatus {
     // image ID
     string image_ref = 9;
     // Brief CamelCase string explaining why container is in its current state.
+    // Must be set to "OOMKilled" for containers terminated by cgroup-based Out-of-Memory killer.
     string reason = 10;
     // Human-readable message indicating details about why container is in its
     // current state.
@@ -1279,8 +1291,16 @@ message ExecSyncRequest {
 
 message ExecSyncResponse {
     // Captured command stdout output.
+	// The runtime should cap the output of this response to 16MB.
+	// If the stdout of the command produces more than 16MB, the remaining output
+	// should be discarded, and the command should proceed with no error.
+	// See CVE-2022-1708 and CVE-2022-31030 for more information.
     bytes stdout = 1;
     // Captured command stderr output.
+	// The runtime should cap the output of this response to 16MB.
+	// If the stderr of the command produces more than 16MB, the remaining output
+	// should be discarded, and the command should proceed with no error.
+	// See CVE-2022-1708 and CVE-2022-31030 for more information.
     bytes stderr = 2;
     // Exit code the command finished with. Default: 0 (success).
     int32 exit_code = 3;
@@ -1609,7 +1629,7 @@ message ContainerStats {
     FilesystemUsage writable_layer = 4;
 }
 
-// WindowsContainerStats provides the resource usage statistics for a container specific for Windows 
+// WindowsContainerStats provides the resource usage statistics for a container specific for Windows
 message WindowsContainerStats {
     // Information of the container.
     ContainerAttributes attributes = 1;
@@ -1745,7 +1765,7 @@ message MetricDescriptor {
     repeated string label_keys = 3;
 }
 
-message ListPodSandboxMetricsRequest {} 
+message ListPodSandboxMetricsRequest {}
 
 message ListPodSandboxMetricsResponse {
     repeated PodSandboxMetrics pod_metrics = 1;

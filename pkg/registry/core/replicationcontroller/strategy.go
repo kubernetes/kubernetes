@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -40,7 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
-	"k8s.io/kubernetes/pkg/apis/core/validation"
+	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -122,13 +123,18 @@ func (rcStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object)
 func (rcStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	controller := obj.(*api.ReplicationController)
 	opts := pod.GetValidationOptionsFromPodTemplate(controller.Spec.Template, nil)
-	return validation.ValidateReplicationController(controller, opts)
+	return corevalidation.ValidateReplicationController(controller, opts)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
 func (rcStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
 	newRC := obj.(*api.ReplicationController)
-	return pod.GetWarningsForPodTemplate(ctx, field.NewPath("template"), newRC.Spec.Template, nil)
+	var warnings []string
+	if msgs := utilvalidation.IsDNS1123Label(newRC.Name); len(msgs) != 0 {
+		warnings = append(warnings, fmt.Sprintf("metadata.name: this is used in Pod names and hostnames, which can result in surprising behavior; a DNS label is recommended: %v", msgs))
+	}
+	warnings = append(warnings, pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), newRC.Spec.Template, nil)...)
+	return warnings
 }
 
 // Canonicalize normalizes the object after validation.
@@ -147,8 +153,8 @@ func (rcStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) f
 	newRc := obj.(*api.ReplicationController)
 
 	opts := pod.GetValidationOptionsFromPodTemplate(newRc.Spec.Template, oldRc.Spec.Template)
-	validationErrorList := validation.ValidateReplicationController(newRc, opts)
-	updateErrorList := validation.ValidateReplicationControllerUpdate(newRc, oldRc, opts)
+	validationErrorList := corevalidation.ValidateReplicationController(newRc, opts)
+	updateErrorList := corevalidation.ValidateReplicationControllerUpdate(newRc, oldRc, opts)
 	errs := append(validationErrorList, updateErrorList...)
 
 	for key, value := range helper.NonConvertibleFields(oldRc.Annotations) {
@@ -240,7 +246,7 @@ func (rcStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.O
 }
 
 func (rcStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateReplicationControllerStatusUpdate(obj.(*api.ReplicationController), old.(*api.ReplicationController))
+	return corevalidation.ValidateReplicationControllerStatusUpdate(obj.(*api.ReplicationController), old.(*api.ReplicationController))
 }
 
 // WarningsOnUpdate returns warnings for the given update.

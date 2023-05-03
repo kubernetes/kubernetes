@@ -23,17 +23,19 @@ CODEGEN_PKG=${CODEGEN_PKG:-$(cd "${SCRIPT_ROOT}"; ls -d -1 ./vendor/k8s.io/code-
 
 CLIENTSET_NAME_VERSIONED=clientset \
 CLIENTSET_PKG_NAME=clientset \
-bash "${CODEGEN_PKG}/generate-groups.sh" deepcopy,client,lister,informer \
-  k8s.io/apiextensions-apiserver/pkg/client k8s.io/apiextensions-apiserver/pkg/apis \
+"${CODEGEN_PKG}/generate-groups.sh" "deepcopy,client,lister,informer" \
+  k8s.io/apiextensions-apiserver/pkg/client \
+  k8s.io/apiextensions-apiserver/pkg/apis \
   "apiextensions:v1beta1,v1" \
   --output-base "$(dirname "${BASH_SOURCE[0]}")/../../.." \
   --go-header-file "${SCRIPT_ROOT}/hack/boilerplate.go.txt"
 
 CLIENTSET_NAME_VERSIONED=clientset \
 CLIENTSET_PKG_NAME=clientset \
-CLIENTSET_NAME_INTERNAL=internalclientset \
-bash "${CODEGEN_PKG}/generate-internal-groups.sh" deepcopy,conversion \
-  k8s.io/apiextensions-apiserver/pkg/client k8s.io/apiextensions-apiserver/pkg/apis k8s.io/apiextensions-apiserver/pkg/apis \
+"${CODEGEN_PKG}/generate-internal-groups.sh" "deepcopy,conversion" \
+  k8s.io/apiextensions-apiserver/pkg/client \
+  k8s.io/apiextensions-apiserver/pkg/apis \
+  k8s.io/apiextensions-apiserver/pkg/apis \
   "apiextensions:v1beta1,v1" \
   --output-base "$(dirname "${BASH_SOURCE[0]}")/../../.." \
   --go-header-file "${SCRIPT_ROOT}/hack/boilerplate.go.txt"

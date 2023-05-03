@@ -1,41 +1,89 @@
 //go:build linux
-// +build linux
+
+/*
+Copyright 2022 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 
 package kubelet
 
 import (
+	"context"
 	"fmt"
+	"os/exec"
+	"strings"
 )
 
-// getLoggingCmd returns the journalctl cmd and arguments for the given journalArgs and boot
-func getLoggingCmd(a *journalArgs, boot int) (string, []string) {
+// getLoggingCmd returns the journalctl cmd and arguments for the given nodeLogQuery and boot. Note that
+// services are explicitly passed here to account for the heuristics
+func getLoggingCmd(n *nodeLogQuery, services []string) (string, []string, error) {
 	args := []string{
 		"--utc",
 		"--no-pager",
 	}
-	if len(a.Since) > 0 {
-		args = append(args, "--since="+a.Since)
+
+	if len(n.Since) > 0 {
+		args = append(args, fmt.Sprintf("--since=%s", n.Since))
+	} else if n.SinceTime != nil {
+		args = append(args, fmt.Sprintf("--since=%s", n.SinceTime.Format(dateLayout)))
 	}
-	if len(a.Until) > 0 {
-		args = append(args, "--until="+a.Until)
+
+	if len(n.Until) > 0 {
+		args = append(args, fmt.Sprintf("--since=%s", n.Since))
+	} else if n.UntilTime != nil {
+		args = append(args, fmt.Sprintf("--until=%s", n.SinceTime.Format(dateLayout)))
 	}
-	if a.Tail > 0 {
-		args = append(args, "--pager-end", fmt.Sprintf("--lines=%d", a.Tail))
+
+	if n.TailLines != nil {
+		args = append(args, "--pager-end", fmt.Sprintf("--lines=%d", *n.TailLines))
 	}
-	if len(a.Format) > 0 {
-		args = append(args, "--output="+a.Format)
-	}
-	for _, unit := range a.Units {
-		if len(unit) > 0 {
-			args = append(args, "--unit="+unit)
+	for _, service := range services {
+		if len(service) > 0 {
+			args = append(args, "--unit="+service)
 		}
 	}
-	if len(a.Pattern) > 0 {
-		args = append(args, "--grep="+a.Pattern)
-		args = append(args, fmt.Sprintf("--case-sensitive=%t", a.CaseSensitive))
+	if len(n.Pattern) > 0 {
+		args = append(args, "--grep="+n.Pattern)
+		args = append(args, fmt.Sprintf("--case-sensitive=%t", n.CaseSensitive))
 	}
 
-	args = append(args, "--boot", fmt.Sprintf("%d", boot))
+	if n.Boot != nil {
+		args = append(args, "--boot", fmt.Sprintf("%d", *n.Boot))
+	}
 
-	return "journalctl", args
+	var output string
+	if len(n.Format) > 0 {
+		output = n.Format
+	} else {
+		output = "short-precise"
+	}
+	args = append(args, fmt.Sprintf("--output=%s", output))
+
+	return "journalctl", args, nil
+}
+
+// checkForNativeLogger checks journalctl output for a service
+func checkForNativeLogger(ctx context.Context, service string) bool {
+	// This will return all the journald units
+	cmd := exec.CommandContext(ctx, "journalctl", []string{"--field", "_SYSTEMD_UNIT"}...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		// Returning false to allow checking if the service is logging to a file
+		return false
+	}
+
+	// journalctl won't return an error if we try to fetch logs for a non-existent service,
+	// hence we search for it in the list of services known to journalctl
+	return strings.Contains(string(output), service+".service")
 }

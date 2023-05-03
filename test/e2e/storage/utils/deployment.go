@@ -17,6 +17,7 @@ limitations under the License.
 package utils
 
 import (
+	"fmt"
 	"path"
 	"strings"
 
@@ -92,6 +93,11 @@ func PatchCSIDeployment(f *e2eframework.Framework, o PatchCSIOptions, object int
 			}
 			for e := range container.VolumeMounts {
 				container.VolumeMounts[e].MountPath = substKubeletRootDir(container.VolumeMounts[e].MountPath)
+			}
+
+			if len(o.Features) > 0 && len(o.Features[container.Name]) > 0 {
+				featuregateString := strings.Join(o.Features[container.Name], ",")
+				container.Args = append(container.Args, fmt.Sprintf("--feature-gates=%s", featuregateString))
 			}
 
 			// Overwrite driver name resp. provider name
@@ -218,4 +224,10 @@ type PatchCSIOptions struct {
 	// field *if* the driver deploys a CSIDriver object. Ignored
 	// otherwise.
 	SELinuxMount *bool
+	// If not nil, the values will be used for setting feature arguments to
+	// specific sidecar.
+	// Feature is a map - where key is sidecar name such as:
+	//	-- key: resizer
+	//	-- value: []string{feature-gates}
+	Features map[string][]string
 }

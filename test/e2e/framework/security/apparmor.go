@@ -39,15 +39,15 @@ const (
 )
 
 // LoadAppArmorProfiles creates apparmor-profiles ConfigMap and apparmor-loader ReplicationController.
-func LoadAppArmorProfiles(nsName string, clientset clientset.Interface) {
-	createAppArmorProfileCM(nsName, clientset)
-	createAppArmorProfileLoader(nsName, clientset)
+func LoadAppArmorProfiles(ctx context.Context, nsName string, clientset clientset.Interface) {
+	createAppArmorProfileCM(ctx, nsName, clientset)
+	createAppArmorProfileLoader(ctx, nsName, clientset)
 }
 
 // CreateAppArmorTestPod creates a pod that tests apparmor profile enforcement. The pod exits with
 // an error code if the profile is incorrectly enforced. If runOnce is true the pod will exit after
 // a single test, otherwise it will repeat the test every 1 second until failure.
-func CreateAppArmorTestPod(nsName string, clientset clientset.Interface, podClient *e2epod.PodClient, unconfined bool, runOnce bool) *v1.Pod {
+func CreateAppArmorTestPod(ctx context.Context, nsName string, clientset clientset.Interface, podClient *e2epod.PodClient, unconfined bool, runOnce bool) *v1.Pod {
 	profile := "localhost/" + appArmorProfilePrefix + nsName
 	testCmd := fmt.Sprintf(`
 if touch %[1]s; then
@@ -115,25 +115,25 @@ done`, testCmd)
 	}
 
 	if runOnce {
-		pod = podClient.Create(pod)
-		framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(
+		pod = podClient.Create(ctx, pod)
+		framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(ctx,
 			clientset, pod.Name, nsName))
 		var err error
-		pod, err = podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
+		pod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 	} else {
-		pod = podClient.CreateSync(pod)
-		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(clientset, pod.Name, nsName, framework.PodStartTimeout))
+		pod = podClient.CreateSync(ctx, pod)
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, clientset, pod.Name, nsName, framework.PodStartTimeout))
 	}
 
 	// Verify Pod affinity colocated the Pods.
-	loader := getRunningLoaderPod(nsName, clientset)
+	loader := getRunningLoaderPod(ctx, nsName, clientset)
 	framework.ExpectEqual(pod.Spec.NodeName, loader.Spec.NodeName)
 
 	return pod
 }
 
-func createAppArmorProfileCM(nsName string, clientset clientset.Interface) {
+func createAppArmorProfileCM(ctx context.Context, nsName string, clientset clientset.Interface) {
 	profileName := appArmorProfilePrefix + nsName
 	profile := fmt.Sprintf(`#include <tunables/global>
 profile %s flags=(attach_disconnected) {
@@ -155,11 +155,11 @@ profile %s flags=(attach_disconnected) {
 			profileName: profile,
 		},
 	}
-	_, err := clientset.CoreV1().ConfigMaps(nsName).Create(context.TODO(), cm, metav1.CreateOptions{})
+	_, err := clientset.CoreV1().ConfigMaps(nsName).Create(ctx, cm, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Failed to create apparmor-profiles ConfigMap")
 }
 
-func createAppArmorProfileLoader(nsName string, clientset clientset.Interface) {
+func createAppArmorProfileLoader(ctx context.Context, nsName string, clientset clientset.Interface) {
 	True := true
 	One := int32(1)
 	loader := &v1.ReplicationController{
@@ -223,18 +223,18 @@ func createAppArmorProfileLoader(nsName string, clientset clientset.Interface) {
 			},
 		},
 	}
-	_, err := clientset.CoreV1().ReplicationControllers(nsName).Create(context.TODO(), loader, metav1.CreateOptions{})
+	_, err := clientset.CoreV1().ReplicationControllers(nsName).Create(ctx, loader, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Failed to create apparmor-loader ReplicationController")
 
 	// Wait for loader to be ready.
-	getRunningLoaderPod(nsName, clientset)
+	getRunningLoaderPod(ctx, nsName, clientset)
 }
 
-func getRunningLoaderPod(nsName string, clientset clientset.Interface) *v1.Pod {
+func getRunningLoaderPod(ctx context.Context, nsName string, clientset clientset.Interface) *v1.Pod {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{loaderLabelKey: loaderLabelValue}))
-	pods, err := e2epod.WaitForPodsWithLabelScheduled(clientset, nsName, label)
+	pods, err := e2epod.WaitForPodsWithLabelScheduled(ctx, clientset, nsName, label)
 	framework.ExpectNoError(err, "Failed to schedule apparmor-loader Pod")
 	pod := &pods.Items[0]
-	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(clientset, pod), "Failed to run apparmor-loader Pod")
+	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, clientset, pod), "Failed to run apparmor-loader Pod")
 	return pod
 }

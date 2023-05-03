@@ -32,12 +32,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/endpoints/deprecation"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/apiserver/pkg/endpoints/handlers"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	utilwarning "k8s.io/apiserver/pkg/endpoints/warning"
@@ -345,13 +345,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		isCreater = true
 	}
 
-	var resetFields map[fieldpath.APIVersion]*fieldpath.Set
-	if a.group.OpenAPIModels != nil {
-		if resetFieldsStrategy, isResetFieldsStrategy := storage.(rest.ResetFieldsStrategy); isResetFieldsStrategy {
-			resetFields = resetFieldsStrategy.GetResetFields()
-		}
-	}
-
 	var versionedList interface{}
 	if isLister {
 		list := lister.NewList()
@@ -622,11 +615,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		}
 	}
 
-	var disabledParams []string
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ServerSideFieldValidation) {
-		disabledParams = []string{"fieldValidation"}
-	}
-
 	// Create Routes for the actions.
 	// TODO: Add status documentation using Returns()
 	// Errors (see api/errors/errors.go as well as go-restful router):
@@ -685,8 +673,17 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	if a.group.MetaGroupVersion != nil {
 		reqScope.MetaGroupVersion = *a.group.MetaGroupVersion
 	}
-	if a.group.OpenAPIModels != nil {
-		reqScope.FieldManager, err = fieldmanager.NewDefaultFieldManager(
+
+	// Use TypeConverter's nil-ness as a proxy for whether SSA/OpenAPI is enabled
+	// This should be removed in the future and made unconditional
+	// https://github.com/kubernetes/kubernetes/pull/114998
+	if a.group.TypeConverter != nil {
+		var resetFields map[fieldpath.APIVersion]*fieldpath.Set
+		if resetFieldsStrategy, isResetFieldsStrategy := storage.(rest.ResetFieldsStrategy); isResetFieldsStrategy {
+			resetFields = resetFieldsStrategy.GetResetFields()
+		}
+
+		reqScope.FieldManager, err = managedfields.NewDefaultFieldManager(
 			a.group.TypeConverter,
 			a.group.UnsafeConvertor,
 			a.group.Defaulter,
@@ -700,6 +697,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			return nil, nil, fmt.Errorf("failed to create field manager: %v", err)
 		}
 	}
+
 	for _, action := range actions {
 		producedObject := storageMeta.ProducesObject(action.Verb)
 		if producedObject == nil {
@@ -857,7 +855,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Returns(http.StatusCreated, "Created", producedObject).
 				Reads(defaultVersionedObject).
 				Writes(producedObject)
-			if err := AddObjectParams(ws, route, versionedUpdateOptions, disabledParams...); err != nil {
+			if err := AddObjectParams(ws, route, versionedUpdateOptions); err != nil {
 				return nil, nil, err
 			}
 			addParams(route, action.Params)
@@ -886,7 +884,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Returns(http.StatusCreated, "Created", producedObject).
 				Reads(metav1.Patch{}).
 				Writes(producedObject)
-			if err := AddObjectParams(ws, route, versionedPatchOptions, disabledParams...); err != nil {
+			if err := AddObjectParams(ws, route, versionedPatchOptions); err != nil {
 				return nil, nil, err
 			}
 			addParams(route, action.Params)
@@ -917,7 +915,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Returns(http.StatusAccepted, "Accepted", producedObject).
 				Reads(defaultVersionedObject).
 				Writes(producedObject)
-			if err := AddObjectParams(ws, route, versionedCreateOptions, disabledParams...); err != nil {
+			if err := AddObjectParams(ws, route, versionedCreateOptions); err != nil {
 				return nil, nil, err
 			}
 			addParams(route, action.Params)
@@ -1080,6 +1078,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	if categoriesProvider, ok := storage.(rest.CategoriesProvider); ok {
 		apiResource.Categories = categoriesProvider.Categories()
 	}
+	if !isSubresource {
+		singularNameProvider, ok := storage.(rest.SingularNameProvider)
+		if !ok {
+			return nil, nil, fmt.Errorf("resource %s must implement SingularNameProvider", resource)
+		}
+		apiResource.SingularName = singularNameProvider.GetSingularName()
+	}
+
 	if gvkProvider, ok := storage.(rest.GroupVersionKindProvider); ok {
 		gvk := gvkProvider.GroupVersionKind(a.group.GroupVersion)
 		apiResource.Group = gvk.Group

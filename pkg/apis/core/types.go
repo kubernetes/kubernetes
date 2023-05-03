@@ -682,7 +682,7 @@ type EmptyDirVolumeSource struct {
 	// The maximum usage on memory medium EmptyDir would be the minimum value between
 	// the SizeLimit specified here and the sum of memory limits of all containers in a pod.
 	// The default is nil which means that the limit is undefined.
-	// More info: http://kubernetes.io/docs/user-guide/volumes#emptydir
+	// More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir
 	// +optional
 	SizeLimit *resource.Quantity
 }
@@ -1741,7 +1741,6 @@ type CSIPersistentVolumeSource struct {
 	// ControllerExpandSecretRef is a reference to the secret object containing
 	// sensitive information to pass to the CSI driver to complete the CSI
 	// ControllerExpandVolume call.
-	// This is an beta field and requires enabling ExpandCSIVolumes feature gate.
 	// This field is optional, and may be empty if no secret is required. If the
 	// secret object contains more than one secret, all secrets are passed.
 	// +optional
@@ -1750,9 +1749,10 @@ type CSIPersistentVolumeSource struct {
 	// NodeExpandSecretRef is a reference to the secret object containing
 	// sensitive information to pass to the CSI driver to complete the CSI
 	// NodeExpandVolume call.
-	// This is an alpha field and requires enabling CSINodeExpandSecret feature gate.
+	// This is a beta field which is enabled default by CSINodeExpandSecret feature gate.
 	// This field is optional, may be omitted if no secret is required. If the
 	// secret object contains more than one secret, all secrets are passed.
+	// +featureGate=CSINodeExpandSecret
 	// +optional
 	NodeExpandSecretRef *SecretReference
 }
@@ -2139,6 +2139,33 @@ const (
 	PullIfNotPresent PullPolicy = "IfNotPresent"
 )
 
+// ResourceResizeRestartPolicy specifies how to handle container resource resize.
+type ResourceResizeRestartPolicy string
+
+// These are the valid resource resize restart policy values:
+const (
+	// 'NotRequired' means Kubernetes will try to resize the container
+	// without restarting it, if possible. Kubernetes may however choose to
+	// restart the container if it is unable to actuate resize without a
+	// restart. For e.g. the runtime doesn't support restart-free resizing.
+	NotRequired ResourceResizeRestartPolicy = "NotRequired"
+	// 'RestartContainer' means Kubernetes will resize the container in-place
+	// by stopping and starting the container when new resources are applied.
+	// This is needed for legacy applications. For e.g. java apps using the
+	// -xmxN flag which are unable to use resized memory without restarting.
+	RestartContainer ResourceResizeRestartPolicy = "RestartContainer"
+)
+
+// ContainerResizePolicy represents resource resize policy for the container.
+type ContainerResizePolicy struct {
+	// Name of the resource to which this resource resize policy applies.
+	// Supported values: cpu, memory.
+	ResourceName ResourceName
+	// Restart policy to apply when specified resource is resized.
+	// If not specified, it defaults to NotRequired.
+	RestartPolicy ResourceResizeRestartPolicy
+}
+
 // PreemptionPolicy describes a policy for if/when to preempt a pod.
 type PreemptionPolicy string
 
@@ -2191,7 +2218,7 @@ type ResourceRequirements struct {
 	// This is an alpha field and requires enabling the
 	// DynamicResourceAllocation feature gate.
 	//
-	// This field is immutable.
+	// This field is immutable. It can only be set for containers.
 	//
 	// +featureGate=DynamicResourceAllocation
 	// +optional
@@ -2247,6 +2274,10 @@ type Container struct {
 	// Compute resource requirements.
 	// +optional
 	Resources ResourceRequirements
+	// Resources resize policy for the container.
+	// +featureGate=InPlacePodVerticalScaling
+	// +optional
+	ResizePolicy []ContainerResizePolicy
 	// +optional
 	VolumeMounts []VolumeMount
 	// volumeDevices is the list of block devices to be used by the container.
@@ -2296,8 +2327,6 @@ type ProbeHandler struct {
 	TCPSocket *TCPSocketAction
 
 	// GRPC specifies an action involving a GRPC port.
-	// This is a beta field and requires enabling GRPCContainerProbe feature gate.
-	// +featureGate=GRPCContainerProbe
 	// +optional
 	GRPC *GRPCAction
 }
@@ -2413,24 +2442,68 @@ type ContainerState struct {
 	Terminated *ContainerStateTerminated
 }
 
-// ContainerStatus represents the status of a container
+// ContainerStatus contains details for the current status of this container.
 type ContainerStatus struct {
-	// Each container in a pod must have a unique name.
+	// Name is a DNS_LABEL representing the unique name of the container.
+	// Each container in a pod must have a unique name across all container types.
+	// Cannot be updated.
 	Name string
+	// State holds details about the container's current condition.
 	// +optional
 	State ContainerState
+	// LastTerminationState holds the last termination state of the container to
+	// help debug container crashes and restarts. This field is not
+	// populated if the container is still running and RestartCount is 0.
 	// +optional
 	LastTerminationState ContainerState
-	// Ready specifies whether the container has passed its readiness check.
+	// Ready specifies whether the container is currently passing its readiness check.
+	// The value will change as readiness probes keep executing. If no readiness
+	// probes are specified, this field defaults to true once the container is
+	// fully started (see Started field).
+	//
+	// The value is typically used to determine whether a container is ready to
+	// accept traffic.
 	Ready bool
-	// Note that this is calculated from dead containers.  But those containers are subject to
-	// garbage collection.  This value will get capped at 5 by GC.
+	// RestartCount holds the number of times the container has been restarted.
+	// Kubelet makes an effort to always increment the value, but there
+	// are cases when the state may be lost due to node restarts and then the value
+	// may be reset to 0. The value is never negative.
 	RestartCount int32
-	Image        string
-	ImageID      string
+	// Image is the name of container image that the container is running.
+	// The container image may not match the image used in the PodSpec,
+	// as it may have been resolved by the runtime.
+	// More info: https://kubernetes.io/docs/concepts/containers/images.
+	Image string
+	// ImageID is the image ID of the container's image. The image ID may not
+	// match the image ID of the image used in the PodSpec, as it may have been
+	// resolved by the runtime.
+	ImageID string
+	// ContainerID is the ID of the container in the format '<type>://<container_id>'.
+	// Where type is a container runtime identifier, returned from Version call of CRI API
+	// (for example "containerd").
 	// +optional
 	ContainerID string
-	Started     *bool
+	// Started indicates whether the container has finished its postStart lifecycle hook
+	// and passed its startup probe.
+	// Initialized as false, becomes true after startupProbe is considered
+	// successful. Resets to false when the container is restarted, or if kubelet
+	// loses state temporarily. In both cases, startup probes will run again.
+	// Is always true when no startupProbe is defined and container is running and
+	// has passed the postStart lifecycle hook. The null value must be treated the
+	// same as false.
+	// +optional
+	Started *bool
+	// AllocatedResources represents the compute resources allocated for this container by the
+	// node. Kubelet sets this value to Container.Resources.Requests upon successful pod admission
+	// and after successfully admitting desired pod resize.
+	// +featureGate=InPlacePodVerticalScaling
+	// +optional
+	AllocatedResources ResourceList
+	// Resources represents the compute resource requests and limits that have been successfully
+	// enacted on the running container after it has been started or has been successfully resized.
+	// +featureGate=InPlacePodVerticalScaling
+	// +optional
+	Resources *ResourceRequirements
 }
 
 // PodPhase is a label for the condition of a pod at the current time.
@@ -2495,6 +2568,20 @@ type PodCondition struct {
 	// +optional
 	Message string
 }
+
+// PodResizeStatus shows status of desired resize of a pod's containers.
+type PodResizeStatus string
+
+const (
+	// Pod resources resize has been requested and will be evaluated by node.
+	PodResizeStatusProposed PodResizeStatus = "Proposed"
+	// Pod resources resize has been accepted by node and is being actuated.
+	PodResizeStatusInProgress PodResizeStatus = "InProgress"
+	// Node cannot resize the pod at this time and will keep retrying.
+	PodResizeStatusDeferred PodResizeStatus = "Deferred"
+	// Requested pod resize is not feasible and will not be re-evaluated.
+	PodResizeStatusInfeasible PodResizeStatus = "Infeasible"
+)
 
 // RestartPolicy describes how the container should be restarted.
 // Only one of the following restart policies may be specified.
@@ -3045,9 +3132,14 @@ type PodSpec struct {
 	OS *PodOS
 
 	// SchedulingGates is an opaque list of values that if specified will block scheduling the pod.
-	// More info:  https://git.k8s.io/enhancements/keps/sig-scheduling/3521-pod-scheduling-readiness.
+	// If schedulingGates is not empty, the pod will stay in the SchedulingGated state and the
+	// scheduler will not attempt to schedule the pod.
 	//
-	// This is an alpha-level feature enabled by PodSchedulingReadiness feature gate.
+	// SchedulingGates can only be set at pod creation time, and be removed only afterwards.
+	//
+	// This is a beta feature enabled by the PodSchedulingReadiness feature gate.
+	//
+	// +featureGate=PodSchedulingReadiness
 	// +optional
 	SchedulingGates []PodSchedulingGate
 	// ResourceClaims defines which ResourceClaims must be allocated
@@ -3408,6 +3500,10 @@ type EphemeralContainerCommon struct {
 	// already allocated to the pod.
 	// +optional
 	Resources ResourceRequirements
+	// Resources resize policy for the container.
+	// +featureGate=InPlacePodVerticalScaling
+	// +optional
+	ResizePolicy []ContainerResizePolicy
 	// Pod volumes to mount into the container's filesystem. Subpath mounts are not allowed for ephemeral containers.
 	// +optional
 	VolumeMounts []VolumeMount
@@ -3524,6 +3620,13 @@ type PodStatus struct {
 	// Status for any ephemeral containers that have run in this pod.
 	// +optional
 	EphemeralContainerStatuses []ContainerStatus
+
+	// Status of resources resize desired for pod's containers.
+	// It is empty if no resources resize is pending.
+	// Any changes to container resources will automatically set this to "Proposed"
+	// +featureGate=InPlacePodVerticalScaling
+	// +optional
+	Resize PodResizeStatus
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -3617,6 +3720,7 @@ type ReplicationControllerSpec struct {
 	// Template is the object that describes the pod that will be created if
 	// insufficient replicas are detected. Internally, this takes precedence over a
 	// TemplateRef.
+	// The only allowed template.spec.restartPolicy value is "Always".
 	// +optional
 	Template *PodTemplateSpec
 }
@@ -3781,33 +3885,33 @@ const (
 	ServiceTypeExternalName ServiceType = "ExternalName"
 )
 
-// ServiceInternalTrafficPolicyType describes the endpoint-selection policy for
+// ServiceInternalTrafficPolicy describes the endpoint-selection policy for
 // traffic sent to the ClusterIP.
-type ServiceInternalTrafficPolicyType string
+type ServiceInternalTrafficPolicy string
 
 const (
 	// ServiceInternalTrafficPolicyCluster routes traffic to all endpoints.
-	ServiceInternalTrafficPolicyCluster ServiceInternalTrafficPolicyType = "Cluster"
+	ServiceInternalTrafficPolicyCluster ServiceInternalTrafficPolicy = "Cluster"
 
 	// ServiceInternalTrafficPolicyLocal routes traffic only to endpoints on the same
 	// node as the traffic was received on (dropping the traffic if there are no
 	// local endpoints).
-	ServiceInternalTrafficPolicyLocal ServiceInternalTrafficPolicyType = "Local"
+	ServiceInternalTrafficPolicyLocal ServiceInternalTrafficPolicy = "Local"
 )
 
-// ServiceExternalTrafficPolicyType describes the endpoint-selection policy for
+// ServiceExternalTrafficPolicy describes the endpoint-selection policy for
 // traffic to external service entrypoints (NodePorts, ExternalIPs, and
 // LoadBalancer IPs).
-type ServiceExternalTrafficPolicyType string
+type ServiceExternalTrafficPolicy string
 
 const (
-	// ServiceExternalTrafficPolicyTypeCluster routes traffic to all endpoints.
-	ServiceExternalTrafficPolicyTypeCluster ServiceExternalTrafficPolicyType = "Cluster"
+	// ServiceExternalTrafficPolicyCluster routes traffic to all endpoints.
+	ServiceExternalTrafficPolicyCluster ServiceExternalTrafficPolicy = "Cluster"
 
-	// ServiceExternalTrafficPolicyTypeLocal preserves the source IP of the traffic by
+	// ServiceExternalTrafficPolicyLocal preserves the source IP of the traffic by
 	// routing only to endpoints on the same node as the traffic was received on
 	// (dropping the traffic if there are no local endpoints).
-	ServiceExternalTrafficPolicyTypeLocal ServiceExternalTrafficPolicyType = "Local"
+	ServiceExternalTrafficPolicyLocal ServiceExternalTrafficPolicy = "Local"
 )
 
 // These are the valid conditions of a service.
@@ -4013,7 +4117,7 @@ type ServiceSpec struct {
 	// a NodePort from within the cluster may need to take traffic policy into account
 	// when picking a node.
 	// +optional
-	ExternalTrafficPolicy ServiceExternalTrafficPolicyType
+	ExternalTrafficPolicy ServiceExternalTrafficPolicy
 
 	// healthCheckNodePort specifies the healthcheck nodePort for the service.
 	// If not specified, HealthCheckNodePort is created by the service api
@@ -4064,7 +4168,7 @@ type ServiceSpec struct {
 	// "Cluster", uses the standard behavior of routing to all endpoints evenly
 	// (possibly modified by topology and other features).
 	// +optional
-	InternalTrafficPolicy *ServiceInternalTrafficPolicyType
+	InternalTrafficPolicy *ServiceInternalTrafficPolicy
 }
 
 // ServicePort represents the port on which the service is exposed
@@ -4079,10 +4183,17 @@ type ServicePort struct {
 	Protocol Protocol
 
 	// The application protocol for this port.
+	// This is used as a hint for implementations to offer richer behavior for protocols that they understand.
 	// This field follows standard Kubernetes label syntax.
-	// Un-prefixed names are reserved for IANA standard service names (as per
+	// Valid values are either:
+	//
+	// * Un-prefixed protocol names - reserved for IANA standard service names (as per
 	// RFC-6335 and https://www.iana.org/assignments/service-names).
-	// Non-standard protocols should use prefixed names such as
+	//
+	// * Kubernetes-defined prefixed names:
+	//   * 'kubernetes.io/h2c' - HTTP/2 over cleartext as described in https://www.rfc-editor.org/rfc/rfc7540
+	//
+	// * Other protocols should use implementation-defined prefixed names such as
 	// mycompany.com/my-custom-protocol.
 	// +optional
 	AppProtocol *string
@@ -4208,9 +4319,8 @@ type EndpointSubset struct {
 // EndpointAddress is a tuple that describes single IP address.
 type EndpointAddress struct {
 	// The IP of this endpoint.
-	// IPv6 is also accepted but not fully supported on all platforms. Also, certain
-	// kubernetes components, like kube-proxy, are not IPv6 ready.
-	// TODO: This should allow hostname or IP, see #4447.
+	// May not be loopback (127.0.0.0/8 or ::1), link-local (169.254.0.0/16 or fe80::/10),
+	// or link-local multicast (224.0.0.0/24 or ff02::/16).
 	IP string
 	// Optional: Hostname of this endpoint
 	// Meant to be used by DNS servers etc.
@@ -5870,8 +5980,12 @@ type TopologySpreadConstraint struct {
 	// spreading will be calculated. The keys are used to lookup values from the
 	// incoming pod labels, those key-value labels are ANDed with labelSelector
 	// to select the group of existing pods over which spreading will be calculated
-	// for the incoming pod. Keys that don't exist in the incoming pod labels will
+	// for the incoming pod. The same key is forbidden to exist in both MatchLabelKeys and LabelSelector.
+	// MatchLabelKeys cannot be set when LabelSelector isn't set.
+	// Keys that don't exist in the incoming pod labels will
 	// be ignored. A null or empty list means only match against labelSelector.
+	//
+	// This is a beta field and requires the MatchLabelKeysInPodTopologySpread feature gate to be enabled (enabled by default).
 	// +listType=atomic
 	// +optional
 	MatchLabelKeys []string

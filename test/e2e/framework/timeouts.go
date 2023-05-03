@@ -18,33 +18,41 @@ package framework
 
 import "time"
 
-const (
-	// Default timeouts to be used in TimeoutContext
-	podStartTimeout                  = 5 * time.Minute
-	podStartShortTimeout             = 2 * time.Minute
-	podStartSlowTimeout              = 15 * time.Minute
-	podDeleteTimeout                 = 5 * time.Minute
-	claimProvisionTimeout            = 5 * time.Minute
-	claimProvisionShortTimeout       = 1 * time.Minute
-	dataSourceProvisionTimeout       = 5 * time.Minute
-	claimBoundTimeout                = 3 * time.Minute
-	pvReclaimTimeout                 = 3 * time.Minute
-	pvBoundTimeout                   = 3 * time.Minute
-	pvCreateTimeout                  = 3 * time.Minute
-	pvDeleteTimeout                  = 5 * time.Minute
-	pvDeleteSlowTimeout              = 20 * time.Minute
-	snapshotCreateTimeout            = 5 * time.Minute
-	snapshotDeleteTimeout            = 5 * time.Minute
-	snapshotControllerMetricsTimeout = 5 * time.Minute
-)
+var defaultTimeouts = TimeoutContext{
+	Poll:                      2 * time.Second, // from the former e2e/framework/pod poll interval
+	PodStart:                  5 * time.Minute,
+	PodStartShort:             2 * time.Minute,
+	PodStartSlow:              15 * time.Minute,
+	PodDelete:                 5 * time.Minute,
+	ClaimProvision:            5 * time.Minute,
+	ClaimProvisionShort:       1 * time.Minute,
+	DataSourceProvision:       5 * time.Minute,
+	ClaimBound:                3 * time.Minute,
+	PVReclaim:                 3 * time.Minute,
+	PVBound:                   3 * time.Minute,
+	PVCreate:                  3 * time.Minute,
+	PVDelete:                  5 * time.Minute,
+	PVDeleteSlow:              20 * time.Minute,
+	SnapshotCreate:            5 * time.Minute,
+	SnapshotDelete:            5 * time.Minute,
+	SnapshotControllerMetrics: 5 * time.Minute,
+	SystemPodsStartup:         10 * time.Minute,
+	NodeSchedulable:           30 * time.Minute,
+	SystemDaemonsetStartup:    5 * time.Minute,
+}
 
 // TimeoutContext contains timeout settings for several actions.
 type TimeoutContext struct {
+	// Poll is how long to wait between API calls when waiting for some condition.
+	Poll time.Duration
+
 	// PodStart is how long to wait for the pod to be started.
+	// This value is the default for gomega.Eventually.
 	PodStart time.Duration
 
 	// PodStartShort is same as `PodStart`, but shorter.
 	// Use it in a case-by-case basis, mostly when you are sure pod start will not be delayed.
+	// This value is the default for gomega.Consistently.
 	PodStartShort time.Duration
 
 	// PodStartSlow is same as `PodStart`, but longer.
@@ -89,26 +97,31 @@ type TimeoutContext struct {
 
 	// SnapshotControllerMetrics is how long to wait for snapshot controller metrics.
 	SnapshotControllerMetrics time.Duration
+
+	// SystemPodsStartup is how long to wait for system pods to be running.
+	SystemPodsStartup time.Duration
+
+	// NodeSchedulable is how long to wait for all nodes to be schedulable.
+	NodeSchedulable time.Duration
+
+	// SystemDaemonsetStartup is how long to wait for all system daemonsets to be ready.
+	SystemDaemonsetStartup time.Duration
 }
 
-// NewTimeoutContextWithDefaults returns a TimeoutContext with default values.
-func NewTimeoutContextWithDefaults() *TimeoutContext {
-	return &TimeoutContext{
-		PodStart:                  podStartTimeout,
-		PodStartShort:             podStartShortTimeout,
-		PodStartSlow:              podStartSlowTimeout,
-		PodDelete:                 podDeleteTimeout,
-		ClaimProvision:            claimProvisionTimeout,
-		ClaimProvisionShort:       claimProvisionShortTimeout,
-		DataSourceProvision:       dataSourceProvisionTimeout,
-		ClaimBound:                claimBoundTimeout,
-		PVReclaim:                 pvReclaimTimeout,
-		PVBound:                   pvBoundTimeout,
-		PVCreate:                  pvCreateTimeout,
-		PVDelete:                  pvDeleteTimeout,
-		PVDeleteSlow:              pvDeleteSlowTimeout,
-		SnapshotCreate:            snapshotCreateTimeout,
-		SnapshotDelete:            snapshotDeleteTimeout,
-		SnapshotControllerMetrics: snapshotControllerMetricsTimeout,
-	}
+// NewTimeoutContext returns a TimeoutContext with all values set either to
+// hard-coded defaults or a value that was configured when running the E2E
+// suite. Should be called after command line parsing.
+func NewTimeoutContext() *TimeoutContext {
+	// Make a copy, otherwise the caller would have the ability to modify
+	// the original values.
+	copy := TestContext.timeouts
+	return &copy
+}
+
+// PollInterval defines how long to wait between API server queries while
+// waiting for some condition.
+//
+// This value is the default for gomega.Eventually and gomega.Consistently.
+func PollInterval() time.Duration {
+	return TestContext.timeouts.Poll
 }

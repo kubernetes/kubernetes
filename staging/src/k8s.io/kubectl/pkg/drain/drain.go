@@ -83,7 +83,6 @@ type Helper struct {
 	ErrOut io.Writer
 
 	DryRunStrategy cmdutil.DryRunStrategy
-	DryRunVerifier *resource.QueryParamVerifier
 
 	// OnPodDeletedOrEvicted is called when a pod is evicted/deleted; for printing progress output
 	OnPodDeletedOrEvicted func(pod *corev1.Pod, usingEviction bool)
@@ -135,22 +134,11 @@ func (d *Helper) makeDeleteOptions() metav1.DeleteOptions {
 
 // DeletePod will delete the given pod, or return an error if it couldn't
 func (d *Helper) DeletePod(pod corev1.Pod) error {
-	if d.DryRunStrategy == cmdutil.DryRunServer {
-		if err := d.DryRunVerifier.HasSupport(pod.GroupVersionKind()); err != nil {
-			return err
-		}
-	}
 	return d.Client.CoreV1().Pods(pod.Namespace).Delete(d.getContext(), pod.Name, d.makeDeleteOptions())
 }
 
 // EvictPod will evict the given pod, or return an error if it couldn't
 func (d *Helper) EvictPod(pod corev1.Pod, evictionGroupVersion schema.GroupVersion) error {
-	if d.DryRunStrategy == cmdutil.DryRunServer {
-		if err := d.DryRunVerifier.HasSupport(pod.GroupVersionKind()); err != nil {
-			return err
-		}
-	}
-
 	delOpts := d.makeDeleteOptions()
 
 	switch evictionGroupVersion {
@@ -327,7 +315,7 @@ func (d *Helper) evictPods(pods []corev1.Pod, evictionGroupVersion schema.GroupV
 				} else if apierrors.IsForbidden(err) && apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
 					// an eviction request in a deleting namespace will throw a forbidden error,
 					// if the pod is not marked deleted, we retry until it is.
-					fmt.Fprintf(d.ErrOut, "error when evicting pod %q (will retry after 5s): %v\n", activePod.Name, err)
+					fmt.Fprintf(d.ErrOut, "error when evicting pod %q from terminating namespace %q (will retry after 5s): %v\n", activePod.Name, activePod.Namespace, err)
 					time.Sleep(5 * time.Second)
 				} else {
 					returnCh <- fmt.Errorf("error when evicting pods/%q -n %q: %v", activePod.Name, activePod.Namespace, err)
@@ -354,7 +342,7 @@ func (d *Helper) evictPods(pods []corev1.Pod, evictionGroupVersion schema.GroupV
 			if err == nil {
 				returnCh <- nil
 			} else {
-				returnCh <- fmt.Errorf("error when waiting for pod %q terminating: %v", pod.Name, err)
+				returnCh <- fmt.Errorf("error when waiting for pod %q in namespace %q to terminate: %v", pod.Name, pod.Namespace, err)
 			}
 		}(pod, returnCh)
 	}

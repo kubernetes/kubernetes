@@ -65,7 +65,7 @@ import (
 type OperationExecutor interface {
 	// AttachVolume attaches the volume to the node specified in volumeToAttach.
 	// It then updates the actual state of the world to reflect that.
-	AttachVolume(volumeToAttach VolumeToAttach, actualStateOfWorld ActualStateOfWorldAttacherUpdater) error
+	AttachVolume(logger klog.Logger, volumeToAttach VolumeToAttach, actualStateOfWorld ActualStateOfWorldAttacherUpdater) error
 
 	// VerifyVolumesAreAttachedPerNode verifies the given list of volumes to see whether they are still attached to the node.
 	// If any volume is not attached right now, it will update the actual state of the world to reflect that.
@@ -83,7 +83,7 @@ type OperationExecutor interface {
 	// that. If verifySafeToDetach is set, a call is made to the fetch the node
 	// object and it is used to verify that the volume does not exist in Node's
 	// Status.VolumesInUse list (operation fails with error if it is).
-	DetachVolume(volumeToDetach AttachedVolume, verifySafeToDetach bool, actualStateOfWorld ActualStateOfWorldAttacherUpdater) error
+	DetachVolume(logger klog.Logger, volumeToDetach AttachedVolume, verifySafeToDetach bool, actualStateOfWorld ActualStateOfWorldAttacherUpdater) error
 
 	// If a volume has 'Filesystem' volumeMode, MountVolume mounts the
 	// volume to the pod specified in volumeToMount.
@@ -139,7 +139,7 @@ type OperationExecutor interface {
 	// If the volume is not found or there is an error (fetching the node
 	// object, for example) then an error is returned which triggers exponential
 	// back off on retries.
-	VerifyControllerAttachedVolume(volumeToMount VolumeToMount, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) error
+	VerifyControllerAttachedVolume(logger klog.Logger, volumeToMount VolumeToMount, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) error
 
 	// IsOperationPending returns true if an operation for the given volumeName
 	// and one of podName or nodeName is pending, otherwise it returns false
@@ -245,13 +245,13 @@ type ActualStateOfWorldAttacherUpdater interface {
 	// TODO: in the future, we should be able to remove the volumeName
 	// argument to this method -- since it is used only for attachable
 	// volumes.  See issue 29695.
-	MarkVolumeAsAttached(volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string) error
+	MarkVolumeAsAttached(logger klog.Logger, volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string) error
 
 	// Marks the specified volume as *possibly* attached to the specified node.
 	// If an attach operation fails, the attach/detach controller does not know for certain if the volume is attached or not.
 	// If the volume name is supplied, that volume name will be used.  If not, the
 	// volume name is computed using the result from querying the plugin.
-	MarkVolumeAsUncertain(volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName) error
+	MarkVolumeAsUncertain(logger klog.Logger, volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName) error
 
 	// Marks the specified volume as detached from the specified node
 	MarkVolumeAsDetached(volumeName v1.UniqueVolumeName, nodeName types.NodeName)
@@ -262,10 +262,10 @@ type ActualStateOfWorldAttacherUpdater interface {
 
 	// Unmarks the desire to detach for the specified volume (add the volume back to
 	// the node's volumesToReportAsAttached list)
-	AddVolumeToReportAsAttached(volumeName v1.UniqueVolumeName, nodeName types.NodeName)
+	AddVolumeToReportAsAttached(logger klog.Logger, volumeName v1.UniqueVolumeName, nodeName types.NodeName)
 
 	// InitializeClaimSize sets pvc claim size by reading pvc.Status.Capacity
-	InitializeClaimSize(volumeName v1.UniqueVolumeName, claimSize *resource.Quantity)
+	InitializeClaimSize(logger klog.Logger, volumeName v1.UniqueVolumeName, claimSize *resource.Quantity)
 
 	GetClaimSize(volumeName v1.UniqueVolumeName) *resource.Quantity
 }
@@ -789,10 +789,11 @@ func (oe *operationExecutor) IsOperationSafeToRetry(
 }
 
 func (oe *operationExecutor) AttachVolume(
+	logger klog.Logger,
 	volumeToAttach VolumeToAttach,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) error {
 	generatedOperations :=
-		oe.operationGenerator.GenerateAttachVolumeFunc(volumeToAttach, actualStateOfWorld)
+		oe.operationGenerator.GenerateAttachVolumeFunc(logger, volumeToAttach, actualStateOfWorld)
 
 	if util.IsMultiAttachAllowed(volumeToAttach.VolumeSpec) {
 		return oe.pendingOperations.Run(
@@ -804,11 +805,12 @@ func (oe *operationExecutor) AttachVolume(
 }
 
 func (oe *operationExecutor) DetachVolume(
+	logger klog.Logger,
 	volumeToDetach AttachedVolume,
 	verifySafeToDetach bool,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) error {
 	generatedOperations, err :=
-		oe.operationGenerator.GenerateDetachVolumeFunc(volumeToDetach, verifySafeToDetach, actualStateOfWorld)
+		oe.operationGenerator.GenerateDetachVolumeFunc(logger, volumeToDetach, verifySafeToDetach, actualStateOfWorld)
 	if err != nil {
 		return err
 	}
@@ -1039,11 +1041,12 @@ func (oe *operationExecutor) ExpandInUseVolume(volumeToMount VolumeToMount, actu
 }
 
 func (oe *operationExecutor) VerifyControllerAttachedVolume(
+	logger klog.Logger,
 	volumeToMount VolumeToMount,
 	nodeName types.NodeName,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) error {
 	generatedOperations, err :=
-		oe.operationGenerator.GenerateVerifyControllerAttachedVolumeFunc(volumeToMount, nodeName, actualStateOfWorld)
+		oe.operationGenerator.GenerateVerifyControllerAttachedVolumeFunc(logger, volumeToMount, nodeName, actualStateOfWorld)
 	if err != nil {
 		return err
 	}

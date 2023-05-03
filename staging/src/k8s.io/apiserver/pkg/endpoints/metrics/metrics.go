@@ -32,8 +32,6 @@ import (
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/endpoints/responsewriter"
-	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 )
@@ -107,7 +105,7 @@ var (
 		&compbasemetrics.HistogramOpts{
 			Subsystem: APIServerComponent,
 			Name:      "request_slo_duration_seconds",
-			Help:      "Response latency distribution (not counting webhook duration) in seconds for each verb, group, version, resource, subresource, scope and component.",
+			Help:      "Response latency distribution (not counting webhook duration and priority & fairness queue wait times) in seconds for each verb, group, version, resource, subresource, scope and component.",
 			// This metric is supplementary to the requestLatencies metric.
 			// It measures request duration excluding webhooks as they are mostly
 			// dependant on user configuration.
@@ -122,7 +120,7 @@ var (
 		&compbasemetrics.HistogramOpts{
 			Subsystem: APIServerComponent,
 			Name:      "request_sli_duration_seconds",
-			Help:      "Response latency distribution (not counting webhook duration) in seconds for each verb, group, version, resource, subresource, scope and component.",
+			Help:      "Response latency distribution (not counting webhook duration and priority & fairness queue wait times) in seconds for each verb, group, version, resource, subresource, scope and component.",
 			// This metric is supplementary to the requestLatencies metric.
 			// It measures request duration excluding webhooks as they are mostly
 			// dependant on user configuration.
@@ -135,7 +133,7 @@ var (
 	fieldValidationRequestLatencies = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
 			Name: "field_validation_request_duration_seconds",
-			Help: "Response latency distribution in seconds for each field validation value and whether field validation is enabled or not",
+			Help: "Response latency distribution in seconds for each field validation value",
 			// This metric is supplementary to the requestLatencies metric.
 			// It measures request durations for the various field validation
 			// values.
@@ -143,7 +141,7 @@ var (
 				4, 5, 6, 8, 10, 15, 20, 30, 45, 60},
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{"field_validation", "enabled"},
+		[]string{"field_validation"},
 	)
 	responseSizes = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
@@ -320,6 +318,14 @@ var (
 		"UPDATE",
 		"WATCH",
 		"WATCHLIST")
+
+	// These are the valid connect requests which we report in our metrics.
+	validConnectRequests = utilsets.NewString(
+		"log",
+		"exec",
+		"portforward",
+		"attach",
+		"proxy")
 )
 
 const (
@@ -426,7 +432,7 @@ func RecordRequestAbort(req *http.Request, requestInfo *request.RequestInfo) {
 	}
 
 	scope := CleanScope(requestInfo)
-	reportedVerb := cleanVerb(CanonicalVerb(strings.ToUpper(req.Method), scope), getVerbIfWatch(req), req)
+	reportedVerb := cleanVerb(CanonicalVerb(strings.ToUpper(req.Method), scope), "", req, requestInfo)
 	resource := requestInfo.Resource
 	subresource := requestInfo.Subresource
 	group := requestInfo.APIGroup
@@ -447,7 +453,7 @@ func RecordDroppedRequest(req *http.Request, requestInfo *request.RequestInfo, c
 	// InstrumentRouteFunc which is registered in installer.go with predefined
 	// list of verbs (different than those translated to RequestInfo).
 	// However, we need to tweak it e.g. to differentiate GET from LIST.
-	reportedVerb := cleanVerb(CanonicalVerb(strings.ToUpper(req.Method), scope), getVerbIfWatch(req), req)
+	reportedVerb := cleanVerb(CanonicalVerb(strings.ToUpper(req.Method), scope), "", req, requestInfo)
 
 	if requestInfo.IsResourceRequest {
 		requestCounter.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component, codeToString(http.StatusTooManyRequests), "").Inc()
@@ -470,7 +476,7 @@ func RecordRequestTermination(req *http.Request, requestInfo *request.RequestInf
 	// InstrumentRouteFunc which is registered in installer.go with predefined
 	// list of verbs (different than those translated to RequestInfo).
 	// However, we need to tweak it e.g. to differentiate GET from LIST.
-	reportedVerb := cleanVerb(CanonicalVerb(strings.ToUpper(req.Method), scope), getVerbIfWatch(req), req)
+	reportedVerb := cleanVerb(CanonicalVerb(strings.ToUpper(req.Method), scope), "", req, requestInfo)
 
 	if requestInfo.IsResourceRequest {
 		requestTerminationsTotal.WithContext(req.Context()).WithLabelValues(reportedVerb, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component, codeToString(code)).Inc()
@@ -492,7 +498,7 @@ func RecordLongRunning(req *http.Request, requestInfo *request.RequestInfo, comp
 	// InstrumentRouteFunc which is registered in installer.go with predefined
 	// list of verbs (different than those translated to RequestInfo).
 	// However, we need to tweak it e.g. to differentiate GET from LIST.
-	reportedVerb := cleanVerb(CanonicalVerb(strings.ToUpper(req.Method), scope), getVerbIfWatch(req), req)
+	reportedVerb := cleanVerb(CanonicalVerb(strings.ToUpper(req.Method), scope), "", req, requestInfo)
 
 	if requestInfo.IsResourceRequest {
 		g = longRunningRequestsGauge.WithContext(req.Context()).WithLabelValues(reportedVerb, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component)
@@ -507,11 +513,15 @@ func RecordLongRunning(req *http.Request, requestInfo *request.RequestInfo, comp
 // MonitorRequest handles standard transformations for client and the reported verb and then invokes Monitor to record
 // a request. verb must be uppercase to be backwards compatible with existing monitoring tooling.
 func MonitorRequest(req *http.Request, verb, group, version, resource, subresource, scope, component string, deprecated bool, removedRelease string, httpCode, respSize int, elapsed time.Duration) {
+	requestInfo, ok := request.RequestInfoFrom(req.Context())
+	if !ok || requestInfo == nil {
+		requestInfo = &request.RequestInfo{Verb: req.Method, Path: req.URL.Path}
+	}
 	// We don't use verb from <requestInfo>, as this may be propagated from
 	// InstrumentRouteFunc which is registered in installer.go with predefined
 	// list of verbs (different than those translated to RequestInfo).
 	// However, we need to tweak it e.g. to differentiate GET from LIST.
-	reportedVerb := cleanVerb(CanonicalVerb(strings.ToUpper(req.Method), scope), verb, req)
+	reportedVerb := cleanVerb(CanonicalVerb(strings.ToUpper(req.Method), scope), verb, req, requestInfo)
 
 	dryRun := cleanDryRun(req.URL)
 	elapsedSeconds := elapsed.Seconds()
@@ -537,11 +547,10 @@ func MonitorRequest(req *http.Request, verb, group, version, resource, subresour
 	}
 	requestLatencies.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component).Observe(elapsedSeconds)
 	fieldValidation := cleanFieldValidation(req.URL)
-	fieldValidationEnabled := strconv.FormatBool(utilfeature.DefaultFeatureGate.Enabled(features.ServerSideFieldValidation))
-	fieldValidationRequestLatencies.WithContext(req.Context()).WithLabelValues(fieldValidation, fieldValidationEnabled)
+	fieldValidationRequestLatencies.WithContext(req.Context()).WithLabelValues(fieldValidation)
 
 	if wd, ok := request.LatencyTrackersFrom(req.Context()); ok {
-		sliLatency := elapsedSeconds - (wd.MutatingWebhookTracker.GetLatency() + wd.ValidatingWebhookTracker.GetLatency()).Seconds()
+		sliLatency := elapsedSeconds - (wd.MutatingWebhookTracker.GetLatency() + wd.ValidatingWebhookTracker.GetLatency() + wd.APFQueueWaitTracker.GetLatency()).Seconds()
 		requestSloLatencies.WithContext(req.Context()).WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(sliLatency)
 		requestSliLatencies.WithContext(req.Context()).WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(sliLatency)
 	}
@@ -591,15 +600,16 @@ func InstrumentHandlerFunc(verb, group, version, resource, subresource, scope, c
 // NormalizedVerb returns normalized verb
 func NormalizedVerb(req *http.Request) string {
 	verb := req.Method
-	if requestInfo, ok := request.RequestInfoFrom(req.Context()); ok {
+	requestInfo, ok := request.RequestInfoFrom(req.Context())
+	if ok {
 		// If we can find a requestInfo, we can get a scope, and then
 		// we can convert GETs to LISTs when needed.
 		scope := CleanScope(requestInfo)
 		verb = CanonicalVerb(strings.ToUpper(verb), scope)
 	}
 
-	// mark APPLY requests and WATCH requests correctly.
-	return CleanVerb(verb, req)
+	// mark APPLY requests, WATCH requests and CONNECT requests correctly.
+	return CleanVerb(verb, req, requestInfo)
 }
 
 // CleanScope returns the scope of the request.
@@ -632,8 +642,8 @@ func CanonicalVerb(verb string, scope string) string {
 }
 
 // CleanVerb returns a normalized verb, so that it is easy to tell WATCH from
-// LIST and APPLY from PATCH.
-func CleanVerb(verb string, request *http.Request) string {
+// LIST, APPLY from PATCH and CONNECT from others.
+func CleanVerb(verb string, request *http.Request, requestInfo *request.RequestInfo) string {
 	reportedVerb := verb
 	if suggestedVerb := getVerbIfWatch(request); suggestedVerb == "WATCH" {
 		reportedVerb = "WATCH"
@@ -645,21 +655,22 @@ func CleanVerb(verb string, request *http.Request) string {
 	if verb == "PATCH" && request.Header.Get("Content-Type") == string(types.ApplyPatchType) {
 		reportedVerb = "APPLY"
 	}
+	if requestInfo != nil && requestInfo.IsResourceRequest && len(requestInfo.Subresource) > 0 && validConnectRequests.Has(requestInfo.Subresource) {
+		reportedVerb = "CONNECT"
+	}
 	return reportedVerb
 }
 
 // cleanVerb additionally ensures that unknown verbs don't clog up the metrics.
-func cleanVerb(verb, suggestedVerb string, request *http.Request) string {
+func cleanVerb(verb, suggestedVerb string, request *http.Request, requestInfo *request.RequestInfo) string {
 	// CanonicalVerb (being an input for this function) doesn't handle correctly the
 	// deprecated path pattern for watch of:
 	//   GET /api/{version}/watch/{resource}
 	// We correct it manually based on the pass verb from the installer.
-	var reportedVerb string
 	if suggestedVerb == "WATCH" || suggestedVerb == "WATCHLIST" {
-		reportedVerb = "WATCH"
-	} else {
-		reportedVerb = CleanVerb(verb, request)
+		return "WATCH"
 	}
+	reportedVerb := CleanVerb(verb, request, requestInfo)
 	if validRequestMethods.Has(reportedVerb) {
 		return reportedVerb
 	}

@@ -25,7 +25,7 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -37,6 +37,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2/ktesting"
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/features"
@@ -241,6 +242,7 @@ func TestStatefulPodControlCreatePodFailed(t *testing.T) {
 }
 
 func TestStatefulPodControlNoOpUpdate(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	recorder := record.NewFakeRecorder(10)
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
@@ -257,7 +259,7 @@ func TestStatefulPodControlNoOpUpdate(t *testing.T) {
 		t.Error("no-op update should not make any client invocation")
 		return true, nil, apierrors.NewInternalError(errors.New("if we are here we have a problem"))
 	})
-	if err := control.UpdateStatefulPod(set, pod); err != nil {
+	if err := control.UpdateStatefulPod(ctx, set, pod); err != nil {
 		t.Errorf("Error returned on no-op update error: %s", err)
 	}
 	events := collectEvents(recorder.Events)
@@ -267,6 +269,7 @@ func TestStatefulPodControlNoOpUpdate(t *testing.T) {
 }
 
 func TestStatefulPodControlUpdatesIdentity(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	recorder := record.NewFakeRecorder(10)
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
@@ -281,7 +284,7 @@ func TestStatefulPodControlUpdatesIdentity(t *testing.T) {
 		return true, update.GetObject(), nil
 	})
 	pod.Name = "goo-0"
-	if err := control.UpdateStatefulPod(set, pod); err != nil {
+	if err := control.UpdateStatefulPod(ctx, set, pod); err != nil {
 		t.Errorf("Successful update returned an error: %s", err)
 	}
 	events := collectEvents(recorder.Events)
@@ -296,6 +299,7 @@ func TestStatefulPodControlUpdatesIdentity(t *testing.T) {
 }
 
 func TestStatefulPodControlUpdateIdentityFailure(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	recorder := record.NewFakeRecorder(10)
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
@@ -313,7 +317,7 @@ func TestStatefulPodControlUpdateIdentityFailure(t *testing.T) {
 		return true, nil, apierrors.NewInternalError(errors.New("API server down"))
 	})
 	pod.Name = "goo-0"
-	if err := control.UpdateStatefulPod(set, pod); err == nil {
+	if err := control.UpdateStatefulPod(ctx, set, pod); err == nil {
 		t.Error("Failed update does not generate an error")
 	}
 	events := collectEvents(recorder.Events)
@@ -328,6 +332,7 @@ func TestStatefulPodControlUpdateIdentityFailure(t *testing.T) {
 }
 
 func TestStatefulPodControlUpdatesPodStorage(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	recorder := record.NewFakeRecorder(10)
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
@@ -357,7 +362,7 @@ func TestStatefulPodControlUpdatesPodStorage(t *testing.T) {
 		updated = update.GetObject().(*v1.Pod)
 		return true, update.GetObject(), nil
 	})
-	if err := control.UpdateStatefulPod(set, pod); err != nil {
+	if err := control.UpdateStatefulPod(ctx, set, pod); err != nil {
 		t.Errorf("Successful update returned an error: %s", err)
 	}
 	events := collectEvents(recorder.Events)
@@ -375,6 +380,7 @@ func TestStatefulPodControlUpdatesPodStorage(t *testing.T) {
 }
 
 func TestStatefulPodControlUpdatePodStorageFailure(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	recorder := record.NewFakeRecorder(10)
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
@@ -397,7 +403,7 @@ func TestStatefulPodControlUpdatePodStorageFailure(t *testing.T) {
 	fakeClient.AddReactor("create", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
 		return true, nil, apierrors.NewInternalError(errors.New("API server down"))
 	})
-	if err := control.UpdateStatefulPod(set, pod); err == nil {
+	if err := control.UpdateStatefulPod(ctx, set, pod); err == nil {
 		t.Error("Failed Pod storage update did not return an error")
 	}
 	events := collectEvents(recorder.Events)
@@ -412,6 +418,7 @@ func TestStatefulPodControlUpdatePodStorageFailure(t *testing.T) {
 }
 
 func TestStatefulPodControlUpdatePodConflictSuccess(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	recorder := record.NewFakeRecorder(10)
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
@@ -440,7 +447,7 @@ func TestStatefulPodControlUpdatePodConflictSuccess(t *testing.T) {
 
 	})
 	pod.Labels[apps.StatefulSetPodNameLabel] = "goo-0"
-	if err := control.UpdateStatefulPod(set, pod); err != nil {
+	if err := control.UpdateStatefulPod(ctx, set, pod); err != nil {
 		t.Errorf("Successful update returned an error: %s", err)
 	}
 	events := collectEvents(recorder.Events)
@@ -497,6 +504,7 @@ func TestStatefulPodControlDeleteFailure(t *testing.T) {
 func TestStatefulPodControlClaimsMatchDeletionPolcy(t *testing.T) {
 	// The claimOwnerMatchesSetAndPod is tested exhaustively in stateful_set_utils_test; this
 	// test is for the wiring to the method tested there.
+	_, ctx := ktesting.NewTestContext(t)
 	fakeClient := &fake.Clientset{}
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	claimLister := corelisters.NewPersistentVolumeClaimLister(indexer)
@@ -512,7 +520,7 @@ func TestStatefulPodControlClaimsMatchDeletionPolcy(t *testing.T) {
 		WhenDeleted: apps.RetainPersistentVolumeClaimRetentionPolicyType,
 		WhenScaled:  apps.RetainPersistentVolumeClaimRetentionPolicyType,
 	}
-	if matches, err := control.ClaimsMatchRetentionPolicy(set, pod); err != nil {
+	if matches, err := control.ClaimsMatchRetentionPolicy(ctx, set, pod); err != nil {
 		t.Errorf("Unexpected error for ClaimsMatchRetentionPolicy (retain): %v", err)
 	} else if !matches {
 		t.Error("Unexpected non-match for ClaimsMatchRetentionPolicy (retain)")
@@ -521,7 +529,7 @@ func TestStatefulPodControlClaimsMatchDeletionPolcy(t *testing.T) {
 		WhenDeleted: apps.DeletePersistentVolumeClaimRetentionPolicyType,
 		WhenScaled:  apps.RetainPersistentVolumeClaimRetentionPolicyType,
 	}
-	if matches, err := control.ClaimsMatchRetentionPolicy(set, pod); err != nil {
+	if matches, err := control.ClaimsMatchRetentionPolicy(ctx, set, pod); err != nil {
 		t.Errorf("Unexpected error for ClaimsMatchRetentionPolicy (set deletion): %v", err)
 	} else if matches {
 		t.Error("Unexpected match for ClaimsMatchRetentionPolicy (set deletion)")
@@ -532,10 +540,16 @@ func TestStatefulPodControlUpdatePodClaimForRetentionPolicy(t *testing.T) {
 	// All the update conditions are tested exhaustively in stateful_set_utils_test. This
 	// tests the wiring from the pod control to that method.
 	testFn := func(t *testing.T) {
+		_, ctx := ktesting.NewTestContext(t)
 		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
 		fakeClient := &fake.Clientset{}
 		indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 		claimLister := corelisters.NewPersistentVolumeClaimLister(indexer)
+		fakeClient.AddReactor("update", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
+			update := action.(core.UpdateAction)
+			indexer.Update(update.GetObject())
+			return true, update.GetObject(), nil
+		})
 		set := newStatefulSet(3)
 		set.GetObjectMeta().SetUID("set-123")
 		pod := newStatefulSetPod(set, 0)
@@ -549,7 +563,7 @@ func TestStatefulPodControlUpdatePodClaimForRetentionPolicy(t *testing.T) {
 			WhenDeleted: apps.DeletePersistentVolumeClaimRetentionPolicyType,
 			WhenScaled:  apps.RetainPersistentVolumeClaimRetentionPolicyType,
 		}
-		if err := control.UpdatePodClaimForRetentionPolicy(set, pod); err != nil {
+		if err := control.UpdatePodClaimForRetentionPolicy(ctx, set, pod); err != nil {
 			t.Errorf("Unexpected error for UpdatePodClaimForRetentionPolicy (retain): %v", err)
 		}
 		expectRef := utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC)
@@ -676,6 +690,7 @@ func TestPodClaimIsStale(t *testing.T) {
 
 func TestStatefulPodControlRetainDeletionPolicyUpdate(t *testing.T) {
 	testFn := func(t *testing.T) {
+		_, ctx := ktesting.NewTestContext(t)
 		recorder := record.NewFakeRecorder(10)
 		set := newStatefulSet(1)
 		set.Spec.PersistentVolumeClaimRetentionPolicy = &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
@@ -699,7 +714,7 @@ func TestStatefulPodControlRetainDeletionPolicyUpdate(t *testing.T) {
 			claimIndexer.Add(&claim)
 		}
 		control := NewStatefulPodControl(fakeClient, podLister, claimLister, recorder)
-		if err := control.UpdateStatefulPod(set, pod); err != nil {
+		if err := control.UpdateStatefulPod(ctx, set, pod); err != nil {
 			t.Errorf("Successful update returned an error: %s", err)
 		}
 		for k := range claims {
@@ -730,6 +745,7 @@ func TestStatefulPodControlRetainDeletionPolicyUpdate(t *testing.T) {
 }
 
 func TestStatefulPodControlRetentionPolicyUpdate(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	// Only applicable when the feature gate is on; the off case is tested in TestStatefulPodControlRetainRetentionPolicyUpdate.
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
 
@@ -761,7 +777,7 @@ func TestStatefulPodControlRetentionPolicyUpdate(t *testing.T) {
 	podLister := corelisters.NewPodLister(podIndexer)
 	claimLister := corelisters.NewPersistentVolumeClaimLister(claimIndexer)
 	control := NewStatefulPodControl(fakeClient, podLister, claimLister, recorder)
-	if err := control.UpdateStatefulPod(set, pod); err != nil {
+	if err := control.UpdateStatefulPod(ctx, set, pod); err != nil {
 		t.Errorf("Successful update returned an error: %s", err)
 	}
 	updatedClaim, err := claimLister.PersistentVolumeClaims(claim.Namespace).Get(claim.Name)
@@ -778,6 +794,7 @@ func TestStatefulPodControlRetentionPolicyUpdate(t *testing.T) {
 }
 
 func TestStatefulPodControlRetentionPolicyUpdateMissingClaims(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	// Only applicable when the feature gate is on.
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
 
@@ -800,7 +817,7 @@ func TestStatefulPodControlRetentionPolicyUpdateMissingClaims(t *testing.T) {
 		return true, update.GetObject(), nil
 	})
 	control := NewStatefulPodControl(fakeClient, podLister, claimLister, recorder)
-	if err := control.UpdateStatefulPod(set, pod); err != nil {
+	if err := control.UpdateStatefulPod(ctx, set, pod); err != nil {
 		t.Error("Unexpected error on pod update when PVCs are missing")
 	}
 	claims := getPersistentVolumeClaims(set, pod)
@@ -813,7 +830,7 @@ func TestStatefulPodControlRetentionPolicyUpdateMissingClaims(t *testing.T) {
 		claimIndexer.Add(&claim)
 	}
 
-	if err := control.UpdateStatefulPod(set, pod); err != nil {
+	if err := control.UpdateStatefulPod(ctx, set, pod); err != nil {
 		t.Errorf("Expected update to succeed, saw error %v", err)
 	}
 	updatedClaim, err := claimLister.PersistentVolumeClaims(claim.Namespace).Get(claim.Name)

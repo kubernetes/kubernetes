@@ -23,6 +23,7 @@ type PlatformStatusApplyConfiguration struct {
 	PowerVS      *PowerVSPlatformStatusApplyConfiguration      `json:"powervs,omitempty"`
 	AlibabaCloud *AlibabaCloudPlatformStatusApplyConfiguration `json:"alibabaCloud,omitempty"`
 	Nutanix      *NutanixPlatformStatusApplyConfiguration      `json:"nutanix,omitempty"`
+	External     *v1.ExternalPlatformStatus                    `json:"external,omitempty"`
 }
 
 // PlatformStatusApplyConfiguration constructs an declarative configuration of the PlatformStatus type for use with
@@ -140,5 +141,13 @@ func (b *PlatformStatusApplyConfiguration) WithAlibabaCloud(value *AlibabaCloudP
 // If called multiple times, the Nutanix field is set to the value of the last call.
 func (b *PlatformStatusApplyConfiguration) WithNutanix(value *NutanixPlatformStatusApplyConfiguration) *PlatformStatusApplyConfiguration {
 	b.Nutanix = value
+	return b
+}
+
+// WithExternal sets the External field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the External field is set to the value of the last call.
+func (b *PlatformStatusApplyConfiguration) WithExternal(value v1.ExternalPlatformStatus) *PlatformStatusApplyConfiguration {
+	b.External = &value
 	return b
 }

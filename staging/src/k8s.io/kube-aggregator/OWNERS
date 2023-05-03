@@ -14,5 +14,7 @@ reviewers:
   - sttts
   - cheftako
   - logicalhan
+  - alexzielenski
+  - jefftree
 labels:
   - sig/api-machinery

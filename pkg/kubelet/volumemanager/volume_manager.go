@@ -61,12 +61,6 @@ const (
 	// DesiredStateOfWorldPopulator loop waits between successive executions
 	desiredStateOfWorldPopulatorLoopSleepPeriod = 100 * time.Millisecond
 
-	// desiredStateOfWorldPopulatorGetPodStatusRetryDuration is the amount of
-	// time the DesiredStateOfWorldPopulator loop waits between successive pod
-	// cleanup calls (to prevent calling containerruntime.GetPodStatus too
-	// frequently).
-	desiredStateOfWorldPopulatorGetPodStatusRetryDuration = 2 * time.Second
-
 	// podAttachAndMountTimeout is the maximum amount of time the
 	// WaitForAttachAndMount call will wait for all volumes in the specified pod
 	// to be attached and mounted. Even though cloud operations can take several
@@ -165,12 +159,10 @@ type podStateProvider interface {
 // VolumeManager interface.
 //
 // kubeClient - kubeClient is the kube API client used by DesiredStateOfWorldPopulator
-//
-//	to communicate with the API server to fetch PV and PVC objects
+// to communicate with the API server to fetch PV and PVC objects
 //
 // volumePluginMgr - the volume plugin manager used to access volume plugins.
-//
-//	Must be pre-initialized.
+// Must be pre-initialized.
 func NewVolumeManager(
 	controllerAttachDetachEnabled bool,
 	nodeName k8stypes.NodeName,
@@ -207,7 +199,6 @@ func NewVolumeManager(
 	vm.desiredStateOfWorldPopulator = populator.NewDesiredStateOfWorldPopulator(
 		kubeClient,
 		desiredStateOfWorldPopulatorLoopSleepPeriod,
-		desiredStateOfWorldPopulatorGetPodStatusRetryDuration,
 		podManager,
 		podStateProvider,
 		vm.desiredStateOfWorld,
@@ -421,18 +412,21 @@ func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
 	if err != nil {
 		unmountedVolumes :=
 			vm.getUnmountedVolumes(uniquePodName, expectedVolumes)
-		// Also get unattached volumes for error message
+		// Also get unattached volumes and volumes not in dsw for error message
 		unattachedVolumes :=
-			vm.getUnattachedVolumes(expectedVolumes)
+			vm.getUnattachedVolumes(uniquePodName)
+		volumesNotInDSW :=
+			vm.getVolumesNotInDSW(uniquePodName, expectedVolumes)
 
 		if len(unmountedVolumes) == 0 {
 			return nil
 		}
 
 		return fmt.Errorf(
-			"unmounted volumes=%v, unattached volumes=%v: %s",
+			"unmounted volumes=%v, unattached volumes=%v, failed to process volumes=%v: %s",
 			unmountedVolumes,
 			unattachedVolumes,
+			volumesNotInDSW,
 			err)
 	}
 
@@ -476,15 +470,30 @@ func (vm *volumeManager) WaitForUnmount(pod *v1.Pod) error {
 	return nil
 }
 
-// getUnattachedVolumes returns a list of the volumes that are expected to be attached but
-// are not currently attached to the node
-func (vm *volumeManager) getUnattachedVolumes(expectedVolumes []string) []string {
-	unattachedVolumes := []string{}
-	for _, volume := range expectedVolumes {
-		if !vm.actualStateOfWorld.VolumeExists(v1.UniqueVolumeName(volume)) {
-			unattachedVolumes = append(unattachedVolumes, volume)
+func (vm *volumeManager) getVolumesNotInDSW(uniquePodName types.UniquePodName, expectedVolumes []string) []string {
+	volumesNotInDSW := sets.NewString(expectedVolumes...)
+
+	for _, volumeToMount := range vm.desiredStateOfWorld.GetVolumesToMount() {
+		if volumeToMount.PodName == uniquePodName {
+			volumesNotInDSW.Delete(volumeToMount.OuterVolumeSpecName)
 		}
 	}
+
+	return volumesNotInDSW.List()
+}
+
+// getUnattachedVolumes returns a list of the volumes that are expected to be attached but
+// are not currently attached to the node
+func (vm *volumeManager) getUnattachedVolumes(uniquePodName types.UniquePodName) []string {
+	unattachedVolumes := []string{}
+	for _, volumeToMount := range vm.desiredStateOfWorld.GetVolumesToMount() {
+		if volumeToMount.PodName == uniquePodName &&
+			volumeToMount.PluginIsAttachable &&
+			!vm.actualStateOfWorld.VolumeExists(volumeToMount.VolumeName) {
+			unattachedVolumes = append(unattachedVolumes, volumeToMount.OuterVolumeSpecName)
+		}
+	}
+
 	return unattachedVolumes
 }
 

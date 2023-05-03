@@ -28,6 +28,8 @@ import (
 	"time"
 
 	"golang.org/x/time/rate"
+	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 
 	"github.com/golang/groupcache/lru"
 	"github.com/google/go-cmp/cmp"
@@ -102,15 +104,17 @@ func TestGarbageCollectorConstruction(t *testing.T) {
 	}
 	assert.Equal(t, 0, len(gc.dependencyGraphBuilder.monitors))
 
+	logger, _ := ktesting.NewTestContext(t)
+
 	// Make sure resource monitor syncing creates and stops resource monitors.
 	tweakableRM.Add(schema.GroupVersionKind{Group: "tpr.io", Version: "v1", Kind: "unknown"}, nil)
-	err = gc.resyncMonitors(twoResources)
+	err = gc.resyncMonitors(logger, twoResources)
 	if err != nil {
 		t.Errorf("Failed adding a monitor: %v", err)
 	}
 	assert.Equal(t, 2, len(gc.dependencyGraphBuilder.monitors))
 
-	err = gc.resyncMonitors(podResource)
+	err = gc.resyncMonitors(logger, podResource)
 	if err != nil {
 		t.Errorf("Failed removing a monitor: %v", err)
 	}
@@ -121,13 +125,13 @@ func TestGarbageCollectorConstruction(t *testing.T) {
 	defer cancel()
 	go gc.Run(ctx, 1)
 
-	err = gc.resyncMonitors(twoResources)
+	err = gc.resyncMonitors(logger, twoResources)
 	if err != nil {
 		t.Errorf("Failed adding a monitor: %v", err)
 	}
 	assert.Equal(t, 2, len(gc.dependencyGraphBuilder.monitors))
 
-	err = gc.resyncMonitors(podResource)
+	err = gc.resyncMonitors(logger, podResource)
 	if err != nil {
 		t.Errorf("Failed removing a monitor: %v", err)
 	}
@@ -408,6 +412,8 @@ func TestProcessEvent(t *testing.T) {
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
 	for _, scenario := range testScenarios {
+		logger, _ := ktesting.NewTestContext(t)
+
 		dependencyGraphBuilder := &GraphBuilder{
 			informersStarted: alwaysStarted,
 			graphChanges:     workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
@@ -420,7 +426,7 @@ func TestProcessEvent(t *testing.T) {
 		}
 		for i := 0; i < len(scenario.events); i++ {
 			dependencyGraphBuilder.graphChanges.Add(&scenario.events[i])
-			dependencyGraphBuilder.processGraphChanges()
+			dependencyGraphBuilder.processGraphChanges(logger)
 			verifyGraphInvariants(scenario.name, dependencyGraphBuilder.uidToNode.uidToNode, t)
 		}
 	}
@@ -439,6 +445,8 @@ func BenchmarkReferencesDiffs(t *testing.B) {
 // TestDependentsRace relies on golang's data race detector to check if there is
 // data race among in the dependents field.
 func TestDependentsRace(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
 	gc := setupGC(t, &restclient.Config{})
 	defer close(gc.stop)
 
@@ -452,7 +460,7 @@ func TestDependentsRace(t *testing.T) {
 		defer wg.Done()
 		for i := 0; i < updates; i++ {
 			dependent := &node{}
-			gc.dependencyGraphBuilder.addDependentToOwners(dependent, []metav1.OwnerReference{{UID: ownerUID}})
+			gc.dependencyGraphBuilder.addDependentToOwners(logger, dependent, []metav1.OwnerReference{{UID: ownerUID}})
 			gc.dependencyGraphBuilder.removeDependentFromOwners(dependent, []metav1.OwnerReference{{UID: ownerUID}})
 		}
 	}()
@@ -460,7 +468,7 @@ func TestDependentsRace(t *testing.T) {
 		defer wg.Done()
 		for i := 0; i < updates; i++ {
 			gc.attemptToOrphan.Add(owner)
-			gc.processAttemptToOrphanWorker()
+			gc.processAttemptToOrphanWorker(logger)
 		}
 	}()
 	wg.Wait()
@@ -489,7 +497,7 @@ func TestAbsentOwnerCache(t *testing.T) {
 			Name:       "rc1",
 			UID:        "1",
 			APIVersion: "v1",
-			Controller: pointer.BoolPtr(true),
+			Controller: pointer.Bool(true),
 		},
 	})
 	rc1Pod2 := getPod("rc1Pod2", []metav1.OwnerReference{
@@ -498,7 +506,7 @@ func TestAbsentOwnerCache(t *testing.T) {
 			Name:       "rc1",
 			UID:        "1",
 			APIVersion: "v1",
-			Controller: pointer.BoolPtr(false),
+			Controller: pointer.Bool(false),
 		},
 	})
 	rc2Pod1 := getPod("rc2Pod1", []metav1.OwnerReference{
@@ -672,6 +680,8 @@ func TestUnblockOwnerReference(t *testing.T) {
 }
 
 func TestOrphanDependentsFailure(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
 	testHandler := &fakeActionHandler{
 		response: map[string]FakeResponse{
 			"PATCH" + "/api/v1/namespaces/ns1/pods/pod": {
@@ -698,7 +708,7 @@ func TestOrphanDependentsFailure(t *testing.T) {
 			},
 		},
 	}
-	err := gc.orphanDependents(objectReference{}, dependents)
+	err := gc.orphanDependents(logger, objectReference{}, dependents)
 	expected := `the server reported a conflict`
 	if err == nil || !strings.Contains(err.Error(), expected) {
 		if err != nil {
@@ -862,7 +872,8 @@ func TestGarbageCollectorSync(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	go gc.Run(ctx, 1)
 	// The pseudo-code of GarbageCollector.Sync():
@@ -879,7 +890,7 @@ func TestGarbageCollectorSync(t *testing.T) {
 	// The 1s sleep in the test allows GetDeletableResources and
 	// gc.resyncMonitors to run ~5 times to ensure the changes to the
 	// fakeDiscoveryClient are picked up.
-	go gc.Sync(fakeDiscoveryClient, 200*time.Millisecond, ctx.Done())
+	go gc.Sync(ctx, fakeDiscoveryClient, 200*time.Millisecond)
 
 	// Wait until the sync discovers the initial resources
 	time.Sleep(1 * time.Second)
@@ -2286,8 +2297,11 @@ func TestConflictingData(t *testing.T) {
 				},
 			}
 
+			logger, _ := ktesting.NewTestContext(t)
+
 			ctx := stepContext{
 				t:               t,
+				logger:          logger,
 				gc:              gc,
 				eventRecorder:   eventRecorder,
 				metadataClient:  metadataClient,
@@ -2396,6 +2410,7 @@ func makeMetadataObj(identity objectReference, owners ...objectReference) *metav
 
 type stepContext struct {
 	t               *testing.T
+	logger          klog.Logger
 	gc              *GarbageCollector
 	eventRecorder   *record.FakeRecorder
 	metadataClient  *fakemetadata.FakeMetadataClient
@@ -2417,7 +2432,7 @@ func processPendingGraphChanges(count int) step {
 			if count <= 0 {
 				// process all
 				for ctx.gc.dependencyGraphBuilder.graphChanges.Len() != 0 {
-					ctx.gc.dependencyGraphBuilder.processGraphChanges()
+					ctx.gc.dependencyGraphBuilder.processGraphChanges(ctx.logger)
 				}
 			} else {
 				for i := 0; i < count; i++ {
@@ -2425,7 +2440,7 @@ func processPendingGraphChanges(count int) step {
 						ctx.t.Errorf("expected at least %d pending changes, got %d", count, i+1)
 						return
 					}
-					ctx.gc.dependencyGraphBuilder.processGraphChanges()
+					ctx.gc.dependencyGraphBuilder.processGraphChanges(ctx.logger)
 				}
 			}
 		},
@@ -2488,7 +2503,7 @@ func processEvent(e *event) step {
 				ctx.t.Fatalf("events present in graphChanges, must process pending graphChanges before calling processEvent")
 			}
 			ctx.gc.dependencyGraphBuilder.graphChanges.Add(e)
-			ctx.gc.dependencyGraphBuilder.processGraphChanges()
+			ctx.gc.dependencyGraphBuilder.processGraphChanges(ctx.logger)
 		},
 	}
 }

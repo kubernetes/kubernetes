@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright 2015 The Kubernetes Authors.
 #
@@ -13,8 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from __future__ import print_function
 
 import argparse
 import datetime
@@ -64,10 +62,6 @@ def get_refs():
 
 
 def is_generated_file(filename, data, regexs):
-    for d in skipped_ungenerated_files:
-        if d in filename:
-            return False
-
     p = regexs["generated"]
     return p.search(data)
 
@@ -153,19 +147,15 @@ def file_extension(filename):
     return os.path.splitext(filename)[1].split(".")[-1].lower()
 
 
-skipped_dirs = ['third_party', '_gopath', '_output', '.git', 'cluster/env.sh',
-                "vendor", "test/e2e/generated/bindata.go", "hack/boilerplate/test",
-                "staging/src/k8s.io/kubectl/pkg/generated/bindata.go"]
-
-# list all the files contain 'DO NOT EDIT', but are not generated
-skipped_ungenerated_files = [
-    'hack/lib/swagger.sh', 'hack/boilerplate/boilerplate.py']
+skipped_names = ['third_party', '_gopath', '_output', '.git', 'cluster/env.sh',
+                 "vendor", "test/e2e/generated/bindata.go", "hack/boilerplate/test",
+                 "staging/src/k8s.io/kubectl/pkg/generated/bindata.go"]
 
 
 def normalize_files(files):
     newfiles = []
     for pathname in files:
-        if any(x in pathname for x in skipped_dirs):
+        if any(x in pathname for x in skipped_names):
             continue
         newfiles.append(pathname)
     for i, pathname in enumerate(newfiles):
@@ -184,8 +174,12 @@ def get_files(extensions):
             # as we would prune these later in normalize_files(). But doing it
             # cuts down the amount of filesystem walking we do and cuts down
             # the size of the file list
-            for d in skipped_dirs:
+            for d in skipped_names:
                 if d in dirs:
+                    dirs.remove(d)
+            for d in dirs:
+                # dirs that start with __ are ignored
+                if re.match("^__", d):
                     dirs.remove(d)
 
             for name in walkfiles:
@@ -222,14 +216,14 @@ def get_regexs():
     # strip #!.* from scripts
     regexs["shebang"] = re.compile(r"^(#!.*\n)\n*", re.MULTILINE)
     # Search for generated files
-    regexs["generated"] = re.compile('DO NOT EDIT')
+    regexs["generated"] = re.compile(r"^[/*#]+ +.* DO NOT EDIT\.$", re.MULTILINE)
     return regexs
 
 
 def main():
     regexs = get_regexs()
     refs = get_refs()
-    filenames = get_files(refs.keys())
+    filenames = get_files(list(refs.keys()))
 
     for filename in filenames:
         if not file_passes(filename, refs, regexs):

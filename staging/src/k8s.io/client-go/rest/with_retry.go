@@ -242,7 +242,19 @@ func (r *withRetry) After(ctx context.Context, request *Request, resp *http.Resp
 	// parameters calculated from the (response, err) tuple from
 	// attempt N-1, so r.retryAfter is outdated and should not be
 	// referred to here.
+	isRetry := r.retryAfter != nil
 	r.retryAfter = nil
+
+	// the client finishes a single request after N attempts (1..N)
+	//  - all attempts (1..N) are counted to the rest_client_requests_total
+	//    metric (current behavior).
+	//  - every attempt after the first (2..N) are counted to the
+	//    rest_client_request_retries_total metric.
+	updateRequestResultMetric(ctx, request, resp, err)
+	if isRetry {
+		// this is attempt 2 or later
+		updateRequestRetryMetric(ctx, request, resp, err)
+	}
 
 	if request.c.base != nil {
 		if err != nil {
@@ -346,8 +358,12 @@ func retryAfterResponse() *http.Response {
 }
 
 func retryAfterResponseWithDelay(delay string) *http.Response {
+	return retryAfterResponseWithCodeAndDelay(http.StatusInternalServerError, delay)
+}
+
+func retryAfterResponseWithCodeAndDelay(code int, delay string) *http.Response {
 	return &http.Response{
-		StatusCode: http.StatusInternalServerError,
+		StatusCode: code,
 		Header:     http.Header{"Retry-After": []string{delay}},
 	}
 }

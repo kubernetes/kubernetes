@@ -33,9 +33,10 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against Role objects.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &rbac.Role{} },
-		NewListFunc:              func() runtime.Object { return &rbac.RoleList{} },
-		DefaultQualifiedResource: rbac.Resource("roles"),
+		NewFunc:                   func() runtime.Object { return &rbac.Role{} },
+		NewListFunc:               func() runtime.Object { return &rbac.RoleList{} },
+		DefaultQualifiedResource:  rbac.Resource("roles"),
+		SingularQualifiedResource: rbac.Resource("role"),
 
 		CreateStrategy: role.Strategy,
 		UpdateStrategy: role.Strategy,

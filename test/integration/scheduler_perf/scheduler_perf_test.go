@@ -19,9 +19,13 @@ package benchmark
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"math"
 	"os"
+	"path"
 	"strings"
 	"sync"
 	"testing"
@@ -48,6 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/utils"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"sigs.k8s.io/yaml"
 )
 
@@ -570,6 +575,39 @@ func (so sleepOp) patchParams(_ *workload) (realOp, error) {
 	return &so, nil
 }
 
+var useTestingLog = flag.Bool("use-testing-log", false, "Write log entries with testing.TB.Log. This is more suitable for unit testing and debugging, but less realistic in real benchmarks.")
+
+func initTestOutput(tb testing.TB) io.Writer {
+	var output io.Writer
+	if *useTestingLog {
+		output = framework.NewTBWriter(tb)
+	} else {
+		tmpDir := tb.TempDir()
+		logfileName := path.Join(tmpDir, "output.log")
+		fileOutput, err := os.Create(logfileName)
+		if err != nil {
+			tb.Fatalf("create log file: %v", err)
+		}
+		output = fileOutput
+
+		tb.Cleanup(func() {
+			// Dump the log output when the test is done.  The user
+			// can decide how much of it will be visible in case of
+			// success: then "go test" truncates, "go test -v"
+			// doesn't. All of it will be shown for a failure.
+			if err := fileOutput.Close(); err != nil {
+				tb.Fatalf("close log file: %v", err)
+			}
+			log, err := ioutil.ReadFile(logfileName)
+			if err != nil {
+				tb.Fatalf("read log file: %v", err)
+			}
+			tb.Logf("full log output:\n%s", string(log))
+		})
+	}
+	return output
+}
+
 func BenchmarkPerfScheduling(b *testing.B) {
 	testCases, err := getTestCases(configFile)
 	if err != nil {
@@ -579,15 +617,76 @@ func BenchmarkPerfScheduling(b *testing.B) {
 		b.Fatal(err)
 	}
 
+	output := initTestOutput(b)
+
+	// Because we run sequentially, it is possible to change the global
+	// klog logger and redirect log output. Quite a lot of code still uses
+	// it instead of supporting contextual logging.
+	//
+	// Because we leak one goroutine which calls klog, we cannot restore
+	// the previous state.
+	_ = framework.RedirectKlog(b, output)
+
 	dataItems := DataItems{Version: "v1"}
 	for _, tc := range testCases {
 		b.Run(tc.Name, func(b *testing.B) {
 			for _, w := range tc.Workloads {
 				b.Run(w.Name, func(b *testing.B) {
+					// Ensure that there are no leaked
+					// goroutines.  They could influence
+					// performance of the next benchmark.
+					// This must *after* RedirectKlog
+					// because then during cleanup, the
+					// test will wait for goroutines to
+					// quit *before* restoring klog settings.
+					framework.GoleakCheck(b)
+
+					ctx := context.Background()
+
+					if *useTestingLog {
+						// In addition to redirection klog
+						// output, also enable contextual
+						// logging.
+						_, ctx = ktesting.NewTestContext(b)
+					}
+
+					// Now that we are ready to run, start
+					// etcd.
+					framework.StartEtcd(b, output)
+
+					// 30 minutes should be plenty enough even for the 5000-node tests.
+					ctx, cancel := context.WithTimeout(ctx, 30*time.Minute)
+					b.Cleanup(cancel)
+
 					for feature, flag := range tc.FeatureGates {
 						defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, feature, flag)()
 					}
-					dataItems.DataItems = append(dataItems.DataItems, runWorkload(b, tc, w)...)
+					results := runWorkload(ctx, b, tc, w)
+					dataItems.DataItems = append(dataItems.DataItems, results...)
+
+					if len(results) > 0 {
+						// The default ns/op is not
+						// useful because it includes
+						// the time spent on
+						// initialization and shutdown. Here we suppress it.
+						b.ReportMetric(0, "ns/op")
+
+						// Instead, report the same
+						// results that also get stored
+						// in the JSON file.
+						for _, result := range results {
+							// For some metrics like
+							// scheduler_framework_extension_point_duration_seconds
+							// the actual value has some
+							// other unit. We patch the key
+							// to make it look right.
+							metric := strings.ReplaceAll(result.Labels["Metric"], "_seconds", "_"+result.Unit)
+							for key, value := range result.Data {
+								b.ReportMetric(value, metric+"/"+key)
+							}
+						}
+					}
+
 					// Reset metrics to prevent metrics generated in current workload gets
 					// carried over to the next workload.
 					legacyregistry.Reset()
@@ -639,10 +738,7 @@ func unrollWorkloadTemplate(b *testing.B, wt []op, w *workload) []op {
 	return unrolled
 }
 
-func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
-	// 30 minutes should be plenty enough even for the 5000-node tests.
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
-	defer cancel()
+func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload) []DataItem {
 	var cfg *config.KubeSchedulerConfiguration
 	var err error
 	if tc.SchedulerConfigPath != nil {
@@ -654,7 +750,7 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 			b.Fatalf("validate scheduler config file failed: %v", err)
 		}
 	}
-	finalFunc, podInformer, client, dynClient := mustSetupScheduler(b, cfg)
+	finalFunc, podInformer, client, dynClient := mustSetupScheduler(ctx, b, cfg)
 	b.Cleanup(finalFunc)
 
 	var mu sync.Mutex
@@ -665,7 +761,7 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 	numPodsScheduledPerNamespace := make(map[string]int)
 	b.Cleanup(func() {
 		for namespace := range numPodsScheduledPerNamespace {
-			if err := client.CoreV1().Namespaces().Delete(context.Background(), namespace, metav1.DeleteOptions{}); err != nil {
+			if err := client.CoreV1().Namespaces().Delete(ctx, namespace, metav1.DeleteOptions{}); err != nil {
 				b.Errorf("Deleting Namespace in numPodsScheduledPerNamespace: %v", err)
 			}
 		}
@@ -687,11 +783,13 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 			if err != nil {
 				b.Fatalf("op %d: %v", opIndex, err)
 			}
-			if err := nodePreparer.PrepareNodes(nextNodeIndex); err != nil {
+			if err := nodePreparer.PrepareNodes(ctx, nextNodeIndex); err != nil {
 				b.Fatalf("op %d: %v", opIndex, err)
 			}
 			b.Cleanup(func() {
-				nodePreparer.CleanupNodes()
+				if err := nodePreparer.CleanupNodes(ctx); err != nil {
+					b.Fatalf("failed to clean up nodes, error: %v", err)
+				}
 			})
 			nextNodeIndex += concreteOp.Count
 
@@ -700,8 +798,8 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 			if err != nil {
 				b.Fatalf("op %d: %v", opIndex, err)
 			}
-			if err := nsPreparer.prepare(); err != nil {
-				nsPreparer.cleanup()
+			if err := nsPreparer.prepare(ctx); err != nil {
+				nsPreparer.cleanup(ctx)
 				b.Fatalf("op %d: %v", opIndex, err)
 			}
 			for _, n := range nsPreparer.namespaces() {
@@ -742,7 +840,7 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 					go collector.run(collectorCtx)
 				}
 			}
-			if err := createPods(b, namespace, concreteOp, client); err != nil {
+			if err := createPods(ctx, b, namespace, concreteOp, client); err != nil {
 				b.Fatalf("op %d: %v", opIndex, err)
 			}
 			if concreteOp.SkipWaitToCompletion {
@@ -958,7 +1056,7 @@ func getNodePreparer(prefix string, cno *createNodesOp, clientset clientset.Inte
 	), nil
 }
 
-func createPods(b *testing.B, namespace string, cpo *createPodsOp, clientset clientset.Interface) error {
+func createPods(ctx context.Context, b *testing.B, namespace string, cpo *createPodsOp, clientset clientset.Interface) error {
 	strategy, err := getPodStrategy(cpo)
 	if err != nil {
 		return err
@@ -967,7 +1065,7 @@ func createPods(b *testing.B, namespace string, cpo *createPodsOp, clientset cli
 	config := testutils.NewTestPodCreatorConfig()
 	config.AddStrategy(namespace, cpo.Count, strategy)
 	podCreator := testutils.NewTestPodCreator(clientset, config)
-	return podCreator.CreatePods()
+	return podCreator.CreatePods(ctx)
 }
 
 // waitUntilPodsScheduledInNamespace blocks until all pods in the given
@@ -985,6 +1083,7 @@ func waitUntilPodsScheduledInNamespace(ctx context.Context, b *testing.B, podInf
 			return false, err
 		}
 		if len(scheduled) >= wantCount {
+			b.Logf("scheduling succeed")
 			return true, nil
 		}
 		b.Logf("namespace: %s, pods: want %d, got %d", namespace, wantCount, len(scheduled))
@@ -1195,7 +1294,7 @@ func (p *namespacePreparer) namespaces() []string {
 }
 
 // prepare creates the namespaces.
-func (p *namespacePreparer) prepare() error {
+func (p *namespacePreparer) prepare(ctx context.Context) error {
 	base := &v1.Namespace{}
 	if p.spec != nil {
 		base = p.spec
@@ -1205,7 +1304,7 @@ func (p *namespacePreparer) prepare() error {
 		n := base.DeepCopy()
 		n.Name = fmt.Sprintf("%s-%d", p.prefix, i)
 		if err := testutils.RetryWithExponentialBackOff(func() (bool, error) {
-			_, err := p.client.CoreV1().Namespaces().Create(context.Background(), n, metav1.CreateOptions{})
+			_, err := p.client.CoreV1().Namespaces().Create(ctx, n, metav1.CreateOptions{})
 			return err == nil || apierrors.IsAlreadyExists(err), nil
 		}); err != nil {
 			return err
@@ -1215,11 +1314,11 @@ func (p *namespacePreparer) prepare() error {
 }
 
 // cleanup deletes existing test namespaces.
-func (p *namespacePreparer) cleanup() error {
+func (p *namespacePreparer) cleanup(ctx context.Context) error {
 	var errRet error
 	for i := 0; i < p.count; i++ {
 		n := fmt.Sprintf("%s-%d", p.prefix, i)
-		if err := p.client.CoreV1().Namespaces().Delete(context.Background(), n, metav1.DeleteOptions{}); err != nil {
+		if err := p.client.CoreV1().Namespaces().Delete(ctx, n, metav1.DeleteOptions{}); err != nil {
 			p.t.Errorf("Deleting Namespace: %v", err)
 			errRet = err
 		}

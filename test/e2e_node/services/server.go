@@ -156,7 +156,7 @@ func (s *server) start() error {
 		// Start the command
 		err = s.startCommand.Start()
 		if err != nil {
-			errCh <- fmt.Errorf("failed to run %s: %v", s, err)
+			errCh <- fmt.Errorf("failed to run %s: %w", s, err)
 			return
 		}
 		if !s.restartOnExit {
@@ -165,7 +165,7 @@ func (s *server) start() error {
 			// Otherwise, we Wait() in the restart loop.
 			err = s.startCommand.Wait()
 			if err != nil {
-				errCh <- fmt.Errorf("failed to run start command for server %q: %v", s.name, err)
+				errCh <- fmt.Errorf("failed to run start command for server %q: %w", s.name, err)
 				return
 			}
 		} else {
@@ -305,7 +305,7 @@ func (s *server) kill() error {
 		select {
 		case err := <-waitChan:
 			if err != nil {
-				return fmt.Errorf("error stopping %q: %v", name, err)
+				return fmt.Errorf("error stopping %q: %w", name, err)
 			}
 			// Success!
 			return nil
@@ -322,7 +322,7 @@ func (s *server) stopUnit() error {
 	if s.systemdUnitName != "" {
 		err := exec.Command("sudo", "systemctl", "stop", s.systemdUnitName).Run()
 		if err != nil {
-			return fmt.Errorf("Failed to stop systemd unit name: %q: %v", s.systemdUnitName, err)
+			return fmt.Errorf("Failed to stop systemd unit name: %q: %w", s.systemdUnitName, err)
 		}
 	}
 	return nil

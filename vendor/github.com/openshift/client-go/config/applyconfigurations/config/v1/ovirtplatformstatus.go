@@ -5,11 +5,12 @@ package v1
 // OvirtPlatformStatusApplyConfiguration represents an declarative configuration of the OvirtPlatformStatus type for use
 // with apply.
 type OvirtPlatformStatusApplyConfiguration struct {
-	APIServerInternalIP  *string  `json:"apiServerInternalIP,omitempty"`
-	APIServerInternalIPs []string `json:"apiServerInternalIPs,omitempty"`
-	IngressIP            *string  `json:"ingressIP,omitempty"`
-	IngressIPs           []string `json:"ingressIPs,omitempty"`
-	NodeDNSIP            *string  `json:"nodeDNSIP,omitempty"`
+	APIServerInternalIP  *string                                      `json:"apiServerInternalIP,omitempty"`
+	APIServerInternalIPs []string                                     `json:"apiServerInternalIPs,omitempty"`
+	IngressIP            *string                                      `json:"ingressIP,omitempty"`
+	IngressIPs           []string                                     `json:"ingressIPs,omitempty"`
+	NodeDNSIP            *string                                      `json:"nodeDNSIP,omitempty"`
+	LoadBalancer         *OvirtPlatformLoadBalancerApplyConfiguration `json:"loadBalancer,omitempty"`
 }
 
 // OvirtPlatformStatusApplyConfiguration constructs an declarative configuration of the OvirtPlatformStatus type for use with
@@ -59,5 +60,13 @@ func (b *OvirtPlatformStatusApplyConfiguration) WithIngressIPs(values ...string)
 // If called multiple times, the NodeDNSIP field is set to the value of the last call.
 func (b *OvirtPlatformStatusApplyConfiguration) WithNodeDNSIP(value string) *OvirtPlatformStatusApplyConfiguration {
 	b.NodeDNSIP = &value
+	return b
+}
+
+// WithLoadBalancer sets the LoadBalancer field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the LoadBalancer field is set to the value of the last call.
+func (b *OvirtPlatformStatusApplyConfiguration) WithLoadBalancer(value *OvirtPlatformLoadBalancerApplyConfiguration) *OvirtPlatformStatusApplyConfiguration {
+	b.LoadBalancer = value
 	return b
 }

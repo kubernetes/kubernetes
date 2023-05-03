@@ -66,7 +66,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		explain the nested custom resource properties.
 		All validation should be the same.
 	*/
-	framework.ConformanceIt("works for CRD with validation schema", func() {
+	framework.ConformanceIt("works for CRD with validation schema", func(ctx context.Context) {
 		crd, err := setupCRD(f, schemaFoo, "foo", "v1")
 		if err != nil {
 			framework.Failf("%v", err)
@@ -129,7 +129,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		if err := verifyKubectlExplain(f.Namespace.Name, crd.Crd.Spec.Names.Plural+".spec", `(?s)DESCRIPTION:.*Specification of Foo.*FIELDS:.*bars.*<\[\]Object>.*List of Bars and their specs`); err != nil {
 			framework.Failf("%v", err)
 		}
-		if err := verifyKubectlExplain(f.Namespace.Name, crd.Crd.Spec.Names.Plural+".spec.bars", `(?s)RESOURCE:.*bars.*<\[\]Object>.*DESCRIPTION:.*List of Bars and their specs.*FIELDS:.*bazs.*<\[\]string>.*List of Bazs.*name.*<string>.*Name of Bar`); err != nil {
+		if err := verifyKubectlExplain(f.Namespace.Name, crd.Crd.Spec.Names.Plural+".spec.bars", `(?s)(FIELD|RESOURCE):.*bars.*<\[\]Object>.*DESCRIPTION:.*List of Bars and their specs.*FIELDS:.*bazs.*<\[\]string>.*List of Bazs.*name.*<string>.*Name of Bar`); err != nil {
 			framework.Failf("%v", err)
 		}
 
@@ -138,7 +138,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 			framework.Failf("unexpected no error when explaining property that doesn't exist: %v", err)
 		}
 
-		if err := cleanupCRD(f, crd); err != nil {
+		if err := cleanupCRD(ctx, f, crd); err != nil {
 			framework.Failf("%v", err)
 		}
 	})
@@ -150,7 +150,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		Attempt to create and apply a change a custom resource, via kubectl; kubectl validation MUST accept unknown
 		properties. Attempt kubectl explain; the output MUST contain a valid DESCRIPTION stanza.
 	*/
-	framework.ConformanceIt("works for CRD without validation schema", func() {
+	framework.ConformanceIt("works for CRD without validation schema", func(ctx context.Context) {
 		crd, err := setupCRD(f, nil, "empty", "v1")
 		if err != nil {
 			framework.Failf("%v", err)
@@ -179,7 +179,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 			framework.Failf("%v", err)
 		}
 
-		if err := cleanupCRD(f, crd); err != nil {
+		if err := cleanupCRD(ctx, f, crd); err != nil {
 			framework.Failf("%v", err)
 		}
 	})
@@ -191,7 +191,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		Attempt to create and apply a change a custom resource, via kubectl; kubectl validation MUST accept unknown
 		properties. Attempt kubectl explain; the output MUST show the custom resource KIND.
 	*/
-	framework.ConformanceIt("works for CRD preserving unknown fields at the schema root", func() {
+	framework.ConformanceIt("works for CRD preserving unknown fields at the schema root", func(ctx context.Context) {
 		crd, err := setupCRDAndVerifySchema(f, schemaPreserveRoot, nil, "unknown-at-root", "v1")
 		if err != nil {
 			framework.Failf("%v", err)
@@ -220,7 +220,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 			framework.Failf("%v", err)
 		}
 
-		if err := cleanupCRD(f, crd); err != nil {
+		if err := cleanupCRD(ctx, f, crd); err != nil {
 			framework.Failf("%v", err)
 		}
 	})
@@ -233,7 +233,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		properties. Attempt kubectl explain; the output MUST show that x-preserve-unknown-properties is used on the
 		nested field.
 	*/
-	framework.ConformanceIt("works for CRD preserving unknown fields in an embedded object", func() {
+	framework.ConformanceIt("works for CRD preserving unknown fields in an embedded object", func(ctx context.Context) {
 		crd, err := setupCRDAndVerifySchema(f, schemaPreserveNested, nil, "unknown-in-nested", "v1")
 		if err != nil {
 			framework.Failf("%v", err)
@@ -262,7 +262,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 			framework.Failf("%v", err)
 		}
 
-		if err := cleanupCRD(f, crd); err != nil {
+		if err := cleanupCRD(ctx, f, crd); err != nil {
 			framework.Failf("%v", err)
 		}
 	})
@@ -273,7 +273,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		Description: Register multiple custom resource definitions spanning different groups and versions;
 		OpenAPI definitions MUST be published for custom resource definitions.
 	*/
-	framework.ConformanceIt("works for multiple CRDs of different groups", func() {
+	framework.ConformanceIt("works for multiple CRDs of different groups", func(ctx context.Context) {
 		ginkgo.By("CRs in different groups (two CRDs) show up in OpenAPI documentation")
 		crdFoo, err := setupCRD(f, schemaFoo, "foo", "v1")
 		if err != nil {
@@ -292,10 +292,10 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		if err := waitForDefinition(f.ClientSet, definitionName(crdFoo, "v1"), schemaFoo); err != nil {
 			framework.Failf("%v", err)
 		}
-		if err := cleanupCRD(f, crdFoo); err != nil {
+		if err := cleanupCRD(ctx, f, crdFoo); err != nil {
 			framework.Failf("%v", err)
 		}
-		if err := cleanupCRD(f, crdWaldo); err != nil {
+		if err := cleanupCRD(ctx, f, crdWaldo); err != nil {
 			framework.Failf("%v", err)
 		}
 	})
@@ -306,7 +306,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		Description: Register a custom resource definition with multiple versions; OpenAPI definitions MUST be published
 		for custom resource definitions.
 	*/
-	framework.ConformanceIt("works for multiple CRDs of same group but different versions", func() {
+	framework.ConformanceIt("works for multiple CRDs of same group but different versions", func(ctx context.Context) {
 		ginkgo.By("CRs in the same group but different versions (one multiversion CRD) show up in OpenAPI documentation")
 		crdMultiVer, err := setupCRD(f, schemaFoo, "multi-ver", "v2", "v3")
 		if err != nil {
@@ -318,7 +318,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		if err := waitForDefinition(f.ClientSet, definitionName(crdMultiVer, "v2"), schemaFoo); err != nil {
 			framework.Failf("%v", err)
 		}
-		if err := cleanupCRD(f, crdMultiVer); err != nil {
+		if err := cleanupCRD(ctx, f, crdMultiVer); err != nil {
 			framework.Failf("%v", err)
 		}
 
@@ -340,10 +340,10 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		if err := waitForDefinition(f.ClientSet, definitionName(crdFoo, "v4"), schemaFoo); err != nil {
 			framework.Failf("%v", err)
 		}
-		if err := cleanupCRD(f, crdFoo); err != nil {
+		if err := cleanupCRD(ctx, f, crdFoo); err != nil {
 			framework.Failf("%v", err)
 		}
-		if err := cleanupCRD(f, crdWaldo); err != nil {
+		if err := cleanupCRD(ctx, f, crdWaldo); err != nil {
 			framework.Failf("%v", err)
 		}
 	})
@@ -354,7 +354,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		Description: Register multiple custom resource definitions in the same group and version but spanning different kinds;
 		OpenAPI definitions MUST be published for custom resource definitions.
 	*/
-	framework.ConformanceIt("works for multiple CRDs of same group and version but different kinds", func() {
+	framework.ConformanceIt("works for multiple CRDs of same group and version but different kinds", func(ctx context.Context) {
 		ginkgo.By("CRs in the same group and version but different kinds (two CRDs) show up in OpenAPI documentation")
 		crdFoo, err := setupCRD(f, schemaFoo, "common-group", "v6")
 		if err != nil {
@@ -373,10 +373,10 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		if err := waitForDefinition(f.ClientSet, definitionName(crdFoo, "v6"), schemaFoo); err != nil {
 			framework.Failf("%v", err)
 		}
-		if err := cleanupCRD(f, crdFoo); err != nil {
+		if err := cleanupCRD(ctx, f, crdFoo); err != nil {
 			framework.Failf("%v", err)
 		}
-		if err := cleanupCRD(f, crdWaldo); err != nil {
+		if err := cleanupCRD(ctx, f, crdWaldo); err != nil {
 			framework.Failf("%v", err)
 		}
 	})
@@ -388,7 +388,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		for custom resource definitions. Rename one of the versions of the custom resource definition via a patch;
 		OpenAPI definitions MUST update to reflect the rename.
 	*/
-	framework.ConformanceIt("updates the published spec when one version gets renamed", func() {
+	framework.ConformanceIt("updates the published spec when one version gets renamed", func(ctx context.Context) {
 		ginkgo.By("set up a multi version CRD")
 		crdMultiVer, err := setupCRD(f, schemaFoo, "multi-ver", "v2", "v3")
 		if err != nil {
@@ -406,7 +406,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 			{"op":"test","path":"/spec/versions/1/name","value":"v3"},
 			{"op": "replace", "path": "/spec/versions/1/name", "value": "v4"}
 		]`)
-		crdMultiVer.Crd, err = crdMultiVer.APIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Patch(context.TODO(), crdMultiVer.Crd.Name, types.JSONPatchType, patch, metav1.PatchOptions{})
+		crdMultiVer.Crd, err = crdMultiVer.APIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Patch(ctx, crdMultiVer.Crd.Name, types.JSONPatchType, patch, metav1.PatchOptions{})
 		if err != nil {
 			framework.Failf("%v", err)
 		}
@@ -427,7 +427,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		// TestCrd.Versions is different from TestCrd.Crd.Versions, we have to manually
 		// update the name there. Used by cleanupCRD
 		crdMultiVer.Crd.Spec.Versions[1].Name = "v4"
-		if err := cleanupCRD(f, crdMultiVer); err != nil {
+		if err := cleanupCRD(ctx, f, crdMultiVer); err != nil {
 			framework.Failf("%v", err)
 		}
 	})
@@ -439,7 +439,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		for custom resource definitions. Update the custom resource definition to not serve one of the versions. OpenAPI
 		definitions MUST be updated to not contain the version that is no longer served.
 	*/
-	framework.ConformanceIt("removes definition from spec when one version gets changed to not be served", func() {
+	framework.ConformanceIt("removes definition from spec when one version gets changed to not be served", func(ctx context.Context) {
 		ginkgo.By("set up a multi version CRD")
 		crd, err := setupCRD(f, schemaFoo, "multi-to-single-ver", "v5", "v6alpha1")
 		if err != nil {
@@ -454,12 +454,12 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		}
 
 		ginkgo.By("mark a version not serverd")
-		crd.Crd, err = crd.APIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), crd.Crd.Name, metav1.GetOptions{})
+		crd.Crd, err = crd.APIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, crd.Crd.Name, metav1.GetOptions{})
 		if err != nil {
 			framework.Failf("%v", err)
 		}
 		crd.Crd.Spec.Versions[1].Served = false
-		crd.Crd, err = crd.APIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Update(context.TODO(), crd.Crd, metav1.UpdateOptions{})
+		crd.Crd, err = crd.APIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Update(ctx, crd.Crd, metav1.UpdateOptions{})
 		if err != nil {
 			framework.Failf("%v", err)
 		}
@@ -473,13 +473,13 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 			framework.Failf("%v", err)
 		}
 
-		if err := cleanupCRD(f, crd); err != nil {
+		if err := cleanupCRD(ctx, f, crd); err != nil {
 			framework.Failf("%v", err)
 		}
 	})
 
 	// Marked as flaky until https://github.com/kubernetes/kubernetes/issues/65517 is solved.
-	ginkgo.It("[Flaky] kubectl explain works for CR with the same resource name as built-in object.", func() {
+	ginkgo.It("[Flaky] kubectl explain works for CR with the same resource name as built-in object.", func(ctx context.Context) {
 		customServiceShortName := fmt.Sprintf("ksvc-%d", time.Now().Unix()) // make short name unique
 		opt := func(crd *apiextensionsv1.CustomResourceDefinition) {
 			crd.ObjectMeta = metav1.ObjectMeta{Name: "services." + crd.Spec.Group}
@@ -497,11 +497,11 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		}
 
 		if err := verifyKubectlExplain(f.Namespace.Name, customServiceShortName+".spec", `(?s)DESCRIPTION:.*Specification of CustomService.*FIELDS:.*dummy.*<string>.*Dummy property`); err != nil {
-			_ = cleanupCRD(f, crdSvc) // need to remove the crd since its name is unchanged
+			_ = cleanupCRD(ctx, f, crdSvc) // need to remove the crd since its name is unchanged
 			framework.Failf("%v", err)
 		}
 
-		if err := cleanupCRD(f, crdSvc); err != nil {
+		if err := cleanupCRD(ctx, f, crdSvc); err != nil {
 			framework.Failf("%v", err)
 		}
 	})
@@ -567,7 +567,7 @@ func setupCRDAndVerifySchemaWithOptions(f *framework.Framework, schema, expect [
 	})
 	tCRD, err = crd.CreateMultiVersionTestCRD(f, group, options...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create CRD: %v", err)
+		return nil, fmt.Errorf("failed to create CRD: %w", err)
 	}
 
 	for _, v := range tCRD.Crd.Spec.Versions {
@@ -578,8 +578,8 @@ func setupCRDAndVerifySchemaWithOptions(f *framework.Framework, schema, expect [
 	return tCRD, nil
 }
 
-func cleanupCRD(f *framework.Framework, crd *crd.TestCrd) error {
-	crd.CleanUp()
+func cleanupCRD(ctx context.Context, f *framework.Framework, crd *crd.TestCrd) error {
+	_ = crd.CleanUp(ctx)
 	for _, v := range crd.Crd.Spec.Versions {
 		name := definitionName(crd, v.Name)
 		if err := waitForDefinitionCleanup(f.ClientSet, name); err != nil {
@@ -629,7 +629,7 @@ func waitForDefinition(c k8sclientset.Interface, name string, schema []byte) err
 		return true, ""
 	})
 	if err != nil {
-		return fmt.Errorf("failed to wait for definition %q to be served with the right OpenAPI schema: %v", name, err)
+		return fmt.Errorf("failed to wait for definition %q to be served with the right OpenAPI schema: %w", name, err)
 	}
 	return nil
 }
@@ -643,7 +643,7 @@ func waitForDefinitionCleanup(c k8sclientset.Interface, name string) error {
 		return true, ""
 	})
 	if err != nil {
-		return fmt.Errorf("failed to wait for definition %q not to be served anymore: %v", name, err)
+		return fmt.Errorf("failed to wait for definition %q not to be served anymore: %w", name, err)
 	}
 	return nil
 }
@@ -724,7 +724,7 @@ func dropDefaults(s *spec.Schema) {
 func verifyKubectlExplain(ns, name, pattern string) error {
 	result, err := e2ekubectl.RunKubectl(ns, "explain", name)
 	if err != nil {
-		return fmt.Errorf("failed to explain %s: %v", name, err)
+		return fmt.Errorf("failed to explain %s: %w", name, err)
 	}
 	r := regexp.MustCompile(pattern)
 	if !r.Match([]byte(result)) {

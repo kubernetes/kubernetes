@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -28,6 +29,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
+	"k8s.io/kubernetes/pkg/cluster/ports"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletconfigscheme "k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
 
@@ -36,8 +38,8 @@ import (
 )
 
 // GetCurrentKubeletConfig fetches the current Kubelet Config for the given node
-func GetCurrentKubeletConfig(nodeName, namespace string, useProxy bool) (*kubeletconfig.KubeletConfiguration, error) {
-	resp := pollConfigz(5*time.Minute, 5*time.Second, nodeName, namespace, useProxy)
+func GetCurrentKubeletConfig(ctx context.Context, nodeName, namespace string, useProxy bool, standaloneMode bool) (*kubeletconfig.KubeletConfiguration, error) {
+	resp := pollConfigz(ctx, 5*time.Minute, 5*time.Second, nodeName, namespace, useProxy, standaloneMode)
 	if len(resp) == 0 {
 		return nil, fmt.Errorf("failed to fetch /configz from %q", nodeName)
 	}
@@ -49,7 +51,7 @@ func GetCurrentKubeletConfig(nodeName, namespace string, useProxy bool) (*kubele
 }
 
 // returns a status 200 response from the /configz endpoint or nil if fails
-func pollConfigz(timeout time.Duration, pollInterval time.Duration, nodeName, namespace string, useProxy bool) []byte {
+func pollConfigz(ctx context.Context, timeout time.Duration, pollInterval time.Duration, nodeName, namespace string, useProxy bool, standaloneMode bool) []byte {
 	endpoint := ""
 	if useProxy {
 		// start local proxy, so we can send graceful deletion over query string, rather than body parameter
@@ -74,8 +76,10 @@ func pollConfigz(timeout time.Duration, pollInterval time.Duration, nodeName, na
 		framework.ExpectNoError(err)
 		framework.Logf("http requesting node kubelet /configz")
 		endpoint = fmt.Sprintf("http://127.0.0.1:%d/api/v1/nodes/%s/proxy/configz", port, nodeName)
-	} else {
+	} else if !standaloneMode {
 		endpoint = fmt.Sprintf("%s/api/v1/nodes/%s/proxy/configz", framework.TestContext.Host, framework.TestContext.NodeName)
+	} else {
+		endpoint = fmt.Sprintf("https://127.0.0.1:%d/configz", ports.KubeletPort)
 	}
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -89,7 +93,7 @@ func pollConfigz(timeout time.Duration, pollInterval time.Duration, nodeName, na
 	req.Header.Add("Accept", "application/json")
 
 	var respBody []byte
-	err = wait.PollImmediate(pollInterval, timeout, func() (bool, error) {
+	err = wait.PollImmediateWithContext(ctx, pollInterval, timeout, func(ctx context.Context) (bool, error) {
 		resp, err := client.Do(req)
 		if err != nil {
 			framework.Logf("Failed to get /configz, retrying. Error: %v", err)

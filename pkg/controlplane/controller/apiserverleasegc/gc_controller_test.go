@@ -44,7 +44,7 @@ func Test_Controller(t *testing.T) {
 					Name:      "kube-apiserver-12345",
 					Namespace: metav1.NamespaceSystem,
 					Labels: map[string]string{
-						"k8s.io/component": "kube-apiserver",
+						"apiserver.kubernetes.io/identity": "kube-apiserver",
 					},
 				},
 				Spec: coordinationv1.LeaseSpec{
@@ -62,7 +62,7 @@ func Test_Controller(t *testing.T) {
 					Name:      "kube-apiserver-12345",
 					Namespace: metav1.NamespaceSystem,
 					Labels: map[string]string{
-						"k8s.io/component": "kube-controller-manager",
+						"apiserver.kubernetes.io/identity": "kube-controller-manager",
 					},
 				},
 				Spec: coordinationv1.LeaseSpec{
@@ -80,7 +80,7 @@ func Test_Controller(t *testing.T) {
 					Name:      "kube-apiserver-12345",
 					Namespace: metav1.NamespaceSystem,
 					Labels: map[string]string{
-						"k8s.io/component": "kube-apiserver",
+						"apiserver.kubernetes.io/identity": "kube-apiserver",
 					},
 				},
 				Spec: coordinationv1.LeaseSpec{
@@ -98,7 +98,7 @@ func Test_Controller(t *testing.T) {
 					Name:      "kube-apiserver-12345",
 					Namespace: metav1.NamespaceSystem,
 					Labels: map[string]string{
-						"k8s.io/component": "kube-apiserver",
+						"apiserver.kubernetes.io/identity": "kube-apiserver",
 					},
 				},
 				Spec: coordinationv1.LeaseSpec{
@@ -116,7 +116,7 @@ func Test_Controller(t *testing.T) {
 					Name:      "kube-apiserver-12345",
 					Namespace: metav1.NamespaceSystem,
 					Labels: map[string]string{
-						"k8s.io/component": "kube-apiserver",
+						"apiserver.kubernetes.io/identity": "kube-apiserver",
 					},
 				},
 				Spec: coordinationv1.LeaseSpec{
@@ -132,7 +132,7 @@ func Test_Controller(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			clientset := fake.NewSimpleClientset(test.lease)
-			controller := NewAPIServerLeaseGC(clientset, 100*time.Millisecond, metav1.NamespaceSystem, "k8s.io/component=kube-apiserver")
+			controller := NewAPIServerLeaseGC(clientset, 100*time.Millisecond, metav1.NamespaceSystem, "apiserver.kubernetes.io/identity=kube-apiserver")
 			go controller.Run(nil)
 
 			time.Sleep(time.Second)

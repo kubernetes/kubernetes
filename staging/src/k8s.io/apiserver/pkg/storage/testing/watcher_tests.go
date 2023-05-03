@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/value"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
@@ -70,10 +71,10 @@ func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recur
 		watchTests: []*testWatchStruct{{basePod, false, ""}, {basePodAssigned, true, watch.Added}},
 		pred: storage.SelectionPredicate{
 			Label: labels.Everything(),
-			Field: fields.ParseSelectorOrDie("spec.nodename=bar"),
+			Field: fields.ParseSelectorOrDie("spec.nodeName=bar"),
 			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
 				pod := obj.(*example.Pod)
-				return nil, fields.Set{"spec.nodename": pod.Spec.NodeName}, nil
+				return nil, fields.Set{"spec.nodeName": pod.Spec.NodeName}, nil
 			},
 		},
 	}, {
@@ -87,22 +88,28 @@ func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recur
 		watchTests: []*testWatchStruct{{basePod, true, watch.Added}, {basePodAssigned, true, watch.Deleted}},
 		pred: storage.SelectionPredicate{
 			Label: labels.Everything(),
-			Field: fields.ParseSelectorOrDie("spec.nodename!=bar"),
+			Field: fields.ParseSelectorOrDie("spec.nodeName!=bar"),
 			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
 				pod := obj.(*example.Pod)
-				return nil, fields.Set{"spec.nodename": pod.Spec.NodeName}, nil
+				return nil, fields.Set{"spec.nodeName": pod.Spec.NodeName}, nil
 			},
 		},
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			watchKey := fmt.Sprintf("pods/%s", tt.namespace)
+			watchKey := fmt.Sprintf("/pods/%s", tt.namespace)
 			key := watchKey + "/foo"
 			if !recursive {
 				watchKey = key
 			}
 
-			w, err := store.Watch(ctx, watchKey, storage.ListOptions{ResourceVersion: "0", Predicate: tt.pred, Recursive: recursive})
+			// Get the current RV from which we can start watching.
+			out := &example.PodList{}
+			if err := store.GetList(ctx, watchKey, storage.ListOptions{ResourceVersion: "", Predicate: tt.pred, Recursive: recursive}, out); err != nil {
+				t.Fatalf("List failed: %v", err)
+			}
+
+			w, err := store.Watch(ctx, watchKey, storage.ListOptions{ResourceVersion: out.ResourceVersion, Predicate: tt.pred, Recursive: recursive})
 			if err != nil {
 				t.Fatalf("Watch failed: %v", err)
 			}
@@ -281,7 +288,8 @@ func RunTestWatchContextCancel(ctx context.Context, t *testing.T, store storage.
 func RunTestWatchDeleteEventObjectHaveLatestRV(ctx context.Context, t *testing.T, store storage.Interface) {
 	key, storedObj := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}})
 
-	watchCtx, _ := context.WithTimeout(ctx, wait.ForeverTestTimeout)
+	watchCtx, cancel := context.WithTimeout(ctx, wait.ForeverTestTimeout)
+	t.Cleanup(cancel)
 	w, err := store.Watch(watchCtx, key, storage.ListOptions{ResourceVersion: storedObj.ResourceVersion, Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
@@ -307,7 +315,8 @@ func RunTestWatchDeleteEventObjectHaveLatestRV(ctx context.Context, t *testing.T
 }
 
 func RunTestWatchInitializationSignal(ctx context.Context, t *testing.T, store storage.Interface) {
-	ctx, _ = context.WithTimeout(ctx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	t.Cleanup(cancel)
 	initSignal := utilflowcontrol.NewInitializationSignal()
 	ctx = utilflowcontrol.WithInitializationSignal(ctx, initSignal)
 
@@ -366,8 +375,548 @@ func RunOptionalTestProgressNotify(ctx context.Context, t *testing.T, store stor
 	})
 }
 
+// It tests watches of cluster-scoped resources.
+func TestClusterScopedWatch(ctx context.Context, t *testing.T, store storage.Interface) {
+	tests := []struct {
+		name string
+		// For watch request, the name of object is specified with field selector
+		// "metadata.name=objectName". So in this watch tests, we should set the
+		// requestedName and field selector "metadata.name=requestedName" at the
+		// same time or set neighter of them.
+		requestedName string
+		recursive     bool
+		fieldSelector fields.Selector
+		indexFields   []string
+		watchTests    []*testWatchStruct
+	}{
+		{
+			name:          "cluster-wide watch, request without name, without field selector",
+			recursive:     true,
+			fieldSelector: fields.Everything(),
+			watchTests: []*testWatchStruct{
+				{basePod("t1-foo1"), true, watch.Added},
+				{basePodUpdated("t1-foo1"), true, watch.Modified},
+				{basePodAssigned("t1-foo2", "t1-bar1"), true, watch.Added},
+			},
+		},
+		{
+			name:          "cluster-wide watch, request without name, field selector with spec.nodeName",
+			recursive:     true,
+			fieldSelector: fields.ParseSelectorOrDie("spec.nodeName=t2-bar1"),
+			indexFields:   []string{"spec.nodeName"},
+			watchTests: []*testWatchStruct{
+				{basePod("t2-foo1"), false, ""},
+				{basePodAssigned("t2-foo1", "t2-bar1"), true, watch.Added},
+			},
+		},
+		{
+			name:          "cluster-wide watch, request without name, field selector with spec.nodeName to filter out watch",
+			recursive:     true,
+			fieldSelector: fields.ParseSelectorOrDie("spec.nodeName!=t3-bar1"),
+			indexFields:   []string{"spec.nodeName"},
+			watchTests: []*testWatchStruct{
+				{basePod("t3-foo1"), true, watch.Added},
+				{basePod("t3-foo2"), true, watch.Added},
+				{basePodUpdated("t3-foo1"), true, watch.Modified},
+				{basePodAssigned("t3-foo1", "t3-bar1"), true, watch.Deleted},
+			},
+		},
+		{
+			name:          "cluster-wide watch, request with name, field selector with metadata.name",
+			requestedName: "t4-foo1",
+			fieldSelector: fields.ParseSelectorOrDie("metadata.name=t4-foo1"),
+			watchTests: []*testWatchStruct{
+				{basePod("t4-foo1"), true, watch.Added},
+				{basePod("t4-foo2"), false, ""},
+				{basePodUpdated("t4-foo1"), true, watch.Modified},
+				{basePodUpdated("t4-foo2"), false, ""},
+			},
+		},
+		{
+			name:          "cluster-wide watch, request with name, field selector with metadata.name and spec.nodeName",
+			requestedName: "t5-foo1",
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name": "t5-foo1",
+				"spec.nodeName": "t5-bar1",
+			}),
+			indexFields: []string{"spec.nodeName"},
+			watchTests: []*testWatchStruct{
+				{basePod("t5-foo1"), false, ""},
+				{basePod("t5-foo2"), false, ""},
+				{basePodUpdated("t5-foo1"), false, ""},
+				{basePodUpdated("t5-foo2"), false, ""},
+				{basePodAssigned("t5-foo1", "t5-bar1"), true, watch.Added},
+			},
+		},
+		{
+			name:          "cluster-wide watch, request with name, field selector with metadata.name, and with spec.nodeName to filter out watch",
+			requestedName: "t6-foo1",
+			fieldSelector: fields.AndSelectors(
+				fields.ParseSelectorOrDie("spec.nodeName!=t6-bar1"),
+				fields.SelectorFromSet(fields.Set{"metadata.name": "t6-foo1"}),
+			),
+			indexFields: []string{"spec.nodeName"},
+			watchTests: []*testWatchStruct{
+				{basePod("t6-foo1"), true, watch.Added},
+				{basePod("t6-foo2"), false, ""},
+				{basePodUpdated("t6-foo1"), true, watch.Modified},
+				{basePodAssigned("t6-foo1", "t6-bar1"), true, watch.Deleted},
+				{basePodAssigned("t6-foo2", "t6-bar1"), false, ""},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			requestInfo := &genericapirequest.RequestInfo{}
+			requestInfo.Name = tt.requestedName
+			requestInfo.Namespace = ""
+			ctx = genericapirequest.WithRequestInfo(ctx, requestInfo)
+			ctx = genericapirequest.WithNamespace(ctx, "")
+
+			watchKey := "/pods"
+			if tt.requestedName != "" {
+				watchKey += "/" + tt.requestedName
+			}
+
+			predicate := createPodPredicate(tt.fieldSelector, false, tt.indexFields)
+
+			list := &example.PodList{}
+			opts := storage.ListOptions{
+				ResourceVersion: "",
+				Predicate:       predicate,
+				Recursive:       true,
+			}
+			if err := store.GetList(ctx, "/pods", opts, list); err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+
+			opts.ResourceVersion = list.ResourceVersion
+			opts.Recursive = tt.recursive
+
+			w, err := store.Watch(ctx, watchKey, opts)
+			if err != nil {
+				t.Fatalf("Watch failed: %v", err)
+			}
+
+			currentObjs := map[string]*example.Pod{}
+			for _, watchTest := range tt.watchTests {
+				out := &example.Pod{}
+				key := "pods/" + watchTest.obj.Name
+				err := store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
+					func(runtime.Object) (runtime.Object, error) {
+						obj := watchTest.obj.DeepCopy()
+						return obj, nil
+					}), nil)
+				if err != nil {
+					t.Fatalf("GuaranteedUpdate failed: %v", err)
+				}
+
+				expectObj := out
+				if watchTest.watchType == watch.Deleted {
+					expectObj = currentObjs[watchTest.obj.Name]
+					expectObj.ResourceVersion = out.ResourceVersion
+					delete(currentObjs, watchTest.obj.Name)
+				} else {
+					currentObjs[watchTest.obj.Name] = out
+				}
+				if watchTest.expectEvent {
+					testCheckResult(t, watchTest.watchType, w, expectObj)
+				}
+			}
+			w.Stop()
+			testCheckStop(t, w)
+		})
+	}
+}
+
+// It tests watch of namespace-scoped resources.
+func TestNamespaceScopedWatch(ctx context.Context, t *testing.T, store storage.Interface) {
+	tests := []struct {
+		name string
+		// For watch request, the name of object is specified with field selector
+		// "metadata.name=objectName". So in this watch tests, we should set the
+		// requestedName and field selector "metadata.name=requestedName" at the
+		// same time or set neighter of them.
+		requestedName      string
+		requestedNamespace string
+		recursive          bool
+		fieldSelector      fields.Selector
+		indexFields        []string
+		watchTests         []*testWatchStruct
+	}{
+		{
+			name:          "namespaced watch, request without name, request without namespace, without field selector",
+			recursive:     true,
+			fieldSelector: fields.Everything(),
+			watchTests: []*testWatchStruct{
+				{baseNamespacedPod("t1-foo1", "t1-ns1"), true, watch.Added},
+				{baseNamespacedPod("t1-foo2", "t1-ns2"), true, watch.Added},
+				{baseNamespacedPodUpdated("t1-foo1", "t1-ns1"), true, watch.Modified},
+				{baseNamespacedPodUpdated("t1-foo2", "t1-ns2"), true, watch.Modified},
+			},
+		},
+		{
+			name:          "namespaced watch, request without name, request without namespace, field selector with metadata.namespace",
+			recursive:     true,
+			fieldSelector: fields.ParseSelectorOrDie("metadata.namespace=t2-ns1"),
+			watchTests: []*testWatchStruct{
+				{baseNamespacedPod("t2-foo1", "t2-ns1"), true, watch.Added},
+				{baseNamespacedPod("t2-foo1", "t2-ns2"), false, ""},
+				{baseNamespacedPodUpdated("t2-foo1", "t2-ns1"), true, watch.Modified},
+				{baseNamespacedPodUpdated("t2-foo1", "t2-ns2"), false, ""},
+			},
+		},
+		{
+			name:          "namespaced watch, request without name, request without namespace, field selector with spec.nodename",
+			recursive:     true,
+			fieldSelector: fields.ParseSelectorOrDie("spec.nodeName=t3-bar1"),
+			indexFields:   []string{"spec.nodeName"},
+			watchTests: []*testWatchStruct{
+				{baseNamespacedPod("t3-foo1", "t3-ns1"), false, ""},
+				{baseNamespacedPod("t3-foo2", "t3-ns2"), false, ""},
+				{baseNamespacedPodAssigned("t3-foo1", "t3-ns1", "t3-bar1"), true, watch.Added},
+				{baseNamespacedPodAssigned("t3-foo2", "t3-ns2", "t3-bar1"), true, watch.Added},
+			},
+		},
+		{
+			name:          "namespaced watch, request without name, request without namespace, field selector with spec.nodename to filter out watch",
+			recursive:     true,
+			fieldSelector: fields.ParseSelectorOrDie("spec.nodeName!=t4-bar1"),
+			indexFields:   []string{"spec.nodeName"},
+			watchTests: []*testWatchStruct{
+				{baseNamespacedPod("t4-foo1", "t4-ns1"), true, watch.Added},
+				{baseNamespacedPod("t4-foo2", "t4-ns1"), true, watch.Added},
+				{baseNamespacedPodUpdated("t4-foo1", "t4-ns1"), true, watch.Modified},
+				{baseNamespacedPodAssigned("t4-foo1", "t4-ns1", "t4-bar1"), true, watch.Deleted},
+			},
+		},
+		{
+			name:               "namespaced watch, request without name, request with namespace, without field selector",
+			requestedNamespace: "t5-ns1",
+			recursive:          true,
+			fieldSelector:      fields.Everything(),
+			watchTests: []*testWatchStruct{
+				{baseNamespacedPod("t5-foo1", "t5-ns1"), true, watch.Added},
+				{baseNamespacedPod("t5-foo1", "t5-ns2"), false, ""},
+				{baseNamespacedPod("t5-foo2", "t5-ns1"), true, watch.Added},
+				{baseNamespacedPodUpdated("t5-foo1", "t5-ns1"), true, watch.Modified},
+				{baseNamespacedPodUpdated("t5-foo1", "t5-ns2"), false, ""},
+			},
+		},
+		{
+			name:               "namespaced watch, request without name, request with namespace, field selector with matched metadata.namespace",
+			requestedNamespace: "t6-ns1",
+			recursive:          true,
+			fieldSelector:      fields.ParseSelectorOrDie("metadata.namespace=t6-ns1"),
+			watchTests: []*testWatchStruct{
+				{baseNamespacedPod("t6-foo1", "t6-ns1"), true, watch.Added},
+				{baseNamespacedPod("t6-foo1", "t6-ns2"), false, ""},
+				{baseNamespacedPodUpdated("t6-foo1", "t6-ns1"), true, watch.Modified},
+			},
+		},
+		{
+			name:               "namespaced watch, request without name, request with namespace, field selector with non-matched metadata.namespace",
+			requestedNamespace: "t7-ns1",
+			recursive:          true,
+			fieldSelector:      fields.ParseSelectorOrDie("metadata.namespace=t7-ns2"),
+			watchTests: []*testWatchStruct{
+				{baseNamespacedPod("t7-foo1", "t7-ns1"), false, ""},
+				{baseNamespacedPod("t7-foo1", "t7-ns2"), false, ""},
+				{baseNamespacedPodUpdated("t7-foo1", "t7-ns1"), false, ""},
+				{baseNamespacedPodUpdated("t7-foo1", "t7-ns2"), false, ""},
+			},
+		},
+		{
+			name:               "namespaced watch, request without name, request with namespace, field selector with spec.nodename",
+			requestedNamespace: "t8-ns1",
+			recursive:          true,
+			fieldSelector:      fields.ParseSelectorOrDie("spec.nodeName=t8-bar2"),
+			indexFields:        []string{"spec.nodeName"},
+			watchTests: []*testWatchStruct{
+				{baseNamespacedPod("t8-foo1", "t8-ns1"), false, ""},
+				{baseNamespacedPodAssigned("t8-foo1", "t8-ns1", "t8-bar1"), false, ""},
+				{baseNamespacedPodAssigned("t8-foo1", "t8-ns2", "t8-bar2"), false, ""},
+				{baseNamespacedPodAssigned("t8-foo1", "t8-ns1", "t8-bar2"), true, watch.Added},
+			},
+		},
+		{
+			name:               "namespaced watch, request without name, request with namespace, field selector with spec.nodename to filter out watch",
+			requestedNamespace: "t9-ns2",
+			recursive:          true,
+			fieldSelector:      fields.ParseSelectorOrDie("spec.nodeName!=t9-bar1"),
+			indexFields:        []string{"spec.nodeName"},
+			watchTests: []*testWatchStruct{
+				{baseNamespacedPod("t9-foo1", "t9-ns1"), false, ""},
+				{baseNamespacedPod("t9-foo1", "t9-ns2"), true, watch.Added},
+				{baseNamespacedPodAssigned("t9-foo1", "t9-ns2", "t9-bar1"), true, watch.Deleted},
+				{baseNamespacedPodAssigned("t9-foo1", "t9-ns2", "t9-bar2"), true, watch.Added},
+			},
+		},
+		{
+			name:          "namespaced watch, request with name, request without namespace, field selector with metadata.name",
+			requestedName: "t10-foo1",
+			recursive:     true,
+			fieldSelector: fields.ParseSelectorOrDie("metadata.name=t10-foo1"),
+			watchTests: []*testWatchStruct{
+				{baseNamespacedPod("t10-foo1", "t10-ns1"), true, watch.Added},
+				{baseNamespacedPod("t10-foo1", "t10-ns2"), true, watch.Added},
+				{baseNamespacedPod("t10-foo2", "t10-ns1"), false, ""},
+				{baseNamespacedPodUpdated("t10-foo1", "t10-ns1"), true, watch.Modified},
+				{baseNamespacedPodAssigned("t10-foo1", "t10-ns1", "t10-bar1"), true, watch.Modified},
+			},
+		},
+		{
+			name:          "namespaced watch, request with name, request without namespace, field selector with metadata.name and metadata.namespace",
+			requestedName: "t11-foo1",
+			recursive:     true,
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "t11-foo1",
+				"metadata.namespace": "t11-ns1",
+			}),
+			watchTests: []*testWatchStruct{
+				{baseNamespacedPod("t11-foo1", "t11-ns1"), true, watch.Added},
+				{baseNamespacedPod("t11-foo2", "t11-ns1"), false, ""},
+				{baseNamespacedPod("t11-foo1", "t11-ns2"), false, ""},
+				{baseNamespacedPodUpdated("t11-foo1", "t11-ns1"), true, watch.Modified},
+				{baseNamespacedPodAssigned("t11-foo1", "t11-ns1", "t11-bar1"), true, watch.Modified},
+			},
+		},
+		{
+			name:          "namespaced watch, request with name, request without namespace, field selector with metadata.name and spec.nodeName",
+			requestedName: "t12-foo1",
+			recursive:     true,
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name": "t12-foo1",
+				"spec.nodeName": "t12-bar1",
+			}),
+			indexFields: []string{"spec.nodeName"},
+			watchTests: []*testWatchStruct{
+				{baseNamespacedPod("t12-foo1", "t12-ns1"), false, ""},
+				{baseNamespacedPodUpdated("t12-foo1", "t12-ns1"), false, ""},
+				{baseNamespacedPodAssigned("t12-foo1", "t12-ns1", "t12-bar1"), true, watch.Added},
+			},
+		},
+		{
+			name:          "namespaced watch, request with name, request without namespace, field selector with metadata.name, and with spec.nodeName to filter out watch",
+			requestedName: "t15-foo1",
+			recursive:     true,
+			fieldSelector: fields.AndSelectors(
+				fields.ParseSelectorOrDie("spec.nodeName!=t15-bar1"),
+				fields.SelectorFromSet(fields.Set{"metadata.name": "t15-foo1"}),
+			),
+			indexFields: []string{"spec.nodeName"},
+			watchTests: []*testWatchStruct{
+				{baseNamespacedPod("t15-foo1", "t15-ns1"), true, watch.Added},
+				{baseNamespacedPod("t15-foo2", "t15-ns1"), false, ""},
+				{baseNamespacedPodUpdated("t15-foo1", "t15-ns1"), true, watch.Modified},
+				{baseNamespacedPodAssigned("t15-foo1", "t15-ns1", "t15-bar1"), true, watch.Deleted},
+				{baseNamespacedPodAssigned("t15-foo1", "t15-ns1", "t15-bar2"), true, watch.Added},
+			},
+		},
+		{
+			name:               "namespaced watch, request with name, request with namespace, with field selector metadata.name",
+			requestedName:      "t16-foo1",
+			requestedNamespace: "t16-ns1",
+			fieldSelector:      fields.ParseSelectorOrDie("metadata.name=t16-foo1"),
+			watchTests: []*testWatchStruct{
+				{baseNamespacedPod("t16-foo1", "t16-ns1"), true, watch.Added},
+				{baseNamespacedPod("t16-foo2", "t16-ns1"), false, ""},
+				{baseNamespacedPodUpdated("t16-foo1", "t16-ns1"), true, watch.Modified},
+				{baseNamespacedPodAssigned("t16-foo1", "t16-ns1", "t16-bar1"), true, watch.Modified},
+			},
+		},
+		{
+			name:               "namespaced watch, request with name, request with namespace, with field selector metadata.name and metadata.namespace",
+			requestedName:      "t17-foo2",
+			requestedNamespace: "t17-ns1",
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "t17-foo2",
+				"metadata.namespace": "t17-ns1",
+			}),
+			watchTests: []*testWatchStruct{
+				{baseNamespacedPod("t17-foo1", "t17-ns1"), false, ""},
+				{baseNamespacedPod("t17-foo2", "t17-ns1"), true, watch.Added},
+				{baseNamespacedPodUpdated("t17-foo1", "t17-ns1"), false, ""},
+				{baseNamespacedPodAssigned("t17-foo2", "t17-ns1", "t17-bar1"), true, watch.Modified},
+			},
+		},
+		{
+			name:               "namespaced watch, request with name, request with namespace, with field selector metadata.name, metadata.namespace and spec.nodename",
+			requestedName:      "t18-foo1",
+			requestedNamespace: "t18-ns1",
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "t18-foo1",
+				"metadata.namespace": "t18-ns1",
+				"spec.nodeName":      "t18-bar1",
+			}),
+			indexFields: []string{"spec.nodeName"},
+			watchTests: []*testWatchStruct{
+				{baseNamespacedPod("t18-foo1", "t18-ns1"), false, ""},
+				{baseNamespacedPod("t18-foo2", "t18-ns1"), false, ""},
+				{baseNamespacedPod("t18-foo1", "t18-ns2"), false, ""},
+				{baseNamespacedPodUpdated("t18-foo1", "t18-ns1"), false, ""},
+				{baseNamespacedPodAssigned("t18-foo1", "t18-ns1", "t18-bar1"), true, watch.Added},
+			},
+		},
+		{
+			name:               "namespaced watch, request with name, request with namespace, with field selector metadata.name, metadata.namespace, and with spec.nodename to filter out watch",
+			requestedName:      "t19-foo2",
+			requestedNamespace: "t19-ns1",
+			fieldSelector: fields.AndSelectors(
+				fields.ParseSelectorOrDie("spec.nodeName!=t19-bar1"),
+				fields.SelectorFromSet(fields.Set{"metadata.name": "t19-foo2", "metadata.namespace": "t19-ns1"}),
+			),
+			indexFields: []string{"spec.nodeName"},
+			watchTests: []*testWatchStruct{
+				{baseNamespacedPod("t19-foo1", "t19-ns1"), false, ""},
+				{baseNamespacedPod("t19-foo2", "t19-ns2"), false, ""},
+				{baseNamespacedPod("t19-foo2", "t19-ns1"), true, watch.Added},
+				{baseNamespacedPodUpdated("t19-foo2", "t19-ns1"), true, watch.Modified},
+				{baseNamespacedPodAssigned("t19-foo2", "t19-ns1", "t19-bar1"), true, watch.Deleted},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			requestInfo := &genericapirequest.RequestInfo{}
+			requestInfo.Name = tt.requestedName
+			requestInfo.Namespace = tt.requestedNamespace
+			ctx = genericapirequest.WithRequestInfo(ctx, requestInfo)
+			ctx = genericapirequest.WithNamespace(ctx, tt.requestedNamespace)
+
+			watchKey := "/pods"
+			if tt.requestedNamespace != "" {
+				watchKey += "/" + tt.requestedNamespace
+				if tt.requestedName != "" {
+					watchKey += "/" + tt.requestedName
+				}
+			}
+
+			predicate := createPodPredicate(tt.fieldSelector, true, tt.indexFields)
+
+			list := &example.PodList{}
+			opts := storage.ListOptions{
+				ResourceVersion: "",
+				Predicate:       predicate,
+				Recursive:       true,
+			}
+			if err := store.GetList(ctx, "/pods", opts, list); err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+
+			opts.ResourceVersion = list.ResourceVersion
+			opts.Recursive = tt.recursive
+
+			w, err := store.Watch(ctx, watchKey, opts)
+			if err != nil {
+				t.Fatalf("Watch failed: %v", err)
+			}
+
+			currentObjs := map[string]*example.Pod{}
+			for _, watchTest := range tt.watchTests {
+				out := &example.Pod{}
+				key := "pods/" + watchTest.obj.Namespace + "/" + watchTest.obj.Name
+				err := store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
+					func(runtime.Object) (runtime.Object, error) {
+						obj := watchTest.obj.DeepCopy()
+						return obj, nil
+					}), nil)
+				if err != nil {
+					t.Fatalf("GuaranteedUpdate failed: %v", err)
+				}
+
+				expectObj := out
+				podIdentifier := watchTest.obj.Namespace + "/" + watchTest.obj.Name
+				if watchTest.watchType == watch.Deleted {
+					expectObj = currentObjs[podIdentifier]
+					expectObj.ResourceVersion = out.ResourceVersion
+					delete(currentObjs, podIdentifier)
+				} else {
+					currentObjs[podIdentifier] = out
+				}
+				if watchTest.expectEvent {
+					testCheckResult(t, watchTest.watchType, w, expectObj)
+				}
+			}
+			w.Stop()
+			testCheckStop(t, w)
+		})
+	}
+}
+
 type testWatchStruct struct {
 	obj         *example.Pod
 	expectEvent bool
 	watchType   watch.EventType
+}
+
+func createPodPredicate(field fields.Selector, namespaceScoped bool, indexField []string) storage.SelectionPredicate {
+	return storage.SelectionPredicate{
+		Label:       labels.Everything(),
+		Field:       field,
+		GetAttrs:    determinePodGetAttrFunc(namespaceScoped, indexField),
+		IndexFields: indexField,
+	}
+}
+
+func determinePodGetAttrFunc(namespaceScoped bool, indexField []string) storage.AttrFunc {
+	if indexField != nil {
+		if namespaceScoped {
+			return namespacedScopedNodeNameAttrFunc
+		}
+		return clusterScopedNodeNameAttrFunc
+	}
+	if namespaceScoped {
+		return storage.DefaultNamespaceScopedAttr
+	}
+	return storage.DefaultClusterScopedAttr
+}
+
+func namespacedScopedNodeNameAttrFunc(obj runtime.Object) (labels.Set, fields.Set, error) {
+	pod := obj.(*example.Pod)
+	return nil, fields.Set{
+		"spec.nodeName":      pod.Spec.NodeName,
+		"metadata.name":      pod.ObjectMeta.Name,
+		"metadata.namespace": pod.ObjectMeta.Namespace,
+	}, nil
+}
+
+func clusterScopedNodeNameAttrFunc(obj runtime.Object) (labels.Set, fields.Set, error) {
+	pod := obj.(*example.Pod)
+	return nil, fields.Set{
+		"spec.nodeName": pod.Spec.NodeName,
+		"metadata.name": pod.ObjectMeta.Name,
+	}, nil
+}
+
+func basePod(podName string) *example.Pod {
+	return baseNamespacedPod(podName, "")
+}
+
+func basePodUpdated(podName string) *example.Pod {
+	return baseNamespacedPodUpdated(podName, "")
+}
+
+func basePodAssigned(podName, nodeName string) *example.Pod {
+	return baseNamespacedPodAssigned(podName, "", nodeName)
+}
+
+func baseNamespacedPod(podName, namespace string) *example.Pod {
+	return &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: podName, Namespace: namespace},
+	}
+}
+
+func baseNamespacedPodUpdated(podName, namespace string) *example.Pod {
+	return &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: podName, Namespace: namespace},
+		Status:     example.PodStatus{Phase: "Running"},
+	}
+}
+
+func baseNamespacedPodAssigned(podName, namespace, nodeName string) *example.Pod {
+	return &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: podName, Namespace: namespace},
+		Spec:       example.PodSpec{NodeName: nodeName},
+	}
 }

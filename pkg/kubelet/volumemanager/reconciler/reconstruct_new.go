@@ -107,7 +107,7 @@ func (rc *reconciler) updateStatesNew(reconstructedVolumes map[v1.UniqueVolumeNa
 	for _, gvl := range reconstructedVolumes {
 		err := rc.actualStateOfWorld.MarkVolumeAsAttached(
 			//TODO: the devicePath might not be correct for some volume plugins: see issue #54108
-			gvl.volumeName, gvl.volumeSpec, rc.nodeName, gvl.devicePath)
+			klog.TODO(), gvl.volumeName, gvl.volumeSpec, rc.nodeName, gvl.devicePath)
 		if err != nil {
 			klog.ErrorS(err, "Could not add volume information to actual state of world", "volumeName", gvl.volumeName)
 			continue
@@ -179,6 +179,14 @@ func (rc *reconciler) cleanOrphanVolumes() {
 // server is established, i.e. it can't be part of reconstructVolumes().
 func (rc *reconciler) updateReconstructedDevicePaths() {
 	klog.V(4).InfoS("Updating reconstructed devicePaths")
+
+	if rc.kubeClient == nil {
+		// Skip reconstructing devicePath from node objects if kubelet is in standalone mode.
+		// Such kubelet is not expected to mount any attachable volume or Secrets / ConfigMap.
+		klog.V(2).InfoS("Skipped reconstruction of DevicePaths from node.status in standalone mode")
+		rc.volumesNeedDevicePath = nil
+		return
+	}
 
 	node, fetchErr := rc.kubeClient.CoreV1().Nodes().Get(context.TODO(), string(rc.nodeName), metav1.GetOptions{})
 	if fetchErr != nil {

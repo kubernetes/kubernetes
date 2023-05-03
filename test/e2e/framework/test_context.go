@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
@@ -32,6 +33,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/ginkgo/v2/reporters"
 	"github.com/onsi/ginkgo/v2/types"
+	"github.com/onsi/gomega"
 	gomegaformat "github.com/onsi/gomega/format"
 
 	restclient "k8s.io/client-go/rest"
@@ -40,6 +42,8 @@ import (
 	"k8s.io/klog/v2"
 
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/test/e2e/framework/internal/junit"
+	"k8s.io/kubernetes/test/utils/image"
 	"k8s.io/kubernetes/test/utils/kubeconfig"
 )
 
@@ -100,15 +104,22 @@ type TestContextType struct {
 	// Tooling is the tooling in use (e.g. kops, gke).  Provider is the cloud provider and might not uniquely identify the tooling.
 	Tooling string
 
-	CloudConfig    CloudConfig
-	KubectlPath    string
-	OutputDir      string
-	ReportDir      string
-	ReportPrefix   string
-	Prefix         string
-	MinStartupPods int
-	// Timeout for waiting for system pods to be running
-	SystemPodsStartupTimeout    time.Duration
+	// timeouts contains user-configurable timeouts for various operations.
+	// Individual Framework instance also have such timeouts which may be
+	// different from these here. To avoid confusion, this field is not
+	// exported. Its values can be accessed through
+	// NewTimeoutContext.
+	timeouts TimeoutContext
+
+	CloudConfig                 CloudConfig
+	KubectlPath                 string
+	OutputDir                   string
+	ReportDir                   string
+	ReportPrefix                string
+	ReportCompleteGinkgo        bool
+	ReportCompleteJUnit         bool
+	Prefix                      string
+	MinStartupPods              int
 	EtcdUpgradeStorage          string
 	EtcdUpgradeVersion          string
 	GCEUpgradeScript            string
@@ -141,10 +152,6 @@ type TestContextType struct {
 	IncludeClusterAutoscalerMetrics bool
 	// Currently supported values are 'hr' for human-readable and 'json'. It's a comma separated list.
 	OutputPrintType string
-	// NodeSchedulableTimeout is the timeout for waiting for all nodes to be schedulable.
-	NodeSchedulableTimeout time.Duration
-	// SystemDaemonsetStartupTimeout is the timeout for waiting for all system daemonsets to be ready.
-	SystemDaemonsetStartupTimeout time.Duration
 	// CreateTestingNS is responsible for creating namespace used for executing e2e tests.
 	// It accepts namespace base name, which will be prepended with e2e prefix, kube client
 	// and labels to be applied to a namespace.
@@ -182,6 +189,13 @@ type TestContextType struct {
 	// DockerConfigFile is a file that contains credentials which can be used to pull images from certain private registries, needed for a test.
 	DockerConfigFile string
 
+	// E2EDockerConfigFile is a docker credentials configuration file used which contains authorization token that can be used to pull images from certain private registries provided by the users.
+	// For more details refer https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/#log-in-to-docker-hub
+	E2EDockerConfigFile string
+
+	// KubeTestRepoConfigFile is a yaml file used for overriding registries for test images.
+	KubeTestRepoList string
+
 	// SnapshotControllerPodName is the name used for identifying the snapshot controller pod.
 	SnapshotControllerPodName string
 
@@ -214,8 +228,10 @@ type NodeKillerConfig struct {
 	JitterFactor float64
 	// SimulatedDowntime is a duration between node is killed and recreated.
 	SimulatedDowntime time.Duration
-	// NodeKillerStopCh is a channel that is used to notify NodeKiller to stop killing nodes.
-	NodeKillerStopCh chan struct{}
+	// NodeKillerStopCtx is a context that is used to notify NodeKiller to stop killing nodes.
+	NodeKillerStopCtx context.Context
+	// NodeKillerStop is the cancel function for NodeKillerStopCtx.
+	NodeKillerStop func()
 }
 
 // NodeTestContextType is part of TestContextType, it is shared by all node e2e test.
@@ -242,6 +258,8 @@ type NodeTestContextType struct {
 	RestartKubelet bool
 	// ExtraEnvs is a map of environment names to values.
 	ExtraEnvs map[string]string
+	// StandaloneMode indicates whether the test is running kubelet in a standalone mode.
+	StandaloneMode bool
 }
 
 // CloudConfig holds the cloud configuration for e2e test suites.
@@ -268,7 +286,9 @@ type CloudConfig struct {
 }
 
 // TestContext should be used by all tests to access common context data.
-var TestContext TestContextType
+var TestContext = TestContextType{
+	timeouts: defaultTimeouts,
+}
 
 // StringArrayValue is used with flag.Var for a comma-separated list of strings placed into a string array.
 type stringArrayValue struct {
@@ -327,7 +347,9 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 
 	flags.StringVar(&TestContext.Host, "host", "", fmt.Sprintf("The host, or apiserver, to connect to. Will default to %s if this argument and --kubeconfig are not set.", defaultHost))
 	flags.StringVar(&TestContext.ReportPrefix, "report-prefix", "", "Optional prefix for JUnit XML reports. Default is empty, which doesn't prepend anything to the default name.")
-	flags.StringVar(&TestContext.ReportDir, "report-dir", "", "Path to the directory where the JUnit XML reports and other tests results should be saved. Default is empty, which doesn't generate these reports. If ginkgo's -junit-report parameter is used, that parameter instead of -report-dir determines the location of a single JUnit report.")
+	flags.StringVar(&TestContext.ReportDir, "report-dir", "", "Path to the directory where the simplified JUnit XML reports and other tests results should be saved. Default is empty, which doesn't generate these reports.  If ginkgo's -junit-report parameter is used, that parameter instead of -report-dir determines the location of a single JUnit report.")
+	flags.BoolVar(&TestContext.ReportCompleteGinkgo, "report-complete-ginkgo", false, "Enables writing a complete test report as Ginkgo JSON to <report dir>/ginkgo/report.json. Ignored if --report-dir is not set.")
+	flags.BoolVar(&TestContext.ReportCompleteJUnit, "report-complete-junit", false, "Enables writing a complete test report as JUnit XML to <report dir>/ginkgo/report.json. Ignored if --report-dir is not set.")
 	flags.StringVar(&TestContext.ContainerRuntimeEndpoint, "container-runtime-endpoint", "unix:///var/run/containerd/containerd.sock", "The container runtime endpoint of cluster VM instances.")
 	flags.StringVar(&TestContext.ContainerRuntimeProcessName, "container-runtime-process-name", "dockerd", "The name of the container runtime process.")
 	flags.StringVar(&TestContext.ContainerRuntimePidFile, "container-runtime-pid-file", "/var/run/docker.pid", "The pid file of the container runtime.")
@@ -342,12 +364,14 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 	flags.StringVar(&TestContext.NonblockingTaints, "non-blocking-taints", `node-role.kubernetes.io/control-plane,node-role.kubernetes.io/master`, "Nodes with taints in this comma-delimited list will not block the test framework from starting tests. The default taint 'node-role.kubernetes.io/master' is DEPRECATED and will be removed from the list in a future release.")
 
 	flags.BoolVar(&TestContext.ListImages, "list-images", false, "If true, will show list of images used for running tests.")
-	flags.BoolVar(&TestContext.ListConformanceTests, "list-conformance-tests", false, "If true, will show list of conformance tests.")
 	flags.StringVar(&TestContext.KubectlPath, "kubectl-path", "kubectl", "The kubectl binary to use. For development, you might use 'cluster/kubectl.sh' here.")
 
 	flags.StringVar(&TestContext.ProgressReportURL, "progress-report-url", "", "The URL to POST progress updates to as the suite runs to assist in aiding integrations. If empty, no messages sent.")
 	flags.StringVar(&TestContext.SpecSummaryOutput, "spec-dump", "", "The file to dump all ginkgo.SpecSummary to after tests run. If empty, no objects are saved/printed.")
-	flags.StringVar(&TestContext.DockerConfigFile, "docker-config-file", "", "A file that contains credentials which can be used to pull images from certain private registries, needed for a test.")
+	flags.StringVar(&TestContext.DockerConfigFile, "docker-config-file", "", "A docker credential file which contains authorization token that is used to perform image pull tests from an authenticated registry. For more details regarding the content of the file refer https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/#log-in-to-docker-hub")
+
+	flags.StringVar(&TestContext.E2EDockerConfigFile, "e2e-docker-config-file", "", "A docker credentials configuration file used which contains authorization token that can be used to pull images from certain private registries provided by the users. For more details refer https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/#log-in-to-docker-hub")
+	flags.StringVar(&TestContext.KubeTestRepoList, "kube-test-repo-list", "", "A yaml file used for overriding registries for test images. Alternatively, the KUBE_TEST_REPO_LIST env variable can be set.")
 
 	flags.StringVar(&TestContext.SnapshotControllerPodName, "snapshot-controller-pod-name", "", "The pod name to use for identifying the snapshot controller in the kube-system namespace.")
 	flags.IntVar(&TestContext.SnapshotControllerHTTPPort, "snapshot-controller-http-port", 0, "The port to use for snapshot controller HTTP communication.")
@@ -358,12 +382,8 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 func CreateGinkgoConfig() (types.SuiteConfig, types.ReporterConfig) {
 	// fetch the current config
 	suiteConfig, reporterConfig := ginkgo.GinkgoConfiguration()
-	// Turn on EmitSpecProgress to get spec progress (especially on interrupt)
-	suiteConfig.EmitSpecProgress = true
 	// Randomize specs as well as suites
 	suiteConfig.RandomizeAllSpecs = true
-	// Turn on verbose by default to get spec names
-	reporterConfig.Verbose = true
 	// Disable skipped tests unless they are explicitly requested.
 	if len(suiteConfig.FocusStrings) == 0 && len(suiteConfig.SkipStrings) == 0 {
 		suiteConfig.SkipStrings = []string{`\[Flaky\]|\[Feature:.+\]`}
@@ -415,9 +435,9 @@ func RegisterClusterFlags(flags *flag.FlagSet) {
 	flags.StringVar(&cloudConfig.ClusterTag, "cluster-tag", "", "Tag used to identify resources.  Only required if provider is aws.")
 	flags.StringVar(&cloudConfig.ConfigFile, "cloud-config-file", "", "Cloud config file.  Only required if provider is azure or vsphere.")
 	flags.IntVar(&TestContext.MinStartupPods, "minStartupPods", 0, "The number of pods which we need to see in 'Running' state with a 'Ready' condition of true, before we try running tests. This is useful in any cluster which needs some base pod-based services running before it can be used. If set to -1, no pods are checked and tests run straight away.")
-	flags.DurationVar(&TestContext.SystemPodsStartupTimeout, "system-pods-startup-timeout", 10*time.Minute, "Timeout for waiting for all system pods to be running before starting tests.")
-	flags.DurationVar(&TestContext.NodeSchedulableTimeout, "node-schedulable-timeout", 30*time.Minute, "Timeout for waiting for all nodes to be schedulable.")
-	flags.DurationVar(&TestContext.SystemDaemonsetStartupTimeout, "system-daemonsets-startup-timeout", 5*time.Minute, "Timeout for waiting for all system daemonsets to be ready.")
+	flags.DurationVar(&TestContext.timeouts.SystemPodsStartup, "system-pods-startup-timeout", TestContext.timeouts.SystemPodsStartup, "Timeout for waiting for all system pods to be running before starting tests.")
+	flags.DurationVar(&TestContext.timeouts.NodeSchedulable, "node-schedulable-timeout", TestContext.timeouts.NodeSchedulable, "Timeout for waiting for all nodes to be schedulable.")
+	flags.DurationVar(&TestContext.timeouts.SystemDaemonsetStartup, "system-daemonsets-startup-timeout", TestContext.timeouts.SystemDaemonsetStartup, "Timeout for waiting for all system daemonsets to be ready.")
 	flags.StringVar(&TestContext.EtcdUpgradeStorage, "etcd-upgrade-storage", "", "The storage version to upgrade to (either 'etcdv2' or 'etcdv3') if doing an etcd upgrade test.")
 	flags.StringVar(&TestContext.EtcdUpgradeVersion, "etcd-upgrade-version", "", "The etcd binary version to upgrade to (e.g., '3.0.14', '2.3.7') if doing an etcd upgrade test.")
 	flags.StringVar(&TestContext.GCEUpgradeScript, "gce-upgrade-script", "", "Script to use to upgrade a GCE cluster.")
@@ -455,6 +475,9 @@ func AfterReadingAllFlags(t *TestContextType) {
 
 	// These flags are not exposed via the normal command line flag set,
 	// therefore we have to use our own private one here.
+	if t.KubeTestRepoList != "" {
+		image.Init(t.KubeTestRepoList)
+	}
 	var fs flag.FlagSet
 	klog.InitFlags(&fs)
 	fs.Set("logtostderr", "false")
@@ -462,6 +485,22 @@ func AfterReadingAllFlags(t *TestContextType) {
 	fs.Set("one_output", "true")
 	fs.Set("stderrthreshold", "10" /* higher than any of the severities -> none pass the threshold */)
 	klog.SetOutput(ginkgo.GinkgoWriter)
+
+	if t.ListImages {
+		for _, v := range image.GetImageConfigs() {
+			fmt.Println(v.GetE2EImage())
+		}
+		os.Exit(0)
+	}
+
+	// Reconfigure gomega defaults. The poll interval should be suitable
+	// for most tests. The timeouts are more subjective and tests may want
+	// to override them, but these defaults are still better for E2E than the
+	// ones from Gomega (1s timeout, 10ms interval).
+	gomega.SetDefaultEventuallyPollingInterval(t.timeouts.Poll)
+	gomega.SetDefaultConsistentlyPollingInterval(t.timeouts.Poll)
+	gomega.SetDefaultEventuallyTimeout(t.timeouts.PodStart)
+	gomega.SetDefaultConsistentlyDuration(t.timeouts.PodStartShort)
 
 	// Only set a default host if one won't be supplied via kubeconfig
 	if len(t.Host) == 0 && len(t.KubeConfig) == 0 {
@@ -526,72 +565,46 @@ func AfterReadingAllFlags(t *TestContextType) {
 	}
 
 	if TestContext.ReportDir != "" {
-		ginkgo.ReportAfterSuite("Kubernetes e2e JUnit report", writeJUnitReport)
-	}
-}
-
-const (
-	// This is the traditional gomega.Format default of 4000 for an object
-	// dump plus some extra room for the message.
-	maxFailureMessageSize = 5000
-
-	truncatedMsg = "\n[... see output for full dump ...]\n"
-)
-
-// writeJUnitReport generates a JUnit file in the e2e report directory that is
-// shorter than the one normally written by `ginkgo --junit-report`. This is
-// needed because the full report can become too large for tools like Spyglass
-// (https://github.com/kubernetes/kubernetes/issues/111510).
-//
-// Users who want the full report can use `--junit-report`.
-func writeJUnitReport(report ginkgo.Report) {
-	trimmedReport := report
-	trimmedReport.SpecReports = nil
-	for _, specReport := range report.SpecReports {
-		// Remove details for any spec that hasn't failed. In Prow,
-		// the test output captured in build-log.txt has all of this
-		// information, so we don't need it in the XML.
-		if specReport.State != types.SpecStateFailed {
-			specReport.CapturedGinkgoWriterOutput = ""
-			specReport.CapturedStdOutErr = ""
-		} else {
-			// Truncate the failure message if it is too large.
-			msgLen := len(specReport.Failure.Message)
-			if msgLen > maxFailureMessageSize {
-				// Insert full message at the beginning where it is easy to find.
-				specReport.CapturedGinkgoWriterOutput =
-					"Full failure message:\n" +
-						specReport.Failure.Message + "\n\n" +
-						strings.Repeat("=", 70) + "\n\n" +
-						specReport.CapturedGinkgoWriterOutput
-				specReport.Failure.Message = specReport.Failure.Message[0:maxFailureMessageSize/2] + truncatedMsg + specReport.Failure.Message[msgLen-maxFailureMessageSize/2:msgLen]
+		// Create the directory before running the suite. If
+		// --report-dir is not unusable, we should report
+		// that as soon as possible. This will be done by each worker
+		// in parallel, so we will get "exists" error in most of them.
+		if err := os.MkdirAll(TestContext.ReportDir, 0777); err != nil && !os.IsExist(err) {
+			klog.Errorf("Create report dir: %v", err)
+			os.Exit(1)
+		}
+		ginkgoDir := path.Join(TestContext.ReportDir, "ginkgo")
+		if TestContext.ReportCompleteGinkgo || TestContext.ReportCompleteJUnit {
+			if err := os.MkdirAll(ginkgoDir, 0777); err != nil && !os.IsExist(err) {
+				klog.Errorf("Create <report-dir>/ginkgo: %v", err)
+				os.Exit(1)
 			}
 		}
 
-		// Remove report entries generated by ginkgo.By("doing
-		// something") because those are not useful (just have the
-		// start time) and cause Spyglass to show an additional "open
-		// stdout" button with a summary of the steps, which usually
-		// doesn't help. We don't remove all entries because other
-		// measurements also get reported this way.
-		//
-		// Removing the report entries is okay because message text was
-		// already added to the test output when ginkgo.By was called.
-		reportEntries := specReport.ReportEntries
-		specReport.ReportEntries = nil
-		for _, reportEntry := range reportEntries {
-			if reportEntry.Name != "By Step" {
-				specReport.ReportEntries = append(specReport.ReportEntries, reportEntry)
-			}
+		if TestContext.ReportCompleteGinkgo {
+			ginkgo.ReportAfterSuite("Ginkgo JSON report", func(report ginkgo.Report) {
+				ExpectNoError(reporters.GenerateJSONReport(report, path.Join(ginkgoDir, "report.json")))
+			})
+			ginkgo.ReportAfterSuite("JUnit XML report", func(report ginkgo.Report) {
+				ExpectNoError(reporters.GenerateJUnitReport(report, path.Join(ginkgoDir, "report.xml")))
+			})
 		}
 
-		trimmedReport.SpecReports = append(trimmedReport.SpecReports, specReport)
-	}
+		ginkgo.ReportAfterSuite("Kubernetes e2e JUnit report", func(report ginkgo.Report) {
+			// With Ginkgo v1, we used to write one file per
+			// parallel node. Now Ginkgo v2 automatically merges
+			// all results into a report for us. The 01 suffix is
+			// kept in case that users expect files to be called
+			// "junit_<prefix><number>.xml".
+			junitReport := path.Join(TestContext.ReportDir, "junit_"+TestContext.ReportPrefix+"01.xml")
 
-	// With Ginkgo v1, we used to write one file per parallel node. Now
-	// Ginkgo v2 automatically merges all results into a report for us. The
-	// 01 suffix is kept in case that users expect files to be called
-	// "junit_<prefix><number>.xml".
-	junitReport := path.Join(TestContext.ReportDir, "junit_"+TestContext.ReportPrefix+"01.xml")
-	reporters.GenerateJUnitReport(trimmedReport, junitReport)
+			// writeJUnitReport generates a JUnit file in the e2e
+			// report directory that is shorter than the one
+			// normally written by `ginkgo --junit-report`. This is
+			// needed because the full report can become too large
+			// for tools like Spyglass
+			// (https://github.com/kubernetes/kubernetes/issues/111510).
+			ExpectNoError(junit.WriteJUnitReport(report, junitReport))
+		})
+	}
 }

@@ -15,8 +15,8 @@ var (
 			`\[Feature:UserNamespacesStatelessPodsSupport\]`,
 			`\[Feature:ReadWriteOncePod\]`,
 			`\[Feature:SELinuxMountReadWriteOncePod\]`,
-			`\[Feature:add node log viewer\]`,
 			`\[Feature:PodSchedulingReadiness\]`,
+			`\[Feature:InPlacePodVerticalScaling\]`,
 		},
 		// tests for features that are not implemented in openshift
 		"[Disabled:Unimplemented]": {
@@ -66,9 +66,9 @@ var (
 
 			"RuntimeClass should reject",
 
-			`Services should implement service.kubernetes.io/headless`,       // requires SSH access to function, needs to be refactored
-			`ClusterDns \[Feature:Example\] should create pod that uses dns`, // doesn't use bindata, not part of kube test binary
-			`Simple pod should handle in-cluster config`,                     // kubectl cp doesn't work or is not preserving executable bit, we have this test already
+			`Services should implement service.kubernetes.io/headless`,                    // requires SSH access to function, needs to be refactored
+			`ClusterDns \[Feature:Example\] should create pod that uses dns`,              // doesn't use bindata, not part of kube test binary
+			`Simple pod should return command exit codes should handle in-cluster config`, // kubectl cp doesn't work or is not preserving executable bit, we have this test already
 
 			// TODO(node): configure the cri handler for the runtime class to make this work
 			"should run a Pod requesting a RuntimeClass with a configured handler",
@@ -145,10 +145,12 @@ var (
 			// https://issues.redhat.com/browse/WRKLDS-665
 			`\[sig-scheduling\] SchedulerPreemption \[Serial\] validates pod disruption condition is added to the preempted pod`,
 		},
-		// tests that need to be temporarily disabled while the rebase is in progress
+		// tests that need to be temporarily disabled while the rebase is in progress.
 		"[Disabled:RebaseInProgress]": {
-			`Kubectl client Kubectl events should show event when pod is created`,                                           // TODO: needs oc with 1.26 kubectl
-			`DNS HostNetwork should resolve DNS of partial qualified names for services on hostNetwork pods with dnsPolicy`, // TODO not working, yet not testing anything new
+			// https://issues.redhat.com/browse/OCPBUGS-12870
+			`DNS HostNetwork should resolve DNS of partial qualified names for services on hostNetwork pods with dnsPolicy`,
+			`\[sig-network\] Connectivity Pod Lifecycle should be able to connect to other Pod from a terminating Pod`, // TODO(network): simple test in k8s 1.27, needs investigation
+			`\[sig-cli\] Kubectl client Kubectl prune with applyset should apply and prune objects`,                    // TODO(workloads): alpha feature in k8s 1.27. It's failing with `error: unknown flag: --applyset`. Needs investigation
 		},
 		// tests that may work, but we don't support them
 		"[Disabled:Unsupported]": {

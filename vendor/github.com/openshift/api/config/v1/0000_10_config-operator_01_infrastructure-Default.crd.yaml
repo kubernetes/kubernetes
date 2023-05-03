@@ -79,17 +79,6 @@ spec:
                     external:
                       description: ExternalPlatformType represents generic infrastructure provider. Platform-specific components should be supplemented separately.
                       properties:
-                        cloudControllerManager:
-                          description: CloudControllerManager contains settings specific to the external Cloud Controller Manager (a.k.a. CCM or CPI)
-                          properties:
-                            state:
-                              description: "state determines whether or not an external Cloud Controller Manager is expected to be installed within the cluster. https://kubernetes.io/docs/tasks/administer-cluster/running-cloud-controller/#running-cloud-controller-manager \n When set to \"External\", new nodes will be tainted as uninitialized when created, preventing them from running workloads until they are initialized by the cloud controller manager. When omitted or set to \"None\", new nodes will be not tainted and no extra initialization from the cloud controller manager is expected."
-                              enum:
-                                - ""
-                                - External
-                                - None
-                              type: string
-                          type: object
                         platformName:
                           default: Unknown
                           description: PlatformName holds the arbitrary string representing the infrastructure provider name, expected to be set at the installation time. This field is solely for informational and reporting purposes and is not expected to be used for decision-making.
@@ -693,6 +682,22 @@ spec:
                             type: string
                           maxItems: 2
                           type: array
+                        loadBalancer:
+                          default:
+                            type: OpenShiftManagedDefault
+                          description: loadBalancer defines how the load balancer used by the cluster is configured.
+                          properties:
+                            type:
+                              default: OpenShiftManagedDefault
+                              description: type defines the type of load balancer used by the cluster on OpenStack platform which can be a user-managed or openshift-managed load balancer that is to be used for the OpenShift API and Ingress endpoints. When set to OpenShiftManagedDefault the static pods in charge of API and Ingress traffic load-balancing defined in the machine config operator will be deployed. When set to UserManaged these static pods will not be deployed and it is expected that the load balancer is configured out of band by the deployer. When omitted, this means no opinion and the platform is left to choose a reasonable default. The default value is OpenShiftManagedDefault.
+                              enum:
+                                - OpenShiftManagedDefault
+                                - UserManaged
+                              type: string
+                              x-kubernetes-validations:
+                                - message: type is immutable once set
+                                  rule: oldSelf == '' || self == oldSelf
+                          type: object
                         nodeDNSIP:
                           description: nodeDNSIP is the IP address for the internal DNS used by the nodes. Unlike the one managed by the DNS operator, `NodeDNSIP` provides name resolution for the nodes themselves. There is no DNS-as-a-service for OpenStack deployments. In order to minimize necessary changes to the datacenter DNS, a DNS service is hosted as a static pod to serve those hostnames to the nodes in the cluster.
                           type: string
@@ -736,6 +741,14 @@ spec:
                         region:
                           description: region holds the default Power VS region for new Power VS resources created by the cluster.
                           type: string
+                        resourceGroup:
+                          description: 'resourceGroup is the resource group name for new IBMCloud resources created for a cluster. The resource group specified here will be used by cluster-image-registry-operator to set up a COS Instance in IBMCloud for the cluster registry. More about resource groups can be found here: https://cloud.ibm.com/docs/account?topic=account-rgs. When omitted, the image registry operator won''t be able to configure storage, which results in the image registry cluster operator not being in an available state.'
+                          maxLength: 40
+                          pattern: ^[a-zA-Z0-9-_ ]+$
+                          type: string
+                          x-kubernetes-validations:
+                            - message: resourceGroup is immutable once set
+                              rule: oldSelf == '' || self == oldSelf
                         serviceEndpoints:
                           description: serviceEndpoints is a list of custom endpoints which will override the default service endpoints of a Power VS service.
                           items:
@@ -759,6 +772,9 @@ spec:
                           description: 'zone holds the default zone for the new Power VS resources created by the cluster. Note: Currently only single-zone OCP clusters are supported'
                           type: string
                       type: object
+                      x-kubernetes-validations:
+                        - message: cannot unset resourceGroup once set
+                          rule: '!has(oldSelf.resourceGroup) || has(self.resourceGroup)'
                     type:
                       description: "type is the underlying infrastructure provider for the cluster. This value controls whether infrastructure automation such as service load balancers, dynamic volume provisioning, machine creation and deletion, and other integrations are enabled. If None, no infrastructure automation is enabled. Allowed values are \"AWS\", \"Azure\", \"BareMetal\", \"GCP\", \"Libvirt\", \"OpenStack\", \"VSphere\", \"oVirt\", \"EquinixMetal\", \"PowerVS\", \"AlibabaCloud\", \"Nutanix\" and \"None\". Individual components may not support all platforms, and must handle unrecognized platforms as None if they do not support that platform. \n This value will be synced with to the `status.platform` and `status.platformStatus.type`. Currently this value cannot be changed once set."
                       enum:

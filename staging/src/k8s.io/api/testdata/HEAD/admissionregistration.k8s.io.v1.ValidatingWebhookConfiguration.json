@@ -107,6 +107,12 @@
       "timeoutSeconds": 7,
       "admissionReviewVersions": [
         "admissionReviewVersionsValue"
+      ],
+      "matchConditions": [
+        {
+          "name": "nameValue",
+          "expression": "expressionValue"
+        }
       ]
     }
   ]

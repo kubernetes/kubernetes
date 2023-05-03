@@ -107,7 +107,7 @@ func RunHostCmdWithRetries(ns, name, cmd string, interval, timeout time.Duration
 			return out, nil
 		}
 		if elapsed := time.Since(start); elapsed > timeout {
-			return out, fmt.Errorf("RunHostCmd still failed after %v: %v", elapsed, err)
+			return out, fmt.Errorf("RunHostCmd still failed after %v: %w", elapsed, err)
 		}
 		framework.Logf("Waiting %v to retry failed RunHostCmd: %v", interval, err)
 		time.Sleep(interval)
@@ -121,6 +121,15 @@ func LookForStringInLog(ns, podName, container, expectedString string, timeout t
 	})
 }
 
+// LookForStringInLogWithoutKubectl looks for the given string in the log of a specific pod container
+func LookForStringInLogWithoutKubectl(ctx context.Context, client clientset.Interface, ns string, podName string, container string, expectedString string, timeout time.Duration) (result string, err error) {
+	return lookForString(expectedString, timeout, func() string {
+		podLogs, err := e2epod.GetPodLogs(ctx, client, ns, podName, container)
+		framework.ExpectNoError(err)
+		return podLogs
+	})
+}
+
 // CreateEmptyFileOnPod creates empty file at given path on the pod.
 func CreateEmptyFileOnPod(namespace string, podName string, filePath string) error {
 	_, err := e2ekubectl.RunKubectl(namespace, "exec", podName, "--", "/bin/sh", "-c", fmt.Sprintf("touch %s", filePath))
@@ -128,8 +137,8 @@ func CreateEmptyFileOnPod(namespace string, podName string, filePath string) err
 }
 
 // DumpDebugInfo dumps debug info of tests.
-func DumpDebugInfo(c clientset.Interface, ns string) {
-	sl, _ := c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{LabelSelector: labels.Everything().String()})
+func DumpDebugInfo(ctx context.Context, c clientset.Interface, ns string) {
+	sl, _ := c.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{LabelSelector: labels.Everything().String()})
 	for _, s := range sl.Items {
 		desc, _ := e2ekubectl.RunKubectl(ns, "describe", "po", s.Name)
 		framework.Logf("\nOutput of kubectl describe %v:\n%v", s.Name, desc)
@@ -142,6 +151,7 @@ func DumpDebugInfo(c clientset.Interface, ns string) {
 // MatchContainerOutput creates a pod and waits for all it's containers to exit with success.
 // It then tests that the matcher with each expectedOutput matches the output of the specified container.
 func MatchContainerOutput(
+	ctx context.Context,
 	f *framework.Framework,
 	pod *v1.Pod,
 	containerName string,
@@ -153,25 +163,25 @@ func MatchContainerOutput(
 	}
 	podClient := e2epod.PodClientNS(f, ns)
 
-	createdPod := podClient.Create(pod)
+	createdPod := podClient.Create(ctx, pod)
 	defer func() {
 		ginkgo.By("delete the pod")
-		podClient.DeleteSync(createdPod.Name, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
+		podClient.DeleteSync(ctx, createdPod.Name, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
 	}()
 
 	// Wait for client pod to complete.
-	podErr := e2epod.WaitForPodSuccessInNamespaceTimeout(f.ClientSet, createdPod.Name, ns, f.Timeouts.PodStart)
+	podErr := e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, f.ClientSet, createdPod.Name, ns, f.Timeouts.PodStart)
 
 	// Grab its logs.  Get host first.
-	podStatus, err := podClient.Get(context.TODO(), createdPod.Name, metav1.GetOptions{})
+	podStatus, err := podClient.Get(ctx, createdPod.Name, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to get pod status: %v", err)
+		return fmt.Errorf("failed to get pod status: %w", err)
 	}
 
 	if podErr != nil {
 		// Pod failed. Dump all logs from all containers to see what's wrong
 		_ = apiv1pod.VisitContainers(&podStatus.Spec, apiv1pod.AllFeatureEnabledContainers(), func(c *v1.Container, containerType apiv1pod.ContainerType) bool {
-			logs, err := e2epod.GetPodLogs(f.ClientSet, ns, podStatus.Name, c.Name)
+			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, ns, podStatus.Name, c.Name)
 			if err != nil {
 				framework.Logf("Failed to get logs from node %q pod %q container %q: %v",
 					podStatus.Spec.NodeName, podStatus.Name, c.Name, err)
@@ -187,18 +197,18 @@ func MatchContainerOutput(
 		podStatus.Spec.NodeName, podStatus.Name, containerName, err)
 
 	// Sometimes the actual containers take a second to get started, try to get logs for 60s
-	logs, err := e2epod.GetPodLogs(f.ClientSet, ns, podStatus.Name, containerName)
+	logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, ns, podStatus.Name, containerName)
 	if err != nil {
 		framework.Logf("Failed to get logs from node %q pod %q container %q. %v",
 			podStatus.Spec.NodeName, podStatus.Name, containerName, err)
-		return fmt.Errorf("failed to get logs from %s for %s: %v", podStatus.Name, containerName, err)
+		return fmt.Errorf("failed to get logs from %s for %s: %w", podStatus.Name, containerName, err)
 	}
 
 	for _, expected := range expectedOutput {
 		m := matcher(expected)
 		matches, err := m.Match(logs)
 		if err != nil {
-			return fmt.Errorf("expected %q in container output: %v", expected, err)
+			return fmt.Errorf("expected %q in container output: %w", expected, err)
 		} else if !matches {
 			return fmt.Errorf("expected %q in container output: %s", expected, m.FailureMessage(logs))
 		}
@@ -210,21 +220,21 @@ func MatchContainerOutput(
 // TestContainerOutput runs the given pod in the given namespace and waits
 // for all of the containers in the podSpec to move into the 'Success' status, and tests
 // the specified container log against the given expected output using a substring matcher.
-func TestContainerOutput(f *framework.Framework, scenarioName string, pod *v1.Pod, containerIndex int, expectedOutput []string) {
-	TestContainerOutputMatcher(f, scenarioName, pod, containerIndex, expectedOutput, gomega.ContainSubstring)
+func TestContainerOutput(ctx context.Context, f *framework.Framework, scenarioName string, pod *v1.Pod, containerIndex int, expectedOutput []string) {
+	TestContainerOutputMatcher(ctx, f, scenarioName, pod, containerIndex, expectedOutput, gomega.ContainSubstring)
 }
 
 // TestContainerOutputRegexp runs the given pod in the given namespace and waits
 // for all of the containers in the podSpec to move into the 'Success' status, and tests
 // the specified container log against the given expected output using a regexp matcher.
-func TestContainerOutputRegexp(f *framework.Framework, scenarioName string, pod *v1.Pod, containerIndex int, expectedOutput []string) {
-	TestContainerOutputMatcher(f, scenarioName, pod, containerIndex, expectedOutput, gomega.MatchRegexp)
+func TestContainerOutputRegexp(ctx context.Context, f *framework.Framework, scenarioName string, pod *v1.Pod, containerIndex int, expectedOutput []string) {
+	TestContainerOutputMatcher(ctx, f, scenarioName, pod, containerIndex, expectedOutput, gomega.MatchRegexp)
 }
 
 // TestContainerOutputMatcher runs the given pod in the given namespace and waits
 // for all of the containers in the podSpec to move into the 'Success' status, and tests
 // the specified container log against the given expected output using the given matcher.
-func TestContainerOutputMatcher(f *framework.Framework,
+func TestContainerOutputMatcher(ctx context.Context, f *framework.Framework,
 	scenarioName string,
 	pod *v1.Pod,
 	containerIndex int,
@@ -234,5 +244,5 @@ func TestContainerOutputMatcher(f *framework.Framework,
 	if containerIndex < 0 || containerIndex >= len(pod.Spec.Containers) {
 		framework.Failf("Invalid container index: %d", containerIndex)
 	}
-	framework.ExpectNoError(MatchContainerOutput(f, pod, pod.Spec.Containers[containerIndex].Name, expectedOutput, matcher))
+	framework.ExpectNoError(MatchContainerOutput(ctx, f, pod, pod.Spec.Containers[containerIndex].Name, expectedOutput, matcher))
 }

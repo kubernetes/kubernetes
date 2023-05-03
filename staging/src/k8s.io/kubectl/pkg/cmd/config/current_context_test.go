@@ -18,7 +18,6 @@ package config
 
 import (
 	"bytes"
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
@@ -57,7 +56,7 @@ func TestCurrentContextWithUnsetContext(t *testing.T) {
 }
 
 func (test currentContextTest) run(t *testing.T) {
-	fakeKubeFile, err := ioutil.TempFile(os.TempDir(), "")
+	fakeKubeFile, err := os.CreateTemp(os.TempDir(), "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

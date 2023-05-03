@@ -11,6 +11,7 @@ import (
 // with apply.
 type StorageSpecApplyConfiguration struct {
 	OperatorSpecApplyConfiguration `json:",inline"`
+	VSphereStorageDriver           *operatorv1.StorageDriverType `json:"vsphereStorageDriver,omitempty"`
 }
 
 // StorageSpecApplyConfiguration constructs an declarative configuration of the StorageSpec type for use with
@@ -56,5 +57,13 @@ func (b *StorageSpecApplyConfiguration) WithUnsupportedConfigOverrides(value run
 // If called multiple times, the ObservedConfig field is set to the value of the last call.
 func (b *StorageSpecApplyConfiguration) WithObservedConfig(value runtime.RawExtension) *StorageSpecApplyConfiguration {
 	b.ObservedConfig = &value
+	return b
+}
+
+// WithVSphereStorageDriver sets the VSphereStorageDriver field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the VSphereStorageDriver field is set to the value of the last call.
+func (b *StorageSpecApplyConfiguration) WithVSphereStorageDriver(value operatorv1.StorageDriverType) *StorageSpecApplyConfiguration {
+	b.VSphereStorageDriver = &value
 	return b
 }

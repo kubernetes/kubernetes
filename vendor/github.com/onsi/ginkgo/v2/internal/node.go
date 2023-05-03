@@ -44,23 +44,23 @@ type Node struct {
 	SynchronizedAfterSuiteProc1Body              func(SpecContext)
 	SynchronizedAfterSuiteProc1BodyHasContext    bool
 
-	ReportEachBody       func(types.SpecReport)
-	ReportAfterSuiteBody func(types.Report)
+	ReportEachBody  func(types.SpecReport)
+	ReportSuiteBody func(types.Report)
 
-	MarkedFocus                     bool
-	MarkedPending                   bool
-	MarkedSerial                    bool
-	MarkedOrdered                   bool
-	MarkedOncePerOrdered            bool
-	MarkedSuppressProgressReporting bool
-	FlakeAttempts                   int
-	MustPassRepeatedly              int
-	Labels                          Labels
-	PollProgressAfter               time.Duration
-	PollProgressInterval            time.Duration
-	NodeTimeout                     time.Duration
-	SpecTimeout                     time.Duration
-	GracePeriod                     time.Duration
+	MarkedFocus             bool
+	MarkedPending           bool
+	MarkedSerial            bool
+	MarkedOrdered           bool
+	MarkedContinueOnFailure bool
+	MarkedOncePerOrdered    bool
+	FlakeAttempts           int
+	MustPassRepeatedly      int
+	Labels                  Labels
+	PollProgressAfter       time.Duration
+	PollProgressInterval    time.Duration
+	NodeTimeout             time.Duration
+	SpecTimeout             time.Duration
+	GracePeriod             time.Duration
 
 	NodeIDWhereCleanupWasGenerated uint
 }
@@ -70,6 +70,7 @@ type focusType bool
 type pendingType bool
 type serialType bool
 type orderedType bool
+type continueOnFailureType bool
 type honorsOrderedType bool
 type suppressProgressReporting bool
 
@@ -77,6 +78,7 @@ const Focus = focusType(true)
 const Pending = pendingType(true)
 const Serial = serialType(true)
 const Ordered = orderedType(true)
+const ContinueOnFailure = continueOnFailureType(true)
 const OncePerOrdered = honorsOrderedType(true)
 const SuppressProgressReporting = suppressProgressReporting(true)
 
@@ -90,6 +92,10 @@ type PollProgressAfter time.Duration
 type NodeTimeout time.Duration
 type SpecTimeout time.Duration
 type GracePeriod time.Duration
+
+func (l Labels) MatchesLabelFilter(query string) bool {
+	return types.MustParseLabelFilter(query)(l)
+}
 
 func UnionOfLabels(labels ...Labels) Labels {
 	out := Labels{}
@@ -133,6 +139,8 @@ func isDecoration(arg interface{}) bool {
 	case t == reflect.TypeOf(Serial):
 		return true
 	case t == reflect.TypeOf(Ordered):
+		return true
+	case t == reflect.TypeOf(ContinueOnFailure):
 		return true
 	case t == reflect.TypeOf(OncePerOrdered):
 		return true
@@ -242,16 +250,18 @@ func NewNode(deprecationTracker *types.DeprecationTracker, nodeType types.NodeTy
 			if !nodeType.Is(types.NodeTypeContainer) {
 				appendError(types.GinkgoErrors.InvalidDecoratorForNodeType(node.CodeLocation, nodeType, "Ordered"))
 			}
+		case t == reflect.TypeOf(ContinueOnFailure):
+			node.MarkedContinueOnFailure = bool(arg.(continueOnFailureType))
+			if !nodeType.Is(types.NodeTypeContainer) {
+				appendError(types.GinkgoErrors.InvalidDecoratorForNodeType(node.CodeLocation, nodeType, "ContinueOnFailure"))
+			}
 		case t == reflect.TypeOf(OncePerOrdered):
 			node.MarkedOncePerOrdered = bool(arg.(honorsOrderedType))
 			if !nodeType.Is(types.NodeTypeBeforeEach | types.NodeTypeJustBeforeEach | types.NodeTypeAfterEach | types.NodeTypeJustAfterEach) {
 				appendError(types.GinkgoErrors.InvalidDecoratorForNodeType(node.CodeLocation, nodeType, "OncePerOrdered"))
 			}
 		case t == reflect.TypeOf(SuppressProgressReporting):
-			node.MarkedSuppressProgressReporting = bool(arg.(suppressProgressReporting))
-			if nodeType.Is(types.NodeTypeContainer) {
-				appendError(types.GinkgoErrors.InvalidDecoratorForNodeType(node.CodeLocation, nodeType, "SuppressProgressReporting"))
-			}
+			deprecationTracker.TrackDeprecation(types.Deprecations.SuppressProgressReporting())
 		case t == reflect.TypeOf(FlakeAttempts(0)):
 			node.FlakeAttempts = int(arg.(FlakeAttempts))
 			if !nodeType.Is(types.NodeTypesForContainerAndIt) {
@@ -321,9 +331,9 @@ func NewNode(deprecationTracker *types.DeprecationTracker, nodeType types.NodeTy
 					trackedFunctionError = true
 					break
 				}
-			} else if nodeType.Is(types.NodeTypeReportAfterSuite) {
-				if node.ReportAfterSuiteBody == nil {
-					node.ReportAfterSuiteBody = arg.(func(types.Report))
+			} else if nodeType.Is(types.NodeTypeReportBeforeSuite | types.NodeTypeReportAfterSuite) {
+				if node.ReportSuiteBody == nil {
+					node.ReportSuiteBody = arg.(func(types.Report))
 				} else {
 					appendError(types.GinkgoErrors.MultipleBodyFunctions(node.CodeLocation, nodeType))
 					trackedFunctionError = true
@@ -390,13 +400,17 @@ func NewNode(deprecationTracker *types.DeprecationTracker, nodeType types.NodeTy
 		appendError(types.GinkgoErrors.InvalidDeclarationOfFocusedAndPending(node.CodeLocation, nodeType))
 	}
 
+	if node.MarkedContinueOnFailure && !node.MarkedOrdered {
+		appendError(types.GinkgoErrors.InvalidContinueOnFailureDecoration(node.CodeLocation))
+	}
+
 	hasContext := node.HasContext || node.SynchronizedAfterSuiteProc1BodyHasContext || node.SynchronizedAfterSuiteAllProcsBodyHasContext || node.SynchronizedBeforeSuiteProc1BodyHasContext || node.SynchronizedBeforeSuiteAllProcsBodyHasContext
 
 	if !hasContext && (node.NodeTimeout > 0 || node.SpecTimeout > 0 || node.GracePeriod > 0) && len(errors) == 0 {
 		appendError(types.GinkgoErrors.InvalidTimeoutOrGracePeriodForNonContextNode(node.CodeLocation, nodeType))
 	}
 
-	if !node.NodeType.Is(types.NodeTypeReportBeforeEach|types.NodeTypeReportAfterEach|types.NodeTypeSynchronizedBeforeSuite|types.NodeTypeSynchronizedAfterSuite|types.NodeTypeReportAfterSuite) && node.Body == nil && !node.MarkedPending && !trackedFunctionError {
+	if !node.NodeType.Is(types.NodeTypeReportBeforeEach|types.NodeTypeReportAfterEach|types.NodeTypeSynchronizedBeforeSuite|types.NodeTypeSynchronizedAfterSuite|types.NodeTypeReportBeforeSuite|types.NodeTypeReportAfterSuite) && node.Body == nil && !node.MarkedPending && !trackedFunctionError {
 		appendError(types.GinkgoErrors.MissingBodyFunction(node.CodeLocation, nodeType))
 	}
 

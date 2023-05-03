@@ -75,6 +75,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
+	podresourcesgrpc "k8s.io/kubernetes/pkg/kubelet/apis/podresources/grpc"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming"
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/portforward"
@@ -209,11 +210,20 @@ func ListenAndServeKubeletReadOnlyServer(
 	}
 }
 
+type PodResourcesProviders struct {
+	Pods    podresources.PodsProvider
+	Devices podresources.DevicesProvider
+	Cpus    podresources.CPUsProvider
+	Memory  podresources.MemoryProvider
+}
+
 // ListenAndServePodResources initializes a gRPC server to serve the PodResources service
-func ListenAndServePodResources(socket string, podsProvider podresources.PodsProvider, devicesProvider podresources.DevicesProvider, cpusProvider podresources.CPUsProvider, memoryProvider podresources.MemoryProvider) {
-	server := grpc.NewServer()
-	podresourcesapiv1alpha1.RegisterPodResourcesListerServer(server, podresources.NewV1alpha1PodResourcesServer(podsProvider, devicesProvider))
-	podresourcesapi.RegisterPodResourcesListerServer(server, podresources.NewV1PodResourcesServer(podsProvider, devicesProvider, cpusProvider, memoryProvider))
+func ListenAndServePodResources(socket string, providers podresources.PodResourcesProviders) {
+	server := grpc.NewServer(podresourcesgrpc.WithRateLimiter(podresourcesgrpc.DefaultQPS, podresourcesgrpc.DefaultBurstTokens))
+
+	podresourcesapiv1alpha1.RegisterPodResourcesListerServer(server, podresources.NewV1alpha1PodResourcesServer(providers))
+	podresourcesapi.RegisterPodResourcesListerServer(server, podresources.NewV1PodResourcesServer(providers))
+
 	l, err := util.CreateListener(socket)
 	if err != nil {
 		klog.ErrorS(err, "Failed to create listener for podResources endpoint")
@@ -281,7 +291,7 @@ func NewServer(
 		server.InstallDebuggingHandlers()
 		// To maintain backward compatibility serve logs and pprof only when enableDebuggingHandlers is also enabled
 		// see https://github.com/kubernetes/kubernetes/pull/87273
-		server.InstallSystemLogHandler(kubeCfg.EnableSystemLogHandler)
+		server.InstallSystemLogHandler(kubeCfg.EnableSystemLogHandler, kubeCfg.EnableSystemLogQuery)
 		server.InstallProfilingHandler(kubeCfg.EnableProfilingHandler, kubeCfg.EnableContentionProfiling)
 		server.InstallDebugFlagsHandler(kubeCfg.EnableDebugFlagsHandler)
 	} else {
@@ -563,7 +573,7 @@ func (s *Server) InstallDebuggingDisabledHandlers() {
 }
 
 // InstallSystemLogHandler registers the HTTP request patterns for logs endpoint.
-func (s *Server) InstallSystemLogHandler(enableSystemLogHandler bool) {
+func (s *Server) InstallSystemLogHandler(enableSystemLogHandler bool, enableSystemLogQuery bool) {
 	s.addMetricsBucketMatcher("logs")
 	if enableSystemLogHandler {
 		ws := new(restful.WebService)
@@ -571,10 +581,23 @@ func (s *Server) InstallSystemLogHandler(enableSystemLogHandler bool) {
 		ws.Route(ws.GET("").
 			To(s.getLogs).
 			Operation("getLogs"))
-		ws.Route(ws.GET("/{logpath:*}").
-			To(s.getLogs).
-			Operation("getLogs").
-			Param(ws.PathParameter("logpath", "path to the log").DataType("string")))
+		if !enableSystemLogQuery {
+			ws.Route(ws.GET("/{logpath:*}").
+				To(s.getLogs).
+				Operation("getLogs").
+				Param(ws.PathParameter("logpath", "path to the log").DataType("string")))
+		} else {
+			ws.Route(ws.GET("/{logpath:*}").
+				To(s.getLogs).
+				Operation("getLogs").
+				Param(ws.PathParameter("logpath", "path to the log").DataType("string")).
+				Param(ws.QueryParameter("query", "query specifies services(s) or files from which to return logs").DataType("string")).
+				Param(ws.QueryParameter("sinceTime", "sinceTime is an RFC3339 timestamp from which to show logs").DataType("string")).
+				Param(ws.QueryParameter("untilTime", "untilTime is an RFC3339 timestamp until which to show logs").DataType("string")).
+				Param(ws.QueryParameter("tailLines", "tailLines is used to retrieve the specified number of lines from the end of the log").DataType("string")).
+				Param(ws.QueryParameter("pattern", "pattern filters log entries by the provided regex pattern").DataType("string")).
+				Param(ws.QueryParameter("boot", "boot show messages from a specific system boot").DataType("string")))
+		}
 		s.restfulCont.Add(ws)
 	} else {
 		s.restfulCont.Handle(logsPath, getHandlerForDisabledEndpoint("logs endpoint is disabled."))
@@ -937,12 +960,14 @@ func (s *Server) checkpoint(request *restful.Request, response *restful.Response
 	for _, container := range pod.Spec.Containers {
 		if container.Name == containerName {
 			found = true
+			break
 		}
 	}
 	if !found {
 		for _, container := range pod.Spec.InitContainers {
 			if container.Name == containerName {
 				found = true
+				break
 			}
 		}
 	}
@@ -950,6 +975,7 @@ func (s *Server) checkpoint(request *restful.Request, response *restful.Response
 		for _, container := range pod.Spec.EphemeralContainers {
 			if container.Name == containerName {
 				found = true
+				break
 			}
 		}
 	}

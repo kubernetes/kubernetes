@@ -41,21 +41,17 @@ type FakeOpenAPIServer struct {
 // API server.
 //
 // specsPath - Give a path to some test data organized so that each GroupVersion
+// has its own OpenAPI V3 JSON file.
 //
-//	has its own OpenAPI V3 JSON file.
-//		i.e. apps/v1beta1 is stored in <specsPath>/apps/v1beta1.json
+//	i.e. apps/v1beta1 is stored in <specsPath>/apps/v1beta1.json
 func NewFakeOpenAPIV3Server(specsPath string) (*FakeOpenAPIServer, error) {
 	mux := &testMux{
 		counts: map[string]int{},
 	}
 	server := httptest.NewServer(mux)
 
-	openAPIVersionedService, err := handler3.NewOpenAPIService(nil)
-	if err != nil {
-		return nil, err
-	}
-
-	err = openAPIVersionedService.RegisterOpenAPIV3VersionedService("/openapi/v3", mux)
+	openAPIVersionedService := handler3.NewOpenAPIService()
+	err := openAPIVersionedService.RegisterOpenAPIV3VersionedService("/openapi/v3", mux)
 	if err != nil {
 		return nil, err
 	}

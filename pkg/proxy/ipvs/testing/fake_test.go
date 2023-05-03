@@ -17,33 +17,36 @@ limitations under the License.
 package testing
 
 import (
-	"reflect"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/proxy/ipvs"
 )
 
 func TestSetGetLocalAddresses(t *testing.T) {
-	fake := NewFakeNetlinkHandle()
+	fake := NewFakeNetlinkHandle(false)
+	_ = ipvs.NetLinkHandle(fake) // Ensure that the interface is honored
 	fake.SetLocalAddresses("eth0", "1.2.3.4")
-	expected := sets.NewString("1.2.3.4")
-	addr, _ := fake.GetLocalAddresses("eth0")
-	if !reflect.DeepEqual(expected, addr) {
+	var expected, addr sets.Set[string]
+	expected = sets.New("1.2.3.4")
+	addr, _ = fake.GetLocalAddresses("eth0")
+	if !addr.Equal(expected) {
 		t.Errorf("Unexpected mismatch, expected: %v, got: %v", expected, addr)
 	}
-	list, _ := fake.GetAllLocalAddresses()
-	if !reflect.DeepEqual(expected, list) {
-		t.Errorf("Unexpected mismatch, expected: %v, got: %v", expected, list)
+	addr, _ = fake.GetAllLocalAddresses()
+	if !addr.Equal(expected) {
+		t.Errorf("Unexpected mismatch, expected: %v, got: %v", expected, addr)
 	}
 	fake.SetLocalAddresses("lo", "127.0.0.1")
-	expected = sets.NewString()
+	expected = nil
 	addr, _ = fake.GetLocalAddresses("lo")
-	if !reflect.DeepEqual(expected, addr) {
+	if !addr.Equal(expected) {
 		t.Errorf("Unexpected mismatch, expected: %v, got: %v", expected, addr)
 	}
-	list, _ = fake.GetAllLocalAddresses()
-	expected = sets.NewString("1.2.3.4")
-	if !reflect.DeepEqual(expected, list) {
-		t.Errorf("Unexpected mismatch, expected: %v, got: %v", expected, list)
+	fake.SetLocalAddresses("kube-ipvs0", "4.3.2.1")
+	addr, _ = fake.GetAllLocalAddresses()
+	expected = sets.New("1.2.3.4", "4.3.2.1")
+	if !addr.Equal(expected) {
+		t.Errorf("Unexpected mismatch, expected: %v, got: %v", expected, addr)
 	}
 }

@@ -23,6 +23,7 @@ import (
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2/ktesting"
 	v1 "k8s.io/kube-scheduler/config/v1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
@@ -37,6 +38,9 @@ func TestApplyFeatureGates(t *testing.T) {
 	}{
 		{
 			name: "Feature gates disabled",
+			features: map[featuregate.Feature]bool{
+				features.PodSchedulingReadiness: false,
+			},
 			wantConfig: &v1.Plugins{
 				MultiPoint: v1.PluginSet{
 					Enabled: []v1.Plugin{
@@ -126,6 +130,7 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: names.NodeResourcesBalancedAllocation, Weight: pointer.Int32(1)},
 						{Name: names.ImageLocality, Weight: pointer.Int32(1)},
 						{Name: names.DefaultBinder},
+						{Name: names.SchedulingGates},
 					},
 				},
 			},
@@ -581,7 +586,8 @@ func TestMergePlugins(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			gotPlugins := mergePlugins(test.defaultPlugins, test.customPlugins)
+			logger, _ := ktesting.NewTestContext(t)
+			gotPlugins := mergePlugins(logger, test.defaultPlugins, test.customPlugins)
 			if d := cmp.Diff(test.expectedPlugins, gotPlugins); d != "" {
 				t.Fatalf("plugins mismatch (-want +got):\n%s", d)
 			}

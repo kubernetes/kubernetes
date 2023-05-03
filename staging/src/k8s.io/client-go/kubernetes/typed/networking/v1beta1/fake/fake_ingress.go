@@ -26,7 +26,6 @@ import (
 	v1beta1 "k8s.io/api/networking/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	networkingv1beta1 "k8s.io/client-go/applyconfigurations/networking/v1beta1"
@@ -39,9 +38,9 @@ type FakeIngresses struct {
 	ns   string
 }
 
-var ingressesResource = schema.GroupVersionResource{Group: "networking.k8s.io", Version: "v1beta1", Resource: "ingresses"}
+var ingressesResource = v1beta1.SchemeGroupVersion.WithResource("ingresses")
 
-var ingressesKind = schema.GroupVersionKind{Group: "networking.k8s.io", Version: "v1beta1", Kind: "Ingress"}
+var ingressesKind = v1beta1.SchemeGroupVersion.WithKind("Ingress")
 
 // Get takes name of the ingress, and returns the corresponding ingress object, and an error if there is any.
 func (c *FakeIngresses) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.Ingress, err error) {

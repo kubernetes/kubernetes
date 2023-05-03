@@ -86,6 +86,7 @@ func (t refGraph) applyConfigForType(field *types.Type) *types.Type {
 			return &types.Type{
 				Kind: types.Map,
 				Elem: t.applyConfigForType(field.Elem),
+				Key:  t.applyConfigForType(field.Key),
 			}
 		}
 		return field

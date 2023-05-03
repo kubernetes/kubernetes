@@ -28,7 +28,6 @@ import (
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
-	"github.com/Azure/go-autorest/autorest/to"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -36,6 +35,7 @@ import (
 	cloudvolume "k8s.io/cloud-provider/volume"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/pointer"
 )
 
 const (
@@ -128,7 +128,7 @@ func (c *ManagedDiskController) CreateManagedDisk(options *ManagedDiskOptions) (
 			}
 			diskIOPSReadWrite = int64(v)
 		}
-		diskProperties.DiskIOPSReadWrite = to.Int64Ptr(diskIOPSReadWrite)
+		diskProperties.DiskIOPSReadWrite = pointer.Int64(diskIOPSReadWrite)
 
 		diskMBpsReadWrite := int64(defaultDiskMBpsReadWrite)
 		if options.DiskMBpsReadWrite != "" {
@@ -138,7 +138,7 @@ func (c *ManagedDiskController) CreateManagedDisk(options *ManagedDiskOptions) (
 			}
 			diskMBpsReadWrite = int64(v)
 		}
-		diskProperties.DiskMBpsReadWrite = to.Int64Ptr(diskMBpsReadWrite)
+		diskProperties.DiskMBpsReadWrite = pointer.Int64(diskMBpsReadWrite)
 	} else {
 		if options.DiskIOPSReadWrite != "" {
 			return "", fmt.Errorf("AzureDisk - DiskIOPSReadWrite parameter is only applicable in UltraSSD_LRS disk type")
@@ -308,7 +308,7 @@ func (c *ManagedDiskController) ResizeDisk(diskURI string, oldSize resource.Quan
 	}
 
 	if result.DiskProperties.DiskState != compute.Unattached {
-		return oldSize, fmt.Errorf("azureDisk - disk resize is only supported on Unattached disk, current disk state: %s, already attached to %s", result.DiskProperties.DiskState, to.String(result.ManagedBy))
+		return oldSize, fmt.Errorf("azureDisk - disk resize is only supported on Unattached disk, current disk state: %s, already attached to %s", result.DiskProperties.DiskState, pointer.StringDeref(result.ManagedBy, ""))
 	}
 
 	diskParameter := compute.DiskUpdate{

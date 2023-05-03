@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	resourcev1alpha1 "k8s.io/api/resource/v1alpha1"
+	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -48,14 +48,14 @@ func TestResourceClaimIsForPod(t *testing.T) {
 			UID:       newUID(),
 		},
 	}
-	claimNoOwner := &resourcev1alpha1.ResourceClaim{
+	claimNoOwner := &resourcev1alpha2.ResourceClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "kube-system",
 			Name:      "claimNoOwner",
 			UID:       newUID(),
 		},
 	}
-	claimWithOwner := &resourcev1alpha1.ResourceClaim{
+	claimWithOwner := &resourcev1alpha2.ResourceClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "kube-system",
 			Name:      "claimNoOwner",
@@ -68,7 +68,7 @@ func TestResourceClaimIsForPod(t *testing.T) {
 			},
 		},
 	}
-	userClaimWithOwner := &resourcev1alpha1.ResourceClaim{
+	userClaimWithOwner := &resourcev1alpha2.ResourceClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "user-namespace",
 			Name:      "userClaimWithOwner",
@@ -84,7 +84,7 @@ func TestResourceClaimIsForPod(t *testing.T) {
 
 	testcases := map[string]struct {
 		pod           *v1.Pod
-		claim         *resourcev1alpha1.ResourceClaim
+		claim         *resourcev1alpha2.ResourceClaim
 		expectedError string
 	}{
 		"owned": {

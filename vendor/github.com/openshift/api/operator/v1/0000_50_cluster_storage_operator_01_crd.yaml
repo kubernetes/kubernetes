@@ -65,10 +65,25 @@ spec:
                     - Trace
                     - TraceAll
                 unsupportedConfigOverrides:
-                  description: 'unsupportedConfigOverrides holds a sparse config that will override any previously set options.  It only needs to be the fields to override it will end up overlaying in the following order: 1. hardcoded defaults 2. observedConfig 3. unsupportedConfigOverrides'
+                  description: unsupportedConfigOverrides overrides the final configuration that was computed by the operator. Red Hat does not support the use of this field. Misuse of this field could lead to unexpected behavior or conflict with other configuration options. Seek guidance from the Red Hat support before using this field. Use of this property blocks cluster upgrades, it must be removed before upgrading your cluster.
                   type: object
                   nullable: true
                   x-kubernetes-preserve-unknown-fields: true
+                vsphereStorageDriver:
+                  description: 'VSphereStorageDriver indicates the storage driver to use on VSphere clusters. Once this field is set to CSIWithMigrationDriver, it can not be changed. If this is empty, the platform will choose a good default, which may change over time without notice. The current default is CSIWithMigrationDriver and may not be changed. DEPRECATED: This field will be removed in a future release.'
+                  type: string
+                  enum:
+                    - ""
+                    - LegacyDeprecatedInTreeDriver
+                    - CSIWithMigrationDriver
+                  x-kubernetes-validations:
+                    - rule: oldSelf != "CSIWithMigrationDriver" || self == "CSIWithMigrationDriver"
+                      message: VSphereStorageDriver can not be changed once it is set to CSIWithMigrationDriver
+                    - rule: self != "LegacyDeprecatedInTreeDriver"
+                      message: VSphereStorageDriver can not be set to LegacyDeprecatedInTreeDriver
+              x-kubernetes-validations:
+                - rule: '!has(oldSelf.vsphereStorageDriver) || has(self.vsphereStorageDriver)'
+                  message: VSphereStorageDriver is required once set
             status:
               description: status holds observed values from the cluster. They may not be overridden.
               type: object

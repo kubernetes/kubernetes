@@ -62,12 +62,6 @@ const (
 	DefaultImagePullPolicy = corev1.PullIfNotPresent
 )
 
-var (
-	// DefaultAuditPolicyLogMaxAge is defined as a var so its address can be taken
-	// It is the number of days to store audit logs
-	DefaultAuditPolicyLogMaxAge = int32(2)
-)
-
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }

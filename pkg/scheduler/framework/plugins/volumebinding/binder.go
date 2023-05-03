@@ -45,6 +45,7 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding/metrics"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 // ConflictReason is used for the special strings which explain why
@@ -126,6 +127,8 @@ type InTreeToCSITranslator interface {
 //  1. The scheduler takes a Pod off the scheduler queue and processes it serially:
 //     a. Invokes all pre-filter plugins for the pod. GetPodVolumes() is invoked
 //     here, pod volume information will be saved in current scheduling cycle state for later use.
+//     If pod has bound immediate PVCs, GetEligibleNodes() is invoked to potentially reduce
+//     down the list of eligible nodes based on the bound PV's NodeAffinity (if any).
 //     b. Invokes all filter plugins, parallelized across nodes.  FindPodVolumes() is invoked here.
 //     c. Invokes all score plugins.  Future/TBD
 //     d. Selects the best node for the Pod.
@@ -144,9 +147,17 @@ type InTreeToCSITranslator interface {
 //  2. Once all the assume operations are done in e), the scheduler processes the next Pod in the scheduler queue
 //     while the actual binding operation occurs in the background.
 type SchedulerVolumeBinder interface {
-	// GetPodVolumes returns a pod's PVCs separated into bound, unbound with delayed binding (including provisioning)
-	// and unbound with immediate binding (including prebound)
-	GetPodVolumes(pod *v1.Pod) (boundClaims, unboundClaimsDelayBinding, unboundClaimsImmediate []*v1.PersistentVolumeClaim, err error)
+	// GetPodVolumeClaims returns a pod's PVCs separated into bound, unbound with delayed binding (including provisioning),
+	// unbound with immediate binding (including prebound) and PVs that belong to storage classes of unbound PVCs with delayed binding.
+	GetPodVolumeClaims(pod *v1.Pod) (podVolumeClaims *PodVolumeClaims, err error)
+
+	// GetEligibleNodes checks the existing bound claims of the pod to determine if the list of nodes can be
+	// potentially reduced down to a subset of eligible nodes based on the bound claims which then can be used
+	// in subsequent scheduling stages.
+	//
+	// If eligibleNodes is 'nil', then it indicates that such eligible node reduction cannot be made
+	// and all nodes should be considered.
+	GetEligibleNodes(boundClaims []*v1.PersistentVolumeClaim) (eligibleNodes sets.String)
 
 	// FindPodVolumes checks if all of a Pod's PVCs can be satisfied by the
 	// node and returns pod's volumes information.
@@ -161,7 +172,7 @@ type SchedulerVolumeBinder interface {
 	// for volumes that still need to be created.
 	//
 	// This function is called by the scheduler VolumeBinding plugin and can be called in parallel
-	FindPodVolumes(pod *v1.Pod, boundClaims, claimsToBind []*v1.PersistentVolumeClaim, node *v1.Node) (podVolumes *PodVolumes, reasons ConflictReasons, err error)
+	FindPodVolumes(pod *v1.Pod, podVolumeClaims *PodVolumeClaims, node *v1.Node) (podVolumes *PodVolumes, reasons ConflictReasons, err error)
 
 	// AssumePodVolumes will:
 	// 1. Take the PV matches for unbound PVCs and update the PV cache assuming
@@ -188,6 +199,17 @@ type SchedulerVolumeBinder interface {
 	BindPodVolumes(ctx context.Context, assumedPod *v1.Pod, podVolumes *PodVolumes) error
 }
 
+type PodVolumeClaims struct {
+	// boundClaims are the pod's bound PVCs.
+	boundClaims []*v1.PersistentVolumeClaim
+	// unboundClaimsDelayBinding are the pod's unbound with delayed binding (including provisioning) PVCs.
+	unboundClaimsDelayBinding []*v1.PersistentVolumeClaim
+	// unboundClaimsImmediate are the pod's unbound with immediate binding PVCs (i.e., supposed to be bound already) .
+	unboundClaimsImmediate []*v1.PersistentVolumeClaim
+	// unboundVolumesDelayBinding are PVs that belong to storage classes of the pod's unbound PVCs with delayed binding.
+	unboundVolumesDelayBinding map[string][]*v1.PersistentVolume
+}
+
 type volumeBinder struct {
 	kubeClient clientset.Interface
 
@@ -207,6 +229,8 @@ type volumeBinder struct {
 	csiDriverLister          storagelisters.CSIDriverLister
 	csiStorageCapacityLister storagelisters.CSIStorageCapacityLister
 }
+
+var _ SchedulerVolumeBinder = &volumeBinder{}
 
 // CapacityCheck contains additional parameters for NewVolumeBinder that
 // are only needed when checking volume sizes against available storage
@@ -248,9 +272,9 @@ func NewVolumeBinder(
 }
 
 // FindPodVolumes finds the matching PVs for PVCs and nodes to provision PVs
-// for the given pod and node. If the node does not fit, confilict reasons are
+// for the given pod and node. If the node does not fit, conflict reasons are
 // returned.
-func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, boundClaims, claimsToBind []*v1.PersistentVolumeClaim, node *v1.Node) (podVolumes *PodVolumes, reasons ConflictReasons, err error) {
+func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, podVolumeClaims *PodVolumeClaims, node *v1.Node) (podVolumes *PodVolumes, reasons ConflictReasons, err error) {
 	podVolumes = &PodVolumes{}
 
 	// Warning: Below log needs high verbosity as it can be printed several times (#60933).
@@ -305,22 +329,22 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, boundClaims, claimsToBind []*
 	}()
 
 	// Check PV node affinity on bound volumes
-	if len(boundClaims) > 0 {
-		boundVolumesSatisfied, boundPVsFound, err = b.checkBoundClaims(boundClaims, node, pod)
+	if len(podVolumeClaims.boundClaims) > 0 {
+		boundVolumesSatisfied, boundPVsFound, err = b.checkBoundClaims(podVolumeClaims.boundClaims, node, pod)
 		if err != nil {
 			return
 		}
 	}
 
 	// Find matching volumes and node for unbound claims
-	if len(claimsToBind) > 0 {
+	if len(podVolumeClaims.unboundClaimsDelayBinding) > 0 {
 		var (
 			claimsToFindMatching []*v1.PersistentVolumeClaim
 			claimsToProvision    []*v1.PersistentVolumeClaim
 		)
 
 		// Filter out claims to provision
-		for _, claim := range claimsToBind {
+		for _, claim := range podVolumeClaims.unboundClaimsDelayBinding {
 			if selectedNode, ok := claim.Annotations[volume.AnnSelectedNode]; ok {
 				if selectedNode != node.Name {
 					// Fast path, skip unmatched node.
@@ -336,7 +360,7 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, boundClaims, claimsToBind []*
 		// Find matching volumes
 		if len(claimsToFindMatching) > 0 {
 			var unboundClaims []*v1.PersistentVolumeClaim
-			unboundVolumesSatisfied, staticBindings, unboundClaims, err = b.findMatchingVolumes(pod, claimsToFindMatching, node)
+			unboundVolumesSatisfied, staticBindings, unboundClaims, err = b.findMatchingVolumes(pod, claimsToFindMatching, podVolumeClaims.unboundVolumesDelayBinding, node)
 			if err != nil {
 				return
 			}
@@ -353,6 +377,55 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, boundClaims, claimsToBind []*
 		}
 	}
 
+	return
+}
+
+// GetEligibleNodes checks the existing bound claims of the pod to determine if the list of nodes can be
+// potentially reduced down to a subset of eligible nodes based on the bound claims which then can be used
+// in subsequent scheduling stages.
+//
+// Returning 'nil' for eligibleNodes indicates that such eligible node reduction cannot be made and all nodes
+// should be considered.
+func (b *volumeBinder) GetEligibleNodes(boundClaims []*v1.PersistentVolumeClaim) (eligibleNodes sets.String) {
+	if len(boundClaims) == 0 {
+		return
+	}
+
+	var errs []error
+	for _, pvc := range boundClaims {
+		pvName := pvc.Spec.VolumeName
+		pv, err := b.pvCache.GetPV(pvName)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+
+		// if the PersistentVolume is local and has node affinity matching specific node(s),
+		// add them to the eligible nodes
+		nodeNames := util.GetLocalPersistentVolumeNodeNames(pv)
+		if len(nodeNames) != 0 {
+			// on the first found list of eligible nodes for the local PersistentVolume,
+			// insert to the eligible node set.
+			if eligibleNodes == nil {
+				eligibleNodes = sets.NewString(nodeNames...)
+			} else {
+				// for subsequent finding of eligible nodes for the local PersistentVolume,
+				// take the intersection of the nodes with the existing eligible nodes
+				// for cases if PV1 has node affinity to node1 and PV2 has node affinity to node2,
+				// then the eligible node list should be empty.
+				eligibleNodes = eligibleNodes.Intersection(sets.NewString(nodeNames...))
+			}
+		}
+	}
+
+	if len(errs) > 0 {
+		klog.V(4).InfoS("GetEligibleNodes: one or more error occurred finding eligible nodes", "error", errs)
+		return nil
+	}
+
+	if eligibleNodes != nil {
+		klog.V(4).InfoS("GetEligibleNodes: reduced down eligible nodes", "nodes", eligibleNodes)
+	}
 	return
 }
 
@@ -500,16 +573,15 @@ func (b *volumeBinder) bindAPIUpdate(ctx context.Context, pod *v1.Pod, bindings 
 	// Do the actual prebinding. Let the PV controller take care of the rest
 	// There is no API rollback if the actual binding fails
 	for _, binding = range bindings {
-		klog.V(5).InfoS("bindAPIUpdate: binding PV to PVC", "pod", klog.KObj(pod), "PV", klog.KObj(binding.pv), "PVC", klog.KObj(binding.pvc))
 		// TODO: does it hurt if we make an api call and nothing needs to be updated?
-		klog.V(2).InfoS("Claim bound to volume", "PVC", klog.KObj(binding.pvc), "PV", klog.KObj(binding.pv))
+		klog.V(5).InfoS("Updating PersistentVolume: binding to claim", "pod", klog.KObj(pod), "PV", klog.KObj(binding.pv), "PVC", klog.KObj(binding.pvc))
 		newPV, err := b.kubeClient.CoreV1().PersistentVolumes().Update(ctx, binding.pv, metav1.UpdateOptions{})
 		if err != nil {
-			klog.V(4).InfoS("Updating PersistentVolume: binding to claim failed", "PV", klog.KObj(binding.pv), "PVC", klog.KObj(binding.pvc), "err", err)
+			klog.V(4).InfoS("Updating PersistentVolume: binding to claim failed", "pod", klog.KObj(pod), "PV", klog.KObj(binding.pv), "PVC", klog.KObj(binding.pvc), "err", err)
 			return err
 		}
 
-		klog.V(4).InfoS("Updating PersistentVolume: bound to claim", "PV", klog.KObj(binding.pv), "PVC", klog.KObj(binding.pvc))
+		klog.V(2).InfoS("Updated PersistentVolume with claim. Waiting for binding to complete", "pod", klog.KObj(pod), "PV", klog.KObj(binding.pv), "PVC", klog.KObj(binding.pvc))
 		// Save updated object from apiserver for later checking.
 		binding.pv = newPV
 		lastProcessedBinding++
@@ -672,7 +744,7 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*BindingInfo, claim
 	}
 
 	// All pvs and pvcs that we operated on are bound
-	klog.V(4).InfoS("All PVCs for pod are bound", "pod", klog.KObj(pod))
+	klog.V(2).InfoS("All PVCs for pod are bound", "pod", klog.KObj(pod))
 	return true, nil
 }
 
@@ -742,40 +814,49 @@ func (b *volumeBinder) arePodVolumesBound(pod *v1.Pod) bool {
 	return true
 }
 
-// GetPodVolumes returns a pod's PVCs separated into bound, unbound with delayed binding (including provisioning)
-// and unbound with immediate binding (including prebound)
-func (b *volumeBinder) GetPodVolumes(pod *v1.Pod) (boundClaims []*v1.PersistentVolumeClaim, unboundClaimsDelayBinding []*v1.PersistentVolumeClaim, unboundClaimsImmediate []*v1.PersistentVolumeClaim, err error) {
-	boundClaims = []*v1.PersistentVolumeClaim{}
-	unboundClaimsImmediate = []*v1.PersistentVolumeClaim{}
-	unboundClaimsDelayBinding = []*v1.PersistentVolumeClaim{}
+// GetPodVolumeClaims returns a pod's PVCs separated into bound, unbound with delayed binding (including provisioning),
+// unbound with immediate binding (including prebound) and PVs that belong to storage classes of unbound PVCs with delayed binding.
+func (b *volumeBinder) GetPodVolumeClaims(pod *v1.Pod) (podVolumeClaims *PodVolumeClaims, err error) {
+	podVolumeClaims = &PodVolumeClaims{
+		boundClaims:               []*v1.PersistentVolumeClaim{},
+		unboundClaimsImmediate:    []*v1.PersistentVolumeClaim{},
+		unboundClaimsDelayBinding: []*v1.PersistentVolumeClaim{},
+	}
 
 	for _, vol := range pod.Spec.Volumes {
 		volumeBound, pvc, err := b.isVolumeBound(pod, &vol)
 		if err != nil {
-			return nil, nil, nil, err
+			return podVolumeClaims, err
 		}
 		if pvc == nil {
 			continue
 		}
 		if volumeBound {
-			boundClaims = append(boundClaims, pvc)
+			podVolumeClaims.boundClaims = append(podVolumeClaims.boundClaims, pvc)
 		} else {
 			delayBindingMode, err := volume.IsDelayBindingMode(pvc, b.classLister)
 			if err != nil {
-				return nil, nil, nil, err
+				return podVolumeClaims, err
 			}
 			// Prebound PVCs are treated as unbound immediate binding
 			if delayBindingMode && pvc.Spec.VolumeName == "" {
 				// Scheduler path
-				unboundClaimsDelayBinding = append(unboundClaimsDelayBinding, pvc)
+				podVolumeClaims.unboundClaimsDelayBinding = append(podVolumeClaims.unboundClaimsDelayBinding, pvc)
 			} else {
 				// !delayBindingMode || pvc.Spec.VolumeName != ""
 				// Immediate binding should have already been bound
-				unboundClaimsImmediate = append(unboundClaimsImmediate, pvc)
+				podVolumeClaims.unboundClaimsImmediate = append(podVolumeClaims.unboundClaimsImmediate, pvc)
 			}
 		}
 	}
-	return boundClaims, unboundClaimsDelayBinding, unboundClaimsImmediate, nil
+
+	podVolumeClaims.unboundVolumesDelayBinding = map[string][]*v1.PersistentVolume{}
+	for _, pvc := range podVolumeClaims.unboundClaimsDelayBinding {
+		// Get storage class name from each PVC
+		storageClassName := volume.GetPersistentVolumeClaimClass(pvc)
+		podVolumeClaims.unboundVolumesDelayBinding[storageClassName] = b.pvCache.ListPVs(storageClassName)
+	}
+	return podVolumeClaims, nil
 }
 
 func (b *volumeBinder) checkBoundClaims(claims []*v1.PersistentVolumeClaim, node *v1.Node, pod *v1.Pod) (bool, bool, error) {
@@ -814,7 +895,7 @@ func (b *volumeBinder) checkBoundClaims(claims []*v1.PersistentVolumeClaim, node
 
 // findMatchingVolumes tries to find matching volumes for given claims,
 // and return unbound claims for further provision.
-func (b *volumeBinder) findMatchingVolumes(pod *v1.Pod, claimsToBind []*v1.PersistentVolumeClaim, node *v1.Node) (foundMatches bool, bindings []*BindingInfo, unboundClaims []*v1.PersistentVolumeClaim, err error) {
+func (b *volumeBinder) findMatchingVolumes(pod *v1.Pod, claimsToBind []*v1.PersistentVolumeClaim, unboundVolumesDelayBinding map[string][]*v1.PersistentVolume, node *v1.Node) (foundMatches bool, bindings []*BindingInfo, unboundClaims []*v1.PersistentVolumeClaim, err error) {
 	// Sort all the claims by increasing size request to get the smallest fits
 	sort.Sort(byPVCSize(claimsToBind))
 
@@ -825,10 +906,10 @@ func (b *volumeBinder) findMatchingVolumes(pod *v1.Pod, claimsToBind []*v1.Persi
 	for _, pvc := range claimsToBind {
 		// Get storage class name from each PVC
 		storageClassName := volume.GetPersistentVolumeClaimClass(pvc)
-		allPVs := b.pvCache.ListPVs(storageClassName)
+		pvs := unboundVolumesDelayBinding[storageClassName]
 
 		// Find a matching PV
-		pv, err := volume.FindMatchingVolume(pvc, allPVs, node, chosenPVs, true)
+		pv, err := volume.FindMatchingVolume(pvc, pvs, node, chosenPVs, true)
 		if err != nil {
 			return false, nil, nil, err
 		}
@@ -1005,11 +1086,11 @@ func (a byPVCSize) Less(i, j int) bool {
 func isCSIMigrationOnForPlugin(pluginName string) bool {
 	switch pluginName {
 	case csiplugins.AWSEBSInTreePluginName:
-		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAWS)
+		return true
 	case csiplugins.GCEPDInTreePluginName:
 		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationGCE)
 	case csiplugins.AzureDiskInTreePluginName:
-		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureDisk)
+		return true
 	case csiplugins.CinderInTreePluginName:
 		return true
 	case csiplugins.PortworxVolumePluginName:

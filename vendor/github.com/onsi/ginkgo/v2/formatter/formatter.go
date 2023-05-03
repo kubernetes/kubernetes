@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -50,6 +51,37 @@ func NewWithNoColorBool(noColor bool) Formatter {
 }
 
 func New(colorMode ColorMode) Formatter {
+	colorAliases := map[string]int{
+		"black":   0,
+		"red":     1,
+		"green":   2,
+		"yellow":  3,
+		"blue":    4,
+		"magenta": 5,
+		"cyan":    6,
+		"white":   7,
+	}
+	for colorAlias, n := range colorAliases {
+		colorAliases[fmt.Sprintf("bright-%s", colorAlias)] = n + 8
+	}
+
+	getColor := func(color, defaultEscapeCode string) string {
+		color = strings.ToUpper(strings.ReplaceAll(color, "-", "_"))
+		envVar := fmt.Sprintf("GINKGO_CLI_COLOR_%s", color)
+		envVarColor := os.Getenv(envVar)
+		if envVarColor == "" {
+			return defaultEscapeCode
+		}
+		if colorCode, ok := colorAliases[envVarColor]; ok {
+			return fmt.Sprintf("\x1b[38;5;%dm", colorCode)
+		}
+		colorCode, err := strconv.Atoi(envVarColor)
+		if err != nil || colorCode < 0 || colorCode > 255 {
+			return defaultEscapeCode
+		}
+		return fmt.Sprintf("\x1b[38;5;%dm", colorCode)
+	}
+
 	f := Formatter{
 		ColorMode: colorMode,
 		colors: map[string]string{
@@ -57,18 +89,18 @@ func New(colorMode ColorMode) Formatter {
 			"bold":      "\x1b[1m",
 			"underline": "\x1b[4m",
 
-			"red":          "\x1b[38;5;9m",
-			"orange":       "\x1b[38;5;214m",
-			"coral":        "\x1b[38;5;204m",
-			"magenta":      "\x1b[38;5;13m",
-			"green":        "\x1b[38;5;10m",
-			"dark-green":   "\x1b[38;5;28m",
-			"yellow":       "\x1b[38;5;11m",
-			"light-yellow": "\x1b[38;5;228m",
-			"cyan":         "\x1b[38;5;14m",
-			"gray":         "\x1b[38;5;243m",
-			"light-gray":   "\x1b[38;5;246m",
-			"blue":         "\x1b[38;5;12m",
+			"red":          getColor("red", "\x1b[38;5;9m"),
+			"orange":       getColor("orange", "\x1b[38;5;214m"),
+			"coral":        getColor("coral", "\x1b[38;5;204m"),
+			"magenta":      getColor("magenta", "\x1b[38;5;13m"),
+			"green":        getColor("green", "\x1b[38;5;10m"),
+			"dark-green":   getColor("dark-green", "\x1b[38;5;28m"),
+			"yellow":       getColor("yellow", "\x1b[38;5;11m"),
+			"light-yellow": getColor("light-yellow", "\x1b[38;5;228m"),
+			"cyan":         getColor("cyan", "\x1b[38;5;14m"),
+			"gray":         getColor("gray", "\x1b[38;5;243m"),
+			"light-gray":   getColor("light-gray", "\x1b[38;5;246m"),
+			"blue":         getColor("blue", "\x1b[38;5;12m"),
 		},
 	}
 	colors := []string{}
@@ -88,7 +120,10 @@ func (f Formatter) Fi(indentation uint, format string, args ...interface{}) stri
 }
 
 func (f Formatter) Fiw(indentation uint, maxWidth uint, format string, args ...interface{}) string {
-	out := fmt.Sprintf(f.style(format), args...)
+	out := f.style(format)
+	if len(args) > 0 {
+		out = fmt.Sprintf(out, args...)
+	}
 
 	if indentation == 0 && maxWidth == 0 {
 		return out

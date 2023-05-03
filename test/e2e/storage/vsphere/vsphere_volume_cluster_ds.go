@@ -52,12 +52,12 @@ var _ = utils.SIGDescribe("Volume Provisioning On Clustered Datastore [Feature:v
 		nodeInfo         *NodeInfo
 	)
 
-	ginkgo.BeforeEach(func() {
+	ginkgo.BeforeEach(func(ctx context.Context) {
 		e2eskipper.SkipUnlessProviderIs("vsphere")
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
-		nodeInfo = GetReadySchedulableRandomNodeInfo(client)
+		nodeInfo = GetReadySchedulableRandomNodeInfo(ctx, client)
 		scParameters = make(map[string]string)
 		clusterDatastore = GetAndExpectStringEnvVar(VCPClusterDatastore)
 	})
@@ -72,7 +72,7 @@ var _ = utils.SIGDescribe("Volume Provisioning On Clustered Datastore [Feature:v
 		6. Delete the volume
 	*/
 
-	ginkgo.It("verify static provisioning on clustered datastore", func() {
+	ginkgo.It("verify static provisioning on clustered datastore", func(ctx context.Context) {
 		var volumePath string
 
 		ginkgo.By("creating a test vsphere volume")
@@ -92,25 +92,25 @@ var _ = utils.SIGDescribe("Volume Provisioning On Clustered Datastore [Feature:v
 		podspec := getVSpherePodSpecWithVolumePaths([]string{volumePath}, nil, nil)
 
 		ginkgo.By("Creating pod")
-		pod, err := client.CoreV1().Pods(namespace).Create(context.TODO(), podspec, metav1.CreateOptions{})
+		pod, err := client.CoreV1().Pods(namespace).Create(ctx, podspec, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		ginkgo.By("Waiting for pod to be ready")
-		gomega.Expect(e2epod.WaitForPodNameRunningInNamespace(client, pod.Name, namespace)).To(gomega.Succeed())
+		gomega.Expect(e2epod.WaitForPodNameRunningInNamespace(ctx, client, pod.Name, namespace)).To(gomega.Succeed())
 
 		// get fresh pod info
-		pod, err = client.CoreV1().Pods(namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+		pod, err = client.CoreV1().Pods(namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		nodeName := pod.Spec.NodeName
 
 		ginkgo.By("Verifying volume is attached")
-		expectVolumeToBeAttached(nodeName, volumePath)
+		expectVolumeToBeAttached(ctx, nodeName, volumePath)
 
 		ginkgo.By("Deleting pod")
-		err = e2epod.DeletePodWithWait(client, pod)
+		err = e2epod.DeletePodWithWait(ctx, client, pod)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Waiting for volumes to be detached from the node")
-		err = waitForVSphereDiskToDetach(volumePath, nodeName)
+		err = waitForVSphereDiskToDetach(ctx, volumePath, nodeName)
 		framework.ExpectNoError(err)
 	})
 
@@ -119,9 +119,9 @@ var _ = utils.SIGDescribe("Volume Provisioning On Clustered Datastore [Feature:v
 		1. Create storage class parameter and specify datastore to be a clustered datastore name
 		2. invokeValidPolicyTest - util to do e2e dynamic provision test
 	*/
-	ginkgo.It("verify dynamic provision with default parameter on clustered datastore", func() {
+	ginkgo.It("verify dynamic provision with default parameter on clustered datastore", func(ctx context.Context) {
 		scParameters[Datastore] = clusterDatastore
-		invokeValidPolicyTest(f, client, namespace, scParameters)
+		invokeValidPolicyTest(ctx, f, client, namespace, scParameters)
 	})
 
 	/*
@@ -129,9 +129,9 @@ var _ = utils.SIGDescribe("Volume Provisioning On Clustered Datastore [Feature:v
 		1. Create storage class parameter and specify storage policy to be a tag based spbm policy
 		2. invokeValidPolicyTest - util to do e2e dynamic provision test
 	*/
-	ginkgo.It("verify dynamic provision with spbm policy on clustered datastore", func() {
+	ginkgo.It("verify dynamic provision with spbm policy on clustered datastore", func(ctx context.Context) {
 		policyDatastoreCluster := GetAndExpectStringEnvVar(SPBMPolicyDataStoreCluster)
 		scParameters[SpbmStoragePolicy] = policyDatastoreCluster
-		invokeValidPolicyTest(f, client, namespace, scParameters)
+		invokeValidPolicyTest(ctx, f, client, namespace, scParameters)
 	})
 })

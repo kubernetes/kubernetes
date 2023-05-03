@@ -592,7 +592,7 @@ func (plugin *rbdPlugin) getDeviceNameFromOldMountPath(mounter mount.Interface, 
 	return "", fmt.Errorf("can't find source name from mounted path: %s", mountPath)
 }
 
-func (plugin *rbdPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
+func (plugin *rbdPlugin) NewDeleter(logger klog.Logger, spec *volume.Spec) (volume.Deleter, error) {
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.RBD == nil {
 		return nil, fmt.Errorf("spec.PersistentVolume.Spec.RBD is nil")
 	}
@@ -615,7 +615,7 @@ func (plugin *rbdPlugin) newDeleterInternal(spec *volume.Spec, admin, secret str
 		}}, nil
 }
 
-func (plugin *rbdPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
+func (plugin *rbdPlugin) NewProvisioner(logger klog.Logger, options volume.VolumeOptions) (volume.Provisioner, error) {
 	return plugin.newProvisionerInternal(options, &rbdUtil{})
 }
 

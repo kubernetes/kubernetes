@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -30,6 +31,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/cache/synctrack"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 )
@@ -45,6 +47,11 @@ type controller[T runtime.Object] struct {
 	reconciler func(namespace, name string, newObj T) error
 
 	options ControllerOptions
+
+	// must hold a func() bool or nil
+	notificationsDelivered atomic.Value
+
+	hasProcessed synctrack.AsyncTracker[string]
 }
 
 type ControllerOptions struct {
@@ -69,12 +76,20 @@ func NewController[T runtime.Object](
 		options.Name = fmt.Sprintf("%T-controller", *new(T))
 	}
 
-	return &controller[T]{
+	c := &controller[T]{
 		options:    options,
 		informer:   informer,
 		reconciler: reconciler,
 		queue:      nil,
 	}
+	c.hasProcessed.UpstreamHasSynced = func() bool {
+		f := c.notificationsDelivered.Load()
+		if f == nil {
+			return false
+		}
+		return f.(func() bool)()
+	}
+	return c
 }
 
 // Runs the controller and returns an error explaining why running was stopped.
@@ -92,20 +107,22 @@ func (c *controller[T]) Run(ctx context.Context) error {
 	// would never shut down the workqueue
 	defer c.queue.ShutDown()
 
-	enqueue := func(obj interface{}) {
+	enqueue := func(obj interface{}, isInInitialList bool) {
 		var key string
 		var err error
 		if key, err = cache.DeletionHandlingMetaNamespaceKeyFunc(obj); err != nil {
 			utilruntime.HandleError(err)
 			return
 		}
+		if isInInitialList {
+			c.hasProcessed.Start(key)
+		}
+
 		c.queue.Add(key)
 	}
 
-	registration, err := c.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			enqueue(obj)
-		},
+	registration, err := c.informer.AddEventHandler(cache.ResourceEventHandlerDetailedFuncs{
+		AddFunc: enqueue,
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			oldMeta, err1 := meta.Accessor(oldObj)
 			newMeta, err2 := meta.Accessor(newObj)
@@ -126,11 +143,11 @@ func (c *controller[T]) Run(ctx context.Context) error {
 				return
 			}
 
-			enqueue(newObj)
+			enqueue(newObj, false)
 		},
 		DeleteFunc: func(obj interface{}) {
 			// Enqueue
-			enqueue(obj)
+			enqueue(obj, false)
 		},
 	})
 
@@ -139,9 +156,12 @@ func (c *controller[T]) Run(ctx context.Context) error {
 		return err
 	}
 
+	c.notificationsDelivered.Store(registration.HasSynced)
+
 	// Make sure event handler is removed from informer in case return early from
 	// an error
 	defer func() {
+		c.notificationsDelivered.Store(func() bool { return false })
 		// Remove event handler and Handle Error here. Error should only be raised
 		// for improper usage of event handler API.
 		if err := c.informer.RemoveEventHandler(registration); err != nil {
@@ -166,8 +186,8 @@ func (c *controller[T]) Run(ctx context.Context) error {
 	for i := uint(0); i < c.options.Workers; i++ {
 		waitGroup.Add(1)
 		go func() {
+			defer waitGroup.Done()
 			wait.Until(c.runWorker, time.Second, ctx.Done())
-			waitGroup.Done()
 		}()
 	}
 
@@ -188,7 +208,7 @@ func (c *controller[T]) Run(ctx context.Context) error {
 }
 
 func (c *controller[T]) HasSynced() bool {
-	return c.informer.HasSynced()
+	return c.hasProcessed.HasSynced()
 }
 
 func (c *controller[T]) runWorker() {
@@ -220,6 +240,7 @@ func (c *controller[T]) runWorker() {
 				// but the key is invalid so there is no point in doing that)
 				return fmt.Errorf("expected string in workqueue but got %#v", obj)
 			}
+			defer c.hasProcessed.Finished(key)
 
 			if err := c.reconcile(key); err != nil {
 				// Put the item back on the workqueue to handle any transient errors.

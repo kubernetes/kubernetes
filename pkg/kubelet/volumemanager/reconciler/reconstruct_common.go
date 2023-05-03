@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"path"
 	"path/filepath"
 	"time"
 
@@ -29,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/config"
+	"k8s.io/kubernetes/pkg/kubelet/volumemanager/metrics"
 	volumepkg "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
@@ -72,10 +72,14 @@ type globalVolumeInfo struct {
 }
 
 func (rc *reconciler) updateLastSyncTime() {
+	rc.timeOfLastSyncLock.Lock()
+	defer rc.timeOfLastSyncLock.Unlock()
 	rc.timeOfLastSync = time.Now()
 }
 
 func (rc *reconciler) StatesHasBeenSynced() bool {
+	rc.timeOfLastSyncLock.Lock()
+	defer rc.timeOfLastSyncLock.Unlock()
 	return !rc.timeOfLastSync.IsZero()
 }
 
@@ -95,10 +99,12 @@ func (rc *reconciler) cleanupMounts(volume podVolume) {
 		PluginName:          volume.pluginName,
 		PodUID:              types.UID(volume.podName),
 	}
+	metrics.ForceCleanedFailedVolumeOperationsTotal.Inc()
 	// TODO: Currently cleanupMounts only includes UnmountVolume operation. In the next PR, we will add
 	// to unmount both volume and device in the same routine.
 	err := rc.operationExecutor.UnmountVolume(mountedVolume, rc.actualStateOfWorld, rc.kubeletPodsDir)
 	if err != nil {
+		metrics.ForceCleanedFailedVolumeOperationsErrorsTotal.Inc()
 		klog.ErrorS(err, mountedVolume.GenerateErrorDetailed("volumeHandler.UnmountVolumeHandler for UnmountVolume failed", err).Error())
 		return
 	}
@@ -133,16 +139,16 @@ func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
 			continue
 		}
 		podName := podsDirInfo[i].Name()
-		podDir := path.Join(podDir, podName)
+		podDir := filepath.Join(podDir, podName)
 
 		// Find filesystem volume information
-		// ex. filesystem volume: /pods/{podUid}/volume/{escapeQualifiedPluginName}/{volumeName}
+		// ex. filesystem volume: /pods/{podUid}/volumes/{escapeQualifiedPluginName}/{volumeName}
 		volumesDirs := map[v1.PersistentVolumeMode]string{
-			v1.PersistentVolumeFilesystem: path.Join(podDir, config.DefaultKubeletVolumesDirName),
+			v1.PersistentVolumeFilesystem: filepath.Join(podDir, config.DefaultKubeletVolumesDirName),
 		}
 		// Find block volume information
 		// ex. block volume: /pods/{podUid}/volumeDevices/{escapeQualifiedPluginName}/{volumeName}
-		volumesDirs[v1.PersistentVolumeBlock] = path.Join(podDir, config.DefaultKubeletVolumeDevicesDirName)
+		volumesDirs[v1.PersistentVolumeBlock] = filepath.Join(podDir, config.DefaultKubeletVolumeDevicesDirName)
 
 		for volumeMode, volumesDir := range volumesDirs {
 			var volumesDirInfo []fs.DirEntry
@@ -152,7 +158,7 @@ func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
 			}
 			for _, volumeDir := range volumesDirInfo {
 				pluginName := volumeDir.Name()
-				volumePluginPath := path.Join(volumesDir, pluginName)
+				volumePluginPath := filepath.Join(volumesDir, pluginName)
 				volumePluginDirs, err := utilpath.ReadDirNoStat(volumePluginPath)
 				if err != nil {
 					klog.ErrorS(err, "Could not read volume plugin directory", "volumePluginPath", volumePluginPath)
@@ -160,7 +166,7 @@ func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
 				}
 				unescapePluginName := utilstrings.UnescapeQualifiedName(pluginName)
 				for _, volumeName := range volumePluginDirs {
-					volumePath := path.Join(volumePluginPath, volumeName)
+					volumePath := filepath.Join(volumePluginPath, volumeName)
 					klog.V(5).InfoS("Volume path from volume plugin directory", "podName", podName, "volumePath", volumePath)
 					volumes = append(volumes, podVolume{
 						podName:        volumetypes.UniquePodName(podName),
@@ -178,7 +184,14 @@ func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
 }
 
 // Reconstruct volume data structure by reading the pod's volume directories
-func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume, error) {
+func (rc *reconciler) reconstructVolume(volume podVolume) (rvolume *reconstructedVolume, rerr error) {
+	metrics.ReconstructVolumeOperationsTotal.Inc()
+	defer func() {
+		if rerr != nil {
+			metrics.ReconstructVolumeOperationsErrorsTotal.Inc()
+		}
+	}()
+
 	// plugin initializations
 	plugin, err := rc.volumePluginMgr.FindPluginByName(volume.pluginName)
 	if err != nil {

@@ -35,6 +35,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/metadata"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/klog/v2/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/namespace"
 	"k8s.io/kubernetes/test/integration/etcd"
@@ -55,10 +56,12 @@ func TestNamespaceCondition(t *testing.T) {
 	}
 
 	// Start informer and controllers
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	informers.Start(stopCh)
-	go nsController.Run(5, stopCh)
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	informers.Start(ctx.Done())
+	go nsController.Run(ctx, 5)
 
 	data := etcd.GetEtcdStorageDataForNamespace(nsName)
 	podJSON, err := jsonToUnstructured(data[corev1.SchemeGroupVersion.WithResource("pods")].Stub, "v1", "Pod")
@@ -124,9 +127,10 @@ func TestNamespaceLabels(t *testing.T) {
 
 	// Even though nscontroller isn't used in this test, its creation is already
 	// spawning some goroutines. So we need to run it to ensure they won't leak.
-	stopCh := make(chan struct{})
-	close(stopCh)
-	go nsController.Run(5, stopCh)
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	go nsController.Run(ctx, 5)
 
 	nsName := "test-namespace-labels-generated"
 	// Create a new namespace w/ no name
@@ -192,8 +196,9 @@ func namespaceLifecycleSetup(t *testing.T) (kubeapiservertesting.TearDownFunc, *
 	}
 
 	discoverResourcesFn := clientSet.Discovery().ServerPreferredNamespacedResources
-
+	_, ctx := ktesting.NewTestContext(t)
 	controller := namespace.NewNamespaceController(
+		ctx,
 		clientSet,
 		metadataClient,
 		discoverResourcesFn,

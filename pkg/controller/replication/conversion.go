@@ -125,13 +125,13 @@ type conversionEventHandler struct {
 	handler cache.ResourceEventHandler
 }
 
-func (h conversionEventHandler) OnAdd(obj interface{}) {
+func (h conversionEventHandler) OnAdd(obj interface{}, isInInitialList bool) {
 	rs, err := convertRCtoRS(obj.(*v1.ReplicationController), nil)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("dropping RC OnAdd event: can't convert object %#v to RS: %v", obj, err))
 		return
 	}
-	h.handler.OnAdd(rs)
+	h.handler.OnAdd(rs, isInInitialList)
 }
 
 func (h conversionEventHandler) OnUpdate(oldObj, newObj interface{}) {

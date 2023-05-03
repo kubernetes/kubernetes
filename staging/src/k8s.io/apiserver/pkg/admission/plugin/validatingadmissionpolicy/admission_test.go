@@ -19,24 +19,37 @@ package validatingadmissionpolicy
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	celgo "github.com/google/cel-go/cel"
 	"github.com/stretchr/testify/require"
+
+	admissionv1 "k8s.io/api/admission/v1"
+	admissionRegistrationv1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/api/admissionregistration/v1alpha1"
+	v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utiljson "k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
+	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy/internal/generic"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/matchconditions"
+	auditinternal "k8s.io/apiserver/pkg/apis/audit"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/warning"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -59,6 +72,11 @@ var (
 		if err := v1alpha1.AddToScheme(res); err != nil {
 			panic(err)
 		}
+
+		if err := fake.AddToScheme(res); err != nil {
+			panic(err)
+		}
+
 		return res
 	}()
 	paramsGVK schema.GroupVersionKind = schema.GroupVersionKind{
@@ -78,6 +96,7 @@ var (
 		res.Add(paramsGVK, meta.RESTScopeNamespace)
 		res.Add(definitionGVK, meta.RESTScopeRoot)
 		res.Add(bindingGVK, meta.RESTScopeRoot)
+		res.Add(v1.SchemeGroupVersion.WithKind("ConfigMap"), meta.RESTScopeNamespace)
 		return res
 	}()
 
@@ -99,6 +118,11 @@ var (
 				Kind:       paramsGVK.Kind,
 			},
 			FailurePolicy: ptrTo(v1alpha1.Fail),
+			Validations: []v1alpha1.Validation{
+				{
+					Expression: "messageId for deny policy",
+				},
+			},
 		},
 	}
 
@@ -125,6 +149,7 @@ var (
 				Name:      fakeParams.GetName(),
 				Namespace: fakeParams.GetNamespace(),
 			},
+			ValidationActions: []v1alpha1.ValidationAction{v1alpha1.Deny},
 		},
 	}
 	denyBindingWithNoParamRef *v1alpha1.ValidatingAdmissionPolicyBinding = &v1alpha1.ValidatingAdmissionPolicyBinding{
@@ -133,48 +158,202 @@ var (
 			ResourceVersion: "1",
 		},
 		Spec: v1alpha1.ValidatingAdmissionPolicyBindingSpec{
-			PolicyName: denyPolicy.Name,
+			PolicyName:        denyPolicy.Name,
+			ValidationActions: []v1alpha1.ValidationAction{v1alpha1.Deny},
+		},
+	}
+
+	denyBindingWithAudit = &v1alpha1.ValidatingAdmissionPolicyBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "denybinding.example.com",
+			ResourceVersion: "1",
+		},
+		Spec: v1alpha1.ValidatingAdmissionPolicyBindingSpec{
+			PolicyName:        denyPolicy.Name,
+			ValidationActions: []v1alpha1.ValidationAction{v1alpha1.Audit},
+		},
+	}
+	denyBindingWithWarn = &v1alpha1.ValidatingAdmissionPolicyBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "denybinding.example.com",
+			ResourceVersion: "1",
+		},
+		Spec: v1alpha1.ValidatingAdmissionPolicyBindingSpec{
+			PolicyName:        denyPolicy.Name,
+			ValidationActions: []v1alpha1.ValidationAction{v1alpha1.Warn},
+		},
+	}
+	denyBindingWithAll = &v1alpha1.ValidatingAdmissionPolicyBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "denybinding.example.com",
+			ResourceVersion: "1",
+		},
+		Spec: v1alpha1.ValidatingAdmissionPolicyBindingSpec{
+			PolicyName:        denyPolicy.Name,
+			ValidationActions: []v1alpha1.ValidationAction{v1alpha1.Deny, v1alpha1.Warn, v1alpha1.Audit},
 		},
 	}
 )
 
-// Interface which has fake compile and match functionality for use in tests
+// Interface which has fake compile functionality for use in tests
 // So that we can test the controller without pulling in any CEL functionality
 type fakeCompiler struct {
-	DefaultMatch         bool
-	CompileFuncs         map[string]func(*v1alpha1.ValidatingAdmissionPolicy) Validator
-	DefinitionMatchFuncs map[string]func(*v1alpha1.ValidatingAdmissionPolicy, admission.Attributes) bool
-	BindingMatchFuncs    map[string]func(*v1alpha1.ValidatingAdmissionPolicyBinding, admission.Attributes) bool
+	CompileFuncs map[string]func([]cel.ExpressionAccessor, cel.OptionalVariableDeclarations) cel.Filter
 }
 
-var _ ValidatorCompiler = &fakeCompiler{}
+var _ cel.FilterCompiler = &fakeCompiler{}
 
 func (f *fakeCompiler) HasSynced() bool {
 	return true
 }
 
-func (f *fakeCompiler) ValidateInitialization() error {
+func (f *fakeCompiler) Compile(
+	expressions []cel.ExpressionAccessor,
+	options cel.OptionalVariableDeclarations,
+	perCallLimit uint64,
+) cel.Filter {
+	if len(expressions) > 0 && expressions[0] != nil {
+		key := expressions[0].GetExpression()
+		if fun, ok := f.CompileFuncs[key]; ok {
+			return fun(expressions, options)
+		}
+	}
+	return &fakeFilter{}
+}
+
+func (f *fakeCompiler) RegisterDefinition(definition *v1alpha1.ValidatingAdmissionPolicy, compileFunc func([]cel.ExpressionAccessor, cel.OptionalVariableDeclarations) cel.Filter) {
+	//Key must be something that we can decipher from the inputs to Validate so using expression which will be passed to validate on the filter
+	key := definition.Spec.Validations[0].Expression
+	if compileFunc != nil {
+		if f.CompileFuncs == nil {
+			f.CompileFuncs = make(map[string]func([]cel.ExpressionAccessor, cel.OptionalVariableDeclarations) cel.Filter)
+		}
+		f.CompileFuncs[key] = compileFunc
+	}
+}
+
+var _ cel.ExpressionAccessor = &fakeEvalRequest{}
+
+type fakeEvalRequest struct {
+	Key string
+}
+
+func (f *fakeEvalRequest) GetExpression() string {
+	return ""
+}
+
+func (f *fakeEvalRequest) ReturnTypes() []*celgo.Type {
+	return []*celgo.Type{celgo.BoolType}
+}
+
+var _ cel.Filter = &fakeFilter{}
+
+type fakeFilter struct {
+	keyId string
+}
+
+func (f *fakeFilter) ForInput(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *admissionv1.AdmissionRequest, inputs cel.OptionalVariableBindings, runtimeCELCostBudget int64) ([]cel.EvaluationResult, int64, error) {
+	return []cel.EvaluationResult{}, 0, nil
+}
+
+func (f *fakeFilter) CompilationErrors() []error {
+	return []error{}
+}
+
+var _ Validator = &fakeValidator{}
+
+type fakeValidator struct {
+	validationFilter, auditAnnotationFilter, messageFilter *fakeFilter
+	ValidateFunc                                           func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult
+}
+
+func (f *fakeValidator) RegisterDefinition(definition *v1alpha1.ValidatingAdmissionPolicy, validateFunc func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult) {
+	//Key must be something that we can decipher from the inputs to Validate so using message which will be on the validationCondition object of evalResult
+	var key string
+	if len(definition.Spec.Validations) > 0 {
+		key = definition.Spec.Validations[0].Expression
+	} else {
+		key = definition.Spec.AuditAnnotations[0].Key
+	}
+
+	if validatorMap == nil {
+		validatorMap = make(map[string]*fakeValidator)
+	}
+
+	f.ValidateFunc = validateFunc
+	validatorMap[key] = f
+}
+
+func (f *fakeValidator) Validate(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+	return f.ValidateFunc(ctx, versionedAttr, versionedParams, runtimeCELCostBudget)
+}
+
+var _ Matcher = &fakeMatcher{}
+
+func (f *fakeMatcher) ValidateInitialization() error {
 	return nil
 }
 
-// Matches says whether this policy definition matches the provided admission
-// resource request
-func (f *fakeCompiler) DefinitionMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1alpha1.ValidatingAdmissionPolicy) (bool, schema.GroupVersionKind, error) {
+type fakeMatcher struct {
+	DefaultMatch         bool
+	DefinitionMatchFuncs map[namespacedName]func(*v1alpha1.ValidatingAdmissionPolicy, admission.Attributes) bool
+	BindingMatchFuncs    map[namespacedName]func(*v1alpha1.ValidatingAdmissionPolicyBinding, admission.Attributes) bool
+}
+
+func (f *fakeMatcher) RegisterDefinition(definition *v1alpha1.ValidatingAdmissionPolicy, matchFunc func(*v1alpha1.ValidatingAdmissionPolicy, admission.Attributes) bool) {
 	namespace, name := definition.Namespace, definition.Name
-	key := namespace + "/" + name
-	if fun, ok := f.DefinitionMatchFuncs[key]; ok {
-		return fun(definition, a), schema.GroupVersionKind{}, nil
+	key := namespacedName{
+		name:      name,
+		namespace: namespace,
 	}
 
-	// Default is match everything
-	return f.DefaultMatch, schema.GroupVersionKind{}, nil
+	if matchFunc != nil {
+		if f.DefinitionMatchFuncs == nil {
+			f.DefinitionMatchFuncs = make(map[namespacedName]func(*v1alpha1.ValidatingAdmissionPolicy, admission.Attributes) bool)
+		}
+		f.DefinitionMatchFuncs[key] = matchFunc
+	}
+}
+
+func (f *fakeMatcher) RegisterBinding(binding *v1alpha1.ValidatingAdmissionPolicyBinding, matchFunc func(*v1alpha1.ValidatingAdmissionPolicyBinding, admission.Attributes) bool) {
+	namespace, name := binding.Namespace, binding.Name
+	key := namespacedName{
+		name:      name,
+		namespace: namespace,
+	}
+
+	if matchFunc != nil {
+		if f.BindingMatchFuncs == nil {
+			f.BindingMatchFuncs = make(map[namespacedName]func(*v1alpha1.ValidatingAdmissionPolicyBinding, admission.Attributes) bool)
+		}
+		f.BindingMatchFuncs[key] = matchFunc
+	}
 }
 
 // Matches says whether this policy definition matches the provided admission
 // resource request
-func (f *fakeCompiler) BindingMatches(a admission.Attributes, o admission.ObjectInterfaces, binding *v1alpha1.ValidatingAdmissionPolicyBinding) (bool, error) {
+func (f *fakeMatcher) DefinitionMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1alpha1.ValidatingAdmissionPolicy) (bool, schema.GroupVersionKind, error) {
+	namespace, name := definition.Namespace, definition.Name
+	key := namespacedName{
+		name:      name,
+		namespace: namespace,
+	}
+	if fun, ok := f.DefinitionMatchFuncs[key]; ok {
+		return fun(definition, a), a.GetKind(), nil
+	}
+
+	// Default is match everything
+	return f.DefaultMatch, a.GetKind(), nil
+}
+
+// Matches says whether this policy definition matches the provided admission
+// resource request
+func (f *fakeMatcher) BindingMatches(a admission.Attributes, o admission.ObjectInterfaces, binding *v1alpha1.ValidatingAdmissionPolicyBinding) (bool, error) {
 	namespace, name := binding.Namespace, binding.Name
-	key := namespace + "/" + name
+	key := namespacedName{
+		name:      name,
+		namespace: namespace,
+	}
 	if fun, ok := f.BindingMatchFuncs[key]; ok {
 		return fun(binding, a), nil
 	}
@@ -183,52 +362,14 @@ func (f *fakeCompiler) BindingMatches(a admission.Attributes, o admission.Object
 	return f.DefaultMatch, nil
 }
 
-func (f *fakeCompiler) Compile(
-	definition *v1alpha1.ValidatingAdmissionPolicy,
-) Validator {
-	namespace, name := definition.Namespace, definition.Name
+var validatorMap map[string]*fakeValidator
 
-	key := namespace + "/" + name
-	if fun, ok := f.CompileFuncs[key]; ok {
-		return fun(definition)
-	}
-
-	return nil
+func reset() {
+	validatorMap = make(map[string]*fakeValidator)
 }
 
-func (f *fakeCompiler) RegisterDefinition(definition *v1alpha1.ValidatingAdmissionPolicy, compileFunc func(*v1alpha1.ValidatingAdmissionPolicy) Validator, matchFunc func(*v1alpha1.ValidatingAdmissionPolicy, admission.Attributes) bool) {
-	namespace, name := definition.Namespace, definition.Name
-	key := namespace + "/" + name
-	if compileFunc != nil {
-
-		if f.CompileFuncs == nil {
-			f.CompileFuncs = make(map[string]func(*v1alpha1.ValidatingAdmissionPolicy) Validator)
-		}
-		f.CompileFuncs[key] = compileFunc
-	}
-
-	if matchFunc != nil {
-		if f.DefinitionMatchFuncs == nil {
-			f.DefinitionMatchFuncs = make(map[string]func(*v1alpha1.ValidatingAdmissionPolicy, admission.Attributes) bool)
-		}
-		f.DefinitionMatchFuncs[key] = matchFunc
-	}
-}
-
-func (f *fakeCompiler) RegisterBinding(binding *v1alpha1.ValidatingAdmissionPolicyBinding, matchFunc func(*v1alpha1.ValidatingAdmissionPolicyBinding, admission.Attributes) bool) {
-	namespace, name := binding.Namespace, binding.Name
-	key := namespace + "/" + name
-
-	if matchFunc != nil {
-		if f.BindingMatchFuncs == nil {
-			f.BindingMatchFuncs = make(map[string]func(*v1alpha1.ValidatingAdmissionPolicyBinding, admission.Attributes) bool)
-		}
-		f.BindingMatchFuncs[key] = matchFunc
-	}
-}
-
-func setupFakeTest(t *testing.T, comp *fakeCompiler) (plugin admission.ValidationInterface, paramTracker, policyTracker clienttesting.ObjectTracker, controller *celAdmissionController) {
-	return setupTestCommon(t, comp, true)
+func setupFakeTest(t *testing.T, comp *fakeCompiler, match *fakeMatcher) (plugin admission.ValidationInterface, paramTracker, policyTracker clienttesting.ObjectTracker, controller *celAdmissionController) {
+	return setupTestCommon(t, comp, match, true)
 }
 
 // Starts CEL admission controller and sets up a plugin configured with it as well
@@ -240,10 +381,11 @@ func setupFakeTest(t *testing.T, comp *fakeCompiler) (plugin admission.Validatio
 // PolicyTracker expects FakePolicyDefinition and FakePolicyBinding types
 // !TODO: refactor this test/framework to remove startInformers argument and
 // clean up the return args, and in general make it more accessible.
-func setupTestCommon(t *testing.T, compiler ValidatorCompiler, shouldStartInformers bool) (plugin admission.ValidationInterface, paramTracker, policyTracker clienttesting.ObjectTracker, controller *celAdmissionController) {
+func setupTestCommon(t *testing.T, compiler cel.FilterCompiler, matcher Matcher, shouldStartInformers bool) (plugin admission.ValidationInterface, paramTracker, policyTracker clienttesting.ObjectTracker, controller *celAdmissionController) {
 	testContext, testContextCancel := context.WithCancel(context.Background())
 	t.Cleanup(testContextCancel)
 
+	fakeAuthorizer := fakeAuthorizer{}
 	dynamicClient := dynamicfake.NewSimpleDynamicClient(scheme)
 
 	fakeClient := fake.NewSimpleClientset()
@@ -253,13 +395,11 @@ func setupTestCommon(t *testing.T, compiler ValidatorCompiler, shouldStartInform
 		features.ValidatingAdmissionPolicy: {
 			Default: true, PreRelease: featuregate.Alpha}})
 	if err != nil {
-		// FIXME: handle error.
-		panic("Unexpected error")
+		t.Fatalf("Unable to add feature gate: %v", err)
 	}
 	err = featureGate.SetFromMap(map[string]bool{string(features.ValidatingAdmissionPolicy): true})
 	if err != nil {
-		// FIXME: handle error.
-		panic("Unexpected error.")
+		t.Fatalf("Unable to store flag gate: %v", err)
 	}
 
 	plug, err := NewPlugin()
@@ -268,7 +408,7 @@ func setupTestCommon(t *testing.T, compiler ValidatorCompiler, shouldStartInform
 	handler := plug.(*celAdmissionPlugin)
 	handler.enabled = true
 
-	genericInitializer := initializer.New(fakeClient, dynamicClient, fakeInformerFactory, nil, featureGate, testContext.Done())
+	genericInitializer := initializer.New(fakeClient, dynamicClient, fakeInformerFactory, fakeAuthorizer, featureGate, testContext.Done())
 	genericInitializer.Initialize(handler)
 	handler.SetRESTMapper(fakeRestMapper)
 	err = admission.ValidateInitialization(handler)
@@ -277,7 +417,16 @@ func setupTestCommon(t *testing.T, compiler ValidatorCompiler, shouldStartInform
 
 	// Override compiler used by controller for tests
 	controller = handler.evaluator.(*celAdmissionController)
-	controller.validatorCompiler = compiler
+	controller.policyController.filterCompiler = compiler
+	controller.policyController.newValidator = func(validationFilter cel.Filter, celMatcher matchconditions.Matcher, auditAnnotationFilter, messageFilter cel.Filter, fail *admissionRegistrationv1.FailurePolicyType, authorizer authorizer.Authorizer) Validator {
+		f := validationFilter.(*fakeFilter)
+		v := validatorMap[f.keyId]
+		v.validationFilter = f
+		v.messageFilter = f
+		v.auditAnnotationFilter = auditAnnotationFilter.(*fakeFilter)
+		return v
+	}
+	controller.policyController.matcher = matcher
 
 	t.Cleanup(func() {
 		testContextCancel()
@@ -370,18 +519,37 @@ func (c *celAdmissionController) getCurrentObject(obj runtime.Object) (runtime.O
 		return nil, err
 	}
 
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
+	c.policyController.mutex.RLock()
+	defer c.policyController.mutex.RUnlock()
 
 	switch obj.(type) {
-	case *unstructured.Unstructured:
+	case *v1alpha1.ValidatingAdmissionPolicyBinding:
+		nn := getNamespaceName(accessor.GetNamespace(), accessor.GetName())
+		info, ok := c.policyController.bindingInfos[nn]
+		if !ok {
+			return nil, nil
+		}
+
+		return info.lastReconciledValue, nil
+	case *v1alpha1.ValidatingAdmissionPolicy:
+		nn := getNamespaceName(accessor.GetNamespace(), accessor.GetName())
+		info, ok := c.policyController.definitionInfo[nn]
+		if !ok {
+			return nil, nil
+		}
+
+		return info.lastReconciledValue, nil
+	default:
+		// If test isn't trying to fetch a policy or binding, assume it is
+		// fetching a param
 		paramSourceGVK := obj.GetObjectKind().GroupVersionKind()
 		paramKind := v1alpha1.ParamKind{
 			APIVersion: paramSourceGVK.GroupVersion().String(),
 			Kind:       paramSourceGVK.Kind,
 		}
-		var paramInformer generic.Informer[*unstructured.Unstructured]
-		if paramInfo, ok := c.paramsCRDControllers[paramKind]; ok {
+
+		var paramInformer generic.Informer[runtime.Object]
+		if paramInfo, ok := c.policyController.paramsCRDControllers[paramKind]; ok {
 			paramInformer = paramInfo.controller.Informer()
 		} else {
 			// Treat unknown CRD the same as not found
@@ -398,24 +566,6 @@ func (c *celAdmissionController) getCurrentObject(obj runtime.Object) (runtime.O
 		}
 
 		return item, nil
-	case *v1alpha1.ValidatingAdmissionPolicyBinding:
-		nn := getNamespaceName(accessor.GetNamespace(), accessor.GetName())
-		info, ok := c.bindingInfos[nn]
-		if !ok {
-			return nil, nil
-		}
-
-		return info.lastReconciledValue, nil
-	case *v1alpha1.ValidatingAdmissionPolicy:
-		nn := getNamespaceName(accessor.GetNamespace(), accessor.GetName())
-		info, ok := c.definitionInfo[nn]
-		if !ok {
-			return nil, nil
-		}
-
-		return info.lastReconciledValue, nil
-	default:
-		panic(fmt.Errorf("unhandled object type: %T", obj))
 	}
 }
 
@@ -423,7 +573,15 @@ func (c *celAdmissionController) getCurrentObject(obj runtime.Object) (runtime.O
 // their gvk/name in the controller
 func waitForReconcile(ctx context.Context, controller *celAdmissionController, objects ...runtime.Object) error {
 	return wait.PollWithContext(ctx, 100*time.Millisecond, 1*time.Second, func(ctx context.Context) (done bool, err error) {
+		defer func() {
+			if done {
+				// force admission controller to refresh the information it
+				// uses for validation now that it is done in the background
+				controller.refreshPolicies()
+			}
+		}()
 		for _, obj := range objects {
+
 			objMeta, err := meta.Accessor(obj)
 			if err != nil {
 				return false, fmt.Errorf("error getting meta accessor for original %T object (%v): %w", obj, obj, err)
@@ -463,6 +621,14 @@ func waitForReconcile(ctx context.Context, controller *celAdmissionController, o
 // with the given GVKs and namespace/names
 func waitForReconcileDeletion(ctx context.Context, controller *celAdmissionController, objects ...runtime.Object) error {
 	return wait.PollWithContext(ctx, 200*time.Millisecond, 3*time.Hour, func(ctx context.Context) (done bool, err error) {
+		defer func() {
+			if done {
+				// force admission controller to refresh the information it
+				// uses for validation now that it is done in the background
+				controller.refreshPolicies()
+			}
+		}()
+
 		for _, obj := range objects {
 			currentValue, err := controller.getCurrentObject(obj)
 			if err != nil {
@@ -481,7 +647,7 @@ func waitForReconcileDeletion(ctx context.Context, controller *celAdmissionContr
 func attributeRecord(
 	old, new runtime.Object,
 	operation admission.Operation,
-) admission.Attributes {
+) *FakeAttributes {
 	if old == nil && new == nil {
 		panic("both `old` and `new` may not be nil")
 	}
@@ -507,19 +673,21 @@ func attributeRecord(
 		panic(err)
 	}
 
-	return admission.NewAttributesRecord(
-		new,
-		old,
-		gvk,
-		accessor.GetNamespace(),
-		accessor.GetName(),
-		mapping.Resource,
-		"",
-		operation,
-		nil,
-		false,
-		nil,
-	)
+	return &FakeAttributes{
+		Attributes: admission.NewAttributesRecord(
+			new,
+			old,
+			gvk,
+			accessor.GetNamespace(),
+			accessor.GetName(),
+			mapping.Resource,
+			"",
+			operation,
+			nil,
+			false,
+			nil,
+		),
+	}
 }
 
 func ptrTo[T any](obj T) *T {
@@ -545,14 +713,15 @@ func must3[T any, I any](val T, _ I, err error) T {
 ////////////////////////////////////////////////////////////////////////////////
 
 func TestPluginNotReady(t *testing.T) {
-	compiler := &fakeCompiler{
-		// Match everything by default
+	reset()
+	compiler := &fakeCompiler{}
+	matcher := &fakeMatcher{
 		DefaultMatch: true,
 	}
 
 	// Show that an unstarted informer (or one that has failed its listwatch)
 	// will show proper error from plugin
-	handler, _, _, _ := setupTestCommon(t, compiler, false)
+	handler, _, _, _ := setupTestCommon(t, compiler, matcher, false)
 	err := handler.Validate(
 		context.Background(),
 		// Object is irrelevant/unchecked for this test. Just test that
@@ -564,7 +733,7 @@ func TestPluginNotReady(t *testing.T) {
 	require.ErrorContains(t, err, "not yet ready to handle request")
 
 	// Show that by now starting the informer, the error is dissipated
-	handler, _, _, _ = setupTestCommon(t, compiler, true)
+	handler, _, _, _ = setupTestCommon(t, compiler, matcher, true)
 	err = handler.Validate(
 		context.Background(),
 		// Object is irrelevant/unchecked for this test. Just test that
@@ -577,25 +746,41 @@ func TestPluginNotReady(t *testing.T) {
 }
 
 func TestBasicPolicyDefinitionFailure(t *testing.T) {
+	reset()
 	testContext, testContextCancel := context.WithCancel(context.Background())
 	defer testContextCancel()
 
 	datalock := sync.Mutex{}
 	numCompiles := 0
 
-	compiler := &fakeCompiler{
-		// Match everything by default
+	compiler := &fakeCompiler{}
+	validator := &fakeValidator{}
+	matcher := &fakeMatcher{
 		DefaultMatch: true,
 	}
-	compiler.RegisterDefinition(denyPolicy, func(policy *v1alpha1.ValidatingAdmissionPolicy) Validator {
+
+	compiler.RegisterDefinition(denyPolicy, func([]cel.ExpressionAccessor, cel.OptionalVariableDeclarations) cel.Filter {
 		datalock.Lock()
 		numCompiles += 1
 		datalock.Unlock()
 
-		return testValidator{}
-	}, nil)
+		return &fakeFilter{
+			keyId: denyPolicy.Spec.Validations[0].Expression,
+		}
+	})
 
-	handler, paramTracker, tracker, controller := setupFakeTest(t, compiler)
+	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+		return ValidateResult{
+			Decisions: []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Message: "Denied",
+				},
+			},
+		}
+	})
+
+	handler, paramTracker, tracker, controller := setupFakeTest(t, compiler, matcher)
 
 	require.NoError(t, paramTracker.Add(fakeParams))
 	require.NoError(t, tracker.Create(definitionsGVR, denyPolicy, denyPolicy.Namespace))
@@ -607,44 +792,36 @@ func TestBasicPolicyDefinitionFailure(t *testing.T) {
 			testContext, controller,
 			fakeParams, denyBinding, denyPolicy))
 
+	warningRecorder := newWarningRecorder()
+	warnCtx := warning.WithWarningRecorder(testContext, warningRecorder)
+	attr := attributeRecord(nil, fakeParams, admission.Create)
 	err := handler.Validate(
-		testContext,
+		warnCtx,
 		// Object is irrelevant/unchecked for this test. Just test that
 		// the evaluator is executed, and returns a denial
-		attributeRecord(nil, fakeParams, admission.Create),
+		attr,
 		&admission.RuntimeObjectInterfaces{},
 	)
 
+	require.Equal(t, 0, warningRecorder.len())
+
+	annotations := attr.GetAnnotations(auditinternal.LevelMetadata)
+	require.Equal(t, 0, len(annotations))
+
 	require.ErrorContains(t, err, `Denied`)
-}
-
-type validatorFunc func(a admission.Attributes, o admission.ObjectInterfaces, params runtime.Object, matchKind schema.GroupVersionKind) ([]policyDecision, error)
-
-func (f validatorFunc) Validate(a admission.Attributes, o admission.ObjectInterfaces, params runtime.Object, matchKind schema.GroupVersionKind) ([]policyDecision, error) {
-	return f(a, o, params, matchKind)
-}
-
-type testValidator struct {
-}
-
-func (v testValidator) Validate(a admission.Attributes, o admission.ObjectInterfaces, params runtime.Object, matchKind schema.GroupVersionKind) ([]policyDecision, error) {
-	// Policy always denies
-	return []policyDecision{
-		{
-			action:  actionDeny,
-			message: "Denied",
-		},
-	}, nil
 }
 
 // Shows that if a definition does not match the input, it will not be used.
 // But with a different input it will be used.
 func TestDefinitionDoesntMatch(t *testing.T) {
-	compiler := &fakeCompiler{
-		// Match everything by default
+	reset()
+	compiler := &fakeCompiler{}
+	validator := &fakeValidator{}
+	matcher := &fakeMatcher{
 		DefaultMatch: true,
 	}
-	handler, paramTracker, tracker, controller := setupFakeTest(t, compiler)
+
+	handler, paramTracker, tracker, controller := setupFakeTest(t, compiler, matcher)
 	testContext, testContextCancel := context.WithCancel(context.Background())
 	defer testContextCancel()
 
@@ -652,26 +829,39 @@ func TestDefinitionDoesntMatch(t *testing.T) {
 	passedParams := []*unstructured.Unstructured{}
 	numCompiles := 0
 
-	compiler.RegisterDefinition(denyPolicy,
-		func(vap *v1alpha1.ValidatingAdmissionPolicy) Validator {
-			datalock.Lock()
-			numCompiles += 1
-			datalock.Unlock()
+	compiler.RegisterDefinition(denyPolicy, func([]cel.ExpressionAccessor, cel.OptionalVariableDeclarations) cel.Filter {
+		datalock.Lock()
+		numCompiles += 1
+		datalock.Unlock()
 
-			return testValidator{}
+		return &fakeFilter{
+			keyId: denyPolicy.Spec.Validations[0].Expression,
+		}
+	})
 
-		}, func(vap *v1alpha1.ValidatingAdmissionPolicy, a admission.Attributes) bool {
-			// Match names with even-numbered length
-			obj := a.GetObject()
+	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+		return ValidateResult{
+			Decisions: []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Message: "Denied",
+				},
+			},
+		}
+	})
 
-			accessor, err := meta.Accessor(obj)
-			if err != nil {
-				t.Fatal(err)
-				return false
-			}
+	matcher.RegisterDefinition(denyPolicy, func(vap *v1alpha1.ValidatingAdmissionPolicy, a admission.Attributes) bool {
+		// Match names with even-numbered length
+		obj := a.GetObject()
 
-			return len(accessor.GetName())%2 == 0
-		})
+		accessor, err := meta.Accessor(obj)
+		if err != nil {
+			t.Fatal(err)
+			return false
+		}
+
+		return len(accessor.GetName())%2 == 0
+	})
 
 	require.NoError(t, paramTracker.Add(fakeParams))
 	require.NoError(t, tracker.Create(definitionsGVR, denyPolicy, denyPolicy.Namespace))
@@ -701,7 +891,6 @@ func TestDefinitionDoesntMatch(t *testing.T) {
 			attributeRecord(
 				nil, nonMatchingParams,
 				admission.Create), &admission.RuntimeObjectInterfaces{}))
-	require.Zero(t, numCompiles)
 	require.Empty(t, passedParams)
 
 	// Validate a matching input.
@@ -726,15 +915,17 @@ func TestDefinitionDoesntMatch(t *testing.T) {
 }
 
 func TestReconfigureBinding(t *testing.T) {
+	reset()
 	testContext, testContextCancel := context.WithCancel(context.Background())
 	defer testContextCancel()
 
-	compiler := &fakeCompiler{
-		// Match everything by default
+	compiler := &fakeCompiler{}
+	validator := &fakeValidator{}
+	matcher := &fakeMatcher{
 		DefaultMatch: true,
 	}
 
-	handler, paramTracker, tracker, controller := setupFakeTest(t, compiler)
+	handler, paramTracker, tracker, controller := setupFakeTest(t, compiler, matcher)
 
 	datalock := sync.Mutex{}
 	numCompiles := 0
@@ -751,15 +942,26 @@ func TestReconfigureBinding(t *testing.T) {
 		},
 	}
 
-	compiler.RegisterDefinition(denyPolicy,
-		func(vap *v1alpha1.ValidatingAdmissionPolicy) Validator {
-			datalock.Lock()
-			numCompiles += 1
-			datalock.Unlock()
+	compiler.RegisterDefinition(denyPolicy, func([]cel.ExpressionAccessor, cel.OptionalVariableDeclarations) cel.Filter {
+		datalock.Lock()
+		numCompiles += 1
+		datalock.Unlock()
 
-			return testValidator{}
+		return &fakeFilter{
+			keyId: denyPolicy.Spec.Validations[0].Expression,
+		}
+	})
 
-		}, nil)
+	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+		return ValidateResult{
+			Decisions: []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Message: "Denied",
+				},
+			},
+		}
+	})
 
 	denyBinding2 := &v1alpha1.ValidatingAdmissionPolicyBinding{
 		ObjectMeta: metav1.ObjectMeta{
@@ -772,6 +974,7 @@ func TestReconfigureBinding(t *testing.T) {
 				Name:      fakeParams2.GetName(),
 				Namespace: fakeParams2.GetNamespace(),
 			},
+			ValidationActions: []v1alpha1.ValidationAction{v1alpha1.Deny},
 		},
 	}
 
@@ -798,9 +1001,6 @@ func TestReconfigureBinding(t *testing.T) {
 	// Expect `Compile` only called once
 	require.Equal(t, 1, numCompiles, "expect `Compile` to be called only once")
 
-	// Show Evaluator was called
-	//require.Len(t, passedParams, 1, "expect evaluator is called due to proper configuration")
-
 	// Update the tracker to point at different params
 	require.NoError(t, tracker.Update(bindingsGVR, denyBinding2, ""))
 
@@ -815,8 +1015,6 @@ func TestReconfigureBinding(t *testing.T) {
 	)
 
 	require.ErrorContains(t, err, `failed to configure binding: replicas-test2.example.com not found`)
-	require.Equal(t, 1, numCompiles, "expect compile is not called when there is configuration error")
-	//require.Len(t, passedParams, 1, "expect evaluator was not called when there is configuration error")
 
 	// Add the missing params
 	require.NoError(t, paramTracker.Add(fakeParams2))
@@ -839,25 +1037,41 @@ func TestReconfigureBinding(t *testing.T) {
 
 // Shows that a policy which is in effect will stop being in effect when removed
 func TestRemoveDefinition(t *testing.T) {
+	reset()
 	testContext, testContextCancel := context.WithCancel(context.Background())
 	defer testContextCancel()
 
-	compiler := &fakeCompiler{
-		// Match everything by default
+	compiler := &fakeCompiler{}
+	validator := &fakeValidator{}
+	matcher := &fakeMatcher{
 		DefaultMatch: true,
 	}
-	handler, paramTracker, tracker, controller := setupFakeTest(t, compiler)
+
+	handler, paramTracker, tracker, controller := setupFakeTest(t, compiler, matcher)
 
 	datalock := sync.Mutex{}
 	numCompiles := 0
 
-	compiler.RegisterDefinition(denyPolicy, func(vap *v1alpha1.ValidatingAdmissionPolicy) Validator {
+	compiler.RegisterDefinition(denyPolicy, func([]cel.ExpressionAccessor, cel.OptionalVariableDeclarations) cel.Filter {
 		datalock.Lock()
 		numCompiles += 1
 		datalock.Unlock()
 
-		return testValidator{}
-	}, nil)
+		return &fakeFilter{
+			keyId: denyPolicy.Spec.Validations[0].Expression,
+		}
+	})
+
+	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+		return ValidateResult{
+			Decisions: []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Message: "Denied",
+				},
+			},
+		}
+	})
 
 	require.NoError(t, paramTracker.Add(fakeParams))
 	require.NoError(t, tracker.Create(definitionsGVR, denyPolicy, denyPolicy.Namespace))
@@ -892,24 +1106,41 @@ func TestRemoveDefinition(t *testing.T) {
 
 // Shows that a binding which is in effect will stop being in effect when removed
 func TestRemoveBinding(t *testing.T) {
+	reset()
 	testContext, testContextCancel := context.WithCancel(context.Background())
 	defer testContextCancel()
-	compiler := &fakeCompiler{
-		// Match everything by default
+
+	compiler := &fakeCompiler{}
+	validator := &fakeValidator{}
+	matcher := &fakeMatcher{
 		DefaultMatch: true,
 	}
-	handler, paramTracker, tracker, controller := setupFakeTest(t, compiler)
+
+	handler, paramTracker, tracker, controller := setupFakeTest(t, compiler, matcher)
 
 	datalock := sync.Mutex{}
 	numCompiles := 0
 
-	compiler.RegisterDefinition(denyPolicy, func(vap *v1alpha1.ValidatingAdmissionPolicy) Validator {
+	compiler.RegisterDefinition(denyPolicy, func([]cel.ExpressionAccessor, cel.OptionalVariableDeclarations) cel.Filter {
 		datalock.Lock()
 		numCompiles += 1
 		datalock.Unlock()
 
-		return testValidator{}
-	}, nil)
+		return &fakeFilter{
+			keyId: denyPolicy.Spec.Validations[0].Expression,
+		}
+	})
+
+	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+		return ValidateResult{
+			Decisions: []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Message: "Denied",
+				},
+			},
+		}
+	})
 
 	require.NoError(t, paramTracker.Add(fakeParams))
 	require.NoError(t, tracker.Create(definitionsGVR, denyPolicy, denyPolicy.Namespace))
@@ -939,13 +1170,16 @@ func TestRemoveBinding(t *testing.T) {
 // Shows that an error is surfaced if a paramSource specified in a binding does
 // not actually exist
 func TestInvalidParamSourceGVK(t *testing.T) {
+	reset()
 	testContext, testContextCancel := context.WithCancel(context.Background())
 	defer testContextCancel()
-	compiler := &fakeCompiler{
-		// Match everything by default
+
+	compiler := &fakeCompiler{}
+	matcher := &fakeMatcher{
 		DefaultMatch: true,
 	}
-	handler, _, tracker, controller := setupFakeTest(t, compiler)
+
+	handler, _, tracker, controller := setupFakeTest(t, compiler, matcher)
 	passedParams := make(chan *unstructured.Unstructured)
 
 	badPolicy := *denyPolicy
@@ -981,25 +1215,42 @@ func TestInvalidParamSourceGVK(t *testing.T) {
 // Shows that an error is surfaced if a param specified in a binding does not
 // actually exist
 func TestInvalidParamSourceInstanceName(t *testing.T) {
+	reset()
 	testContext, testContextCancel := context.WithCancel(context.Background())
 	defer testContextCancel()
-	compiler := &fakeCompiler{
-		// Match everything by default
+
+	compiler := &fakeCompiler{}
+	validator := &fakeValidator{}
+	matcher := &fakeMatcher{
 		DefaultMatch: true,
 	}
-	handler, _, tracker, controller := setupFakeTest(t, compiler)
+
+	handler, _, tracker, controller := setupFakeTest(t, compiler, matcher)
 
 	datalock := sync.Mutex{}
 	passedParams := []*unstructured.Unstructured{}
 	numCompiles := 0
 
-	compiler.RegisterDefinition(denyPolicy, func(vap *v1alpha1.ValidatingAdmissionPolicy) Validator {
+	compiler.RegisterDefinition(denyPolicy, func([]cel.ExpressionAccessor, cel.OptionalVariableDeclarations) cel.Filter {
 		datalock.Lock()
 		numCompiles += 1
 		datalock.Unlock()
 
-		return testValidator{}
-	}, nil)
+		return &fakeFilter{
+			keyId: denyPolicy.Spec.Validations[0].Expression,
+		}
+	})
+
+	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+		return ValidateResult{
+			Decisions: []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Message: "Denied",
+				},
+			},
+		}
+	})
 
 	require.NoError(t, tracker.Create(definitionsGVR, denyPolicy, denyPolicy.Namespace))
 	require.NoError(t, tracker.Create(bindingsGVR, denyBinding, denyBinding.Namespace))
@@ -1029,13 +1280,17 @@ func TestInvalidParamSourceInstanceName(t *testing.T) {
 // Also shows that if binding has specified params in this instance then they
 // are silently ignored.
 func TestEmptyParamSource(t *testing.T) {
+	reset()
 	testContext, testContextCancel := context.WithCancel(context.Background())
 	defer testContextCancel()
-	compiler := &fakeCompiler{
-		// Match everything by default
+
+	compiler := &fakeCompiler{}
+	validator := &fakeValidator{}
+	matcher := &fakeMatcher{
 		DefaultMatch: true,
 	}
-	handler, _, tracker, controller := setupFakeTest(t, compiler)
+
+	handler, _, tracker, controller := setupFakeTest(t, compiler, matcher)
 
 	datalock := sync.Mutex{}
 	numCompiles := 0
@@ -1044,13 +1299,26 @@ func TestEmptyParamSource(t *testing.T) {
 	noParamSourcePolicy := *denyPolicy
 	noParamSourcePolicy.Spec.ParamKind = nil
 
-	compiler.RegisterDefinition(&noParamSourcePolicy, func(vap *v1alpha1.ValidatingAdmissionPolicy) Validator {
+	compiler.RegisterDefinition(denyPolicy, func([]cel.ExpressionAccessor, cel.OptionalVariableDeclarations) cel.Filter {
 		datalock.Lock()
 		numCompiles += 1
 		datalock.Unlock()
 
-		return testValidator{}
-	}, nil)
+		return &fakeFilter{
+			keyId: denyPolicy.Spec.Validations[0].Expression,
+		}
+	})
+
+	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+		return ValidateResult{
+			Decisions: []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Message: "Denied",
+				},
+			},
+		}
+	})
 
 	require.NoError(t, tracker.Create(definitionsGVR, &noParamSourcePolicy, noParamSourcePolicy.Namespace))
 	require.NoError(t, tracker.Create(bindingsGVR, denyBindingWithNoParamRef, denyBindingWithNoParamRef.Namespace))
@@ -1077,21 +1345,49 @@ func TestEmptyParamSource(t *testing.T) {
 // one policy stops using the param. The expectation is the second policy
 // keeps behaving normally
 func TestMultiplePoliciesSharedParamType(t *testing.T) {
+	reset()
 	testContext, testContextCancel := context.WithCancel(context.Background())
 	defer testContextCancel()
 
-	compiler := &fakeCompiler{
-		// Match everything by default
+	compiler := &fakeCompiler{}
+	validator1 := &fakeValidator{}
+	validator2 := &fakeValidator{}
+	matcher := &fakeMatcher{
 		DefaultMatch: true,
 	}
-	handler, paramTracker, tracker, controller := setupFakeTest(t, compiler)
+
+	handler, paramTracker, tracker, controller := setupFakeTest(t, compiler, matcher)
 
 	// Use ConfigMap native-typed param
 	policy1 := *denyPolicy
 	policy1.Name = "denypolicy1.example.com"
+	policy1.Spec = v1alpha1.ValidatingAdmissionPolicySpec{
+		ParamKind: &v1alpha1.ParamKind{
+			APIVersion: paramsGVK.GroupVersion().String(),
+			Kind:       paramsGVK.Kind,
+		},
+		FailurePolicy: ptrTo(v1alpha1.Fail),
+		Validations: []v1alpha1.Validation{
+			{
+				Expression: "policy1",
+			},
+		},
+	}
 
 	policy2 := *denyPolicy
 	policy2.Name = "denypolicy2.example.com"
+	policy2.Spec = v1alpha1.ValidatingAdmissionPolicySpec{
+		ParamKind: &v1alpha1.ParamKind{
+			APIVersion: paramsGVK.GroupVersion().String(),
+			Kind:       paramsGVK.Kind,
+		},
+		FailurePolicy: ptrTo(v1alpha1.Fail),
+		Validations: []v1alpha1.Validation{
+			{
+				Expression: "policy2",
+			},
+		},
+	}
 
 	binding1 := *denyBinding
 	binding2 := *denyBinding
@@ -1107,32 +1403,44 @@ func TestMultiplePoliciesSharedParamType(t *testing.T) {
 	compiles2 := atomic.Int64{}
 	evaluations2 := atomic.Int64{}
 
-	compiler.RegisterDefinition(&policy1, func(vap *v1alpha1.ValidatingAdmissionPolicy) Validator {
+	compiler.RegisterDefinition(&policy1, func([]cel.ExpressionAccessor, cel.OptionalVariableDeclarations) cel.Filter {
 		compiles1.Add(1)
 
-		return validatorFunc(func(a admission.Attributes, o admission.ObjectInterfaces, params runtime.Object, matchKind schema.GroupVersionKind) ([]policyDecision, error) {
-			evaluations1.Add(1)
-			return []policyDecision{
-				{
-					action: actionAdmit,
-				},
-			}, nil
-		})
-	}, nil)
+		return &fakeFilter{
+			keyId: policy1.Spec.Validations[0].Expression,
+		}
+	})
 
-	compiler.RegisterDefinition(&policy2, func(vap *v1alpha1.ValidatingAdmissionPolicy) Validator {
+	validator1.RegisterDefinition(&policy1, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+		evaluations1.Add(1)
+		return ValidateResult{
+			Decisions: []PolicyDecision{
+				{
+					Action: ActionAdmit,
+				},
+			},
+		}
+	})
+
+	compiler.RegisterDefinition(&policy2, func([]cel.ExpressionAccessor, cel.OptionalVariableDeclarations) cel.Filter {
 		compiles2.Add(1)
 
-		return validatorFunc(func(a admission.Attributes, o admission.ObjectInterfaces, params runtime.Object, matchKind schema.GroupVersionKind) ([]policyDecision, error) {
-			evaluations2.Add(1)
-			return []policyDecision{
+		return &fakeFilter{
+			keyId: policy2.Spec.Validations[0].Expression,
+		}
+	})
+
+	validator2.RegisterDefinition(&policy2, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+		evaluations2.Add(1)
+		return ValidateResult{
+			Decisions: []PolicyDecision{
 				{
-					action:  actionDeny,
-					message: "Policy2Denied",
+					Action:  ActionDeny,
+					Message: "Policy2Denied",
 				},
-			}, nil
-		})
-	}, nil)
+			},
+		}
+	})
 
 	require.NoError(t, tracker.Create(definitionsGVR, &policy1, policy1.Namespace))
 	require.NoError(t, tracker.Create(bindingsGVR, &binding1, binding1.Namespace))
@@ -1198,4 +1506,462 @@ func TestMultiplePoliciesSharedParamType(t *testing.T) {
 	require.EqualValues(t, 2, evaluations1.Load())
 	require.EqualValues(t, 1, compiles2.Load())
 	require.EqualValues(t, 2, evaluations2.Load())
+}
+
+// Shows that we can refer to native-typed params just fine
+// (as opposed to CRD params)
+func TestNativeTypeParam(t *testing.T) {
+	reset()
+	testContext, testContextCancel := context.WithCancel(context.Background())
+	defer testContextCancel()
+
+	compiler := &fakeCompiler{}
+	validator := &fakeValidator{}
+	matcher := &fakeMatcher{
+		DefaultMatch: true,
+	}
+	handler, _, tracker, controller := setupFakeTest(t, compiler, matcher)
+
+	compiles := atomic.Int64{}
+	evaluations := atomic.Int64{}
+
+	// Use ConfigMap native-typed param
+	nativeTypeParamPolicy := *denyPolicy
+	nativeTypeParamPolicy.Spec.ParamKind = &v1alpha1.ParamKind{
+		APIVersion: "v1",
+		Kind:       "ConfigMap",
+	}
+
+	compiler.RegisterDefinition(&nativeTypeParamPolicy, func([]cel.ExpressionAccessor, cel.OptionalVariableDeclarations) cel.Filter {
+		compiles.Add(1)
+
+		return &fakeFilter{
+			keyId: nativeTypeParamPolicy.Spec.Validations[0].Expression,
+		}
+	})
+
+	validator.RegisterDefinition(&nativeTypeParamPolicy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+		evaluations.Add(1)
+		if _, ok := versionedParams.(*v1.ConfigMap); ok {
+			return ValidateResult{
+				Decisions: []PolicyDecision{
+					{
+						Action:  ActionDeny,
+						Message: "correct type",
+					},
+				},
+			}
+		}
+		return ValidateResult{
+			Decisions: []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Message: "Incorrect param type",
+				},
+			},
+		}
+	})
+
+	configMapParam := &v1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "replicas-test.example.com",
+			Namespace:       "",
+			ResourceVersion: "1",
+		},
+		Data: map[string]string{
+			"coolkey": "coolvalue",
+		},
+	}
+	require.NoError(t, tracker.Create(definitionsGVR, &nativeTypeParamPolicy, nativeTypeParamPolicy.Namespace))
+	require.NoError(t, tracker.Create(bindingsGVR, denyBinding, denyBinding.Namespace))
+	require.NoError(t, tracker.Add(configMapParam))
+
+	// Wait for controller to reconcile given objects
+	require.NoError(t,
+		waitForReconcile(
+			testContext, controller,
+			denyBinding, denyPolicy, configMapParam))
+
+	err := handler.Validate(
+		testContext,
+		// Object is irrelevant/unchecked for this test. Just test that
+		// the evaluator is executed, and returns admit meaning the params
+		// passed was a configmap
+		attributeRecord(nil, fakeParams, admission.Create),
+		&admission.RuntimeObjectInterfaces{},
+	)
+
+	require.ErrorContains(t, err, "correct type")
+	require.EqualValues(t, 1, compiles.Load())
+	require.EqualValues(t, 1, evaluations.Load())
+}
+
+func TestAuditValidationAction(t *testing.T) {
+	testContext, testContextCancel := context.WithCancel(context.Background())
+	defer testContextCancel()
+
+	compiler := &fakeCompiler{}
+	validator := &fakeValidator{}
+	matcher := &fakeMatcher{
+		DefaultMatch: true,
+	}
+	handler, _, tracker, controller := setupFakeTest(t, compiler, matcher)
+
+	// Push some fake
+	noParamSourcePolicy := *denyPolicy
+	noParamSourcePolicy.Spec.ParamKind = nil
+
+	compiler.RegisterDefinition(denyPolicy, func([]cel.ExpressionAccessor, cel.OptionalVariableDeclarations) cel.Filter {
+
+		return &fakeFilter{
+			keyId: denyPolicy.Spec.Validations[0].Expression,
+		}
+	})
+
+	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+		return ValidateResult{
+			Decisions: []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Message: "I'm sorry Dave",
+				},
+			},
+		}
+	})
+
+	require.NoError(t, tracker.Create(definitionsGVR, &noParamSourcePolicy, noParamSourcePolicy.Namespace))
+	require.NoError(t, tracker.Create(bindingsGVR, denyBindingWithAudit, denyBindingWithAudit.Namespace))
+
+	// Wait for controller to reconcile given objects
+	require.NoError(t,
+		waitForReconcile(
+			testContext, controller,
+			denyBindingWithAudit, &noParamSourcePolicy))
+	attr := attributeRecord(nil, fakeParams, admission.Create)
+	warningRecorder := newWarningRecorder()
+	warnCtx := warning.WithWarningRecorder(testContext, warningRecorder)
+	err := handler.Validate(
+		warnCtx,
+		attr,
+		&admission.RuntimeObjectInterfaces{},
+	)
+
+	require.Equal(t, 0, warningRecorder.len())
+
+	annotations := attr.GetAnnotations(auditinternal.LevelMetadata)
+	require.Equal(t, 1, len(annotations))
+	valueJson, ok := annotations["validation.policy.admission.k8s.io/validation_failure"]
+	require.True(t, ok)
+	var value []validationFailureValue
+	jsonErr := utiljson.Unmarshal([]byte(valueJson), &value)
+	require.NoError(t, jsonErr)
+	expected := []validationFailureValue{{
+		ExpressionIndex:   0,
+		Message:           "I'm sorry Dave",
+		ValidationActions: []v1alpha1.ValidationAction{v1alpha1.Audit},
+		Binding:           "denybinding.example.com",
+		Policy:            noParamSourcePolicy.Name,
+	}}
+	require.Equal(t, expected, value)
+
+	require.NoError(t, err)
+}
+
+func TestWarnValidationAction(t *testing.T) {
+	testContext, testContextCancel := context.WithCancel(context.Background())
+	defer testContextCancel()
+
+	compiler := &fakeCompiler{}
+	validator := &fakeValidator{}
+	matcher := &fakeMatcher{
+		DefaultMatch: true,
+	}
+	handler, _, tracker, controller := setupFakeTest(t, compiler, matcher)
+
+	// Push some fake
+	noParamSourcePolicy := *denyPolicy
+	noParamSourcePolicy.Spec.ParamKind = nil
+
+	compiler.RegisterDefinition(denyPolicy, func([]cel.ExpressionAccessor, cel.OptionalVariableDeclarations) cel.Filter {
+
+		return &fakeFilter{
+			keyId: denyPolicy.Spec.Validations[0].Expression,
+		}
+	})
+
+	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+		return ValidateResult{
+			Decisions: []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Message: "I'm sorry Dave",
+				},
+			},
+		}
+	})
+
+	require.NoError(t, tracker.Create(definitionsGVR, &noParamSourcePolicy, noParamSourcePolicy.Namespace))
+	require.NoError(t, tracker.Create(bindingsGVR, denyBindingWithWarn, denyBindingWithWarn.Namespace))
+
+	// Wait for controller to reconcile given objects
+	require.NoError(t,
+		waitForReconcile(
+			testContext, controller,
+			denyBindingWithWarn, &noParamSourcePolicy))
+	attr := attributeRecord(nil, fakeParams, admission.Create)
+	warningRecorder := newWarningRecorder()
+	warnCtx := warning.WithWarningRecorder(testContext, warningRecorder)
+	err := handler.Validate(
+		warnCtx,
+		attr,
+		&admission.RuntimeObjectInterfaces{},
+	)
+
+	require.Equal(t, 1, warningRecorder.len())
+	require.True(t, warningRecorder.hasWarning("Validation failed for ValidatingAdmissionPolicy 'denypolicy.example.com' with binding 'denybinding.example.com': I'm sorry Dave"))
+
+	annotations := attr.GetAnnotations(auditinternal.LevelMetadata)
+	require.Equal(t, 0, len(annotations))
+
+	require.NoError(t, err)
+}
+
+func TestAllValidationActions(t *testing.T) {
+	testContext, testContextCancel := context.WithCancel(context.Background())
+	defer testContextCancel()
+
+	compiler := &fakeCompiler{}
+	validator := &fakeValidator{}
+	matcher := &fakeMatcher{
+		DefaultMatch: true,
+	}
+	handler, _, tracker, controller := setupFakeTest(t, compiler, matcher)
+
+	// Push some fake
+	noParamSourcePolicy := *denyPolicy
+	noParamSourcePolicy.Spec.ParamKind = nil
+
+	compiler.RegisterDefinition(denyPolicy, func([]cel.ExpressionAccessor, cel.OptionalVariableDeclarations) cel.Filter {
+
+		return &fakeFilter{
+			keyId: denyPolicy.Spec.Validations[0].Expression,
+		}
+	})
+
+	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+		return ValidateResult{
+			Decisions: []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Message: "I'm sorry Dave",
+				},
+			},
+		}
+	})
+
+	require.NoError(t, tracker.Create(definitionsGVR, &noParamSourcePolicy, noParamSourcePolicy.Namespace))
+	require.NoError(t, tracker.Create(bindingsGVR, denyBindingWithAll, denyBindingWithAll.Namespace))
+
+	// Wait for controller to reconcile given objects
+	require.NoError(t,
+		waitForReconcile(
+			testContext, controller,
+			denyBindingWithAll, &noParamSourcePolicy))
+	attr := attributeRecord(nil, fakeParams, admission.Create)
+	warningRecorder := newWarningRecorder()
+	warnCtx := warning.WithWarningRecorder(testContext, warningRecorder)
+	err := handler.Validate(
+		warnCtx,
+		attr,
+		&admission.RuntimeObjectInterfaces{},
+	)
+
+	require.Equal(t, 1, warningRecorder.len())
+	require.True(t, warningRecorder.hasWarning("Validation failed for ValidatingAdmissionPolicy 'denypolicy.example.com' with binding 'denybinding.example.com': I'm sorry Dave"))
+
+	annotations := attr.GetAnnotations(auditinternal.LevelMetadata)
+	require.Equal(t, 1, len(annotations))
+	valueJson, ok := annotations["validation.policy.admission.k8s.io/validation_failure"]
+	require.True(t, ok)
+	var value []validationFailureValue
+	jsonErr := utiljson.Unmarshal([]byte(valueJson), &value)
+	require.NoError(t, jsonErr)
+	expected := []validationFailureValue{{
+		ExpressionIndex:   0,
+		Message:           "I'm sorry Dave",
+		ValidationActions: []v1alpha1.ValidationAction{v1alpha1.Deny, v1alpha1.Warn, v1alpha1.Audit},
+		Binding:           "denybinding.example.com",
+		Policy:            noParamSourcePolicy.Name,
+	}}
+	require.Equal(t, expected, value)
+
+	require.ErrorContains(t, err, "I'm sorry Dave")
+}
+
+func TestAuditAnnotations(t *testing.T) {
+	testContext, testContextCancel := context.WithCancel(context.Background())
+	defer testContextCancel()
+
+	compiler := &fakeCompiler{}
+	validator := &fakeValidator{}
+	matcher := &fakeMatcher{
+		DefaultMatch: true,
+	}
+	handler, paramsTracker, tracker, controller := setupFakeTest(t, compiler, matcher)
+
+	// Push some fake
+	policy := *denyPolicy
+
+	compiler.RegisterDefinition(denyPolicy, func([]cel.ExpressionAccessor, cel.OptionalVariableDeclarations) cel.Filter {
+
+		return &fakeFilter{
+			keyId: denyPolicy.Spec.Validations[0].Expression,
+		}
+	})
+
+	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+		o, err := meta.Accessor(versionedParams)
+		if err != nil {
+			t.Fatal(err)
+		}
+		exampleValue := "normal-value"
+		if o.GetName() == "replicas-test2.example.com" {
+			exampleValue = "special-value"
+		}
+		return ValidateResult{
+			AuditAnnotations: []PolicyAuditAnnotation{
+				{
+					Key:    "example-key",
+					Value:  exampleValue,
+					Action: AuditAnnotationActionPublish,
+				},
+				{
+					Key:    "excluded-key",
+					Value:  "excluded-value",
+					Action: AuditAnnotationActionExclude,
+				},
+				{
+					Key:    "error-key",
+					Action: AuditAnnotationActionError,
+					Error:  "example error",
+				},
+			},
+		}
+	})
+
+	fakeParams2 := fakeParams.DeepCopy()
+	fakeParams2.SetName("replicas-test2.example.com")
+	denyBinding2 := denyBinding.DeepCopy()
+	denyBinding2.SetName("denybinding2.example.com")
+	denyBinding2.Spec.ParamRef.Name = fakeParams2.GetName()
+
+	fakeParams3 := fakeParams.DeepCopy()
+	fakeParams3.SetName("replicas-test3.example.com")
+	denyBinding3 := denyBinding.DeepCopy()
+	denyBinding3.SetName("denybinding3.example.com")
+	denyBinding3.Spec.ParamRef.Name = fakeParams3.GetName()
+
+	require.NoError(t, paramsTracker.Add(fakeParams))
+	require.NoError(t, paramsTracker.Add(fakeParams2))
+	require.NoError(t, paramsTracker.Add(fakeParams3))
+	require.NoError(t, tracker.Create(definitionsGVR, &policy, policy.Namespace))
+	require.NoError(t, tracker.Create(bindingsGVR, denyBinding, denyBinding.Namespace))
+	require.NoError(t, tracker.Create(bindingsGVR, denyBinding2, denyBinding2.Namespace))
+	require.NoError(t, tracker.Create(bindingsGVR, denyBinding3, denyBinding3.Namespace))
+
+	// Wait for controller to reconcile given objects
+	require.NoError(t,
+		waitForReconcile(
+			testContext, controller,
+			denyBinding, denyBinding2, denyBinding3, denyPolicy, fakeParams, fakeParams2, fakeParams3))
+	attr := attributeRecord(nil, fakeParams, admission.Create)
+	err := handler.Validate(
+		testContext,
+		attr,
+		&admission.RuntimeObjectInterfaces{},
+	)
+
+	annotations := attr.GetAnnotations(auditinternal.LevelMetadata)
+	require.Equal(t, 1, len(annotations))
+	value := annotations[policy.Name+"/example-key"]
+	parts := strings.Split(value, ", ")
+	require.Equal(t, 2, len(parts))
+	require.Contains(t, parts, "normal-value", "special-value")
+
+	require.ErrorContains(t, err, "example error")
+}
+
+// FakeAttributes decorates admission.Attributes. It's used to trace the added annotations.
+type FakeAttributes struct {
+	admission.Attributes
+	annotations map[string]string
+	mutex       sync.Mutex
+}
+
+// AddAnnotation adds an annotation key value pair to FakeAttributes
+func (f *FakeAttributes) AddAnnotation(k, v string) error {
+	return f.AddAnnotationWithLevel(k, v, auditinternal.LevelMetadata)
+}
+
+// AddAnnotationWithLevel adds an annotation key value pair to FakeAttributes
+func (f *FakeAttributes) AddAnnotationWithLevel(k, v string, _ auditinternal.Level) error {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+	if err := f.Attributes.AddAnnotation(k, v); err != nil {
+		return err
+	}
+	if f.annotations == nil {
+		f.annotations = make(map[string]string)
+	}
+	f.annotations[k] = v
+	return nil
+}
+
+// GetAnnotations reads annotations from FakeAttributes
+func (f *FakeAttributes) GetAnnotations(_ auditinternal.Level) map[string]string {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+	annotations := make(map[string]string, len(f.annotations))
+	for k, v := range f.annotations {
+		annotations[k] = v
+	}
+	return annotations
+}
+
+type warningRecorder struct {
+	sync.Mutex
+	warnings sets.Set[string]
+}
+
+func newWarningRecorder() *warningRecorder {
+	return &warningRecorder{warnings: sets.New[string]()}
+}
+
+func (r *warningRecorder) AddWarning(_, text string) {
+	r.Lock()
+	defer r.Unlock()
+	r.warnings.Insert(text)
+	return
+}
+
+func (r *warningRecorder) hasWarning(text string) bool {
+	r.Lock()
+	defer r.Unlock()
+	return r.warnings.Has(text)
+}
+
+func (r *warningRecorder) len() int {
+	r.Lock()
+	defer r.Unlock()
+	return len(r.warnings)
+}
+
+type fakeAuthorizer struct{}
+
+func (f fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+	return authorizer.DecisionAllow, "", nil
 }

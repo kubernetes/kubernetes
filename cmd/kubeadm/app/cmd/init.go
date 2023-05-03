@@ -76,7 +76,7 @@ type initData struct {
 	dryRun                  bool
 	kubeconfigDir           string
 	kubeconfigPath          string
-	ignorePreflightErrors   sets.String
+	ignorePreflightErrors   sets.Set[string]
 	certificatesDir         string
 	dryRunDir               string
 	externalCA              bool
@@ -89,8 +89,7 @@ type initData struct {
 
 // newCmdInit returns "kubeadm init" command.
 // NB. initOptions is exposed as parameter for allowing unit testing of
-//
-//	the newInitOptions method, that implements all the command options validation logic
+// the newInitOptions method, that implements all the command options validation logic
 func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	if initOptions == nil {
 		initOptions = newInitOptions()
@@ -114,7 +113,7 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 		Args: cobra.NoArgs,
 	}
 
-	// adds flags to the init command
+	// add flags to the init command.
 	// init command local flags could be eventually inherited by the sub-commands automatically generated for phases
 	AddInitConfigFlags(cmd.Flags(), initOptions.externalInitCfg)
 	AddClusterConfigFlags(cmd.Flags(), initOptions.externalClusterCfg, &initOptions.featureGatesString)
@@ -150,6 +149,11 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	// sets the data builder function, that will be used by the runner
 	// both when running the entire workflow or single phases
 	initRunner.SetDataInitializer(func(cmd *cobra.Command, args []string) (workflow.RunData, error) {
+		if cmd.Flags().Lookup(options.NodeCRISocket) == nil {
+			// avoid CRI detection
+			// assume that the command execution does not depend on CRISocket when --cri-socket flag is not set
+			initOptions.externalInitCfg.NodeRegistration.CRISocket = kubeadmconstants.UnknownCRISocket
+		}
 		data, err := newInitData(cmd, args, initOptions, out)
 		if err != nil {
 			return nil, err
@@ -307,7 +311,7 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 		return nil, err
 	}
 	// Also set the union of pre-flight errors to InitConfiguration, to provide a consistent view of the runtime configuration:
-	cfg.NodeRegistration.IgnorePreflightErrors = ignorePreflightErrorsSet.List()
+	cfg.NodeRegistration.IgnorePreflightErrors = sets.List(ignorePreflightErrorsSet)
 
 	// override node name from the command line option
 	if options.externalInitCfg.NodeRegistration.Name != "" {
@@ -416,7 +420,7 @@ func (d *initData) SkipTokenPrint() bool {
 }
 
 // IgnorePreflightErrors returns the IgnorePreflightErrors flag.
-func (d *initData) IgnorePreflightErrors() sets.String {
+func (d *initData) IgnorePreflightErrors() sets.Set[string] {
 	return d.ignorePreflightErrors
 }
 

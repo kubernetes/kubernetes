@@ -189,7 +189,7 @@ func TestTransformationFailure(t *testing.T) {
 
 func TestList(t *testing.T) {
 	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestList(ctx, t, store)
+	storagetesting.RunTestList(ctx, t, store, false)
 }
 
 func TestListWithoutPaging(t *testing.T) {

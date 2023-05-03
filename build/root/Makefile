@@ -193,6 +193,7 @@ define TEST_IT_HELP_INFO
 #
 # Example:
 #   make test-integration
+#   make test-integration WHAT=./test/integration/kubelet GOFLAGS="-v -coverpkg=./pkg/kubelet/..." KUBE_COVER="y"
 endef
 .PHONY: test-integration
 ifeq ($(PRINT_HELP),y)
@@ -253,6 +254,7 @@ define TEST_E2E_NODE_HELP_INFO
 #  GUBERNATOR: For REMOTE=true only. Produce link to Gubernator to view logs.
 #    Defaults to false.
 #  TEST_SUITE: For REMOTE=true only. Test suite to use. Defaults to "default".
+#  SSH_USER: For REMOTE=true only  SSH username to use.
 #  SSH_KEY: For REMOTE=true only. Path to SSH key to use.
 #  SSH_OPTIONS: For REMOTE=true only. SSH options to use.
 #  RUNTIME_CONFIG: The runtime configuration for the API server on the node e2e tests.

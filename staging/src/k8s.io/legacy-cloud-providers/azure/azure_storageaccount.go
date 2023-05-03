@@ -24,9 +24,9 @@ import (
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
-	"github.com/Azure/go-autorest/autorest/to"
 
 	"k8s.io/klog/v2"
+	"k8s.io/utils/pointer"
 )
 
 // AccountOptions contains the fields which are used to create storage account.
@@ -76,7 +76,7 @@ func (az *Cloud) getStorageAccounts(accountOptions *AccountOptions) ([]accountWi
 				found := false
 				for _, subnetID := range accountOptions.VirtualNetworkResourceIDs {
 					for _, rule := range *acct.AccountProperties.NetworkRuleSet.VirtualNetworkRules {
-						if strings.EqualFold(to.String(rule.VirtualNetworkResourceID), subnetID) && rule.Action == storage.Allow {
+						if strings.EqualFold(pointer.StringDeref(rule.VirtualNetworkResourceID, ""), subnetID) && rule.Action == storage.Allow {
 							found = true
 							break
 						}
@@ -199,7 +199,7 @@ func (az *Cloud) EnsureStorageAccount(accountOptions *AccountOptions, genAccount
 			defer cancel()
 			rerr := az.StorageAccountClient.Create(ctx, resourceGroup, accountName, cp)
 			if rerr != nil {
-				return "", "", fmt.Errorf(fmt.Sprintf("Failed to create storage account %s, error: %v", accountName, rerr))
+				return "", "", fmt.Errorf("failed to create storage account %s, error: %v", accountName, rerr)
 			}
 		}
 	}

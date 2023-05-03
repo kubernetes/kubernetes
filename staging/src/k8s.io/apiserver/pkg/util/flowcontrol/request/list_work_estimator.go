@@ -147,8 +147,11 @@ func key(requestInfo *apirequest.RequestInfo) string {
 //	staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
 func shouldListFromStorage(query url.Values, opts *metav1.ListOptions) bool {
 	resourceVersion := opts.ResourceVersion
+	match := opts.ResourceVersionMatch
 	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
 	hasContinuation := pagingEnabled && len(opts.Continue) > 0
 	hasLimit := pagingEnabled && opts.Limit > 0 && resourceVersion != "0"
-	return resourceVersion == "" || hasContinuation || hasLimit || opts.ResourceVersionMatch == metav1.ResourceVersionMatchExact
+	unsupportedMatch := match != "" && match != metav1.ResourceVersionMatchNotOlderThan
+
+	return resourceVersion == "" || hasContinuation || hasLimit || unsupportedMatch
 }

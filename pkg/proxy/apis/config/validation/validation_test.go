@@ -828,52 +828,6 @@ func TestValidateHostPort(t *testing.T) {
 	}
 }
 
-func TestValidateIPVSSchedulerMethod(t *testing.T) {
-	newPath := field.NewPath("KubeProxyConfiguration")
-
-	successCases := []kubeproxyconfig.IPVSSchedulerMethod{
-		kubeproxyconfig.RoundRobin,
-		kubeproxyconfig.WeightedRoundRobin,
-		kubeproxyconfig.LeastConnection,
-		kubeproxyconfig.WeightedLeastConnection,
-		kubeproxyconfig.LocalityBasedLeastConnection,
-		kubeproxyconfig.LocalityBasedLeastConnectionWithReplication,
-		kubeproxyconfig.SourceHashing,
-		kubeproxyconfig.DestinationHashing,
-		kubeproxyconfig.ShortestExpectedDelay,
-		kubeproxyconfig.NeverQueue,
-		"",
-	}
-
-	for _, successCase := range successCases {
-		if errs := validateIPVSSchedulerMethod(successCase, newPath.Child("Scheduler")); len(errs) != 0 {
-			t.Errorf("expected success: %v", errs)
-		}
-	}
-
-	errorCases := map[string]struct {
-		mode         kubeproxyconfig.IPVSSchedulerMethod
-		expectedErrs field.ErrorList
-	}{
-		"non-existent scheduler method": {
-			mode:         kubeproxyconfig.IPVSSchedulerMethod("non-existing"),
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ProxyMode.Scheduler"), "non-existing", "must be in [rr wrr lc wlc lblc lblcr sh dh sed nq ], blank means the default algorithm method (currently rr)")},
-		},
-	}
-
-	for _, errorCase := range errorCases {
-		errs := validateIPVSSchedulerMethod(errorCase.mode, newPath.Child("ProxyMode"))
-		if len(errorCase.expectedErrs) != len(errs) {
-			t.Fatalf("Expected %d errors, got %d errors: %v", len(errorCase.expectedErrs), len(errs), errs)
-		}
-		for i, err := range errs {
-			if err.Error() != errorCase.expectedErrs[i].Error() {
-				t.Fatalf("Expected error: %s, got %s", errorCase.expectedErrs[i], err.Error())
-			}
-		}
-	}
-}
-
 func TestValidateKubeProxyNodePortAddress(t *testing.T) {
 	newPath := field.NewPath("KubeProxyConfiguration")
 

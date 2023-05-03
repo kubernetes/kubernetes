@@ -204,15 +204,14 @@ func (c *autoRegisterController) processNextWorkItem() bool {
 
 // checkAPIService syncs the current APIService against a list of desired APIService objects
 //
-//	| A. desired: not found | B. desired: sync on start | C. desired: sync always
-//
-// ------------------------------------------------|-----------------------|---------------------------|------------------------
-// 1. current: lookup error                        | error                 | error                     | error
-// 2. current: not found                           | -                     | create once               | create
-// 3. current: no sync                             | -                     | -                         | -
-// 4. current: sync on start, not present at start | -                     | -                         | -
-// 5. current: sync on start, present at start     | delete once           | update once               | update once
-// 6. current: sync always                         | delete                | update once               | update
+//	                                                | A. desired: not found | B. desired: sync on start | C. desired: sync always
+//	------------------------------------------------|-----------------------|---------------------------|------------------------
+//	1. current: lookup error                        | error                 | error                     | error
+//	2. current: not found                           | -                     | create once               | create
+//	3. current: no sync                             | -                     | -                         | -
+//	4. current: sync on start, not present at start | -                     | -                         | -
+//	5. current: sync on start, present at start     | delete once           | update once               | update once
+//	6. current: sync always                         | delete                | update once               | update
 func (c *autoRegisterController) checkAPIService(name string) (err error) {
 	desired := c.GetAPIServiceToSync(name)
 	curr, err := c.apiServiceLister.Get(name)

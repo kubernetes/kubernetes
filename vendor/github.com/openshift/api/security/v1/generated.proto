@@ -137,6 +137,8 @@ message PodSecurityPolicySubjectReviewStatus {
 // Compatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.
 // +openshift:compatibility-gen:level=4
 message RangeAllocation {
+  // metadata is the standard object's metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // range is a string representing a unique label for a range of uids, "1000000000-2000000000/10000".
@@ -152,6 +154,8 @@ message RangeAllocation {
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
 // +openshift:compatibility-gen:level=1
 message RangeAllocationList {
+  // metadata is the standard list's metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of RangeAllocations.
@@ -203,6 +207,8 @@ message SELinuxContextStrategyOptions {
 // +kubebuilder:singular=securitycontextconstraint
 // +openshift:compatibility-gen:level=1
 message SecurityContextConstraints {
+  // metadata is the standard object's metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Priority influences the sort order of SCCs when evaluating which SCCs to try first for
@@ -346,6 +352,8 @@ message SecurityContextConstraints {
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
 // +openshift:compatibility-gen:level=1
 message SecurityContextConstraintsList {
+  // metadata is the standard list's metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of security context constraints.

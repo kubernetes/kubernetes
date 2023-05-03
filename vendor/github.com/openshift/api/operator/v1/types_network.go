@@ -15,7 +15,10 @@ import (
 // +k8s:openapi-gen=true
 // +openshift:compatibility-gen:level=1
 type Network struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
+
+	// metadata is the standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	Spec   NetworkSpec   `json:"spec,omitempty"`
@@ -36,8 +39,12 @@ type NetworkStatus struct {
 // +openshift:compatibility-gen:level=1
 type NetworkList struct {
 	metav1.TypeMeta `json:",inline"`
+
+	// metadata is the standard list's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Network `json:"items"`
+
+	Items []Network `json:"items"`
 }
 
 // NetworkSpec is the top-level network configuration object.
@@ -404,7 +411,8 @@ type KuryrConfig struct {
 	// mtu is the MTU that Kuryr should use when creating pod networks in Neutron.
 	// The value has to be lower or equal to the MTU of the nodes network and Neutron has
 	// to allow creation of tenant networks with such MTU. If unset Pod networks will be
-	// created with the same MTU as the nodes network has.
+	// created with the same MTU as the nodes network has. This also affects the services
+	// network created by cluster-network-operator.
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	MTU *uint32 `json:"mtu,omitempty"`

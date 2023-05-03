@@ -512,7 +512,7 @@ __EOF__
   local tries=5
   for i in $(seq 1 $tries); do
       local output
-      output=$(kubectl "${kube_flags[@]:?}" api-resources --api-group example.com -oname)
+      output=$(kubectl "${kube_flags[@]:?}" api-resources --api-group example.com -oname || true)
       if kube::test::if_has_string "$output" deprecated.example.com; then
           break
       fi

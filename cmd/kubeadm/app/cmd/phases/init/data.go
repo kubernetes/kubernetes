@@ -35,7 +35,7 @@ type InitData interface {
 	Cfg() *kubeadmapi.InitConfiguration
 	DryRun() bool
 	SkipTokenPrint() bool
-	IgnorePreflightErrors() sets.String
+	IgnorePreflightErrors() sets.Set[string]
 	CertificateWriteDir() string
 	CertificateDir() string
 	KubeConfigDir() string

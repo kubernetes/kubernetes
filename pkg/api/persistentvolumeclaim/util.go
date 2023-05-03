@@ -49,6 +49,10 @@ func DropDisabledFields(pvcSpec, oldPVCSpec *core.PersistentVolumeClaimSpec) {
 			pvcSpec.DataSourceRef = nil
 		}
 	}
+
+	// Setting VolumeClaimTemplate.Resources.Claims should have been caught by validation when
+	// extending ResourceRequirements in 1.26. Now we can only accept it and drop the field.
+	pvcSpec.Resources.Claims = nil
 }
 
 // EnforceDataSourceBackwardsCompatibility drops the data source field under certain conditions

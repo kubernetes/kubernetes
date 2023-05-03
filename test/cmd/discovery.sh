@@ -55,7 +55,152 @@ run_assert_short_name_tests() {
   output_message=$(kubectl get --raw=/api/v1)
 
   ## test if a short name is exported during discovery
-  kube::test::if_has_string "${output_message}" '{"name":"configmaps","singularName":"","namespaced":true,"kind":"ConfigMap","verbs":\["create","delete","deletecollection","get","list","patch","update","watch"\],"shortNames":\["cm"\],"storageVersionHash":'
+  kube::test::if_has_string "${output_message}" '{"name":"configmaps","singularName":"configmap","namespaced":true,"kind":"ConfigMap","verbs":\["create","delete","deletecollection","get","list","patch","update","watch"\],"shortNames":\["cm"\],"storageVersionHash":'
+
+  # check that there is no pod with the name test-crd-example
+  output_message=$(kubectl get pod)
+  kube::test::if_has_not_string "${output_message}" "test-crd-example"
+
+    kubectl create -f - << __EOF__
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: examples.test.com
+spec:
+  group: test.com
+  scope: Namespaced
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                test:
+                  type: string
+  names:
+    plural: examples
+    singular: example
+    shortNames:
+      - pod
+    kind: Example
+__EOF__
+
+  # Test that we can list this new custom resource
+  kube::test::wait_object_assert customresourcedefinitions "{{range.items}}{{if eq ${id_field:?} \"examples.test.com\"}}{{$id_field}}:{{end}}{{end}}" 'examples.test.com:'
+
+  kubectl create -f - << __EOF__
+apiVersion: test.com/v1
+kind: Example
+metadata:
+  name: test-crd-example
+spec:
+  test: test
+__EOF__
+
+  # Test that we can list this new custom resource
+  kube::test::wait_object_assert examples "{{range.items}}{{${id_field:?}}}:{{end}}" 'test-crd-example:'
+
+  output_message=$(kubectl get examples)
+  kube::test::if_has_string "${output_message}" "test-crd-example"
+
+  # test that get pod returns v1/pod instead crd
+  output_message=$(kubectl get pod)
+  kube::test::if_has_not_string "${output_message}" "test-crd-example"
+
+  # invalidate cache and assure that still correct resource is shown
+  kubectl api-resources
+
+  # retest the above cases after invalidating cache
+  output_message=$(kubectl get examples)
+  kube::test::if_has_string "${output_message}" "test-crd-example"
+
+  output_message=$(kubectl get pod)
+  kube::test::if_has_not_string "${output_message}" "test-crd-example"
+
+  # Cleanup
+  kubectl delete examples/test-crd-example
+  kubectl delete customresourcedefinition examples.test.com
+
+  set +o nounset
+  set +o errexit
+}
+
+run_assert_singular_name_tests() {
+  set -o nounset
+  set -o errexit
+
+  create_and_use_new_namespace
+  kube::log::status "Testing assert singular name"
+
+  # check that there is no pod with the name test-crd-example
+  output_message=$(kubectl get pod)
+  kube::test::if_has_not_string "${output_message}" "test-crd-example"
+
+  kubectl create -f - << __EOF__
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: examples.test.com
+spec:
+  group: test.com
+  scope: Namespaced
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                test:
+                  type: string
+  names:
+    plural: examples
+    singular: pod
+    kind: Example
+__EOF__
+
+  # Test that we can list this new custom resource
+  kube::test::wait_object_assert customresourcedefinitions "{{range.items}}{{if eq ${id_field:?} \"examples.test.com\"}}{{$id_field}}:{{end}}{{end}}" 'examples.test.com:'
+
+  kubectl create -f - << __EOF__
+apiVersion: test.com/v1
+kind: Example
+metadata:
+  name: test-crd-example
+spec:
+  test: test
+__EOF__
+
+  # Test that we can list this new custom resource
+  kube::test::wait_object_assert examples "{{range.items}}{{$id_field}}:{{end}}" 'test-crd-example:'
+
+  output_message=$(kubectl get examples)
+  kube::test::if_has_string "${output_message}" "test-crd-example"
+
+  output_message=$(kubectl get pod)
+  kube::test::if_has_not_string "${output_message}" "test-crd-example"
+
+  # invalidate cache and assure that still correct resource is shown
+  kubectl api-resources
+
+  output_message=$(kubectl get examples)
+  kube::test::if_has_string "${output_message}" "test-crd-example"
+
+  output_message=$(kubectl get pod)
+  kube::test::if_has_not_string "${output_message}" "test-crd-example"
+
+  # Cleanup
+  kubectl delete examples/test-crd-example
+  kubectl delete customresourcedefinition examples.test.com
 
   set +o nounset
   set +o errexit

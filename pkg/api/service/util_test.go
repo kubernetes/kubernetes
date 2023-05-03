@@ -152,25 +152,25 @@ func TestRequestsOnlyLocalTraffic(t *testing.T) {
 	checkRequestsOnlyLocalTraffic(false, &api.Service{
 		Spec: api.ServiceSpec{
 			Type:                  api.ServiceTypeNodePort,
-			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeCluster,
+			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyCluster,
 		},
 	})
 	checkRequestsOnlyLocalTraffic(true, &api.Service{
 		Spec: api.ServiceSpec{
 			Type:                  api.ServiceTypeNodePort,
-			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeLocal,
+			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyLocal,
 		},
 	})
 	checkRequestsOnlyLocalTraffic(false, &api.Service{
 		Spec: api.ServiceSpec{
 			Type:                  api.ServiceTypeLoadBalancer,
-			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeCluster,
+			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyCluster,
 		},
 	})
 	checkRequestsOnlyLocalTraffic(true, &api.Service{
 		Spec: api.ServiceSpec{
 			Type:                  api.ServiceTypeLoadBalancer,
-			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeLocal,
+			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyLocal,
 		},
 	})
 }
@@ -192,25 +192,25 @@ func TestNeedsHealthCheck(t *testing.T) {
 	checkNeedsHealthCheck(false, &api.Service{
 		Spec: api.ServiceSpec{
 			Type:                  api.ServiceTypeNodePort,
-			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeCluster,
+			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyCluster,
 		},
 	})
 	checkNeedsHealthCheck(false, &api.Service{
 		Spec: api.ServiceSpec{
 			Type:                  api.ServiceTypeNodePort,
-			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeLocal,
+			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyLocal,
 		},
 	})
 	checkNeedsHealthCheck(false, &api.Service{
 		Spec: api.ServiceSpec{
 			Type:                  api.ServiceTypeLoadBalancer,
-			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeCluster,
+			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyCluster,
 		},
 	})
 	checkNeedsHealthCheck(true, &api.Service{
 		Spec: api.ServiceSpec{
 			Type:                  api.ServiceTypeLoadBalancer,
-			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeLocal,
+			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyLocal,
 		},
 	})
 }

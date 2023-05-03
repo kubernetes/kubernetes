@@ -74,7 +74,6 @@ type AutoscaleOptions struct {
 	enforceNamespace bool
 	namespace        string
 	dryRunStrategy   cmdutil.DryRunStrategy
-	dryRunVerifier   *resource.QueryParamVerifier
 	builder          *resource.Builder
 	fieldManager     string
 
@@ -138,15 +137,10 @@ func (o *AutoscaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	if err != nil {
 		return err
 	}
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
 	discoveryClient, err := f.ToDiscoveryClient()
 	if err != nil {
 		return err
 	}
-	o.dryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 	o.createAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
 	o.builder = f.NewBuilder()
 	o.scaleKindResolver = scale.NewDiscoveryScaleKindResolver(discoveryClient)
@@ -242,9 +236,6 @@ func (o *AutoscaleOptions) Run() error {
 			createOptions.FieldManager = o.fieldManager
 		}
 		if o.dryRunStrategy == cmdutil.DryRunServer {
-			if err := o.dryRunVerifier.HasSupport(hpa.GroupVersionKind()); err != nil {
-				return err
-			}
 			createOptions.DryRun = []string{metav1.DryRunAll}
 		}
 		actualHPA, err := o.HPAClient.HorizontalPodAutoscalers(o.namespace).Create(context.TODO(), hpa, createOptions)

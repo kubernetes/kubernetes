@@ -35,22 +35,17 @@ if ! ${ALL} ; then
 	echo "Running in short-circuit mode; run with FORCE_ALL=true to force all scripts to run."
 fi
 
-# Skip bazel since it's not used downstream
-BASH_TARGETS="
+BASH_TARGETS=(
 	update-kubensenter
 	update-test-annotations
-	update-generated-protobuf
 	update-codegen
-	update-generated-runtime
-	update-generated-device-plugin
-	update-generated-dynamic-resource-allocation
 	update-generated-api-compatibility-data
 	update-generated-docs
-	update-generated-swagger-docs
 	update-openapi-spec
-	update-gofmt"
+	update-gofmt
+)
 
-for t in ${BASH_TARGETS}; do
+for t in "${BASH_TARGETS[@]}"; do
 	echo -e "${color_yellow:?}Running ${t}${color_norm:?}"
 	if ${SILENT} ; then
 		if ! bash "${KUBE_ROOT}/hack/${t}.sh" 1> /dev/null; then

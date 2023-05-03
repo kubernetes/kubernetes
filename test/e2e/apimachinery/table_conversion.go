@@ -50,18 +50,18 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 		e2eskipper.SkipUnlessServerVersionGTE(serverPrintVersion, f.ClientSet.Discovery())
 	})
 
-	ginkgo.It("should return pod details", func() {
+	ginkgo.It("should return pod details", func(ctx context.Context) {
 		ns := f.Namespace.Name
 		c := f.ClientSet
 
 		podName := "pod-1"
 		framework.Logf("Creating pod %s", podName)
 
-		_, err := c.CoreV1().Pods(ns).Create(context.TODO(), newTablePod(ns, podName), metav1.CreateOptions{})
+		_, err := c.CoreV1().Pods(ns).Create(ctx, newTablePod(ns, podName), metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create pod %s in namespace: %s", podName, ns)
 
 		table := &metav1beta1.Table{}
-		err = c.CoreV1().RESTClient().Get().Resource("pods").Namespace(ns).Name(podName).SetHeader("Accept", "application/json;as=Table;v=v1beta1;g=meta.k8s.io").Do(context.TODO()).Into(table)
+		err = c.CoreV1().RESTClient().Get().Resource("pods").Namespace(ns).Name(podName).SetHeader("Accept", "application/json;as=Table;v=v1beta1;g=meta.k8s.io").Do(ctx).Into(table)
 		framework.ExpectNoError(err, "failed to get pod %s in Table form in namespace: %s", podName, ns)
 		framework.Logf("Table: %#v", table)
 
@@ -77,15 +77,15 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 		framework.Logf("Table:\n%s", out)
 	})
 
-	ginkgo.It("should return chunks of table results for list calls", func() {
+	ginkgo.It("should return chunks of table results for list calls", func(ctx context.Context) {
 		ns := f.Namespace.Name
 		c := f.ClientSet
 		client := c.CoreV1().PodTemplates(ns)
 
 		ginkgo.By("creating a large number of resources")
-		workqueue.ParallelizeUntil(context.TODO(), 5, 20, func(i int) {
+		workqueue.ParallelizeUntil(ctx, 5, 20, func(i int) {
 			for tries := 3; tries >= 0; tries-- {
-				_, err := client.Create(context.TODO(), &v1.PodTemplate{
+				_, err := client.Create(ctx, &v1.PodTemplate{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: fmt.Sprintf("template-%04d", i),
 					},
@@ -109,7 +109,7 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 		err := c.CoreV1().RESTClient().Get().Namespace(ns).Resource("podtemplates").
 			VersionedParams(&metav1.ListOptions{Limit: 2}, metav1.ParameterCodec).
 			SetHeader("Accept", "application/json;as=Table;v=v1beta1;g=meta.k8s.io").
-			Do(context.TODO()).Into(pagedTable)
+			Do(ctx).Into(pagedTable)
 		framework.ExpectNoError(err, "failed to get pod templates in Table form in namespace: %s", ns)
 		framework.ExpectEqual(len(pagedTable.Rows), 2)
 		framework.ExpectNotEqual(pagedTable.ResourceVersion, "")
@@ -120,22 +120,22 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 		err = c.CoreV1().RESTClient().Get().Namespace(ns).Resource("podtemplates").
 			VersionedParams(&metav1.ListOptions{Continue: pagedTable.Continue}, metav1.ParameterCodec).
 			SetHeader("Accept", "application/json;as=Table;v=v1beta1;g=meta.k8s.io").
-			Do(context.TODO()).Into(pagedTable)
+			Do(ctx).Into(pagedTable)
 		framework.ExpectNoError(err, "failed to get pod templates in Table form in namespace: %s", ns)
-		gomega.Expect(len(pagedTable.Rows)).To(gomega.BeNumerically(">", 0))
+		gomega.Expect(pagedTable.Rows).ToNot(gomega.BeEmpty())
 		framework.ExpectEqual(pagedTable.Rows[0].Cells[0], "template-0002")
 	})
 
-	ginkgo.It("should return generic metadata details across all namespaces for nodes", func() {
+	ginkgo.It("should return generic metadata details across all namespaces for nodes", func(ctx context.Context) {
 		c := f.ClientSet
 
 		table := &metav1beta1.Table{}
-		err := c.CoreV1().RESTClient().Get().Resource("nodes").SetHeader("Accept", "application/json;as=Table;v=v1beta1;g=meta.k8s.io").Do(context.TODO()).Into(table)
+		err := c.CoreV1().RESTClient().Get().Resource("nodes").SetHeader("Accept", "application/json;as=Table;v=v1beta1;g=meta.k8s.io").Do(ctx).Into(table)
 		framework.ExpectNoError(err, "failed to get nodes in Table form across all namespaces")
 		framework.Logf("Table: %#v", table)
 
 		gomega.Expect(len(table.ColumnDefinitions)).To(gomega.BeNumerically(">=", 2))
-		gomega.Expect(len(table.Rows)).To(gomega.BeNumerically(">=", 1))
+		gomega.Expect(table.Rows).ToNot(gomega.BeEmpty())
 		framework.ExpectEqual(len(table.Rows[0].Cells), len(table.ColumnDefinitions))
 		framework.ExpectEqual(table.ColumnDefinitions[0].Name, "Name")
 		framework.ExpectNotEqual(table.ResourceVersion, "")
@@ -151,7 +151,7 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 				Description: Issue a HTTP request to the API.
 		        HTTP request MUST return a HTTP status code of 406.
 	*/
-	framework.ConformanceIt("should return a 406 for a backend which does not implement metadata", func() {
+	framework.ConformanceIt("should return a 406 for a backend which does not implement metadata", func(ctx context.Context) {
 		c := f.ClientSet
 
 		table := &metav1beta1.Table{}
@@ -163,7 +163,7 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 				},
 			},
 		}
-		err := c.AuthorizationV1().RESTClient().Post().Resource("selfsubjectaccessreviews").SetHeader("Accept", "application/json;as=Table;v=v1;g=meta.k8s.io").Body(sar).Do(context.TODO()).Into(table)
+		err := c.AuthorizationV1().RESTClient().Post().Resource("selfsubjectaccessreviews").SetHeader("Accept", "application/json;as=Table;v=v1;g=meta.k8s.io").Body(sar).Do(ctx).Into(table)
 		framework.ExpectError(err, "failed to return error when posting self subject access review: %+v, to a backend that does not implement metadata", sar)
 		framework.ExpectEqual(err.(apierrors.APIStatus).Status().Code, int32(406))
 	})

@@ -70,7 +70,7 @@ func WithAuthorization(handler http.Handler, a authorizer.Authorizer, s runtime.
 			return
 		}
 
-		klog.V(4).InfoS("Forbidden", "URI", req.RequestURI, "Reason", reason)
+		klog.V(4).InfoS("Forbidden", "URI", req.RequestURI, "reason", reason)
 		audit.AddAuditAnnotations(ctx,
 			decisionAnnotationKey, decisionForbid,
 			reasonAnnotationKey, reason)

@@ -118,8 +118,7 @@ func (s *Scheme) Converter() *conversion.Converter {
 // API group and version that would never be updated.
 //
 // TODO: there is discussion about removing unversioned and replacing it with objects that are manifest into
-//
-//	every version with particular schemas. Resolve this method at that point.
+// every version with particular schemas. Resolve this method at that point.
 func (s *Scheme) AddUnversionedTypes(version schema.GroupVersion, types ...Object) {
 	s.addObservedVersion(version)
 	s.AddKnownTypes(version, types...)

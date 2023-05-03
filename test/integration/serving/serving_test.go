@@ -17,6 +17,7 @@ limitations under the License.
 package serving
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -32,6 +33,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	cloudctrlmgrtesting "k8s.io/cloud-provider/app/testing"
 	"k8s.io/cloud-provider/fake"
+	"k8s.io/klog/v2/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	kubectrlmgrtesting "k8s.io/kubernetes/cmd/kube-controller-manager/app/testing"
 	kubeschedulertesting "k8s.io/kubernetes/cmd/kube-scheduler/app/testing"
@@ -39,15 +41,15 @@ import (
 )
 
 type componentTester interface {
-	StartTestServer(t kubectrlmgrtesting.Logger, customFlags []string) (*options.SecureServingOptionsWithLoopback, *server.SecureServingInfo, func(), error)
+	StartTestServer(ctx context.Context, customFlags []string) (*options.SecureServingOptionsWithLoopback, *server.SecureServingInfo, func(), error)
 }
 
 type kubeControllerManagerTester struct{}
 
-func (kubeControllerManagerTester) StartTestServer(t kubectrlmgrtesting.Logger, customFlags []string) (*options.SecureServingOptionsWithLoopback, *server.SecureServingInfo, func(), error) {
+func (kubeControllerManagerTester) StartTestServer(ctx context.Context, customFlags []string) (*options.SecureServingOptionsWithLoopback, *server.SecureServingInfo, func(), error) {
 	// avoid starting any controller loops, we're just testing serving
 	customFlags = append([]string{"--controllers="}, customFlags...)
-	gotResult, err := kubectrlmgrtesting.StartTestServer(t, customFlags)
+	gotResult, err := kubectrlmgrtesting.StartTestServer(ctx, customFlags)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -56,8 +58,8 @@ func (kubeControllerManagerTester) StartTestServer(t kubectrlmgrtesting.Logger, 
 
 type cloudControllerManagerTester struct{}
 
-func (cloudControllerManagerTester) StartTestServer(t kubectrlmgrtesting.Logger, customFlags []string) (*options.SecureServingOptionsWithLoopback, *server.SecureServingInfo, func(), error) {
-	gotResult, err := cloudctrlmgrtesting.StartTestServer(t, customFlags)
+func (cloudControllerManagerTester) StartTestServer(ctx context.Context, customFlags []string) (*options.SecureServingOptionsWithLoopback, *server.SecureServingInfo, func(), error) {
+	gotResult, err := cloudctrlmgrtesting.StartTestServer(ctx, customFlags)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -66,8 +68,8 @@ func (cloudControllerManagerTester) StartTestServer(t kubectrlmgrtesting.Logger,
 
 type kubeSchedulerTester struct{}
 
-func (kubeSchedulerTester) StartTestServer(t kubectrlmgrtesting.Logger, customFlags []string) (*options.SecureServingOptionsWithLoopback, *server.SecureServingInfo, func(), error) {
-	gotResult, err := kubeschedulertesting.StartTestServer(t, customFlags)
+func (kubeSchedulerTester) StartTestServer(ctx context.Context, customFlags []string) (*options.SecureServingOptionsWithLoopback, *server.SecureServingInfo, func(), error) {
+	gotResult, err := kubeschedulertesting.StartTestServer(ctx, customFlags)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -163,7 +165,7 @@ users:
 		extraFlags []string
 	}{
 		{"kube-controller-manager", kubeControllerManagerTester{}, nil},
-		{"cloud-controller-manager", cloudControllerManagerTester{}, []string{"--cloud-provider=fake"}},
+		{"cloud-controller-manager", cloudControllerManagerTester{}, []string{"--cloud-provider=fake", "--webhook-secure-port=0"}},
 		{"kube-scheduler", kubeSchedulerTester{}, nil},
 	}
 
@@ -222,7 +224,8 @@ func testComponentWithSecureServing(t *testing.T, tester componentTester, kubeco
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			secureOptions, secureInfo, tearDownFn, err := tester.StartTestServer(t, append(append([]string{}, tt.flags...), extraFlags...))
+			_, ctx := ktesting.NewTestContext(t)
+			secureOptions, secureInfo, tearDownFn, err := tester.StartTestServer(ctx, append(append([]string{}, tt.flags...), extraFlags...))
 			if tearDownFn != nil {
 				defer tearDownFn()
 			}

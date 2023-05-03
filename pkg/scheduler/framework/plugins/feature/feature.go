@@ -27,4 +27,6 @@ type Features struct {
 	EnableNodeInclusionPolicyInPodTopologySpread bool
 	EnableMatchLabelKeysInPodTopologySpread      bool
 	EnablePodSchedulingReadiness                 bool
+	EnablePodDisruptionConditions                bool
+	EnableInPlacePodVerticalScaling              bool
 }

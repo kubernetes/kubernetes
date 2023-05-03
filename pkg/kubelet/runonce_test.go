@@ -19,6 +19,7 @@ package kubelet
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -72,7 +73,7 @@ func TestRunOnce(t *testing.T) {
 	fakeSecretManager := secret.NewFakeManager()
 	fakeConfigMapManager := configmap.NewFakeManager()
 	podManager := kubepod.NewBasicPodManager(
-		podtest.NewFakeMirrorClient(), fakeSecretManager, fakeConfigMapManager)
+		podtest.NewFakeMirrorClient())
 	fakeRuntime := &containertest.FakeRuntime{}
 	podStartupLatencyTracker := kubeletutil.NewPodStartupLatencyTracker()
 	basePath, err := utiltesting.MkTmpdir("kubelet")
@@ -81,11 +82,11 @@ func TestRunOnce(t *testing.T) {
 	}
 	defer os.RemoveAll(basePath)
 	kb := &Kubelet{
-		rootDirectory:    basePath,
+		rootDirectory:    filepath.Clean(basePath),
 		recorder:         &record.FakeRecorder{},
 		cadvisor:         cadvisor,
 		nodeLister:       testNodeLister{},
-		statusManager:    status.NewManager(nil, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker),
+		statusManager:    status.NewManager(nil, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker, basePath),
 		podManager:       podManager,
 		podWorkers:       &fakePodWorkers{},
 		os:               &containertest.FakeOS{},

@@ -21,11 +21,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"os"
 	"reflect"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -266,8 +264,6 @@ type Proxier struct {
 	healthzServer       healthcheck.ProxierHealthUpdater
 
 	ipvsScheduler string
-	// Added as a member to the struct to allow injection for testing.
-	ipGetter IPGetter
 	// The following buffers are used to reuse memory and avoid allocations
 	// that are significantly impacting performance.
 	iptablesData     *bytes.Buffer
@@ -280,8 +276,8 @@ type Proxier struct {
 	netlinkHandle NetLinkHandle
 	// ipsetList is the list of ipsets that ipvs proxier used.
 	ipsetList map[string]*IPSet
-	// Values are as a parameter to select the interfaces which nodeport works.
-	nodePortAddresses []string
+	// nodePortAddresses selects the interfaces where nodePort works.
+	nodePortAddresses *utilproxy.NodePortAddresses
 	// networkInterfacer defines an interface for several net library functions.
 	// Inject for test purpose.
 	networkInterfacer     utilproxy.NetworkInterfacer
@@ -290,62 +286,16 @@ type Proxier struct {
 	// due to the absence of local endpoints when the internal traffic policy is "Local".
 	// It is used to publish the sync_proxy_rules_no_endpoints_total
 	// metric with the traffic_policy label set to "internal".
-	// sets.String is used here since we end up calculating endpoint topology multiple times for the same Service
+	// A Set is used here since we end up calculating endpoint topology multiple times for the same Service
 	// if it has multiple ports but each Service should only be counted once.
-	serviceNoLocalEndpointsInternal sets.String
-	// serviceNoLocalEndpointsExternal irepresents the set of services that couldn't be applied
+	serviceNoLocalEndpointsInternal sets.Set[string]
+	// serviceNoLocalEndpointsExternal represents the set of services that couldn't be applied
 	// due to the absence of any endpoints when the external traffic policy is "Local".
 	// It is used to publish the sync_proxy_rules_no_endpoints_total
 	// metric with the traffic_policy label set to "external".
-	// sets.String is used here since we end up calculating endpoint topology multiple times for the same Service
+	// A Set is used here since we end up calculating endpoint topology multiple times for the same Service
 	// if it has multiple ports but each Service should only be counted once.
-	serviceNoLocalEndpointsExternal sets.String
-}
-
-// IPGetter helps get node network interface IP and IPs binded to the IPVS dummy interface
-type IPGetter interface {
-	NodeIPs() ([]net.IP, error)
-	BindedIPs() (sets.String, error)
-}
-
-// realIPGetter is a real NodeIP handler, it implements IPGetter.
-type realIPGetter struct {
-	// nl is a handle for revoking netlink interface
-	nl NetLinkHandle
-}
-
-// NodeIPs returns all LOCAL type IP addresses from host which are
-// taken as the Node IPs of NodePort service. Filtered addresses:
-//
-//   - Loopback addresses
-//   - Addresses of the "other" family (not handled by this proxier instance)
-//   - Link-local IPv6 addresses
-//   - Addresses on the created dummy device `kube-ipvs0`
-func (r *realIPGetter) NodeIPs() (ips []net.IP, err error) {
-
-	nodeAddress, err := r.nl.GetAllLocalAddresses()
-	if err != nil {
-		return nil, fmt.Errorf("error listing LOCAL type addresses from host, error: %v", err)
-	}
-
-	// We must exclude the addresses on the IPVS dummy interface
-	bindedAddress, err := r.BindedIPs()
-	if err != nil {
-		return nil, err
-	}
-	ipset := nodeAddress.Difference(bindedAddress)
-
-	// translate ip string to IP
-	for _, ipStr := range ipset.UnsortedList() {
-		a := netutils.ParseIPSloppy(ipStr)
-		ips = append(ips, a)
-	}
-	return ips, nil
-}
-
-// BindedIPs returns all addresses that are binded to the IPVS dummy interface kube-ipvs0
-func (r *realIPGetter) BindedIPs() (sets.String, error) {
-	return r.nl.GetLocalAddresses(defaultDummyDevice)
+	serviceNoLocalEndpointsExternal sets.Set[string]
 }
 
 // Proxier implements proxy.Provider
@@ -356,7 +306,8 @@ var _ proxy.Provider = &Proxier{}
 // An error will be returned if it fails to update or acquire the initial lock.
 // Once a proxier is created, it will keep iptables and ipvs rules up to date in the background and
 // will not terminate if a particular iptables or ipvs call fails.
-func NewProxier(ipt utiliptables.Interface,
+func NewProxier(ipFamily v1.IPFamily,
+	ipt utiliptables.Interface,
 	ipvs utilipvs.Interface,
 	ipset utilipset.Interface,
 	sysctl utilsysctl.Interface,
@@ -376,7 +327,7 @@ func NewProxier(ipt utiliptables.Interface,
 	recorder events.EventRecorder,
 	healthzServer healthcheck.ProxierHealthUpdater,
 	scheduler string,
-	nodePortAddresses []string,
+	nodePortAddressStrings []string,
 	kernelHandler KernelHandler,
 ) (*Proxier, error) {
 	// Proxy needs br_netfilter and bridge-nf-call-iptables=1 when containers
@@ -451,11 +402,6 @@ func NewProxier(ipt utiliptables.Interface,
 	masqueradeValue := 1 << uint(masqueradeBit)
 	masqueradeMark := fmt.Sprintf("%#08x", masqueradeValue)
 
-	ipFamily := v1.IPv4Protocol
-	if ipt.IsIPv6() {
-		ipFamily = v1.IPv6Protocol
-	}
-
 	klog.V(2).InfoS("Record nodeIP and family", "nodeIP", nodeIP, "family", ipFamily)
 
 	if len(scheduler) == 0 {
@@ -463,14 +409,9 @@ func NewProxier(ipt utiliptables.Interface,
 		scheduler = defaultScheduler
 	}
 
-	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses)
+	nodePortAddresses := utilproxy.NewNodePortAddresses(nodePortAddressStrings)
 
-	ipFamilyMap := utilproxy.MapCIDRsByIPFamily(nodePortAddresses)
-	nodePortAddresses = ipFamilyMap[ipFamily]
-	// Log the IPs not matching the ipFamily
-	if ips, ok := ipFamilyMap[utilproxy.OtherIPFamily(ipFamily)]; ok && len(ips) > 0 {
-		klog.InfoS("Found node IPs of the wrong family", "ipFamily", ipFamily, "IPs", ips)
-	}
+	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses, healthzServer)
 
 	// excludeCIDRs has been validated before, here we just parse it to IPNet list
 	parsedExcludeCIDRs, _ := netutils.ParseCIDRs(excludeCIDRs)
@@ -497,7 +438,6 @@ func NewProxier(ipt utiliptables.Interface,
 		healthzServer:         healthzServer,
 		ipvs:                  ipvs,
 		ipvsScheduler:         scheduler,
-		ipGetter:              &realIPGetter{nl: NewNetLinkHandle(ipFamily == v1.IPv6Protocol)},
 		iptablesData:          bytes.NewBuffer(nil),
 		filterChainsData:      bytes.NewBuffer(nil),
 		natChains:             utilproxy.LineBuffer{},
@@ -553,7 +493,7 @@ func NewDualStackProxier(
 	ipFamilyMap := utilproxy.MapCIDRsByIPFamily(nodePortAddresses)
 
 	// Create an ipv4 instance of the single-stack proxier
-	ipv4Proxier, err := NewProxier(ipt[0], ipvs, safeIpset, sysctl,
+	ipv4Proxier, err := NewProxier(v1.IPv4Protocol, ipt[0], ipvs, safeIpset, sysctl,
 		exec, syncPeriod, minSyncPeriod, filterCIDRs(false, excludeCIDRs), strictARP,
 		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
 		localDetectors[0], hostname, nodeIP[0],
@@ -562,7 +502,7 @@ func NewDualStackProxier(
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
 
-	ipv6Proxier, err := NewProxier(ipt[1], ipvs, safeIpset, sysctl,
+	ipv6Proxier, err := NewProxier(v1.IPv6Protocol, ipt[1], ipvs, safeIpset, sysctl,
 		exec, syncPeriod, minSyncPeriod, filterCIDRs(true, excludeCIDRs), strictARP,
 		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
 		localDetectors[1], hostname, nodeIP[1],
@@ -607,7 +547,6 @@ func newServiceInfo(port *v1.ServicePort, service *v1.Service, bsvcPortInfo *pro
 
 // KernelHandler can handle the current installed kernel modules.
 type KernelHandler interface {
-	GetModules() ([]string, error)
 	GetKernelVersion() (string, error)
 }
 
@@ -623,77 +562,10 @@ func NewLinuxKernelHandler() *LinuxKernelHandler {
 	}
 }
 
-// GetModules returns all installed kernel modules.
-func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
-	// Check whether IPVS required kernel modules are built-in
-	kernelVersionStr, err := handle.GetKernelVersion()
-	if err != nil {
-		return nil, err
-	}
-	kernelVersion, err := version.ParseGeneric(kernelVersionStr)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing kernel version %q: %v", kernelVersionStr, err)
-	}
-	ipvsModules := utilipvs.GetRequiredIPVSModules(kernelVersion)
-
-	var bmods, lmods []string
-
-	// Find out loaded kernel modules. If this is a full static kernel it will try to verify if the module is compiled using /boot/config-KERNELVERSION
-	modulesFile, err := os.Open("/proc/modules")
-	if err == os.ErrNotExist {
-		klog.ErrorS(err, "Failed to read file /proc/modules, assuming this is a kernel without loadable modules support enabled")
-		kernelConfigFile := fmt.Sprintf("/boot/config-%s", kernelVersionStr)
-		kConfig, err := ioutil.ReadFile(kernelConfigFile)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read Kernel Config file %s with error %w", kernelConfigFile, err)
-		}
-		for _, module := range ipvsModules {
-			if match, _ := regexp.Match("CONFIG_"+strings.ToUpper(module)+"=y", kConfig); match {
-				bmods = append(bmods, module)
-			}
-		}
-		return bmods, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file /proc/modules with error %w", err)
-	}
-	defer modulesFile.Close()
-
-	mods, err := getFirstColumn(modulesFile)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find loaded kernel modules: %v", err)
-	}
-
-	builtinModsFilePath := fmt.Sprintf("/lib/modules/%s/modules.builtin", kernelVersionStr)
-	b, err := ioutil.ReadFile(builtinModsFilePath)
-	if err != nil {
-		klog.ErrorS(err, "Failed to read builtin modules file, you can ignore this message when kube-proxy is running inside container without mounting /lib/modules", "filePath", builtinModsFilePath)
-	}
-
-	for _, module := range ipvsModules {
-		if match, _ := regexp.Match(module+".ko", b); match {
-			bmods = append(bmods, module)
-		} else {
-			// Try to load the required IPVS kernel modules if not built in
-			err := handle.executor.Command("modprobe", "--", module).Run()
-			if err != nil {
-				klog.InfoS("Failed to load kernel module with modprobe, "+
-					"you can ignore this message when kube-proxy is running inside container without mounting /lib/modules", "moduleName", module)
-			} else {
-				lmods = append(lmods, module)
-			}
-		}
-	}
-
-	mods = append(mods, bmods...)
-	mods = append(mods, lmods...)
-	return mods, nil
-}
-
 // getFirstColumn reads all the content from r into memory and return a
 // slice which consists of the first word from each line.
 func getFirstColumn(r io.Reader) ([]string, error) {
-	b, err := ioutil.ReadAll(r)
+	b, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}
@@ -712,7 +584,7 @@ func getFirstColumn(r io.Reader) ([]string, error) {
 // GetKernelVersion returns currently running kernel version.
 func (handle *LinuxKernelHandler) GetKernelVersion() (string, error) {
 	kernelVersionFile := "/proc/sys/kernel/osrelease"
-	fileContent, err := ioutil.ReadFile(kernelVersionFile)
+	fileContent, err := os.ReadFile(kernelVersionFile)
 	if err != nil {
 		return "", fmt.Errorf("error reading osrelease file %q: %v", kernelVersionFile, err)
 	}
@@ -721,51 +593,18 @@ func (handle *LinuxKernelHandler) GetKernelVersion() (string, error) {
 }
 
 // CanUseIPVSProxier checks if we can use the ipvs Proxier.
-// This is determined by checking if all the required kernel modules can be loaded. It may
-// return an error if it fails to get the kernel modules information without error, in which
-// case it will also return false.
-func CanUseIPVSProxier(handle KernelHandler, ipsetver IPSetVersioner, scheduler string) error {
-	mods, err := handle.GetModules()
-	if err != nil {
-		return fmt.Errorf("error getting installed ipvs required kernel modules: %v", err)
-	}
-	loadModules := sets.NewString()
-	loadModules.Insert(mods...)
-
-	kernelVersionStr, err := handle.GetKernelVersion()
-	if err != nil {
-		return fmt.Errorf("error determining kernel version to find required kernel modules for ipvs support: %v", err)
-	}
-	kernelVersion, err := version.ParseGeneric(kernelVersionStr)
-	if err != nil {
-		return fmt.Errorf("error parsing kernel version %q: %v", kernelVersionStr, err)
-	}
-	mods = utilipvs.GetRequiredIPVSModules(kernelVersion)
-	wantModules := sets.NewString()
-	// We check for the existence of the scheduler mod and will trigger a missingMods error if not found
-	if scheduler == "" {
-		scheduler = defaultScheduler
-	}
-	schedulerMod := "ip_vs_" + scheduler
-	mods = append(mods, schedulerMod)
-	wantModules.Insert(mods...)
-
-	modules := wantModules.Difference(loadModules).UnsortedList()
-	var missingMods []string
-	ConntrackiMissingCounter := 0
-	for _, mod := range modules {
-		if strings.Contains(mod, "nf_conntrack") {
-			ConntrackiMissingCounter++
-		} else {
-			missingMods = append(missingMods, mod)
-		}
-	}
-	if ConntrackiMissingCounter == 2 {
-		missingMods = append(missingMods, "nf_conntrack_ipv4(or nf_conntrack for Linux kernel 4.19 and later)")
-	}
-
-	if len(missingMods) != 0 {
-		return fmt.Errorf("IPVS proxier will not be used because the following required kernel modules are not loaded: %v", missingMods)
+// The ipset version and the scheduler are checked. If any virtual servers (VS)
+// already exist with the configured scheduler, we just return. Otherwise
+// we check if a dummy VS can be configured with the configured scheduler.
+// Kernel modules will be loaded automatically if necessary.
+func CanUseIPVSProxier(ipvs utilipvs.Interface, ipsetver IPSetVersioner, scheduler string) error {
+	// BUG: https://github.com/moby/ipvs/issues/27
+	// If ipvs is not compiled into the kernel no error is returned and handle==nil.
+	// This in turn causes ipvs.GetVirtualServers and ipvs.AddVirtualServer
+	// to return ok (err==nil). If/when this bug is fixed parameter "ipvs" will be nil
+	// if ipvs is not supported by the kernel. Until then a re-read work-around is used.
+	if ipvs == nil {
+		return fmt.Errorf("Ipvs not supported by the kernel")
 	}
 
 	// Check ipset version
@@ -776,6 +615,70 @@ func CanUseIPVSProxier(handle KernelHandler, ipsetver IPSetVersioner, scheduler 
 	if !checkMinVersion(versionString) {
 		return fmt.Errorf("ipset version: %s is less than min required version: %s", versionString, MinIPSetCheckVersion)
 	}
+
+	if scheduler == "" {
+		scheduler = defaultScheduler
+	}
+
+	// If any virtual server (VS) using the scheduler exist we skip the checks.
+	vservers, err := ipvs.GetVirtualServers()
+	if err != nil {
+		klog.ErrorS(err, "Can't read the ipvs")
+		return err
+	}
+	klog.V(5).InfoS("Virtual Servers", "count", len(vservers))
+	if len(vservers) > 0 {
+		// This is most likely a kube-proxy re-start. We know that ipvs works
+		// and if any VS uses the configured scheduler, we are done.
+		for _, vs := range vservers {
+			if vs.Scheduler == scheduler {
+				klog.V(5).InfoS("VS exist, Skipping checks")
+				return nil
+			}
+		}
+		klog.V(5).InfoS("No existing VS uses the configured scheduler", "scheduler", scheduler)
+	}
+
+	// Try to insert a dummy VS with the passed scheduler.
+	// We should use a VIP address that is not used on the node.
+	// An address "198.51.100.0" from the TEST-NET-2 rage in https://datatracker.ietf.org/doc/html/rfc5737
+	// is used. These addresses are reserved for documentation. If the user is using
+	// this address for a VS anyway we *will* mess up, but that would be an invalid configuration.
+	// If the user have configured the address to an interface on the node (but not a VS)
+	// then traffic will temporary be routed to ipvs during the probe and dropped.
+	// The later case is also and invalid configuration, but the traffic impact will be minor.
+	// This should not be a problem if users honors reserved addresses, but cut/paste
+	// from documentation is not unheard of, so the restriction to not use the TEST-NET-2 range
+	// must be documented.
+	vs := utilipvs.VirtualServer{
+		Address:   netutils.ParseIPSloppy("198.51.100.0"),
+		Protocol:  "TCP",
+		Port:      20000,
+		Scheduler: scheduler,
+	}
+	if err := ipvs.AddVirtualServer(&vs); err != nil {
+		klog.ErrorS(err, "Could not create dummy VS", "scheduler", scheduler)
+		return err
+	}
+
+	// To overcome the BUG described above we check that the VS is *really* added.
+	vservers, err = ipvs.GetVirtualServers()
+	if err != nil {
+		klog.ErrorS(err, "ipvs.GetVirtualServers")
+		return err
+	}
+	klog.V(5).InfoS("Virtual Servers after adding dummy", "count", len(vservers))
+	if len(vservers) == 0 {
+		klog.InfoS("Dummy VS not created", "scheduler", scheduler)
+		return fmt.Errorf("Ipvs not supported") // This is a BUG work-around
+	}
+	klog.V(5).InfoS("Dummy VS created", "vs", vs)
+
+	if err := ipvs.DeleteVirtualServer(&vs); err != nil {
+		klog.ErrorS(err, "Could not delete dummy VS")
+		return err
+	}
+
 	return nil
 }
 
@@ -1043,25 +946,33 @@ func (proxier *Proxier) syncProxyRules() {
 	serviceUpdateResult := proxier.svcPortMap.Update(proxier.serviceChanges)
 	endpointUpdateResult := proxier.endpointsMap.Update(proxier.endpointsChanges)
 
-	staleServices := serviceUpdateResult.UDPStaleClusterIP
+	// We need to detect stale connections to UDP Services so we
+	// can clean dangling conntrack entries that can blackhole traffic.
+	conntrackCleanupServiceIPs := serviceUpdateResult.DeletedUDPClusterIPs
+	conntrackCleanupServiceNodePorts := sets.NewInt()
 	// merge stale services gathered from updateEndpointsMap
-	for _, svcPortName := range endpointUpdateResult.StaleServiceNames {
-		if svcInfo, ok := proxier.svcPortMap[svcPortName]; ok && svcInfo != nil && conntrack.IsClearConntrackNeeded(svcInfo.Protocol()) {
-			klog.V(2).InfoS("Stale service", "protocol", strings.ToLower(string(svcInfo.Protocol())), "servicePortName", svcPortName, "clusterIP", svcInfo.ClusterIP())
-			staleServices.Insert(svcInfo.ClusterIP().String())
+	// an UDP service that changes from 0 to non-0 endpoints is considered stale.
+	for _, svcPortName := range endpointUpdateResult.NewlyActiveUDPServices {
+		if svcInfo, ok := proxier.svcPortMap[svcPortName]; ok {
+			klog.V(4).InfoS("Newly-active UDP service may have stale conntrack entries", "servicePortName", svcPortName)
+			conntrackCleanupServiceIPs.Insert(svcInfo.ClusterIP().String())
 			for _, extIP := range svcInfo.ExternalIPStrings() {
-				staleServices.Insert(extIP)
+				conntrackCleanupServiceIPs.Insert(extIP)
 			}
-			for _, extIP := range svcInfo.LoadBalancerIPStrings() {
-				staleServices.Insert(extIP)
+			for _, lbIP := range svcInfo.LoadBalancerIPStrings() {
+				conntrackCleanupServiceIPs.Insert(lbIP)
+			}
+			nodePort := svcInfo.NodePort()
+			if svcInfo.Protocol() == v1.ProtocolUDP && nodePort != 0 {
+				conntrackCleanupServiceNodePorts.Insert(nodePort)
 			}
 		}
 	}
 
 	klog.V(3).InfoS("Syncing ipvs proxier rules")
 
-	proxier.serviceNoLocalEndpointsInternal = sets.NewString()
-	proxier.serviceNoLocalEndpointsExternal = sets.NewString()
+	proxier.serviceNoLocalEndpointsInternal = sets.New[string]()
+	proxier.serviceNoLocalEndpointsExternal = sets.New[string]()
 	// Begin install iptables
 
 	// Reset all buffers used later.
@@ -1093,16 +1004,20 @@ func (proxier *Proxier) syncProxyRules() {
 	}
 
 	// activeIPVSServices represents IPVS service successfully created in this round of sync
-	activeIPVSServices := map[string]bool{}
-	// currentIPVSServices represent IPVS services listed from the system
-	currentIPVSServices := make(map[string]*utilipvs.VirtualServer)
-	// activeBindAddrs represents ip address successfully bind to defaultDummyDevice in this round of sync
-	activeBindAddrs := map[string]bool{}
-
-	bindedAddresses, err := proxier.ipGetter.BindedIPs()
+	activeIPVSServices := sets.New[string]()
+	// activeBindAddrs Represents addresses we want on the defaultDummyDevice after this round of sync
+	activeBindAddrs := sets.New[string]()
+	// alreadyBoundAddrs Represents addresses currently assigned to the dummy interface
+	alreadyBoundAddrs, err := proxier.netlinkHandle.GetLocalAddresses(defaultDummyDevice)
 	if err != nil {
 		klog.ErrorS(err, "Error listing addresses binded to dummy interface")
 	}
+	// nodeAddressSet All addresses *except* those on the dummy interface
+	nodeAddressSet, err := proxier.netlinkHandle.GetAllLocalAddresses()
+	if err != nil {
+		klog.ErrorS(err, "Error listing node addresses")
+	}
+	nodeAddressSet = nodeAddressSet.Difference(alreadyBoundAddrs)
 
 	hasNodePort := false
 	for _, svc := range proxier.svcPortMap {
@@ -1123,7 +1038,7 @@ func (proxier *Proxier) syncProxyRules() {
 	)
 
 	if hasNodePort {
-		nodeAddrSet, err := utilproxy.GetNodeAddresses(proxier.nodePortAddresses, proxier.networkInterfacer)
+		nodeAddrSet, err := proxier.nodePortAddresses.GetNodeAddresses(proxier.networkInterfacer)
 		if err != nil {
 			klog.ErrorS(err, "Failed to get node IP address matching nodeport cidr")
 		} else {
@@ -1134,27 +1049,18 @@ func (proxier *Proxier) syncProxyRules() {
 					continue
 				}
 				if utilproxy.IsZeroCIDR(address) {
-					nodeIPs, err = proxier.ipGetter.NodeIPs()
-					if err != nil {
-						klog.ErrorS(err, "Failed to list all node IPs from host")
+					nodeIPs = nil
+					for _, ipStr := range nodeAddressSet.UnsortedList() {
+						nodeIPs = append(nodeIPs, netutils.ParseIPSloppy(ipStr))
 					}
 					break
 				}
-				nodeIPs = append(nodeIPs, a)
+				if getIPFamily(a) == proxier.ipFamily {
+					nodeIPs = append(nodeIPs, a)
+				}
 			}
 		}
 	}
-
-	// filter node IPs by proxier ipfamily
-	idx := 0
-	for _, nodeIP := range nodeIPs {
-		if (proxier.ipFamily == v1.IPv6Protocol) == netutils.IsIPv6(nodeIP) {
-			nodeIPs[idx] = nodeIP
-			idx++
-		}
-	}
-	// reset slice to filtered entries
-	nodeIPs = nodeIPs[:idx]
 
 	// Build IPVS rules for each service.
 	for svcPortName, svcPort := range proxier.svcPortMap {
@@ -1163,11 +1069,7 @@ func (proxier *Proxier) syncProxyRules() {
 			klog.ErrorS(nil, "Failed to cast serviceInfo", "servicePortName", svcPortName)
 			continue
 		}
-		isIPv6 := netutils.IsIPv6(svcInfo.ClusterIP())
-		localPortIPFamily := netutils.IPv4
-		if isIPv6 {
-			localPortIPFamily = netutils.IPv6
-		}
+
 		protocol := strings.ToLower(string(svcInfo.Protocol()))
 		// Precompute svcNameString; with many services the many calls
 		// to ServicePortName.String() show up in CPU profiles.
@@ -1230,10 +1132,14 @@ func (proxier *Proxier) syncProxyRules() {
 			serv.Flags |= utilipvs.FlagPersistent
 			serv.Timeout = uint32(svcInfo.StickyMaxAgeSeconds())
 		}
+		// Set the source hash flag needed for the distribution method "mh"
+		if proxier.ipvsScheduler == "mh" {
+			serv.Flags |= utilipvs.FlagSourceHash
+		}
 		// We need to bind ClusterIP to dummy interface, so set `bindAddr` parameter to `true` in syncService()
-		if err := proxier.syncService(svcPortNameString, serv, true, bindedAddresses); err == nil {
-			activeIPVSServices[serv.String()] = true
-			activeBindAddrs[serv.Address.String()] = true
+		if err := proxier.syncService(svcPortNameString, serv, true, alreadyBoundAddrs); err == nil {
+			activeIPVSServices.Insert(serv.String())
+			activeBindAddrs.Insert(serv.Address.String())
 			// ExternalTrafficPolicy only works for NodePort and external LB traffic, does not affect ClusterIP
 			// So we still need clusterIP rules in onlyNodeLocalEndpoints mode.
 			internalNodeLocal := false
@@ -1283,10 +1189,13 @@ func (proxier *Proxier) syncProxyRules() {
 				serv.Flags |= utilipvs.FlagPersistent
 				serv.Timeout = uint32(svcInfo.StickyMaxAgeSeconds())
 			}
-			if err := proxier.syncService(svcPortNameString, serv, true, bindedAddresses); err == nil {
-				activeIPVSServices[serv.String()] = true
-				activeBindAddrs[serv.Address.String()] = true
-
+			// Set the source hash flag needed for the distribution method "mh"
+			if proxier.ipvsScheduler == "mh" {
+				serv.Flags |= utilipvs.FlagSourceHash
+			}
+			if err := proxier.syncService(svcPortNameString, serv, true, alreadyBoundAddrs); err == nil {
+				activeIPVSServices.Insert(serv.String())
+				activeBindAddrs.Insert(serv.Address.String())
 				if err := proxier.syncEndpoint(svcPortName, svcInfo.ExternalPolicyLocal(), serv); err != nil {
 					klog.ErrorS(err, "Failed to sync endpoint for service", "servicePortName", svcPortName, "virtualServer", serv)
 				}
@@ -1383,9 +1292,13 @@ func (proxier *Proxier) syncProxyRules() {
 				serv.Flags |= utilipvs.FlagPersistent
 				serv.Timeout = uint32(svcInfo.StickyMaxAgeSeconds())
 			}
-			if err := proxier.syncService(svcPortNameString, serv, true, bindedAddresses); err == nil {
-				activeIPVSServices[serv.String()] = true
-				activeBindAddrs[serv.Address.String()] = true
+			// Set the source hash flag needed for the distribution method "mh"
+			if proxier.ipvsScheduler == "mh" {
+				serv.Flags |= utilipvs.FlagSourceHash
+			}
+			if err := proxier.syncService(svcPortNameString, serv, true, alreadyBoundAddrs); err == nil {
+				activeIPVSServices.Insert(serv.String())
+				activeBindAddrs.Insert(serv.Address.String())
 				if err := proxier.syncEndpoint(svcPortName, svcInfo.ExternalPolicyLocal(), serv); err != nil {
 					klog.ErrorS(err, "Failed to sync endpoint for service", "servicePortName", svcPortName, "virtualServer", serv)
 				}
@@ -1399,32 +1312,6 @@ func (proxier *Proxier) syncProxyRules() {
 				// Skip nodePort configuration since an error occurred when
 				// computing nodeAddresses or nodeIPs.
 				continue
-			}
-
-			var lps []netutils.LocalPort
-			for _, address := range nodeAddresses {
-				lp := netutils.LocalPort{
-					Description: "nodePort for " + svcPortNameString,
-					IP:          address,
-					IPFamily:    localPortIPFamily,
-					Port:        svcInfo.NodePort(),
-					Protocol:    netutils.Protocol(svcInfo.Protocol()),
-				}
-				if utilproxy.IsZeroCIDR(address) {
-					// Empty IP address means all
-					lp.IP = ""
-					lps = append(lps, lp)
-					// If we encounter a zero CIDR, then there is no point in processing the rest of the addresses.
-					break
-				}
-				lps = append(lps, lp)
-			}
-
-			// For ports on node IPs, open the actual port and hold it.
-			for _, lp := range lps {
-				if svcInfo.Protocol() != v1.ProtocolSCTP && lp.Protocol == netutils.UDP {
-					conntrack.ClearEntriesForPort(proxier.exec, lp.Port, isIPv6, v1.ProtocolUDP)
-				}
 			}
 
 			// Nodeports need SNAT, unless they're local.
@@ -1526,9 +1413,13 @@ func (proxier *Proxier) syncProxyRules() {
 					serv.Flags |= utilipvs.FlagPersistent
 					serv.Timeout = uint32(svcInfo.StickyMaxAgeSeconds())
 				}
+				// Set the source hash flag needed for the distribution method "mh"
+				if proxier.ipvsScheduler == "mh" {
+					serv.Flags |= utilipvs.FlagSourceHash
+				}
 				// There is no need to bind Node IP to dummy interface, so set parameter `bindAddr` to `false`.
-				if err := proxier.syncService(svcPortNameString, serv, false, bindedAddresses); err == nil {
-					activeIPVSServices[serv.String()] = true
+				if err := proxier.syncService(svcPortNameString, serv, false, alreadyBoundAddrs); err == nil {
+					activeIPVSServices.Insert(serv.String())
 					if err := proxier.syncEndpoint(svcPortName, svcInfo.ExternalPolicyLocal(), serv); err != nil {
 						klog.ErrorS(err, "Failed to sync endpoint for service", "servicePortName", svcPortName, "virtualServer", serv)
 					}
@@ -1556,7 +1447,7 @@ func (proxier *Proxier) syncProxyRules() {
 	}
 
 	// Set the KUBE-IPVS-IPS set to the "activeBindAddrs"
-	proxier.ipsetList[kubeIPVSSet].activeEntries = sets.StringKeySet(activeBindAddrs)
+	proxier.ipsetList[kubeIPVSSet].activeEntries = activeBindAddrs
 
 	// sync ipset entries
 	for _, set := range proxier.ipsetList {
@@ -1575,14 +1466,14 @@ func (proxier *Proxier) syncProxyRules() {
 	proxier.iptablesData.Write(proxier.filterChains.Bytes())
 	proxier.iptablesData.Write(proxier.filterRules.Bytes())
 
-	klog.V(5).InfoS("Restoring iptables", "rules", string(proxier.iptablesData.Bytes()))
+	klog.V(5).InfoS("Restoring iptables", "rules", proxier.iptablesData.Bytes())
 	err = proxier.iptables.RestoreAll(proxier.iptablesData.Bytes(), utiliptables.NoFlushTables, utiliptables.RestoreCounters)
 	if err != nil {
 		if pErr, ok := err.(utiliptables.ParseError); ok {
 			lines := utiliptables.ExtractLines(proxier.iptablesData.Bytes(), pErr.Line(), 3)
 			klog.ErrorS(pErr, "Failed to execute iptables-restore", "rules", lines)
 		} else {
-			klog.ErrorS(err, "Failed to execute iptables-restore", "rules", string(proxier.iptablesData.Bytes()))
+			klog.ErrorS(err, "Failed to execute iptables-restore", "rules", proxier.iptablesData.Bytes())
 		}
 		metrics.IptablesRestoreFailuresTotal.Inc()
 		return
@@ -1595,15 +1486,20 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 	}
 
-	// Get legacy bind address
-	// currentBindAddrs represents ip addresses bind to defaultDummyDevice from the system
-	currentBindAddrs, err := proxier.netlinkHandle.ListBindAddress(defaultDummyDevice)
-	if err != nil {
-		klog.ErrorS(err, "Failed to get bind address")
+	// Remove superfluous addresses from the dummy device
+	superfluousAddresses := alreadyBoundAddrs.Difference(activeBindAddrs)
+	if superfluousAddresses.Len() > 0 {
+		klog.V(2).InfoS("Removing addresses", "interface", defaultDummyDevice, "addresses", superfluousAddresses)
+		for adr := range superfluousAddresses {
+			if err := proxier.netlinkHandle.UnbindAddress(adr, defaultDummyDevice); err != nil {
+				klog.ErrorS(err, "UnbindAddress", "interface", defaultDummyDevice, "address", adr)
+			}
+		}
 	}
-	legacyBindAddrs := proxier.getLegacyBindAddr(activeBindAddrs, currentBindAddrs)
 
-	// Clean up legacy IPVS services and unbind addresses
+	// currentIPVSServices represent IPVS services listed from the system
+	// (including any we have created in this sync)
+	currentIPVSServices := make(map[string]*utilipvs.VirtualServer)
 	appliedSvcs, err := proxier.ipvs.GetVirtualServers()
 	if err == nil {
 		for _, appliedSvc := range appliedSvcs {
@@ -1612,7 +1508,7 @@ func (proxier *Proxier) syncProxyRules() {
 	} else {
 		klog.ErrorS(err, "Failed to get ipvs service")
 	}
-	proxier.cleanLegacyService(activeIPVSServices, currentIPVSServices, legacyBindAddrs)
+	proxier.cleanLegacyService(activeIPVSServices, currentIPVSServices)
 
 	if proxier.healthzServer != nil {
 		proxier.healthzServer.Updated()
@@ -1622,24 +1518,34 @@ func (proxier *Proxier) syncProxyRules() {
 	// Update service healthchecks.  The endpoints list might include services that are
 	// not "OnlyLocal", but the services list will not, and the serviceHealthServer
 	// will just drop those endpoints.
-	if err := proxier.serviceHealthServer.SyncServices(serviceUpdateResult.HCServiceNodePorts); err != nil {
+	if err := proxier.serviceHealthServer.SyncServices(proxier.svcPortMap.HealthCheckNodePorts()); err != nil {
 		klog.ErrorS(err, "Error syncing healthcheck services")
 	}
-	if err := proxier.serviceHealthServer.SyncEndpoints(endpointUpdateResult.HCEndpointsLocalIPSize); err != nil {
+	if err := proxier.serviceHealthServer.SyncEndpoints(proxier.endpointsMap.LocalReadyEndpoints()); err != nil {
 		klog.ErrorS(err, "Error syncing healthcheck endpoints")
 	}
 
-	// Finish housekeeping.
-	// TODO: these could be made more consistent.
-	for _, svcIP := range staleServices.UnsortedList() {
-		if err := conntrack.ClearEntriesForIP(proxier.exec, svcIP, v1.ProtocolUDP); err != nil {
-			klog.ErrorS(err, "Failed to delete stale service IP connections", "IP", svcIP)
-		}
-	}
-	proxier.deleteEndpointConnections(endpointUpdateResult.StaleEndpoints)
-
 	metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("internal").Set(float64(proxier.serviceNoLocalEndpointsInternal.Len()))
 	metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("external").Set(float64(proxier.serviceNoLocalEndpointsExternal.Len()))
+
+	// Finish housekeeping.
+	// Clear stale conntrack entries for UDP Services, this has to be done AFTER the ipvs rules are programmed.
+	// TODO: these could be made more consistent.
+	klog.V(4).InfoS("Deleting conntrack stale entries for services", "IPs", conntrackCleanupServiceIPs.UnsortedList())
+	for _, svcIP := range conntrackCleanupServiceIPs.UnsortedList() {
+		if err := conntrack.ClearEntriesForIP(proxier.exec, svcIP, v1.ProtocolUDP); err != nil {
+			klog.ErrorS(err, "Failed to delete stale service connections", "IP", svcIP)
+		}
+	}
+	klog.V(4).InfoS("Deleting conntrack stale entries for services", "nodePorts", conntrackCleanupServiceNodePorts.UnsortedList())
+	for _, nodePort := range conntrackCleanupServiceNodePorts.UnsortedList() {
+		err := conntrack.ClearEntriesForPort(proxier.exec, nodePort, proxier.ipFamily == v1.IPv6Protocol, v1.ProtocolUDP)
+		if err != nil {
+			klog.ErrorS(err, "Failed to clear udp conntrack", "nodePort", nodePort)
+		}
+	}
+	klog.V(4).InfoS("Deleting stale endpoint connections", "endpoints", endpointUpdateResult.DeletedUDPEndpoints)
+	proxier.deleteUDPEndpointConnections(endpointUpdateResult.DeletedUDPEndpoints)
 }
 
 // writeIptablesRules write all iptables rules to proxier.natRules or proxier.FilterRules that ipvs proxier needed
@@ -1906,35 +1812,43 @@ func (proxier *Proxier) createAndLinkKubeChain() {
 
 }
 
-// After a UDP or SCTP endpoint has been removed, we must flush any pending conntrack entries to it, or else we
+// After a UDP endpoint has been removed, we must flush any pending conntrack entries to it, or else we
 // risk sending more traffic to it, all of which will be lost (because UDP).
 // This assumes the proxier mutex is held
-func (proxier *Proxier) deleteEndpointConnections(connectionMap []proxy.ServiceEndpoint) {
-	for _, epSvcPair := range connectionMap {
-		if svcInfo, ok := proxier.svcPortMap[epSvcPair.ServicePortName]; ok && conntrack.IsClearConntrackNeeded(svcInfo.Protocol()) {
+// TODO: move it to util
+func (proxier *Proxier) deleteUDPEndpointConnections(deletedUDPEndpoints []proxy.ServiceEndpoint) {
+	for _, epSvcPair := range deletedUDPEndpoints {
+		if svcInfo, ok := proxier.svcPortMap[epSvcPair.ServicePortName]; ok {
 			endpointIP := utilproxy.IPPart(epSvcPair.Endpoint)
-			svcProto := svcInfo.Protocol()
-			err := conntrack.ClearEntriesForNAT(proxier.exec, svcInfo.ClusterIP().String(), endpointIP, svcProto)
+			nodePort := svcInfo.NodePort()
+			var err error
+			if nodePort != 0 {
+				err = conntrack.ClearEntriesForPortNAT(proxier.exec, endpointIP, nodePort, v1.ProtocolUDP)
+				if err != nil {
+					klog.ErrorS(err, "Failed to delete nodeport-related endpoint connections", "servicePortName", epSvcPair.ServicePortName)
+				}
+			}
+			err = conntrack.ClearEntriesForNAT(proxier.exec, svcInfo.ClusterIP().String(), endpointIP, v1.ProtocolUDP)
 			if err != nil {
 				klog.ErrorS(err, "Failed to delete endpoint connections", "servicePortName", epSvcPair.ServicePortName)
 			}
 			for _, extIP := range svcInfo.ExternalIPStrings() {
-				err := conntrack.ClearEntriesForNAT(proxier.exec, extIP, endpointIP, svcProto)
+				err := conntrack.ClearEntriesForNAT(proxier.exec, extIP, endpointIP, v1.ProtocolUDP)
 				if err != nil {
-					klog.ErrorS(err, "Failed to delete endpoint connections for externalIP", "servicePortName", epSvcPair.ServicePortName, "IP", extIP)
+					klog.ErrorS(err, "Failed to delete endpoint connections for externalIP", "servicePortName", epSvcPair.ServicePortName, "externalIP", extIP)
 				}
 			}
 			for _, lbIP := range svcInfo.LoadBalancerIPStrings() {
-				err := conntrack.ClearEntriesForNAT(proxier.exec, lbIP, endpointIP, svcProto)
+				err := conntrack.ClearEntriesForNAT(proxier.exec, lbIP, endpointIP, v1.ProtocolUDP)
 				if err != nil {
-					klog.ErrorS(err, "Failed to delete endpoint connections for LoadBalancerIP", "servicePortName", epSvcPair.ServicePortName, "IP", lbIP)
+					klog.ErrorS(err, "Failed to delete endpoint connections for LoadBalancerIP", "servicePortName", epSvcPair.ServicePortName, "loadBalancerIP", lbIP)
 				}
 			}
 		}
 	}
 }
 
-func (proxier *Proxier) syncService(svcName string, vs *utilipvs.VirtualServer, bindAddr bool, bindedAddresses sets.String) error {
+func (proxier *Proxier) syncService(svcName string, vs *utilipvs.VirtualServer, bindAddr bool, alreadyBoundAddrs sets.Set[string]) error {
 	appliedVirtualServer, _ := proxier.ipvs.GetVirtualServer(vs)
 	if appliedVirtualServer == nil || !appliedVirtualServer.Equal(vs) {
 		if appliedVirtualServer == nil {
@@ -1957,9 +1871,9 @@ func (proxier *Proxier) syncService(svcName string, vs *utilipvs.VirtualServer, 
 
 	// bind service address to dummy interface
 	if bindAddr {
-		// always attempt to bind if bindedAddresses is nil,
+		// always attempt to bind if alreadyBoundAddrs is nil,
 		// otherwise check if it's already binded and return early
-		if bindedAddresses != nil && bindedAddresses.Has(vs.Address.String()) {
+		if alreadyBoundAddrs != nil && alreadyBoundAddrs.Has(vs.Address.String()) {
 			return nil
 		}
 
@@ -2119,31 +2033,19 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 	return nil
 }
 
-func (proxier *Proxier) cleanLegacyService(activeServices map[string]bool, currentServices map[string]*utilipvs.VirtualServer, legacyBindAddrs map[string]bool) {
-	isIPv6 := netutils.IsIPv6(proxier.nodeIP)
-	for cs := range currentServices {
-		svc := currentServices[cs]
+func (proxier *Proxier) cleanLegacyService(activeServices sets.Set[string], currentServices map[string]*utilipvs.VirtualServer) {
+	for cs, svc := range currentServices {
 		if proxier.isIPInExcludeCIDRs(svc.Address) {
 			continue
 		}
-		if netutils.IsIPv6(svc.Address) != isIPv6 {
+		if getIPFamily(svc.Address) != proxier.ipFamily {
 			// Not our family
 			continue
 		}
-		if _, ok := activeServices[cs]; !ok {
+		if !activeServices.Has(cs) {
 			klog.V(4).InfoS("Delete service", "virtualServer", svc)
 			if err := proxier.ipvs.DeleteVirtualServer(svc); err != nil {
 				klog.ErrorS(err, "Failed to delete service", "virtualServer", svc)
-			}
-			addr := svc.Address.String()
-			if _, ok := legacyBindAddrs[addr]; ok {
-				klog.V(4).InfoS("Unbinding address", "address", addr)
-				if err := proxier.netlinkHandle.UnbindAddress(addr, defaultDummyDevice); err != nil {
-					klog.ErrorS(err, "Failed to unbind service from dummy interface", "interface", defaultDummyDevice, "address", addr)
-				} else {
-					// In case we delete a multi-port service, avoid trying to unbind multiple times
-					delete(legacyBindAddrs, addr)
-				}
 			}
 		}
 	}
@@ -2159,19 +2061,11 @@ func (proxier *Proxier) isIPInExcludeCIDRs(ip net.IP) bool {
 	return false
 }
 
-func (proxier *Proxier) getLegacyBindAddr(activeBindAddrs map[string]bool, currentBindAddrs []string) map[string]bool {
-	legacyAddrs := make(map[string]bool)
-	isIPv6 := netutils.IsIPv6(proxier.nodeIP)
-	for _, addr := range currentBindAddrs {
-		addrIsIPv6 := netutils.IsIPv6(netutils.ParseIPSloppy(addr))
-		if addrIsIPv6 && !isIPv6 || !addrIsIPv6 && isIPv6 {
-			continue
-		}
-		if _, ok := activeBindAddrs[addr]; !ok {
-			legacyAddrs[addr] = true
-		}
+func getIPFamily(ip net.IP) v1.IPFamily {
+	if netutils.IsIPv4(ip) {
+		return v1.IPv4Protocol
 	}
-	return legacyAddrs
+	return v1.IPv6Protocol
 }
 
 // ipvs Proxier fall back on iptables when it needs to do SNAT for engress packets

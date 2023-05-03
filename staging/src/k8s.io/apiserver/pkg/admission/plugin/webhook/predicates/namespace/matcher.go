@@ -116,7 +116,7 @@ func (m *Matcher) MatchNamespaceSelector(p NamespaceSelectorProvider, attr admis
 		if !ok {
 			return false, apierrors.NewInternalError(err)
 		}
-		return false, &apierrors.StatusError{status.Status()}
+		return false, &apierrors.StatusError{ErrStatus: status.Status()}
 	}
 	if err != nil {
 		return false, apierrors.NewInternalError(err)

@@ -23,13 +23,12 @@ import (
 	json "encoding/json"
 	"fmt"
 
-	nodev1 "k8s.io/api/node/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/api/node/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	applyconfigurationsnodev1 "k8s.io/client-go/applyconfigurations/node/v1"
+	nodev1 "k8s.io/client-go/applyconfigurations/node/v1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -38,24 +37,24 @@ type FakeRuntimeClasses struct {
 	Fake *FakeNodeV1
 }
 
-var runtimeclassesResource = schema.GroupVersionResource{Group: "node.k8s.io", Version: "v1", Resource: "runtimeclasses"}
+var runtimeclassesResource = v1.SchemeGroupVersion.WithResource("runtimeclasses")
 
-var runtimeclassesKind = schema.GroupVersionKind{Group: "node.k8s.io", Version: "v1", Kind: "RuntimeClass"}
+var runtimeclassesKind = v1.SchemeGroupVersion.WithKind("RuntimeClass")
 
 // Get takes name of the runtimeClass, and returns the corresponding runtimeClass object, and an error if there is any.
-func (c *FakeRuntimeClasses) Get(ctx context.Context, name string, options v1.GetOptions) (result *nodev1.RuntimeClass, err error) {
+func (c *FakeRuntimeClasses) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.RuntimeClass, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(runtimeclassesResource, name), &nodev1.RuntimeClass{})
+		Invokes(testing.NewRootGetAction(runtimeclassesResource, name), &v1.RuntimeClass{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*nodev1.RuntimeClass), err
+	return obj.(*v1.RuntimeClass), err
 }
 
 // List takes label and field selectors, and returns the list of RuntimeClasses that match those selectors.
-func (c *FakeRuntimeClasses) List(ctx context.Context, opts v1.ListOptions) (result *nodev1.RuntimeClassList, err error) {
+func (c *FakeRuntimeClasses) List(ctx context.Context, opts metav1.ListOptions) (result *v1.RuntimeClassList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(runtimeclassesResource, runtimeclassesKind, opts), &nodev1.RuntimeClassList{})
+		Invokes(testing.NewRootListAction(runtimeclassesResource, runtimeclassesKind, opts), &v1.RuntimeClassList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -64,8 +63,8 @@ func (c *FakeRuntimeClasses) List(ctx context.Context, opts v1.ListOptions) (res
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &nodev1.RuntimeClassList{ListMeta: obj.(*nodev1.RuntimeClassList).ListMeta}
-	for _, item := range obj.(*nodev1.RuntimeClassList).Items {
+	list := &v1.RuntimeClassList{ListMeta: obj.(*v1.RuntimeClassList).ListMeta}
+	for _, item := range obj.(*v1.RuntimeClassList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -74,58 +73,58 @@ func (c *FakeRuntimeClasses) List(ctx context.Context, opts v1.ListOptions) (res
 }
 
 // Watch returns a watch.Interface that watches the requested runtimeClasses.
-func (c *FakeRuntimeClasses) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeRuntimeClasses) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(runtimeclassesResource, opts))
 }
 
 // Create takes the representation of a runtimeClass and creates it.  Returns the server's representation of the runtimeClass, and an error, if there is any.
-func (c *FakeRuntimeClasses) Create(ctx context.Context, runtimeClass *nodev1.RuntimeClass, opts v1.CreateOptions) (result *nodev1.RuntimeClass, err error) {
+func (c *FakeRuntimeClasses) Create(ctx context.Context, runtimeClass *v1.RuntimeClass, opts metav1.CreateOptions) (result *v1.RuntimeClass, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(runtimeclassesResource, runtimeClass), &nodev1.RuntimeClass{})
+		Invokes(testing.NewRootCreateAction(runtimeclassesResource, runtimeClass), &v1.RuntimeClass{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*nodev1.RuntimeClass), err
+	return obj.(*v1.RuntimeClass), err
 }
 
 // Update takes the representation of a runtimeClass and updates it. Returns the server's representation of the runtimeClass, and an error, if there is any.
-func (c *FakeRuntimeClasses) Update(ctx context.Context, runtimeClass *nodev1.RuntimeClass, opts v1.UpdateOptions) (result *nodev1.RuntimeClass, err error) {
+func (c *FakeRuntimeClasses) Update(ctx context.Context, runtimeClass *v1.RuntimeClass, opts metav1.UpdateOptions) (result *v1.RuntimeClass, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(runtimeclassesResource, runtimeClass), &nodev1.RuntimeClass{})
+		Invokes(testing.NewRootUpdateAction(runtimeclassesResource, runtimeClass), &v1.RuntimeClass{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*nodev1.RuntimeClass), err
+	return obj.(*v1.RuntimeClass), err
 }
 
 // Delete takes name of the runtimeClass and deletes it. Returns an error if one occurs.
-func (c *FakeRuntimeClasses) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeRuntimeClasses) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteActionWithOptions(runtimeclassesResource, name, opts), &nodev1.RuntimeClass{})
+		Invokes(testing.NewRootDeleteActionWithOptions(runtimeclassesResource, name, opts), &v1.RuntimeClass{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeRuntimeClasses) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeRuntimeClasses) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(runtimeclassesResource, listOpts)
 
-	_, err := c.Fake.Invokes(action, &nodev1.RuntimeClassList{})
+	_, err := c.Fake.Invokes(action, &v1.RuntimeClassList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched runtimeClass.
-func (c *FakeRuntimeClasses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *nodev1.RuntimeClass, err error) {
+func (c *FakeRuntimeClasses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.RuntimeClass, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(runtimeclassesResource, name, pt, data, subresources...), &nodev1.RuntimeClass{})
+		Invokes(testing.NewRootPatchSubresourceAction(runtimeclassesResource, name, pt, data, subresources...), &v1.RuntimeClass{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*nodev1.RuntimeClass), err
+	return obj.(*v1.RuntimeClass), err
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied runtimeClass.
-func (c *FakeRuntimeClasses) Apply(ctx context.Context, runtimeClass *applyconfigurationsnodev1.RuntimeClassApplyConfiguration, opts v1.ApplyOptions) (result *nodev1.RuntimeClass, err error) {
+func (c *FakeRuntimeClasses) Apply(ctx context.Context, runtimeClass *nodev1.RuntimeClassApplyConfiguration, opts metav1.ApplyOptions) (result *v1.RuntimeClass, err error) {
 	if runtimeClass == nil {
 		return nil, fmt.Errorf("runtimeClass provided to Apply must not be nil")
 	}
@@ -138,9 +137,9 @@ func (c *FakeRuntimeClasses) Apply(ctx context.Context, runtimeClass *applyconfi
 		return nil, fmt.Errorf("runtimeClass.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(runtimeclassesResource, *name, types.ApplyPatchType, data), &nodev1.RuntimeClass{})
+		Invokes(testing.NewRootPatchSubresourceAction(runtimeclassesResource, *name, types.ApplyPatchType, data), &v1.RuntimeClass{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*nodev1.RuntimeClass), err
+	return obj.(*v1.RuntimeClass), err
 }

@@ -39,12 +39,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints"
 	"k8s.io/apiserver/pkg/endpoints/openapi"
-	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
 	openapibuilder "k8s.io/kube-openapi/pkg/builder"
 	"k8s.io/kube-openapi/pkg/builder3"
 	"k8s.io/kube-openapi/pkg/common"
+	"k8s.io/kube-openapi/pkg/common/restfuladapter"
 	"k8s.io/kube-openapi/pkg/spec3"
 	"k8s.io/kube-openapi/pkg/util"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -201,7 +200,7 @@ func BuildOpenAPIV3(crd *apiextensionsv1.CustomResourceDefinition, version strin
 		return nil, err
 	}
 
-	return builder3.BuildOpenAPISpec([]*restful.WebService{b.ws}, b.getOpenAPIConfig(false))
+	return builder3.BuildOpenAPISpecFromRoutes(restfuladapter.AdaptWebServices([]*restful.WebService{b.ws}), b.getOpenAPIConfig(false))
 }
 
 // BuildOpenAPIV2 builds OpenAPI v2 for the given crd in the given version
@@ -211,7 +210,7 @@ func BuildOpenAPIV2(crd *apiextensionsv1.CustomResourceDefinition, version strin
 		return nil, err
 	}
 
-	return openapibuilder.BuildOpenAPISpec([]*restful.WebService{b.ws}, b.getOpenAPIConfig(true))
+	return openapibuilder.BuildOpenAPISpecFromRoutes(restfuladapter.AdaptWebServices([]*restful.WebService{b.ws}), b.getOpenAPIConfig(true))
 }
 
 // Implements CanonicalTypeNamer
@@ -347,22 +346,18 @@ func (b *builder) buildRoute(root, path, httpMethod, actionVerb, operationVerb s
 		route.Consumes(runtime.ContentTypeJSON, runtime.ContentTypeYAML)
 	}
 
-	var disabledParams []string
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ServerSideFieldValidation) {
-		disabledParams = []string{"fieldValidation"}
-	}
 	// Build option parameters
 	switch actionVerb {
 	case "get":
-		// TODO: CRD support for export is still under consideration
 		endpoints.AddObjectParams(b.ws, route, &metav1.GetOptions{})
 	case "list", "deletecollection":
 		endpoints.AddObjectParams(b.ws, route, &metav1.ListOptions{})
-	case "put", "patch":
-		// TODO: PatchOption added in feature branch but not in master yet
-		endpoints.AddObjectParams(b.ws, route, &metav1.UpdateOptions{}, disabledParams...)
+	case "put":
+		endpoints.AddObjectParams(b.ws, route, &metav1.UpdateOptions{})
+	case "patch":
+		endpoints.AddObjectParams(b.ws, route, &metav1.PatchOptions{})
 	case "post":
-		endpoints.AddObjectParams(b.ws, route, &metav1.CreateOptions{}, disabledParams...)
+		endpoints.AddObjectParams(b.ws, route, &metav1.CreateOptions{})
 	case "delete":
 		endpoints.AddObjectParams(b.ws, route, &metav1.DeleteOptions{})
 		route.Reads(&metav1.DeleteOptions{}).ParameterNamed("body").Required(false)
@@ -499,7 +494,9 @@ func addTypeMetaProperties(s *spec.Schema, v2 bool) {
 func (b *builder) buildListSchema(v2 bool) *spec.Schema {
 	name := definitionPrefix + util.ToRESTFriendlyName(fmt.Sprintf("%s/%s/%s", b.group, b.version, b.kind))
 	doc := fmt.Sprintf("List of %s. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md", b.plural)
-	s := new(spec.Schema).WithDescription(fmt.Sprintf("%s is a list of %s", b.listKind, b.kind)).
+	s := new(spec.Schema).
+		Typed("object", "").
+		WithDescription(fmt.Sprintf("%s is a list of %s", b.listKind, b.kind)).
 		WithRequired("items").
 		SetProperty("items", *spec.ArrayProperty(spec.RefSchema(refForOpenAPIVersion(name, v2))).WithDescription(doc)).
 		SetProperty("metadata", *spec.RefSchema(refForOpenAPIVersion(listMetaSchemaRef, v2)).WithDescription(swaggerPartialObjectMetadataListDescriptions["metadata"]))

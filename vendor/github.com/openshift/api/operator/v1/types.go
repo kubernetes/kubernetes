@@ -10,7 +10,10 @@ import (
 // Compatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.
 // +openshift:compatibility-gen:internal
 type MyOperatorResource struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
+
+	// metadata is the standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata"`
 
 	// +kubebuilder:validation:Required
@@ -70,11 +73,11 @@ type OperatorSpec struct {
 	// +kubebuilder:default=Normal
 	OperatorLogLevel LogLevel `json:"operatorLogLevel,omitempty"`
 
-	// unsupportedConfigOverrides holds a sparse config that will override any previously set options.  It only needs to be the fields to override
-	// it will end up overlaying in the following order:
-	// 1. hardcoded defaults
-	// 2. observedConfig
-	// 3. unsupportedConfigOverrides
+	// unsupportedConfigOverrides overrides the final configuration that was computed by the operator.
+	// Red Hat does not support the use of this field.
+	// Misuse of this field could lead to unexpected behavior or conflict with other configuration options.
+	// Seek guidance from the Red Hat support before using this field.
+	// Use of this property blocks cluster upgrades, it must be removed before upgrading your cluster.
 	// +optional
 	// +nullable
 	// +kubebuilder:pruning:PreserveUnknownFields

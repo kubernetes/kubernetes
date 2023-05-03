@@ -21,9 +21,9 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// TODO: move to reconciler.go and remove old code there when SELinuxMountReadWriteOncePod is GA
+// TODO: move to reconciler.go and remove old code there when NewVolumeManagerReconstruction is GA
 
-// TODO: Replace Run() when SELinuxMountReadWriteOncePod is GA
+// TODO: Replace Run() when NewVolumeManagerReconstruction is GA
 func (rc *reconciler) runNew(stopCh <-chan struct{}) {
 	rc.reconstructVolumes()
 	klog.InfoS("Reconciler: start to sync state")

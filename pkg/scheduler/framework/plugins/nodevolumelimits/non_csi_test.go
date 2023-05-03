@@ -18,6 +18,7 @@ package nodevolumelimits
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"reflect"
@@ -126,14 +127,14 @@ func TestEphemeralLimits(t *testing.T) {
 			newPod:           ephemeralVolumePod,
 			ephemeralEnabled: true,
 			test:             "volume missing",
-			wantStatus:       framework.NewStatus(framework.Error, `looking up PVC test/abc-xyz: persistentvolumeclaim "abc-xyz" not found`),
+			wantStatus:       framework.AsStatus(errors.New(`looking up PVC test/abc-xyz: persistentvolumeclaim "abc-xyz" not found`)),
 		},
 		{
 			newPod:           ephemeralVolumePod,
 			ephemeralEnabled: true,
 			extraClaims:      []v1.PersistentVolumeClaim{*conflictingClaim},
 			test:             "volume not owned",
-			wantStatus:       framework.NewStatus(framework.Error, "PVC test/abc-xyz was not created for pod test/abc (pod is not owner)"),
+			wantStatus:       framework.AsStatus(errors.New("PVC test/abc-xyz was not created for pod test/abc (pod is not owner)")),
 		},
 		{
 			newPod:           ephemeralVolumePod,

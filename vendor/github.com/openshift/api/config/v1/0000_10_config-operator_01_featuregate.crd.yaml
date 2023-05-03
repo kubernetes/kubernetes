@@ -44,12 +44,16 @@ spec:
                       description: disabled is a list of all feature gates that you want to force off
                       type: array
                       items:
+                        description: FeatureGateName is a string to enforce patterns on the name of a FeatureGate
                         type: string
+                        pattern: ^([A-Za-z0-9-]+\.)*[A-Za-z0-9-]+\.?$
                     enabled:
                       description: enabled is a list of all feature gates that you want to force on
                       type: array
                       items:
+                        description: FeatureGateName is a string to enforce patterns on the name of a FeatureGate
                         type: string
+                        pattern: ^([A-Za-z0-9-]+\.)*[A-Za-z0-9-]+\.?$
                   nullable: true
                 featureSet:
                   description: featureSet changes the list of features in the cluster.  The default is empty.  Be very careful adjusting this setting. Turning on or off features may cause irreversible changes in your cluster which cannot be undone.
@@ -57,6 +61,92 @@ spec:
             status:
               description: status holds observed values from the cluster. They may not be overridden.
               type: object
+              properties:
+                conditions:
+                  description: 'conditions represent the observations of the current state. Known .status.conditions.type are: "DeterminationDegraded"'
+                  type: array
+                  items:
+                    description: "Condition contains details for one aspect of the current state of this API Resource. --- This struct is intended for direct use as an array at the field path .status.conditions.  For example, \n type FooStatus struct{ // Represents the observations of a foo's current state. // Known .status.conditions.type are: \"Available\", \"Progressing\", and \"Degraded\" // +patchMergeKey=type // +patchStrategy=merge // +listType=map // +listMapKey=type Conditions []metav1.Condition `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"` \n // other fields }"
+                    type: object
+                    required:
+                      - lastTransitionTime
+                      - message
+                      - reason
+                      - status
+                      - type
+                    properties:
+                      lastTransitionTime:
+                        description: lastTransitionTime is the last time the condition transitioned from one status to another. This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                        type: string
+                        format: date-time
+                      message:
+                        description: message is a human readable message indicating details about the transition. This may be an empty string.
+                        type: string
+                        maxLength: 32768
+                      observedGeneration:
+                        description: observedGeneration represents the .metadata.generation that the condition was set based upon. For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date with respect to the current state of the instance.
+                        type: integer
+                        format: int64
+                        minimum: 0
+                      reason:
+                        description: reason contains a programmatic identifier indicating the reason for the condition's last transition. Producers of specific condition types may define expected values and meanings for this field, and whether the values are considered a guaranteed API. The value should be a CamelCase string. This field may not be empty.
+                        type: string
+                        maxLength: 1024
+                        minLength: 1
+                        pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      status:
+                        description: status of the condition, one of True, False, Unknown.
+                        type: string
+                        enum:
+                          - "True"
+                          - "False"
+                          - Unknown
+                      type:
+                        description: type of condition in CamelCase or in foo.example.com/CamelCase. --- Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be useful (see .node.status.conditions), the ability to deconflict is important. The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                        type: string
+                        maxLength: 316
+                        pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                  x-kubernetes-list-map-keys:
+                    - type
+                  x-kubernetes-list-type: map
+                featureGates:
+                  description: featureGates contains a list of enabled and disabled featureGates that are keyed by payloadVersion. Operators other than the CVO and cluster-config-operator, must read the .status.featureGates, locate the version they are managing, find the enabled/disabled featuregates and make the operand and operator match. The enabled/disabled values for a particular version may change during the life of the cluster as various .spec.featureSet values are selected. Operators may choose to restart their processes to pick up these changes, but remembering past enable/disable lists is beyond the scope of this API and is the responsibility of individual operators. Only featureGates with .version in the ClusterVersion.status will be present in this list.
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - version
+                    properties:
+                      disabled:
+                        description: disabled is a list of all feature gates that are disabled in the cluster for the named version.
+                        type: array
+                        items:
+                          type: object
+                          required:
+                            - name
+                          properties:
+                            name:
+                              description: name is the name of the FeatureGate.
+                              type: string
+                              pattern: ^([A-Za-z0-9-]+\.)*[A-Za-z0-9-]+\.?$
+                      enabled:
+                        description: enabled is a list of all feature gates that are enabled in the cluster for the named version.
+                        type: array
+                        items:
+                          type: object
+                          required:
+                            - name
+                          properties:
+                            name:
+                              description: name is the name of the FeatureGate.
+                              type: string
+                              pattern: ^([A-Za-z0-9-]+\.)*[A-Za-z0-9-]+\.?$
+                      version:
+                        description: version matches the version provided by the ClusterVersion and in the ClusterOperator.Status.Versions field.
+                        type: string
+                  x-kubernetes-list-map-keys:
+                    - version
+                  x-kubernetes-list-type: map
       served: true
       storage: true
       subresources:

@@ -41,7 +41,10 @@ import (
 )
 
 var (
-	fetchEvent = func(recorder *record.FakeRecorder) string {
+	// testHostNameserver and testHostDomain are also being used in dns_windows_test.go.
+	testHostNameserver = "8.8.8.8"
+	testHostDomain     = "host.domain"
+	fetchEvent         = func(recorder *record.FakeRecorder) string {
 		select {
 		case event := <-recorder.Events:
 			return event
@@ -533,8 +536,8 @@ func testGetPodDNS(t *testing.T) {
 		t.Errorf("expected search \".\", got %+v", options[3].DNSSearch)
 	}
 
-	testResolverConfig := "/etc/resolv.conf"
-	configurer = NewConfigurer(recorder, nodeRef, nil, testClusterDNS, testClusterDNSDomain, testResolverConfig)
+	configurer = NewConfigurer(recorder, nodeRef, nil, testClusterDNS, testClusterDNSDomain, defaultResolvConf)
+	configurer.getHostDNSConfig = fakeGetHostDNSConfigCustom
 	for i, pod := range pods {
 		var err error
 		dnsConfig, err := configurer.GetPodDNS(pod)
@@ -591,8 +594,6 @@ func TestGetPodDNSCustom(t *testing.T) {
 	testSvcDomain := fmt.Sprintf("svc.%s", testClusterDNSDomain)
 	testNsSvcDomain := fmt.Sprintf("%s.svc.%s", testPodNamespace, testClusterDNSDomain)
 	testNdotsOptionValue := "3"
-	testHostNameserver := "8.8.8.8"
-	testHostDomain := "host.domain"
 
 	testPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

@@ -421,6 +421,12 @@ items:
     - selfsubjectrulesreviews
     verbs:
     - create
+  - apiGroups:
+    - authentication.k8s.io
+    resources:
+    - selfsubjectreviews
+    verbs:
+    - create
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
@@ -915,7 +921,6 @@ items:
     - nodes/log
     - nodes/metrics
     - nodes/proxy
-    - nodes/spec
     - nodes/stats
     verbs:
     - '*'

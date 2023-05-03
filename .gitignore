@@ -64,6 +64,9 @@ network_closure.sh
 /third_party/etcd*
 /default.etcd
 
+# Also ignore protoc installed by hack/install-protoc.sh
+/third_party/protoc*
+
 # User cluster configs
 .kubeconfig
 

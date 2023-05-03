@@ -18,18 +18,21 @@ package cel
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"math"
 	"strings"
 	"testing"
 	"time"
 
+	"k8s.io/klog/v2"
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
 
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	celconfig "k8s.io/apiserver/pkg/apis/cel"
 )
 
 // TestValidationExpressions tests CEL integration with custom resource values and OpenAPIv3.
@@ -1751,6 +1754,14 @@ func TestValidationExpressions(t *testing.T) {
 				"oldSelf == self",
 			},
 		},
+		{name: "authorizer is not supported for CRD Validation Rules",
+			obj:    []interface{}{},
+			oldObj: []interface{}{},
+			schema: objectTypePtr(map[string]schema.Structural{}),
+			errors: map[string]string{
+				"authorizer.path('/healthz').check('get').isAllowed()": "undeclared reference to 'authorizer'",
+			},
+		},
 	}
 
 	for i := range tests {
@@ -1758,7 +1769,7 @@ func TestValidationExpressions(t *testing.T) {
 		t.Run(tests[i].name, func(t *testing.T) {
 			t.Parallel()
 			tt := tests[i]
-			tt.costBudget = RuntimeCELCostBudget
+			tt.costBudget = celconfig.RuntimeCELCostBudget
 			ctx := context.TODO()
 			for j := range tt.valid {
 				validRule := tt.valid[j]
@@ -1769,7 +1780,7 @@ func TestValidationExpressions(t *testing.T) {
 				t.Run(testName, func(t *testing.T) {
 					t.Parallel()
 					s := withRule(*tt.schema, validRule)
-					celValidator := validator(&s, tt.isRoot, model.SchemaDeclType(&s, tt.isRoot), PerCallLimit)
+					celValidator := validator(&s, tt.isRoot, model.SchemaDeclType(&s, tt.isRoot), celconfig.PerCallLimit)
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
@@ -1793,7 +1804,7 @@ func TestValidationExpressions(t *testing.T) {
 				}
 				t.Run(testName, func(t *testing.T) {
 					s := withRule(*tt.schema, rule)
-					celValidator := NewValidator(&s, true, PerCallLimit)
+					celValidator := NewValidator(&s, true, celconfig.PerCallLimit)
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
@@ -2003,10 +2014,11 @@ func TestValidationExpressionsAtSchemaLevels(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			ctx := context.TODO()
-			celValidator := validator(tt.schema, true, model.SchemaDeclType(tt.schema, true), PerCallLimit)
+			celValidator := validator(tt.schema, true, model.SchemaDeclType(tt.schema, true), celconfig.PerCallLimit)
 			if celValidator == nil {
 				t.Fatal("expected non nil validator")
 			}
@@ -2073,7 +2085,7 @@ func TestCELValidationLimit(t *testing.T) {
 				t.Run(validRule, func(t *testing.T) {
 					t.Parallel()
 					s := withRule(*tt.schema, validRule)
-					celValidator := validator(&s, false, model.SchemaDeclType(&s, false), PerCallLimit)
+					celValidator := validator(&s, false, model.SchemaDeclType(&s, false), celconfig.PerCallLimit)
 
 					// test with cost budget exceeded
 					errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, 0)
@@ -2098,7 +2110,7 @@ func TestCELValidationLimit(t *testing.T) {
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
-					errs, _ = celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
+					errs, _ = celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, celconfig.RuntimeCELCostBudget)
 					for _, err := range errs {
 						if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "no further validation rules will be run due to call cost exceeds limit for rule") {
 							found = true
@@ -2141,11 +2153,11 @@ func TestCELValidationContextCancellation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.TODO()
 			s := withRule(*tt.schema, tt.rule)
-			celValidator := NewValidator(&s, true, PerCallLimit)
+			celValidator := NewValidator(&s, true, celconfig.PerCallLimit)
 			if celValidator == nil {
 				t.Fatal("expected non nil validator")
 			}
-			errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
+			errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, celconfig.RuntimeCELCostBudget)
 			for _, err := range errs {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -2154,7 +2166,7 @@ func TestCELValidationContextCancellation(t *testing.T) {
 			found := false
 			evalCtx, cancel := context.WithTimeout(ctx, time.Microsecond)
 			cancel()
-			errs, _ = celValidator.Validate(evalCtx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
+			errs, _ = celValidator.Validate(evalCtx, field.NewPath("root"), &s, tt.obj, nil, celconfig.RuntimeCELCostBudget)
 			for _, err := range errs {
 				if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "operation interrupted") {
 					found = true
@@ -2199,7 +2211,7 @@ func TestCELMaxRecursionDepth(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.costBudget = RuntimeCELCostBudget
+			tt.costBudget = celconfig.RuntimeCELCostBudget
 			ctx := context.TODO()
 			for j := range tt.valid {
 				validRule := tt.valid[j]
@@ -2207,7 +2219,7 @@ func TestCELMaxRecursionDepth(t *testing.T) {
 				t.Run(testName, func(t *testing.T) {
 					t.Parallel()
 					s := withRule(*tt.schema, validRule)
-					celValidator := validator(&s, tt.isRoot, model.SchemaDeclType(&s, tt.isRoot), PerCallLimit)
+					celValidator := validator(&s, tt.isRoot, model.SchemaDeclType(&s, tt.isRoot), celconfig.PerCallLimit)
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
@@ -2231,7 +2243,7 @@ func TestCELMaxRecursionDepth(t *testing.T) {
 				}
 				t.Run(testName, func(t *testing.T) {
 					s := withRule(*tt.schema, rule)
-					celValidator := NewValidator(&s, true, PerCallLimit)
+					celValidator := NewValidator(&s, true, celconfig.PerCallLimit)
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
@@ -2248,6 +2260,186 @@ func TestCELMaxRecursionDepth(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMessageExpression(t *testing.T) {
+	klog.LogToStderr(false)
+	klog.InitFlags(nil)
+	setDefaultVerbosity(2)
+	defer klog.LogToStderr(true)
+	tests := []struct {
+		name                    string
+		costBudget              int64
+		perCallLimit            uint64
+		message                 string
+		messageExpression       string
+		expectedLogErr          string
+		expectedValidationErr   string
+		expectedRemainingBudget int64
+	}{
+		{
+			name:                    "no cost error expected",
+			messageExpression:       `"static string"`,
+			expectedValidationErr:   "static string",
+			costBudget:              300,
+			expectedRemainingBudget: 300,
+		},
+		{
+			name:                  "messageExpression takes precedence over message",
+			message:               "invisible",
+			messageExpression:     `"this is messageExpression"`,
+			costBudget:            celconfig.RuntimeCELCostBudget,
+			expectedValidationErr: "this is messageExpression",
+		},
+		{
+			name:                    "default rule message used if messageExpression does not eval to string",
+			messageExpression:       `true`,
+			costBudget:              celconfig.RuntimeCELCostBudget,
+			expectedValidationErr:   "failed rule",
+			expectedRemainingBudget: celconfig.RuntimeCELCostBudget,
+		},
+		{
+			name:                    "limit exceeded",
+			messageExpression:       `"string 1" + "string 2" + "string 3"`,
+			costBudget:              1,
+			expectedValidationErr:   "messageExpression evaluation failed due to running out of cost budget",
+			expectedRemainingBudget: -1,
+		},
+		{
+			name:                    "messageExpression budget (str concat)",
+			messageExpression:       `"str1 " + self.str`,
+			costBudget:              50,
+			expectedValidationErr:   "str1 a string",
+			expectedRemainingBudget: 46,
+		},
+		{
+			name:                    "runtime cost preserved if messageExpression fails during evaluation",
+			message:                 "message not messageExpression",
+			messageExpression:       `"str1 " + ["a", "b", "c", "d"][4]`,
+			costBudget:              50,
+			expectedLogErr:          "messageExpression evaluation failed due to: index '4' out of range in list size '4'",
+			expectedValidationErr:   "message not messageExpression",
+			expectedRemainingBudget: 47,
+		},
+		{
+			name:                    "runtime cost preserved if messageExpression fails during evaluation (no message set)",
+			messageExpression:       `"str1 " + ["a", "b", "c", "d"][4]`,
+			costBudget:              50,
+			expectedLogErr:          "messageExpression evaluation failed due to: index '4' out of range in list size '4'",
+			expectedValidationErr:   "failed rule",
+			expectedRemainingBudget: 47,
+		},
+		{
+			name:                    "per-call limit exceeded during messageExpression execution",
+			messageExpression:       `"string 1" + "string 2" + "string 3"`,
+			costBudget:              celconfig.RuntimeCELCostBudget,
+			perCallLimit:            1,
+			expectedValidationErr:   "call cost exceeds limit for messageExpression",
+			expectedRemainingBudget: -1,
+		},
+		{
+			name:                  "messageExpression is not allowed to generate a string with newlines",
+			message:               "message not messageExpression",
+			messageExpression:     `"str with \na newline"`,
+			costBudget:            celconfig.RuntimeCELCostBudget,
+			expectedLogErr:        "messageExpression should not contain line breaks",
+			expectedValidationErr: "message not messageExpression",
+		},
+		{
+			name:                  "messageExpression is not allowed to generate messages >5000 characters",
+			message:               "message not messageExpression",
+			messageExpression:     fmt.Sprintf(`"%s"`, genString(5121, 'a')),
+			costBudget:            celconfig.RuntimeCELCostBudget,
+			expectedLogErr:        "messageExpression beyond allowable length of 5120",
+			expectedValidationErr: "message not messageExpression",
+		},
+		{
+			name:                  "messageExpression is not allowed to generate an empty string",
+			message:               "message not messageExpression",
+			messageExpression:     `string("")`,
+			costBudget:            celconfig.RuntimeCELCostBudget,
+			expectedLogErr:        "messageExpression should evaluate to a non-empty string",
+			expectedValidationErr: "message not messageExpression",
+		},
+		{
+			name:                  "messageExpression is not allowed to generate a string with only spaces",
+			message:               "message not messageExpression",
+			messageExpression:     `string("     ")`,
+			costBudget:            celconfig.RuntimeCELCostBudget,
+			expectedLogErr:        "messageExpression should evaluate to a non-empty string",
+			expectedValidationErr: "message not messageExpression",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			outputBuffer := strings.Builder{}
+			klog.SetOutput(&outputBuffer)
+
+			ctx := context.TODO()
+			var s schema.Structural
+			if tt.message != "" {
+				s = withRuleMessageAndMessageExpression(objectType(map[string]schema.Structural{
+					"str": stringType}), "false", tt.message, tt.messageExpression)
+			} else {
+				s = withRuleAndMessageExpression(objectType(map[string]schema.Structural{
+					"str": stringType}), "false", tt.messageExpression)
+			}
+			obj := map[string]interface{}{
+				"str": "a string",
+			}
+
+			callLimit := uint64(celconfig.PerCallLimit)
+			if tt.perCallLimit != 0 {
+				callLimit = tt.perCallLimit
+			}
+			celValidator := NewValidator(&s, false, callLimit)
+			if celValidator == nil {
+				t.Fatal("expected non nil validator")
+			}
+			errs, remainingBudget := celValidator.Validate(ctx, field.NewPath("root"), &s, obj, nil, tt.costBudget)
+			klog.Flush()
+
+			if len(errs) != 1 {
+				t.Fatalf("expected 1 error, got %d", len(errs))
+			}
+
+			if tt.expectedLogErr != "" {
+				if !strings.Contains(outputBuffer.String(), tt.expectedLogErr) {
+					t.Fatalf("did not find expected log error message: %q\n%q", tt.expectedLogErr, outputBuffer.String())
+				}
+			} else if tt.expectedLogErr == "" && outputBuffer.String() != "" {
+				t.Fatalf("expected no log output, got: %q", outputBuffer.String())
+			}
+
+			if tt.expectedValidationErr != "" {
+				if !strings.Contains(errs[0].Error(), tt.expectedValidationErr) {
+					t.Fatalf("did not find expected validation error message: %q", tt.expectedValidationErr)
+				}
+			}
+
+			if tt.expectedRemainingBudget != 0 {
+				if tt.expectedRemainingBudget != remainingBudget {
+					t.Fatalf("expected %d cost left, got %d", tt.expectedRemainingBudget, remainingBudget)
+				}
+			}
+		})
+	}
+}
+
+func genString(n int, c rune) string {
+	b := strings.Builder{}
+	for i := 0; i < n; i++ {
+		_, err := b.WriteRune(c)
+		if err != nil {
+			panic(err)
+		}
+	}
+	return b.String()
+}
+
+func setDefaultVerbosity(v int) {
+	f := flag.CommandLine.Lookup("v")
+	_ = f.Value.Set(fmt.Sprintf("%d", v))
 }
 
 func BenchmarkCELValidationWithContext(b *testing.B) {
@@ -2276,12 +2468,12 @@ func BenchmarkCELValidationWithContext(b *testing.B) {
 		b.Run(tt.name, func(b *testing.B) {
 			ctx := context.TODO()
 			s := withRule(*tt.schema, tt.rule)
-			celValidator := NewValidator(&s, true, PerCallLimit)
+			celValidator := NewValidator(&s, true, celconfig.PerCallLimit)
 			if celValidator == nil {
 				b.Fatal("expected non nil validator")
 			}
 			for i := 0; i < b.N; i++ {
-				errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
+				errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, celconfig.RuntimeCELCostBudget)
 				for _, err := range errs {
 					b.Fatalf("validation failed: %v", err)
 				}
@@ -2316,14 +2508,14 @@ func BenchmarkCELValidationWithCancelledContext(b *testing.B) {
 		b.Run(tt.name, func(b *testing.B) {
 			ctx := context.TODO()
 			s := withRule(*tt.schema, tt.rule)
-			celValidator := NewValidator(&s, true, PerCallLimit)
+			celValidator := NewValidator(&s, true, celconfig.PerCallLimit)
 			if celValidator == nil {
 				b.Fatal("expected non nil validator")
 			}
 			for i := 0; i < b.N; i++ {
 				evalCtx, cancel := context.WithTimeout(ctx, time.Microsecond)
 				cancel()
-				errs, _ := celValidator.Validate(evalCtx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
+				errs, _ := celValidator.Validate(evalCtx, field.NewPath("root"), &s, tt.obj, nil, celconfig.RuntimeCELCostBudget)
 				//found := false
 				//for _, err := range errs {
 				//	if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "operation interrupted") {
@@ -2370,7 +2562,7 @@ func BenchmarkCELValidationWithAndWithoutOldSelfReference(b *testing.B) {
 					},
 				},
 			}
-			validator := NewValidator(s, true, PerCallLimit)
+			validator := NewValidator(s, true, celconfig.PerCallLimit)
 			if validator == nil {
 				b.Fatal("expected non nil validator")
 			}
@@ -2381,7 +2573,7 @@ func BenchmarkCELValidationWithAndWithoutOldSelfReference(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				errs, _ := validator.Validate(ctx, root, s, obj, obj, RuntimeCELCostBudget)
+				errs, _ := validator.Validate(ctx, root, s, obj, obj, celconfig.RuntimeCELCostBudget)
 				for _, err := range errs {
 					b.Errorf("unexpected error: %v", err)
 				}
@@ -2519,6 +2711,27 @@ func withRule(s schema.Structural, rule string) schema.Structural {
 	s.Extensions.XValidations = apiextensions.ValidationRules{
 		{
 			Rule: rule,
+		},
+	}
+	return s
+}
+
+func withRuleMessageAndMessageExpression(s schema.Structural, rule, message, messageExpression string) schema.Structural {
+	s.Extensions.XValidations = apiextensions.ValidationRules{
+		{
+			Rule:              rule,
+			Message:           message,
+			MessageExpression: messageExpression,
+		},
+	}
+	return s
+}
+
+func withRuleAndMessageExpression(s schema.Structural, rule, messageExpression string) schema.Structural {
+	s.Extensions.XValidations = apiextensions.ValidationRules{
+		{
+			Rule:              rule,
+			MessageExpression: messageExpression,
 		},
 	}
 	return s

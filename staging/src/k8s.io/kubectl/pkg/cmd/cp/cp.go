@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -110,14 +109,14 @@ func NewCmdCp(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.C
 					// complete <namespace>/<pod>
 					namespace := toComplete[:idx]
 					template := "{{ range .items }}{{ .metadata.namespace }}/{{ .metadata.name }}: {{ end }}"
-					comps = completion.CompGetFromTemplate(&template, f, namespace, cmd, []string{"pod"}, toComplete)
+					comps = completion.CompGetFromTemplate(&template, f, namespace, []string{"pod"}, toComplete)
 				} else {
 					// Complete namespaces followed by a /
-					for _, ns := range completion.CompGetResource(f, cmd, "namespace", toComplete) {
+					for _, ns := range completion.CompGetResource(f, "namespace", toComplete) {
 						comps = append(comps, fmt.Sprintf("%s/", ns))
 					}
 					// Complete pod names followed by a :
-					for _, pod := range completion.CompGetResource(f, cmd, "pod", toComplete) {
+					for _, pod := range completion.CompGetResource(f, "pod", toComplete) {
 						comps = append(comps, fmt.Sprintf("%s:", pod))
 					}
 
@@ -129,7 +128,7 @@ func NewCmdCp(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.C
 					//    listing the entire content of the current directory which could
 					//    be too many choices for the user)
 					if len(comps) > 0 && len(toComplete) > 0 {
-						if files, err := ioutil.ReadDir("."); err == nil {
+						if files, err := os.ReadDir("."); err == nil {
 							for _, file := range files {
 								filename := file.Name()
 								if strings.HasPrefix(filename, toComplete) {
@@ -304,7 +303,6 @@ func (o *CopyOptions) copyToPod(src, dest fileSpec, options *exec.ExecOptions) e
 	}(srcFile, destFile, writer)
 	var cmdArr []string
 
-	// TODO: Improve error messages by first testing if 'tar' is present in the container?
 	if o.NoPreserve {
 		cmdArr = []string{"tar", "--no-same-permissions", "--no-same-owner", "-xmf", "-"}
 	} else {
@@ -373,7 +371,6 @@ func (t *TarPipe) initReadFrom(n uint64) {
 			PodName:   t.src.PodName,
 		},
 
-		// TODO: Improve error messages by first testing if 'tar' is present in the container?
 		Command:  []string{"tar", "cf", "-", t.src.File.String()},
 		Executor: &exec.DefaultRemoteExecutor{},
 	}
@@ -425,7 +422,7 @@ func recursiveTar(srcDir, srcFile localPath, destDir, destFile remotePath, tw *t
 			return err
 		}
 		if stat.IsDir() {
-			files, err := ioutil.ReadDir(fpath)
+			files, err := os.ReadDir(fpath)
 			if err != nil {
 				return err
 			}

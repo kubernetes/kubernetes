@@ -45,12 +45,13 @@ var _ = SIGDescribe("ContainerLogRotation [Slow] [Serial] [Disruptive]", func() 
 	f := framework.NewDefaultFramework("container-log-rotation-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when a container generates a lot of log", func() {
-		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			initialConfig.ContainerLogMaxFiles = testContainerLogMaxFiles
 			initialConfig.ContainerLogMaxSize = testContainerLogMaxSize
 		})
 
-		ginkgo.It("should be rotated and limited to a fixed amount of files", func() {
+		var logRotationPod *v1.Pod
+		ginkgo.BeforeEach(func(ctx context.Context) {
 			ginkgo.By("create log container")
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -72,17 +73,22 @@ var _ = SIGDescribe("ContainerLogRotation [Slow] [Serial] [Disruptive]", func() 
 					},
 				},
 			}
-			pod = e2epod.NewPodClient(f).CreateSync(pod)
+			logRotationPod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+			ginkgo.DeferCleanup(e2epod.NewPodClient(f).DeleteSync, logRotationPod.Name, metav1.DeleteOptions{}, time.Minute)
+		})
+
+		ginkgo.It("should be rotated and limited to a fixed amount of files", func(ctx context.Context) {
+
 			ginkgo.By("get container log path")
-			framework.ExpectEqual(len(pod.Status.ContainerStatuses), 1)
-			id := kubecontainer.ParseContainerID(pod.Status.ContainerStatuses[0].ContainerID).ID
+			framework.ExpectEqual(len(logRotationPod.Status.ContainerStatuses), 1, "log rotation pod should have one container")
+			id := kubecontainer.ParseContainerID(logRotationPod.Status.ContainerStatuses[0].ContainerID).ID
 			r, _, err := getCRIClient()
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "should connect to CRI and obtain runtime service clients and image service client")
 			resp, err := r.ContainerStatus(context.Background(), id, false)
 			framework.ExpectNoError(err)
 			logPath := resp.GetStatus().GetLogPath()
 			ginkgo.By("wait for container log being rotated to max file limit")
-			gomega.Eventually(func() (int, error) {
+			gomega.Eventually(ctx, func() (int, error) {
 				logs, err := kubelogs.GetAllLogs(logPath)
 				if err != nil {
 					return 0, err
@@ -90,7 +96,7 @@ var _ = SIGDescribe("ContainerLogRotation [Slow] [Serial] [Disruptive]", func() 
 				return len(logs), nil
 			}, rotationEventuallyTimeout, rotationPollInterval).Should(gomega.Equal(testContainerLogMaxFiles), "should eventually rotate to max file limit")
 			ginkgo.By("make sure container log number won't exceed max file limit")
-			gomega.Consistently(func() (int, error) {
+			gomega.Consistently(ctx, func() (int, error) {
 				logs, err := kubelogs.GetAllLogs(logPath)
 				if err != nil {
 					return 0, err

@@ -19,8 +19,11 @@ package spec3
 import (
 	"encoding/json"
 
-	"k8s.io/kube-openapi/pkg/validation/spec"
 	"github.com/go-openapi/swag"
+	"k8s.io/kube-openapi/pkg/internal"
+	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
+
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 // Example https://swagger.io/specification/#example-object
@@ -49,6 +52,9 @@ func (e *Example) MarshalJSON() ([]byte, error) {
 }
 
 func (e *Example) UnmarshalJSON(data []byte) error {
+	if internal.UseOptimizedJSONUnmarshalingV3 {
+		return jsonv2.Unmarshal(data, e)
+	}
 	if err := json.Unmarshal(data, &e.Refable); err != nil {
 		return err
 	}
@@ -58,6 +64,23 @@ func (e *Example) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &e.VendorExtensible); err != nil {
 		return err
 	}
+	return nil
+}
+
+func (e *Example) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
+	var x struct {
+		spec.Extensions
+		ExampleProps
+	}
+	if err := opts.UnmarshalNext(dec, &x); err != nil {
+		return err
+	}
+	if err := internal.JSONRefFromMap(&e.Ref.Ref, x.Extensions); err != nil {
+		return err
+	}
+	e.Extensions = internal.SanitizeExtensions(x.Extensions)
+	e.ExampleProps = x.ExampleProps
+
 	return nil
 }
 

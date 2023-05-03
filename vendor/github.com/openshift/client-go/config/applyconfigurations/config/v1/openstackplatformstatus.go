@@ -5,12 +5,13 @@ package v1
 // OpenStackPlatformStatusApplyConfiguration represents an declarative configuration of the OpenStackPlatformStatus type for use
 // with apply.
 type OpenStackPlatformStatusApplyConfiguration struct {
-	APIServerInternalIP  *string  `json:"apiServerInternalIP,omitempty"`
-	APIServerInternalIPs []string `json:"apiServerInternalIPs,omitempty"`
-	CloudName            *string  `json:"cloudName,omitempty"`
-	IngressIP            *string  `json:"ingressIP,omitempty"`
-	IngressIPs           []string `json:"ingressIPs,omitempty"`
-	NodeDNSIP            *string  `json:"nodeDNSIP,omitempty"`
+	APIServerInternalIP  *string                                          `json:"apiServerInternalIP,omitempty"`
+	APIServerInternalIPs []string                                         `json:"apiServerInternalIPs,omitempty"`
+	CloudName            *string                                          `json:"cloudName,omitempty"`
+	IngressIP            *string                                          `json:"ingressIP,omitempty"`
+	IngressIPs           []string                                         `json:"ingressIPs,omitempty"`
+	NodeDNSIP            *string                                          `json:"nodeDNSIP,omitempty"`
+	LoadBalancer         *OpenStackPlatformLoadBalancerApplyConfiguration `json:"loadBalancer,omitempty"`
 }
 
 // OpenStackPlatformStatusApplyConfiguration constructs an declarative configuration of the OpenStackPlatformStatus type for use with
@@ -68,5 +69,13 @@ func (b *OpenStackPlatformStatusApplyConfiguration) WithIngressIPs(values ...str
 // If called multiple times, the NodeDNSIP field is set to the value of the last call.
 func (b *OpenStackPlatformStatusApplyConfiguration) WithNodeDNSIP(value string) *OpenStackPlatformStatusApplyConfiguration {
 	b.NodeDNSIP = &value
+	return b
+}
+
+// WithLoadBalancer sets the LoadBalancer field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the LoadBalancer field is set to the value of the last call.
+func (b *OpenStackPlatformStatusApplyConfiguration) WithLoadBalancer(value *OpenStackPlatformLoadBalancerApplyConfiguration) *OpenStackPlatformStatusApplyConfiguration {
+	b.LoadBalancer = value
 	return b
 }

@@ -44,7 +44,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	controllerpkg "k8s.io/kubernetes/pkg/controller"
 	utilnet "k8s.io/utils/net"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/pointer"
 )
 
 var alwaysReady = func() bool { return true }
@@ -477,6 +477,75 @@ func TestSyncEndpointsHeadlessServiceLabel(t *testing.T) {
 	})
 	endpoints.syncService(context.TODO(), ns+"/foo")
 	endpointsHandler.ValidateRequestCount(t, 0)
+}
+
+func TestSyncServiceExternalNameType(t *testing.T) {
+	serviceName := "testing-1"
+	namespace := metav1.NamespaceDefault
+
+	testCases := []struct {
+		desc    string
+		service *v1.Service
+	}{
+		{
+			desc: "External name with selector and ports should not receive endpoints",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: namespace},
+				Spec: v1.ServiceSpec{
+					Selector: map[string]string{"foo": "bar"},
+					Ports:    []v1.ServicePort{{Port: 80}},
+					Type:     v1.ServiceTypeExternalName,
+				},
+			},
+		},
+		{
+			desc: "External name with ports should not receive endpoints",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: namespace},
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{{Port: 80}},
+					Type:  v1.ServiceTypeExternalName,
+				},
+			},
+		},
+		{
+			desc: "External name with selector should not receive endpoints",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: namespace},
+				Spec: v1.ServiceSpec{
+					Selector: map[string]string{"foo": "bar"},
+					Type:     v1.ServiceTypeExternalName,
+				},
+			},
+		},
+		{
+			desc: "External name without selector and ports should not receive endpoints",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: namespace},
+				Spec: v1.ServiceSpec{
+					Type: v1.ServiceTypeExternalName,
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			testServer, endpointsHandler := makeTestServer(t, namespace)
+
+			defer testServer.Close()
+			endpoints := newController(testServer.URL, 0*time.Second)
+			err := endpoints.serviceStore.Add(tc.service)
+			if err != nil {
+				t.Fatalf("Error adding service to service store: %v", err)
+			}
+			err = endpoints.syncService(context.TODO(), namespace+"/"+serviceName)
+			if err != nil {
+				t.Fatalf("Error syncing service: %v", err)
+			}
+			endpointsHandler.ValidateRequestCount(t, 0)
+		})
+	}
 }
 
 func TestSyncEndpointsProtocolUDP(t *testing.T) {
@@ -1942,7 +2011,7 @@ func TestSyncServiceOverCapacity(t *testing.T) {
 		expectedAnnotation:  true,
 	}, {
 		name:                "annotation removed below capacity",
-		startingAnnotation:  utilpointer.StringPtr("truncated"),
+		startingAnnotation:  pointer.String("truncated"),
 		numExisting:         maxCapacity - 1,
 		numDesired:          maxCapacity - 1,
 		numDesiredNotReady:  0,
@@ -1951,7 +2020,7 @@ func TestSyncServiceOverCapacity(t *testing.T) {
 		expectedAnnotation:  false,
 	}, {
 		name:                "annotation was set to warning previously, annotation removed at capacity",
-		startingAnnotation:  utilpointer.StringPtr("warning"),
+		startingAnnotation:  pointer.String("warning"),
 		numExisting:         maxCapacity,
 		numDesired:          maxCapacity,
 		numDesiredNotReady:  0,
@@ -1960,7 +2029,7 @@ func TestSyncServiceOverCapacity(t *testing.T) {
 		expectedAnnotation:  false,
 	}, {
 		name:                "annotation was set to warning previously but still over capacity",
-		startingAnnotation:  utilpointer.StringPtr("warning"),
+		startingAnnotation:  pointer.String("warning"),
 		numExisting:         maxCapacity + 1,
 		numDesired:          maxCapacity + 1,
 		numDesiredNotReady:  0,
@@ -1969,7 +2038,7 @@ func TestSyncServiceOverCapacity(t *testing.T) {
 		expectedAnnotation:  true,
 	}, {
 		name:                "annotation removed at capacity",
-		startingAnnotation:  utilpointer.StringPtr("truncated"),
+		startingAnnotation:  pointer.String("truncated"),
 		numExisting:         maxCapacity,
 		numDesired:          maxCapacity,
 		numDesiredNotReady:  0,
@@ -1978,7 +2047,7 @@ func TestSyncServiceOverCapacity(t *testing.T) {
 		expectedAnnotation:  false,
 	}, {
 		name:                "no endpoints change, annotation value corrected",
-		startingAnnotation:  utilpointer.StringPtr("invalid"),
+		startingAnnotation:  pointer.String("invalid"),
 		numExisting:         maxCapacity + 1,
 		numDesired:          maxCapacity + 1,
 		numDesiredNotReady:  0,
@@ -2133,7 +2202,7 @@ func TestTruncateEndpoints(t *testing.T) {
 }
 
 func TestEndpointPortFromServicePort(t *testing.T) {
-	http := utilpointer.StringPtr("http")
+	http := pointer.String("http")
 	testCases := map[string]struct {
 		serviceAppProtocol           *string
 		expectedEndpointsAppProtocol *string

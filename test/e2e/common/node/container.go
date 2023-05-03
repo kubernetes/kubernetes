@@ -50,7 +50,7 @@ type ConformanceContainer struct {
 }
 
 // Create creates the defined conformance container
-func (cc *ConformanceContainer) Create() {
+func (cc *ConformanceContainer) Create(ctx context.Context) {
 	cc.podName = cc.Container.Name + string(uuid.NewUUID())
 	imagePullSecrets := []v1.LocalObjectReference{}
 	for _, s := range cc.ImagePullSecrets {
@@ -70,17 +70,17 @@ func (cc *ConformanceContainer) Create() {
 			ImagePullSecrets: imagePullSecrets,
 		},
 	}
-	cc.PodClient.Create(pod)
+	cc.PodClient.Create(ctx, pod)
 }
 
 // Delete deletes the defined conformance container
-func (cc *ConformanceContainer) Delete() error {
-	return cc.PodClient.Delete(context.TODO(), cc.podName, *metav1.NewDeleteOptions(0))
+func (cc *ConformanceContainer) Delete(ctx context.Context) error {
+	return cc.PodClient.Delete(ctx, cc.podName, *metav1.NewDeleteOptions(0))
 }
 
 // IsReady returns whether this container is ready and error if any
-func (cc *ConformanceContainer) IsReady() (bool, error) {
-	pod, err := cc.PodClient.Get(context.TODO(), cc.podName, metav1.GetOptions{})
+func (cc *ConformanceContainer) IsReady(ctx context.Context) (bool, error) {
+	pod, err := cc.PodClient.Get(ctx, cc.podName, metav1.GetOptions{})
 	if err != nil {
 		return false, err
 	}
@@ -88,8 +88,8 @@ func (cc *ConformanceContainer) IsReady() (bool, error) {
 }
 
 // GetPhase returns the phase of the pod lifecycle and error if any
-func (cc *ConformanceContainer) GetPhase() (v1.PodPhase, error) {
-	pod, err := cc.PodClient.Get(context.TODO(), cc.podName, metav1.GetOptions{})
+func (cc *ConformanceContainer) GetPhase(ctx context.Context) (v1.PodPhase, error) {
+	pod, err := cc.PodClient.Get(ctx, cc.podName, metav1.GetOptions{})
 	if err != nil {
 		// it doesn't matter what phase to return as error would not be nil
 		return v1.PodSucceeded, err
@@ -98,8 +98,8 @@ func (cc *ConformanceContainer) GetPhase() (v1.PodPhase, error) {
 }
 
 // GetStatus returns the details of the current status of this container and error if any
-func (cc *ConformanceContainer) GetStatus() (v1.ContainerStatus, error) {
-	pod, err := cc.PodClient.Get(context.TODO(), cc.podName, metav1.GetOptions{})
+func (cc *ConformanceContainer) GetStatus(ctx context.Context) (v1.ContainerStatus, error) {
+	pod, err := cc.PodClient.Get(ctx, cc.podName, metav1.GetOptions{})
 	if err != nil {
 		return v1.ContainerStatus{}, err
 	}
@@ -111,8 +111,8 @@ func (cc *ConformanceContainer) GetStatus() (v1.ContainerStatus, error) {
 }
 
 // Present returns whether this pod is present and error if any
-func (cc *ConformanceContainer) Present() (bool, error) {
-	_, err := cc.PodClient.Get(context.TODO(), cc.podName, metav1.GetOptions{})
+func (cc *ConformanceContainer) Present(ctx context.Context) (bool, error) {
+	_, err := cc.PodClient.Get(ctx, cc.podName, metav1.GetOptions{})
 	if err == nil {
 		return true, nil
 	}

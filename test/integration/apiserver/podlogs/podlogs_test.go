@@ -238,6 +238,7 @@ func TestPodLogsKubeletClientCertReload(t *testing.T) {
 				w.WriteHeader(http.StatusUnauthorized)
 			}),
 			nil,
+			nil,
 		),
 	)
 	fakeKubeletServer.TLS = &tls.Config{ClientAuth: tls.RequestClientCert}

@@ -21,6 +21,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -45,7 +46,6 @@ type HollowProxy struct {
 }
 
 type FakeProxier struct {
-	proxyconfig.NoopEndpointSliceHandler
 	proxyconfig.NoopNodeHandler
 }
 
@@ -53,14 +53,14 @@ func (*FakeProxier) Sync() {}
 func (*FakeProxier) SyncLoop() {
 	select {}
 }
-func (*FakeProxier) OnServiceAdd(service *v1.Service)                        {}
-func (*FakeProxier) OnServiceUpdate(oldService, service *v1.Service)         {}
-func (*FakeProxier) OnServiceDelete(service *v1.Service)                     {}
-func (*FakeProxier) OnServiceSynced()                                        {}
-func (*FakeProxier) OnEndpointsAdd(endpoints *v1.Endpoints)                  {}
-func (*FakeProxier) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoints) {}
-func (*FakeProxier) OnEndpointsDelete(endpoints *v1.Endpoints)               {}
-func (*FakeProxier) OnEndpointsSynced()                                      {}
+func (*FakeProxier) OnServiceAdd(service *v1.Service)                                 {}
+func (*FakeProxier) OnServiceUpdate(oldService, service *v1.Service)                  {}
+func (*FakeProxier) OnServiceDelete(service *v1.Service)                              {}
+func (*FakeProxier) OnServiceSynced()                                                 {}
+func (*FakeProxier) OnEndpointSliceAdd(slice *discoveryv1.EndpointSlice)              {}
+func (*FakeProxier) OnEndpointSliceUpdate(oldSlice, slice *discoveryv1.EndpointSlice) {}
+func (*FakeProxier) OnEndpointSliceDelete(slice *discoveryv1.EndpointSlice)           {}
+func (*FakeProxier) OnEndpointSlicesSynced()                                          {}
 
 func NewHollowProxyOrDie(
 	nodeName string,
@@ -82,12 +82,17 @@ func NewHollowProxyOrDie(
 	if useRealProxier {
 		nodeIP := utilnode.GetNodeIP(client, nodeName)
 		if nodeIP == nil {
-			klog.InfoS("can't determine this node's IP, assuming 127.0.0.1")
+			klog.InfoS("Can't determine this node's IP, assuming 127.0.0.1")
 			nodeIP = netutils.ParseIPSloppy("127.0.0.1")
+		}
+		family := v1.IPv4Protocol
+		if iptInterface.IsIPv6() {
+			family = v1.IPv6Protocol
 		}
 		// Real proxier with fake iptables, sysctl, etc underneath it.
 		//var err error
 		proxier, err = iptables.NewProxier(
+			family,
 			iptInterface,
 			sysctl,
 			execer,

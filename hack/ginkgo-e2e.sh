@@ -134,7 +134,6 @@ fi
 # Some arguments (like --nodes) are only supported when using the CLI.
 # Those get set below when choosing the program.
 ginkgo_args=(
-  "--slow-spec-threshold=${GINKGO_SLOW_SPEC_THRESHOLD:-300s}"
   "--poll-progress-after=${GINKGO_POLL_PROGRESS_AFTER:-300s}"
   "--poll-progress-interval=${GINKGO_POLL_PROGRESS_INTERVAL:-20s}"
   "--source-root=${KUBE_ROOT}"
@@ -192,11 +191,16 @@ esac
 # Move Ginkgo arguments that are understood by the suite when not using
 # the CLI.
 suite_args=()
-if [ "${E2E_TEST_DEBUG_TOOL}" != "ginkgo" ]; then
+if [ "${E2E_TEST_DEBUG_TOOL:-ginkgo}" != "ginkgo" ]; then
   for arg in "${ginkgo_args[@]}"; do
     suite_args+=("--ginkgo.${arg#--}")
   done
 fi
+
+# Generate full dumps of the test result and progress in <report-dir>/ginkgo/,
+# using the Ginkgo-specific JSON format and JUnit XML. Ignored if --report-dir
+# is not used.
+suite_args+=(--report-complete-ginkgo --report-complete-junit)
 
 # The following invocation is fairly complex. Let's dump it to simplify
 # determining what the final options are. Enabled by default in CI
@@ -230,4 +234,4 @@ case "${GINKGO_SHOW_COMMAND:-${CI:-no}}" in y|yes|true) set -x ;; esac
   ${E2E_REPORT_DIR:+"--report-dir=${E2E_REPORT_DIR}"} \
   ${E2E_REPORT_PREFIX:+"--report-prefix=${E2E_REPORT_PREFIX}"} \
   "${suite_args[@]:+${suite_args[@]}}" \
-  "${@:-}"
+  "${@}"

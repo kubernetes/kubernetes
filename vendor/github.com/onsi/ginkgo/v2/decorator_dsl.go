@@ -46,7 +46,7 @@ const Pending = internal.Pending
 
 /*
 Serial is a decorator that allows you to mark a spec or container as serial.  These specs will never run in parallel with other specs.
-Tests in ordered containers cannot be marked as serial - mark the ordered container instead.
+Specs in ordered containers cannot be marked as serial - mark the ordered container instead.
 
 You can learn more here: https://onsi.github.io/ginkgo/#serial-specs
 You can learn more about decorators here: https://onsi.github.io/ginkgo/#decorator-reference
@@ -54,13 +54,23 @@ You can learn more about decorators here: https://onsi.github.io/ginkgo/#decorat
 const Serial = internal.Serial
 
 /*
-Ordered is a decorator that allows you to mark a container as ordered.  Tests in the container will always run in the order they appear.
+Ordered is a decorator that allows you to mark a container as ordered.  Specs in the container will always run in the order they appear.
 They will never be randomized and they will never run in parallel with one another, though they may run in parallel with other specs.
 
 You can learn more here: https://onsi.github.io/ginkgo/#ordered-containers
 You can learn more about decorators here: https://onsi.github.io/ginkgo/#decorator-reference
 */
 const Ordered = internal.Ordered
+
+/*
+ContinueOnFailure is a decorator that allows you to mark an Ordered container to continue running specs even if failures occur.  Ordinarily an ordered container will stop running specs after the first failure occurs.  Note that if a BeforeAll or a BeforeEach/JustBeforeEach annotated with OncePerOrdered fails then no specs will run as the precondition for the Ordered container will consider to be failed.
+
+ContinueOnFailure only applies to the outermost Ordered container.  Attempting to place ContinueOnFailure in a nested container will result in an error.
+
+You can learn more here: https://onsi.github.io/ginkgo/#ordered-containers
+You can learn more about decorators here: https://onsi.github.io/ginkgo/#decorator-reference
+*/
+const ContinueOnFailure = internal.ContinueOnFailure
 
 /*
 OncePerOrdered is a decorator that allows you to mark outer BeforeEach, AfterEach, JustBeforeEach, and JustAfterEach setup nodes to run once

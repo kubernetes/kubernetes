@@ -75,7 +75,7 @@ func VerifyFSGroupInPod(f *framework.Framework, filePath, expectedFSGroup string
 }
 
 // getKubeletMainPid return the Main PID of the Kubelet Process
-func getKubeletMainPid(nodeIP string, sudoPresent bool, systemctlPresent bool) string {
+func getKubeletMainPid(ctx context.Context, nodeIP string, sudoPresent bool, systemctlPresent bool) string {
 	command := ""
 	if systemctlPresent {
 		command = "systemctl status kubelet | grep 'Main PID'"
@@ -86,7 +86,7 @@ func getKubeletMainPid(nodeIP string, sudoPresent bool, systemctlPresent bool) s
 		command = fmt.Sprintf("sudo %s", command)
 	}
 	framework.Logf("Attempting `%s`", command)
-	sshResult, err := e2essh.SSH(command, nodeIP, framework.TestContext.Provider)
+	sshResult, err := e2essh.SSH(ctx, command, nodeIP, framework.TestContext.Provider)
 	framework.ExpectNoError(err, fmt.Sprintf("SSH to Node %q errored.", nodeIP))
 	e2essh.LogResult(sshResult)
 	gomega.Expect(sshResult.Code).To(gomega.BeZero(), "Failed to get kubelet PID")
@@ -95,7 +95,7 @@ func getKubeletMainPid(nodeIP string, sudoPresent bool, systemctlPresent bool) s
 }
 
 // TestKubeletRestartsAndRestoresMount tests that a volume mounted to a pod remains mounted after a kubelet restarts
-func TestKubeletRestartsAndRestoresMount(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, volumePath string) {
+func TestKubeletRestartsAndRestoresMount(ctx context.Context, c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, volumePath string) {
 	byteLen := 64
 	seed := time.Now().UTC().UnixNano()
 
@@ -103,7 +103,7 @@ func TestKubeletRestartsAndRestoresMount(c clientset.Interface, f *framework.Fra
 	CheckWriteToPath(f, clientPod, v1.PersistentVolumeFilesystem, false, volumePath, byteLen, seed)
 
 	ginkgo.By("Restarting kubelet")
-	KubeletCommand(KRestart, c, clientPod)
+	KubeletCommand(ctx, KRestart, c, clientPod)
 
 	ginkgo.By("Testing that written file is accessible.")
 	CheckReadFromPath(f, clientPod, v1.PersistentVolumeFilesystem, false, volumePath, byteLen, seed)
@@ -112,7 +112,7 @@ func TestKubeletRestartsAndRestoresMount(c clientset.Interface, f *framework.Fra
 }
 
 // TestKubeletRestartsAndRestoresMap tests that a volume mapped to a pod remains mapped after a kubelet restarts
-func TestKubeletRestartsAndRestoresMap(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, volumePath string) {
+func TestKubeletRestartsAndRestoresMap(ctx context.Context, c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, volumePath string) {
 	byteLen := 64
 	seed := time.Now().UTC().UnixNano()
 
@@ -120,7 +120,7 @@ func TestKubeletRestartsAndRestoresMap(c clientset.Interface, f *framework.Frame
 	CheckWriteToPath(f, clientPod, v1.PersistentVolumeBlock, false, volumePath, byteLen, seed)
 
 	ginkgo.By("Restarting kubelet")
-	KubeletCommand(KRestart, c, clientPod)
+	KubeletCommand(ctx, KRestart, c, clientPod)
 
 	ginkgo.By("Testing that written pv is accessible.")
 	CheckReadFromPath(f, clientPod, v1.PersistentVolumeBlock, false, volumePath, byteLen, seed)
@@ -132,20 +132,20 @@ func TestKubeletRestartsAndRestoresMap(c clientset.Interface, f *framework.Frame
 // forceDelete is true indicating whether the pod is forcefully deleted.
 // checkSubpath is true indicating whether the subpath should be checked.
 // If secondPod is set, it is started when kubelet is down to check that the volume is usable while the old pod is being deleted and the new pod is starting.
-func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, forceDelete bool, checkSubpath bool, secondPod *v1.Pod, volumePath string) {
-	nodeIP, err := getHostAddress(c, clientPod)
+func TestVolumeUnmountsFromDeletedPodWithForceOption(ctx context.Context, c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, forceDelete bool, checkSubpath bool, secondPod *v1.Pod, volumePath string) {
+	nodeIP, err := getHostAddress(ctx, c, clientPod)
 	framework.ExpectNoError(err)
 	nodeIP = nodeIP + ":22"
 
 	ginkgo.By("Expecting the volume mount to be found.")
-	result, err := e2essh.SSH(fmt.Sprintf("mount | grep %s | grep -v volume-subpaths", clientPod.UID), nodeIP, framework.TestContext.Provider)
+	result, err := e2essh.SSH(ctx, fmt.Sprintf("mount | grep %s | grep -v volume-subpaths", clientPod.UID), nodeIP, framework.TestContext.Provider)
 	e2essh.LogResult(result)
 	framework.ExpectNoError(err, "Encountered SSH error.")
 	framework.ExpectEqual(result.Code, 0, fmt.Sprintf("Expected grep exit code of 0, got %d", result.Code))
 
 	if checkSubpath {
 		ginkgo.By("Expecting the volume subpath mount to be found.")
-		result, err := e2essh.SSH(fmt.Sprintf("cat /proc/self/mountinfo | grep %s | grep volume-subpaths", clientPod.UID), nodeIP, framework.TestContext.Provider)
+		result, err := e2essh.SSH(ctx, fmt.Sprintf("cat /proc/self/mountinfo | grep %s | grep volume-subpaths", clientPod.UID), nodeIP, framework.TestContext.Provider)
 		e2essh.LogResult(result)
 		framework.ExpectNoError(err, "Encountered SSH error.")
 		framework.ExpectEqual(result.Code, 0, fmt.Sprintf("Expected grep exit code of 0, got %d", result.Code))
@@ -157,11 +157,9 @@ func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *f
 	CheckWriteToPath(f, clientPod, v1.PersistentVolumeFilesystem, false, volumePath, byteLen, seed)
 
 	// This command is to make sure kubelet is started after test finishes no matter it fails or not.
-	defer func() {
-		KubeletCommand(KStart, c, clientPod)
-	}()
+	ginkgo.DeferCleanup(KubeletCommand, KStart, c, clientPod)
 	ginkgo.By("Stopping the kubelet.")
-	KubeletCommand(KStop, c, clientPod)
+	KubeletCommand(ctx, KStop, c, clientPod)
 
 	if secondPod != nil {
 		ginkgo.By("Starting the second pod")
@@ -171,15 +169,15 @@ func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *f
 
 	ginkgo.By(fmt.Sprintf("Deleting Pod %q", clientPod.Name))
 	if forceDelete {
-		err = c.CoreV1().Pods(clientPod.Namespace).Delete(context.TODO(), clientPod.Name, *metav1.NewDeleteOptions(0))
+		err = c.CoreV1().Pods(clientPod.Namespace).Delete(ctx, clientPod.Name, *metav1.NewDeleteOptions(0))
 	} else {
-		err = c.CoreV1().Pods(clientPod.Namespace).Delete(context.TODO(), clientPod.Name, metav1.DeleteOptions{})
+		err = c.CoreV1().Pods(clientPod.Namespace).Delete(ctx, clientPod.Name, metav1.DeleteOptions{})
 	}
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Starting the kubelet and waiting for pod to delete.")
-	KubeletCommand(KStart, c, clientPod)
-	err = e2epod.WaitForPodNotFoundInNamespace(f.ClientSet, clientPod.Name, f.Namespace.Name, f.Timeouts.PodDelete)
+	KubeletCommand(ctx, KStart, c, clientPod)
+	err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, clientPod.Name, f.Namespace.Name, f.Timeouts.PodDelete)
 	if err != nil {
 		framework.ExpectNoError(err, "Expected pod to be not found.")
 	}
@@ -192,7 +190,7 @@ func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *f
 
 	if secondPod != nil {
 		ginkgo.By("Waiting for the second pod.")
-		err = e2epod.WaitForPodRunningInNamespace(c, secondPod)
+		err = e2epod.WaitForPodRunningInNamespace(ctx, c, secondPod)
 		framework.ExpectNoError(err, "while waiting for the second pod Running")
 
 		ginkgo.By("Getting the second pod uuid.")
@@ -200,7 +198,7 @@ func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *f
 		framework.ExpectNoError(err, "getting the second UID")
 
 		ginkgo.By("Expecting the volume mount to be found in the second pod.")
-		result, err := e2essh.SSH(fmt.Sprintf("mount | grep %s | grep -v volume-subpaths", secondPod.UID), nodeIP, framework.TestContext.Provider)
+		result, err := e2essh.SSH(ctx, fmt.Sprintf("mount | grep %s | grep -v volume-subpaths", secondPod.UID), nodeIP, framework.TestContext.Provider)
 		e2essh.LogResult(result)
 		framework.ExpectNoError(err, "Encountered SSH error when checking the second pod.")
 		framework.ExpectEqual(result.Code, 0, fmt.Sprintf("Expected grep exit code of 0, got %d", result.Code))
@@ -209,12 +207,12 @@ func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *f
 		CheckReadFromPath(f, secondPod, v1.PersistentVolumeFilesystem, false, volumePath, byteLen, seed)
 		err = c.CoreV1().Pods(secondPod.Namespace).Delete(context.TODO(), secondPod.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "when deleting the second pod")
-		err = e2epod.WaitForPodNotFoundInNamespace(f.ClientSet, secondPod.Name, f.Namespace.Name, f.Timeouts.PodDelete)
+		err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, secondPod.Name, f.Namespace.Name, f.Timeouts.PodDelete)
 		framework.ExpectNoError(err, "when waiting for the second pod to disappear")
 	}
 
 	ginkgo.By("Expecting the volume mount not to be found.")
-	result, err = e2essh.SSH(fmt.Sprintf("mount | grep %s | grep -v volume-subpaths", clientPod.UID), nodeIP, framework.TestContext.Provider)
+	result, err = e2essh.SSH(ctx, fmt.Sprintf("mount | grep %s | grep -v volume-subpaths", clientPod.UID), nodeIP, framework.TestContext.Provider)
 	e2essh.LogResult(result)
 	framework.ExpectNoError(err, "Encountered SSH error.")
 	gomega.Expect(result.Stdout).To(gomega.BeEmpty(), "Expected grep stdout to be empty (i.e. no mount found).")
@@ -222,7 +220,7 @@ func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *f
 
 	if checkSubpath {
 		ginkgo.By("Expecting the volume subpath mount not to be found.")
-		result, err = e2essh.SSH(fmt.Sprintf("cat /proc/self/mountinfo | grep %s | grep volume-subpaths", clientPod.UID), nodeIP, framework.TestContext.Provider)
+		result, err = e2essh.SSH(ctx, fmt.Sprintf("cat /proc/self/mountinfo | grep %s | grep volume-subpaths", clientPod.UID), nodeIP, framework.TestContext.Provider)
 		e2essh.LogResult(result)
 		framework.ExpectNoError(err, "Encountered SSH error.")
 		gomega.Expect(result.Stdout).To(gomega.BeEmpty(), "Expected grep stdout to be empty (i.e. no subpath mount found).")
@@ -232,64 +230,62 @@ func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *f
 }
 
 // TestVolumeUnmountsFromDeletedPod tests that a volume unmounts if the client pod was deleted while the kubelet was down.
-func TestVolumeUnmountsFromDeletedPod(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, volumePath string) {
-	TestVolumeUnmountsFromDeletedPodWithForceOption(c, f, clientPod, false, false, nil, volumePath)
+func TestVolumeUnmountsFromDeletedPod(ctx context.Context, c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, volumePath string) {
+	TestVolumeUnmountsFromDeletedPodWithForceOption(ctx, c, f, clientPod, false, false, nil, volumePath)
 }
 
 // TestVolumeUnmountsFromForceDeletedPod tests that a volume unmounts if the client pod was forcefully deleted while the kubelet was down.
-func TestVolumeUnmountsFromForceDeletedPod(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, volumePath string) {
-	TestVolumeUnmountsFromDeletedPodWithForceOption(c, f, clientPod, true, false, nil, volumePath)
+func TestVolumeUnmountsFromForceDeletedPod(ctx context.Context, c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, volumePath string) {
+	TestVolumeUnmountsFromDeletedPodWithForceOption(ctx, c, f, clientPod, true, false, nil, volumePath)
 }
 
 // TestVolumeUnmapsFromDeletedPodWithForceOption tests that a volume unmaps if the client pod was deleted while the kubelet was down.
 // forceDelete is true indicating whether the pod is forcefully deleted.
-func TestVolumeUnmapsFromDeletedPodWithForceOption(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, forceDelete bool, devicePath string) {
-	nodeIP, err := getHostAddress(c, clientPod)
+func TestVolumeUnmapsFromDeletedPodWithForceOption(ctx context.Context, c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, forceDelete bool, devicePath string) {
+	nodeIP, err := getHostAddress(ctx, c, clientPod)
 	framework.ExpectNoError(err, "Failed to get nodeIP.")
 	nodeIP = nodeIP + ":22"
 
 	// Creating command to check whether path exists
 	podDirectoryCmd := fmt.Sprintf("ls /var/lib/kubelet/pods/%s/volumeDevices/*/ | grep '.'", clientPod.UID)
-	if isSudoPresent(nodeIP, framework.TestContext.Provider) {
+	if isSudoPresent(ctx, nodeIP, framework.TestContext.Provider) {
 		podDirectoryCmd = fmt.Sprintf("sudo sh -c \"%s\"", podDirectoryCmd)
 	}
 	// Directories in the global directory have unpredictable names, however, device symlinks
 	// have the same name as pod.UID. So just find anything with pod.UID name.
 	globalBlockDirectoryCmd := fmt.Sprintf("find /var/lib/kubelet/plugins -name %s", clientPod.UID)
-	if isSudoPresent(nodeIP, framework.TestContext.Provider) {
+	if isSudoPresent(ctx, nodeIP, framework.TestContext.Provider) {
 		globalBlockDirectoryCmd = fmt.Sprintf("sudo sh -c \"%s\"", globalBlockDirectoryCmd)
 	}
 
 	ginkgo.By("Expecting the symlinks from PodDeviceMapPath to be found.")
-	result, err := e2essh.SSH(podDirectoryCmd, nodeIP, framework.TestContext.Provider)
+	result, err := e2essh.SSH(ctx, podDirectoryCmd, nodeIP, framework.TestContext.Provider)
 	e2essh.LogResult(result)
 	framework.ExpectNoError(err, "Encountered SSH error.")
 	framework.ExpectEqual(result.Code, 0, fmt.Sprintf("Expected grep exit code of 0, got %d", result.Code))
 
 	ginkgo.By("Expecting the symlinks from global map path to be found.")
-	result, err = e2essh.SSH(globalBlockDirectoryCmd, nodeIP, framework.TestContext.Provider)
+	result, err = e2essh.SSH(ctx, globalBlockDirectoryCmd, nodeIP, framework.TestContext.Provider)
 	e2essh.LogResult(result)
 	framework.ExpectNoError(err, "Encountered SSH error.")
 	framework.ExpectEqual(result.Code, 0, fmt.Sprintf("Expected find exit code of 0, got %d", result.Code))
 
 	// This command is to make sure kubelet is started after test finishes no matter it fails or not.
-	defer func() {
-		KubeletCommand(KStart, c, clientPod)
-	}()
+	ginkgo.DeferCleanup(KubeletCommand, KStart, c, clientPod)
 	ginkgo.By("Stopping the kubelet.")
-	KubeletCommand(KStop, c, clientPod)
+	KubeletCommand(ctx, KStop, c, clientPod)
 
 	ginkgo.By(fmt.Sprintf("Deleting Pod %q", clientPod.Name))
 	if forceDelete {
-		err = c.CoreV1().Pods(clientPod.Namespace).Delete(context.TODO(), clientPod.Name, *metav1.NewDeleteOptions(0))
+		err = c.CoreV1().Pods(clientPod.Namespace).Delete(ctx, clientPod.Name, *metav1.NewDeleteOptions(0))
 	} else {
-		err = c.CoreV1().Pods(clientPod.Namespace).Delete(context.TODO(), clientPod.Name, metav1.DeleteOptions{})
+		err = c.CoreV1().Pods(clientPod.Namespace).Delete(ctx, clientPod.Name, metav1.DeleteOptions{})
 	}
 	framework.ExpectNoError(err, "Failed to delete pod.")
 
 	ginkgo.By("Starting the kubelet and waiting for pod to delete.")
-	KubeletCommand(KStart, c, clientPod)
-	err = e2epod.WaitForPodNotFoundInNamespace(f.ClientSet, clientPod.Name, f.Namespace.Name, f.Timeouts.PodDelete)
+	KubeletCommand(ctx, KStart, c, clientPod)
+	err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, clientPod.Name, f.Namespace.Name, f.Timeouts.PodDelete)
 	framework.ExpectNoError(err, "Expected pod to be not found.")
 
 	if forceDelete {
@@ -299,13 +295,13 @@ func TestVolumeUnmapsFromDeletedPodWithForceOption(c clientset.Interface, f *fra
 	}
 
 	ginkgo.By("Expecting the symlink from PodDeviceMapPath not to be found.")
-	result, err = e2essh.SSH(podDirectoryCmd, nodeIP, framework.TestContext.Provider)
+	result, err = e2essh.SSH(ctx, podDirectoryCmd, nodeIP, framework.TestContext.Provider)
 	e2essh.LogResult(result)
 	framework.ExpectNoError(err, "Encountered SSH error.")
 	gomega.Expect(result.Stdout).To(gomega.BeEmpty(), "Expected grep stdout to be empty.")
 
 	ginkgo.By("Expecting the symlinks from global map path not to be found.")
-	result, err = e2essh.SSH(globalBlockDirectoryCmd, nodeIP, framework.TestContext.Provider)
+	result, err = e2essh.SSH(ctx, globalBlockDirectoryCmd, nodeIP, framework.TestContext.Provider)
 	e2essh.LogResult(result)
 	framework.ExpectNoError(err, "Encountered SSH error.")
 	gomega.Expect(result.Stdout).To(gomega.BeEmpty(), "Expected find stdout to be empty.")
@@ -314,17 +310,17 @@ func TestVolumeUnmapsFromDeletedPodWithForceOption(c clientset.Interface, f *fra
 }
 
 // TestVolumeUnmapsFromDeletedPod tests that a volume unmaps if the client pod was deleted while the kubelet was down.
-func TestVolumeUnmapsFromDeletedPod(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, devicePath string) {
-	TestVolumeUnmapsFromDeletedPodWithForceOption(c, f, clientPod, false, devicePath)
+func TestVolumeUnmapsFromDeletedPod(ctx context.Context, c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, devicePath string) {
+	TestVolumeUnmapsFromDeletedPodWithForceOption(ctx, c, f, clientPod, false, devicePath)
 }
 
 // TestVolumeUnmapsFromForceDeletedPod tests that a volume unmaps if the client pod was forcefully deleted while the kubelet was down.
-func TestVolumeUnmapsFromForceDeletedPod(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, devicePath string) {
-	TestVolumeUnmapsFromDeletedPodWithForceOption(c, f, clientPod, true, devicePath)
+func TestVolumeUnmapsFromForceDeletedPod(ctx context.Context, c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, devicePath string) {
+	TestVolumeUnmapsFromDeletedPodWithForceOption(ctx, c, f, clientPod, true, devicePath)
 }
 
 // RunInPodWithVolume runs a command in a pod with given claim mounted to /mnt directory.
-func RunInPodWithVolume(c clientset.Interface, t *framework.TimeoutContext, ns, claimName, command string) {
+func RunInPodWithVolume(ctx context.Context, c clientset.Interface, t *framework.TimeoutContext, ns, claimName, command string) {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -362,16 +358,14 @@ func RunInPodWithVolume(c clientset.Interface, t *framework.TimeoutContext, ns, 
 			},
 		},
 	}
-	pod, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
+	pod, err := c.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Failed to create pod: %v", err)
-	defer func() {
-		e2epod.DeletePodOrFail(c, ns, pod.Name)
-	}()
-	framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceTimeout(c, pod.Name, pod.Namespace, t.PodStartSlow))
+	ginkgo.DeferCleanup(e2epod.DeletePodOrFail, c, ns, pod.Name)
+	framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, c, pod.Name, pod.Namespace, t.PodStartSlow))
 }
 
 // StartExternalProvisioner create external provisioner pod
-func StartExternalProvisioner(c clientset.Interface, ns string, externalPluginName string) *v1.Pod {
+func StartExternalProvisioner(ctx context.Context, c clientset.Interface, ns string, externalPluginName string) *v1.Pod {
 	podClient := c.CoreV1().Pods(ns)
 
 	provisionerPod := &v1.Pod{
@@ -432,21 +426,21 @@ func StartExternalProvisioner(c clientset.Interface, ns string, externalPluginNa
 			},
 		},
 	}
-	provisionerPod, err := podClient.Create(context.TODO(), provisionerPod, metav1.CreateOptions{})
+	provisionerPod, err := podClient.Create(ctx, provisionerPod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Failed to create %s pod: %v", provisionerPod.Name, err)
 
-	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(c, provisionerPod))
+	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, c, provisionerPod))
 
 	ginkgo.By("locating the provisioner pod")
-	pod, err := podClient.Get(context.TODO(), provisionerPod.Name, metav1.GetOptions{})
+	pod, err := podClient.Get(ctx, provisionerPod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "Cannot locate the provisioner pod %v: %v", provisionerPod.Name, err)
 
 	return pod
 }
 
-func isSudoPresent(nodeIP string, provider string) bool {
+func isSudoPresent(ctx context.Context, nodeIP string, provider string) bool {
 	framework.Logf("Checking if sudo command is present")
-	sshResult, err := e2essh.SSH("sudo --version", nodeIP, provider)
+	sshResult, err := e2essh.SSH(ctx, "sudo --version", nodeIP, provider)
 	framework.ExpectNoError(err, "SSH to %q errored.", nodeIP)
 	if !strings.Contains(sshResult.Stderr, "command not found") {
 		return true
@@ -562,8 +556,8 @@ func GetSectorSize(f *framework.Framework, pod *v1.Pod, device string) int {
 }
 
 // findMountPoints returns all mount points on given node under specified directory.
-func findMountPoints(hostExec HostExec, node *v1.Node, dir string) []string {
-	result, err := hostExec.IssueCommandWithResult(fmt.Sprintf(`find %s -type d -exec mountpoint {} \; | grep 'is a mountpoint$' || true`, dir), node)
+func findMountPoints(ctx context.Context, hostExec HostExec, node *v1.Node, dir string) []string {
+	result, err := hostExec.IssueCommandWithResult(ctx, fmt.Sprintf(`find %s -type d -exec mountpoint {} \; | grep 'is a mountpoint$' || true`, dir), node)
 	framework.ExpectNoError(err, "Encountered HostExec error.")
 	var mountPoints []string
 	if err != nil {
@@ -578,16 +572,16 @@ func findMountPoints(hostExec HostExec, node *v1.Node, dir string) []string {
 }
 
 // FindVolumeGlobalMountPoints returns all volume global mount points on the node of given pod.
-func FindVolumeGlobalMountPoints(hostExec HostExec, node *v1.Node) sets.String {
-	return sets.NewString(findMountPoints(hostExec, node, "/var/lib/kubelet/plugins")...)
+func FindVolumeGlobalMountPoints(ctx context.Context, hostExec HostExec, node *v1.Node) sets.String {
+	return sets.NewString(findMountPoints(ctx, hostExec, node, "/var/lib/kubelet/plugins")...)
 }
 
 // CreateDriverNamespace creates a namespace for CSI driver installation.
 // The namespace is still tracked and ensured that gets deleted when test terminates.
-func CreateDriverNamespace(f *framework.Framework) *v1.Namespace {
+func CreateDriverNamespace(ctx context.Context, f *framework.Framework) *v1.Namespace {
 	ginkgo.By(fmt.Sprintf("Building a driver namespace object, basename %s", f.Namespace.Name))
 	// The driver namespace will be bound to the test namespace in the prefix
-	namespace, err := f.CreateNamespace(f.Namespace.Name, map[string]string{
+	namespace, err := f.CreateNamespace(ctx, f.Namespace.Name, map[string]string{
 		"e2e-framework":      f.BaseName,
 		"e2e-test-namespace": f.Namespace.Name,
 	})
@@ -595,7 +589,7 @@ func CreateDriverNamespace(f *framework.Framework) *v1.Namespace {
 
 	if framework.TestContext.VerifyServiceAccount {
 		ginkgo.By("Waiting for a default service account to be provisioned in namespace")
-		err = framework.WaitForDefaultServiceAccountInNamespace(f.ClientSet, namespace.Name)
+		err = framework.WaitForDefaultServiceAccountInNamespace(ctx, f.ClientSet, namespace.Name)
 		framework.ExpectNoError(err)
 	} else {
 		framework.Logf("Skipping waiting for service account")
@@ -604,11 +598,11 @@ func CreateDriverNamespace(f *framework.Framework) *v1.Namespace {
 }
 
 // WaitForGVRDeletion waits until a non-namespaced object has been deleted
-func WaitForGVRDeletion(c dynamic.Interface, gvr schema.GroupVersionResource, objectName string, poll, timeout time.Duration) error {
+func WaitForGVRDeletion(ctx context.Context, c dynamic.Interface, gvr schema.GroupVersionResource, objectName string, poll, timeout time.Duration) error {
 	framework.Logf("Waiting up to %v for %s %s to be deleted", timeout, gvr.Resource, objectName)
 
 	if successful := WaitUntil(poll, timeout, func() bool {
-		_, err := c.Resource(gvr).Get(context.TODO(), objectName, metav1.GetOptions{})
+		_, err := c.Resource(gvr).Get(ctx, objectName, metav1.GetOptions{})
 		if err != nil && apierrors.IsNotFound(err) {
 			framework.Logf("%s %v is not found and has been deleted", gvr.Resource, objectName)
 			return true
@@ -627,11 +621,11 @@ func WaitForGVRDeletion(c dynamic.Interface, gvr schema.GroupVersionResource, ob
 }
 
 // WaitForNamespacedGVRDeletion waits until a namespaced object has been deleted
-func WaitForNamespacedGVRDeletion(c dynamic.Interface, gvr schema.GroupVersionResource, ns, objectName string, poll, timeout time.Duration) error {
+func WaitForNamespacedGVRDeletion(ctx context.Context, c dynamic.Interface, gvr schema.GroupVersionResource, ns, objectName string, poll, timeout time.Duration) error {
 	framework.Logf("Waiting up to %v for %s %s to be deleted", timeout, gvr.Resource, objectName)
 
 	if successful := WaitUntil(poll, timeout, func() bool {
-		_, err := c.Resource(gvr).Namespace(ns).Get(context.TODO(), objectName, metav1.GetOptions{})
+		_, err := c.Resource(gvr).Namespace(ns).Get(ctx, objectName, metav1.GetOptions{})
 		if err != nil && apierrors.IsNotFound(err) {
 			framework.Logf("%s %s is not found in namespace %s and has been deleted", gvr.Resource, objectName, ns)
 			return true
@@ -651,6 +645,7 @@ func WaitForNamespacedGVRDeletion(c dynamic.Interface, gvr schema.GroupVersionRe
 
 // WaitUntil runs checkDone until a timeout is reached
 func WaitUntil(poll, timeout time.Duration, checkDone func() bool) bool {
+	// TODO (pohly): replace with gomega.Eventually
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
 		if checkDone() {
 			framework.Logf("WaitUntil finished successfully after %v", time.Since(start))
@@ -716,8 +711,8 @@ func ChangeFilePathGidInPod(f *framework.Framework, filePath, targetGid string, 
 }
 
 // DeleteStorageClass deletes the passed in StorageClass and catches errors other than "Not Found"
-func DeleteStorageClass(cs clientset.Interface, className string) error {
-	err := cs.StorageV1().StorageClasses().Delete(context.TODO(), className, metav1.DeleteOptions{})
+func DeleteStorageClass(ctx context.Context, cs clientset.Interface, className string) error {
+	err := cs.StorageV1().StorageClasses().Delete(ctx, className, metav1.DeleteOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}

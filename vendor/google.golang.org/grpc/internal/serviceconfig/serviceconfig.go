@@ -67,10 +67,10 @@ func (bc *BalancerConfig) MarshalJSON() ([]byte, error) {
 // ServiceConfig contains a list of loadBalancingConfigs, each with a name and
 // config. This method iterates through that list in order, and stops at the
 // first policy that is supported.
-// - If the config for the first supported policy is invalid, the whole service
-//   config is invalid.
-// - If the list doesn't contain any supported policy, the whole service config
-//   is invalid.
+//   - If the config for the first supported policy is invalid, the whole service
+//     config is invalid.
+//   - If the list doesn't contain any supported policy, the whole service config
+//     is invalid.
 func (bc *BalancerConfig) UnmarshalJSON(b []byte) error {
 	var ir intermediateBalancerConfig
 	err := json.Unmarshal(b, &ir)

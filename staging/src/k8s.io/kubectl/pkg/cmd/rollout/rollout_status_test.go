@@ -18,7 +18,7 @@ package rollout
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/watch"
@@ -50,7 +50,7 @@ func TestRolloutStatus(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			dep := &appsv1.Deployment{}
 			dep.Name = deploymentName
-			body := ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, dep))))
+			body := io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, dep))))
 			return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 		}),
 	}
@@ -106,7 +106,7 @@ func TestRolloutStatusWithSelector(t *testing.T) {
 			dep.Name = deploymentName
 			dep.Labels = make(map[string]string)
 			dep.Labels["app"] = "api"
-			body := ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, dep))))
+			body := io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, dep))))
 			return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 		}),
 	}
@@ -163,7 +163,7 @@ func TestRolloutStatusWatchDisabled(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			dep := &appsv1.Deployment{}
 			dep.Name = deploymentName
-			body := ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, dep))))
+			body := io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, dep))))
 			return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 		}),
 	}
@@ -218,7 +218,7 @@ func TestRolloutStatusWatchDisabledUnavailable(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			dep := &appsv1.Deployment{}
 			dep.Name = deploymentName
-			body := ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, dep))))
+			body := io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, dep))))
 			return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 		}),
 	}

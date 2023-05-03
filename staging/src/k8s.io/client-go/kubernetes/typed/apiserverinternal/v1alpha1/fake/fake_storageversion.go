@@ -26,7 +26,6 @@ import (
 	v1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	apiserverinternalv1alpha1 "k8s.io/client-go/applyconfigurations/apiserverinternal/v1alpha1"
@@ -38,9 +37,9 @@ type FakeStorageVersions struct {
 	Fake *FakeInternalV1alpha1
 }
 
-var storageversionsResource = schema.GroupVersionResource{Group: "internal.apiserver.k8s.io", Version: "v1alpha1", Resource: "storageversions"}
+var storageversionsResource = v1alpha1.SchemeGroupVersion.WithResource("storageversions")
 
-var storageversionsKind = schema.GroupVersionKind{Group: "internal.apiserver.k8s.io", Version: "v1alpha1", Kind: "StorageVersion"}
+var storageversionsKind = v1alpha1.SchemeGroupVersion.WithKind("StorageVersion")
 
 // Get takes name of the storageVersion, and returns the corresponding storageVersion object, and an error if there is any.
 func (c *FakeStorageVersions) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.StorageVersion, err error) {

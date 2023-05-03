@@ -19,7 +19,6 @@ package configuration
 import (
 	"fmt"
 	"sort"
-	"sync/atomic"
 
 	"k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,18 +28,14 @@ import (
 	"k8s.io/client-go/informers"
 	admissionregistrationlisters "k8s.io/client-go/listers/admissionregistration/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/cache/synctrack"
 )
 
 // validatingWebhookConfigurationManager collects the validating webhook objects so that they can be called.
 type validatingWebhookConfigurationManager struct {
-	configuration *atomic.Value
-	lister        admissionregistrationlisters.ValidatingWebhookConfigurationLister
-	hasSynced     func() bool
-	// initialConfigurationSynced tracks if
-	// the existing webhook configs have been synced (honored) by the
-	// manager at startup-- the informer has synced and either has no items
-	// or has finished executing updateConfiguration() once.
-	initialConfigurationSynced *atomic.Bool
+	lister    admissionregistrationlisters.ValidatingWebhookConfigurationLister
+	hasSynced func() bool
+	lazy      synctrack.Lazy[[]webhook.WebhookAccessor]
 }
 
 var _ generic.Source = &validatingWebhookConfigurationManager{}
@@ -48,63 +43,39 @@ var _ generic.Source = &validatingWebhookConfigurationManager{}
 func NewValidatingWebhookConfigurationManager(f informers.SharedInformerFactory) generic.Source {
 	informer := f.Admissionregistration().V1().ValidatingWebhookConfigurations()
 	manager := &validatingWebhookConfigurationManager{
-		configuration:              &atomic.Value{},
-		lister:                     informer.Lister(),
-		hasSynced:                  informer.Informer().HasSynced,
-		initialConfigurationSynced: &atomic.Bool{},
+		lister: informer.Lister(),
 	}
+	manager.lazy.Evaluate = manager.getConfiguration
 
-	// Start with an empty list
-	manager.configuration.Store([]webhook.WebhookAccessor{})
-	manager.initialConfigurationSynced.Store(false)
-
-	// On any change, rebuild the config
-	informer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    func(_ interface{}) { manager.updateConfiguration() },
-		UpdateFunc: func(_, _ interface{}) { manager.updateConfiguration() },
-		DeleteFunc: func(_ interface{}) { manager.updateConfiguration() },
+	handle, _ := informer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    func(_ interface{}) { manager.lazy.Notify() },
+		UpdateFunc: func(_, _ interface{}) { manager.lazy.Notify() },
+		DeleteFunc: func(_ interface{}) { manager.lazy.Notify() },
 	})
+	manager.hasSynced = handle.HasSynced
 
 	return manager
 }
 
 // Webhooks returns the merged ValidatingWebhookConfiguration.
 func (v *validatingWebhookConfigurationManager) Webhooks() []webhook.WebhookAccessor {
-	return v.configuration.Load().([]webhook.WebhookAccessor)
+	out, err := v.lazy.Get()
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("error getting webhook configuration: %v", err))
+	}
+	return out
 }
 
-// HasSynced returns true when the manager is synced with existing webhookconfig
-// objects at startup-- which means the informer is synced and either has no items
-// or updateConfiguration() has completed.
-func (v *validatingWebhookConfigurationManager) HasSynced() bool {
-	if !v.hasSynced() {
-		return false
-	}
-	if v.initialConfigurationSynced.Load() {
-		// the informer has synced and configuration has been updated
-		return true
-	}
-	if configurations, err := v.lister.List(labels.Everything()); err == nil && len(configurations) == 0 {
-		// the empty list we initially stored is valid to use.
-		// Setting initialConfigurationSynced to true, so subsequent checks
-		// would be able to take the fast path on the atomic boolean in a
-		// cluster without any admission webhooks configured.
-		v.initialConfigurationSynced.Store(true)
-		// the informer has synced and we don't have any items
-		return true
-	}
-	return false
+// HasSynced returns true if the initial set of mutating webhook configurations
+// has been loaded.
+func (v *validatingWebhookConfigurationManager) HasSynced() bool { return v.hasSynced() }
 
-}
-
-func (v *validatingWebhookConfigurationManager) updateConfiguration() {
+func (v *validatingWebhookConfigurationManager) getConfiguration() ([]webhook.WebhookAccessor, error) {
 	configurations, err := v.lister.List(labels.Everything())
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("error updating configuration: %v", err))
-		return
+		return []webhook.WebhookAccessor{}, err
 	}
-	v.configuration.Store(mergeValidatingWebhookConfigurations(configurations))
-	v.initialConfigurationSynced.Store(true)
+	return mergeValidatingWebhookConfigurations(configurations), nil
 }
 
 func mergeValidatingWebhookConfigurations(configurations []*v1.ValidatingWebhookConfiguration) []webhook.WebhookAccessor {

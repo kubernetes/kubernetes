@@ -57,6 +57,7 @@ import (
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/configz"
 	"k8s.io/component-base/logs"
+	logsapi "k8s.io/component-base/logs/api/v1"
 	metricsfeatures "k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/prometheus/slis"
@@ -89,6 +90,7 @@ import (
 
 func init() {
 	utilruntime.Must(metricsfeatures.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
+	logsapi.AddFeatureGates(utilfeature.DefaultMutableFeatureGate)
 }
 
 // proxyRun defines the interface to run a specified ProxyServer
@@ -363,7 +365,7 @@ func (o *Options) writeConfigFile() (err error) {
 		return err
 	}
 
-	klog.InfoS("Wrote configuration", "WriteConfigTo", o.WriteConfigTo)
+	klog.InfoS("Wrote configuration", "file", o.WriteConfigTo)
 
 	return nil
 }

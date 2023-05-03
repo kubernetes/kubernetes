@@ -29,6 +29,8 @@ type ValidatingAdmissionPolicySpecApplyConfiguration struct {
 	MatchConstraints *MatchResourcesApplyConfiguration                `json:"matchConstraints,omitempty"`
 	Validations      []ValidationApplyConfiguration                   `json:"validations,omitempty"`
 	FailurePolicy    *admissionregistrationv1alpha1.FailurePolicyType `json:"failurePolicy,omitempty"`
+	AuditAnnotations []AuditAnnotationApplyConfiguration              `json:"auditAnnotations,omitempty"`
+	MatchConditions  []MatchConditionApplyConfiguration               `json:"matchConditions,omitempty"`
 }
 
 // ValidatingAdmissionPolicySpecApplyConfiguration constructs an declarative configuration of the ValidatingAdmissionPolicySpec type for use with
@@ -71,5 +73,31 @@ func (b *ValidatingAdmissionPolicySpecApplyConfiguration) WithValidations(values
 // If called multiple times, the FailurePolicy field is set to the value of the last call.
 func (b *ValidatingAdmissionPolicySpecApplyConfiguration) WithFailurePolicy(value admissionregistrationv1alpha1.FailurePolicyType) *ValidatingAdmissionPolicySpecApplyConfiguration {
 	b.FailurePolicy = &value
+	return b
+}
+
+// WithAuditAnnotations adds the given value to the AuditAnnotations field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the AuditAnnotations field.
+func (b *ValidatingAdmissionPolicySpecApplyConfiguration) WithAuditAnnotations(values ...*AuditAnnotationApplyConfiguration) *ValidatingAdmissionPolicySpecApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithAuditAnnotations")
+		}
+		b.AuditAnnotations = append(b.AuditAnnotations, *values[i])
+	}
+	return b
+}
+
+// WithMatchConditions adds the given value to the MatchConditions field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the MatchConditions field.
+func (b *ValidatingAdmissionPolicySpecApplyConfiguration) WithMatchConditions(values ...*MatchConditionApplyConfiguration) *ValidatingAdmissionPolicySpecApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithMatchConditions")
+		}
+		b.MatchConditions = append(b.MatchConditions, *values[i])
+	}
 	return b
 }

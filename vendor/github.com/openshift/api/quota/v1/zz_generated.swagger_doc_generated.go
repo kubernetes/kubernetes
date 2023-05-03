@@ -12,9 +12,10 @@ package v1
 
 // AUTO-GENERATED FUNCTIONS START HERE
 var map_AppliedClusterResourceQuota = map[string]string{
-	"":       "AppliedClusterResourceQuota mirrors ClusterResourceQuota at a project scope, for projection into a project.  It allows a project-admin to know which ClusterResourceQuotas are applied to his project and their associated usage.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
-	"spec":   "Spec defines the desired quota",
-	"status": "Status defines the actual enforced quota and its current usage",
+	"":         "AppliedClusterResourceQuota mirrors ClusterResourceQuota at a project scope, for projection into a project.  It allows a project-admin to know which ClusterResourceQuotas are applied to his project and their associated usage.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "Spec defines the desired quota",
+	"status":   "Status defines the actual enforced quota and its current usage",
 }
 
 func (AppliedClusterResourceQuota) SwaggerDoc() map[string]string {
@@ -22,8 +23,9 @@ func (AppliedClusterResourceQuota) SwaggerDoc() map[string]string {
 }
 
 var map_AppliedClusterResourceQuotaList = map[string]string{
-	"":      "AppliedClusterResourceQuotaList is a collection of AppliedClusterResourceQuotas\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
-	"items": "Items is a list of AppliedClusterResourceQuota",
+	"":         "AppliedClusterResourceQuotaList is a collection of AppliedClusterResourceQuotas\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"items":    "Items is a list of AppliedClusterResourceQuota",
 }
 
 func (AppliedClusterResourceQuotaList) SwaggerDoc() map[string]string {
@@ -31,9 +33,10 @@ func (AppliedClusterResourceQuotaList) SwaggerDoc() map[string]string {
 }
 
 var map_ClusterResourceQuota = map[string]string{
-	"":       "ClusterResourceQuota mirrors ResourceQuota at a cluster scope.  This object is easily convertible to synthetic ResourceQuota object to allow quota evaluation re-use.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
-	"spec":   "Spec defines the desired quota",
-	"status": "Status defines the actual enforced quota and its current usage",
+	"":         "ClusterResourceQuota mirrors ResourceQuota at a cluster scope.  This object is easily convertible to synthetic ResourceQuota object to allow quota evaluation re-use.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "Spec defines the desired quota",
+	"status":   "Status defines the actual enforced quota and its current usage",
 }
 
 func (ClusterResourceQuota) SwaggerDoc() map[string]string {
@@ -41,8 +44,9 @@ func (ClusterResourceQuota) SwaggerDoc() map[string]string {
 }
 
 var map_ClusterResourceQuotaList = map[string]string{
-	"":      "ClusterResourceQuotaList is a collection of ClusterResourceQuotas\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
-	"items": "Items is a list of ClusterResourceQuotas",
+	"":         "ClusterResourceQuotaList is a collection of ClusterResourceQuotas\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"items":    "Items is a list of ClusterResourceQuotas",
 }
 
 func (ClusterResourceQuotaList) SwaggerDoc() map[string]string {

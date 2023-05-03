@@ -44,8 +44,8 @@ var _ = SIGDescribe("ConfigMap", func() {
 		Testname: ConfigMap Volume, without mapping
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The data content of the file MUST be readable and verified and file modes MUST default to 0x644.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume [NodeConformance]", func() {
-		doConfigMapE2EWithoutMappings(f, false, 0, nil)
+	framework.ConformanceIt("should be consumable from pods in volume [NodeConformance]", func(ctx context.Context) {
+		doConfigMapE2EWithoutMappings(ctx, f, false, 0, nil)
 	})
 
 	/*
@@ -54,16 +54,16 @@ var _ = SIGDescribe("ConfigMap", func() {
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. File mode is changed to a custom value of '0x400'. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The data content of the file MUST be readable and verified and file modes MUST be set to the custom value of '0x400'
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set [LinuxOnly] [NodeConformance]", func() {
+	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
 		defaultMode := int32(0400)
-		doConfigMapE2EWithoutMappings(f, false, 0, &defaultMode)
+		doConfigMapE2EWithoutMappings(ctx, f, false, 0, &defaultMode)
 	})
 
-	ginkgo.It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [LinuxOnly] [NodeFeature:FSGroup]", func() {
+	ginkgo.It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [LinuxOnly] [NodeFeature:FSGroup]", func(ctx context.Context) {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options, and it does not support setting file permissions.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
-		doConfigMapE2EWithoutMappings(f, true, 1001, &defaultMode)
+		doConfigMapE2EWithoutMappings(ctx, f, true, 1001, &defaultMode)
 	})
 
 	/*
@@ -71,14 +71,14 @@ var _ = SIGDescribe("ConfigMap", func() {
 		Testname: ConfigMap Volume, without mapping, non-root user
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. Pod is run as a non-root user with uid=1000. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The file on the volume MUST have file mode set to default value of 0x644.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume as non-root [NodeConformance]", func() {
-		doConfigMapE2EWithoutMappings(f, true, 0, nil)
+	framework.ConformanceIt("should be consumable from pods in volume as non-root [NodeConformance]", func(ctx context.Context) {
+		doConfigMapE2EWithoutMappings(ctx, f, true, 0, nil)
 	})
 
-	ginkgo.It("should be consumable from pods in volume as non-root with FSGroup [LinuxOnly] [NodeFeature:FSGroup]", func() {
+	ginkgo.It("should be consumable from pods in volume as non-root with FSGroup [LinuxOnly] [NodeFeature:FSGroup]", func(ctx context.Context) {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
-		doConfigMapE2EWithoutMappings(f, true, 1001, nil)
+		doConfigMapE2EWithoutMappings(ctx, f, true, 1001, nil)
 	})
 
 	/*
@@ -86,8 +86,8 @@ var _ = SIGDescribe("ConfigMap", func() {
 		Testname: ConfigMap Volume, with mapping
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. Files are mapped to a path in the volume. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The data content of the file MUST be readable and verified and file modes MUST default to 0x644.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with mappings [NodeConformance]", func() {
-		doConfigMapE2EWithMappings(f, false, 0, nil)
+	framework.ConformanceIt("should be consumable from pods in volume with mappings [NodeConformance]", func(ctx context.Context) {
+		doConfigMapE2EWithMappings(ctx, f, false, 0, nil)
 	})
 
 	/*
@@ -96,9 +96,9 @@ var _ = SIGDescribe("ConfigMap", func() {
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. Files are mapped to a path in the volume. File mode is changed to a custom value of '0x400'. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The data content of the file MUST be readable and verified and file modes MUST be set to the custom value of '0x400'
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item mode set [LinuxOnly] [NodeConformance]", func() {
+	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item mode set [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
 		mode := int32(0400)
-		doConfigMapE2EWithMappings(f, false, 0, &mode)
+		doConfigMapE2EWithMappings(ctx, f, false, 0, &mode)
 	})
 
 	/*
@@ -106,14 +106,14 @@ var _ = SIGDescribe("ConfigMap", func() {
 		Testname: ConfigMap Volume, with mapping, non-root user
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. Files are mapped to a path in the volume. Pod is run as a non-root user with uid=1000. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The file on the volume MUST have file mode set to default value of 0x644.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with mappings as non-root [NodeConformance]", func() {
-		doConfigMapE2EWithMappings(f, true, 0, nil)
+	framework.ConformanceIt("should be consumable from pods in volume with mappings as non-root [NodeConformance]", func(ctx context.Context) {
+		doConfigMapE2EWithMappings(ctx, f, true, 0, nil)
 	})
 
-	ginkgo.It("should be consumable from pods in volume with mappings as non-root with FSGroup [LinuxOnly] [NodeFeature:FSGroup]", func() {
+	ginkgo.It("should be consumable from pods in volume with mappings as non-root with FSGroup [LinuxOnly] [NodeFeature:FSGroup]", func(ctx context.Context) {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
-		doConfigMapE2EWithMappings(f, true, 1001, nil)
+		doConfigMapE2EWithMappings(ctx, f, true, 1001, nil)
 	})
 
 	/*
@@ -121,8 +121,8 @@ var _ = SIGDescribe("ConfigMap", func() {
 		Testname: ConfigMap Volume, update
 		Description: The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount that is mapped to custom path in the Pod. When the ConfigMap is updated the change to the config map MUST be verified by reading the content from the mounted file in the Pod.
 	*/
-	framework.ConformanceIt("updates should be reflected in volume [NodeConformance]", func() {
-		podLogTimeout := e2epod.GetPodSecretUpdateTimeout(f.ClientSet)
+	framework.ConformanceIt("updates should be reflected in volume [NodeConformance]", func(ctx context.Context) {
+		podLogTimeout := e2epod.GetPodSecretUpdateTimeout(ctx, f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 
 		name := "configmap-test-upd-" + string(uuid.NewUUID())
@@ -141,7 +141,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 
 		ginkgo.By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
 		var err error
-		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{}); err != nil {
+		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, configMap, metav1.CreateOptions{}); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 		}
 
@@ -149,22 +149,22 @@ var _ = SIGDescribe("ConfigMap", func() {
 			"--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volume/data-1")
 
 		ginkgo.By("Creating the pod")
-		e2epod.NewPodClient(f).CreateSync(pod)
+		e2epod.NewPodClient(f).CreateSync(ctx, pod)
 
 		pollLogs := func() (string, error) {
-			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
+			return e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
 		}
 
-		gomega.Eventually(pollLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-1"))
+		gomega.Eventually(ctx, pollLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-1"))
 
 		ginkgo.By(fmt.Sprintf("Updating configmap %v", configMap.Name))
 		configMap.ResourceVersion = "" // to force update
 		configMap.Data["data-1"] = "value-2"
-		_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(context.TODO(), configMap, metav1.UpdateOptions{})
+		_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(ctx, configMap, metav1.UpdateOptions{})
 		framework.ExpectNoError(err, "Failed to update configmap %q in namespace %q", configMap.Name, f.Namespace.Name)
 
 		ginkgo.By("waiting to observe update in volume")
-		gomega.Eventually(pollLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-2"))
+		gomega.Eventually(ctx, pollLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-2"))
 	})
 
 	/*
@@ -172,8 +172,8 @@ var _ = SIGDescribe("ConfigMap", func() {
 		Testname: ConfigMap Volume, text data, binary data
 		Description: The ConfigMap that is created with text data and binary data MUST be accessible to read from the newly created Pod using the volume mount that is mapped to custom path in the Pod. ConfigMap's text data and binary data MUST be verified by reading the content from the mounted files in the Pod.
 	*/
-	framework.ConformanceIt("binary data should be reflected in volume [NodeConformance]", func() {
-		podLogTimeout := e2epod.GetPodSecretUpdateTimeout(f.ClientSet)
+	framework.ConformanceIt("binary data should be reflected in volume [NodeConformance]", func(ctx context.Context) {
+		podLogTimeout := e2epod.GetPodSecretUpdateTimeout(ctx, f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 
 		name := "configmap-test-upd-" + string(uuid.NewUUID())
@@ -196,7 +196,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 
 		ginkgo.By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
 		var err error
-		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{}); err != nil {
+		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, configMap, metav1.CreateOptions{}); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 		}
 
@@ -216,20 +216,20 @@ var _ = SIGDescribe("ConfigMap", func() {
 		})
 
 		ginkgo.By("Creating the pod")
-		e2epod.NewPodClient(f).Create(pod)
-		e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
+		e2epod.NewPodClient(f).Create(ctx, pod)
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
 
 		pollLogs1 := func() (string, error) {
-			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
+			return e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
 		}
 		pollLogs2 := func() (string, error) {
-			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[1].Name)
+			return e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[1].Name)
 		}
 
 		ginkgo.By("Waiting for pod with text data")
-		gomega.Eventually(pollLogs1, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-1"))
+		gomega.Eventually(ctx, pollLogs1, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-1"))
 		ginkgo.By("Waiting for pod with binary data")
-		gomega.Eventually(pollLogs2, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("de ca fe ba d0 fe ff"))
+		gomega.Eventually(ctx, pollLogs2, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("de ca fe ba d0 fe ff"))
 	})
 
 	/*
@@ -237,8 +237,8 @@ var _ = SIGDescribe("ConfigMap", func() {
 		Testname: ConfigMap Volume, create, update and delete
 		Description: The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount that is mapped to custom path in the Pod. When the config map is updated the change to the config map MUST be verified by reading the content from the mounted file in the Pod. Also when the item(file) is deleted from the map that MUST result in a error reading that item(file).
 	*/
-	framework.ConformanceIt("optional updates should be reflected in volume [NodeConformance]", func() {
-		podLogTimeout := e2epod.GetPodSecretUpdateTimeout(f.ClientSet)
+	framework.ConformanceIt("optional updates should be reflected in volume [NodeConformance]", func(ctx context.Context) {
+		podLogTimeout := e2epod.GetPodSecretUpdateTimeout(ctx, f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 		trueVal := true
 		volumeMountPath := "/etc/configmap-volumes"
@@ -284,12 +284,12 @@ var _ = SIGDescribe("ConfigMap", func() {
 
 		ginkgo.By(fmt.Sprintf("Creating configMap with name %s", deleteConfigMap.Name))
 		var err error
-		if deleteConfigMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), deleteConfigMap, metav1.CreateOptions{}); err != nil {
+		if deleteConfigMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, deleteConfigMap, metav1.CreateOptions{}); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", deleteConfigMap.Name, err)
 		}
 
 		ginkgo.By(fmt.Sprintf("Creating configMap with name %s", updateConfigMap.Name))
-		if updateConfigMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), updateConfigMap, metav1.CreateOptions{}); err != nil {
+		if updateConfigMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, updateConfigMap, metav1.CreateOptions{}); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", updateConfigMap.Name, err)
 		}
 
@@ -375,44 +375,44 @@ var _ = SIGDescribe("ConfigMap", func() {
 			},
 		}
 		ginkgo.By("Creating the pod")
-		e2epod.NewPodClient(f).CreateSync(pod)
+		e2epod.NewPodClient(f).CreateSync(ctx, pod)
 
 		pollCreateLogs := func() (string, error) {
-			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, createContainerName)
+			return e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, createContainerName)
 		}
-		gomega.Eventually(pollCreateLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("Error reading file /etc/configmap-volumes/create/data-1"))
+		gomega.Eventually(ctx, pollCreateLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("Error reading file /etc/configmap-volumes/create/data-1"))
 
 		pollUpdateLogs := func() (string, error) {
-			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, updateContainerName)
+			return e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, updateContainerName)
 		}
-		gomega.Eventually(pollUpdateLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("Error reading file /etc/configmap-volumes/update/data-3"))
+		gomega.Eventually(ctx, pollUpdateLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("Error reading file /etc/configmap-volumes/update/data-3"))
 
 		pollDeleteLogs := func() (string, error) {
-			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, deleteContainerName)
+			return e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, deleteContainerName)
 		}
-		gomega.Eventually(pollDeleteLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-1"))
+		gomega.Eventually(ctx, pollDeleteLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-1"))
 
 		ginkgo.By(fmt.Sprintf("Deleting configmap %v", deleteConfigMap.Name))
-		err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(context.TODO(), deleteConfigMap.Name, metav1.DeleteOptions{})
+		err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(ctx, deleteConfigMap.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "Failed to delete configmap %q in namespace %q", deleteConfigMap.Name, f.Namespace.Name)
 
 		ginkgo.By(fmt.Sprintf("Updating configmap %v", updateConfigMap.Name))
 		updateConfigMap.ResourceVersion = "" // to force update
 		delete(updateConfigMap.Data, "data-1")
 		updateConfigMap.Data["data-3"] = "value-3"
-		_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(context.TODO(), updateConfigMap, metav1.UpdateOptions{})
+		_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(ctx, updateConfigMap, metav1.UpdateOptions{})
 		framework.ExpectNoError(err, "Failed to update configmap %q in namespace %q", updateConfigMap.Name, f.Namespace.Name)
 
 		ginkgo.By(fmt.Sprintf("Creating configMap with name %s", createConfigMap.Name))
-		if createConfigMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), createConfigMap, metav1.CreateOptions{}); err != nil {
+		if createConfigMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, createConfigMap, metav1.CreateOptions{}); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", createConfigMap.Name, err)
 		}
 
 		ginkgo.By("waiting to observe update in volume")
 
-		gomega.Eventually(pollCreateLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-1"))
-		gomega.Eventually(pollUpdateLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-3"))
-		gomega.Eventually(pollDeleteLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("Error reading file /etc/configmap-volumes/delete/data-1"))
+		gomega.Eventually(ctx, pollCreateLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-1"))
+		gomega.Eventually(ctx, pollUpdateLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-3"))
+		gomega.Eventually(ctx, pollDeleteLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("Error reading file /etc/configmap-volumes/delete/data-1"))
 	})
 
 	/*
@@ -420,7 +420,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 		Testname: ConfigMap Volume, multiple volume maps
 		Description: The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount that is mapped to multiple paths in the Pod. The content MUST be accessible from all the mapped volume mounts.
 	*/
-	framework.ConformanceIt("should be consumable in multiple volumes in the same pod [NodeConformance]", func() {
+	framework.ConformanceIt("should be consumable in multiple volumes in the same pod [NodeConformance]", func(ctx context.Context) {
 		var (
 			name             = "configmap-test-volume-" + string(uuid.NewUUID())
 			volumeName       = "configmap-volume"
@@ -432,7 +432,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 
 		ginkgo.By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
 		var err error
-		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{}); err != nil {
+		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, configMap, metav1.CreateOptions{}); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 		}
 
@@ -486,7 +486,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 			},
 		}
 
-		e2epodoutput.TestContainerOutput(f, "consume configMaps", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(ctx, f, "consume configMaps", pod, 0, []string{
 			"content of file \"/etc/configmap-volume/data-1\": value-1",
 		})
 
@@ -501,32 +501,32 @@ var _ = SIGDescribe("ConfigMap", func() {
 			Try to update the ConfigMap`s metadata (labels), the update must succeed.
 			Try to delete the ConfigMap, the deletion must succeed.
 	*/
-	framework.ConformanceIt("should be immutable if `immutable` field is set", func() {
+	framework.ConformanceIt("should be immutable if `immutable` field is set", func(ctx context.Context) {
 		name := "immutable"
 		configMap := newConfigMap(f, name)
 
-		currentConfigMap, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{})
+		currentConfigMap, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, configMap, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Failed to create config map %q in namespace %q", configMap.Name, configMap.Namespace)
 
 		currentConfigMap.Data["data-4"] = "value-4"
-		currentConfigMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(context.TODO(), currentConfigMap, metav1.UpdateOptions{})
+		currentConfigMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(ctx, currentConfigMap, metav1.UpdateOptions{})
 		framework.ExpectNoError(err, "Failed to update config map %q in namespace %q", configMap.Name, configMap.Namespace)
 
 		// Mark config map as immutable.
 		trueVal := true
 		currentConfigMap.Immutable = &trueVal
-		currentConfigMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(context.TODO(), currentConfigMap, metav1.UpdateOptions{})
+		currentConfigMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(ctx, currentConfigMap, metav1.UpdateOptions{})
 		framework.ExpectNoError(err, "Failed to mark config map %q in namespace %q as immutable", configMap.Name, configMap.Namespace)
 
 		// Ensure data can't be changed now.
 		currentConfigMap.Data["data-5"] = "value-5"
-		_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(context.TODO(), currentConfigMap, metav1.UpdateOptions{})
+		_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(ctx, currentConfigMap, metav1.UpdateOptions{})
 		if !apierrors.IsInvalid(err) {
 			framework.Failf("expected 'invalid' as error, got instead: %v", err)
 		}
 
 		// Ensure config map can't be switched from immutable to mutable.
-		currentConfigMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Get(context.TODO(), name, metav1.GetOptions{})
+		currentConfigMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Get(ctx, name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "Failed to get config map %q in namespace %q", configMap.Name, configMap.Namespace)
 		if !*currentConfigMap.Immutable {
 			framework.Failf("currentConfigMap %s can be switched from immutable to mutable", currentConfigMap.Name)
@@ -534,39 +534,41 @@ var _ = SIGDescribe("ConfigMap", func() {
 
 		falseVal := false
 		currentConfigMap.Immutable = &falseVal
-		_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(context.TODO(), currentConfigMap, metav1.UpdateOptions{})
+		_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(ctx, currentConfigMap, metav1.UpdateOptions{})
 		if !apierrors.IsInvalid(err) {
 			framework.Failf("expected 'invalid' as error, got instead: %v", err)
 		}
 
 		// Ensure that metadata can be changed.
-		currentConfigMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Get(context.TODO(), name, metav1.GetOptions{})
+		currentConfigMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Get(ctx, name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "Failed to get config map %q in namespace %q", configMap.Name, configMap.Namespace)
 		currentConfigMap.Labels = map[string]string{"label1": "value1"}
-		_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(context.TODO(), currentConfigMap, metav1.UpdateOptions{})
+		_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(ctx, currentConfigMap, metav1.UpdateOptions{})
 		framework.ExpectNoError(err, "Failed to update config map %q in namespace %q", configMap.Name, configMap.Namespace)
 
 		// Ensure that immutable config map can be deleted.
-		err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(context.TODO(), name, metav1.DeleteOptions{})
+		err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(ctx, name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "Failed to delete config map %q in namespace %q", configMap.Name, configMap.Namespace)
 	})
 
 	// The pod is in pending during volume creation until the configMap objects are available
 	// or until mount the configMap volume times out. There is no configMap object defined for the pod, so it should return timeout exception unless it is marked optional.
 	// Slow (~5 mins)
-	ginkgo.It("Should fail non-optional pod creation due to configMap object does not exist [Slow]", func() {
+	ginkgo.It("Should fail non-optional pod creation due to configMap object does not exist [Slow]", func(ctx context.Context) {
 		volumeMountPath := "/etc/configmap-volumes"
-		pod, err := createNonOptionalConfigMapPod(f, volumeMountPath)
-		framework.ExpectError(err, "created pod %q with non-optional configMap in namespace %q", pod.Name, f.Namespace.Name)
+		pod := createNonOptionalConfigMapPod(ctx, f, volumeMountPath)
+		getPod := e2epod.Get(f.ClientSet, pod)
+		gomega.Consistently(ctx, getPod).WithTimeout(f.Timeouts.PodStart).Should(e2epod.BeInPhase(v1.PodPending))
 	})
 
 	// ConfigMap object defined for the pod, If a key is specified which is not present in the ConfigMap,
 	// the volume setup will error unless it is marked optional, during the pod creation.
 	// Slow (~5 mins)
-	ginkgo.It("Should fail non-optional pod creation due to the key in the configMap object does not exist [Slow]", func() {
+	ginkgo.It("Should fail non-optional pod creation due to the key in the configMap object does not exist [Slow]", func(ctx context.Context) {
 		volumeMountPath := "/etc/configmap-volumes"
-		pod, err := createNonOptionalConfigMapPodWithConfig(f, volumeMountPath)
-		framework.ExpectError(err, "created pod %q with non-optional configMap in namespace %q", pod.Name, f.Namespace.Name)
+		pod := createNonOptionalConfigMapPodWithConfig(ctx, f, volumeMountPath)
+		getPod := e2epod.Get(f.ClientSet, pod)
+		gomega.Consistently(ctx, getPod).WithTimeout(f.Timeouts.PodStart).Should(e2epod.BeInPhase(v1.PodPending))
 	})
 })
 
@@ -584,7 +586,7 @@ func newConfigMap(f *framework.Framework, name string) *v1.ConfigMap {
 	}
 }
 
-func doConfigMapE2EWithoutMappings(f *framework.Framework, asUser bool, fsGroup int64, defaultMode *int32) {
+func doConfigMapE2EWithoutMappings(ctx context.Context, f *framework.Framework, asUser bool, fsGroup int64, defaultMode *int32) {
 	groupID := int64(fsGroup)
 
 	var (
@@ -596,7 +598,7 @@ func doConfigMapE2EWithoutMappings(f *framework.Framework, asUser bool, fsGroup 
 
 	ginkgo.By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
 	var err error
-	if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{}); err != nil {
+	if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, configMap, metav1.CreateOptions{}); err != nil {
 		framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 	}
 
@@ -622,10 +624,10 @@ func doConfigMapE2EWithoutMappings(f *framework.Framework, asUser bool, fsGroup 
 		"content of file \"/etc/configmap-volume/data-1\": value-1",
 		fileModeRegexp,
 	}
-	e2epodoutput.TestContainerOutputRegexp(f, "consume configMaps", pod, 0, output)
+	e2epodoutput.TestContainerOutputRegexp(ctx, f, "consume configMaps", pod, 0, output)
 }
 
-func doConfigMapE2EWithMappings(f *framework.Framework, asUser bool, fsGroup int64, itemMode *int32) {
+func doConfigMapE2EWithMappings(ctx context.Context, f *framework.Framework, asUser bool, fsGroup int64, itemMode *int32) {
 	groupID := int64(fsGroup)
 
 	var (
@@ -638,7 +640,7 @@ func doConfigMapE2EWithMappings(f *framework.Framework, asUser bool, fsGroup int
 	ginkgo.By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
 
 	var err error
-	if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{}); err != nil {
+	if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, configMap, metav1.CreateOptions{}); err != nil {
 		framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 	}
 
@@ -674,11 +676,11 @@ func doConfigMapE2EWithMappings(f *framework.Framework, asUser bool, fsGroup int
 		fileModeRegexp := getFileModeRegex("/etc/configmap-volume/path/to/data-2", itemMode)
 		output = append(output, fileModeRegexp)
 	}
-	e2epodoutput.TestContainerOutputRegexp(f, "consume configMaps", pod, 0, output)
+	e2epodoutput.TestContainerOutputRegexp(ctx, f, "consume configMaps", pod, 0, output)
 }
 
-func createNonOptionalConfigMapPod(f *framework.Framework, volumeMountPath string) (*v1.Pod, error) {
-	podLogTimeout := e2epod.GetPodSecretUpdateTimeout(f.ClientSet)
+func createNonOptionalConfigMapPod(ctx context.Context, f *framework.Framework, volumeMountPath string) *v1.Pod {
+	podLogTimeout := e2epod.GetPodSecretUpdateTimeout(ctx, f.ClientSet)
 	containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 	falseValue := false
 
@@ -691,12 +693,12 @@ func createNonOptionalConfigMapPod(f *framework.Framework, volumeMountPath strin
 	pod.Spec.Volumes[0].VolumeSource.ConfigMap.Optional = &falseValue
 
 	ginkgo.By("Creating the pod")
-	pod = e2epod.NewPodClient(f).Create(pod)
-	return pod, e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
+	pod = e2epod.NewPodClient(f).Create(ctx, pod)
+	return pod
 }
 
-func createNonOptionalConfigMapPodWithConfig(f *framework.Framework, volumeMountPath string) (*v1.Pod, error) {
-	podLogTimeout := e2epod.GetPodSecretUpdateTimeout(f.ClientSet)
+func createNonOptionalConfigMapPodWithConfig(ctx context.Context, f *framework.Framework, volumeMountPath string) *v1.Pod {
+	podLogTimeout := e2epod.GetPodSecretUpdateTimeout(ctx, f.ClientSet)
 	containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 	falseValue := false
 
@@ -706,7 +708,7 @@ func createNonOptionalConfigMapPodWithConfig(f *framework.Framework, volumeMount
 
 	ginkgo.By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
 	var err error
-	if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{}); err != nil {
+	if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, configMap, metav1.CreateOptions{}); err != nil {
 		framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 	}
 	// creating a pod with configMap object, but with different key which is not present in configMap object.
@@ -721,8 +723,8 @@ func createNonOptionalConfigMapPodWithConfig(f *framework.Framework, volumeMount
 	}
 
 	ginkgo.By("Creating the pod")
-	pod = e2epod.NewPodClient(f).Create(pod)
-	return pod, e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
+	pod = e2epod.NewPodClient(f).Create(ctx, pod)
+	return pod
 }
 
 func createConfigMapVolumeMounttestPod(namespace, volumeName, referenceName, mountPath string, mounttestArgs ...string) *v1.Pod {

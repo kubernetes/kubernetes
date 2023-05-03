@@ -19,11 +19,11 @@ type Gomega interface {
 	Expect(actual interface{}, extra ...interface{}) Assertion
 	ExpectWithOffset(offset int, actual interface{}, extra ...interface{}) Assertion
 
-	Eventually(args ...interface{}) AsyncAssertion
-	EventuallyWithOffset(offset int, args ...interface{}) AsyncAssertion
+	Eventually(actualOrCtx interface{}, args ...interface{}) AsyncAssertion
+	EventuallyWithOffset(offset int, actualOrCtx interface{}, args ...interface{}) AsyncAssertion
 
-	Consistently(args ...interface{}) AsyncAssertion
-	ConsistentlyWithOffset(offset int, args ...interface{}) AsyncAssertion
+	Consistently(actualOrCtx interface{}, args ...interface{}) AsyncAssertion
+	ConsistentlyWithOffset(offset int, actualOrCtx interface{}, args ...interface{}) AsyncAssertion
 
 	SetDefaultEventuallyTimeout(time.Duration)
 	SetDefaultEventuallyPollingInterval(time.Duration)
@@ -75,6 +75,7 @@ type AsyncAssertion interface {
 	ProbeEvery(interval time.Duration) AsyncAssertion
 	WithContext(ctx context.Context) AsyncAssertion
 	WithArguments(argsToForward ...interface{}) AsyncAssertion
+	MustPassRepeatedly(count int) AsyncAssertion
 }
 
 // Assertions are returned by Ω and Expect and enable assertions against Gomega matchers

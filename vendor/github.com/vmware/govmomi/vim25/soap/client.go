@@ -35,11 +35,14 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/vmware/govmomi/internal/version"
 	"github.com/vmware/govmomi/vim25/progress"
 	"github.com/vmware/govmomi/vim25/types"
 	"github.com/vmware/govmomi/vim25/xml"
@@ -57,6 +60,15 @@ const (
 	SessionCookieName = "vmware_soap_session"
 )
 
+// defaultUserAgent is the default user agent string, e.g.
+// "govmomi/0.28.0 (go1.18.3;linux;amd64)"
+var defaultUserAgent = fmt.Sprintf(
+	"%s/%s (%s)",
+	version.ClientName,
+	version.ClientVersion,
+	strings.Join([]string{runtime.Version(), runtime.GOOS, runtime.GOARCH}, ";"),
+)
+
 type Client struct {
 	http.Client
 
@@ -70,9 +82,11 @@ type Client struct {
 
 	Namespace string // Vim namespace
 	Version   string // Vim version
+	Types     types.Func
 	UserAgent string
 
-	cookie string
+	cookie          string
+	insecureCookies bool
 }
 
 var schemeMatch = regexp.MustCompile(`^\w+://`)
@@ -122,6 +136,8 @@ func NewClient(u *url.URL, insecure bool) *Client {
 		u: u,
 		k: insecure,
 		d: newDebug(),
+
+		Types: types.TypeFunc(),
 	}
 
 	// Initialize http.RoundTripper on client, so we can customize it below
@@ -140,10 +156,14 @@ func NewClient(u *url.URL, insecure bool) *Client {
 
 	c.hosts = make(map[string]string)
 	c.t.TLSClientConfig = &tls.Config{InsecureSkipVerify: c.k}
-	// Don't bother setting DialTLS if InsecureSkipVerify=true
-	if !c.k {
-		c.t.DialTLS = c.dialTLS
-	}
+
+	// Always set DialTLS and DialTLSContext, even if InsecureSkipVerify=true,
+	// because of how certificate verification has been delegated to the host's
+	// PKI framework in Go 1.18. Please see the following links for more info:
+	//
+	//   * https://tip.golang.org/doc/go1.18 (search for "Certificate.Verify")
+	//   * https://github.com/square/certigo/issues/264
+	c.t.DialTLSContext = c.dialTLSContext
 
 	c.Client.Transport = c.t
 	c.Client.Jar, _ = cookiejar.New(nil)
@@ -152,7 +172,15 @@ func NewClient(u *url.URL, insecure bool) *Client {
 	c.u = c.URL()
 	c.u.User = nil
 
+	if c.u.Scheme == "http" {
+		c.insecureCookies = os.Getenv("GOVMOMI_INSECURE_COOKIES") == "true"
+	}
+
 	return &c
+}
+
+func (c *Client) DefaultTransport() *http.Transport {
+	return c.t
 }
 
 // NewServiceClient creates a NewClient with the given URL.Path and namespace.
@@ -169,7 +197,7 @@ func (c *Client) NewServiceClient(path string, namespace string) *Client {
 
 	client := NewClient(u, c.k)
 	client.Namespace = "urn:" + namespace
-	client.Transport.(*http.Transport).TLSClientConfig = c.Transport.(*http.Transport).TLSClientConfig
+	client.DefaultTransport().TLSClientConfig = c.DefaultTransport().TLSClientConfig
 	if cert := c.Certificate(); cert != nil {
 		client.SetCertificate(*cert)
 	}
@@ -195,19 +223,34 @@ func (c *Client) NewServiceClient(path string, namespace string) *Client {
 	// Copy any query params (e.g. GOVMOMI_TUNNEL_PROXY_PORT used in testing)
 	client.u.RawQuery = vc.RawQuery
 
+	client.UserAgent = c.UserAgent
+
+	vimTypes := c.Types
+	client.Types = func(name string) (reflect.Type, bool) {
+		kind, ok := vimTypes(name)
+		if ok {
+			return kind, ok
+		}
+		// vim25/xml typeToString() does not have an option to include namespace prefix.
+		// Workaround this by re-trying the lookup with the namespace prefix.
+		return vimTypes(namespace + ":" + name)
+	}
+
 	return client
 }
 
-// SetRootCAs defines the set of root certificate authorities
-// that clients use when verifying server certificates.
-// By default TLS uses the host's root CA set.
+// SetRootCAs defines the set of PEM-encoded file locations of root certificate
+// authorities the client uses when verifying server certificates instead of the
+// TLS defaults which uses the host's root CA set. Multiple PEM file locations
+// can be specified using the OS-specific PathListSeparator.
 //
-// See: http.Client.Transport.TLSClientConfig.RootCAs
-func (c *Client) SetRootCAs(file string) error {
+// See: http.Client.Transport.TLSClientConfig.RootCAs and
+// https://pkg.go.dev/os#PathListSeparator
+func (c *Client) SetRootCAs(pemPaths string) error {
 	pool := x509.NewCertPool()
 
-	for _, name := range filepath.SplitList(file) {
-		pem, err := ioutil.ReadFile(name)
+	for _, name := range filepath.SplitList(pemPaths) {
+		pem, err := ioutil.ReadFile(filepath.Clean(name))
 		if err != nil {
 			return err
 		}
@@ -277,7 +320,7 @@ func (c *Client) LoadThumbprints(file string) error {
 }
 
 func (c *Client) loadThumbprints(name string) error {
-	f, err := os.Open(name)
+	f, err := os.Open(filepath.Clean(name))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
@@ -313,7 +356,10 @@ func ThumbprintSHA1(cert *x509.Certificate) string {
 	return strings.Join(hex, ":")
 }
 
-func (c *Client) dialTLS(network string, addr string) (net.Conn, error) {
+func (c *Client) dialTLSContext(
+	ctx context.Context,
+	network, addr string) (net.Conn, error) {
+
 	// Would be nice if there was a tls.Config.Verify func,
 	// see tls.clientHandshakeState.doFullHandshake
 
@@ -327,7 +373,20 @@ func (c *Client) dialTLS(network string, addr string) (net.Conn, error) {
 	case x509.UnknownAuthorityError:
 	case x509.HostnameError:
 	default:
-		return nil, err
+		// Allow a thumbprint verification attempt if the error indicates
+		// the failure was due to lack of trust.
+		//
+		// Please note the err variable is not a special type of x509 or HTTP
+		// error that can be validated by a type assertion. The err variable is
+		// in fact an *errors.errorString.
+		switch {
+		case strings.HasSuffix(err.Error(), "certificate is not trusted"):
+			// darwin and linux
+		case strings.HasSuffix(err.Error(), "certificate signed by unknown authority"):
+			// windows
+		default:
+			return nil, err
+		}
 	}
 
 	thumbprint := c.Thumbprint(addr)
@@ -346,10 +405,14 @@ func (c *Client) dialTLS(network string, addr string) (net.Conn, error) {
 	if thumbprint != peer {
 		_ = conn.Close()
 
-		return nil, fmt.Errorf("Host %q thumbprint does not match %q", addr, thumbprint)
+		return nil, fmt.Errorf("host %q thumbprint does not match %q", addr, thumbprint)
 	}
 
 	return conn, nil
+}
+
+func (c *Client) dialTLS(network, addr string) (net.Conn, error) {
+	return c.dialTLSContext(context.Background(), network, addr)
 }
 
 // splitHostPort is similar to net.SplitHostPort,
@@ -424,6 +487,7 @@ type marshaledClient struct {
 	Cookies  []*http.Cookie
 	URL      *url.URL
 	Insecure bool
+	Version  string
 }
 
 func (c *Client) MarshalJSON() ([]byte, error) {
@@ -431,6 +495,7 @@ func (c *Client) MarshalJSON() ([]byte, error) {
 		Cookies:  c.Jar.Cookies(c.u),
 		URL:      c.u,
 		Insecure: c.k,
+		Version:  c.Version,
 	}
 
 	return json.Marshal(m)
@@ -445,12 +510,23 @@ func (c *Client) UnmarshalJSON(b []byte) error {
 	}
 
 	*c = *NewClient(m.URL, m.Insecure)
+	c.Version = m.Version
 	c.Jar.SetCookies(m.URL, m.Cookies)
 
 	return nil
 }
 
 type kindContext struct{}
+
+func (c *Client) setInsecureCookies(res *http.Response) {
+	cookies := res.Cookies()
+	if len(cookies) != 0 {
+		for _, cookie := range cookies {
+			cookie.Secure = false
+		}
+		c.Jar.SetCookies(c.u, cookies)
+	}
+}
 
 func (c *Client) Do(ctx context.Context, req *http.Request, f func(*http.Response) error) error {
 	if ctx == nil {
@@ -462,12 +538,16 @@ func (c *Client) Do(ctx context.Context, req *http.Request, f func(*http.Respons
 		defer d.done()
 	}
 
-	if c.UserAgent != "" {
-		req.Header.Set(`User-Agent`, c.UserAgent)
+	// use default
+	if c.UserAgent == "" {
+		c.UserAgent = defaultUserAgent
 	}
 
+	req.Header.Set(`User-Agent`, c.UserAgent)
+
+	ext := ""
 	if d.enabled() {
-		d.debugRequest(req)
+		ext = d.debugRequest(req)
 	}
 
 	tstart := time.Now()
@@ -488,11 +568,15 @@ func (c *Client) Do(ctx context.Context, req *http.Request, f func(*http.Respons
 		return err
 	}
 
-	defer res.Body.Close()
-
 	if d.enabled() {
-		d.debugResponse(res)
+		d.debugResponse(res, ext)
 	}
+
+	if c.insecureCookies {
+		c.setInsecureCookies(res)
+	}
+
+	defer res.Body.Close()
 
 	return f(res)
 }
@@ -509,6 +593,32 @@ type headerContext struct{}
 // WithHeader can be used to modify the outgoing request soap.Header fields.
 func (c *Client) WithHeader(ctx context.Context, header Header) context.Context {
 	return context.WithValue(ctx, headerContext{}, header)
+}
+
+type statusError struct {
+	res *http.Response
+}
+
+// Temporary returns true for HTTP response codes that can be retried
+// See vim25.IsTemporaryNetworkError
+func (e *statusError) Temporary() bool {
+	switch e.res.StatusCode {
+	case http.StatusBadGateway:
+		return true
+	}
+	return false
+}
+
+func (e *statusError) Error() string {
+	return e.res.Status
+}
+
+func newStatusError(res *http.Response) error {
+	return &url.Error{
+		Op:  res.Request.Method,
+		URL: res.Request.URL.Path,
+		Err: &statusError{res},
+	}
 }
 
 func (c *Client) RoundTrip(ctx context.Context, reqBody, resBody HasFault) error {
@@ -566,11 +676,11 @@ func (c *Client) RoundTrip(ctx context.Context, reqBody, resBody HasFault) error
 		case http.StatusInternalServerError:
 			// Error, but typically includes a body explaining the error
 		default:
-			return errors.New(res.Status)
+			return newStatusError(res)
 		}
 
 		dec := xml.NewDecoder(res.Body)
-		dec.TypeFunc = types.TypeFunc()
+		dec.TypeFunc = c.Types
 		err = dec.Decode(&resEnv)
 		if err != nil {
 			return err
@@ -681,7 +791,7 @@ func (c *Client) UploadFile(ctx context.Context, file string, u *url.URL, param 
 		return err
 	}
 
-	f, err := os.Open(file)
+	f, err := os.Open(filepath.Clean(file))
 	if err != nil {
 		return err
 	}
@@ -734,7 +844,7 @@ func (c *Client) Download(ctx context.Context, u *url.URL, param *Download) (io.
 	switch res.StatusCode {
 	case http.StatusOK:
 	default:
-		err = errors.New(res.Status)
+		err = fmt.Errorf("download(%s): %s", u, res.Status)
 	}
 
 	if err != nil {
@@ -758,7 +868,7 @@ func (c *Client) WriteFile(ctx context.Context, file string, src io.Reader, size
 
 	if s != nil {
 		pr := progress.NewReader(ctx, s, src, size)
-		src = pr
+		r = pr
 
 		// Mark progress reader as done when returning from this function.
 		defer func() {

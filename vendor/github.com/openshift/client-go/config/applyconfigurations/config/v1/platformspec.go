@@ -9,20 +9,21 @@ import (
 // PlatformSpecApplyConfiguration represents an declarative configuration of the PlatformSpec type for use
 // with apply.
 type PlatformSpecApplyConfiguration struct {
-	Type         *v1.PlatformType                       `json:"type,omitempty"`
-	AWS          *AWSPlatformSpecApplyConfiguration     `json:"aws,omitempty"`
-	Azure        *v1.AzurePlatformSpec                  `json:"azure,omitempty"`
-	GCP          *v1.GCPPlatformSpec                    `json:"gcp,omitempty"`
-	BareMetal    *v1.BareMetalPlatformSpec              `json:"baremetal,omitempty"`
-	OpenStack    *v1.OpenStackPlatformSpec              `json:"openstack,omitempty"`
-	Ovirt        *v1.OvirtPlatformSpec                  `json:"ovirt,omitempty"`
-	VSphere      *VSpherePlatformSpecApplyConfiguration `json:"vsphere,omitempty"`
-	IBMCloud     *v1.IBMCloudPlatformSpec               `json:"ibmcloud,omitempty"`
-	Kubevirt     *v1.KubevirtPlatformSpec               `json:"kubevirt,omitempty"`
-	EquinixMetal *v1.EquinixMetalPlatformSpec           `json:"equinixMetal,omitempty"`
-	PowerVS      *PowerVSPlatformSpecApplyConfiguration `json:"powervs,omitempty"`
-	AlibabaCloud *v1.AlibabaCloudPlatformSpec           `json:"alibabaCloud,omitempty"`
-	Nutanix      *NutanixPlatformSpecApplyConfiguration `json:"nutanix,omitempty"`
+	Type         *v1.PlatformType                        `json:"type,omitempty"`
+	AWS          *AWSPlatformSpecApplyConfiguration      `json:"aws,omitempty"`
+	Azure        *v1.AzurePlatformSpec                   `json:"azure,omitempty"`
+	GCP          *v1.GCPPlatformSpec                     `json:"gcp,omitempty"`
+	BareMetal    *v1.BareMetalPlatformSpec               `json:"baremetal,omitempty"`
+	OpenStack    *v1.OpenStackPlatformSpec               `json:"openstack,omitempty"`
+	Ovirt        *v1.OvirtPlatformSpec                   `json:"ovirt,omitempty"`
+	VSphere      *VSpherePlatformSpecApplyConfiguration  `json:"vsphere,omitempty"`
+	IBMCloud     *v1.IBMCloudPlatformSpec                `json:"ibmcloud,omitempty"`
+	Kubevirt     *v1.KubevirtPlatformSpec                `json:"kubevirt,omitempty"`
+	EquinixMetal *v1.EquinixMetalPlatformSpec            `json:"equinixMetal,omitempty"`
+	PowerVS      *PowerVSPlatformSpecApplyConfiguration  `json:"powervs,omitempty"`
+	AlibabaCloud *v1.AlibabaCloudPlatformSpec            `json:"alibabaCloud,omitempty"`
+	Nutanix      *NutanixPlatformSpecApplyConfiguration  `json:"nutanix,omitempty"`
+	External     *ExternalPlatformSpecApplyConfiguration `json:"external,omitempty"`
 }
 
 // PlatformSpecApplyConfiguration constructs an declarative configuration of the PlatformSpec type for use with
@@ -140,5 +141,13 @@ func (b *PlatformSpecApplyConfiguration) WithAlibabaCloud(value v1.AlibabaCloudP
 // If called multiple times, the Nutanix field is set to the value of the last call.
 func (b *PlatformSpecApplyConfiguration) WithNutanix(value *NutanixPlatformSpecApplyConfiguration) *PlatformSpecApplyConfiguration {
 	b.Nutanix = value
+	return b
+}
+
+// WithExternal sets the External field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the External field is set to the value of the last call.
+func (b *PlatformSpecApplyConfiguration) WithExternal(value *ExternalPlatformSpecApplyConfiguration) *PlatformSpecApplyConfiguration {
+	b.External = value
 	return b
 }

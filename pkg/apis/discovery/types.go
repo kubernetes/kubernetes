@@ -37,7 +37,7 @@ type EndpointSlice struct {
 	// supported:
 	// * IPv4: Represents an IPv4 Address.
 	// * IPv6: Represents an IPv6 Address.
-	// * FQDN: Represents a Fully Qualified Domain Name.
+	// * FQDN: Represents a Fully Qualified Domain Name. [DEPRECATED]
 	AddressType AddressType
 	// endpoints is a list of unique endpoints in this slice. Each slice may
 	// include a maximum of 1000 endpoints.
@@ -112,7 +112,9 @@ type EndpointConditions struct {
 	// according to whatever system is managing the endpoint. A nil value
 	// indicates an unknown state. In most cases consumers should interpret this
 	// unknown state as ready. For compatibility reasons, ready should never be
-	// "true" for terminating endpoints.
+	// "true" for terminating endpoints, except when the normal readiness
+	// behavior is being explicitly overridden, for example when the associated
+	// Service has set the publishNotReadyAddresses flag.
 	Ready *bool
 
 	// serving is identical to ready except that it is set regardless of the
@@ -160,10 +162,17 @@ type EndpointPort struct {
 	// interpreted in the context of the specific consumer.
 	Port *int32
 	// The application protocol for this port.
+	// This is used as a hint for implementations to offer richer behavior for protocols that they understand.
 	// This field follows standard Kubernetes label syntax.
-	// Un-prefixed names are reserved for IANA standard service names (as per
+	// Valid values are either:
+	//
+	// * Un-prefixed protocol names - reserved for IANA standard service names (as per
 	// RFC-6335 and https://www.iana.org/assignments/service-names).
-	// Non-standard protocols should use prefixed names such as
+	//
+	// * Kubernetes-defined prefixed names:
+	//   * 'kubernetes.io/h2c' - HTTP/2 over cleartext as described in https://www.rfc-editor.org/rfc/rfc7540
+	//
+	// * Other protocols should use implementation-defined prefixed names such as
 	// mycompany.com/my-custom-protocol.
 	// +optional
 	AppProtocol *string

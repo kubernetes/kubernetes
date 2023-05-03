@@ -43,7 +43,6 @@ func PodScheduleError(profile string, duration float64) {
 }
 
 func observeScheduleAttemptAndLatency(result, profile string, duration float64) {
-	e2eSchedulingLatency.WithLabelValues(result, profile).Observe(duration)
 	schedulingLatency.WithLabelValues(result, profile).Observe(duration)
 	scheduleAttempts.WithLabelValues(result, profile).Inc()
 }

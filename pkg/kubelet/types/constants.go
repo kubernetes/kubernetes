@@ -25,11 +25,6 @@ const (
 	RFC3339NanoLenient = "2006-01-02T15:04:05.999999999Z07:00"
 )
 
-// Different container runtimes.
-const (
-	RemoteContainerRuntime = "remote"
-)
-
 // User visible keys for managing node allocatable enforcement on the node.
 const (
 	NodeAllocatableEnforcementKey = "pods"

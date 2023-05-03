@@ -123,9 +123,43 @@
       {
         "expression": "expressionValue",
         "message": "messageValue",
-        "reason": "reasonValue"
+        "reason": "reasonValue",
+        "messageExpression": "messageExpressionValue"
       }
     ],
-    "failurePolicy": "failurePolicyValue"
+    "failurePolicy": "failurePolicyValue",
+    "auditAnnotations": [
+      {
+        "key": "keyValue",
+        "valueExpression": "valueExpressionValue"
+      }
+    ],
+    "matchConditions": [
+      {
+        "name": "nameValue",
+        "expression": "expressionValue"
+      }
+    ]
+  },
+  "status": {
+    "observedGeneration": 1,
+    "typeChecking": {
+      "expressionWarnings": [
+        {
+          "fieldRef": "fieldRefValue",
+          "warning": "warningValue"
+        }
+      ]
+    },
+    "conditions": [
+      {
+        "type": "typeValue",
+        "status": "statusValue",
+        "observedGeneration": 3,
+        "lastTransitionTime": "2004-01-01T01:01:01Z",
+        "reason": "reasonValue",
+        "message": "messageValue"
+      }
+    ]
   }
 }

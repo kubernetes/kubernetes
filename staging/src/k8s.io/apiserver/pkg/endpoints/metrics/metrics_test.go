@@ -34,6 +34,7 @@ func TestCleanVerb(t *testing.T) {
 		initialVerb   string
 		suggestedVerb string
 		request       *http.Request
+		requestInfo   *request.RequestInfo
 		expectedVerb  string
 	}{
 		{
@@ -142,6 +143,89 @@ func TestCleanVerb(t *testing.T) {
 			request:      nil,
 			expectedVerb: "other",
 		},
+		{
+			desc:        "Pod logs should be transformed to CONNECT",
+			initialVerb: "GET",
+			request: &http.Request{
+				Method: "GET",
+				URL: &url.URL{
+					RawQuery: "/api/v1/namespaces/default/pods/test-pod/log",
+				},
+			},
+			requestInfo: &request.RequestInfo{
+				Verb:              "GET",
+				Resource:          "pods",
+				IsResourceRequest: true,
+				Subresource:       "log",
+			},
+			expectedVerb: "CONNECT",
+		},
+		{
+			desc:        "Pod exec should be transformed to CONNECT",
+			initialVerb: "POST",
+			request: &http.Request{
+				Method: "POST",
+				URL: &url.URL{
+					RawQuery: "/api/v1/namespaces/default/pods/test-pod/exec?command=sh",
+				},
+				Header: map[string][]string{
+					"Connection": {"Upgrade"},
+					"Upgrade":    {"SPDY/3.1"},
+					"X-Stream-Protocol-Version": {
+						"v4.channel.k8s.io", "v3.channel.k8s.io", "v2.channel.k8s.io", "channel.k8s.io",
+					},
+				},
+			},
+			requestInfo: &request.RequestInfo{
+				Verb:              "POST",
+				Resource:          "pods",
+				IsResourceRequest: true,
+				Subresource:       "exec",
+			},
+			expectedVerb: "CONNECT",
+		},
+		{
+			desc:        "Pod portforward should be transformed to CONNECT",
+			initialVerb: "POST",
+			request: &http.Request{
+				Method: "POST",
+				URL: &url.URL{
+					RawQuery: "/api/v1/namespaces/default/pods/test-pod/portforward",
+				},
+				Header: map[string][]string{
+					"Connection": {"Upgrade"},
+					"Upgrade":    {"SPDY/3.1"},
+					"X-Stream-Protocol-Version": {
+						"v4.channel.k8s.io", "v3.channel.k8s.io", "v2.channel.k8s.io", "channel.k8s.io",
+					},
+				},
+			},
+			requestInfo: &request.RequestInfo{
+				Verb:              "POST",
+				Resource:          "pods",
+				IsResourceRequest: true,
+				Subresource:       "portforward",
+			},
+			expectedVerb: "CONNECT",
+		},
+		{
+			desc:        "Deployment scale should not be transformed to CONNECT",
+			initialVerb: "PUT",
+			request: &http.Request{
+				Method: "PUT",
+				URL: &url.URL{
+					RawQuery: "/apis/apps/v1/namespaces/default/deployments/test-1/scale",
+				},
+				Header: map[string][]string{},
+			},
+			requestInfo: &request.RequestInfo{
+				Verb:              "PUT",
+				Resource:          "deployments",
+				IsResourceRequest: true,
+				Subresource:       "scale",
+			},
+			expectedVerb: "PUT",
+		},
 	}
 	for _, tt := range testCases {
 		t.Run(tt.initialVerb, func(t *testing.T) {
@@ -149,7 +233,7 @@ func TestCleanVerb(t *testing.T) {
 			if tt.request != nil {
 				req = tt.request
 			}
-			cleansedVerb := cleanVerb(tt.initialVerb, tt.suggestedVerb, req)
+			cleansedVerb := cleanVerb(tt.initialVerb, tt.suggestedVerb, req, tt.requestInfo)
 			if cleansedVerb != tt.expectedVerb {
 				t.Errorf("Got %s, but expected %s", cleansedVerb, tt.expectedVerb)
 			}

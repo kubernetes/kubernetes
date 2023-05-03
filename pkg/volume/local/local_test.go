@@ -244,6 +244,11 @@ func TestInvalidLocalPath(t *testing.T) {
 }
 
 func TestBlockDeviceGlobalPathAndMountDevice(t *testing.T) {
+	// Skip tests that fail on Windows, as discussed during the SIG Testing meeting from January 10, 2023
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping test that fails on Windows")
+	}
+
 	// Block device global mount path testing
 	tmpBlockDir, plug := getDeviceMountablePluginWithBlockPath(t, true)
 	defer os.RemoveAll(tmpBlockDir)

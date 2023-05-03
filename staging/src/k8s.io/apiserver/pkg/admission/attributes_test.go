@@ -27,22 +27,22 @@ func TestAddAnnotation(t *testing.T) {
 	attr := &attributesRecord{}
 
 	// test AddAnnotation
-	attr.AddAnnotation("podsecuritypolicy.admission.k8s.io/validate-policy", "privileged")
-	attr.AddAnnotation("podsecuritypolicy.admission.k8s.io/admit-policy", "privileged")
+	attr.AddAnnotation("foo.admission.k8s.io/key1", "value1")
+	attr.AddAnnotation("foo.admission.k8s.io/key2", "value2")
 	annotations := attr.getAnnotations(auditinternal.LevelMetadata)
-	assert.Equal(t, annotations["podsecuritypolicy.admission.k8s.io/validate-policy"], "privileged")
+	assert.Equal(t, annotations["foo.admission.k8s.io/key1"], "value1")
 
 	// test overwrite
-	assert.Error(t, attr.AddAnnotation("podsecuritypolicy.admission.k8s.io/validate-policy", "privileged-overwrite"),
+	assert.Error(t, attr.AddAnnotation("foo.admission.k8s.io/key1", "value1-overwrite"),
 		"admission annotations should not be allowd to be overwritten")
 	annotations = attr.getAnnotations(auditinternal.LevelMetadata)
-	assert.Equal(t, annotations["podsecuritypolicy.admission.k8s.io/validate-policy"], "privileged", "admission annotations should not be overwritten")
+	assert.Equal(t, annotations["foo.admission.k8s.io/key1"], "value1", "admission annotations should not be overwritten")
 
 	// test invalid plugin names
-	var testCases map[string]string = map[string]string{
+	var testCases = map[string]string{
 		"invalid dns subdomain": "INVALID-DNS-Subdomain/policy",
 		"no plugin name":        "policy",
-		"no key name":           "podsecuritypolicy.admission.k8s.io",
+		"no key name":           "foo.admission.k8s.io",
 		"empty key":             "",
 	}
 	for name, invalidKey := range testCases {
@@ -57,8 +57,8 @@ func TestAddAnnotation(t *testing.T) {
 		t,
 		annotations,
 		map[string]string{
-			"podsecuritypolicy.admission.k8s.io/validate-policy": "privileged",
-			"podsecuritypolicy.admission.k8s.io/admit-policy":    "privileged",
+			"foo.admission.k8s.io/key1": "value1",
+			"foo.admission.k8s.io/key2": "value2",
 		},
 		"unexpected final annotations",
 	)

@@ -39,15 +39,15 @@ import (
 func getPatchBytes(oldLease, newLease *coordinationv1.Lease) ([]byte, error) {
 	oldData, err := json.Marshal(oldLease)
 	if err != nil {
-		return nil, fmt.Errorf("failed to Marshal oldData: %v", err)
+		return nil, fmt.Errorf("failed to Marshal oldData: %w", err)
 	}
 	newData, err := json.Marshal(newLease)
 	if err != nil {
-		return nil, fmt.Errorf("failed to Marshal newData: %v", err)
+		return nil, fmt.Errorf("failed to Marshal newData: %w", err)
 	}
 	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, coordinationv1.Lease{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to CreateTwoWayMergePatch: %v", err)
+		return nil, fmt.Errorf("failed to CreateTwoWayMergePatch: %w", err)
 	}
 	return patchBytes, nil
 }
@@ -69,7 +69,7 @@ var _ = SIGDescribe("Lease", func() {
 		return just the remaining lease. Delete the lease; delete MUST be successful. Get the lease; get
 		MUST return not found error.
 	*/
-	framework.ConformanceIt("lease API should be available", func() {
+	framework.ConformanceIt("lease API should be available", func(ctx context.Context) {
 		leaseClient := f.ClientSet.CoordinationV1().Leases(f.Namespace.Name)
 
 		name := "lease"
@@ -78,35 +78,35 @@ var _ = SIGDescribe("Lease", func() {
 				Name: name,
 			},
 			Spec: coordinationv1.LeaseSpec{
-				HolderIdentity:       pointer.StringPtr("holder"),
-				LeaseDurationSeconds: pointer.Int32Ptr(30),
+				HolderIdentity:       pointer.String("holder"),
+				LeaseDurationSeconds: pointer.Int32(30),
 				AcquireTime:          &metav1.MicroTime{Time: time.Time{}.Add(2 * time.Second)},
 				RenewTime:            &metav1.MicroTime{Time: time.Time{}.Add(5 * time.Second)},
-				LeaseTransitions:     pointer.Int32Ptr(0),
+				LeaseTransitions:     pointer.Int32(0),
 			},
 		}
 
-		createdLease, err := leaseClient.Create(context.TODO(), lease, metav1.CreateOptions{})
+		createdLease, err := leaseClient.Create(ctx, lease, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "creating Lease failed")
 
-		readLease, err := leaseClient.Get(context.TODO(), name, metav1.GetOptions{})
+		readLease, err := leaseClient.Get(ctx, name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "couldn't read Lease")
 		if !apiequality.Semantic.DeepEqual(lease.Spec, readLease.Spec) {
 			framework.Failf("Leases don't match. Diff (- for expected, + for actual):\n%s", cmp.Diff(lease.Spec, readLease.Spec))
 		}
 
 		createdLease.Spec = coordinationv1.LeaseSpec{
-			HolderIdentity:       pointer.StringPtr("holder2"),
-			LeaseDurationSeconds: pointer.Int32Ptr(30),
+			HolderIdentity:       pointer.String("holder2"),
+			LeaseDurationSeconds: pointer.Int32(30),
 			AcquireTime:          &metav1.MicroTime{Time: time.Time{}.Add(20 * time.Second)},
 			RenewTime:            &metav1.MicroTime{Time: time.Time{}.Add(50 * time.Second)},
-			LeaseTransitions:     pointer.Int32Ptr(1),
+			LeaseTransitions:     pointer.Int32(1),
 		}
 
-		_, err = leaseClient.Update(context.TODO(), createdLease, metav1.UpdateOptions{})
+		_, err = leaseClient.Update(ctx, createdLease, metav1.UpdateOptions{})
 		framework.ExpectNoError(err, "updating Lease failed")
 
-		readLease, err = leaseClient.Get(context.TODO(), name, metav1.GetOptions{})
+		readLease, err = leaseClient.Get(ctx, name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "couldn't read Lease")
 		if !apiequality.Semantic.DeepEqual(createdLease.Spec, readLease.Spec) {
 			framework.Failf("Leases don't match. Diff (- for expected, + for actual):\n%s", cmp.Diff(createdLease.Spec, readLease.Spec))
@@ -114,19 +114,19 @@ var _ = SIGDescribe("Lease", func() {
 
 		patchedLease := readLease.DeepCopy()
 		patchedLease.Spec = coordinationv1.LeaseSpec{
-			HolderIdentity:       pointer.StringPtr("holder3"),
-			LeaseDurationSeconds: pointer.Int32Ptr(60),
+			HolderIdentity:       pointer.String("holder3"),
+			LeaseDurationSeconds: pointer.Int32(60),
 			AcquireTime:          &metav1.MicroTime{Time: time.Time{}.Add(50 * time.Second)},
 			RenewTime:            &metav1.MicroTime{Time: time.Time{}.Add(70 * time.Second)},
-			LeaseTransitions:     pointer.Int32Ptr(2),
+			LeaseTransitions:     pointer.Int32(2),
 		}
 		patchBytes, err := getPatchBytes(readLease, patchedLease)
 		framework.ExpectNoError(err, "creating patch failed")
 
-		_, err = leaseClient.Patch(context.TODO(), name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
+		_, err = leaseClient.Patch(ctx, name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 		framework.ExpectNoError(err, "patching Lease failed")
 
-		readLease, err = leaseClient.Get(context.TODO(), name, metav1.GetOptions{})
+		readLease, err = leaseClient.Get(ctx, name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "couldn't read Lease")
 		if !apiequality.Semantic.DeepEqual(patchedLease.Spec, readLease.Spec) {
 			framework.Failf("Leases don't match. Diff (- for expected, + for actual):\n%s", cmp.Diff(patchedLease.Spec, readLease.Spec))
@@ -139,32 +139,32 @@ var _ = SIGDescribe("Lease", func() {
 				Labels: map[string]string{"deletecollection": "true"},
 			},
 			Spec: coordinationv1.LeaseSpec{
-				HolderIdentity:       pointer.StringPtr("holder"),
-				LeaseDurationSeconds: pointer.Int32Ptr(30),
+				HolderIdentity:       pointer.String("holder"),
+				LeaseDurationSeconds: pointer.Int32(30),
 				AcquireTime:          &metav1.MicroTime{Time: time.Time{}.Add(2 * time.Second)},
 				RenewTime:            &metav1.MicroTime{Time: time.Time{}.Add(5 * time.Second)},
-				LeaseTransitions:     pointer.Int32Ptr(0),
+				LeaseTransitions:     pointer.Int32(0),
 			},
 		}
-		_, err = leaseClient.Create(context.TODO(), lease2, metav1.CreateOptions{})
+		_, err = leaseClient.Create(ctx, lease2, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "creating Lease failed")
 
-		leases, err := leaseClient.List(context.TODO(), metav1.ListOptions{})
+		leases, err := leaseClient.List(ctx, metav1.ListOptions{})
 		framework.ExpectNoError(err, "couldn't list Leases")
 		framework.ExpectEqual(len(leases.Items), 2)
 
 		selector := labels.Set(map[string]string{"deletecollection": "true"}).AsSelector()
-		err = leaseClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: selector.String()})
+		err = leaseClient.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: selector.String()})
 		framework.ExpectNoError(err, "couldn't delete collection")
 
-		leases, err = leaseClient.List(context.TODO(), metav1.ListOptions{})
+		leases, err = leaseClient.List(ctx, metav1.ListOptions{})
 		framework.ExpectNoError(err, "couldn't list Leases")
 		framework.ExpectEqual(len(leases.Items), 1)
 
-		err = leaseClient.Delete(context.TODO(), name, metav1.DeleteOptions{})
+		err = leaseClient.Delete(ctx, name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "deleting Lease failed")
 
-		_, err = leaseClient.Get(context.TODO(), name, metav1.GetOptions{})
+		_, err = leaseClient.Get(ctx, name, metav1.GetOptions{})
 		if !apierrors.IsNotFound(err) {
 			framework.Failf("expected IsNotFound error, got %#v", err)
 		}
@@ -174,7 +174,7 @@ var _ = SIGDescribe("Lease", func() {
 		// created for every node by the corresponding Kubelet.
 		// That said, the objects themselves are small (~300B), so even with 5000
 		// of them, that gives ~1.5MB, which is acceptable.
-		_, err = leaseClient.List(context.TODO(), metav1.ListOptions{})
+		_, err = leaseClient.List(ctx, metav1.ListOptions{})
 		framework.ExpectNoError(err, "couldn't list Leases from all namespace")
 	})
 })

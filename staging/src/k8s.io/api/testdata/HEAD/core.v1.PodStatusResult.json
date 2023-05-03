@@ -110,7 +110,23 @@
         "image": "imageValue",
         "imageID": "imageIDValue",
         "containerID": "containerIDValue",
-        "started": true
+        "started": true,
+        "allocatedResources": {
+          "allocatedResourcesKey": "0"
+        },
+        "resources": {
+          "limits": {
+            "limitsKey": "0"
+          },
+          "requests": {
+            "requestsKey": "0"
+          },
+          "claims": [
+            {
+              "name": "nameValue"
+            }
+          ]
+        }
       }
     ],
     "containerStatuses": [
@@ -157,7 +173,23 @@
         "image": "imageValue",
         "imageID": "imageIDValue",
         "containerID": "containerIDValue",
-        "started": true
+        "started": true,
+        "allocatedResources": {
+          "allocatedResourcesKey": "0"
+        },
+        "resources": {
+          "limits": {
+            "limitsKey": "0"
+          },
+          "requests": {
+            "requestsKey": "0"
+          },
+          "claims": [
+            {
+              "name": "nameValue"
+            }
+          ]
+        }
       }
     ],
     "qosClass": "qosClassValue",
@@ -205,8 +237,25 @@
         "image": "imageValue",
         "imageID": "imageIDValue",
         "containerID": "containerIDValue",
-        "started": true
+        "started": true,
+        "allocatedResources": {
+          "allocatedResourcesKey": "0"
+        },
+        "resources": {
+          "limits": {
+            "limitsKey": "0"
+          },
+          "requests": {
+            "requestsKey": "0"
+          },
+          "claims": [
+            {
+              "name": "nameValue"
+            }
+          ]
+        }
       }
-    ]
+    ],
+    "resize": "resizeValue"
   }
 }

@@ -375,6 +375,7 @@ func autoConvert_v1beta2_InterPodAffinityArgs_To_config_InterPodAffinityArgs(in 
 	if err := v1.Convert_Pointer_int32_To_int32(&in.HardPodAffinityWeight, &out.HardPodAffinityWeight, s); err != nil {
 		return err
 	}
+	out.IgnorePreferredTermsOfExistingPods = in.IgnorePreferredTermsOfExistingPods
 	return nil
 }
 
@@ -387,6 +388,7 @@ func autoConvert_config_InterPodAffinityArgs_To_v1beta2_InterPodAffinityArgs(in 
 	if err := v1.Convert_int32_To_Pointer_int32(&in.HardPodAffinityWeight, &out.HardPodAffinityWeight, s); err != nil {
 		return err
 	}
+	out.IgnorePreferredTermsOfExistingPods = in.IgnorePreferredTermsOfExistingPods
 	return nil
 }
 

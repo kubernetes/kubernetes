@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -69,7 +70,9 @@ func TestGCEDiskConflicts(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			p := newPlugin(ctx, t)
-			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), nil, test.pod, test.nodeInfo)
+			cycleState := framework.NewCycleState()
+			p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod)
+			gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, test.pod, test.nodeInfo)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}
@@ -111,7 +114,9 @@ func TestAWSDiskConflicts(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			p := newPlugin(ctx, t)
-			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), nil, test.pod, test.nodeInfo)
+			cycleState := framework.NewCycleState()
+			p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod)
+			gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, test.pod, test.nodeInfo)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}
@@ -159,7 +164,9 @@ func TestRBDDiskConflicts(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			p := newPlugin(ctx, t)
-			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), nil, test.pod, test.nodeInfo)
+			cycleState := framework.NewCycleState()
+			p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod)
+			gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, test.pod, test.nodeInfo)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}
@@ -207,7 +214,9 @@ func TestISCSIDiskConflicts(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			p := newPlugin(ctx, t)
-			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), nil, test.pod, test.nodeInfo)
+			cycleState := framework.NewCycleState()
+			p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod)
+			gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, test.pod, test.nodeInfo)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}
@@ -219,7 +228,10 @@ func TestAccessModeConflicts(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReadWriteOncePod, true)()
 
 	// Required for querying lister for PVCs in the same namespace.
-	podWithReadWriteOncePodPVC := st.MakePod().Name("pod-with-rwop").Namespace(metav1.NamespaceDefault).PVC("claim-with-rwop").Node("node-1").Obj()
+	podWithOnePVC := st.MakePod().Name("pod-with-one-pvc").Namespace(metav1.NamespaceDefault).PVC("claim-with-rwop-1").Node("node-1").Obj()
+	podWithTwoPVCs := st.MakePod().Name("pod-with-two-pvcs").Namespace(metav1.NamespaceDefault).PVC("claim-with-rwop-1").PVC("claim-with-rwop-2").Node("node-1").Obj()
+	podWithOneConflict := st.MakePod().Name("pod-with-one-conflict").Namespace(metav1.NamespaceDefault).PVC("claim-with-rwop-1").Node("node-1").Obj()
+	podWithTwoConflicts := st.MakePod().Name("pod-with-two-conflicts").Namespace(metav1.NamespaceDefault).PVC("claim-with-rwop-1").PVC("claim-with-rwop-2").Node("node-1").Obj()
 	// Required for querying lister for PVCs in the same namespace.
 	podWithReadWriteManyPVC := st.MakePod().Name("pod-with-rwx").Namespace(metav1.NamespaceDefault).PVC("claim-with-rwx").Node("node-1").Obj()
 
@@ -230,10 +242,19 @@ func TestAccessModeConflicts(t *testing.T) {
 		},
 	}
 
-	readWriteOncePodPVC := &v1.PersistentVolumeClaim{
+	readWriteOncePodPVC1 := &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
-			Name:      "claim-with-rwop",
+			Name:      "claim-with-rwop-1",
+		},
+		Spec: v1.PersistentVolumeClaimSpec{
+			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod},
+		},
+	}
+	readWriteOncePodPVC2 := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "claim-with-rwop-2",
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod},
@@ -252,47 +273,68 @@ func TestAccessModeConflicts(t *testing.T) {
 	tests := []struct {
 		name                   string
 		pod                    *v1.Pod
+		nodeInfo               *framework.NodeInfo
 		existingPods           []*v1.Pod
 		existingNodes          []*v1.Node
 		existingPVCs           []*v1.PersistentVolumeClaim
 		enableReadWriteOncePod bool
+		preFilterWantStatus    *framework.Status
 		wantStatus             *framework.Status
 	}{
 		{
 			name:                   "nothing",
 			pod:                    &v1.Pod{},
+			nodeInfo:               framework.NewNodeInfo(),
 			existingPods:           []*v1.Pod{},
 			existingNodes:          []*v1.Node{},
 			existingPVCs:           []*v1.PersistentVolumeClaim{},
 			enableReadWriteOncePod: true,
+			preFilterWantStatus:    nil,
 			wantStatus:             nil,
 		},
 		{
 			name:                   "failed to get PVC",
-			pod:                    podWithReadWriteOncePodPVC,
+			pod:                    podWithOnePVC,
+			nodeInfo:               framework.NewNodeInfo(),
 			existingPods:           []*v1.Pod{},
 			existingNodes:          []*v1.Node{},
 			existingPVCs:           []*v1.PersistentVolumeClaim{},
 			enableReadWriteOncePod: true,
-			wantStatus:             framework.NewStatus(framework.UnschedulableAndUnresolvable, "persistentvolumeclaim \"claim-with-rwop\" not found"),
-		},
-		{
-			name:                   "no access mode conflict",
-			pod:                    podWithReadWriteOncePodPVC,
-			existingPods:           []*v1.Pod{podWithReadWriteManyPVC},
-			existingNodes:          []*v1.Node{node},
-			existingPVCs:           []*v1.PersistentVolumeClaim{readWriteOncePodPVC, readWriteManyPVC},
-			enableReadWriteOncePod: true,
+			preFilterWantStatus:    framework.NewStatus(framework.UnschedulableAndUnresolvable, "persistentvolumeclaim \"claim-with-rwop-1\" not found"),
 			wantStatus:             nil,
 		},
 		{
-			name:                   "access mode conflict",
-			pod:                    podWithReadWriteOncePodPVC,
-			existingPods:           []*v1.Pod{podWithReadWriteOncePodPVC, podWithReadWriteManyPVC},
+			name:                   "no access mode conflict",
+			pod:                    podWithOnePVC,
+			nodeInfo:               framework.NewNodeInfo(podWithReadWriteManyPVC),
+			existingPods:           []*v1.Pod{podWithReadWriteManyPVC},
 			existingNodes:          []*v1.Node{node},
-			existingPVCs:           []*v1.PersistentVolumeClaim{readWriteOncePodPVC, readWriteManyPVC},
+			existingPVCs:           []*v1.PersistentVolumeClaim{readWriteOncePodPVC1, readWriteManyPVC},
 			enableReadWriteOncePod: true,
-			wantStatus:             framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonReadWriteOncePodConflict),
+			preFilterWantStatus:    nil,
+			wantStatus:             nil,
+		},
+		{
+			name:                   "access mode conflict, unschedulable",
+			pod:                    podWithOneConflict,
+			nodeInfo:               framework.NewNodeInfo(podWithOnePVC, podWithReadWriteManyPVC),
+			existingPods:           []*v1.Pod{podWithOnePVC, podWithReadWriteManyPVC},
+			existingNodes:          []*v1.Node{node},
+			existingPVCs:           []*v1.PersistentVolumeClaim{readWriteOncePodPVC1, readWriteManyPVC},
+			enableReadWriteOncePod: true,
+			preFilterWantStatus:    nil,
+			wantStatus:             framework.NewStatus(framework.Unschedulable, ErrReasonReadWriteOncePodConflict),
+		},
+		{
+			name:                   "two conflicts, unschedulable",
+			pod:                    podWithTwoConflicts,
+			nodeInfo:               framework.NewNodeInfo(podWithTwoPVCs, podWithReadWriteManyPVC),
+			existingPods:           []*v1.Pod{podWithTwoPVCs, podWithReadWriteManyPVC},
+			existingNodes:          []*v1.Node{node},
+			existingPVCs:           []*v1.PersistentVolumeClaim{readWriteOncePodPVC1, readWriteOncePodPVC2, readWriteManyPVC},
+			enableReadWriteOncePod: true,
+			preFilterWantStatus:    nil,
+			wantStatus:             framework.NewStatus(framework.Unschedulable, ErrReasonReadWriteOncePodConflict),
 		},
 	}
 
@@ -301,9 +343,17 @@ func TestAccessModeConflicts(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			p := newPluginWithListers(ctx, t, test.existingPods, test.existingNodes, test.existingPVCs, test.enableReadWriteOncePod)
-			_, gotStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), nil, test.pod)
-			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-				t.Errorf("status does not match: %+v, want: %+v", gotStatus, test.wantStatus)
+			cycleState := framework.NewCycleState()
+			_, preFilterGotStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod)
+			if diff := cmp.Diff(test.preFilterWantStatus, preFilterGotStatus); diff != "" {
+				t.Errorf("Unexpected PreFilter status (-want, +got): %s", diff)
+			}
+			// If PreFilter fails, then Filter will not run.
+			if test.preFilterWantStatus.IsSuccess() {
+				gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, test.pod, test.nodeInfo)
+				if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
+					t.Errorf("Unexpected Filter status (-want, +got): %s", diff)
+				}
 			}
 		})
 	}

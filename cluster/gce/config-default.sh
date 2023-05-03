@@ -255,6 +255,9 @@ if [[ (( "${KUBE_FEATURE_GATES:-}" == *"AllAlpha=true"* ) || ( "${KUBE_FEATURE_G
   RUN_CONTROLLERS="${RUN_CONTROLLERS:-*,endpointslice}"
 fi
 
+# By default disable gkenetworkparamset controller in CCM
+RUN_CCM_CONTROLLERS="${RUN_CCM_CONTROLLERS:-*,-gkenetworkparamset}"
+
 # List of the set of feature gates recognized by the GCP CCM
 export CCM_FEATURE_GATES="APIListChunking,APIPriorityAndFairness,APIResponseCompression,APIServerIdentity,APIServerTracing,AllAlpha,AllBeta,CustomResourceValidationExpressions,KMSv2,OpenAPIEnums,OpenAPIV3,RemainingItemCount,ServerSideFieldValidation,StorageVersionAPI,StorageVersionHash"
 

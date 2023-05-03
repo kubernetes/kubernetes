@@ -23,6 +23,7 @@ import (
 	"math"
 	"reflect"
 	"regexp"
+	"sort"
 	"strconv"
 	"sync"
 	"testing"
@@ -600,11 +601,11 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) (ScheduleResult, error) {
 				return item.mockResult.result, item.mockResult.err
 			}
-			sched.FailureHandler = func(_ context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, err error, _ string, _ *framework.NominatingInfo, _ time.Time) {
+			sched.FailureHandler = func(_ context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *framework.Status, _ *framework.NominatingInfo, _ time.Time) {
 				gotPod = p.Pod
-				gotError = err
+				gotError = status.AsError()
 
-				msg := truncateMessage(err.Error())
+				msg := truncateMessage(gotError.Error())
 				fwk.EventRecorder().Eventf(p.Pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
 			}
 			called := make(chan struct{})
@@ -1270,45 +1271,45 @@ func TestUpdatePod(t *testing.T) {
 func TestSelectHost(t *testing.T) {
 	tests := []struct {
 		name          string
-		list          framework.NodeScoreList
+		list          []framework.NodePluginScores
 		possibleHosts sets.String
 		expectsErr    bool
 	}{
 		{
 			name: "unique properly ordered scores",
-			list: []framework.NodeScore{
-				{Name: "node1.1", Score: 1},
-				{Name: "node2.1", Score: 2},
+			list: []framework.NodePluginScores{
+				{Name: "node1.1", TotalScore: 1},
+				{Name: "node2.1", TotalScore: 2},
 			},
 			possibleHosts: sets.NewString("node2.1"),
 			expectsErr:    false,
 		},
 		{
 			name: "equal scores",
-			list: []framework.NodeScore{
-				{Name: "node1.1", Score: 1},
-				{Name: "node1.2", Score: 2},
-				{Name: "node1.3", Score: 2},
-				{Name: "node2.1", Score: 2},
+			list: []framework.NodePluginScores{
+				{Name: "node1.1", TotalScore: 1},
+				{Name: "node1.2", TotalScore: 2},
+				{Name: "node1.3", TotalScore: 2},
+				{Name: "node2.1", TotalScore: 2},
 			},
 			possibleHosts: sets.NewString("node1.2", "node1.3", "node2.1"),
 			expectsErr:    false,
 		},
 		{
 			name: "out of order scores",
-			list: []framework.NodeScore{
-				{Name: "node1.1", Score: 3},
-				{Name: "node1.2", Score: 3},
-				{Name: "node2.1", Score: 2},
-				{Name: "node3.1", Score: 1},
-				{Name: "node1.3", Score: 3},
+			list: []framework.NodePluginScores{
+				{Name: "node1.1", TotalScore: 3},
+				{Name: "node1.2", TotalScore: 3},
+				{Name: "node2.1", TotalScore: 2},
+				{Name: "node3.1", TotalScore: 1},
+				{Name: "node1.3", TotalScore: 3},
 			},
 			possibleHosts: sets.NewString("node1.1", "node1.2", "node1.3"),
 			expectsErr:    false,
 		},
 		{
 			name:          "empty priority list",
-			list:          []framework.NodeScore{},
+			list:          []framework.NodePluginScores{},
 			possibleHosts: sets.NewString(),
 			expectsErr:    true,
 		},
@@ -1979,10 +1980,64 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "test prefilter plugin returning skip",
+			registerPlugins: []st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterPreFilterPlugin(
+					"FakePreFilter1",
+					st.NewFakePreFilterPlugin("FakeFilter1", nil, nil),
+				),
+				st.RegisterFilterPlugin(
+					"FakeFilter1",
+					st.NewFakeFilterPlugin(map[string]framework.Code{
+						"node1": framework.Unschedulable,
+					}),
+				),
+				st.RegisterPluginAsExtensions("FakeFilter2", func(configuration runtime.Object, f framework.Handle) (framework.Plugin, error) {
+					return st.FakePreFilterAndFilterPlugin{
+						FakePreFilterPlugin: &st.FakePreFilterPlugin{
+							Result: nil,
+							Status: framework.NewStatus(framework.Skip),
+						},
+						FakeFilterPlugin: &st.FakeFilterPlugin{
+							// This Filter plugin shouldn't be executed in the Filter extension point due to skip.
+							// To confirm that, return the status code Error to all Nodes.
+							FailedNodeReturnCodeMap: map[string]framework.Code{
+								"node1": framework.Error, "node2": framework.Error, "node3": framework.Error,
+							},
+						},
+					}, nil
+				}, "PreFilter", "Filter"),
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			},
+			nodes:              []string{"node1", "node2", "node3"},
+			pod:                st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
+			wantNodes:          sets.NewString("node2", "node3"),
+			wantEvaluatedNodes: pointer.Int32(3),
+		},
+		{
+			name: "test all prescore plugins return skip",
+			registerPlugins: []st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				st.RegisterPluginAsExtensions("FakePreScoreAndScorePlugin", st.NewFakePreScoreAndScorePlugin("FakePreScoreAndScorePlugin", 0,
+					framework.NewStatus(framework.Skip, "fake skip"),
+					framework.NewStatus(framework.Error, "this score function shouldn't be executed because this plugin returned Skip in the PreScore"),
+				), "PreScore", "Score"),
+			},
+			nodes:     []string{"node1", "node2"},
+			pod:       st.MakePod().Name("ignore").UID("ignore").Obj(),
+			wantNodes: sets.NewString("node1", "node2"),
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cache := internalcache.New(time.Duration(0), wait.NeverStop)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			cache := internalcache.New(time.Duration(0), ctx.Done())
 			for _, pod := range test.pods {
 				cache.AddPod(pod)
 			}
@@ -1993,8 +2048,6 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				cache.AddNode(node)
 			}
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
 			cs := clientsetfake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
 			for _, pvc := range test.pvcs {
@@ -2053,10 +2106,11 @@ func TestSchedulerSchedulePod(t *testing.T) {
 }
 
 func TestFindFitAllError(t *testing.T) {
-	nodes := makeNodeList([]string{"3", "2", "1"})
-	scheduler := makeScheduler(nodes)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	nodes := makeNodeList([]string{"3", "2", "1"})
+	scheduler := makeScheduler(ctx, nodes)
 
 	fwk, err := st.NewFramework(
 		[]st.RegisterPluginFunc{
@@ -2092,10 +2146,11 @@ func TestFindFitAllError(t *testing.T) {
 }
 
 func TestFindFitSomeError(t *testing.T) {
-	nodes := makeNodeList([]string{"3", "2", "1"})
-	scheduler := makeScheduler(nodes)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	nodes := makeNodeList([]string{"3", "2", "1"})
+	scheduler := makeScheduler(ctx, nodes)
 
 	fwk, err := st.NewFramework(
 		[]st.RegisterPluginFunc{
@@ -2187,7 +2242,7 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			scheduler := makeScheduler(nodes)
+			scheduler := makeScheduler(ctx, nodes)
 			if err := scheduler.Cache.UpdateSnapshot(scheduler.nodeInfoSnapshot); err != nil {
 				t.Fatal(err)
 			}
@@ -2343,9 +2398,240 @@ func TestZeroRequest(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 			for _, hp := range list {
-				if hp.Score != test.expectedScore {
+				if hp.TotalScore != test.expectedScore {
 					t.Errorf("expected %d for all priorities, got list %#v", test.expectedScore, list)
 				}
+			}
+		})
+	}
+}
+
+func Test_prioritizeNodes(t *testing.T) {
+	tests := []struct {
+		name                string
+		pod                 *v1.Pod
+		pods                []*v1.Pod
+		nodes               []*v1.Node
+		pluginRegistrations []st.RegisterPluginFunc
+		extenders           []st.FakeExtender
+		want                []framework.NodePluginScores
+	}{
+		{
+			name:  "the score from all plugins should be recorded in PluginToNodeScores",
+			pod:   &v1.Pod{},
+			nodes: []*v1.Node{makeNode("node1", 1000, schedutil.DefaultMemoryRequest*10), makeNode("node2", 1000, schedutil.DefaultMemoryRequest*10)},
+			pluginRegistrations: []st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterScorePlugin(noderesources.BalancedAllocationName, frameworkruntime.FactoryAdapter(feature.Features{}, noderesources.NewBalancedAllocation), 1),
+				st.RegisterScorePlugin("Node2Prioritizer", st.NewNode2PrioritizerPlugin(), 1),
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			},
+			extenders: nil,
+			want: []framework.NodePluginScores{
+				{
+					Name: "node1",
+					Scores: []framework.PluginScore{
+						{
+							Name:  "Node2Prioritizer",
+							Score: 10,
+						},
+						{
+							Name:  "NodeResourcesBalancedAllocation",
+							Score: 100,
+						},
+					},
+					TotalScore: 110,
+				},
+				{
+					Name: "node2",
+					Scores: []framework.PluginScore{
+						{
+							Name:  "Node2Prioritizer",
+							Score: 100,
+						},
+						{
+							Name:  "NodeResourcesBalancedAllocation",
+							Score: 100,
+						},
+					},
+					TotalScore: 200,
+				},
+			},
+		},
+		{
+			name:  "the score from extender should also be recorded in PluginToNodeScores with plugin scores",
+			pod:   &v1.Pod{},
+			nodes: []*v1.Node{makeNode("node1", 1000, schedutil.DefaultMemoryRequest*10), makeNode("node2", 1000, schedutil.DefaultMemoryRequest*10)},
+			pluginRegistrations: []st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterScorePlugin(noderesources.BalancedAllocationName, frameworkruntime.FactoryAdapter(feature.Features{}, noderesources.NewBalancedAllocation), 1),
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			},
+			extenders: []st.FakeExtender{
+				{
+					ExtenderName: "FakeExtender1",
+					Weight:       1,
+					Prioritizers: []st.PriorityConfig{
+						{
+							Weight:   3,
+							Function: st.Node1PrioritizerExtender,
+						},
+					},
+				},
+				{
+					ExtenderName: "FakeExtender2",
+					Weight:       1,
+					Prioritizers: []st.PriorityConfig{
+						{
+							Weight:   2,
+							Function: st.Node2PrioritizerExtender,
+						},
+					},
+				},
+			},
+			want: []framework.NodePluginScores{
+				{
+					Name: "node1",
+					Scores: []framework.PluginScore{
+
+						{
+							Name:  "FakeExtender1",
+							Score: 300,
+						},
+						{
+							Name:  "FakeExtender2",
+							Score: 20,
+						},
+						{
+							Name:  "NodeResourcesBalancedAllocation",
+							Score: 100,
+						},
+					},
+					TotalScore: 420,
+				},
+				{
+					Name: "node2",
+					Scores: []framework.PluginScore{
+						{
+							Name:  "FakeExtender1",
+							Score: 30,
+						},
+						{
+							Name:  "FakeExtender2",
+							Score: 200,
+						},
+						{
+							Name:  "NodeResourcesBalancedAllocation",
+							Score: 100,
+						},
+					},
+					TotalScore: 330,
+				},
+			},
+		},
+		{
+			name:  "plugin which returned skip in preScore shouldn't be executed in the score phase",
+			pod:   &v1.Pod{},
+			nodes: []*v1.Node{makeNode("node1", 1000, schedutil.DefaultMemoryRequest*10), makeNode("node2", 1000, schedutil.DefaultMemoryRequest*10)},
+			pluginRegistrations: []st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterScorePlugin(noderesources.BalancedAllocationName, frameworkruntime.FactoryAdapter(feature.Features{}, noderesources.NewBalancedAllocation), 1),
+				st.RegisterScorePlugin("Node2Prioritizer", st.NewNode2PrioritizerPlugin(), 1),
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				st.RegisterPluginAsExtensions("FakePreScoreAndScorePlugin", st.NewFakePreScoreAndScorePlugin("FakePreScoreAndScorePlugin", 0,
+					framework.NewStatus(framework.Skip, "fake skip"),
+					framework.NewStatus(framework.Error, "this score function shouldn't be executed because this plugin returned Skip in the PreScore"),
+				), "PreScore", "Score"),
+			},
+			extenders: nil,
+			want: []framework.NodePluginScores{
+				{
+					Name: "node1",
+					Scores: []framework.PluginScore{
+						{
+							Name:  "Node2Prioritizer",
+							Score: 10,
+						},
+						{
+							Name:  "NodeResourcesBalancedAllocation",
+							Score: 100,
+						},
+					},
+					TotalScore: 110,
+				},
+				{
+					Name: "node2",
+					Scores: []framework.PluginScore{
+						{
+							Name:  "Node2Prioritizer",
+							Score: 100,
+						},
+						{
+							Name:  "NodeResourcesBalancedAllocation",
+							Score: 100,
+						},
+					},
+					TotalScore: 200,
+				},
+			},
+		},
+		{
+			name:  "all score plugins are skipped",
+			pod:   &v1.Pod{},
+			nodes: []*v1.Node{makeNode("node1", 1000, schedutil.DefaultMemoryRequest*10), makeNode("node2", 1000, schedutil.DefaultMemoryRequest*10)},
+			pluginRegistrations: []st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				st.RegisterPluginAsExtensions("FakePreScoreAndScorePlugin", st.NewFakePreScoreAndScorePlugin("FakePreScoreAndScorePlugin", 0,
+					framework.NewStatus(framework.Skip, "fake skip"),
+					framework.NewStatus(framework.Error, "this score function shouldn't be executed because this plugin returned Skip in the PreScore"),
+				), "PreScore", "Score"),
+			},
+			extenders: nil,
+			want: []framework.NodePluginScores{
+				{Name: "node1", Scores: []framework.PluginScore{}},
+				{Name: "node2", Scores: []framework.PluginScore{}},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			client := clientsetfake.NewSimpleClientset()
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+
+			snapshot := internalcache.NewSnapshot(test.pods, test.nodes)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			fwk, err := st.NewFramework(
+				test.pluginRegistrations, "",
+				ctx.Done(),
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithClientSet(client),
+				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
+			)
+			if err != nil {
+				t.Fatalf("error creating framework: %+v", err)
+			}
+
+			state := framework.NewCycleState()
+			var extenders []framework.Extender
+			for ii := range test.extenders {
+				extenders = append(extenders, &test.extenders[ii])
+			}
+			nodesscores, err := prioritizeNodes(ctx, extenders, fwk, state, test.pod, test.nodes)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			for i := range nodesscores {
+				sort.Slice(nodesscores[i].Scores, func(j, k int) bool {
+					return nodesscores[i].Scores[j].Name < nodesscores[i].Scores[k].Name
+				})
+			}
+
+			if diff := cmp.Diff(test.want, nodesscores); diff != "" {
+				t.Errorf("returned nodes scores (-want,+got):\n%s", diff)
 			}
 		})
 	}
@@ -2428,9 +2714,10 @@ func TestFairEvaluationForNodes(t *testing.T) {
 		nodeNames = append(nodeNames, strconv.Itoa(i))
 	}
 	nodes := makeNodeList(nodeNames)
-	sched := makeScheduler(nodes)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	sched := makeScheduler(ctx, nodes)
+
 	fwk, err := st.NewFramework(
 		[]st.RegisterPluginFunc{
 			st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
@@ -2492,11 +2779,14 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			// create three nodes in the cluster.
 			nodes := makeNodeList([]string{"node1", "node2", "node3"})
 			client := clientsetfake.NewSimpleClientset(test.pod)
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			cache := internalcache.New(time.Duration(0), wait.NeverStop)
+			cache := internalcache.New(time.Duration(0), ctx.Done())
 			for _, n := range nodes {
 				cache.AddNode(n)
 			}
@@ -2512,8 +2802,6 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 				registerFakeFilterFunc,
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			}
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
 			fwk, err := st.NewFramework(
 				registerPlugins, "", ctx.Done(),
 				frameworkruntime.WithClientSet(client),
@@ -2575,8 +2863,8 @@ func makeNodeList(nodeNames []string) []*v1.Node {
 }
 
 // makeScheduler makes a simple Scheduler for testing.
-func makeScheduler(nodes []*v1.Node) *Scheduler {
-	cache := internalcache.New(time.Duration(0), wait.NeverStop)
+func makeScheduler(ctx context.Context, nodes []*v1.Node) *Scheduler {
+	cache := internalcache.New(time.Duration(0), ctx.Done())
 	for _, n := range nodes {
 		cache.AddNode(n)
 	}
@@ -2689,7 +2977,8 @@ func setupTestScheduler(ctx context.Context, t *testing.T, queuedPodStore *clien
 	}
 
 	sched.SchedulePod = sched.schedulePod
-	sched.FailureHandler = func(_ context.Context, _ framework.Framework, p *framework.QueuedPodInfo, err error, _ string, _ *framework.NominatingInfo, _ time.Time) {
+	sched.FailureHandler = func(_ context.Context, _ framework.Framework, p *framework.QueuedPodInfo, status *framework.Status, _ *framework.NominatingInfo, _ time.Time) {
+		err := status.AsError()
 		errChan <- err
 
 		msg := truncateMessage(err.Error())

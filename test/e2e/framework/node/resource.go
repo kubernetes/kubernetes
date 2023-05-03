@@ -193,8 +193,8 @@ func Filter(nodeList *v1.NodeList, fn func(node v1.Node) bool) {
 }
 
 // TotalRegistered returns number of schedulable Nodes.
-func TotalRegistered(c clientset.Interface) (int, error) {
-	nodes, err := waitListSchedulableNodes(c)
+func TotalRegistered(ctx context.Context, c clientset.Interface) (int, error) {
+	nodes, err := waitListSchedulableNodes(ctx, c)
 	if err != nil {
 		framework.Logf("Failed to list nodes: %v", err)
 		return 0, err
@@ -203,8 +203,8 @@ func TotalRegistered(c clientset.Interface) (int, error) {
 }
 
 // TotalReady returns number of ready schedulable Nodes.
-func TotalReady(c clientset.Interface) (int, error) {
-	nodes, err := waitListSchedulableNodes(c)
+func TotalReady(ctx context.Context, c clientset.Interface) (int, error) {
+	nodes, err := waitListSchedulableNodes(ctx, c)
 	if err != nil {
 		framework.Logf("Failed to list nodes: %v", err)
 		return 0, err
@@ -217,36 +217,28 @@ func TotalReady(c clientset.Interface) (int, error) {
 	return len(nodes.Items), nil
 }
 
-// GetExternalIP returns node external IP concatenated with port 22 for ssh
+// GetSSHExternalIP returns node external IP concatenated with port 22 for ssh
 // e.g. 1.2.3.4:22
-func GetExternalIP(node *v1.Node) (string, error) {
+func GetSSHExternalIP(node *v1.Node) (string, error) {
 	framework.Logf("Getting external IP address for %s", node.Name)
-	host := ""
+
 	for _, a := range node.Status.Addresses {
 		if a.Type == v1.NodeExternalIP && a.Address != "" {
-			host = net.JoinHostPort(a.Address, sshPort)
-			break
+			return net.JoinHostPort(a.Address, sshPort), nil
 		}
 	}
-	if host == "" {
-		return "", fmt.Errorf("Couldn't get the external IP of host %s with addresses %v", node.Name, node.Status.Addresses)
-	}
-	return host, nil
+	return "", fmt.Errorf("Couldn't get the external IP of host %s with addresses %v", node.Name, node.Status.Addresses)
 }
 
-// GetInternalIP returns node internal IP
-func GetInternalIP(node *v1.Node) (string, error) {
-	host := ""
+// GetSSHInternalIP returns node internal IP concatenated with port 22 for ssh
+func GetSSHInternalIP(node *v1.Node) (string, error) {
 	for _, address := range node.Status.Addresses {
 		if address.Type == v1.NodeInternalIP && address.Address != "" {
-			host = net.JoinHostPort(address.Address, sshPort)
-			break
+			return net.JoinHostPort(address.Address, sshPort), nil
 		}
 	}
-	if host == "" {
-		return "", fmt.Errorf("Couldn't get the internal IP of host %s with addresses %v", node.Name, node.Status.Addresses)
-	}
-	return host, nil
+
+	return "", fmt.Errorf("Couldn't get the internal IP of host %s with addresses %v", node.Name, node.Status.Addresses)
 }
 
 // FirstAddressByTypeAndFamily returns the first address that matches the given type and family of the list of nodes
@@ -301,10 +293,10 @@ func CollectAddresses(nodes *v1.NodeList, addressType v1.NodeAddressType) []stri
 }
 
 // PickIP picks one public node IP
-func PickIP(c clientset.Interface) (string, error) {
-	publicIps, err := GetPublicIps(c)
+func PickIP(ctx context.Context, c clientset.Interface) (string, error) {
+	publicIps, err := GetPublicIps(ctx, c)
 	if err != nil {
-		return "", fmt.Errorf("get node public IPs error: %s", err)
+		return "", fmt.Errorf("get node public IPs error: %w", err)
 	}
 	if len(publicIps) == 0 {
 		return "", fmt.Errorf("got unexpected number (%d) of public IPs", len(publicIps))
@@ -314,10 +306,10 @@ func PickIP(c clientset.Interface) (string, error) {
 }
 
 // GetPublicIps returns a public IP list of nodes.
-func GetPublicIps(c clientset.Interface) ([]string, error) {
-	nodes, err := GetReadySchedulableNodes(c)
+func GetPublicIps(ctx context.Context, c clientset.Interface) ([]string, error) {
+	nodes, err := GetReadySchedulableNodes(ctx, c)
 	if err != nil {
-		return nil, fmt.Errorf("get schedulable and ready nodes error: %s", err)
+		return nil, fmt.Errorf("get schedulable and ready nodes error: %w", err)
 	}
 	ips := CollectAddresses(nodes, v1.NodeExternalIP)
 	if len(ips) == 0 {
@@ -332,10 +324,10 @@ func GetPublicIps(c clientset.Interface) ([]string, error) {
 // 2) Needs to be ready.
 // If EITHER 1 or 2 is not true, most tests will want to ignore the node entirely.
 // If there are no nodes that are both ready and schedulable, this will return an error.
-func GetReadySchedulableNodes(c clientset.Interface) (nodes *v1.NodeList, err error) {
-	nodes, err = checkWaitListSchedulableNodes(c)
+func GetReadySchedulableNodes(ctx context.Context, c clientset.Interface) (nodes *v1.NodeList, err error) {
+	nodes, err = checkWaitListSchedulableNodes(ctx, c)
 	if err != nil {
-		return nil, fmt.Errorf("listing schedulable nodes error: %s", err)
+		return nil, fmt.Errorf("listing schedulable nodes error: %w", err)
 	}
 	Filter(nodes, func(node v1.Node) bool {
 		return IsNodeSchedulable(&node) && isNodeUntainted(&node)
@@ -349,8 +341,8 @@ func GetReadySchedulableNodes(c clientset.Interface) (nodes *v1.NodeList, err er
 // GetBoundedReadySchedulableNodes is like GetReadySchedulableNodes except that it returns
 // at most maxNodes nodes. Use this to keep your test case from blowing up when run on a
 // large cluster.
-func GetBoundedReadySchedulableNodes(c clientset.Interface, maxNodes int) (nodes *v1.NodeList, err error) {
-	nodes, err = GetReadySchedulableNodes(c)
+func GetBoundedReadySchedulableNodes(ctx context.Context, c clientset.Interface, maxNodes int) (nodes *v1.NodeList, err error) {
+	nodes, err = GetReadySchedulableNodes(ctx, c)
 	if err != nil {
 		return nil, err
 	}
@@ -369,8 +361,8 @@ func GetBoundedReadySchedulableNodes(c clientset.Interface, maxNodes int) (nodes
 
 // GetRandomReadySchedulableNode gets a single randomly-selected node which is available for
 // running pods on. If there are no available nodes it will return an error.
-func GetRandomReadySchedulableNode(c clientset.Interface) (*v1.Node, error) {
-	nodes, err := GetReadySchedulableNodes(c)
+func GetRandomReadySchedulableNode(ctx context.Context, c clientset.Interface) (*v1.Node, error) {
+	nodes, err := GetReadySchedulableNodes(ctx, c)
 	if err != nil {
 		return nil, err
 	}
@@ -381,10 +373,10 @@ func GetRandomReadySchedulableNode(c clientset.Interface) (*v1.Node, error) {
 // There are cases when we care about tainted nodes
 // E.g. in tests related to nodes with gpu we care about nodes despite
 // presence of nvidia.com/gpu=present:NoSchedule taint
-func GetReadyNodesIncludingTainted(c clientset.Interface) (nodes *v1.NodeList, err error) {
-	nodes, err = checkWaitListSchedulableNodes(c)
+func GetReadyNodesIncludingTainted(ctx context.Context, c clientset.Interface) (nodes *v1.NodeList, err error) {
+	nodes, err = checkWaitListSchedulableNodes(ctx, c)
 	if err != nil {
-		return nil, fmt.Errorf("listing schedulable nodes error: %s", err)
+		return nil, fmt.Errorf("listing schedulable nodes error: %w", err)
 	}
 	Filter(nodes, func(node v1.Node) bool {
 		return IsNodeSchedulable(&node)
@@ -401,25 +393,6 @@ func isNodeUntainted(node *v1.Node) bool {
 // isNodeUntaintedWithNonblocking tests whether a fake pod can be scheduled on "node"
 // but allows for taints in the list of non-blocking taints.
 func isNodeUntaintedWithNonblocking(node *v1.Node, nonblockingTaints string) bool {
-	fakePod := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "fake-not-scheduled",
-			Namespace: "fake-not-scheduled",
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "fake-not-scheduled",
-					Image: "fake-not-scheduled",
-				},
-			},
-		},
-	}
-
 	// Simple lookup for nonblocking taints based on comma-delimited list.
 	nonblockingTaintsMap := map[string]struct{}{}
 	for _, t := range strings.Split(nonblockingTaints, ",") {
@@ -439,7 +412,8 @@ func isNodeUntaintedWithNonblocking(node *v1.Node, nonblockingTaints string) boo
 		}
 		n = nodeCopy
 	}
-	return toleratesTaintsWithNoScheduleNoExecuteEffects(n.Spec.Taints, fakePod.Spec.Tolerations)
+
+	return toleratesTaintsWithNoScheduleNoExecuteEffects(n.Spec.Taints, nil)
 }
 
 func toleratesTaintsWithNoScheduleNoExecuteEffects(taints []v1.Taint, tolerations []v1.Toleration) bool {
@@ -522,10 +496,10 @@ func hasNonblockingTaint(node *v1.Node, nonblockingTaints string) bool {
 }
 
 // PodNodePairs return podNode pairs for all pods in a namespace
-func PodNodePairs(c clientset.Interface, ns string) ([]PodNode, error) {
+func PodNodePairs(ctx context.Context, c clientset.Interface, ns string) ([]PodNode, error) {
 	var result []PodNode
 
-	podList, err := c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
+	podList, err := c.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return result, err
 	}
@@ -541,10 +515,10 @@ func PodNodePairs(c clientset.Interface, ns string) ([]PodNode, error) {
 }
 
 // GetClusterZones returns the values of zone label collected from all nodes.
-func GetClusterZones(c clientset.Interface) (sets.String, error) {
-	nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+func GetClusterZones(ctx context.Context, c clientset.Interface) (sets.String, error) {
+	nodes, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("Error getting nodes while attempting to list cluster zones: %v", err)
+		return nil, fmt.Errorf("Error getting nodes while attempting to list cluster zones: %w", err)
 	}
 
 	// collect values of zone label from all nodes
@@ -562,11 +536,11 @@ func GetClusterZones(c clientset.Interface) (sets.String, error) {
 }
 
 // GetSchedulableClusterZones returns the values of zone label collected from all nodes which are schedulable.
-func GetSchedulableClusterZones(c clientset.Interface) (sets.String, error) {
+func GetSchedulableClusterZones(ctx context.Context, c clientset.Interface) (sets.String, error) {
 	// GetReadySchedulableNodes already filters our tainted and unschedulable nodes.
-	nodes, err := GetReadySchedulableNodes(c)
+	nodes, err := GetReadySchedulableNodes(ctx, c)
 	if err != nil {
-		return nil, fmt.Errorf("error getting nodes while attempting to list cluster zones: %v", err)
+		return nil, fmt.Errorf("error getting nodes while attempting to list cluster zones: %w", err)
 	}
 
 	// collect values of zone label from all nodes
@@ -584,8 +558,8 @@ func GetSchedulableClusterZones(c clientset.Interface) (sets.String, error) {
 }
 
 // CreatePodsPerNodeForSimpleApp creates pods w/ labels.  Useful for tests which make a bunch of pods w/o any networking.
-func CreatePodsPerNodeForSimpleApp(c clientset.Interface, namespace, appName string, podSpec func(n v1.Node) v1.PodSpec, maxCount int) map[string]string {
-	nodes, err := GetBoundedReadySchedulableNodes(c, maxCount)
+func CreatePodsPerNodeForSimpleApp(ctx context.Context, c clientset.Interface, namespace, appName string, podSpec func(n v1.Node) v1.PodSpec, maxCount int) map[string]string {
+	nodes, err := GetBoundedReadySchedulableNodes(ctx, c, maxCount)
 	// TODO use wrapper methods in expect.go after removing core e2e dependency on node
 	gomega.ExpectWithOffset(2, err).NotTo(gomega.HaveOccurred())
 	podLabels := map[string]string{
@@ -593,7 +567,7 @@ func CreatePodsPerNodeForSimpleApp(c clientset.Interface, namespace, appName str
 	}
 	for i, node := range nodes.Items {
 		framework.Logf("%v/%v : Creating container with label app=%v-pod", i, maxCount, appName)
-		_, err := c.CoreV1().Pods(namespace).Create(context.TODO(), &v1.Pod{
+		_, err := c.CoreV1().Pods(namespace).Create(ctx, &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   fmt.Sprintf(appName+"-pod-%v", i),
 				Labels: podLabels,
@@ -608,33 +582,33 @@ func CreatePodsPerNodeForSimpleApp(c clientset.Interface, namespace, appName str
 
 // RemoveTaintsOffNode removes a list of taints from the given node
 // It is simply a helper wrapper for RemoveTaintOffNode
-func RemoveTaintsOffNode(c clientset.Interface, nodeName string, taints []v1.Taint) {
+func RemoveTaintsOffNode(ctx context.Context, c clientset.Interface, nodeName string, taints []v1.Taint) {
 	for _, taint := range taints {
-		RemoveTaintOffNode(c, nodeName, taint)
+		RemoveTaintOffNode(ctx, c, nodeName, taint)
 	}
 }
 
 // RemoveTaintOffNode removes the given taint from the given node.
-func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint v1.Taint) {
-	err := removeNodeTaint(c, nodeName, nil, &taint)
+func RemoveTaintOffNode(ctx context.Context, c clientset.Interface, nodeName string, taint v1.Taint) {
+	err := removeNodeTaint(ctx, c, nodeName, nil, &taint)
 
 	// TODO use wrapper methods in expect.go after removing core e2e dependency on node
 	gomega.ExpectWithOffset(2, err).NotTo(gomega.HaveOccurred())
-	verifyThatTaintIsGone(c, nodeName, &taint)
+	verifyThatTaintIsGone(ctx, c, nodeName, &taint)
 }
 
 // AddOrUpdateTaintOnNode adds the given taint to the given node or updates taint.
-func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taint v1.Taint) {
+func AddOrUpdateTaintOnNode(ctx context.Context, c clientset.Interface, nodeName string, taint v1.Taint) {
 	// TODO use wrapper methods in expect.go after removing the dependency on this
 	// package from the core e2e framework.
-	err := addOrUpdateTaintOnNode(c, nodeName, &taint)
+	err := addOrUpdateTaintOnNode(ctx, c, nodeName, &taint)
 	gomega.ExpectWithOffset(2, err).NotTo(gomega.HaveOccurred())
 }
 
 // addOrUpdateTaintOnNode add taints to the node. If taint was added into node, it'll issue API calls
 // to update nodes; otherwise, no API calls. Return error if any.
 // copied from pkg/controller/controller_utils.go AddOrUpdateTaintOnNode()
-func addOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taints ...*v1.Taint) error {
+func addOrUpdateTaintOnNode(ctx context.Context, c clientset.Interface, nodeName string, taints ...*v1.Taint) error {
 	if len(taints) == 0 {
 		return nil
 	}
@@ -645,10 +619,10 @@ func addOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taints ...*v
 		// First we try getting node from the API server cache, as it's cheaper. If it fails
 		// we get it from etcd to be sure to have fresh data.
 		if firstTry {
-			oldNode, err = c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{ResourceVersion: "0"})
+			oldNode, err = c.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{ResourceVersion: "0"})
 			firstTry = false
 		} else {
-			oldNode, err = c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+			oldNode, err = c.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 		}
 		if err != nil {
 			return err
@@ -669,7 +643,7 @@ func addOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taints ...*v
 		if !updated {
 			return nil
 		}
-		return patchNodeTaints(c, nodeName, oldNode, newNode)
+		return patchNodeTaints(ctx, c, nodeName, oldNode, newNode)
 	})
 }
 
@@ -732,7 +706,7 @@ var semantic = conversion.EqualitiesOrDie(
 // won't fail if target taint doesn't exist or has been removed.
 // If passed a node it'll check if there's anything to be done, if taint is not present it won't issue
 // any API calls.
-func removeNodeTaint(c clientset.Interface, nodeName string, node *v1.Node, taints ...*v1.Taint) error {
+func removeNodeTaint(ctx context.Context, c clientset.Interface, nodeName string, node *v1.Node, taints ...*v1.Taint) error {
 	if len(taints) == 0 {
 		return nil
 	}
@@ -757,10 +731,10 @@ func removeNodeTaint(c clientset.Interface, nodeName string, node *v1.Node, tain
 		// First we try getting node from the API server cache, as it's cheaper. If it fails
 		// we get it from etcd to be sure to have fresh data.
 		if firstTry {
-			oldNode, err = c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{ResourceVersion: "0"})
+			oldNode, err = c.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{ResourceVersion: "0"})
 			firstTry = false
 		} else {
-			oldNode, err = c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+			oldNode, err = c.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 		}
 		if err != nil {
 			return err
@@ -781,15 +755,15 @@ func removeNodeTaint(c clientset.Interface, nodeName string, node *v1.Node, tain
 		if !updated {
 			return nil
 		}
-		return patchNodeTaints(c, nodeName, oldNode, newNode)
+		return patchNodeTaints(ctx, c, nodeName, oldNode, newNode)
 	})
 }
 
 // patchNodeTaints patches node's taints.
-func patchNodeTaints(c clientset.Interface, nodeName string, oldNode *v1.Node, newNode *v1.Node) error {
+func patchNodeTaints(ctx context.Context, c clientset.Interface, nodeName string, oldNode *v1.Node, newNode *v1.Node) error {
 	oldData, err := json.Marshal(oldNode)
 	if err != nil {
-		return fmt.Errorf("failed to marshal old node %#v for node %q: %v", oldNode, nodeName, err)
+		return fmt.Errorf("failed to marshal old node %#v for node %q: %w", oldNode, nodeName, err)
 	}
 
 	newTaints := newNode.Spec.Taints
@@ -797,15 +771,15 @@ func patchNodeTaints(c clientset.Interface, nodeName string, oldNode *v1.Node, n
 	newNodeClone.Spec.Taints = newTaints
 	newData, err := json.Marshal(newNodeClone)
 	if err != nil {
-		return fmt.Errorf("failed to marshal new node %#v for node %q: %v", newNodeClone, nodeName, err)
+		return fmt.Errorf("failed to marshal new node %#v for node %q: %w", newNodeClone, nodeName, err)
 	}
 
 	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1.Node{})
 	if err != nil {
-		return fmt.Errorf("failed to create patch for node %q: %v", nodeName, err)
+		return fmt.Errorf("failed to create patch for node %q: %w", nodeName, err)
 	}
 
-	_, err = c.CoreV1().Nodes().Patch(context.TODO(), nodeName, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
+	_, err = c.CoreV1().Nodes().Patch(ctx, nodeName, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 	return err
 }
 
@@ -841,9 +815,9 @@ func deleteTaint(taints []v1.Taint, taintToDelete *v1.Taint) ([]v1.Taint, bool) 
 	return newTaints, deleted
 }
 
-func verifyThatTaintIsGone(c clientset.Interface, nodeName string, taint *v1.Taint) {
+func verifyThatTaintIsGone(ctx context.Context, c clientset.Interface, nodeName string, taint *v1.Taint) {
 	ginkgo.By("verifying the node doesn't have the taint " + taint.ToString())
-	nodeUpdated, err := c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+	nodeUpdated, err := c.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 
 	// TODO use wrapper methods in expect.go after removing core e2e dependency on node
 	gomega.ExpectWithOffset(2, err).NotTo(gomega.HaveOccurred())

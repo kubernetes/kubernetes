@@ -1,3 +1,110 @@
+## 1.27.4
+
+### Fixes
+- improve error formatting and remove duplication of error message in Eventually/Consistently [854f075]
+
+### Maintenance
+- Bump github.com/onsi/ginkgo/v2 from 2.9.0 to 2.9.1 (#650) [ccebd9b]
+
+## 1.27.3
+
+### Fixes
+- format.Object now always includes err.Error() when passed an error [86d97ef]
+- Fix HaveExactElements to work inside ContainElement or other collection matchers (#648) [636757e]
+
+### Maintenance
+- Bump github.com/golang/protobuf from 1.5.2 to 1.5.3 (#649) [cc16689]
+- Bump github.com/onsi/ginkgo/v2 from 2.8.4 to 2.9.0 (#646) [e783366]
+
+## 1.27.2
+
+### Fixes
+- improve poll progress message when polling a consistently that has been passing [28a319b]
+
+### Maintenance
+- bump ginkgo
+- remove tools.go hack as Ginkgo 2.8.2 automatically pulls in the cli dependencies [81443b3]
+
+## 1.27.1
+
+### Maintenance
+
+- Bump golang.org/x/net from 0.6.0 to 0.7.0 (#640) [bc686cd]
+
+## 1.27.0
+
+### Features
+- Add HaveExactElements matcher (#634) [9d50783]
+- update Gomega docs to discuss GinkgoHelper() [be32774]
+
+### Maintenance
+- Bump github.com/onsi/ginkgo/v2 from 2.8.0 to 2.8.1 (#639) [296a68b]
+- Bump golang.org/x/net from 0.5.0 to 0.6.0 (#638) [c2b098b]
+- Bump github-pages from 227 to 228 in /docs (#636) [a9069ab]
+- test: update matrix for Go 1.20 (#635) [6bd25c8]
+- Bump github.com/onsi/ginkgo/v2 from 2.7.0 to 2.8.0 (#631) [5445f8b]
+- Bump webrick from 1.7.0 to 1.8.1 in /docs (#630) [03e93bb]
+- codeql: add ruby language (#626) [63c7d21]
+- dependabot: add bundler package-ecosystem for docs (#625) [d92f963]
+
+## 1.26.0
+
+### Features
+- When a polled function returns an error, keep track of the actual and report on the matcher state of the last non-errored actual [21f3090]
+- improve eventually failure message output [c530fb3]
+
+### Fixes
+- fix several documentation spelling issues [e2eff1f]
+
+
+## 1.25.0
+
+### Features
+- add `MustPassRepeatedly(int)` to asyncAssertion (#619) [4509f72]
+- compare unwrapped errors using DeepEqual (#617) [aaeaa5d]
+
+### Maintenance
+- Bump golang.org/x/net from 0.4.0 to 0.5.0 (#614) [c7cfea4]
+- Bump github.com/onsi/ginkgo/v2 from 2.6.1 to 2.7.0 (#615) [71b8adb]
+- Docs: Fix typo "MUltiple" -> "Multiple" (#616) [9351dda]
+- clean up go.sum [cd1dc1d]
+
+## 1.24.2
+
+### Fixes
+- Correctly handle assertion failure panics for eventually/consistnetly "g Gomega"s in a goroutine [78f1660]
+- docs:Fix typo "you an" -> "you can" (#607) [3187c1f]
+- fixes issue #600 (#606) [808d192]
+
+### Maintenance
+- Bump golang.org/x/net from 0.2.0 to 0.4.0 (#611) [6ebc0bf]
+- Bump nokogiri from 1.13.9 to 1.13.10 in /docs (#612) [258cfc8]
+- Bump github.com/onsi/ginkgo/v2 from 2.5.0 to 2.5.1 (#609) [e6c3eb9]
+
+## 1.24.1
+
+### Fixes
+- maintain backward compatibility for Eventually and Consisntetly's signatures [4c7df5e]
+- fix small typo (#601) [ea0ebe6]
+
+### Maintenance
+- Bump golang.org/x/net from 0.1.0 to 0.2.0 (#603) [1ba8372]
+- Bump github.com/onsi/ginkgo/v2 from 2.4.0 to 2.5.0 (#602) [f9426cb]
+- fix label-filter in test.yml [d795db6]
+- stop running flakey tests and rely on external network dependencies in CI [7133290]
+
+## 1.24.0
+
+### Features
+
+Introducting [gcustom](https://onsi.github.io/gomega/#gcustom-a-convenient-mechanism-for-buildling-custom-matchers) - a convenient mechanism for building custom matchers.
+
+This is an RC release for `gcustom`.  The external API may be tweaked in response to feedback however it is expected to remain mostly stable.
+
+### Maintenance
+
+- Update BeComparableTo documentation [756eaa0]
+
 ## 1.23.0
 
 ### Features

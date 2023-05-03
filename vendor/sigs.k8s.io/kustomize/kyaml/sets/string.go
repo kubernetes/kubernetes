@@ -10,7 +10,7 @@ func (s String) Len() int {
 }
 
 func (s String) List() []string {
-	var val []string
+	val := make([]string, 0, len(s))
 	for k := range s {
 		val = append(val, k)
 	}

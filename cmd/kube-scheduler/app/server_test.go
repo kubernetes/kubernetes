@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/testing/defaults"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 func TestSetup(t *testing.T) {
@@ -318,21 +317,33 @@ leaderElection:
 		wantLeaderElection *componentbaseconfig.LeaderElectionConfiguration
 	}{
 		{
-			name: "default config with two alpha features enabled",
+			name: "default config with an alpha feature enabled",
 			flags: []string{
 				"--kubeconfig", configKubeconfig,
-				"--feature-gates=VolumeCapacityPriority=true,PodSchedulingReadiness=true",
+				"--feature-gates=VolumeCapacityPriority=true",
+			},
+			wantPlugins: map[string]*config.Plugins{
+				"default-scheduler": defaults.ExpandedPluginsV1,
+			},
+			restoreFeatures: map[featuregate.Feature]bool{
+				features.VolumeCapacityPriority: false,
+			},
+		},
+		{
+			name: "default config with a beta feature disabled",
+			flags: []string{
+				"--kubeconfig", configKubeconfig,
+				"--feature-gates=PodSchedulingReadiness=false",
 			},
 			wantPlugins: map[string]*config.Plugins{
 				"default-scheduler": func() *config.Plugins {
 					plugins := defaults.ExpandedPluginsV1.DeepCopy()
-					plugins.PreEnqueue.Enabled = append(plugins.PreEnqueue.Enabled, config.Plugin{Name: names.SchedulingGates})
+					plugins.PreEnqueue = config.PluginSet{}
 					return plugins
 				}(),
 			},
 			restoreFeatures: map[featuregate.Feature]bool{
-				features.VolumeCapacityPriority: false,
-				features.PodSchedulingReadiness: false,
+				features.PodSchedulingReadiness: true,
 			},
 		},
 		{
@@ -351,37 +362,26 @@ leaderElection:
 				"--kubeconfig", configKubeconfig,
 			},
 			wantPlugins: map[string]*config.Plugins{
-				"default-scheduler": {
-					Bind: config.PluginSet{Enabled: []config.Plugin{{Name: "DefaultBinder"}}},
-					Filter: config.PluginSet{
-						Enabled: []config.Plugin{
-							{Name: "NodeResourcesFit"},
-							{Name: "NodePorts"},
-						},
-					},
-					PreFilter: config.PluginSet{
-						Enabled: []config.Plugin{
-							{Name: "NodeResourcesFit"},
-							{Name: "NodePorts"},
-						},
-					},
-					PostFilter: config.PluginSet{Enabled: []config.Plugin{{Name: "DefaultPreemption"}}},
-					PreScore: config.PluginSet{
-						Enabled: []config.Plugin{
-							{Name: "InterPodAffinity"},
-							{Name: "TaintToleration"},
-						},
-					},
-					QueueSort: config.PluginSet{Enabled: []config.Plugin{{Name: "PrioritySort"}}},
-					Score: config.PluginSet{
-						Enabled: []config.Plugin{
-							{Name: "InterPodAffinity", Weight: 1},
-							{Name: "TaintToleration", Weight: 1},
-						},
-					},
-					Reserve: config.PluginSet{Enabled: []config.Plugin{{Name: "VolumeBinding"}}},
-					PreBind: config.PluginSet{Enabled: []config.Plugin{{Name: "VolumeBinding"}}},
-				},
+				"default-scheduler": func() *config.Plugins {
+					plugins := defaults.PluginsV1beta2.DeepCopy()
+					plugins.Filter.Enabled = []config.Plugin{
+						{Name: "NodeResourcesFit"},
+						{Name: "NodePorts"},
+					}
+					plugins.PreFilter.Enabled = []config.Plugin{
+						{Name: "NodeResourcesFit"},
+						{Name: "NodePorts"},
+					}
+					plugins.PreScore.Enabled = []config.Plugin{
+						{Name: "InterPodAffinity"},
+						{Name: "TaintToleration"},
+					}
+					plugins.Score.Enabled = []config.Plugin{
+						{Name: "InterPodAffinity", Weight: 1},
+						{Name: "TaintToleration", Weight: 1},
+					}
+					return plugins
+				}(),
 			},
 		},
 		{
@@ -391,38 +391,27 @@ leaderElection:
 				"--kubeconfig", configKubeconfig,
 			},
 			wantPlugins: map[string]*config.Plugins{
-				"default-scheduler": {
-					PreEnqueue: config.PluginSet{Enabled: []config.Plugin{{Name: "SchedulingGates"}}},
-					Bind:       config.PluginSet{Enabled: []config.Plugin{{Name: "DefaultBinder"}}},
-					Filter: config.PluginSet{
-						Enabled: []config.Plugin{
-							{Name: "NodeResourcesFit"},
-							{Name: "NodePorts"},
-						},
-					},
-					PreFilter: config.PluginSet{
-						Enabled: []config.Plugin{
-							{Name: "NodeResourcesFit"},
-							{Name: "NodePorts"},
-						},
-					},
-					PostFilter: config.PluginSet{Enabled: []config.Plugin{{Name: "DefaultPreemption"}}},
-					PreScore: config.PluginSet{
-						Enabled: []config.Plugin{
-							{Name: "InterPodAffinity"},
-							{Name: "TaintToleration"},
-						},
-					},
-					QueueSort: config.PluginSet{Enabled: []config.Plugin{{Name: "PrioritySort"}}},
-					Score: config.PluginSet{
-						Enabled: []config.Plugin{
-							{Name: "InterPodAffinity", Weight: 1},
-							{Name: "TaintToleration", Weight: 1},
-						},
-					},
-					Reserve: config.PluginSet{Enabled: []config.Plugin{{Name: "VolumeBinding"}}},
-					PreBind: config.PluginSet{Enabled: []config.Plugin{{Name: "VolumeBinding"}}},
-				},
+				"default-scheduler": func() *config.Plugins {
+					plugins := defaults.ExpandedPluginsV1beta3.DeepCopy()
+					plugins.Filter.Enabled = []config.Plugin{
+						{Name: "NodeResourcesFit"},
+						{Name: "NodePorts"},
+					}
+					plugins.PreFilter.Enabled = []config.Plugin{
+						{Name: "NodeResourcesFit"},
+						{Name: "NodePorts"},
+					}
+					plugins.PreScore.Enabled = []config.Plugin{
+						{Name: "NodeResourcesFit"},
+						{Name: "InterPodAffinity"},
+						{Name: "TaintToleration"},
+					}
+					plugins.Score.Enabled = []config.Plugin{
+						{Name: "InterPodAffinity", Weight: 1},
+						{Name: "TaintToleration", Weight: 1},
+					}
+					return plugins
+				}(),
 			},
 		},
 		{
@@ -432,38 +421,27 @@ leaderElection:
 				"--kubeconfig", configKubeconfig,
 			},
 			wantPlugins: map[string]*config.Plugins{
-				"default-scheduler": {
-					PreEnqueue: config.PluginSet{Enabled: []config.Plugin{{Name: "SchedulingGates"}}},
-					Bind:       config.PluginSet{Enabled: []config.Plugin{{Name: "DefaultBinder"}}},
-					Filter: config.PluginSet{
-						Enabled: []config.Plugin{
-							{Name: "NodeResourcesFit"},
-							{Name: "NodePorts"},
-						},
-					},
-					PreFilter: config.PluginSet{
-						Enabled: []config.Plugin{
-							{Name: "NodeResourcesFit"},
-							{Name: "NodePorts"},
-						},
-					},
-					PostFilter: config.PluginSet{Enabled: []config.Plugin{{Name: "DefaultPreemption"}}},
-					PreScore: config.PluginSet{
-						Enabled: []config.Plugin{
-							{Name: "InterPodAffinity"},
-							{Name: "TaintToleration"},
-						},
-					},
-					QueueSort: config.PluginSet{Enabled: []config.Plugin{{Name: "PrioritySort"}}},
-					Score: config.PluginSet{
-						Enabled: []config.Plugin{
-							{Name: "InterPodAffinity", Weight: 1},
-							{Name: "TaintToleration", Weight: 1},
-						},
-					},
-					Reserve: config.PluginSet{Enabled: []config.Plugin{{Name: "VolumeBinding"}}},
-					PreBind: config.PluginSet{Enabled: []config.Plugin{{Name: "VolumeBinding"}}},
-				},
+				"default-scheduler": func() *config.Plugins {
+					plugins := defaults.ExpandedPluginsV1.DeepCopy()
+					plugins.Filter.Enabled = []config.Plugin{
+						{Name: "NodeResourcesFit"},
+						{Name: "NodePorts"},
+					}
+					plugins.PreFilter.Enabled = []config.Plugin{
+						{Name: "NodeResourcesFit"},
+						{Name: "NodePorts"},
+					}
+					plugins.PreScore.Enabled = []config.Plugin{
+						{Name: "NodeResourcesFit"},
+						{Name: "InterPodAffinity"},
+						{Name: "TaintToleration"},
+					}
+					plugins.Score.Enabled = []config.Plugin{
+						{Name: "InterPodAffinity", Weight: 1},
+						{Name: "TaintToleration", Weight: 1},
+					}
+					return plugins
+				}(),
 			},
 		},
 		{
@@ -474,21 +452,12 @@ leaderElection:
 			},
 			registryOptions: []Option{WithPlugin("Foo", newFoo)},
 			wantPlugins: map[string]*config.Plugins{
-				"default-scheduler": {
-					Bind: defaults.PluginsV1beta2.Bind,
-					Filter: config.PluginSet{
-						Enabled: append(defaults.PluginsV1beta2.Filter.Enabled, config.Plugin{Name: "Foo"}),
-					},
-					PreFilter: config.PluginSet{
-						Enabled: append(defaults.PluginsV1beta2.PreFilter.Enabled, config.Plugin{Name: "Foo"}),
-					},
-					PostFilter: defaults.PluginsV1beta2.PostFilter,
-					PreScore:   defaults.PluginsV1beta2.PreScore,
-					QueueSort:  defaults.PluginsV1beta2.QueueSort,
-					Score:      defaults.PluginsV1beta2.Score,
-					Reserve:    defaults.PluginsV1beta2.Reserve,
-					PreBind:    defaults.PluginsV1beta2.PreBind,
-				},
+				"default-scheduler": func() *config.Plugins {
+					plugins := defaults.PluginsV1beta2.DeepCopy()
+					plugins.PreFilter.Enabled = append(plugins.PreFilter.Enabled, config.Plugin{Name: "Foo"})
+					plugins.Filter.Enabled = append(plugins.Filter.Enabled, config.Plugin{Name: "Foo"})
+					return plugins
+				}(),
 			},
 		},
 		{
@@ -499,21 +468,12 @@ leaderElection:
 			},
 			registryOptions: []Option{WithPlugin("Foo", newFoo)},
 			wantPlugins: map[string]*config.Plugins{
-				"default-scheduler": {
-					Bind: defaults.ExpandedPluginsV1beta3.Bind,
-					Filter: config.PluginSet{
-						Enabled: append(defaults.ExpandedPluginsV1beta3.Filter.Enabled, config.Plugin{Name: "Foo"}),
-					},
-					PreFilter: config.PluginSet{
-						Enabled: append(defaults.ExpandedPluginsV1beta3.PreFilter.Enabled, config.Plugin{Name: "Foo"}),
-					},
-					PostFilter: defaults.ExpandedPluginsV1beta3.PostFilter,
-					PreScore:   defaults.ExpandedPluginsV1beta3.PreScore,
-					QueueSort:  defaults.ExpandedPluginsV1beta3.QueueSort,
-					Score:      defaults.ExpandedPluginsV1beta3.Score,
-					Reserve:    defaults.ExpandedPluginsV1beta3.Reserve,
-					PreBind:    defaults.ExpandedPluginsV1beta3.PreBind,
-				},
+				"default-scheduler": func() *config.Plugins {
+					plugins := defaults.ExpandedPluginsV1beta3.DeepCopy()
+					plugins.PreFilter.Enabled = append(plugins.PreFilter.Enabled, config.Plugin{Name: "Foo"})
+					plugins.Filter.Enabled = append(plugins.Filter.Enabled, config.Plugin{Name: "Foo"})
+					return plugins
+				}(),
 			},
 		},
 		{
@@ -524,22 +484,12 @@ leaderElection:
 			},
 			registryOptions: []Option{WithPlugin("Foo", newFoo)},
 			wantPlugins: map[string]*config.Plugins{
-				"default-scheduler": {
-					PreEnqueue: defaults.ExpandedPluginsV1.PreEnqueue,
-					Bind:       defaults.ExpandedPluginsV1.Bind,
-					Filter: config.PluginSet{
-						Enabled: append(defaults.ExpandedPluginsV1.Filter.Enabled, config.Plugin{Name: "Foo"}),
-					},
-					PreFilter: config.PluginSet{
-						Enabled: append(defaults.ExpandedPluginsV1.PreFilter.Enabled, config.Plugin{Name: "Foo"}),
-					},
-					PostFilter: defaults.ExpandedPluginsV1.PostFilter,
-					PreScore:   defaults.ExpandedPluginsV1.PreScore,
-					QueueSort:  defaults.ExpandedPluginsV1.QueueSort,
-					Score:      defaults.ExpandedPluginsV1.Score,
-					Reserve:    defaults.ExpandedPluginsV1.Reserve,
-					PreBind:    defaults.ExpandedPluginsV1.PreBind,
-				},
+				"default-scheduler": func() *config.Plugins {
+					plugins := defaults.ExpandedPluginsV1.DeepCopy()
+					plugins.PreFilter.Enabled = append(plugins.PreFilter.Enabled, config.Plugin{Name: "Foo"})
+					plugins.Filter.Enabled = append(plugins.Filter.Enabled, config.Plugin{Name: "Foo"})
+					return plugins
+				}(),
 			},
 		},
 		{

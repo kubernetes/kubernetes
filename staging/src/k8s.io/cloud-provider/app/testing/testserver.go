@@ -33,7 +33,6 @@ import (
 	"k8s.io/cloud-provider/app/config"
 	"k8s.io/cloud-provider/options"
 	cliflag "k8s.io/component-base/cli/flag"
-
 	"k8s.io/klog/v2"
 )
 
@@ -49,21 +48,14 @@ type TestServer struct {
 	TmpDir               string       // Temp Dir used, by the apiserver
 }
 
-// Logger allows t.Testing and b.Testing to be passed to StartTestServer and StartTestServerOrDie
-type Logger interface {
-	Errorf(format string, args ...interface{})
-	Fatalf(format string, args ...interface{})
-	Logf(format string, args ...interface{})
-}
-
 // StartTestServer starts a cloud-controller-manager. A rest client config and a tear-down func,
 // and location of the tmpdir are returned.
 //
 // Note: we return a tear-down func instead of a stop channel because the later will leak temporary
-//
-//	files that because Golang testing's call to os.Exit will not give a stop channel go routine
-//	enough time to remove temporary files.
-func StartTestServer(t Logger, customFlags []string) (result TestServer, err error) {
+// files that because Golang testing's call to os.Exit will not give a stop channel go routine
+// enough time to remove temporary files.
+func StartTestServer(ctx context.Context, customFlags []string) (result TestServer, err error) {
+	logger := klog.FromContext(ctx)
 	stopCh := make(chan struct{})
 	var errCh chan error
 	configDoneCh := make(chan struct{})
@@ -106,11 +98,11 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 		cloudConfig := config.ComponentConfig.KubeCloudShared.CloudProvider
 		cloud, err := cloudprovider.InitCloudProvider(cloudConfig.Name, cloudConfig.CloudConfigFile)
 		if err != nil {
-			t.Fatalf("Cloud provider could not be initialized: %v", err)
+			panic(fmt.Errorf("Cloud provider could not be initialized: %v", err))
 		}
 		s.SecureServing.ServerCert.CertDirectory = result.TmpDir
 		if cloud == nil {
-			t.Fatalf("Cloud provider is nil")
+			panic("Cloud provider is nil")
 		}
 		return cloud
 	}
@@ -120,14 +112,22 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 	commandArgs := []string{}
 	listeners := []net.Listener{}
 	disableSecure := false
+	webhookServing := false
 	for _, arg := range customFlags {
-		if strings.HasPrefix(arg, "--secure-port=") {
+		// This block collects all custom flags other than secure serving flags,
+		// which are added after creating a listener.
+		if strings.HasPrefix(arg, "--secure-port=") || strings.HasPrefix(arg, "--cert-dir=") {
 			if arg == "--secure-port=0" {
 				commandArgs = append(commandArgs, arg)
 				disableSecure = true
 			}
-		} else if strings.HasPrefix(arg, "--cert-dir=") {
-			// skip it
+		} else if strings.HasPrefix(arg, "--webhook-secure-port=") || strings.HasPrefix(arg, "--webhook-cert-dir=") {
+			if arg == "--webhook-secure-port=0" {
+				commandArgs = append(commandArgs, arg)
+				webhookServing = false
+			} else {
+				webhookServing = true
+			}
 		} else {
 			commandArgs = append(commandArgs, arg)
 		}
@@ -142,8 +142,21 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 		commandArgs = append(commandArgs, fmt.Sprintf("--secure-port=%d", bindPort))
 		commandArgs = append(commandArgs, fmt.Sprintf("--cert-dir=%s", result.TmpDir))
 
-		t.Logf("cloud-controller-manager will listen securely on port %d...", bindPort)
+		logger.Info("cloud-controller-manager will listen securely", "port", bindPort)
 	}
+
+	if webhookServing {
+		listener, bindPort, err := createListenerOnFreePort()
+		if err != nil {
+			return result, fmt.Errorf("failed to create listener: %v", err)
+		}
+		listeners = append(listeners, listener)
+		commandArgs = append(commandArgs, fmt.Sprintf("--webhook-secure-port=%d", bindPort))
+		commandArgs = append(commandArgs, fmt.Sprintf("--webhook-cert-dir=%s", result.TmpDir))
+
+		logger.Info("cloud-controller-manager (webhook endpoint) will listen securely", "port", bindPort)
+	}
+
 	for _, listener := range listeners {
 		listener.Close()
 	}
@@ -165,7 +178,7 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 		return result, err
 	}
 
-	t.Logf("Waiting for /healthz to be ok...")
+	logger.Info("Waiting for /healthz to be ok...")
 	client, err := kubernetes.NewForConfig(capturedConfig.LoopbackClientConfig)
 	if err != nil {
 		return result, fmt.Errorf("failed to create a client: %v", err)
@@ -198,15 +211,14 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 	return result, nil
 }
 
-// StartTestServerOrDie calls StartTestServer t.Fatal if it does not succeed.
-func StartTestServerOrDie(t Logger, flags []string) *TestServer {
-	result, err := StartTestServer(t, flags)
+// StartTestServerOrDie calls StartTestServer panic if it does not succeed.
+func StartTestServerOrDie(ctx context.Context, flags []string) *TestServer {
+	result, err := StartTestServer(ctx, flags)
 	if err == nil {
 		return &result
 	}
 
-	t.Fatalf("failed to launch server: %v", err)
-	return nil
+	panic(fmt.Errorf("failed to launch server: %v", err))
 }
 
 func createListenerOnFreePort() (net.Listener, int, error) {

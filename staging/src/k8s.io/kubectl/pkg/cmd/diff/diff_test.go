@@ -19,7 +19,6 @@ package diff
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -134,7 +133,7 @@ func TestDiffVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fcontent, err := ioutil.ReadFile(path.Join(diff.Dir.Name, obj.Name()))
+	fcontent, err := os.ReadFile(path.Join(diff.Dir.Name, obj.Name()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -157,7 +156,7 @@ func TestDirectory(t *testing.T) {
 	if !strings.HasPrefix(filepath.Base(dir.Name), "prefix") {
 		t.Fatalf(`Directory doesn't start with "prefix": %q`, dir.Name)
 	}
-	entries, err := ioutil.ReadDir(dir.Name)
+	entries, err := os.ReadDir(dir.Name)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +171,7 @@ func TestDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	entries, err = ioutil.ReadDir(dir.Name)
+	entries, err = os.ReadDir(dir.Name)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,7 +204,7 @@ func TestDiffer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fcontent, err := ioutil.ReadFile(path.Join(diff.From.Dir.Name, obj.Name()))
+	fcontent, err := os.ReadFile(path.Join(diff.From.Dir.Name, obj.Name()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,7 +213,7 @@ func TestDiffer(t *testing.T) {
 		t.Fatalf("File has %q, expected %q", string(fcontent), econtent)
 	}
 
-	fcontent, err = ioutil.ReadFile(path.Join(diff.To.Dir.Name, obj.Name()))
+	fcontent, err = os.ReadFile(path.Join(diff.To.Dir.Name, obj.Name()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -290,12 +289,12 @@ metadata:
 				t.Fatal(err)
 			}
 
-			actualFromContent, _ := ioutil.ReadFile(path.Join(diff.From.Dir.Name, obj.Name()))
+			actualFromContent, _ := os.ReadFile(path.Join(diff.From.Dir.Name, obj.Name()))
 			if string(actualFromContent) != tc.expectedFromContent {
 				t.Fatalf("File has %q, expected %q", string(actualFromContent), tc.expectedFromContent)
 			}
 
-			actualToContent, _ := ioutil.ReadFile(path.Join(diff.To.Dir.Name, obj.Name()))
+			actualToContent, _ := os.ReadFile(path.Join(diff.To.Dir.Name, obj.Name()))
 			if string(actualToContent) != tc.expectedToContent {
 				t.Fatalf("File has %q, expected %q", string(actualToContent), tc.expectedToContent)
 			}

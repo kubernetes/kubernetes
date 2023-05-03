@@ -63,16 +63,18 @@ func TestNodeAddress(t *testing.T) {
 		cloudProviderExternal
 		cloudProviderNone
 	)
+	existingNodeAddress := v1.NodeAddress{Address: "10.1.1.2"}
 	cases := []struct {
-		name                string
-		hostnameOverride    bool
-		nodeIP              net.IP
-		cloudProviderType   cloudProviderType
-		nodeAddresses       []v1.NodeAddress
-		expectedAddresses   []v1.NodeAddress
-		existingAnnotations map[string]string
-		expectedAnnotations map[string]string
-		shouldError         bool
+		name                           string
+		hostnameOverride               bool
+		nodeIP                         net.IP
+		cloudProviderType              cloudProviderType
+		nodeAddresses                  []v1.NodeAddress
+		expectedAddresses              []v1.NodeAddress
+		existingAnnotations            map[string]string
+		expectedAnnotations            map[string]string
+		shouldError                    bool
+		shouldSetNodeAddressBeforeTest bool
 	}{
 		{
 			name:   "A single InternalIP",
@@ -440,6 +442,15 @@ func TestNodeAddress(t *testing.T) {
 			shouldError: false,
 		},
 		{
+			name:                           "External cloud provider, node address is already set",
+			nodeIP:                         netutils.ParseIPSloppy("10.1.1.1"),
+			cloudProviderType:              cloudProviderExternal,
+			nodeAddresses:                  []v1.NodeAddress{existingNodeAddress},
+			expectedAddresses:              []v1.NodeAddress{existingNodeAddress},
+			shouldError:                    true,
+			shouldSetNodeAddressBeforeTest: true,
+		},
+		{
 			name:              "No cloud provider does not get nodeIP annotation",
 			nodeIP:            netutils.ParseIPSloppy("10.1.1.1"),
 			cloudProviderType: cloudProviderNone,
@@ -526,6 +537,10 @@ func TestNodeAddress(t *testing.T) {
 				},
 			}
 
+			if testCase.shouldSetNodeAddressBeforeTest {
+				existingNode.Status.Addresses = append(existingNode.Status.Addresses, existingNodeAddress)
+			}
+
 			nodeIP := testCase.nodeIP
 			nodeIPValidator := func(nodeIP net.IP) error {
 				return nil
@@ -579,6 +594,7 @@ func TestNodeAddress_NoCloudProvider(t *testing.T) {
 		name              string
 		nodeIPs           []net.IP
 		expectedAddresses []v1.NodeAddress
+		shouldError       bool
 	}{
 		{
 			name:    "Single --node-ip",
@@ -589,6 +605,11 @@ func TestNodeAddress_NoCloudProvider(t *testing.T) {
 			},
 		},
 		{
+			name:        "Invalid single --node-ip (using loopback)",
+			nodeIPs:     []net.IP{netutils.ParseIPSloppy("127.0.0.1")},
+			shouldError: true,
+		},
+		{
 			name:    "Dual --node-ips",
 			nodeIPs: []net.IP{netutils.ParseIPSloppy("10.1.1.1"), netutils.ParseIPSloppy("fd01::1234")},
 			expectedAddresses: []v1.NodeAddress{
@@ -596,6 +617,11 @@ func TestNodeAddress_NoCloudProvider(t *testing.T) {
 				{Type: v1.NodeInternalIP, Address: "fd01::1234"},
 				{Type: v1.NodeHostName, Address: testKubeletHostname},
 			},
+		},
+		{
+			name:        "Dual --node-ips but with invalid secondary IP (using multicast IP)",
+			nodeIPs:     []net.IP{netutils.ParseIPSloppy("10.1.1.1"), netutils.ParseIPSloppy("224.0.0.0")},
+			shouldError: true,
 		},
 	}
 	for _, testCase := range cases {
@@ -611,6 +637,11 @@ func TestNodeAddress_NoCloudProvider(t *testing.T) {
 			}
 
 			nodeIPValidator := func(nodeIP net.IP) error {
+				if nodeIP.IsLoopback() {
+					return fmt.Errorf("nodeIP can't be loopback address")
+				} else if nodeIP.IsMulticast() {
+					return fmt.Errorf("nodeIP can't be a multicast address")
+				}
 				return nil
 			}
 			nodeAddressesFunc := func() ([]v1.NodeAddress, error) {
@@ -628,7 +659,10 @@ func TestNodeAddress_NoCloudProvider(t *testing.T) {
 
 			// call setter on existing node
 			err := setter(ctx, existingNode)
-			if err != nil {
+			if testCase.shouldError && err == nil {
+				t.Fatal("expected error but no error returned")
+			}
+			if err != nil && !testCase.shouldError {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
@@ -829,6 +863,37 @@ func TestMachineInfo(t *testing.T) {
 						v1.ResourceMemory:   *resource.NewQuantity(1024, resource.BinarySI),
 						v1.ResourcePods:     *resource.NewQuantity(110, resource.DecimalSI),
 						"negative-resource": *resource.NewQuantity(0, resource.BinarySI),
+					},
+				},
+			},
+		},
+		{
+			desc: "hugepages reservation greater than node memory capacity should result in memory capacity set to 0",
+			node: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceHugePagesPrefix + "test": *resource.NewQuantity(1025, resource.BinarySI),
+					},
+				},
+			},
+			maxPods: 110,
+			machineInfo: &cadvisorapiv1.MachineInfo{
+				NumCores:       2,
+				MemoryCapacity: 1024,
+			},
+			expectNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:                      *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:                   *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourcePods:                     *resource.NewQuantity(110, resource.DecimalSI),
+						v1.ResourceHugePagesPrefix + "test": *resource.NewQuantity(1025, resource.BinarySI),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:                      *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:                   *resource.NewQuantity(0, resource.BinarySI),
+						v1.ResourcePods:                     *resource.NewQuantity(110, resource.DecimalSI),
+						v1.ResourceHugePagesPrefix + "test": *resource.NewQuantity(1025, resource.BinarySI),
 					},
 				},
 			},
@@ -1933,6 +1998,45 @@ func TestVolumeLimits(t *testing.T) {
 			// check expected node
 			assert.True(t, apiequality.Semantic.DeepEqual(tc.expectNode, node),
 				"Diff: %s", diff.ObjectDiff(tc.expectNode, node))
+		})
+	}
+}
+
+func TestDaemonEndpoints(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		endpoints *v1.NodeDaemonEndpoints
+		expected  *v1.NodeDaemonEndpoints
+	}{
+		{
+			name:      "empty daemon endpoints",
+			endpoints: &v1.NodeDaemonEndpoints{},
+			expected:  &v1.NodeDaemonEndpoints{KubeletEndpoint: v1.DaemonEndpoint{Port: 0}},
+		},
+		{
+			name:      "daemon endpoints with specific port",
+			endpoints: &v1.NodeDaemonEndpoints{KubeletEndpoint: v1.DaemonEndpoint{Port: 5678}},
+			expected:  &v1.NodeDaemonEndpoints{KubeletEndpoint: v1.DaemonEndpoint{Port: 5678}},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
+			existingNode := &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: testKubeletHostname,
+				},
+				Spec: v1.NodeSpec{},
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{},
+				},
+			}
+
+			setter := DaemonEndpoints(test.endpoints)
+			if err := setter(ctx, existingNode); err != nil {
+				t.Fatal(err)
+			}
+
+			assert.Equal(t, *test.expected, existingNode.Status.DaemonEndpoints)
 		})
 	}
 }

@@ -612,11 +612,11 @@ func TestPrintNodeRole(t *testing.T) {
 			node: api.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo10",
-					Labels: map[string]string{"node-role.kubernetes.io/master": "", "node-role.kubernetes.io/proxy": "", "kubernetes.io/role": "node"},
+					Labels: map[string]string{"node-role.kubernetes.io/master": "", "node-role.kubernetes.io/control-plane": "", "node-role.kubernetes.io/proxy": "", "kubernetes.io/role": "node"},
 				},
 			},
 			// Columns: Name, Status, Roles, Age, KubeletVersion
-			expected: []metav1.TableRow{{Cells: []interface{}{"foo10", "Unknown", "master,node,proxy", "<unknown>", ""}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"foo10", "Unknown", "control-plane,master,node,proxy", "<unknown>", ""}}},
 		},
 		{
 			node: api.Node{
@@ -6098,12 +6098,6 @@ func TestTableRowDeepCopyShouldNotPanic(t *testing.T) {
 			},
 		},
 		{
-			name: "PodSecurityPolicy",
-			printer: func() ([]metav1.TableRow, error) {
-				return printPodSecurityPolicy(&policy.PodSecurityPolicy{}, printers.GenerateOptions{})
-			},
-		},
-		{
 			name: "NetworkPolicy",
 			printer: func() ([]metav1.TableRow, error) {
 				return printNetworkPolicy(&networking.NetworkPolicy{}, printers.GenerateOptions{})
@@ -6487,4 +6481,84 @@ func TestPrintClusterCIDRList(t *testing.T) {
 			t.Errorf("mismatch: %s", diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
+}
+
+func TestPrintIPAddress(t *testing.T) {
+	ip := networking.IPAddress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "192.168.2.2",
+			CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
+		},
+		Spec: networking.IPAddressSpec{
+			ParentRef: &networking.ParentReference{
+				Group:     "mygroup",
+				Resource:  "myresource",
+				Namespace: "mynamespace",
+				Name:      "myname",
+			},
+		},
+	}
+	// Columns: Name, ParentRef, Age
+	expected := []metav1.TableRow{{Cells: []interface{}{"192.168.2.2", "myresource.mygroup/mynamespace/myname", "10y"}}}
+
+	rows, err := printIPAddress(&ip, printers.GenerateOptions{})
+	if err != nil {
+		t.Fatalf("Error generating table rows for IPAddress: %#v", err)
+	}
+	rows[0].Object.Object = nil
+	if !reflect.DeepEqual(expected, rows) {
+		t.Errorf("mismatch: %s", diff.ObjectReflectDiff(expected, rows))
+	}
+}
+
+func TestPrintIPAddressList(t *testing.T) {
+	ipList := networking.IPAddressList{
+		Items: []networking.IPAddress{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "192.168.2.2",
+					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
+				},
+				Spec: networking.IPAddressSpec{
+					ParentRef: &networking.ParentReference{
+						Group:     "mygroup",
+						Resource:  "myresource",
+						Namespace: "mynamespace",
+						Name:      "myname",
+					},
+				},
+			}, {
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "2001:db8::2",
+					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-5, 0, 0)},
+				},
+				Spec: networking.IPAddressSpec{
+					ParentRef: &networking.ParentReference{
+						Group:     "mygroup2",
+						Resource:  "myresource2",
+						Namespace: "mynamespace2",
+						Name:      "myname2",
+					},
+				},
+			},
+		},
+	}
+	// Columns: Name, ParentRef, Age
+	expected := []metav1.TableRow{
+		{Cells: []interface{}{"192.168.2.2", "myresource.mygroup/mynamespace/myname", "10y"}},
+		{Cells: []interface{}{"2001:db8::2", "myresource2.mygroup2/mynamespace2/myname2", "5y1d"}},
+	}
+
+	rows, err := printIPAddressList(&ipList, printers.GenerateOptions{})
+	if err != nil {
+		t.Fatalf("Error generating table rows for IPAddress: %#v", err)
+	}
+	for i := range rows {
+		rows[i].Object.Object = nil
+
+	}
+	if !reflect.DeepEqual(expected, rows) {
+		t.Errorf("mismatch: %s", diff.ObjectReflectDiff(expected, rows))
+	}
+
 }

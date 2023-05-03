@@ -26,7 +26,6 @@ import (
 	v1beta1 "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	batchv1beta1 "k8s.io/client-go/applyconfigurations/batch/v1beta1"
@@ -39,9 +38,9 @@ type FakeCronJobs struct {
 	ns   string
 }
 
-var cronjobsResource = schema.GroupVersionResource{Group: "batch", Version: "v1beta1", Resource: "cronjobs"}
+var cronjobsResource = v1beta1.SchemeGroupVersion.WithResource("cronjobs")
 
-var cronjobsKind = schema.GroupVersionKind{Group: "batch", Version: "v1beta1", Kind: "CronJob"}
+var cronjobsKind = v1beta1.SchemeGroupVersion.WithKind("CronJob")
 
 // Get takes name of the cronJob, and returns the corresponding cronJob object, and an error if there is any.
 func (c *FakeCronJobs) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.CronJob, err error) {

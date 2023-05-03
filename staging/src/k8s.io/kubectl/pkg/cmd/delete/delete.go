@@ -125,7 +125,6 @@ type DeleteOptions struct {
 	Timeout     time.Duration
 
 	DryRunStrategy cmdutil.DryRunStrategy
-	DryRunVerifier *resource.QueryParamVerifier
 
 	Output string
 
@@ -196,11 +195,6 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Co
 	if err != nil {
 		return err
 	}
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 
 	if len(o.Raw) == 0 {
 		r := f.NewBuilder().
@@ -330,11 +324,6 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 				o.PrintObj(info)
 			}
 			return nil
-		}
-		if o.DryRunStrategy == cmdutil.DryRunServer {
-			if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
-				return err
-			}
 		}
 		response, err := o.deleteResource(info, options)
 		if err != nil {

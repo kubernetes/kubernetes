@@ -78,7 +78,7 @@ func cassandraKubectlCreate(ns, file string) {
 // the upgrade.
 // It waits for the system to stabilize before adding two users to verify
 // connectivity.
-func (t *CassandraUpgradeTest) Setup(f *framework.Framework) {
+func (t *CassandraUpgradeTest) Setup(ctx context.Context, f *framework.Framework) {
 	ns := f.Namespace.Name
 	statefulsetPoll := 30 * time.Second
 	statefulsetTimeout := 10 * time.Minute
@@ -87,14 +87,14 @@ func (t *CassandraUpgradeTest) Setup(f *framework.Framework) {
 	cassandraKubectlCreate(ns, "pdb.yaml")
 
 	ginkgo.By("Creating a Cassandra StatefulSet")
-	e2estatefulset.CreateStatefulSet(f.ClientSet, cassandraManifestPath, ns)
+	e2estatefulset.CreateStatefulSet(ctx, f.ClientSet, cassandraManifestPath, ns)
 
 	ginkgo.By("Creating a cassandra-test-server deployment")
 	cassandraKubectlCreate(ns, "tester.yaml")
 
 	ginkgo.By("Getting the ingress IPs from the services")
-	err := wait.PollImmediate(statefulsetPoll, statefulsetTimeout, func() (bool, error) {
-		if t.ip = t.getServiceIP(f, ns, "test-server"); t.ip == "" {
+	err := wait.PollImmediateWithContext(ctx, statefulsetPoll, statefulsetTimeout, func(ctx context.Context) (bool, error) {
+		if t.ip = t.getServiceIP(ctx, f, ns, "test-server"); t.ip == "" {
 			return false, nil
 		}
 		if _, err := t.listUsers(); err != nil {
@@ -159,8 +159,8 @@ func (t *CassandraUpgradeTest) addUser(name string) error {
 }
 
 // getServiceIP is a helper method to extract the Ingress IP from the service.
-func (t *CassandraUpgradeTest) getServiceIP(f *framework.Framework, ns, svcName string) string {
-	svc, err := f.ClientSet.CoreV1().Services(ns).Get(context.TODO(), svcName, metav1.GetOptions{})
+func (t *CassandraUpgradeTest) getServiceIP(ctx context.Context, f *framework.Framework, ns, svcName string) string {
+	svc, err := f.ClientSet.CoreV1().Services(ns).Get(ctx, svcName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	ingress := svc.Status.LoadBalancer.Ingress
 	if len(ingress) == 0 {
@@ -174,7 +174,7 @@ func (t *CassandraUpgradeTest) getServiceIP(f *framework.Framework, ns, svcName 
 // from the db. Each attempt is tallied and at the end we verify if the success
 // ratio is over a certain threshold (0.75). We also verify that we get
 // at least the same number of rows back as we successfully wrote.
-func (t *CassandraUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
+func (t *CassandraUpgradeTest) Test(ctx context.Context, f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
 	ginkgo.By("Continuously polling the database during upgrade.")
 	var (
 		success, failures, writeAttempts, lastUserCount int
@@ -219,7 +219,7 @@ func (t *CassandraUpgradeTest) Test(f *framework.Framework, done <-chan struct{}
 }
 
 // Teardown does one final check of the data's availability.
-func (t *CassandraUpgradeTest) Teardown(f *framework.Framework) {
+func (t *CassandraUpgradeTest) Teardown(ctx context.Context, f *framework.Framework) {
 	users, err := t.listUsers()
 	framework.ExpectNoError(err)
 	gomega.Expect(len(users)).To(gomega.BeNumerically(">=", t.successfulWrites), "len(users) is too small")

@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
+	"k8s.io/apiserver/pkg/cel/openapi/resolver"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 )
 
@@ -35,6 +36,7 @@ type PluginInitializer struct {
 	cloudConfig        []byte
 	restMapper         meta.RESTMapper
 	quotaConfiguration quota.Configuration
+	schemaResolver     resolver.SchemaResolver
 }
 
 var _ admission.PluginInitializer = &PluginInitializer{}
@@ -46,11 +48,13 @@ func NewPluginInitializer(
 	cloudConfig []byte,
 	restMapper meta.RESTMapper,
 	quotaConfiguration quota.Configuration,
+	schemaResolver resolver.SchemaResolver,
 ) *PluginInitializer {
 	return &PluginInitializer{
 		cloudConfig:        cloudConfig,
 		restMapper:         restMapper,
 		quotaConfiguration: quotaConfiguration,
+		schemaResolver:     schemaResolver,
 	}
 }
 
@@ -67,5 +71,9 @@ func (i *PluginInitializer) Initialize(plugin admission.Interface) {
 
 	if wants, ok := plugin.(initializer.WantsQuotaConfiguration); ok {
 		wants.SetQuotaConfiguration(i.quotaConfiguration)
+	}
+
+	if wants, ok := plugin.(initializer.WantsSchemaResolver); ok {
+		wants.SetSchemaResolver(i.schemaResolver)
 	}
 }

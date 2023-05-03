@@ -28,6 +28,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -227,6 +228,111 @@ func TestToKubeContainerStatus(t *testing.T) {
 	} {
 		actual := toKubeContainerStatus(test.input, cid.Type)
 		assert.Equal(t, test.expected, actual, desc)
+	}
+}
+
+// TestToKubeContainerStatusWithResources tests the converting the CRI container status to
+// the internal type (i.e., toKubeContainerStatus()) for containers that returns Resources.
+func TestToKubeContainerStatusWithResources(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+	cid := &kubecontainer.ContainerID{Type: "testRuntime", ID: "dummyid"}
+	meta := &runtimeapi.ContainerMetadata{Name: "cname", Attempt: 3}
+	imageSpec := &runtimeapi.ImageSpec{Image: "fimage"}
+	var (
+		createdAt int64 = 327
+		startedAt int64 = 999
+	)
+
+	for desc, test := range map[string]struct {
+		input    *runtimeapi.ContainerStatus
+		expected *kubecontainer.Status
+	}{
+		"container reporting cpu and memory": {
+			input: &runtimeapi.ContainerStatus{
+				Id:        cid.ID,
+				Metadata:  meta,
+				Image:     imageSpec,
+				State:     runtimeapi.ContainerState_CONTAINER_RUNNING,
+				CreatedAt: createdAt,
+				StartedAt: startedAt,
+				Resources: &runtimeapi.ContainerResources{
+					Linux: &runtimeapi.LinuxContainerResources{
+						CpuQuota:           25000,
+						CpuPeriod:          100000,
+						MemoryLimitInBytes: 524288000,
+						OomScoreAdj:        -998,
+					},
+				},
+			},
+			expected: &kubecontainer.Status{
+				ID:        *cid,
+				Image:     imageSpec.Image,
+				State:     kubecontainer.ContainerStateRunning,
+				CreatedAt: time.Unix(0, createdAt),
+				StartedAt: time.Unix(0, startedAt),
+				Resources: &kubecontainer.ContainerResources{
+					CPULimit:    resource.NewMilliQuantity(250, resource.DecimalSI),
+					MemoryLimit: resource.NewQuantity(524288000, resource.BinarySI),
+				},
+			},
+		},
+		"container reporting cpu only": {
+			input: &runtimeapi.ContainerStatus{
+				Id:        cid.ID,
+				Metadata:  meta,
+				Image:     imageSpec,
+				State:     runtimeapi.ContainerState_CONTAINER_RUNNING,
+				CreatedAt: createdAt,
+				StartedAt: startedAt,
+				Resources: &runtimeapi.ContainerResources{
+					Linux: &runtimeapi.LinuxContainerResources{
+						CpuQuota:  50000,
+						CpuPeriod: 100000,
+					},
+				},
+			},
+			expected: &kubecontainer.Status{
+				ID:        *cid,
+				Image:     imageSpec.Image,
+				State:     kubecontainer.ContainerStateRunning,
+				CreatedAt: time.Unix(0, createdAt),
+				StartedAt: time.Unix(0, startedAt),
+				Resources: &kubecontainer.ContainerResources{
+					CPULimit: resource.NewMilliQuantity(500, resource.DecimalSI),
+				},
+			},
+		},
+		"container reporting memory only": {
+			input: &runtimeapi.ContainerStatus{
+				Id:        cid.ID,
+				Metadata:  meta,
+				Image:     imageSpec,
+				State:     runtimeapi.ContainerState_CONTAINER_RUNNING,
+				CreatedAt: createdAt,
+				StartedAt: startedAt,
+				Resources: &runtimeapi.ContainerResources{
+					Linux: &runtimeapi.LinuxContainerResources{
+						MemoryLimitInBytes: 524288000,
+						OomScoreAdj:        -998,
+					},
+				},
+			},
+			expected: &kubecontainer.Status{
+				ID:        *cid,
+				Image:     imageSpec.Image,
+				State:     kubecontainer.ContainerStateRunning,
+				CreatedAt: time.Unix(0, createdAt),
+				StartedAt: time.Unix(0, startedAt),
+				Resources: &kubecontainer.ContainerResources{
+					MemoryLimit: resource.NewQuantity(524288000, resource.BinarySI),
+				},
+			},
+		},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			actual := toKubeContainerStatus(test.input, cid.Type)
+			assert.Equal(t, test.expected, actual, desc)
+		})
 	}
 }
 
@@ -476,6 +582,48 @@ func TestRestartCountByLogDir(t *testing.T) {
 			filenames:    []string{"5.log.rotated", "6.log", "7.log"},
 			restartCount: 8,
 		},
+		// no restart count log files
+		{
+			filenames:    []string{},
+			restartCount: 0,
+		},
+		{
+			filenames:    []string{"a.log.rotated", "b.log.rotated", "12log.rotated"},
+			restartCount: 0,
+		},
+		// log extension twice
+		{
+			filenames:    []string{"145.log.log.rotated"},
+			restartCount: 146,
+		},
+		// too big of the integer
+		{
+			filenames:    []string{"92233720368547758089223372036854775808.log.rotated"},
+			restartCount: 0,
+		},
+		// mix of log files
+		{
+			filenames:    []string{"9223372036854775808.log.rotated", "23.log", "23a.log", "1aaa.log.rotated", "2.log", "3.log.rotated"},
+			restartCount: 24,
+		},
+		// prefixed
+		{
+			filenames:    []string{"rotated.23.log"},
+			restartCount: 0,
+		},
+		{
+			filenames:    []string{"mylog42.log"},
+			restartCount: 0,
+		},
+		{
+			filenames:    []string{"-42.log"},
+			restartCount: 0,
+		},
+		// same restart count multiple times
+		{
+			filenames:    []string{"6.log", "6.log.rotated", "6.log.rotated.rotated"},
+			restartCount: 7,
+		},
 	} {
 		tempDirPath, err := os.MkdirTemp("", "test-restart-count-")
 		assert.NoError(t, err, "create tempdir error")
@@ -484,8 +632,10 @@ func TestRestartCountByLogDir(t *testing.T) {
 			err = os.WriteFile(filepath.Join(tempDirPath, filename), []byte("a log line"), 0600)
 			assert.NoError(t, err, "could not write log file")
 		}
-		count, _ := calcRestartCountByLogDir(tempDirPath)
-		assert.Equal(t, count, tc.restartCount, "count %v should equal restartCount %v", count, tc.restartCount)
+		count, err := calcRestartCountByLogDir(tempDirPath)
+		if assert.NoError(t, err) {
+			assert.Equal(t, count, tc.restartCount, "count %v should equal restartCount %v", count, tc.restartCount)
+		}
 	}
 }
 
@@ -651,4 +801,41 @@ func TestKillContainerGracePeriod(t *testing.T) {
 			require.Equal(t, test.expectedGracePeriod, actualGracePeriod)
 		})
 	}
+}
+
+// TestUpdateContainerResources tests updating a container in a Pod.
+func TestUpdateContainerResources(t *testing.T) {
+	fakeRuntime, _, m, errCreate := createTestRuntimeManager()
+	require.NoError(t, errCreate)
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "bar",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:            "foo",
+					Image:           "busybox",
+					ImagePullPolicy: v1.PullIfNotPresent,
+				},
+			},
+		},
+	}
+
+	// Create fake sandbox and container
+	_, fakeContainers := makeAndSetFakePod(t, m, fakeRuntime, pod)
+	assert.Equal(t, len(fakeContainers), 1)
+
+	ctx := context.Background()
+	cStatus, err := m.getPodContainerStatuses(ctx, pod.UID, pod.Name, pod.Namespace)
+	assert.NoError(t, err)
+	containerID := cStatus[0].ID
+
+	err = m.updateContainerResources(pod, &pod.Spec.Containers[0], containerID)
+	assert.NoError(t, err)
+
+	// Verify container is updated
+	assert.Contains(t, fakeRuntime.Called, "UpdateContainerResources")
 }

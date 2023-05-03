@@ -149,14 +149,12 @@ type Requirement struct {
 
 // NewRequirement is the constructor for a Requirement.
 // If any of these rules is violated, an error is returned:
-// (1) The operator can only be In, NotIn, Equals, DoubleEquals, Gt, Lt, NotEquals, Exists, or DoesNotExist.
-// (2) If the operator is In or NotIn, the values set must be non-empty.
-// (3) If the operator is Equals, DoubleEquals, or NotEquals, the values set must contain one value.
-// (4) If the operator is Exists or DoesNotExist, the value set must be empty.
-// (5) If the operator is Gt or Lt, the values set must contain only one value, which will be interpreted as an integer.
-// (6) The key is invalid due to its length, or sequence
-//
-//	of characters. See validateLabelKey for more details.
+//  1. The operator can only be In, NotIn, Equals, DoubleEquals, Gt, Lt, NotEquals, Exists, or DoesNotExist.
+//  2. If the operator is In or NotIn, the values set must be non-empty.
+//  3. If the operator is Equals, DoubleEquals, or NotEquals, the values set must contain one value.
+//  4. If the operator is Exists or DoesNotExist, the value set must be empty.
+//  5. If the operator is Gt or Lt, the values set must contain only one value, which will be interpreted as an integer.
+//  6. The key is invalid due to its length, or sequence of characters. See validateLabelKey for more details.
 //
 // The empty string is a valid value in the input values set.
 // Returned error, if not nil, is guaranteed to be an aggregated field.ErrorList
@@ -213,22 +211,15 @@ func (r *Requirement) hasValue(value string) bool {
 
 // Matches returns true if the Requirement matches the input Labels.
 // There is a match in the following cases:
-// (1) The operator is Exists and Labels has the Requirement's key.
-// (2) The operator is In, Labels has the Requirement's key and Labels'
-//
-//	value for that key is in Requirement's value set.
-//
-// (3) The operator is NotIn, Labels has the Requirement's key and
-//
-//	Labels' value for that key is not in Requirement's value set.
-//
-// (4) The operator is DoesNotExist or NotIn and Labels does not have the
-//
-//	Requirement's key.
-//
-// (5) The operator is GreaterThanOperator or LessThanOperator, and Labels has
-//
-//	the Requirement's key and the corresponding value satisfies mathematical inequality.
+//  1. The operator is Exists and Labels has the Requirement's key.
+//  2. The operator is In, Labels has the Requirement's key and Labels'
+//     value for that key is in Requirement's value set.
+//  3. The operator is NotIn, Labels has the Requirement's key and
+//     Labels' value for that key is not in Requirement's value set.
+//  4. The operator is DoesNotExist or NotIn and Labels does not have the
+//     Requirement's key.
+//  5. The operator is GreaterThanOperator or LessThanOperator, and Labels has
+//     the Requirement's key and the corresponding value satisfies mathematical inequality.
 func (r *Requirement) Matches(ls Labels) bool {
 	switch r.operator {
 	case selection.In, selection.Equals, selection.DoubleEquals:
@@ -872,15 +863,14 @@ func (p *Parser) parseExactValue() (sets.String, error) {
 //	"x in (foo,,baz),y,z notin ()"
 //
 // Note:
-//
-//	(1) Inclusion - " in " - denotes that the KEY exists and is equal to any of the
-//	    VALUEs in its requirement
-//	(2) Exclusion - " notin " - denotes that the KEY is not equal to any
-//	    of the VALUEs in its requirement or does not exist
-//	(3) The empty string is a valid VALUE
-//	(4) A requirement with just a KEY - as in "y" above - denotes that
-//	    the KEY exists and can be any VALUE.
-//	(5) A requirement with just !KEY requires that the KEY not exist.
+//  1. Inclusion - " in " - denotes that the KEY exists and is equal to any of the
+//     VALUEs in its requirement
+//  2. Exclusion - " notin " - denotes that the KEY is not equal to any
+//     of the VALUEs in its requirement or does not exist
+//  3. The empty string is a valid VALUE
+//  4. A requirement with just a KEY - as in "y" above - denotes that
+//     the KEY exists and can be any VALUE.
+//  5. A requirement with just !KEY requires that the KEY not exist.
 func Parse(selector string, opts ...field.PathOption) (Selector, error) {
 	parsedSelector, err := parse(selector, field.ToPath(opts...))
 	if err == nil {
@@ -948,6 +938,8 @@ func ValidatedSelectorFromSet(ls Set) (Selector, error) {
 // SelectorFromValidatedSet returns a Selector which will match exactly the given Set.
 // A nil and empty Sets are considered equivalent to Everything().
 // It assumes that Set is already validated and doesn't do any validation.
+// Note: this method copies the Set; if the Set is immutable, consider wrapping it with ValidatedSetSelector
+// instead, which does not copy.
 func SelectorFromValidatedSet(ls Set) Selector {
 	if ls == nil || len(ls) == 0 {
 		return internalSelector{}
@@ -969,3 +961,76 @@ func SelectorFromValidatedSet(ls Set) Selector {
 func ParseToRequirements(selector string, opts ...field.PathOption) ([]Requirement, error) {
 	return parse(selector, field.ToPath(opts...))
 }
+
+// ValidatedSetSelector wraps a Set, allowing it to implement the Selector interface. Unlike
+// Set.AsSelectorPreValidated (which copies the input Set), this type simply wraps the underlying
+// Set. As a result, it is substantially more efficient. A nil and empty Sets are considered
+// equivalent to Everything().
+//
+// Callers MUST ensure the underlying Set is not mutated, and that it is already validated. If these
+// constraints are not met, Set.AsValidatedSelector should be preferred
+//
+// None of the Selector methods mutate the underlying Set, but Add() and Requirements() convert to
+// the less optimized version.
+type ValidatedSetSelector Set
+
+func (s ValidatedSetSelector) Matches(labels Labels) bool {
+	for k, v := range s {
+		if !labels.Has(k) || v != labels.Get(k) {
+			return false
+		}
+	}
+	return true
+}
+
+func (s ValidatedSetSelector) Empty() bool {
+	return len(s) == 0
+}
+
+func (s ValidatedSetSelector) String() string {
+	keys := make([]string, 0, len(s))
+	for k := range s {
+		keys = append(keys, k)
+	}
+	// Ensure deterministic output
+	sort.Strings(keys)
+	b := strings.Builder{}
+	for i, key := range keys {
+		v := s[key]
+		b.Grow(len(key) + 2 + len(v))
+		if i != 0 {
+			b.WriteString(",")
+		}
+		b.WriteString(key)
+		b.WriteString("=")
+		b.WriteString(v)
+	}
+	return b.String()
+}
+
+func (s ValidatedSetSelector) Add(r ...Requirement) Selector {
+	return s.toFullSelector().Add(r...)
+}
+
+func (s ValidatedSetSelector) Requirements() (requirements Requirements, selectable bool) {
+	return s.toFullSelector().Requirements()
+}
+
+func (s ValidatedSetSelector) DeepCopySelector() Selector {
+	res := make(ValidatedSetSelector, len(s))
+	for k, v := range s {
+		res[k] = v
+	}
+	return res
+}
+
+func (s ValidatedSetSelector) RequiresExactMatch(label string) (value string, found bool) {
+	v, f := s[label]
+	return v, f
+}
+
+func (s ValidatedSetSelector) toFullSelector() Selector {
+	return SelectorFromValidatedSet(Set(s))
+}
+
+var _ Selector = ValidatedSetSelector{}

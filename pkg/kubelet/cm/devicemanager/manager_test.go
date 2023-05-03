@@ -21,6 +21,9 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	goruntime "runtime"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -119,6 +122,10 @@ func TestNewManagerImplStartProbeMode(t *testing.T) {
 // making sure that after registration, devices are correctly updated and if a re-registration
 // happens, we will NOT delete devices; and no orphaned devices left.
 func TestDevicePluginReRegistration(t *testing.T) {
+	// TODO: Remove skip once https://github.com/kubernetes/kubernetes/pull/115269 merges.
+	if goruntime.GOOS == "windows" {
+		t.Skip("Skipping test on Windows.")
+	}
 	socketDir, socketName, pluginSocketName, err := tmpSocketDir()
 	require.NoError(t, err)
 	defer os.RemoveAll(socketDir)
@@ -252,9 +259,10 @@ func TestDevicePluginReRegistrationProbeMode(t *testing.T) {
 	cleanup(t, m, p1)
 }
 
-func setupDeviceManager(t *testing.T, devs []*pluginapi.Device, callback monitorCallback, socketName string) (Manager, <-chan interface{}) {
+func setupDeviceManager(t *testing.T, devs []*pluginapi.Device, callback monitorCallback, socketName string,
+	topology []cadvisorapi.Node) (Manager, <-chan interface{}) {
 	topologyStore := topologymanager.NewFakeManager()
-	m, err := newManagerImpl(socketName, nil, topologyStore)
+	m, err := newManagerImpl(socketName, topology, topologyStore)
 	require.NoError(t, err)
 	updateChan := make(chan interface{})
 
@@ -302,13 +310,13 @@ func runPluginManager(pluginManager pluginmanager.PluginManager) {
 }
 
 func setup(t *testing.T, devs []*pluginapi.Device, callback monitorCallback, socketName string, pluginSocketName string) (Manager, <-chan interface{}, *plugin.Stub) {
-	m, updateChan := setupDeviceManager(t, devs, callback, socketName)
+	m, updateChan := setupDeviceManager(t, devs, callback, socketName, nil)
 	p := setupDevicePlugin(t, devs, pluginSocketName)
 	return m, updateChan, p
 }
 
 func setupInProbeMode(t *testing.T, devs []*pluginapi.Device, callback monitorCallback, socketName string, pluginSocketName string) (Manager, <-chan interface{}, *plugin.Stub, pluginmanager.PluginManager) {
-	m, updateChan := setupDeviceManager(t, devs, callback, socketName)
+	m, updateChan := setupDeviceManager(t, devs, callback, socketName, nil)
 	p := setupDevicePlugin(t, devs, pluginSocketName)
 	pm := setupPluginManager(t, pluginSocketName, m)
 	return m, updateChan, p, pm
@@ -1402,4 +1410,84 @@ func TestReadPreNUMACheckpoint(t *testing.T) {
 	// TODO: we should not calling private methods, but among the existing tests we do anyway
 	err = m.readCheckpoint()
 	require.NoError(t, err)
+}
+
+func TestGetTopologyHintsWithUpdates(t *testing.T) {
+	socketDir, socketName, _, err := tmpSocketDir()
+	defer os.RemoveAll(socketDir)
+	require.NoError(t, err)
+
+	devs := []pluginapi.Device{}
+	for i := 0; i < 1000; i++ {
+		devs = append(devs, pluginapi.Device{
+			ID:     fmt.Sprintf("dev-%d", i),
+			Health: pluginapi.Healthy,
+			Topology: &pluginapi.TopologyInfo{
+				Nodes: []*pluginapi.NUMANode{
+					{ID: 0},
+				},
+			}})
+	}
+	testPod := makePod(v1.ResourceList{
+		testResourceName: *resource.NewQuantity(int64(1), resource.DecimalSI),
+	})
+	topology := []cadvisorapi.Node{
+		{Id: 0},
+	}
+	testCases := []struct {
+		description string
+		count       int
+		devices     []pluginapi.Device
+		testfunc    func(manager *wrappedManagerImpl)
+	}{
+		{
+			description: "GetTopologyHints data race when update device",
+			count:       10,
+			devices:     devs,
+			testfunc: func(manager *wrappedManagerImpl) {
+				manager.GetTopologyHints(testPod, &testPod.Spec.Containers[0])
+			},
+		},
+		{
+			description: "GetPodTopologyHints data race when update device",
+			count:       10,
+			devices:     devs,
+			testfunc: func(manager *wrappedManagerImpl) {
+				manager.GetPodTopologyHints(testPod)
+			},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.description, func(t *testing.T) {
+			m, _ := setupDeviceManager(t, nil, nil, socketName, topology)
+			defer m.Stop()
+			mimpl := m.(*wrappedManagerImpl)
+
+			wg := sync.WaitGroup{}
+			wg.Add(2)
+
+			updated := atomic.Bool{}
+			updated.Store(false)
+			go func() {
+				defer wg.Done()
+				for i := 0; i < test.count; i++ {
+					// simulate the device plugin to send device updates
+					mimpl.genericDeviceUpdateCallback(testResourceName, devs)
+				}
+				updated.Store(true)
+			}()
+			go func() {
+				defer wg.Done()
+				for !updated.Load() {
+					// When a data race occurs, golang will throw an error, and recover() cannot catch this error,
+					// Such as: `throw("Concurrent map iteration and map writing")`.
+					// When this test ends quietly, no data race error occurs.
+					// Otherwise, the test process exits automatically and prints all goroutine call stacks.
+					test.testfunc(mimpl)
+				}
+			}()
+			wg.Wait()
+		})
+	}
 }

@@ -1,0 +1,2 @@
+namespace/foo unchanged
+namespace/bar pruned

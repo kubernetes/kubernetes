@@ -54,13 +54,13 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var kubeClient clientset.Interface
 
-	ginkgo.It("should run Stackdriver Metadata Agent [Feature:StackdriverMetadataAgent]", func() {
+	ginkgo.It("should run Stackdriver Metadata Agent [Feature:StackdriverMetadataAgent]", func(ctx context.Context) {
 		kubeClient = f.ClientSet
-		testAgent(f, kubeClient)
+		testAgent(ctx, f, kubeClient)
 	})
 })
 
-func testAgent(f *framework.Framework, kubeClient clientset.Interface) {
+func testAgent(ctx context.Context, f *framework.Framework, kubeClient clientset.Interface) {
 	projectID := framework.TestContext.CloudConfig.ProjectID
 	resourceType := "k8s_container"
 	uniqueContainerName := fmt.Sprintf("test-container-%v", time.Now().Unix())
@@ -70,16 +70,16 @@ func testAgent(f *framework.Framework, kubeClient clientset.Interface) {
 		resourceType,
 		uniqueContainerName)
 
-	oauthClient, err := google.DefaultClient(context.Background(), MonitoringScope)
+	oauthClient, err := google.DefaultClient(ctx, MonitoringScope)
 	if err != nil {
 		framework.Failf("Failed to create oauth client: %s", err)
 	}
 
 	// Create test pod with unique name.
-	_ = e2epod.CreateExecPodOrFail(kubeClient, f.Namespace.Name, uniqueContainerName, func(pod *v1.Pod) {
+	_ = e2epod.CreateExecPodOrFail(ctx, kubeClient, f.Namespace.Name, uniqueContainerName, func(pod *v1.Pod) {
 		pod.Spec.Containers[0].Name = uniqueContainerName
 	})
-	defer kubeClient.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), uniqueContainerName, metav1.DeleteOptions{})
+	ginkgo.DeferCleanup(kubeClient.CoreV1().Pods(f.Namespace.Name).Delete, uniqueContainerName, metav1.DeleteOptions{})
 
 	// Wait a short amount of time for Metadata Agent to be created and metadata to be exported
 	time.Sleep(metadataWaitTime)
@@ -120,7 +120,7 @@ func verifyPodExists(response []byte, containerName string) (bool, error) {
 	var metadata Metadata
 	err := json.Unmarshal(response, &metadata)
 	if err != nil {
-		return false, fmt.Errorf("Failed to unmarshall: %s", err)
+		return false, fmt.Errorf("Failed to unmarshall: %w", err)
 	}
 
 	for _, result := range metadata.Results {
@@ -130,7 +130,7 @@ func verifyPodExists(response []byte, containerName string) (bool, error) {
 		}
 		resource, err := parseResource(rawResource)
 		if err != nil {
-			return false, fmt.Errorf("No 'resource' label: %s", err)
+			return false, fmt.Errorf("No 'resource' label: %w", err)
 		}
 		if resource.resourceType == "k8s_container" &&
 			resource.resourceLabels["container_name"] == containerName {

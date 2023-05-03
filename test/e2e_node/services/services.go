@@ -63,7 +63,7 @@ func NewE2EServices(monitorParent bool) *E2EServices {
 func (e *E2EServices) Start(featureGates map[string]bool) error {
 	var err error
 	if e.services, err = e.startInternalServices(); err != nil {
-		return fmt.Errorf("failed to start internal services: %v", err)
+		return fmt.Errorf("failed to start internal services: %w", err)
 	}
 	klog.Infof("Node services started.")
 	// running the kubelet depends on whether we are running conformance test-suite
@@ -73,7 +73,7 @@ func (e *E2EServices) Start(featureGates map[string]bool) error {
 		// Start kubelet
 		e.kubelet, err = e.startKubelet(featureGates)
 		if err != nil {
-			return fmt.Errorf("failed to start kubelet: %v", err)
+			return fmt.Errorf("failed to start kubelet: %w", err)
 		}
 		klog.Infof("Kubelet started.")
 	}
@@ -130,7 +130,7 @@ const (
 func (e *E2EServices) startInternalServices() (*server, error) {
 	testBin, err := os.Executable()
 	if err != nil {
-		return nil, fmt.Errorf("can't get current binary: %v", err)
+		return nil, fmt.Errorf("can't get current binary: %w", err)
 	}
 	// Pass all flags into the child process, so that it will see the same flag set.
 	startCmd := exec.Command(testBin,

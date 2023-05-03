@@ -140,12 +140,10 @@ func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*cor
 
 	// Build data structures for existing state.
 	existingSlicesByPortMap := map[endpointutil.PortMapKey][]*discovery.EndpointSlice{}
-	numExistingEndpoints := 0
 	for _, existingSlice := range existingSlices {
 		if ownedBy(existingSlice, service) {
 			epHash := endpointutil.NewPortMapKey(existingSlice.Ports)
 			existingSlicesByPortMap[epHash] = append(existingSlicesByPortMap[epHash], existingSlice)
-			numExistingEndpoints += len(existingSlice.Endpoints)
 		} else {
 			slicesToDelete = append(slicesToDelete, existingSlice)
 		}

@@ -33,12 +33,15 @@ const (
 	PublicKeysECDSA = "PublicKeysECDSA"
 	// RootlessControlPlane is expected to be in alpha in v1.22
 	RootlessControlPlane = "RootlessControlPlane"
+	// EtcdLearnerMode is expected to be in alpha in v1.27
+	EtcdLearnerMode = "EtcdLearnerMode"
 )
 
 // InitFeatureGates are the default feature gates for the init command
 var InitFeatureGates = FeatureList{
 	PublicKeysECDSA:      {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
 	RootlessControlPlane: {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
+	EtcdLearnerMode:      {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
 }
 
 // Feature represents a feature being gated

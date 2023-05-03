@@ -5,7 +5,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -68,7 +67,7 @@ func (s *strategy) Generate(podAnnotations map[string]string, pod *api.Pod) (str
 	}
 	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SeccompProfile != nil {
 		// Profile field already set, translate to annotation.
-		return podutil.SeccompAnnotationForField(pod.Spec.SecurityContext.SeccompProfile), nil
+		return seccompAnnotationForField(pod.Spec.SecurityContext.SeccompProfile), nil
 	}
 
 	// return the first non-wildcard profile
@@ -89,7 +88,7 @@ func (s *strategy) ValidatePod(pod *api.Pod) field.ErrorList {
 	// We are keeping annotations for backward compatibility - in case the pod is
 	// running on an older node.
 	if len(podProfile) == 0 && pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SeccompProfile != nil {
-		podProfile = podutil.SeccompAnnotationForField(pod.Spec.SecurityContext.SeccompProfile)
+		podProfile = seccompAnnotationForField(pod.Spec.SecurityContext.SeccompProfile)
 	}
 
 	if err := s.validateProfile(podSpecFieldPath, podProfile); err != nil {
@@ -154,7 +153,7 @@ func (s *strategy) validateProfile(fldPath *field.Path, profile string) *field.E
 func profileForContainer(pod *api.Pod, container *api.Container) string {
 	if container.SecurityContext != nil && container.SecurityContext.SeccompProfile != nil {
 		// derive the annotation value from the container field
-		return podutil.SeccompAnnotationForField(container.SecurityContext.SeccompProfile)
+		return seccompAnnotationForField(container.SecurityContext.SeccompProfile)
 	}
 	containerProfile, ok := pod.Annotations[api.SeccompContainerAnnotationKeyPrefix+container.Name]
 	if ok {
@@ -163,8 +162,36 @@ func profileForContainer(pod *api.Pod, container *api.Container) string {
 	}
 	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SeccompProfile != nil {
 		// derive the annotation value from the pod field
-		return podutil.SeccompAnnotationForField(pod.Spec.SecurityContext.SeccompProfile)
+		return seccompAnnotationForField(pod.Spec.SecurityContext.SeccompProfile)
 	}
 	// return the existing pod annotation
 	return pod.Annotations[api.SeccompPodAnnotationKey]
+}
+
+// seccompAnnotationForField takes a pod seccomp profile field and returns the
+// converted annotation value.
+// DEPRECATED: this is originally from k8s.io/kubernetes/pkg/api pod module which has
+// been removed in upstream: https://github.com/kubernetes/kubernetes/pull/114947/files.
+// TODO(auth team): remove once we stop handling the annotation.
+func seccompAnnotationForField(field *api.SeccompProfile) string {
+	// If only seccomp fields are specified, add the corresponding annotations.
+	// This ensures that the fields are enforced even if the node version
+	// trails the API version
+	switch field.Type {
+	case api.SeccompProfileTypeUnconfined:
+		return v1.SeccompProfileNameUnconfined
+
+	case api.SeccompProfileTypeRuntimeDefault:
+		return v1.SeccompProfileRuntimeDefault
+
+	case api.SeccompProfileTypeLocalhost:
+		if field.LocalhostProfile != nil {
+			return v1.SeccompLocalhostProfileNamePrefix + *field.LocalhostProfile
+		}
+	}
+
+	// we can only reach this code path if the LocalhostProfile is nil but the
+	// provided field type is SeccompProfileTypeLocalhost or if an unrecognized
+	// type is specified
+	return ""
 }

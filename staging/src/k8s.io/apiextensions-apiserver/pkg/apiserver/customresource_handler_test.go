@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -405,7 +404,7 @@ func TestRouting(t *testing.T) {
 						t.Errorf("expected delegated called %v, got %v", tc.ExpectDelegateCalled, delegateCalled)
 					}
 					result := recorder.Result()
-					content, _ := ioutil.ReadAll(result.Body)
+					content, _ := io.ReadAll(result.Body)
 					if e, a := expectStatus, result.StatusCode; e != a {
 						t.Log(string(content))
 						t.Errorf("expected %v, got %v", e, a)
@@ -791,7 +790,7 @@ unknown: foo`
 				t.Fatal(err)
 			}
 			structuralSchemas[v] = structuralSchema
-			delegate := serializerjson.NewSerializerWithOptions(serializerjson.DefaultMetaFactory, unstructuredCreator{}, nil, serializerjson.SerializerOptions{tc.yaml, false, tc.strictDecoding})
+			delegate := serializerjson.NewSerializerWithOptions(serializerjson.DefaultMetaFactory, unstructuredCreator{}, nil, serializerjson.SerializerOptions{Yaml: tc.yaml, Strict: tc.strictDecoding})
 			decoder := &schemaCoercingDecoder{
 				delegate: delegate,
 				validator: unstructuredSchemaCoercer{
@@ -1033,9 +1032,15 @@ func TestBuildOpenAPIModelsForApply(t *testing.T) {
 		},
 	}
 
+	convertedDefs := map[string]*spec.Schema{}
+	for k, v := range staticSpec.Definitions {
+		vCopy := v
+		convertedDefs[k] = &vCopy
+	}
+
 	for i, test := range tests {
 		crd.Spec.Versions[0].Schema = &test
-		models, err := buildOpenAPIModelsForApply(staticSpec, &crd)
+		models, err := buildOpenAPIModelsForApply(convertedDefs, &crd)
 		if err != nil {
 			t.Fatalf("failed to convert to apply model: %v", err)
 		}
@@ -1051,7 +1056,7 @@ func getOpenAPISpecFromFile() (*spec.Swagger, error) {
 	if err != nil {
 		return nil, err
 	}
-	byteSpec, err := ioutil.ReadFile(path)
+	byteSpec, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}

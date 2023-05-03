@@ -43,7 +43,7 @@ func (ConfigMapUpgradeTest) Name() string {
 }
 
 // Setup creates a ConfigMap and then verifies that a pod can consume it.
-func (t *ConfigMapUpgradeTest) Setup(f *framework.Framework) {
+func (t *ConfigMapUpgradeTest) Setup(ctx context.Context, f *framework.Framework) {
 	configMapName := "upgrade-configmap"
 
 	ns := f.Namespace
@@ -60,30 +60,30 @@ func (t *ConfigMapUpgradeTest) Setup(f *framework.Framework) {
 
 	ginkgo.By("Creating a ConfigMap")
 	var err error
-	if t.configMap, err = f.ClientSet.CoreV1().ConfigMaps(ns.Name).Create(context.TODO(), t.configMap, metav1.CreateOptions{}); err != nil {
+	if t.configMap, err = f.ClientSet.CoreV1().ConfigMaps(ns.Name).Create(ctx, t.configMap, metav1.CreateOptions{}); err != nil {
 		framework.Failf("unable to create test ConfigMap %s: %v", t.configMap.Name, err)
 	}
 
 	ginkgo.By("Making sure the ConfigMap is consumable")
-	t.testPod(f)
+	t.testPod(ctx, f)
 }
 
 // Test waits for the upgrade to complete, and then verifies that a
 // pod can still consume the ConfigMap.
-func (t *ConfigMapUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
+func (t *ConfigMapUpgradeTest) Test(ctx context.Context, f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
 	<-done
 	ginkgo.By("Consuming the ConfigMap after upgrade")
-	t.testPod(f)
+	t.testPod(ctx, f)
 }
 
 // Teardown cleans up any remaining resources.
-func (t *ConfigMapUpgradeTest) Teardown(f *framework.Framework) {
+func (t *ConfigMapUpgradeTest) Teardown(ctx context.Context, f *framework.Framework) {
 	// rely on the namespace deletion to clean up everything
 }
 
 // testPod creates a pod that consumes a ConfigMap and prints it out. The
 // output is then verified.
-func (t *ConfigMapUpgradeTest) testPod(f *framework.Framework) {
+func (t *ConfigMapUpgradeTest) testPod(ctx context.Context, f *framework.Framework) {
 	volumeName := "configmap-volume"
 	volumeMountPath := "/etc/configmap-volume"
 
@@ -148,8 +148,8 @@ func (t *ConfigMapUpgradeTest) testPod(f *framework.Framework) {
 		"content of file \"/etc/configmap-volume/data\": some configmap data",
 		"mode of file \"/etc/configmap-volume/data\": -rw-r--r--",
 	}
-	e2eoutput.TestContainerOutput(f, "volume consume configmap", pod, 0, expectedOutput)
+	e2eoutput.TestContainerOutput(ctx, f, "volume consume configmap", pod, 0, expectedOutput)
 
 	expectedOutput = []string{"CONFIGMAP_DATA=some configmap data"}
-	e2eoutput.TestContainerOutput(f, "env consume configmap", pod, 1, expectedOutput)
+	e2eoutput.TestContainerOutput(ctx, f, "env consume configmap", pod, 1, expectedOutput)
 }

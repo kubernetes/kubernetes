@@ -5,8 +5,9 @@ package v1
 // PerspectiveApplyConfiguration represents an declarative configuration of the Perspective type for use
 // with apply.
 type PerspectiveApplyConfiguration struct {
-	ID         *string                                  `json:"id,omitempty"`
-	Visibility *PerspectiveVisibilityApplyConfiguration `json:"visibility,omitempty"`
+	ID              *string                                      `json:"id,omitempty"`
+	Visibility      *PerspectiveVisibilityApplyConfiguration     `json:"visibility,omitempty"`
+	PinnedResources *[]PinnedResourceReferenceApplyConfiguration `json:"pinnedResources,omitempty"`
 }
 
 // PerspectiveApplyConfiguration constructs an declarative configuration of the Perspective type for use with
@@ -28,5 +29,25 @@ func (b *PerspectiveApplyConfiguration) WithID(value string) *PerspectiveApplyCo
 // If called multiple times, the Visibility field is set to the value of the last call.
 func (b *PerspectiveApplyConfiguration) WithVisibility(value *PerspectiveVisibilityApplyConfiguration) *PerspectiveApplyConfiguration {
 	b.Visibility = value
+	return b
+}
+
+func (b *PerspectiveApplyConfiguration) ensurePinnedResourceReferenceApplyConfigurationExists() {
+	if b.PinnedResources == nil {
+		b.PinnedResources = &[]PinnedResourceReferenceApplyConfiguration{}
+	}
+}
+
+// WithPinnedResources adds the given value to the PinnedResources field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the PinnedResources field.
+func (b *PerspectiveApplyConfiguration) WithPinnedResources(values ...*PinnedResourceReferenceApplyConfiguration) *PerspectiveApplyConfiguration {
+	b.ensurePinnedResourceReferenceApplyConfigurationExists()
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithPinnedResources")
+		}
+		*b.PinnedResources = append(*b.PinnedResources, *values[i])
+	}
 	return b
 }

@@ -5,6 +5,7 @@
 package json
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -85,25 +86,39 @@ func makeTimeArshaler(fncs *arshaler, t reflect.Type) *arshaler {
 		fncs.nonDefault = true
 		fncs.marshal = func(mo MarshalOptions, enc *Encoder, va addressableValue) error {
 			format := time.RFC3339Nano
+			isRFC3339 := true
 			if mo.format != "" && mo.formatDepth == enc.tokens.depth() {
 				var err error
-				format, err = checkTimeFormat(mo.format)
+				format, isRFC3339, err = checkTimeFormat(mo.format)
 				if err != nil {
 					return &SemanticError{action: "marshal", GoType: t, Err: err}
 				}
 			}
 
 			tt := va.Interface().(time.Time)
-			if y := tt.Year(); y < 0 || y >= 10000 {
-				// RFC 3339 is clear that years are 4 digits exactly.
-				// See https://go.dev/issue/4556#c15 for more discussion.
-				err := fmt.Errorf("year %d outside of range [0,9999]", y)
-				return &SemanticError{action: "marshal", GoType: t, Err: err}
-			}
 			b := enc.UnusedBuffer()
 			b = append(b, '"')
 			b = tt.AppendFormat(b, format)
 			b = append(b, '"')
+			if isRFC3339 {
+				// Not all Go timestamps can be represented as valid RFC 3339.
+				// Explicitly check for these edge cases.
+				// See https://go.dev/issue/4556 and https://go.dev/issue/54580.
+				var err error
+				switch b := b[len(`"`) : len(b)-len(`"`)]; {
+				case b[len("9999")] != '-': // year must be exactly 4 digits wide
+					err = errors.New("year outside of range [0,9999]")
+				case b[len(b)-1] != 'Z':
+					c := b[len(b)-len("Z07:00")]
+					if ('0' <= c && c <= '9') || parseDec2(b[len(b)-len("07:00"):]) >= 24 {
+						err = errors.New("timezone hour outside of range [0,23]")
+					}
+				}
+				if err != nil {
+					return &SemanticError{action: "marshal", GoType: t, Err: err}
+				}
+				return enc.WriteValue(b) // RFC 3339 never needs JSON escaping
+			}
 			// The format may contain special characters that need escaping.
 			// Verify that the result is a valid JSON string (common case),
 			// otherwise escape the string correctly (slower case).
@@ -113,10 +128,11 @@ func makeTimeArshaler(fncs *arshaler, t reflect.Type) *arshaler {
 			return enc.WriteValue(b)
 		}
 		fncs.unmarshal = func(uo UnmarshalOptions, dec *Decoder, va addressableValue) error {
-			format := time.RFC3339Nano
+			format := time.RFC3339
+			isRFC3339 := true
 			if uo.format != "" && uo.formatDepth == dec.tokens.depth() {
 				var err error
-				format, err = checkTimeFormat(uo.format)
+				format, isRFC3339, err = checkTimeFormat(uo.format)
 				if err != nil {
 					return &SemanticError{action: "unmarshal", GoType: t, Err: err}
 				}
@@ -136,6 +152,29 @@ func makeTimeArshaler(fncs *arshaler, t reflect.Type) *arshaler {
 			case '"':
 				val = unescapeStringMayCopy(val, flags.isVerbatim())
 				tt2, err := time.Parse(format, string(val))
+				if isRFC3339 && err == nil {
+					// TODO(https://go.dev/issue/54580): RFC 3339 specifies
+					// the exact grammar of a valid timestamp. However,
+					// the parsing functionality in "time" is too loose and
+					// incorrectly accepts invalid timestamps as valid.
+					// Remove these manual checks when "time" checks it for us.
+					newParseError := func(layout, value, layoutElem, valueElem, message string) error {
+						return &time.ParseError{Layout: layout, Value: value, LayoutElem: layoutElem, ValueElem: valueElem, Message: message}
+					}
+					switch {
+					case val[len("2006-01-02T")+1] == ':': // hour must be two digits
+						err = newParseError(format, string(val), "15", string(val[len("2006-01-02T"):][:1]), "")
+					case val[len("2006-01-02T15:04:05")] == ',': // sub-second separator must be a period
+						err = newParseError(format, string(val), ".", ",", "")
+					case val[len(val)-1] != 'Z':
+						switch {
+						case parseDec2(val[len(val)-len("07:00"):]) >= 24: // timezone hour must be in range
+							err = newParseError(format, string(val), "Z07:00", string(val[len(val)-len("Z07:00"):]), ": timezone hour out of range")
+						case parseDec2(val[len(val)-len("00"):]) >= 60: // timezone minute must be in range
+							err = newParseError(format, string(val), "Z07:00", string(val[len(val)-len("Z07:00"):]), ": timezone minute out of range")
+						}
+					}
+				}
 				if err != nil {
 					return &SemanticError{action: "unmarshal", JSONKind: k, GoType: t, Err: err}
 				}
@@ -149,48 +188,54 @@ func makeTimeArshaler(fncs *arshaler, t reflect.Type) *arshaler {
 	return fncs
 }
 
-func checkTimeFormat(format string) (string, error) {
+func checkTimeFormat(format string) (string, bool, error) {
 	// We assume that an exported constant in the time package will
 	// always start with an uppercase ASCII letter.
 	if len(format) > 0 && 'A' <= format[0] && format[0] <= 'Z' {
 		switch format {
 		case "ANSIC":
-			return time.ANSIC, nil
+			return time.ANSIC, false, nil
 		case "UnixDate":
-			return time.UnixDate, nil
+			return time.UnixDate, false, nil
 		case "RubyDate":
-			return time.RubyDate, nil
+			return time.RubyDate, false, nil
 		case "RFC822":
-			return time.RFC822, nil
+			return time.RFC822, false, nil
 		case "RFC822Z":
-			return time.RFC822Z, nil
+			return time.RFC822Z, false, nil
 		case "RFC850":
-			return time.RFC850, nil
+			return time.RFC850, false, nil
 		case "RFC1123":
-			return time.RFC1123, nil
+			return time.RFC1123, false, nil
 		case "RFC1123Z":
-			return time.RFC1123Z, nil
+			return time.RFC1123Z, false, nil
 		case "RFC3339":
-			return time.RFC3339, nil
+			return time.RFC3339, true, nil
 		case "RFC3339Nano":
-			return time.RFC3339Nano, nil
+			return time.RFC3339Nano, true, nil
 		case "Kitchen":
-			return time.Kitchen, nil
+			return time.Kitchen, false, nil
 		case "Stamp":
-			return time.Stamp, nil
+			return time.Stamp, false, nil
 		case "StampMilli":
-			return time.StampMilli, nil
+			return time.StampMilli, false, nil
 		case "StampMicro":
-			return time.StampMicro, nil
+			return time.StampMicro, false, nil
 		case "StampNano":
-			return time.StampNano, nil
+			return time.StampNano, false, nil
 		default:
 			// Reject any format that is an exported Go identifier in case
 			// new format constants are added to the time package.
 			if strings.TrimFunc(format, isLetterOrDigit) == "" {
-				return "", fmt.Errorf("undefined format layout: %v", format)
+				return "", false, fmt.Errorf("undefined format layout: %v", format)
 			}
 		}
 	}
-	return format, nil
+	return format, false, nil
+}
+
+// parseDec2 parses b as an unsigned, base-10, 2-digit number.
+// It panics if len(b) < 2. The result is undefined if digits are not base-10.
+func parseDec2(b []byte) byte {
+	return 10*(b[0]-'0') + (b[1] - '0')
 }

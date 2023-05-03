@@ -16,10 +16,11 @@ package swag
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -40,13 +41,13 @@ var LoadHTTPCustomHeaders = map[string]string{}
 
 // LoadFromFileOrHTTP loads the bytes from a file or a remote http server based on the path passed in
 func LoadFromFileOrHTTP(path string) ([]byte, error) {
-	return LoadStrategy(path, ioutil.ReadFile, loadHTTPBytes(LoadHTTPTimeout))(path)
+	return LoadStrategy(path, os.ReadFile, loadHTTPBytes(LoadHTTPTimeout))(path)
 }
 
 // LoadFromFileOrHTTPWithTimeout loads the bytes from a file or a remote http server based on the path passed in
 // timeout arg allows for per request overriding of the request timeout
 func LoadFromFileOrHTTPWithTimeout(path string, timeout time.Duration) ([]byte, error) {
-	return LoadStrategy(path, ioutil.ReadFile, loadHTTPBytes(timeout))(path)
+	return LoadStrategy(path, os.ReadFile, loadHTTPBytes(timeout))(path)
 }
 
 // LoadStrategy returns a loader function for a given path or uri
@@ -86,7 +87,7 @@ func LoadStrategy(path string, local, remote func(string) ([]byte, error)) func(
 func loadHTTPBytes(timeout time.Duration) func(path string) ([]byte, error) {
 	return func(path string) ([]byte, error) {
 		client := &http.Client{Timeout: timeout}
-		req, err := http.NewRequest("GET", path, nil) // nolint: noctx
+		req, err := http.NewRequest(http.MethodGet, path, nil) //nolint:noctx
 		if err != nil {
 			return nil, err
 		}
@@ -115,6 +116,6 @@ func loadHTTPBytes(timeout time.Duration) func(path string) ([]byte, error) {
 			return nil, fmt.Errorf("could not access document at %q [%s] ", path, resp.Status)
 		}
 
-		return ioutil.ReadAll(resp.Body)
+		return io.ReadAll(resp.Body)
 	}
 }

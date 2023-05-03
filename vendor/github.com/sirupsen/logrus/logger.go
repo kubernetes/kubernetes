@@ -44,6 +44,9 @@ type Logger struct {
 	entryPool sync.Pool
 	// Function to exit the application, defaults to `os.Exit()`
 	ExitFunc exitFunc
+	// The buffer pool used to format the log. If it is nil, the default global
+	// buffer pool will be used.
+	BufferPool BufferPool
 }
 
 type exitFunc func(int)
@@ -192,6 +195,9 @@ func (logger *Logger) Panicf(format string, args ...interface{}) {
 	logger.Logf(PanicLevel, format, args...)
 }
 
+// Log will log a message at the level given as parameter.
+// Warning: using Log at Panic or Fatal level will not respectively Panic nor Exit.
+// For this behaviour Logger.Panic or Logger.Fatal should be used instead.
 func (logger *Logger) Log(level Level, args ...interface{}) {
 	if logger.IsLevelEnabled(level) {
 		entry := logger.newEntry()
@@ -401,4 +407,11 @@ func (logger *Logger) ReplaceHooks(hooks LevelHooks) LevelHooks {
 	logger.Hooks = hooks
 	logger.mu.Unlock()
 	return oldHooks
+}
+
+// SetBufferPool sets the logger buffer pool.
+func (logger *Logger) SetBufferPool(pool BufferPool) {
+	logger.mu.Lock()
+	defer logger.mu.Unlock()
+	logger.BufferPool = pool
 }

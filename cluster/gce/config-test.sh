@@ -156,6 +156,9 @@ if [[ (( "${KUBE_FEATURE_GATES:-}" = *"AllAlpha=true"* ) || ( "${KUBE_FEATURE_GA
   RUN_CONTROLLERS=${RUN_CONTROLLERS:-*,endpointslice}
 fi
 
+# By default disable gkenetworkparamset controller in CCM
+RUN_CCM_CONTROLLERS="${RUN_CCM_CONTROLLERS:-*,-gkenetworkparamset}"
+
 # Optional: set feature gates
 # shellcheck disable=SC2034 # Variables sourced in other scripts.
 FEATURE_GATES=${KUBE_FEATURE_GATES:-}

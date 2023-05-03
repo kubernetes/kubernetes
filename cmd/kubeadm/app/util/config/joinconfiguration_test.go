@@ -17,14 +17,11 @@ limitations under the License.
 package config
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/lithammer/dedent"
-
-	kubeadmapiv1old "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 )
 
 func TestLoadJoinConfigurationFromFile(t *testing.T) {
@@ -44,29 +41,6 @@ func TestLoadJoinConfigurationFromFile(t *testing.T) {
 		{
 			name:      "empty file causes error",
 			expectErr: true,
-		},
-		{
-			name: "Invalid v1beta2 causes error",
-			fileContents: dedent.Dedent(fmt.Sprintf(`
-				apiVersion: %s
-				kind: JoinConfiguration
-			`, kubeadmapiv1old.SchemeGroupVersion.String())),
-			expectErr: true,
-		},
-		{
-			name: "valid v1beta2 is loaded",
-			fileContents: dedent.Dedent(fmt.Sprintf(`
-				apiVersion: %s
-				kind: JoinConfiguration
-				caCertPath: /etc/kubernetes/pki/ca.crt
-				discovery:
-				  bootstrapToken:
-				    apiServerEndpoint: kube-apiserver:6443
-				    token: abcdef.0123456789abcdef
-				    unsafeSkipCAVerification: true
-				  timeout: 5m0s
-				  tlsBootstrapToken: abcdef.0123456789abcdef
-			`, kubeadmapiv1old.SchemeGroupVersion.String())),
 		},
 		{
 			name: "Invalid v1beta3 causes error",

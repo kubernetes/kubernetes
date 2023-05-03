@@ -1,7 +1,8 @@
-// To regenerate api.pb.go run hack/update-generated-device-plugin.sh
+// To regenerate api.pb.go run `hack/update-codegen.sh protobindings`
 syntax = "proto3";
 
 package v1beta1;
+option go_package = "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1";
 
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 

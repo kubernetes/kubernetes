@@ -19,12 +19,13 @@ package completion
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
@@ -69,10 +70,10 @@ func SpecifiedResourceTypeAndNameNoRepeatCompletionFunc(f cmdutil.Factory, allow
 // that don't support that form.  For commands that apply to pods and that support the <type>/<name>
 // form, please use PodResourceNameCompletionFunc()
 func ResourceNameCompletionFunc(f cmdutil.Factory, resourceType string) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
-	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return func(_ *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		var comps []string
 		if len(args) == 0 {
-			comps = CompGetResource(f, cmd, resourceType, toComplete)
+			comps = CompGetResource(f, resourceType, toComplete)
 		}
 		return comps, cobra.ShellCompDirectiveNoFileComp
 	}
@@ -82,11 +83,11 @@ func ResourceNameCompletionFunc(f cmdutil.Factory, resourceType string) func(*co
 // 1- pod names that match the toComplete prefix
 // 2- resource types containing pods which match the toComplete prefix
 func PodResourceNameCompletionFunc(f cmdutil.Factory) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
-	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return func(_ *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		var comps []string
 		directive := cobra.ShellCompDirectiveNoFileComp
 		if len(args) == 0 {
-			comps, directive = doPodResourceCompletion(f, cmd, toComplete)
+			comps, directive = doPodResourceCompletion(f, toComplete)
 		}
 		return comps, directive
 	}
@@ -97,14 +98,14 @@ func PodResourceNameCompletionFunc(f cmdutil.Factory) func(*cobra.Command, []str
 // 2- resource types containing pods which match the toComplete prefix
 // and as a second argument the containers within the specified pod.
 func PodResourceNameAndContainerCompletionFunc(f cmdutil.Factory) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
-	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return func(_ *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		var comps []string
 		directive := cobra.ShellCompDirectiveNoFileComp
 		if len(args) == 0 {
-			comps, directive = doPodResourceCompletion(f, cmd, toComplete)
+			comps, directive = doPodResourceCompletion(f, toComplete)
 		} else if len(args) == 1 {
 			podName := convertResourceNameToPodName(f, args[0])
-			comps = CompGetContainers(f, cmd, podName, toComplete)
+			comps = CompGetContainers(f, podName, toComplete)
 		}
 		return comps, directive
 	}
@@ -114,13 +115,13 @@ func PodResourceNameAndContainerCompletionFunc(f cmdutil.Factory) func(*cobra.Co
 // pod specified by the first argument.  The resource containing the pod can be specified in
 // the <type>/<name> form.
 func ContainerCompletionFunc(f cmdutil.Factory) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
-	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return func(_ *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		var comps []string
 		// We need the pod name to be able to complete the container names, it must be in args[0].
 		// That first argument can also be of the form <type>/<name> so we need to convert it.
 		if len(args) > 0 {
 			podName := convertResourceNameToPodName(f, args[0])
-			comps = CompGetContainers(f, cmd, podName, toComplete)
+			comps = CompGetContainers(f, podName, toComplete)
 		}
 		return comps, cobra.ShellCompDirectiveNoFileComp
 	}
@@ -128,7 +129,7 @@ func ContainerCompletionFunc(f cmdutil.Factory) func(*cobra.Command, []string, s
 
 // ContextCompletionFunc is a completion function that completes as a first argument the
 // context names that match the toComplete prefix
-func ContextCompletionFunc(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+func ContextCompletionFunc(_ *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	if len(args) == 0 {
 		return ListContextsInConfig(toComplete), cobra.ShellCompDirectiveNoFileComp
 	}
@@ -137,7 +138,7 @@ func ContextCompletionFunc(cmd *cobra.Command, args []string, toComplete string)
 
 // ClusterCompletionFunc is a completion function that completes as a first argument the
 // cluster names that match the toComplete prefix
-func ClusterCompletionFunc(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+func ClusterCompletionFunc(_ *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	if len(args) == 0 {
 		return ListClustersInConfig(toComplete), cobra.ShellCompDirectiveNoFileComp
 	}
@@ -146,7 +147,7 @@ func ClusterCompletionFunc(cmd *cobra.Command, args []string, toComplete string)
 
 // UserCompletionFunc is a completion function that completes as a first argument the
 // user names that match the toComplete prefix
-func UserCompletionFunc(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+func UserCompletionFunc(_ *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	if len(args) == 0 {
 		return ListUsersInConfig(toComplete), cobra.ShellCompDirectiveNoFileComp
 	}
@@ -154,22 +155,22 @@ func UserCompletionFunc(cmd *cobra.Command, args []string, toComplete string) ([
 }
 
 // CompGetResource gets the list of the resource specified which begin with `toComplete`.
-func CompGetResource(f cmdutil.Factory, cmd *cobra.Command, resourceName string, toComplete string) []string {
+func CompGetResource(f cmdutil.Factory, resourceName string, toComplete string) []string {
 	template := "{{ range .items  }}{{ .metadata.name }} {{ end }}"
-	return CompGetFromTemplate(&template, f, "", cmd, []string{resourceName}, toComplete)
+	return CompGetFromTemplate(&template, f, "", []string{resourceName}, toComplete)
 }
 
 // CompGetContainers gets the list of containers of the specified pod which begin with `toComplete`.
-func CompGetContainers(f cmdutil.Factory, cmd *cobra.Command, podName string, toComplete string) []string {
+func CompGetContainers(f cmdutil.Factory, podName string, toComplete string) []string {
 	template := "{{ range .spec.initContainers }}{{ .name }} {{end}}{{ range .spec.containers  }}{{ .name }} {{ end }}"
-	return CompGetFromTemplate(&template, f, "", cmd, []string{"pod", podName}, toComplete)
+	return CompGetFromTemplate(&template, f, "", []string{"pod", podName}, toComplete)
 }
 
 // CompGetFromTemplate executes a Get operation using the specified template and args and returns the results
 // which begin with `toComplete`.
-func CompGetFromTemplate(template *string, f cmdutil.Factory, namespace string, cmd *cobra.Command, args []string, toComplete string) []string {
+func CompGetFromTemplate(template *string, f cmdutil.Factory, namespace string, args []string, toComplete string) []string {
 	buf := new(bytes.Buffer)
-	streams := genericclioptions.IOStreams{In: os.Stdin, Out: buf, ErrOut: ioutil.Discard}
+	streams := genericclioptions.IOStreams{In: os.Stdin, Out: buf, ErrOut: io.Discard}
 	o := get.NewGetOptions("kubectl", streams)
 
 	// Get the list of names of the specified resource
@@ -199,7 +200,7 @@ func CompGetFromTemplate(template *string, f cmdutil.Factory, namespace string, 
 		return printer.PrintObj, nil
 	}
 
-	o.Run(f, cmd, args)
+	o.Run(f, args)
 
 	var comps []string
 	resources := strings.Split(buf.String(), " ")
@@ -259,7 +260,7 @@ func ListUsersInConfig(toComplete string) []string {
 // compGetResourceList returns the list of api resources which begin with `toComplete`.
 func compGetResourceList(restClientGetter genericclioptions.RESTClientGetter, cmd *cobra.Command, toComplete string) []string {
 	buf := new(bytes.Buffer)
-	streams := genericclioptions.IOStreams{In: os.Stdin, Out: buf, ErrOut: ioutil.Discard}
+	streams := genericclioptions.IOStreams{In: os.Stdin, Out: buf, ErrOut: io.Discard}
 	o := apiresources.NewAPIResourceOptions(streams)
 
 	o.Complete(restClientGetter, cmd, nil)
@@ -304,7 +305,7 @@ func resourceTypeAndNameCompletionFunc(f cmdutil.Factory, allowedTypes []string,
 			// The first argument is of the form <type> (e.g., pods)
 			// All following arguments should be a resource name.
 			if allowRepeat || len(args) == 1 {
-				comps = CompGetResource(f, cmd, args[0], toComplete)
+				comps = CompGetResource(f, args[0], toComplete)
 
 				// Remove choices already on the command-line
 				if len(args) > 1 {
@@ -356,7 +357,7 @@ func resourceTypeAndNameCompletionFunc(f cmdutil.Factory, allowedTypes []string,
 				if allowRepeat || len(args) == 0 {
 					resourceType := toComplete[:slashIdx]
 					toComplete = toComplete[slashIdx+1:]
-					nameComps := CompGetResource(f, cmd, resourceType, toComplete)
+					nameComps := CompGetResource(f, resourceType, toComplete)
 					for _, c := range nameComps {
 						comps = append(comps, fmt.Sprintf("%s/%s", resourceType, c))
 					}
@@ -375,13 +376,13 @@ func resourceTypeAndNameCompletionFunc(f cmdutil.Factory, allowedTypes []string,
 // doPodResourceCompletion Returns completions of:
 // 1- pod names that match the toComplete prefix
 // 2- resource types containing pods which match the toComplete prefix
-func doPodResourceCompletion(f cmdutil.Factory, cmd *cobra.Command, toComplete string) ([]string, cobra.ShellCompDirective) {
+func doPodResourceCompletion(f cmdutil.Factory, toComplete string) ([]string, cobra.ShellCompDirective) {
 	var comps []string
 	directive := cobra.ShellCompDirectiveNoFileComp
 	slashIdx := strings.Index(toComplete, "/")
 	if slashIdx == -1 {
 		// Standard case, complete pod names
-		comps = CompGetResource(f, cmd, "pod", toComplete)
+		comps = CompGetResource(f, "pod", toComplete)
 
 		// Also include resource choices for the <type>/<name> form,
 		// but only for resources that contain pods
@@ -410,7 +411,7 @@ func doPodResourceCompletion(f cmdutil.Factory, cmd *cobra.Command, toComplete s
 		// Dealing with the <type>/<name> form, use the specified resource type
 		resourceType := toComplete[:slashIdx]
 		toComplete = toComplete[slashIdx+1:]
-		nameComps := CompGetResource(f, cmd, resourceType, toComplete)
+		nameComps := CompGetResource(f, resourceType, toComplete)
 		for _, c := range nameComps {
 			comps = append(comps, fmt.Sprintf("%s/%s", resourceType, c))
 		}

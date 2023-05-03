@@ -17,6 +17,7 @@ limitations under the License.
 package gce
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -373,33 +374,33 @@ func VerifyFirewallRule(res, exp *compute.Firewall, network string, portsSubset 
 	expPorts := PackProtocolsPortsFromFirewall(exp.Allowed)
 	if portsSubset {
 		if err := isPortsSubset(expPorts, actualPorts); err != nil {
-			return fmt.Errorf("incorrect allowed protocol ports: %v", err)
+			return fmt.Errorf("incorrect allowed protocol ports: %w", err)
 		}
 	} else {
 		if err := SameStringArray(actualPorts, expPorts, false); err != nil {
-			return fmt.Errorf("incorrect allowed protocols ports: %v", err)
+			return fmt.Errorf("incorrect allowed protocols ports: %w", err)
 		}
 	}
 
 	if err := SameStringArray(res.SourceRanges, exp.SourceRanges, false); err != nil {
-		return fmt.Errorf("incorrect source ranges %v, expected %v: %v", res.SourceRanges, exp.SourceRanges, err)
+		return fmt.Errorf("incorrect source ranges %v, expected %v: %w", res.SourceRanges, exp.SourceRanges, err)
 	}
 	if err := SameStringArray(res.SourceTags, exp.SourceTags, false); err != nil {
-		return fmt.Errorf("incorrect source tags %v, expected %v: %v", res.SourceTags, exp.SourceTags, err)
+		return fmt.Errorf("incorrect source tags %v, expected %v: %w", res.SourceTags, exp.SourceTags, err)
 	}
 	if err := SameStringArray(res.TargetTags, exp.TargetTags, false); err != nil {
-		return fmt.Errorf("incorrect target tags %v, expected %v: %v", res.TargetTags, exp.TargetTags, err)
+		return fmt.Errorf("incorrect target tags %v, expected %v: %w", res.TargetTags, exp.TargetTags, err)
 	}
 	return nil
 }
 
 // WaitForFirewallRule waits for the specified firewall existence
-func WaitForFirewallRule(gceCloud *gcecloud.Cloud, fwName string, exist bool, timeout time.Duration) (*compute.Firewall, error) {
+func WaitForFirewallRule(ctx context.Context, gceCloud *gcecloud.Cloud, fwName string, exist bool, timeout time.Duration) (*compute.Firewall, error) {
 	framework.Logf("Waiting up to %v for firewall %v exist=%v", timeout, fwName, exist)
 	var fw *compute.Firewall
 	var err error
 
-	condition := func() (bool, error) {
+	condition := func(ctx context.Context) (bool, error) {
 		fw, err = gceCloud.GetFirewall(fwName)
 		if err != nil && exist ||
 			err == nil && !exist ||
@@ -409,7 +410,7 @@ func WaitForFirewallRule(gceCloud *gcecloud.Cloud, fwName string, exist bool, ti
 		return true, nil
 	}
 
-	if err := wait.PollImmediate(5*time.Second, timeout, condition); err != nil {
+	if err := wait.PollImmediateWithContext(ctx, 5*time.Second, timeout, condition); err != nil {
 		return nil, fmt.Errorf("error waiting for firewall %v exist=%v", fwName, exist)
 	}
 	return fw, nil

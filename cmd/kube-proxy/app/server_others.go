@@ -46,6 +46,7 @@ import (
 	toolswatch "k8s.io/client-go/tools/watch"
 	"k8s.io/component-base/configz"
 	"k8s.io/component-base/metrics"
+	nodeutil "k8s.io/component-helpers/node/util"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
@@ -54,11 +55,11 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/iptables"
 	"k8s.io/kubernetes/pkg/proxy/ipvs"
 	proxymetrics "k8s.io/kubernetes/pkg/proxy/metrics"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
-	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/utils/exec"
 	netutils "k8s.io/utils/net"
 
@@ -95,7 +96,7 @@ func newProxyServer(
 		metrics.SetShowHidden()
 	}
 
-	hostname, err := utilnode.GetHostname(config.HostnameOverride)
+	hostname, err := nodeutil.GetHostname(config.HostnameOverride)
 	if err != nil {
 		return nil, err
 	}
@@ -140,13 +141,15 @@ func newProxyServer(
 		if err != nil {
 			return nil, err
 		}
-		klog.InfoS("NodeInfo", "PodCIDR", nodeInfo.Spec.PodCIDR, "PodCIDRs", nodeInfo.Spec.PodCIDRs)
+		klog.InfoS("NodeInfo", "podCIDR", nodeInfo.Spec.PodCIDR, "podCIDRs", nodeInfo.Spec.PodCIDRs)
 	}
 
-	klog.V(2).InfoS("DetectLocalMode", "LocalMode", string(detectLocalMode))
+	klog.V(2).InfoS("DetectLocalMode", "localMode", string(detectLocalMode))
 
+	primaryFamily := v1.IPv4Protocol
 	primaryProtocol := utiliptables.ProtocolIPv4
 	if netutils.IsIPv6(nodeIP) {
+		primaryFamily = v1.IPv6Protocol
 		primaryProtocol = utiliptables.ProtocolIPv6
 	}
 	execer := exec.New()
@@ -165,10 +168,21 @@ func newProxyServer(
 		ipt[1] = iptInterface
 	}
 
-	for _, perFamilyIpt := range ipt {
-		if !perFamilyIpt.Present() {
-			klog.V(0).InfoS("kube-proxy running in single-stack mode, this ipFamily is not supported", "ipFamily", perFamilyIpt.Protocol())
-			dualStack = false
+	nodePortAddresses := config.NodePortAddresses
+
+	if !ipt[0].Present() {
+		return nil, fmt.Errorf("iptables is not supported for primary IP family %q", primaryProtocol)
+	} else if !ipt[1].Present() {
+		klog.InfoS("kube-proxy running in single-stack mode: secondary ipFamily is not supported", "ipFamily", ipt[1].Protocol())
+		dualStack = false
+
+		// Validate NodePortAddresses is single-stack
+		npaByFamily := proxyutil.MapCIDRsByIPFamily(config.NodePortAddresses)
+		secondaryFamily := proxyutil.OtherIPFamily(primaryFamily)
+		badAddrs := npaByFamily[secondaryFamily]
+		if len(badAddrs) > 0 {
+			klog.InfoS("Ignoring --nodeport-addresses of the wrong family", "ipFamily", secondaryFamily, "addresses", badAddrs)
+			nodePortAddresses = npaByFamily[primaryFamily]
 		}
 	}
 
@@ -204,7 +218,7 @@ func newProxyServer(
 				nodeIPTuple(config.BindAddress),
 				recorder,
 				healthzServer,
-				config.NodePortAddresses,
+				nodePortAddresses,
 			)
 		} else {
 			// Create a single-stack proxier if and only if the node does not support dual-stack (i.e, no iptables support).
@@ -216,6 +230,7 @@ func newProxyServer(
 
 			// TODO this has side effects that should only happen when Run() is invoked.
 			proxier, err = iptables.NewProxier(
+				primaryFamily,
 				iptInterface,
 				utilsysctl.New(),
 				execer,
@@ -229,7 +244,7 @@ func newProxyServer(
 				nodeIP,
 				recorder,
 				healthzServer,
-				config.NodePortAddresses,
+				nodePortAddresses,
 			)
 		}
 
@@ -240,10 +255,10 @@ func newProxyServer(
 	} else if proxyMode == proxyconfigapi.ProxyModeIPVS {
 		kernelHandler := ipvs.NewLinuxKernelHandler()
 		ipsetInterface = utilipset.New(execer)
-		if err := ipvs.CanUseIPVSProxier(kernelHandler, ipsetInterface, config.IPVS.Scheduler); err != nil {
+		ipvsInterface = utilipvs.New()
+		if err := ipvs.CanUseIPVSProxier(ipvsInterface, ipsetInterface, config.IPVS.Scheduler); err != nil {
 			return nil, fmt.Errorf("can't use the IPVS proxier: %v", err)
 		}
-		ipvsInterface = utilipvs.New()
 
 		klog.InfoS("Using ipvs Proxier")
 		if dualStack {
@@ -279,7 +294,7 @@ func newProxyServer(
 				recorder,
 				healthzServer,
 				config.IPVS.Scheduler,
-				config.NodePortAddresses,
+				nodePortAddresses,
 				kernelHandler,
 			)
 		} else {
@@ -290,6 +305,7 @@ func newProxyServer(
 			}
 
 			proxier, err = ipvs.NewProxier(
+				primaryFamily,
 				iptInterface,
 				ipvsInterface,
 				ipsetInterface,
@@ -310,7 +326,7 @@ func newProxyServer(
 				recorder,
 				healthzServer,
 				config.IPVS.Scheduler,
-				config.NodePortAddresses,
+				nodePortAddresses,
 				kernelHandler,
 			)
 		}
@@ -406,7 +422,7 @@ func getDetectLocalMode(config *proxyconfigapi.KubeProxyConfiguration) (proxycon
 		if strings.TrimSpace(mode.String()) != "" {
 			return mode, fmt.Errorf("unknown detect-local-mode: %v", mode)
 		}
-		klog.V(4).InfoS("Defaulting detect-local-mode", "LocalModeClusterCIDR", string(proxyconfigapi.LocalModeClusterCIDR))
+		klog.V(4).InfoS("Defaulting detect-local-mode", "localModeClusterCIDR", string(proxyconfigapi.LocalModeClusterCIDR))
 		return proxyconfigapi.LocalModeClusterCIDR, nil
 	}
 }
@@ -436,7 +452,7 @@ func getLocalDetector(mode proxyconfigapi.LocalMode, config *proxyconfigapi.Kube
 		}
 		return proxyutiliptables.NewDetectLocalByInterfaceNamePrefix(config.DetectLocal.InterfaceNamePrefix)
 	}
-	klog.InfoS("Defaulting to no-op detect-local", "detect-local-mode", string(mode))
+	klog.InfoS("Defaulting to no-op detect-local", "detectLocalMode", string(mode))
 	return proxyutiliptables.NewNoOpLocalDetector(), nil
 }
 
@@ -462,7 +478,7 @@ func getDualStackLocalDetectorTuple(mode proxyconfigapi.LocalMode, config *proxy
 		}
 
 		if len(strings.TrimSpace(clusterCIDRs[1])) == 0 {
-			klog.InfoS("Detect-local-mode set to ClusterCIDR, but no IPv6 cluster CIDR defined, , defaulting to no-op detect-local for IPv6")
+			klog.InfoS("Detect-local-mode set to ClusterCIDR, but no IPv6 cluster CIDR defined, defaulting to no-op detect-local for IPv6")
 		} else {
 			localDetectors[1], err = proxyutiliptables.NewDetectLocalByCIDR(clusterCIDRs[1], ipt[1])
 		}
@@ -500,9 +516,9 @@ func getDualStackLocalDetectorTuple(mode proxyconfigapi.LocalMode, config *proxy
 		}
 		return localDetectors, err
 	default:
-		klog.InfoS("Unknown detect-local-mode", "detect-local-mode", mode)
+		klog.InfoS("Unknown detect-local-mode", "detectLocalMode", mode)
 	}
-	klog.InfoS("Defaulting to no-op detect-local", "detect-local-mode", string(mode))
+	klog.InfoS("Defaulting to no-op detect-local", "detectLocalMode", string(mode))
 	return localDetectors, nil
 }
 

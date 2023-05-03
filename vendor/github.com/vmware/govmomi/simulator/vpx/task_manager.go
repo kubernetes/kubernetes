@@ -1055,7 +1055,7 @@ var Description = types.TaskDescription{
 		&types.ElementDescription{
 			Description: types.Description{
 				Label:   "Query feature capabilities for vSphere Distributed Switch specification",
-				Summary: "Queries feature capabilites available for a given vSphere Distributed Switch specification",
+				Summary: "Queries feature capabilities available for a given vSphere Distributed Switch specification",
 			},
 			Key: "dvs.DistributedVirtualSwitchManager.queryFeatureCapability",
 		},
@@ -7040,7 +7040,7 @@ var Description = types.TaskDescription{
 		&types.ElementDescription{
 			Description: types.Description{
 				Label:   "Retrieve Managed Method Executer",
-				Summary: "Retrieves a referemce to Managed Method Executer",
+				Summary: "Retrieves a reference to Managed Method Executer",
 			},
 			Key: "HostSystem.retrieveManagedMethodExecuter",
 		},
@@ -10876,7 +10876,7 @@ var Description = types.TaskDescription{
 		&types.ElementDescription{
 			Description: types.Description{
 				Label:   "Convert to a stretched cluster",
-				Summary: "Convert the given configuration to a streched cluster",
+				Summary: "Convert the given configuration to a stretched cluster",
 			},
 			Key: "com.vmware.vsan.stretchedcluster.tasks.convert2stretchedcluster",
 		},
@@ -10988,14 +10988,14 @@ var Description = types.TaskDescription{
 		&types.ElementDescription{
 			Description: types.Description{
 				Label:   "Detect Update Manager Guest Agent",
-				Summary: "Detect Update Manager Guest Agent installataion on Linux VMs",
+				Summary: "Detect Update Manager Guest Agent installation on Linux VMs",
 			},
 			Key: "com.vmware.vcIntegrity.DetectLinuxGATask",
 		},
 		&types.ElementDescription{
 			Description: types.Description{
 				Label:   "Cancel detecting Update Manager GuestAgent",
-				Summary: "Cancel detecting Update Manager GuestAgent installataion on Linux VMs",
+				Summary: "Cancel detecting Update Manager GuestAgent installation on Linux VMs",
 			},
 			Key: "com.vmware.vcIntegrity.CancelDetectLinuxGATask",
 		},

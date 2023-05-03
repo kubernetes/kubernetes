@@ -20,6 +20,8 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
@@ -28,6 +30,7 @@ import (
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
 	v1 "k8s.io/code-generator/examples/HyphenGroup/apis/example/v1"
+	examplev1 "k8s.io/code-generator/examples/HyphenGroup/applyconfiguration/example/v1"
 	scheme "k8s.io/code-generator/examples/HyphenGroup/clientset/versioned/scheme"
 )
 
@@ -48,6 +51,8 @@ type ClusterTestTypeInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.ClusterTestTypeList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClusterTestType, err error)
+	Apply(ctx context.Context, clusterTestType *examplev1.ClusterTestTypeApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterTestType, err error)
+	ApplyStatus(ctx context.Context, clusterTestType *examplev1.ClusterTestTypeApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterTestType, err error)
 	GetScale(ctx context.Context, clusterTestTypeName string, options metav1.GetOptions) (*autoscalingv1.Scale, error)
 	UpdateScale(ctx context.Context, clusterTestTypeName string, scale *autoscalingv1.Scale, opts metav1.UpdateOptions) (*autoscalingv1.Scale, error)
 
@@ -181,6 +186,60 @@ func (c *clusterTestTypes) Patch(ctx context.Context, name string, pt types.Patc
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied clusterTestType.
+func (c *clusterTestTypes) Apply(ctx context.Context, clusterTestType *examplev1.ClusterTestTypeApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterTestType, err error) {
+	if clusterTestType == nil {
+		return nil, fmt.Errorf("clusterTestType provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(clusterTestType)
+	if err != nil {
+		return nil, err
+	}
+	name := clusterTestType.Name
+	if name == nil {
+		return nil, fmt.Errorf("clusterTestType.Name must be provided to Apply")
+	}
+	result = &v1.ClusterTestType{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("clustertesttypes").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *clusterTestTypes) ApplyStatus(ctx context.Context, clusterTestType *examplev1.ClusterTestTypeApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterTestType, err error) {
+	if clusterTestType == nil {
+		return nil, fmt.Errorf("clusterTestType provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(clusterTestType)
+	if err != nil {
+		return nil, err
+	}
+
+	name := clusterTestType.Name
+	if name == nil {
+		return nil, fmt.Errorf("clusterTestType.Name must be provided to Apply")
+	}
+
+	result = &v1.ClusterTestType{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("clustertesttypes").
+		Name(*name).
+		SubResource("status").
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

@@ -49,7 +49,7 @@ message CSIDriver {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Specification of the CSI Driver.
+  // spec represents the specification of the CSI Driver.
   optional CSIDriverSpec spec = 2;
 }
 
@@ -82,16 +82,15 @@ message CSIDriverSpec {
   // +optional
   optional bool attachRequired = 1;
 
-  // If set to true, podInfoOnMount indicates this CSI volume driver
-  // requires additional pod information (like podName, podUID, etc.) during
-  // mount operations.
+  // podInfoOnMount indicates this CSI volume driver requires additional pod information (like podName, podUID, etc.)
+  // during mount operations, if set to true.
   // If set to false, pod information will not be passed on mount.
   // Default is false.
+  //
   // The CSI driver specifies podInfoOnMount as part of driver deployment.
-  // If true, Kubelet will pass pod information as VolumeContext in the CSI
-  // NodePublishVolume() calls.
-  // The CSI driver is responsible for parsing and validating the information
-  // passed in as VolumeContext.
+  // If true, Kubelet will pass pod information as VolumeContext in the CSI NodePublishVolume() calls.
+  // The CSI driver is responsible for parsing and validating the information passed in as VolumeContext.
+  //
   // The following VolumeConext will be passed if podInfoOnMount is set to true.
   // This list might grow, but the prefix will be used.
   // "csi.storage.k8s.io/pod.name": pod.Name
@@ -112,14 +111,14 @@ message CSIDriverSpec {
   // +optional
   optional bool podInfoOnMount = 2;
 
-  // VolumeLifecycleModes defines what kind of volumes this CSI volume driver supports.
-  // The default if the list is empty is "Persistent", which is the usage
-  // defined by the CSI specification and implemented in Kubernetes via the usual
-  // PV/PVC mechanism.
-  // The other mode is "Ephemeral". In this mode, volumes are defined inline
-  // inside the pod spec with CSIVolumeSource and their lifecycle is tied to
-  // the lifecycle of that pod. A driver has to be aware of this
-  // because it is only going to get a NodePublishVolume call for such a volume.
+  // volumeLifecycleModes defines what kind of volumes this CSI volume driver supports.
+  // The default if the list is empty is "Persistent", which is the usage defined by the
+  // CSI specification and implemented in Kubernetes via the usual PV/PVC mechanism.
+  //
+  // The other mode is "Ephemeral". In this mode, volumes are defined inline inside the pod spec
+  // with CSIVolumeSource and their lifecycle is tied to the lifecycle of that pod.
+  // A driver has to be aware of this because it is only going to get a NodePublishVolume call for such a volume.
+  //
   // For more information about implementing this mode, see
   // https://kubernetes-csi.github.io/docs/ephemeral-local-volumes.html
   // A driver can support one or more of these modes and
@@ -130,10 +129,9 @@ message CSIDriverSpec {
   // +optional
   repeated string volumeLifecycleModes = 3;
 
-  // If set to true, storageCapacity indicates that the CSI
-  // volume driver wants pod scheduling to consider the storage
+  // storageCapacity indicates that the CSI volume driver wants pod scheduling to consider the storage
   // capacity that the driver deployment will report by creating
-  // CSIStorageCapacity objects with capacity information.
+  // CSIStorageCapacity objects with capacity information, if set to true.
   //
   // The check can be enabled immediately when deploying a driver.
   // In that case, provisioning new volumes with late binding
@@ -149,7 +147,7 @@ message CSIDriverSpec {
   // +optional
   optional bool storageCapacity = 4;
 
-  // Defines if the underlying volume supports changing ownership and
+  // fsGroupPolicy defines if the underlying volume supports changing ownership and
   // permission of the volume before being mounted.
   // Refer to the specific FSGroupPolicy values for additional details.
   //
@@ -159,10 +157,11 @@ message CSIDriverSpec {
   // to determine if Kubernetes should modify ownership and permissions of the volume.
   // With the default policy the defined fsGroup will only be applied
   // if a fstype is defined and the volume's access mode contains ReadWriteOnce.
+  //
   // +optional
   optional string fsGroupPolicy = 5;
 
-  // TokenRequests indicates the CSI driver needs pods' service account
+  // tokenRequests indicates the CSI driver needs pods' service account
   // tokens it is mounting volume for to do necessary authentication. Kubelet
   // will pass the tokens in VolumeContext in the CSI NodePublishVolume calls.
   // The CSI driver should parse and validate the following VolumeContext:
@@ -182,7 +181,7 @@ message CSIDriverSpec {
   // +listType=atomic
   repeated TokenRequest tokenRequests = 6;
 
-  // RequiresRepublish indicates the CSI driver wants `NodePublishVolume`
+  // requiresRepublish indicates the CSI driver wants `NodePublishVolume`
   // being periodically called to reflect any possible change in the mounted
   // volume. This field defaults to false.
   //
@@ -193,7 +192,7 @@ message CSIDriverSpec {
   // +optional
   optional bool requiresRepublish = 7;
 
-  // SELinuxMount specifies if the CSI driver supports "-o context"
+  // seLinuxMount specifies if the CSI driver supports "-o context"
   // mount option.
   //
   // When "true", the CSI driver must ensure that all volumes provided by this CSI
@@ -211,6 +210,7 @@ message CSIDriverSpec {
   //
   // Default is "false".
   //
+  // +featureGate=SELinuxMountReadWriteOncePod
   // +optional
   optional bool seLinuxMount = 8;
 }
@@ -236,7 +236,7 @@ message CSINode {
 
 // CSINodeDriver holds information about the specification of one CSI driver installed on a node
 message CSINodeDriver {
-  // This is the name of the CSI driver that this object refers to.
+  // name represents the name of the CSI driver that this object refers to.
   // This MUST be the same name returned by the CSI GetPluginName() call for
   // that driver.
   optional string name = 1;
@@ -327,7 +327,7 @@ message CSIStorageCapacity {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // NodeTopology defines which nodes have access to the storage
+  // nodeTopology defines which nodes have access to the storage
   // for which capacity was reported. If not set, the storage is
   // not accessible from any node in the cluster. If empty, the
   // storage is accessible from all nodes. This field is
@@ -336,7 +336,7 @@ message CSIStorageCapacity {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector nodeTopology = 2;
 
-  // The name of the StorageClass that the reported capacity applies to.
+  // storageClassName represents the name of the StorageClass that the reported capacity applies to.
   // It must meet the same requirements as the name of a StorageClass
   // object (non-empty, DNS subdomain). If that object no longer exists,
   // the CSIStorageCapacity object is obsolete and should be removed by its
@@ -344,7 +344,7 @@ message CSIStorageCapacity {
   // This field is immutable.
   optional string storageClassName = 3;
 
-  // Capacity is the value reported by the CSI driver in its GetCapacityResponse
+  // capacity is the value reported by the CSI driver in its GetCapacityResponse
   // for a GetCapacityRequest with topology and parameters that match the
   // previous fields.
   //
@@ -356,7 +356,7 @@ message CSIStorageCapacity {
   // +optional
   optional k8s.io.apimachinery.pkg.api.resource.Quantity capacity = 4;
 
-  // MaximumVolumeSize is the value reported by the CSI driver in its GetCapacityResponse
+  // maximumVolumeSize is the value reported by the CSI driver in its GetCapacityResponse
   // for a GetCapacityRequest with topology and parameters that match the
   // previous fields.
   //
@@ -378,7 +378,7 @@ message CSIStorageCapacityList {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // Items is the list of CSIStorageCapacity objects.
+  // items is the list of CSIStorageCapacity objects.
   // +listType=map
   // +listMapKey=name
   repeated CSIStorageCapacity items = 2;
@@ -395,36 +395,36 @@ message StorageClass {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Provisioner indicates the type of the provisioner.
+  // provisioner indicates the type of the provisioner.
   optional string provisioner = 2;
 
-  // Parameters holds the parameters for the provisioner that should
+  // parameters holds the parameters for the provisioner that should
   // create volumes of this storage class.
   // +optional
   map<string, string> parameters = 3;
 
-  // Dynamically provisioned PersistentVolumes of this storage class are
-  // created with this reclaimPolicy. Defaults to Delete.
+  // reclaimPolicy controls the reclaimPolicy for dynamically provisioned PersistentVolumes of this storage class.
+  // Defaults to Delete.
   // +optional
   optional string reclaimPolicy = 4;
 
-  // Dynamically provisioned PersistentVolumes of this storage class are
-  // created with these mountOptions, e.g. ["ro", "soft"]. Not validated -
+  // mountOptions controls the mountOptions for dynamically provisioned PersistentVolumes of this storage class.
+  // e.g. ["ro", "soft"]. Not validated -
   // mount of the PVs will simply fail if one is invalid.
   // +optional
   repeated string mountOptions = 5;
 
-  // AllowVolumeExpansion shows whether the storage class allow volume expand
+  // allowVolumeExpansion shows whether the storage class allow volume expand
   // +optional
   optional bool allowVolumeExpansion = 6;
 
-  // VolumeBindingMode indicates how PersistentVolumeClaims should be
+  // volumeBindingMode indicates how PersistentVolumeClaims should be
   // provisioned and bound.  When unset, VolumeBindingImmediate is used.
   // This field is only honored by servers that enable the VolumeScheduling feature.
   // +optional
   optional string volumeBindingMode = 7;
 
-  // Restrict the node topologies where volumes can be dynamically provisioned.
+  // allowedTopologies restrict the node topologies where volumes can be dynamically provisioned.
   // Each volume plugin defines its own supported topology specifications.
   // An empty TopologySelectorTerm list means there is no topology restriction.
   // This field is only honored by servers that enable the VolumeScheduling feature.
@@ -440,17 +440,17 @@ message StorageClassList {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // Items is the list of StorageClasses
+  // items is the list of StorageClasses
   repeated StorageClass items = 2;
 }
 
 // TokenRequest contains parameters of a service account token.
 message TokenRequest {
-  // Audience is the intended audience of the token in "TokenRequestSpec".
+  // audience is the intended audience of the token in "TokenRequestSpec".
   // It will default to the audiences of kube apiserver.
   optional string audience = 1;
 
-  // ExpirationSeconds is the duration of validity of the token in "TokenRequestSpec".
+  // expirationSeconds is the duration of validity of the token in "TokenRequestSpec".
   // It has the same default value of "ExpirationSeconds" in "TokenRequestSpec"
   //
   // +optional
@@ -467,11 +467,11 @@ message VolumeAttachment {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Specification of the desired attach/detach volume behavior.
+  // spec represents specification of the desired attach/detach volume behavior.
   // Populated by the Kubernetes system.
   optional VolumeAttachmentSpec spec = 2;
 
-  // Status of the VolumeAttachment request.
+  // status represents status of the VolumeAttachment request.
   // Populated by the entity completing the attach or detach
   // operation, i.e. the external-attacher.
   // +optional
@@ -485,7 +485,7 @@ message VolumeAttachmentList {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // Items is the list of VolumeAttachments
+  // items is the list of VolumeAttachments
   repeated VolumeAttachment items = 2;
 }
 
@@ -494,7 +494,7 @@ message VolumeAttachmentList {
 // in future we may allow also inline volumes in pods.
 // Exactly one member can be set.
 message VolumeAttachmentSource {
-  // Name of the persistent volume to attach.
+  // persistentVolumeName represents the name of the persistent volume to attach.
   // +optional
   optional string persistentVolumeName = 1;
 
@@ -510,39 +510,39 @@ message VolumeAttachmentSource {
 
 // VolumeAttachmentSpec is the specification of a VolumeAttachment request.
 message VolumeAttachmentSpec {
-  // Attacher indicates the name of the volume driver that MUST handle this
+  // attacher indicates the name of the volume driver that MUST handle this
   // request. This is the name returned by GetPluginName().
   optional string attacher = 1;
 
-  // Source represents the volume that should be attached.
+  // source represents the volume that should be attached.
   optional VolumeAttachmentSource source = 2;
 
-  // The node that the volume should be attached to.
+  // nodeName represents the node that the volume should be attached to.
   optional string nodeName = 3;
 }
 
 // VolumeAttachmentStatus is the status of a VolumeAttachment request.
 message VolumeAttachmentStatus {
-  // Indicates the volume is successfully attached.
+  // attached indicates the volume is successfully attached.
   // This field must only be set by the entity completing the attach
   // operation, i.e. the external-attacher.
   optional bool attached = 1;
 
-  // Upon successful attach, this field is populated with any
-  // information returned by the attach operation that must be passed
+  // attachmentMetadata is populated with any
+  // information returned by the attach operation, upon successful attach, that must be passed
   // into subsequent WaitForAttach or Mount calls.
   // This field must only be set by the entity completing the attach
   // operation, i.e. the external-attacher.
   // +optional
   map<string, string> attachmentMetadata = 2;
 
-  // The last error encountered during attach operation, if any.
+  // attachError represents the last error encountered during attach operation, if any.
   // This field must only be set by the entity completing the attach
   // operation, i.e. the external-attacher.
   // +optional
   optional VolumeError attachError = 3;
 
-  // The last error encountered during detach operation, if any.
+  // detachError represents the last error encountered during detach operation, if any.
   // This field must only be set by the entity completing the detach
   // operation, i.e. the external-attacher.
   // +optional
@@ -551,11 +551,11 @@ message VolumeAttachmentStatus {
 
 // VolumeError captures an error encountered during a volume operation.
 message VolumeError {
-  // Time the error was encountered.
+  // time represents the time the error was encountered.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.Time time = 1;
 
-  // String detailing the error encountered during Attach or Detach operation.
+  // message represents the error encountered during Attach or Detach operation.
   // This string may be logged, so it should not contain sensitive
   // information.
   // +optional
@@ -564,7 +564,7 @@ message VolumeError {
 
 // VolumeNodeResources is a set of resource limits for scheduling of volumes.
 message VolumeNodeResources {
-  // Maximum number of unique volumes managed by the CSI driver that can be used on a node.
+  // count indicates the maximum number of unique volumes managed by the CSI driver that can be used on a node.
   // A volume that is both attached and mounted on a node is considered to be used once, not twice.
   // The same rule applies for a unique volume that is shared among multiple pods on the same node.
   // If this field is nil, then the supported number of volumes on this node is unbounded.

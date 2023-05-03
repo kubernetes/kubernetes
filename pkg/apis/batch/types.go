@@ -22,16 +22,29 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
-// JobTrackingFinalizer is a finalizer for Job's pods. It prevents them from
-// being deleted before being accounted in the Job status.
-//
-// Additionally, the apiserver and job controller use this string as a Job
-// annotation, to mark Jobs that are being tracked using pod finalizers.
-// However, this behavior is deprecated in kubernetes 1.26. This means that, in
-// 1.27+, one release after JobTrackingWithFinalizers graduates to GA, the
-// apiserver and job controller will ignore this annotation and they will
-// always track jobs using finalizers.
-const JobTrackingFinalizer = "batch.kubernetes.io/job-tracking"
+const (
+	// Unprefixed labels are reserved for end-users
+	// so we will add a batch.kubernetes.io to designate these labels as official Kubernetes labels.
+	// See https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#label-selector-and-annotation-conventions
+	labelPrefix = "batch.kubernetes.io/"
+	// JobTrackingFinalizer is a finalizer for Job's pods. It prevents them from
+	// being deleted before being accounted in the Job status.
+	//
+	// Additionally, the apiserver and job controller use this string as a Job
+	// annotation, to mark Jobs that are being tracked using pod finalizers.
+	// However, this behavior is deprecated in kubernetes 1.26. This means that, in
+	// 1.27+, one release after JobTrackingWithFinalizers graduates to GA, the
+	// apiserver and job controller will ignore this annotation and they will
+	// always track jobs using finalizers.
+	JobTrackingFinalizer = labelPrefix + "job-tracking"
+	// LegacyJobName and LegacyControllerUid are legacy labels that were set using unprefixed labels.
+	LegacyJobNameLabel       = "job-name"
+	LegacyControllerUidLabel = "controller-uid"
+	// JobName is a user friendly way to refer to jobs and is set in the labels for jobs.
+	JobNameLabel = labelPrefix + LegacyJobNameLabel
+	// Controller UID is used for selectors and labels for jobs
+	ControllerUidLabel = labelPrefix + LegacyControllerUidLabel
+)
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -66,22 +79,6 @@ type JobList struct {
 
 	// items is the list of Jobs.
 	Items []Job
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// JobTemplate describes a template for creating copies of a predefined pod.
-type JobTemplate struct {
-	metav1.TypeMeta
-	// Standard object's metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-	// +optional
-	metav1.ObjectMeta
-
-	// Defines jobs that will be created from this template.
-	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-	// +optional
-	Template JobTemplateSpec
 }
 
 // JobTemplateSpec describes the data a Job should have when created from a template
@@ -158,6 +155,7 @@ type PodFailurePolicyOnExitCodesRequirement struct {
 	// Represents the relationship between the container exit code(s) and the
 	// specified values. Containers completed with success (exit code 0) are
 	// excluded from the requirement check. Possible values are:
+	//
 	// - In: the requirement is satisfied if at least one container exit code
 	//   (might be multiple if there are multiple containers not restricted
 	//   by the 'containerName' field) is in the set of specified values.
@@ -194,6 +192,7 @@ type PodFailurePolicyOnPodConditionsPattern struct {
 type PodFailurePolicyRule struct {
 	// Specifies the action taken on a pod failure when the requirements are satisfied.
 	// Possible values are:
+	//
 	// - FailJob: indicates that the pod's job is marked as Failed and all
 	//   running pods are terminated.
 	// - Ignore: indicates that the counter towards the .backoffLimit is not
@@ -237,7 +236,7 @@ type JobSpec struct {
 	Parallelism *int32
 
 	// Specifies the desired number of successfully finished pods the
-	// job should be run with.  Setting to nil means that the success of any
+	// job should be run with.  Setting to null means that the success of any
 	// pod signals the success of all pods, and allows parallelism to have any positive
 	// value.  Setting to 1 means that parallelism is limited to 1 and the success of that
 	// pod signals the success of the job.
@@ -293,6 +292,7 @@ type JobSpec struct {
 	ManualSelector *bool
 
 	// Describes the pod that will be created when executing a job.
+	// The only allowed template.spec.restartPolicy values are "Never" or "OnFailure".
 	Template api.PodTemplateSpec
 
 	// ttlSecondsAfterFinished limits the lifetime of a Job that has finished
@@ -305,7 +305,7 @@ type JobSpec struct {
 	// +optional
 	TTLSecondsAfterFinished *int32
 
-	// CompletionMode specifies how Pod completions are tracked. It can be
+	// completionMode specifies how Pod completions are tracked. It can be
 	// `NonIndexed` (default) or `Indexed`.
 	//
 	// `NonIndexed` means that the Job is considered complete when there have
@@ -330,7 +330,7 @@ type JobSpec struct {
 	// +optional
 	CompletionMode *CompletionMode
 
-	// Suspend specifies whether the Job controller should create Pods or not. If
+	// suspend specifies whether the Job controller should create Pods or not. If
 	// a Job is created with suspend set to true, no Pods are created by the Job
 	// controller. If a Job is suspended after creation (i.e. the flag goes from
 	// false to true), the Job controller will delete all active Pods associated
@@ -387,7 +387,7 @@ type JobStatus struct {
 	// +optional
 	Failed int32
 
-	// CompletedIndexes holds the completed indexes when .spec.completionMode =
+	// completedIndexes holds the completed indexes when .spec.completionMode =
 	// "Indexed" in a text format. The indexes are represented as decimal integers
 	// separated by commas. The numbers are listed in increasing order. Three or
 	// more consecutive numbers are compressed and represented by the first and
@@ -397,15 +397,16 @@ type JobStatus struct {
 	// +optional
 	CompletedIndexes string
 
-	// UncountedTerminatedPods holds the UIDs of Pods that have terminated but
+	// uncountedTerminatedPods holds the UIDs of Pods that have terminated but
 	// the job controller hasn't yet accounted for in the status counters.
 	//
 	// The job controller creates pods with a finalizer. When a pod terminates
 	// (succeeded or failed), the controller does three steps to account for it
 	// in the job status:
-	// (1) Add the pod UID to the corresponding array in this field.
-	// (2) Remove the pod finalizer.
-	// (3) Remove the pod UID from the array while increasing the corresponding
+	//
+	// 1. Add the pod UID to the corresponding array in this field.
+	// 2. Remove the pod finalizer.
+	// 3. Remove the pod UID from the array while increasing the corresponding
 	//     counter.
 	//
 	// Old jobs might not be tracked using this field, in which case the field
@@ -417,12 +418,12 @@ type JobStatus struct {
 // UncountedTerminatedPods holds UIDs of Pods that have terminated but haven't
 // been accounted in Job status counters.
 type UncountedTerminatedPods struct {
-	// Succeeded holds UIDs of succeeded Pods.
+	// succeeded holds UIDs of succeeded Pods.
 	// +listType=set
 	// +optional
 	Succeeded []types.UID
 
-	// Failed holds UIDs of failed Pods.
+	// failed holds UIDs of failed Pods.
 	// +listType=set
 	// +optional
 	Failed []types.UID
@@ -513,7 +514,6 @@ type CronJobSpec struct {
 	// configuration, the controller will stop creating new new Jobs and will create a system event with the
 	// reason UnknownTimeZone.
 	// More information can be found in https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#time-zones
-	// This is beta field and must be enabled via the `CronJobTimeZone` feature gate.
 	// +optional
 	TimeZone *string
 
@@ -524,6 +524,7 @@ type CronJobSpec struct {
 
 	// Specifies how to treat concurrent executions of a Job.
 	// Valid values are:
+	//
 	// - "Allow" (default): allows CronJobs to run concurrently;
 	// - "Forbid": forbids concurrent runs, skipping next run if previous run hasn't finished yet;
 	// - "Replace": cancels currently running job and replaces it with a new one

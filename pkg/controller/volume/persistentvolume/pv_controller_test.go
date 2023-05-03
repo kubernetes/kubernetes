@@ -38,6 +38,7 @@ import (
 	"k8s.io/component-helpers/storage/volume"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
 	"k8s.io/kubernetes/pkg/features"
@@ -310,7 +311,7 @@ func TestControllerSync(t *testing.T) {
 			},
 		},
 	}
-
+	_, ctx := ktesting.NewTestContext(t)
 	doit := func(test controllerTest) {
 		// Initialize the controller
 		client := &fake.Clientset{}
@@ -324,7 +325,7 @@ func TestControllerSync(t *testing.T) {
 		client.PrependWatchReactor("pods", core.DefaultWatchReactor(watch.NewFake(), nil))
 
 		informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
-		ctrl, err := newTestController(client, informers, true)
+		ctrl, err := newTestController(ctx, client, informers, true)
 		if err != nil {
 			t.Fatalf("Test %q construct persistent volume failed: %v", test.name, err)
 		}
@@ -341,7 +342,7 @@ func TestControllerSync(t *testing.T) {
 		}
 		ctrl.classLister = storagelisters.NewStorageClassLister(indexer)
 
-		reactor := newVolumeReactor(client, ctrl, fakeVolumeWatch, fakeClaimWatch, test.errors)
+		reactor := newVolumeReactor(ctx, client, ctrl, fakeVolumeWatch, fakeClaimWatch, test.errors)
 		for _, claim := range test.initialClaims {
 			claim = claim.DeepCopy()
 			reactor.AddClaim(claim)
@@ -380,7 +381,7 @@ func TestControllerSync(t *testing.T) {
 		}
 		// Simulate a periodic resync, just in case some events arrived in a
 		// wrong order.
-		ctrl.resync()
+		ctrl.resync(ctx)
 
 		err = reactor.waitTest(test)
 		if err != nil {
@@ -388,7 +389,7 @@ func TestControllerSync(t *testing.T) {
 		}
 		cancel()
 
-		evaluateTestResults(ctrl, reactor.VolumeReactor, test, t)
+		evaluateTestResults(ctx, ctrl, reactor.VolumeReactor, test, t)
 	}
 
 	for _, test := range tests {
@@ -402,7 +403,8 @@ func TestControllerSync(t *testing.T) {
 func storeVersion(t *testing.T, prefix string, c cache.Store, version string, expectedReturn bool) {
 	pv := newVolume("pvName", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classEmpty)
 	pv.ResourceVersion = version
-	ret, err := storeObjectUpdate(c, pv, "volume")
+	logger, _ := ktesting.NewTestContext(t)
+	ret, err := storeObjectUpdate(logger, c, pv, "volume")
 	if err != nil {
 		t.Errorf("%s: expected storeObjectUpdate to succeed, got: %v", prefix, err)
 	}
@@ -461,7 +463,8 @@ func TestControllerCacheParsingError(t *testing.T) {
 
 	pv := newVolume("pvName", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classEmpty)
 	pv.ResourceVersion = "xxx"
-	_, err := storeObjectUpdate(c, pv, "volume")
+	logger, _ := ktesting.NewTestContext(t)
+	_, err := storeObjectUpdate(logger, c, pv, "volume")
 	if err == nil {
 		t.Errorf("Expected parsing error, got nil instead")
 	}
@@ -572,19 +575,19 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 
 	translator := csitrans.New()
 	cmpm := csimigration.NewPluginManager(translator, utilfeature.DefaultFeatureGate)
-
+	logger, _ := ktesting.NewTestContext(t)
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.volumeAnnotations != nil {
 				ann := tc.volumeAnnotations
-				updateMigrationAnnotations(cmpm, translator, ann, false)
+				updateMigrationAnnotations(logger, cmpm, translator, ann, false)
 				if !reflect.DeepEqual(tc.expVolumeAnnotations, ann) {
 					t.Errorf("got volume annoations: %v, but expected: %v", ann, tc.expVolumeAnnotations)
 				}
 			}
 			if tc.claimAnnotations != nil {
 				ann := tc.claimAnnotations
-				updateMigrationAnnotations(cmpm, translator, ann, true)
+				updateMigrationAnnotations(logger, cmpm, translator, ann, true)
 				if !reflect.DeepEqual(tc.expClaimAnnotations, ann) {
 					t.Errorf("got volume annoations: %v, but expected: %v", ann, tc.expVolumeAnnotations)
 				}
@@ -732,13 +735,13 @@ func TestModifyDeletionFinalizers(t *testing.T) {
 
 	translator := csitrans.New()
 	cmpm := csimigration.NewPluginManager(translator, utilfeature.DefaultFeatureGate)
-
+	logger, _ := ktesting.NewTestContext(t)
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.volumeAnnotations != nil {
 				tc.initialVolume.SetAnnotations(tc.volumeAnnotations)
 			}
-			modifiedFinalizers, modified := modifyDeletionFinalizers(cmpm, tc.initialVolume)
+			modifiedFinalizers, modified := modifyDeletionFinalizers(logger, cmpm, tc.initialVolume)
 			if modified != tc.expModified {
 				t.Errorf("got modified: %v, but expected: %v", modified, tc.expModified)
 			}
@@ -862,8 +865,27 @@ func TestRetroactiveStorageClassAssignment(t *testing.T) {
 				},
 			},
 		},
+		{
+			storageClasses: []*storagev1.StorageClass{
+				makeDefaultStorageClass(classGold, &modeImmediate),
+				makeStorageClass(classCopper, &modeImmediate),
+			},
+			tests: []controllerTest{
+				{
+					name:            "15-7 - pvc storage class is not changed if claim is not bound but already set annotation \"volume.beta.kubernetes.io/storage-class\"",
+					initialVolumes:  novolumes,
+					expectedVolumes: novolumes,
+					initialClaims:   newClaimArray("claim15-7", "uid15-7", "1Gi", "", v1.ClaimPending, nil, v1.BetaStorageClassAnnotation),
+					expectedClaims:  newClaimArray("claim15-7", "uid15-7", "1Gi", "", v1.ClaimPending, nil, v1.BetaStorageClassAnnotation),
+					expectedEvents:  noevents,
+					errors:          noerrors,
+					test:            testSyncClaim,
+				},
+			},
+		},
 	}
+	_, ctx := ktesting.NewTestContext(t)
 	for _, test := range tests {
-		runSyncTests(t, test.tests, test.storageClasses, nil)
+		runSyncTests(t, ctx, test.tests, test.storageClasses, nil)
 	}
 }

@@ -17,15 +17,18 @@ limitations under the License.
 package upgrade
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/pkg/errors"
 
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
@@ -103,49 +106,103 @@ func TestRollbackFiles(t *testing.T) {
 	}
 }
 
-func TestCleanupKubeletDynamicEnvFileContainerRuntime(t *testing.T) {
-	tcases := []struct {
-		name     string
-		input    string
-		expected string
+func TestWriteKubeletConfigFiles(t *testing.T) {
+	// exit early if the user doesn't have root permission as the test needs to create /etc/kubernetes directory
+	// while the permission should be granted to the user.
+	isPrivileged := preflight.IsPrivilegedUserCheck{}
+	if _, err := isPrivileged.Check(); err != nil {
+		return
+	}
+	testCases := []struct {
+		name       string
+		dryrun     bool
+		patchesDir string
+		errPattern string
+		cfg        *kubeadmapi.InitConfiguration
 	}{
+		// Be careful that if the dryrun is set to false and the test is run on a live cluster, the kubelet config file might be overwritten.
+		// However, you should be able to find the original config file in /etc/kubernetes/tmp/kubeadm-kubelet-configxxx folder.
+		// The test haven't clean up the temporary file created under /etc/kubernetes/tmp/ as that could be accidentally delete other files in
+		// that folder as well which might be unexpected.
 		{
-			name:     "common flag",
-			input:    fmt.Sprintf("%s=\"--container-runtime=remote --container-runtime-endpoint=unix:///var/run/containerd/containerd.sock --pod-infra-container-image=registry.k8s.io/pause:3.9\"", constants.KubeletEnvFileVariableName),
-			expected: fmt.Sprintf("%s=\"--container-runtime-endpoint=unix:///var/run/containerd/containerd.sock --pod-infra-container-image=registry.k8s.io/pause:3.9\"", constants.KubeletEnvFileVariableName),
+			name:   "write kubelet config file successfully",
+			dryrun: true,
+			cfg: &kubeadmapi.InitConfiguration{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					ComponentConfigs: kubeadmapi.ComponentConfigMap{
+						componentconfigs.KubeletGroup: &componentConfig{},
+					},
+				},
+			},
 		},
 		{
-			name:     "missing flag of interest",
-			input:    fmt.Sprintf("%s=\"--foo=abc --bar=def --container-runtime-endpoint=unix:///var/run/containerd/containerd.sock\"", constants.KubeletEnvFileVariableName),
-			expected: fmt.Sprintf("%s=\"--foo=abc --bar=def --container-runtime-endpoint=unix:///var/run/containerd/containerd.sock\"", constants.KubeletEnvFileVariableName),
+			name:       "aggregate errs: no kubelet config file and cannot read config file",
+			dryrun:     true,
+			errPattern: missingKubeletConfig,
+			cfg:        &kubeadmapi.InitConfiguration{},
 		},
 		{
-			name:     "add missing URL scheme",
-			input:    fmt.Sprintf("%s=\"--foo=abc --container-runtime=remote --bar=def\"", constants.KubeletEnvFileVariableName),
-			expected: fmt.Sprintf("%s=\"--foo=abc --bar=def\"", constants.KubeletEnvFileVariableName),
-		},
-		{
-			name:     "add missing URL scheme if there is no '=' after the flag name",
-			input:    fmt.Sprintf("%s=\"--foo=abc --container-runtime remote --container-runtime-endpoint=unix:///var/run/containerd/containerd.sock --bar=def\"", constants.KubeletEnvFileVariableName),
-			expected: fmt.Sprintf("%s=\"--foo=abc --container-runtime-endpoint=unix:///var/run/containerd/containerd.sock --bar=def\"", constants.KubeletEnvFileVariableName),
-		},
-		{
-			name:     "empty flag of interest value following '='",
-			input:    fmt.Sprintf("%s=\"--foo=abc --container-runtime= --container-runtime-endpoint unix:///var/run/containerd/containerd.sock --bar=def\"", constants.KubeletEnvFileVariableName),
-			expected: fmt.Sprintf("%s=\"--foo=abc --container-runtime-endpoint unix:///var/run/containerd/containerd.sock --bar=def\"", constants.KubeletEnvFileVariableName),
-		},
-		{
-			name:     "empty flag of interest value without '='",
-			input:    fmt.Sprintf("%s=\"--foo=abc --container-runtime --bar=def\"", constants.KubeletEnvFileVariableName),
-			expected: fmt.Sprintf("%s=\"--foo=abc --bar=def\"", constants.KubeletEnvFileVariableName),
+			name:       "only one err: patch dir does not exist",
+			dryrun:     true,
+			patchesDir: "Bogus",
+			errPattern: "could not list patch files for path \"Bogus\"",
+			cfg: &kubeadmapi.InitConfiguration{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					ComponentConfigs: kubeadmapi.ComponentConfigMap{
+						componentconfigs.KubeletGroup: &componentConfig{},
+					},
+				},
+			},
 		},
 	}
-	for _, tt := range tcases {
-		t.Run(tt.name, func(t *testing.T) {
-			output := cleanupKubeletDynamicEnvFileContainerRuntime(tt.input)
-			if output != tt.expected {
-				t.Errorf("expected output: %q, got: %q", tt.expected, output)
+	for _, tc := range testCases {
+		err := WriteKubeletConfigFiles(tc.cfg, tc.patchesDir, tc.dryrun, os.Stdout)
+		if err != nil && tc.errPattern != "" {
+			if match, _ := regexp.MatchString(tc.errPattern, err.Error()); !match {
+				t.Fatalf("Expected error contains %q, got %v", tc.errPattern, err.Error())
 			}
-		})
+		}
+		if err == nil && len(tc.errPattern) != 0 {
+			t.Fatalf("WriteKubeletConfigFiles didn't return error expected %s", tc.errPattern)
+		}
 	}
+}
+
+// Just some stub code, the code could be enriched when necessary.
+type componentConfig struct {
+	userSupplied bool
+}
+
+func (cc *componentConfig) DeepCopy() kubeadmapi.ComponentConfig {
+	result := &componentConfig{}
+	return result
+}
+
+func (cc *componentConfig) Marshal() ([]byte, error) {
+	return nil, nil
+}
+
+func (cc *componentConfig) Unmarshal(docmap kubeadmapi.DocumentMap) error {
+	return nil
+}
+
+func (cc *componentConfig) Get() interface{} {
+	return &cc
+}
+
+func (cc *componentConfig) Set(cfg interface{}) {
+}
+
+func (cc *componentConfig) Default(_ *kubeadmapi.ClusterConfiguration, _ *kubeadmapi.APIEndpoint, _ *kubeadmapi.NodeRegistrationOptions) {
+}
+
+func (cc *componentConfig) Mutate() error {
+	return nil
+}
+
+func (cc *componentConfig) IsUserSupplied() bool {
+	return false
+}
+func (cc *componentConfig) SetUserSupplied(userSupplied bool) {
+	cc.userSupplied = userSupplied
 }

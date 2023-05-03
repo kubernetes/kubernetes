@@ -62,30 +62,51 @@ func newValidatingDispatcher(p *Plugin) func(cm *webhookutil.ClientManager) gene
 	}
 }
 
+var _ generic.VersionedAttributeAccessor = &versionedAttributeAccessor{}
+
+type versionedAttributeAccessor struct {
+	versionedAttrs   map[schema.GroupVersionKind]*admission.VersionedAttributes
+	attr             admission.Attributes
+	objectInterfaces admission.ObjectInterfaces
+}
+
+func (v *versionedAttributeAccessor) VersionedAttribute(gvk schema.GroupVersionKind) (*admission.VersionedAttributes, error) {
+	if val, ok := v.versionedAttrs[gvk]; ok {
+		return val, nil
+	}
+	versionedAttr, err := admission.NewVersionedAttributes(v.attr, gvk, v.objectInterfaces)
+	if err != nil {
+		return nil, err
+	}
+	v.versionedAttrs[gvk] = versionedAttr
+	return versionedAttr, nil
+}
+
 var _ generic.Dispatcher = &validatingDispatcher{}
 
 func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces, hooks []webhook.WebhookAccessor) error {
 	var relevantHooks []*generic.WebhookInvocation
 	// Construct all the versions we need to call our webhooks
-	versionedAttrs := map[schema.GroupVersionKind]*generic.VersionedAttributes{}
+	versionedAttrAccessor := &versionedAttributeAccessor{
+		versionedAttrs:   map[schema.GroupVersionKind]*admission.VersionedAttributes{},
+		attr:             attr,
+		objectInterfaces: o,
+	}
 	for _, hook := range hooks {
-		invocation, statusError := d.plugin.ShouldCallHook(hook, attr, o)
+		invocation, statusError := d.plugin.ShouldCallHook(ctx, hook, attr, o, versionedAttrAccessor)
 		if statusError != nil {
 			return statusError
 		}
 		if invocation == nil {
 			continue
 		}
+
 		relevantHooks = append(relevantHooks, invocation)
-		// If we already have this version, continue
-		if _, ok := versionedAttrs[invocation.Kind]; ok {
-			continue
-		}
-		versionedAttr, err := generic.NewVersionedAttributes(attr, invocation.Kind, o)
+		// VersionedAttr result will be cached and reused later during parallel webhook calls
+		_, err := versionedAttrAccessor.VersionedAttribute(invocation.Kind)
 		if err != nil {
 			return apierrors.NewInternalError(err)
 		}
-		versionedAttrs[invocation.Kind] = versionedAttr
 	}
 
 	if len(relevantHooks) == 0 {
@@ -108,7 +129,7 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attr
 		go func(invocation *generic.WebhookInvocation, idx int) {
 			ignoreClientCallFailures := false
 			hookName := "unknown"
-			versionedAttr := versionedAttrs[invocation.Kind]
+			versionedAttr := versionedAttrAccessor.versionedAttrs[invocation.Kind]
 			// The ordering of these two defers is critical. The wg.Done will release the parent go func to close the errCh
 			// that is used by the second defer to report errors. The recovery and error reporting must be done first.
 			defer wg.Done()
@@ -215,7 +236,7 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attr
 	return errs[0]
 }
 
-func (d *validatingDispatcher) callHook(ctx context.Context, h *v1.ValidatingWebhook, invocation *generic.WebhookInvocation, attr *generic.VersionedAttributes) error {
+func (d *validatingDispatcher) callHook(ctx context.Context, h *v1.ValidatingWebhook, invocation *generic.WebhookInvocation, attr *admission.VersionedAttributes) error {
 	if attr.Attributes.IsDryRun() {
 		if h.SideEffects == nil {
 			return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Webhook SideEffects is nil"), Status: apierrors.NewBadRequest("Webhook SideEffects is nil")}

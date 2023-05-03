@@ -1,21 +1,34 @@
 //go:build windows
-// +build windows
+
+/*
+Copyright 2022 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 
 package kubelet
 
 import (
+	"context"
 	"fmt"
+	"os/exec"
 	"strings"
 )
 
-// getLoggingCmd returns the powershell cmd and arguments for the given journalArgs and boot
-func getLoggingCmd(a *journalArgs, boot int) (string, []string) {
-	// The WinEvent log does not support querying by boot
-	// Set the cmd to return true on windows in case boot is not 0
-	if boot != 0 {
-		return "cd.", []string{}
-	}
+const powershellExe = "PowerShell.exe"
 
+// getLoggingCmd returns the powershell cmd and arguments for the given nodeLogQuery and boot
+func getLoggingCmd(n *nodeLogQuery, services []string) (string, []string, error) {
 	args := []string{
 		"-NonInteractive",
 		"-ExecutionPolicy", "Bypass",
@@ -23,32 +36,56 @@ func getLoggingCmd(a *journalArgs, boot int) (string, []string) {
 	}
 
 	psCmd := "Get-WinEvent -FilterHashtable @{LogName='Application'"
-	if len(a.Since) > 0 {
-		psCmd += fmt.Sprintf("; StartTime='%s'", a.Since)
+	if len(n.Since) > 0 {
+		psCmd += fmt.Sprintf("; StartTime='%s'", n.Since)
+	} else if n.SinceTime != nil {
+		psCmd += fmt.Sprintf("; StartTime='%s'", n.SinceTime.Format(dateLayout))
 	}
-	if len(a.Until) > 0 {
-		psCmd += fmt.Sprintf("; EndTime='%s'", a.Until)
+
+	if len(n.Until) > 0 {
+		psCmd += fmt.Sprintf("; EndTime='%s'", n.Until)
+	} else if n.UntilTime != nil {
+		psCmd += fmt.Sprintf("; EndTime='%s'", n.UntilTime.Format(dateLayout))
 	}
-	var units []string
-	for _, unit := range a.Units {
-		if len(unit) > 0 {
-			units = append(units, "'"+unit+"'")
+	var providers []string
+	for _, service := range services {
+		if len(service) > 0 {
+			providers = append(providers, "'"+service+"'")
 		}
 	}
-	if len(units) > 0 {
-		psCmd += fmt.Sprintf("; ProviderName=%s", strings.Join(units, ","))
+	if len(providers) > 0 {
+		psCmd += fmt.Sprintf("; ProviderName=%s", strings.Join(providers, ","))
 	}
 	psCmd += "}"
-	if a.Tail > 0 {
-		psCmd += fmt.Sprintf(" -MaxEvents %d", a.Tail)
+	if n.TailLines != nil {
+		psCmd += fmt.Sprintf(" -MaxEvents %d", *n.TailLines)
 	}
 	psCmd += " | Sort-Object TimeCreated"
-	if len(a.Pattern) > 0 {
-		psCmd += fmt.Sprintf(" | Where-Object -Property Message -Match %s", a.Pattern)
+	if len(n.Pattern) > 0 {
+		psCmd += fmt.Sprintf(" | Where-Object -Property Message -Match '%s'", n.Pattern)
 	}
 	psCmd += " | Format-Table -AutoSize -Wrap"
 
 	args = append(args, psCmd)
 
-	return "PowerShell.exe", args
+	return powershellExe, args, nil
+}
+
+// checkForNativeLogger always returns true for Windows
+func checkForNativeLogger(ctx context.Context, service string) bool {
+	cmd := exec.CommandContext(ctx, powershellExe, []string{
+		"-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command",
+		fmt.Sprintf("Get-WinEvent -ListProvider %s | Format-Table -AutoSize", service)}...)
+
+	_, err := cmd.CombinedOutput()
+	if err != nil {
+		// Get-WinEvent will return ExitError if the service is not listed as a provider
+		if _, ok := err.(*exec.ExitError); ok {
+			return false
+		}
+		// Other errors imply that CombinedOutput failed before the command was executed,
+		// so lets to get the logs using Get-WinEvent at the call site instead of assuming
+		// the service is logging to a file
+	}
+	return true
 }

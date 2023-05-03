@@ -1,3 +1,211 @@
+## 2.9.1
+
+### Fixes
+This release fixes a longstanding issue where `ginkgo -coverpkg=./...` would not work.  This is now resolved and fixes [#1161](https://github.com/onsi/ginkgo/issues/1161) and [#995](https://github.com/onsi/ginkgo/issues/995)
+- Support -coverpkg=./... [26ca1b5]
+- document coverpkg a bit more clearly [fc44c3b]
+
+### Maintenance
+- bump various dependencies
+- Improve Documentation and fix typo (#1158) [93de676]
+
+## 2.9.0
+
+### Features
+- AttachProgressReporter is an experimental feature that allows users to provide arbitrary information when a ProgressReport is requested [28801fe]
+
+- GinkgoT() has been expanded to include several Ginkgo-specific methods [2bd5a3b]
+
+  The intent is to enable the development of third-party libraries that integrate deeply with Ginkgo using `GinkgoT()` to access Ginkgo's functionality.
+
+## 2.8.4
+
+### Features
+- Add OmitSuiteSetupNodes to JunitReportConfig (#1147) [979fbc2]
+- Add a reference to ginkgolinter in docs.index.md (#1143) [8432589]
+
+### Fixes
+- rename tools hack to see if it fixes things for downstream users [a8bb39a]
+
+### Maintenance
+- Bump golang.org/x/text (#1144) [41b2a8a]
+- Bump github.com/onsi/gomega from 1.27.0 to 1.27.1 (#1142) [7c4f583]
+
+## 2.8.3
+
+Released to fix security issue in golang.org/x/net dependency
+
+### Maintenance
+
+- Bump golang.org/x/net from 0.6.0 to 0.7.0 (#1141) [fc1a02e]
+- remove tools.go hack from documentation [0718693]
+
+## 2.8.2
+
+Ginkgo now includes a `tools.go` file in the root directory of the `ginkgo` package.  This should allow modules that simply `go get github.com/onsi/ginkgo/v2` to also pull in the CLI dependencies.  This obviates the need for consumers of Ginkgo to have their own `tools.go` file and makes it simpler to ensure that the version of the `ginkgo` CLI being used matches the version of the library.  You can simply run `go run github.com/onsi/ginkgo/v2/ginkgo` to run the version of the cli associated with your package go.mod.
+
+### Maintenance
+
+- Bump github.com/onsi/gomega from 1.26.0 to 1.27.0 (#1139) [5767b0a]
+- Fix minor typos (#1138) [e1e9723]
+- Fix link in V2 Migration Guide (#1137) [a588f60]
+
+## 2.8.1
+
+### Fixes
+- lock around default report output to avoid triggering the race detector when calling By from goroutines [2d5075a]
+- don't run ReportEntries through sprintf [febbe38]
+
+### Maintenance
+- Bump golang.org/x/tools from 0.5.0 to 0.6.0 (#1135) [11a4860]
+- test: update matrix for Go 1.20 (#1130) [4890a62]
+- Bump golang.org/x/sys from 0.4.0 to 0.5.0 (#1133) [a774638]
+- Bump github.com/onsi/gomega from 1.25.0 to 1.26.0 (#1120) [3f233bd]
+- Bump github-pages from 227 to 228 in /docs (#1131) [f9b8649]
+- Bump activesupport from 6.0.6 to 6.0.6.1 in /docs (#1127) [6f8c042]
+- Update index.md with instructions on how to upgrade Ginkgo [833a75e]
+
+## 2.8.0
+
+### Features
+
+- Introduce GinkgoHelper() to track and exclude helper functions from potential CodeLocations [e19f556]
+
+Modeled after `testing.T.Helper()`.  Now, rather than write code like:
+
+```go
+func helper(model Model) {
+    Expect(model).WithOffset(1).To(BeValid())
+    Expect(model.SerialNumber).WithOffset(1).To(MatchRegexp(/[a-f0-9]*/))
+}
+```
+
+you can stop tracking offsets (which makes nesting composing helpers nearly impossible) and simply write:
+
+```go
+func helper(model Model) {
+    GinkgoHelper()
+    Expect(model).To(BeValid())
+    Expect(model.SerialNumber).To(MatchRegexp(/[a-f0-9]*/))
+}
+```
+
+- Introduce GinkgoLabelFilter() and Label().MatchesLabelFilter() to make it possible to programmatically match filters (fixes #1119) [2f6597c]
+
+You can now write code like this:
+
+```go
+BeforeSuite(func() {
+	if Label("slow").MatchesLabelFilter(GinkgoLabelFilter()) {
+		// do slow setup
+	}
+
+	if Label("fast").MatchesLabelFilter(GinkgoLabelFilter()) {
+		// do fast setup
+	}
+})
+```
+
+to programmatically check whether a given set of labels will match the configured `--label-filter`.
+
+### Maintenance
+
+- Bump webrick from 1.7.0 to 1.8.1 in /docs (#1125) [ea4966e]
+- cdeql: add ruby language (#1124) [9dd275b]
+- dependabot: add bundler package-ecosystem for docs (#1123) [14e7bdd]
+
+## 2.7.1
+
+### Fixes
+- Bring back SuiteConfig.EmitSpecProgress to avoid compilation issue for consumers that set it manually [d2a1cb0]
+
+### Maintenance
+- Bump github.com/onsi/gomega from 1.24.2 to 1.25.0 (#1118) [cafece6]
+- Bump golang.org/x/tools from 0.4.0 to 0.5.0 (#1111) [eda66c2]
+- Bump golang.org/x/sys from 0.3.0 to 0.4.0 (#1112) [ac5ccaa]
+- Bump github.com/onsi/gomega from 1.24.1 to 1.24.2 (#1097) [eee6480]
+
+## 2.7.0
+
+### Features
+- Introduce ContinueOnFailure for Ordered containers [e0123ca] - Ordered containers that are also decorated with ContinueOnFailure will not stop running specs after the first spec fails.
+- Support for bootstrap commands to use custom data for templates (#1110) [7a2b242]
+- Support for labels and pending decorator in ginkgo outline output (#1113) [e6e3b98]
+- Color aliases for custom color support (#1101) [49fab7a]
+
+### Fixes
+- correctly ensure deterministic spec order, even if specs are generated by iterating over a map [89dda20]
+- Fix a bug where timedout specs were not correctly treated as failures when determining whether or not to run AfterAlls in an Ordered container.
+- Ensure go test coverprofile outputs to the expected location (#1105) [b0bd77b]
+
+## 2.6.1
+
+### Features
+- Override formatter colors from envvars - this is a new feature but an alternative approach involving config files might be taken in the future (#1095) [60240d1]
+
+### Fixes
+- GinkgoRecover now supports ignoring panics that match a specific, hidden, interface [301f3e2]
+
+### Maintenance
+- Bump github.com/onsi/gomega from 1.24.0 to 1.24.1 (#1077) [3643823]
+- Bump golang.org/x/tools from 0.2.0 to 0.4.0 (#1090) [f9f856e]
+- Bump nokogiri from 1.13.9 to 1.13.10 in /docs (#1091) [0d7087e]
+
+## 2.6.0
+
+### Features
+- `ReportBeforeSuite` provides access to the suite report before the suite begins.
+- Add junit config option for omitting leafnodetype (#1088) [956e6d2]
+- Add support to customize junit report config to omit spec labels (#1087) [de44005]
+
+### Fixes
+- Fix stack trace pruning so that it has a chance of working on windows [2165648]
+
+## 2.5.1
+
+### Fixes
+- skipped tests only show as 'S' when running with -v [3ab38ae]
+- Fix typo in docs/index.md (#1082) [55fc58d]
+- Fix typo in docs/index.md (#1081) [8a14f1f]
+- Fix link notation in docs/index.md (#1080) [2669612]
+- Fix typo in `--progress` deprecation message (#1076) [b4b7edc]
+
+### Maintenance
+- chore: Included githubactions in the dependabot config (#976) [baea341]
+- Bump golang.org/x/sys from 0.1.0 to 0.2.0 (#1075) [9646297]
+
+## 2.5.0
+
+### Ginkgo output now includes a timeline-view of the spec
+
+This commit changes Ginkgo's default output.  Spec details are now
+presented as a **timeline** that includes events that occur during the spec
+lifecycle interleaved with any GinkgoWriter content.  This makes is much easier
+to understand the flow of a spec and where a given failure occurs.
+
+The --progress, --slow-spec-threshold, --always-emit-ginkgo-writer flags
+and the SuppressProgressReporting decorator have all been deprecated.  Instead
+the existing -v and -vv flags better capture the level of verbosity to display.  However,
+a new --show-node-events flag is added to include node `> Enter` and `< Exit` events
+in the spec timeline.
+
+In addition, JUnit reports now include the timeline (rendered with -vv) and custom JUnit
+reports can be configured and generated using
+`GenerateJUnitReportWithConfig(report types.Report, dst string, config JunitReportConfig)`
+
+Code should continue to work unchanged with this version of Ginkgo - however if you have tooling that
+was relying on the specific output format of Ginkgo you _may_ run into issues.  Ginkgo's console output is not guaranteed to be stable for tooling and automation purposes.  You should, instead, use Ginkgo's JSON format
+to build tooling on top of as it has stronger guarantees to be stable from version to version.
+
+### Features
+- Provide details about which timeout expired [0f2fa27]
+
+### Fixes
+- Add Support Policy to docs [c70867a]
+
+### Maintenance
+- Bump github.com/onsi/gomega from 1.22.1 to 1.23.0 (#1070) [bb3b4e2]
+
 ## 2.4.0
 
 ### Features
@@ -8,7 +216,7 @@
 
 ### Fixes
 - correcting some typos (#1064) [1403d3c]
-- fix flaky internal_integration interupt specs [2105ba3]
+- fix flaky internal_integration interrupt specs [2105ba3]
 - Correct busted link in README [be6b5b9]
 
 ### Maintenance

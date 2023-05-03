@@ -57,8 +57,8 @@ func (o FileItem) File() types.OvfFile {
 }
 
 type LeaseUpdater struct {
-	pos   int64 // Number of bytes (keep first to ensure 64 bit aligment)
-	total int64 // Total number of bytes (keep first to ensure 64 bit aligment)
+	pos   int64 // Number of bytes (keep first to ensure 64 bit alignment)
+	total int64 // Total number of bytes (keep first to ensure 64 bit alignment)
 
 	lease *Lease
 

@@ -530,9 +530,9 @@ func errorDiffArguments(t *testing.T, name string, actual, expected []string) {
 // removeCommon removes common items from left list
 // makes compairing two cmdline (with lots of arguments) easier
 func removeCommon(left, right []string) []string {
-	origSet := sets.NewString(left...)
+	origSet := sets.New(left...)
 	origSet.Delete(right...)
-	return origSet.List()
+	return sets.List(origSet)
 }
 
 func TestGetControllerManagerCommand(t *testing.T) {

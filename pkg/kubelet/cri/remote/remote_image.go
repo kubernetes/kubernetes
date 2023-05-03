@@ -25,9 +25,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/status"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	tracing "k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
@@ -93,13 +91,11 @@ func (r *remoteImageService) validateServiceConnection(ctx context.Context, conn
 	klog.V(4).InfoS("Validating the CRI v1 API image version")
 	r.imageClient = runtimeapi.NewImageServiceClient(conn)
 
-	if _, err := r.imageClient.ImageFsInfo(ctx, &runtimeapi.ImageFsInfoRequest{}); err == nil {
-		klog.V(2).InfoS("Validated CRI v1 image API")
-
-	} else if status.Code(err) == codes.Unimplemented {
-		return fmt.Errorf("CRI v1 image API is not implemented for endpoint %q: %w", endpoint, err)
+	if _, err := r.imageClient.ImageFsInfo(ctx, &runtimeapi.ImageFsInfoRequest{}); err != nil {
+		return fmt.Errorf("validate CRI v1 image API for endpoint %q: %w", endpoint, err)
 	}
 
+	klog.V(2).InfoS("Validated CRI v1 image API")
 	return nil
 }
 

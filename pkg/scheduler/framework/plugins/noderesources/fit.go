@@ -24,6 +24,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+
+	"k8s.io/kubernetes/pkg/api/v1/resource"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
@@ -35,6 +37,7 @@ import (
 var _ framework.PreFilterPlugin = &Fit{}
 var _ framework.FilterPlugin = &Fit{}
 var _ framework.EnqueueExtensions = &Fit{}
+var _ framework.PreScorePlugin = &Fit{}
 var _ framework.ScorePlugin = &Fit{}
 
 const (
@@ -44,41 +47,45 @@ const (
 	// preFilterStateKey is the key in CycleState to NodeResourcesFit pre-computed data.
 	// Using the name of the plugin will likely help us avoid collisions with other plugins.
 	preFilterStateKey = "PreFilter" + Name
+
+	// preScoreStateKey is the key in CycleState to NodeResourcesFit pre-computed data for Scoring.
+	preScoreStateKey = "PreScore" + Name
 )
 
 // nodeResourceStrategyTypeMap maps strategy to scorer implementation
 var nodeResourceStrategyTypeMap = map[config.ScoringStrategyType]scorer{
 	config.LeastAllocated: func(args *config.NodeResourcesFitArgs) *resourceAllocationScorer {
-		resToWeightMap := resourcesToWeightMap(args.ScoringStrategy.Resources)
+		resources := args.ScoringStrategy.Resources
 		return &resourceAllocationScorer{
-			Name:                string(config.LeastAllocated),
-			scorer:              leastResourceScorer(resToWeightMap),
-			resourceToWeightMap: resToWeightMap,
+			Name:      string(config.LeastAllocated),
+			scorer:    leastResourceScorer(resources),
+			resources: resources,
 		}
 	},
 	config.MostAllocated: func(args *config.NodeResourcesFitArgs) *resourceAllocationScorer {
-		resToWeightMap := resourcesToWeightMap(args.ScoringStrategy.Resources)
+		resources := args.ScoringStrategy.Resources
 		return &resourceAllocationScorer{
-			Name:                string(config.MostAllocated),
-			scorer:              mostResourceScorer(resToWeightMap),
-			resourceToWeightMap: resToWeightMap,
+			Name:      string(config.MostAllocated),
+			scorer:    mostResourceScorer(resources),
+			resources: resources,
 		}
 	},
 	config.RequestedToCapacityRatio: func(args *config.NodeResourcesFitArgs) *resourceAllocationScorer {
-		resToWeightMap := resourcesToWeightMap(args.ScoringStrategy.Resources)
+		resources := args.ScoringStrategy.Resources
 		return &resourceAllocationScorer{
-			Name:                string(config.RequestedToCapacityRatio),
-			scorer:              requestedToCapacityRatioScorer(resToWeightMap, args.ScoringStrategy.RequestedToCapacityRatio.Shape),
-			resourceToWeightMap: resToWeightMap,
+			Name:      string(config.RequestedToCapacityRatio),
+			scorer:    requestedToCapacityRatioScorer(resources, args.ScoringStrategy.RequestedToCapacityRatio.Shape),
+			resources: resources,
 		}
 	},
 }
 
 // Fit is a plugin that checks if a node has sufficient resources.
 type Fit struct {
-	ignoredResources      sets.String
-	ignoredResourceGroups sets.String
-	handle                framework.Handle
+	ignoredResources                sets.String
+	ignoredResourceGroups           sets.String
+	enableInPlacePodVerticalScaling bool
+	handle                          framework.Handle
 	resourceAllocationScorer
 }
 
@@ -95,6 +102,41 @@ type preFilterState struct {
 // Clone the prefilter state.
 func (s *preFilterState) Clone() framework.StateData {
 	return s
+}
+
+// preScoreState computed at PreScore and used at Score.
+type preScoreState struct {
+	// podRequests have the same order as the resources defined in NodeResourcesBalancedAllocationArgs.Resources,
+	// same for other place we store a list like that.
+	podRequests []int64
+}
+
+// Clone implements the mandatory Clone interface. We don't really copy the data since
+// there is no need for that.
+func (s *preScoreState) Clone() framework.StateData {
+	return s
+}
+
+// PreScore calculates incoming pod's resource requests and writes them to the cycle state used.
+func (f *Fit) PreScore(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) *framework.Status {
+	state := &preScoreState{
+		podRequests: f.calculatePodResourceRequestList(pod, f.resources),
+	}
+	cycleState.Write(preScoreStateKey, state)
+	return nil
+}
+
+func getPreScoreState(cycleState *framework.CycleState) (*preScoreState, error) {
+	c, err := cycleState.Read(preScoreStateKey)
+	if err != nil {
+		return nil, fmt.Errorf("reading %q from cycleState: %w", preScoreStateKey, err)
+	}
+
+	s, ok := c.(*preScoreState)
+	if !ok {
+		return nil, fmt.Errorf("invalid PreScore state, got type %T", c)
+	}
+	return s, nil
 }
 
 // Name returns name of the plugin. It is used in logs, etc.
@@ -123,10 +165,11 @@ func NewFit(plArgs runtime.Object, h framework.Handle, fts feature.Features) (fr
 	}
 
 	return &Fit{
-		ignoredResources:         sets.NewString(args.IgnoredResources...),
-		ignoredResourceGroups:    sets.NewString(args.IgnoredResourceGroups...),
-		handle:                   h,
-		resourceAllocationScorer: *scorePlugin(args),
+		ignoredResources:                sets.NewString(args.IgnoredResources...),
+		ignoredResourceGroups:           sets.NewString(args.IgnoredResourceGroups...),
+		enableInPlacePodVerticalScaling: fts.EnableInPlacePodVerticalScaling,
+		handle:                          h,
+		resourceAllocationScorer:        *scorePlugin(args),
 	}, nil
 }
 
@@ -158,20 +201,10 @@ func NewFit(plArgs runtime.Object, h framework.Handle, fts feature.Features) (fr
 //
 // Result: CPU: 3, Memory: 3G
 func computePodResourceRequest(pod *v1.Pod) *preFilterState {
+	// pod hasn't scheduled yet so we don't need to worry about InPlacePodVerticalScalingEnabled
+	reqs := resource.PodRequests(pod, resource.PodResourcesOptions{})
 	result := &preFilterState{}
-	for _, container := range pod.Spec.Containers {
-		result.Add(container.Resources.Requests)
-	}
-
-	// take max_resource(sum_pod, any_init_container)
-	for _, container := range pod.Spec.InitContainers {
-		result.SetMaxResource(container.Resources.Requests)
-	}
-
-	// If Overhead is being utilized, add to the total requests for the pod
-	if pod.Spec.Overhead != nil {
-		result.Add(pod.Spec.Overhead)
-	}
+	result.SetMaxResource(reqs)
 	return result
 }
 
@@ -202,12 +235,15 @@ func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-// NOTE: if in-place-update (KEP 1287) gets implemented, then PodUpdate event
-// should be registered for this plugin since a Pod update may free up resources
-// that make other Pods schedulable.
 func (f *Fit) EventsToRegister() []framework.ClusterEvent {
+	podActionType := framework.Delete
+	if f.enableInPlacePodVerticalScaling {
+		// If InPlacePodVerticalScaling (KEP 1287) is enabled, then PodUpdate event should be registered
+		// for this plugin since a Pod update may free up resources that make other Pods schedulable.
+		podActionType |= framework.Update
+	}
 	return []framework.ClusterEvent{
-		{Resource: framework.Pod, ActionType: framework.Delete},
+		{Resource: framework.Pod, ActionType: podActionType},
 		{Resource: framework.Node, ActionType: framework.Add | framework.Update},
 	}
 }
@@ -338,5 +374,12 @@ func (f *Fit) Score(ctx context.Context, state *framework.CycleState, pod *v1.Po
 		return 0, framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", nodeName, err))
 	}
 
-	return f.score(pod, nodeInfo)
+	s, err := getPreScoreState(state)
+	if err != nil {
+		s = &preScoreState{
+			podRequests: f.calculatePodResourceRequestList(pod, f.resources),
+		}
+	}
+
+	return f.score(pod, nodeInfo, s.podRequests)
 }

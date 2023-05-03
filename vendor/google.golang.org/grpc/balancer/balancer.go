@@ -110,6 +110,11 @@ type SubConn interface {
 	UpdateAddresses([]resolver.Address)
 	// Connect starts the connecting for this SubConn.
 	Connect()
+	// GetOrBuildProducer returns a reference to the existing Producer for this
+	// ProducerBuilder in this SubConn, or, if one does not currently exist,
+	// creates a new one and returns it.  Returns a close function which must
+	// be called when the Producer is no longer needed.
+	GetOrBuildProducer(ProducerBuilder) (p Producer, close func())
 }
 
 // NewSubConnOptions contains options to create new SubConn.
@@ -244,7 +249,7 @@ type DoneInfo struct {
 	// ServerLoad is the load received from server. It's usually sent as part of
 	// trailing metadata.
 	//
-	// The only supported type now is *orca_v1.LoadReport.
+	// The only supported type now is *orca_v3.LoadReport.
 	ServerLoad interface{}
 }
 
@@ -371,3 +376,21 @@ type ClientConnState struct {
 // ErrBadResolverState may be returned by UpdateClientConnState to indicate a
 // problem with the provided name resolver data.
 var ErrBadResolverState = errors.New("bad resolver state")
+
+// A ProducerBuilder is a simple constructor for a Producer.  It is used by the
+// SubConn to create producers when needed.
+type ProducerBuilder interface {
+	// Build creates a Producer.  The first parameter is always a
+	// grpc.ClientConnInterface (a type to allow creating RPCs/streams on the
+	// associated SubConn), but is declared as interface{} to avoid a
+	// dependency cycle.  Should also return a close function that will be
+	// called when all references to the Producer have been given up.
+	Build(grpcClientConnInterface interface{}) (p Producer, close func())
+}
+
+// A Producer is a type shared among potentially many consumers.  It is
+// associated with a SubConn, and an implementation will typically contain
+// other methods to provide additional functionality, e.g. configuration or
+// subscription registration.
+type Producer interface {
+}

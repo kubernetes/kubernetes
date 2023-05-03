@@ -20,7 +20,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/kubectl/pkg/cmd/auth"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -33,18 +32,6 @@ func NewCmdAlpha(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 		Short: i18n.T("Commands for features in alpha"),
 		Long:  templates.LongDesc(i18n.T("These commands correspond to alpha features that are not enabled in Kubernetes clusters by default.")),
 	}
-
-	// Alpha commands should be added here. As features graduate from alpha they should move
-	// from here to the CommandGroups defined by NewKubeletCommand() in cmd.go.
-
-	authCmds := &cobra.Command{
-		Use:   "auth",
-		Short: "Inspect authorization",
-		Long:  `Inspect authorization`,
-		Run:   cmdutil.DefaultSubCommandRun(streams.ErrOut),
-	}
-	cmd.AddCommand(authCmds)
-	authCmds.AddCommand(auth.NewCmdWhoAmI(f, streams))
 
 	// NewKubeletCommand() will hide the alpha command if it has no subcommands. Overriding
 	// the help function ensures a reasonable message if someone types the hidden command anyway.

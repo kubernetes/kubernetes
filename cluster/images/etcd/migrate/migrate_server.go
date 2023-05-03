@@ -66,10 +66,10 @@ func (r *EtcdMigrateServer) Start(version *EtcdVersion) error {
 	}
 	interval := time.NewTicker(time.Millisecond * 500)
 	defer interval.Stop()
-	done := make(chan bool, 1)
+	done := make(chan bool)
 	go func() {
 		time.Sleep(time.Minute * 2)
-		done <- true
+		close(done)
 	}()
 	for {
 		select {
@@ -108,7 +108,7 @@ func (r *EtcdMigrateServer) Stop() error {
 	timedout := make(chan bool)
 	go func() {
 		time.Sleep(gracefulWait)
-		timedout <- true
+		close(timedout)
 	}()
 	go func() {
 		select {
@@ -121,7 +121,7 @@ func (r *EtcdMigrateServer) Stop() error {
 		}
 	}()
 	err = r.cmd.Wait()
-	stopped <- true
+	close(stopped)
 	if exiterr, ok := err.(*exec.ExitError); ok {
 		klog.Infof("etcd server stopped (signal: %s)", exiterr.Error())
 		// stopped

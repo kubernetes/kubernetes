@@ -286,7 +286,7 @@ func testDefaulting(t *testing.T, watchCache bool) {
 	}
 
 	t.Logf("Creating CR and expecting defaulted fields in spec, but status does not exist at all")
-	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Versions[0].Name, crd.Spec.Names.Plural})
+	fooClient := dynamicClient.Resource(schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Versions[0].Name, Resource: crd.Spec.Names.Plural})
 	foo := &unstructured.Unstructured{}
 	if err := yaml.Unmarshal([]byte(defaultingFooInstance), &foo.Object); err != nil {
 		t.Fatal(err)

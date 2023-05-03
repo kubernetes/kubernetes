@@ -36,8 +36,7 @@ const (
 
 // New creates Prober that will skip TLS verification while probing.
 // followNonLocalRedirects configures whether the prober should follow redirects to a different hostname.
-//
-//	If disabled, redirects to other hosts will trigger a warning result.
+// If disabled, redirects to other hosts will trigger a warning result.
 func New(followNonLocalRedirects bool) Prober {
 	tlsConfig := &tls.Config{InsecureSkipVerify: true}
 	return NewWithTLSConfig(tlsConfig, followNonLocalRedirects)
@@ -45,8 +44,7 @@ func New(followNonLocalRedirects bool) Prober {
 
 // NewWithTLSConfig takes tls config as parameter.
 // followNonLocalRedirects configures whether the prober should follow redirects to a different hostname.
-//
-//	If disabled, redirects to other hosts will trigger a warning result.
+// If disabled, redirects to other hosts will trigger a warning result.
 func NewWithTLSConfig(config *tls.Config, followNonLocalRedirects bool) Prober {
 	// We do not want the probe use node's local proxy set.
 	transport := utilnet.SetTransportDefaults(
@@ -120,7 +118,10 @@ func DoHTTPProbe(req *http.Request, client GetHTTPInterface) (probe.Result, stri
 		return probe.Success, body, body, nil
 	}
 	klog.V(4).Infof("Probe failed for %s with request headers %v, response body: %v", url.String(), headers, body)
-	return probe.Failure, fmt.Sprintf("HTTP probe failed with statuscode: %d", res.StatusCode), body, nil
+	// Note: Until https://issue.k8s.io/99425 is addressed, this user-facing failure message must not contain the response body.
+	// @deads2k recommended we return the body. Slack discussion: https://redhat-internal.slack.com/archives/C04UQLWQAP3/p1679590747021409
+	failureMsg := fmt.Sprintf("HTTP probe failed with statuscode: %d", res.StatusCode)
+	return probe.Failure, failureMsg, body, nil
 }
 
 // RedirectChecker returns a function that can be used to check HTTP redirects.

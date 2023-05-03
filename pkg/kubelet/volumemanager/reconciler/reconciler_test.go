@@ -20,7 +20,6 @@ import (
 	"crypto/md5"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"testing"
 	"time"
@@ -41,6 +40,7 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
@@ -2306,8 +2306,8 @@ func TestSyncStates(t *testing.T) {
 		{
 			name: "when two pods are using same volume and both are deleted",
 			volumePaths: []string{
-				path.Join("pod1", "volumes", "fake-plugin", "pvc-abcdef"),
-				path.Join("pod2", "volumes", "fake-plugin", "pvc-abcdef"),
+				filepath.Join("pod1", "volumes", "fake-plugin", "pvc-abcdef"),
+				filepath.Join("pod2", "volumes", "fake-plugin", "pvc-abcdef"),
 			},
 			createMountPoint: true,
 			podInfos:         []podInfo{},
@@ -2322,8 +2322,8 @@ func TestSyncStates(t *testing.T) {
 		{
 			name: "when two pods are using same volume and one of them is deleted",
 			volumePaths: []string{
-				path.Join("pod1uid", "volumes", "fake-plugin", "volume-name"),
-				path.Join("pod2uid", "volumes", "fake-plugin", "volume-name"),
+				filepath.Join("pod1uid", "volumes", "fake-plugin", "volume-name"),
+				filepath.Join("pod2uid", "volumes", "fake-plugin", "volume-name"),
 			},
 			createMountPoint: true,
 			podInfos:         []podInfo{defaultPodInfo},
@@ -2342,7 +2342,7 @@ func TestSyncStates(t *testing.T) {
 		{
 			name: "when reconstruction fails for a volume, volumes should be cleaned up",
 			volumePaths: []string{
-				path.Join("pod1", "volumes", "fake-plugin", "pvc-abcdef"),
+				filepath.Join("pod1", "volumes", "fake-plugin", "pvc-abcdef"),
 			},
 			createMountPoint: false,
 			podInfos:         []podInfo{},
@@ -2359,7 +2359,7 @@ func TestSyncStates(t *testing.T) {
 		{
 			name: "when volume exists in dsow, volume should be recorded in skipped during reconstruction",
 			volumePaths: []string{
-				path.Join("pod1uid", "volumes", "fake-plugin", "volume-name"),
+				filepath.Join("pod1uid", "volumes", "fake-plugin", "volume-name"),
 			},
 			createMountPoint: true,
 			podInfos:         []podInfo{defaultPodInfo},
@@ -2426,7 +2426,7 @@ func TestSyncStates(t *testing.T) {
 
 			rc, fakePlugin := getReconciler(tmpKubeletDir, t, mountPaths)
 			rcInstance, _ := rc.(*reconciler)
-
+			logger, _ := ktesting.NewTestContext(t)
 			for _, tpodInfo := range tc.podInfos {
 				pod := getInlineFakePod(tpodInfo.podName, tpodInfo.podUID, tpodInfo.outerVolumeName, tpodInfo.innerVolumeName)
 				volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
@@ -2436,7 +2436,7 @@ func TestSyncStates(t *testing.T) {
 				if err != nil {
 					t.Fatalf("error adding volume %s to dsow: %v", volumeSpec.Name(), err)
 				}
-				rcInstance.actualStateOfWorld.MarkVolumeAsAttached(volumeName, volumeSpec, nodeName, "")
+				rcInstance.actualStateOfWorld.MarkVolumeAsAttached(logger, volumeName, volumeSpec, nodeName, "")
 			}
 
 			rcInstance.syncStates(tmpKubeletPodDir)

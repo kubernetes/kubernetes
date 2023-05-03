@@ -9,10 +9,11 @@ import (
 // AzurePlatformStatusApplyConfiguration represents an declarative configuration of the AzurePlatformStatus type for use
 // with apply.
 type AzurePlatformStatusApplyConfiguration struct {
-	ResourceGroupName        *string                   `json:"resourceGroupName,omitempty"`
-	NetworkResourceGroupName *string                   `json:"networkResourceGroupName,omitempty"`
-	CloudName                *v1.AzureCloudEnvironment `json:"cloudName,omitempty"`
-	ARMEndpoint              *string                   `json:"armEndpoint,omitempty"`
+	ResourceGroupName        *string                              `json:"resourceGroupName,omitempty"`
+	NetworkResourceGroupName *string                              `json:"networkResourceGroupName,omitempty"`
+	CloudName                *v1.AzureCloudEnvironment            `json:"cloudName,omitempty"`
+	ARMEndpoint              *string                              `json:"armEndpoint,omitempty"`
+	ResourceTags             []AzureResourceTagApplyConfiguration `json:"resourceTags,omitempty"`
 }
 
 // AzurePlatformStatusApplyConfiguration constructs an declarative configuration of the AzurePlatformStatus type for use with
@@ -50,5 +51,18 @@ func (b *AzurePlatformStatusApplyConfiguration) WithCloudName(value v1.AzureClou
 // If called multiple times, the ARMEndpoint field is set to the value of the last call.
 func (b *AzurePlatformStatusApplyConfiguration) WithARMEndpoint(value string) *AzurePlatformStatusApplyConfiguration {
 	b.ARMEndpoint = &value
+	return b
+}
+
+// WithResourceTags adds the given value to the ResourceTags field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the ResourceTags field.
+func (b *AzurePlatformStatusApplyConfiguration) WithResourceTags(values ...*AzureResourceTagApplyConfiguration) *AzurePlatformStatusApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithResourceTags")
+		}
+		b.ResourceTags = append(b.ResourceTags, *values[i])
+	}
 	return b
 }

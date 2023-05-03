@@ -138,30 +138,30 @@ aliases:
     - Verolop # SIG Technical Lead / RelEng subproject owner / Release Manager
     - xmudrii # Release Manager
   sig-storage-approvers:
+    - gnufied
+    - jsafrane
+    - msau42
     - saad-ali
     - thockin
-    - jsafrane
-    - gnufied
-    - msau42
     - xing-yang
   # emeritus:
   # - rootfs
   sig-storage-reviewers:
+    - chrishenzie
+    - gnufied
+    - humblec
     - jsafrane
     - jingxu97
-    - msau42
-    - gnufied
-    - verult
-    - humblec
-    - xing-yang
-    - chrishenzie
-    - Jiawei0227
     - mattcary
+    - mauriciopoppe
+    - msau42
     - saikat-royc
+    - xing-yang
   # emeritus:
   # - davidz627
+  # - Jiawei0227
   # - rootfs
-
+  # - verult
   sig-scheduling-maintainers:
     - alculquicondor
     - Huang-Wei
@@ -208,6 +208,7 @@ aliases:
     - brianpursley
     - eddiezane
     - KnVerey
+    - mpuckett159
     - seans3
     - soltysh
   sig-testing-reviewers:
@@ -215,13 +216,6 @@ aliases:
     - cblecker
     - spiffxp
     - dims
-  sig-testing-approvers:
-    - bentheelder
-    - cblecker
-    - spiffxp
-    # emeritus
-    # - ixdy
-    # - krzyzacy
   sig-node-approvers:
     - Random-Liu
     - dchen1107
@@ -238,6 +232,7 @@ aliases:
     - dchen1107
     - derekwaynecarr
     - dims
+    - endocrimes
     - feiskyer
     - mtaufen
     - sjenning
@@ -251,6 +246,7 @@ aliases:
     - SergeyKanzhelev
     - bobbypage
     - pacoxu
+    - bart0sh
   sig-network-driver-approvers:
     - dcbw
     - freehan
@@ -284,13 +280,14 @@ aliases:
     - soltysh
     - smarterclayton
   sig-apps-reviewers:
+    - alculquicondor
+    - atiratree
     - janetkuo
     - kow3ns
+    - krmayankk
     - mortent
     - smarterclayton
     - soltysh
-    - krmayankk
-    - alculquicondor
   # sig-apps-emeritus:
   # - tnozicka
 
@@ -403,6 +400,7 @@ aliases:
     - soltysh
     - jsafrane
     - dims
+    - cici37
   # api-reviewers targeted by sig area
   # see https://git.k8s.io/community/sig-architecture/api-review-process.md#training-reviews
   sig-api-machinery-api-reviewers:
@@ -410,6 +408,7 @@ aliases:
     - deads2k
     - jpbetz
     - sttts
+    - cici37
   sig-apps-api-reviewers:
     - janetkuo
     - kow3ns

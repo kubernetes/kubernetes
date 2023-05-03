@@ -53,12 +53,84 @@ spec:
                 driverConfig:
                   description: driverConfig can be used to specify platform specific driver configuration. When omitted, this means no opinion and the platform is left to choose reasonable defaults. These defaults are subject to change over time.
                   properties:
+                    aws:
+                      description: aws is used to configure the AWS CSI driver.
+                      properties:
+                        kmsKeyARN:
+                          description: kmsKeyARN sets the cluster default storage class to encrypt volumes with a user-defined KMS key, rather than the default KMS key used by AWS. The value may be either the ARN or Alias ARN of a KMS key.
+                          pattern: ^arn:(aws|aws-cn|aws-us-gov):kms:[a-z0-9-]+:[0-9]{12}:(key|alias)\/.*$
+                          type: string
+                      type: object
+                    azure:
+                      description: azure is used to configure the Azure CSI driver.
+                      properties:
+                        diskEncryptionSet:
+                          description: diskEncryptionSet sets the cluster default storage class to encrypt volumes with a customer-managed encryption set, rather than the default platform-managed keys.
+                          properties:
+                            name:
+                              description: name is the name of the disk encryption set that will be set on the default storage class. The value should consist of only alphanumberic characters, underscores (_), hyphens, and be at most 80 characters in length.
+                              maxLength: 80
+                              pattern: ^[a-zA-Z0-9\_-]+$
+                              type: string
+                            resourceGroup:
+                              description: resourceGroup defines the Azure resource group that contains the disk encryption set. The value should consist of only alphanumberic characters, underscores (_), parentheses, hyphens and periods. The value should not end in a period and be at most 90 characters in length.
+                              maxLength: 90
+                              pattern: ^[\w\.\-\(\)]*[\w\-\(\)]$
+                              type: string
+                            subscriptionID:
+                              description: 'subscriptionID defines the Azure subscription that contains the disk encryption set. The value should meet the following conditions: 1. It should be a 128-bit number. 2. It should be 36 characters (32 hexadecimal characters and 4 hyphens) long. 3. It should be displayed in five groups separated by hyphens (-). 4. The first group should be 8 characters long. 5. The second, third, and fourth groups should be 4 characters long. 6. The fifth group should be 12 characters long. An Example SubscrionID: f2007bbf-f802-4a47-9336-cf7c6b89b378'
+                              maxLength: 36
+                              pattern: ^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$
+                              type: string
+                          required:
+                            - name
+                            - resourceGroup
+                            - subscriptionID
+                          type: object
+                      type: object
                     driverType:
-                      description: "driverType indicates type of CSI driver for which the driverConfig is being applied to. \n Valid values are: \n * vSphere \n Allows configuration of vsphere CSI driver topology. \n --- Consumers should treat unknown values as a NO-OP."
+                      description: 'driverType indicates type of CSI driver for which the driverConfig is being applied to. Valid values are: AWS, Azure, GCP, vSphere and omitted. Consumers should treat unknown values as a NO-OP.'
                       enum:
                         - ""
+                        - AWS
+                        - Azure
+                        - GCP
                         - vSphere
                       type: string
+                    gcp:
+                      description: gcp is used to configure the GCP CSI driver.
+                      properties:
+                        kmsKey:
+                          description: kmsKey sets the cluster default storage class to encrypt volumes with customer-supplied encryption keys, rather than the default keys managed by GCP.
+                          properties:
+                            keyRing:
+                              description: keyRing is the name of the KMS Key Ring which the KMS Key belongs to. The value should correspond to an existing KMS key ring and should consist of only alphanumeric characters, hyphens (-) and underscores (_), and be at most 63 characters in length.
+                              maxLength: 63
+                              minLength: 1
+                              pattern: ^[a-zA-Z0-9\_-]+$
+                              type: string
+                            location:
+                              description: location is the GCP location in which the Key Ring exists. The value must match an existing GCP location, or "global". Defaults to global, if not set.
+                              pattern: ^[a-zA-Z0-9\_-]+$
+                              type: string
+                            name:
+                              description: name is the name of the customer-managed encryption key to be used for disk encryption. The value should correspond to an existing KMS key and should consist of only alphanumeric characters, hyphens (-) and underscores (_), and be at most 63 characters in length.
+                              maxLength: 63
+                              minLength: 1
+                              pattern: ^[a-zA-Z0-9\_-]+$
+                              type: string
+                            projectID:
+                              description: projectID is the ID of the Project in which the KMS Key Ring exists. It must be 6 to 30 lowercase letters, digits, or hyphens. It must start with a letter. Trailing hyphens are prohibited.
+                              maxLength: 30
+                              minLength: 6
+                              pattern: ^[a-z][a-z0-9-]+[a-z0-9]$
+                              type: string
+                          required:
+                            - keyRing
+                            - name
+                            - projectID
+                          type: object
+                      type: object
                     vSphere:
                       description: vsphere is used to configure the vsphere CSI driver.
                       properties:
@@ -109,7 +181,7 @@ spec:
                     - Removed
                   type: string
                 unsupportedConfigOverrides:
-                  description: 'unsupportedConfigOverrides holds a sparse config that will override any previously set options.  It only needs to be the fields to override it will end up overlaying in the following order: 1. hardcoded defaults 2. observedConfig 3. unsupportedConfigOverrides'
+                  description: unsupportedConfigOverrides overrides the final configuration that was computed by the operator. Red Hat does not support the use of this field. Misuse of this field could lead to unexpected behavior or conflict with other configuration options. Seek guidance from the Red Hat support before using this field. Use of this property blocks cluster upgrades, it must be removed before upgrading your cluster.
                   nullable: true
                   type: object
                   x-kubernetes-preserve-unknown-fields: true

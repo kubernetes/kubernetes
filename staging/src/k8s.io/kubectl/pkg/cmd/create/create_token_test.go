@@ -19,7 +19,7 @@ package create
 import (
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"reflect"
 	"testing"
@@ -280,7 +280,7 @@ status:
 					if req.URL.Path != test.expectRequestPath {
 						t.Fatalf("expected %q, got %q", test.expectRequestPath, req.URL.Path)
 					}
-					data, err := ioutil.ReadAll(req.Body)
+					data, err := io.ReadAll(req.Body)
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -293,7 +293,7 @@ status:
 
 					return &http.Response{
 						StatusCode: code,
-						Body:       ioutil.NopCloser(bytes.NewBuffer(body)),
+						Body:       io.NopCloser(bytes.NewBuffer(body)),
 					}, nil
 				}),
 			}

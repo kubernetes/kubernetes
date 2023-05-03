@@ -18,7 +18,6 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"testing"
@@ -26,7 +25,10 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/spf13/cobra"
+
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 func TestNormalizationFuncGlobalExistence(t *testing.T) {
@@ -55,6 +57,104 @@ func TestNormalizationFuncGlobalExistence(t *testing.T) {
 	}
 }
 
+func TestKubectlSubcommandShadowPlugin(t *testing.T) {
+	tests := []struct {
+		name             string
+		args             []string
+		expectPlugin     string
+		expectPluginArgs []string
+		expectError      string
+	}{
+		{
+			name:             "test that a plugin executable is found based on command args when builtin subcommand does not exist",
+			args:             []string{"kubectl", "create", "foo", "--bar", "--bar2", "--namespace", "test-namespace"},
+			expectPlugin:     "plugin/testdata/kubectl-create-foo",
+			expectPluginArgs: []string{"--bar", "--bar2", "--namespace", "test-namespace"},
+		},
+		{
+			name:        "test that a plugin executable is not found based on command args when also builtin subcommand does not exist",
+			args:        []string{"kubectl", "create", "foo2", "--bar", "--bar2", "--namespace", "test-namespace"},
+			expectError: "unable to find a plugin executable \"kubectl-create-foo2\"",
+		},
+		{
+			name:             "test that normal commands are able to be executed, when builtin subcommand exists",
+			args:             []string{"kubectl", "create", "role", "--bar", "--bar2", "--namespace", "test-namespace"},
+			expectPlugin:     "",
+			expectPluginArgs: []string{},
+		},
+		// rest of the tests are copied from TestKubectlCommandHandlesPlugins function,
+		// just to retest them also when feature is enabled.
+		{
+			name:             "test that normal commands are able to be executed, when no plugin overshadows them",
+			args:             []string{"kubectl", "get", "foo"},
+			expectPlugin:     "",
+			expectPluginArgs: []string{},
+		},
+		{
+			name:             "test that a plugin executable is found based on command args",
+			args:             []string{"kubectl", "foo", "--bar"},
+			expectPlugin:     "plugin/testdata/kubectl-foo",
+			expectPluginArgs: []string{"--bar"},
+		},
+		{
+			name: "test that a plugin does not execute over an existing command by the same name",
+			args: []string{"kubectl", "version"},
+		},
+		{
+			name: "test that a plugin does not execute over Cobra's help command",
+			args: []string{"kubectl", "help"},
+		},
+		{
+			name: "test that a plugin does not execute over Cobra's __complete command",
+			args: []string{"kubectl", cobra.ShellCompRequestCmd},
+		},
+		{
+			name: "test that a plugin does not execute over Cobra's __completeNoDesc command",
+			args: []string{"kubectl", cobra.ShellCompNoDescRequestCmd},
+		},
+		{
+			name: "test that a flag does not break Cobra's help command",
+			args: []string{"kubectl", "--kubeconfig=/path/to/kubeconfig", "help"},
+		},
+		{
+			name: "test that a flag does not break Cobra's __complete command",
+			args: []string{"kubectl", "--kubeconfig=/path/to/kubeconfig", cobra.ShellCompRequestCmd},
+		},
+		{
+			name: "test that a flag does not break Cobra's __completeNoDesc command",
+			args: []string{"kubectl", "--kubeconfig=/path/to/kubeconfig", cobra.ShellCompNoDescRequestCmd},
+		},
+	}
+
+	for _, test := range tests {
+		cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.CmdPluginAsSubcommand}, t, func(t *testing.T) {
+			t.Run(test.name, func(t *testing.T) {
+				pluginsHandler := &testPluginHandler{
+					pluginsDirectory: "plugin/testdata",
+				}
+				ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
+
+				root := NewDefaultKubectlCommandWithArgs(KubectlOptions{PluginHandler: pluginsHandler, Arguments: test.args, IOStreams: ioStreams})
+				if err := root.Execute(); err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+
+				if pluginsHandler.err != nil && pluginsHandler.err.Error() != test.expectError {
+					t.Fatalf("unexpected error: expected %q to occur, but got %q", test.expectError, pluginsHandler.err)
+				}
+
+				if pluginsHandler.executedPlugin != test.expectPlugin {
+					t.Fatalf("unexpected plugin execution: expected %q, got %q", test.expectPlugin, pluginsHandler.executedPlugin)
+				}
+
+				if !cmp.Equal(pluginsHandler.withArgs, test.expectPluginArgs, cmpopts.EquateEmpty()) {
+					t.Fatalf("unexpected plugin execution args: expected %q, got %q", test.expectPluginArgs, pluginsHandler.withArgs)
+				}
+			})
+		})
+	}
+}
+
 func TestKubectlCommandHandlesPlugins(t *testing.T) {
 	tests := []struct {
 		name             string
@@ -66,6 +166,12 @@ func TestKubectlCommandHandlesPlugins(t *testing.T) {
 		{
 			name:             "test that normal commands are able to be executed, when no plugin overshadows them",
 			args:             []string{"kubectl", "get", "foo"},
+			expectPlugin:     "",
+			expectPluginArgs: []string{},
+		},
+		{
+			name:             "test that normal commands are able to be executed, when no plugin overshadows them and shadowing feature is not enabled",
+			args:             []string{"kubectl", "create", "foo"},
 			expectPlugin:     "",
 			expectPluginArgs: []string{},
 		},
@@ -178,7 +284,7 @@ func (h *testPluginHandler) Lookup(filename string) (string, bool) {
 		return "", false
 	}
 
-	plugins, err := ioutil.ReadDir(h.pluginsDirectory)
+	plugins, err := os.ReadDir(h.pluginsDirectory)
 	if err != nil {
 		h.err = err
 		return "", false

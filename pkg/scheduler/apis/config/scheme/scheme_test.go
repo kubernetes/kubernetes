@@ -1134,6 +1134,71 @@ profiles:
 				},
 			},
 		},
+		{
+			name: "ignorePreferredTermsOfExistingPods is enabled",
+			data: []byte(`
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+profiles:
+- pluginConfig:
+  - name: InterPodAffinity
+    args:
+      ignorePreferredTermsOfExistingPods: true
+`),
+			wantProfiles: []config.KubeSchedulerProfile{
+				{
+					SchedulerName: "default-scheduler",
+					Plugins:       defaults.PluginsV1,
+					PluginConfig: []config.PluginConfig{
+						{
+							Name: "InterPodAffinity",
+							Args: &config.InterPodAffinityArgs{
+								HardPodAffinityWeight:              1,
+								IgnorePreferredTermsOfExistingPods: true,
+							},
+						},
+						{
+							Name: "DefaultPreemption",
+							Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 10, MinCandidateNodesAbsolute: 100},
+						},
+						{
+							Name: "NodeAffinity",
+							Args: &config.NodeAffinityArgs{},
+						},
+						{
+							Name: "NodeResourcesBalancedAllocation",
+							Args: &config.NodeResourcesBalancedAllocationArgs{
+								Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+							},
+						},
+						{
+							Name: "NodeResourcesFit",
+							Args: &config.NodeResourcesFitArgs{
+								ScoringStrategy: &config.ScoringStrategy{
+									Type: config.LeastAllocated,
+									Resources: []config.ResourceSpec{
+										{Name: "cpu", Weight: 1},
+										{Name: "memory", Weight: 1},
+									},
+								},
+							},
+						},
+						{
+							Name: "PodTopologySpread",
+							Args: &config.PodTopologySpreadArgs{
+								DefaultingType: config.SystemDefaulting,
+							},
+						},
+						{
+							Name: "VolumeBinding",
+							Args: &config.VolumeBindingArgs{
+								BindTimeoutSeconds: 600,
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 	decoder := Codecs.UniversalDecoder()
 	for _, tt := range testCases {
@@ -1255,6 +1320,7 @@ profiles:
   - args:
       apiVersion: kubescheduler.config.k8s.io/v1beta2
       hardPodAffinityWeight: 5
+      ignorePreferredTermsOfExistingPods: false
       kind: InterPodAffinityArgs
     name: InterPodAffinity
   - args:
@@ -1360,6 +1426,7 @@ profiles:
   - args:
       apiVersion: kubescheduler.config.k8s.io/v1beta2
       hardPodAffinityWeight: 5
+      ignorePreferredTermsOfExistingPods: false
       kind: InterPodAffinityArgs
     name: InterPodAffinity
   - args:
@@ -1475,6 +1542,7 @@ profiles:
   - args:
       apiVersion: kubescheduler.config.k8s.io/v1beta3
       hardPodAffinityWeight: 5
+      ignorePreferredTermsOfExistingPods: false
       kind: InterPodAffinityArgs
     name: InterPodAffinity
   - args:
@@ -1578,6 +1646,7 @@ profiles:
   - args:
       apiVersion: kubescheduler.config.k8s.io/v1beta3
       hardPodAffinityWeight: 5
+      ignorePreferredTermsOfExistingPods: false
       kind: InterPodAffinityArgs
     name: InterPodAffinity
   - args:
@@ -1693,6 +1762,7 @@ profiles:
   - args:
       apiVersion: kubescheduler.config.k8s.io/v1
       hardPodAffinityWeight: 5
+      ignorePreferredTermsOfExistingPods: false
       kind: InterPodAffinityArgs
     name: InterPodAffinity
   - args:
@@ -1796,6 +1866,7 @@ profiles:
   - args:
       apiVersion: kubescheduler.config.k8s.io/v1
       hardPodAffinityWeight: 5
+      ignorePreferredTermsOfExistingPods: false
       kind: InterPodAffinityArgs
     name: InterPodAffinity
   - args:
@@ -1819,6 +1890,57 @@ profiles:
   - args:
       foo: bar
     name: OutOfTreePlugin
+  schedulerName: ""
+`,
+		},
+		{
+			name:    "v1 ignorePreferredTermsOfExistingPods is enabled",
+			version: v1.SchemeGroupVersion,
+			obj: &config.KubeSchedulerConfiguration{
+				Parallelism: 8,
+				Profiles: []config.KubeSchedulerProfile{
+					{
+						PluginConfig: []config.PluginConfig{
+							{
+								Name: "InterPodAffinity",
+								Args: &config.InterPodAffinityArgs{
+									HardPodAffinityWeight:              5,
+									IgnorePreferredTermsOfExistingPods: true,
+								},
+							},
+						},
+					},
+				},
+			},
+			want: `apiVersion: kubescheduler.config.k8s.io/v1
+clientConnection:
+  acceptContentTypes: ""
+  burst: 0
+  contentType: ""
+  kubeconfig: ""
+  qps: 0
+enableContentionProfiling: false
+enableProfiling: false
+kind: KubeSchedulerConfiguration
+leaderElection:
+  leaderElect: false
+  leaseDuration: 0s
+  renewDeadline: 0s
+  resourceLock: ""
+  resourceName: ""
+  resourceNamespace: ""
+  retryPeriod: 0s
+parallelism: 8
+podInitialBackoffSeconds: 0
+podMaxBackoffSeconds: 0
+profiles:
+- pluginConfig:
+  - args:
+      apiVersion: kubescheduler.config.k8s.io/v1
+      hardPodAffinityWeight: 5
+      ignorePreferredTermsOfExistingPods: true
+      kind: InterPodAffinityArgs
+    name: InterPodAffinity
   schedulerName: ""
 `,
 		},

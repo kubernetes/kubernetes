@@ -109,3 +109,15 @@ func (m *ValidatingAdmissionPolicyMetrics) ObserveRejection(ctx context.Context,
 	m.policyCheck.WithContext(ctx).WithLabelValues(policy, binding, "deny", state).Inc()
 	m.policyLatency.WithContext(ctx).WithLabelValues(policy, binding, "deny", state).Observe(elapsed.Seconds())
 }
+
+// ObserveAudit observes a policy validation audit annotation was published for a validation failure.
+func (m *ValidatingAdmissionPolicyMetrics) ObserveAudit(ctx context.Context, elapsed time.Duration, policy, binding, state string) {
+	m.policyCheck.WithContext(ctx).WithLabelValues(policy, binding, "audit", state).Inc()
+	m.policyLatency.WithContext(ctx).WithLabelValues(policy, binding, "audit", state).Observe(elapsed.Seconds())
+}
+
+// ObserveWarn observes a policy validation warning was published for a validation failure.
+func (m *ValidatingAdmissionPolicyMetrics) ObserveWarn(ctx context.Context, elapsed time.Duration, policy, binding, state string) {
+	m.policyCheck.WithContext(ctx).WithLabelValues(policy, binding, "warn", state).Inc()
+	m.policyLatency.WithContext(ctx).WithLabelValues(policy, binding, "warn", state).Observe(elapsed.Seconds())
+}

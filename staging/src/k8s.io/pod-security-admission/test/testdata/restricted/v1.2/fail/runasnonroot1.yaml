@@ -4,11 +4,11 @@ metadata:
   name: runasnonroot1
 spec:
   containers:
-  - image: k8s.gcr.io/pause
+  - image: registry.k8s.io/pause
     name: container1
     securityContext: {}
   initContainers:
-  - image: k8s.gcr.io/pause
+  - image: registry.k8s.io/pause
     name: initcontainer1
     securityContext: {}
   securityContext:

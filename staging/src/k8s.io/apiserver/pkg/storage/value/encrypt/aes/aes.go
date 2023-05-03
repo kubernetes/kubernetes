@@ -23,14 +23,24 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
+	"sync/atomic"
+	"time"
 
 	"k8s.io/apiserver/pkg/storage/value"
+	"k8s.io/klog/v2"
 )
 
-// gcm implements AEAD encryption of the provided values given a cipher.Block algorithm.
+type gcm struct {
+	aead      cipher.AEAD
+	nonceFunc func([]byte) error
+}
+
+// NewGCMTransformer takes the given block cipher and performs encryption and decryption on the given data.
+// It implements AEAD encryption of the provided values given a cipher.Block algorithm.
 // The authenticated data provided as part of the value.Context method must match when the same
 // value is set to and loaded from storage. In order to ensure that values cannot be copied by
 // an attacker from a location under their control, use characteristics of the storage location
@@ -43,44 +53,148 @@ import (
 // therefore transformers using this implementation *must* ensure they allow for frequent key
 // rotation. Future work should include investigation of AES-GCM-SIV as an alternative to
 // random nonces.
-type gcm struct {
-	block cipher.Block
+func NewGCMTransformer(block cipher.Block) (value.Transformer, error) {
+	aead, err := newGCM(block)
+	if err != nil {
+		return nil, err
+	}
+
+	return &gcm{aead: aead, nonceFunc: randomNonce}, nil
 }
 
-// NewGCMTransformer takes the given block cipher and performs encryption and decryption on the given
-// data.
-func NewGCMTransformer(block cipher.Block) value.Transformer {
-	return &gcm{block: block}
+// NewGCMTransformerWithUniqueKeyUnsafe is the same as NewGCMTransformer but is unsafe for general
+// use because it makes assumptions about the key underlying the block cipher.  Specifically,
+// it uses a 96-bit nonce where the first 32 bits are random data and the remaining 64 bits are
+// a monotonically incrementing atomic counter.  This means that the key must be randomly generated
+// on process startup and must never be used for encryption outside the lifetime of the process.
+// Unlike NewGCMTransformer, this function is immune to the birthday attack and thus the key can
+// be used for 2^64-1 writes without rotation.  Furthermore, cryptographic wear out of AES-GCM with
+// a sequential nonce occurs after 2^64 encryptions, which is not a concern for our use cases.
+// Even if that occurs, the nonce counter would overflow and crash the process.  We have no concerns
+// around plaintext length because all stored items are small (less than 2 MB).  To prevent the
+// chance of the block cipher being accidentally re-used, it is not taken in as input.  Instead,
+// a new random key is generated and returned on every invocation of this function.  This key is
+// used as the input to the block cipher.  If the key is stored and retrieved at a later point,
+// it can be passed to NewGCMTransformer(aes.NewCipher(key)) to construct a transformer capable
+// of decrypting values encrypted by this transformer (that transformer must not be used for encryption).
+func NewGCMTransformerWithUniqueKeyUnsafe() (value.Transformer, []byte, error) {
+	key, err := generateKey(32)
+	if err != nil {
+		return nil, nil, err
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	nonceGen := &nonceGenerator{
+		// we start the nonce counter at one billion so that we are
+		// guaranteed to detect rollover across different go routines
+		zero:  1_000_000_000,
+		fatal: die,
+	}
+	nonceGen.nonce.Add(nonceGen.zero)
+
+	transformer, err := newGCMTransformerWithUniqueKeyUnsafe(block, nonceGen)
+	if err != nil {
+		return nil, nil, err
+	}
+	return transformer, key, nil
+}
+
+func newGCMTransformerWithUniqueKeyUnsafe(block cipher.Block, nonceGen *nonceGenerator) (value.Transformer, error) {
+	aead, err := newGCM(block)
+	if err != nil {
+		return nil, err
+	}
+
+	nonceFunc := func(b []byte) error {
+		// we only need 8 bytes to store our 64 bit incrementing nonce
+		// instead of leaving the unused bytes as zeros, set those to random bits
+		// this mostly protects us from weird edge cases like a VM restore that rewinds our atomic counter
+		randNonceSize := len(b) - 8
+
+		if err := randomNonce(b[:randNonceSize]); err != nil {
+			return err
+		}
+
+		nonceGen.next(b[randNonceSize:])
+
+		return nil
+	}
+
+	return &gcm{aead: aead, nonceFunc: nonceFunc}, nil
+}
+
+func newGCM(block cipher.Block) (cipher.AEAD, error) {
+	aead, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	if nonceSize := aead.NonceSize(); nonceSize != 12 { // all data in etcd will be broken if this ever changes
+		return nil, fmt.Errorf("crypto/cipher.NewGCM returned unexpected nonce size: %d", nonceSize)
+	}
+	return aead, nil
+}
+
+func randomNonce(b []byte) error {
+	_, err := rand.Read(b)
+	return err
+}
+
+type nonceGenerator struct {
+	// even at one million encryptions per second, this counter is enough for half a million years
+	// using this struct avoids alignment bugs: https://pkg.go.dev/sync/atomic#pkg-note-BUG
+	nonce atomic.Uint64
+	zero  uint64
+	fatal func(msg string)
+}
+
+func (n *nonceGenerator) next(b []byte) {
+	incrementingNonce := n.nonce.Add(1)
+	if incrementingNonce <= n.zero {
+		// this should never happen, and is unrecoverable if it does
+		n.fatal("aes-gcm detected nonce overflow - cryptographic wear out has occurred")
+	}
+	binary.LittleEndian.PutUint64(b, incrementingNonce)
+}
+
+func die(msg string) {
+	// nolint:logcheck // we want the stack traces, log flushing, and process exiting logic from FatalDepth
+	klog.FatalDepth(1, msg)
+}
+
+// generateKey generates a random key using system randomness.
+func generateKey(length int) (key []byte, err error) {
+	defer func(start time.Time) {
+		value.RecordDataKeyGeneration(start, err)
+	}(time.Now())
+	key = make([]byte, length)
+	if _, err = rand.Read(key); err != nil {
+		return nil, err
+	}
+
+	return key, nil
 }
 
 func (t *gcm) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
-	aead, err := cipher.NewGCM(t.block)
-	if err != nil {
-		return nil, false, err
-	}
-	nonceSize := aead.NonceSize()
+	nonceSize := t.aead.NonceSize()
 	if len(data) < nonceSize {
-		return nil, false, fmt.Errorf("the stored data was shorter than the required size")
+		return nil, false, errors.New("the stored data was shorter than the required size")
 	}
-	result, err := aead.Open(nil, data[:nonceSize], data[nonceSize:], dataCtx.AuthenticatedData())
+	result, err := t.aead.Open(nil, data[:nonceSize], data[nonceSize:], dataCtx.AuthenticatedData())
 	return result, false, err
 }
 
 func (t *gcm) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, error) {
-	aead, err := cipher.NewGCM(t.block)
-	if err != nil {
-		return nil, err
+	nonceSize := t.aead.NonceSize()
+	result := make([]byte, nonceSize+t.aead.Overhead()+len(data))
+
+	if err := t.nonceFunc(result[:nonceSize]); err != nil {
+		return nil, fmt.Errorf("failed to write nonce for AES-GCM: %w", err)
 	}
-	nonceSize := aead.NonceSize()
-	result := make([]byte, nonceSize+aead.Overhead()+len(data))
-	n, err := rand.Read(result[:nonceSize])
-	if err != nil {
-		return nil, err
-	}
-	if n != nonceSize {
-		return nil, fmt.Errorf("unable to read sufficient random bytes")
-	}
-	cipherText := aead.Seal(result[nonceSize:nonceSize], result[:nonceSize], data, dataCtx.AuthenticatedData())
+
+	cipherText := t.aead.Seal(result[nonceSize:nonceSize], result[:nonceSize], data, dataCtx.AuthenticatedData())
 	return result[:nonceSize+len(cipherText)], nil
 }
 
@@ -96,7 +210,7 @@ func NewCBCTransformer(block cipher.Block) value.Transformer {
 }
 
 var (
-	ErrInvalidBlockSize    = fmt.Errorf("the stored data is not a multiple of the block size")
+	errInvalidBlockSize    = errors.New("the stored data is not a multiple of the block size")
 	errInvalidPKCS7Data    = errors.New("invalid PKCS7 data (empty or not padded)")
 	errInvalidPKCS7Padding = errors.New("invalid padding on input")
 )
@@ -104,13 +218,13 @@ var (
 func (t *cbc) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
 	blockSize := aes.BlockSize
 	if len(data) < blockSize {
-		return nil, false, fmt.Errorf("the stored data was shorter than the required size")
+		return nil, false, errors.New("the stored data was shorter than the required size")
 	}
 	iv := data[:blockSize]
 	data = data[blockSize:]
 
 	if len(data)%blockSize != 0 {
-		return nil, false, ErrInvalidBlockSize
+		return nil, false, errInvalidBlockSize
 	}
 
 	result := make([]byte, len(data))
@@ -140,7 +254,7 @@ func (t *cbc) TransformToStorage(ctx context.Context, data []byte, dataCtx value
 	result := make([]byte, blockSize+len(data)+paddingSize)
 	iv := result[:blockSize]
 	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
-		return nil, fmt.Errorf("unable to read sufficient random bytes")
+		return nil, errors.New("unable to read sufficient random bytes")
 	}
 	copy(result[blockSize:], data)
 

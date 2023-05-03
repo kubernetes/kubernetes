@@ -155,7 +155,6 @@ API rule violation: list_type_missing,k8s.io/api/core/v1,TopologySelectorLabelRe
 API rule violation: list_type_missing,k8s.io/api/core/v1,TopologySelectorTerm,MatchLabelExpressions
 API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,DaemonSetStatus,Conditions
 API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,DeploymentStatus,Conditions
-API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,FSGroupStrategyOptions,Ranges
 API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,HTTPIngressRuleValue,Paths
 API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,IPBlock,Except
 API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,IngressLoadBalancerStatus,Ingress
@@ -169,22 +168,7 @@ API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,NetworkPolic
 API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,NetworkPolicySpec,Egress
 API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,NetworkPolicySpec,Ingress
 API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,NetworkPolicySpec,PolicyTypes
-API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,PodSecurityPolicySpec,AllowedCSIDrivers
-API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,PodSecurityPolicySpec,AllowedCapabilities
-API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,PodSecurityPolicySpec,AllowedFlexVolumes
-API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,PodSecurityPolicySpec,AllowedHostPaths
-API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,PodSecurityPolicySpec,AllowedProcMountTypes
-API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,PodSecurityPolicySpec,AllowedUnsafeSysctls
-API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,PodSecurityPolicySpec,DefaultAddCapabilities
-API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,PodSecurityPolicySpec,ForbiddenSysctls
-API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,PodSecurityPolicySpec,HostPorts
-API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,PodSecurityPolicySpec,RequiredDropCapabilities
-API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,PodSecurityPolicySpec,Volumes
 API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,ReplicaSetStatus,Conditions
-API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,RunAsGroupStrategyOptions,Ranges
-API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,RunAsUserStrategyOptions,Ranges
-API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,RuntimeClassStrategyOptions,AllowedRuntimeClassNames
-API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,SupplementalGroupsStrategyOptions,Ranges
 API rule violation: list_type_missing,k8s.io/api/imagepolicy/v1alpha1,ImageReviewSpec,Containers
 API rule violation: list_type_missing,k8s.io/api/networking/v1,IPBlock,Except
 API rule violation: list_type_missing,k8s.io/api/networking/v1,IngressLoadBalancerStatus,Ingress
@@ -332,6 +316,7 @@ API rule violation: list_type_missing,k8s.io/apiserver/pkg/apis/audit/v1,PolicyR
 API rule violation: list_type_missing,k8s.io/apiserver/pkg/apis/audit/v1,PolicyRule,UserGroups
 API rule violation: list_type_missing,k8s.io/apiserver/pkg/apis/audit/v1,PolicyRule,Users
 API rule violation: list_type_missing,k8s.io/apiserver/pkg/apis/audit/v1,PolicyRule,Verbs
+API rule violation: list_type_missing,k8s.io/cloud-provider/config/v1alpha1,WebhookConfiguration,Webhooks
 API rule violation: list_type_missing,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,Controllers
 API rule violation: list_type_missing,k8s.io/controller-manager/config/v1alpha1,LeaderMigrationConfiguration,ControllerLeaders
 API rule violation: list_type_missing,k8s.io/kube-controller-manager/config/v1alpha1,GarbageCollectorControllerConfiguration,GCIgnoredResources
@@ -394,7 +379,6 @@ API rule violation: names_match,k8s.io/api/core/v1,VolumeSource,CephFS
 API rule violation: names_match,k8s.io/api/core/v1,VolumeSource,StorageOS
 API rule violation: names_match,k8s.io/api/networking/v1alpha1,ClusterCIDRSpec,IPv4
 API rule violation: names_match,k8s.io/api/networking/v1alpha1,ClusterCIDRSpec,IPv6
-API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSON,Raw
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,Ref
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,Schema
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,XEmbeddedResource
@@ -411,7 +395,6 @@ API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiexten
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaPropsOrStringArray,Property
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaPropsOrStringArray,Schema
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,CustomResourceColumnDefinition,JSONPath
-API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSON,Raw
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaProps,Ref
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaProps,Schema
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaProps,XEmbeddedResource
@@ -442,7 +425,6 @@ API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,StatusCause
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,Time,Time
 API rule violation: names_match,k8s.io/apimachinery/pkg/runtime,Unknown,ContentEncoding
 API rule violation: names_match,k8s.io/apimachinery/pkg/runtime,Unknown,ContentType
-API rule violation: names_match,k8s.io/apimachinery/pkg/runtime,Unknown,Raw
 API rule violation: names_match,k8s.io/apimachinery/pkg/util/intstr,IntOrString,IntVal
 API rule violation: names_match,k8s.io/apimachinery/pkg/util/intstr,IntOrString,StrVal
 API rule violation: names_match,k8s.io/apimachinery/pkg/util/intstr,IntOrString,Type
@@ -458,8 +440,10 @@ API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v
 API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1beta1,Cluster,TLSServerName
 API rule violation: names_match,k8s.io/cloud-provider/config/v1alpha1,CloudControllerManagerConfiguration,Generic
 API rule violation: names_match,k8s.io/cloud-provider/config/v1alpha1,CloudControllerManagerConfiguration,KubeCloudShared
+API rule violation: names_match,k8s.io/cloud-provider/config/v1alpha1,CloudControllerManagerConfiguration,NodeController
 API rule violation: names_match,k8s.io/cloud-provider/config/v1alpha1,CloudControllerManagerConfiguration,NodeStatusUpdateFrequency
 API rule violation: names_match,k8s.io/cloud-provider/config/v1alpha1,CloudControllerManagerConfiguration,ServiceController
+API rule violation: names_match,k8s.io/cloud-provider/config/v1alpha1,CloudControllerManagerConfiguration,Webhook
 API rule violation: names_match,k8s.io/cloud-provider/config/v1alpha1,CloudProviderConfiguration,CloudConfigFile
 API rule violation: names_match,k8s.io/cloud-provider/config/v1alpha1,CloudProviderConfiguration,Name
 API rule violation: names_match,k8s.io/cloud-provider/config/v1alpha1,KubeCloudSharedConfiguration,AllocateNodeCIDRs
@@ -474,6 +458,7 @@ API rule violation: names_match,k8s.io/cloud-provider/config/v1alpha1,KubeCloudS
 API rule violation: names_match,k8s.io/cloud-provider/config/v1alpha1,KubeCloudSharedConfiguration,NodeSyncPeriod
 API rule violation: names_match,k8s.io/cloud-provider/config/v1alpha1,KubeCloudSharedConfiguration,RouteReconciliationPeriod
 API rule violation: names_match,k8s.io/cloud-provider/config/v1alpha1,KubeCloudSharedConfiguration,UseServiceAccountCredentials
+API rule violation: names_match,k8s.io/cloud-provider/config/v1alpha1,WebhookConfiguration,Webhooks
 API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,Address
 API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,ClientConnection
 API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,ControllerStartInterval
@@ -555,7 +540,6 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,N
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NodeIPAMControllerConfiguration,NodeCIDRMaskSizeIPv6
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NodeIPAMControllerConfiguration,SecondaryServiceCIDR
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NodeIPAMControllerConfiguration,ServiceCIDR
-API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NodeLifecycleControllerConfiguration,EnableTaintManager
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NodeLifecycleControllerConfiguration,LargeClusterSizeThreshold
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NodeLifecycleControllerConfiguration,NodeEvictionRate
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NodeLifecycleControllerConfiguration,NodeMonitorGracePeriod

@@ -170,6 +170,7 @@ func TestNewWithDelegate(t *testing.T) {
 		"/livez/poststarthook/storage-object-count-tracker-hook",
 		"/livez/poststarthook/wrapping-post-start-hook",
 		"/metrics",
+		"/metrics/slis",
 		"/readyz",
 		"/readyz/delegate-health",
 		"/readyz/informer-sync",
@@ -298,12 +299,12 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 		AuditPolicyRuleEvaluator: policy.NewFakePolicyRuleEvaluator(auditinternal.LevelMetadata, nil),
 
 		// avoid nil panics
-		HandlerChainWaitGroup: &waitgroup.SafeWaitGroup{},
-		RequestInfoResolver:   &request.RequestInfoFactory{},
-		RequestTimeout:        10 * time.Second,
-		LongRunningFunc:       func(_ *http.Request, _ *request.RequestInfo) bool { return false },
-		lifecycleSignals:      newLifecycleSignals(),
-		TracerProvider:        tracing.NewNoopTracerProvider(),
+		NonLongRunningRequestWaitGroup: &waitgroup.SafeWaitGroup{},
+		RequestInfoResolver:            &request.RequestInfoFactory{},
+		RequestTimeout:                 10 * time.Second,
+		LongRunningFunc:                func(_ *http.Request, _ *request.RequestInfo) bool { return false },
+		lifecycleSignals:               newLifecycleSignals(),
+		TracerProvider:                 tracing.NewNoopTracerProvider(),
 	}
 
 	h := DefaultBuildHandlerChain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

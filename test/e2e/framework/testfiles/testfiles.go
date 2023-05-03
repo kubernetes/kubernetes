@@ -73,7 +73,7 @@ func Read(filePath string) ([]byte, error) {
 	for _, filesource := range filesources {
 		data, err := filesource.ReadTestFile(filePath)
 		if err != nil {
-			return nil, fmt.Errorf("fatal error retrieving test file %s: %s", filePath, err)
+			return nil, fmt.Errorf("fatal error retrieving test file %s: %w", filePath, err)
 		}
 		if data != nil {
 			return data, nil

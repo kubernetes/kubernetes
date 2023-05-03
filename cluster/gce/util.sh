@@ -327,9 +327,6 @@ function upload-tars() {
 
   for region in "${PREFERRED_REGION[@]}"; do
     suffix="-${region}"
-    if [[ "${suffix}" == "-us-central1" ]]; then
-      suffix=""
-    fi
     local staging_bucket="gs://kubernetes-staging-${project_hash}${suffix}"
 
     # Ensure the buckets are created
@@ -1184,7 +1181,6 @@ PROMETHEUS_TO_SD_ENDPOINT: $(yaml-quote "${PROMETHEUS_TO_SD_ENDPOINT:-}")
 PROMETHEUS_TO_SD_PREFIX: $(yaml-quote "${PROMETHEUS_TO_SD_PREFIX:-}")
 ENABLE_PROMETHEUS_TO_SD: $(yaml-quote "${ENABLE_PROMETHEUS_TO_SD:-false}")
 DISABLE_PROMETHEUS_TO_SD_IN_DS: $(yaml-quote "${DISABLE_PROMETHEUS_TO_SD_IN_DS:-false}")
-CONTAINER_RUNTIME: $(yaml-quote "${CONTAINER_RUNTIME:-}")
 CONTAINER_RUNTIME_ENDPOINT: $(yaml-quote "${CONTAINER_RUNTIME_ENDPOINT:-}")
 CONTAINER_RUNTIME_NAME: $(yaml-quote "${CONTAINER_RUNTIME_NAME:-}")
 CONTAINER_RUNTIME_TEST_HANDLER: $(yaml-quote "${CONTAINER_RUNTIME_TEST_HANDLER:-}")
@@ -1278,6 +1274,11 @@ EOF
   if [ -n "${RUN_CONTROLLERS:-}" ]; then
     cat >>"$file" <<EOF
 RUN_CONTROLLERS: $(yaml-quote "${RUN_CONTROLLERS}")
+EOF
+  fi
+  if [ -n "${RUN_CCM_CONTROLLERS:-}" ]; then
+    cat >>"$file" <<EOF
+RUN_CCM_CONTROLLERS: $(yaml-quote "${RUN_CCM_CONTROLLERS}")
 EOF
   fi
   if [ -n "${PROVIDER_VARS:-}" ]; then

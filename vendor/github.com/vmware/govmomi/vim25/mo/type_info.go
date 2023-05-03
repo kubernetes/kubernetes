@@ -157,7 +157,7 @@ func (t *typeInfo) build(typ reflect.Type, fn string, fi []int) {
 
 var nilValue reflect.Value
 
-// assignValue assignes a value 'pv' to the struct pointed to by 'val', given a
+// assignValue assigns a value 'pv' to the struct pointed to by 'val', given a
 // slice of field indices. It recurses into the struct until it finds the field
 // specified by the indices. It creates new values for pointer types where
 // needed.
@@ -255,4 +255,9 @@ func (t *typeInfo) LoadFromObjectContent(o types.ObjectContent) (reflect.Value, 
 	}
 
 	return v, nil
+}
+
+func IsManagedObjectType(kind string) bool {
+	_, ok := t[kind]
+	return ok
 }

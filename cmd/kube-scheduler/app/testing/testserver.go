@@ -48,13 +48,6 @@ type TestServer struct {
 	TmpDir               string       // Temp Dir used, by the apiserver
 }
 
-// Logger allows t.Testing and b.Testing to be passed to StartTestServer and StartTestServerOrDie
-type Logger interface {
-	Errorf(format string, args ...interface{})
-	Fatalf(format string, args ...interface{})
-	Logf(format string, args ...interface{})
-}
-
 // StartTestServer starts a kube-scheduler. A rest client config and a tear-down func,
 // and location of the tmpdir are returned.
 //
@@ -62,8 +55,9 @@ type Logger interface {
 //
 //	files that because Golang testing's call to os.Exit will not give a stop channel go routine
 //	enough time to remove temporary files.
-func StartTestServer(t Logger, customFlags []string) (result TestServer, err error) {
-	ctx, cancel := context.WithCancel(context.Background())
+func StartTestServer(ctx context.Context, customFlags []string) (result TestServer, err error) {
+	logger := klog.FromContext(ctx)
+	ctx, cancel := context.WithCancel(ctx)
 
 	var errCh chan error
 	tearDown := func() {
@@ -74,7 +68,7 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 		if errCh != nil {
 			err, ok := <-errCh
 			if ok && err != nil {
-				klog.ErrorS(err, "Failed to shutdown test server clearly")
+				logger.Error(err, "Failed to shutdown test server clearly")
 			}
 		}
 		if len(result.TmpDir) != 0 {
@@ -109,7 +103,7 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 		}
 		opts.SecureServing.ServerCert.CertDirectory = result.TmpDir
 
-		t.Logf("kube-scheduler will listen securely on port %d...", opts.SecureServing.BindPort)
+		logger.Info("kube-scheduler will listen securely", "port", opts.SecureServing.BindPort)
 	}
 
 	cc, sched, err := app.Setup(ctx, opts)
@@ -125,7 +119,7 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 		}
 	}(ctx)
 
-	t.Logf("Waiting for /healthz to be ok...")
+	logger.Info("Waiting for /healthz to be ok...")
 	client, err := kubernetes.NewForConfig(cc.LoopbackClientConfig)
 	if err != nil {
 		return result, fmt.Errorf("failed to create a client: %v", err)
@@ -158,15 +152,14 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 	return result, nil
 }
 
-// StartTestServerOrDie calls StartTestServer t.Fatal if it does not succeed.
-func StartTestServerOrDie(t Logger, flags []string) *TestServer {
-	result, err := StartTestServer(t, flags)
+// StartTestServerOrDie calls StartTestServer panic if it does not succeed.
+func StartTestServerOrDie(ctx context.Context, flags []string) *TestServer {
+	result, err := StartTestServer(ctx, flags)
 	if err == nil {
 		return &result
 	}
 
-	t.Fatalf("failed to launch server: %v", err)
-	return nil
+	panic(fmt.Errorf("failed to launch server: %v", err))
 }
 
 func createListenerOnFreePort() (net.Listener, int, error) {

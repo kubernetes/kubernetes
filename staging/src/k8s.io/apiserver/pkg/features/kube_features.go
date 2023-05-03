@@ -35,8 +35,16 @@ const (
 	// of code conflicts because changes are more likely to be scattered
 	// across the file.
 
+	// owner: @ivelichkovich, @tallclair
+	// alpha: v1.27
+	// kep: https://kep.k8s.io/3716
+	//
+	// Enables usage of MatchConditions fields to use CEL expressions for matching on admission webhooks
+	AdmissionWebhookMatchConditions featuregate.Feature = "AdmissionWebhookMatchConditions"
+
 	// owner: @jefftree @alexzielenski
 	// alpha: v1.26
+	// beta: v1.27
 	//
 	// Enables an single HTTP endpoint /discovery/<version> which supports native HTTP
 	// caching with ETags containing all APIResources known to the apiserver.
@@ -74,6 +82,7 @@ const (
 
 	// owner: @dashpole
 	// alpha: v1.22
+	// beta: v1.27
 	//
 	// Add support for distributed tracing in the API Server
 	APIServerTracing featuregate.Feature = "APIServerTracing"
@@ -124,6 +133,7 @@ const (
 	// owner: @aramase
 	// kep: https://kep.k8s.io/3299
 	// alpha: v1.25
+	// beta: v1.27
 	//
 	// Enables KMS v2 API for encryption at rest.
 	KMSv2 featuregate.Feature = "KMSv2"
@@ -141,6 +151,7 @@ const (
 	// kep: https://kep.k8s.io/2896
 	// alpha: v1.23
 	// beta: v1.24
+	// stable: v1.27
 	//
 	// Enables kubernetes to publish OpenAPI v3
 	OpenAPIV3 featuregate.Feature = "OpenAPIV3"
@@ -198,6 +209,19 @@ const (
 	//
 	// Enables support for watch bookmark events.
 	WatchBookmark featuregate.Feature = "WatchBookmark"
+
+	// owner: @vinaykul
+	// kep: http://kep.k8s.io/1287
+	// alpha: v1.27
+	//
+	// Enables In-Place Pod Vertical Scaling
+	InPlacePodVerticalScaling featuregate.Feature = "InPlacePodVerticalScaling"
+
+	// owner: @p0lyn0mial
+	// alpha: v1.27
+	//
+	// Allow the API server to stream individual items instead of chunking
+	WatchList featuregate.Feature = "WatchList"
 )
 
 func init() {
@@ -208,7 +232,10 @@ func init() {
 // To add a new feature, define a key for it above and add it here. The features will be
 // available throughout Kubernetes binaries.
 var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	AggregatedDiscoveryEndpoint: {Default: false, PreRelease: featuregate.Alpha},
+
+	AggregatedDiscoveryEndpoint: {Default: true, PreRelease: featuregate.Beta},
+
+	AdmissionWebhookMatchConditions: {Default: false, PreRelease: featuregate.Alpha},
 
 	APIListChunking: {Default: true, PreRelease: featuregate.Beta},
 
@@ -218,9 +245,9 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	APIServerIdentity: {Default: true, PreRelease: featuregate.Beta},
 
-	APIServerTracing: {Default: false, PreRelease: featuregate.Alpha},
+	APIServerTracing: {Default: true, PreRelease: featuregate.Beta},
 
-	AdvancedAuditing: {Default: true, PreRelease: featuregate.GA},
+	AdvancedAuditing: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 
 	ValidatingAdmissionPolicy: {Default: false, PreRelease: featuregate.Alpha},
 
@@ -230,11 +257,11 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	EfficientWatchResumption: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
-	KMSv2: {Default: false, PreRelease: featuregate.Alpha},
+	KMSv2: {Default: true, PreRelease: featuregate.Beta},
 
 	OpenAPIEnums: {Default: true, PreRelease: featuregate.Beta},
 
-	OpenAPIV3: {Default: true, PreRelease: featuregate.Beta},
+	OpenAPIV3: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 
 	RemainingItemCount: {Default: true, PreRelease: featuregate.Beta},
 
@@ -242,11 +269,15 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	ServerSideApply: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 
-	ServerSideFieldValidation: {Default: true, PreRelease: featuregate.Beta},
+	ServerSideFieldValidation: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 
 	StorageVersionAPI: {Default: false, PreRelease: featuregate.Alpha},
 
 	StorageVersionHash: {Default: true, PreRelease: featuregate.Beta},
 
 	WatchBookmark: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+
+	InPlacePodVerticalScaling: {Default: false, PreRelease: featuregate.Alpha},
+
+	WatchList: {Default: false, PreRelease: featuregate.Alpha},
 }

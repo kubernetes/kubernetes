@@ -48,8 +48,8 @@ import (
 )
 
 const (
-	NodePrepareResourceMethod   = "/v1alpha1.Node/NodePrepareResource"
-	NodeUnprepareResourceMethod = "/v1alpha1.Node/NodeUnprepareResource"
+	NodePrepareResourceMethod   = "/v1alpha2.Node/NodePrepareResource"
+	NodeUnprepareResourceMethod = "/v1alpha2.Node/NodeUnprepareResource"
 )
 
 type Nodes struct {
@@ -59,7 +59,7 @@ type Nodes struct {
 // NewNodes selects nodes to run the test on.
 func NewNodes(f *framework.Framework, minNodes, maxNodes int) *Nodes {
 	nodes := &Nodes{}
-	ginkgo.BeforeEach(func() {
+	ginkgo.BeforeEach(func(ctx context.Context) {
 		ginkgo.By("selecting nodes")
 		// The kubelet plugin is harder. We deploy the builtin manifest
 		// after patching in the driver name and all nodes on which we
@@ -67,7 +67,7 @@ func NewNodes(f *framework.Framework, minNodes, maxNodes int) *Nodes {
 		//
 		// Only a subset of the nodes are picked to avoid causing
 		// unnecessary load on a big cluster.
-		nodeList, err := e2enode.GetBoundedReadySchedulableNodes(f.ClientSet, maxNodes)
+		nodeList, err := e2enode.GetBoundedReadySchedulableNodes(ctx, f.ClientSet, maxNodes)
 		framework.ExpectNoError(err, "get nodes")
 		numNodes := int32(len(nodeList.Items))
 		if int(numNodes) < minNodes {
@@ -140,10 +140,7 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 	d.ctx = ctx
 	d.cleanup = append(d.cleanup, cancel)
 
-	// The controller is easy: we simply connect to the API server. It
-	// would be slightly nicer if we had a way to wait for all goroutines, but
-	// SharedInformerFactory has no API for that. At least we can wait
-	// for our own goroutine to stop once the context gets cancelled.
+	// The controller is easy: we simply connect to the API server.
 	d.Controller = app.NewController(d.f.ClientSet, d.Name, resources)
 	d.wg.Add(1)
 	go func() {
@@ -160,7 +157,7 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 	rsName := ""
 	draAddr := path.Join(framework.TestContext.KubeletRootDir, "plugins", d.Name+".sock")
 	numNodes := int32(len(nodes.NodeNames))
-	undeploy, err := utils.CreateFromManifests(d.f, d.f.Namespace, func(item interface{}) error {
+	err := utils.CreateFromManifests(ctx, d.f, d.f.Namespace, func(item interface{}) error {
 		switch item := item.(type) {
 		case *appsv1.ReplicaSet:
 			item.Name += d.NameSuffix
@@ -192,13 +189,12 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 		return nil
 	}, manifests...)
 	framework.ExpectNoError(err, "deploy kubelet plugin replicaset")
-	d.cleanup = append(d.cleanup, undeploy)
 
 	rs, err := d.f.ClientSet.AppsV1().ReplicaSets(d.f.Namespace.Name).Get(ctx, rsName, metav1.GetOptions{})
 	framework.ExpectNoError(err, "get replicaset")
 
 	// Wait for all pods to be running.
-	if err := e2ereplicaset.WaitForReplicaSetTargetAvailableReplicas(d.f.ClientSet, rs, numNodes); err != nil {
+	if err := e2ereplicaset.WaitForReplicaSetTargetAvailableReplicas(ctx, d.f.ClientSet, rs, numNodes); err != nil {
 		framework.ExpectNoError(err, "all kubelet plugin proxies running")
 	}
 	requirement, err := labels.NewRequirement(instanceKey, selection.Equals, []string{d.Name})

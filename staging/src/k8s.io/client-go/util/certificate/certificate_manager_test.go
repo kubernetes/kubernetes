@@ -276,7 +276,6 @@ func TestSetRotationDeadline(t *testing.T) {
 					},
 				},
 				getTemplate: func() *x509.CertificateRequest { return &x509.CertificateRequest{} },
-				usages:      []certificatesv1.KeyUsage{},
 				now:         func() time.Time { return now },
 				logf:        t.Logf,
 			}
@@ -472,7 +471,6 @@ func TestRotateCertCreateCSRError(t *testing.T) {
 			},
 		},
 		getTemplate: func() *x509.CertificateRequest { return &x509.CertificateRequest{} },
-		usages:      []certificatesv1.KeyUsage{},
 		clientsetFn: func(_ *tls.Certificate) (clientset.Interface, error) {
 			return newClientset(fakeClient{failureType: createError}), nil
 		},
@@ -497,7 +495,6 @@ func TestRotateCertWaitingForResultError(t *testing.T) {
 			},
 		},
 		getTemplate: func() *x509.CertificateRequest { return &x509.CertificateRequest{} },
-		usages:      []certificatesv1.KeyUsage{},
 		clientsetFn: func(_ *tls.Certificate) (clientset.Interface, error) {
 			return newClientset(fakeClient{failureType: watchError}), nil
 		},

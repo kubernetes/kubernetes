@@ -85,7 +85,7 @@ func TestSecretsShouldBeTransformed(t *testing.T) {
 		// TODO: add secretbox
 	}
 	for _, tt := range testCases {
-		test, err := newTransformTest(t, tt.transformerConfigContent, false, "", false)
+		test, err := newTransformTest(t, tt.transformerConfigContent, false, "")
 		if err != nil {
 			test.cleanUp()
 			t.Errorf("failed to setup test for envelop %s, error was %v", tt.transformerPrefix, err)
@@ -120,7 +120,7 @@ func BenchmarkAESCBCEnvelopeWrite(b *testing.B) {
 
 func runBenchmark(b *testing.B, transformerConfig string) {
 	b.StopTimer()
-	test, err := newTransformTest(b, transformerConfig, false, "", false)
+	test, err := newTransformTest(b, transformerConfig, false, "")
 	defer test.cleanUp()
 	if err != nil {
 		b.Fatalf("failed to setup benchmark for config %s, error was %v", transformerConfig, err)
@@ -140,7 +140,10 @@ func unSealWithGCMTransformer(ctx context.Context, cipherText []byte, dataCtx va
 		return nil, fmt.Errorf("failed to create block cipher: %v", err)
 	}
 
-	gcmTransformer := aestransformer.NewGCMTransformer(block)
+	gcmTransformer, err := aestransformer.NewGCMTransformer(block)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transformer from block: %v", err)
+	}
 
 	clearText, _, err := gcmTransformer.TransformFromStorage(ctx, cipherText, dataCtx)
 	if err != nil {

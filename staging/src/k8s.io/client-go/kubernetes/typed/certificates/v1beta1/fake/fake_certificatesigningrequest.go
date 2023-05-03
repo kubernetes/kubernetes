@@ -26,7 +26,6 @@ import (
 	v1beta1 "k8s.io/api/certificates/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	certificatesv1beta1 "k8s.io/client-go/applyconfigurations/certificates/v1beta1"
@@ -38,9 +37,9 @@ type FakeCertificateSigningRequests struct {
 	Fake *FakeCertificatesV1beta1
 }
 
-var certificatesigningrequestsResource = schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1beta1", Resource: "certificatesigningrequests"}
+var certificatesigningrequestsResource = v1beta1.SchemeGroupVersion.WithResource("certificatesigningrequests")
 
-var certificatesigningrequestsKind = schema.GroupVersionKind{Group: "certificates.k8s.io", Version: "v1beta1", Kind: "CertificateSigningRequest"}
+var certificatesigningrequestsKind = v1beta1.SchemeGroupVersion.WithKind("CertificateSigningRequest")
 
 // Get takes name of the certificateSigningRequest, and returns the corresponding certificateSigningRequest object, and an error if there is any.
 func (c *FakeCertificateSigningRequests) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.CertificateSigningRequest, err error) {

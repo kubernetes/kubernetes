@@ -77,3 +77,15 @@ The configuration file under `config/performance-config.yaml` contains a default
 various scenarios. In case you want to add your own, you can extend the list with new templates.
 It's also possible to extend `op` data type, respectively its underlying data types
 to extend configuration of possible test cases.
+
+### Logging
+
+The default verbosity is 2 (the recommended value for production). -v can be
+used to change this. The log format can be changed with
+-logging-format=text|json. The default is to write into a log file (when using
+the text format) or stderr (when using JSON). Together these options allow
+simulating different real production configurations and to compare their
+performance.
+
+During interactive debugging sessions it is possible to enable per-test output
+via -use-testing-log.

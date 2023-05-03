@@ -40,9 +40,10 @@ type REST struct {
 // NewREST returns a registry which will store CertificateSigningRequest in the given helper.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *ApprovalREST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &certificates.CertificateSigningRequest{} },
-		NewListFunc:              func() runtime.Object { return &certificates.CertificateSigningRequestList{} },
-		DefaultQualifiedResource: certificates.Resource("certificatesigningrequests"),
+		NewFunc:                   func() runtime.Object { return &certificates.CertificateSigningRequest{} },
+		NewListFunc:               func() runtime.Object { return &certificates.CertificateSigningRequestList{} },
+		DefaultQualifiedResource:  certificates.Resource("certificatesigningrequests"),
+		SingularQualifiedResource: certificates.Resource("certificatesigningrequest"),
 
 		CreateStrategy:      csrregistry.Strategy,
 		UpdateStrategy:      csrregistry.Strategy,

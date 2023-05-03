@@ -27,6 +27,8 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+	"golang.org/x/crypto/cryptobyte"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -37,7 +39,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-func getControlPlaneHostname(node *v1.Node) (string, error) {
+func getControlPlaneHostname(ctx context.Context, node *v1.Node) (string, error) {
 	nodeAddresses := e2enode.GetAddresses(node, v1.NodeExternalIP)
 	if len(nodeAddresses) == 0 {
 		return "", errors.New("no valid addresses to use for SSH")
@@ -46,7 +48,7 @@ func getControlPlaneHostname(node *v1.Node) (string, error) {
 	controlPlaneAddress := nodeAddresses[0]
 
 	host := controlPlaneAddress + ":" + e2essh.SSHPort
-	result, err := e2essh.SSH("hostname", host, framework.TestContext.Provider)
+	result, err := e2essh.SSH(ctx, "hostname", host, framework.TestContext.Provider)
 	if err != nil {
 		return "", err
 	}
@@ -59,7 +61,7 @@ func getControlPlaneHostname(node *v1.Node) (string, error) {
 }
 
 // restartAPIServer attempts to restart the kube-apiserver on a node
-func restartAPIServer(node *v1.Node) error {
+func restartAPIServer(ctx context.Context, node *v1.Node) error {
 	nodeAddresses := e2enode.GetAddresses(node, v1.NodeExternalIP)
 	if len(nodeAddresses) == 0 {
 		return errors.New("no valid addresses to use for SSH")
@@ -68,10 +70,10 @@ func restartAPIServer(node *v1.Node) error {
 	controlPlaneAddress := nodeAddresses[0]
 	cmd := "pidof kube-apiserver | xargs sudo kill"
 	framework.Logf("Restarting kube-apiserver via ssh, running: %v", cmd)
-	result, err := e2essh.SSH(cmd, net.JoinHostPort(controlPlaneAddress, e2essh.SSHPort), framework.TestContext.Provider)
+	result, err := e2essh.SSH(ctx, cmd, net.JoinHostPort(controlPlaneAddress, e2essh.SSHPort), framework.TestContext.Provider)
 	if err != nil || result.Code != 0 {
 		e2essh.LogResult(result)
-		return fmt.Errorf("couldn't restart kube-apiserver: %v", err)
+		return fmt.Errorf("couldn't restart kube-apiserver: %w", err)
 	}
 	return nil
 }
@@ -81,7 +83,7 @@ var _ = SIGDescribe("kube-apiserver identity [Feature:APIServerIdentity]", func(
 	f := framework.NewDefaultFramework("kube-apiserver-identity")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
-	ginkgo.It("kube-apiserver identity should persist after restart [Disruptive]", func() {
+	ginkgo.It("kube-apiserver identity should persist after restart [Disruptive]", func(ctx context.Context) {
 		e2eskipper.SkipUnlessProviderIs("gce")
 
 		client := f.ClientSet
@@ -115,24 +117,34 @@ var _ = SIGDescribe("kube-apiserver identity [Feature:APIServerIdentity]", func(
 		}
 
 		leases, err := client.CoordinationV1().Leases(metav1.NamespaceSystem).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: "k8s.io/component=kube-apiserver",
+			LabelSelector: "apiserver.kubernetes.io/identity=kube-apiserver",
 		})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(len(leases.Items), len(controlPlaneNodes), "unexpected number of leases")
 
 		for _, node := range controlPlaneNodes {
-			hostname, err := getControlPlaneHostname(&node)
+			hostname, err := getControlPlaneHostname(ctx, &node)
 			framework.ExpectNoError(err)
 
-			hash := sha256.Sum256([]byte(hostname))
-			leaseName := "kube-apiserver-" + strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(hash[:16]))
+			b := cryptobyte.NewBuilder(nil)
+			b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+				b.AddBytes([]byte(hostname))
+			})
+			b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+				b.AddBytes([]byte("kube-apiserver"))
+			})
+
+			hashData, err := b.Bytes()
+			framework.ExpectNoError(err)
+			hash := sha256.Sum256(hashData)
+			leaseName := "apiserver-" + strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(hash[:16]))
 
 			lease, err := client.CoordinationV1().Leases(metav1.NamespaceSystem).Get(context.TODO(), leaseName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			oldHolderIdentity := lease.Spec.HolderIdentity
 			lastRenewedTime := lease.Spec.RenewTime
 
-			err = restartAPIServer(&node)
+			err = restartAPIServer(ctx, &node)
 			framework.ExpectNoError(err)
 
 			err = wait.PollImmediate(time.Second, wait.ForeverTestTimeout, func() (bool, error) {
@@ -161,7 +173,7 @@ var _ = SIGDescribe("kube-apiserver identity [Feature:APIServerIdentity]", func(
 		// As long as the hostname of kube-apiserver is unchanged, a restart should not result in new Lease objects.
 		// Check that the number of lease objects remains the same after restarting kube-apiserver.
 		leases, err = client.CoordinationV1().Leases(metav1.NamespaceSystem).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: "k8s.io/component=kube-apiserver",
+			LabelSelector: "apiserver.kubernetes.io/identity=kube-apiserver",
 		})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(len(leases.Items), len(controlPlaneNodes), "unexpected number of leases")

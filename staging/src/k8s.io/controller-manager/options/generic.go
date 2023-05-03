@@ -102,6 +102,12 @@ func (o *GenericControllerManagerConfigurationOptions) Validate(allControllers [
 	errs := []error{}
 	errs = append(errs, o.Debugging.Validate()...)
 
+	// TODO: This can be removed when ResourceLock is not available
+	// Lock the ResourceLock using leases
+	if o.LeaderElection.LeaderElect && o.LeaderElection.ResourceLock != "leases" {
+		errs = append(errs, fmt.Errorf(`resourceLock value must be "leases"`))
+	}
+
 	allControllersSet := sets.NewString(allControllers...)
 	for _, controller := range o.Controllers {
 		if controller == "*" {

@@ -93,6 +93,7 @@ STORAGE_BACKEND=${STORAGE_BACKEND:-"etcd3"}
 STORAGE_MEDIA_TYPE=${STORAGE_MEDIA_TYPE:-"application/vnd.kubernetes.protobuf"}
 # preserve etcd data. you also need to set ETCD_DIR.
 PRESERVE_ETCD="${PRESERVE_ETCD:-false}"
+ENABLE_TRACING=${ENABLE_TRACING:-false}
 
 # enable Kubernetes-CSI snapshotter
 ENABLE_CSI_SNAPSHOTTER=${ENABLE_CSI_SNAPSHOTTER:-false}
@@ -217,7 +218,7 @@ LOG_LEVEL=${LOG_LEVEL:-3}
 # Use to increase verbosity on particular files, e.g. LOG_SPEC=token_controller*=5,other_controller*=4
 LOG_SPEC=${LOG_SPEC:-""}
 LOG_DIR=${LOG_DIR:-"/tmp"}
-CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-"remote"}
+TMP_DIR=${TMP_DIR:-$(kube::realpath "$(mktemp -d -t "$(basename "$0").XXXXXX")")}
 CONTAINER_RUNTIME_ENDPOINT=${CONTAINER_RUNTIME_ENDPOINT:-"unix:///run/containerd/containerd.sock"}
 RUNTIME_REQUEST_TIMEOUT=${RUNTIME_REQUEST_TIMEOUT:-"2m"}
 IMAGE_SERVICE_ENDPOINT=${IMAGE_SERVICE_ENDPOINT:-""}
@@ -412,7 +413,7 @@ function start_etcd {
 
 function set_service_accounts {
     SERVICE_ACCOUNT_LOOKUP=${SERVICE_ACCOUNT_LOOKUP:-true}
-    SERVICE_ACCOUNT_KEY=${SERVICE_ACCOUNT_KEY:-/tmp/kube-serviceaccount.key}
+    SERVICE_ACCOUNT_KEY=${SERVICE_ACCOUNT_KEY:-${TMP_DIR}/kube-serviceaccount.key}
     # Generate ServiceAccount key if needed
     if [[ ! -f "${SERVICE_ACCOUNT_KEY}" ]]; then
       mkdir -p "$(dirname "${SERVICE_ACCOUNT_KEY}")"
@@ -511,7 +512,7 @@ function start_apiserver {
     fi
 
     if [[ -z "${EGRESS_SELECTOR_CONFIG_FILE:-}" ]]; then
-      cat <<EOF > /tmp/kube_egress_selector_configuration.yaml
+      cat <<EOF > "${TMP_DIR}"/kube_egress_selector_configuration.yaml
 apiVersion: apiserver.k8s.io/v1beta1
 kind: EgressSelectorConfiguration
 egressSelections:
@@ -525,18 +526,18 @@ egressSelections:
   connection:
     proxyProtocol: Direct
 EOF
-      EGRESS_SELECTOR_CONFIG_FILE="/tmp/kube_egress_selector_configuration.yaml"
+      EGRESS_SELECTOR_CONFIG_FILE="${TMP_DIR}/kube_egress_selector_configuration.yaml"
     fi
 
     if [[ -z "${AUDIT_POLICY_FILE}" ]]; then
-      cat <<EOF > /tmp/kube-audit-policy-file
+      cat <<EOF > "${TMP_DIR}"/kube-audit-policy-file
 # Log all requests at the Metadata level.
 apiVersion: audit.k8s.io/v1
 kind: Policy
 rules:
 - level: Metadata
 EOF
-      AUDIT_POLICY_FILE="/tmp/kube-audit-policy-file"
+      AUDIT_POLICY_FILE="${TMP_DIR}/kube-audit-policy-file"
     fi
 
     APISERVER_LOG=${LOG_DIR}/kube-apiserver.log
@@ -655,8 +656,9 @@ function start_cloud_controller_manager {
     fi
 
     CLOUD_CTLRMGR_LOG=${LOG_DIR}/cloud-controller-manager.log
+    # shellcheck disable=SC2086
     ${CONTROLPLANE_SUDO} "${EXTERNAL_CLOUD_PROVIDER_BINARY:-"${GO_OUT}/cloud-controller-manager"}" \
-      "${CLOUD_CTLRMGR_FLAGS}" \
+      ${CLOUD_CTLRMGR_FLAGS} \
       --v="${LOG_LEVEL}" \
       --vmodule="${LOG_SPEC}" \
       --feature-gates="${FEATURE_GATES}" \
@@ -712,7 +714,6 @@ function start_kubelet {
     all_kubelet_flags=(
       "--v=${LOG_LEVEL}"
       "--vmodule=${LOG_SPEC}"
-      "--container-runtime=${CONTAINER_RUNTIME}"
       "--hostname-override=${HOSTNAME_OVERRIDE}"
       "${cloud_config_arg[@]}"
       "--bootstrap-kubeconfig=${CERT_DIR}/kubelet.kubeconfig"
@@ -734,7 +735,7 @@ function start_kubelet {
         generate_kubelet_certs
     fi
 
-    cat <<EOF > /tmp/kubelet.yaml
+    cat <<EOF > "${TMP_DIR}"/kubelet.yaml
 apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration
 address: "${KUBELET_HOST}"
@@ -753,6 +754,15 @@ runtimeRequestTimeout: "${RUNTIME_REQUEST_TIMEOUT}"
 staticPodPath: "${POD_MANIFEST_PATH}"
 resolvConf: "${KUBELET_RESOLV_CONF}"
 EOF
+
+  if [[ "$ENABLE_TRACING" = true ]]; then
+        cat <<EOF >> "${TMP_DIR}"/kubelet.yaml
+tracing:
+  endpoint: localhost:4317 # the default value
+  samplingRatePerMillion: 1000000 # sample always
+EOF
+    fi
+
     {
       # authentication
       echo "authentication:"
@@ -804,11 +814,11 @@ EOF
       if [[ -n ${FEATURE_GATES} ]]; then
         parse_feature_gates "${FEATURE_GATES}"
       fi
-    } >>/tmp/kubelet.yaml
+    } >>"${TMP_DIR}"/kubelet.yaml
 
     # shellcheck disable=SC2024
     sudo -E "${GO_OUT}/kubelet" "${all_kubelet_flags[@]}" \
-      --config=/tmp/kubelet.yaml >"${KUBELET_LOG}" 2>&1 &
+      --config="${TMP_DIR}"/kubelet.yaml >"${KUBELET_LOG}" 2>&1 &
     KUBELET_PID=$!
 
     # Quick check that kubelet is running.
@@ -828,7 +838,7 @@ function start_kubeproxy {
       wait_node_ready
     fi
 
-    cat <<EOF > /tmp/kube-proxy.yaml
+    cat <<EOF > "${TMP_DIR}"/kube-proxy.yaml
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
 kind: KubeProxyConfiguration
 clientConnection:
@@ -845,7 +855,7 @@ conntrack:
 EOF
     if [[ -n ${FEATURE_GATES} ]]; then
       parse_feature_gates "${FEATURE_GATES}"
-    fi >>/tmp/kube-proxy.yaml
+    fi >>"${TMP_DIR}"/kube-proxy.yaml
 
     if [[ "${REUSE_CERTS}" != true ]]; then
         generate_kubeproxy_certs
@@ -854,7 +864,7 @@ EOF
     # shellcheck disable=SC2024
     sudo "${GO_OUT}/kube-proxy" \
       --v="${LOG_LEVEL}" \
-      --config=/tmp/kube-proxy.yaml \
+      --config="${TMP_DIR}"/kube-proxy.yaml \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${PROXY_LOG}" 2>&1 &
     PROXY_PID=$!
 }
@@ -862,7 +872,7 @@ EOF
 function start_kubescheduler {
     SCHEDULER_LOG=${LOG_DIR}/kube-scheduler.log
 
-    cat <<EOF > /tmp/kube-scheduler.yaml
+    cat <<EOF > "${TMP_DIR}"/kube-scheduler.yaml
 apiVersion: kubescheduler.config.k8s.io/v1
 kind: KubeSchedulerConfiguration
 clientConnection:
@@ -872,7 +882,7 @@ leaderElection:
 EOF
     ${CONTROLPLANE_SUDO} "${GO_OUT}/kube-scheduler" \
       --v="${LOG_LEVEL}" \
-      --config=/tmp/kube-scheduler.yaml \
+      --config="${TMP_DIR}"/kube-scheduler.yaml \
       --feature-gates="${FEATURE_GATES}" \
       --authentication-kubeconfig "${CERT_DIR}"/scheduler.kubeconfig \
       --authorization-kubeconfig "${CERT_DIR}"/scheduler.kubeconfig \
@@ -947,9 +957,17 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
   else
     echo "Local Kubernetes cluster is running."
   fi
+
+  echo
+  echo "Configurations:"
+  for f in "${TMP_DIR}"/*; do
+    echo "  ${f}"
+  done
+
   cat <<EOF
 
 Logs:
+  ${ETCD_LOGFILE:-}
   ${APISERVER_LOG:-}
   ${CTLRMGR_LOG:-}
   ${CLOUD_CTLRMGR_LOG:-}
@@ -1021,13 +1039,13 @@ function parse_eviction {
 function install_cni {
   cni_plugin_sha=CNI_PLUGINS_${CNI_TARGETARCH^^}_SHA256SUM
   echo "Installing CNI plugin binaries ..." \
-    && curl -sSL --retry 5 --output /tmp/cni."${CNI_TARGETARCH}".tgz "${CNI_PLUGINS_URL}" \
-    && echo "${!cni_plugin_sha} /tmp/cni.${CNI_TARGETARCH}.tgz" | tee /tmp/cni.sha256 \
-    && sha256sum --ignore-missing -c /tmp/cni.sha256 \
-    && rm -f /tmp/cni.sha256 \
+    && curl -sSL --retry 5 --output "${TMP_DIR}"/cni."${CNI_TARGETARCH}".tgz "${CNI_PLUGINS_URL}" \
+    && echo "${!cni_plugin_sha} ${TMP_DIR}/cni.${CNI_TARGETARCH}.tgz" | tee "${TMP_DIR}"/cni.sha256 \
+    && sha256sum --ignore-missing -c "${TMP_DIR}"/cni.sha256 \
+    && rm -f "${TMP_DIR}"/cni.sha256 \
     && sudo mkdir -p /opt/cni/bin \
-    && sudo tar -C /opt/cni/bin -xzvf /tmp/cni."${CNI_TARGETARCH}".tgz \
-    && rm -rf /tmp/cni."${CNI_TARGETARCH}".tgz \
+    && sudo tar -C /opt/cni/bin -xzvf "${TMP_DIR}"/cni."${CNI_TARGETARCH}".tgz \
+    && rm -rf "${TMP_DIR}"/cni."${CNI_TARGETARCH}".tgz \
     && sudo find /opt/cni/bin -type f -not \( \
          -iname host-local \
          -o -iname bridge \
@@ -1130,9 +1148,10 @@ if [ "${GO_OUT}" == "" ]; then
 fi
 echo "Detected host and ready to start services.  Doing some housekeeping first..."
 echo "Using GO_OUT ${GO_OUT}"
-export KUBELET_CIDFILE=/tmp/kubelet.cid
+export KUBELET_CIDFILE=${TMP_DIR}/kubelet.cid
 if [[ "${ENABLE_DAEMON}" = false ]]; then
   trap cleanup EXIT
+  trap cleanup INT
 fi
 
 echo "Starting services now!"

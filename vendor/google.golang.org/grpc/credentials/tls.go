@@ -195,7 +195,7 @@ func NewServerTLSFromFile(certFile, keyFile string) (TransportCredentials, error
 // TLSChannelzSecurityValue defines the struct that TLS protocol should return
 // from GetSecurityValue(), containing security info like cipher and certificate used.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This type is EXPERIMENTAL and may be changed or removed in a
 // later release.

@@ -17,6 +17,7 @@ limitations under the License.
 package autoscaling
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -38,8 +39,8 @@ type HPAUpgradeTest struct {
 func (HPAUpgradeTest) Name() string { return "hpa-upgrade" }
 
 // Setup creates a resource consumer and an HPA object that autoscales the consumer.
-func (t *HPAUpgradeTest) Setup(f *framework.Framework) {
-	t.rc = e2eautoscaling.NewDynamicResourceConsumer(
+func (t *HPAUpgradeTest) Setup(ctx context.Context, f *framework.Framework) {
+	t.rc = e2eautoscaling.NewDynamicResourceConsumer(ctx,
 		"res-cons-upgrade",
 		f.Namespace.Name,
 		e2eautoscaling.KindRC,
@@ -53,49 +54,49 @@ func (t *HPAUpgradeTest) Setup(f *framework.Framework) {
 		f.ScalesGetter,
 		e2eautoscaling.Disable,
 		e2eautoscaling.Idle)
-	t.hpa = e2eautoscaling.CreateCPUResourceHorizontalPodAutoscaler(
+	t.hpa = e2eautoscaling.CreateCPUResourceHorizontalPodAutoscaler(ctx,
 		t.rc,
 		20, /* targetCPUUtilizationPercent */
 		1,  /* minPods */
 		5)  /* maxPods */
 
 	t.rc.Pause()
-	t.test()
+	t.test(ctx)
 }
 
 // Test waits for upgrade to complete and verifies if HPA works correctly.
-func (t *HPAUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
+func (t *HPAUpgradeTest) Test(ctx context.Context, f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
 	// Block until upgrade is done
 	ginkgo.By(fmt.Sprintf("Waiting for upgrade to finish before checking HPA"))
 	<-done
-	t.test()
+	t.test(ctx)
 }
 
 // Teardown cleans up any remaining resources.
-func (t *HPAUpgradeTest) Teardown(f *framework.Framework) {
+func (t *HPAUpgradeTest) Teardown(ctx context.Context, f *framework.Framework) {
 	// rely on the namespace deletion to clean up everything
-	e2eautoscaling.DeleteHorizontalPodAutoscaler(t.rc, t.hpa.Name)
-	t.rc.CleanUp()
+	e2eautoscaling.DeleteHorizontalPodAutoscaler(ctx, t.rc, t.hpa.Name)
+	t.rc.CleanUp(ctx)
 }
 
-func (t *HPAUpgradeTest) test() {
+func (t *HPAUpgradeTest) test(ctx context.Context) {
 	const timeToWait = 15 * time.Minute
-	t.rc.Resume()
+	t.rc.Resume(ctx)
 
 	ginkgo.By(fmt.Sprintf("HPA scales to 1 replica: consume 10 millicores, target per pod 100 millicores, min pods 1."))
 	t.rc.ConsumeCPU(10) /* millicores */
 	ginkgo.By(fmt.Sprintf("HPA waits for 1 replica"))
-	t.rc.WaitForReplicas(1, timeToWait)
+	t.rc.WaitForReplicas(ctx, 1, timeToWait)
 
 	ginkgo.By(fmt.Sprintf("HPA scales to 3 replicas: consume 250 millicores, target per pod 100 millicores."))
 	t.rc.ConsumeCPU(250) /* millicores */
 	ginkgo.By(fmt.Sprintf("HPA waits for 3 replicas"))
-	t.rc.WaitForReplicas(3, timeToWait)
+	t.rc.WaitForReplicas(ctx, 3, timeToWait)
 
 	ginkgo.By(fmt.Sprintf("HPA scales to 5 replicas: consume 700 millicores, target per pod 100 millicores, max pods 5."))
 	t.rc.ConsumeCPU(700) /* millicores */
 	ginkgo.By(fmt.Sprintf("HPA waits for 5 replicas"))
-	t.rc.WaitForReplicas(5, timeToWait)
+	t.rc.WaitForReplicas(ctx, 5, timeToWait)
 
 	// We need to pause background goroutines as during upgrade master is unavailable and requests issued by them fail.
 	t.rc.Pause()

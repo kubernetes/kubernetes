@@ -10,6 +10,9 @@ import (
 // with apply.
 type CSIDriverConfigSpecApplyConfiguration struct {
 	DriverType *v1.CSIDriverType                             `json:"driverType,omitempty"`
+	AWS        *AWSCSIDriverConfigSpecApplyConfiguration     `json:"aws,omitempty"`
+	Azure      *AzureCSIDriverConfigSpecApplyConfiguration   `json:"azure,omitempty"`
+	GCP        *GCPCSIDriverConfigSpecApplyConfiguration     `json:"gcp,omitempty"`
 	VSphere    *VSphereCSIDriverConfigSpecApplyConfiguration `json:"vSphere,omitempty"`
 }
 
@@ -24,6 +27,30 @@ func CSIDriverConfigSpec() *CSIDriverConfigSpecApplyConfiguration {
 // If called multiple times, the DriverType field is set to the value of the last call.
 func (b *CSIDriverConfigSpecApplyConfiguration) WithDriverType(value v1.CSIDriverType) *CSIDriverConfigSpecApplyConfiguration {
 	b.DriverType = &value
+	return b
+}
+
+// WithAWS sets the AWS field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the AWS field is set to the value of the last call.
+func (b *CSIDriverConfigSpecApplyConfiguration) WithAWS(value *AWSCSIDriverConfigSpecApplyConfiguration) *CSIDriverConfigSpecApplyConfiguration {
+	b.AWS = value
+	return b
+}
+
+// WithAzure sets the Azure field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Azure field is set to the value of the last call.
+func (b *CSIDriverConfigSpecApplyConfiguration) WithAzure(value *AzureCSIDriverConfigSpecApplyConfiguration) *CSIDriverConfigSpecApplyConfiguration {
+	b.Azure = value
+	return b
+}
+
+// WithGCP sets the GCP field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the GCP field is set to the value of the last call.
+func (b *CSIDriverConfigSpecApplyConfiguration) WithGCP(value *GCPCSIDriverConfigSpecApplyConfiguration) *CSIDriverConfigSpecApplyConfiguration {
+	b.GCP = value
 	return b
 }
 

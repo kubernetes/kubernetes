@@ -487,6 +487,15 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+- name: io.k8s.api.core.v1.ClaimSource
+  map:
+    fields:
+    - name: resourceClaimName
+      type:
+        scalar: string
+    - name: resourceClaimTemplateName
+      type:
+        scalar: string
 - name: io.k8s.api.core.v1.ConfigMapEnvSource
   map:
     fields:
@@ -600,6 +609,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: readinessProbe
       type:
         namedType: io.k8s.api.core.v1.Probe
+    - name: resizePolicy
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.core.v1.ContainerResizePolicy
+          elementRelationship: atomic
     - name: resources
       type:
         namedType: io.k8s.api.core.v1.ResourceRequirements
@@ -664,6 +679,17 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: TCP
+- name: io.k8s.api.core.v1.ContainerResizePolicy
+  map:
+    fields:
+    - name: resourceName
+      type:
+        scalar: string
+      default: ""
+    - name: restartPolicy
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.core.v1.DownwardAPIProjection
   map:
     fields:
@@ -807,6 +833,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: readinessProbe
       type:
         namedType: io.k8s.api.core.v1.Probe
+    - name: resizePolicy
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.core.v1.ContainerResizePolicy
+          elementRelationship: atomic
     - name: resources
       type:
         namedType: io.k8s.api.core.v1.ResourceRequirements
@@ -1235,7 +1267,7 @@ var schemaYAML = typed.YAMLObject(`types:
         namedType: io.k8s.api.core.v1.TypedLocalObjectReference
     - name: dataSourceRef
       type:
-        namedType: io.k8s.api.core.v1.TypedLocalObjectReference
+        namedType: io.k8s.api.core.v1.TypedObjectReference
     - name: resources
       type:
         namedType: io.k8s.api.core.v1.ResourceRequirements
@@ -1373,6 +1405,24 @@ var schemaYAML = typed.YAMLObject(`types:
   map:
     fields:
     - name: conditionType
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.core.v1.PodResourceClaim
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: source
+      type:
+        namedType: io.k8s.api.core.v1.ClaimSource
+      default: {}
+- name: io.k8s.api.core.v1.PodSchedulingGate
+  map:
+    fields:
+    - name: name
       type:
         scalar: string
       default: ""
@@ -1523,6 +1573,14 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.core.v1.PodReadinessGate
           elementRelationship: atomic
+    - name: resourceClaims
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.core.v1.PodResourceClaim
+          elementRelationship: associative
+          keys:
+          - name
     - name: restartPolicy
       type:
         scalar: string
@@ -1532,6 +1590,14 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: schedulerName
       type:
         scalar: string
+    - name: schedulingGates
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.core.v1.PodSchedulingGate
+          elementRelationship: associative
+          keys:
+          - name
     - name: securityContext
       type:
         namedType: io.k8s.api.core.v1.PodSecurityContext
@@ -1710,6 +1776,13 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: user
       type:
         scalar: string
+- name: io.k8s.api.core.v1.ResourceClaim
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.core.v1.ResourceFieldSelector
   map:
     fields:
@@ -1728,6 +1801,14 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.core.v1.ResourceRequirements
   map:
     fields:
+    - name: claims
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.core.v1.ResourceClaim
+          elementRelationship: associative
+          keys:
+          - name
     - name: limits
       type:
         map:
@@ -2013,6 +2094,23 @@ var schemaYAML = typed.YAMLObject(`types:
         scalar: string
       default: ""
     elementRelationship: atomic
+- name: io.k8s.api.core.v1.TypedObjectReference
+  map:
+    fields:
+    - name: apiGroup
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+      default: ""
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: namespace
+      type:
+        scalar: string
 - name: io.k8s.api.core.v1.Volume
   map:
     fields:

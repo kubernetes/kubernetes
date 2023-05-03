@@ -19,6 +19,7 @@ package cloud
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -29,12 +30,15 @@ import (
 	"k8s.io/klog/v2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
+	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	fakecloud "k8s.io/cloud-provider/fake"
+	_ "k8s.io/controller-manager/pkg/features/register"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
@@ -2431,6 +2435,111 @@ func TestGetProviderID(t *testing.T) {
 			if !cmp.Equal(providerID, test.expectedProviderID) {
 				t.Errorf("unexpected providerID %s", cmp.Diff(providerID, test.expectedProviderID))
 			}
+		})
+	}
+}
+
+func TestUpdateNodeStatus(t *testing.T) {
+	// emaulate the latency of the cloud API calls
+	const cloudLatency = 10 * time.Millisecond
+
+	generateNodes := func(n int) []runtime.Object {
+		result := []runtime.Object{}
+		for i := 0; i < n; i++ {
+			result = append(result, &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fmt.Sprintf("node0%d", i),
+				},
+			})
+		}
+		return result
+	}
+
+	tests := []struct {
+		name    string
+		workers int32
+		nodes   int
+	}{
+		{
+			name:    "single thread",
+			workers: 1,
+			nodes:   100,
+		},
+		{
+			name:    "5 workers",
+			workers: 5,
+			nodes:   100,
+		},
+		{
+			name:    "10 workers",
+			workers: 10,
+			nodes:   100,
+		},
+		{
+			name:    "30 workers",
+			workers: 30,
+			nodes:   100,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeCloud := &fakecloud.Cloud{
+				EnableInstancesV2: false,
+				Addresses: []v1.NodeAddress{
+					{
+						Type:    v1.NodeHostName,
+						Address: "node0.cloud.internal",
+					},
+					{
+						Type:    v1.NodeInternalIP,
+						Address: "10.0.0.1",
+					},
+					{
+						Type:    v1.NodeExternalIP,
+						Address: "132.143.154.163",
+					},
+				},
+				RequestDelay: cloudLatency,
+				Err:          nil,
+			}
+
+			clientset := fake.NewSimpleClientset()
+			clientset.PrependReactor("patch", "nodes", func(action clienttesting.Action) (bool, runtime.Object, error) {
+				return true, &v1.Node{}, nil
+			})
+
+			factory := informers.NewSharedInformerFactory(clientset, 0)
+			eventBroadcaster := record.NewBroadcaster()
+			nodeInformer := factory.Core().V1().Nodes()
+			nodeIndexer := nodeInformer.Informer().GetIndexer()
+			cloudNodeController := &CloudNodeController{
+				kubeClient:                clientset,
+				nodeInformer:              nodeInformer,
+				nodesLister:               nodeInformer.Lister(),
+				nodesSynced:               func() bool { return true },
+				cloud:                     fakeCloud,
+				recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
+				nodeStatusUpdateFrequency: 1 * time.Second,
+				workerCount:               test.workers,
+			}
+
+			for _, n := range generateNodes(test.nodes) {
+				err := nodeIndexer.Add(n)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			w := eventBroadcaster.StartLogging(klog.Infof)
+			defer w.Stop()
+
+			start := time.Now()
+			cloudNodeController.UpdateNodeStatus(context.TODO())
+			t.Logf("%d workers: processed %d nodes int %v ", test.workers, test.nodes, time.Since(start))
+			if len(fakeCloud.Calls) != test.nodes {
+				t.Errorf("expected %d cloud-provider calls, got %d", test.nodes, len(fakeCloud.Calls))
+			}
+
 		})
 	}
 }

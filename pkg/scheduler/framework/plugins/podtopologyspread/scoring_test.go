@@ -18,13 +18,13 @@ package podtopologyspread
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
@@ -90,6 +90,38 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 					{key: "zone", value: "zone2"}: pointer.Int64(0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2), topologyNormalizingWeight(3)},
+			},
+		},
+		{
+			name: "null selector",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", v1.ScheduleAnyway, nil, nil, nil, nil, nil).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label(v1.LabelHostname, "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label(v1.LabelHostname, "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label(v1.LabelHostname, "node-x").Obj(),
+			},
+			config: config.PodTopologySpreadArgs{
+				DefaultingType: config.ListDefaulting,
+			},
+			want: &preScoreState{
+				Constraints: []topologySpreadConstraint{
+					{
+						MaxSkew:            1,
+						TopologyKey:        "zone",
+						Selector:           labels.Nothing(),
+						MinDomains:         1,
+						NodeAffinityPolicy: v1.NodeInclusionPolicyHonor,
+						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
+					},
+				},
+				IgnoredNodes: sets.NewString(),
+				TopologyPairToPodCounts: map[topologyPair]*int64{
+					{key: "zone", value: "zone1"}: pointer.Int64(0),
+					{key: "zone", value: "zone2"}: pointer.Int64(0),
+				},
+				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
 			},
 		},
 		{
@@ -623,6 +655,32 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				{Name: "node-b", Score: 60},
 				{Name: "node-c", Score: 100},
 				{Name: "node-d", Score: 0},
+			},
+		},
+		{
+			name: "one constraint on node, null selector",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, v1.LabelHostname, v1.ScheduleAnyway, nil, nil, nil, nil, nil).
+				Obj(),
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-d1").Node("node-d").Label("foo", "").Obj(),
+				st.MakePod().Name("p-d2").Node("node-d").Label("foo", "").Obj(),
+				st.MakePod().Name("p-d3").Node("node-d").Label("foo", "").Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label(v1.LabelHostname, "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label(v1.LabelHostname, "node-b").Obj(),
+				st.MakeNode().Name("node-c").Label(v1.LabelHostname, "node-c").Obj(),
+				st.MakeNode().Name("node-d").Label(v1.LabelHostname, "node-d").Obj(),
+			},
+			want: []framework.NodeScore{
+				{Name: "node-a", Score: 100},
+				{Name: "node-b", Score: 100},
+				{Name: "node-c", Score: 100},
+				{Name: "node-d", Score: 100},
 			},
 		},
 		{
@@ -1250,14 +1308,12 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			for _, n := range tt.nodes {
 				nodeName := n.Name
 				score, status := p.Score(ctx, state, tt.pod, nodeName)
-				fmt.Println("get score", score)
 				if !status.IsSuccess() {
 					t.Errorf("unexpected error: %v", status)
 				}
 				gotList = append(gotList, framework.NodeScore{Name: nodeName, Score: score})
 			}
 
-			fmt.Println(gotList)
 			status = p.NormalizeScore(ctx, state, tt.pod, gotList)
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)

@@ -72,10 +72,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	genericapitesting "k8s.io/apiserver/pkg/endpoints/testing"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 type alwaysMutatingDeny struct{}
@@ -372,6 +369,10 @@ func (storage *SimpleRESTStorage) ConvertToTable(ctx context.Context, obj runtim
 	return rest.NewDefaultTableConvertor(schema.GroupResource{Resource: "simple"}).ConvertToTable(ctx, obj, tableOptions)
 }
 
+func (storate *SimpleRESTStorage) GetSingularName() string {
+	return "simple"
+}
+
 func (storage *SimpleRESTStorage) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	result := &genericapitesting.SimpleList{
@@ -575,6 +576,10 @@ func (s *ConnecterRESTStorage) NewConnectOptions() (runtime.Object, bool, string
 	return s.emptyConnectOptions, false, ""
 }
 
+func (s *ConnecterRESTStorage) GetSingularName() string {
+	return "simple"
+}
+
 type MetadataRESTStorage struct {
 	*SimpleRESTStorage
 	types []string
@@ -617,6 +622,10 @@ type GetWithOptionsRootRESTStorage struct {
 	*SimpleTypedStorage
 	optionsReceived runtime.Object
 	takesPath       string
+}
+
+func (r *GetWithOptionsRootRESTStorage) GetSingularName() string {
+	return "simple"
 }
 
 func (r *GetWithOptionsRootRESTStorage) NamespaceScoped() bool {
@@ -685,6 +694,10 @@ func (storage *SimpleTypedStorage) Get(ctx context.Context, id string, options *
 
 func (storage *SimpleTypedStorage) checkContext(ctx context.Context) {
 	storage.actualNamespace, storage.namespacePresent = request.NamespaceFrom(ctx)
+}
+
+func (storage *SimpleTypedStorage) GetSingularName() string {
+	return "simple"
 }
 
 func bodyOrDie(response *http.Response) string {
@@ -821,6 +834,10 @@ func (UnimplementedRESTStorage) New() runtime.Object {
 }
 
 func (UnimplementedRESTStorage) Destroy() {
+}
+
+func (UnimplementedRESTStorage) GetSingularName() string {
+	return ""
 }
 
 // TestUnimplementedRESTStorage ensures that if a rest.Storage does not implement a given
@@ -2068,7 +2085,7 @@ func watcher(mediaType string, r io.ReadCloser) streaming.Decoder {
 }
 
 func TestGetPartialObjectMetadata(t *testing.T) {
-	now := metav1.Time{metav1.Now().Rfc3339Copy().Local()}
+	now := metav1.Time{Time: metav1.Now().Rfc3339Copy().Local()}
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{
 		item: genericapitesting.Simple{
@@ -4021,7 +4038,6 @@ var (
 
 // TestFieldValidation tests the create, update, and patch handlers for correctness when faced with field validation errors.
 func TestFieldValidation(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServerSideFieldValidation, true)()
 	var (
 		strictDecodingErr          = `strict decoding error: duplicate field \"other\", unknown field \"unknown\"`
 		strictDecodingWarns        = []string{`duplicate field "other"`, `unknown field "unknown"`}
@@ -4160,7 +4176,6 @@ unknown: baz`)
 // BenchmarkFieldValidation benchmarks the create, update, and patch handlers for performance distinctions between
 // strict, warn, and ignore field validation handling.
 func BenchmarkFieldValidation(b *testing.B) {
-	defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.ServerSideFieldValidation, true)()
 	var (
 		validJSONDataPost = []byte(`{"kind":"Simple", "apiVersion":"test.group/version", "metadata":{"creationTimestamp":null}, "other":"foo"}`)
 		validYAMLDataPost = []byte(`apiVersion: test.group/version
@@ -4287,6 +4302,10 @@ func (storage *SimpleXGSubresourceRESTStorage) Delete(ctx context.Context, name 
 
 func (storage *SimpleXGSubresourceRESTStorage) GroupVersionKind(containingGV schema.GroupVersion) schema.GroupVersionKind {
 	return storage.itemGVK
+}
+
+func (storage *SimpleXGSubresourceRESTStorage) GetSingularName() string {
+	return "simple"
 }
 
 func TestXGSubresource(t *testing.T) {

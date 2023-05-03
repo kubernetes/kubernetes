@@ -25,11 +25,15 @@ import (
 )
 
 const (
-	prefix          = "GRPC_GO_"
-	txtErrIgnoreStr = prefix + "IGNORE_TXT_ERRORS"
+	prefix                  = "GRPC_GO_"
+	txtErrIgnoreStr         = prefix + "IGNORE_TXT_ERRORS"
+	advertiseCompressorsStr = prefix + "ADVERTISE_COMPRESSORS"
 )
 
 var (
 	// TXTErrIgnore is set if TXT errors should be ignored ("GRPC_GO_IGNORE_TXT_ERRORS" is not "false").
 	TXTErrIgnore = !strings.EqualFold(os.Getenv(txtErrIgnoreStr), "false")
+	// AdvertiseCompressors is set if registered compressor should be advertised
+	// ("GRPC_GO_ADVERTISE_COMPRESSORS" is not "false").
+	AdvertiseCompressors = !strings.EqualFold(os.Getenv(advertiseCompressorsStr), "false")
 )

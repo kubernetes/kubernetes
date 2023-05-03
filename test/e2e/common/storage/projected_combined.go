@@ -41,7 +41,7 @@ var _ = SIGDescribe("Projected combined", func() {
 	   Testname: Projected Volume, multiple projections
 	   Description: A Pod is created with a projected volume source for secrets, configMap and downwardAPI with pod name, cpu and memory limits and cpu and memory requests. Pod MUST be able to read the secrets, configMap values and the cpu and memory limits as well as cpu and memory requests from the mounted DownwardAPIVolumeFiles.
 	*/
-	framework.ConformanceIt("should project all components that make up the projection API [Projection][NodeConformance]", func() {
+	framework.ConformanceIt("should project all components that make up the projection API [Projection][NodeConformance]", func(ctx context.Context) {
 		var err error
 		podName := "projected-volume-" + string(uuid.NewUUID())
 		secretName := "secret-projected-all-test-volume-" + string(uuid.NewUUID())
@@ -66,11 +66,11 @@ var _ = SIGDescribe("Projected combined", func() {
 		}
 
 		ginkgo.By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
-		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{}); err != nil {
+		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, configMap, metav1.CreateOptions{}); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 		}
 		ginkgo.By(fmt.Sprintf("Creating secret with name %s", secret.Name))
-		if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
+		if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(ctx, secret, metav1.CreateOptions{}); err != nil {
 			framework.Failf("unable to create test secret %s: %v", secret.Name, err)
 		}
 
@@ -89,7 +89,7 @@ var _ = SIGDescribe("Projected combined", func() {
 				},
 			},
 		}
-		e2epodoutput.TestContainerOutput(f, "Check all projections for projected volume plugin", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(ctx, f, "Check all projections for projected volume plugin", pod, 0, []string{
 			podName,
 			"secret-value-1",
 			"configmap-value-1",

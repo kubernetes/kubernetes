@@ -18,6 +18,7 @@ package volumerestrictions
 
 import (
 	"context"
+	"fmt"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -40,16 +41,56 @@ type VolumeRestrictions struct {
 var _ framework.PreFilterPlugin = &VolumeRestrictions{}
 var _ framework.FilterPlugin = &VolumeRestrictions{}
 var _ framework.EnqueueExtensions = &VolumeRestrictions{}
-
-// Name is the name of the plugin used in the plugin registry and configurations.
-const Name = names.VolumeRestrictions
+var _ framework.StateData = &preFilterState{}
 
 const (
+	// Name is the name of the plugin used in the plugin registry and configurations.
+	Name = names.VolumeRestrictions
+	// preFilterStateKey is the key in CycleState to VolumeRestrictions pre-computed data for Filtering.
+	// Using the name of the plugin will likely help us avoid collisions with other plugins.
+	preFilterStateKey = "PreFilter" + Name
+
 	// ErrReasonDiskConflict is used for NoDiskConflict predicate error.
 	ErrReasonDiskConflict = "node(s) had no available disk"
 	// ErrReasonReadWriteOncePodConflict is used when a pod is found using the same PVC with the ReadWriteOncePod access mode.
 	ErrReasonReadWriteOncePodConflict = "node has pod using PersistentVolumeClaim with the same name and ReadWriteOncePod access mode"
 )
+
+// preFilterState computed at PreFilter and used at Filter.
+type preFilterState struct {
+	// Names of the pod's volumes using the ReadWriteOncePod access mode.
+	readWriteOncePodPVCs sets.Set[string]
+	// The number of references to these ReadWriteOncePod volumes by scheduled pods.
+	conflictingPVCRefCount int
+}
+
+func (s *preFilterState) updateWithPod(podInfo *framework.PodInfo, multiplier int) {
+	s.conflictingPVCRefCount += multiplier * s.conflictingPVCRefCountForPod(podInfo)
+}
+
+func (s *preFilterState) conflictingPVCRefCountForPod(podInfo *framework.PodInfo) int {
+	conflicts := 0
+	for _, volume := range podInfo.Pod.Spec.Volumes {
+		if volume.PersistentVolumeClaim == nil {
+			continue
+		}
+		if s.readWriteOncePodPVCs.Has(volume.PersistentVolumeClaim.ClaimName) {
+			conflicts += 1
+		}
+	}
+	return conflicts
+}
+
+// Clone the prefilter state.
+func (s *preFilterState) Clone() framework.StateData {
+	if s == nil {
+		return nil
+	}
+	return &preFilterState{
+		readWriteOncePodPVCs:   s.readWriteOncePodPVCs,
+		conflictingPVCRefCount: s.conflictingPVCRefCount,
+	}
+}
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *VolumeRestrictions) Name() string {
@@ -103,11 +144,7 @@ func haveOverlap(a1, a2 []string) bool {
 	if len(a1) > len(a2) {
 		a1, a2 = a2, a1
 	}
-	m := make(sets.String)
-
-	for _, val := range a1 {
-		m.Insert(val)
-	}
+	m := sets.New(a1...)
 	for _, val := range a2 {
 		if _, ok := m[val]; ok {
 			return true
@@ -117,18 +154,87 @@ func haveOverlap(a1, a2 []string) bool {
 	return false
 }
 
+// PreFilter computes and stores cycleState containing details for enforcing ReadWriteOncePod.
 func (pl *VolumeRestrictions) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
-	if pl.enableReadWriteOncePod {
-		return nil, pl.isReadWriteOncePodAccessModeConflict(ctx, pod)
+	if !pl.enableReadWriteOncePod {
+		return nil, nil
 	}
-	return nil, framework.NewStatus(framework.Success)
+
+	pvcs, err := pl.readWriteOncePodPVCsForPod(ctx, pod)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, err.Error())
+		}
+		return nil, framework.AsStatus(err)
+	}
+
+	s, err := pl.calPreFilterState(ctx, pod, pvcs)
+	if err != nil {
+		return nil, framework.AsStatus(err)
+	}
+	cycleState.Write(preFilterStateKey, s)
+	return nil, nil
 }
 
-// isReadWriteOncePodAccessModeConflict checks if a pod uses a PVC with the ReadWriteOncePod access mode.
-// This access mode restricts volume access to a single pod on a single node. Since only a single pod can
-// use a ReadWriteOncePod PVC, mark any other pods attempting to use this PVC as UnschedulableAndUnresolvable.
-// TODO(#103132): Mark pod as Unschedulable and add preemption logic.
-func (pl *VolumeRestrictions) isReadWriteOncePodAccessModeConflict(ctx context.Context, pod *v1.Pod) *framework.Status {
+// AddPod from pre-computed data in cycleState.
+func (pl *VolumeRestrictions) AddPod(ctx context.Context, cycleState *framework.CycleState, podToSchedule *v1.Pod, podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
+	if !pl.enableReadWriteOncePod {
+		return nil
+	}
+	state, err := getPreFilterState(cycleState)
+	if err != nil {
+		return framework.AsStatus(err)
+	}
+	state.updateWithPod(podInfoToAdd, 1)
+	return nil
+}
+
+// RemovePod from pre-computed data in cycleState.
+func (pl *VolumeRestrictions) RemovePod(ctx context.Context, cycleState *framework.CycleState, podToSchedule *v1.Pod, podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
+	if !pl.enableReadWriteOncePod {
+		return nil
+	}
+	state, err := getPreFilterState(cycleState)
+	if err != nil {
+		return framework.AsStatus(err)
+	}
+	state.updateWithPod(podInfoToRemove, -1)
+	return nil
+}
+
+func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error) {
+	c, err := cycleState.Read(preFilterStateKey)
+	if err != nil {
+		// preFilterState doesn't exist, likely PreFilter wasn't invoked.
+		return nil, fmt.Errorf("cannot read %q from cycleState", preFilterStateKey)
+	}
+
+	s, ok := c.(*preFilterState)
+	if !ok {
+		return nil, fmt.Errorf("%+v convert to volumerestrictions.state error", c)
+	}
+	return s, nil
+}
+
+// calPreFilterState computes preFilterState describing which PVCs use ReadWriteOncePod
+// and which pods in the cluster are in conflict.
+func (pl *VolumeRestrictions) calPreFilterState(ctx context.Context, pod *v1.Pod, pvcs sets.Set[string]) (*preFilterState, error) {
+	conflictingPVCRefCount := 0
+	for pvc := range pvcs {
+		key := framework.GetNamespacedName(pod.Namespace, pvc)
+		if pl.sharedLister.StorageInfos().IsPVCUsedByPods(key) {
+			// There can only be at most one pod using the ReadWriteOncePod PVC.
+			conflictingPVCRefCount += 1
+		}
+	}
+	return &preFilterState{
+		readWriteOncePodPVCs:   pvcs,
+		conflictingPVCRefCount: conflictingPVCRefCount,
+	}, nil
+}
+
+func (pl *VolumeRestrictions) readWriteOncePodPVCsForPod(ctx context.Context, pod *v1.Pod) (sets.Set[string], error) {
+	pvcs := sets.New[string]()
 	for _, volume := range pod.Spec.Volumes {
 		if volume.PersistentVolumeClaim == nil {
 			continue
@@ -136,27 +242,50 @@ func (pl *VolumeRestrictions) isReadWriteOncePodAccessModeConflict(ctx context.C
 
 		pvc, err := pl.pvcLister.PersistentVolumeClaims(pod.Namespace).Get(volume.PersistentVolumeClaim.ClaimName)
 		if err != nil {
-			if apierrors.IsNotFound(err) {
-				return framework.NewStatus(framework.UnschedulableAndUnresolvable, err.Error())
-			}
-			return framework.AsStatus(err)
+			return nil, err
 		}
 
 		if !v1helper.ContainsAccessMode(pvc.Spec.AccessModes, v1.ReadWriteOncePod) {
 			continue
 		}
+		pvcs.Insert(pvc.Name)
+	}
+	return pvcs, nil
+}
 
-		key := framework.GetNamespacedName(pod.Namespace, volume.PersistentVolumeClaim.ClaimName)
-		if pl.sharedLister.StorageInfos().IsPVCUsedByPods(key) {
-			return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonReadWriteOncePodConflict)
+// Checks if scheduling the pod onto this node would cause any conflicts with
+// existing volumes.
+func satisfyVolumeConflicts(pod *v1.Pod, nodeInfo *framework.NodeInfo) bool {
+	for i := range pod.Spec.Volumes {
+		v := &pod.Spec.Volumes[i]
+		// fast path if there is no conflict checking targets.
+		if v.GCEPersistentDisk == nil && v.AWSElasticBlockStore == nil && v.RBD == nil && v.ISCSI == nil {
+			continue
+		}
+
+		for _, ev := range nodeInfo.Pods {
+			if isVolumeConflict(v, ev.Pod) {
+				return false
+			}
 		}
 	}
+	return true
+}
 
+// Checks if scheduling the pod would cause any ReadWriteOncePod PVC access mode conflicts.
+func satisfyReadWriteOncePod(ctx context.Context, state *preFilterState) *framework.Status {
+	if state == nil {
+		return nil
+	}
+	if state.conflictingPVCRefCount > 0 {
+		return framework.NewStatus(framework.Unschedulable, ErrReasonReadWriteOncePodConflict)
+	}
 	return nil
 }
 
+// PreFilterExtensions returns prefilter extensions, pod add and remove.
 func (pl *VolumeRestrictions) PreFilterExtensions() framework.PreFilterExtensions {
-	return nil
+	return pl
 }
 
 // Filter invoked at the filter extension point.
@@ -168,21 +297,20 @@ func (pl *VolumeRestrictions) PreFilterExtensions() framework.PreFilterExtension
 // - AWS EBS forbids any two pods mounting the same volume ID
 // - Ceph RBD forbids if any two pods share at least same monitor, and match pool and image, and the image is read-only
 // - ISCSI forbids if any two pods share at least same IQN and ISCSI volume is read-only
-func (pl *VolumeRestrictions) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
-	for i := range pod.Spec.Volumes {
-		v := &pod.Spec.Volumes[i]
-		// fast path if there is no conflict checking targets.
-		if v.GCEPersistentDisk == nil && v.AWSElasticBlockStore == nil && v.RBD == nil && v.ISCSI == nil {
-			continue
-		}
-
-		for _, ev := range nodeInfo.Pods {
-			if isVolumeConflict(v, ev.Pod) {
-				return framework.NewStatus(framework.Unschedulable, ErrReasonDiskConflict)
-			}
-		}
+// If the pod uses PVCs with the ReadWriteOncePod access mode, it evaluates if
+// these PVCs are already in-use and if preemption will help.
+func (pl *VolumeRestrictions) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+	if !satisfyVolumeConflicts(pod, nodeInfo) {
+		return framework.NewStatus(framework.Unschedulable, ErrReasonDiskConflict)
 	}
-	return nil
+	if !pl.enableReadWriteOncePod {
+		return nil
+	}
+	state, err := getPreFilterState(cycleState)
+	if err != nil {
+		return framework.AsStatus(err)
+	}
+	return satisfyReadWriteOncePod(ctx, state)
 }
 
 // EventsToRegister returns the possible events that may make a Pod

@@ -25,16 +25,15 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/batch"
-	"k8s.io/kubernetes/pkg/apis/batch/validation"
-	"k8s.io/kubernetes/pkg/features"
+	batchvalidation "k8s.io/kubernetes/pkg/apis/batch/validation"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -90,10 +89,6 @@ func (cronJobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object)
 
 	cronJob.Generation = 1
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CronJobTimeZone) {
-		cronJob.Spec.TimeZone = nil
-	}
-
 	pod.DropDisabledTemplateFields(&cronJob.Spec.JobTemplate.Spec.Template, nil)
 }
 
@@ -102,10 +97,6 @@ func (cronJobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Ob
 	newCronJob := obj.(*batch.CronJob)
 	oldCronJob := old.(*batch.CronJob)
 	newCronJob.Status = oldCronJob.Status
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CronJobTimeZone) && oldCronJob.Spec.TimeZone == nil {
-		newCronJob.Spec.TimeZone = nil
-	}
 
 	pod.DropDisabledTemplateFields(&newCronJob.Spec.JobTemplate.Spec.Template, &oldCronJob.Spec.JobTemplate.Spec.Template)
 
@@ -120,13 +111,17 @@ func (cronJobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Ob
 func (cronJobStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	cronJob := obj.(*batch.CronJob)
 	opts := pod.GetValidationOptionsFromPodTemplate(&cronJob.Spec.JobTemplate.Spec.Template, nil)
-	return validation.ValidateCronJobCreate(cronJob, opts)
+	return batchvalidation.ValidateCronJobCreate(cronJob, opts)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
 func (cronJobStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
 	newCronJob := obj.(*batch.CronJob)
-	warnings := pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "jobTemplate", "spec", "template"), &newCronJob.Spec.JobTemplate.Spec.Template, nil)
+	var warnings []string
+	if msgs := utilvalidation.IsDNS1123Label(newCronJob.Name); len(msgs) != 0 {
+		warnings = append(warnings, fmt.Sprintf("metadata.name: this is used in Pod names and hostnames, which can result in surprising behavior; a DNS label is recommended: %v", msgs))
+	}
+	warnings = append(warnings, pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "jobTemplate", "spec", "template"), &newCronJob.Spec.JobTemplate.Spec.Template, nil)...)
 	if strings.Contains(newCronJob.Spec.Schedule, "TZ") {
 		warnings = append(warnings, fmt.Sprintf("CRON_TZ or TZ used in %s is not officially supported, see https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/ for more details", field.NewPath("spec", "spec", "schedule")))
 	}
@@ -152,7 +147,7 @@ func (cronJobStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Obje
 	oldCronJob := old.(*batch.CronJob)
 
 	opts := pod.GetValidationOptionsFromPodTemplate(&newCronJob.Spec.JobTemplate.Spec.Template, &oldCronJob.Spec.JobTemplate.Spec.Template)
-	return validation.ValidateCronJobUpdate(newCronJob, oldCronJob, opts)
+	return batchvalidation.ValidateCronJobUpdate(newCronJob, oldCronJob, opts)
 }
 
 // WarningsOnUpdate returns warnings for the given update.

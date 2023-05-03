@@ -20,12 +20,14 @@ import (
 	"fmt"
 	"time"
 
+	"go.opentelemetry.io/otel/trace"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/record"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
@@ -111,6 +113,8 @@ func NewHollowKubelet(
 		Subpather:                &subpath.FakeSubpath{},
 		HostUtil:                 hostutil.NewFakeHostUtil(nil),
 		PodStartupLatencyTracker: kubeletutil.NewPodStartupLatencyTracker(),
+		TracerProvider:           trace.NewNoopTracerProvider(),
+		Recorder:                 &record.FakeRecorder{}, // With real recorder we attempt to read /dev/kmsg.
 	}
 
 	return &HollowKubelet{
@@ -131,8 +135,8 @@ func (hk *HollowKubelet) Run() {
 	select {}
 }
 
-// HollowKubletOptions contains settable parameters for hollow kubelet.
-type HollowKubletOptions struct {
+// HollowKubeletOptions contains settable parameters for hollow kubelet.
+type HollowKubeletOptions struct {
 	NodeName            string
 	KubeletPort         int
 	KubeletReadOnlyPort int
@@ -144,7 +148,7 @@ type HollowKubletOptions struct {
 
 // Builds a KubeletConfiguration for the HollowKubelet, ensuring that the
 // usual defaults are applied for fields we do not override.
-func GetHollowKubeletConfig(opt *HollowKubletOptions) (*options.KubeletFlags, *kubeletconfig.KubeletConfiguration) {
+func GetHollowKubeletConfig(opt *HollowKubeletOptions) (*options.KubeletFlags, *kubeletconfig.KubeletConfiguration) {
 	testRootDir := utils.MakeTempDirOrDie("hollow-kubelet.", "")
 	podFilePath := utils.MakeTempDirOrDie("static-pods", testRootDir)
 	klog.Infof("Using %s as root dir for hollow-kubelet", testRootDir)
@@ -158,7 +162,6 @@ func GetHollowKubeletConfig(opt *HollowKubletOptions) (*options.KubeletFlags, *k
 	f.MaxPerPodContainerCount = 2
 	f.NodeLabels = opt.NodeLabels
 	f.RegisterSchedulable = true
-	f.RemoteImageEndpoint = "unix:///run/containerd/containerd.sock"
 
 	// Config struct
 	c, err := options.NewKubeletConfiguration()
@@ -166,6 +169,7 @@ func GetHollowKubeletConfig(opt *HollowKubletOptions) (*options.KubeletFlags, *k
 		panic(err)
 	}
 
+	c.ImageServiceEndpoint = "unix:///run/containerd/containerd.sock"
 	c.StaticPodURL = ""
 	c.EnableServer = true
 	c.Address = "0.0.0.0" /* bind address */

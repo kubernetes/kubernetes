@@ -33,6 +33,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/util/podcmd"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
@@ -308,6 +309,10 @@ func (p *ExecOptions) Run() error {
 		obj, err := builder.Do().Object()
 		if err != nil {
 			return err
+		}
+
+		if meta.IsListType(obj) {
+			return fmt.Errorf("cannot exec into multiple objects at a time")
 		}
 
 		p.Pod, err = p.ExecutablePodFn(p.restClientGetter, obj, p.GetPodTimeout)

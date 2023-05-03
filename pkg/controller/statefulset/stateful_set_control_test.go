@@ -173,6 +173,8 @@ func TestStatefulSetControl(t *testing.T) {
 		{UpdatePodFailure, simpleSetFn},
 		{UpdateSetStatusFailure, simpleSetFn},
 		{PodRecreateDeleteFailure, simpleSetFn},
+		{NewRevisionDeletePodFailure, simpleSetFn},
+		{RecreatesPVCForPendingPod, simpleSetFn},
 	}
 
 	for _, testCase := range testCases {
@@ -559,6 +561,75 @@ func PodRecreateDeleteFailure(t *testing.T, set *apps.StatefulSet, invariants in
 	}
 }
 
+func NewRevisionDeletePodFailure(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
+	client := fake.NewSimpleClientset(set)
+	om, _, ssc := setupController(client)
+	if err := scaleUpStatefulSetControl(set, ssc, om, invariants); err != nil {
+		t.Errorf("Failed to turn up StatefulSet : %s", err)
+	}
+	var err error
+	set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	if err != nil {
+		t.Fatalf("Error getting updated StatefulSet: %v", err)
+	}
+	if set.Status.Replicas != 3 {
+		t.Error("Failed to scale StatefulSet to 3 replicas")
+	}
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		t.Error(err)
+	}
+	pods, err := om.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// trigger a new revision
+	updateSet := set.DeepCopy()
+	updateSet.Spec.Template.Spec.Containers[0].Image = "nginx-new"
+	if err := om.setsIndexer.Update(updateSet); err != nil {
+		t.Error("Failed to update StatefulSet")
+	}
+	set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	if err != nil {
+		t.Fatalf("Error getting updated StatefulSet: %v", err)
+	}
+
+	// delete fails
+	om.SetDeleteStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 0)
+	_, err = ssc.UpdateStatefulSet(context.TODO(), set, pods)
+	if err == nil {
+		t.Error("Expected err in update StatefulSet when deleting a pod")
+	}
+
+	set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	if err != nil {
+		t.Fatalf("Error getting updated StatefulSet: %v", err)
+	}
+	if err := invariants(set, om); err != nil {
+		t.Error(err)
+	}
+	if set.Status.CurrentReplicas != 3 {
+		t.Fatalf("Failed pod deletion should not update CurrentReplicas: want 3, got %d", set.Status.CurrentReplicas)
+	}
+	if set.Status.CurrentRevision == set.Status.UpdateRevision {
+		t.Error("Failed to create new revision")
+	}
+
+	// delete works
+	om.SetDeleteStatefulPodError(nil, 0)
+	status, err := ssc.UpdateStatefulSet(context.TODO(), set, pods)
+	if err != nil {
+		t.Fatalf("Unexpected err in update StatefulSet: %v", err)
+	}
+	if status.CurrentReplicas != 2 {
+		t.Fatalf("Pod deletion should update CurrentReplicas: want 2, got %d", status.CurrentReplicas)
+	}
+	if err := invariants(set, om); err != nil {
+		t.Error(err)
+	}
+}
+
 func emptyInvariants(set *apps.StatefulSet, om *fakeObjectManager) error {
 	return nil
 }
@@ -624,6 +695,45 @@ func CreatesPodsWithStartOrdinal(t *testing.T, set *apps.StatefulSet, invariants
 		if actualPodOrdinal != expectedOrdinal {
 			t.Errorf("Expected pod ordinal %d. Got %d", expectedOrdinal, actualPodOrdinal)
 		}
+	}
+}
+
+func RecreatesPVCForPendingPod(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
+	client := fake.NewSimpleClientset()
+	om, _, ssc := setupController(client)
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		t.Error(err)
+	}
+	pods, err := om.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Error(err)
+	}
+	if _, err := ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
+		t.Errorf("Error updating StatefulSet %s", err)
+	}
+	if err := invariants(set, om); err != nil {
+		t.Error(err)
+	}
+	pods, err = om.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Error(err)
+	}
+	for _, claim := range getPersistentVolumeClaims(set, pods[0]) {
+		om.claimsIndexer.Delete(&claim)
+	}
+	pods[0].Status.Phase = v1.PodPending
+	om.podsIndexer.Update(pods[0])
+	if _, err := ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
+		t.Errorf("Error updating StatefulSet %s", err)
+	}
+	// invariants check if there any missing PVCs for the Pods
+	if err := invariants(set, om); err != nil {
+		t.Error(err)
+	}
+	_, err = om.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Error(err)
 	}
 }
 

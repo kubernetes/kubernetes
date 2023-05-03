@@ -17,14 +17,16 @@ limitations under the License.
 package ttlafterfinished
 
 import (
+	"k8s.io/klog/v2"
 	"strings"
 	"testing"
 	"time"
 
 	batch "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/klog/v2/ktesting"
+	"k8s.io/utils/pointer"
 )
 
 func newJob(completionTime, failedTime metav1.Time, ttl *int32) *batch.Job {
@@ -91,7 +93,7 @@ func TestTimeLeft(t *testing.T) {
 	}{
 		{
 			name:         "Error case: Job unfinished",
-			ttl:          utilpointer.Int32Ptr(100),
+			ttl:          pointer.Int32(100),
 			since:        &now.Time,
 			expectErr:    true,
 			expectErrStr: "should not be cleaned up",
@@ -106,7 +108,7 @@ func TestTimeLeft(t *testing.T) {
 		{
 			name:             "Job completed now, 0s TTL",
 			completionTime:   now,
-			ttl:              utilpointer.Int32Ptr(0),
+			ttl:              pointer.Int32(0),
 			since:            &now.Time,
 			expectedTimeLeft: durationPointer(0),
 			expectedExpireAt: now.Time,
@@ -114,7 +116,7 @@ func TestTimeLeft(t *testing.T) {
 		{
 			name:             "Job completed now, 10s TTL",
 			completionTime:   now,
-			ttl:              utilpointer.Int32Ptr(10),
+			ttl:              pointer.Int32(10),
 			since:            &now.Time,
 			expectedTimeLeft: durationPointer(10),
 			expectedExpireAt: now.Add(10 * time.Second),
@@ -122,7 +124,7 @@ func TestTimeLeft(t *testing.T) {
 		{
 			name:             "Job completed 10s ago, 15s TTL",
 			completionTime:   metav1.NewTime(now.Add(-10 * time.Second)),
-			ttl:              utilpointer.Int32Ptr(15),
+			ttl:              pointer.Int32(15),
 			since:            &now.Time,
 			expectedTimeLeft: durationPointer(5),
 			expectedExpireAt: now.Add(5 * time.Second),
@@ -137,7 +139,7 @@ func TestTimeLeft(t *testing.T) {
 		{
 			name:             "Job failed now, 0s TTL",
 			failedTime:       now,
-			ttl:              utilpointer.Int32Ptr(0),
+			ttl:              pointer.Int32(0),
 			since:            &now.Time,
 			expectedTimeLeft: durationPointer(0),
 			expectedExpireAt: now.Time,
@@ -145,7 +147,7 @@ func TestTimeLeft(t *testing.T) {
 		{
 			name:             "Job failed now, 10s TTL",
 			failedTime:       now,
-			ttl:              utilpointer.Int32Ptr(10),
+			ttl:              pointer.Int32(10),
 			since:            &now.Time,
 			expectedTimeLeft: durationPointer(10),
 			expectedExpireAt: now.Add(10 * time.Second),
@@ -153,7 +155,7 @@ func TestTimeLeft(t *testing.T) {
 		{
 			name:             "Job failed 10s ago, 15s TTL",
 			failedTime:       metav1.NewTime(now.Add(-10 * time.Second)),
-			ttl:              utilpointer.Int32Ptr(15),
+			ttl:              pointer.Int32(15),
 			since:            &now.Time,
 			expectedTimeLeft: durationPointer(5),
 			expectedExpireAt: now.Add(5 * time.Second),
@@ -161,8 +163,11 @@ func TestTimeLeft(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+
 		job := newJob(tc.completionTime, tc.failedTime, tc.ttl)
-		gotTimeLeft, gotExpireAt, gotErr := timeLeft(job, tc.since)
+		_, ctx := ktesting.NewTestContext(t)
+		logger := klog.FromContext(ctx)
+		gotTimeLeft, gotExpireAt, gotErr := timeLeft(logger, job, tc.since)
 		if tc.expectErr != (gotErr != nil) {
 			t.Errorf("%s: expected error is %t, got %t, error: %v", tc.name, tc.expectErr, gotErr != nil, gotErr)
 		}

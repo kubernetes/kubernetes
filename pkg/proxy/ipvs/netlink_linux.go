@@ -129,7 +129,7 @@ func (h *netlinkHandle) ListBindAddress(devName string) ([]string, error) {
 // GetAllLocalAddresses return all local addresses on the node.
 // Only the addresses of the current family are returned.
 // IPv6 link-local and loopback addresses are excluded.
-func (h *netlinkHandle) GetAllLocalAddresses() (sets.String, error) {
+func (h *netlinkHandle) GetAllLocalAddresses() (sets.Set[string], error) {
 	addr, err := net.InterfaceAddrs()
 	if err != nil {
 		return nil, fmt.Errorf("Could not get addresses: %v", err)
@@ -140,7 +140,7 @@ func (h *netlinkHandle) GetAllLocalAddresses() (sets.String, error) {
 // GetLocalAddresses return all local addresses for an interface.
 // Only the addresses of the current family are returned.
 // IPv6 link-local and loopback addresses are excluded.
-func (h *netlinkHandle) GetLocalAddresses(dev string) (sets.String, error) {
+func (h *netlinkHandle) GetLocalAddresses(dev string) (sets.Set[string], error) {
 	ifi, err := net.InterfaceByName(dev)
 	if err != nil {
 		return nil, fmt.Errorf("Could not get interface %s: %v", dev, err)

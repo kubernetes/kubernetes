@@ -119,6 +119,9 @@
         }
       ],
       "matchPolicy": "matchPolicyValue"
-    }
+    },
+    "validationActions": [
+      "validationActionsValue"
+    ]
   }
 }

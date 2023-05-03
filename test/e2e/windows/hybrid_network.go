@@ -17,6 +17,7 @@ limitations under the License.
 package windows
 
 import (
+	"context"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
@@ -53,48 +54,48 @@ var _ = SIGDescribe("Hybrid cluster network", func() {
 
 	ginkgo.Context("for all supported CNIs", func() {
 
-		ginkgo.It("should have stable networking for Linux and Windows pods", func() {
+		ginkgo.It("should have stable networking for Linux and Windows pods", func(ctx context.Context) {
 
 			linuxPod := createTestPod(f, linuxBusyBoxImage, linuxOS)
 			ginkgo.By("creating a linux pod and waiting for it to be running")
-			linuxPod = e2epod.NewPodClient(f).CreateSync(linuxPod)
+			linuxPod = e2epod.NewPodClient(f).CreateSync(ctx, linuxPod)
 
 			windowsPod := createTestPod(f, windowsBusyBoximage, windowsOS)
 
 			windowsPod.Spec.Containers[0].Args = []string{"test-webserver"}
 			ginkgo.By("creating a windows pod and waiting for it to be running")
-			windowsPod = e2epod.NewPodClient(f).CreateSync(windowsPod)
+			windowsPod = e2epod.NewPodClient(f).CreateSync(ctx, windowsPod)
 
 			ginkgo.By("verifying pod internal connectivity to the cluster dataplane")
 
 			ginkgo.By("checking connectivity from Linux to Windows")
-			assertConsistentConnectivity(f, linuxPod.ObjectMeta.Name, linuxOS, linuxCheck(windowsPod.Status.PodIP, 80))
+			assertConsistentConnectivity(ctx, f, linuxPod.ObjectMeta.Name, linuxOS, linuxCheck(windowsPod.Status.PodIP, 80))
 
 			ginkgo.By("checking connectivity from Windows to Linux")
-			assertConsistentConnectivity(f, windowsPod.ObjectMeta.Name, windowsOS, windowsCheck(linuxPod.Status.PodIP))
+			assertConsistentConnectivity(ctx, f, windowsPod.ObjectMeta.Name, windowsOS, windowsCheck(linuxPod.Status.PodIP))
 
 		})
 
-		ginkgo.It("should provide Internet connection for Linux containers using DNS [Feature:Networking-DNS]", func() {
+		ginkgo.It("should provide Internet connection for Linux containers using DNS [Feature:Networking-DNS]", func(ctx context.Context) {
 			linuxPod := createTestPod(f, linuxBusyBoxImage, linuxOS)
 			ginkgo.By("creating a linux pod and waiting for it to be running")
-			linuxPod = e2epod.NewPodClient(f).CreateSync(linuxPod)
+			linuxPod = e2epod.NewPodClient(f).CreateSync(ctx, linuxPod)
 
 			ginkgo.By("verifying pod external connectivity to the internet")
 
 			ginkgo.By("checking connectivity to 8.8.8.8 53 (google.com) from Linux")
-			assertConsistentConnectivity(f, linuxPod.ObjectMeta.Name, linuxOS, linuxCheck("8.8.8.8", 53))
+			assertConsistentConnectivity(ctx, f, linuxPod.ObjectMeta.Name, linuxOS, linuxCheck("8.8.8.8", 53))
 		})
 
-		ginkgo.It("should provide Internet connection for Windows containers using DNS [Feature:Networking-DNS]", func() {
+		ginkgo.It("should provide Internet connection for Windows containers using DNS [Feature:Networking-DNS]", func(ctx context.Context) {
 			windowsPod := createTestPod(f, windowsBusyBoximage, windowsOS)
 			ginkgo.By("creating a windows pod and waiting for it to be running")
-			windowsPod = e2epod.NewPodClient(f).CreateSync(windowsPod)
+			windowsPod = e2epod.NewPodClient(f).CreateSync(ctx, windowsPod)
 
 			ginkgo.By("verifying pod external connectivity to the internet")
 
 			ginkgo.By("checking connectivity to 8.8.8.8 53 (google.com) from Windows")
-			assertConsistentConnectivity(f, windowsPod.ObjectMeta.Name, windowsOS, windowsCheck("www.google.com"))
+			assertConsistentConnectivity(ctx, f, windowsPod.ObjectMeta.Name, windowsOS, windowsCheck("www.google.com"))
 		})
 
 	})
@@ -106,7 +107,7 @@ var (
 	timeoutSeconds = 10
 )
 
-func assertConsistentConnectivity(f *framework.Framework, podName string, os string, cmd []string) {
+func assertConsistentConnectivity(ctx context.Context, f *framework.Framework, podName string, os string, cmd []string) {
 	connChecker := func() error {
 		ginkgo.By(fmt.Sprintf("checking connectivity of %s-container in %s", os, podName))
 		// TODO, we should be retrying this similar to what is done in DialFromNode, in the test/e2e/networking/networking.go tests
@@ -116,8 +117,8 @@ func assertConsistentConnectivity(f *framework.Framework, podName string, os str
 		}
 		return err
 	}
-	gomega.Eventually(connChecker, duration, pollInterval).ShouldNot(gomega.HaveOccurred())
-	gomega.Consistently(connChecker, duration, pollInterval).ShouldNot(gomega.HaveOccurred())
+	gomega.Eventually(ctx, connChecker, duration, pollInterval).ShouldNot(gomega.HaveOccurred())
+	gomega.Consistently(ctx, connChecker, duration, pollInterval).ShouldNot(gomega.HaveOccurred())
 }
 
 func linuxCheck(address string, port int) []string {

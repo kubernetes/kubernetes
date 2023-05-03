@@ -27,7 +27,8 @@ func BeEquivalentTo(expected interface{}) types.GomegaMatcher {
 	}
 }
 
-// BeComparableTo uses gocmp.Equal to compare. You can pass cmp.Option as options.
+// BeComparableTo uses gocmp.Equal from github.com/google/go-cmp (instead of reflect.DeepEqual) to perform a deep comparison.
+// You can pass cmp.Option as options.
 // It is an error for actual and expected to be nil.  Use BeNil() instead.
 func BeComparableTo(expected interface{}, opts ...cmp.Option) types.GomegaMatcher {
 	return &matchers.BeComparableToMatcher{
@@ -344,6 +345,20 @@ func BeKeyOf(element interface{}) types.GomegaMatcher {
 // Note that Go's type system does not allow you to write this as ConsistOf([]string{"FooBar", "Foo"}...) as []string and []interface{} are different types - hence the need for this special rule.
 func ConsistOf(elements ...interface{}) types.GomegaMatcher {
 	return &matchers.ConsistOfMatcher{
+		Elements: elements,
+	}
+}
+
+// HaveExactElemets succeeds if actual contains elements that precisely match the elemets passed into the matcher. The ordering of the elements does matter.
+// By default HaveExactElements() uses Equal() to match the elements, however custom matchers can be passed in instead.  Here are some examples:
+//
+//	Expect([]string{"Foo", "FooBar"}).Should(HaveExactElements("Foo", "FooBar"))
+//	Expect([]string{"Foo", "FooBar"}).Should(HaveExactElements("Foo", ContainSubstring("Bar")))
+//	Expect([]string{"Foo", "FooBar"}).Should(HaveExactElements(ContainSubstring("Foo"), ContainSubstring("Foo")))
+//
+// Actual must be an array or slice.
+func HaveExactElements(elements ...interface{}) types.GomegaMatcher {
+	return &matchers.HaveExactElementsMatcher{
 		Elements: elements,
 	}
 }

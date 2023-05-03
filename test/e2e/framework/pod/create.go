@@ -52,76 +52,76 @@ type Config struct {
 }
 
 // CreateUnschedulablePod with given claims based on node selector
-func CreateUnschedulablePod(client clientset.Interface, namespace string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) (*v1.Pod, error) {
+func CreateUnschedulablePod(ctx context.Context, client clientset.Interface, namespace string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) (*v1.Pod, error) {
 	pod := MakePod(namespace, nodeSelector, pvclaims, isPrivileged, command)
-	pod, err := client.CoreV1().Pods(namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
+	pod, err := client.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("pod Create API error: %v", err)
+		return nil, fmt.Errorf("pod Create API error: %w", err)
 	}
 	// Waiting for pod to become Unschedulable
-	err = WaitForPodNameUnschedulableInNamespace(client, pod.Name, namespace)
+	err = WaitForPodNameUnschedulableInNamespace(ctx, client, pod.Name, namespace)
 	if err != nil {
-		return pod, fmt.Errorf("pod %q is not Unschedulable: %v", pod.Name, err)
+		return pod, fmt.Errorf("pod %q is not Unschedulable: %w", pod.Name, err)
 	}
 	// get fresh pod info
-	pod, err = client.CoreV1().Pods(namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+	pod, err = client.CoreV1().Pods(namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 	if err != nil {
-		return pod, fmt.Errorf("pod Get API error: %v", err)
+		return pod, fmt.Errorf("pod Get API error: %w", err)
 	}
 	return pod, nil
 }
 
 // CreateClientPod defines and creates a pod with a mounted PV. Pod runs infinite loop until killed.
-func CreateClientPod(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim) (*v1.Pod, error) {
-	return CreatePod(c, ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, "")
+func CreateClientPod(ctx context.Context, c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim) (*v1.Pod, error) {
+	return CreatePod(ctx, c, ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, "")
 }
 
 // CreatePod with given claims based on node selector
-func CreatePod(client clientset.Interface, namespace string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) (*v1.Pod, error) {
+func CreatePod(ctx context.Context, client clientset.Interface, namespace string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) (*v1.Pod, error) {
 	pod := MakePod(namespace, nodeSelector, pvclaims, isPrivileged, command)
-	pod, err := client.CoreV1().Pods(namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
+	pod, err := client.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("pod Create API error: %v", err)
+		return nil, fmt.Errorf("pod Create API error: %w", err)
 	}
 	// Waiting for pod to be running
-	err = WaitForPodNameRunningInNamespace(client, pod.Name, namespace)
+	err = WaitForPodNameRunningInNamespace(ctx, client, pod.Name, namespace)
 	if err != nil {
-		return pod, fmt.Errorf("pod %q is not Running: %v", pod.Name, err)
+		return pod, fmt.Errorf("pod %q is not Running: %w", pod.Name, err)
 	}
 	// get fresh pod info
-	pod, err = client.CoreV1().Pods(namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+	pod, err = client.CoreV1().Pods(namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 	if err != nil {
-		return pod, fmt.Errorf("pod Get API error: %v", err)
+		return pod, fmt.Errorf("pod Get API error: %w", err)
 	}
 	return pod, nil
 }
 
 // CreateSecPod creates security pod with given claims
-func CreateSecPod(client clientset.Interface, podConfig *Config, timeout time.Duration) (*v1.Pod, error) {
-	return CreateSecPodWithNodeSelection(client, podConfig, timeout)
+func CreateSecPod(ctx context.Context, client clientset.Interface, podConfig *Config, timeout time.Duration) (*v1.Pod, error) {
+	return CreateSecPodWithNodeSelection(ctx, client, podConfig, timeout)
 }
 
 // CreateSecPodWithNodeSelection creates security pod with given claims
-func CreateSecPodWithNodeSelection(client clientset.Interface, podConfig *Config, timeout time.Duration) (*v1.Pod, error) {
+func CreateSecPodWithNodeSelection(ctx context.Context, client clientset.Interface, podConfig *Config, timeout time.Duration) (*v1.Pod, error) {
 	pod, err := MakeSecPod(podConfig)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to create pod: %v", err)
+		return nil, fmt.Errorf("Unable to create pod: %w", err)
 	}
 
-	pod, err = client.CoreV1().Pods(podConfig.NS).Create(context.TODO(), pod, metav1.CreateOptions{})
+	pod, err = client.CoreV1().Pods(podConfig.NS).Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("pod Create API error: %v", err)
+		return nil, fmt.Errorf("pod Create API error: %w", err)
 	}
 
 	// Waiting for pod to be running
-	err = WaitTimeoutForPodRunningInNamespace(client, pod.Name, podConfig.NS, timeout)
+	err = WaitTimeoutForPodRunningInNamespace(ctx, client, pod.Name, podConfig.NS, timeout)
 	if err != nil {
-		return pod, fmt.Errorf("pod %q is not Running: %v", pod.Name, err)
+		return pod, fmt.Errorf("pod %q is not Running: %w", pod.Name, err)
 	}
 	// get fresh pod info
-	pod, err = client.CoreV1().Pods(podConfig.NS).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+	pod, err = client.CoreV1().Pods(podConfig.NS).Get(ctx, pod.Name, metav1.GetOptions{})
 	if err != nil {
-		return pod, fmt.Errorf("pod Get API error: %v", err)
+		return pod, fmt.Errorf("pod Get API error: %w", err)
 	}
 	return pod, nil
 }

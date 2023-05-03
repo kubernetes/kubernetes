@@ -41,7 +41,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	e2etestingmanifests "k8s.io/kubernetes/test/e2e/testing-manifests"
 	testfixtures "k8s.io/kubernetes/test/fixtures"
-	"k8s.io/kubernetes/test/utils/image"
 
 	// test sources
 	_ "k8s.io/kubernetes/test/e2e/apimachinery"
@@ -60,6 +59,7 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/node"
 	_ "k8s.io/kubernetes/test/e2e/scheduling"
 	_ "k8s.io/kubernetes/test/e2e/storage"
+	_ "k8s.io/kubernetes/test/e2e/storage/csi_mock"
 	_ "k8s.io/kubernetes/test/e2e/storage/external"
 	_ "k8s.io/kubernetes/test/e2e/windows"
 
@@ -73,16 +73,11 @@ import (
 func TestMain(m *testing.M) {
 	var versionFlag bool
 	flag.CommandLine.BoolVar(&versionFlag, "version", false, "Displays version information.")
+	listConformanceTests := flag.CommandLine.Bool("list-conformance-tests", false, "If true, will show list of conformance tests.")
 
 	// Register test flags, then parse flags.
 	HandleFlags()
 
-	if framework.TestContext.ListImages {
-		for _, v := range image.GetImageConfigs() {
-			fmt.Println(v.GetE2EImage())
-		}
-		os.Exit(0)
-	}
 	if versionFlag {
 		fmt.Printf("%s\n", version.Get())
 		os.Exit(0)
@@ -93,7 +88,7 @@ func TestMain(m *testing.M) {
 	testfiles.AddFileSource(testfixtures.GetTestFixturesFS())
 	testfiles.AddFileSource(conformancetestdata.GetConformanceTestdataFS())
 
-	if framework.TestContext.ListConformanceTests {
+	if *listConformanceTests {
 		var tests []struct {
 			Testname    string `yaml:"testname"`
 			Codename    string `yaml:"codename"`
@@ -139,7 +134,11 @@ func TestE2E(t *testing.T) {
 
 var _ = ginkgo.ReportAfterEach(func(report ginkgo.SpecReport) {
 	progressReporter.ProcessSpecReport(report)
-}, ginkgo.SuppressProgressReporting)
+})
+
+var _ = ginkgo.ReportBeforeSuite(func(report ginkgo.Report) {
+	progressReporter.SetTestsTotal(report.PreRunStats.SpecsThatWillRun)
+})
 
 var _ = ginkgo.ReportAfterSuite("Kubernetes e2e suite report", func(report ginkgo.Report) {
 	var err error

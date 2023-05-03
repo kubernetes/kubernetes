@@ -35,6 +35,7 @@ func NewCmdAuth(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 
 	cmds.AddCommand(NewCmdCanI(f, streams))
 	cmds.AddCommand(NewCmdReconcile(f, streams))
+	cmds.AddCommand(NewCmdWhoAmI(f, streams))
 
 	return cmds
 }

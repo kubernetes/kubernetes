@@ -136,8 +136,9 @@ func (VersionAvailability) SwaggerDoc() map[string]string {
 }
 
 var map_ImageContentSourcePolicy = map[string]string{
-	"":     "ImageContentSourcePolicy holds cluster-wide information about how to handle registry mirror rules. When multiple policies are defined, the outcome of the behavior is defined on each field.\n\nCompatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.",
-	"spec": "spec holds user settable values for configuration",
+	"":         "ImageContentSourcePolicy holds cluster-wide information about how to handle registry mirror rules. When multiple policies are defined, the outcome of the behavior is defined on each field.\n\nCompatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "spec holds user settable values for configuration",
 }
 
 func (ImageContentSourcePolicy) SwaggerDoc() map[string]string {
@@ -145,7 +146,8 @@ func (ImageContentSourcePolicy) SwaggerDoc() map[string]string {
 }
 
 var map_ImageContentSourcePolicyList = map[string]string{
-	"": "ImageContentSourcePolicyList lists the items in the ImageContentSourcePolicy CRD.\n\nCompatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.",
+	"":         "ImageContentSourcePolicyList lists the items in the ImageContentSourcePolicy CRD.\n\nCompatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 }
 
 func (ImageContentSourcePolicyList) SwaggerDoc() map[string]string {

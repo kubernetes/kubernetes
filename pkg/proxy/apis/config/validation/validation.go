@@ -143,7 +143,6 @@ func validateKubeProxyIPVSConfiguration(config kubeproxyconfig.KubeProxyIPVSConf
 	}
 
 	allErrs = append(allErrs, validateIPVSTimeout(config, fldPath)...)
-	allErrs = append(allErrs, validateIPVSSchedulerMethod(kubeproxyconfig.IPVSSchedulerMethod(config.Scheduler), fldPath.Child("Scheduler"))...)
 	allErrs = append(allErrs, validateIPVSExcludeCIDRs(config.ExcludeCIDRs, fldPath.Child("ExcludeCidrs"))...)
 
 	return allErrs
@@ -231,36 +230,6 @@ func validateHostPort(input string, fldPath *field.Path) field.ErrorList {
 		allErrs = append(allErrs, field.Invalid(fldPath, port, "must be a valid port"))
 	}
 
-	return allErrs
-}
-
-func validateIPVSSchedulerMethod(scheduler kubeproxyconfig.IPVSSchedulerMethod, fldPath *field.Path) field.ErrorList {
-	supportedMethod := []kubeproxyconfig.IPVSSchedulerMethod{
-		kubeproxyconfig.RoundRobin,
-		kubeproxyconfig.WeightedRoundRobin,
-		kubeproxyconfig.LeastConnection,
-		kubeproxyconfig.WeightedLeastConnection,
-		kubeproxyconfig.LocalityBasedLeastConnection,
-		kubeproxyconfig.LocalityBasedLeastConnectionWithReplication,
-		kubeproxyconfig.SourceHashing,
-		kubeproxyconfig.DestinationHashing,
-		kubeproxyconfig.ShortestExpectedDelay,
-		kubeproxyconfig.NeverQueue,
-		"",
-	}
-	allErrs := field.ErrorList{}
-	var found bool
-	for i := range supportedMethod {
-		if scheduler == supportedMethod[i] {
-			found = true
-			break
-		}
-	}
-	// Not found
-	if !found {
-		errMsg := fmt.Sprintf("must be in %v, blank means the default algorithm method (currently rr)", supportedMethod)
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("Scheduler"), string(scheduler), errMsg))
-	}
 	return allErrs
 }
 

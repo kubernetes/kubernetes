@@ -18,18 +18,13 @@ package node
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/pkg/errors"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
-	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 )
 
 var (
@@ -65,30 +60,11 @@ func runKubeletConfigPhase() func(c workflow.RunData) error {
 		cfg := data.Cfg()
 		dryRun := data.DryRun()
 
-		// Set up the kubelet directory to use. If dry-running, this will return a fake directory
-		kubeletDir, err := upgrade.GetKubeletDir(dryRun)
+		// Write the configuration for the kubelet down to disk and print the generated manifests instead if dry-running.
+		// If not dry-running, the kubelet config file will be backed up to /etc/kubernetes/tmp/ dir, so that it could be
+		// recovered if there is anything goes wrong.
+		err := upgrade.WriteKubeletConfigFiles(cfg, data.PatchesDir(), dryRun, data.OutputWriter())
 		if err != nil {
-			return err
-		}
-
-		// TODO: Checkpoint the current configuration first so that if something goes wrong it can be recovered
-
-		// Store the kubelet component configuration.
-		if err = kubeletphase.WriteConfigToDisk(&cfg.ClusterConfiguration, kubeletDir, data.PatchesDir(), data.OutputWriter()); err != nil {
-			return err
-		}
-
-		// If we're dry-running, print the generated manifests
-		if dryRun {
-			if err := printFilesIfDryRunning(dryRun, kubeletDir); err != nil {
-				return errors.Wrap(err, "error printing files on dryrun")
-			}
-			return nil
-		}
-
-		// TODO: Temporary workaround. Remove in 1.27:
-		// https://github.com/kubernetes/kubeadm/issues/2626
-		if err := upgrade.CleanupKubeletDynamicEnvFileContainerRuntime(dryRun); err != nil {
 			return err
 		}
 
@@ -96,18 +72,4 @@ func runKubeletConfigPhase() func(c workflow.RunData) error {
 		fmt.Println("[upgrade] Now you should go ahead and upgrade the kubelet package using your package manager.")
 		return nil
 	}
-}
-
-// printFilesIfDryRunning prints the Static Pod manifests to stdout and informs about the temporary directory to go and lookup
-func printFilesIfDryRunning(dryRun bool, kubeletDir string) error {
-	if !dryRun {
-		return nil
-	}
-
-	// Print the contents of the upgraded file and pretend like they were in kubeadmconstants.KubeletRunDirectory
-	fileToPrint := dryrunutil.FileToPrint{
-		RealPath:  filepath.Join(kubeletDir, constants.KubeletConfigurationFileName),
-		PrintPath: filepath.Join(constants.KubeletRunDirectory, constants.KubeletConfigurationFileName),
-	}
-	return dryrunutil.PrintDryRunFiles([]dryrunutil.FileToPrint{fileToPrint}, os.Stdout)
 }

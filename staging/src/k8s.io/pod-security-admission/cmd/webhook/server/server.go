@@ -171,7 +171,7 @@ func (s *Server) HandleValidate(w http.ResponseWriter, r *http.Request) {
 		defer cancel()
 	}
 
-	if r.Body == nil {
+	if r.Body == nil || r.Body == http.NoBody {
 		err = errors.New("request body is empty")
 		klog.ErrorS(err, "bad request")
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -194,7 +194,7 @@ func (s *Server) HandleValidate(w http.ResponseWriter, r *http.Request) {
 	// verify the content type is accurate
 	if contentType := r.Header.Get("Content-Type"); contentType != "application/json" {
 		err = fmt.Errorf("contentType=%s, expected application/json", contentType)
-		klog.ErrorS(err, "unable to process a request with an unknown content type", "content type", contentType)
+		klog.ErrorS(err, "unable to process a request with an unknown content type", "contentType", contentType)
 		http.Error(w, "unable to process a request with a non-json content type", http.StatusBadRequest)
 		return
 	}

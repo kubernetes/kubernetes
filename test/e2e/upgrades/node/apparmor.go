@@ -57,54 +57,54 @@ func (AppArmorUpgradeTest) Skip(upgCtx upgrades.UpgradeContext) bool {
 }
 
 // Setup creates a secret and then verifies that a pod can consume it.
-func (t *AppArmorUpgradeTest) Setup(f *framework.Framework) {
+func (t *AppArmorUpgradeTest) Setup(ctx context.Context, f *framework.Framework) {
 	ginkgo.By("Loading AppArmor profiles to nodes")
-	e2esecurity.LoadAppArmorProfiles(f.Namespace.Name, f.ClientSet)
+	e2esecurity.LoadAppArmorProfiles(ctx, f.Namespace.Name, f.ClientSet)
 
 	// Create the initial test pod.
 	ginkgo.By("Creating a long-running AppArmor enabled pod.")
-	t.pod = e2esecurity.CreateAppArmorTestPod(f.Namespace.Name, f.ClientSet, e2epod.NewPodClient(f), false, false)
+	t.pod = e2esecurity.CreateAppArmorTestPod(ctx, f.Namespace.Name, f.ClientSet, e2epod.NewPodClient(f), false, false)
 
 	// Verify initial state.
-	t.verifyNodesAppArmorEnabled(f)
-	t.verifyNewPodSucceeds(f)
+	t.verifyNodesAppArmorEnabled(ctx, f)
+	t.verifyNewPodSucceeds(ctx, f)
 }
 
 // Test waits for the upgrade to complete, and then verifies that a
 // pod can still consume the secret.
-func (t *AppArmorUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
+func (t *AppArmorUpgradeTest) Test(ctx context.Context, f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
 	<-done
 	if upgrade == upgrades.MasterUpgrade {
-		t.verifyPodStillUp(f)
+		t.verifyPodStillUp(ctx, f)
 	}
-	t.verifyNodesAppArmorEnabled(f)
-	t.verifyNewPodSucceeds(f)
+	t.verifyNodesAppArmorEnabled(ctx, f)
+	t.verifyNewPodSucceeds(ctx, f)
 }
 
 // Teardown cleans up any remaining resources.
-func (t *AppArmorUpgradeTest) Teardown(f *framework.Framework) {
+func (t *AppArmorUpgradeTest) Teardown(ctx context.Context, f *framework.Framework) {
 	// rely on the namespace deletion to clean up everything
 	ginkgo.By("Logging container failures")
-	e2ekubectl.LogFailedContainers(f.ClientSet, f.Namespace.Name, framework.Logf)
+	e2ekubectl.LogFailedContainers(ctx, f.ClientSet, f.Namespace.Name, framework.Logf)
 }
 
-func (t *AppArmorUpgradeTest) verifyPodStillUp(f *framework.Framework) {
+func (t *AppArmorUpgradeTest) verifyPodStillUp(ctx context.Context, f *framework.Framework) {
 	ginkgo.By("Verifying an AppArmor profile is continuously enforced for a pod")
-	pod, err := e2epod.NewPodClient(f).Get(context.TODO(), t.pod.Name, metav1.GetOptions{})
+	pod, err := e2epod.NewPodClient(f).Get(ctx, t.pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "Should be able to get pod")
 	framework.ExpectEqual(pod.Status.Phase, v1.PodRunning, "Pod should stay running")
 	gomega.Expect(pod.Status.ContainerStatuses[0].State.Running).NotTo(gomega.BeNil(), "Container should be running")
 	gomega.Expect(pod.Status.ContainerStatuses[0].RestartCount).To(gomega.BeZero(), "Container should not need to be restarted")
 }
 
-func (t *AppArmorUpgradeTest) verifyNewPodSucceeds(f *framework.Framework) {
+func (t *AppArmorUpgradeTest) verifyNewPodSucceeds(ctx context.Context, f *framework.Framework) {
 	ginkgo.By("Verifying an AppArmor profile is enforced for a new pod")
-	e2esecurity.CreateAppArmorTestPod(f.Namespace.Name, f.ClientSet, e2epod.NewPodClient(f), false, true)
+	e2esecurity.CreateAppArmorTestPod(ctx, f.Namespace.Name, f.ClientSet, e2epod.NewPodClient(f), false, true)
 }
 
-func (t *AppArmorUpgradeTest) verifyNodesAppArmorEnabled(f *framework.Framework) {
+func (t *AppArmorUpgradeTest) verifyNodesAppArmorEnabled(ctx context.Context, f *framework.Framework) {
 	ginkgo.By("Verifying nodes are AppArmor enabled")
-	nodes, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+	nodes, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	framework.ExpectNoError(err, "Failed to list nodes")
 	for _, node := range nodes.Items {
 		gomega.Expect(node.Status.Conditions).To(gstruct.MatchElements(conditionType, gstruct.IgnoreExtras, gstruct.Elements{

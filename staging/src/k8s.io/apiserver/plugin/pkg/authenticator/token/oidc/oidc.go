@@ -662,11 +662,11 @@ func getClaimJWT(client *http.Client, url, accessToken string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	defer response.Body.Close()
 	// Report non-OK status code as an error.
 	if response.StatusCode < http.StatusOK || response.StatusCode > http.StatusIMUsed {
 		return "", fmt.Errorf("error while getting distributed claim JWT: %v", response.Status)
 	}
-	defer response.Body.Close()
 	responseBytes, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		return "", fmt.Errorf("could not decode distributed claim response")

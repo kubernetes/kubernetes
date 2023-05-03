@@ -18,11 +18,14 @@ package validation
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/robfig/cron/v3"
+
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
@@ -67,12 +70,12 @@ var (
 		string(v1.ConditionUnknown))
 )
 
-// ValidateGeneratedSelector validates that the generated selector on a controller object match the controller object
+// validateGeneratedSelector validates that the generated selector on a controller object match the controller object
 // metadata, and the labels on the pod template are as generated.
 //
 // TODO: generalize for other controller objects that will follow the same pattern, such as ReplicaSet and DaemonSet, and
 // move to new location.  Replace batch.Job with an interface.
-func ValidateGeneratedSelector(obj *batch.Job) field.ErrorList {
+func validateGeneratedSelector(obj *batch.Job, validateBatchLabels bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if obj.Spec.ManualSelector != nil && *obj.Spec.ManualSelector {
 		return allErrs
@@ -97,12 +100,20 @@ func ValidateGeneratedSelector(obj *batch.Job) field.ErrorList {
 	// have placed certain labels on the pod, but this could have failed if
 	// the user added coflicting labels.  Validate that the expected
 	// generated ones are there.
-
-	allErrs = append(allErrs, apivalidation.ValidateHasLabel(obj.Spec.Template.ObjectMeta, field.NewPath("spec").Child("template").Child("metadata"), "controller-uid", string(obj.UID))...)
-	allErrs = append(allErrs, apivalidation.ValidateHasLabel(obj.Spec.Template.ObjectMeta, field.NewPath("spec").Child("template").Child("metadata"), "job-name", string(obj.Name))...)
+	allErrs = append(allErrs, apivalidation.ValidateHasLabel(obj.Spec.Template.ObjectMeta, field.NewPath("spec").Child("template").Child("metadata"), batch.LegacyControllerUidLabel, string(obj.UID))...)
+	allErrs = append(allErrs, apivalidation.ValidateHasLabel(obj.Spec.Template.ObjectMeta, field.NewPath("spec").Child("template").Child("metadata"), batch.LegacyJobNameLabel, string(obj.Name))...)
 	expectedLabels := make(map[string]string)
-	expectedLabels["controller-uid"] = string(obj.UID)
-	expectedLabels["job-name"] = string(obj.Name)
+	if validateBatchLabels {
+		allErrs = append(allErrs, apivalidation.ValidateHasLabel(obj.Spec.Template.ObjectMeta, field.NewPath("spec").Child("template").Child("metadata"), batch.ControllerUidLabel, string(obj.UID))...)
+		allErrs = append(allErrs, apivalidation.ValidateHasLabel(obj.Spec.Template.ObjectMeta, field.NewPath("spec").Child("template").Child("metadata"), batch.JobNameLabel, string(obj.Name))...)
+		expectedLabels[batch.ControllerUidLabel] = string(obj.UID)
+		expectedLabels[batch.JobNameLabel] = string(obj.Name)
+	}
+	// Labels created by the Kubernetes project should have a Kubernetes prefix.
+	// These labels are set due to legacy reasons.
+
+	expectedLabels[batch.LegacyControllerUidLabel] = string(obj.UID)
+	expectedLabels[batch.LegacyJobNameLabel] = string(obj.Name)
 	// Whether manually or automatically generated, the selector of the job must match the pods it will produce.
 	if selector, err := metav1.LabelSelectorAsSelector(obj.Spec.Selector); err == nil {
 		if !selector.Matches(labels.Set(expectedLabels)) {
@@ -117,7 +128,7 @@ func ValidateGeneratedSelector(obj *batch.Job) field.ErrorList {
 func ValidateJob(job *batch.Job, opts JobValidationOptions) field.ErrorList {
 	// Jobs and rcs have the same name validation
 	allErrs := apivalidation.ValidateObjectMeta(&job.ObjectMeta, true, apivalidation.ValidateReplicationControllerName, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateGeneratedSelector(job)...)
+	allErrs = append(allErrs, validateGeneratedSelector(job, opts.RequirePrefixedLabels)...)
 	allErrs = append(allErrs, ValidateJobSpec(&job.Spec, field.NewPath("spec"), opts.PodValidationOptions)...)
 	if !opts.AllowTrackingAnnotation && hasJobTrackingAnnotation(job) {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("metadata").Child("annotations").Key(batch.JobTrackingFinalizer), "cannot add this annotation"))
@@ -373,7 +384,7 @@ func ValidateJobUpdateStatus(job, oldJob *batch.Job) field.ErrorList {
 func ValidateJobSpecUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path, opts JobValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateJobSpec(&spec, fldPath, opts.PodValidationOptions)...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.Completions, oldSpec.Completions, fldPath.Child("completions"))...)
+	allErrs = append(allErrs, validateCompletions(spec, oldSpec, fldPath.Child("completions"), opts)...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.Selector, oldSpec.Selector, fldPath.Child("selector"))...)
 	allErrs = append(allErrs, validatePodTemplateUpdate(spec, oldSpec, fldPath, opts)...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.CompletionMode, oldSpec.CompletionMode, fldPath.Child("completionMode"))...)
@@ -401,10 +412,11 @@ func validatePodTemplateUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path,
 			// allow the NodeAffinity field to skip immutability checking
 			oldTemplate.Spec.Affinity.NodeAffinity = template.Spec.Affinity.NodeAffinity // +k8s:verify-mutation:reason=clone
 		}
-		oldTemplate.Spec.NodeSelector = template.Spec.NodeSelector // +k8s:verify-mutation:reason=clone
-		oldTemplate.Spec.Tolerations = template.Spec.Tolerations   // +k8s:verify-mutation:reason=clone
-		oldTemplate.Annotations = template.Annotations             // +k8s:verify-mutation:reason=clone
-		oldTemplate.Labels = template.Labels                       // +k8s:verify-mutation:reason=clone
+		oldTemplate.Spec.NodeSelector = template.Spec.NodeSelector       // +k8s:verify-mutation:reason=clone
+		oldTemplate.Spec.Tolerations = template.Spec.Tolerations         // +k8s:verify-mutation:reason=clone
+		oldTemplate.Annotations = template.Annotations                   // +k8s:verify-mutation:reason=clone
+		oldTemplate.Labels = template.Labels                             // +k8s:verify-mutation:reason=clone
+		oldTemplate.Spec.SchedulingGates = template.Spec.SchedulingGates // +k8s:verify-mutation:reason=clone
 	}
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(template, oldTemplate, fldPath.Child("template"))...)
 	return allErrs
@@ -502,6 +514,16 @@ func validateScheduleFormat(schedule string, timeZone *string, fldPath *field.Pa
 	return allErrs
 }
 
+// https://data.iana.org/time-zones/theory.html#naming
+// * A name must not be empty, or contain '//', or start or end with '/'.
+// * Do not use the file name components '.' and '..'.
+// * Within a file name component, use only ASCII letters, '.', '-' and '_'.
+// * Do not use digits, as that might create an ambiguity with POSIX TZ strings.
+// * A file name component must not exceed 14 characters or start with '-'
+//
+// 0-9 and + characters are tolerated to accommodate legacy compatibility names
+var validTimeZoneCharacters = regexp.MustCompile(`^[A-Za-z\.\-_0-9+]{1,14}$`)
+
 func validateTimeZone(timeZone *string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if timeZone == nil {
@@ -513,6 +535,13 @@ func validateTimeZone(timeZone *string, fldPath *field.Path) field.ErrorList {
 		return allErrs
 	}
 
+	for _, part := range strings.Split(*timeZone, "/") {
+		if part == "." || part == ".." || strings.HasPrefix(part, "-") || !validTimeZoneCharacters.MatchString(part) {
+			allErrs = append(allErrs, field.Invalid(fldPath, timeZone, fmt.Sprintf("unknown time zone %s", *timeZone)))
+			return allErrs
+		}
+	}
+
 	if strings.EqualFold(*timeZone, "Local") {
 		allErrs = append(allErrs, field.Invalid(fldPath, timeZone, "timeZone must be an explicit time zone as defined in https://www.iana.org/time-zones"))
 	}
@@ -521,14 +550,6 @@ func validateTimeZone(timeZone *string, fldPath *field.Path) field.ErrorList {
 		allErrs = append(allErrs, field.Invalid(fldPath, timeZone, err.Error()))
 	}
 
-	return allErrs
-}
-
-// ValidateJobTemplate validates a JobTemplate and returns an ErrorList with any errors.
-func ValidateJobTemplate(job *batch.JobTemplate, opts apivalidation.PodValidationOptions) field.ErrorList {
-	// this method should be identical to ValidateJob
-	allErrs := apivalidation.ValidateObjectMeta(&job.ObjectMeta, true, apivalidation.ValidateReplicationControllerName, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateJobTemplateSpec(&job.Template, field.NewPath("template"), opts)...)
 	return allErrs
 }
 
@@ -546,10 +567,43 @@ func ValidateJobTemplateSpec(spec *batch.JobTemplateSpec, fldPath *field.Path, o
 	return allErrs
 }
 
+func validateCompletions(spec, oldSpec batch.JobSpec, fldPath *field.Path, opts JobValidationOptions) field.ErrorList {
+	if !opts.AllowElasticIndexedJobs {
+		return apivalidation.ValidateImmutableField(spec.Completions, oldSpec.Completions, fldPath)
+	}
+
+	// Completions is immutable for non-indexed jobs.
+	// For Indexed Jobs, if ElasticIndexedJob feature gate is not enabled,
+	// fall back to validating that spec.Completions is always immutable.
+	isIndexedJob := spec.CompletionMode != nil && *spec.CompletionMode == batch.IndexedCompletion
+	if !isIndexedJob {
+		return apivalidation.ValidateImmutableField(spec.Completions, oldSpec.Completions, fldPath)
+	}
+
+	var allErrs field.ErrorList
+	if apiequality.Semantic.DeepEqual(spec.Completions, oldSpec.Completions) {
+		return allErrs
+	}
+	// Indexed Jobs cannot set completions to nil. The nil check
+	// is already performed in validateJobSpec, no need to add another error.
+	if spec.Completions == nil {
+		return allErrs
+	}
+
+	if *spec.Completions != *spec.Parallelism {
+		allErrs = append(allErrs, field.Invalid(fldPath, spec.Completions, fmt.Sprintf("can only be modified in tandem with %s", fldPath.Root().Child("parallelism").String())))
+	}
+	return allErrs
+}
+
 type JobValidationOptions struct {
 	apivalidation.PodValidationOptions
 	// Allow Job to have the annotation batch.kubernetes.io/job-tracking
 	AllowTrackingAnnotation bool
 	// Allow mutable node affinity, selector and tolerations of the template
 	AllowMutableSchedulingDirectives bool
+	// Allow elastic indexed jobs
+	AllowElasticIndexedJobs bool
+	// Require Job to have the label on batch.kubernetes.io/job-name and batch.kubernetes.io/controller-uid
+	RequirePrefixedLabels bool
 }

@@ -22,7 +22,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/pkg/errors"
 
@@ -41,6 +40,7 @@ import (
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 )
 
@@ -57,19 +57,13 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 	}
 
 	// Create the new, version-branched kubelet ComponentConfig ConfigMap
-	if err := kubeletphase.CreateConfigMap(&cfg.ClusterConfiguration, client); err != nil {
+	if err := kubeletphase.CreateConfigMap(&cfg.ClusterConfiguration, patchesDir, client); err != nil {
 		errs = append(errs, errors.Wrap(err, "error creating kubelet configuration ConfigMap"))
 	}
 
 	// Write the new kubelet config down to disk and the env file if needed
-	if err := writeKubeletConfigFiles(client, cfg, patchesDir, dryRun, out); err != nil {
+	if err := WriteKubeletConfigFiles(cfg, patchesDir, dryRun, out); err != nil {
 		errs = append(errs, err)
-	}
-
-	// TODO: Temporary workaround. Remove in 1.27:
-	// https://github.com/kubernetes/kubeadm/issues/2626
-	if err := CleanupKubeletDynamicEnvFileContainerRuntime(dryRun); err != nil {
-		return err
 	}
 
 	// Annotate the node with the crisocket information, sourced either from the InitConfiguration struct or
@@ -162,12 +156,36 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 	return errorsutil.NewAggregate(errs)
 }
 
-func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, patchesDir string, dryRun bool, out io.Writer) error {
+func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, patchesDir string, dryRun bool, out io.Writer) error {
+	// Set up the kubelet directory to use. If dry-running, this will return a fake directory
 	kubeletDir, err := GetKubeletDir(dryRun)
 	if err != nil {
 		// The error here should never occur in reality, would only be thrown if /tmp doesn't exist on the machine.
 		return err
 	}
+
+	// Create a copy of the kubelet config file in the /etc/kubernetes/tmp/ folder.
+	backupDir, err := kubeadmconstants.CreateTempDirForKubeadm(kubeadmconstants.KubernetesDir, "kubeadm-kubelet-config")
+	if err != nil {
+		return err
+	}
+	src := filepath.Join(kubeletDir, kubeadmconstants.KubeletConfigurationFileName)
+	dest := filepath.Join(backupDir, kubeadmconstants.KubeletConfigurationFileName)
+
+	if !dryRun {
+		// call `cp` instead of `rename` here since the kubelet config file and back up directory (/etc/kubernetes/tmp/)
+		// might on the filesystem with different mount points in the test environment, such as kinder.
+		// This will lead to a failure to move the file from the source to dest since `rename` normally doesn't work
+		// across different mount points on most Unix system.
+		fmt.Printf("[upgrade] Backing up kubelet config file to %s\n", dest)
+		output, err := kubeadmutil.CopyDir(src, dest)
+		if err != nil {
+			return errors.Wrapf(err, "error backing up the kubelet config file, output: %q", output)
+		}
+	} else {
+		fmt.Printf("[dryrun] Would back up kubelet config file to %s\n", dest)
+	}
+
 	errs := []error{}
 	// Write the configuration for the kubelet down to disk so the upgraded kubelet can start with fresh config
 	if err := kubeletphase.WriteConfigToDisk(&cfg.ClusterConfiguration, kubeletDir, patchesDir, out); err != nil {
@@ -175,7 +193,10 @@ func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitCon
 	}
 
 	if dryRun { // Print what contents would be written
-		dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, os.Stdout)
+		err := dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, os.Stdout)
+		if err != nil {
+			errs = append(errs, errors.Wrap(err, "error printing files on dryrun"))
+		}
 	}
 	return errorsutil.NewAggregate(errs)
 }
@@ -209,68 +230,4 @@ func rollbackFiles(files map[string]string, originalErr error) error {
 		}
 	}
 	return errors.Errorf("couldn't move these files: %v. Got errors: %v", files, errorsutil.NewAggregate(errs))
-}
-
-// CleanupKubeletDynamicEnvFileContainerRuntime reads the kubelet dynamic environment file
-// from disk, ensure that the container runtime flag is removed.
-// TODO: Temporary workaround. Remove in 1.27:
-// https://github.com/kubernetes/kubeadm/issues/2626
-func CleanupKubeletDynamicEnvFileContainerRuntime(dryRun bool) error {
-	filePath := filepath.Join(kubeadmconstants.KubeletRunDirectory, kubeadmconstants.KubeletEnvFileName)
-	if dryRun {
-		fmt.Printf("[dryrun] Would ensure that %q does not include a --container-runtime flag\n", filePath)
-		return nil
-	}
-	klog.V(2).Infof("Ensuring that %q does not include a --container-runtime flag", filePath)
-	bytes, err := os.ReadFile(filePath)
-	if err != nil {
-		return errors.Wrapf(err, "failed to read kubelet configuration from file %q", filePath)
-	}
-	updated := cleanupKubeletDynamicEnvFileContainerRuntime(string(bytes))
-	if err := os.WriteFile(filePath, []byte(updated), 0644); err != nil {
-		return errors.Wrapf(err, "failed to write kubelet configuration to the file %q", filePath)
-	}
-	return nil
-}
-
-func cleanupKubeletDynamicEnvFileContainerRuntime(str string) string {
-	const (
-		// `remote` is the only possible value
-		containerRuntimeFlag = "container-runtime"
-		endpointFlag         = "container-runtime-endpoint"
-	)
-	// Trim the prefix
-	str = strings.TrimLeft(str, fmt.Sprintf("%s=\"", kubeadmconstants.KubeletEnvFileVariableName))
-
-	// Flags are managed by kubeadm as pairs of key=value separated by space.
-	// Split them, find the one containing the flag of interest and update
-	// its value to have the scheme prefix.
-	split := strings.Split(str, " ")
-	for i, s := range split {
-		if !(strings.Contains(s, containerRuntimeFlag) && !strings.Contains(s, endpointFlag)) {
-			continue
-		}
-		keyValue := strings.Split(s, "=")
-		if len(keyValue) < 2 {
-			// Post init/join, the user may have edited the file and has flags that are not
-			// followed by "=". If that is the case the next argument must be the value
-			// of the endpoint flag and if its not a flag itself.
-			if i+1 < len(split) {
-				nextArg := split[i+1]
-				if strings.HasPrefix(nextArg, "-") {
-					// remove the flag only
-					split = append(split[:i], split[i+1:]...)
-				} else {
-					// remove the flag and value
-					split = append(split[:i], split[i+2:]...)
-				}
-			}
-			continue
-		}
-
-		// remove the flag and value in one
-		split = append(split[:i], split[i+1:]...)
-	}
-	str = strings.Join(split, " ")
-	return fmt.Sprintf("%s=\"%s", kubeadmconstants.KubeletEnvFileVariableName, str)
 }

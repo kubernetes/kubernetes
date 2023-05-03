@@ -32,11 +32,17 @@ PATH="${GOBIN}:${PATH}"
 
 # Install levee
 pushd "${KUBE_ROOT}/hack/tools" >/dev/null
-  GO111MODULE=on go install github.com/google/go-flow-levee/cmd/levee
+  GO111MODULE=on go install -mod=readonly github.com/google/go-flow-levee/cmd/levee
 popd >/dev/null
 
 # Prefer full path for interaction with make vet
 LEVEE_BIN="$(which levee)"
 CONFIG_FILE="${KUBE_ROOT}/hack/testdata/levee/levee-config.yaml"
 
-"${KUBE_ROOT}"/hack/verify-govet.sh -vettool="${LEVEE_BIN}" -config="${CONFIG_FILE}"
+# Do not run on third_party directories or generated client code or build tools.
+targets=()
+while IFS='' read -r line; do
+  targets+=("${line}")
+done < <(GO111MODULE=on go list --find -e ./... | grep -E -v "/(build|third_party|vendor|staging|clientset_generated|hack)/")
+
+GO111MODULE=on go vet -vettool="${LEVEE_BIN}" -config="${CONFIG_FILE}" "${targets[@]}"

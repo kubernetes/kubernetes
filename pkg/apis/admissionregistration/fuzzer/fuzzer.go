@@ -20,6 +20,7 @@ import (
 	fuzz "github.com/google/gofuzz"
 
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
+
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 )
 
@@ -82,6 +83,12 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			if obj.FailurePolicy == nil {
 				p := admissionregistration.FailurePolicyType("Fail")
 				obj.FailurePolicy = &p
+			}
+		},
+		func(obj *admissionregistration.ValidatingAdmissionPolicyBindingSpec, c fuzz.Continue) {
+			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+			if obj.ValidationActions == nil {
+				obj.ValidationActions = []admissionregistration.ValidationAction{admissionregistration.Deny}
 			}
 		},
 		func(obj *admissionregistration.MatchResources, c fuzz.Continue) {

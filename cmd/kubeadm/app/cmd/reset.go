@@ -76,7 +76,7 @@ type resetData struct {
 	client                clientset.Interface
 	criSocketPath         string
 	forceReset            bool
-	ignorePreflightErrors sets.String
+	ignorePreflightErrors sets.Set[string]
 	inputReader           io.Reader
 	outputWriter          io.Writer
 	cfg                   *kubeadmapi.InitConfiguration
@@ -116,7 +116,7 @@ func newResetData(cmd *cobra.Command, options *resetOptions, in io.Reader, out i
 	}
 	if cfg != nil {
 		// Also set the union of pre-flight errors to InitConfiguration, to provide a consistent view of the runtime configuration:
-		cfg.NodeRegistration.IgnorePreflightErrors = ignorePreflightErrorsSet.List()
+		cfg.NodeRegistration.IgnorePreflightErrors = sets.List(ignorePreflightErrorsSet)
 	}
 
 	var criSocketPath string
@@ -203,6 +203,11 @@ func newCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra
 	// sets the data builder function, that will be used by the runner
 	// both when running the entire workflow or single phases
 	resetRunner.SetDataInitializer(func(cmd *cobra.Command, args []string) (workflow.RunData, error) {
+		if cmd.Flags().Lookup(options.NodeCRISocket) == nil {
+			// avoid CRI detection
+			// assume that the command execution does not depend on CRISocket when --cri-socket flag is not set
+			resetOptions.criSocketPath = kubeadmconstants.UnknownCRISocket
+		}
 		return newResetData(cmd, resetOptions, in, out)
 	})
 
@@ -249,7 +254,7 @@ func (r *resetData) InputReader() io.Reader {
 }
 
 // IgnorePreflightErrors returns the list of preflight errors to ignore.
-func (r *resetData) IgnorePreflightErrors() sets.String {
+func (r *resetData) IgnorePreflightErrors() sets.Set[string] {
 	return r.ignorePreflightErrors
 }
 

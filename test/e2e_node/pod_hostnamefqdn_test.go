@@ -21,6 +21,7 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"crypto/rand"
 	"fmt"
 	"math/big"
@@ -79,12 +80,12 @@ var _ = SIGDescribe("Hostname of Pod [NodeConformance]", func() {
 	   Testname: Create Pod without fully qualified domain name (FQDN)
 	   Description: A Pod that does not define the subdomain field in it spec, does not have FQDN.
 	*/
-	ginkgo.It("a pod without subdomain field does not have FQDN", func() {
+	ginkgo.It("a pod without subdomain field does not have FQDN", func(ctx context.Context) {
 		pod := testPod("hostfqdn")
 		pod.Spec.Containers[0].Command = []string{"sh", "-c", "echo $(hostname)';'$(hostname -f)';'"}
 		output := []string{fmt.Sprintf("%s;%s;", pod.ObjectMeta.Name, pod.ObjectMeta.Name)}
 		// Create Pod
-		e2eoutput.TestContainerOutput(f, "shortname only", pod, 0, output)
+		e2eoutput.TestContainerOutput(ctx, f, "shortname only", pod, 0, output)
 	})
 
 	/*
@@ -93,7 +94,7 @@ var _ = SIGDescribe("Hostname of Pod [NodeConformance]", func() {
 	   Description: A Pod that does not define the subdomain field in it spec, does not have FQDN.
 	                Hence, setHostnameAsFQDN field has no effect.
 	*/
-	ginkgo.It("a pod without FQDN is not affected by SetHostnameAsFQDN field", func() {
+	ginkgo.It("a pod without FQDN is not affected by SetHostnameAsFQDN field", func(ctx context.Context) {
 		pod := testPod("hostfqdn")
 		// Setting setHostnameAsFQDN field to true should have no effect.
 		setHostnameAsFQDN := true
@@ -101,7 +102,7 @@ var _ = SIGDescribe("Hostname of Pod [NodeConformance]", func() {
 		pod.Spec.Containers[0].Command = []string{"sh", "-c", "echo $(hostname)';'$(hostname -f)';'"}
 		output := []string{fmt.Sprintf("%s;%s;", pod.ObjectMeta.Name, pod.ObjectMeta.Name)}
 		// Create Pod
-		e2eoutput.TestContainerOutput(f, "shortname only", pod, 0, output)
+		e2eoutput.TestContainerOutput(ctx, f, "shortname only", pod, 0, output)
 	})
 
 	/*
@@ -110,7 +111,7 @@ var _ = SIGDescribe("Hostname of Pod [NodeConformance]", func() {
 	   Description: A Pod that defines the subdomain field in it spec has FQDN.
 	                hostname command returns shortname (pod name in this case), and hostname -f returns FQDN.
 	*/
-	ginkgo.It("a pod with subdomain field has FQDN, hostname is shortname", func() {
+	ginkgo.It("a pod with subdomain field has FQDN, hostname is shortname", func(ctx context.Context) {
 		pod := testPod("hostfqdn")
 		pod.Spec.Containers[0].Command = []string{"sh", "-c", "echo $(hostname)';'$(hostname -f)';'"}
 		subdomain := "t"
@@ -120,7 +121,7 @@ var _ = SIGDescribe("Hostname of Pod [NodeConformance]", func() {
 		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", pod.ObjectMeta.Name, subdomain, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		output := []string{fmt.Sprintf("%s;%s;", pod.ObjectMeta.Name, hostFQDN)}
 		// Create Pod
-		e2eoutput.TestContainerOutput(f, "shortname and fqdn", pod, 0, output)
+		e2eoutput.TestContainerOutput(ctx, f, "shortname and fqdn", pod, 0, output)
 	})
 
 	/*
@@ -129,7 +130,7 @@ var _ = SIGDescribe("Hostname of Pod [NodeConformance]", func() {
 	   Description: A Pod that defines the subdomain field in it spec has FQDN. When setHostnameAsFQDN: true, the
 	                hostname is set to be the FQDN. In this case, both commands hostname and hostname -f return the FQDN of the Pod.
 	*/
-	ginkgo.It("a pod with subdomain field has FQDN, when setHostnameAsFQDN is set to true, the FQDN is set as hostname", func() {
+	ginkgo.It("a pod with subdomain field has FQDN, when setHostnameAsFQDN is set to true, the FQDN is set as hostname", func(ctx context.Context) {
 		pod := testPod("hostfqdn")
 		pod.Spec.Containers[0].Command = []string{"sh", "-c", "echo $(hostname)';'$(hostname -f)';'"}
 		subdomain := "t"
@@ -145,7 +146,7 @@ var _ = SIGDescribe("Hostname of Pod [NodeConformance]", func() {
 		framework.ExpectEqual(len(hostFQDN) < 65, true, fmt.Sprintf("The FQDN of the Pod cannot be longer than 64 characters, requested %s which is %d characters long.", hostFQDN, len(hostFQDN)))
 		output := []string{fmt.Sprintf("%s;%s;", hostFQDN, hostFQDN)}
 		// Create Pod
-		e2eoutput.TestContainerOutput(f, "fqdn and fqdn", pod, 0, output)
+		e2eoutput.TestContainerOutput(ctx, f, "fqdn and fqdn", pod, 0, output)
 	})
 
 	/*
@@ -160,7 +161,7 @@ var _ = SIGDescribe("Hostname of Pod [NodeConformance]", func() {
 
 	ginkgo.It("a pod configured to set FQDN as hostname will remain in Pending "+
 		"state generating FailedCreatePodSandBox events when the FQDN is "+
-		"longer than 64 bytes", func() {
+		"longer than 64 bytes", func(ctx context.Context) {
 		// 55 characters for name plus -<int>.t.svc.cluster.local is way more than 64 bytes
 		pod := testPod("hostfqdnveryveryveryverylongforfqdntobemorethan64bytes")
 		pod.Spec.Containers[0].Command = []string{"sh", "-c", "echo $(hostname)';'$(hostname -f)';'"}
@@ -171,9 +172,9 @@ var _ = SIGDescribe("Hostname of Pod [NodeConformance]", func() {
 		setHostnameAsFQDN := true
 		pod.Spec.SetHostnameAsFQDN = &setHostnameAsFQDN
 		// Create Pod
-		launchedPod := e2epod.NewPodClient(f).Create(pod)
+		launchedPod := e2epod.NewPodClient(f).Create(ctx, pod)
 		// Ensure we delete pod
-		defer e2epod.NewPodClient(f).DeleteSync(launchedPod.Name, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
+		ginkgo.DeferCleanup(e2epod.NewPodClient(f).DeleteSync, launchedPod.Name, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
 
 		// Pod should remain in the pending state generating events with reason FailedCreatePodSandBox
 		// Expected Message Error Event
@@ -181,9 +182,9 @@ var _ = SIGDescribe("Hostname of Pod [NodeConformance]", func() {
 			"to construct FQDN from pod hostname and cluster domain, FQDN "
 		framework.Logf("Waiting for Pod to generate FailedCreatePodSandBox event.")
 		// Wait for event with reason FailedCreatePodSandBox
-		expectSandboxFailureEvent(f, launchedPod, expectedMessage)
+		expectSandboxFailureEvent(ctx, f, launchedPod, expectedMessage)
 		// Check Pod is in Pending Phase
-		err := checkPodIsPending(f, launchedPod.ObjectMeta.Name, launchedPod.ObjectMeta.Namespace)
+		err := checkPodIsPending(ctx, f, launchedPod.ObjectMeta.Name, launchedPod.ObjectMeta.Namespace)
 		framework.ExpectNoError(err)
 
 	})
@@ -191,25 +192,25 @@ var _ = SIGDescribe("Hostname of Pod [NodeConformance]", func() {
 
 // expectSandboxFailureEvent polls for an event with reason "FailedCreatePodSandBox" containing the
 // expected message string.
-func expectSandboxFailureEvent(f *framework.Framework, pod *v1.Pod, msg string) {
+func expectSandboxFailureEvent(ctx context.Context, f *framework.Framework, pod *v1.Pod, msg string) {
 	eventSelector := fields.Set{
 		"involvedObject.kind":      "Pod",
 		"involvedObject.name":      pod.Name,
 		"involvedObject.namespace": f.Namespace.Name,
 		"reason":                   events.FailedCreatePodSandBox,
 	}.AsSelector().String()
-	framework.ExpectNoError(e2eevents.WaitTimeoutForEvent(
+	framework.ExpectNoError(e2eevents.WaitTimeoutForEvent(ctx,
 		f.ClientSet, f.Namespace.Name, eventSelector, msg, framework.PodEventTimeout))
 }
 
-func checkPodIsPending(f *framework.Framework, podName, namespace string) error {
+func checkPodIsPending(ctx context.Context, f *framework.Framework, podName, namespace string) error {
 	c := f.ClientSet
 	// we call this function after we saw event failing to create Pod, hence
 	// pod has already been created and it should be in Pending status. Giving
 	// 30 seconds to fetch the pod to avoid failing for transient issues getting
 	// pods.
 	fetchPodTimeout := 30 * time.Second
-	return e2epod.WaitForPodCondition(c, namespace, podName, "Failed to Create Pod", fetchPodTimeout, func(pod *v1.Pod) (bool, error) {
+	return e2epod.WaitForPodCondition(ctx, c, namespace, podName, "Failed to Create Pod", fetchPodTimeout, func(pod *v1.Pod) (bool, error) {
 		// We are looking for the pod to be scheduled and in Pending state
 		if pod.Status.Phase == v1.PodPending {
 			for _, cond := range pod.Status.Conditions {

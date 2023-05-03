@@ -190,6 +190,7 @@ func (e *EventedPLEG) watchEventsChannel() {
 
 			err := e.runtimeService.GetContainerEvents(containerEventsResponseCh)
 			if err != nil {
+				metrics.EventedPLEGConnErr.Inc()
 				numAttempts++
 				e.Relist() // Force a relist to get the latest container and pods running metric.
 				klog.V(4).InfoS("Evented PLEG: Failed to get container events, retrying: ", "err", err)
@@ -245,6 +246,7 @@ func (e *EventedPLEG) processCRIEvents(containerEventsResponseCh chan *runtimeap
 
 		e.updateRunningPodMetric(status)
 		e.updateRunningContainerMetric(status)
+		e.updateLatencyMetric(event)
 
 		if event.ContainerEventType == runtimeapi.ContainerEventType_CONTAINER_DELETED_EVENT {
 			for _, sandbox := range status.SandboxStatuses {
@@ -408,4 +410,13 @@ func (e *EventedPLEG) updateRunningContainerMetric(podStatus *kubecontainer.PodS
 			metrics.RunningContainerCount.WithLabelValues(string(state)).Add(float64(diff))
 		}
 	}
+}
+
+func (e *EventedPLEG) updateLatencyMetric(event *runtimeapi.ContainerEventResponse) {
+	duration := time.Duration(time.Now().UnixNano()-event.CreatedAt) * time.Nanosecond
+	metrics.EventedPLEGConnLatency.Observe(duration.Seconds())
+}
+
+func (e *EventedPLEG) UpdateCache(pod *kubecontainer.Pod, pid types.UID) (error, bool) {
+	return fmt.Errorf("not implemented"), false
 }

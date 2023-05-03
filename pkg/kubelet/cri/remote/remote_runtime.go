@@ -37,8 +37,10 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/probe/exec"
+
 	utilexec "k8s.io/utils/exec"
 )
 
@@ -117,13 +119,11 @@ func (r *remoteRuntimeService) validateServiceConnection(ctx context.Context, co
 	klog.V(4).InfoS("Validating the CRI v1 API runtime version")
 	r.runtimeClient = runtimeapi.NewRuntimeServiceClient(conn)
 
-	if _, err := r.runtimeClient.Version(ctx, &runtimeapi.VersionRequest{}); err == nil {
-		klog.V(2).InfoS("Validated CRI v1 runtime API")
-
-	} else if status.Code(err) == codes.Unimplemented {
-		return fmt.Errorf("CRI v1 runtime API is not implemented for endpoint %q: %w", endpoint, err)
+	if _, err := r.runtimeClient.Version(ctx, &runtimeapi.VersionRequest{}); err != nil {
+		return fmt.Errorf("validate CRI v1 runtime API for endpoint %q: %w", endpoint, err)
 	}
 
+	klog.V(2).InfoS("Validated CRI v1 runtime API")
 	return nil
 }
 
@@ -798,6 +798,9 @@ func (r *remoteRuntimeService) GetContainerEvents(containerEventsCh chan *runtim
 		klog.ErrorS(err, "GetContainerEvents failed to get streaming client")
 		return err
 	}
+
+	// The connection is successfully established and we have a streaming client ready for use.
+	metrics.EventedPLEGConn.Inc()
 
 	for {
 		resp, err := containerEventsStreamingClient.Recv()

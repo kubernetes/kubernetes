@@ -323,6 +323,8 @@ func print(lg *zap.Logger, ec Config, sc config.ServerConfig, memberInitialized 
 		zap.String("election-timeout", fmt.Sprintf("%v", time.Duration(sc.ElectionTicks*int(sc.TickMs))*time.Millisecond)),
 		zap.Bool("initial-election-tick-advance", sc.InitialElectionTickAdvance),
 		zap.Uint64("snapshot-count", sc.SnapshotCount),
+		zap.Uint("max-wals", sc.MaxWALFiles),
+		zap.Uint("max-snapshots", sc.MaxSnapFiles),
 		zap.Uint64("snapshot-catchup-entries", sc.SnapshotCatchUpEntries),
 		zap.Strings("initial-advertise-peer-urls", ec.getAPURLs()),
 		zap.Strings("listen-peer-urls", ec.getLPURLs()),

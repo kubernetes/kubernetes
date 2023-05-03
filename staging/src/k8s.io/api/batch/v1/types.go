@@ -23,8 +23,11 @@ import (
 )
 
 const (
-	JobCompletionIndexAnnotation = "batch.kubernetes.io/job-completion-index"
+	// All Kubernetes labels need to be prefixed with Kubernetes to distinguish them from end-user labels
+	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#label-selector-and-annotation-conventions
+	labelPrefix = "batch.kubernetes.io/"
 
+	JobCompletionIndexAnnotation = labelPrefix + "job-completion-index"
 	// JobTrackingFinalizer is a finalizer for Job's pods. It prevents them from
 	// being deleted before being accounted in the Job status.
 	//
@@ -34,7 +37,14 @@ const (
 	// 1.27+, one release after JobTrackingWithFinalizers graduates to GA, the
 	// apiserver and job controller will ignore this annotation and they will
 	// always track jobs using finalizers.
-	JobTrackingFinalizer = "batch.kubernetes.io/job-tracking"
+	JobTrackingFinalizer = labelPrefix + "job-tracking"
+	// The Job labels will use batch.kubernetes.io as a prefix for all labels
+	// Historically the job controller uses unprefixed labels for job-name and controller-uid and
+	// Kubernetes continutes to recognize those unprefixed labels for consistency.
+	JobNameLabel = labelPrefix + "job-name"
+	// ControllerUid is used to programatically get pods corresponding to a Job.
+	// There is a corresponding label without the batch.kubernetes.io that we support for legacy reasons.
+	ControllerUidLabel = labelPrefix + "controller-uid"
 )
 
 // +genclient
@@ -135,6 +145,7 @@ type PodFailurePolicyOnExitCodesRequirement struct {
 	// Represents the relationship between the container exit code(s) and the
 	// specified values. Containers completed with success (exit code 0) are
 	// excluded from the requirement check. Possible values are:
+	//
 	// - In: the requirement is satisfied if at least one container exit code
 	//   (might be multiple if there are multiple containers not restricted
 	//   by the 'containerName' field) is in the set of specified values.
@@ -168,10 +179,11 @@ type PodFailurePolicyOnPodConditionsPattern struct {
 }
 
 // PodFailurePolicyRule describes how a pod failure is handled when the requirements are met.
-// One of OnExitCodes and onPodConditions, but not both, can be used in each rule.
+// One of onExitCodes and onPodConditions, but not both, can be used in each rule.
 type PodFailurePolicyRule struct {
 	// Specifies the action taken on a pod failure when the requirements are satisfied.
 	// Possible values are:
+	//
 	// - FailJob: indicates that the pod's job is marked as Failed and all
 	//   running pods are terminated.
 	// - Ignore: indicates that the counter towards the .backoffLimit is not
@@ -216,7 +228,7 @@ type JobSpec struct {
 	Parallelism *int32 `json:"parallelism,omitempty" protobuf:"varint,1,opt,name=parallelism"`
 
 	// Specifies the desired number of successfully finished pods the
-	// job should be run with.  Setting to nil means that the success of any
+	// job should be run with.  Setting to null means that the success of any
 	// pod signals the success of all pods, and allows parallelism to have any positive
 	// value.  Setting to 1 means that parallelism is limited to 1 and the success of that
 	// pod signals the success of the job.
@@ -275,6 +287,7 @@ type JobSpec struct {
 	ManualSelector *bool `json:"manualSelector,omitempty" protobuf:"varint,5,opt,name=manualSelector"`
 
 	// Describes the pod that will be created when executing a job.
+	// The only allowed template.spec.restartPolicy values are "Never" or "OnFailure".
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/
 	Template corev1.PodTemplateSpec `json:"template" protobuf:"bytes,6,opt,name=template"`
 
@@ -288,7 +301,7 @@ type JobSpec struct {
 	// +optional
 	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty" protobuf:"varint,8,opt,name=ttlSecondsAfterFinished"`
 
-	// CompletionMode specifies how Pod completions are tracked. It can be
+	// completionMode specifies how Pod completions are tracked. It can be
 	// `NonIndexed` (default) or `Indexed`.
 	//
 	// `NonIndexed` means that the Job is considered complete when there have
@@ -313,7 +326,7 @@ type JobSpec struct {
 	// +optional
 	CompletionMode *CompletionMode `json:"completionMode,omitempty" protobuf:"bytes,9,opt,name=completionMode,casttype=CompletionMode"`
 
-	// Suspend specifies whether the Job controller should create Pods or not. If
+	// suspend specifies whether the Job controller should create Pods or not. If
 	// a Job is created with suspend set to true, no Pods are created by the Job
 	// controller. If a Job is suspended after creation (i.e. the flag goes from
 	// false to true), the Job controller will delete all active Pods associated
@@ -366,7 +379,7 @@ type JobStatus struct {
 	// +optional
 	Failed int32 `json:"failed,omitempty" protobuf:"varint,6,opt,name=failed"`
 
-	// CompletedIndexes holds the completed indexes when .spec.completionMode =
+	// completedIndexes holds the completed indexes when .spec.completionMode =
 	// "Indexed" in a text format. The indexes are represented as decimal integers
 	// separated by commas. The numbers are listed in increasing order. Three or
 	// more consecutive numbers are compressed and represented by the first and
@@ -376,15 +389,16 @@ type JobStatus struct {
 	// +optional
 	CompletedIndexes string `json:"completedIndexes,omitempty" protobuf:"bytes,7,opt,name=completedIndexes"`
 
-	// UncountedTerminatedPods holds the UIDs of Pods that have terminated but
+	// uncountedTerminatedPods holds the UIDs of Pods that have terminated but
 	// the job controller hasn't yet accounted for in the status counters.
 	//
 	// The job controller creates pods with a finalizer. When a pod terminates
 	// (succeeded or failed), the controller does three steps to account for it
 	// in the job status:
-	// (1) Add the pod UID to the arrays in this field.
-	// (2) Remove the pod finalizer.
-	// (3) Remove the pod UID from the arrays while increasing the corresponding
+	//
+	// 1. Add the pod UID to the arrays in this field.
+	// 2. Remove the pod finalizer.
+	// 3. Remove the pod UID from the arrays while increasing the corresponding
 	//     counter.
 	//
 	// Old jobs might not be tracked using this field, in which case the field
@@ -403,12 +417,12 @@ type JobStatus struct {
 // UncountedTerminatedPods holds UIDs of Pods that have terminated but haven't
 // been accounted in Job status counters.
 type UncountedTerminatedPods struct {
-	// Succeeded holds UIDs of succeeded Pods.
+	// succeeded holds UIDs of succeeded Pods.
 	// +listType=set
 	// +optional
 	Succeeded []types.UID `json:"succeeded,omitempty" protobuf:"bytes,1,rep,name=succeeded,casttype=k8s.io/apimachinery/pkg/types.UID"`
 
-	// Failed holds UIDs of failed Pods.
+	// failed holds UIDs of failed Pods.
 	// +listType=set
 	// +optional
 	Failed []types.UID `json:"failed,omitempty" protobuf:"bytes,2,rep,name=failed,casttype=k8s.io/apimachinery/pkg/types.UID"`
@@ -513,7 +527,6 @@ type CronJobSpec struct {
 	// configuration, the controller will stop creating new new Jobs and will create a system event with the
 	// reason UnknownTimeZone.
 	// More information can be found in https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#time-zones
-	// This is beta field and must be enabled via the `CronJobTimeZone` feature gate.
 	// +optional
 	TimeZone *string `json:"timeZone,omitempty" protobuf:"bytes,8,opt,name=timeZone"`
 
@@ -524,6 +537,7 @@ type CronJobSpec struct {
 
 	// Specifies how to treat concurrent executions of a Job.
 	// Valid values are:
+	//
 	// - "Allow" (default): allows CronJobs to run concurrently;
 	// - "Forbid": forbids concurrent runs, skipping next run if previous run hasn't finished yet;
 	// - "Replace": cancels currently running job and replaces it with a new one

@@ -36,7 +36,7 @@ import (
 )
 
 // TODO(knverey): remove this hardcoding once kubectl being built with module support makes BuildInfo available.
-const kustomizeVersion = "v4.5.7"
+const kustomizeVersion = "v5.0.1"
 
 // Version is a struct for version information
 type Version struct {
@@ -195,7 +195,7 @@ func GetKustomizeModVersion() (string, bool) {
 		return "", false
 	}
 	for _, dep := range info.Deps {
-		if dep.Path == "sigs.k8s.io/kustomize/kustomize/v4" {
+		if dep.Path == "sigs.k8s.io/kustomize/kustomize/v4" || dep.Path == "sigs.k8s.io/kustomize/kustomize/v5" {
 			return dep.Version, true
 		}
 	}

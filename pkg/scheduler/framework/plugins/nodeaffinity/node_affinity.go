@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -89,13 +89,19 @@ func (pl *NodeAffinity) EventsToRegister() []framework.ClusterEvent {
 
 // PreFilter builds and writes cycle state used by Filter.
 func (pl *NodeAffinity) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+	affinity := pod.Spec.Affinity
+	noNodeAffinity := (affinity == nil ||
+		affinity.NodeAffinity == nil ||
+		affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil)
+	if noNodeAffinity && pl.addedNodeSelector == nil && pod.Spec.NodeSelector == nil {
+		// NodeAffinity Filter has nothing to do with the Pod.
+		return nil, framework.NewStatus(framework.Skip)
+	}
+
 	state := &preFilterState{requiredNodeSelectorAndAffinity: nodeaffinity.GetRequiredNodeAffinity(pod)}
 	cycleState.Write(preFilterStateKey, state)
-	affinity := pod.Spec.Affinity
-	if affinity == nil ||
-		affinity.NodeAffinity == nil ||
-		affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil ||
-		len(affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms) == 0 {
+
+	if noNodeAffinity || len(affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms) == 0 {
 		return nil, nil
 	}
 
@@ -121,14 +127,13 @@ func (pl *NodeAffinity) PreFilter(ctx context.Context, cycleState *framework.Cyc
 			// then all nodes are eligible because the terms are ORed.
 			return nil, nil
 		}
-		// If the set is empty, it means the terms had affinity to different
-		// sets of nodes, and since they are ANDed, then the pod will not match any node.
-		if len(termNodeNames) == 0 {
-			return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, errReasonConflict)
-		}
 		nodeNames = nodeNames.Union(termNodeNames)
 	}
-	if nodeNames != nil {
+	// If nodeNames is not nil, but length is 0, it means each term have conflicting affinity to node.Name;
+	// therefore, pod will not match any node.
+	if nodeNames != nil && len(nodeNames) == 0 {
+		return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, errReasonConflict)
+	} else if len(nodeNames) > 0 {
 		return &framework.PreFilterResult{NodeNames: nodeNames}, nil
 	}
 	return nil, nil

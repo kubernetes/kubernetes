@@ -199,7 +199,7 @@ func TestAggregatedAPIServiceDiscovery(t *testing.T) {
 	defer cleanup()
 
 	// Create a resource manager whichs serves our GroupVersion
-	resourceManager := discoveryendpoint.NewResourceManager()
+	resourceManager := discoveryendpoint.NewResourceManager("apis")
 	resourceManager.SetGroups([]apidiscoveryv2beta1.APIGroupDiscovery{basicTestGroup})
 
 	// Install our ResourceManager as an Aggregated APIService to the
@@ -255,13 +255,16 @@ func runTestCases(t *testing.T, cases []testCase) {
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
 			func() {
-				for _, a := range c.Actions {
+				testContext, testDone := context.WithCancel(ctx)
+				defer testDone()
+
+				for i, a := range c.Actions {
 					if cleaning, ok := a.(cleaningAction); ok {
 						defer func() {
-							require.NoError(t, cleaning.Cleanup(ctx, client))
+							require.NoError(t, cleaning.Cleanup(testContext, client), "cleanup after \"%T\" step %v", a, i)
 						}()
 					}
-					require.NoError(t, a.Do(ctx, client))
+					require.NoError(t, a.Do(testContext, client), "running \"%T\" step %v", a, i)
 				}
 			}()
 
@@ -339,9 +342,10 @@ func TestCRD(t *testing.T) {
 
 				applyCRD(makeCRDSpec(stableGroup, "Bar", false, []string{"v1", "v2"})),
 
-				// only CRD has stable v2,  this will show that CRD has been synced
-				waitForGroupVersionsV1([]metav1.GroupVersion{stableV2}),
-				waitForGroupVersionsV2([]metav1.GroupVersion{stableV2}),
+				// Show that we have v1 and v2 but v1 is stale
+				waitForGroupVersionsV1([]metav1.GroupVersion{stableV1, stableV2}),
+				waitForStaleGroupVersionsV2([]metav1.GroupVersion{stableV1}),
+				waitForFreshGroupVersionsV2([]metav1.GroupVersion{stableV2}),
 
 				// Delete APIService shared by the aggregated apiservice and
 				// CRD
@@ -355,7 +359,160 @@ func TestCRD(t *testing.T) {
 
 				// Show that the groupversion is re-added back
 				waitForGroupVersionsV1([]metav1.GroupVersion{stableV1, stableV2, stableV1alpha1}),
-				waitForGroupVersionsV2([]metav1.GroupVersion{stableV1, stableV2, stableV1alpha1}),
+				waitForFreshGroupVersionsV2([]metav1.GroupVersion{stableV1, stableV2, stableV1alpha1}),
+			},
+		},
+		{
+			// Show that if CRD and Aggregated APIservice share a groupversiom,
+			// The aggregated apiservice's discovery information is shown in both
+			// v1 and v2 discovery
+			Name: "CRDAPIServiceSameGroupDifferentVersions",
+			Actions: []testAction{
+				// Wait for CRD to apply
+				applyCRD(makeCRDSpec(stableGroup, "Bar", false, []string{"v2", "v1alpha1"})),
+				// Wait for GV to appear in both discovery documents
+				waitForGroupVersionsV1([]metav1.GroupVersion{stableV2, stableV1alpha1}),
+				waitForGroupVersionsV2([]metav1.GroupVersion{stableV2, stableV1alpha1}),
+
+				applyAPIService(
+					apiregistrationv1.APIServiceSpec{
+						Group:                 stableGroup,
+						Version:               "v1",
+						InsecureSkipTLSVerify: true,
+						GroupPriorityMinimum:  int32(1000),
+						VersionPriority:       int32(100),
+						Service: &apiregistrationv1.ServiceReference{
+							Name:      "unused",
+							Namespace: "default",
+						},
+					},
+				),
+
+				// We should now have stable v1 available
+				waitForGroupVersionsV1([]metav1.GroupVersion{stableV1}),
+				waitForGroupVersionsV2([]metav1.GroupVersion{stableV1}),
+
+				// The CRD group-versions not served by the aggregated
+				// apiservice should still be availablee
+				waitForGroupVersionsV1([]metav1.GroupVersion{stableV2, stableV1alpha1}),
+				waitForGroupVersionsV2([]metav1.GroupVersion{stableV2, stableV1alpha1}),
+
+				// Remove API service. Show we have switched to CRD
+				deleteObject{
+					GroupVersionResource: metav1.GroupVersionResource(apiregistrationv1.SchemeGroupVersion.WithResource("apiservices")),
+					Name:                 "v1.stable.example.com",
+				},
+
+				// Show that we still have stable v1 since it is in the CRD
+				waitForGroupVersionsV1([]metav1.GroupVersion{stableV2, stableV1alpha1}),
+				waitForGroupVersionsV2([]metav1.GroupVersion{stableV2, stableV1alpha1}),
+
+				waitForAbsentGroupVersionsV1([]metav1.GroupVersion{stableV1}),
+				waitForAbsentGroupVersionsV2([]metav1.GroupVersion{stableV1}),
+			},
+		},
+		{
+			// Show that if CRD and a builtin share a group version,
+			// the builtin takes precedence in both versions of discovery
+			Name: "CRDBuiltinOverlapPrecence",
+			Actions: []testAction{
+				// Create CRD that overrides a builtin
+				applyCRD(makeCRDSpec("apiextensions.k8s.io", "Bar", true, []string{"v1", "v2", "vfake"})),
+
+				waitForGroupVersionsV1([]metav1.GroupVersion{{Group: "apiextensions.k8s.io", Version: "vfake"}}),
+				waitForGroupVersionsV2([]metav1.GroupVersion{{Group: "apiextensions.k8s.io", Version: "vfake"}}),
+
+				// Show that the builtin group-version is still used for V1
+				// By showing presence of v1.CustomResourceDefinition
+				// and absence of v1.Bar
+				waitForResourcesV1([]metav1.GroupVersionResource{
+					{
+						Group:    "apiextensions.k8s.io",
+						Version:  "v1",
+						Resource: "customresourcedefinitions",
+					},
+					{
+						Group:    "apiextensions.k8s.io",
+						Version:  "vfake",
+						Resource: "bars",
+					},
+				}),
+				waitForResourcesV2([]metav1.GroupVersionResource{
+					{
+						Group:    "apiextensions.k8s.io",
+						Version:  "v1",
+						Resource: "customresourcedefinitions",
+					},
+					{
+						Group:    "apiextensions.k8s.io",
+						Version:  "vfake",
+						Resource: "bars",
+					},
+				}),
+
+				waitForResourcesAbsentV1([]metav1.GroupVersionResource{
+					{
+						Group:    "apiextensions.k8s.io",
+						Version:  "v1",
+						Resource: "bars",
+					},
+				}),
+				waitForResourcesAbsentV2([]metav1.GroupVersionResource{
+					{
+						Group:    "apiextensions.k8s.io",
+						Version:  "v1",
+						Resource: "bars",
+					},
+				}),
+			},
+		},
+		{
+			// Tests that a race discovered during alpha phase of the feature is fixed.
+			// Rare race would occur if a CRD was synced before the removal of an aggregated
+			// APIService could be synced.
+			// To test this we:
+			//  1. Add CRD to apiserver
+			// 	2. Wait for it to sync
+			//  3. Add aggregated APIService with same groupversion
+			//  4. Remove aggregated apiservice
+			//  5. Check that we have CRD GVs in discovery document
+			// Show that if CRD and APIService share a groupversion, and the
+			// APIService is deleted, and CRD updated, the groupversion from
+			// the CRD remains in discovery.
+			Name: "Race",
+			Actions: []testAction{
+				// Create CRD with the same GV as the aggregated APIService
+				applyCRD(makeCRDSpec(stableGroup, "Bar", false, []string{"v1", "v2"})),
+
+				// only CRD has stable v2,  this will show that CRD has been synced
+				waitForGroupVersionsV1([]metav1.GroupVersion{stableV1, stableV2}),
+				waitForGroupVersionsV2([]metav1.GroupVersion{stableV1, stableV2}),
+
+				// Add Aggregated APIService that overlaps the CRD.
+				applyAPIService(
+					apiregistrationv1.APIServiceSpec{
+						Group:                 stableGroup,
+						Version:               "v1",
+						InsecureSkipTLSVerify: true,
+						GroupPriorityMinimum:  int32(1000),
+						VersionPriority:       int32(100),
+						Service: &apiregistrationv1.ServiceReference{
+							Name:      "fake",
+							Namespace: "default",
+						},
+					},
+				),
+
+				// Delete APIService shared by the aggregated apiservice and
+				// CRD
+				deleteObject{
+					GroupVersionResource: metav1.GroupVersionResource(apiregistrationv1.SchemeGroupVersion.WithResource("apiservices")),
+					Name:                 "v1.stable.example.com",
+				},
+
+				// Show the CRD (with stablev2) is the one which is now advertised
+				waitForGroupVersionsV1([]metav1.GroupVersion{stableV1, stableV2}),
+				waitForGroupVersionsV2([]metav1.GroupVersion{stableV1, stableV2}),
 			},
 		},
 	})
@@ -695,6 +852,33 @@ func TestGroupPriorty(t *testing.T) {
 			},
 		},
 	})
+}
+
+func TestSingularNames(t *testing.T) {
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--runtime-config=api/all=true"}, framework.SharedEtcd())
+	t.Cleanup(server.TearDownFn)
+
+	kubeClientSet, err := kubernetes.NewForConfig(server.ClientConfig)
+	require.NoError(t, err)
+
+	_, resources, err := kubeClientSet.Discovery().ServerGroupsAndResources()
+	require.NoError(t, err)
+
+	for _, rr := range resources {
+		for _, r := range rr.APIResources {
+			if strings.Contains(r.Name, "/") {
+				continue
+			}
+			if r.SingularName == "" {
+				t.Errorf("missing singularName for resource %q in %q", r.Name, rr.GroupVersion)
+				continue
+			}
+			if r.SingularName != strings.ToLower(r.Kind) {
+				t.Errorf("expected singularName for resource %q in %q to be %q, got %q", r.Name, rr.GroupVersion, strings.ToLower(r.Kind), r.SingularName)
+				continue
+			}
+		}
+	}
 }
 
 func makeCRDSpec(group string, kind string, namespaced bool, versions []string, categories ...string) apiextensionsv1.CustomResourceDefinitionSpec {

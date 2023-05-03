@@ -119,8 +119,10 @@ func loadConfig(cfgPath string, client clientset.Interface, skipComponentConfigs
 	return initCfg, false, nil
 }
 
+type LoadConfigFunc func(cfgPath string, client clientset.Interface, skipComponentConfigs bool, printer output.Printer) (*kubeadmapi.InitConfiguration, bool, error)
+
 // enforceRequirements verifies that it's okay to upgrade and then returns the variables needed for the rest of the procedure
-func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgradeApply bool, printer output.Printer) (clientset.Interface, upgrade.VersionGetter, *kubeadmapi.InitConfiguration, error) {
+func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgradeApply bool, printer output.Printer, loadConfig LoadConfigFunc) (clientset.Interface, upgrade.VersionGetter, *kubeadmapi.InitConfiguration, error) {
 	client, err := getClient(flags.kubeConfigPath, dryRun)
 	if err != nil {
 		return nil, nil, nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
@@ -177,7 +179,7 @@ func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgr
 		return nil, nil, nil, err
 	}
 	// Also set the union of pre-flight errors to InitConfiguration, to provide a consistent view of the runtime configuration:
-	cfg.NodeRegistration.IgnorePreflightErrors = ignorePreflightErrorsSet.List()
+	cfg.NodeRegistration.IgnorePreflightErrors = sets.List(ignorePreflightErrorsSet)
 
 	// Ensure the user is root
 	klog.V(1).Info("running preflight checks")
@@ -234,7 +236,7 @@ func printConfiguration(clustercfg *kubeadmapi.ClusterConfiguration, w io.Writer
 }
 
 // runPreflightChecks runs the root preflight check
-func runPreflightChecks(client clientset.Interface, ignorePreflightErrors sets.String, cfg *kubeadmapi.ClusterConfiguration, printer output.Printer) error {
+func runPreflightChecks(client clientset.Interface, ignorePreflightErrors sets.Set[string], cfg *kubeadmapi.ClusterConfiguration, printer output.Printer) error {
 	printer.Printf("[preflight] Running pre-flight checks.\n")
 	err := preflight.RunRootCheckOnly(ignorePreflightErrors)
 	if err != nil {

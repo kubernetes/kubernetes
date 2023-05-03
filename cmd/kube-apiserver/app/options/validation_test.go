@@ -22,7 +22,13 @@ import (
 	"testing"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	kubeapiserveradmission "k8s.io/apiserver/pkg/admission"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	basemetrics "k8s.io/component-base/metrics"
+	"k8s.io/kubernetes/pkg/features"
+	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	netutils "k8s.io/utils/net"
 )
 
@@ -58,6 +64,7 @@ func TestClusterServiceIPRange(t *testing.T) {
 		name         string
 		options      *ServerRunOptions
 		expectErrors bool
+		gate         bool
 	}{
 		{
 			name:         "no service cidr",
@@ -85,11 +92,33 @@ func TestClusterServiceIPRange(t *testing.T) {
 			options:      makeOptionsWithCIDRs("10.0.0.0/8", ""),
 		},
 		{
+			name:         "service cidr IPv4 is too big but gate enbled",
+			expectErrors: false,
+			options:      makeOptionsWithCIDRs("10.0.0.0/8", ""),
+			gate:         true,
+		},
+		{
+			name:         "service cidr IPv6 is too big but gate enbled",
+			expectErrors: false,
+			options:      makeOptionsWithCIDRs("2001:db8::/64", ""),
+			gate:         true,
+		},
+		{
+			name:         "service cidr IPv6 is too big despuite gate enbled",
+			expectErrors: true,
+			options:      makeOptionsWithCIDRs("2001:db8::/12", ""),
+			gate:         true,
+		},
+		{
 			name:         "dual-stack secondary cidr too big",
 			expectErrors: true,
 			options:      makeOptionsWithCIDRs("10.0.0.0/16", "3000::/64"),
 		},
-
+		{
+			name:         "more than two entries",
+			expectErrors: true,
+			options:      makeOptionsWithCIDRs("10.0.0.0/16,244.0.0.0/16", "3000::/108"),
+		},
 		/* success cases */
 		{
 			name:         "valid primary",
@@ -115,6 +144,8 @@ func TestClusterServiceIPRange(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRServiceAllocator, tc.gate)()
+
 			errs := validateClusterIPFlags(tc.options)
 			if len(errs) > 0 && !tc.expectErrors {
 				t.Errorf("expected no errors, errors found %+v", errs)
@@ -218,7 +249,7 @@ func TestValidateMaxCIDRRange(t *testing.T) {
 			expectErrors:         false,
 		},
 		{
-			name:                 "ipv4 cidr to big",
+			name:                 "ipv4 cidr too big",
 			cidr:                 *getIPnetFromCIDR("10.92.0.0/8"),
 			maxCIDRBits:          20,
 			cidrFlag:             "--service-cluster-ip-range",
@@ -226,7 +257,7 @@ func TestValidateMaxCIDRRange(t *testing.T) {
 			expectErrors:         true,
 		},
 		{
-			name:                 "ipv6 cidr to big",
+			name:                 "ipv6 cidr too big",
 			cidr:                 *getIPnetFromCIDR("3000::/64"),
 			maxCIDRBits:          20,
 			cidrFlag:             "--service-cluster-ip-range",
@@ -279,6 +310,10 @@ func TestValidateAPIPriorityAndFairness(t *testing.T) {
 			runtimeConfig:    "flowcontrol.apiserver.k8s.io/v1beta3=false",
 			errShouldContain: conflict,
 		},
+		{
+			runtimeConfig:    "flowcontrol.apiserver.k8s.io/v1beta3=true",
+			errShouldContain: "",
+		},
 	}
 
 	for _, test := range tests {
@@ -297,6 +332,94 @@ func TestValidateAPIPriorityAndFairness(t *testing.T) {
 			}
 			if !strings.Contains(errMessageGot, test.errShouldContain) {
 				t.Errorf("Expected error message to contain: %q, but got: %q", test.errShouldContain, errMessageGot)
+			}
+		})
+	}
+}
+
+func TestValidateServerRunOptions(t *testing.T) {
+	cidrOpts := makeOptionsWithCIDRs("10.0.0.0/16", "3000::/64")
+	nodePortOpts := makeOptionsWithPort(-1, 30065, 1)
+
+	testCases := []struct {
+		name         string
+		options      *ServerRunOptions
+		expectErrors bool
+	}{
+		{
+			name:         "validate master count equal 0",
+			expectErrors: true,
+			options: &ServerRunOptions{
+				MasterCount:             0,
+				GenericServerRunOptions: &genericoptions.ServerRunOptions{},
+				Etcd:                    &genericoptions.EtcdOptions{},
+				SecureServing:           &genericoptions.SecureServingOptionsWithLoopback{},
+				Audit:                   &genericoptions.AuditOptions{},
+				Admission: &kubeoptions.AdmissionOptions{
+					GenericAdmission: &genericoptions.AdmissionOptions{
+						EnablePlugins: []string{"foo"},
+						Plugins:       kubeapiserveradmission.NewPlugins(),
+					},
+					PluginNames: []string{"foo"},
+				},
+				Authentication: &kubeoptions.BuiltInAuthenticationOptions{
+					APIAudiences: []string{"bar"},
+					ServiceAccounts: &kubeoptions.ServiceAccountAuthenticationOptions{
+						Issuers: []string{"baz"},
+					},
+				},
+				Authorization:                  &kubeoptions.BuiltInAuthorizationOptions{},
+				APIEnablement:                  genericoptions.NewAPIEnablementOptions(),
+				Metrics:                        &basemetrics.Options{},
+				ServiceClusterIPRanges:         cidrOpts.ServiceClusterIPRanges,
+				PrimaryServiceClusterIPRange:   cidrOpts.PrimaryServiceClusterIPRange,
+				SecondaryServiceClusterIPRange: cidrOpts.SecondaryServiceClusterIPRange,
+				ServiceNodePortRange:           nodePortOpts.ServiceNodePortRange,
+				KubernetesServiceNodePort:      nodePortOpts.KubernetesServiceNodePort,
+				ServiceAccountSigningKeyFile:   "",
+			},
+		},
+		{
+			name:         "validate token request enable not attempted",
+			expectErrors: true,
+			options: &ServerRunOptions{
+				MasterCount:             1,
+				GenericServerRunOptions: &genericoptions.ServerRunOptions{},
+				Etcd:                    &genericoptions.EtcdOptions{},
+				SecureServing:           &genericoptions.SecureServingOptionsWithLoopback{},
+				Audit:                   &genericoptions.AuditOptions{},
+				Admission: &kubeoptions.AdmissionOptions{
+					GenericAdmission: &genericoptions.AdmissionOptions{
+						EnablePlugins: []string{""},
+						Plugins:       kubeapiserveradmission.NewPlugins(),
+					},
+					PluginNames: []string{""},
+				},
+				Authentication: &kubeoptions.BuiltInAuthenticationOptions{
+					ServiceAccounts: &kubeoptions.ServiceAccountAuthenticationOptions{},
+				},
+				Authorization:                  &kubeoptions.BuiltInAuthorizationOptions{},
+				APIEnablement:                  genericoptions.NewAPIEnablementOptions(),
+				Metrics:                        &basemetrics.Options{},
+				ServiceClusterIPRanges:         cidrOpts.ServiceClusterIPRanges,
+				PrimaryServiceClusterIPRange:   cidrOpts.PrimaryServiceClusterIPRange,
+				SecondaryServiceClusterIPRange: cidrOpts.SecondaryServiceClusterIPRange,
+				ServiceNodePortRange:           nodePortOpts.ServiceNodePortRange,
+				KubernetesServiceNodePort:      nodePortOpts.KubernetesServiceNodePort,
+				ServiceAccountSigningKeyFile:   "",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := tc.options.Validate()
+			if len(errs) > 0 && !tc.expectErrors {
+				t.Errorf("expected no errors, errors found %+v", errs)
+			}
+
+			if len(errs) == 0 && tc.expectErrors {
+				t.Errorf("expected errors, no errors found")
 			}
 		})
 	}

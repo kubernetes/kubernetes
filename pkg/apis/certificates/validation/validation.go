@@ -25,6 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
@@ -197,7 +198,7 @@ func validateCertificateSigningRequest(csr *certificates.CertificateSigningReque
 	if !opts.allowLegacySignerName && csr.Spec.SignerName == certificates.LegacyUnknownSignerName {
 		allErrs = append(allErrs, field.Invalid(specPath.Child("signerName"), csr.Spec.SignerName, "the legacy signerName is not allowed via this API version"))
 	} else {
-		allErrs = append(allErrs, ValidateCertificateSigningRequestSignerName(specPath.Child("signerName"), csr.Spec.SignerName)...)
+		allErrs = append(allErrs, ValidateSignerName(specPath.Child("signerName"), csr.Spec.SignerName)...)
 	}
 	if csr.Spec.ExpirationSeconds != nil && *csr.Spec.ExpirationSeconds < 600 {
 		allErrs = append(allErrs, field.Invalid(specPath.Child("expirationSeconds"), *csr.Spec.ExpirationSeconds, "may not specify a duration less than 600 seconds (10 minutes)"))
@@ -272,7 +273,7 @@ func validateConditions(fldPath *field.Path, csr *certificates.CertificateSignin
 // The max length of a namespace name is 63 characters (DNS1123Label max length)
 // The max length of a resource name is 253 characters (DNS1123Subdomain max length)
 // We then add an additional 2 characters to account for the one '.' and one '/'.
-func ValidateCertificateSigningRequestSignerName(fldPath *field.Path, signerName string) field.ErrorList {
+func ValidateSignerName(fldPath *field.Path, signerName string) field.ErrorList {
 	var el field.ErrorList
 	if len(signerName) == 0 {
 		el = append(el, field.Required(fldPath, ""))
@@ -536,4 +537,130 @@ func hasDuplicateUsage(usages []certificates.KeyUsage) bool {
 		seen[usage] = true
 	}
 	return false
+}
+
+// We require your name to be prefixed by .spec.signerName
+func validateClusterTrustBundleName(signerName string) func(name string, prefix bool) []string {
+	return func(name string, isPrefix bool) []string {
+		if signerName == "" {
+			if strings.Contains(name, ":") {
+				return []string{"ClusterTrustBundle without signer name must not have \":\" in its name"}
+			}
+			return apimachineryvalidation.NameIsDNSSubdomain(name, isPrefix)
+		}
+
+		requiredPrefix := strings.ReplaceAll(signerName, "/", ":") + ":"
+		if !strings.HasPrefix(name, requiredPrefix) {
+			return []string{fmt.Sprintf("ClusterTrustBundle for signerName %s must be named with prefix %s", signerName, requiredPrefix)}
+		}
+		return apimachineryvalidation.NameIsDNSSubdomain(strings.TrimPrefix(name, requiredPrefix), isPrefix)
+	}
+}
+
+type ValidateClusterTrustBundleOptions struct {
+	SuppressBundleParsing bool
+}
+
+// ValidateClusterTrustBundle runs all validation checks on bundle.
+func ValidateClusterTrustBundle(bundle *certificates.ClusterTrustBundle, opts ValidateClusterTrustBundleOptions) field.ErrorList {
+	var allErrors field.ErrorList
+
+	metaErrors := apivalidation.ValidateObjectMeta(&bundle.ObjectMeta, false, validateClusterTrustBundleName(bundle.Spec.SignerName), field.NewPath("metadata"))
+	allErrors = append(allErrors, metaErrors...)
+
+	if bundle.Spec.SignerName != "" {
+		signerNameErrors := ValidateSignerName(field.NewPath("spec", "signerName"), bundle.Spec.SignerName)
+		allErrors = append(allErrors, signerNameErrors...)
+	}
+
+	if !opts.SuppressBundleParsing {
+		pemErrors := validateTrustBundle(field.NewPath("spec", "trustBundle"), bundle.Spec.TrustBundle)
+		allErrors = append(allErrors, pemErrors...)
+	}
+
+	return allErrors
+}
+
+// ValidateClusterTrustBundleUpdate runs all update validation checks on an
+// update.
+func ValidateClusterTrustBundleUpdate(newBundle, oldBundle *certificates.ClusterTrustBundle) field.ErrorList {
+	// If the caller isn't changing the TrustBundle field, don't parse it.
+	// This helps smoothly handle changes in Go's PEM or X.509 parsing
+	// libraries.
+	opts := ValidateClusterTrustBundleOptions{}
+	if newBundle.Spec.TrustBundle == oldBundle.Spec.TrustBundle {
+		opts.SuppressBundleParsing = true
+	}
+
+	var allErrors field.ErrorList
+	allErrors = append(allErrors, ValidateClusterTrustBundle(newBundle, opts)...)
+	allErrors = append(allErrors, apivalidation.ValidateObjectMetaUpdate(&newBundle.ObjectMeta, &oldBundle.ObjectMeta, field.NewPath("metadata"))...)
+	allErrors = append(allErrors, apivalidation.ValidateImmutableField(newBundle.Spec.SignerName, oldBundle.Spec.SignerName, field.NewPath("spec", "signerName"))...)
+	return allErrors
+}
+
+// validateTrustBundle rejects intra-block headers, blocks
+// that don't parse as X.509 CA certificates, and duplicate trust anchors.  It
+// requires that at least one trust anchor is provided.
+func validateTrustBundle(path *field.Path, in string) field.ErrorList {
+	var allErrors field.ErrorList
+
+	blockDedupe := map[string][]int{}
+
+	rest := []byte(in)
+	var b *pem.Block
+	i := -1
+	for {
+		b, rest = pem.Decode(rest)
+		if b == nil {
+			break
+		}
+		i++
+
+		if b.Type != "CERTIFICATE" {
+			allErrors = append(allErrors, field.Invalid(path, "<value omitted>", fmt.Sprintf("entry %d has bad block type: %v", i, b.Type)))
+			continue
+		}
+
+		if len(b.Headers) != 0 {
+			allErrors = append(allErrors, field.Invalid(path, "<value omitted>", fmt.Sprintf("entry %d has PEM block headers", i)))
+			continue
+		}
+
+		cert, err := x509.ParseCertificate(b.Bytes)
+		if err != nil {
+			allErrors = append(allErrors, field.Invalid(path, "<value omitted>", fmt.Sprintf("entry %d does not parse as X.509", i)))
+			continue
+		}
+
+		if !cert.IsCA {
+			allErrors = append(allErrors, field.Invalid(path, "<value omitted>", fmt.Sprintf("entry %d does not have the CA bit set", i)))
+			continue
+		}
+
+		if !cert.BasicConstraintsValid {
+			allErrors = append(allErrors, field.Invalid(path, "<value omitted>", fmt.Sprintf("entry %d has invalid basic constraints", i)))
+			continue
+		}
+
+		blockDedupe[string(b.Bytes)] = append(blockDedupe[string(b.Bytes)], i)
+	}
+
+	// If we had a malformed block, don't also output potentially-redundant
+	// errors about duplicate or missing trust anchors.
+	if len(allErrors) != 0 {
+		return allErrors
+	}
+
+	if len(blockDedupe) == 0 {
+		allErrors = append(allErrors, field.Invalid(path, "<value omitted>", "at least one trust anchor must be provided"))
+	}
+
+	for _, indices := range blockDedupe {
+		if len(indices) > 1 {
+			allErrors = append(allErrors, field.Invalid(path, "<value omitted>", fmt.Sprintf("duplicate trust anchor (indices %v)", indices)))
+		}
+	}
+
+	return allErrors
 }

@@ -21,9 +21,11 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"regexp"
 	"strings"
 	"time"
 
+	celgo "github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/interpreter"
@@ -34,6 +36,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/metrics"
+	"k8s.io/klog/v2"
+
+	celconfig "k8s.io/apiserver/pkg/apis/cel"
 )
 
 // Validator parallels the structure of schema.Structural and includes the compiled CEL programs
@@ -64,7 +69,7 @@ type Validator struct {
 // of the Structural schema and returns a custom resource validator that contains nested
 // validators for all items, properties and additionalProperties that transitively contain validator rules.
 // Returns nil if there are no validator rules in the Structural schema. May return a validator containing only errors.
-// Adding perCallLimit as input arg for testing purpose only. Callers should always use const PerCallLimit as input
+// Adding perCallLimit as input arg for testing purpose only. Callers should always use const PerCallLimit from k8s.io/apiserver/pkg/apis/cel/config.go as input
 func NewValidator(s *schema.Structural, isResourceRoot bool, perCallLimit uint64) *Validator {
 	if !hasXValidations(s) {
 		return nil
@@ -75,6 +80,7 @@ func NewValidator(s *schema.Structural, isResourceRoot bool, perCallLimit uint64
 // validator creates a Validator for all x-kubernetes-validations at the level of the provided schema and lower and
 // returns the Validator if any x-kubernetes-validations exist in the schema, or nil if no x-kubernetes-validations
 // exist. declType is expected to be a CEL DeclType corresponding to the structural schema.
+// perCallLimit was added for testing purpose only. Callers should always use const PerCallLimit from k8s.io/apiserver/pkg/apis/cel/config.go as input.
 func validator(s *schema.Structural, isResourceRoot bool, declType *cel.DeclType, perCallLimit uint64) *Validator {
 	compiledRules, err := Compile(s, declType, perCallLimit)
 	var itemsValidator, additionalPropertiesValidator *Validator
@@ -251,14 +257,100 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 			continue
 		}
 		if evalResult != types.True {
-			if len(rule.Message) != 0 {
-				errs = append(errs, field.Invalid(fldPath, sts.Type, rule.Message))
+			if compiled.MessageExpression != nil {
+				messageExpression, newRemainingBudget, msgErr := evalMessageExpression(ctx, compiled.MessageExpression, rule.MessageExpression, activation, remainingBudget)
+				if msgErr != nil {
+					if msgErr.Type == cel.ErrorTypeInternal {
+						errs = append(errs, field.InternalError(fldPath, msgErr))
+						return errs, -1
+					} else if msgErr.Type == cel.ErrorTypeInvalid {
+						errs = append(errs, field.Invalid(fldPath, sts.Type, msgErr.Error()))
+						return errs, -1
+					} else {
+						klog.V(2).ErrorS(msgErr, "messageExpression evaluation failed")
+						errs = append(errs, field.Invalid(fldPath, sts.Type, ruleMessageOrDefault(rule)))
+						remainingBudget = newRemainingBudget
+					}
+				} else {
+					errs = append(errs, field.Invalid(fldPath, sts.Type, messageExpression))
+					remainingBudget = newRemainingBudget
+				}
 			} else {
-				errs = append(errs, field.Invalid(fldPath, sts.Type, fmt.Sprintf("failed rule: %s", ruleErrorString(rule))))
+				errs = append(errs, field.Invalid(fldPath, sts.Type, ruleMessageOrDefault(rule)))
 			}
 		}
 	}
 	return errs, remainingBudget
+}
+
+// evalMessageExpression evaluates the given message expression and returns the evaluated string form and the remaining budget, or an error if one
+// occurred during evaluation.
+func evalMessageExpression(ctx context.Context, expr celgo.Program, exprSrc string, activation interpreter.Activation, remainingBudget int64) (string, int64, *cel.Error) {
+	evalResult, evalDetails, err := expr.ContextEval(ctx, activation)
+	if evalDetails == nil {
+		return "", -1, &cel.Error{
+			Type:   cel.ErrorTypeInternal,
+			Detail: fmt.Sprintf("runtime cost could not be calculated for messageExpression: %q", exprSrc),
+		}
+	}
+	rtCost := evalDetails.ActualCost()
+	if rtCost == nil {
+		return "", -1, &cel.Error{
+			Type:   cel.ErrorTypeInternal,
+			Detail: fmt.Sprintf("runtime cost could not be calculated for messageExpression: %q", exprSrc),
+		}
+	} else if *rtCost > math.MaxInt64 || int64(*rtCost) > remainingBudget {
+		return "", -1, &cel.Error{
+			Type:   cel.ErrorTypeInvalid,
+			Detail: "messageExpression evaluation failed due to running out of cost budget, no further validation rules will be run",
+		}
+	}
+	if err != nil {
+		if strings.HasPrefix(err.Error(), "operation cancelled: actual cost limit exceeded") {
+			return "", -1, &cel.Error{
+				Type:   cel.ErrorTypeInvalid,
+				Detail: fmt.Sprintf("no further validation rules will be run due to call cost exceeds limit for messageExpression: %q", exprSrc),
+			}
+		}
+		return "", remainingBudget - int64(*rtCost), &cel.Error{
+			Detail: fmt.Sprintf("messageExpression evaluation failed due to: %v", err.Error()),
+		}
+	}
+	messageStr, ok := evalResult.Value().(string)
+	if !ok {
+		return "", remainingBudget - int64(*rtCost), &cel.Error{
+			Detail: "messageExpression failed to convert to string",
+		}
+	}
+	trimmedMsgStr := strings.TrimSpace(messageStr)
+	if len(trimmedMsgStr) > celconfig.MaxEvaluatedMessageExpressionSizeBytes {
+		return "", remainingBudget - int64(*rtCost), &cel.Error{
+			Detail: fmt.Sprintf("messageExpression beyond allowable length of %d", celconfig.MaxEvaluatedMessageExpressionSizeBytes),
+		}
+	} else if hasNewlines(trimmedMsgStr) {
+		return "", remainingBudget - int64(*rtCost), &cel.Error{
+			Detail: "messageExpression should not contain line breaks",
+		}
+	} else if len(trimmedMsgStr) == 0 {
+		return "", remainingBudget - int64(*rtCost), &cel.Error{
+			Detail: "messageExpression should evaluate to a non-empty string",
+		}
+	}
+	return trimmedMsgStr, remainingBudget - int64(*rtCost), nil
+}
+
+var newlineMatcher = regexp.MustCompile(`[\n]+`)
+
+func hasNewlines(s string) bool {
+	return newlineMatcher.MatchString(s)
+}
+
+func ruleMessageOrDefault(rule apiextensions.ValidationRule) string {
+	if len(rule.Message) == 0 {
+		return fmt.Sprintf("failed rule: %s", ruleErrorString(rule))
+	} else {
+		return strings.TrimSpace(rule.Message)
+	}
 }
 
 func ruleErrorString(rule apiextensions.ValidationRule) string {
@@ -366,7 +458,7 @@ func (s *Validator) validateArray(ctx context.Context, fldPath *field.Path, sts 
 		correlatableOldItems := makeMapList(sts, oldObj)
 		for i := range obj {
 			var err field.ErrorList
-			err, remainingBudget = s.Items.Validate(ctx, fldPath.Index(i), sts.Items, obj[i], correlatableOldItems.get(obj[i]), remainingBudget)
+			err, remainingBudget = s.Items.Validate(ctx, fldPath.Index(i), sts.Items, obj[i], correlatableOldItems.Get(obj[i]), remainingBudget)
 			errs = append(errs, err...)
 			if remainingBudget < 0 {
 				return errs, remainingBudget

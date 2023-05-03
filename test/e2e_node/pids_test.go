@@ -17,6 +17,7 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
@@ -87,9 +88,9 @@ func makePodToVerifyPids(baseName string, pidsLimit resource.Quantity) *v1.Pod {
 }
 
 func runPodPidsLimitTests(f *framework.Framework) {
-	ginkgo.It("should set pids.max for Pod", func() {
+	ginkgo.It("should set pids.max for Pod", func(ctx context.Context) {
 		ginkgo.By("by creating a G pod")
-		pod := e2epod.NewPodClient(f).Create(&v1.Pod{
+		pod := e2epod.NewPodClient(f).Create(ctx, &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod" + string(uuid.NewUUID()),
 				Namespace: f.Namespace.Name,
@@ -112,8 +113,8 @@ func runPodPidsLimitTests(f *framework.Framework) {
 		podUID := string(pod.UID)
 		ginkgo.By("checking if the expected pids settings were applied")
 		verifyPod := makePodToVerifyPids("pod"+podUID, resource.MustParse("1024"))
-		e2epod.NewPodClient(f).Create(verifyPod)
-		err := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, verifyPod.Name, f.Namespace.Name)
+		e2epod.NewPodClient(f).Create(ctx, verifyPod)
+		err := e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, verifyPod.Name, f.Namespace.Name)
 		framework.ExpectNoError(err)
 	})
 }
@@ -123,7 +124,7 @@ var _ = SIGDescribe("PodPidsLimit [Serial]", func() {
 	f := framework.NewDefaultFramework("pids-limit-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("With config updated with pids limits", func() {
-		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			initialConfig.PodPidsLimit = int64(1024)
 		})
 		runPodPidsLimitTests(f)

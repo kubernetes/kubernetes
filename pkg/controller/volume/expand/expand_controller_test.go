@@ -38,7 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/attachdetach/testing"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/awsebs"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
@@ -107,7 +106,6 @@ func TestSyncHandler(t *testing.T) {
 			informerFactory.Core().V1().PersistentVolumeClaims().Informer().GetIndexer().Add(pvc)
 		}
 		allPlugins := []volume.VolumePlugin{}
-		allPlugins = append(allPlugins, awsebs.ProbeVolumePlugins()...)
 		translator := csitrans.New()
 		expc, err := NewExpandController(fakeKubeClient, pvcInformer, pvInformer, nil, allPlugins, translator, csimigration.NewPluginManager(translator, utilfeature.DefaultFeatureGate), nil)
 		if err != nil {

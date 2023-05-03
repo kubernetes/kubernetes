@@ -25,8 +25,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	serviceapi "k8s.io/kubernetes/pkg/api/service"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -83,7 +85,9 @@ func (svcStrategy) Validate(ctx context.Context, obj runtime.Object) field.Error
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
-func (svcStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
+func (svcStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return serviceapi.GetWarningsForService(obj.(*api.Service), nil)
+}
 
 // Canonicalize normalizes the object after validation.
 func (svcStrategy) Canonicalize(obj runtime.Object) {
@@ -100,7 +104,7 @@ func (strategy svcStrategy) ValidateUpdate(ctx context.Context, obj, old runtime
 
 // WarningsOnUpdate returns warnings for the given update.
 func (svcStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
+	return serviceapi.GetWarningsForService(obj.(*api.Service), old.(*api.Service))
 }
 
 func (svcStrategy) AllowUnconditionalUpdate() bool {
@@ -243,7 +247,7 @@ func dropTypeDependentFields(newSvc *api.Service, oldSvc *api.Service) {
 	// If a user is switching to a type that doesn't need ExternalTrafficPolicy
 	// AND they did not change this field, it is safe to drop it.
 	if needsExternalTrafficPolicy(oldSvc) && !needsExternalTrafficPolicy(newSvc) && sameExternalTrafficPolicy(oldSvc, newSvc) {
-		newSvc.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyType("")
+		newSvc.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicy("")
 	}
 
 	// NOTE: there are other fields like `selector` which we could wipe.
@@ -317,7 +321,7 @@ func needsHCNodePort(svc *api.Service) bool {
 	if svc.Spec.Type != api.ServiceTypeLoadBalancer {
 		return false
 	}
-	if svc.Spec.ExternalTrafficPolicy != api.ServiceExternalTrafficPolicyTypeLocal {
+	if svc.Spec.ExternalTrafficPolicy != api.ServiceExternalTrafficPolicyLocal {
 		return false
 	}
 	return true

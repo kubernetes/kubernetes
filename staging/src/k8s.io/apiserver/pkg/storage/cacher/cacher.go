@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"strconv"
 	"sync"
 	"time"
 
@@ -34,17 +35,17 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/audit"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/tracing"
+
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 )
@@ -127,29 +128,37 @@ func (wm watchersMap) terminateAll(done func(*cacheWatcher)) {
 }
 
 type indexedWatchers struct {
-	allWatchers   watchersMap
+	allWatchers   map[namespacedName]watchersMap
 	valueWatchers map[string]watchersMap
 }
 
-func (i *indexedWatchers) addWatcher(w *cacheWatcher, number int, value string, supported bool) {
+func (i *indexedWatchers) addWatcher(w *cacheWatcher, number int, scope namespacedName, value string, supported bool) {
 	if supported {
 		if _, ok := i.valueWatchers[value]; !ok {
 			i.valueWatchers[value] = watchersMap{}
 		}
 		i.valueWatchers[value].addWatcher(w, number)
 	} else {
-		i.allWatchers.addWatcher(w, number)
+		scopedWatchers, ok := i.allWatchers[scope]
+		if !ok {
+			scopedWatchers = watchersMap{}
+			i.allWatchers[scope] = scopedWatchers
+		}
+		scopedWatchers.addWatcher(w, number)
 	}
 }
 
-func (i *indexedWatchers) deleteWatcher(number int, value string, supported bool, done func(*cacheWatcher)) {
+func (i *indexedWatchers) deleteWatcher(number int, scope namespacedName, value string, supported bool, done func(*cacheWatcher)) {
 	if supported {
 		i.valueWatchers[value].deleteWatcher(number, done)
 		if len(i.valueWatchers[value]) == 0 {
 			delete(i.valueWatchers, value)
 		}
 	} else {
-		i.allWatchers.deleteWatcher(number, done)
+		i.allWatchers[scope].deleteWatcher(number, done)
+		if len(i.allWatchers[scope]) == 0 {
+			delete(i.allWatchers, scope)
+		}
 	}
 }
 
@@ -161,10 +170,13 @@ func (i *indexedWatchers) terminateAll(groupResource schema.GroupResource, done 
 	if len(i.allWatchers) > 0 || len(i.valueWatchers) > 0 {
 		klog.Warningf("Terminating all watchers from cacher %v", groupResource)
 	}
-	i.allWatchers.terminateAll(done)
+	for _, watchers := range i.allWatchers {
+		watchers.terminateAll(done)
+	}
 	for _, watchers := range i.valueWatchers {
 		watchers.terminateAll(done)
 	}
+	i.allWatchers = map[namespacedName]watchersMap{}
 	i.valueWatchers = map[string]watchersMap{}
 }
 
@@ -278,6 +290,9 @@ type Cacher struct {
 	// newFunc is a function that creates new empty object storing a object of type Type.
 	newFunc func() runtime.Object
 
+	// newListFunc is a function that creates new empty list for storing objects of type Type.
+	newListFunc func() runtime.Object
+
 	// indexedTrigger is used for optimizing amount of watchers that needs to process
 	// an incoming event.
 	indexedTrigger *indexedTriggerFunc
@@ -359,10 +374,11 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		groupResource:  config.GroupResource,
 		versioner:      config.Versioner,
 		newFunc:        config.NewFunc,
+		newListFunc:    config.NewListFunc,
 		indexedTrigger: indexedTrigger,
 		watcherIdx:     0,
 		watchers: indexedWatchers{
-			allWatchers:   make(map[int]*cacheWatcher),
+			allWatchers:   make(map[namespacedName]watchersMap),
 			valueWatchers: make(map[string]watchersMap),
 		},
 		// TODO: Figure out the correct value for the buffer size.
@@ -399,6 +415,9 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	// We don't want to terminate all watchers as recreating all watchers puts high load on api-server.
 	// In most of the cases, leader is reelected within few cycles.
 	reflector.MaxInternalErrorRetryDuration = time.Second * 30
+	// since the watch-list is provided by the watch cache instruct
+	// the reflector to issue a regular LIST against the store
+	reflector.UseWatchList = false
 
 	cacher.watchCache = watchCache
 	cacher.reflector = reflector
@@ -479,16 +498,48 @@ func (c *Cacher) Delete(
 	return c.storage.Delete(ctx, key, out, preconditions, validateDeletion, nil)
 }
 
+type namespacedName struct {
+	namespace string
+	name      string
+}
+
 // Watch implements storage.Interface.
 func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
 	pred := opts.Predicate
-	watchRV, err := c.versioner.ParseResourceVersion(opts.ResourceVersion)
+	// if the watch-list feature wasn't set and the resourceVersion is unset
+	// ensure that the rv from which the watch is being served, is the latest
+	// one. "latest" is ensured by serving the watch from
+	// the underlying storage.
+	//
+	// it should never happen due to our validation but let's just be super-safe here
+	// and disable sendingInitialEvents when the feature wasn't enabled
+	if !utilfeature.DefaultFeatureGate.Enabled(features.WatchList) && opts.SendInitialEvents != nil {
+		opts.SendInitialEvents = nil
+	}
+	if opts.SendInitialEvents == nil && opts.ResourceVersion == "" {
+		return c.storage.Watch(ctx, key, opts)
+	}
+	requestedWatchRV, err := c.versioner.ParseResourceVersion(opts.ResourceVersion)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := c.ready.wait(); err != nil {
+	readyGeneration, err := c.ready.waitAndReadGeneration(ctx)
+	if err != nil {
 		return nil, errors.NewServiceUnavailable(err.Error())
+	}
+
+	// determine the namespace and name scope of the watch, first from the request, secondarily from the field selector
+	scope := namespacedName{}
+	if requestNamespace, ok := request.NamespaceFrom(ctx); ok && len(requestNamespace) > 0 {
+		scope.namespace = requestNamespace
+	} else if selectorNamespace, ok := pred.Field.RequiresExactMatch("metadata.namespace"); ok {
+		scope.namespace = selectorNamespace
+	}
+	if requestInfo, ok := request.RequestInfoFrom(ctx); ok && requestInfo != nil && len(requestInfo.Name) > 0 {
+		scope.name = requestInfo.Name
+	} else if selectorName, ok := pred.Field.RequiresExactMatch("metadata.name"); ok {
+		scope.name = selectorName
 	}
 
 	triggerValue, triggerSupported := "", false
@@ -508,6 +559,18 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	//   a bunch of changes have enough buffer to avoid from blocking other
 	//   watchers on our watcher having a processing hiccup
 	chanSize := c.watchCache.suggestedWatchChannelSize(c.indexedTrigger != nil, triggerSupported)
+
+	// Determine a function that computes the bookmarkAfterResourceVersion
+	bookmarkAfterResourceVersionFn, err := c.getBookmarkAfterResourceVersionLockedFunc(ctx, requestedWatchRV, opts)
+	if err != nil {
+		return newErrWatcher(err), nil
+	}
+
+	// Determine a function that computes the watchRV we should start from
+	startWatchResourceVersionFn, err := c.getStartResourceVersionForWatchLockedFunc(ctx, requestedWatchRV, opts)
+	if err != nil {
+		return newErrWatcher(err), nil
+	}
 
 	// Determine watch timeout('0' means deadline is not set, ignore checking)
 	deadline, _ := ctx.Deadline()
@@ -536,7 +599,17 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	// underlying watchCache is calling processEvent under its lock.
 	c.watchCache.RLock()
 	defer c.watchCache.RUnlock()
-	cacheInterval, err := c.watchCache.getAllEventsSinceLocked(watchRV)
+	forceAllEvents, err := c.waitUntilWatchCacheFreshAndForceAllEvents(ctx, requestedWatchRV, opts)
+	if err != nil {
+		return newErrWatcher(err), nil
+	}
+	startWatchRV := startWatchResourceVersionFn()
+	var cacheInterval *watchCacheInterval
+	if forceAllEvents {
+		cacheInterval, err = c.watchCache.getIntervalFromStoreLocked()
+	} else {
+		cacheInterval, err = c.watchCache.getAllEventsSinceLocked(startWatchRV)
+	}
 	if err != nil {
 		// To match the uncached watch implementation, once we have passed authn/authz/admission,
 		// and successfully parsed a resource version, other errors must fail with a watch event of type ERROR,
@@ -544,12 +617,24 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		return newErrWatcher(err), nil
 	}
 
+	addedWatcher := false
 	func() {
 		c.Lock()
 		defer c.Unlock()
+
+		if generation, ok := c.ready.checkAndReadGeneration(); generation != readyGeneration || !ok {
+			// We went unready or are already on a different generation.
+			// Avoid registering and starting the watch as it will have to be
+			// terminated immediately anyway.
+			return
+		}
+
 		// Update watcher.forget function once we can compute it.
-		watcher.forget = forgetWatcher(c, watcher, c.watcherIdx, triggerValue, triggerSupported)
-		c.watchers.addWatcher(watcher, c.watcherIdx, triggerValue, triggerSupported)
+		watcher.forget = forgetWatcher(c, watcher, c.watcherIdx, scope, triggerValue, triggerSupported)
+		// Update the bookMarkAfterResourceVersion
+		watcher.setBookmarkAfterResourceVersion(bookmarkAfterResourceVersionFn())
+		c.watchers.addWatcher(watcher, c.watcherIdx, scope, triggerValue, triggerSupported)
+		addedWatcher = true
 
 		// Add it to the queue only when the client support watch bookmarks.
 		if watcher.allowWatchBookmarks {
@@ -558,7 +643,15 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		c.watcherIdx++
 	}()
 
-	go watcher.processInterval(ctx, cacheInterval, watchRV)
+	if !addedWatcher {
+		// Watcher isn't really started at this point, so it's safe to just drop it.
+		//
+		// We're simulating the immediate watch termination, which boils down to simply
+		// closing the watcher.
+		return newImmediateCloseWatcher(), nil
+	}
+
+	go watcher.processInterval(ctx, cacheInterval, startWatchRV)
 	return watcher, nil
 }
 
@@ -586,7 +679,7 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 
 	// Do not create a trace - it's not for free and there are tons
 	// of Get requests. We can add it if it will be really needed.
-	if err := c.ready.wait(); err != nil {
+	if err := c.ready.wait(ctx); err != nil {
 		return errors.NewServiceUnavailable(err.Error())
 	}
 
@@ -621,9 +714,11 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 func shouldDelegateList(opts storage.ListOptions) bool {
 	resourceVersion := opts.ResourceVersion
 	pred := opts.Predicate
+	match := opts.ResourceVersionMatch
 	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
 	hasContinuation := pagingEnabled && len(pred.Continue) > 0
 	hasLimit := pagingEnabled && pred.Limit > 0 && resourceVersion != "0"
+	unsupportedMatch := match != "" && match != metav1.ResourceVersionMatchNotOlderThan
 
 	// If resourceVersion is not specified, serve it from underlying
 	// storage (for backward compatibility). If a continuation is
@@ -631,7 +726,7 @@ func shouldDelegateList(opts storage.ListOptions) bool {
 	// Limits are only sent to storage when resourceVersion is non-zero
 	// since the watch cache isn't able to perform continuations, and
 	// limits are ignored when resource version is zero
-	return resourceVersion == "" || hasContinuation || hasLimit || opts.ResourceVersionMatch == metav1.ResourceVersionMatchExact
+	return resourceVersion == "" || hasContinuation || hasLimit || unsupportedMatch
 }
 
 func (c *Cacher) listItems(ctx context.Context, listRV uint64, key string, pred storage.SelectionPredicate, recursive bool) ([]interface{}, uint64, string, error) {
@@ -676,7 +771,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		attribute.Stringer("type", c.groupResource))
 	defer span.End(500 * time.Millisecond)
 
-	if err := c.ready.wait(); err != nil {
+	if err := c.ready.wait(ctx); err != nil {
 		return errors.NewServiceUnavailable(err.Error())
 	}
 	span.AddEvent("Ready")
@@ -714,6 +809,10 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		if filter(elem.Key, elem.Labels, elem.Fields) {
 			listVal.Set(reflect.Append(listVal, reflect.ValueOf(elem.Object).Elem()))
 		}
+	}
+	if listVal.IsNil() {
+		// Ensure that we never return a nil Items pointer in the result for consistency.
+		listVal.Set(reflect.MakeSlice(listVal.Type(), 0, 0))
 	}
 	span.AddEvent("Filtered items", attribute.Int("count", listVal.Len()))
 	if c.versioner != nil {
@@ -974,10 +1073,32 @@ func (c *Cacher) startDispatching(event *watchCacheEvent) {
 		return
 	}
 
-	// Iterate over "allWatchers" no matter what the trigger function is.
-	for _, watcher := range c.watchers.allWatchers {
+	// iterate over watchers for each applicable namespace/name tuple
+	namespace := event.ObjFields["metadata.namespace"]
+	name := event.ObjFields["metadata.name"]
+	if len(namespace) > 0 {
+		if len(name) > 0 {
+			// namespaced watchers scoped by name
+			for _, watcher := range c.watchers.allWatchers[namespacedName{namespace: namespace, name: name}] {
+				c.watchersBuffer = append(c.watchersBuffer, watcher)
+			}
+		}
+		// namespaced watchers not scoped by name
+		for _, watcher := range c.watchers.allWatchers[namespacedName{namespace: namespace}] {
+			c.watchersBuffer = append(c.watchersBuffer, watcher)
+		}
+	}
+	if len(name) > 0 {
+		// cluster-wide watchers scoped by name
+		for _, watcher := range c.watchers.allWatchers[namespacedName{name: name}] {
+			c.watchersBuffer = append(c.watchersBuffer, watcher)
+		}
+	}
+	// cluster-wide watchers unscoped by name
+	for _, watcher := range c.watchers.allWatchers[namespacedName{}] {
 		c.watchersBuffer = append(c.watchersBuffer, watcher)
 	}
+
 	if supported {
 		// Iterate over watchers interested in the given values of the trigger.
 		for _, triggerValue := range triggerValues {
@@ -1059,7 +1180,7 @@ func (c *Cacher) Stop() {
 	c.stopWg.Wait()
 }
 
-func forgetWatcher(c *Cacher, w *cacheWatcher, index int, triggerValue string, triggerSupported bool) func(bool) {
+func forgetWatcher(c *Cacher, w *cacheWatcher, index int, scope namespacedName, triggerValue string, triggerSupported bool) func(bool) {
 	return func(drainWatcher bool) {
 		c.Lock()
 		defer c.Unlock()
@@ -1069,7 +1190,7 @@ func forgetWatcher(c *Cacher, w *cacheWatcher, index int, triggerValue string, t
 		// It's possible that the watcher is already not in the structure (e.g. in case of
 		// simultaneous Stop() and terminateAllWatchers(), but it is safe to call stopLocked()
 		// on a watcher multiple times.
-		c.watchers.deleteWatcher(index, triggerValue, triggerSupported, c.stopWatcherLocked)
+		c.watchers.deleteWatcher(index, scope, triggerValue, triggerSupported, c.stopWatcherLocked)
 	}
 }
 
@@ -1085,12 +1206,107 @@ func filterWithAttrsFunction(key string, p storage.SelectionPredicate) filterWit
 
 // LastSyncResourceVersion returns resource version to which the underlying cache is synced.
 func (c *Cacher) LastSyncResourceVersion() (uint64, error) {
-	if err := c.ready.wait(); err != nil {
+	if err := c.ready.wait(context.Background()); err != nil {
 		return 0, errors.NewServiceUnavailable(err.Error())
 	}
 
 	resourceVersion := c.reflector.LastSyncResourceVersion()
 	return c.versioner.ParseResourceVersion(resourceVersion)
+}
+
+// getCurrentResourceVersionFromStorage gets the current resource version from the underlying storage engine.
+// this method issues an empty list request and reads only the ResourceVersion from the object metadata
+func (c *Cacher) getCurrentResourceVersionFromStorage(ctx context.Context) (uint64, error) {
+	if c.newListFunc == nil {
+		return 0, fmt.Errorf("newListFunction wasn't provided for %v", c.objectType)
+	}
+	emptyList := c.newListFunc()
+	pred := storage.SelectionPredicate{
+		Label: labels.Everything(),
+		Field: fields.Everything(),
+		Limit: 1, // just in case we actually hit something
+	}
+
+	err := c.storage.GetList(ctx, c.resourcePrefix, storage.ListOptions{Predicate: pred}, emptyList)
+	if err != nil {
+		return 0, err
+	}
+	emptyListAccessor, err := meta.ListAccessor(emptyList)
+	if err != nil {
+		return 0, err
+	}
+	if emptyListAccessor == nil {
+		return 0, fmt.Errorf("unable to extract a list accessor from %T", emptyList)
+	}
+
+	currentResourceVersion, err := strconv.Atoi(emptyListAccessor.GetResourceVersion())
+	if err != nil {
+		return 0, err
+	}
+
+	if currentResourceVersion == 0 {
+		return 0, fmt.Errorf("the current resource version must be greater than 0")
+	}
+	return uint64(currentResourceVersion), nil
+}
+
+// getBookmarkAfterResourceVersionLockedFunc returns a function that
+// spits a ResourceVersion after which the bookmark event will be delivered.
+//
+// The returned function must be called under the watchCache lock.
+func (c *Cacher) getBookmarkAfterResourceVersionLockedFunc(ctx context.Context, parsedResourceVersion uint64, opts storage.ListOptions) (func() uint64, error) {
+	if opts.SendInitialEvents == nil || *opts.SendInitialEvents == false || !opts.Predicate.AllowWatchBookmarks {
+		return func() uint64 { return 0 }, nil
+	}
+	return c.getCommonResourceVersionLockedFunc(ctx, parsedResourceVersion, opts)
+}
+
+// getStartResourceVersionForWatchLockedFunc returns a function that
+// spits a ResourceVersion the watch will be started from.
+// Depending on the input parameters the semantics of the returned ResourceVersion are:
+//   - start at Exact (return parsedWatchResourceVersion)
+//   - start at Most Recent (return an RV from etcd)
+//   - start at Any (return the current watchCache's RV)
+//
+// The returned function must be called under the watchCache lock.
+func (c *Cacher) getStartResourceVersionForWatchLockedFunc(ctx context.Context, parsedWatchResourceVersion uint64, opts storage.ListOptions) (func() uint64, error) {
+	if opts.SendInitialEvents == nil || *opts.SendInitialEvents == true {
+		return func() uint64 { return parsedWatchResourceVersion }, nil
+	}
+	return c.getCommonResourceVersionLockedFunc(ctx, parsedWatchResourceVersion, opts)
+}
+
+// getCommonResourceVersionLockedFunc a helper that simply computes a ResourceVersion
+// based on the input parameters. Please examine callers of this method to get more context.
+//
+// The returned function must be called under the watchCache lock.
+func (c *Cacher) getCommonResourceVersionLockedFunc(ctx context.Context, parsedWatchResourceVersion uint64, opts storage.ListOptions) (func() uint64, error) {
+	switch {
+	case len(opts.ResourceVersion) == 0:
+		rv, err := c.getCurrentResourceVersionFromStorage(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return func() uint64 { return rv }, nil
+	case parsedWatchResourceVersion == 0:
+		// here we assume that watchCache locked is already held
+		return func() uint64 { return c.watchCache.resourceVersion }, nil
+	default:
+		return func() uint64 { return parsedWatchResourceVersion }, nil
+	}
+}
+
+// waitUntilWatchCacheFreshAndForceAllEvents waits until cache is at least
+// as fresh as given requestedWatchRV if sendInitialEvents was requested.
+// Additionally, it instructs the caller whether it should ask for
+// all events from the cache (full state) or not.
+func (c *Cacher) waitUntilWatchCacheFreshAndForceAllEvents(ctx context.Context, requestedWatchRV uint64, opts storage.ListOptions) (bool, error) {
+	if opts.SendInitialEvents != nil && *opts.SendInitialEvents == true {
+		err := c.watchCache.waitUntilFreshAndBlock(ctx, requestedWatchRV)
+		defer c.watchCache.RUnlock()
+		return err == nil, err
+	}
+	return false, nil
 }
 
 // cacherListerWatcher opaques storage.Interface to expose cache.ListerWatcher.
@@ -1181,339 +1397,23 @@ func (c *errWatcher) Stop() {
 	// no-op
 }
 
-// cacheWatcher implements watch.Interface
-// this is not thread-safe
-type cacheWatcher struct {
-	input     chan *watchCacheEvent
-	result    chan watch.Event
-	done      chan struct{}
-	filter    filterWithAttrsFunc
-	stopped   bool
-	forget    func(bool)
-	versioner storage.Versioner
-	// The watcher will be closed by server after the deadline,
-	// save it here to send bookmark events before that.
-	deadline            time.Time
-	allowWatchBookmarks bool
-	groupResource       schema.GroupResource
-
-	// human readable identifier that helps assigning cacheWatcher
-	// instance with request
-	identifier string
-
-	// drainInputBuffer indicates whether we should delay closing this watcher
-	// and send all event in the input buffer.
-	drainInputBuffer bool
+// immediateCloseWatcher implements watch.Interface that is immediately closed
+type immediateCloseWatcher struct {
+	result chan watch.Event
 }
 
-func newCacheWatcher(
-	chanSize int,
-	filter filterWithAttrsFunc,
-	forget func(bool),
-	versioner storage.Versioner,
-	deadline time.Time,
-	allowWatchBookmarks bool,
-	groupResource schema.GroupResource,
-	identifier string,
-) *cacheWatcher {
-	return &cacheWatcher{
-		input:               make(chan *watchCacheEvent, chanSize),
-		result:              make(chan watch.Event, chanSize),
-		done:                make(chan struct{}),
-		filter:              filter,
-		stopped:             false,
-		forget:              forget,
-		versioner:           versioner,
-		deadline:            deadline,
-		allowWatchBookmarks: allowWatchBookmarks,
-		groupResource:       groupResource,
-		identifier:          identifier,
-	}
+func newImmediateCloseWatcher() *immediateCloseWatcher {
+	watcher := &immediateCloseWatcher{result: make(chan watch.Event)}
+	close(watcher.result)
+	return watcher
 }
 
 // Implements watch.Interface.
-func (c *cacheWatcher) ResultChan() <-chan watch.Event {
+func (c *immediateCloseWatcher) ResultChan() <-chan watch.Event {
 	return c.result
 }
 
 // Implements watch.Interface.
-func (c *cacheWatcher) Stop() {
-	c.forget(false)
-}
-
-// we rely on the fact that stopLocked is actually protected by Cacher.Lock()
-func (c *cacheWatcher) stopLocked() {
-	if !c.stopped {
-		c.stopped = true
-		// stop without draining the input channel was requested.
-		if !c.drainInputBuffer {
-			close(c.done)
-		}
-		close(c.input)
-	}
-
-	// Even if the watcher was already stopped, if it previously was
-	// using draining mode and it's not using it now we need to
-	// close the done channel now. Otherwise we could leak the
-	// processing goroutine if it will be trying to put more objects
-	// into result channel, the channel will be full and there will
-	// already be noone on the processing the events on the receiving end.
-	if !c.drainInputBuffer && !c.isDoneChannelClosedLocked() {
-		close(c.done)
-	}
-}
-
-func (c *cacheWatcher) nonblockingAdd(event *watchCacheEvent) bool {
-	select {
-	case c.input <- event:
-		return true
-	default:
-		return false
-	}
-}
-
-// Nil timer means that add will not block (if it can't send event immediately, it will break the watcher)
-func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
-	// Try to send the event immediately, without blocking.
-	if c.nonblockingAdd(event) {
-		return true
-	}
-
-	closeFunc := func() {
-		// This means that we couldn't send event to that watcher.
-		// Since we don't want to block on it infinitely,
-		// we simply terminate it.
-		klog.V(1).Infof("Forcing %v watcher close due to unresponsiveness: %v. len(c.input) = %v, len(c.result) = %v", c.groupResource.String(), c.identifier, len(c.input), len(c.result))
-		metrics.TerminatedWatchersCounter.WithLabelValues(c.groupResource.String()).Inc()
-		c.forget(false)
-	}
-
-	if timer == nil {
-		closeFunc()
-		return false
-	}
-
-	// OK, block sending, but only until timer fires.
-	select {
-	case c.input <- event:
-		return true
-	case <-timer.C:
-		closeFunc()
-		return false
-	}
-}
-
-func (c *cacheWatcher) nextBookmarkTime(now time.Time, bookmarkFrequency time.Duration) (time.Time, bool) {
-	// We try to send bookmarks:
-	//
-	// (a) right before the watcher timeout - for now we simply set it 2s before
-	//     the deadline
-	//
-	// (b) roughly every minute
-	//
-	// (b) gives us periodicity if the watch breaks due to unexpected
-	// conditions, (a) ensures that on timeout the watcher is as close to
-	// now as possible - this covers 99% of cases.
-
-	heartbeatTime := now.Add(bookmarkFrequency)
-	if c.deadline.IsZero() {
-		// Timeout is set by our client libraries (e.g. reflector) as well as defaulted by
-		// apiserver if properly configured. So this shoudln't happen in practice.
-		return heartbeatTime, true
-	}
-	if pretimeoutTime := c.deadline.Add(-2 * time.Second); pretimeoutTime.Before(heartbeatTime) {
-		heartbeatTime = pretimeoutTime
-	}
-
-	if heartbeatTime.Before(now) {
-		return time.Time{}, false
-	}
-	return heartbeatTime, true
-}
-
-// setDrainInputBufferLocked if set to true indicates that we should delay closing this watcher
-// until we send all events residing in the input buffer.
-func (c *cacheWatcher) setDrainInputBufferLocked(drain bool) {
-	c.drainInputBuffer = drain
-}
-
-// isDoneChannelClosed checks if c.done channel is closed
-func (c *cacheWatcher) isDoneChannelClosedLocked() bool {
-	select {
-	case <-c.done:
-		return true
-	default:
-	}
-	return false
-}
-
-func getMutableObject(object runtime.Object) runtime.Object {
-	if _, ok := object.(*cachingObject); ok {
-		// It is safe to return without deep-copy, because the underlying
-		// object will lazily perform deep-copy on the first try to change
-		// any of its fields.
-		return object
-	}
-	return object.DeepCopyObject()
-}
-
-func updateResourceVersion(object runtime.Object, versioner storage.Versioner, resourceVersion uint64) {
-	if err := versioner.UpdateObject(object, resourceVersion); err != nil {
-		utilruntime.HandleError(fmt.Errorf("failure to version api object (%d) %#v: %v", resourceVersion, object, err))
-	}
-}
-
-func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event {
-	if event.Type == watch.Bookmark {
-		return &watch.Event{Type: watch.Bookmark, Object: event.Object.DeepCopyObject()}
-	}
-
-	curObjPasses := event.Type != watch.Deleted && c.filter(event.Key, event.ObjLabels, event.ObjFields)
-	oldObjPasses := false
-	if event.PrevObject != nil {
-		oldObjPasses = c.filter(event.Key, event.PrevObjLabels, event.PrevObjFields)
-	}
-	if !curObjPasses && !oldObjPasses {
-		// Watcher is not interested in that object.
-		return nil
-	}
-
-	switch {
-	case curObjPasses && !oldObjPasses:
-		return &watch.Event{Type: watch.Added, Object: getMutableObject(event.Object)}
-	case curObjPasses && oldObjPasses:
-		return &watch.Event{Type: watch.Modified, Object: getMutableObject(event.Object)}
-	case !curObjPasses && oldObjPasses:
-		// return a delete event with the previous object content, but with the event's resource version
-		oldObj := getMutableObject(event.PrevObject)
-		// We know that if oldObj is cachingObject (which can only be set via
-		// setCachingObjects), its resourceVersion is already set correctly and
-		// we don't need to update it. However, since cachingObject efficiently
-		// handles noop updates, we avoid this microoptimization here.
-		updateResourceVersion(oldObj, c.versioner, event.ResourceVersion)
-		return &watch.Event{Type: watch.Deleted, Object: oldObj}
-	}
-
-	return nil
-}
-
-// NOTE: sendWatchCacheEvent is assumed to not modify <event> !!!
-func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
-	watchEvent := c.convertToWatchEvent(event)
-	if watchEvent == nil {
-		// Watcher is not interested in that object.
-		return
-	}
-
-	// We need to ensure that if we put event X to the c.result, all
-	// previous events were already put into it before, no matter whether
-	// c.done is close or not.
-	// Thus we cannot simply select from c.done and c.result and this
-	// would give us non-determinism.
-	// At the same time, we don't want to block infinitely on putting
-	// to c.result, when c.done is already closed.
-	//
-	// This ensures that with c.done already close, we at most once go
-	// into the next select after this. With that, no matter which
-	// statement we choose there, we will deliver only consecutive
-	// events.
-	select {
-	case <-c.done:
-		return
-	default:
-	}
-
-	select {
-	case c.result <- *watchEvent:
-	case <-c.done:
-	}
-}
-
-func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watchCacheInterval, resourceVersion uint64) {
-	defer utilruntime.HandleCrash()
-	defer close(c.result)
-	defer c.Stop()
-
-	// Check how long we are processing initEvents.
-	// As long as these are not processed, we are not processing
-	// any incoming events, so if it takes long, we may actually
-	// block all watchers for some time.
-	// TODO: From the logs it seems that there happens processing
-	// times even up to 1s which is very long. However, this doesn't
-	// depend that much on the number of initEvents. E.g. from the
-	// 2000-node Kubemark run we have logs like this, e.g.:
-	// ... processing 13862 initEvents took 66.808689ms
-	// ... processing 14040 initEvents took 993.532539ms
-	// We should understand what is blocking us in those cases (e.g.
-	// is it lack of CPU, network, or sth else) and potentially
-	// consider increase size of result buffer in those cases.
-	const initProcessThreshold = 500 * time.Millisecond
-	startTime := time.Now()
-
-	initEventCount := 0
-	for {
-		event, err := cacheInterval.Next()
-		if err != nil {
-			// An error indicates that the cache interval
-			// has been invalidated and can no longer serve
-			// events.
-			//
-			// Initially we considered sending an "out-of-history"
-			// Error event in this case, but because historically
-			// such events weren't sent out of the watchCache, we
-			// decided not to. This is still ok, because on watch
-			// closure, the watcher will try to re-instantiate the
-			// watch and then will get an explicit "out-of-history"
-			// window. There is potential for optimization, but for
-			// now, in order to be on the safe side and not break
-			// custom clients, the cost of it is something that we
-			// are fully accepting.
-			klog.Warningf("couldn't retrieve watch event to serve: %#v", err)
-			return
-		}
-		if event == nil {
-			break
-		}
-		c.sendWatchCacheEvent(event)
-		// With some events already sent, update resourceVersion so that
-		// events that were buffered and not yet processed won't be delivered
-		// to this watcher second time causing going back in time.
-		resourceVersion = event.ResourceVersion
-		initEventCount++
-	}
-
-	if initEventCount > 0 {
-		metrics.InitCounter.WithLabelValues(c.groupResource.String()).Add(float64(initEventCount))
-	}
-	processingTime := time.Since(startTime)
-	if processingTime > initProcessThreshold {
-		klog.V(2).Infof("processing %d initEvents of %s (%s) took %v", initEventCount, c.groupResource, c.identifier, processingTime)
-	}
-
-	c.process(ctx, resourceVersion)
-}
-
-func (c *cacheWatcher) process(ctx context.Context, resourceVersion uint64) {
-	// At this point we already start processing incoming watch events.
-	// However, the init event can still be processed because their serialization
-	// and sending to the client happens asynchrnously.
-	// TODO: As describe in the KEP, we would like to estimate that by delaying
-	//   the initialization signal proportionally to the number of events to
-	//   process, but we're leaving this to the tuning phase.
-	utilflowcontrol.WatchInitialized(ctx)
-
-	for {
-		select {
-		case event, ok := <-c.input:
-			if !ok {
-				return
-			}
-			// only send events newer than resourceVersion
-			if event.ResourceVersion > resourceVersion {
-				c.sendWatchCacheEvent(event)
-			}
-		case <-ctx.Done():
-			return
-		}
-	}
+func (c *immediateCloseWatcher) Stop() {
+	// no-op
 }

@@ -158,7 +158,7 @@
     API Server using the current Aggregator [Conformance]'
   description: Ensure that the sample-apiserver code from 1.17 and compiled against
     1.17 will work on the current Aggregator/API-Server.
-  release: v1.17, v1.21
+  release: v1.17, v1.21, v1.27
   file: test/e2e/apimachinery/aggregator.go
 - testname: Custom Resource Definition Conversion Webhook, convert mixed version list
   codename: '[sig-api-machinery] CustomResourceConversionWebhook [Privileged:ClusterAdmin]
@@ -319,6 +319,55 @@
     return a valid PreferredVersion unless the group suffix is example.com.
   release: v1.19
   file: test/e2e/apimachinery/discovery.go
+- testname: Server side field validation, unknown fields CR no validation schema
+  codename: '[sig-api-machinery] FieldValidation should create/apply a CR with unknown
+    fields for CRD with no validation schema [Conformance]'
+  description: When a CRD does not have a validation schema, it should succeed when
+    a CR with unknown fields is applied.
+  release: v1.27
+  file: test/e2e/apimachinery/field_validation.go
+- testname: Server side field validation, valid CR with validation schema
+  codename: '[sig-api-machinery] FieldValidation should create/apply a valid CR for
+    CRD with validation schema [Conformance]'
+  description: When a CRD has a validation schema, it should succeed when a valid
+    CR is applied.
+  release: v1.27
+  file: test/e2e/apimachinery/field_validation.go
+- testname: Server side field validation, unknown fields CR fails validation
+  codename: '[sig-api-machinery] FieldValidation should create/apply an invalid CR
+    with extra properties for CRD with validation schema [Conformance]'
+  description: When a CRD does have a validation schema, it should reject CRs with
+    unknown fields.
+  release: v1.27
+  file: test/e2e/apimachinery/field_validation.go
+- testname: Server side field validation, CR duplicates
+  codename: '[sig-api-machinery] FieldValidation should detect duplicates in a CR
+    when preserving unknown fields [Conformance]'
+  description: The server should reject CRs with duplicate fields even when preserving
+    unknown fields.
+  release: v1.27
+  file: test/e2e/apimachinery/field_validation.go
+- testname: Server side field validation, typed object
+  codename: '[sig-api-machinery] FieldValidation should detect unknown and duplicate
+    fields of a typed object [Conformance]'
+  description: It should reject the request if a typed object has unknown or duplicate
+    fields.
+  release: v1.27
+  file: test/e2e/apimachinery/field_validation.go
+- testname: Server side field validation, unknown metadata
+  codename: '[sig-api-machinery] FieldValidation should detect unknown metadata fields
+    in both the root and embedded object of a CR [Conformance]'
+  description: The server should reject CRs with unknown metadata fields in both the
+    root and embedded objects of a CR.
+  release: v1.27
+  file: test/e2e/apimachinery/field_validation.go
+- testname: Server side field validation, typed unknown metadata
+  codename: '[sig-api-machinery] FieldValidation should detect unknown metadata fields
+    of a typed object [Conformance]'
+  description: It should reject the request if a typed object has unknown fields in
+    the metadata.
+  release: v1.27
+  file: test/e2e/apimachinery/field_validation.go
 - testname: Garbage Collector, delete deployment,  propagation policy background
   codename: '[sig-api-machinery] Garbage collector should delete RS created by deployment
     when not orphaning [Conformance]'
@@ -1119,6 +1168,18 @@
     it MUST succeed and the field MUST equal the new value.
   release: v1.26
   file: test/e2e/auth/service_accounts.go
+- testname: SubjectReview, API Operations
+  codename: '[sig-auth] SubjectReview should support SubjectReview API operations
+    [Conformance]'
+  description: A ServiceAccount is created which MUST succeed. A clientset is created
+    to impersonate the ServiceAccount. A SubjectAccessReview is created for the ServiceAccount
+    which MUST succeed. The allowed status for the SubjectAccessReview MUST match
+    the expected allowed for the impersonated client call. A LocalSubjectAccessReviews
+    is created for the ServiceAccount which MUST succeed. The allowed status for the
+    LocalSubjectAccessReview MUST match the expected allowed for the impersonated
+    client call.
+  release: v1.27
+  file: test/e2e/auth/subjectreviews.go
 - testname: Kubectl, guestbook application
   codename: '[sig-cli] Kubectl client Guestbook application should create and stop
     a working application  [Conformance]'
@@ -1178,18 +1239,6 @@
     container MUST verify that the label can be read back. Use 'kubectl label label-'
     to remove the label. 'kubectl get pod' with -l option SHOULD not list the deleted
     label as the label is removed.
-  release: v1.9
-  file: test/e2e/kubectl/kubectl.go
-- testname: Kubectl, logs
-  codename: '[sig-cli] Kubectl client Kubectl logs should be able to retrieve and
-    filter logs  [Conformance]'
-  description: When a Pod is running then it MUST generate logs. Starting a Pod should
-    have a expected log line. Also log command options MUST work as expected and described
-    below. 'kubectl logs -tail=1' should generate a output of one line, the last line
-    in the log. 'kubectl --limit-bytes=1' should generate a single byte output. 'kubectl
-    --tail=1 --timestamp should generate one line with timestamp in RFC3339 format
-    'kubectl --since=1s' should output logs that are only 1 second older from now
-    'kubectl --since=24h' should output logs that are only 1 day older from now
   release: v1.9
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, patch to annotate
@@ -1266,6 +1315,17 @@
     the replicaset to 2. Number of running instances of the Pod MUST be 2.
   release: v1.9
   file: test/e2e/kubectl/kubectl.go
+- testname: Kubectl, logs
+  codename: '[sig-cli] Kubectl logs logs should be able to retrieve and filter logs  [Conformance]'
+  description: When a Pod is running then it MUST generate logs. Starting a Pod should
+    have a expected log line. Also log command options MUST work as expected and described
+    below. 'kubectl logs -tail=1' should generate a output of one line, the last line
+    in the log. 'kubectl --limit-bytes=1' should generate a single byte output. 'kubectl
+    --tail=1 --timestamp should generate one line with timestamp in RFC3339 format
+    'kubectl --since=1s' should output logs that are only 1 second older from now
+    'kubectl --since=24h' should output logs that are only 1 day older from now
+  release: v1.9
+  file: test/e2e/kubectl/logs.go
 - testname: New Event resource lifecycle, testing a list of events
   codename: '[sig-instrumentation] Events API should delete a collection of events
     [Conformance]'
@@ -2125,6 +2185,14 @@
     restart count MUST remain zero.
   release: v1.9
   file: test/e2e/common/node/container_probe.go
+- testname: Pod liveness probe, using grpc call, success
+  codename: '[sig-node] Probing container should *not* be restarted with a GRPC liveness
+    probe [NodeConformance] [Conformance]'
+  description: A Pod is created with liveness probe on grpc service. Liveness probe
+    on this endpoint will not fail. When liveness probe does not fail then the restart
+    count MUST remain zero.
+  release: v1.23
+  file: test/e2e/common/node/container_probe.go
 - testname: Pod liveness probe, using local file, no restart
   codename: '[sig-node] Probing container should *not* be restarted with a exec "cat
     /tmp/health" liveness probe [NodeConformance] [Conformance]'
@@ -2150,6 +2218,14 @@
     Pod is started. This MUST result in liveness check failure. The Pod MUST now be
     killed and restarted incrementing restart count to 1.
   release: v1.9
+  file: test/e2e/common/node/container_probe.go
+- testname: Pod liveness probe, using grpc call, failure
+  codename: '[sig-node] Probing container should be restarted with a GRPC liveness
+    probe [NodeConformance] [Conformance]'
+  description: A Pod is created with liveness probe on grpc service. Liveness probe
+    on this endpoint should fail because of wrong probe port. When liveness probe
+    does  fail then the restart count should +1.
+  release: v1.23
   file: test/e2e/common/node/container_probe.go
 - testname: Pod liveness probe, using local file, restart
   codename: '[sig-node] Probing container should be restarted with a exec "cat /tmp/health"

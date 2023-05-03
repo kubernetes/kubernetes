@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	testingclock "k8s.io/utils/clock/testing"
 
 	"github.com/davecgh/go-spew/spew"
@@ -104,6 +105,10 @@ func (fake *fakeHTTPServer) Serve(listener net.Listener) error {
 	return nil // Cause the goroutine to return
 }
 
+func (fake *fakeHTTPServer) Close() error {
+	return nil
+}
+
 func mknsn(ns, name string) types.NamespacedName {
 	return types.NamespacedName{
 		Namespace: ns,
@@ -116,7 +121,8 @@ type hcPayload struct {
 		Namespace string
 		Name      string
 	}
-	LocalEndpoints int
+	LocalEndpoints      int
+	ServiceProxyHealthy bool
 }
 
 type healthzPayload struct {
@@ -124,11 +130,21 @@ type healthzPayload struct {
 	CurrentTime string
 }
 
+type fakeProxierHealthChecker struct {
+	healthy bool
+}
+
+func (fake fakeProxierHealthChecker) IsHealthy() bool {
+	return fake.healthy
+}
+
 func TestServer(t *testing.T) {
 	listener := newFakeListener()
 	httpFactory := newFakeHTTPServerFactory()
+	nodePortAddresses := utilproxy.NewNodePortAddresses([]string{})
+	proxyChecker := &fakeProxierHealthChecker{true}
 
-	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory, []string{})
+	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory, nodePortAddresses, proxyChecker)
 	hcs := hcsi.(*server)
 	if len(hcs.services) != 0 {
 		t.Errorf("expected 0 services, got %d", len(hcs.services))
@@ -345,9 +361,29 @@ func TestServer(t *testing.T) {
 	testHandler(hcs, nsn2, http.StatusServiceUnavailable, 0, t)
 	testHandler(hcs, nsn3, http.StatusOK, 7, t)
 	testHandler(hcs, nsn4, http.StatusOK, 6, t)
+
+	// fake a temporary unhealthy proxy
+	proxyChecker.healthy = false
+	testHandlerWithHealth(hcs, nsn2, http.StatusServiceUnavailable, 0, false, t)
+	testHandlerWithHealth(hcs, nsn3, http.StatusServiceUnavailable, 7, false, t)
+	testHandlerWithHealth(hcs, nsn4, http.StatusServiceUnavailable, 6, false, t)
+
+	// fake a healthy proxy
+	proxyChecker.healthy = true
+	testHandlerWithHealth(hcs, nsn2, http.StatusServiceUnavailable, 0, true, t)
+	testHandlerWithHealth(hcs, nsn3, http.StatusOK, 7, true, t)
+	testHandlerWithHealth(hcs, nsn4, http.StatusOK, 6, true, t)
 }
 
 func testHandler(hcs *server, nsn types.NamespacedName, status int, endpoints int, t *testing.T) {
+	tHandler(hcs, nsn, status, endpoints, true, t)
+}
+
+func testHandlerWithHealth(hcs *server, nsn types.NamespacedName, status int, endpoints int, kubeProxyHealthy bool, t *testing.T) {
+	tHandler(hcs, nsn, status, endpoints, kubeProxyHealthy, t)
+}
+
+func tHandler(hcs *server, nsn types.NamespacedName, status int, endpoints int, kubeProxyHealthy bool, t *testing.T) {
 	instance := hcs.services[nsn]
 	for _, h := range instance.httpServers {
 		handler := h.(*fakeHTTPServer).handler
@@ -372,6 +408,9 @@ func testHandler(hcs *server, nsn types.NamespacedName, status int, endpoints in
 		}
 		if payload.LocalEndpoints != endpoints {
 			t.Errorf("expected %d endpoints, got %d", endpoints, payload.LocalEndpoints)
+		}
+		if payload.ServiceProxyHealthy != kubeProxyHealthy {
+			t.Errorf("expected %v kubeProxyHealthy, got %v", kubeProxyHealthy, payload.ServiceProxyHealthy)
 		}
 	}
 }
@@ -428,11 +467,13 @@ func testHealthzHandler(server httpServer, status int, t *testing.T) {
 func TestServerWithSelectiveListeningAddress(t *testing.T) {
 	listener := newFakeListener()
 	httpFactory := newFakeHTTPServerFactory()
+	proxyChecker := &fakeProxierHealthChecker{true}
 
 	// limiting addresses to loop back. We don't want any cleverness here around getting IP for
 	// machine nor testing ipv6 || ipv4. using loop back guarantees the test will work on any machine
+	nodePortAddresses := utilproxy.NewNodePortAddresses([]string{"127.0.0.0/8"})
 
-	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory, []string{"127.0.0.0/8"})
+	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory, nodePortAddresses, proxyChecker)
 	hcs := hcsi.(*server)
 	if len(hcs.services) != 0 {
 		t.Errorf("expected 0 services, got %d", len(hcs.services))

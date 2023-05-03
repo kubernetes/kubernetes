@@ -65,10 +65,10 @@ type Interface interface {
 	// care about such situations, this is a faster alternative to calling List()
 	// and scanning that output.
 	IsLikelyNotMountPoint(file string) (bool, error)
-	// canSafelySkipMountPointCheck indicates whether this mounter returns errors on
+	// CanSafelySkipMountPointCheck indicates whether this mounter returns errors on
 	// operations for targets that are not mount points. If this returns true, no such
 	// errors will be returned.
-	canSafelySkipMountPointCheck() bool
+	CanSafelySkipMountPointCheck() bool
 	// IsMountPoint determines if a directory is a mountpoint.
 	// It should return ErrNotExist when the directory does not exist.
 	// IsMountPoint is more expensive than IsLikelyNotMountPoint.
@@ -147,6 +147,37 @@ func NewMountError(mountErrorValue MountErrorType, format string, args ...interf
 type SafeFormatAndMount struct {
 	Interface
 	Exec utilexec.Interface
+
+	formatSem     chan any
+	formatTimeout time.Duration
+}
+
+func NewSafeFormatAndMount(mounter Interface, exec utilexec.Interface, opts ...Option) *SafeFormatAndMount {
+	res := &SafeFormatAndMount{
+		Interface: mounter,
+		Exec:      exec,
+	}
+	for _, opt := range opts {
+		opt(res)
+	}
+	return res
+}
+
+type Option func(*SafeFormatAndMount)
+
+// WithMaxConcurrentFormat sets the maximum number of concurrent format
+// operations executed by the mounter. The timeout controls the maximum
+// duration of a format operation before its concurrency token is released.
+// Once a token is released, it can be acquired by another concurrent format
+// operation. The original operation is allowed to complete.
+// If n < 1, concurrency is set to unlimited.
+func WithMaxConcurrentFormat(n int, timeout time.Duration) Option {
+	return func(mounter *SafeFormatAndMount) {
+		if n > 0 {
+			mounter.formatSem = make(chan any, n)
+			mounter.formatTimeout = timeout
+		}
+	}
 }
 
 // FormatAndMount formats the given disk, if needed, and mounts it.

@@ -23,6 +23,7 @@ import (
 	"net/url"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/apis/config"
@@ -34,7 +35,7 @@ const (
 	unsupportedSchemeErrFmt        = "unsupported scheme %q for KMS provider, only unix is supported"
 	unsupportedKMSAPIVersionErrFmt = "unsupported apiVersion %s for KMS provider, only v1 and v2 are supported"
 	atLeastOneRequiredErrFmt       = "at least one %s is required"
-	invalidURLErrFmt               = "invalid endpoint for kms provider, error: parse %s: net/url: invalid control character in URL"
+	invalidURLErrFmt               = "invalid endpoint for kms provider, error: %v"
 	mandatoryFieldErrFmt           = "%s is a mandatory field for a %s"
 	base64EncodingErr              = "secrets must be base64 encoded"
 	zeroOrNegativeErrFmt           = "%s should be a positive value"
@@ -42,6 +43,14 @@ const (
 	encryptionConfigNilErr         = "EncryptionConfiguration can't be nil"
 	invalidKMSConfigNameErrFmt     = "invalid KMS provider name %s, must not contain ':'"
 	duplicateKMSConfigNameErrFmt   = "duplicate KMS provider name %s, names must be unique"
+	eventsGroupErr                 = "'*.events.k8s.io' objects are stored using the 'events' API group in etcd. Use 'events' instead in the config file"
+	extensionsGroupErr             = "'extensions' group has been removed and cannot be used for encryption"
+	starResourceErr                = "use '*.' to encrypt all the resources from core API group or *.* to encrypt all resources"
+	overlapErr                     = "using overlapping resources such as 'secrets' and '*.' in the same resource list is not allowed as they will be masked"
+	nonRESTAPIResourceErr          = "resources which do not have REST API/s cannot be encrypted"
+	resourceNameErr                = "resource name should not contain capital letters"
+	resourceAcrossGroupErr         = "encrypting the same resource across groups is not supported"
+	duplicateResourceErr           = "the same resource cannot be specified multiple times"
 )
 
 var (
@@ -59,7 +68,7 @@ func ValidateEncryptionConfiguration(c *config.EncryptionConfiguration, reload b
 	allErrs := field.ErrorList{}
 
 	if c == nil {
-		allErrs = append(allErrs, field.Required(root, "EncryptionConfiguration can't be nil"))
+		allErrs = append(allErrs, field.Required(root, encryptionConfigNilErr))
 		return allErrs
 	}
 
@@ -77,6 +86,9 @@ func ValidateEncryptionConfiguration(c *config.EncryptionConfiguration, reload b
 		if len(conf.Resources) == 0 {
 			allErrs = append(allErrs, field.Required(r, fmt.Sprintf(atLeastOneRequiredErrFmt, r)))
 		}
+
+		allErrs = append(allErrs, validateResourceOverlap(conf.Resources, r)...)
+		allErrs = append(allErrs, validateResourceNames(conf.Resources, r)...)
 
 		if len(conf.Providers) == 0 {
 			allErrs = append(allErrs, field.Required(p, fmt.Sprintf(atLeastOneRequiredErrFmt, p)))
@@ -97,6 +109,175 @@ func ValidateEncryptionConfiguration(c *config.EncryptionConfiguration, reload b
 			case provider.Secretbox != nil:
 				allErrs = append(allErrs, validateKeys(provider.Secretbox.Keys, path.Child("secretbox").Child("keys"), secretBoxKeySizes)...)
 			}
+		}
+	}
+
+	return allErrs
+}
+
+var anyGroupAnyResource = schema.GroupResource{
+	Group:    "*",
+	Resource: "*",
+}
+
+func validateResourceOverlap(resources []string, fieldPath *field.Path) field.ErrorList {
+	if len(resources) < 2 { // cannot have overlap with a single resource
+		return nil
+	}
+
+	var allErrs field.ErrorList
+
+	r := make([]schema.GroupResource, 0, len(resources))
+	for _, resource := range resources {
+		r = append(r, schema.ParseGroupResource(resource))
+	}
+
+	var hasOverlap, hasDuplicate bool
+
+	for i, r1 := range r {
+		for j, r2 := range r {
+			if i == j {
+				continue
+			}
+
+			if r1 == r2 && !hasDuplicate {
+				hasDuplicate = true
+				continue
+			}
+
+			if hasOverlap {
+				continue
+			}
+
+			if r1 == anyGroupAnyResource {
+				hasOverlap = true
+				continue
+			}
+
+			if r1.Group != r2.Group {
+				continue
+			}
+
+			if r1.Resource == "*" || r2.Resource == "*" {
+				hasOverlap = true
+				continue
+			}
+		}
+	}
+
+	if hasDuplicate {
+		allErrs = append(
+			allErrs,
+			field.Invalid(
+				fieldPath,
+				resources,
+				duplicateResourceErr,
+			),
+		)
+	}
+
+	if hasOverlap {
+		allErrs = append(
+			allErrs,
+			field.Invalid(
+				fieldPath,
+				resources,
+				overlapErr,
+			),
+		)
+	}
+
+	return allErrs
+}
+
+func validateResourceNames(resources []string, fieldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	for j, res := range resources {
+		jj := fieldPath.Index(j)
+
+		// check if resource name has capital letters
+		if hasCapital(res) {
+			allErrs = append(
+				allErrs,
+				field.Invalid(
+					jj,
+					resources[j],
+					resourceNameErr,
+				),
+			)
+			continue
+		}
+
+		// check if resource is '*'
+		if res == "*" {
+			allErrs = append(
+				allErrs,
+				field.Invalid(
+					jj,
+					resources[j],
+					starResourceErr,
+				),
+			)
+			continue
+		}
+
+		// check if resource is:
+		// 'apiserveripinfo' OR
+		// 'serviceipallocations' OR
+		// 'servicenodeportallocations' OR
+		if res == "apiserveripinfo" ||
+			res == "serviceipallocations" ||
+			res == "servicenodeportallocations" {
+			allErrs = append(
+				allErrs,
+				field.Invalid(
+					jj,
+					resources[j],
+					nonRESTAPIResourceErr,
+				),
+			)
+			continue
+		}
+
+		// check if group is 'events.k8s.io'
+		gr := schema.ParseGroupResource(res)
+		if gr.Group == "events.k8s.io" {
+			allErrs = append(
+				allErrs,
+				field.Invalid(
+					jj,
+					resources[j],
+					eventsGroupErr,
+				),
+			)
+			continue
+		}
+
+		// check if group is 'extensions'
+		if gr.Group == "extensions" {
+			allErrs = append(
+				allErrs,
+				field.Invalid(
+					jj,
+					resources[j],
+					extensionsGroupErr,
+				),
+			)
+			continue
+		}
+
+		// disallow resource.* as encrypting the same resource across groups does not make sense
+		if gr.Group == "*" && gr.Resource != "*" {
+			allErrs = append(
+				allErrs,
+				field.Invalid(
+					jj,
+					resources[j],
+					resourceAcrossGroupErr,
+				),
+			)
+			continue
 		}
 	}
 
@@ -195,7 +376,13 @@ func validateKMSConfiguration(c *config.KMSConfiguration, fieldPath *field.Path,
 
 func validateKMSCacheSize(c *config.KMSConfiguration, fieldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if *c.CacheSize == 0 {
+
+	// In defaulting, we set the cache size to the default value only when API version is v1.
+	// So, for v2 API version, we expect the cache size field to be nil.
+	if c.APIVersion != "v1" && c.CacheSize != nil {
+		allErrs = append(allErrs, field.Invalid(fieldPath, *c.CacheSize, "cachesize is not supported in v2"))
+	}
+	if c.APIVersion == "v1" && *c.CacheSize == 0 {
 		allErrs = append(allErrs, field.Invalid(fieldPath, *c.CacheSize, fmt.Sprintf(nonZeroErrFmt, "cachesize")))
 	}
 
@@ -219,7 +406,7 @@ func validateKMSEndpoint(c *config.KMSConfiguration, fieldPath *field.Path) fiel
 
 	u, err := url.Parse(c.Endpoint)
 	if err != nil {
-		return append(allErrs, field.Invalid(fieldPath, c.Endpoint, fmt.Sprintf("invalid endpoint for kms provider, error: %v", err)))
+		return append(allErrs, field.Invalid(fieldPath, c.Endpoint, fmt.Sprintf(invalidURLErrFmt, err)))
 	}
 
 	if u.Scheme != "unix" {
@@ -258,4 +445,8 @@ func validateKMSConfigName(c *config.KMSConfiguration, fieldPath *field.Path, km
 	}
 
 	return allErrs
+}
+
+func hasCapital(input string) bool {
+	return strings.ToLower(input) != input
 }
