@@ -14,7 +14,7 @@ It provides a set of APIs to directly measure performance and behavior of your s
 | Signal  | Status     | Project |
 | ------- | ---------- | ------- |
 | Traces  | Stable     | N/A     |
-| Metrics | Alpha      | N/A     |
+| Metrics | Beta       | N/A     |
 | Logs    | Frozen [1] | N/A     |
 
 - [1]: The Logs signal development is halted for this project while we develop both Traces and Metrics.
@@ -50,21 +50,16 @@ Currently, this project supports the following environments.
 
 | OS      | Go Version | Architecture |
 | ------- | ---------- | ------------ |
+| Ubuntu  | 1.20       | amd64        |
 | Ubuntu  | 1.19       | amd64        |
-| Ubuntu  | 1.18       | amd64        |
-| Ubuntu  | 1.17       | amd64        |
+| Ubuntu  | 1.20       | 386          |
 | Ubuntu  | 1.19       | 386          |
-| Ubuntu  | 1.18       | 386          |
-| Ubuntu  | 1.17       | 386          |
+| MacOS   | 1.20       | amd64        |
 | MacOS   | 1.19       | amd64        |
-| MacOS   | 1.18       | amd64        |
-| MacOS   | 1.17       | amd64        |
+| Windows | 1.20       | amd64        |
 | Windows | 1.19       | amd64        |
-| Windows | 1.18       | amd64        |
-| Windows | 1.17       | amd64        |
+| Windows | 1.20       | 386          |
 | Windows | 1.19       | 386          |
-| Windows | 1.18       | 386          |
-| Windows | 1.17       | 386          |
 
 While this project should work for other systems, no compatibility guarantees
 are made for those systems currently.

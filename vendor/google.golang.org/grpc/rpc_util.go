@@ -25,7 +25,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 	"strings"
 	"sync"
@@ -77,7 +76,7 @@ func NewGZIPCompressorWithLevel(level int) (Compressor, error) {
 	return &gzipCompressor{
 		pool: sync.Pool{
 			New: func() interface{} {
-				w, err := gzip.NewWriterLevel(ioutil.Discard, level)
+				w, err := gzip.NewWriterLevel(io.Discard, level)
 				if err != nil {
 					panic(err)
 				}
@@ -143,7 +142,7 @@ func (d *gzipDecompressor) Do(r io.Reader) ([]byte, error) {
 		z.Close()
 		d.pool.Put(z)
 	}()
-	return ioutil.ReadAll(z)
+	return io.ReadAll(z)
 }
 
 func (d *gzipDecompressor) Type() string {
@@ -160,6 +159,7 @@ type callInfo struct {
 	contentSubtype        string
 	codec                 baseCodec
 	maxRetryRPCBufferSize int
+	onFinish              []func(err error)
 }
 
 func defaultCallInfo() *callInfo {
@@ -296,8 +296,44 @@ func (o FailFastCallOption) before(c *callInfo) error {
 }
 func (o FailFastCallOption) after(c *callInfo, attempt *csAttempt) {}
 
+// OnFinish returns a CallOption that configures a callback to be called when
+// the call completes. The error passed to the callback is the status of the
+// RPC, and may be nil. The onFinish callback provided will only be called once
+// by gRPC. This is mainly used to be used by streaming interceptors, to be
+// notified when the RPC completes along with information about the status of
+// the RPC.
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a
+// later release.
+func OnFinish(onFinish func(err error)) CallOption {
+	return OnFinishCallOption{
+		OnFinish: onFinish,
+	}
+}
+
+// OnFinishCallOption is CallOption that indicates a callback to be called when
+// the call completes.
+//
+// # Experimental
+//
+// Notice: This type is EXPERIMENTAL and may be changed or removed in a
+// later release.
+type OnFinishCallOption struct {
+	OnFinish func(error)
+}
+
+func (o OnFinishCallOption) before(c *callInfo) error {
+	c.onFinish = append(c.onFinish, o.OnFinish)
+	return nil
+}
+
+func (o OnFinishCallOption) after(c *callInfo, attempt *csAttempt) {}
+
 // MaxCallRecvMsgSize returns a CallOption which sets the maximum message size
-// in bytes the client can receive.
+// in bytes the client can receive. If this is not set, gRPC uses the default
+// 4MB.
 func MaxCallRecvMsgSize(bytes int) CallOption {
 	return MaxRecvMsgSizeCallOption{MaxRecvMsgSize: bytes}
 }
@@ -320,7 +356,8 @@ func (o MaxRecvMsgSizeCallOption) before(c *callInfo) error {
 func (o MaxRecvMsgSizeCallOption) after(c *callInfo, attempt *csAttempt) {}
 
 // MaxCallSendMsgSize returns a CallOption which sets the maximum message size
-// in bytes the client can send.
+// in bytes the client can send. If this is not set, gRPC uses the default
+// `math.MaxInt32`.
 func MaxCallSendMsgSize(bytes int) CallOption {
 	return MaxSendMsgSizeCallOption{MaxSendMsgSize: bytes}
 }
@@ -657,12 +694,13 @@ func msgHeader(data, compData []byte) (hdr []byte, payload []byte) {
 
 func outPayload(client bool, msg interface{}, data, payload []byte, t time.Time) *stats.OutPayload {
 	return &stats.OutPayload{
-		Client:     client,
-		Payload:    msg,
-		Data:       data,
-		Length:     len(data),
-		WireLength: len(payload) + headerLen,
-		SentTime:   t,
+		Client:           client,
+		Payload:          msg,
+		Data:             data,
+		Length:           len(data),
+		WireLength:       len(payload) + headerLen,
+		CompressedLength: len(payload),
+		SentTime:         t,
 	}
 }
 
@@ -683,7 +721,7 @@ func checkRecvPayload(pf payloadFormat, recvCompress string, haveCompressor bool
 }
 
 type payloadInfo struct {
-	wireLength        int // The compressed length got from wire.
+	compressedLength  int // The compressed length got from wire.
 	uncompressedBytes []byte
 }
 
@@ -693,7 +731,7 @@ func recvAndDecompress(p *parser, s *transport.Stream, dc Decompressor, maxRecei
 		return nil, err
 	}
 	if payInfo != nil {
-		payInfo.wireLength = len(d)
+		payInfo.compressedLength = len(d)
 	}
 
 	if st := checkRecvPayload(pf, s.RecvCompress(), compressor != nil || dc != nil); st != nil {
@@ -711,7 +749,7 @@ func recvAndDecompress(p *parser, s *transport.Stream, dc Decompressor, maxRecei
 			d, size, err = decompress(compressor, d, maxReceiveMessageSize)
 		}
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "grpc: failed to decompress the received message %v", err)
+			return nil, status.Errorf(codes.Internal, "grpc: failed to decompress the received message: %v", err)
 		}
 		if size > maxReceiveMessageSize {
 			// TODO: Revisit the error code. Currently keep it consistent with java
@@ -746,7 +784,7 @@ func decompress(compressor encoding.Compressor, d []byte, maxReceiveMessageSize 
 	}
 	// Read from LimitReader with limit max+1. So if the underlying
 	// reader is over limit, the result will be bigger than max.
-	d, err = ioutil.ReadAll(io.LimitReader(dcReader, int64(maxReceiveMessageSize)+1))
+	d, err = io.ReadAll(io.LimitReader(dcReader, int64(maxReceiveMessageSize)+1))
 	return d, len(d), err
 }
 
@@ -759,7 +797,7 @@ func recv(p *parser, c baseCodec, s *transport.Stream, dc Decompressor, m interf
 		return err
 	}
 	if err := c.Unmarshal(d, m); err != nil {
-		return status.Errorf(codes.Internal, "grpc: failed to unmarshal the received message %v", err)
+		return status.Errorf(codes.Internal, "grpc: failed to unmarshal the received message: %v", err)
 	}
 	if payInfo != nil {
 		payInfo.uncompressedBytes = d

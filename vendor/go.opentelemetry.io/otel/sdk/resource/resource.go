@@ -17,7 +17,6 @@ package resource // import "go.opentelemetry.io/otel/sdk/resource"
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 
 	"go.opentelemetry.io/otel"
@@ -51,17 +50,8 @@ func New(ctx context.Context, opts ...Option) (*Resource, error) {
 		cfg = opt.apply(cfg)
 	}
 
-	resource, err := Detect(ctx, cfg.detectors...)
-
-	var err2 error
-	resource, err2 = Merge(resource, &Resource{schemaURL: cfg.schemaURL})
-	if err == nil {
-		err = err2
-	} else if err2 != nil {
-		err = fmt.Errorf("detecting resources: %s", []string{err.Error(), err2.Error()})
-	}
-
-	return resource, err
+	r := &Resource{schemaURL: cfg.schemaURL}
+	return r, detect(ctx, r, cfg.detectors)
 }
 
 // NewWithAttributes creates a resource from attrs and associates the resource with a

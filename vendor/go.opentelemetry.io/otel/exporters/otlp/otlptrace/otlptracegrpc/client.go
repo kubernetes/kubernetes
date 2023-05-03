@@ -130,13 +130,16 @@ var errAlreadyStopped = errors.New("the client is already stopped")
 // If the client has already stopped, an error will be returned describing
 // this.
 func (c *client) Stop(ctx context.Context) error {
+	// Make sure to return context error if the context is done when calling this method.
+	err := ctx.Err()
+
 	// Acquire the c.tscMu lock within the ctx lifetime.
 	acquired := make(chan struct{})
 	go func() {
 		c.tscMu.Lock()
 		close(acquired)
 	}()
-	var err error
+
 	select {
 	case <-ctx.Done():
 		// The Stop timeout is reached. Kill any remaining exports to force
@@ -202,11 +205,12 @@ func (c *client) UploadTraces(ctx context.Context, protoSpans []*tracepb.Resourc
 			ResourceSpans: protoSpans,
 		})
 		if resp != nil && resp.PartialSuccess != nil {
-			otel.Handle(internal.PartialSuccessToError(
-				internal.TracingPartialSuccess,
-				resp.PartialSuccess.RejectedSpans,
-				resp.PartialSuccess.ErrorMessage,
-			))
+			msg := resp.PartialSuccess.GetErrorMessage()
+			n := resp.PartialSuccess.GetRejectedSpans()
+			if n != 0 || msg != "" {
+				err := internal.TracePartialSuccessError(n, msg)
+				otel.Handle(err)
+			}
 		}
 		// nil is converted to OK.
 		if status.Code(err) == codes.OK {

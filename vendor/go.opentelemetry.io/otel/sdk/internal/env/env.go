@@ -70,8 +70,8 @@ const (
 // returned.
 func firstInt(defaultValue int, keys ...string) int {
 	for _, key := range keys {
-		value, ok := os.LookupEnv(key)
-		if !ok {
+		value := os.Getenv(key)
+		if value == "" {
 			continue
 		}
 
@@ -88,10 +88,10 @@ func firstInt(defaultValue int, keys ...string) int {
 }
 
 // IntEnvOr returns the int value of the environment variable with name key if
-// it exists and the value is an int. Otherwise, defaultValue is returned.
+// it exists, it is not empty, and the value is an int. Otherwise, defaultValue is returned.
 func IntEnvOr(key string, defaultValue int) int {
-	value, ok := os.LookupEnv(key)
-	if !ok {
+	value := os.Getenv(key)
+	if value == "" {
 		return defaultValue
 	}
 
