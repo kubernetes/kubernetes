@@ -41,7 +41,7 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
-	"k8s.io/kube-scheduler/config/v1beta2"
+	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
@@ -60,7 +60,7 @@ const (
 var dataItemsDir = flag.String("data-items-dir", "", "destination directory for storing generated data items for perf dashboard")
 
 func newDefaultComponentConfig() (*config.KubeSchedulerConfiguration, error) {
-	gvk := v1beta2.SchemeGroupVersion.WithKind("KubeSchedulerConfiguration")
+	gvk := kubeschedulerconfigv1.SchemeGroupVersion.WithKind("KubeSchedulerConfiguration")
 	cfg := config.KubeSchedulerConfiguration{}
 	_, _, err := kubeschedulerscheme.Codecs.UniversalDecoder().Decode(nil, &gvk, &cfg)
 	if err != nil {
