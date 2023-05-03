@@ -111,6 +111,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 						"RSSBytes":        bounded(1*e2evolume.Mb, memoryLimit),
 						"PageFaults":      bounded(1000, 1e9),
 						"MajorPageFaults": bounded(0, 100000),
+						"SwapBytes":       bounded(0, memoryLimit),
 					}),
 					"Accelerators":       gomega.BeEmpty(),
 					"Rootfs":             gomega.BeNil(),
@@ -137,6 +138,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 				"RSSBytes":        bounded(1*e2evolume.Kb, memoryLimit),
 				"PageFaults":      bounded(0, expectedPageFaultsUpperBound),
 				"MajorPageFaults": bounded(0, expectedMajorPageFaultsUpperBound),
+				"SwapBytes":       bounded(0, memoryLimit),
 			})
 			runtimeContExpectations := sysContExpectations().(*gstruct.FieldsMatcher)
 			systemContainers := gstruct.Elements{
@@ -158,6 +160,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 					"RSSBytes":        bounded(100*e2evolume.Kb, memoryLimit),
 					"PageFaults":      bounded(1000, 1e9),
 					"MajorPageFaults": bounded(0, 100000),
+					"SwapBytes":       bounded(0, memoryLimit),
 				})
 				systemContainers["misc"] = miscContExpectations
 			}
@@ -182,6 +185,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 							"RSSBytes":        bounded(1*e2evolume.Kb, 80*e2evolume.Mb),
 							"PageFaults":      bounded(100, expectedPageFaultsUpperBound),
 							"MajorPageFaults": bounded(0, expectedMajorPageFaultsUpperBound),
+							"SwapBytes":       bounded(1*e2evolume.Kb, 80*e2evolume.Mb),
 						}),
 						"Accelerators": gomega.BeEmpty(),
 						"Rootfs": ptrMatchAllFields(gstruct.Fields{
@@ -229,6 +233,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 					"RSSBytes":        bounded(1*e2evolume.Kb, 80*e2evolume.Mb),
 					"PageFaults":      bounded(0, expectedPageFaultsUpperBound),
 					"MajorPageFaults": bounded(0, expectedMajorPageFaultsUpperBound),
+					"SwapBytes":       bounded(0, expectedPageFaultsUpperBound),
 				}),
 				"VolumeStats": gstruct.MatchAllElements(summaryObjectID, gstruct.Elements{
 					"test-empty-dir": gstruct.MatchAllFields(gstruct.Fields{
@@ -279,6 +284,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 						"RSSBytes":        bounded(1*e2evolume.Kb, memoryLimit),
 						"PageFaults":      bounded(1000, 1e9),
 						"MajorPageFaults": bounded(0, 100000),
+						"SwapBytes":       bounded(0, memoryLimit),
 					}),
 					// TODO(#28407): Handle non-eth0 network interface names.
 					"Network": ptrMatchAllFields(gstruct.Fields{
