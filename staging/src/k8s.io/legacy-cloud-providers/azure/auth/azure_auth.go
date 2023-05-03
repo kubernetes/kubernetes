@@ -20,7 +20,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strings"
 
 	"github.com/Azure/go-autorest/autorest/adal"
@@ -124,7 +124,7 @@ func GetServicePrincipalToken(config *AzureAuthConfig, env *azure.Environment) (
 
 	if len(config.AADClientCertPath) > 0 && len(config.AADClientCertPassword) > 0 {
 		klog.V(2).Infoln("azure: using jwt client_assertion (client_cert+client_private_key) to retrieve access token")
-		certData, err := ioutil.ReadFile(config.AADClientCertPath)
+		certData, err := os.ReadFile(config.AADClientCertPath)
 		if err != nil {
 			return nil, fmt.Errorf("reading the client certificate from file %s: %v", config.AADClientCertPath, err)
 		}
