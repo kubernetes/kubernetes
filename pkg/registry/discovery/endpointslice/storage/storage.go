@@ -52,3 +52,8 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	}
 	return &REST{store}, nil
 }
+
+// ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
+func (r *REST) ShortNames() []string {
+	return []string{"eps"}
+}
