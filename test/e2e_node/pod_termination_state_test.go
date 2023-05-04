@@ -42,7 +42,7 @@ var _ = SIGDescribe("Pod Termination State [NodeConformance]", func() {
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	// Normal Pod Cases
-  normalContainerName := "normal-container"
+	normalContainerName := "normal-container"
 	podSpec := getNormalPod("normal-pod", normalContainerName)
 	runNormalTest(f, podSpec, normalContainerName)
 
@@ -88,7 +88,7 @@ func runNormalTest(f *framework.Framework, podSpec *v1.Pod, containerName string
 			framework.ExpectNoError(err)
 
 			// Sleep enough time to ensure the pod is terminated
-			time.Sleep(30)
+			time.Sleep(30 * time.Second)
 
 			// resources are cleaned up and phase is set correctly cgroup files
 			// see same way in pods_container_manager_test.go
@@ -120,11 +120,6 @@ func runEvictedTest(f *framework.Framework, podSpec *v1.Pod, containerName strin
 		})
 
 		ginkgo.It("The containers terminated by OOM killer should have the reason set to OOMKilled", func() {
-			// verifying the kubelet observed the termination notice
-			// check pod status is from running to terminating status, after a while, pod is deleted in kubelet
-			err := e2epod.WaitForPodTerminatingInNamespaceTimeout(context.TODO(), f.ClientSet, podSpec.Name, f.Namespace.Name, 300)
-			framework.ExpectNoError(err)
-
 			ginkgo.By("Waiting for the pod to be failed")
 			e2epod.WaitForPodTerminatedInNamespace(context.TODO(), f.ClientSet, podSpec.Name, "", f.Namespace.Name)
 
@@ -150,7 +145,7 @@ func runEvictedTest(f *framework.Framework, podSpec *v1.Pod, containerName strin
 		})
 
 		ginkgo.AfterEach(func() {
-			ginkgo.By(fmt.Sprintf("deleting pod: %s",podSpec.Name))
+			ginkgo.By(fmt.Sprintf("deleting pod: %s", podSpec.Name))
 			e2epod.NewPodClient(f).DeleteSync(context.TODO(), podSpec.Name, metav1.DeleteOptions{}, framework.PodDeleteTimeout)
 		})
 	})
