@@ -106,6 +106,9 @@ func hasGVKExtensionV3(extensions spec.Extensions, gvk schema.GroupVersionKind) 
 // the PATCH end-point. Returns true if the query param is supported by the
 // spec for the passed GVK; false otherwise.
 func supportsQueryParamV3(doc *spec3.OpenAPI, gvk schema.GroupVersionKind, queryParam VerifiableQueryParam) bool {
+	if doc == nil || doc.Paths == nil {
+		return false
+	}
 	for _, path := range doc.Paths.Paths {
 		// If operation is not PATCH, then continue.
 		op := path.PathProps.Patch
