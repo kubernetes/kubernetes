@@ -1105,6 +1105,51 @@ func TestPodEvaluatorUsageResourceResize(t *testing.T) {
 	}
 }
 
+func BenchmarkPodMatchesScopeFunc(b *testing.B) {
+	pod, _ := toExternalPodOrError(makePod("p1", "high-priority",
+		api.ResourceList{api.ResourceCPU: resource.MustParse("1")}, api.PodRunning))
+
+	tests := []struct {
+		name     string
+		selector corev1.ScopedResourceSelectorRequirement
+	}{
+		{
+			name: "PriorityClass selector w/o operator",
+			selector: corev1.ScopedResourceSelectorRequirement{
+				ScopeName: corev1.ResourceQuotaScopePriorityClass,
+			},
+		},
+		{
+			name: "PriorityClass selector w/ 'Exists' operator",
+			selector: corev1.ScopedResourceSelectorRequirement{
+				ScopeName: corev1.ResourceQuotaScopePriorityClass,
+				Operator:  corev1.ScopeSelectorOpExists,
+			},
+		},
+		{
+			name: "BestEfforts selector w/o operator",
+			selector: corev1.ScopedResourceSelectorRequirement{
+				ScopeName: corev1.ResourceQuotaScopeBestEffort,
+			},
+		},
+		{
+			name: "BestEfforts selector w/ 'Exists' operator",
+			selector: corev1.ScopedResourceSelectorRequirement{
+				ScopeName: corev1.ResourceQuotaScopeBestEffort,
+				Operator:  corev1.ScopeSelectorOpExists,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		b.Run(tt.name, func(b *testing.B) {
+			for n := 0; n < b.N; n++ {
+				_, _ = podMatchesScopeFunc(tt.selector, pod)
+			}
+		})
+	}
+}
+
 func mockListerForResourceFunc(listerForResource map[schema.GroupVersionResource]cache.GenericLister) quota.ListerForResourceFunc {
 	return func(gvr schema.GroupVersionResource) (cache.GenericLister, error) {
 		lister, found := listerForResource[gvr]
