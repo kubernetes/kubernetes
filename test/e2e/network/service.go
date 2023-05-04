@@ -1020,7 +1020,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 		ginkgo.By("creating a TCP service " + serviceName + " with type=ClusterIP in namespace " + ns)
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
-		jig.ExternalIPs = true
+		jig.ExternalIPs = false
 		servicePort := 8080
 		tcpService, err := jig.CreateTCPServiceWithPort(ctx, nil, int32(servicePort))
 		framework.ExpectNoError(err)
@@ -1090,7 +1090,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 		ginkgo.By("creating a TCP service " + serviceName + " with type=ClusterIP in namespace " + ns)
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
-		jig.ExternalIPs = true
+		jig.ExternalIPs = false
 		servicePort := 8080
 		svc, err := jig.CreateTCPServiceWithPort(ctx, nil, int32(servicePort))
 		framework.ExpectNoError(err)
@@ -1312,7 +1312,7 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
-		jig.ExternalIPs = true
+		jig.ExternalIPs = false
 
 		ginkgo.By("creating service " + serviceName + " with type=clusterIP in namespace " + ns)
 		clusterIPService, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
@@ -1344,7 +1344,7 @@ var _ = common.SIGDescribe("Services", func() {
 		serviceName := "nodeport-update-service"
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
-		jig.ExternalIPs = true
+		jig.ExternalIPs = false
 
 		ginkgo.By("creating a TCP service " + serviceName + " with type=ClusterIP in namespace " + ns)
 		tcpService, err := jig.CreateTCPService(ctx, nil)
