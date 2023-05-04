@@ -653,6 +653,7 @@ const (
 	// kep: https://kep.k8s.io/1669
 	// alpha: v1.22
 	// beta: v1.26
+	// GA: v1.28
 	//
 	// Enable kube-proxy to handle terminating ednpoints when externalTrafficPolicy=Local
 	ProxyTerminatingEndpoints featuregate.Feature = "ProxyTerminatingEndpoints"
@@ -1035,7 +1036,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	ProcMountType: {Default: false, PreRelease: featuregate.Alpha},
 
-	ProxyTerminatingEndpoints: {Default: true, PreRelease: featuregate.Beta},
+	ProxyTerminatingEndpoints: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.30
 
 	QOSReserved: {Default: false, PreRelease: featuregate.Alpha},
 
