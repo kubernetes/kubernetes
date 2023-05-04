@@ -131,9 +131,8 @@ func (v *ConfigValidator) cgroupnamespace(config *configs.Config) error {
 // convertSysctlVariableToDotsSeparator can return sysctl variables in dots separator format.
 // The '/' separator is also accepted in place of a '.'.
 // Convert the sysctl variables to dots separator format for validation.
-// More info:
-//   https://man7.org/linux/man-pages/man8/sysctl.8.html
-//   https://man7.org/linux/man-pages/man5/sysctl.d.5.html
+// More info: sysctl(8), sysctl.d(5).
+//
 // For example:
 // Input sysctl variable "net/ipv4/conf/eno2.100.rp_filter"
 // will return the converted value "net.ipv4.conf.eno2/100.rp_filter"
