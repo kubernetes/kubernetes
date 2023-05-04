@@ -57,6 +57,9 @@ var _ = SIGDescribe("Services", func() {
 		ginkgo.By("creating service " + serviceName + " with type=NodePort in namespace " + ns)
 		svc, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeNodePort
+			// port 47001 is typically used by the System (PID 4), and thus, we shouldn't be able to use it as a NodePort.
+			// See: https://github.com/kubernetes/kubernetes/issues/107114#issuecomment-1208116303
+			svc.Spec.Ports[0].NodePort = 47001
 		})
 		framework.ExpectNoError(err)
 
