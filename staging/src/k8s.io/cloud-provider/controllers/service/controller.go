@@ -659,16 +659,20 @@ func nodeNames(nodes []*v1.Node) sets.String {
 
 func shouldSyncUpdatedNode(oldNode, newNode *v1.Node) bool {
 	// Evaluate the individual node exclusion predicate before evaluating the
-	// compounded result of all predicates. We don't sync ETP=local services
-	// for changes on the readiness condition, hence if a node remains NotReady
-	// and a user adds the exclusion label we will need to sync as to make sure
-	// this change is reflected correctly on ETP=local services. The sync
-	// function compares lastSyncedNodes with the new (existing) set of nodes
-	// for each service, so services which are synced with the same set of nodes
-	// should be skipped internally in the sync function. This is needed as to
-	// trigger a global sync for all services and make sure no service gets
-	// skipped due to a changing node predicate.
+	// compounded result of all predicates. We don't sync changes on the
+	// readiness condition for eTP:Local services is enabled, hence if a node
+	// remains NotReady and a user adds the exclusion label we will need to sync
+	// as to make sure this change is reflected correctly on ETP=local services.
+	// The sync function compares lastSyncedNodes with the new (existing) set of
+	// nodes for each service, so services which are synced with the same set of
+	// nodes should be skipped internally in the sync function. This is needed
+	// as to trigger a global sync for all services and make sure no service
+	// gets skipped due to a changing node predicate.
 	if respectsPredicates(oldNode, nodeIncludedPredicate) != respectsPredicates(newNode, nodeIncludedPredicate) {
+		return true
+	}
+	// For the same reason as above, also check for changes to the providerID
+	if respectsPredicates(oldNode, nodeHasProviderIDPredicate) != respectsPredicates(newNode, nodeHasProviderIDPredicate) {
 		return true
 	}
 	return respectsPredicates(oldNode, allNodePredicates...) != respectsPredicates(newNode, allNodePredicates...)
@@ -927,10 +931,12 @@ var (
 		nodeIncludedPredicate,
 		nodeUnTaintedPredicate,
 		nodeReadyPredicate,
+		nodeHasProviderIDPredicate,
 	}
 	etpLocalNodePredicates []NodeConditionPredicate = []NodeConditionPredicate{
 		nodeIncludedPredicate,
 		nodeUnTaintedPredicate,
+		nodeHasProviderIDPredicate,
 	}
 )
 
@@ -945,6 +951,10 @@ func getNodePredicatesForService(service *v1.Service) []NodeConditionPredicate {
 func nodeIncludedPredicate(node *v1.Node) bool {
 	_, hasExcludeBalancerLabel := node.Labels[v1.LabelNodeExcludeBalancers]
 	return !hasExcludeBalancerLabel
+}
+
+func nodeHasProviderIDPredicate(node *v1.Node) bool {
+	return node.Spec.ProviderID != ""
 }
 
 // We consider the node for load balancing only when its not tainted for deletion by the cluster autoscaler.
