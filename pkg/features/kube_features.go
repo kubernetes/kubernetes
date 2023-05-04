@@ -1108,8 +1108,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	genericfeatures.CustomResourceValidationExpressions: {Default: true, PreRelease: featuregate.Beta},
 
-	genericfeatures.DryRun: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
-
 	genericfeatures.OpenAPIEnums: {Default: true, PreRelease: featuregate.Beta},
 
 	genericfeatures.OpenAPIV3: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
