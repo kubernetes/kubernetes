@@ -205,10 +205,22 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.config.DetectLocal.InterfaceNamePrefix, "pod-interface-name-prefix", o.config.DetectLocal.InterfaceNamePrefix, "An interface prefix in the cluster. Kube-proxy considers traffic as local if originating from interfaces that match the given prefix. This argument should be set if DetectLocalMode is set to InterfaceNamePrefix.")
 }
 
+// newKubeProxyConfiguration returns a KubeProxyConfiguration with default values
+func newKubeProxyConfiguration() *kubeproxyconfig.KubeProxyConfiguration {
+	versionedConfig := &v1alpha1.KubeProxyConfiguration{}
+	proxyconfigscheme.Scheme.Default(versionedConfig)
+	internalConfig, err := proxyconfigscheme.Scheme.ConvertToVersion(versionedConfig, kubeproxyconfig.SchemeGroupVersion)
+	if err != nil {
+		panic(fmt.Sprintf("Unable to create default config: %v", err))
+	}
+
+	return internalConfig.(*kubeproxyconfig.KubeProxyConfiguration)
+}
+
 // NewOptions returns initialized Options
 func NewOptions() *Options {
 	return &Options{
-		config:      new(kubeproxyconfig.KubeProxyConfiguration),
+		config:      newKubeProxyConfiguration(),
 		healthzPort: ports.ProxyHealthzPort,
 		metricsPort: ports.ProxyStatusPort,
 		errCh:       make(chan error),
@@ -438,25 +450,6 @@ func (o *Options) loadConfig(data []byte) (*kubeproxyconfig.KubeProxyConfigurati
 	return proxyConfig, nil
 }
 
-// ApplyDefaults applies the default values to Options.
-func (o *Options) ApplyDefaults(in *kubeproxyconfig.KubeProxyConfiguration) (*kubeproxyconfig.KubeProxyConfiguration, error) {
-	external, err := proxyconfigscheme.Scheme.ConvertToVersion(in, v1alpha1.SchemeGroupVersion)
-	if err != nil {
-		return nil, err
-	}
-
-	proxyconfigscheme.Scheme.Default(external)
-
-	internal, err := proxyconfigscheme.Scheme.ConvertToVersion(external, kubeproxyconfig.SchemeGroupVersion)
-	if err != nil {
-		return nil, err
-	}
-
-	out := internal.(*kubeproxyconfig.KubeProxyConfiguration)
-
-	return out, nil
-}
-
 // NewProxyCommand creates a *cobra.Command object with default parameters
 func NewProxyCommand() *cobra.Command {
 	opts := NewOptions()
@@ -502,14 +495,6 @@ with the apiserver API to configure the proxy.`,
 			}
 			return nil
 		},
-	}
-
-	var err error
-	opts.config, err = opts.ApplyDefaults(opts.config)
-	if err != nil {
-		klog.ErrorS(err, "Unable to create flag defaults")
-		// ACTION REQUIRED: Exit code changed from 255 to 1
-		os.Exit(1)
 	}
 
 	fs := cmd.Flags()
