@@ -59,13 +59,14 @@ type TestServerSetup struct {
 type TearDownFunc func()
 
 // StartTestServer runs a kube-apiserver, optionally calling out to the setup.ModifyServerRunOptions and setup.ModifyServerConfig functions
-func StartTestServer(t testing.TB, setup TestServerSetup) (client.Interface, *rest.Config, TearDownFunc) {
+func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (client.Interface, *rest.Config, TearDownFunc) {
+	ctx, cancel := context.WithCancel(ctx)
+
 	certDir, err := os.MkdirTemp("", "test-integration-"+strings.ReplaceAll(t.Name(), "/", "_"))
 	if err != nil {
 		t.Fatalf("Couldn't create temp dir: %v", err)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
 	var errCh chan error
 	tearDownFn := func() {
 		// Calling cancel function is stopping apiserver and cleaning up

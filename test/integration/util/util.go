@@ -58,6 +58,7 @@ import (
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/test/integration/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/pointer"
 )
 
@@ -143,15 +144,22 @@ func StartFakePVController(ctx context.Context, clientSet clientset.Interface) {
 
 // TestContext store necessary context info
 type TestContext struct {
-	CloseFn            framework.TearDownFunc
 	NS                 *v1.Namespace
 	ClientSet          clientset.Interface
 	KubeConfig         *restclient.Config
 	InformerFactory    informers.SharedInformerFactory
 	DynInformerFactory dynamicinformer.DynamicSharedInformerFactory
 	Scheduler          *scheduler.Scheduler
-	Ctx                context.Context
-	CancelFn           context.CancelFunc
+	// This is the top context when initializing the test environment.
+	Ctx context.Context
+	// CloseFn will stop the apiserver and clean up the resources
+	// after itself, including shutting down its storage layer.
+	CloseFn framework.TearDownFunc
+	// This is the context when initializing scheduler.
+	SchedulerCtx context.Context
+	// SchedulerCloseFn will tear down the resources in creating scheduler,
+	// including the scheduler itself.
+	SchedulerCloseFn framework.TearDownFunc
 }
 
 // CleanupNodes cleans all nodes which were created during integration test
@@ -163,9 +171,9 @@ func CleanupNodes(cs clientset.Interface, t *testing.T) {
 }
 
 // PodDeleted returns true if a pod is not found in the given namespace.
-func PodDeleted(c clientset.Interface, podNamespace, podName string) wait.ConditionFunc {
-	return func() (bool, error) {
-		pod, err := c.CoreV1().Pods(podNamespace).Get(context.TODO(), podName, metav1.GetOptions{})
+func PodDeleted(ctx context.Context, c clientset.Interface, podNamespace, podName string) wait.ConditionWithContextFunc {
+	return func(context.Context) (bool, error) {
+		pod, err := c.CoreV1().Pods(podNamespace).Get(ctx, podName, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return true, nil
 		}
@@ -176,25 +184,37 @@ func PodDeleted(c clientset.Interface, podNamespace, podName string) wait.Condit
 	}
 }
 
-// SyncInformerFactory starts informer and waits for caches to be synced
-func SyncInformerFactory(testCtx *TestContext) {
-	testCtx.InformerFactory.Start(testCtx.Ctx.Done())
-	if testCtx.DynInformerFactory != nil {
-		testCtx.DynInformerFactory.Start(testCtx.Ctx.Done())
+// PodsCleanedUp returns true if all pods are deleted in the specific namespace.
+func PodsCleanedUp(ctx context.Context, c clientset.Interface, namespace string) wait.ConditionWithContextFunc {
+	return func(context.Context) (bool, error) {
+		list, err := c.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return false, err
+		}
+		return len(list.Items) == 0, nil
 	}
-	testCtx.InformerFactory.WaitForCacheSync(testCtx.Ctx.Done())
+}
+
+// SyncSchedulerInformerFactory starts informer and waits for caches to be synced
+func SyncSchedulerInformerFactory(testCtx *TestContext) {
+	testCtx.InformerFactory.Start(testCtx.SchedulerCtx.Done())
 	if testCtx.DynInformerFactory != nil {
-		testCtx.DynInformerFactory.WaitForCacheSync(testCtx.Ctx.Done())
+		testCtx.DynInformerFactory.Start(testCtx.SchedulerCtx.Done())
+	}
+	testCtx.InformerFactory.WaitForCacheSync(testCtx.SchedulerCtx.Done())
+	if testCtx.DynInformerFactory != nil {
+		testCtx.DynInformerFactory.WaitForCacheSync(testCtx.SchedulerCtx.Done())
 	}
 }
 
 // CleanupTest cleans related resources which were created during integration test
 func CleanupTest(t *testing.T, testCtx *TestContext) {
-	// Kill the scheduler.
-	testCtx.CancelFn()
-	// Cleanup nodes.
-	testCtx.ClientSet.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
+	// Cleanup nodes and namespaces.
+	if err := testCtx.ClientSet.CoreV1().Nodes().DeleteCollection(testCtx.Ctx, *metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
+		t.Errorf("error while cleaning up nodes, error: %v", err)
+	}
 	framework.DeleteNamespaceOrDie(testCtx.ClientSet, testCtx.NS, t)
+	// Terminate the scheduler and apiserver.
 	testCtx.CloseFn()
 }
 
@@ -215,16 +235,16 @@ func RemovePodFinalizers(cs clientset.Interface, t *testing.T, pods []*v1.Pod) {
 }
 
 // CleanupPods deletes the given pods and waits for them to be actually deleted.
-func CleanupPods(cs clientset.Interface, t *testing.T, pods []*v1.Pod) {
+func CleanupPods(ctx context.Context, cs clientset.Interface, t *testing.T, pods []*v1.Pod) {
 	for _, p := range pods {
-		err := cs.CoreV1().Pods(p.Namespace).Delete(context.TODO(), p.Name, *metav1.NewDeleteOptions(0))
+		err := cs.CoreV1().Pods(p.Namespace).Delete(ctx, p.Name, *metav1.NewDeleteOptions(0))
 		if err != nil && !apierrors.IsNotFound(err) {
 			t.Errorf("error while deleting pod %v/%v: %v", p.Namespace, p.Name, err)
 		}
 	}
 	for _, p := range pods {
-		if err := wait.Poll(time.Millisecond, wait.ForeverTestTimeout,
-			PodDeleted(cs, p.Namespace, p.Name)); err != nil {
+		if err := wait.PollUntilContextTimeout(ctx, time.Duration(time.Microsecond.Seconds()), wait.ForeverTestTimeout, true,
+			PodDeleted(ctx, cs, p.Namespace, p.Name)); err != nil {
 			t.Errorf("error while waiting for pod  %v/%v to get deleted: %v", p.Namespace, p.Name, err)
 		}
 	}
@@ -330,14 +350,14 @@ func UpdateNodeStatus(cs clientset.Interface, node *v1.Node) error {
 
 // InitTestAPIServer initializes a test environment and creates an API server with default
 // configuration.
+// It registers cleanup functions to t.Cleanup(), they will be called when the test completes,
+// no need to do this again.
 func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interface) *TestContext {
-	ctx, cancelFunc := context.WithCancel(context.Background())
-	testCtx := TestContext{
-		Ctx:      ctx,
-		CancelFn: cancelFunc,
-	}
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	testCtx := TestContext{Ctx: ctx}
 
-	testCtx.ClientSet, testCtx.KubeConfig, testCtx.CloseFn = framework.StartTestServer(t, framework.TestServerSetup{
+	testCtx.ClientSet, testCtx.KubeConfig, testCtx.CloseFn = framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(options *options.ServerRunOptions) {
 			options.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition", "Priority", "StorageObjectInUseProtection"}
 		},
@@ -348,11 +368,21 @@ func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interf
 		},
 	})
 
+	oldCloseFn := testCtx.CloseFn
+	testCtx.CloseFn = func() {
+		cancel()
+		oldCloseFn()
+	}
+
 	if nsPrefix != "default" {
 		testCtx.NS = framework.CreateNamespaceOrDie(testCtx.ClientSet, nsPrefix+string(uuid.NewUUID()), t)
 	} else {
 		testCtx.NS = framework.CreateNamespaceOrDie(testCtx.ClientSet, "default", t)
 	}
+
+	t.Cleanup(func() {
+		CleanupTest(t, &testCtx)
+	})
 
 	return &testCtx
 }
@@ -388,6 +418,9 @@ func InitTestSchedulerWithOptions(
 	resyncPeriod time.Duration,
 	opts ...scheduler.Option,
 ) *TestContext {
+	ctx, cancel := context.WithCancel(testCtx.Ctx)
+	testCtx.SchedulerCtx = ctx
+
 	// 1. Create scheduler
 	testCtx.InformerFactory = scheduler.NewInformerFactory(testCtx.ClientSet, resyncPeriod)
 	if testCtx.KubeConfig != nil {
@@ -406,7 +439,7 @@ func InitTestSchedulerWithOptions(
 		testCtx.InformerFactory,
 		testCtx.DynInformerFactory,
 		profile.NewRecorderFactory(eventBroadcaster),
-		testCtx.Ctx.Done(),
+		ctx.Done(),
 		opts...,
 	)
 
@@ -414,13 +447,19 @@ func InitTestSchedulerWithOptions(
 		t.Fatalf("Couldn't create scheduler: %v", err)
 	}
 
-	eventBroadcaster.StartRecordingToSink(testCtx.Ctx.Done())
+	eventBroadcaster.StartRecordingToSink(ctx.Done())
 
 	oldCloseFn := testCtx.CloseFn
 	testCtx.CloseFn = func() {
 		oldCloseFn()
 		eventBroadcaster.Shutdown()
 	}
+
+	testCtx.SchedulerCloseFn = func() {
+		cancel()
+		eventBroadcaster.Shutdown()
+	}
+
 	return testCtx
 }
 
@@ -488,8 +527,8 @@ func InitDisruptionController(t *testing.T, testCtx *TestContext) *disruption.Di
 // configuration.
 func InitTestSchedulerWithNS(t *testing.T, nsPrefix string, opts ...scheduler.Option) *TestContext {
 	testCtx := InitTestSchedulerWithOptions(t, InitTestAPIServer(t, nsPrefix, nil), 0, opts...)
-	SyncInformerFactory(testCtx)
-	go testCtx.Scheduler.Run(testCtx.Ctx)
+	SyncSchedulerInformerFactory(testCtx)
+	go testCtx.Scheduler.Run(testCtx.SchedulerCtx)
 	return testCtx
 }
 
@@ -512,8 +551,8 @@ func InitTestDisablePreemption(t *testing.T, nsPrefix string) *TestContext {
 		t, InitTestAPIServer(t, nsPrefix, nil),
 		0,
 		scheduler.WithProfiles(cfg.Profiles...))
-	SyncInformerFactory(testCtx)
-	go testCtx.Scheduler.Run(testCtx.Ctx)
+	SyncSchedulerInformerFactory(testCtx)
+	go testCtx.Scheduler.Run(testCtx.SchedulerCtx)
 	return testCtx
 }
 

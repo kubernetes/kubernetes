@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestDynamicClientBuilder(t *testing.T) {
@@ -51,7 +52,11 @@ func TestDynamicClientBuilder(t *testing.T) {
 		t.Fatalf("parse duration failed: %v", err)
 	}
 
-	baseClient, baseConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	baseClient, baseConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.ServiceAccountSigningKeyFile = tmpfile.Name()
 			opts.ServiceAccountTokenMaxExpiration = maxExpirationDuration
@@ -95,7 +100,7 @@ func TestDynamicClientBuilder(t *testing.T) {
 
 	// We want to trigger token rotation here by deleting service account
 	// the dynamic client was using.
-	if err = dymClient.CoreV1().ServiceAccounts(ns).Delete(context.TODO(), saName, metav1.DeleteOptions{}); err != nil {
+	if err = dymClient.CoreV1().ServiceAccounts(ns).Delete(ctx, saName, metav1.DeleteOptions{}); err != nil {
 		t.Fatalf("delete service account %s failed: %v", saName, err)
 	}
 	time.Sleep(time.Second * 10)

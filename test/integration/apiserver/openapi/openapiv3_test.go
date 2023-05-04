@@ -41,13 +41,18 @@ import (
 	"k8s.io/kube-openapi/pkg/spec3"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"sigs.k8s.io/yaml"
 )
 
 func TestOpenAPIV3SpecRoundTrip(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.OpenAPIV3, true)()
 
-	_, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{})
+	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{})
 	defer tearDownFn()
 
 	paths := []string{
@@ -189,9 +194,14 @@ func TestOpenAPIV3ProtoRoundtrip(t *testing.T) {
 	// The OpenAPI V3 proto library strips fields that are sibling elements to $ref
 	// See https://github.com/kubernetes/kubernetes/issues/106387 for more details
 	t.Skip("Skipping OpenAPI V3 Proto roundtrip test")
+
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.OpenAPIV3, true)()
 
-	_, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{})
+	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{})
 	defer tearDownFn()
 
 	rt, err := restclient.TransportFor(kubeConfig)

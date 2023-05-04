@@ -17,7 +17,6 @@ limitations under the License.
 package apiserver
 
 import (
-	"context"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -37,7 +36,7 @@ import (
 
 // Tests that the apiserver retries patches
 func TestPatchConflicts(t *testing.T) {
-	clientSet, _, tearDownFn := setup(t)
+	ctx, clientSet, _, tearDownFn := setup(t)
 	defer tearDownFn()
 
 	ns := framework.CreateNamespaceOrDie(clientSet, "status-code", t)
@@ -66,7 +65,7 @@ func TestPatchConflicts(t *testing.T) {
 	}
 
 	// Create the object we're going to conflict on
-	_, err := clientSet.CoreV1().Secrets(ns.Name).Create(context.TODO(), secret, metav1.CreateOptions{})
+	_, err := clientSet.CoreV1().Secrets(ns.Name).Create(ctx, secret, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +88,7 @@ func TestPatchConflicts(t *testing.T) {
 				Resource("secrets").
 				Name("test").
 				Body([]byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}, "ownerReferences":[{"$patch":"delete","uid":"%s"}]}}`, labelName, value, UIDs[i]))).
-				Do(context.TODO()).
+				Do(ctx).
 				Get()
 
 			if apierrors.IsConflict(err) {
@@ -143,7 +142,7 @@ func findOwnerRefByUID(ownerRefs []metav1.OwnerReference, uid types.UID) bool {
 // with an empty slice is handled property
 // https://github.com/kubernetes/kubernetes/issues/117470
 func TestNestedStrategicMergePatchWithEmpty(t *testing.T) {
-	clientSet, _, tearDownFn := setup(t)
+	ctx, clientSet, _, tearDownFn := setup(t)
 	defer tearDownFn()
 
 	url := "https://foo.com"
@@ -153,7 +152,7 @@ func TestNestedStrategicMergePatchWithEmpty(t *testing.T) {
 		AdmissionregistrationV1().
 		ValidatingWebhookConfigurations().
 		Create(
-			context.TODO(),
+			ctx,
 			&admissionregistrationv1.ValidatingWebhookConfiguration{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "base-validation",
@@ -178,7 +177,7 @@ func TestNestedStrategicMergePatchWithEmpty(t *testing.T) {
 		AdmissionregistrationV1().
 		ValidatingWebhookConfigurations().
 		Patch(
-			context.TODO(),
+			ctx,
 			"base-validation",
 			types.StrategicMergePatchType,
 			[]byte(`
@@ -198,7 +197,7 @@ func TestNestedStrategicMergePatchWithEmpty(t *testing.T) {
 		AdmissionregistrationV1().
 		ValidatingWebhookConfigurations().
 		Patch(
-			context.TODO(),
+			ctx,
 			"base-validation",
 			types.StrategicMergePatchType,
 			[]byte(`{"$setElementOrder/webhooks":[{"name":"new.foo.com"}],"metadata":{"annotations":{"kubectl.kubernetes.io/last-applied-configuration":"{\"apiVersion\":\"admissionregistration.k8s.io/v1\",\"kind\":\"ValidatingWebhookConfiguration\",\"metadata\":{\"annotations\":{},\"name\":\"base-validation\"},\"webhooks\":[{\"admissionReviewVersions\":[\"v1\"],\"clientConfig\":{\"url\":\"https://foo.com\"},\"name\":\"new.foo.com\",\"sideEffects\":\"None\"}]}\n"}},"webhooks":[{"admissionReviewVersions":["v1"],"clientConfig":{"url":"https://foo.com"},"name":"new.foo.com","sideEffects":"None"},{"$patch":"delete","name":"foo.bar.com"}]}`),

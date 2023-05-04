@@ -124,8 +124,7 @@ func TestSchedulingGates(t *testing.T) {
 				scheduler.WithPodInitialBackoffSeconds(0),
 				scheduler.WithPodMaxBackoffSeconds(0),
 			)
-			testutils.SyncInformerFactory(testCtx)
-			defer testutils.CleanupTest(t, testCtx)
+			testutils.SyncSchedulerInformerFactory(testCtx)
 
 			cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
 			for _, p := range tt.pods {
@@ -186,9 +185,8 @@ func TestCoreResourceEnqueue(t *testing.T) {
 		scheduler.WithPodInitialBackoffSeconds(0),
 		scheduler.WithPodMaxBackoffSeconds(0),
 	)
-	testutils.SyncInformerFactory(testCtx)
+	testutils.SyncSchedulerInformerFactory(testCtx)
 
-	defer testutils.CleanupTest(t, testCtx)
 	defer testCtx.Scheduler.SchedulingQueue.Close()
 
 	cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
@@ -293,8 +291,12 @@ func TestCustomResourceEnqueue(t *testing.T) {
 		testfwk.SharedEtcd(),
 	)
 	testCtx := &testutils.TestContext{}
-	testCtx.Ctx, testCtx.CancelFn = context.WithCancel(context.Background())
-	testCtx.CloseFn = func() { server.TearDownFn() }
+	ctx, cancel := context.WithCancel(context.Background())
+	testCtx.Ctx = ctx
+	testCtx.CloseFn = func() {
+		cancel()
+		server.TearDownFn()
+	}
 
 	apiExtensionClient := apiextensionsclient.NewForConfigOrDie(server.ClientConfig)
 	dynamicClient := dynamic.NewForConfigOrDie(server.ClientConfig)
@@ -371,7 +373,7 @@ func TestCustomResourceEnqueue(t *testing.T) {
 		scheduler.WithPodInitialBackoffSeconds(0),
 		scheduler.WithPodMaxBackoffSeconds(0),
 	)
-	testutils.SyncInformerFactory(testCtx)
+	testutils.SyncSchedulerInformerFactory(testCtx)
 
 	defer testutils.CleanupTest(t, testCtx)
 

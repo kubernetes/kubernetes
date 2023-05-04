@@ -214,13 +214,6 @@ func (sp *ScorePlugin) Name() string {
 	return scorePluginName
 }
 
-// reset returns name of the score plugin.
-func (sp *ScorePlugin) reset() {
-	sp.failScore = false
-	sp.numScoreCalled = 0
-	sp.highScoreNode = ""
-}
-
 // Score returns the score of scheduling a pod on a specific node.
 func (sp *ScorePlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) (int64, *framework.Status) {
 	curCalled := atomic.AddInt32(&sp.numScoreCalled, 1)
@@ -246,12 +239,6 @@ func (sp *ScoreWithNormalizePlugin) Name() string {
 	return scoreWithNormalizePluginName
 }
 
-// reset returns name of the score plugin.
-func (sp *ScoreWithNormalizePlugin) reset() {
-	sp.numScoreCalled = 0
-	sp.numNormalizeScoreCalled = 0
-}
-
 // Score returns the score of scheduling a pod on a specific node.
 func (sp *ScoreWithNormalizePlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) (int64, *framework.Status) {
 	sp.numScoreCalled++
@@ -271,15 +258,6 @@ func (sp *ScoreWithNormalizePlugin) ScoreExtensions() framework.ScoreExtensions 
 // Name returns name of the plugin.
 func (fp *FilterPlugin) Name() string {
 	return filterPluginName
-}
-
-// reset is used to reset filter plugin.
-func (fp *FilterPlugin) reset() {
-	fp.numFilterCalled = 0
-	fp.failFilter = false
-	if fp.numCalledPerPod != nil {
-		fp.numCalledPerPod = make(map[string]int)
-	}
 }
 
 // Filter is a test function that returns an error or nil, depending on the
@@ -328,13 +306,6 @@ func (rp *ReservePlugin) Unreserve(ctx context.Context, state *framework.CycleSt
 	}
 }
 
-// reset used to reset internal counters.
-func (rp *ReservePlugin) reset() {
-	rp.numReserveCalled = 0
-	rp.numUnreserveCalled = 0
-	rp.failReserve = false
-}
-
 // Name returns name of the plugin.
 func (*PreScorePlugin) Name() string {
 	return preScorePluginName
@@ -348,12 +319,6 @@ func (pfp *PreScorePlugin) PreScore(ctx context.Context, _ *framework.CycleState
 	}
 
 	return nil
-}
-
-// reset used to reset prescore plugin.
-func (pfp *PreScorePlugin) reset() {
-	pfp.numPreScoreCalled = 0
-	pfp.failPreScore = false
 }
 
 // Name returns name of the plugin.
@@ -375,15 +340,6 @@ func (pp *PreBindPlugin) PreBind(ctx context.Context, state *framework.CycleStat
 		return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("reject pod %v", pod.Name))
 	}
 	return nil
-}
-
-// reset used to reset prebind plugin.
-func (pp *PreBindPlugin) reset() {
-	pp.numPreBindCalled = 0
-	pp.failPreBind = false
-	pp.rejectPreBind = false
-	pp.succeedOnRetry = false
-	pp.podUIDs = make(map[types.UID]struct{})
 }
 
 const bindPluginAnnotation = "bindPluginName"
@@ -411,11 +367,6 @@ func (bp *BindPlugin) Bind(ctx context.Context, state *framework.CycleState, p *
 	return bp.bindStatus
 }
 
-// reset used to reset numBindCalled.
-func (bp *BindPlugin) reset() {
-	bp.numBindCalled = 0
-}
-
 // Name returns name of the plugin.
 func (pp *PostBindPlugin) Name() string {
 	return pp.name
@@ -427,11 +378,6 @@ func (pp *PostBindPlugin) PostBind(ctx context.Context, state *framework.CycleSt
 	if pp.pluginInvokeEventChan != nil {
 		pp.pluginInvokeEventChan <- pluginInvokeEvent{pluginName: pp.Name(), val: pp.numPostBindCalled}
 	}
-}
-
-// reset used to reset postbind plugin.
-func (pp *PostBindPlugin) reset() {
-	pp.numPostBindCalled = 0
 }
 
 // Name returns name of the plugin.
@@ -454,13 +400,6 @@ func (pp *PreFilterPlugin) PreFilter(ctx context.Context, state *framework.Cycle
 		return nil, framework.NewStatus(framework.Unschedulable, fmt.Sprintf("reject pod %v", pod.Name))
 	}
 	return nil, nil
-}
-
-// reset used to reset prefilter plugin.
-func (pp *PreFilterPlugin) reset() {
-	pp.numPreFilterCalled = 0
-	pp.failPreFilter = false
-	pp.rejectPreFilter = false
 }
 
 // Name returns name of the plugin.
@@ -551,31 +490,9 @@ func (pp *PermitPlugin) rejectAllPods() {
 	pp.fh.IterateOverWaitingPods(func(wp framework.WaitingPod) { wp.Reject(pp.name, "rejectAllPods") })
 }
 
-// reset used to reset permit plugin.
-func (pp *PermitPlugin) reset() {
-	pp.numPermitCalled = 0
-	pp.failPermit = false
-	pp.rejectPermit = false
-	pp.timeoutPermit = false
-	pp.waitAndRejectPermit = false
-	pp.waitAndAllowPermit = false
-	pp.cancelled = false
-	pp.waitingPod = ""
-	pp.allowingPod = ""
-	pp.rejectingPod = ""
-}
-
 // TestPreFilterPlugin tests invocation of prefilter plugins.
 func TestPreFilterPlugin(t *testing.T) {
-	// Create a plugin registry for testing. Register only a pre-filter plugin.
-	preFilterPlugin := &PreFilterPlugin{}
-	registry, prof := initRegistryAndConfig(t, preFilterPlugin)
-
-	// Create the API server and the scheduler with the test plugin set.
-	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestAPIServer(t, "prefilter-plugin", nil), 2,
-		scheduler.WithProfiles(prof),
-		scheduler.WithFrameworkOutOfTreeRegistry(registry))
-	defer testutils.CleanupTest(t, testCtx)
+	testContext := testutils.InitTestAPIServer(t, "prefilter-plugin", nil)
 
 	tests := []struct {
 		name   string
@@ -601,6 +518,15 @@ func TestPreFilterPlugin(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			// Create a plugin registry for testing. Register only a pre-filter plugin.
+			preFilterPlugin := &PreFilterPlugin{}
+			registry, prof := initRegistryAndConfig(t, preFilterPlugin)
+
+			testCtx, teardown := initTestSchedulerForFrameworkTest(t, testContext, 2,
+				scheduler.WithProfiles(prof),
+				scheduler.WithFrameworkOutOfTreeRegistry(registry))
+			defer teardown()
+
 			preFilterPlugin.failPreFilter = test.fail
 			preFilterPlugin.rejectPreFilter = test.reject
 			// Create a best effort pod.
@@ -627,9 +553,6 @@ func TestPreFilterPlugin(t *testing.T) {
 			if preFilterPlugin.numPreFilterCalled == 0 {
 				t.Errorf("Expected the prefilter plugin to be called.")
 			}
-
-			preFilterPlugin.reset()
-			testutils.CleanupPods(testCtx.ClientSet, t, []*v1.Pod{pod})
 		})
 	}
 }
@@ -713,8 +636,9 @@ func TestPostFilterPlugin(t *testing.T) {
 	}
 
 	var postFilterPluginName2 = postfilterPluginName + "2"
+	testContext := testutils.InitTestAPIServer(t, "post-filter", nil)
 
-	for i, tt := range tests {
+	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a plugin registry for testing. Register a combination of filter and postFilter plugin.
 			var (
@@ -771,15 +695,11 @@ func TestPostFilterPlugin(t *testing.T) {
 					},
 				}}})
 
-			// Create the API server and the scheduler with the test plugin set.
-			testCtx := initTestSchedulerForFrameworkTest(
-				t,
-				testutils.InitTestAPIServer(t, fmt.Sprintf("postfilter%v-", i), nil),
-				int(tt.numNodes),
+			testCtx, teardown := initTestSchedulerForFrameworkTest(t, testContext, int(tt.numNodes),
 				scheduler.WithProfiles(cfg.Profiles...),
 				scheduler.WithFrameworkOutOfTreeRegistry(registry),
 			)
-			defer testutils.CleanupTest(t, testCtx)
+			defer teardown()
 
 			// Create a best effort pod.
 			pod, err := createPausePod(testCtx.ClientSet, initPausePod(&testutils.PausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
@@ -820,14 +740,7 @@ func TestPostFilterPlugin(t *testing.T) {
 
 // TestScorePlugin tests invocation of score plugins.
 func TestScorePlugin(t *testing.T) {
-	// Create a plugin registry for testing. Register only a score plugin.
-	scorePlugin := &ScorePlugin{}
-	registry, prof := initRegistryAndConfig(t, scorePlugin)
-
-	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestAPIServer(t, "score-plugin", nil), 10,
-		scheduler.WithProfiles(prof),
-		scheduler.WithFrameworkOutOfTreeRegistry(registry))
-	defer testutils.CleanupTest(t, testCtx)
+	testContext := testutils.InitTestAPIServer(t, "score-plugin", nil)
 
 	tests := []struct {
 		name string
@@ -845,6 +758,15 @@ func TestScorePlugin(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			// Create a plugin registry for testing. Register only a score plugin.
+			scorePlugin := &ScorePlugin{}
+			registry, prof := initRegistryAndConfig(t, scorePlugin)
+
+			testCtx, teardown := initTestSchedulerForFrameworkTest(t, testContext, 10,
+				scheduler.WithProfiles(prof),
+				scheduler.WithFrameworkOutOfTreeRegistry(registry))
+			defer teardown()
+
 			scorePlugin.failScore = test.fail
 			// Create a best effort pod.
 			pod, err := createPausePod(testCtx.ClientSet,
@@ -873,9 +795,6 @@ func TestScorePlugin(t *testing.T) {
 			if numScoreCalled := atomic.LoadInt32(&scorePlugin.numScoreCalled); numScoreCalled == 0 {
 				t.Errorf("Expected the score plugin to be called.")
 			}
-
-			scorePlugin.reset()
-			testutils.CleanupPods(testCtx.ClientSet, t, []*v1.Pod{pod})
 		})
 	}
 }
@@ -886,11 +805,9 @@ func TestNormalizeScorePlugin(t *testing.T) {
 	scoreWithNormalizePlugin := &ScoreWithNormalizePlugin{}
 	registry, prof := initRegistryAndConfig(t, scoreWithNormalizePlugin)
 
-	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestAPIServer(t, "score-plugin", nil), 10,
+	testCtx, _ := initTestSchedulerForFrameworkTest(t, testutils.InitTestAPIServer(t, "score-plugin", nil), 10,
 		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
-
-	defer testutils.CleanupTest(t, testCtx)
 
 	// Create a best effort pod.
 	pod, err := createPausePod(testCtx.ClientSet,
@@ -909,21 +826,11 @@ func TestNormalizeScorePlugin(t *testing.T) {
 	if scoreWithNormalizePlugin.numNormalizeScoreCalled == 0 {
 		t.Error("Expected the normalize score plugin to be called")
 	}
-
-	scoreWithNormalizePlugin.reset()
 }
 
 // TestReservePlugin tests invocation of reserve plugins.
 func TestReservePluginReserve(t *testing.T) {
-	// Create a plugin registry for testing. Register only a reserve plugin.
-	reservePlugin := &ReservePlugin{}
-	registry, prof := initRegistryAndConfig(t, reservePlugin)
-
-	// Create the API server and the scheduler with the test plugin set.
-	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestAPIServer(t, "reserve-plugin-reserve", nil), 2,
-		scheduler.WithProfiles(prof),
-		scheduler.WithFrameworkOutOfTreeRegistry(registry))
-	defer testutils.CleanupTest(t, testCtx)
+	testContext := testutils.InitTestAPIServer(t, "reserve-plugin-reserve", nil)
 
 	tests := []struct {
 		name string
@@ -941,6 +848,15 @@ func TestReservePluginReserve(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			// Create a plugin registry for testing. Register only a reserve plugin.
+			reservePlugin := &ReservePlugin{}
+			registry, prof := initRegistryAndConfig(t, reservePlugin)
+
+			testCtx, teardown := initTestSchedulerForFrameworkTest(t, testContext, 2,
+				scheduler.WithProfiles(prof),
+				scheduler.WithFrameworkOutOfTreeRegistry(registry))
+			defer teardown()
+
 			reservePlugin.failReserve = test.fail
 			// Create a best effort pod.
 			pod, err := createPausePod(testCtx.ClientSet,
@@ -963,57 +879,15 @@ func TestReservePluginReserve(t *testing.T) {
 			if reservePlugin.numReserveCalled == 0 {
 				t.Errorf("Expected the reserve plugin to be called.")
 			}
-
-			reservePlugin.reset()
-			testutils.CleanupPods(testCtx.ClientSet, t, []*v1.Pod{pod})
 		})
 	}
 }
 
 // TestPrebindPlugin tests invocation of prebind plugins.
 func TestPrebindPlugin(t *testing.T) {
-	// Create a plugin registry for testing. Register a prebind and a filter plugin.
-	preBindPlugin := &PreBindPlugin{podUIDs: make(map[types.UID]struct{})}
-	filterPlugin := &FilterPlugin{}
-	registry := frameworkruntime.Registry{
-		preBindPluginName: newPlugin(preBindPlugin),
-		filterPluginName:  newPlugin(filterPlugin),
-	}
+	testContext := testutils.InitTestAPIServer(t, "prebind-plugin", nil)
 
-	// Setup initial prebind and filter plugin in different profiles.
-	// The second profile ensures the embedded filter plugin is exclusively called, and hence
-	// we can use its internal `numFilterCalled` to perform some precise checking logic.
-	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
-		Profiles: []configv1.KubeSchedulerProfile{
-			{
-				SchedulerName: pointer.String(v1.DefaultSchedulerName),
-				Plugins: &configv1.Plugins{
-					PreBind: configv1.PluginSet{
-						Enabled: []configv1.Plugin{
-							{Name: preBindPluginName},
-						},
-					},
-				},
-			},
-			{
-				SchedulerName: pointer.String("2nd-scheduler"),
-				Plugins: &configv1.Plugins{
-					Filter: configv1.PluginSet{
-						Enabled: []configv1.Plugin{
-							{Name: filterPluginName},
-						},
-					},
-				},
-			},
-		},
-	})
-
-	// Create the API server and the scheduler with the test plugin set.
 	nodesNum := 2
-	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestAPIServer(t, "prebind-plugin", nil), nodesNum,
-		scheduler.WithProfiles(cfg.Profiles...),
-		scheduler.WithFrameworkOutOfTreeRegistry(registry))
-	defer testutils.CleanupTest(t, testCtx)
 
 	tests := []struct {
 		name             string
@@ -1051,19 +925,59 @@ func TestPrebindPlugin(t *testing.T) {
 		{
 			name:             "failure on preBind moves unschedulable pods",
 			fail:             true,
-			unschedulablePod: st.MakePod().Name("unschedulable-pod").Namespace(testCtx.NS.Name).Container(imageutils.GetPauseImageName()).Obj(),
+			unschedulablePod: st.MakePod().Name("unschedulable-pod").Namespace(testContext.NS.Name).Container(imageutils.GetPauseImageName()).Obj(),
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			// Create a plugin registry for testing. Register a prebind and a filter plugin.
+			preBindPlugin := &PreBindPlugin{podUIDs: make(map[types.UID]struct{})}
+			filterPlugin := &FilterPlugin{}
+			registry := frameworkruntime.Registry{
+				preBindPluginName: newPlugin(preBindPlugin),
+				filterPluginName:  newPlugin(filterPlugin),
+			}
+
+			// Setup initial prebind and filter plugin in different profiles.
+			// The second profile ensures the embedded filter plugin is exclusively called, and hence
+			// we can use its internal `numFilterCalled` to perform some precise checking logic.
+			cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+				Profiles: []configv1.KubeSchedulerProfile{
+					{
+						SchedulerName: pointer.String(v1.DefaultSchedulerName),
+						Plugins: &configv1.Plugins{
+							PreBind: configv1.PluginSet{
+								Enabled: []configv1.Plugin{
+									{Name: preBindPluginName},
+								},
+							},
+						},
+					},
+					{
+						SchedulerName: pointer.String("2nd-scheduler"),
+						Plugins: &configv1.Plugins{
+							Filter: configv1.PluginSet{
+								Enabled: []configv1.Plugin{
+									{Name: filterPluginName},
+								},
+							},
+						},
+					},
+				},
+			})
+
+			testCtx, teardown := initTestSchedulerForFrameworkTest(t, testContext, nodesNum,
+				scheduler.WithProfiles(cfg.Profiles...),
+				scheduler.WithFrameworkOutOfTreeRegistry(registry))
+			defer teardown()
+
 			if p := test.unschedulablePod; p != nil {
 				p.Spec.SchedulerName = "2nd-scheduler"
 				filterPlugin.rejectFilter = true
 				if _, err := createPausePod(testCtx.ClientSet, p); err != nil {
 					t.Fatalf("Error while creating an unschedulable pod: %v", err)
 				}
-				defer filterPlugin.reset()
 			}
 
 			preBindPlugin.failPreBind = test.fail
@@ -1105,9 +1019,6 @@ func TestPrebindPlugin(t *testing.T) {
 					t.Errorf("Timed out waiting for the unschedulable Pod to be retried at least twice.")
 				}
 			}
-
-			preBindPlugin.reset()
-			testutils.CleanupPods(testCtx.ClientSet, t, []*v1.Pod{pod})
 		})
 	}
 }
@@ -1201,6 +1112,8 @@ func TestUnReserveReservePlugins(t *testing.T) {
 		},
 	}
 
+	testContext := testutils.InitTestAPIServer(t, "unreserve-reserve-plugin", nil)
+
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var pls []framework.Plugin
@@ -1209,14 +1122,10 @@ func TestUnReserveReservePlugins(t *testing.T) {
 			}
 			registry, prof := initRegistryAndConfig(t, pls...)
 
-			// Create the API server and the scheduler with the test plugin set.
-			testCtx := initTestSchedulerForFrameworkTest(
-				t,
-				testutils.InitTestAPIServer(t, "unreserve-reserve-plugin", nil),
-				2,
+			testCtx, teardown := initTestSchedulerForFrameworkTest(t, testContext, 2,
 				scheduler.WithProfiles(prof),
 				scheduler.WithFrameworkOutOfTreeRegistry(registry))
-			defer testutils.CleanupTest(t, testCtx)
+			defer teardown()
 
 			// Create a best effort pod.
 			podName := "test-pod"
@@ -1260,13 +1169,14 @@ func TestUnReserveReservePlugins(t *testing.T) {
 					}
 				}
 			}
-			testutils.CleanupPods(testCtx.ClientSet, t, []*v1.Pod{pod})
 		})
 	}
 }
 
 // TestUnReservePermitPlugins tests unreserve of Permit plugins.
 func TestUnReservePermitPlugins(t *testing.T) {
+	testContext := testutils.InitTestAPIServer(t, "unreserve-reserve-plugin", nil)
+
 	tests := []struct {
 		name   string
 		plugin *PermitPlugin
@@ -1305,14 +1215,10 @@ func TestUnReservePermitPlugins(t *testing.T) {
 			}
 			registry, profile := initRegistryAndConfig(t, []framework.Plugin{test.plugin, reservePlugin}...)
 
-			// Create the API server and the scheduler with the test plugin set.
-			testCtx := initTestSchedulerForFrameworkTest(
-				t,
-				testutils.InitTestAPIServer(t, "unreserve-reserve-plugin", nil),
-				2,
+			testCtx, teardown := initTestSchedulerForFrameworkTest(t, testContext, 2,
 				scheduler.WithProfiles(profile),
 				scheduler.WithFrameworkOutOfTreeRegistry(registry))
-			defer testutils.CleanupTest(t, testCtx)
+			defer teardown()
 
 			// Create a best effort pod.
 			podName := "test-pod"
@@ -1345,14 +1251,14 @@ func TestUnReservePermitPlugins(t *testing.T) {
 			if test.plugin.numPermitCalled != 1 {
 				t.Errorf("Expected the Permit plugin to be called.")
 			}
-
-			testutils.CleanupPods(testCtx.ClientSet, t, []*v1.Pod{pod})
 		})
 	}
 }
 
 // TestUnReservePreBindPlugins tests unreserve of Prebind plugins.
 func TestUnReservePreBindPlugins(t *testing.T) {
+	testContext := testutils.InitTestAPIServer(t, "unreserve-prebind-plugin", nil)
+
 	tests := []struct {
 		name       string
 		plugin     *PreBindPlugin
@@ -1381,14 +1287,10 @@ func TestUnReservePreBindPlugins(t *testing.T) {
 			}
 			registry, profile := initRegistryAndConfig(t, []framework.Plugin{test.plugin, reservePlugin}...)
 
-			// Create the API server and the scheduler with the test plugin set.
-			testCtx := initTestSchedulerForFrameworkTest(
-				t,
-				testutils.InitTestAPIServer(t, "unreserve-prebind-plugin", nil),
-				2,
+			testCtx, teardown := initTestSchedulerForFrameworkTest(t, testContext, 2,
 				scheduler.WithProfiles(profile),
 				scheduler.WithFrameworkOutOfTreeRegistry(registry))
-			defer testutils.CleanupTest(t, testCtx)
+			defer teardown()
 
 			// Create a pause pod.
 			podName := "test-pod"
@@ -1421,14 +1323,14 @@ func TestUnReservePreBindPlugins(t *testing.T) {
 			if test.plugin.numPreBindCalled != 1 {
 				t.Errorf("Expected the Prebind plugin to be called.")
 			}
-
-			testutils.CleanupPods(testCtx.ClientSet, t, []*v1.Pod{pod})
 		})
 	}
 }
 
 // TestUnReserveBindPlugins tests unreserve of Bind plugins.
 func TestUnReserveBindPlugins(t *testing.T) {
+	testContext := testutils.InitTestAPIServer(t, "unreserve-bind-plugin", nil)
+
 	tests := []struct {
 		name   string
 		plugin *BindPlugin
@@ -1454,17 +1356,12 @@ func TestUnReserveBindPlugins(t *testing.T) {
 			}
 			registry, profile := initRegistryAndConfig(t, []framework.Plugin{test.plugin, reservePlugin}...)
 
-			apiCtx := testutils.InitTestAPIServer(t, "unreserve-bind-plugin", nil)
-			test.plugin.client = apiCtx.ClientSet
+			test.plugin.client = testContext.ClientSet
 
-			// Create the scheduler with the test plugin set.
-			testCtx := initTestSchedulerForFrameworkTest(
-				t,
-				apiCtx,
-				2,
+			testCtx, teardown := initTestSchedulerForFrameworkTest(t, testContext, 2,
 				scheduler.WithProfiles(profile),
 				scheduler.WithFrameworkOutOfTreeRegistry(registry))
-			defer testutils.CleanupTest(t, testCtx)
+			defer teardown()
 
 			// Create a pause pod.
 			podName := "test-pod"
@@ -1497,8 +1394,6 @@ func TestUnReserveBindPlugins(t *testing.T) {
 			if test.plugin.numBindCalled != 1 {
 				t.Errorf("Expected the Bind plugin to be called.")
 			}
-
-			testutils.CleanupPods(testCtx.ClientSet, t, []*v1.Pod{pod})
 		})
 	}
 }
@@ -1508,61 +1403,16 @@ type pluginInvokeEvent struct {
 	val        int
 }
 
-// TestBindPlugin tests invocation of bind plugins.
 func TestBindPlugin(t *testing.T) {
+
+	var (
+		bindPlugin1Name    = "bind-plugin-1"
+		bindPlugin2Name    = "bind-plugin-2"
+		reservePluginName  = "mock-reserve-plugin"
+		postBindPluginName = "mock-post-bind-plugin"
+	)
+
 	testContext := testutils.InitTestAPIServer(t, "bind-plugin", nil)
-	bindPlugin1 := &BindPlugin{name: "bind-plugin-1", client: testContext.ClientSet}
-	bindPlugin2 := &BindPlugin{name: "bind-plugin-2", client: testContext.ClientSet}
-	reservePlugin := &ReservePlugin{name: "mock-reserve-plugin"}
-	postBindPlugin := &PostBindPlugin{name: "mock-post-bind-plugin"}
-	// Create a plugin registry for testing. Register reserve, bind, and
-	// postBind plugins.
-
-	registry := frameworkruntime.Registry{
-		reservePlugin.Name():  newPlugin(reservePlugin),
-		bindPlugin1.Name():    newPlugin(bindPlugin1),
-		bindPlugin2.Name():    newPlugin(bindPlugin2),
-		postBindPlugin.Name(): newPlugin(postBindPlugin),
-	}
-
-	// Setup initial unreserve and bind plugins for testing.
-	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
-		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: pointer.String(v1.DefaultSchedulerName),
-			Plugins: &configv1.Plugins{
-				MultiPoint: configv1.PluginSet{
-					Disabled: []configv1.Plugin{
-						{Name: defaultbinder.Name},
-					},
-				},
-				Reserve: configv1.PluginSet{
-					Enabled: []configv1.Plugin{{Name: reservePlugin.Name()}},
-				},
-				Bind: configv1.PluginSet{
-					// Put DefaultBinder last.
-					Enabled:  []configv1.Plugin{{Name: bindPlugin1.Name()}, {Name: bindPlugin2.Name()}, {Name: defaultbinder.Name}},
-					Disabled: []configv1.Plugin{{Name: defaultbinder.Name}},
-				},
-				PostBind: configv1.PluginSet{
-					Enabled: []configv1.Plugin{{Name: postBindPlugin.Name()}},
-				},
-			},
-		}},
-	})
-
-	// Create the scheduler with the test plugin set.
-	testCtx := testutils.InitTestSchedulerWithOptions(t, testContext, 0,
-		scheduler.WithProfiles(cfg.Profiles...),
-		scheduler.WithFrameworkOutOfTreeRegistry(registry))
-	testutils.SyncInformerFactory(testCtx)
-	go testCtx.Scheduler.Run(testCtx.Ctx)
-	defer testutils.CleanupTest(t, testCtx)
-
-	// Add a few nodes.
-	_, err := createAndWaitForNodesInCache(testCtx, "test-node", st.MakeNode(), 2)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	tests := []struct {
 		name                   string
@@ -1576,32 +1426,77 @@ func TestBindPlugin(t *testing.T) {
 			name:                   "bind plugins skipped to bind the pod and scheduler bond the pod",
 			bindPluginStatuses:     []*framework.Status{framework.NewStatus(framework.Skip, ""), framework.NewStatus(framework.Skip, "")},
 			expectBoundByScheduler: true,
-			expectInvokeEvents:     []pluginInvokeEvent{{pluginName: bindPlugin1.Name(), val: 1}, {pluginName: bindPlugin2.Name(), val: 1}, {pluginName: postBindPlugin.Name(), val: 1}},
+			expectInvokeEvents:     []pluginInvokeEvent{{pluginName: bindPlugin1Name, val: 1}, {pluginName: bindPlugin2Name, val: 1}, {pluginName: postBindPluginName, val: 1}},
 		},
 		{
 			name:                 "bindplugin2 succeeded to bind the pod",
 			bindPluginStatuses:   []*framework.Status{framework.NewStatus(framework.Skip, ""), framework.NewStatus(framework.Success, "")},
 			expectBoundByPlugin:  true,
-			expectBindPluginName: bindPlugin2.Name(),
-			expectInvokeEvents:   []pluginInvokeEvent{{pluginName: bindPlugin1.Name(), val: 1}, {pluginName: bindPlugin2.Name(), val: 1}, {pluginName: postBindPlugin.Name(), val: 1}},
+			expectBindPluginName: bindPlugin2Name,
+			expectInvokeEvents:   []pluginInvokeEvent{{pluginName: bindPlugin1Name, val: 1}, {pluginName: bindPlugin2Name, val: 1}, {pluginName: postBindPluginName, val: 1}},
 		},
 		{
 			name:                 "bindplugin1 succeeded to bind the pod",
 			bindPluginStatuses:   []*framework.Status{framework.NewStatus(framework.Success, ""), framework.NewStatus(framework.Success, "")},
 			expectBoundByPlugin:  true,
-			expectBindPluginName: bindPlugin1.Name(),
-			expectInvokeEvents:   []pluginInvokeEvent{{pluginName: bindPlugin1.Name(), val: 1}, {pluginName: postBindPlugin.Name(), val: 1}},
+			expectBindPluginName: bindPlugin1Name,
+			expectInvokeEvents:   []pluginInvokeEvent{{pluginName: bindPlugin1Name, val: 1}, {pluginName: postBindPluginName, val: 1}},
 		},
 		{
 			name:               "bind plugin fails to bind the pod",
 			bindPluginStatuses: []*framework.Status{framework.NewStatus(framework.Error, "failed to bind"), framework.NewStatus(framework.Success, "")},
-			expectInvokeEvents: []pluginInvokeEvent{{pluginName: bindPlugin1.Name(), val: 1}, {pluginName: reservePlugin.Name(), val: 1}},
+			expectInvokeEvents: []pluginInvokeEvent{{pluginName: bindPlugin1Name, val: 1}, {pluginName: reservePluginName, val: 1}},
 		},
 	}
 
 	var pluginInvokeEventChan chan pluginInvokeEvent
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			bindPlugin1 := &BindPlugin{name: bindPlugin1Name, client: testContext.ClientSet}
+			bindPlugin2 := &BindPlugin{name: bindPlugin2Name, client: testContext.ClientSet}
+			reservePlugin := &ReservePlugin{name: reservePluginName}
+			postBindPlugin := &PostBindPlugin{name: postBindPluginName}
+
+			// Create a plugin registry for testing. Register reserve, bind, and
+			// postBind plugins.
+			registry := frameworkruntime.Registry{
+				reservePlugin.Name():  newPlugin(reservePlugin),
+				bindPlugin1.Name():    newPlugin(bindPlugin1),
+				bindPlugin2.Name():    newPlugin(bindPlugin2),
+				postBindPlugin.Name(): newPlugin(postBindPlugin),
+			}
+
+			// Setup initial unreserve and bind plugins for testing.
+			cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+				Profiles: []configv1.KubeSchedulerProfile{{
+					SchedulerName: pointer.String(v1.DefaultSchedulerName),
+					Plugins: &configv1.Plugins{
+						MultiPoint: configv1.PluginSet{
+							Disabled: []configv1.Plugin{
+								{Name: defaultbinder.Name},
+							},
+						},
+						Reserve: configv1.PluginSet{
+							Enabled: []configv1.Plugin{{Name: reservePlugin.Name()}},
+						},
+						Bind: configv1.PluginSet{
+							// Put DefaultBinder last.
+							Enabled:  []configv1.Plugin{{Name: bindPlugin1.Name()}, {Name: bindPlugin2.Name()}, {Name: defaultbinder.Name}},
+							Disabled: []configv1.Plugin{{Name: defaultbinder.Name}},
+						},
+						PostBind: configv1.PluginSet{
+							Enabled: []configv1.Plugin{{Name: postBindPlugin.Name()}},
+						},
+					},
+				}},
+			})
+
+			testCtx, teardown := initTestSchedulerForFrameworkTest(t, testContext, 2,
+				scheduler.WithProfiles(cfg.Profiles...),
+				scheduler.WithFrameworkOutOfTreeRegistry(registry),
+			)
+			defer teardown()
+
 			pluginInvokeEventChan = make(chan pluginInvokeEvent, 10)
 
 			bindPlugin1.bindStatus = test.bindPluginStatuses[0]
@@ -1678,17 +1573,14 @@ func TestBindPlugin(t *testing.T) {
 					t.Errorf("Waiting for invoke event %d timeout.", j)
 				}
 			}
-			postBindPlugin.reset()
-			bindPlugin1.reset()
-			bindPlugin2.reset()
-			reservePlugin.reset()
-			testutils.CleanupPods(testCtx.ClientSet, t, []*v1.Pod{pod})
 		})
 	}
 }
 
 // TestPostBindPlugin tests invocation of postbind plugins.
 func TestPostBindPlugin(t *testing.T) {
+	testContext := testutils.InitTestAPIServer(t, "postbind-plugin", nil)
+
 	tests := []struct {
 		name        string
 		preBindFail bool
@@ -1716,11 +1608,10 @@ func TestPostBindPlugin(t *testing.T) {
 			}
 
 			registry, prof := initRegistryAndConfig(t, preBindPlugin, postBindPlugin)
-			// Create the API server and the scheduler with the test plugin set.
-			testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestAPIServer(t, "postbind-plugin", nil), 2,
+			testCtx, teardown := initTestSchedulerForFrameworkTest(t, testContext, 2,
 				scheduler.WithProfiles(prof),
 				scheduler.WithFrameworkOutOfTreeRegistry(registry))
-			defer testutils.CleanupTest(t, testCtx)
+			defer teardown()
 
 			// Create a best effort pod.
 			pod, err := createPausePod(testCtx.ClientSet,
@@ -1749,23 +1640,13 @@ func TestPostBindPlugin(t *testing.T) {
 					t.Errorf("Expected the postbind plugin to be called, was called %d times.", postBindPlugin.numPostBindCalled)
 				}
 			}
-
-			testutils.CleanupPods(testCtx.ClientSet, t, []*v1.Pod{pod})
 		})
 	}
 }
 
 // TestPermitPlugin tests invocation of permit plugins.
 func TestPermitPlugin(t *testing.T) {
-	// Create a plugin registry for testing. Register only a permit plugin.
-	perPlugin := &PermitPlugin{name: permitPluginName}
-	registry, prof := initRegistryAndConfig(t, perPlugin)
-
-	// Create the API server and the scheduler with the test plugin set.
-	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestAPIServer(t, "permit-plugin", nil), 2,
-		scheduler.WithProfiles(prof),
-		scheduler.WithFrameworkOutOfTreeRegistry(registry))
-	defer testutils.CleanupTest(t, testCtx)
+	testContext := testutils.InitTestAPIServer(t, "permit-plugin", nil)
 
 	tests := []struct {
 		name    string
@@ -1813,6 +1694,16 @@ func TestPermitPlugin(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+
+			// Create a plugin registry for testing. Register only a permit plugin.
+			perPlugin := &PermitPlugin{name: permitPluginName}
+			registry, prof := initRegistryAndConfig(t, perPlugin)
+
+			testCtx, teardown := initTestSchedulerForFrameworkTest(t, testContext, 2,
+				scheduler.WithProfiles(prof),
+				scheduler.WithFrameworkOutOfTreeRegistry(registry))
+			defer teardown()
+
 			perPlugin.failPermit = test.fail
 			perPlugin.rejectPermit = test.reject
 			perPlugin.timeoutPermit = test.timeout
@@ -1844,9 +1735,6 @@ func TestPermitPlugin(t *testing.T) {
 			if perPlugin.numPermitCalled == 0 {
 				t.Errorf("Expected the permit plugin to be called.")
 			}
-
-			perPlugin.reset()
-			testutils.CleanupPods(testCtx.ClientSet, t, []*v1.Pod{pod})
 		})
 	}
 }
@@ -1859,10 +1747,9 @@ func TestMultiplePermitPlugins(t *testing.T) {
 	registry, prof := initRegistryAndConfig(t, perPlugin1, perPlugin2)
 
 	// Create the API server and the scheduler with the test plugin set.
-	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestAPIServer(t, "multi-permit-plugin", nil), 2,
+	testCtx, _ := initTestSchedulerForFrameworkTest(t, testutils.InitTestAPIServer(t, "multi-permit-plugin", nil), 2,
 		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
-	defer testutils.CleanupTest(t, testCtx)
 
 	// Both permit plugins will return Wait for permitting
 	perPlugin1.timeoutPermit = true
@@ -1902,8 +1789,6 @@ func TestMultiplePermitPlugins(t *testing.T) {
 	if perPlugin1.numPermitCalled == 0 || perPlugin2.numPermitCalled == 0 {
 		t.Errorf("Expected the permit plugin to be called.")
 	}
-
-	testutils.CleanupPods(testCtx.ClientSet, t, []*v1.Pod{pod})
 }
 
 // TestPermitPluginsCancelled tests whether all permit plugins are cancelled when pod is rejected.
@@ -1914,10 +1799,9 @@ func TestPermitPluginsCancelled(t *testing.T) {
 	registry, prof := initRegistryAndConfig(t, perPlugin1, perPlugin2)
 
 	// Create the API server and the scheduler with the test plugin set.
-	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestAPIServer(t, "permit-plugins", nil), 2,
+	testCtx, _ := initTestSchedulerForFrameworkTest(t, testutils.InitTestAPIServer(t, "permit-plugins", nil), 2,
 		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
-	defer testutils.CleanupTest(t, testCtx)
 
 	// Both permit plugins will return Wait for permitting
 	perPlugin1.timeoutPermit = true
@@ -1950,16 +1834,7 @@ func TestPermitPluginsCancelled(t *testing.T) {
 
 // TestCoSchedulingWithPermitPlugin tests invocation of permit plugins.
 func TestCoSchedulingWithPermitPlugin(t *testing.T) {
-	// Create a plugin registry for testing. Register only a permit plugin.
-	permitPlugin := &PermitPlugin{name: permitPluginName}
-	registry, prof := initRegistryAndConfig(t, permitPlugin)
-
-	// Create the API server and the scheduler with the test plugin set.
-	// TODO Make the subtests not share scheduler instances.
-	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestAPIServer(t, "permit-plugin", nil), 2,
-		scheduler.WithProfiles(prof),
-		scheduler.WithFrameworkOutOfTreeRegistry(registry))
-	defer testutils.CleanupTest(t, testCtx)
+	testContext := testutils.InitTestAPIServer(t, "permit-plugin", nil)
 
 	tests := []struct {
 		name       string
@@ -1980,6 +1855,16 @@ func TestCoSchedulingWithPermitPlugin(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+
+			// Create a plugin registry for testing. Register only a permit plugin.
+			permitPlugin := &PermitPlugin{name: permitPluginName}
+			registry, prof := initRegistryAndConfig(t, permitPlugin)
+
+			testCtx, teardown := initTestSchedulerForFrameworkTest(t, testContext, 2,
+				scheduler.WithProfiles(prof),
+				scheduler.WithFrameworkOutOfTreeRegistry(registry))
+			defer teardown()
+
 			permitPlugin.failPermit = false
 			permitPlugin.rejectPermit = false
 			permitPlugin.timeoutPermit = false
@@ -2028,24 +1913,13 @@ func TestCoSchedulingWithPermitPlugin(t *testing.T) {
 			if permitPlugin.numPermitCalled == 0 {
 				t.Errorf("Expected the permit plugin to be called.")
 			}
-
-			permitPlugin.reset()
-			testutils.CleanupPods(testCtx.ClientSet, t, []*v1.Pod{podA, podB})
 		})
 	}
 }
 
 // TestFilterPlugin tests invocation of filter plugins.
 func TestFilterPlugin(t *testing.T) {
-	// Create a plugin registry for testing. Register only a filter plugin.
-	filterPlugin := &FilterPlugin{}
-	registry, prof := initRegistryAndConfig(t, filterPlugin)
-
-	// Create the API server and the scheduler with the test plugin set.
-	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestAPIServer(t, "filter-plugin", nil), 1,
-		scheduler.WithProfiles(prof),
-		scheduler.WithFrameworkOutOfTreeRegistry(registry))
-	defer testutils.CleanupTest(t, testCtx)
+	testContext := testutils.InitTestAPIServer(t, "filter-plugin", nil)
 
 	tests := []struct {
 		name string
@@ -2063,6 +1937,15 @@ func TestFilterPlugin(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			// Create a plugin registry for testing. Register only a filter plugin.
+			filterPlugin := &FilterPlugin{}
+			registry, prof := initRegistryAndConfig(t, filterPlugin)
+
+			testCtx, teardown := initTestSchedulerForFrameworkTest(t, testContext, 1,
+				scheduler.WithProfiles(prof),
+				scheduler.WithFrameworkOutOfTreeRegistry(registry))
+			defer teardown()
+
 			filterPlugin.failFilter = test.fail
 			// Create a best effort pod.
 			pod, err := createPausePod(testCtx.ClientSet,
@@ -2086,24 +1969,13 @@ func TestFilterPlugin(t *testing.T) {
 					t.Errorf("Expected the filter plugin to be called 1 time, but got %v.", filterPlugin.numFilterCalled)
 				}
 			}
-
-			filterPlugin.reset()
-			testutils.CleanupPods(testCtx.ClientSet, t, []*v1.Pod{pod})
 		})
 	}
 }
 
 // TestPreScorePlugin tests invocation of pre-score plugins.
 func TestPreScorePlugin(t *testing.T) {
-	// Create a plugin registry for testing. Register only a pre-score plugin.
-	preScorePlugin := &PreScorePlugin{}
-	registry, prof := initRegistryAndConfig(t, preScorePlugin)
-
-	// Create the API server and the scheduler with the test plugin set.
-	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestAPIServer(t, "pre-score-plugin", nil), 2,
-		scheduler.WithProfiles(prof),
-		scheduler.WithFrameworkOutOfTreeRegistry(registry))
-	defer testutils.CleanupTest(t, testCtx)
+	testContext := testutils.InitTestAPIServer(t, "pre-score-plugin", nil)
 
 	tests := []struct {
 		name string
@@ -2121,6 +1993,15 @@ func TestPreScorePlugin(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			// Create a plugin registry for testing. Register only a pre-score plugin.
+			preScorePlugin := &PreScorePlugin{}
+			registry, prof := initRegistryAndConfig(t, preScorePlugin)
+
+			testCtx, teardown := initTestSchedulerForFrameworkTest(t, testContext, 2,
+				scheduler.WithProfiles(prof),
+				scheduler.WithFrameworkOutOfTreeRegistry(registry))
+			defer teardown()
+
 			preScorePlugin.failPreScore = test.fail
 			// Create a best effort pod.
 			pod, err := createPausePod(testCtx.ClientSet,
@@ -2142,9 +2023,6 @@ func TestPreScorePlugin(t *testing.T) {
 			if preScorePlugin.numPreScoreCalled == 0 {
 				t.Errorf("Expected the pre-score plugin to be called.")
 			}
-
-			preScorePlugin.reset()
-			testutils.CleanupPods(testCtx.ClientSet, t, []*v1.Pod{pod})
 		})
 	}
 }
@@ -2153,17 +2031,7 @@ func TestPreScorePlugin(t *testing.T) {
 func TestPreEnqueuePlugin(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodSchedulingReadiness, true)()
 
-	// Create a plugin registry for testing. Register only a filter plugin.
-	enqueuePlugin := &PreEnqueuePlugin{}
-	// Plumb a preFilterPlugin to verify if it's called or not.
-	preFilterPlugin := &PreFilterPlugin{}
-	registry, prof := initRegistryAndConfig(t, enqueuePlugin, preFilterPlugin)
-
-	// Create the API server and the scheduler with the test plugin set.
-	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestAPIServer(t, "enqueue-plugin", nil), 1,
-		scheduler.WithProfiles(prof),
-		scheduler.WithFrameworkOutOfTreeRegistry(registry))
-	defer testutils.CleanupTest(t, testCtx)
+	testContext := testutils.InitTestAPIServer(t, "enqueue-plugin", nil)
 
 	tests := []struct {
 		name         string
@@ -2172,18 +2040,29 @@ func TestPreEnqueuePlugin(t *testing.T) {
 	}{
 		{
 			name:         "pod is admitted to enqueue",
-			pod:          st.MakePod().Name("p").Namespace(testCtx.NS.Name).Container("pause").Obj(),
+			pod:          st.MakePod().Name("p").Namespace(testContext.NS.Name).Container("pause").Obj(),
 			admitEnqueue: true,
 		},
 		{
 			name:         "pod is not admitted to enqueue",
-			pod:          st.MakePod().Name("p").Namespace(testCtx.NS.Name).SchedulingGates([]string{"foo"}).Container("pause").Obj(),
+			pod:          st.MakePod().Name("p").Namespace(testContext.NS.Name).SchedulingGates([]string{"foo"}).Container("pause").Obj(),
 			admitEnqueue: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Create a plugin registry for testing. Register only a filter plugin.
+			enqueuePlugin := &PreEnqueuePlugin{}
+			// Plumb a preFilterPlugin to verify if it's called or not.
+			preFilterPlugin := &PreFilterPlugin{}
+			registry, prof := initRegistryAndConfig(t, enqueuePlugin, preFilterPlugin)
+
+			testCtx, teardown := initTestSchedulerForFrameworkTest(t, testContext, 1,
+				scheduler.WithProfiles(prof),
+				scheduler.WithFrameworkOutOfTreeRegistry(registry))
+			defer teardown()
+
 			enqueuePlugin.admit = tt.admitEnqueue
 			// Create a best effort pod.
 			pod, err := createPausePod(testCtx.ClientSet, tt.pod)
@@ -2208,9 +2087,6 @@ func TestPreEnqueuePlugin(t *testing.T) {
 					t.Errorf("Expected the preFilter plugin not to be called, but got %v", preFilterPlugin.numPreFilterCalled)
 				}
 			}
-
-			preFilterPlugin.reset()
-			testutils.CleanupPods(testCtx.ClientSet, t, []*v1.Pod{pod})
 		})
 	}
 }
@@ -2223,61 +2099,9 @@ func TestPreEnqueuePlugin(t *testing.T) {
 //
 // - when waitingPods get deleted externally, it'd trigger moving unschedulable Pods
 func TestPreemptWithPermitPlugin(t *testing.T) {
-	// Create a plugin registry for testing. Register a permit and a filter plugin.
-	permitPlugin := &PermitPlugin{}
-	// Inject a fake filter plugin to use its internal `numFilterCalled` to verify
-	// how many times a Pod gets tried scheduling.
-	filterPlugin := &FilterPlugin{numCalledPerPod: make(map[string]int)}
-	registry := frameworkruntime.Registry{
-		permitPluginName: newPlugin(permitPlugin),
-		filterPluginName: newPlugin(filterPlugin),
-	}
+	testContext := testutils.InitTestAPIServer(t, "preempt-with-permit-plugin", nil)
 
-	// Setup initial permit and filter plugins in the profile.
-	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
-		Profiles: []configv1.KubeSchedulerProfile{
-			{
-				SchedulerName: pointer.String(v1.DefaultSchedulerName),
-				Plugins: &configv1.Plugins{
-					Permit: configv1.PluginSet{
-						Enabled: []configv1.Plugin{
-							{Name: permitPluginName},
-						},
-					},
-					Filter: configv1.PluginSet{
-						// Ensure the fake filter plugin is always called; otherwise noderesources
-						// would fail first and exit the Filter phase.
-						Enabled: []configv1.Plugin{
-							{Name: filterPluginName},
-							{Name: noderesources.Name},
-						},
-						Disabled: []configv1.Plugin{
-							{Name: noderesources.Name},
-						},
-					},
-				},
-			},
-		},
-	})
-
-	// Create the API server and the scheduler with the test plugin set.
-	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestAPIServer(t, "preempt-with-permit-plugin", nil), 0,
-		scheduler.WithProfiles(cfg.Profiles...),
-		scheduler.WithFrameworkOutOfTreeRegistry(registry))
-	defer testutils.CleanupTest(t, testCtx)
-
-	// Add one node.
-	nodeRes := map[v1.ResourceName]string{
-		v1.ResourcePods:   "32",
-		v1.ResourceCPU:    "500m",
-		v1.ResourceMemory: "500",
-	}
-	_, err := createAndWaitForNodesInCache(testCtx, "test-node", st.MakeNode().Capacity(nodeRes), 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ns := testCtx.NS.Name
+	ns := testContext.NS.Name
 	lowPriority, highPriority := int32(100), int32(300)
 	resReq := map[v1.ResourceName]string{
 		v1.ResourceCPU:    "200m",
@@ -2286,6 +2110,12 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 	preemptorReq := map[v1.ResourceName]string{
 		v1.ResourceCPU:    "400m",
 		v1.ResourceMemory: "400",
+	}
+
+	nodeRes := map[v1.ResourceName]string{
+		v1.ResourcePods:   "32",
+		v1.ResourceCPU:    "500m",
+		v1.ResourceMemory: "500",
 	}
 
 	tests := []struct {
@@ -2320,17 +2150,53 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			defer func() {
-				permitPlugin.reset()
-				filterPlugin.reset()
-				var pods []*v1.Pod
-				for _, p := range []*v1.Pod{tt.runningPod, tt.waitingPod, tt.preemptor} {
-					if p != nil {
-						pods = append(pods, p)
-					}
-				}
-				testutils.CleanupPods(testCtx.ClientSet, t, pods)
-			}()
+			// Create a plugin registry for testing. Register a permit and a filter plugin.
+			permitPlugin := &PermitPlugin{}
+			// Inject a fake filter plugin to use its internal `numFilterCalled` to verify
+			// how many times a Pod gets tried scheduling.
+			filterPlugin := &FilterPlugin{numCalledPerPod: make(map[string]int)}
+			registry := frameworkruntime.Registry{
+				permitPluginName: newPlugin(permitPlugin),
+				filterPluginName: newPlugin(filterPlugin),
+			}
+
+			// Setup initial permit and filter plugins in the profile.
+			cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+				Profiles: []configv1.KubeSchedulerProfile{
+					{
+						SchedulerName: pointer.String(v1.DefaultSchedulerName),
+						Plugins: &configv1.Plugins{
+							Permit: configv1.PluginSet{
+								Enabled: []configv1.Plugin{
+									{Name: permitPluginName},
+								},
+							},
+							Filter: configv1.PluginSet{
+								// Ensure the fake filter plugin is always called; otherwise noderesources
+								// would fail first and exit the Filter phase.
+								Enabled: []configv1.Plugin{
+									{Name: filterPluginName},
+									{Name: noderesources.Name},
+								},
+								Disabled: []configv1.Plugin{
+									{Name: noderesources.Name},
+								},
+							},
+						},
+					},
+				},
+			})
+
+			testCtx, teardown := initTestSchedulerForFrameworkTest(t, testContext, 0,
+				scheduler.WithProfiles(cfg.Profiles...),
+				scheduler.WithFrameworkOutOfTreeRegistry(registry),
+			)
+			defer teardown()
+
+			_, err := createAndWaitForNodesInCache(testCtx, "test-node", st.MakeNode().Capacity(nodeRes), 1)
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			permitPlugin.waitAndAllowPermit = true
 			permitPlugin.waitingPod = "waiting-pod"
@@ -2502,10 +2368,9 @@ func TestActivatePods(t *testing.T) {
 	})
 
 	// Create the API server and the scheduler with the test plugin set.
-	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestAPIServer(t, "job-plugin", nil), 1,
+	testCtx, _ := initTestSchedulerForFrameworkTest(t, testutils.InitTestAPIServer(t, "job-plugin", nil), 1,
 		scheduler.WithProfiles(cfg.Profiles...),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
-	defer testutils.CleanupTest(t, testCtx)
 
 	cs := testCtx.ClientSet
 	ns := testCtx.NS.Name
@@ -2549,10 +2414,17 @@ func TestActivatePods(t *testing.T) {
 	}
 }
 
-func initTestSchedulerForFrameworkTest(t *testing.T, testCtx *testutils.TestContext, nodeCount int, opts ...scheduler.Option) *testutils.TestContext {
+// The returned shutdown func will delete created resources and scheduler, resources should be those
+// that will affect the scheduling result, like nodes, pods, etc.. Namespaces should not be
+// deleted here because it's created together with the apiserver, they should be deleted
+// simultaneously or we'll have no namespace.
+// This should only be called when you want to kill the scheduler alone, away from apiserver.
+// For example, in scheduler integration tests, recreating apiserver is performance consuming,
+// then shutdown the scheduler and recreate it between each test case is a better approach.
+func initTestSchedulerForFrameworkTest(t *testing.T, testCtx *testutils.TestContext, nodeCount int, opts ...scheduler.Option) (*testutils.TestContext, testutils.ShutdownFunc) {
 	testCtx = testutils.InitTestSchedulerWithOptions(t, testCtx, 0, opts...)
-	testutils.SyncInformerFactory(testCtx)
-	go testCtx.Scheduler.Run(testCtx.Ctx)
+	testutils.SyncSchedulerInformerFactory(testCtx)
+	go testCtx.Scheduler.Run(testCtx.SchedulerCtx)
 
 	if nodeCount > 0 {
 		if _, err := createAndWaitForNodesInCache(testCtx, "test-node", st.MakeNode(), nodeCount); err != nil {
@@ -2561,7 +2433,28 @@ func initTestSchedulerForFrameworkTest(t *testing.T, testCtx *testutils.TestCont
 			t.Fatal(err)
 		}
 	}
-	return testCtx
+
+	teardown := func() {
+		err := testCtx.ClientSet.CoreV1().Nodes().DeleteCollection(testCtx.SchedulerCtx, *metav1.NewDeleteOptions(0), metav1.ListOptions{})
+		if err != nil {
+			t.Errorf("error while deleting all nodes: %v", err)
+		}
+		err = testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).DeleteCollection(testCtx.SchedulerCtx, *metav1.NewDeleteOptions(0), metav1.ListOptions{})
+		if err != nil {
+			t.Errorf("error while deleting pod: %v", err)
+		}
+		// Wait for all pods to be deleted, or will failed to create same name pods
+		// required in other test cases.
+		err = wait.PollUntilContextTimeout(testCtx.SchedulerCtx, time.Millisecond, wait.ForeverTestTimeout, true,
+			testutils.PodsCleanedUp(testCtx.SchedulerCtx, testCtx.ClientSet, testCtx.NS.Name))
+		if err != nil {
+			t.Errorf("error while waiting for all pods to be deleted: %v", err)
+		}
+		// Kill the scheduler.
+		testCtx.SchedulerCloseFn()
+	}
+
+	return testCtx, teardown
 }
 
 // initRegistryAndConfig returns registry and plugins config based on give plugins.

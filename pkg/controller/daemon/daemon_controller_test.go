@@ -480,11 +480,12 @@ func TestDeleteFinalStateUnknown(t *testing.T) {
 }
 
 func TestExpectationsOnRecreate(t *testing.T) {
-	client := fake.NewSimpleClientset()
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-
 	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	client := fake.NewSimpleClientset()
+
 	f := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 	dsc, err := NewDaemonSetsController(
 		ctx,
@@ -550,8 +551,8 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	f.Start(stopCh)
-	for ty, ok := range f.WaitForCacheSync(stopCh) {
+	f.Start(ctx.Done())
+	for ty, ok := range f.WaitForCacheSync(ctx.Done()) {
 		if !ok {
 			t.Fatalf("caches failed to sync: %v", ty)
 		}
