@@ -130,9 +130,6 @@ func ValidateJob(job *batch.Job, opts JobValidationOptions) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&job.ObjectMeta, true, apivalidation.ValidateReplicationControllerName, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateGeneratedSelector(job, opts.RequirePrefixedLabels)...)
 	allErrs = append(allErrs, ValidateJobSpec(&job.Spec, field.NewPath("spec"), opts.PodValidationOptions)...)
-	if !opts.AllowTrackingAnnotation && hasJobTrackingAnnotation(job) {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("metadata").Child("annotations").Key(batch.JobTrackingFinalizer), "cannot add this annotation"))
-	}
 	if job.Spec.CompletionMode != nil && *job.Spec.CompletionMode == batch.IndexedCompletion && job.Spec.Completions != nil && *job.Spec.Completions > 0 {
 		// For indexed job, the job controller appends a suffix (`-$INDEX`)
 		// to the pod hostname when indexed job create pods.
@@ -144,14 +141,6 @@ func ValidateJob(job *batch.Job, opts JobValidationOptions) field.ErrorList {
 		}
 	}
 	return allErrs
-}
-
-func hasJobTrackingAnnotation(job *batch.Job) bool {
-	if job.Annotations == nil {
-		return false
-	}
-	_, ok := job.Annotations[batch.JobTrackingFinalizer]
-	return ok
 }
 
 // ValidateJobSpec validates a JobSpec and returns an ErrorList with any errors.
@@ -598,8 +587,6 @@ func validateCompletions(spec, oldSpec batch.JobSpec, fldPath *field.Path, opts 
 
 type JobValidationOptions struct {
 	apivalidation.PodValidationOptions
-	// Allow Job to have the annotation batch.kubernetes.io/job-tracking
-	AllowTrackingAnnotation bool
 	// Allow mutable node affinity, selector and tolerations of the template
 	AllowMutableSchedulingDirectives bool
 	// Allow elastic indexed jobs
