@@ -176,6 +176,26 @@ func TestWarnings(t *testing.T) {
 				`spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[0].key: beta.kubernetes.io/os is deprecated since v1.14; use "kubernetes.io/os" instead`,
 			},
 		},
+		{
+			name: "PV CephFS deprecation warning",
+			template: &api.PersistentVolume{
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						CephFS: &api.CephFSPersistentVolumeSource{
+							Monitors:   nil,
+							Path:       "",
+							User:       "",
+							SecretFile: "",
+							SecretRef:  nil,
+							ReadOnly:   false,
+						},
+					},
+				},
+			},
+			expected: []string{
+				`spec.persistentVolumeSource.cephfs: deprecated in v1.28, non-functional in v1.31+`,
+			},
+		},
 	}
 
 	for _, tc := range testcases {

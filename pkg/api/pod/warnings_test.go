@@ -214,7 +214,16 @@ func TestWarnings(t *testing.T) {
 				}},
 			},
 			expected: []string{`spec.volumes[0].glusterfs: deprecated in v1.25, non-functional in v1.26+`},
+		}, {
+			name: "CephFS",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Volumes: []api.Volume{
+					{Name: "s", VolumeSource: api.VolumeSource{CephFS: &api.CephFSVolumeSource{}}},
+				}},
+			},
+			expected: []string{`spec.volumes[0].cephfs: deprecated in v1.28, non-functional in v1.31+`},
 		},
+
 		{
 			name: "duplicate hostAlias",
 			template: &api.PodTemplateSpec{Spec: api.PodSpec{
