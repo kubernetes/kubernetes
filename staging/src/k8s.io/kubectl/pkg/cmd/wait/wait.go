@@ -207,10 +207,14 @@ func conditionFuncFor(condition string, errOut io.Writer) (ConditionFunc, error)
 	}
 	if strings.HasPrefix(condition, "jsonpath=") {
 		splitStr := strings.Split(condition, "=")
-		if len(splitStr) != 3 {
-			return nil, fmt.Errorf("jsonpath wait format must be --for=jsonpath='{.status.readyReplicas}'=3")
+		if len(splitStr) < 2 || len(splitStr) > 3 {
+			return nil, fmt.Errorf("jsonpath wait format must be --for=jsonpath='{.status.readyReplicas}'[=3]")
 		}
-		jsonPathExp, jsonPathCond, err := processJSONPathInput(splitStr[1], splitStr[2])
+		conditionStr := ""
+		if len(splitStr) == 3 {
+			conditionStr = splitStr[2]
+		}
+		jsonPathExp, jsonPathCond, err := processJSONPathInput(splitStr[1], conditionStr)
 		if err != nil {
 			return nil, err
 		}
@@ -245,9 +249,6 @@ func processJSONPathInput(jsonPathExpression, jsonPathCond string) (string, stri
 	relaxedJSONPathExp, err := cmdget.RelaxedJSONPathExpression(jsonPathExpression)
 	if err != nil {
 		return "", "", err
-	}
-	if jsonPathCond == "" {
-		return "", "", errors.New("jsonpath wait condition cannot be empty")
 	}
 	jsonPathCond = strings.Trim(jsonPathCond, `'"`)
 
@@ -667,5 +668,5 @@ func compareResults(r reflect.Value, expectedVal string) (bool, error) {
 		return false, errors.New("jsonpath leads to a nested object or list which is not supported")
 	}
 	s := fmt.Sprintf("%v", r.Interface())
-	return strings.TrimSpace(s) == strings.TrimSpace(expectedVal), nil
+	return strings.TrimSpace(s) == strings.TrimSpace(expectedVal) ||  expectedVal == "", nil
 }

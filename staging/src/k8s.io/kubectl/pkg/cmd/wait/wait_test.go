@@ -1047,6 +1047,18 @@ func TestWaitForDifferentJSONPathExpression(t *testing.T) {
 			expectedErr: "timed out waiting for the condition on theresource/foo-b6699dcfb-rnv7t",
 		},
 		{
+			name: "JSONPath condition not given",
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
+				fakeClient.PrependReactor("list", "theresource", listReactionfunc)
+				return fakeClient
+			},
+			jsonPathExp:  "{.status.containerStatuses[0].ready}",
+			jsonPathCond: "",
+
+			expectedErr: None,
+		},
+		{
 			name: "compare boolean JSONPath entry",
 			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
 				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
