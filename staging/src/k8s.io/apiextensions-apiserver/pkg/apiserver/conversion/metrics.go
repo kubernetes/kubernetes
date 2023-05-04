@@ -46,10 +46,30 @@ func newConverterMetricFactory() *converterMetricFactory {
 var _ crConverterInterface = &converterMetric{}
 
 type converterMetric struct {
-	delegate  crConverterInterface
-	latencies *metrics.HistogramVec
-	crdName   string
+	delegate                crConverterInterface
+	latencies               *metrics.HistogramVec
+	webhookConversion       *metrics.CounterVec
+	webhookConversionFailed *metrics.CounterVec
+	crdName                 string
 }
+
+var (
+	webhookConversion = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Name:           "apiserver_crd_webhook_conversion_total",
+			Help:           "CRD webhook conversion total",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"crd_name", "from_version", "to_version"})
+
+	webhookConversionFailed = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Name:           "apiserver_crd_webhook_conversion_failed",
+			Help:           "CRD webhook conversion failed request count",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"crd_name", "from_version", "to_version", "failed"})
+)
 
 func (c *converterMetricFactory) addMetrics(crdName string, converter crConverterInterface) (crConverterInterface, error) {
 	c.factoryLock.Lock()
@@ -70,7 +90,11 @@ func (c *converterMetricFactory) addMetrics(crdName string, converter crConverte
 		}
 		c.durations["webhook"] = metric
 	}
-	return &converterMetric{latencies: metric, delegate: converter, crdName: crdName}, nil
+
+	legacyregistry.MustRegister(webhookConversion)
+	legacyregistry.MustRegister(webhookConversionFailed)
+
+	return &converterMetric{latencies: metric, webhookConversion: webhookConversion, webhookConversionFailed: webhookConversionFailed, delegate: converter, crdName: crdName}, nil
 }
 
 func (m *converterMetric) Convert(in runtime.Object, targetGV schema.GroupVersion) (runtime.Object, error) {
@@ -84,5 +108,7 @@ func (m *converterMetric) Convert(in runtime.Object, targetGV schema.GroupVersio
 		m.latencies.WithLabelValues(
 			m.crdName, fromVersion, toVersion, strconv.FormatBool(err == nil)).Observe(time.Since(start).Seconds())
 	}
+	m.webhookConversion.WithLabelValues(m.crdName, fromVersion, toVersion).Inc()
+	m.webhookConversionFailed.WithLabelValues(m.crdName, fromVersion, toVersion, strconv.FormatBool(err == nil)).Inc()
 	return obj, err
 }
