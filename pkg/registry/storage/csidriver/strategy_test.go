@@ -432,6 +432,8 @@ func TestCSIDriverValidation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			// assume this feature is on for this test, detailed enabled/disabled tests in TestCSIDriverValidationSELinuxMountEnabledDisabled
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
 
 			testValidation := func(csiDriver *storage.CSIDriver, apiVersion string) field.ErrorList {
 				ctx := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{
