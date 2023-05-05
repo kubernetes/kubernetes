@@ -29,6 +29,7 @@ import (
 	"k8s.io/klog/v2"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	crierrors "k8s.io/cri-api/pkg/errors"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 )
@@ -158,20 +159,31 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, pod *v1.Pod, conta
 		m.logIt(ref, v1.EventTypeWarning, events.FailedToPullImage, logPrefix, fmt.Sprintf("Failed to pull image %q: %v", container.Image, imagePullResult.err), klog.Warning)
 		m.backOff.Next(backOffKey, m.backOff.Clock.Now())
 
-		// Error assertions via errors.Is is not supported by gRPC (remote runtime) errors right now.
-		// See https://github.com/grpc/grpc-go/issues/3616
-		if imagePullResult.err.Error() == ErrRegistryUnavailable.Error() {
-			msg := fmt.Sprintf("image pull failed for %s because the registry is unavailable.", container.Image)
-			return "", msg, imagePullResult.err
-		}
-
-		return "", imagePullResult.err.Error(), ErrImagePull
+		msg, err := evalCRIPullErr(container, imagePullResult.err)
+		return "", msg, err
 	}
 	m.podPullingTimeRecorder.RecordImageFinishedPulling(pod.UID)
 	m.logIt(ref, v1.EventTypeNormal, events.PulledImage, logPrefix, fmt.Sprintf("Successfully pulled image %q in %v (%v including waiting)",
 		container.Image, imagePullResult.pullDuration.Truncate(time.Millisecond), time.Since(startTime).Truncate(time.Millisecond)), klog.Info)
 	m.backOff.GC()
 	return imagePullResult.imageRef, "", nil
+}
+
+func evalCRIPullErr(container *v1.Container, err error) (errMsg string, errRes error) {
+	// Error assertions via errors.Is is not supported by gRPC (remote runtime) errors right now.
+	// See https://github.com/grpc/grpc-go/issues/3616
+	if err.Error() == crierrors.ErrRegistryUnavailable.Error() {
+		errMsg = fmt.Sprintf("image pull failed for %s because the registry is unavailable.", container.Image)
+		return errMsg, crierrors.ErrRegistryUnavailable
+	}
+
+	if err.Error() == crierrors.ErrSignatureValidationFailed.Error() {
+		errMsg = fmt.Sprintf("image pull failed for %s because the signature validation failed.", container.Image)
+		return errMsg, crierrors.ErrSignatureValidationFailed
+	}
+
+	// Fallback for no specific error
+	return err.Error(), ErrImagePull
 }
 
 // applyDefaultImageTag parses a docker image string, if it doesn't contain any tag or digest,
