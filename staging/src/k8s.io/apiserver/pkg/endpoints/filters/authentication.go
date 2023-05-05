@@ -34,17 +34,17 @@ import (
 	"k8s.io/klog/v2"
 )
 
-type recordMetrics func(context.Context, *authenticator.Response, bool, error, authenticator.Audiences, time.Time, time.Time)
+type authenticationRecordMetricsFunc func(context.Context, *authenticator.Response, bool, error, authenticator.Audiences, time.Time, time.Time)
 
 // WithAuthentication creates an http handler that tries to authenticate the given request as a user, and then
 // stores any such user found onto the provided context for the request. If authentication fails or returns an error
 // the failed handler is used. On success, "Authorization" header is removed from the request and handler
 // is invoked to serve the request.
 func WithAuthentication(handler http.Handler, auth authenticator.Request, failed http.Handler, apiAuds authenticator.Audiences, requestHeaderConfig *authenticatorfactory.RequestHeaderConfig) http.Handler {
-	return withAuthentication(handler, auth, failed, apiAuds, requestHeaderConfig, recordAuthMetrics)
+	return withAuthentication(handler, auth, failed, apiAuds, requestHeaderConfig, recordAuthenticationMetrics)
 }
 
-func withAuthentication(handler http.Handler, auth authenticator.Request, failed http.Handler, apiAuds authenticator.Audiences, requestHeaderConfig *authenticatorfactory.RequestHeaderConfig, metrics recordMetrics) http.Handler {
+func withAuthentication(handler http.Handler, auth authenticator.Request, failed http.Handler, apiAuds authenticator.Audiences, requestHeaderConfig *authenticatorfactory.RequestHeaderConfig, metrics authenticationRecordMetricsFunc) http.Handler {
 	if auth == nil {
 		klog.Warning("Authentication is disabled")
 		return handler
