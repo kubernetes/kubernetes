@@ -17,6 +17,7 @@ limitations under the License.
 package resource
 
 import (
+	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -141,22 +142,16 @@ func TestInvalidOpenAPIV3Document(t *testing.T) {
 	tests := map[string]struct {
 		spec *spec3.OpenAPI
 	}{
-		"nil document correctly returns Unsupported error": {
+		"nil document returns error": {
 			spec: nil,
 		},
-		"empty document correctly returns Unsupported error": {
+		"empty document returns error": {
 			spec: &spec3.OpenAPI{},
 		},
-		"minimal document correctly returns Unsupported error": {
+		"minimal document returns error": {
 			spec: &spec3.OpenAPI{
 				Version: "openapi 3.0.0",
 				Paths:   nil,
-			},
-		},
-		"document with empty Paths correctly returns Unsupported error": {
-			spec: &spec3.OpenAPI{
-				Version: "openapi 3.0.0",
-				Paths:   &spec3.Paths{},
 			},
 		},
 	}
@@ -177,8 +172,8 @@ func TestInvalidOpenAPIV3Document(t *testing.T) {
 				queryParam: QueryParamFieldValidation,
 			}
 			err := verifier.HasSupport(gvk)
-			if err == nil {
-				t.Errorf("Expected not supports error, but none received.")
+			if !strings.Contains(err.Error(), "Invalid OpenAPI V3 document") {
+				t.Errorf("Expected invalid document error, but none received.")
 			}
 		})
 	}
