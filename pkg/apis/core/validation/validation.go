@@ -1224,7 +1224,7 @@ func validatePathNoBacksteps(targetPath string, fldPath *field.Path) field.Error
 
 // validateMountPropagation verifies that MountPropagation field is valid and
 // allowed for given container.
-func validateMountPropagation(mountPropagation *core.MountPropagationMode, container *core.Container, fldPath *field.Path) field.ErrorList {
+func validateMountPropagation(mountPropagation *core.MountPropagationMode, container *core.Container, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if mountPropagation == nil {
@@ -1243,11 +1243,42 @@ func validateMountPropagation(mountPropagation *core.MountPropagationMode, conta
 		return allErrs
 	}
 
-	privileged := container.SecurityContext != nil && container.SecurityContext.Privileged != nil && *container.SecurityContext.Privileged
-	if *mountPropagation == core.MountPropagationBidirectional && !privileged {
-		allErrs = append(allErrs, field.Forbidden(fldPath, "Bidirectional mount propagation is available only to privileged containers"))
+	if *mountPropagation == core.MountPropagationBidirectional && !hasBidirectionalMountPropagationPermissions(container.SecurityContext, opts) {
+		errMessage := "Bidirectional mount propagation is available only to privileged containers"
+		if opts.AllowUnprivilegedBidirectionalMountPropagation {
+			errMessage += " or containers with the 'SYS_ADMIN' capability"
+		}
+		allErrs = append(allErrs, field.Forbidden(fldPath, errMessage))
 	}
 	return allErrs
+}
+
+// HasUnprivilegedBidirectionalMountPropagation checks if security context has required capability for unprivileged mount propagation
+func HasUnprivilegedBidirectionalMountPropagation(securityContext *core.SecurityContext) bool {
+	if securityContext != nil && securityContext.Capabilities != nil {
+		for _, capability := range securityContext.Capabilities.Add {
+			if capability == "SYS_ADMIN" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// hasBidirectionalMountPropagationPermissions checks if requirements for bidirectional mount propagation exist
+func hasBidirectionalMountPropagationPermissions(securityContext *core.SecurityContext, opts PodValidationOptions) bool {
+	if securityContext == nil {
+		return false
+	}
+
+	if securityContext.Privileged != nil && *securityContext.Privileged {
+		return true
+	}
+
+	if opts.AllowUnprivilegedBidirectionalMountPropagation && HasUnprivilegedBidirectionalMountPropagation(securityContext) {
+		return true
+	}
+	return false
 }
 
 // This validate will make sure targetPath:
@@ -2655,7 +2686,7 @@ func GetVolumeDeviceMap(devices []core.VolumeDevice) map[string]string {
 	return volDevices
 }
 
-func ValidateVolumeMounts(mounts []core.VolumeMount, voldevices map[string]string, volumes map[string]core.VolumeSource, container *core.Container, fldPath *field.Path) field.ErrorList {
+func ValidateVolumeMounts(mounts []core.VolumeMount, voldevices map[string]string, volumes map[string]core.VolumeSource, container *core.Container, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	mountpoints := sets.NewString()
 
@@ -2696,7 +2727,7 @@ func ValidateVolumeMounts(mounts []core.VolumeMount, voldevices map[string]strin
 		}
 
 		if mnt.MountPropagation != nil {
-			allErrs = append(allErrs, validateMountPropagation(mnt.MountPropagation, container, fldPath.Child("mountPropagation"))...)
+			allErrs = append(allErrs, validateMountPropagation(mnt.MountPropagation, container, fldPath.Child("mountPropagation"), opts)...)
 		}
 	}
 	return allErrs
@@ -3233,7 +3264,7 @@ func validateContainerCommon(ctr *core.Container, volumes map[string]core.Volume
 	allErrs = append(allErrs, validateContainerPorts(ctr.Ports, path.Child("ports"))...)
 	allErrs = append(allErrs, ValidateEnv(ctr.Env, path.Child("env"), opts)...)
 	allErrs = append(allErrs, ValidateEnvFrom(ctr.EnvFrom, path.Child("envFrom"))...)
-	allErrs = append(allErrs, ValidateVolumeMounts(ctr.VolumeMounts, volDevices, volumes, ctr, path.Child("volumeMounts"))...)
+	allErrs = append(allErrs, ValidateVolumeMounts(ctr.VolumeMounts, volDevices, volumes, ctr, path.Child("volumeMounts"), opts)...)
 	allErrs = append(allErrs, ValidateVolumeDevices(ctr.VolumeDevices, volMounts, volumes, path.Child("volumeDevices"))...)
 	allErrs = append(allErrs, validatePullPolicy(ctr.ImagePullPolicy, path.Child("imagePullPolicy"))...)
 	allErrs = append(allErrs, ValidateResourceRequirements(&ctr.Resources, podClaimNames, path.Child("resources"), opts)...)
@@ -3683,6 +3714,8 @@ type PodValidationOptions struct {
 	// The top-level resource being validated is a Pod, not just a PodSpec
 	// embedded in some other resource.
 	ResourceIsPod bool
+	// Allow bidirectional mount propagation for unprivileged containers
+	AllowUnprivilegedBidirectionalMountPropagation bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,

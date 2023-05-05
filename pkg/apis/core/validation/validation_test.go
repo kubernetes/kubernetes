@@ -6152,7 +6152,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 		{Name: "xyz", DevicePath: "/foofoo"},
 		{Name: "uvw", DevicePath: "/foofoo/share/test"},
 	}
-	if errs := ValidateVolumeMounts(successCase, GetVolumeDeviceMap(goodVolumeDevices), vols, &container, field.NewPath("field")); len(errs) != 0 {
+	if errs := ValidateVolumeMounts(successCase, GetVolumeDeviceMap(goodVolumeDevices), vols, &container, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -6175,7 +6175,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 	}
 
 	for k, v := range errorCases {
-		if errs := ValidateVolumeMounts(v, GetVolumeDeviceMap(badVolumeDevice), vols, &container, field.NewPath("field")); len(errs) == 0 {
+		if errs := ValidateVolumeMounts(v, GetVolumeDeviceMap(badVolumeDevice), vols, &container, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
 	}
@@ -6241,7 +6241,7 @@ func TestValidateSubpathMutuallyExclusive(t *testing.T) {
 	}
 
 	for name, test := range cases {
-		errs := ValidateVolumeMounts(test.mounts, GetVolumeDeviceMap(goodVolumeDevices), vols, &container, field.NewPath("field"))
+		errs := ValidateVolumeMounts(test.mounts, GetVolumeDeviceMap(goodVolumeDevices), vols, &container, field.NewPath("field"), PodValidationOptions{})
 
 		if len(errs) != 0 && !test.expectError {
 			t.Errorf("test %v failed: %+v", name, errs)
@@ -6297,7 +6297,7 @@ func TestValidateDisabledSubpathExpr(t *testing.T) {
 	}
 
 	for name, test := range cases {
-		errs := ValidateVolumeMounts(test.mounts, GetVolumeDeviceMap(goodVolumeDevices), vols, &container, field.NewPath("field"))
+		errs := ValidateVolumeMounts(test.mounts, GetVolumeDeviceMap(goodVolumeDevices), vols, &container, field.NewPath("field"), PodValidationOptions{})
 
 		if len(errs) != 0 && !test.expectError {
 			t.Errorf("test %v failed: %+v", name, errs)
@@ -6322,6 +6322,16 @@ func TestValidateMountPropagation(t *testing.T) {
 			Privileged: &bFalse,
 		},
 	}
+	nonPrivilegedContainerWithCapability := &core.Container{
+		SecurityContext: &core.SecurityContext{
+			Privileged: &bFalse,
+			Capabilities: &core.Capabilities{
+				Add: []core.Capability{
+					"SYS_ADMIN",
+				},
+			},
+		},
+	}
 	defaultContainer := &core.Container{}
 
 	propagationBidirectional := core.MountPropagationBidirectional
@@ -6329,73 +6339,105 @@ func TestValidateMountPropagation(t *testing.T) {
 	propagationNone := core.MountPropagationNone
 	propagationInvalid := core.MountPropagationMode("invalid")
 
-	tests := []struct {
-		mount       core.VolumeMount
-		container   *core.Container
-		expectError bool
+	var tests = []struct {
+		mount                core.VolumeMount
+		container            *core.Container
+		expectError          bool
+		expectedErrorMessage string
+		opts                 PodValidationOptions
 	}{{
 		// implicitly non-privileged container + no propagation
-		core.VolumeMount{Name: "foo", MountPath: "/foo"},
-		defaultContainer,
-		false,
+		mount:       core.VolumeMount{Name: "foo", MountPath: "/foo"},
+		container:   defaultContainer,
+		expectError: false,
 	}, {
 		// implicitly non-privileged container + HostToContainer
-		core.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationHostToContainer},
-		defaultContainer,
-		false,
+		mount:       core.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationHostToContainer},
+		container:   defaultContainer,
+		expectError: false,
 	}, {
 		// non-privileged container + None
-		core.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationNone},
-		defaultContainer,
-		false,
+		mount:       core.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationNone},
+		container:   defaultContainer,
+		expectError: false,
 	}, {
 		// error: implicitly non-privileged container + Bidirectional
-		core.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationBidirectional},
-		defaultContainer,
-		true,
+		mount:       core.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationBidirectional},
+		container:   defaultContainer,
+		expectError: true,
 	}, {
 		// explicitly non-privileged container + no propagation
-		core.VolumeMount{Name: "foo", MountPath: "/foo"},
-		nonPrivilegedContainer,
-		false,
+		mount:       core.VolumeMount{Name: "foo", MountPath: "/foo"},
+		container:   nonPrivilegedContainer,
+		expectError: false,
 	}, {
 		// explicitly non-privileged container + HostToContainer
-		core.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationHostToContainer},
-		nonPrivilegedContainer,
-		false,
+		mount:       core.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationHostToContainer},
+		container:   nonPrivilegedContainer,
+		expectError: false,
 	}, {
 		// explicitly non-privileged container + HostToContainer
-		core.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationBidirectional},
-		nonPrivilegedContainer,
-		true,
+		mount:       core.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationBidirectional},
+		container:   nonPrivilegedContainer,
+		expectError: true,
 	}, {
 		// privileged container + no propagation
-		core.VolumeMount{Name: "foo", MountPath: "/foo"},
-		privilegedContainer,
-		false,
+		mount:     core.VolumeMount{Name: "foo", MountPath: "/foo"},
+		container: privilegedContainer,
 	}, {
 		// privileged container + HostToContainer
-		core.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationHostToContainer},
-		privilegedContainer,
-		false,
+		mount:       core.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationHostToContainer},
+		container:   privilegedContainer,
+		expectError: false,
 	}, {
 		// privileged container + Bidirectional
-		core.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationBidirectional},
-		privilegedContainer,
-		false,
+		mount:       core.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationBidirectional},
+		container:   privilegedContainer,
+		expectError: false,
 	}, {
 		// error: privileged container + invalid mount propagation
-		core.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationInvalid},
-		privilegedContainer,
-		true,
+		mount:       core.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationInvalid},
+		container:   privilegedContainer,
+		expectError: true,
+	}, {
+		// error: non-privileged container + Bidirectional mount propagation
+		mount:                core.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationBidirectional},
+		container:            nonPrivilegedContainer,
+		expectError:          true,
+		expectedErrorMessage: "Bidirectional mount propagation is available only to privileged containers",
+	}, {
+		// error: non-privileged container with required capability + Bidirectional without validation option
+		mount:     core.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationBidirectional},
+		container: nonPrivilegedContainerWithCapability,
+		opts: PodValidationOptions{
+			AllowUnprivilegedBidirectionalMountPropagation: false,
+		},
+		expectError:          true,
+		expectedErrorMessage: "Bidirectional mount propagation is available only to privileged containers",
+	}, {
+		// error: non-privileged container + Bidirectional without validation option
+		mount:     core.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationBidirectional},
+		container: nonPrivilegedContainer,
+		opts: PodValidationOptions{
+			AllowUnprivilegedBidirectionalMountPropagation: true,
+		},
+		expectError:          true,
+		expectedErrorMessage: "Bidirectional mount propagation is available only to privileged containers or containers with the 'SYS_ADMIN' capability",
+	}, {
+		// explicitly non-privileged container with required capability + Bidirectional
+		mount:     core.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationBidirectional},
+		container: nonPrivilegedContainerWithCapability,
+		opts: PodValidationOptions{
+			AllowUnprivilegedBidirectionalMountPropagation: true,
+		},
+		expectError: false,
 	}, {
 		// no container + Bidirectional
-		core.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationBidirectional},
-		nil,
-		false,
+		mount:       core.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationBidirectional},
+		container:   nil,
+		expectError: false,
 	},
 	}
-
 	volumes := []core.Volume{
 		{Name: "foo", VolumeSource: core.VolumeSource{HostPath: &core.HostPathVolumeSource{Path: "/foo/baz", Type: newHostPathType(string(core.HostPathUnset))}}},
 	}
@@ -6405,12 +6447,25 @@ func TestValidateMountPropagation(t *testing.T) {
 		return
 	}
 	for i, test := range tests {
-		errs := ValidateVolumeMounts([]core.VolumeMount{test.mount}, nil, vols2, test.container, field.NewPath("field"))
+		errs := ValidateVolumeMounts([]core.VolumeMount{test.mount}, nil, vols2, test.container, field.NewPath("field"), test.opts)
 		if test.expectError && len(errs) == 0 {
 			t.Errorf("test %d expected error, got none", i)
 		}
 		if !test.expectError && len(errs) != 0 {
 			t.Errorf("test %d expected success, got error: %v", i, errs)
+		}
+
+		if test.expectError && test.expectedErrorMessage != "" {
+			expectedErrFound := false
+			for _, err := range errs {
+				if err.Detail == test.expectedErrorMessage {
+					expectedErrFound = true
+					break
+				}
+			}
+			if !expectedErrFound {
+				t.Errorf("test %d expected error message: \"%s\"\ngot error: %v", i, test.expectedErrorMessage, errs)
+			}
 		}
 	}
 }
