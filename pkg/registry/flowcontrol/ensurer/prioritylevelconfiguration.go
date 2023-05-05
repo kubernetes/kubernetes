@@ -119,7 +119,10 @@ type plEnsurer struct {
 
 func (e *plEnsurer) Ensure(priorityLevels []*flowcontrolv1beta3.PriorityLevelConfiguration) error {
 	for _, priorityLevel := range priorityLevels {
-		if err := ensureConfiguration(e.wrapper, e.strategy, priorityLevel); err != nil {
+		// This code gets called by different goroutines. To avoid race conditions when
+		// https://github.com/kubernetes/kubernetes/blob/330b5a2b8dbd681811cb8235947557c99dd8e593/staging/src/k8s.io/apimachinery/pkg/runtime/helper.go#L221-L243
+		// temporarily modifies the TypeMeta, we have to make a copy here.
+		if err := ensureConfiguration(e.wrapper, e.strategy, priorityLevel.DeepCopy()); err != nil {
 			return err
 		}
 	}
