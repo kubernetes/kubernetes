@@ -64,3 +64,8 @@ var _ rest.CategoriesProvider = &REST{}
 func (r *REST) Categories() []string {
 	return []string{"api-extensions"}
 }
+
+// ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
+func (r *REST) ShortNames() []string {
+	return []string{"mwc"}
+}
