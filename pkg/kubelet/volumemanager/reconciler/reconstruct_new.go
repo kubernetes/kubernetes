@@ -105,9 +105,9 @@ func (rc *reconciler) reconstructVolumes() {
 
 func (rc *reconciler) updateStatesNew(reconstructedVolumes map[v1.UniqueVolumeName]*globalVolumeInfo) {
 	for _, gvl := range reconstructedVolumes {
-		err := rc.actualStateOfWorld.MarkVolumeAsAttached(
+		err := rc.actualStateOfWorld.AddAttachUncertainReconstructedVolume(
 			//TODO: the devicePath might not be correct for some volume plugins: see issue #54108
-			klog.TODO(), gvl.volumeName, gvl.volumeSpec, rc.nodeName, gvl.devicePath)
+			gvl.volumeName, gvl.volumeSpec, rc.nodeName, gvl.devicePath)
 		if err != nil {
 			klog.ErrorS(err, "Could not add volume information to actual state of world", "volumeName", gvl.volumeName)
 			continue
@@ -196,14 +196,18 @@ func (rc *reconciler) updateReconstructedDevicePaths() {
 	}
 
 	for _, volumeID := range rc.volumesNeedDevicePath {
+		attachable := false
 		for _, attachedVolume := range node.Status.VolumesAttached {
 			if volumeID != attachedVolume.Name {
 				continue
 			}
 			rc.actualStateOfWorld.UpdateReconstructedDevicePath(volumeID, attachedVolume.DevicePath)
+			attachable = true
 			klog.V(4).InfoS("Updated devicePath from node status for volume", "volumeName", attachedVolume.Name, "path", attachedVolume.DevicePath)
 		}
+		rc.actualStateOfWorld.UpdateReconstructedVolumeAttachability(volumeID, attachable)
 	}
+
 	klog.V(2).InfoS("DevicePaths of reconstructed volumes updated")
 	rc.volumesNeedDevicePath = nil
 }

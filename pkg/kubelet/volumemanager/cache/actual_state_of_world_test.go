@@ -525,6 +525,54 @@ func TestActualStateOfWorld_FoundDuringReconstruction(t *testing.T) {
 				return nil
 			},
 		},
+		{
+			name: "uncertain attachability is resolved to attachable",
+			opCallback: func(asw ActualStateOfWorld, volumeOpts operationexecutor.MarkVolumeOpts) error {
+				asw.UpdateReconstructedVolumeAttachability(volumeOpts.VolumeName, true)
+				return nil
+			},
+			verifyCallback: func(asw ActualStateOfWorld, volumeOpts operationexecutor.MarkVolumeOpts) error {
+				verifyVolumeAttachability(t, volumeOpts.VolumeName, asw, volumeAttachabilityTrue)
+				return nil
+			},
+		},
+		{
+			name: "uncertain attachability is resolved to non-attachable",
+			opCallback: func(asw ActualStateOfWorld, volumeOpts operationexecutor.MarkVolumeOpts) error {
+				asw.UpdateReconstructedVolumeAttachability(volumeOpts.VolumeName, false)
+				return nil
+			},
+			verifyCallback: func(asw ActualStateOfWorld, volumeOpts operationexecutor.MarkVolumeOpts) error {
+				verifyVolumeAttachability(t, volumeOpts.VolumeName, asw, volumeAttachabilityFalse)
+				return nil
+			},
+		},
+		{
+			name: "certain (false) attachability cannot be changed",
+			opCallback: func(asw ActualStateOfWorld, volumeOpts operationexecutor.MarkVolumeOpts) error {
+				asw.UpdateReconstructedVolumeAttachability(volumeOpts.VolumeName, false)
+				// This function should be NOOP:
+				asw.UpdateReconstructedVolumeAttachability(volumeOpts.VolumeName, true)
+				return nil
+			},
+			verifyCallback: func(asw ActualStateOfWorld, volumeOpts operationexecutor.MarkVolumeOpts) error {
+				verifyVolumeAttachability(t, volumeOpts.VolumeName, asw, volumeAttachabilityFalse)
+				return nil
+			},
+		},
+		{
+			name: "certain (true) attachability cannot be changed",
+			opCallback: func(asw ActualStateOfWorld, volumeOpts operationexecutor.MarkVolumeOpts) error {
+				asw.UpdateReconstructedVolumeAttachability(volumeOpts.VolumeName, true)
+				// This function should be NOOP:
+				asw.UpdateReconstructedVolumeAttachability(volumeOpts.VolumeName, false)
+				return nil
+			},
+			verifyCallback: func(asw ActualStateOfWorld, volumeOpts operationexecutor.MarkVolumeOpts) error {
+				verifyVolumeAttachability(t, volumeOpts.VolumeName, asw, volumeAttachabilityTrue)
+				return nil
+			},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -537,8 +585,7 @@ func TestActualStateOfWorld_FoundDuringReconstruction(t *testing.T) {
 			generatedVolumeName1, err := util.GetUniqueVolumeNameFromSpec(
 				plugin, volumeSpec1)
 			require.NoError(t, err)
-			logger, _ := ktesting.NewTestContext(t)
-			err = asw.MarkVolumeAsAttached(logger, generatedVolumeName1, volumeSpec1, "" /* nodeName */, devicePath)
+			err = asw.AddAttachUncertainReconstructedVolume(generatedVolumeName1, volumeSpec1, "" /* nodeName */, devicePath)
 			if err != nil {
 				t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
 			}
@@ -575,6 +622,7 @@ func TestActualStateOfWorld_FoundDuringReconstruction(t *testing.T) {
 			verifyVolumeExistsWithSpecNameInVolumeAsw(t, podName1, volumeSpec1.Name(), asw)
 			verifyVolumeSpecNameInVolumeAsw(t, podName1, []*volume.Spec{volumeSpec1}, asw)
 			verifyVolumeFoundInReconstruction(t, podName1, generatedVolumeName1, asw)
+			verifyVolumeAttachability(t, generatedVolumeName1, asw, volumeAttachabilityUncertain)
 
 			if tc.opCallback != nil {
 				err = tc.opCallback(asw, markVolumeOpts1)
@@ -1305,5 +1353,30 @@ func verifyVolumeFoundInReconstruction(t *testing.T, podToCheck volumetypes.Uniq
 	isRecontructed := asw.IsVolumeReconstructed(volumeToCheck, podToCheck)
 	if !isRecontructed {
 		t.Fatalf("ASW IsVolumeReconstructed result invalid. expected <true> Actual <false>")
+	}
+}
+
+func verifyVolumeAttachability(t *testing.T, volumeToCheck v1.UniqueVolumeName, asw ActualStateOfWorld, expected volumeAttachability) {
+	attached := asw.GetAttachedVolumes()
+	attachable := false
+
+	for _, volume := range attached {
+		if volume.VolumeName == volumeToCheck {
+			attachable = volume.PluginIsAttachable
+			break
+		}
+	}
+
+	switch expected {
+	case volumeAttachabilityTrue:
+		if !attachable {
+			t.Errorf("ASW reports %s as not-attachable, when %s was expected", volumeToCheck, expected)
+		}
+	// ASW does not have any special difference between False and Uncertain.
+	// Uncertain only allows to be changed to True / False.
+	case volumeAttachabilityUncertain, volumeAttachabilityFalse:
+		if attachable {
+			t.Errorf("ASW reports %s as attachable, when %s was expected", volumeToCheck, expected)
+		}
 	}
 }
