@@ -17,6 +17,8 @@ limitations under the License.
 package resource
 
 import (
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/openapi"
@@ -62,6 +64,11 @@ func (v *queryParamVerifierV3) HasSupport(gvk schema.GroupVersionKind) error {
 	}
 	gvSpec, err := v.root.GVSpec(gvk.GroupVersion())
 	if err == nil {
+		// Even if there is no error returned fetching OpenAPI V3 document,
+		// check if the returned document is valid before checking support.
+		if gvSpec == nil || gvSpec.Paths == nil {
+			return fmt.Errorf("Invalid OpenAPI V3 document")
+		}
 		if supports := supportsQueryParamV3(gvSpec, gvk, v.queryParam); supports {
 			return nil
 		}
@@ -106,9 +113,6 @@ func hasGVKExtensionV3(extensions spec.Extensions, gvk schema.GroupVersionKind) 
 // the PATCH end-point. Returns true if the query param is supported by the
 // spec for the passed GVK; false otherwise.
 func supportsQueryParamV3(doc *spec3.OpenAPI, gvk schema.GroupVersionKind, queryParam VerifiableQueryParam) bool {
-	if doc == nil || doc.Paths == nil {
-		return false
-	}
 	for _, path := range doc.Paths.Paths {
 		// If operation is not PATCH, then continue.
 		op := path.PathProps.Patch
