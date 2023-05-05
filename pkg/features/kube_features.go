@@ -212,15 +212,6 @@ const (
 	// Enables support for time zones in CronJobs.
 	CronJobTimeZone featuregate.Feature = "CronJobTimeZone"
 
-	// owner: @gnufied, @verult, @bertinatto
-	// alpha: v1.22
-	// beta: v1.23
-	// GA: v1.26
-	// If supported by the CSI driver, delegates the role of applying FSGroup to
-	// the driver by passing FSGroup through the NodeStageVolume and
-	// NodePublishVolume calls.
-	DelegateFSGroupToCSIDriver featuregate.Feature = "DelegateFSGroupToCSIDriver"
-
 	// owner: @jiayingz, @swatisehgal (for GA graduation)
 	// alpha: v1.8
 	// beta: v1.10
@@ -917,8 +908,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ConsistentHTTPGetHandlers: {Default: true, PreRelease: featuregate.GA},
 
 	CronJobTimeZone: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
-
-	DelegateFSGroupToCSIDriver: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 
 	DevicePlugins: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 
