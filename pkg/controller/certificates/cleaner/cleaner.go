@@ -47,6 +47,7 @@ const (
 	// cleaned up.
 	approvedExpiration = 1 * time.Hour
 	deniedExpiration   = 1 * time.Hour
+	failedExpiration   = 1 * time.Hour
 	pendingExpiration  = 24 * time.Hour
 )
 
@@ -155,8 +156,8 @@ func isDeniedPastDeadline(csr *capi.CertificateSigningRequest) bool {
 // maintained for.
 func isFailedPastDeadline(csr *capi.CertificateSigningRequest) bool {
 	for _, c := range csr.Status.Conditions {
-		if c.Type == capi.CertificateFailed && isOlderThan(c.LastUpdateTime, deniedExpiration) {
-			klog.Infof("Cleaning CSR %q as it is more than %v old and failed.", csr.Name, deniedExpiration)
+		if c.Type == capi.CertificateFailed && isOlderThan(c.LastUpdateTime, failedExpiration) {
+			klog.Infof("Cleaning CSR %q as it is more than %v old and failed.", csr.Name, failedExpiration)
 			return true
 		}
 	}
