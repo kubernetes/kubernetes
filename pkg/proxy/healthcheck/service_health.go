@@ -63,15 +63,15 @@ func newServiceHealthServer(hostname string, recorder events.EventRecorder, list
 	nodeAddresses, err := nodePortAddresses.GetNodeAddresses(utilproxy.RealNetwork{})
 	if err != nil || nodeAddresses.Len() == 0 {
 		klog.ErrorS(err, "Failed to get node ip address matching node port addresses, health check port will listen to all node addresses", "nodePortAddresses", nodePortAddresses)
-		nodeAddresses = sets.NewString()
+		nodeAddresses = sets.New[string]()
 		nodeAddresses.Insert(utilproxy.IPv4ZeroCIDR)
 	}
 
 	// if any of the addresses is zero cidr then we listen
 	// to old style :<port>
-	for _, addr := range nodeAddresses.List() {
+	for _, addr := range nodeAddresses.UnsortedList() {
 		if utilproxy.IsZeroCIDR(addr) {
-			nodeAddresses = sets.NewString("")
+			nodeAddresses = sets.New[string]("")
 			break
 		}
 	}
@@ -95,7 +95,7 @@ func NewServiceHealthServer(hostname string, recorder events.EventRecorder, node
 type server struct {
 	hostname string
 	// node addresses where health check port will listen on
-	nodeAddresses sets.String
+	nodeAddresses sets.Set[string]
 	recorder      events.EventRecorder // can be nil
 	listener      listener
 	httpFactory   httpServerFactory
@@ -169,7 +169,7 @@ func (hcI *hcInstance) listenAndServeAll(hcs *server) error {
 	var err error
 	var listener net.Listener
 
-	addresses := hcs.nodeAddresses.List()
+	addresses := hcs.nodeAddresses.UnsortedList()
 	hcI.httpServers = make([]httpServer, 0, len(addresses))
 
 	// for each of the node addresses start listening and serving

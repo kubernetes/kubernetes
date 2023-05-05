@@ -70,8 +70,8 @@ func (npa *NodePortAddresses) String() string {
 // verbatim in the response and no actual IPs of that family will be returned.
 // If no matching IPs are found, GetNodeAddresses will return an error.
 // NetworkInterfacer is injected for test purpose.
-func (npa *NodePortAddresses) GetNodeAddresses(nw NetworkInterfacer) (sets.String, error) {
-	uniqueAddressList := sets.NewString()
+func (npa *NodePortAddresses) GetNodeAddresses(nw NetworkInterfacer) (sets.Set[string], error) {
+	uniqueAddressList := sets.New[string]()
 
 	// First round of iteration to pick out `0.0.0.0/0` or `::/0` for the sake of excluding non-zero IPs.
 	for _, cidr := range npa.cidrStrings {

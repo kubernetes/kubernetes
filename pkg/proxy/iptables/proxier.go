@@ -787,7 +787,7 @@ func (proxier *Proxier) syncProxyRules() {
 	}()
 
 	tryPartialSync := !proxier.needFullSync && utilfeature.DefaultFeatureGate.Enabled(features.MinimizeIPTablesRestore)
-	var serviceChanged, endpointsChanged sets.String
+	var serviceChanged, endpointsChanged sets.Set[string]
 	if tryPartialSync {
 		serviceChanged = proxier.serviceChanges.PendingChanges()
 		endpointsChanged = proxier.endpointsChanges.PendingChanges()
@@ -1419,7 +1419,7 @@ func (proxier *Proxier) syncProxyRules() {
 	for addr := range nodeAddresses {
 		if utilproxy.IsZeroCIDR(addr) && isIPv6 == netutils.IsIPv6CIDRString(addr) {
 			// if any of the addresses is zero cidr of this IP family, non-zero IPs can be excluded.
-			nodeAddresses = sets.NewString(addr)
+			nodeAddresses = sets.New[string](addr)
 			break
 		}
 	}

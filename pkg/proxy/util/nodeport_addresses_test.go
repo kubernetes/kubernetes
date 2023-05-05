@@ -35,7 +35,7 @@ func TestGetNodeAddresses(t *testing.T) {
 		name          string
 		cidrs         []string
 		itfAddrsPairs []InterfaceAddrsPair
-		expected      sets.String
+		expected      sets.Set[string]
 	}{
 		{
 			name:  "IPv4 single",
@@ -50,7 +50,7 @@ func TestGetNodeAddresses(t *testing.T) {
 					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("100.200.201.1"), Mask: net.CIDRMask(24, 32)}},
 				},
 			},
-			expected: sets.NewString("10.20.30.51"),
+			expected: sets.New[string]("10.20.30.51"),
 		},
 		{
 			name:  "IPv4 zero CIDR",
@@ -65,7 +65,7 @@ func TestGetNodeAddresses(t *testing.T) {
 					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("127.0.0.1"), Mask: net.CIDRMask(8, 32)}},
 				},
 			},
-			expected: sets.NewString("0.0.0.0/0"),
+			expected: sets.New[string]("0.0.0.0/0"),
 		},
 		{
 			name:  "IPv6 multiple",
@@ -80,7 +80,7 @@ func TestGetNodeAddresses(t *testing.T) {
 					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("::1"), Mask: net.CIDRMask(128, 128)}},
 				},
 			},
-			expected: sets.NewString("2001:db8::1", "::1"),
+			expected: sets.New[string]("2001:db8::1", "::1"),
 		},
 		{
 			name:  "IPv6 zero CIDR",
@@ -95,7 +95,7 @@ func TestGetNodeAddresses(t *testing.T) {
 					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("::1"), Mask: net.CIDRMask(128, 128)}},
 				},
 			},
-			expected: sets.NewString("::/0"),
+			expected: sets.New[string]("::/0"),
 		},
 		{
 			name:  "IPv4 localhost exact",
@@ -110,7 +110,7 @@ func TestGetNodeAddresses(t *testing.T) {
 					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("127.0.0.1"), Mask: net.CIDRMask(8, 32)}},
 				},
 			},
-			expected: sets.NewString("127.0.0.1"),
+			expected: sets.New[string]("127.0.0.1"),
 		},
 		{
 			name:  "IPv4 localhost subnet",
@@ -121,7 +121,7 @@ func TestGetNodeAddresses(t *testing.T) {
 					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("127.0.1.1"), Mask: net.CIDRMask(8, 32)}},
 				},
 			},
-			expected: sets.NewString("127.0.1.1"),
+			expected: sets.New[string]("127.0.1.1"),
 		},
 		{
 			name:  "IPv4 multiple",
@@ -136,7 +136,7 @@ func TestGetNodeAddresses(t *testing.T) {
 					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("100.200.201.1"), Mask: net.CIDRMask(24, 32)}},
 				},
 			},
-			expected: sets.NewString("10.20.30.51", "100.200.201.1"),
+			expected: sets.New[string]("10.20.30.51", "100.200.201.1"),
 		},
 		{
 			name:  "IPv4 multiple, no match",
@@ -166,7 +166,7 @@ func TestGetNodeAddresses(t *testing.T) {
 					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("127.0.0.1"), Mask: net.CIDRMask(8, 32)}},
 				},
 			},
-			expected: sets.NewString("0.0.0.0/0", "::/0"),
+			expected: sets.New[string]("0.0.0.0/0", "::/0"),
 		},
 		{
 			name:  "empty list, IPv6 addrs",
@@ -181,7 +181,7 @@ func TestGetNodeAddresses(t *testing.T) {
 					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("::1"), Mask: net.CIDRMask(128, 128)}},
 				},
 			},
-			expected: sets.NewString("0.0.0.0/0", "::/0"),
+			expected: sets.New[string]("0.0.0.0/0", "::/0"),
 		},
 		{
 			name:  "IPv4 redundant CIDRs",
@@ -192,7 +192,7 @@ func TestGetNodeAddresses(t *testing.T) {
 					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("1.2.3.4"), Mask: net.CIDRMask(30, 32)}},
 				},
 			},
-			expected: sets.NewString("0.0.0.0/0"),
+			expected: sets.New[string]("0.0.0.0/0"),
 		},
 		{
 			name:  "Dual-stack, redundant IPv4",
@@ -213,7 +213,7 @@ func TestGetNodeAddresses(t *testing.T) {
 					},
 				},
 			},
-			expected: sets.NewString("0.0.0.0/0", "2001:db8::1"),
+			expected: sets.New[string]("0.0.0.0/0", "2001:db8::1"),
 		},
 		{
 			name:  "Dual-stack, redundant IPv6",
@@ -234,7 +234,7 @@ func TestGetNodeAddresses(t *testing.T) {
 					},
 				},
 			},
-			expected: sets.NewString("::/0", "1.2.3.4"),
+			expected: sets.New[string]("::/0", "1.2.3.4"),
 		},
 	}
 
