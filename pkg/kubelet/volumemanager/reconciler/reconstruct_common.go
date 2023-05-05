@@ -236,17 +236,25 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (rvolume *reconstructe
 	// Searching by spec checks whether the volume is actually attachable
 	// (i.e. has a PV) whereas searching by plugin name can only tell whether
 	// the plugin supports attachable volumes.
-	attachablePlugin, err := rc.volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
-	if err != nil {
-		return nil, err
-	}
 	deviceMountablePlugin, err := rc.volumePluginMgr.FindDeviceMountablePluginBySpec(volumeSpec)
 	if err != nil {
 		return nil, err
 	}
+	needsNameFromSpec := deviceMountablePlugin != nil
+	if !needsNameFromSpec {
+		// Check attach-ability of a volume only as a fallback to avoid calling
+		// FindAttachablePluginBySpec for CSI volumes - it needs a connection to the API server,
+		// but it may not be available at this stage of kubelet startup.
+		// All CSI volumes are device-mountable, so they won't reach this code.
+		attachablePlugin, err := rc.volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
+		if err != nil {
+			return nil, err
+		}
+		needsNameFromSpec = attachablePlugin != nil
+	}
 
 	var uniqueVolumeName v1.UniqueVolumeName
-	if attachablePlugin != nil || deviceMountablePlugin != nil {
+	if needsNameFromSpec {
 		uniqueVolumeName, err = util.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
 		if err != nil {
 			return nil, err
