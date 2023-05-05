@@ -93,8 +93,7 @@ func (s *preFilterState) Clone() framework.StateData {
 		copy.TpKeyToCriticalPaths[tpKey] = &criticalPaths{paths[0], paths[1]}
 	}
 	for tpPair, matchNum := range s.TpPairToMatchNum {
-		copyPair := topologyPair{key: tpPair.key, value: tpPair.value}
-		copy.TpPairToMatchNum[copyPair] = matchNum
+		copy.TpPairToMatchNum[tpPair] = matchNum
 	}
 	return &copy
 }
