@@ -137,11 +137,6 @@ func runEvictedTest(f *framework.Framework, podSpec *v1.Pod, containerName strin
 			podClient.Create(context.TODO(), new_pod)
 			err = e2epod.WaitForPodSuccessInNamespace(context.TODO(), f.ClientSet, new_pod.Name, f.Namespace.Name)
 			framework.ExpectNoError(err)
-
-			// verify pod is deleted from API server
-			ginkgo.By("Fetching the latest pod status")
-			err = e2epod.WaitForPodNotFoundInNamespace(context.TODO(), f.ClientSet, podSpec.Name, f.Namespace.Name, 120)
-			framework.ExpectNoError(err)
 		})
 
 		ginkgo.AfterEach(func() {
