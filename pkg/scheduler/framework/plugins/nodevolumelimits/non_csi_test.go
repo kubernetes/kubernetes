@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -73,12 +72,6 @@ var (
 	// pod with unbound PVC that's different to unboundPVC
 	anotherUnboundPVCPod = st.MakePod().PVC("anotherUnboundPVC").Obj()
 )
-
-var cmpOpts = []cmp.Option{
-	cmp.Comparer(func(a, b *framework.Status) bool {
-		return reflect.DeepEqual(a, b)
-	}),
-}
 
 func TestEphemeralLimits(t *testing.T) {
 	// We have to specify a valid filter and arbitrarily pick Cinder here.
@@ -144,14 +137,14 @@ func TestEphemeralLimits(t *testing.T) {
 			newPod:           ephemeralVolumePod,
 			ephemeralEnabled: true,
 			test:             "volume missing",
-			wantStatus:       framework.AsStatus(errors.New(`looking up PVC test/abc-xyz: persistentvolumeclaim "abc-xyz" not found`)),
+			wantStatus:       framework.AsStatus(wantStatusError{errors.New(`looking up PVC test/abc-xyz: persistentvolumeclaim "abc-xyz" not found`)}),
 		},
 		{
 			newPod:           ephemeralVolumePod,
 			ephemeralEnabled: true,
 			extraClaims:      []v1.PersistentVolumeClaim{*conflictingClaim},
 			test:             "volume not owned",
-			wantStatus:       framework.AsStatus(errors.New("PVC test/abc-xyz was not created for pod test/abc (pod is not owner)")),
+			wantStatus:       framework.AsStatus(wantStatusError{errors.New("PVC test/abc-xyz was not created for pod test/abc (pod is not owner)")}),
 		},
 		{
 			newPod:           ephemeralVolumePod,
@@ -197,7 +190,7 @@ func TestEphemeralLimits(t *testing.T) {
 
 			if gotPreFilterStatus.Code() != framework.Skip {
 				gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
-				if diff := cmp.Diff(test.wantStatus, gotStatus, cmpOpts...); diff != "" {
+				if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
 					t.Errorf("Filter status does not match (-want, +got): %s", diff)
 				}
 			}
@@ -427,7 +420,7 @@ func TestAzureDiskLimits(t *testing.T) {
 
 			if gotPreFilterStatus.Code() != framework.Skip {
 				gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
-				if diff := cmp.Diff(test.wantStatus, gotStatus, cmpOpts...); diff != "" {
+				if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
 					t.Errorf("Filter status does not match (-want, +got): %s", diff)
 				}
 			}
@@ -708,7 +701,7 @@ func TestEBSLimits(t *testing.T) {
 
 			if gotPreFilterStatus.Code() != framework.Skip {
 				gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
-				if diff := cmp.Diff(test.wantStatus, gotStatus, cmpOpts...); diff != "" {
+				if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
 					t.Errorf("Filter status does not match (-want, +got): %s", diff)
 				}
 			}
@@ -938,7 +931,7 @@ func TestGCEPDLimits(t *testing.T) {
 
 			if gotPreFilterStatus.Code() != framework.Skip {
 				gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
-				if diff := cmp.Diff(test.wantStatus, gotStatus, cmpOpts...); diff != "" {
+				if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
 					t.Errorf("Filter status does not match (-want, +got): %s", diff)
 				}
 			}
