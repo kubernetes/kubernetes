@@ -231,4 +231,5 @@ func (o *RolloutStatusOptions) Run() error {
 			return err
 		})
 	})
+
 }
