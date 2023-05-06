@@ -289,3 +289,20 @@ func toKubeContainerResources(statusResources *runtimeapi.ContainerResources) *k
 	}
 	return cStatusResources
 }
+
+func toKubeContainerUser(statusUser *runtimeapi.ContainerUser) *kubecontainer.ContainerUser {
+	if statusUser == nil {
+		return nil
+	}
+
+	user := &kubecontainer.ContainerUser{}
+	if statusUser.GetLinux() != nil {
+		user.Linux = &kubecontainer.LinuxContainerUser{
+			Uid:                statusUser.GetLinux().GetUid(),
+			Gid:                statusUser.GetLinux().GetGid(),
+			SupplementalGroups: statusUser.GetLinux().GetSupplementalGroups(),
+		}
+	}
+
+	return user
+}

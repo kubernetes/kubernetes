@@ -137,3 +137,7 @@ func toKubeContainerResources(statusResources *runtimeapi.ContainerResources) *k
 	//TODO: Add windows support
 	return nil
 }
+
+func toKubeContainerUser(statusUser *runtimeapi.ContainerUser) *kubecontainer.ContainerUser {
+	return nil
+}

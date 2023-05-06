@@ -360,6 +360,29 @@ type Status struct {
 	Message string
 	// CPU and memory resources for this container
 	Resources *ContainerResources
+	// User identity information of the first process of this container
+	User *ContainerUser
+}
+
+// ContainerUser represents user identity information
+type ContainerUser struct {
+	// Linux holds user identity information of the first process of the containers in Linux.
+	// Note that this field cannot be set when spec.os.name is windows.
+	Linux *LinuxContainerUser
+
+	// Windows holds user identity information of the first process of the containers in Windows
+	// This is just reserved for future use.
+	// Windows *WindowsContainerUser
+}
+
+// LinuxContainerUser represents user identity information in Linux containers
+type LinuxContainerUser struct {
+	// Uid is the primary uid of the first process in the container
+	Uid int64
+	// Gid is the primary gid of the first process in the container
+	Gid int64
+	// SupplementalGroups are the supplemental groups attached to the first process in the container
+	SupplementalGroups []int64
 }
 
 // FindContainerStatusByName returns container status in the pod status with the given name.

@@ -1860,6 +1860,23 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		return resources
 	}
 
+	convertContainerStatusUser := func(cStatus *kubecontainer.Status) *v1.ContainerUser {
+		if cStatus.User == nil {
+			return nil
+		}
+
+		user := &v1.ContainerUser{}
+		if cStatus.User.Linux != nil {
+			user.Linux = &v1.LinuxContainerUser{
+				Uid:                cStatus.User.Linux.Uid,
+				Gid:                cStatus.User.Linux.Gid,
+				SupplementalGroups: cStatus.User.Linux.SupplementalGroups,
+			}
+		}
+
+		return user
+	}
+
 	// Fetch old containers statuses from old pod status.
 	oldStatuses := make(map[string]v1.ContainerStatus, len(containers))
 	for _, status := range previousStatus {
@@ -1984,6 +2001,9 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			if status.State.Running != nil {
 				status.Resources = convertContainerStatusResources(cName, status, cStatus, oldStatuses)
 			}
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.SupplementalGroupsPolicy) {
+			status.User = convertContainerStatusUser(cStatus)
 		}
 		if containerSeen[cName] == 0 {
 			statuses[cName] = status
