@@ -192,9 +192,7 @@ func (pl *InterPodAffinity) PreScore(
 	index := int32(-1)
 	processNode := func(i int) {
 		nodeInfo := allNodes[i]
-		if nodeInfo.Node() == nil {
-			return
-		}
+
 		// Unless the pod being scheduled has preferred affinity terms, we only
 		// need to process pods with affinity in the node.
 		podsToProcess := nodeInfo.PodsWithAffinity

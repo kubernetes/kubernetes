@@ -275,14 +275,9 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod)
 
 	tpCountsByNode := make([]map[topologyPair]int, len(allNodes))
 	requiredNodeAffinity := nodeaffinity.GetRequiredNodeAffinity(pod)
-	logger := klog.FromContext(ctx)
 	processNode := func(i int) {
 		nodeInfo := allNodes[i]
 		node := nodeInfo.Node()
-		if node == nil {
-			logger.Error(nil, "Node not found")
-			return
-		}
 
 		if !pl.enableNodeInclusionPolicyInPodTopologySpread {
 			// spreading is applied to nodes that pass those filters.
@@ -339,9 +334,6 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod)
 // Filter invoked at the filter extension point.
 func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	node := nodeInfo.Node()
-	if node == nil {
-		return framework.AsStatus(fmt.Errorf("node not found"))
-	}
 
 	s, err := getPreFilterState(cycleState)
 	if err != nil {

@@ -54,9 +54,7 @@ func (pl *NodeName) Name() string {
 
 // Filter invoked at the filter extension point.
 func (pl *NodeName) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
-	if nodeInfo.Node() == nil {
-		return framework.NewStatus(framework.Error, "node not found")
-	}
+
 	if !Fits(pod, nodeInfo) {
 		return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReason)
 	}
