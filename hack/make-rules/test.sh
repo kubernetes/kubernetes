@@ -182,46 +182,6 @@ junitFilenamePrefix() {
   echo "${KUBE_JUNIT_REPORT_DIR}/junit_$(kube::util::sortable_date)"
 }
 
-verifyAndSuggestPackagePath() {
-  local specified_package_path="$1"
-  local alternative_package_path="$2"
-  local original_package_path="$3"
-  local suggestion_package_path="$4"
-
-  if [[ "${specified_package_path}" =~ '/...'$ ]]; then
-    specified_package_path=${specified_package_path::-4}
-  fi
-
-  if ! [ -d "${specified_package_path}" ]; then
-    # Because k8s sets a localized $GOPATH for testing, seeing the actual
-    # directory can be confusing. Instead, just show $GOPATH if it exists in the
-    # $specified_package_path.
-    local printable_package_path
-    printable_package_path=${specified_package_path//${GOPATH}/\$\{GOPATH\}}
-    kube::log::error "specified test path '${printable_package_path}' does not exist"
-
-    if [ -d "${alternative_package_path}" ]; then
-      kube::log::info "try changing \"${original_package_path}\" to \"${suggestion_package_path}\""
-    fi
-    exit 1
-  fi
-}
-
-verifyPathsToPackagesUnderTest() {
-  local packages_under_test=("$@")
-
-  for package_path in "${packages_under_test[@]}"; do
-    local local_package_path="${package_path}"
-    local go_package_path="${GOPATH}/src/${package_path}"
-
-    if [[ "${package_path:0:2}" == "./" ]] ; then
-      verifyAndSuggestPackagePath "${local_package_path}" "${go_package_path}" "${package_path}" "${package_path:2}"
-    else
-      verifyAndSuggestPackagePath "${go_package_path}" "${local_package_path}" "${package_path}" "./${package_path}"
-    fi
-  done
-}
-
 produceJUnitXMLReport() {
   local -r junit_filename_prefix=$1
   if [[ -z "${junit_filename_prefix}" ]]; then
@@ -257,14 +217,17 @@ runTests() {
   local junit_filename_prefix
   junit_filename_prefix=$(junitFilenamePrefix)
 
-  verifyPathsToPackagesUnderTest "$@"
+  # Try to normalize input names.
+  local -a targets
+  while IFS="" read -r target; do targets+=("$target"); done < <(kube::golang::binaries_from_targets "$@")
 
   # If we're not collecting coverage, run all requested tests with one 'go test'
   # command, which is much faster.
   if [[ ! ${KUBE_COVER} =~ ^[yY]$ ]]; then
     kube::log::status "Running tests without code coverage ${KUBE_RACE:+"and with ${KUBE_RACE}"}"
+    # shellcheck disable=SC2031
     go test "${goflags[@]:+${goflags[@]}}" \
-     "${KUBE_TIMEOUT}" "${@}" \
+     "${KUBE_TIMEOUT}" "${targets[@]}" \
      "${testargs[@]:+${testargs[@]}}" \
      | tee ${junit_filename_prefix:+"${junit_filename_prefix}.stdout"} \
      | grep --binary-files=text "${go_test_grep_pattern}" && rc=$? || rc=$?
