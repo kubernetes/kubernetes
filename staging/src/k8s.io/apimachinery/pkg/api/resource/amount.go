@@ -203,43 +203,37 @@ func (a *int64Amount) Sub(b int64Amount) bool {
 	return a.Add(int64Amount{value: -b.value, scale: b.scale})
 }
 
-// Mul multiplies two int64Amounts together, matching scales.
-// It will return false and not mutate a if overflow or underflow would result.
-// Mul adds the value of a to itself n times.
-// It will return false and not mutate a if overflow or underflow would result.
-func (a *int64Amount) Mul(b int64Amount) bool {
+// Mul multiplies the provided b to the current amount, or
+// returns false if overflow or underflow would result.
+func (a *int64Amount) Mul(b int64) bool {
 	switch {
-	case b.value == 0:
-		a.value = 0
-		return true
 	case a.value == 0:
-		a.value = 0
-		a.scale = b.scale
 		return true
-	case a.scale == b.scale:
-		c, ok := int64Multiply(a.value, b.value)
+	case b == 0:
+		a.value = 0
+		a.scale = 0
+		return true
+	case a.scale == 0:
+		c, ok := int64Multiply(a.value, b)
 		if !ok {
 			return false
 		}
 		a.value = c
-	case a.scale > b.scale:
-		c, ok := positiveScaleInt64(a.value, a.scale-b.scale)
+	case a.scale > 0:
+		c, ok := int64Multiply(a.value, b)
 		if !ok {
 			return false
 		}
-		c, ok = int64Multiply(c, b.value)
-		if !ok {
+		if _, ok = positiveScaleInt64(c, a.scale); !ok {
 			return false
 		}
-		a.scale = b.scale
 		a.value = c
 	default:
-		c, ok := positiveScaleInt64(b.value, b.scale-a.scale)
+		c, ok := int64Multiply(a.value, b)
 		if !ok {
 			return false
 		}
-		c, ok = int64Multiply(a.value, c)
-		if !ok {
+		if _, ok = negativeScaleInt64(c, -a.scale); !ok {
 			return false
 		}
 		a.value = c
