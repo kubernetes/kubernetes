@@ -23,11 +23,12 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 
@@ -93,7 +94,7 @@ func TestSecretCache(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	store := newSecretCache(fakeClient, fakeClock, time.Minute)
 
-	store.AddReference("ns", "name")
+	store.AddReference("ns", "name", "pod")
 	_, err := store.Get("ns", "name")
 	if !apierrors.IsNotFound(err) {
 		t.Errorf("Expected NotFound error, got: %v", err)
@@ -138,7 +139,7 @@ func TestSecretCache(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	store.DeleteReference("ns", "name")
+	store.DeleteReference("ns", "name", "pod")
 	_, err = store.Get("ns", "name")
 	if err == nil || !strings.Contains(err.Error(), "not registered") {
 		t.Errorf("unexpected error: %v", err)
@@ -163,7 +164,7 @@ func TestSecretCacheMultipleRegistrations(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	store := newSecretCache(fakeClient, fakeClock, time.Minute)
 
-	store.AddReference("ns", "name")
+	store.AddReference("ns", "name", "pod")
 	// This should trigger List and Watch actions eventually.
 	actionsFn := func() (bool, error) {
 		actions := fakeClient.Actions()
@@ -184,14 +185,14 @@ func TestSecretCacheMultipleRegistrations(t *testing.T) {
 
 	// Next registrations shouldn't trigger any new actions.
 	for i := 0; i < 20; i++ {
-		store.AddReference("ns", "name")
-		store.DeleteReference("ns", "name")
+		store.AddReference("ns", "name", types.UID(fmt.Sprintf("pod-%d", i)))
+		store.DeleteReference("ns", "name", types.UID(fmt.Sprintf("pod-%d", i)))
 	}
 	actions := fakeClient.Actions()
 	assert.Equal(t, 2, len(actions), "unexpected actions: %#v", actions)
 
 	// Final delete also doesn't trigger any action.
-	store.DeleteReference("ns", "name")
+	store.DeleteReference("ns", "name", "pod")
 	_, err := store.Get("ns", "name")
 	if err == nil || !strings.Contains(err.Error(), "not registered") {
 		t.Errorf("unexpected error: %v", err)
@@ -287,7 +288,7 @@ func TestImmutableSecretStopsTheReflector(t *testing.T) {
 			}
 
 			// AddReference should start reflector.
-			store.AddReference("ns", "name")
+			store.AddReference("ns", "name", "pod")
 			if err := wait.Poll(10*time.Millisecond, time.Second, itemExists); err != nil {
 				t.Errorf("item wasn't added to cache")
 			}
@@ -375,7 +376,7 @@ func TestMaxIdleTimeStopsTheReflector(t *testing.T) {
 	}
 
 	// AddReference should start reflector.
-	store.AddReference("ns", "name")
+	store.AddReference("ns", "name", "pod")
 	if err := wait.Poll(10*time.Millisecond, 10*time.Second, itemExists); err != nil {
 		t.Errorf("item wasn't added to cache")
 	}
@@ -467,7 +468,7 @@ func TestReflectorNotStoppedOnSlowInitialization(t *testing.T) {
 	}
 
 	// AddReference should start reflector.
-	store.AddReference("ns", "name")
+	store.AddReference("ns", "name", "pod")
 	if err := wait.Poll(10*time.Millisecond, 10*time.Second, itemExists); err != nil {
 		t.Errorf("item wasn't added to cache")
 	}
