@@ -437,3 +437,20 @@ func (m deviceIdentifierMap) Find(major, minor uint64, namer DeviceNamer) string
 	m[d] = s
 	return s
 }
+
+// RemoveNetMetrics is used to remove any network metrics from the given MetricSet.
+// It returns the original set as is if remove is false, or if there are no metrics
+// to remove.
+func RemoveNetMetrics(metrics container.MetricSet, remove bool) container.MetricSet {
+	if !remove {
+		return metrics
+	}
+
+	// Check if there is anything we can remove, to avoid useless copying.
+	if !metrics.HasAny(container.AllNetworkMetrics) {
+		return metrics
+	}
+
+	// A copy of all metrics except for network ones.
+	return metrics.Difference(container.AllNetworkMetrics)
+}

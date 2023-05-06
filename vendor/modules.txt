@@ -300,8 +300,8 @@ github.com/golang/protobuf/ptypes/wrappers
 # github.com/google/btree v1.0.1
 ## explicit; go 1.12
 github.com/google/btree
-# github.com/google/cadvisor v0.47.1
-## explicit; go 1.16
+# github.com/google/cadvisor v0.47.1-0.20230509172039-eac1257f76a4 => github.com/kolyshkin/cadvisor v0.47.1-0.20230509172039-eac1257f76a4
+## explicit; go 1.17
 github.com/google/cadvisor/cache/memory
 github.com/google/cadvisor/client/v2
 github.com/google/cadvisor/collector
@@ -2485,6 +2485,7 @@ sigs.k8s.io/structured-merge-diff/v4/value
 # sigs.k8s.io/yaml v1.3.0
 ## explicit; go 1.12
 sigs.k8s.io/yaml
+# github.com/google/cadvisor => github.com/kolyshkin/cadvisor v0.47.1-0.20230509172039-eac1257f76a4
 # k8s.io/api => ./staging/src/k8s.io/api
 # k8s.io/apiextensions-apiserver => ./staging/src/k8s.io/apiextensions-apiserver
 # k8s.io/apimachinery => ./staging/src/k8s.io/apimachinery

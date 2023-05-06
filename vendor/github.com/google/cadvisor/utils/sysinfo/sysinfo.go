@@ -104,7 +104,7 @@ func GetNetworkDevices(sysfs sysfs.SysFs) ([]info.NetInfo, error) {
 	for _, dev := range devs {
 		name := dev.Name()
 		// Ignore docker, loopback, and veth devices.
-		ignoredDevices := []string{"lo", "veth", "docker"}
+		ignoredDevices := []string{"lo", "veth", "docker", "nerdctl"}
 		ignored := false
 		for _, prefix := range ignoredDevices {
 			if strings.HasPrefix(name, prefix) {
@@ -200,7 +200,7 @@ func GetNodesInfo(sysFs sysfs.SysFs) ([]info.Node, int, error) {
 	}
 
 	if len(nodesDirs) == 0 {
-		klog.Warningf("Nodes topology is not available, providing CPU topology")
+		klog.V(4).Info("Nodes topology is not available, providing CPU topology")
 		return getCPUTopology(sysFs)
 	}
 

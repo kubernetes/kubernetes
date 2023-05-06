@@ -27,3 +27,5 @@ replace (
 	k8s.io/client-go => ../../../../client-go
 	k8s.io/kms => ../../../../kms
 )
+
+replace github.com/google/cadvisor => github.com/kolyshkin/cadvisor v0.47.1-0.20230509172039-eac1257f76a4

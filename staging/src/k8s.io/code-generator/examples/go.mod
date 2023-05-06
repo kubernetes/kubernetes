@@ -55,3 +55,5 @@ replace (
 	k8s.io/apimachinery => ../../apimachinery
 	k8s.io/client-go => ../../client-go
 )
+
+replace github.com/google/cadvisor => github.com/kolyshkin/cadvisor v0.47.1-0.20230509172039-eac1257f76a4

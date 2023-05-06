@@ -54,7 +54,6 @@
         "github.com/containerd/cgroups",
         "github.com/containerd/ttrpc",
         "github.com/containerd/typeurl",
-        "github.com/gogo/googleapis",
         "github.com/google/cadvisor",
         "github.com/grpc-ecosystem/go-grpc-middleware",
         "go.etcd.io/etcd/api/v3",
@@ -81,7 +80,6 @@
       ],
       "github.com/pkg/errors": [
         "github.com/Microsoft/hcsshim",
-        "github.com/aws/aws-sdk-go",
         "github.com/containerd/continuity",
         "github.com/containerd/fifo",
         "github.com/containerd/go-runc",

@@ -93,6 +93,14 @@ var AllMetrics = MetricSet{
 	OOMMetrics:                     struct{}{},
 }
 
+// AllNetworkMetrics represents all network metrics that cAdvisor supports.
+var AllNetworkMetrics = MetricSet{
+	NetworkUsageMetrics:            struct{}{},
+	NetworkTcpUsageMetrics:         struct{}{},
+	NetworkAdvancedTcpUsageMetrics: struct{}{},
+	NetworkUdpUsageMetrics:         struct{}{},
+}
+
 func (mk MetricKind) String() string {
 	return string(mk)
 }
@@ -102,6 +110,15 @@ type MetricSet map[MetricKind]struct{}
 func (ms MetricSet) Has(mk MetricKind) bool {
 	_, exists := ms[mk]
 	return exists
+}
+
+func (ms MetricSet) HasAny(ms1 MetricSet) bool {
+	for m := range ms1 {
+		if _, ok := ms[m]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 func (ms MetricSet) add(mk MetricKind) {
