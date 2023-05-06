@@ -841,6 +841,13 @@ const (
 	//
 	// Enables In-Place Pod Vertical Scaling
 	InPlacePodVerticalScaling featuregate.Feature = "InPlacePodVerticalScaling"
+
+	// owner: @everpeace
+	// kep: https://kep.k8s.io/3619
+	// alpha: v1.28
+	//
+	// Enable SupplementalGroupsPolicy feature in PodSecurityContext
+	SupplementalGroupsPolicy featuregate.Feature = "SupplementalGroupsPolicy"
 )
 
 func init() {
@@ -1069,6 +1076,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	SELinuxMountReadWriteOncePod: {Default: false, PreRelease: featuregate.Beta}, // disabled for https://github.com/kubernetes/kubernetes/issues/117745
 
 	InPlacePodVerticalScaling: {Default: false, PreRelease: featuregate.Alpha},
+
+	SupplementalGroupsPolicy: {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

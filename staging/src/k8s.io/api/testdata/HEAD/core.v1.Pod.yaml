@@ -796,6 +796,7 @@ spec:
       type: typeValue
     supplementalGroups:
     - 4
+    supplementalGroupsPolicy: supplementalGroupsPolicyValue
     sysctls:
     - name: nameValue
       value: valueValue
@@ -1159,6 +1160,12 @@ status:
       waiting:
         message: messageValue
         reason: reasonValue
+    user:
+      linux:
+        gid: 2
+        supplementalGroups:
+        - 3
+        uid: 1
   ephemeralContainerStatuses:
   - allocatedResources:
       allocatedResourcesKey: "0"
@@ -1204,6 +1211,12 @@ status:
       waiting:
         message: messageValue
         reason: reasonValue
+    user:
+      linux:
+        gid: 2
+        supplementalGroups:
+        - 3
+        uid: 1
   hostIP: hostIPValue
   initContainerStatuses:
   - allocatedResources:
@@ -1250,6 +1263,12 @@ status:
       waiting:
         message: messageValue
         reason: reasonValue
+    user:
+      linux:
+        gid: 2
+        supplementalGroups:
+        - 3
+        uid: 1
   message: messageValue
   nominatedNodeName: nominatedNodeNameValue
   phase: phaseValue

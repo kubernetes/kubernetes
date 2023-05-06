@@ -7189,35 +7189,62 @@ func TestValidateEphemeralContainers(t *testing.T) {
 
 func TestValidateWindowsPodSecurityContext(t *testing.T) {
 	validWindowsSC := &core.PodSecurityContext{WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: utilpointer.String("dummy")}}
-	invalidWindowsSC := &core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummyRole"}}
+	mergePolicy := core.SupplementalGroupsPolicyMerge
+	invalidWindowsSC := &core.PodSecurityContext{
+		SELinuxOptions:           &core.SELinuxOptions{Role: "dummyRole"},
+		SupplementalGroupsPolicy: &mergePolicy,
+	}
 	cases := map[string]struct {
-		podSec      *core.PodSpec
-		expectErr   bool
-		errorType   field.ErrorType
-		errorDetail string
+		podSec       *core.PodSpec
+		expectedErrs map[string]struct {
+			errorType   field.ErrorType
+			errorDetail string
+		}
 	}{
 		"valid SC, windows, no error": {
-			podSec:    &core.PodSpec{SecurityContext: validWindowsSC},
-			expectErr: false,
+			podSec: &core.PodSpec{SecurityContext: validWindowsSC},
 		},
 		"invalid SC, windows, error": {
-			podSec:      &core.PodSpec{SecurityContext: invalidWindowsSC},
-			errorType:   "FieldValueForbidden",
-			errorDetail: "cannot be set for a windows pod",
-			expectErr:   true,
+			podSec: &core.PodSpec{SecurityContext: invalidWindowsSC},
+			expectedErrs: map[string]struct {
+				errorType   field.ErrorType
+				errorDetail string
+			}{
+				"field.securityContext.seLinuxOptions": {
+					errorType:   "FieldValueForbidden",
+					errorDetail: "cannot be set for a windows pod",
+				},
+				"field.securityContext.supplementalGroupsPolicy": {
+					errorType:   "FieldValueForbidden",
+					errorDetail: "cannot be set for a windows pod",
+				},
+			},
 		},
 	}
+
 	for k, v := range cases {
 		t.Run(k, func(t *testing.T) {
 			errs := validateWindows(v.podSec, field.NewPath("field"))
-			if v.expectErr && len(errs) > 0 {
-				if errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
-					t.Errorf("[%s] Expected error type %q with detail %q, got %v", k, v.errorType, v.errorDetail, errs)
+			if len(v.expectedErrs) > 0 && len(errs) > 0 {
+				if len(v.expectedErrs) != len(errs) {
+					t.Errorf("[%s] Expected number of errors is %d, got %d", k, len(v.expectedErrs), len(errs))
 				}
-			} else if v.expectErr && len(errs) == 0 {
+			L:
+				for field, expectedErr := range v.expectedErrs {
+					for _, err := range errs {
+						if err.Field == field {
+							if err.Type != expectedErr.errorType || !strings.Contains(err.Detail, expectedErr.errorDetail) {
+								t.Errorf("[%s] Expected error on field %q with type %q and detail %q, got %v", k, field, expectedErr.errorType, expectedErr.errorDetail, errs)
+							}
+							continue L
+						}
+					}
+					t.Errorf("[%s] Expected error on field %q with type %q and detail %q, got %v", k, field, expectedErr.errorType, expectedErr.errorDetail, errs)
+				}
+			} else if len(v.expectedErrs) > 0 && len(errs) == 0 {
 				t.Errorf("Unexpected success")
 			}
-			if !v.expectErr && len(errs) != 0 {
+			if len(v.expectedErrs) == 0 && len(errs) != 0 {
 				t.Errorf("Unexpected error(s): %v", errs)
 			}
 		})
@@ -8648,6 +8675,8 @@ func TestValidatePodConditions(t *testing.T) {
 }
 
 func TestValidatePodSpec(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SupplementalGroupsPolicy, true)()
+
 	activeDeadlineSeconds := int64(30)
 	activeDeadlineSecondsMax := int64(math.MaxInt32)
 
@@ -8656,8 +8685,10 @@ func TestValidatePodSpec(t *testing.T) {
 	minGroupID := int64(0)
 	maxGroupID := int64(2147483647)
 	goodfsGroupChangePolicy := core.FSGroupChangeAlways
+	goodSupplementalGroupsPolicy := core.SupplementalGroupsPolicyMerge
 	badfsGroupChangePolicy1 := core.PodFSGroupChangePolicy("invalid")
 	badfsGroupChangePolicy2 := core.PodFSGroupChangePolicy("")
+	badSupplementalGroupsPolicy := core.SupplementalGroupsPolicy("not-supported")
 
 	successCases := map[string]core.PodSpec{
 		"populate basic fields, leave defaults for most": {
@@ -8725,6 +8756,17 @@ func TestValidatePodSpec(t *testing.T) {
 				SupplementalGroups: []int64{maxGroupID},
 				RunAsUser:          &maxUserID,
 				FSGroup:            &maxGroupID,
+			},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+		},
+		"populate RunAsUser SupplementalGroups SupplementalGroupsPolicy FSGroup with minID 0": {
+			Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			SecurityContext: &core.PodSecurityContext{
+				SupplementalGroups:       []int64{minGroupID},
+				SupplementalGroupsPolicy: &goodSupplementalGroupsPolicy,
+				RunAsUser:                &minUserID,
+				FSGroup:                  &minGroupID,
 			},
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
@@ -8951,6 +8993,14 @@ func TestValidatePodSpec(t *testing.T) {
 			Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &core.PodSecurityContext{
 				FSGroup: &minGroupID,
+			},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+		},
+		"bad supplementalGroupsPolicy": {
+			Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			SecurityContext: &core.PodSecurityContext{
+				SupplementalGroupsPolicy: &badSupplementalGroupsPolicy,
 			},
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
@@ -12881,10 +12931,11 @@ func TestValidatePodUpdate(t *testing.T) {
 
 func TestValidatePodStatusUpdate(t *testing.T) {
 	tests := []struct {
-		new  core.Pod
-		old  core.Pod
-		err  string
-		test string
+		new          core.Pod
+		old          core.Pod
+		err          string
+		test         string
+		featureGates []featuregate.Feature
 	}{{
 		core.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -12908,6 +12959,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		},
 		"",
 		"removed nominatedNodeName",
+		nil,
 	}, {
 		core.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -12930,6 +12982,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		},
 		"",
 		"add valid nominatedNodeName",
+		nil,
 	}, {
 		core.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -12952,6 +13005,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		},
 		"nominatedNodeName",
 		"Add invalid nominatedNodeName",
+		nil,
 	}, {
 		core.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -12977,6 +13031,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		},
 		"",
 		"Update nominatedNodeName",
+		nil,
 	}, {
 		core.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -13016,6 +13071,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		},
 		"",
 		"Container statuses pending",
+		nil,
 	}, {
 		core.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -13082,6 +13138,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		},
 		"",
 		"Container statuses running",
+		nil,
 	}, {
 		core.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -13136,6 +13193,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		},
 		"",
 		"Container statuses add ephemeral container",
+		nil,
 	}, {
 		core.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -13202,6 +13260,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		},
 		"",
 		"Container statuses ephemeral container running",
+		nil,
 	}, {
 		core.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -13272,6 +13331,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		},
 		"",
 		"Container statuses ephemeral container exited",
+		nil,
 	}, {
 		core.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -13371,10 +13431,135 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		},
 		"",
 		"Container statuses all containers terminated",
+		nil,
+	}, {
+		core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+			Status: core.PodStatus{
+				InitContainerStatuses: []core.ContainerStatus{{
+					ContainerID: "docker://numbers",
+					Image:       "alpine",
+					Name:        "init",
+					Ready:       false,
+					Started:     proto.Bool(false),
+					State: core.ContainerState{
+						Waiting: &core.ContainerStateWaiting{
+							Reason: "PodInitializing",
+						},
+					},
+					User: &core.ContainerUser{
+						Linux: &core.LinuxContainerUser{},
+					},
+				}},
+				ContainerStatuses: []core.ContainerStatus{{
+					ContainerID: "docker://numbers",
+					Image:       "nginx:alpine",
+					Name:        "main",
+					Ready:       false,
+					Started:     proto.Bool(false),
+					State: core.ContainerState{
+						Waiting: &core.ContainerStateWaiting{
+							Reason: "PodInitializing",
+						},
+					},
+					User: &core.ContainerUser{
+						Linux: &core.LinuxContainerUser{},
+					},
+				}},
+				EphemeralContainerStatuses: []core.ContainerStatus{{
+					ContainerID: "docker://numbers",
+					Image:       "busybox",
+					Name:        "debug",
+					Ready:       false,
+					State: core.ContainerState{
+						Waiting: &core.ContainerStateWaiting{
+							Reason: "PodInitializing",
+						},
+					},
+					User: &core.ContainerUser{
+						Linux: &core.LinuxContainerUser{},
+					},
+				}},
+			},
+		},
+		core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+		},
+		"status.containerStatuses[0].user: Forbidden: must not set when SupplementalGroupsPolicy feature gate is disabled, status.initContainerStatuses[0].user: Forbidden: must not set when SupplementalGroupsPolicy feature gate is disabled, status.ephemeralContainerStatuses[0].user: Forbidden: must not set when SupplementalGroupsPolicy feature gate is disabled",
+		"InitContainer statuses pending with ContainerStauts.User when SupplementalGroupsPolicy disabled",
+		nil,
+	}, {
+		core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+			Status: core.PodStatus{
+				InitContainerStatuses: []core.ContainerStatus{{
+					ContainerID: "docker://numbers",
+					Image:       "alpine",
+					Name:        "init",
+					Ready:       false,
+					Started:     proto.Bool(false),
+					State: core.ContainerState{
+						Waiting: &core.ContainerStateWaiting{
+							Reason: "PodInitializing",
+						},
+					},
+					User: &core.ContainerUser{
+						Linux: &core.LinuxContainerUser{},
+					},
+				}},
+				ContainerStatuses: []core.ContainerStatus{{
+					ContainerID: "docker://numbers",
+					Image:       "nginx:alpine",
+					Name:        "main",
+					Ready:       false,
+					Started:     proto.Bool(false),
+					State: core.ContainerState{
+						Waiting: &core.ContainerStateWaiting{
+							Reason: "PodInitializing",
+						},
+					},
+					User: &core.ContainerUser{
+						Linux: &core.LinuxContainerUser{},
+					},
+				}},
+				EphemeralContainerStatuses: []core.ContainerStatus{{
+					ContainerID: "docker://numbers",
+					Image:       "busybox",
+					Name:        "debug",
+					Ready:       false,
+					State: core.ContainerState{
+						Waiting: &core.ContainerStateWaiting{
+							Reason: "PodInitializing",
+						},
+					},
+					User: &core.ContainerUser{
+						Linux: &core.LinuxContainerUser{},
+					},
+				}},
+			},
+		},
+		core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+		},
+		"",
+		"Container statuses pending with ContainerStauts.User when SupplementalGroupsPolicy enabled",
+		[]featuregate.Feature{features.SupplementalGroupsPolicy},
 	},
 	}
 
 	for _, test := range tests {
+		for _, feature := range test.featureGates {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, true)()
+		}
+
 		test.new.ObjectMeta.ResourceVersion = "1"
 		test.old.ObjectMeta.ResourceVersion = "1"
 		errs := ValidatePodStatusUpdate(&test.new, &test.old, PodValidationOptions{})
@@ -19245,6 +19430,7 @@ func TestValidateOSFields(t *testing.T) {
 		"SecurityContext.SeccompProfile",
 		"SecurityContext.ShareProcessNamespace",
 		"SecurityContext.SupplementalGroups",
+		"SecurityContext.SupplementalGroupsPolicy",
 		"SecurityContext.Sysctls",
 		"SecurityContext.WindowsOptions",
 	)

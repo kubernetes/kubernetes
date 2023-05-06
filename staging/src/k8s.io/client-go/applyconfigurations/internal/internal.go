@@ -4489,6 +4489,15 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.core.v1.ContainerState
       default: {}
+    - name: user
+      type:
+        namedType: io.k8s.api.core.v1.ContainerUser
+- name: io.k8s.api.core.v1.ContainerUser
+  map:
+    fields:
+    - name: linux
+      type:
+        namedType: io.k8s.api.core.v1.LinuxContainerUser
 - name: io.k8s.api.core.v1.DaemonEndpoint
   map:
     fields:
@@ -5240,6 +5249,21 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.core.v1.LimitRangeItem
           elementRelationship: atomic
+- name: io.k8s.api.core.v1.LinuxContainerUser
+  map:
+    fields:
+    - name: gid
+      type:
+        scalar: numeric
+    - name: supplementalGroups
+      type:
+        list:
+          elementType:
+            scalar: numeric
+          elementRelationship: atomic
+    - name: uid
+      type:
+        scalar: numeric
 - name: io.k8s.api.core.v1.LoadBalancerIngress
   map:
     fields:
@@ -6139,6 +6163,9 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             scalar: numeric
           elementRelationship: atomic
+    - name: supplementalGroupsPolicy
+      type:
+        scalar: string
     - name: sysctls
       type:
         list:

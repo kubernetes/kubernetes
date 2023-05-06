@@ -1353,6 +1353,7 @@
           "supplementalGroups": [
             4
           ],
+          "supplementalGroupsPolicy": "supplementalGroupsPolicyValue",
           "fsGroup": 5,
           "sysctls": [
             {
