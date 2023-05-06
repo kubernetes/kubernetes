@@ -832,8 +832,8 @@ function kube::util::md5() {
 # kube::util::read-array
 # Reads in stdin and adds it line by line to the array provided. This can be
 # used instead of "mapfile -t", and is bash 3 compatible.  If the named array
-# exists and is an array, it will be used.  Otherwise it will be unset and
-# recreated.
+# exists and is an array, it will be overwritten.  Otherwise it will be unset
+# and recreated.
 #
 # Assumed vars:
 #   $1 (name of array to create/modify)
