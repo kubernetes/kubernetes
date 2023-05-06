@@ -25,46 +25,46 @@ A simple example application, _raftexample_, is also available to help illustrat
 how to use this package in practice:
 https://github.com/etcd-io/etcd/tree/main/contrib/raftexample
 
-Usage
+# Usage
 
 The primary object in raft is a Node. You either start a Node from scratch
 using raft.StartNode or start a Node from some initial state using raft.RestartNode.
 
 To start a node from scratch:
 
-  storage := raft.NewMemoryStorage()
-  c := &Config{
-    ID:              0x01,
-    ElectionTick:    10,
-    HeartbeatTick:   1,
-    Storage:         storage,
-    MaxSizePerMsg:   4096,
-    MaxInflightMsgs: 256,
-  }
-  n := raft.StartNode(c, []raft.Peer{{ID: 0x02}, {ID: 0x03}})
+	storage := raft.NewMemoryStorage()
+	c := &Config{
+	  ID:              0x01,
+	  ElectionTick:    10,
+	  HeartbeatTick:   1,
+	  Storage:         storage,
+	  MaxSizePerMsg:   4096,
+	  MaxInflightMsgs: 256,
+	}
+	n := raft.StartNode(c, []raft.Peer{{ID: 0x02}, {ID: 0x03}})
 
 To restart a node from previous state:
 
-  storage := raft.NewMemoryStorage()
+	storage := raft.NewMemoryStorage()
 
-  // recover the in-memory storage from persistent
-  // snapshot, state and entries.
-  storage.ApplySnapshot(snapshot)
-  storage.SetHardState(state)
-  storage.Append(entries)
+	// recover the in-memory storage from persistent
+	// snapshot, state and entries.
+	storage.ApplySnapshot(snapshot)
+	storage.SetHardState(state)
+	storage.Append(entries)
 
-  c := &Config{
-    ID:              0x01,
-    ElectionTick:    10,
-    HeartbeatTick:   1,
-    Storage:         storage,
-    MaxSizePerMsg:   4096,
-    MaxInflightMsgs: 256,
-  }
+	c := &Config{
+	  ID:              0x01,
+	  ElectionTick:    10,
+	  HeartbeatTick:   1,
+	  Storage:         storage,
+	  MaxSizePerMsg:   4096,
+	  MaxInflightMsgs: 256,
+	}
 
-  // restart raft without peer information.
-  // peer information is already included in the storage.
-  n := raft.RestartNode(c)
+	// restart raft without peer information.
+	// peer information is already included in the storage.
+	n := raft.RestartNode(c)
 
 Now that you are holding onto a Node you have a few responsibilities:
 
@@ -120,29 +120,29 @@ represented by an abstract "tick".
 
 The total state machine handling loop will look something like this:
 
-  for {
-    select {
-    case <-s.Ticker:
-      n.Tick()
-    case rd := <-s.Node.Ready():
-      saveToStorage(rd.State, rd.Entries, rd.Snapshot)
-      send(rd.Messages)
-      if !raft.IsEmptySnap(rd.Snapshot) {
-        processSnapshot(rd.Snapshot)
-      }
-      for _, entry := range rd.CommittedEntries {
-        process(entry)
-        if entry.Type == raftpb.EntryConfChange {
-          var cc raftpb.ConfChange
-          cc.Unmarshal(entry.Data)
-          s.Node.ApplyConfChange(cc)
-        }
-      }
-      s.Node.Advance()
-    case <-s.done:
-      return
-    }
-  }
+	for {
+	  select {
+	  case <-s.Ticker:
+	    n.Tick()
+	  case rd := <-s.Node.Ready():
+	    saveToStorage(rd.State, rd.Entries, rd.Snapshot)
+	    send(rd.Messages)
+	    if !raft.IsEmptySnap(rd.Snapshot) {
+	      processSnapshot(rd.Snapshot)
+	    }
+	    for _, entry := range rd.CommittedEntries {
+	      process(entry)
+	      if entry.Type == raftpb.EntryConfChange {
+	        var cc raftpb.ConfChange
+	        cc.Unmarshal(entry.Data)
+	        s.Node.ApplyConfChange(cc)
+	      }
+	    }
+	    s.Node.Advance()
+	  case <-s.done:
+	    return
+	  }
+	}
 
 To propose changes to the state machine from your node take your application
 data, serialize it into a byte slice and call:
@@ -169,7 +169,7 @@ given ID MUST be used only once even if the old node has been removed.
 This means that for example IP addresses make poor node IDs since they
 may be reused. Node IDs must be non-zero.
 
-Implementation notes
+# Implementation notes
 
 This implementation is up to date with the final Raft thesis
 (https://github.com/ongardie/dissertation/blob/master/stanford.pdf), although our
@@ -194,7 +194,7 @@ cannot be removed any more since the cluster cannot make progress.
 For this reason it is highly recommended to use three or more nodes in
 every cluster.
 
-MessageType
+# MessageType
 
 Package raft sends and receives message in Protocol Buffer format (defined
 in raftpb package). Each state (follower, candidate, leader) implements its
@@ -295,6 +295,5 @@ stale log entries:
 	that the follower that sent this 'MsgUnreachable' is not reachable, often
 	indicating 'MsgApp' is lost. When follower's progress state is replicate,
 	the leader sets it back to probe.
-
 */
 package raft

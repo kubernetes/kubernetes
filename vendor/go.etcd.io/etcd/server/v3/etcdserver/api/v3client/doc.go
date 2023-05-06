@@ -41,5 +41,4 @@
 //	if err != nil {
 //		// handle error!
 //	}
-//
 package v3client

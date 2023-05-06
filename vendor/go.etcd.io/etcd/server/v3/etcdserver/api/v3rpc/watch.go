@@ -144,6 +144,10 @@ type serverWatchStream struct {
 	// records fragmented watch IDs
 	fragment map[mvcc.WatchID]bool
 
+	// indicates whether we have an outstanding global progress
+	// notification to send
+	deferredProgress bool
+
 	// closec indicates the stream is closed.
 	closec chan struct{}
 
@@ -172,6 +176,8 @@ func (ws *watchServer) Watch(stream pb.Watch_WatchServer) (err error) {
 		progress: make(map[mvcc.WatchID]bool),
 		prevKV:   make(map[mvcc.WatchID]bool),
 		fragment: make(map[mvcc.WatchID]bool),
+
+		deferredProgress: false,
 
 		closec: make(chan struct{}),
 	}
@@ -359,10 +365,16 @@ func (sws *serverWatchStream) recvLoop() error {
 			}
 		case *pb.WatchRequest_ProgressRequest:
 			if uv.ProgressRequest != nil {
-				sws.ctrlStream <- &pb.WatchResponse{
-					Header:  sws.newResponseHeader(sws.watchStream.Rev()),
-					WatchId: clientv3.InvalidWatchID, // response is not associated with any WatchId and will be broadcast to all watch channels
+				sws.mu.Lock()
+				// Ignore if deferred progress notification is already in progress
+				if !sws.deferredProgress {
+					// Request progress for all watchers,
+					// force generation of a response
+					if !sws.watchStream.RequestProgressAll() {
+						sws.deferredProgress = true
+					}
 				}
+				sws.mu.Unlock()
 			}
 		default:
 			// we probably should not shutdown the entire stream when
@@ -430,11 +442,15 @@ func (sws *serverWatchStream) sendLoop() {
 				Canceled:        canceled,
 			}
 
-			if _, okID := ids[wresp.WatchID]; !okID {
-				// buffer if id not yet announced
-				wrs := append(pending[wresp.WatchID], wr)
-				pending[wresp.WatchID] = wrs
-				continue
+			// Progress notifications can have WatchID -1
+			// if they announce on behalf of multiple watchers
+			if wresp.WatchID != clientv3.InvalidWatchID {
+				if _, okID := ids[wresp.WatchID]; !okID {
+					// buffer if id not yet announced
+					wrs := append(pending[wresp.WatchID], wr)
+					pending[wresp.WatchID] = wrs
+					continue
+				}
 			}
 
 			mvcc.ReportEventReceived(len(evs))
@@ -464,6 +480,11 @@ func (sws *serverWatchStream) sendLoop() {
 			if len(evs) > 0 && sws.progress[wresp.WatchID] {
 				// elide next progress update if sent a key update
 				sws.progress[wresp.WatchID] = false
+			}
+			if sws.deferredProgress {
+				if sws.watchStream.RequestProgressAll() {
+					sws.deferredProgress = false
+				}
 			}
 			sws.mu.Unlock()
 

@@ -1,5 +1,5 @@
-//go:build riscv64
-// +build riscv64
+//go:build loong64
+// +build loong64
 
 package bbolt
 
