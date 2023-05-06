@@ -1140,21 +1140,26 @@ func TestAdd(t *testing.T) {
 func TestMul(t *testing.T) {
 	tests := []struct {
 		a        Quantity
-		b        Quantity
+		b        int64
 		expected Quantity
+		ok       bool
 	}{
-		{decQuantity(10, 0, DecimalSI), decQuantity(1, 1, DecimalSI), decQuantity(100, 0, DecimalSI)},
-		{decQuantity(10, 0, DecimalSI), decQuantity(1, 0, BinarySI), decQuantity(10, 0, DecimalSI)},
-		{decQuantity(10, 0, BinarySI), decQuantity(1, 0, DecimalSI), decQuantity(10, 0, BinarySI)},
-		{Quantity{Format: DecimalSI}, decQuantity(50, 0, DecimalSI), decQuantity(0, 0, DecimalSI)},
-		{decQuantity(50, 0, DecimalSI), Quantity{Format: DecimalSI}, decQuantity(0, 0, DecimalSI)},
-		{Quantity{Format: DecimalSI}, Quantity{Format: DecimalSI}, decQuantity(0, 0, DecimalSI)},
+		{decQuantity(10, 0, DecimalSI), 10, decQuantity(100, 0, DecimalSI), true},
+		{decQuantity(10, 0, DecimalSI), 1, decQuantity(10, 0, DecimalSI), true},
+		{decQuantity(10, 0, BinarySI), 1, decQuantity(10, 0, BinarySI), true},
+		{Quantity{Format: DecimalSI}, 50, decQuantity(0, 0, DecimalSI), true},
+		{decQuantity(50, 0, DecimalSI), 0, decQuantity(0, 0, DecimalSI), true},
+		{Quantity{Format: DecimalSI}, 0, decQuantity(0, 0, DecimalSI), true},
+
+		{decQuantity(mostPositive, 0, DecimalSI), 10, decQuantity(mostPositive, 1, DecimalSI), false},
 	}
 
 	for i, test := range tests {
-		test.a.Mul(test.b)
+		if ok := test.a.Mul(test.b); test.ok != ok {
+			t.Errorf("[%d] Expected ok: %t, got ok: %t", i, test.ok, ok)
+		}
 		if test.a.Cmp(test.expected) != 0 {
-			t.Errorf("[%d] Expected %q, got %q", i, test.expected.String(), test.a.String())
+			t.Errorf("[%d] Expected %q, got %q", i, test.expected.AsDec().String(), test.a.AsDec().String())
 		}
 	}
 }
