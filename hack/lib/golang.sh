@@ -964,6 +964,7 @@ kube::golang::build_binaries() {
     if [[ ${#targets[@]} -eq 0 ]]; then
       targets=("${KUBE_ALL_TARGETS[@]}")
     fi
+    kube::util::read-array targets < <(kube::golang::dedup "${targets[@]}")
 
     local -a platforms
     IFS=" " read -ra platforms <<< "${KUBE_BUILD_PLATFORMS:-}"
@@ -972,7 +973,7 @@ kube::golang::build_binaries() {
     fi
 
     local -a binaries
-    while IFS="" read -r binary; do binaries+=("$binary"); done < <(kube::golang::binaries_from_targets "${targets[@]}")
+    kube::util::read-array binaries < <(kube::golang::binaries_from_targets "${targets[@]}")
 
     local parallel=false
     if [[ ${#platforms[@]} -gt 1 ]]; then
