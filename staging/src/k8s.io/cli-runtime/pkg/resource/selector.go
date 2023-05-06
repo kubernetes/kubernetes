@@ -17,10 +17,6 @@ limitations under the License.
 package resource
 
 import (
-	"fmt"
-	"os"
-
-	v1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -80,14 +76,6 @@ func (r *Selector) Visit(fn VisitorFunc) error {
 
 		if err := fn(info, nil); err != nil {
 			return nil, err
-		}
-		switch list.(type) {
-		case *v1.DeploymentList:
-			if len(list.(*v1.DeploymentList).Items) == 0 {
-				fmt.Fprintf(os.Stderr, "No resources found in %s namespace.\n", r.Namespace)
-			}
-
-		default:
 		}
 		return list, nil
 	})
