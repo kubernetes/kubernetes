@@ -293,8 +293,8 @@ func TestCreateConfigMap(t *testing.T) {
 		"create_get_env_from_env_file_configmap": {
 			configMapName: "get_env",
 			setup: func() func(t *testing.T, configMapOptions *ConfigMapOptions) func() {
-				os.Setenv("g_key1", "1")
-				os.Setenv("g_key2", "2")
+				t.Setenv("g_key1", "1")
+				t.Setenv("g_key2", "2")
 				return setupEnvFile([][]string{{"g_key1", "g_key2="}})
 			}(),
 			fromEnvFile: []string{"file.env"},
@@ -316,8 +316,8 @@ func TestCreateConfigMap(t *testing.T) {
 		"create_get_env_from_env_file_hash_configmap": {
 			configMapName: "get_env",
 			setup: func() func(t *testing.T, configMapOptions *ConfigMapOptions) func() {
-				os.Setenv("g_key1", "1")
-				os.Setenv("g_key2", "2")
+				t.Setenv("g_key1", "1")
+				t.Setenv("g_key2", "2")
 				return setupEnvFile([][]string{{"g_key1", "g_key2="}})
 			}(),
 			fromEnvFile: []string{"file.env"},

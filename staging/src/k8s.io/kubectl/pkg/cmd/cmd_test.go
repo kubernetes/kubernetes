@@ -342,7 +342,7 @@ func TestKubectlCommandHeadersHooks(t *testing.T) {
 			if kubeConfigFlags.WrapConfigFn != nil {
 				t.Fatal("expected initial nil WrapConfigFn")
 			}
-			os.Setenv(kubectlCmdHeaders, testCase.envVar)
+			t.Setenv(kubectlCmdHeaders, testCase.envVar)
 			addCmdHeaderHooks(cmds, kubeConfigFlags)
 			// Valdidate whether the hooks were added.
 			if testCase.addsHooks && kubeConfigFlags.WrapConfigFn == nil {
