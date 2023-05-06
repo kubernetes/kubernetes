@@ -23,6 +23,9 @@ import (
 	"github.com/spf13/pflag"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/plugin/pkg/admission/podnodeselector"
+	"k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
@@ -121,6 +124,13 @@ func (a *AdmissionOptions) ApplyTo(
 	if a.PluginNames != nil {
 		// pass PluginNames to generic AdmissionOptions
 		a.GenericAdmission.EnablePlugins, a.GenericAdmission.DisablePlugins = computePluginNames(a.PluginNames, a.GenericAdmission.RecommendedPluginOrder)
+	}
+
+	if sets.New(a.GenericAdmission.EnablePlugins...).Has(podnodeselector.PluginName) {
+		klog.InfoS("PodNodeSelector admission plugin is deprecated and will be replaced by CEL admission in the future. It will be removed when mutating CEL admission becomes beta.")
+	}
+	if sets.New(a.GenericAdmission.EnablePlugins...).Has(podtolerationrestriction.PluginName) {
+		klog.InfoS("PodTolerationRestriction admission plugin is deprecated and will be replaced by CEL admission in the future. It will be removed when mutating CEL admission becomes beta.")
 	}
 
 	return a.GenericAdmission.ApplyTo(c, informers, kubeClient, dynamicClient, features, pluginInitializers...)

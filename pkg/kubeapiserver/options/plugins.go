@@ -125,9 +125,9 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	exists.Register(plugins)
 	noderestriction.Register(plugins)
 	nodetaint.Register(plugins)
-	label.Register(plugins) // DEPRECATED, future PVs should not rely on labels for zone topology
-	podnodeselector.Register(plugins)
-	podtolerationrestriction.Register(plugins)
+	label.Register(plugins)                    // DEPRECATED, future PVs should not rely on labels for zone topology
+	podnodeselector.Register(plugins)          // DEPRECATED, it will be replaced by CEL in the future.
+	podtolerationrestriction.Register(plugins) // DEPRECATED, it will be replaced by CEL in the future.
 	runtimeclass.Register(plugins)
 	resourcequota.Register(plugins)
 	podsecurity.Register(plugins)

@@ -37,6 +37,10 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
+// This is deprecated. PodNodeSelector will be replaced by CEL admission
+// in the future.
+// See https://github.com/kubernetes/kubernetes/issues/113474 for details.
+
 // NamespaceNodeSelectors is for assigning node selectors labels to
 // namespaces. Default value is the annotation key
 // scheduler.alpha.kubernetes.io/node-selector
