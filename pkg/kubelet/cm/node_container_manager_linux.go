@@ -153,6 +153,8 @@ func enforceExistingCgroup(cgroupManager CgroupManager, cName CgroupName, rl v1.
 		if rp.Swap != nil && swapControllerAvailable() {
 			rp.Unified[Cgroup2MaxSwapFilename] = strconv.FormatInt(*rp.Swap, 10)
 		}
+=======
+>>>>>>> 73d7f260b69 (remove swap max set for reserved part)
 	}
 
 	cgroupConfig := &CgroupConfig{
