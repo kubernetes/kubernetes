@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 	"net/http"
 	"testing"
-	
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
