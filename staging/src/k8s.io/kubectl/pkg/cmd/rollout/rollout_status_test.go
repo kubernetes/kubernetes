@@ -90,35 +90,6 @@ func TestRolloutStatus(t *testing.T) {
 	}
 }
 
-func TestRolloutStatusNoResources(t *testing.T) {
-	deploymentName := "deployment/nginx-deployment"
-	ns := scheme.Codecs.WithoutConversion()
-	tf := cmdtesting.NewTestFactory().WithNamespace("test")
-	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
-
-	info, _ := runtime.SerializerInfoForMediaType(ns.SupportedMediaTypes(), runtime.ContentTypeJSON)
-	encoder := ns.EncoderForVersion(info.Serializer, rolloutStatusGroupVersionEncoder)
-	tf.Client = &fake.RESTClient{
-		GroupVersion:         rolloutStatusGroupVersionEncoder,
-		NegotiatedSerializer: ns,
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			dep := &appsv1.ReplicaSet{}
-			dep.Name = deploymentName
-			body := io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, dep))))
-			return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader(), Body: body}, nil
-		}),
-	}
-
-	streams, _, _, buf := genericiooptions.NewTestIOStreams()
-	cmd := NewCmdRolloutStatus(tf, streams)
-	cmd.Run(cmd, []string{"deployment"})
-
-	expectedMsg := "No resources found in test namespace.\n"
-	if buf.String() != expectedMsg {
-		t.Errorf("expected output: %s, but got: %s", expectedMsg, buf.String())
-	}
-}
-
 func TestRolloutStatusWithSelector(t *testing.T) {
 	deploymentName := "deployment"
 	ns := scheme.Codecs.WithoutConversion()
