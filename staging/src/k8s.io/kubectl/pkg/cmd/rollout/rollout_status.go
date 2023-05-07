@@ -174,10 +174,7 @@ func (o *RolloutStatusOptions) Run() error {
 		return err
 	}
 
-	resourceFound := false
-
-	r.Visit(func(info *resource.Info, _ error) error {
-		resourceFound = true
+	return r.Visit(func(info *resource.Info, _ error) error {
 		mapping := info.ResourceMapping()
 		statusViewer, err := o.StatusViewerFn(mapping)
 		if err != nil {
@@ -231,5 +228,4 @@ func (o *RolloutStatusOptions) Run() error {
 			return err
 		})
 	})
-
 }
