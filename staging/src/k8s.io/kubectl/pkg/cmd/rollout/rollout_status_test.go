@@ -19,9 +19,6 @@ package rollout
 import (
 	"bytes"
 	"io"
-	"net/http"
-	"testing"
-
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/watch"
@@ -29,7 +26,8 @@ import (
 	"k8s.io/client-go/rest/fake"
 	cgtesting "k8s.io/client-go/testing"
 	"k8s.io/kubectl/pkg/scheme"
-
+	"net/http"
+	"testing"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
