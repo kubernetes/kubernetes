@@ -309,7 +309,15 @@ func (o *CreateRoleOptions) Validate() error {
 		return fmt.Errorf("at least one resource must be specified")
 	}
 
-	return o.validateResource()
+	err := o.validateResource()
+
+	if err != nil {
+		if o.DryRunStrategy != cmdutil.DryRunClient {
+			return err
+		}
+		fmt.Fprintf(o.ErrOut, "Warning (Server side): '%v'\n", err.Error())
+	}
+	return nil
 }
 
 func (o *CreateRoleOptions) validateResource() error {

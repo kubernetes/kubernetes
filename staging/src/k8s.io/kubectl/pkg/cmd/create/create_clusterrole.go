@@ -147,7 +147,10 @@ func (c *CreateClusterRoleOptions) Validate() error {
 			}
 		}
 		if err := c.validateResource(); err != nil {
-			return err
+			if c.DryRunStrategy != cmdutil.DryRunClient {
+				return err
+			}
+			fmt.Fprintf(c.ErrOut, "Warning (Server side): '%v'\n", err.Error())
 		}
 	}
 

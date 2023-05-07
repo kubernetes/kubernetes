@@ -26,6 +26,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 )
 
@@ -213,9 +214,25 @@ func TestClusterRoleValidate(t *testing.T) {
 							Group: "extensions",
 						},
 					},
+					DryRunStrategy: cmdutil.DryRunServer,
 				},
 			},
 			expectErr: true,
+		},
+		"test-missing-resource-existing-apigroup-with-clientside-dryRun": {
+			clusterRoleOptions: &CreateClusterRoleOptions{
+				CreateRoleOptions: &CreateRoleOptions{
+					Name:  "my-clusterrole",
+					Verbs: []string{"get"},
+					Resources: []ResourceOptions{
+						{
+							Group: "extensions",
+						},
+					},
+					DryRunStrategy: cmdutil.DryRunClient,
+				},
+			},
+			expectErr: false,
 		},
 		"test-missing-resource-existing-subresource": {
 			clusterRoleOptions: &CreateClusterRoleOptions{
@@ -230,6 +247,21 @@ func TestClusterRoleValidate(t *testing.T) {
 				},
 			},
 			expectErr: true,
+		},
+		"test-missing-resource-existing-subresource-with-clientside-dryRun": {
+			clusterRoleOptions: &CreateClusterRoleOptions{
+				CreateRoleOptions: &CreateRoleOptions{
+					Name:  "my-clusterrole",
+					Verbs: []string{"get"},
+					Resources: []ResourceOptions{
+						{
+							SubResource: "scale",
+						},
+					},
+					DryRunStrategy: cmdutil.DryRunClient,
+				},
+			},
+			expectErr: false,
 		},
 		"test-invalid-verb": {
 			clusterRoleOptions: &CreateClusterRoleOptions{
@@ -317,6 +349,21 @@ func TestClusterRoleValidate(t *testing.T) {
 				},
 			},
 			expectErr: true,
+		},
+		"test-invalid-resource-with-clientside-dryRun": {
+			clusterRoleOptions: &CreateClusterRoleOptions{
+				CreateRoleOptions: &CreateRoleOptions{
+					Name:  "my-clusterrole",
+					Verbs: []string{"get"},
+					Resources: []ResourceOptions{
+						{
+							Resource: "invalid-resource",
+						},
+					},
+					DryRunStrategy: cmdutil.DryRunClient,
+				},
+			},
+			expectErr: false,
 		},
 		"test-resource-name-with-multiple-resources": {
 			clusterRoleOptions: &CreateClusterRoleOptions{

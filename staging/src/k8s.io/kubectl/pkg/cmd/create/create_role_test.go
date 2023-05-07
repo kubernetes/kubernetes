@@ -30,6 +30,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 )
 
@@ -193,6 +194,19 @@ func TestValidate(t *testing.T) {
 			},
 			expectErr: true,
 		},
+		"test-missing-resource-existing-apigroup-with-clientside-dryRun": {
+			roleOptions: &CreateRoleOptions{
+				Name:  "my-role",
+				Verbs: []string{"get"},
+				Resources: []ResourceOptions{
+					{
+						Group: "extensions",
+					},
+				},
+				DryRunStrategy: cmdutil.DryRunClient,
+			},
+			expectErr: false,
+		},
 		"test-missing-resource-existing-subresource": {
 			roleOptions: &CreateRoleOptions{
 				Name:  "my-role",
@@ -204,6 +218,19 @@ func TestValidate(t *testing.T) {
 				},
 			},
 			expectErr: true,
+		},
+		"test-missing-resource-existing-subresource-with-clientside-dryRun": {
+			roleOptions: &CreateRoleOptions{
+				Name:  "my-role",
+				Verbs: []string{"get"},
+				Resources: []ResourceOptions{
+					{
+						SubResource: "scale",
+					},
+				},
+				DryRunStrategy: cmdutil.DryRunClient,
+			},
+			expectErr: false,
 		},
 		"test-invalid-verb": {
 			roleOptions: &CreateRoleOptions{
