@@ -445,8 +445,13 @@ func (e *execPlugin) runPlugin(ctx context.Context, cmd *exec.Cmd, image string)
 		return fmt.Errorf("error execing credential provider plugin %s for image %s: %w", e.name, image, ctx.Err())
 	}
 	if err != nil {
+		stderr := ""
+		if err2, ok := err.(*exec.ExitError); ok {
+			stderr = string(err2.Stderr)
+		}
 		kubeletCredentialProviderPluginErrors.WithLabelValues(e.name).Inc()
-		return fmt.Errorf("error execing credential provider plugin %s for image %s: %w", e.name, image, err)
+		return fmt.Errorf("error execing credential provider plugin %s for image %s: %w %s",
+			e.name, image, err, stderr)
 	}
 	return nil
 }
