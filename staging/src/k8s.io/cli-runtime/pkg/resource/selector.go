@@ -17,9 +17,7 @@ limitations under the License.
 package resource
 
 import (
-	"fmt"
-	"os"
-	"reflect"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -79,10 +77,6 @@ func (r *Selector) Visit(fn VisitorFunc) error {
 
 		if err := fn(info, nil); err != nil {
 			return nil, err
-		}
-
-		if fmt.Sprintf("%v",reflect.Indirect(reflect.ValueOf(list)).FieldByName("Items"))=="[]" {
-			fmt.Fprintf(os.Stderr, "No resources found in %s namespace\n",r.Namespace)
 		}
 
 		return list, nil
