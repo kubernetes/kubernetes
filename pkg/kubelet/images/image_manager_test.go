@@ -420,30 +420,33 @@ func TestEvalCRIPullErr(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		input  error
-		assert func(string, error)
+		assert func(string, error, bool)
 	}{
 		{
 			name:  "fallback error",
 			input: errors.New("test"),
-			assert: func(msg string, err error) {
+			assert: func(msg string, err error, exclude bool) {
 				assert.ErrorIs(t, err, ErrImagePull)
 				assert.Contains(t, msg, "test")
+				assert.False(t, exclude)
 			},
 		},
 		{
 			name:  "registry is unavailable",
 			input: crierrors.ErrRegistryUnavailable,
-			assert: func(msg string, err error) {
+			assert: func(msg string, err error, exclude bool) {
 				assert.ErrorIs(t, err, crierrors.ErrRegistryUnavailable)
 				assert.Contains(t, msg, "registry is unavailable")
+				assert.False(t, exclude)
 			},
 		},
 		{
 			name:  "signature is invalid",
 			input: crierrors.ErrSignatureValidationFailed,
-			assert: func(msg string, err error) {
+			assert: func(msg string, err error, exclude bool) {
 				assert.ErrorIs(t, err, crierrors.ErrSignatureValidationFailed)
 				assert.Contains(t, msg, "signature validation failed")
+				assert.True(t, exclude)
 			},
 		},
 	} {
@@ -452,8 +455,8 @@ func TestEvalCRIPullErr(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			msg, err := evalCRIPullErr(&v1.Container{}, testInput)
-			testAssert(msg, err)
+			msg, err, exclude := evalCRIPullErr(&v1.Container{}, testInput)
+			testAssert(msg, err, exclude)
 		})
 	}
 }

@@ -25,9 +25,11 @@ import (
 
 var (
 	// ErrRegistryUnavailable - Get http error on the PullImage RPC call.
+	// The kubelet will retry to pull the image using the standard backoff period.
 	ErrRegistryUnavailable = errors.New("RegistryUnavailable")
 
 	// ErrSignatureValidationFailed - Unable to validate the image signature on the PullImage RPC call.
+	// The kubelet will not retry to pull the image again on that error.
 	ErrSignatureValidationFailed = errors.New("SignatureValidationFailed")
 )
 

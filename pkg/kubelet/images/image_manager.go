@@ -19,6 +19,7 @@ package images
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	dockerref "github.com/docker/distribution/reference"
@@ -41,13 +42,19 @@ type ImagePodPullingTimeRecorder interface {
 
 // imageManager provides the functionalities for image pulling.
 type imageManager struct {
-	recorder     record.EventRecorder
-	imageService kubecontainer.ImageService
-	backOff      *flowcontrol.Backoff
+	recorder        record.EventRecorder
+	imageService    kubecontainer.ImageService
+	backOff         *flowcontrol.Backoff
+	backOffExcludes sync.Map
 	// It will check the presence of the image, and report the 'image pulling', image pulled' events correspondingly.
 	puller imagePuller
 
 	podPullingTimeRecorder ImagePodPullingTimeRecorder
+}
+
+type backOffExclude struct {
+	msg string
+	err error
 }
 
 var _ ImageManager = &imageManager{}
@@ -66,6 +73,7 @@ func NewImageManager(recorder record.EventRecorder, imageService kubecontainer.I
 		recorder:               recorder,
 		imageService:           imageService,
 		backOff:                imageBackOff,
+		backOffExcludes:        sync.Map{},
 		puller:                 puller,
 		podPullingTimeRecorder: podPullingTimeRecorder,
 	}
@@ -144,6 +152,12 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, pod *v1.Pod, conta
 	}
 
 	backOffKey := fmt.Sprintf("%s_%s", pod.UID, container.Image)
+	if val, ok := m.backOffExcludes.Load(backOffKey); ok {
+		if exclude, ok := val.(backOffExclude); ok {
+			return "", exclude.msg, exclude.err
+		}
+	}
+
 	if m.backOff.IsInBackOffSinceUpdate(backOffKey, m.backOff.Clock.Now()) {
 		msg := fmt.Sprintf("Back-off pulling image %q", container.Image)
 		m.logIt(ref, v1.EventTypeNormal, events.BackOffPullImage, logPrefix, msg, klog.Info)
@@ -159,7 +173,11 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, pod *v1.Pod, conta
 		m.logIt(ref, v1.EventTypeWarning, events.FailedToPullImage, logPrefix, fmt.Sprintf("Failed to pull image %q: %v", container.Image, imagePullResult.err), klog.Warning)
 		m.backOff.Next(backOffKey, m.backOff.Clock.Now())
 
-		msg, err := evalCRIPullErr(container, imagePullResult.err)
+		msg, err, exclude := evalCRIPullErr(container, imagePullResult.err)
+		if exclude {
+			m.backOffExcludes.Store(backOffKey, backOffExclude{msg, err})
+		}
+
 		return "", msg, err
 	}
 	m.podPullingTimeRecorder.RecordImageFinishedPulling(pod.UID)
@@ -169,21 +187,21 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, pod *v1.Pod, conta
 	return imagePullResult.imageRef, "", nil
 }
 
-func evalCRIPullErr(container *v1.Container, err error) (errMsg string, errRes error) {
+func evalCRIPullErr(container *v1.Container, err error) (errMsg string, errRes error, exclude bool) {
 	// Error assertions via errors.Is is not supported by gRPC (remote runtime) errors right now.
 	// See https://github.com/grpc/grpc-go/issues/3616
 	if err.Error() == crierrors.ErrRegistryUnavailable.Error() {
 		errMsg = fmt.Sprintf("image pull failed for %s because the registry is unavailable.", container.Image)
-		return errMsg, crierrors.ErrRegistryUnavailable
+		return errMsg, crierrors.ErrRegistryUnavailable, false
 	}
 
 	if err.Error() == crierrors.ErrSignatureValidationFailed.Error() {
 		errMsg = fmt.Sprintf("image pull failed for %s because the signature validation failed.", container.Image)
-		return errMsg, crierrors.ErrSignatureValidationFailed
+		return errMsg, crierrors.ErrSignatureValidationFailed, true
 	}
 
 	// Fallback for no specific error
-	return err.Error(), ErrImagePull
+	return err.Error(), ErrImagePull, false
 }
 
 // applyDefaultImageTag parses a docker image string, if it doesn't contain any tag or digest,
