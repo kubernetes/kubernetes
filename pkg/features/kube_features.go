@@ -731,24 +731,6 @@ const (
 	// Enables the use of `RuntimeDefault` as the default seccomp profile for all workloads.
 	SeccompDefault featuregate.Feature = "SeccompDefault"
 
-	// owner: @maplain @andrewsykim
-	// kep: https://kep.k8s.io/2086
-	// alpha: v1.21
-	// beta: v1.22
-	// GA: v1.26
-	//
-	// Enables node-local routing for Service internal traffic
-	ServiceInternalTrafficPolicy featuregate.Feature = "ServiceInternalTrafficPolicy"
-
-	// owner: @aojea
-	// kep: https://kep.k8s.io/3070
-	// alpha: v1.24
-	// beta: v1.25
-	// ga: v1.26
-	//
-	// Subdivide the ClusterIP range for dynamic and static IP allocation.
-	ServiceIPStaticSubrange featuregate.Feature = "ServiceIPStaticSubrange"
-
 	// owner: @xuzhenglun
 	// kep: http://kep.k8s.io/3682
 	// alpha: v1.27
@@ -1090,10 +1072,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ElasticIndexedJob: {Default: true, PreRelease: featuregate.Beta},
 
 	SeccompDefault: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
-
-	ServiceIPStaticSubrange: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
-
-	ServiceInternalTrafficPolicy: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 
 	ServiceNodePortStaticSubrange: {Default: false, PreRelease: featuregate.Alpha},
 
