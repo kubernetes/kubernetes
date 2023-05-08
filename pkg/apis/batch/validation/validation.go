@@ -24,7 +24,6 @@ import (
 
 	"github.com/robfig/cron/v3"
 
-	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
@@ -55,19 +54,19 @@ const (
 )
 
 var (
-	supportedPodFailurePolicyActions sets.String = sets.NewString(
+	supportedPodFailurePolicyActions = sets.New(
 		string(batch.PodFailurePolicyActionCount),
 		string(batch.PodFailurePolicyActionFailJob),
 		string(batch.PodFailurePolicyActionIgnore))
 
-	supportedPodFailurePolicyOnExitCodesOperator sets.String = sets.NewString(
+	supportedPodFailurePolicyOnExitCodesOperator = sets.New(
 		string(batch.PodFailurePolicyOnExitCodesOpIn),
 		string(batch.PodFailurePolicyOnExitCodesOpNotIn))
 
-	supportedPodFailurePolicyOnPodConditionsStatus sets.String = sets.NewString(
-		string(v1.ConditionFalse),
-		string(v1.ConditionTrue),
-		string(v1.ConditionUnknown))
+	supportedPodFailurePolicyOnPodConditionsStatus = sets.New(
+		string(api.ConditionFalse),
+		string(api.ConditionTrue),
+		string(api.ConditionUnknown))
 )
 
 // validateGeneratedSelector validates that the generated selector on a controller object match the controller object
@@ -242,9 +241,9 @@ func validatePodFailurePolicyRule(rule *batch.PodFailurePolicyRule, rulePath *fi
 	var allErrs field.ErrorList
 	actionPath := rulePath.Child("action")
 	if rule.Action == "" {
-		allErrs = append(allErrs, field.Required(actionPath, fmt.Sprintf("valid values: %q", supportedPodFailurePolicyActions.List())))
+		allErrs = append(allErrs, field.Required(actionPath, fmt.Sprintf("valid values: %q", sets.List(supportedPodFailurePolicyActions))))
 	} else if !supportedPodFailurePolicyActions.Has(string(rule.Action)) {
-		allErrs = append(allErrs, field.NotSupported(actionPath, rule.Action, supportedPodFailurePolicyActions.List()))
+		allErrs = append(allErrs, field.NotSupported(actionPath, rule.Action, sets.List(supportedPodFailurePolicyActions)))
 	}
 	if rule.OnExitCodes != nil {
 		allErrs = append(allErrs, validatePodFailurePolicyRuleOnExitCodes(rule.OnExitCodes, rulePath.Child("onExitCodes"), containerNames)...)
@@ -271,9 +270,9 @@ func validatePodFailurePolicyRuleOnPodConditions(onPodConditions []batch.PodFail
 		statusPath := patternPath.Child("status")
 		allErrs = append(allErrs, apivalidation.ValidateQualifiedName(string(pattern.Type), patternPath.Child("type"))...)
 		if pattern.Status == "" {
-			allErrs = append(allErrs, field.Required(statusPath, fmt.Sprintf("valid values: %q", supportedPodFailurePolicyOnPodConditionsStatus.List())))
+			allErrs = append(allErrs, field.Required(statusPath, fmt.Sprintf("valid values: %q", sets.List(supportedPodFailurePolicyOnPodConditionsStatus))))
 		} else if !supportedPodFailurePolicyOnPodConditionsStatus.Has(string(pattern.Status)) {
-			allErrs = append(allErrs, field.NotSupported(statusPath, pattern.Status, supportedPodFailurePolicyOnPodConditionsStatus.List()))
+			allErrs = append(allErrs, field.NotSupported(statusPath, pattern.Status, sets.List(supportedPodFailurePolicyOnPodConditionsStatus)))
 		}
 	}
 	return allErrs
@@ -283,9 +282,9 @@ func validatePodFailurePolicyRuleOnExitCodes(onExitCode *batch.PodFailurePolicyO
 	var allErrs field.ErrorList
 	operatorPath := onExitCodesPath.Child("operator")
 	if onExitCode.Operator == "" {
-		allErrs = append(allErrs, field.Required(operatorPath, fmt.Sprintf("valid values: %q", supportedPodFailurePolicyOnExitCodesOperator.List())))
+		allErrs = append(allErrs, field.Required(operatorPath, fmt.Sprintf("valid values: %q", sets.List(supportedPodFailurePolicyOnExitCodesOperator))))
 	} else if !supportedPodFailurePolicyOnExitCodesOperator.Has(string(onExitCode.Operator)) {
-		allErrs = append(allErrs, field.NotSupported(operatorPath, onExitCode.Operator, supportedPodFailurePolicyOnExitCodesOperator.List()))
+		allErrs = append(allErrs, field.NotSupported(operatorPath, onExitCode.Operator, sets.List(supportedPodFailurePolicyOnExitCodesOperator)))
 	}
 	if onExitCode.ContainerName != nil && !containerNames.Has(*onExitCode.ContainerName) {
 		allErrs = append(allErrs, field.Invalid(onExitCodesPath.Child("containerName"), *onExitCode.ContainerName, "must be one of the container or initContainer names in the pod template"))
