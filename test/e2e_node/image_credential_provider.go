@@ -30,7 +30,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = SIGDescribe("ImageCredentialProvider [Feature:KubeletCredentialProviders]", func() {
+var _ = SIGDescribe("ImageCredentialProvider", func() {
 	f := framework.NewDefaultFramework("image-credential-provider")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var podClient *e2epod.PodClient
