@@ -777,7 +777,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 	if feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) {
 		if failureTargetCondition := findConditionByType(job.Status.Conditions, batch.JobFailureTarget); failureTargetCondition != nil {
 			finishedCondition = newFailedConditionForFailureTarget(failureTargetCondition, jm.clock.Now())
-		} else if failJobMessage := getFailJobMessage(&job, pods, uncounted.Failed()); failJobMessage != nil {
+		} else if failJobMessage := getFailJobMessage(&job, pods); failJobMessage != nil {
 			// Prepare the interim FailureTarget condition to record the failure message before the finalizers (allowing removal of the pods) are removed.
 			finishedCondition = newCondition(batch.JobFailureTarget, v1.ConditionTrue, jobConditionReasonPodFailurePolicy, *failJobMessage, jm.clock.Now())
 		}
@@ -961,7 +961,7 @@ func (jm *Controller) deleteJobPods(ctx context.Context, job *batch.Job, jobKey 
 //
 // It does this up to a limited number of Pods so that the size of .status
 // doesn't grow too much and this sync doesn't starve other Jobs.
-func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job *batch.Job, pods []*v1.Pod, succeededIndexes orderedIntervals, uncounted uncountedTerminatedPods, expectedRmFinalizers sets.String, finishedCond *batch.JobCondition, needsFlush bool, newBackoffRecord backoffRecord) error {
+func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job *batch.Job, pods []*v1.Pod, succeededIndexes orderedIntervals, uncounted uncountedTerminatedPods, expectedRmFinalizers sets.Set[string], finishedCond *batch.JobCondition, needsFlush bool, newBackoffRecord backoffRecord) error {
 	isIndexed := isIndexedJob(job)
 	var podsToRemoveFinalizer []*v1.Pod
 	uncountedStatus := job.Status.UncountedTerminatedPods
@@ -970,7 +970,7 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 		// Sort to introduce completed Indexes in order.
 		sort.Sort(byCompletionIndex(pods))
 	}
-	uidsWithFinalizer := make(sets.String, len(pods))
+	uidsWithFinalizer := make(sets.Set[string], len(pods))
 	for _, p := range pods {
 		uid := string(p.UID)
 		if hasJobTrackingFinalizer(p) && !expectedRmFinalizers.Has(uid) {
@@ -1103,7 +1103,7 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 //
 // Returns whether there are pending changes in the Job status that need to be
 // flushed in subsequent calls.
-func (jm *Controller) flushUncountedAndRemoveFinalizers(ctx context.Context, job *batch.Job, podsToRemoveFinalizer []*v1.Pod, uidsWithFinalizer sets.String, oldCounters *batch.JobStatus, podFailureCountByPolicyAction map[string]int, needsFlush bool, newBackoffRecord backoffRecord) (*batch.Job, bool, error) {
+func (jm *Controller) flushUncountedAndRemoveFinalizers(ctx context.Context, job *batch.Job, podsToRemoveFinalizer []*v1.Pod, uidsWithFinalizer sets.Set[string], oldCounters *batch.JobStatus, podFailureCountByPolicyAction map[string]int, needsFlush bool, newBackoffRecord backoffRecord) (*batch.Job, bool, error) {
 	var err error
 	if needsFlush {
 		if job, err = jm.updateStatusHandler(ctx, job); err != nil {
@@ -1157,7 +1157,7 @@ func (jm *Controller) flushUncountedAndRemoveFinalizers(ctx context.Context, job
 // .status.uncountedTerminatedPods for which the finalizer was successfully
 // removed and increments the corresponding status counters.
 // Returns whether there was any status change.
-func cleanUncountedPodsWithoutFinalizers(status *batch.JobStatus, uidsWithFinalizer sets.String) bool {
+func cleanUncountedPodsWithoutFinalizers(status *batch.JobStatus, uidsWithFinalizer sets.Set[string]) bool {
 	updated := false
 	uncountedStatus := status.UncountedTerminatedPods
 	newUncounted := filterInUncountedUIDs(uncountedStatus.Succeeded, uidsWithFinalizer)
@@ -1254,7 +1254,7 @@ func (jm *Controller) recordJobFinished(job *batch.Job, finishedCond *batch.JobC
 	return true
 }
 
-func filterInUncountedUIDs(uncounted []types.UID, include sets.String) []types.UID {
+func filterInUncountedUIDs(uncounted []types.UID, include sets.Set[string]) []types.UID {
 	var newUncounted []types.UID
 	for _, uid := range uncounted {
 		if include.Has(string(uid)) {
@@ -1320,7 +1320,7 @@ func newCondition(conditionType batch.JobConditionType, status v1.ConditionStatu
 }
 
 // getFailJobMessage returns a job failure message if the job should fail with the current counters
-func getFailJobMessage(job *batch.Job, pods []*v1.Pod, uncounted sets.String) *string {
+func getFailJobMessage(job *batch.Job, pods []*v1.Pod) *string {
 	if !feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) || job.Spec.PodFailurePolicy == nil {
 		return nil
 	}
@@ -1337,7 +1337,7 @@ func getFailJobMessage(job *batch.Job, pods []*v1.Pod, uncounted sets.String) *s
 
 // getNewFinishedPods returns the list of newly succeeded and failed pods that are not accounted
 // in the job status. The list of failed pods can be affected by the podFailurePolicy.
-func getNewFinishedPods(job *batch.Job, pods []*v1.Pod, uncounted *uncountedTerminatedPods, expectedRmFinalizers sets.String) (succeededPods, failedPods []*v1.Pod) {
+func getNewFinishedPods(job *batch.Job, pods []*v1.Pod, uncounted *uncountedTerminatedPods, expectedRmFinalizers sets.Set[string]) (succeededPods, failedPods []*v1.Pod) {
 	succeededPods = getValidPodsWithFilter(job, pods, uncounted.Succeeded(), expectedRmFinalizers, func(p *v1.Pod) bool {
 		return p.Status.Phase == v1.PodSucceeded
 	})
@@ -1580,7 +1580,7 @@ func getBackoff(queue workqueue.RateLimitingInterface, key interface{}) time.Dur
 // getValidPodsWithFilter returns the valid pods that pass the filter.
 // Pods are valid if they have a finalizer or in uncounted set
 // and, for Indexed Jobs, a valid completion index.
-func getValidPodsWithFilter(job *batch.Job, pods []*v1.Pod, uncounted sets.String, expectedRmFinalizers sets.String, filter func(*v1.Pod) bool) []*v1.Pod {
+func getValidPodsWithFilter(job *batch.Job, pods []*v1.Pod, uncounted sets.Set[string], expectedRmFinalizers sets.Set[string], filter func(*v1.Pod) bool) []*v1.Pod {
 	var result []*v1.Pod
 	for _, p := range pods {
 		uid := string(p.UID)
@@ -1634,14 +1634,14 @@ func removeTrackingFinalizerPatch(pod *v1.Pod) []byte {
 }
 
 type uncountedTerminatedPods struct {
-	succeeded sets.String
-	failed    sets.String
+	succeeded sets.Set[string]
+	failed    sets.Set[string]
 }
 
 func newUncountedTerminatedPods(in batch.UncountedTerminatedPods) *uncountedTerminatedPods {
 	obj := uncountedTerminatedPods{
-		succeeded: make(sets.String, len(in.Succeeded)),
-		failed:    make(sets.String, len(in.Failed)),
+		succeeded: make(sets.Set[string], len(in.Succeeded)),
+		failed:    make(sets.Set[string], len(in.Failed)),
 	}
 	for _, v := range in.Succeeded {
 		obj.succeeded.Insert(string(v))
@@ -1652,14 +1652,14 @@ func newUncountedTerminatedPods(in batch.UncountedTerminatedPods) *uncountedTerm
 	return &obj
 }
 
-func (u *uncountedTerminatedPods) Succeeded() sets.String {
+func (u *uncountedTerminatedPods) Succeeded() sets.Set[string] {
 	if u == nil {
 		return nil
 	}
 	return u.succeeded
 }
 
-func (u *uncountedTerminatedPods) Failed() sets.String {
+func (u *uncountedTerminatedPods) Failed() sets.Set[string] {
 	if u == nil {
 		return nil
 	}
