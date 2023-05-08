@@ -9,7 +9,7 @@ Building Kubernetes is easy if you take advantage of the containerized build env
      **Note**: You will want to set the Docker VM to have at least 8GB of initial memory or building will likely fail. (See: [#11852]( http://issue.k8s.io/11852)).
   * **Linux with local Docker**  Install Docker according to the [instructions](https://docs.docker.com/installation/#installation) for your OS.
   * **Windows with Docker Desktop WSL2 backend**  Install Docker according to the [instructions](https://docs.docker.com/docker-for-windows/wsl-tech-preview/). Be sure to store your sources in the local Linux file system, not the Windows remote mount at `/mnt/c`.
-  
+
   **Note**: You will need to check if Docker CLI plugin buildx is properly installed (`docker-buildx` file should be present in `~/.docker/cli-plugins`). You can install buildx according to the [instructions](https://github.com/docker/buildx/blob/master/README.md#installing).
 
 2. **Optional** [Google Cloud SDK](https://developers.google.com/cloud/sdk/)
@@ -48,6 +48,7 @@ There are 3 different containers instances that are run from this image.  The fi
 All Docker names are suffixed with a hash derived from the file path (to allow concurrent usage on things like CI machines) and a version number.  When the version number changes all state is cleared and clean build is started.  This allows the build infrastructure to be changed and signal to CI systems that old artifacts need to be deleted.
 
 ## Build artifacts
+
 The build system output all its products to a top level directory in the source repository named `_output`.
 These include the binary compiled packages (e.g. kubectl, kube-scheduler etc.) and archived Docker images.
 If you intend to run a component with a docker image you will need to import it from this directory with
@@ -57,7 +58,7 @@ the appropriate command (e.g. `docker import _output/release-images/amd64/kube-s
 
 The [`build/release.sh`](release.sh) script will build a release.  It will build binaries, run tests, (optionally) build runtime Docker images.
 
-The main output is a tar file: `kubernetes.tar.gz`.  This includes:
+The main output is a tar file: `kubernetes.tar.gz`. This includes:
 * Cross compiled client utilities.
 * Script (`kubectl`) for picking and running the right client binary based on platform.
 * Examples

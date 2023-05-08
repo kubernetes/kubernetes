@@ -143,4 +143,4 @@ bin/orphan-linux-$(ARCH): linux/orphan.c
 			$(TRIPLE)-strip $@"
 
 clean:
-	rm -rf .*container-* .push-* bin/
+	-rm -vrf .*container-* .push-* bin/
