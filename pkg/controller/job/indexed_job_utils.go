@@ -53,7 +53,7 @@ type orderedIntervals []interval
 // the indexes that succeeded since the last sync.
 func calculateSucceededIndexes(job *batch.Job, pods []*v1.Pod) (orderedIntervals, orderedIntervals) {
 	prevIntervals := succeededIndexesFromString(job.Status.CompletedIndexes, int(*job.Spec.Completions))
-	newSucceeded := sets.NewInt()
+	newSucceeded := sets.New[int]()
 	for _, p := range pods {
 		ix := getCompletionIndex(p.Annotations)
 		// Succeeded Pod with valid index and, if tracking with finalizers,
@@ -63,7 +63,7 @@ func calculateSucceededIndexes(job *batch.Job, pods []*v1.Pod) (orderedIntervals
 		}
 	}
 	// List returns the items of the set in order.
-	result := prevIntervals.withOrderedIndexes(newSucceeded.List())
+	result := prevIntervals.withOrderedIndexes(sets.List(newSucceeded))
 	return prevIntervals, result
 }
 
@@ -194,7 +194,7 @@ func firstPendingIndexes(activePods []*v1.Pod, succeededIndexes orderedIntervals
 	if count == 0 {
 		return nil
 	}
-	active := sets.NewInt()
+	active := sets.New[int]()
 	for _, p := range activePods {
 		ix := getCompletionIndex(p.Annotations)
 		if ix != unknownCompletionIndex {
@@ -202,7 +202,7 @@ func firstPendingIndexes(activePods []*v1.Pod, succeededIndexes orderedIntervals
 		}
 	}
 	result := make([]int, 0, count)
-	nonPending := succeededIndexes.withOrderedIndexes(active.List())
+	nonPending := succeededIndexes.withOrderedIndexes(sets.List(active))
 	// The following algorithm is bounded by len(nonPending) and count.
 	candidate := 0
 	for _, sInterval := range nonPending {
