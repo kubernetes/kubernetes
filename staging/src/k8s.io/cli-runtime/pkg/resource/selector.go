@@ -17,7 +17,6 @@ limitations under the License.
 package resource
 
 import (
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -78,7 +77,6 @@ func (r *Selector) Visit(fn VisitorFunc) error {
 		if err := fn(info, nil); err != nil {
 			return nil, err
 		}
-
 		return list, nil
 	})
 }
