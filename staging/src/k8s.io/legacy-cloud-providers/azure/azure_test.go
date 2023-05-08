@@ -1646,7 +1646,7 @@ func validateLoadBalancer(t *testing.T, loadBalancer *network.LoadBalancer, serv
 			} else {
 				for _, actualProbe := range *loadBalancer.Probes {
 					if strings.EqualFold(*actualProbe.Name, wantedRuleName) &&
-						*actualProbe.Port == wantedRule.NodePort {
+						*actualProbe.Port == lbNodesHealthCheckPort {
 						foundProbe = true
 						break
 					}

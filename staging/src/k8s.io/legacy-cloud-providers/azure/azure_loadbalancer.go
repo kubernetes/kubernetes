@@ -123,6 +123,12 @@ const (
 	serviceUsingDNSKey = "kubernetes-dns-label-service"
 
 	defaultLoadBalancerSourceRanges = "0.0.0.0/0"
+
+	// NOTE: Please keep the following port in sync with ProxyHealthzPort in k/k pkg/cluster/ports/ports.go
+	// ports.ProxyHealthzPort was not used here to avoid dependencies to k8s.io/kubernetes in the
+	// GCE cloud provider which is required as part of the out-of-tree cloud provider efforts.
+	// TODO: use a shared constant once ports in pkg/cluster/ports are in a common external repo.
+	lbNodesHealthCheckPort = 10256
 )
 
 // GetLoadBalancer returns whether the specified load balancer and its components exist, and
@@ -1642,7 +1648,7 @@ func (az *Cloud) reconcileLoadBalancerRule(
 		lbRuleName := az.getLoadBalancerRuleName(service, port.Protocol, port.Port)
 		klog.V(2).Infof("reconcileLoadBalancerRule lb name (%s) rule name (%s)", lbName, lbRuleName)
 
-		transportProto, _, probeProto, err := getProtocolsFromKubernetesProtocol(port.Protocol)
+		transportProto, _, _, err := getProtocolsFromKubernetesProtocol(port.Protocol)
 		if err != nil {
 			return expectedProbes, expectedRules, err
 		}
@@ -1670,24 +1676,34 @@ func (az *Cloud) reconcileLoadBalancerRule(
 				},
 			})
 		} else if port.Protocol != v1.ProtocolUDP && port.Protocol != v1.ProtocolSCTP {
-			// we only add the expected probe if we're doing TCP
-			if probeProtocol == "" {
-				probeProtocol = string(*probeProto)
-			}
 			var actualPath *string
+			probePort := port.NodePort
+
+			if probeProtocol == "" {
+				// If no protocol is specified we want to fall back to HTTP
+				// as we want to leverage kube-proxy's HTTP health endpoint
+				// unless otherwise specified.
+				probeProtocol = string(network.ProbeProtocolHTTP)
+			}
+
 			if !strings.EqualFold(probeProtocol, string(network.ProbeProtocolTCP)) {
+				// In case this is not TCP, instead of using NodePort, we want to probe against
+				// kube-proxy's HTTP health endpoint which, unless otherwise specified,
+				// is available at port lbNodesHealthCheckPort and /healthz path.
+				probePort = lbNodesHealthCheckPort
 				if requestPath != "" {
 					actualPath = pointer.String(requestPath)
 				} else {
 					actualPath = pointer.String("/healthz")
 				}
 			}
+
 			expectedProbes = append(expectedProbes, network.Probe{
 				Name: &lbRuleName,
 				ProbePropertiesFormat: &network.ProbePropertiesFormat{
 					Protocol:          network.ProbeProtocol(probeProtocol),
 					RequestPath:       actualPath,
-					Port:              pointer.Int32(port.NodePort),
+					Port:              pointer.Int32(probePort),
 					IntervalInSeconds: pointer.Int32(5),
 					NumberOfProbes:    pointer.Int32(2),
 				},
