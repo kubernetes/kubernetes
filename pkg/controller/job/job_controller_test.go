@@ -263,7 +263,7 @@ func TestControllerSyncJob(t *testing.T) {
 		expectedCondition       *batch.JobConditionType
 		expectedConditionStatus v1.ConditionStatus
 		expectedConditionReason string
-		expectedCreatedIndexes  sets.Int
+		expectedCreatedIndexes  sets.Set[int]
 		expectedPodPatches      int
 
 		// features
@@ -574,7 +574,7 @@ func TestControllerSyncJob(t *testing.T) {
 			completionMode:         batch.IndexedCompletion,
 			expectedCreations:      2,
 			expectedActive:         2,
-			expectedCreatedIndexes: sets.NewInt(0, 1),
+			expectedCreatedIndexes: sets.New(0, 1),
 		},
 		"indexed job completed": {
 			parallelism:    2,
@@ -608,7 +608,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedActive:         1,
 			expectedSucceeded:      2,
 			expectedCompletedIdxs:  "0,1",
-			expectedCreatedIndexes: sets.NewInt(2),
+			expectedCreatedIndexes: sets.New(2),
 			expectedPodPatches:     3,
 		},
 		"indexed job some running and completed pods": {
@@ -630,7 +630,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedActive:         8,
 			expectedSucceeded:      6,
 			expectedCompletedIdxs:  "2,4,5,7-9",
-			expectedCreatedIndexes: sets.NewInt(1, 6, 10, 11, 12, 13),
+			expectedCreatedIndexes: sets.New(1, 6, 10, 11, 12, 13),
 			expectedPodPatches:     6,
 		},
 		"indexed job some failed pods": {
@@ -646,7 +646,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedCreations:      2,
 			expectedActive:         3,
 			expectedFailed:         2,
-			expectedCreatedIndexes: sets.NewInt(0, 2),
+			expectedCreatedIndexes: sets.New(0, 2),
 			expectedPodPatches:     2,
 		},
 		"indexed job some pods without index": {
@@ -954,9 +954,9 @@ func TestControllerSyncJob(t *testing.T) {
 	}
 }
 
-func checkIndexedJobPods(t *testing.T, control *controller.FakePodControl, wantIndexes sets.Int, jobName string) {
+func checkIndexedJobPods(t *testing.T, control *controller.FakePodControl, wantIndexes sets.Set[int], jobName string) {
 	t.Helper()
-	gotIndexes := sets.NewInt()
+	gotIndexes := sets.New[int]()
 	for _, p := range control.Templates {
 		checkJobCompletionEnvVariable(t, &p.Spec)
 		ix := getCompletionIndex(p.Annotations)
@@ -974,7 +974,7 @@ func checkIndexedJobPods(t *testing.T, control *controller.FakePodControl, wantI
 			t.Errorf("Got pod generate name %s, want %s", p.GenerateName, expectedName)
 		}
 	}
-	if diff := cmp.Diff(wantIndexes.List(), gotIndexes.List()); diff != "" {
+	if diff := cmp.Diff(sets.List(wantIndexes), sets.List(gotIndexes)); diff != "" {
 		t.Errorf("Unexpected created completion indexes (-want,+got):\n%s", diff)
 	}
 }
@@ -983,7 +983,7 @@ func TestGetNewFinshedPods(t *testing.T) {
 	cases := map[string]struct {
 		job                  batch.Job
 		pods                 []*v1.Pod
-		expectedRmFinalizers sets.String
+		expectedRmFinalizers sets.Set[string]
 		wantSucceeded        int32
 		wantFailed           int32
 	}{
@@ -1040,7 +1040,7 @@ func TestGetNewFinshedPods(t *testing.T) {
 					},
 				},
 			},
-			expectedRmFinalizers: sets.NewString("b", "f"),
+			expectedRmFinalizers: sets.New("b", "f"),
 			pods: []*v1.Pod{
 				buildPod().uid("a").phase(v1.PodSucceeded).Pod,
 				buildPod().uid("b").phase(v1.PodSucceeded).trackingFinalizer().Pod,
@@ -1098,7 +1098,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 		job                     batch.Job
 		pods                    []*v1.Pod
 		finishedCond            *batch.JobCondition
-		expectedRmFinalizers    sets.String
+		expectedRmFinalizers    sets.Set[string]
 		needsFlush              bool
 		statusUpdateErr         error
 		podControlErr           error
@@ -1203,7 +1203,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 					},
 				},
 			},
-			expectedRmFinalizers: sets.NewString("c", "d", "g", "h"),
+			expectedRmFinalizers: sets.New("c", "d", "g", "h"),
 			pods: []*v1.Pod{
 				buildPod().uid("a").phase(v1.PodSucceeded).trackingFinalizer().Pod,
 				buildPod().uid("b").phase(v1.PodFailed).trackingFinalizer().Pod,
@@ -4358,7 +4358,7 @@ func TestFinalizersRemovedExpectations(t *testing.T) {
 	pods := append(newPodList(2, v1.PodSucceeded, job), newPodList(2, v1.PodFailed, job)...)
 	podInformer := sharedInformers.Core().V1().Pods().Informer()
 	podIndexer := podInformer.GetIndexer()
-	uids := sets.NewString()
+	uids := sets.New[string]()
 	for i := range pods {
 		clientset.Tracker().Add(pods[i])
 		podIndexer.Add(pods[i])
@@ -4369,7 +4369,7 @@ func TestFinalizersRemovedExpectations(t *testing.T) {
 	manager.syncJob(context.TODO(), jobKey)
 	gotExpectedUIDs := manager.finalizerExpectations.getExpectedUIDs(jobKey)
 	if len(gotExpectedUIDs) != 0 {
-		t.Errorf("Got unwanted expectations for removed finalizers after first syncJob with client failures:\n%s", gotExpectedUIDs.List())
+		t.Errorf("Got unwanted expectations for removed finalizers after first syncJob with client failures:\n%s", sets.List(gotExpectedUIDs))
 	}
 
 	// Remove failures and re-sync.
@@ -4426,7 +4426,7 @@ func TestFinalizersRemovedExpectations(t *testing.T) {
 		t.Errorf("Deleting pod that had finalizer: %v", err)
 	}
 
-	uids = sets.NewString(string(pods[2].UID))
+	uids = sets.New(string(pods[2].UID))
 	var diff string
 	if err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
 		gotExpectedUIDs = manager.finalizerExpectations.getExpectedUIDs(jobKey)
