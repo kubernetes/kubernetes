@@ -40,10 +40,12 @@ type setCredentialsOptions struct {
 	clientCertificate cliflag.StringFlag
 	clientKey         cliflag.StringFlag
 	token             cliflag.StringFlag `datapolicy:"token"`
-	username          cliflag.StringFlag
-	password          cliflag.StringFlag `datapolicy:"password"`
-	embedCertData     cliflag.Tristate
-	authProvider      cliflag.StringFlag
+	// Deprecated: Basic auth has been deprecated This flag will be removed in a future release
+	username cliflag.StringFlag
+	// Deprecated: Basic auth has been deprecated This flag will be removed in a future release
+	password      cliflag.StringFlag `datapolicy:"password"`
+	embedCertData cliflag.Tristate
+	authProvider  cliflag.StringFlag
 
 	authProviderArgs         map[string]string
 	authProviderArgsToRemove []string
@@ -163,7 +165,7 @@ func newCmdConfigSetCredentials(out io.Writer, options *setCredentialsOptions) *
 				cmd.Help()
 				cmdutil.CheckErr(err)
 			}
-			cmdutil.CheckErr(options.run())
+			cmdutil.CheckErr(options.run(out))
 			fmt.Fprintf(out, "User %q set.\n", options.name)
 		},
 	}
@@ -187,7 +189,7 @@ func newCmdConfigSetCredentials(out io.Writer, options *setCredentialsOptions) *
 	return cmd
 }
 
-func (o setCredentialsOptions) run() error {
+func (o setCredentialsOptions) run(out io.Writer) error {
 	err := o.validate()
 	if err != nil {
 		return err
@@ -202,7 +204,7 @@ func (o setCredentialsOptions) run() error {
 	if !exists {
 		startingStanza = clientcmdapi.NewAuthInfo()
 	}
-	authInfo := o.modifyAuthInfo(*startingStanza)
+	authInfo := o.modifyAuthInfo(*startingStanza, out)
 	config.AuthInfos[o.name] = &authInfo
 
 	if err := clientcmd.ModifyConfig(o.configAccess, *config, true); err != nil {
@@ -212,7 +214,7 @@ func (o setCredentialsOptions) run() error {
 	return nil
 }
 
-func (o *setCredentialsOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.AuthInfo) clientcmdapi.AuthInfo {
+func (o *setCredentialsOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.AuthInfo, out io.Writer) clientcmdapi.AuthInfo {
 	modifiedAuthInfo := existingAuthInfo
 
 	var setToken, setBasic bool
@@ -252,10 +254,12 @@ func (o *setCredentialsOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.Aut
 	if o.username.Provided() {
 		modifiedAuthInfo.Username = o.username.Value()
 		setBasic = setBasic || len(modifiedAuthInfo.Username) > 0
+		fmt.Fprintf(out, "Basicauthentication has been deprecated. --username and --password flags will be removed in an upcoming release.\n")
 	}
 	if o.password.Provided() {
 		modifiedAuthInfo.Password = o.password.Value()
 		setBasic = setBasic || len(modifiedAuthInfo.Password) > 0
+		fmt.Fprintf(out, "Basicauthentication has been deprecated. --username and --password flags will be removed in an upcoming release.\n")
 	}
 	if o.authProvider.Provided() {
 		newName := o.authProvider.Value()

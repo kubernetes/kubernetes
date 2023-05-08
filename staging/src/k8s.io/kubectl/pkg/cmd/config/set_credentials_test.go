@@ -417,7 +417,7 @@ func TestModifyExistingAuthInfo(t *testing.T) {
 				return
 			}
 
-			modifiedAuthInfo := opts.modifyAuthInfo(tt.existingAuthInfo)
+			modifiedAuthInfo := opts.modifyAuthInfo(tt.existingAuthInfo, os.Stdout)
 
 			if !reflect.DeepEqual(modifiedAuthInfo, tt.wantAuthInfo) {
 				t.Errorf("case %s: flags %q: mis-matched auth info,\nwanted=%#v\ngot=   %#v", tt.name, tt.flags, tt.wantAuthInfo, modifiedAuthInfo)
