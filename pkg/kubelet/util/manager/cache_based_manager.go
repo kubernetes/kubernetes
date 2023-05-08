@@ -92,7 +92,7 @@ func isObjectOlder(newObject, oldObject runtime.Object) bool {
 	return newVersion < oldVersion
 }
 
-func (s *objectStore) AddReference(namespace, name string, podUID types.UID) {
+func (s *objectStore) AddReference(namespace, name string, _ types.UID) {
 	key := objectKey{namespace: namespace, name: name}
 
 	// AddReference is called from RegisterPod, thus it needs to be efficient.
@@ -114,7 +114,7 @@ func (s *objectStore) AddReference(namespace, name string, podUID types.UID) {
 	item.data = nil
 }
 
-func (s *objectStore) DeleteReference(namespace, name string, podUID types.UID) {
+func (s *objectStore) DeleteReference(namespace, name string, _ types.UID) {
 	key := objectKey{namespace: namespace, name: name}
 
 	s.lock.Lock()

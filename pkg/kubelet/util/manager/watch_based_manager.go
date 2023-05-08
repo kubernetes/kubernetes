@@ -45,7 +45,7 @@ type isImmutableFunc func(runtime.Object) bool
 
 // objectCacheItem is a single item stored in objectCache.
 type objectCacheItem struct {
-	refCount  int
+	refMap    map[types.UID]int
 	store     *cacheStore
 	reflector *cache.Reflector
 
@@ -232,7 +232,7 @@ func (c *objectCache) newReflectorLocked(namespace, name string) *objectCacheIte
 		0,
 	)
 	item := &objectCacheItem{
-		refCount:  0,
+		refMap:    make(map[types.UID]int),
 		store:     store,
 		reflector: reflector,
 		hasSynced: func() (bool, error) { return store.hasSynced(), nil },
@@ -261,7 +261,7 @@ func (c *objectCache) AddReference(namespace, name string, podUID types.UID) {
 		item = c.newReflectorLocked(namespace, name)
 		c.items[key] = item
 	}
-	item.refCount++
+	item.refMap[podUID]++
 }
 
 func (c *objectCache) DeleteReference(namespace, name string, podUID types.UID) {
@@ -270,8 +270,11 @@ func (c *objectCache) DeleteReference(namespace, name string, podUID types.UID) 
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	if item, ok := c.items[key]; ok {
-		item.refCount--
-		if item.refCount == 0 {
+		item.refMap[podUID]--
+		if item.refMap[podUID] == 0 {
+			delete(item.refMap, podUID)
+		}
+		if len(item.refMap) == 0 {
 			// Stop the underlying reflector.
 			item.stop()
 			delete(c.items, key)
