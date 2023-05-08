@@ -98,7 +98,7 @@ func validateGeneratedSelector(obj *batch.Job, validateBatchLabels bool) field.E
 	// backward-compatibility, and experimentation with new
 	// labeling/selection schemes.  Automatic selector generation should
 	// have placed certain labels on the pod, but this could have failed if
-	// the user added coflicting labels.  Validate that the expected
+	// the user added conflicting labels.  Validate that the expected
 	// generated ones are there.
 	allErrs = append(allErrs, apivalidation.ValidateHasLabel(obj.Spec.Template.ObjectMeta, field.NewPath("spec").Child("template").Child("metadata"), batch.LegacyControllerUidLabel, string(obj.UID))...)
 	allErrs = append(allErrs, apivalidation.ValidateHasLabel(obj.Spec.Template.ObjectMeta, field.NewPath("spec").Child("template").Child("metadata"), batch.LegacyJobNameLabel, string(obj.Name))...)
