@@ -28,11 +28,37 @@ const kubeProxySubsystem = "kubeproxy"
 
 var (
 	// SyncProxyRulesLatency is the latency of one round of kube-proxy syncing proxy rules.
+	// (With the iptables proxy, if MinimizeIPTablesRestore is enabled, this includes both
+	// full and partial syncs.)
 	SyncProxyRulesLatency = metrics.NewHistogram(
 		&metrics.HistogramOpts{
 			Subsystem:      kubeProxySubsystem,
 			Name:           "sync_proxy_rules_duration_seconds",
 			Help:           "SyncProxyRules latency in seconds",
+			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// SyncFullProxyRulesLatency is the latency of one round of full rule syncing, when
+	// MinimizeIPTablesRestore is enabled.
+	SyncFullProxyRulesLatency = metrics.NewHistogram(
+		&metrics.HistogramOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "sync_full_proxy_rules_duration_seconds",
+			Help:           "SyncProxyRules latency in seconds for full resyncs",
+			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// SyncPartialProxyRulesLatency is the latency of one round of partial rule syncing, when
+	// MinimizeIPTablesRestore is enabled.
+	SyncPartialProxyRulesLatency = metrics.NewHistogram(
+		&metrics.HistogramOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "sync_partial_proxy_rules_duration_seconds",
+			Help:           "SyncProxyRules latency in seconds for partial resyncs",
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -180,6 +206,8 @@ var registerMetricsOnce sync.Once
 func RegisterMetrics() {
 	registerMetricsOnce.Do(func() {
 		legacyregistry.MustRegister(SyncProxyRulesLatency)
+		legacyregistry.MustRegister(SyncFullProxyRulesLatency)
+		legacyregistry.MustRegister(SyncPartialProxyRulesLatency)
 		legacyregistry.MustRegister(SyncProxyRulesLastTimestamp)
 		legacyregistry.MustRegister(NetworkProgrammingLatency)
 		legacyregistry.MustRegister(EndpointChangesPending)

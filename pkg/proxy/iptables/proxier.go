@@ -779,14 +779,20 @@ func (proxier *Proxier) syncProxyRules() {
 		return
 	}
 
+	tryPartialSync := !proxier.needFullSync && utilfeature.DefaultFeatureGate.Enabled(features.MinimizeIPTablesRestore)
+
 	// Keep track of how long syncs take.
 	start := time.Now()
 	defer func() {
 		metrics.SyncProxyRulesLatency.Observe(metrics.SinceInSeconds(start))
+		if tryPartialSync {
+			metrics.SyncPartialProxyRulesLatency.Observe(metrics.SinceInSeconds(start))
+		} else {
+			metrics.SyncFullProxyRulesLatency.Observe(metrics.SinceInSeconds(start))
+		}
 		klog.V(2).InfoS("SyncProxyRules complete", "elapsed", time.Since(start))
 	}()
 
-	tryPartialSync := !proxier.needFullSync && utilfeature.DefaultFeatureGate.Enabled(features.MinimizeIPTablesRestore)
 	var serviceChanged, endpointsChanged sets.Set[string]
 	if tryPartialSync {
 		serviceChanged = proxier.serviceChanges.PendingChanges()
