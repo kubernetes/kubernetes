@@ -27,9 +27,8 @@ import (
 const kubeProxySubsystem = "kubeproxy"
 
 var (
-	// SyncProxyRulesLatency is the latency of one round of kube-proxy syncing proxy rules.
-	// (With the iptables proxy, if MinimizeIPTablesRestore is enabled, this includes both
-	// full and partial syncs.)
+	// SyncProxyRulesLatency is the latency of one round of kube-proxy syncing proxy
+	// rules. (With the iptables proxy, this includes both full and partial syncs.)
 	SyncProxyRulesLatency = metrics.NewHistogram(
 		&metrics.HistogramOpts{
 			Subsystem:      kubeProxySubsystem,
@@ -40,8 +39,7 @@ var (
 		},
 	)
 
-	// SyncFullProxyRulesLatency is the latency of one round of full rule syncing, when
-	// MinimizeIPTablesRestore is enabled.
+	// SyncFullProxyRulesLatency is the latency of one round of full rule syncing.
 	SyncFullProxyRulesLatency = metrics.NewHistogram(
 		&metrics.HistogramOpts{
 			Subsystem:      kubeProxySubsystem,
@@ -52,8 +50,7 @@ var (
 		},
 	)
 
-	// SyncPartialProxyRulesLatency is the latency of one round of partial rule syncing, when
-	// MinimizeIPTablesRestore is enabled.
+	// SyncPartialProxyRulesLatency is the latency of one round of partial rule syncing.
 	SyncPartialProxyRulesLatency = metrics.NewHistogram(
 		&metrics.HistogramOpts{
 			Subsystem:      kubeProxySubsystem,

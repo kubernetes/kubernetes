@@ -975,7 +975,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	MinDomainsInPodTopologySpread: {Default: true, PreRelease: featuregate.Beta},
 
-	MinimizeIPTablesRestore: {Default: true, PreRelease: featuregate.Beta},
+	MinimizeIPTablesRestore: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.30
 
 	MultiCIDRRangeAllocator: {Default: false, PreRelease: featuregate.Alpha},
 
