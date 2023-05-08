@@ -385,7 +385,7 @@ func TestStatefulSetStatusWithPodFail(t *testing.T) {
 	sts := newSTS("sts", ns.Name, 4)
 	_, err := c.AppsV1().StatefulSets(sts.Namespace).Create(ctx, sts, metav1.CreateOptions{})
 	if err != nil {
-		t.Fatalf("Could not create statefuleSet %s: %v", sts.Name, err)
+		t.Fatalf("Could not create statefulSet %s: %v", sts.Name, err)
 	}
 
 	wantReplicas := limitedPodNumber
