@@ -23,6 +23,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -34,6 +36,7 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/value"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
+	"k8s.io/utils/pointer"
 )
 
 func RunTestWatch(ctx context.Context, t *testing.T, store storage.Interface) {
@@ -1165,6 +1168,18 @@ func RunTestOptionalWatchBookmarksWithCorrectResourceVersion(ctx context.Context
 			lastObservedResourceVersion = rv
 		}
 	}
+}
+
+// RunSendInitialEventsBackwardCompatibility test backward compatibility
+// when SendInitialEvents option is set against various implementations.
+// Backward compatibility is defined as RV = "" || RV = "O" and AllowWatchBookmark is set to false.
+// In that case we expect a watch request to be established.
+func RunSendInitialEventsBackwardCompatibility(ctx context.Context, t *testing.T, store storage.Interface) {
+	opts := storage.ListOptions{Predicate: storage.Everything}
+	opts.SendInitialEvents = pointer.Bool(true)
+	w, err := store.Watch(ctx, "/pods", opts)
+	require.NoError(t, err)
+	w.Stop()
 }
 
 type testWatchStruct struct {

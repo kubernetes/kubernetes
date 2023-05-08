@@ -498,6 +498,12 @@ func TestWatchBookmarksWithCorrectResourceVersion(t *testing.T) {
 	storagetesting.RunTestOptionalWatchBookmarksWithCorrectResourceVersion(ctx, t, cacher)
 }
 
+func TestSendInitialEventsBackwardCompatibility(t *testing.T) {
+	ctx, store, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunSendInitialEventsBackwardCompatibility(ctx, t, store)
+}
+
 // ===================================================
 // Test-setup related function are following.
 // ===================================================
