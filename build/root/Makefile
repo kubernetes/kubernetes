@@ -56,14 +56,14 @@ $(error Both KUBE_GOFLAGS and GOFLAGS are set. Please use just GOFLAGS)
 endif
 endif
 
-# This controls the verbosity of the build.  Higher numbers mean more output.
+# This controls the verbosity of the build. Higher numbers mean more output.
 KUBE_VERBOSE ?= 1
 
 define ALL_HELP_INFO
 # Build code.
 #
 # Args:
-#   WHAT: Directory names to build.  If any of these directories has a 'main'
+#   WHAT: Directory names to build. If any of these directories has a 'main'
 #     package, the build will produce executable files under $(OUT_DIR)/bin.
 #     If not specified, "everything" will be built.
 #     "vendor/<module>/<path>" is accepted as alias for "<module>/<path>".
@@ -72,7 +72,7 @@ define ALL_HELP_INFO
 #   GOLDFLAGS: Extra linking flags passed to 'go' when building.
 #   GOGCFLAGS: Additional go compile flags passed to 'go' when building.
 #   DBG: If set to "1", build with optimizations disabled for easier
-#     debugging.  Any other value is ignored.
+#     debugging. Any other value is ignored.
 #
 # Example:
 #   make
@@ -162,8 +162,8 @@ define CHECK_TEST_HELP_INFO
 # Build and run tests.
 #
 # Args:
-#   WHAT: Directory names to test.  All *_test.go files under these
-#     directories will be run.  If not specified, "everything" will be tested.
+#   WHAT: Directory names to test. All *_test.go files under these
+#     directories will be run. If not specified, "everything" will be tested.
 #   TESTS: Same as WHAT.
 #   KUBE_COVER: Whether to run tests with code coverage. Set to 'y' to enable coverage collection.
 #   GOFLAGS: Extra flags to pass to 'go' when building.
@@ -188,8 +188,8 @@ define TEST_IT_HELP_INFO
 # Build and run integration tests.
 #
 # Args:
-#   WHAT: Directory names to test.  All *_test.go files under these
-#     directories will be run.  If not specified, "everything" will be tested.
+#   WHAT: Directory names to test. All *_test.go files under these
+#     directories will be run. If not specified, "everything" will be tested.
 #
 # Example:
 #   make test-integration
@@ -208,23 +208,23 @@ define TEST_E2E_NODE_HELP_INFO
 # Build and run node end-to-end tests.
 #
 # Args:
-#  FOCUS: Regexp that matches the tests to be run.  Defaults to "".
+#  FOCUS: Regexp that matches the tests to be run. Defaults to "".
 #  SKIP: Regexp that matches the tests that needs to be skipped.
 #    Defaults to "\[Flaky\]|\[Slow\]|\[Serial\]".
 #  TEST_ARGS: A space-separated list of arguments to pass to node e2e test.
 #    Defaults to "".
 #  RUN_UNTIL_FAILURE: If true, pass --untilItFails to ginkgo so tests are run
-#    repeatedly until they fail.  Defaults to false.
-#  REMOTE: If true, run the tests on a remote host.  Defaults to false.
-#  REMOTE_MODE: For REMOTE=true only.  Mode for remote execution (eg. gce, ssh).
+#    repeatedly until they fail. Defaults to false.
+#  REMOTE: If true, run the tests on a remote host. Defaults to false.
+#  REMOTE_MODE: For REMOTE=true only. Mode for remote execution (eg. gce, ssh).
 #    If set to "gce", an instance can be provisioned or reused from GCE. If set
-#    to "ssh", provided `HOSTS` must be IPs or resolvable.  Defaults to "gce".
+#    to "ssh", provided `HOSTS` must be IPs or resolvable. Defaults to "gce".
 #  ARTIFACTS: Local directory to scp test artifacts into from the remote hosts
 #    for REMOTE=true. Local directory to write juntil xml results into for REMOTE=false.
 #    Defaults to "/tmp/_artifacts/$$(date +%y%m%dT%H%M%S)".
 #  TIMEOUT: For REMOTE=true only. How long (in golang duration format) to wait
 #    for ginkgo tests to complete. Defaults to 45m.
-#  PARALLELISM: The number of ginkgo nodes to run.  Defaults to 8.
+#  PARALLELISM: The number of ginkgo nodes to run. Defaults to 8.
 #  CONTAINER_RUNTIME_ENDPOINT: remote container endpoint to connect to.
 #    Defaults to "/run/containerd/containerd.sock".
 #  IMAGE_SERVICE_ENDPOINT: remote image endpoint to connect to, to prepull images.
@@ -236,25 +236,25 @@ define TEST_E2E_NODE_HELP_INFO
 #    test/e2e_node/system/specs/. For example, "SYSTEM_SPEC_NAME=gke" will use
 #    the spec at test/e2e_node/system/specs/gke.yaml. If unspecified, the
 #    default built-in spec (system.DefaultSpec) will be used.
-#  IMAGES: For REMOTE=true only.  Comma delimited list of images for creating
-#    remote hosts to run tests against.  Defaults to a recent image.
-#  HOSTS: For REMOTE=true only.  Comma delimited list of running gce hosts to
-#    run tests against.  Defaults to "".
-#  DELETE_INSTANCES: For REMOTE=true only.  Delete any instances created as
-#    part of this test run.  Defaults to false.
-#  PREEMPTIBLE_INSTANCES: For REMOTE=true only.  Mark created gce instances
-#    as preemptible.  Defaults to false.
-#  CLEANUP: For REMOTE=true only.  If false, do not stop processes or delete
-#    test files on remote hosts.  Defaults to true.
-#  IMAGE_PROJECT: For REMOTE=true only.  Project containing images provided to
-#    $$IMAGES.  Defaults to "cos-cloud".
-#  INSTANCE_PREFIX: For REMOTE=true only.  Instances created from images will
-#    have the name "$${INSTANCE_PREFIX}-$${IMAGE_NAME}".  Defaults to "test".
+#  IMAGES: For REMOTE=true only. Comma delimited list of images for creating
+#    remote hosts to run tests against. Defaults to a recent image.
+#  HOSTS: For REMOTE=true only. Comma delimited list of running gce hosts to
+#    run tests against. Defaults to "".
+#  DELETE_INSTANCES: For REMOTE=true only. Delete any instances created as
+#    part of this test run. Defaults to false.
+#  PREEMPTIBLE_INSTANCES: For REMOTE=true only. Mark created gce instances
+#    as preemptible. Defaults to false.
+#  CLEANUP: For REMOTE=true only. If false, do not stop processes or delete
+#    test files on remote hosts. Defaults to true.
+#  IMAGE_PROJECT: For REMOTE=true only. Project containing images provided to
+#    $$IMAGES. Defaults to "cos-cloud".
+#  INSTANCE_PREFIX: For REMOTE=true only. Instances created from images will
+#    have the name "$${INSTANCE_PREFIX}-$${IMAGE_NAME}". Defaults to "test".
 #  INSTANCE_METADATA: For REMOTE=true and running on GCE only.
 #  GUBERNATOR: For REMOTE=true only. Produce link to Gubernator to view logs.
 #    Defaults to false.
 #  TEST_SUITE: For REMOTE=true only. Test suite to use. Defaults to "default".
-#  SSH_USER: For REMOTE=true only  SSH username to use.
+#  SSH_USER: For REMOTE=true only SSH username to use.
 #  SSH_KEY: For REMOTE=true only. Path to SSH key to use.
 #  SSH_OPTIONS: For REMOTE=true only. SSH options to use.
 #  RUNTIME_CONFIG: The runtime configuration for the API server on the node e2e tests.
@@ -313,7 +313,7 @@ endif
 # TODO(thockin): Remove this in v1.29.
 .PHONY: generated_files
 generated_files:
-	echo "'make generated_files' is deprecated.  Please use hack/update-codegen.sh instead."
+	echo "'make generated_files' is deprecated. Please use hack/update-codegen.sh instead."
 ifneq ($(PRINT_HELP), y)
 	false
 endif
@@ -323,8 +323,8 @@ define VET_HELP_INFO
 # Run 'go vet'.
 #
 # Args:
-#   WHAT: Directory names to vet.  All *.go files under these
-#     directories will be vetted.  If not specified, "everything" will be
+#   WHAT: Directory names to vet. All *.go files under these
+#     directories will be vetted. If not specified, "everything" will be
 #     vetted.
 #
 # Example:
@@ -359,7 +359,7 @@ define RELEASE_HELP_INFO
 # Build a release
 # Use the 'release-in-a-container' target to build the release when already in
 # a container vs. creating a new container to build in using the 'release'
-# target.  Useful for running in GCB.
+# target. Useful for running in GCB.
 #
 # Example:
 #   make release
