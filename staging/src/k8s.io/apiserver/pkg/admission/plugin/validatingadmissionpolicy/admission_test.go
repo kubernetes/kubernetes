@@ -48,6 +48,7 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/matchconditions"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/warning"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
@@ -210,7 +211,7 @@ func (f *fakeCompiler) HasSynced() bool {
 func (f *fakeCompiler) Compile(
 	expressions []cel.ExpressionAccessor,
 	options cel.OptionalVariableDeclarations,
-	perCallLimit uint64,
+	envType environment.Type,
 ) cel.Filter {
 	if len(expressions) > 0 && expressions[0] != nil {
 		key := expressions[0].GetExpression()
@@ -708,9 +709,9 @@ func must3[T any, I any](val T, _ I, err error) T {
 	return val
 }
 
-////////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////////
 // Functionality Tests
-////////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////////
 
 func TestPluginNotReady(t *testing.T) {
 	reset()
@@ -1031,7 +1032,7 @@ func TestReconfigureBinding(t *testing.T) {
 
 	// Expect validation to fail the third time due to validation failure
 	require.ErrorContains(t, err, `Denied`, "expected a true policy failure, not a configuration error")
-	//require.Equal(t, []*unstructured.Unstructured{fakeParams, fakeParams2}, passedParams, "expected call to `Validate` to cause call to evaluator")
+	// require.Equal(t, []*unstructured.Unstructured{fakeParams, fakeParams2}, passedParams, "expected call to `Validate` to cause call to evaluator")
 	require.Equal(t, 2, numCompiles, "expect changing binding causes a recompile")
 }
 
@@ -1162,7 +1163,7 @@ func TestRemoveBinding(t *testing.T) {
 		),
 		`Denied`)
 
-	//require.Equal(t, []*unstructured.Unstructured{fakeParams}, passedParams)
+	// require.Equal(t, []*unstructured.Unstructured{fakeParams}, passedParams)
 	require.NoError(t, tracker.Delete(bindingsGVR, denyBinding.Namespace, denyBinding.Name))
 	require.NoError(t, waitForReconcileDeletion(testContext, controller, denyBinding))
 }

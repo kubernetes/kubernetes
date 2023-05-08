@@ -40,6 +40,7 @@ func TestValidationExpressions(t *testing.T) {
 	tests := []struct {
 		name          string
 		schema        *schema.Structural
+		oldSchema     *schema.Structural
 		obj           interface{}
 		oldObj        interface{}
 		valid         []string
@@ -173,6 +174,60 @@ func TestValidationExpressions(t *testing.T) {
 				"double(self.val1) < 10.0",
 				"double(self.val2) == 10.0",
 				"double(self.val3) > 10.0",
+
+				// Cross Type Numeric Comparisons: integers with all float types
+				"self.val1 < self.val4",
+				"self.val1 <= self.val4",
+				"self.val2 <= self.val4",
+				"self.val2 >= self.val4",
+				"self.val3 > self.val4",
+				"self.val3 >= self.val4",
+
+				"self.val1 < self.val4",
+				"self.val3 > self.val4",
+
+				"self.val1 < self.val5",
+				"self.val3 > self.val5",
+
+				"self.val1 < self.val5",
+				"self.val3 > self.val5",
+
+				"self.val1 < self.val6",
+				"self.val3 > self.val6",
+
+				"self.val1 < self.val6",
+				"self.val3 > self.val6",
+
+				// Cross Type Numeric Comparisons: float types backed by integer values,
+				// which is how integer literals are parsed from JSON for custom resources.
+				"self.val1 < self.val7",
+				"self.val3 > self.val7",
+
+				"self.val1 < int(self.val7)",
+				"self.val3 > int(self.val7)",
+
+				"self.val1 < self.val8",
+				"self.val3 > self.val8",
+
+				"self.val1 < self.val8",
+				"self.val3 > self.val8",
+
+				"self.val1 < self.val9",
+				"self.val3 > self.val9",
+
+				"self.val1 < self.val9",
+				"self.val3 > self.val9",
+
+				// Cross Type Numeric Comparisons: literal integers and floats
+				"5 < 10.0",
+				"15 > 10.0",
+
+				"5 < 10.0",
+				"15 > 10.0",
+
+				// Cross Type Numeric Comparisons: integers with literal floats
+				"self.val1 < 10.0",
+				"self.val3 > 10.0",
 			},
 		},
 		{name: "unicode strings",
@@ -1784,7 +1839,7 @@ func TestValidationExpressions(t *testing.T) {
 			oldObj: []interface{}{},
 			schema: objectTypePtr(map[string]schema.Structural{}),
 			errors: map[string]string{
-				"authorizer.path('/healthz').check('get').isAllowed()": "undeclared reference to 'authorizer'",
+				"authorizer.path('/healthz').check('get').allowed()": "undeclared reference to 'authorizer'",
 			},
 		},
 	}
