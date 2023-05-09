@@ -319,17 +319,17 @@ The cause PR is [reverted](https://github.com/kubernetes/kubernetes/pull/117194)
   enabling it you must stop now.' ([#116255](https://github.com/kubernetes/kubernetes/pull/116255), [@danwinship](https://github.com/danwinship))
  - Give terminal phase correctly to all pods that will not be restarted. 
   
-  In particular, assign Failed phase to pods which are deleted while pending. Also, assign a terminal 
-  phase (Succeeded or Failed, depending on the exit statuses of the pod containers) to pods which
-  are deleted while running.
-  
-  This fixes the issue for jobs using pod failure policy (with JobPodFailurePolicy and PodDisruptionConditions 
-  feature gates enabled) that their pods could get stuck in the pending phase when deleted.
-  
-  Users who maintain controllers which relied on the fact that pods with RestartPolicy=Always
-  never enter the Succeeded phase may need to adapt their controllers. This is because as a consequence of 
-  the change pods which use RestartPolicy=Always may end up in the Succeeded phase in two scenarios: pod 
-  deletion and graceful node shutdown. ([#115331](https://github.com/kubernetes/kubernetes/pull/115331), [@mimowo](https://github.com/mimowo)) [SIG Cloud Provider, Node and Testing]
+    In particular, assign Failed phase to pods which are deleted while pending. Also, assign a terminal 
+    phase (Succeeded or Failed, depending on the exit statuses of the pod containers) to pods which
+    are deleted while running.
+    
+    This fixes the issue for jobs using pod failure policy (with JobPodFailurePolicy and PodDisruptionConditions 
+    feature gates enabled) that their pods could get stuck in the pending phase when deleted.
+    
+    Users who maintain controllers which relied on the fact that pods with RestartPolicy=Always
+    never enter the Succeeded phase may need to adapt their controllers. This is because as a consequence of 
+    the change pods which use RestartPolicy=Always may end up in the Succeeded phase in two scenarios: pod 
+    deletion and graceful node shutdown. ([#115331](https://github.com/kubernetes/kubernetes/pull/115331), [@mimowo](https://github.com/mimowo)) [SIG Cloud Provider, Node and Testing]
  
 ## Changes by Kind
 
