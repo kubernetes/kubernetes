@@ -554,14 +554,12 @@ func fillEventToPluginMap(p framework.Plugin, eventToPlugins *framework.ClusterE
 	}
 
 	if okWithHints {
+		// The logic here is the same as for EnqueueExtensions above, just with a slightly
+		// different API.
 		events := extWithHints.EventsToRegisterWithHints()
-		// It's rare that a plugin implements EnqueueExtensionsWithHints but returns nil.
-		// We treat it as: the plugin is not interested in any event, and hence pod failed by that plugin
-		// cannot be moved by any regular cluster event.
 		if len(events) == 0 {
 			klog.InfoS("Plugin's EventsToRegisterWithHints() returned nil", "plugin", p.Name())
 		} else {
-			// The most common case: a plugin implements EnqueueExtensions and returns non-nil result.
 			eventToPlugins.RegisterClusterEventsWithHints(p.Name(), events)
 		}
 	}

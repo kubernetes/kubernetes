@@ -126,7 +126,7 @@ type ClusterEventMap map[ClusterEvent]ClusterEventPlugins
 // The function may be nil.
 type ClusterEventPlugins map[string]SchedulingHintFn
 
-// ClusterEvents maps events to the optional hint function for that each event.
+// ClusterEvents maps events to the optional hint function for each event.
 type ClusterEvents map[ClusterEvent]SchedulingHintFn
 
 // RegisterClusterEvents registers the events that a plugin is interested in.
@@ -173,7 +173,7 @@ func MakeClusterEventPlugins(names ...string) ClusterEventPlugins {
 	if len(names) == 0 {
 		return nil
 	}
-	events := make(ClusterEventPlugins)
+	events := make(ClusterEventPlugins, len(names))
 	for _, name := range names {
 		events[name] = nil
 	}
