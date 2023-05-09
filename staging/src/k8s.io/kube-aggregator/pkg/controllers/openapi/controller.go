@@ -128,6 +128,9 @@ func (c *AggregationController) sync(key string) (syncAction, error) {
 
 // AddAPIService adds a new API Service to OpenAPI Aggregation.
 func (c *AggregationController) AddAPIService(handler http.Handler, apiService *v1.APIService) {
+	if apiService.Spec.Service == nil {
+		return
+	}
 	if err := c.openAPIAggregationManager.AddAPIService(apiService, handler); err != nil {
 		utilruntime.HandleError(fmt.Errorf("adding %q to AggregationController failed with: %v", apiService.Name, err))
 	}

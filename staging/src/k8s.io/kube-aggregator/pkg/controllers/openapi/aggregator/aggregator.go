@@ -217,6 +217,9 @@ func (s *specAggregator) UpdateAPIService(apiServiceName string) error {
 // AddAPIService adds the api service. It is thread safe. If the
 // apiservice already exists, it will be updated.
 func (s *specAggregator) AddAPIService(apiService *v1.APIService, handler http.Handler) error {
+	if apiService.Spec.Service == nil {
+		return nil
+	}
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
