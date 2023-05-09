@@ -37,7 +37,6 @@ import (
 
 	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
-	utilio "k8s.io/utils/io"
 )
 
 const (
@@ -633,7 +632,7 @@ func (mounter *SafeFormatAndMount) GetDiskFormat(disk string) (string, error) {
 
 // ListProcMounts is shared with NsEnterMounter
 func ListProcMounts(mountFilePath string) ([]MountPoint, error) {
-	content, err := utilio.ConsistentRead(mountFilePath, maxListTries)
+	content, err := readMountInfo(mountFilePath)
 	if err != nil {
 		return nil, err
 	}
