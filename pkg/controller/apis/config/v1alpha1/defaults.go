@@ -41,6 +41,7 @@ import (
 	serviceaccountconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/serviceaccount/config/v1alpha1"
 	statefulsetconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/statefulset/config/v1alpha1"
 	ttlafterfinishedconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/ttlafterfinished/config/v1alpha1"
+	validatingadmissionpolicystatusv1alpha1 "k8s.io/kubernetes/pkg/controller/validatingadmissionpolicystatus/config/v1alpha1"
 	attachdetachconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/volume/attachdetach/config/v1alpha1"
 	ephemeralvolumeconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/volume/ephemeral/config/v1alpha1"
 	persistentvolumeconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/config/v1alpha1"
@@ -112,4 +113,6 @@ func SetDefaults_KubeControllerManagerConfiguration(obj *kubectrlmgrconfigv1alph
 	ttlafterfinishedconfigv1alpha1.RecommendedDefaultTTLAfterFinishedControllerConfiguration(&obj.TTLAfterFinishedController)
 	// Use the default RecommendedDefaultPersistentVolumeBinderControllerConfiguration options
 	persistentvolumeconfigv1alpha1.RecommendedDefaultPersistentVolumeBinderControllerConfiguration(&obj.PersistentVolumeBinderController)
+	// Use the default RecommendedDefaultValidatingAdmissionPolicyStatusControllerConfiguration options
+	validatingadmissionpolicystatusv1alpha1.RecommendedDefaultValidatingAdmissionPolicyStatusControllerConfiguration(&obj.ValidatingAdmissionPolicyStatusController)
 }
