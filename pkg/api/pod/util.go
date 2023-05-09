@@ -510,6 +510,14 @@ func dropDisabledFields(
 			podSpec.EphemeralContainers[i].ResizePolicy = nil
 		}
 	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) && !restartableInitContainersInUse(oldPodSpec) {
+		// Drop the RestartPolicy field of init containers.
+		for i := range podSpec.InitContainers {
+			podSpec.InitContainers[i].RestartPolicy = nil
+		}
+		// For other types of containers, validateContainers will handle them.
+	}
 }
 
 // dropDisabledPodStatusFields removes disabled fields from the pod status
@@ -776,6 +784,23 @@ func schedulingGatesInUse(podSpec *api.PodSpec) bool {
 		return false
 	}
 	return len(podSpec.SchedulingGates) != 0
+}
+
+// restartableInitContainersInUse returns true if the pod spec is non-nil and
+// it has any init container with ContainerRestartPolicyAlways.
+func restartableInitContainersInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	var inUse bool
+	VisitContainers(podSpec, InitContainers, func(c *api.Container, containerType ContainerType) bool {
+		if c.RestartPolicy != nil && *c.RestartPolicy == api.ContainerRestartPolicyAlways {
+			inUse = true
+			return false
+		}
+		return true
+	})
+	return inUse
 }
 
 func hasInvalidLabelValueInAffinitySelector(spec *api.PodSpec) bool {
