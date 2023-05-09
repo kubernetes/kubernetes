@@ -19,13 +19,13 @@ package config
 import (
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -40,9 +40,9 @@ type setCredentialsOptions struct {
 	clientCertificate cliflag.StringFlag
 	clientKey         cliflag.StringFlag
 	token             cliflag.StringFlag `datapolicy:"token"`
-	// Deprecated: Basic auth has been deprecated This flag will be removed in a future release
+	// Deprecated Basic authentication has been deprecated. This flag will be removed in release 1.31
 	username cliflag.StringFlag
-	// Deprecated: Basic auth has been deprecated This flag will be removed in a future release
+	// Deprecated Basic authentication has been deprecated. This flag will be removed in release 1.31
 	password      cliflag.StringFlag `datapolicy:"password"`
 	embedCertData cliflag.Tristate
 	authProvider  cliflag.StringFlag
@@ -118,18 +118,18 @@ var (
 )
 
 // NewCmdConfigSetCredentials returns a Command instance for 'config set-credentials' sub command
-func NewCmdConfigSetCredentials(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
+func NewCmdConfigSetCredentials(streams genericiooptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &setCredentialsOptions{configAccess: configAccess}
-	return newCmdConfigSetCredentials(out, options)
+	return newCmdConfigSetCredentials(streams, options)
 }
 
 // NewCmdConfigSetAuthInfo returns a Command instance for 'config set-credentials' sub command
 // DEPRECATED: Use NewCmdConfigSetCredentials instead
-func NewCmdConfigSetAuthInfo(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
-	return NewCmdConfigSetCredentials(out, configAccess)
+func NewCmdConfigSetAuthInfo(streams genericiooptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
+	return NewCmdConfigSetCredentials(streams, configAccess)
 }
 
-func newCmdConfigSetCredentials(out io.Writer, options *setCredentialsOptions) *cobra.Command {
+func newCmdConfigSetCredentials(streams genericiooptions.IOStreams, options *setCredentialsOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: fmt.Sprintf(
 			"set-credentials NAME [--%v=path/to/certfile] "+
@@ -165,8 +165,8 @@ func newCmdConfigSetCredentials(out io.Writer, options *setCredentialsOptions) *
 				cmd.Help()
 				cmdutil.CheckErr(err)
 			}
-			cmdutil.CheckErr(options.run(out))
-			fmt.Fprintf(out, "User %q set.\n", options.name)
+			cmdutil.CheckErr(options.run(streams))
+			fmt.Fprintf(streams.Out, "User %q set.\n", options.name)
 		},
 	}
 
@@ -189,7 +189,7 @@ func newCmdConfigSetCredentials(out io.Writer, options *setCredentialsOptions) *
 	return cmd
 }
 
-func (o setCredentialsOptions) run(out io.Writer) error {
+func (o setCredentialsOptions) run(streams genericiooptions.IOStreams) error {
 	err := o.validate()
 	if err != nil {
 		return err
@@ -204,7 +204,7 @@ func (o setCredentialsOptions) run(out io.Writer) error {
 	if !exists {
 		startingStanza = clientcmdapi.NewAuthInfo()
 	}
-	authInfo := o.modifyAuthInfo(*startingStanza, out)
+	authInfo := o.modifyAuthInfo(*startingStanza, streams)
 	config.AuthInfos[o.name] = &authInfo
 
 	if err := clientcmd.ModifyConfig(o.configAccess, *config, true); err != nil {
@@ -214,7 +214,7 @@ func (o setCredentialsOptions) run(out io.Writer) error {
 	return nil
 }
 
-func (o *setCredentialsOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.AuthInfo, out io.Writer) clientcmdapi.AuthInfo {
+func (o *setCredentialsOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.AuthInfo, streams genericiooptions.IOStreams) clientcmdapi.AuthInfo {
 	modifiedAuthInfo := existingAuthInfo
 
 	var setToken, setBasic bool
@@ -254,12 +254,12 @@ func (o *setCredentialsOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.Aut
 	if o.username.Provided() {
 		modifiedAuthInfo.Username = o.username.Value()
 		setBasic = setBasic || len(modifiedAuthInfo.Username) > 0
-		fmt.Fprintf(out, "Basicauthentication has been deprecated. --username and --password flags will be removed in an upcoming release.\n")
+		fmt.Fprintf(streams.ErrOut, "Basicauthentication has been deprecated. --username and --password flags will be removed in an upcoming release.\n")
 	}
 	if o.password.Provided() {
 		modifiedAuthInfo.Password = o.password.Value()
 		setBasic = setBasic || len(modifiedAuthInfo.Password) > 0
-		fmt.Fprintf(out, "Basicauthentication has been deprecated. --username and --password flags will be removed in an upcoming release.\n")
+		fmt.Fprintf(streams.ErrOut, "Basicauthentication has been deprecated. --username and --password flags will be removed in an upcoming release.\n")
 	}
 	if o.authProvider.Provided() {
 		newName := o.authProvider.Value()

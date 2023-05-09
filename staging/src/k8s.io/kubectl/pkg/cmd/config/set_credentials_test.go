@@ -17,12 +17,11 @@ limitations under the License.
 package config
 
 import (
-	"bytes"
-	utiltesting "k8s.io/client-go/util/testing"
 	"os"
 	"reflect"
 	"testing"
 
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -202,29 +201,29 @@ func TestSetCredentialsOptions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			buff := new(bytes.Buffer)
+			streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 
 			opts := new(setCredentialsOptions)
-			cmd := newCmdConfigSetCredentials(buff, opts)
+			cmd := newCmdConfigSetCredentials(streams, opts)
 			if err := cmd.ParseFlags(tt.flags); err != nil {
 				if !tt.wantParseErr {
-					t.Errorf("case %s: parsing error for flags %q: %v: %s", tt.name, tt.flags, err, buff)
+					t.Errorf("case %s: parsing error for flags %q: %v: %s", tt.name, tt.flags, err, buf)
 				}
 				return
 			}
 			if tt.wantParseErr {
-				t.Errorf("case %s: expected parsing error for flags %q: %s", tt.name, tt.flags, buff)
+				t.Errorf("case %s: expected parsing error for flags %q: %s", tt.name, tt.flags, buf)
 				return
 			}
 
 			if err := opts.complete(cmd); err != nil {
 				if !tt.wantCompleteErr {
-					t.Errorf("case %s: complete() error for flags %q: %s", tt.name, tt.flags, buff)
+					t.Errorf("case %s: complete() error for flags %q: %s", tt.name, tt.flags, buf)
 				}
 				return
 			}
 			if tt.wantCompleteErr {
-				t.Errorf("case %s: complete() expected errors for flags %q: %s", tt.name, tt.flags, buff)
+				t.Errorf("case %s: complete() expected errors for flags %q: %s", tt.name, tt.flags, buf)
 				return
 			}
 
@@ -379,29 +378,29 @@ func TestModifyExistingAuthInfo(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			buff := new(bytes.Buffer)
+			streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 
 			opts := new(setCredentialsOptions)
-			cmd := newCmdConfigSetCredentials(buff, opts)
+			cmd := newCmdConfigSetCredentials(streams, opts)
 			if err := cmd.ParseFlags(tt.flags); err != nil {
 				if !tt.wantParseErr {
-					t.Errorf("case %s: parsing error for flags %q: %v: %s", tt.name, tt.flags, err, buff)
+					t.Errorf("case %s: parsing error for flags %q: %v: %s", tt.name, tt.flags, err, buf)
 				}
 				return
 			}
 			if tt.wantParseErr {
-				t.Errorf("case %s: expected parsing error for flags %q: %s", tt.name, tt.flags, buff)
+				t.Errorf("case %s: expected parsing error for flags %q: %s", tt.name, tt.flags, buf)
 				return
 			}
 
 			if err := opts.complete(cmd); err != nil {
 				if !tt.wantCompleteErr {
-					t.Errorf("case %s: complete() error for flags %q: %s", tt.name, tt.flags, buff)
+					t.Errorf("case %s: complete() error for flags %q: %s", tt.name, tt.flags, buf)
 				}
 				return
 			}
 			if tt.wantCompleteErr {
-				t.Errorf("case %s: complete() expected errors for flags %q: %s", tt.name, tt.flags, buff)
+				t.Errorf("case %s: complete() expected errors for flags %q: %s", tt.name, tt.flags, buf)
 				return
 			}
 
@@ -417,7 +416,7 @@ func TestModifyExistingAuthInfo(t *testing.T) {
 				return
 			}
 
-			modifiedAuthInfo := opts.modifyAuthInfo(tt.existingAuthInfo, os.Stdout)
+			modifiedAuthInfo := opts.modifyAuthInfo(tt.existingAuthInfo, streams)
 
 			if !reflect.DeepEqual(modifiedAuthInfo, tt.wantAuthInfo) {
 				t.Errorf("case %s: flags %q: mis-matched auth info,\nwanted=%#v\ngot=   %#v", tt.name, tt.flags, tt.wantAuthInfo, modifiedAuthInfo)
@@ -467,8 +466,8 @@ func (test setCredentialsTest) run(t *testing.T) {
 	pathOptions := clientcmd.NewDefaultPathOptions()
 	pathOptions.GlobalFile = fakeKubeFile.Name()
 	pathOptions.EnvVar = ""
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdConfigSetCredentials(buf, pathOptions)
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
+	cmd := NewCmdConfigSetCredentials(streams, pathOptions)
 	cmd.SetArgs(test.args)
 	cmd.Flags().Parse(test.flags)
 	if err := cmd.Execute(); err != nil {

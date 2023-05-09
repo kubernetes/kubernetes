@@ -130,9 +130,11 @@ type AuthInfo struct {
 	ImpersonateUserExtra map[string][]string `json:"as-user-extra,omitempty"`
 	// Username is the username for basic authentication to the kubernetes cluster.
 	// +optional
+	// Deprecated Basic authentication has been deprecated. This flag will be removed in release 1.31
 	Username string `json:"username,omitempty"`
 	// Password is the password for basic authentication to the kubernetes cluster.
 	// +optional
+	// Deprecated Basic authentication has been deprecated. This flag will be removed in release 1.31
 	Password string `json:"password,omitempty" datapolicy:"password"`
 	// AuthProvider specifies a custom authentication plugin for the kubernetes cluster.
 	// +optional
