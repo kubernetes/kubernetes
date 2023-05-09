@@ -221,10 +221,13 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 
 	c, ok := podutil.GetContainerStatus(status.ContainerStatuses, w.container.Name)
 	if !ok || len(c.ContainerID) == 0 {
-		// Either the container has not been created yet, or it was deleted.
-		klog.V(3).InfoS("Probe target container not found",
-			"pod", klog.KObj(w.pod), "containerName", w.container.Name)
-		return true // Wait for more information.
+		c, ok = podutil.GetContainerStatus(status.InitContainerStatuses, w.container.Name)
+		if !ok || len(c.ContainerID) == 0 {
+			// Either the container has not been created yet, or it was deleted.
+			klog.V(3).InfoS("Probe target container not found",
+				"pod", klog.KObj(w.pod), "containerName", w.container.Name)
+			return true // Wait for more information.
+		}
 	}
 
 	if w.containerID.String() != c.ContainerID {

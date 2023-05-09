@@ -23,10 +23,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/utils/pointer"
 )
 
 func TestGenerateContainersReadyCondition(t *testing.T) {
@@ -324,11 +325,31 @@ func TestGeneratePodInitializedCondition(t *testing.T) {
 		InitContainers: []v1.Container{
 			{Name: "1234"},
 		},
+		Containers: []v1.Container{
+			{Name: "regular"},
+		},
 	}
 	twoInitContainer := &v1.PodSpec{
 		InitContainers: []v1.Container{
 			{Name: "1234"},
 			{Name: "5678"},
+		},
+		Containers: []v1.Container{
+			{Name: "regular"},
+		},
+	}
+	oneRestartableInitContainer := &v1.PodSpec{
+		InitContainers: []v1.Container{
+			{
+				Name: "1234",
+				RestartPolicy: func() *v1.ContainerRestartPolicy {
+					p := v1.ContainerRestartPolicyAlways
+					return &p
+				}(),
+			},
+		},
+		Containers: []v1.Container{
+			{Name: "regular"},
 		},
 	}
 	tests := []struct {
@@ -408,6 +429,43 @@ func TestGeneratePodInitializedCondition(t *testing.T) {
 			expected: v1.PodCondition{
 				Status: v1.ConditionTrue,
 				Reason: PodCompleted,
+			},
+		},
+		{
+			spec: oneRestartableInitContainer,
+			containerStatuses: []v1.ContainerStatus{
+				getNotStartedStatus("1234"),
+			},
+			podPhase: v1.PodPending,
+			expected: v1.PodCondition{
+				Status: v1.ConditionFalse,
+				Reason: ContainersNotInitialized,
+			},
+		},
+		{
+			spec: oneRestartableInitContainer,
+			containerStatuses: []v1.ContainerStatus{
+				getStartedStatus("1234"),
+			},
+			podPhase: v1.PodRunning,
+			expected: v1.PodCondition{
+				Status: v1.ConditionTrue,
+			},
+		},
+		{
+			spec: oneRestartableInitContainer,
+			containerStatuses: []v1.ContainerStatus{
+				getNotStartedStatus("1234"),
+				{
+					Name: "regular",
+					State: v1.ContainerState{
+						Running: &v1.ContainerStateRunning{},
+					},
+				},
+			},
+			podPhase: v1.PodRunning,
+			expected: v1.PodCondition{
+				Status: v1.ConditionTrue,
 			},
 		},
 	}
@@ -513,5 +571,19 @@ func getNotReadyStatus(cName string) v1.ContainerStatus {
 	return v1.ContainerStatus{
 		Name:  cName,
 		Ready: false,
+	}
+}
+
+func getStartedStatus(cName string) v1.ContainerStatus {
+	return v1.ContainerStatus{
+		Name:    cName,
+		Started: pointer.Bool(true),
+	}
+}
+
+func getNotStartedStatus(cName string) v1.ContainerStatus {
+	return v1.ContainerStatus{
+		Name:    cName,
+		Started: pointer.Bool(false),
 	}
 }
