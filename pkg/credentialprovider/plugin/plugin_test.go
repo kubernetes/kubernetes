@@ -19,6 +19,8 @@ package plugin
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/exec"
 	"reflect"
 	"sync"
 	"testing"
@@ -44,9 +46,19 @@ type fakeExecPlugin struct {
 	cacheDuration time.Duration
 
 	auth map[string]credentialproviderapi.AuthConfig
+	err  error
 }
 
 func (f *fakeExecPlugin) ExecPlugin(ctx context.Context, image string) (*credentialproviderapi.CredentialProviderResponse, error) {
+	if f.err != nil {
+		if err2, ok := f.err.(*exec.ExitError); ok {
+			stderr := string(err2.Stderr)
+			return nil, fmt.Errorf("error execing credential provider plugin fake for image %s: %w %s",
+				image, f.err, stderr)
+		} else {
+			return nil, f.err
+		}
+	}
 	return &credentialproviderapi.CredentialProviderResponse{
 		CacheKeyType: f.cacheKeyType,
 		CacheDuration: &metav1.Duration{
@@ -484,6 +496,7 @@ func Test_decodeResponse(t *testing.T) {
 		data             []byte
 		expectedResponse *credentialproviderapi.CredentialProviderResponse
 		expectedErr      bool
+		err              error
 	}{
 		{
 			name: "success with v1",
@@ -548,6 +561,13 @@ func Test_decodeResponse(t *testing.T) {
 			expectedResponse: nil,
 			expectedErr:      true,
 		},
+		{
+			name:             "json parse error",
+			data:             []byte(`{"kind:"CredentialProviderResponse","apiVersion":"foobar.kubelet.k8s.io/v1beta1","cacheKeyType":"Registry","cacheDuration":"1m","auth":{"*.registry.io":{"username":"user","password":"password"}}}`),
+			expectedResponse: nil,
+			expectedErr:      true,
+			err:              fmt.Errorf("couldn't get version/kind; json parse error: invalid character 'C' after object key"),
+		},
 	}
 
 	for _, testcase := range testcases {
@@ -561,6 +581,12 @@ func Test_decodeResponse(t *testing.T) {
 
 			if err == nil && testcase.expectedErr {
 				t.Fatalf("expected error %v but not nil", testcase.expectedErr)
+			}
+
+			if err != nil && testcase.err != nil && err.Error() != testcase.err.Error() {
+				t.Logf("actual decode error: %#v", err)
+				t.Logf("expected decode error: %#v", testcase.err)
+				t.Fatalf("unexpected error in response")
 			}
 
 			if !reflect.DeepEqual(decodedResponse, testcase.expectedResponse) {
@@ -878,4 +904,58 @@ func validate(expected, actual []string) error {
 	}
 
 	return nil
+}
+
+func Test_execPluginErrors(t *testing.T) {
+	testcases := []struct {
+		name        string
+		image       string
+		err         error
+		expectedErr string
+	}{
+		{
+			name:        "no errors",
+			image:       "test.registry.io/foobar",
+			err:         nil,
+			expectedErr: "",
+		},
+		{
+			name:        "json parse error",
+			image:       "test.registry.io/foobar",
+			err:         fmt.Errorf("couldn't get version/kind; json parse error: invalid character 'C' after object key"),
+			expectedErr: "couldn't get version/kind; json parse error: invalid character 'C' after object key",
+		},
+		{
+			name:  "plugin error with stderr",
+			image: "test.registry.io/foobar",
+			err: &exec.ExitError{
+				ProcessState: &os.ProcessState{},
+				Stderr:       []byte("failure message from plugin"),
+			},
+			expectedErr: "error execing credential provider plugin fake for image test.registry.io/foobar: exit status 0 failure message from plugin",
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			e := &fakeExecPlugin{
+				err: testcase.err,
+			}
+
+			_, err := e.ExecPlugin(context.Background(), testcase.image)
+			if err != nil && testcase.expectedErr == "" {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if err == nil && testcase.expectedErr != "" {
+				t.Fatalf("expected error %v but not nil", testcase.err)
+			}
+
+			if err != nil && testcase.expectedErr != "" && err.Error() != testcase.expectedErr {
+				t.Logf("actual decode error: %#v", err)
+				t.Logf("expected decode error: %#v", testcase.err)
+				t.Fatalf("unexpected error in response")
+			}
+		})
+	}
 }
