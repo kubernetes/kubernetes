@@ -484,6 +484,9 @@ func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.LegacyServiceAccountTokenCleanUp) {
 		register(names.LegacyServiceAccountTokenCleanerController, startLegacySATokenCleaner)
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ValidatingAdmissionPolicy) {
+		register("validatingadmissionpolicy-status-controller", startValidatingAdmissionPolicyStatusController)
+	}
 
 	return controllers
 }

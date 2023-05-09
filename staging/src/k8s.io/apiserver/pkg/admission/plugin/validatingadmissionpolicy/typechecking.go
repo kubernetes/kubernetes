@@ -44,8 +44,8 @@ import (
 const maxTypesToCheck = 10
 
 type TypeChecker struct {
-	schemaResolver resolver.SchemaResolver
-	restMapper     meta.RESTMapper
+	SchemaResolver resolver.SchemaResolver
+	RestMapper     meta.RESTMapper
 }
 
 // TypeCheckingContext holds information about the policy being type-checked.
@@ -196,7 +196,7 @@ func (c *TypeChecker) declType(gvk schema.GroupVersionKind) (*apiservercel.DeclT
 	if gvk.Empty() {
 		return nil, nil
 	}
-	s, err := c.schemaResolver.ResolveSchema(gvk)
+	s, err := c.SchemaResolver.ResolveSchema(gvk)
 	if err != nil {
 		return nil, err
 	}
@@ -266,7 +266,7 @@ func (c *TypeChecker) typesToCheck(p *v1alpha1.ValidatingAdmissionPolicy) []sche
 						Version:  version,
 						Resource: resource,
 					}
-					resolved, err := c.restMapper.KindsFor(gvr)
+					resolved, err := c.RestMapper.KindsFor(gvr)
 					if err != nil {
 						continue
 					}

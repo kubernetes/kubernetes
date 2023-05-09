@@ -25,8 +25,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"k8s.io/klog/v2"
-
 	"k8s.io/api/admissionregistration/v1alpha1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -50,6 +48,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2"
 )
 
 var _ CELPolicyEvaluator = &celAdmissionController{}
@@ -134,7 +133,7 @@ func NewAdmissionController(
 ) CELPolicyEvaluator {
 	var typeChecker *TypeChecker
 	if schemaResolver != nil {
-		typeChecker = &TypeChecker{schemaResolver: schemaResolver, restMapper: restMapper}
+		typeChecker = &TypeChecker{SchemaResolver: schemaResolver, RestMapper: restMapper}
 	}
 	return &celAdmissionController{
 		definitions: atomic.Value{},
