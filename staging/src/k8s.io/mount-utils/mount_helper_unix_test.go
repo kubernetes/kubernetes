@@ -33,7 +33,7 @@ func writeFile(content string) (string, string, error) {
 		return "", "", err
 	}
 	filename := filepath.Join(tempDir, "mountinfo")
-	err = ioutil.WriteFile(filename, []byte(content), 0600)
+	err = ioutil.WriteFile(filename, []byte(content), 0o600)
 	if err != nil {
 		os.RemoveAll(tempDir)
 		return "", "", err
@@ -42,8 +42,7 @@ func writeFile(content string) (string, string, error) {
 }
 
 func TestParseMountInfo(t *testing.T) {
-	info :=
-		`62 0 253:0 / / rw,relatime shared:1 - ext4 /dev/mapper/ssd-root rw,seclabel,data=ordered
+	info := `62 0 253:0 / / rw,relatime shared:1 - ext4 /dev/mapper/ssd-root rw,seclabel,data=ordered
 78 62 0:41 / /tmp rw,nosuid,nodev shared:30 - tmpfs tmpfs rw,seclabel
 80 62 0:42 / /var/lib/nfs/rpc_pipefs rw,relatime shared:31 - rpc_pipefs sunrpc rw
 82 62 0:43 / /var/lib/foo rw,relatime shared:32 - tmpfs tmpfs rw

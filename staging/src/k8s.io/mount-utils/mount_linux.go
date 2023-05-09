@@ -810,7 +810,6 @@ func tryUnmount(target string, withSafeNotMountedBehavior bool, unmountTimeout t
 func forceUmount(target string, withSafeNotMountedBehavior bool) error {
 	command := exec.Command("umount", "-f", target)
 	output, err := command.CombinedOutput()
-
 	if err != nil {
 		return checkUmountError(target, command, output, err, withSafeNotMountedBehavior)
 	}
