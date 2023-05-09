@@ -153,6 +153,7 @@ require (
 	github.com/containerd/ttrpc v1.2.1 // indirect
 	github.com/coredns/caddy v1.1.1 // indirect
 	github.com/coreos/go-semver v0.3.1 // indirect
+	github.com/coreos/pkg v0.0.0-20230327231512-ba87abf18a23
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/daviddengcn/go-colortext v1.0.0 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
