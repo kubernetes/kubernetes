@@ -67,13 +67,22 @@ func newService(name string, serviceType v1.ServiceType, tweaks ...serviceTweak)
 			Namespace: "default",
 		},
 		Spec: v1.ServiceSpec{
-			Type: serviceType,
+			Type:  serviceType,
+			Ports: makeServicePort(v1.ProtocolTCP, 0),
 		},
 	}
 	for _, tw := range tweaks {
 		tw(s)
 	}
 	return s
+}
+
+func copyService(oldSvc *v1.Service, tweaks ...serviceTweak) *v1.Service {
+	newSvc := oldSvc.DeepCopy()
+	for _, tw := range tweaks {
+		tw(newSvc)
+	}
+	return newSvc
 }
 
 func tweakAddETP(etpType v1.ServiceExternalTrafficPolicyType) serviceTweak {
@@ -126,7 +135,7 @@ func tweakAddAppProtocol(appProtocol string) serviceTweak {
 	}
 }
 
-func tweakAddIPFamilies(families ...v1.IPFamily) serviceTweak {
+func tweakSetIPFamilies(families ...v1.IPFamily) serviceTweak {
 	return func(s *v1.Service) {
 		s.Spec.IPFamilies = families
 	}
@@ -207,7 +216,7 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 		expectPatchFinalizer: true,
 	}, {
 		desc:                 "tcp service that wants LB",
-		service:              newService("basic-service1", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 0)),
+		service:              newService("basic-service1", v1.ServiceTypeLoadBalancer),
 		expectOp:             ensureLoadBalancer,
 		expectCreateAttempt:  true,
 		expectPatchStatus:    true,
@@ -237,7 +246,7 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 		expectPatchFinalizer: true,
 	}, {
 		desc:                 "service that needs cleanup",
-		service:              newService("basic-service1", v1.ServiceTypeLoadBalancer, tweakAddLBIngress("8.8.8.8"), tweakAddPorts(v1.ProtocolTCP, 0), tweakAddFinalizers(servicehelper.LoadBalancerCleanupFinalizer), tweakAddDeletionTimestamp(time.Now())),
+		service:              newService("basic-service1", v1.ServiceTypeLoadBalancer, tweakAddLBIngress("8.8.8.8"), tweakAddFinalizers(servicehelper.LoadBalancerCleanupFinalizer), tweakAddDeletionTimestamp(time.Now())),
 		lbExists:             true,
 		expectOp:             deleteLoadBalancer,
 		expectDeleteAttempt:  true,
@@ -245,7 +254,7 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 		expectPatchFinalizer: true,
 	}, {
 		desc:                 "service with finalizer that wants LB",
-		service:              newService("basic-service1", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 0), tweakAddFinalizers(servicehelper.LoadBalancerCleanupFinalizer)),
+		service:              newService("basic-service1", v1.ServiceTypeLoadBalancer, tweakAddFinalizers(servicehelper.LoadBalancerCleanupFinalizer)),
 		expectOp:             ensureLoadBalancer,
 		expectCreateAttempt:  true,
 		expectPatchStatus:    true,
@@ -1359,8 +1368,7 @@ func TestNeedsUpdate(t *testing.T) {
 		testName: "If TargetGroup is different 1",
 		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
 			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 20))
-			newSvc = oldSvc.DeepCopy()
-			newSvc.Spec.Ports[0].TargetPort = intstr.Parse("21")
+			newSvc = copyService(oldSvc, tweakAddPorts(v1.ProtocolTCP, 21))
 			return
 		},
 		expectedNeedsUpdate: true,
@@ -1376,54 +1384,48 @@ func TestNeedsUpdate(t *testing.T) {
 	}, {
 		testName: "If appProtocol is the same",
 		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
-			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 22))
-			newSvc = oldSvc.DeepCopy()
+			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer)
+			newSvc = copyService(oldSvc)
 			return
 		},
 		expectedNeedsUpdate: false,
 	}, {
 		testName: "If service IPFamilies from single stack to dual stack",
 		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
-			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 22), tweakAddAppProtocol("http"), tweakAddIPFamilies(v1.IPv4Protocol))
-			newSvc = oldSvc.DeepCopy()
-			newSvc.Spec.IPFamilies = []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol}
+			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakSetIPFamilies(v1.IPv4Protocol))
+			newSvc = copyService(oldSvc, tweakSetIPFamilies(v1.IPv4Protocol, v1.IPv6Protocol))
 			return
 		},
 		expectedNeedsUpdate: true,
 	}, {
 		testName: "If service IPFamilies from dual stack to single stack",
 		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
-			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 22), tweakAddAppProtocol("http"), tweakAddIPFamilies(v1.IPv4Protocol, v1.IPv6Protocol))
-			newSvc = oldSvc.DeepCopy()
-			newSvc.Spec.IPFamilies = []v1.IPFamily{v1.IPv4Protocol}
+			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakSetIPFamilies(v1.IPv4Protocol, v1.IPv6Protocol))
+			newSvc = copyService(oldSvc, tweakSetIPFamilies(v1.IPv4Protocol))
 			return
 		},
 		expectedNeedsUpdate: true,
 	}, {
 		testName: "If service IPFamilies not change",
 		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
-			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 22), tweakAddAppProtocol("http"), tweakAddIPFamilies(v1.IPv4Protocol))
-			newSvc = oldSvc.DeepCopy()
+			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakSetIPFamilies(v1.IPv4Protocol))
+			newSvc = copyService(oldSvc)
 			return
 		},
 		expectedNeedsUpdate: false,
 	}, {
 		testName: "If appProtocol is set when previously unset",
 		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
-			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 22))
-			newSvc = oldSvc.DeepCopy()
-			protocol := "http"
-			newSvc.Spec.Ports[0].AppProtocol = &protocol
+			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer)
+			newSvc = copyService(oldSvc, tweakAddAppProtocol("http"))
 			return
 		},
 		expectedNeedsUpdate: true,
 	}, {
 		testName: "If appProtocol is set to a different value",
 		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
-			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 22), tweakAddAppProtocol("http"))
-			newSvc = oldSvc.DeepCopy()
-			newProtocol := "tcp"
-			newSvc.Spec.Ports[0].AppProtocol = &newProtocol
+			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddAppProtocol("http"))
+			newSvc = copyService(oldSvc, tweakAddAppProtocol("tcp"))
 			return
 		},
 		expectedNeedsUpdate: true,
