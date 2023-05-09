@@ -564,6 +564,13 @@ const (
 	// Robust VolumeManager reconstruction after kubelet restart.
 	NewVolumeManagerReconstruction featuregate.Feature = "NewVolumeManagerReconstruction"
 
+	// owner: @danwinship
+	// kep: https://kep.k8s.io/3866
+	// alpha: v1.29
+	//
+	// Allows running kube-proxy with `--mode nftables`.
+	NFTablesProxyMode featuregate.Feature = "NFTablesProxyMode"
+
 	// owner: @aravindhp @LorbusChris
 	// kep: http://kep.k8s.io/2271
 	// alpha: v1.27
@@ -1102,6 +1109,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	MultiCIDRServiceAllocator: {Default: false, PreRelease: featuregate.Alpha},
 
 	NewVolumeManagerReconstruction: {Default: true, PreRelease: featuregate.Beta},
+
+	NFTablesProxyMode: {Default: false, PreRelease: featuregate.Alpha},
 
 	NodeLogQuery: {Default: false, PreRelease: featuregate.Alpha},
 

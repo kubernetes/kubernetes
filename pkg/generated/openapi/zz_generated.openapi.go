@@ -1095,6 +1095,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/kube-proxy/config/v1alpha1.KubeProxyConntrackConfiguration":                                     schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyConntrackConfiguration(ref),
 		"k8s.io/kube-proxy/config/v1alpha1.KubeProxyIPTablesConfiguration":                                      schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyIPTablesConfiguration(ref),
 		"k8s.io/kube-proxy/config/v1alpha1.KubeProxyIPVSConfiguration":                                          schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyIPVSConfiguration(ref),
+		"k8s.io/kube-proxy/config/v1alpha1.KubeProxyNFTablesConfiguration":                                      schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyNFTablesConfiguration(ref),
 		"k8s.io/kube-proxy/config/v1alpha1.KubeProxyWinkernelConfiguration":                                     schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyWinkernelConfiguration(ref),
 		"k8s.io/kube-scheduler/config/v1.DefaultPreemptionArgs":                                                 schema_k8sio_kube_scheduler_config_v1_DefaultPreemptionArgs(ref),
 		"k8s.io/kube-scheduler/config/v1.Extender":                                                              schema_k8sio_kube_scheduler_config_v1_Extender(ref),
@@ -54415,6 +54416,13 @@ func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyConfiguration(ref common.R
 							Ref:         ref("k8s.io/kube-proxy/config/v1alpha1.KubeProxyIPVSConfiguration"),
 						},
 					},
+					"nftables": {
+						SchemaProps: spec.SchemaProps{
+							Description: "nftables contains nftables-related configuration options.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/kube-proxy/config/v1alpha1.KubeProxyNFTablesConfiguration"),
+						},
+					},
 					"winkernel": {
 						SchemaProps: spec.SchemaProps{
 							Description: "winkernel contains winkernel-related configuration options.",
@@ -54489,11 +54497,11 @@ func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyConfiguration(ref common.R
 						},
 					},
 				},
-				Required: []string{"clientConnection", "hostnameOverride", "bindAddress", "healthzBindAddress", "metricsBindAddress", "bindAddressHardFail", "enableProfiling", "showHiddenMetricsForVersion", "mode", "iptables", "ipvs", "winkernel", "detectLocalMode", "detectLocal", "clusterCIDR", "nodePortAddresses", "oomScoreAdj", "conntrack", "configSyncPeriod", "portRange"},
+				Required: []string{"clientConnection", "hostnameOverride", "bindAddress", "healthzBindAddress", "metricsBindAddress", "bindAddressHardFail", "enableProfiling", "showHiddenMetricsForVersion", "mode", "iptables", "ipvs", "nftables", "winkernel", "detectLocalMode", "detectLocal", "clusterCIDR", "nodePortAddresses", "oomScoreAdj", "conntrack", "configSyncPeriod", "portRange"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.Duration", "k8s.io/component-base/config/v1alpha1.ClientConnectionConfiguration", "k8s.io/component-base/logs/api/v1.LoggingConfiguration", "k8s.io/kube-proxy/config/v1alpha1.DetectLocalConfiguration", "k8s.io/kube-proxy/config/v1alpha1.KubeProxyConntrackConfiguration", "k8s.io/kube-proxy/config/v1alpha1.KubeProxyIPTablesConfiguration", "k8s.io/kube-proxy/config/v1alpha1.KubeProxyIPVSConfiguration", "k8s.io/kube-proxy/config/v1alpha1.KubeProxyWinkernelConfiguration"},
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Duration", "k8s.io/component-base/config/v1alpha1.ClientConnectionConfiguration", "k8s.io/component-base/logs/api/v1.LoggingConfiguration", "k8s.io/kube-proxy/config/v1alpha1.DetectLocalConfiguration", "k8s.io/kube-proxy/config/v1alpha1.KubeProxyConntrackConfiguration", "k8s.io/kube-proxy/config/v1alpha1.KubeProxyIPTablesConfiguration", "k8s.io/kube-proxy/config/v1alpha1.KubeProxyIPVSConfiguration", "k8s.io/kube-proxy/config/v1alpha1.KubeProxyNFTablesConfiguration", "k8s.io/kube-proxy/config/v1alpha1.KubeProxyWinkernelConfiguration"},
 	}
 }
 
@@ -54679,6 +54687,56 @@ func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyIPVSConfiguration(ref comm
 					},
 				},
 				Required: []string{"syncPeriod", "minSyncPeriod", "scheduler", "excludeCIDRs", "strictARP", "tcpTimeout", "tcpFinTimeout", "udpTimeout"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Duration"},
+	}
+}
+
+func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyNFTablesConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "KubeProxyNFTablesConfiguration contains nftables-related configuration details for the Kubernetes proxy server.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"masqueradeBit": {
+						SchemaProps: spec.SchemaProps{
+							Description: "masqueradeBit is the bit of the iptables fwmark space to use for SNAT if using the nftables proxy mode. Values must be within the range [0, 31].",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"masqueradeAll": {
+						SchemaProps: spec.SchemaProps{
+							Description: "masqueradeAll tells kube-proxy to SNAT all traffic sent to Service cluster IPs, when using the nftables mode. This may be required with some CNI plugins.",
+							Default:     false,
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"localhostNodePorts": {
+						SchemaProps: spec.SchemaProps{
+							Description: "localhostNodePorts, if false, tells kube-proxy to disable the legacy behavior of allowing NodePort services to be accessed via localhost. FIXME: remove.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"syncPeriod": {
+						SchemaProps: spec.SchemaProps{
+							Description: "syncPeriod is an interval (e.g. '5s', '1m', '2h22m') indicating how frequently various re-synchronizing and cleanup operations are performed. Must be greater than 0.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+						},
+					},
+					"minSyncPeriod": {
+						SchemaProps: spec.SchemaProps{
+							Description: "minSyncPeriod is the minimum period between iptables rule resyncs (e.g. '5s', '1m', '2h22m'). A value of 0 means every Service or EndpointSlice change will result in an immediate iptables resync.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+						},
+					},
+				},
+				Required: []string{"masqueradeBit", "masqueradeAll", "localhostNodePorts", "syncPeriod", "minSyncPeriod"},
 			},
 		},
 		Dependencies: []string{

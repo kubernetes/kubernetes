@@ -77,6 +77,28 @@ type KubeProxyIPVSConfiguration struct {
 	UDPTimeout metav1.Duration `json:"udpTimeout"`
 }
 
+// KubeProxyNFTablesConfiguration contains nftables-related configuration
+// details for the Kubernetes proxy server.
+type KubeProxyNFTablesConfiguration struct {
+	// masqueradeBit is the bit of the iptables fwmark space to use for SNAT if using
+	// the nftables proxy mode. Values must be within the range [0, 31].
+	MasqueradeBit *int32 `json:"masqueradeBit"`
+	// masqueradeAll tells kube-proxy to SNAT all traffic sent to Service cluster IPs,
+	// when using the nftables mode. This may be required with some CNI plugins.
+	MasqueradeAll bool `json:"masqueradeAll"`
+	// localhostNodePorts, if false, tells kube-proxy to disable the legacy behavior
+	// of allowing NodePort services to be accessed via localhost. FIXME: remove.
+	LocalhostNodePorts *bool `json:"localhostNodePorts"`
+	// syncPeriod is an interval (e.g. '5s', '1m', '2h22m') indicating how frequently
+	// various re-synchronizing and cleanup operations are performed. Must be greater
+	// than 0.
+	SyncPeriod metav1.Duration `json:"syncPeriod"`
+	// minSyncPeriod is the minimum period between iptables rule resyncs (e.g. '5s',
+	// '1m', '2h22m'). A value of 0 means every Service or EndpointSlice change will
+	// result in an immediate iptables resync.
+	MinSyncPeriod metav1.Duration `json:"minSyncPeriod"`
+}
+
 // KubeProxyConntrackConfiguration contains conntrack settings for
 // the Kubernetes proxy server.
 type KubeProxyConntrackConfiguration struct {
@@ -189,6 +211,8 @@ type KubeProxyConfiguration struct {
 	IPTables KubeProxyIPTablesConfiguration `json:"iptables"`
 	// ipvs contains ipvs-related configuration options.
 	IPVS KubeProxyIPVSConfiguration `json:"ipvs"`
+	// nftables contains nftables-related configuration options.
+	NFTables KubeProxyNFTablesConfiguration `json:"nftables"`
 	// winkernel contains winkernel-related configuration options.
 	Winkernel KubeProxyWinkernelConfiguration `json:"winkernel"`
 

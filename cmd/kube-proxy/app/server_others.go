@@ -50,6 +50,7 @@ import (
 	utilipset "k8s.io/kubernetes/pkg/proxy/ipvs/ipset"
 	utilipvs "k8s.io/kubernetes/pkg/proxy/ipvs/util"
 	proxymetrics "k8s.io/kubernetes/pkg/proxy/metrics"
+	"k8s.io/kubernetes/pkg/proxy/nftables"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
@@ -285,6 +286,67 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 		if err != nil {
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
+	} else if config.Mode == proxyconfigapi.ProxyModeNFTables {
+		klog.InfoS("Using nftables Proxier")
+
+		if dualStack {
+			// Always ordered to match []ipt
+			var localDetectors [2]proxyutiliptables.LocalTrafficDetector
+			localDetectors, err = getDualStackLocalDetectorTuple(config.DetectLocalMode, config, s.podCIDRs)
+			if err != nil {
+				return nil, fmt.Errorf("unable to create proxier: %v", err)
+			}
+
+			// TODO this has side effects that should only happen when Run() is invoked.
+			proxier, err = nftables.NewDualStackProxier(
+				ipt,
+				utilsysctl.New(),
+				execer,
+				config.NFTables.SyncPeriod.Duration,
+				config.NFTables.MinSyncPeriod.Duration,
+				config.NFTables.MasqueradeAll,
+				*config.NFTables.LocalhostNodePorts,
+				int(*config.NFTables.MasqueradeBit),
+				localDetectors,
+				s.Hostname,
+				s.NodeIPs,
+				s.Recorder,
+				s.HealthzServer,
+				config.NodePortAddresses,
+				initOnly,
+			)
+		} else {
+			// Create a single-stack proxier if and only if the node does not support dual-stack (i.e, no iptables support).
+			var localDetector proxyutiliptables.LocalTrafficDetector
+			localDetector, err = getLocalDetector(s.PrimaryIPFamily, config.DetectLocalMode, config, s.podCIDRs)
+			if err != nil {
+				return nil, fmt.Errorf("unable to create proxier: %v", err)
+			}
+
+			// TODO this has side effects that should only happen when Run() is invoked.
+			proxier, err = nftables.NewProxier(
+				s.PrimaryIPFamily,
+				iptInterface,
+				utilsysctl.New(),
+				execer,
+				config.NFTables.SyncPeriod.Duration,
+				config.NFTables.MinSyncPeriod.Duration,
+				config.NFTables.MasqueradeAll,
+				*config.NFTables.LocalhostNodePorts,
+				int(*config.NFTables.MasqueradeBit),
+				localDetector,
+				s.Hostname,
+				s.NodeIPs[s.PrimaryIPFamily],
+				s.Recorder,
+				s.HealthzServer,
+				config.NodePortAddresses,
+				initOnly,
+			)
+		}
+
+		if err != nil {
+			return nil, fmt.Errorf("unable to create proxier: %v", err)
+		}
 	}
 
 	return proxier, nil
@@ -492,6 +554,7 @@ func cleanupAndExit() error {
 	for _, ipt := range ipts {
 		encounteredError = iptables.CleanupLeftovers(ipt) || encounteredError
 		encounteredError = ipvs.CleanupLeftovers(ipvsInterface, ipt, ipsetInterface) || encounteredError
+		encounteredError = nftables.CleanupLeftovers(ipt) || encounteredError
 	}
 	if encounteredError {
 		return errors.New("encountered an error while tearing down rules")
