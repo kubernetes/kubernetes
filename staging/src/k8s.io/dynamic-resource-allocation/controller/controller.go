@@ -18,7 +18,6 @@ package controller
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -238,7 +237,7 @@ const (
 
 func (ctrl *controller) add(logger *klog.Logger, obj interface{}) {
 	if logger != nil {
-		logger.Info("new object", "content", prettyPrint(obj))
+		logger.Info("new object", "content", klog.Format(obj))
 	}
 	ctrl.addNewOrUpdated("Adding new work item", obj)
 }
@@ -246,7 +245,7 @@ func (ctrl *controller) add(logger *klog.Logger, obj interface{}) {
 func (ctrl *controller) update(logger *klog.Logger, oldObj, newObj interface{}) {
 	if logger != nil {
 		diff := cmp.Diff(oldObj, newObj)
-		logger.Info("updated object", "content", prettyPrint(newObj), "diff", diff)
+		logger.Info("updated object", "content", klog.Format(newObj), "diff", diff)
 	}
 	ctrl.addNewOrUpdated("Adding updated work item", newObj)
 }
@@ -721,7 +720,7 @@ func (ctrl *controller) syncPodSchedulingContexts(ctx context.Context, schedulin
 		}
 	}
 	if modified {
-		logger.V(6).Info("Updating pod scheduling with modified unsuitable nodes", "podSchedulingCtx", schedulingCtx)
+		logger.V(6).Info("Updating pod scheduling with modified unsuitable nodes", "podSchedulingCtxDump", klog.Format(schedulingCtx))
 		if _, err := ctrl.kubeClient.ResourceV1alpha2().PodSchedulingContexts(schedulingCtx.Namespace).UpdateStatus(ctx, schedulingCtx, metav1.UpdateOptions{}); err != nil {
 			return fmt.Errorf("update unsuitable node status: %v", err)
 		}
@@ -801,13 +800,4 @@ func (ctrl *controller) removeFinalizer(in []string) []string {
 		return nil
 	}
 	return out
-}
-
-// prettyPrint formats arbitrary objects as JSON or, if that fails, with Sprintf.
-func prettyPrint(obj interface{}) string {
-	buffer, err := json.Marshal(obj)
-	if err != nil {
-		return fmt.Sprintf("%s", obj)
-	}
-	return string(buffer)
 }
