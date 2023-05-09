@@ -232,7 +232,7 @@ func (o *RolloutStatusOptions) Run() error {
 	})
 
 	if !resourceFound {
-		fmt.Fprintf(o.Out, "No resources found in %s namespace.\n", o.Namespace)
+		fmt.Fprintf(o.ErrOut, "No resources found in %s namespace.\n", o.Namespace)
 	}
 
 	return err
