@@ -216,6 +216,22 @@ func NewValidatingWebhookAccessor(uid, configurationName string, h *v1.Validatin
 	return &validatingWebhookAccessor{uid: uid, configurationName: configurationName, ValidatingWebhook: h}
 }
 
+// NOTE: we're thinking about adding a new NewValidatingWebhookAccessorWithOptions to allow
+// recreating webhookAccessor with existing restClient, compiled CELs, selectors etc... to
+// avoid remaking unnecessary expensive operations.
+/*
+type Options struct {
+	// rest client
+	// compiled CELs
+	// selectors...
+}
+
+// NewValidatingWebhookAccessorWithOptions creates an accessor for a ValidatingWebhook.
+func NewValidatingWebhookAccessorWithOptions(uid, configurationName string, h *v1.ValidatingWebhook, opt *Options) WebhookAccessor {
+	return &validatingWebhookAccessor{uid: uid, configurationName: configurationName, ValidatingWebhook: h}
+}
+*/
+
 type validatingWebhookAccessor struct {
 	*v1.ValidatingWebhook
 	uid               string
