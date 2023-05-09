@@ -246,7 +246,7 @@ func (c *objectCache) newReflectorLocked(namespace, name string) *objectCacheIte
 	return item
 }
 
-func (c *objectCache) AddReference(namespace, name string, podUID types.UID) {
+func (c *objectCache) AddReference(namespace, name string, referencedFrom types.UID) {
 	key := objectKey{namespace: namespace, name: name}
 
 	// AddReference is called from RegisterPod thus it needs to be efficient.
@@ -261,18 +261,18 @@ func (c *objectCache) AddReference(namespace, name string, podUID types.UID) {
 		item = c.newReflectorLocked(namespace, name)
 		c.items[key] = item
 	}
-	item.refMap[podUID]++
+	item.refMap[referencedFrom]++
 }
 
-func (c *objectCache) DeleteReference(namespace, name string, podUID types.UID) {
+func (c *objectCache) DeleteReference(namespace, name string, referencedFrom types.UID) {
 	key := objectKey{namespace: namespace, name: name}
 
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	if item, ok := c.items[key]; ok {
-		item.refMap[podUID]--
-		if item.refMap[podUID] == 0 {
-			delete(item.refMap, podUID)
+		item.refMap[referencedFrom]--
+		if item.refMap[referencedFrom] == 0 {
+			delete(item.refMap, referencedFrom)
 		}
 		if len(item.refMap) == 0 {
 			// Stop the underlying reflector.
