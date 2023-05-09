@@ -374,7 +374,7 @@ func (pl *dynamicResources) isSchedulableAfterPodSchedulingChange(oldObj, newObj
 		p, ok := obj.Obj.(*resourcev1alpha2.PodSchedulingContext)
 		if !ok {
 			// Shouldn't happen.
-			pl.logger.Error(nil, "unexpected deleted object in isSchedulableAfterPodSchedulingUpdateOrDelete", "obj", obj.Obj)
+			pl.logger.Error(nil, "unexpected deleted object in isSchedulableAfterPodSchedulingChange", "obj", obj.Obj)
 			return framework.PodMaybeSchedulable
 		}
 		podScheduling = p
@@ -382,7 +382,7 @@ func (pl *dynamicResources) isSchedulableAfterPodSchedulingChange(oldObj, newObj
 		podScheduling = obj
 	default:
 		// Shouldn't happen.
-		pl.logger.Error(nil, "unexpected object in isSchedulableAfterPodSchedulingUpdateOrDelete", "obj", obj)
+		pl.logger.Error(nil, "unexpected object in isSchedulableAfterPodSchedulingChange", "obj", obj)
 		return framework.PodMaybeSchedulable
 	}
 
@@ -394,10 +394,21 @@ func (pl *dynamicResources) isSchedulableAfterPodSchedulingChange(oldObj, newObj
 			return framework.PodNotAffected
 		}
 
+		var oldPodScheduling *resourcev1alpha2.PodSchedulingContext
+		if oldObj != nil {
+			p, ok := oldObj.(*resourcev1alpha2.PodSchedulingContext)
+			if !ok {
+				pl.logger.Error(nil, "unexpected object in isSchedulableAfterPodSchedulingChange", "obj", obj)
+				return framework.PodMaybeSchedulable
+			}
+			oldPodScheduling = p
+		}
+
 		// If the drivers have provided information about all
 		// unallocated claims with delayed allocation, then the next
 		// scheduling attempt is able to pick a node, so we let it run
-		// immediately.
+		// immediately if this occurred for the first time, otherwise
+		// we allow backoff.
 		pendingDelayedClaims := 0
 		if err := pl.foreachPodResourceClaim(pod, func(podResourceName string, claim *resourcev1alpha2.ResourceClaim) {
 			if claim.Spec.AllocationMode == resourcev1alpha2.AllocationModeWaitForFirstConsumer &&
@@ -409,11 +420,26 @@ func (pl *dynamicResources) isSchedulableAfterPodSchedulingChange(oldObj, newObj
 			// This is not an unexpected error: we know that
 			// foreachPodResourceClaim only returns errors for "not
 			// schedulable".
-			pl.logger.V(4).Info("pod is not schedulable", "pod", klog.KObj(pod), "reason", err.Error())
+			pl.logger.V(4).Info("pod is not schedulable, keep waiting", "pod", klog.KObj(pod), "reason", err.Error())
 			return framework.PodNotAffected
 		}
-		if pendingDelayedClaims == 0 {
-			pl.logger.V(4).Info("PodSchedulingContext for pod got completed", "pod", klog.KObj(pod))
+
+		if pendingDelayedClaims > 0 {
+			// We could start a pod scheduling attempt to refresh the
+			// potential nodes list.  But pod scheduling attempts are
+			// expensive and doing them too often causes the pod to enter
+			// backoff. Let's wait instead for all drivers to reply.
+			if loggerV := pl.logger.V(6); loggerV.Enabled() {
+				loggerV.Info("PodSchedulingContext with missing resource claim information, keep waiting", "pod", klog.KObj(pod), "podSchedulingDiff", cmp.Diff(oldPodScheduling, podScheduling))
+			} else {
+				pl.logger.V(5).Info("PodSchedulingContext with missing resource claim information, keep waiting", "pod", klog.KObj(pod))
+			}
+			return framework.PodNotAffected
+		}
+
+		if oldPodScheduling == nil || len(oldPodScheduling.Status.ResourceClaims) < len(podScheduling.Status.ResourceClaims) {
+			// This definitely is new information for the scheduler. Try again immediately.
+			pl.logger.V(4).Info("PodSchedulingContext for pod got completed, schedule immediately", "pod", klog.KObj(pod))
 			return framework.PodImmediatelySchedulable
 		}
 
@@ -433,17 +459,25 @@ func (pl *dynamicResources) isSchedulableAfterPodSchedulingChange(oldObj, newObj
 		if podScheduling.Spec.SelectedNode != "" {
 			for _, claimStatus := range podScheduling.Status.ResourceClaims {
 				if sliceContains(claimStatus.UnsuitableNodes, podScheduling.Spec.SelectedNode) {
-					pl.logger.V(5).Info("PodSchedulingContext has unsuitable selected node", "pod", klog.KObj(pod), "selectedNode", podScheduling.Spec.SelectedNode, "podResourceName", claimStatus.Name)
+					pl.logger.V(5).Info("PodSchedulingContext has unsuitable selected node, schedule immediately", "pod", klog.KObj(pod), "selectedNode", podScheduling.Spec.SelectedNode, "podResourceName", claimStatus.Name)
 					return framework.PodImmediatelySchedulable
 				}
 			}
 		}
-		// We could start a pod scheduling attempt to refresh the
-		// potential nodes list.  But pod scheduling attempts are
-		// expensive and doing them too often causes the pod to enter
-		// backoff. Let's wait instead for all drivers to reply.
-		pl.logger.V(5).Info("PodSchedulingContext for pod still incomplete", "pod", klog.KObj(pod))
-		return framework.PodNotAffected
+
+		if oldPodScheduling != nil &&
+			!apiequality.Semantic.DeepEqual(&oldPodScheduling.Spec, &podScheduling.Spec) &&
+			apiequality.Semantic.DeepEqual(&oldPodScheduling.Status, &podScheduling.Status) {
+			pl.logger.V(5).Info("PodSchedulingContext has only the scheduler spec changes, ignore the update", "pod", klog.KObj(pod))
+			return framework.PodNotAffected
+		}
+
+		if loggerV := pl.logger.V(6); loggerV.Enabled() {
+			loggerV.Info("PodSchedulingContext for pod with no relevant changes, maybe schedule", "pod", klog.KObj(pod), "podSchedulingDiff", cmp.Diff(oldPodScheduling, podScheduling))
+		} else {
+			pl.logger.V(5).Info("PodSchedulingContext for pod with no relevant changes, maybe schedule", "pod", klog.KObj(pod))
+		}
+		return framework.PodMaybeSchedulable
 	}
 
 	pl.logger.V(7).Info("PodSchedulingContext for unrelated pod got modified", "pod", klog.KObj(pod), "podScheduling", klog.KObj(podScheduling))
