@@ -568,6 +568,7 @@ kube::golang::setup_env() {
   fi
 
   GOMAXPROCS=${GOMAXPROCS:-$(ncpu)}
+  export GOMAXPROCS
   kube::log::status "Setting GOMAXPROCS: ${GOMAXPROCS}"
 }
 
