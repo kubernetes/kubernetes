@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 package libcontainer
@@ -72,6 +73,15 @@ func prepareRootfs(pipe io.ReadWriter, iConfig *initConfig) (err error) {
 				return newSystemErrorWithCause(err, "running premount command")
 			}
 		}
+
+		// Just before the loop we checked that if not empty, len(mountFds) == len(config.Mounts).
+		// Therefore, we can access mountFds[i] without any concerns.
+		if mountFds != nil && mountFds[i] != -1 {
+			mountConfig.fd = &mountFds[i]
+		} else {
+			mountConfig.fd = nil
+		}
+
 		if err := mountToRootfs(m, mountConfig); err != nil {
 			return newSystemErrorWithCausef(err, "mounting %q to rootfs at %q", m.Source, m.Destination)
 		}
@@ -309,26 +319,41 @@ func mountCgroupV2(m *configs.Mount, c *mountConfig) error {
 	if err := os.MkdirAll(dest, 0o755); err != nil {
 		return err
 	}
-	return utils.WithProcfd(c.root, m.Destination, func(procfd string) error {
-		if err := unix.Mount(m.Source, procfd, "cgroup2", uintptr(m.Flags), m.Data); err != nil {
-			// when we are in UserNS but CgroupNS is not unshared, we cannot mount cgroup2 (#2158)
-			if err == unix.EPERM || err == unix.EBUSY {
-				src := fs2.UnifiedMountpoint
-				if c.cgroupns && c.cgroup2Path != "" {
-					// Emulate cgroupns by bind-mounting
-					// the container cgroup path rather than
-					// the whole /sys/fs/cgroup.
-					src = c.cgroup2Path
-				}
-				err = unix.Mount(src, procfd, "", uintptr(m.Flags)|unix.MS_BIND, "")
-				if err == unix.ENOENT && c.rootlessCgroups {
-					err = nil
-				}
-			}
-			return err
-		}
-		return nil
+	err = utils.WithProcfd(c.root, m.Destination, func(procfd string) error {
+		return mount(m.Source, m.Destination, procfd, "cgroup2", uintptr(m.Flags), m.Data)
 	})
+	if err == nil || !(errors.Is(err, unix.EPERM) || errors.Is(err, unix.EBUSY)) {
+		return err
+	}
+
+	// When we are in UserNS but CgroupNS is not unshared, we cannot mount
+	// cgroup2 (#2158), so fall back to bind mount.
+	bindM := &configs.Mount{
+		Device:           "bind",
+		Source:           fs2.UnifiedMountpoint,
+		Destination:      m.Destination,
+		Flags:            unix.MS_BIND | m.Flags,
+		PropagationFlags: m.PropagationFlags,
+	}
+	if c.cgroupns && c.cgroup2Path != "" {
+		// Emulate cgroupns by bind-mounting the container cgroup path
+		// rather than the whole /sys/fs/cgroup.
+		bindM.Source = c.cgroup2Path
+	}
+	// mountToRootfs() handles remounting for MS_RDONLY.
+	// No need to set c.fd here, because mountToRootfs() calls utils.WithProcfd() by itself in mountPropagate().
+	err = mountToRootfs(bindM, c)
+	if c.rootlessCgroups && errors.Is(err, unix.ENOENT) {
+		// ENOENT (for `src = c.cgroup2Path`) happens when rootless runc is being executed
+		// outside the userns+mountns.
+		//
+		// Mask `/sys/fs/cgroup` to ensure it is read-only, even when `/sys` is mounted
+		// with `rbind,ro` (`runc spec --rootless` produces `rbind,ro` for `/sys`).
+		err = utils.WithProcfd(c.root, m.Destination, func(procfd string) error {
+			return maskPath(procfd, c.label)
+		})
+	}
+	return err
 }
 
 func doTmpfsCopyUp(m *configs.Mount, rootfs, mountLabel string) (Err error) {
@@ -378,31 +403,43 @@ func doTmpfsCopyUp(m *configs.Mount, rootfs, mountLabel string) (Err error) {
 
 func mountToRootfs(m *configs.Mount, c *mountConfig) error {
 	rootfs := c.root
+
+	// procfs and sysfs are special because we need to ensure they are actually
+	// mounted on a specific path in a container without any funny business.
+	switch m.Device {
+	case "proc", "sysfs":
+		// If the destination already exists and is not a directory, we bail
+		// out. This is to avoid mounting through a symlink or similar -- which
+		// has been a "fun" attack scenario in the past.
+		// TODO: This won't be necessary once we switch to libpathrs and we can
+		//       stop all of these symlink-exchange attacks.
+		dest := filepath.Clean(m.Destination)
+		if !strings.HasPrefix(dest, rootfs) {
+			// Do not use securejoin as it resolves symlinks.
+			dest = filepath.Join(rootfs, dest)
+		}
+		if fi, err := os.Lstat(dest); err != nil {
+			if !os.IsNotExist(err) {
+				return err
+			}
+		} else if !fi.IsDir() {
+			return fmt.Errorf("filesystem %q must be mounted on ordinary directory", m.Device)
+		}
+		if err := os.MkdirAll(dest, 0o755); err != nil {
+			return err
+		}
+		// Selinux kernels do not support labeling of /proc or /sys.
+		return mountPropagate(m, rootfs, "", nil)
+	}
+
 	mountLabel := c.label
+	mountFd := c.fd
 	dest, err := securejoin.SecureJoin(rootfs, m.Destination)
 	if err != nil {
 		return err
 	}
 
 	switch m.Device {
-	case "proc", "sysfs":
-		// If the destination already exists and is not a directory, we bail
-		// out This is to avoid mounting through a symlink or similar -- which
-		// has been a "fun" attack scenario in the past.
-		// TODO: This won't be necessary once we switch to libpathrs and we can
-		//       stop all of these symlink-exchange attacks.
-		if fi, err := os.Lstat(dest); err != nil {
-			if !os.IsNotExist(err) {
-				return err
-			}
-		} else if fi.Mode()&os.ModeDir == 0 {
-			return fmt.Errorf("filesystem %q must be mounted on ordinary directory", m.Device)
-		}
-		if err := os.MkdirAll(dest, 0o755); err != nil {
-			return err
-		}
-		// Selinux kernels do not support labeling of /proc or /sys
-		return mountPropagate(m, rootfs, "")
 	case "mqueue":
 		if err := os.MkdirAll(dest, 0o755); err != nil {
 			return err
@@ -559,6 +596,7 @@ func checkProcMount(rootfs, dest, source string) error {
 		"/proc/loadavg",
 		"/proc/slabinfo",
 		"/proc/net/dev",
+		"/proc/sys/kernel/ns_last_pid",
 	}
 	for _, valid := range validProcMounts {
 		path, err := filepath.Rel(filepath.Join(rootfs, valid), dest)

@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 package fs
@@ -16,24 +17,23 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-var (
-	subsystems = []subsystem{
-		&CpusetGroup{},
-		&DevicesGroup{},
-		&MemoryGroup{},
-		&CpuGroup{},
-		&CpuacctGroup{},
-		&PidsGroup{},
-		&BlkioGroup{},
-		&HugetlbGroup{},
-		&NetClsGroup{},
-		&NetPrioGroup{},
-		&PerfEventGroup{},
-		&FreezerGroup{},
-		&NameGroup{GroupName: "name=systemd", Join: true},
-	}
-	HugePageSizes, _ = cgroups.GetHugePageSize()
-)
+var subsystems = []subsystem{
+	&CpusetGroup{},
+	&DevicesGroup{},
+	&MemoryGroup{},
+	&CpuGroup{},
+	&CpuacctGroup{},
+	&PidsGroup{},
+	&BlkioGroup{},
+	&HugetlbGroup{},
+	&NetClsGroup{},
+	&NetPrioGroup{},
+	&PerfEventGroup{},
+	&FreezerGroup{},
+	&RdmaGroup{},
+	&NameGroup{GroupName: "name=systemd", Join: true},
+	&NameGroup{GroupName: "misc", Join: true},
+}
 
 var errSubsystemDoesNotExist = errors.New("cgroup: subsystem does not exist")
 

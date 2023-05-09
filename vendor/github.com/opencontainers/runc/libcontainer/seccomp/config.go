@@ -17,12 +17,26 @@ var operators = map[string]configs.Operator{
 }
 
 var actions = map[string]configs.Action{
-	"SCMP_ACT_KILL":  configs.Kill,
-	"SCMP_ACT_ERRNO": configs.Errno,
-	"SCMP_ACT_TRAP":  configs.Trap,
-	"SCMP_ACT_ALLOW": configs.Allow,
-	"SCMP_ACT_TRACE": configs.Trace,
-	"SCMP_ACT_LOG":   configs.Log,
+	"SCMP_ACT_KILL":         configs.Kill,
+	"SCMP_ACT_ERRNO":        configs.Errno,
+	"SCMP_ACT_TRAP":         configs.Trap,
+	"SCMP_ACT_ALLOW":        configs.Allow,
+	"SCMP_ACT_TRACE":        configs.Trace,
+	"SCMP_ACT_LOG":          configs.Log,
+	"SCMP_ACT_NOTIFY":       configs.Notify,
+	"SCMP_ACT_KILL_THREAD":  configs.KillThread,
+	"SCMP_ACT_KILL_PROCESS": configs.KillProcess,
+}
+
+// KnownActions returns the list of the known actions.
+// Used by `runc features`.
+func KnownActions() []string {
+	var res []string
+	for k := range actions {
+		res = append(res, k)
+	}
+	sort.Strings(res)
+	return res
 }
 
 var archs = map[string]string{

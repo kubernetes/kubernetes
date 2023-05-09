@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 package libcontainer
@@ -263,6 +264,47 @@ func (l *LinuxFactory) Create(id string, config *configs.Config) (Container, err
 	} else if !os.IsNotExist(err) {
 		return nil, newGenericError(err, SystemError)
 	}
+
+	cm, err := manager.New(config.Cgroups)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check that cgroup does not exist or empty (no processes).
+	// Note for cgroup v1 this check is not thorough, as there are multiple
+	// separate hierarchies, while both Exists() and GetAllPids() only use
+	// one for "devices" controller (assuming others are the same, which is
+	// probably true in almost all scenarios). Checking all the hierarchies
+	// would be too expensive.
+	if cm.Exists() {
+		pids, err := cm.GetAllPids()
+		// Reading PIDs can race with cgroups removal, so ignore ENOENT and ENODEV.
+		if err != nil && !errors.Is(err, os.ErrNotExist) && !errors.Is(err, unix.ENODEV) {
+			return nil, fmt.Errorf("unable to get cgroup PIDs: %w", err)
+		}
+		if len(pids) != 0 {
+			if config.Cgroups.Systemd {
+				// systemd cgroup driver can't add a pid to an
+				// existing systemd unit and will return an
+				// error anyway, so let's error out early.
+				return nil, fmt.Errorf("container's cgroup is not empty: %d process(es) found", len(pids))
+			}
+			// TODO: return an error.
+			logrus.Warnf("container's cgroup is not empty: %d process(es) found", len(pids))
+			logrus.Warn("DEPRECATED: running container in a non-empty cgroup won't be supported in runc 1.2; https://github.com/opencontainers/runc/issues/3132")
+		}
+	}
+
+	// Check that cgroup is not frozen. Do not use Exists() here
+	// since in cgroup v1 it only checks "devices" controller.
+	st, err := cm.GetFreezerState()
+	if err != nil {
+		return nil, fmt.Errorf("unable to get cgroup freezer state: %w", err)
+	}
+	if st == configs.Frozen {
+		return nil, errors.New("container's cgroup unexpectedly frozen")
+	}
+
 	if err := os.MkdirAll(containerRoot, 0o711); err != nil {
 		return nil, newGenericError(err, SystemError)
 	}
@@ -393,7 +435,11 @@ func (l *LinuxFactory) StartInitialization() (err error) {
 	}()
 	defer func() {
 		if e := recover(); e != nil {
-			err = fmt.Errorf("panic from initialization: %v, %v", e, string(debug.Stack()))
+			if ee, ok := e.(error); ok {
+				err = fmt.Errorf("panic from initialization: %w, %s", ee, debug.Stack())
+			} else {
+				err = fmt.Errorf("panic from initialization: %v, %s", e, debug.Stack())
+			}
 		}
 	}()
 

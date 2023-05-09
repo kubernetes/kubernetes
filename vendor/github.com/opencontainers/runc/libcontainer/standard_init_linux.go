@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 package libcontainer
@@ -180,6 +181,29 @@ func (l *linuxStandardInit) Init() error {
 	name, err := exec.LookPath(l.config.Args[0])
 	if err != nil {
 		return err
+	}
+	// exec.LookPath in Go < 1.20 might return no error for an executable
+	// residing on a file system mounted with noexec flag, so perform this
+	// extra check now while we can still return a proper error.
+	// TODO: remove this once go < 1.20 is not supported.
+	if err := eaccess(name); err != nil {
+		return &os.PathError{Op: "eaccess", Path: name, Err: err}
+	}
+
+	// Set seccomp as close to execve as possible, so as few syscalls take
+	// place afterward (reducing the amount of syscalls that users need to
+	// enable in their seccomp profiles). However, this needs to be done
+	// before closing the pipe since we need it to pass the seccompFd to
+	// the parent.
+	if l.config.Config.Seccomp != nil && l.config.NoNewPrivileges {
+		seccompFd, err := seccomp.InitSeccomp(l.config.Config.Seccomp)
+		if err != nil {
+			return fmt.Errorf("unable to init seccomp: %w", err)
+		}
+
+		if err := syncParentSeccomp(l.pipe, seccompFd); err != nil {
+			return err
+		}
 	}
 	// Close the pipe to signal that we have completed our init.
 	logrus.Debugf("init: closing the pipe to signal completion")

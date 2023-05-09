@@ -53,15 +53,10 @@ func RangeToBits(str string) ([]byte, error) {
 		// do not allow empty values
 		return nil, errors.New("empty value")
 	}
-	ret := make([]byte, len(val)*8)
-	for i := range val {
-		// bitset uses BigEndian internally
-		binary.BigEndian.PutUint64(ret[i*8:], val[len(val)-1-i])
-	}
-	// remove upper all-zero bytes
-	for ret[0] == 0 {
-		ret = ret[1:]
-	}
 
+	// fit cpuset parsing order in systemd
+	for l, r := 0, len(ret)-1; l < r; l, r = l+1, r-1 {
+		ret[l], ret[r] = ret[r], ret[l]
+	}
 	return ret, nil
 }

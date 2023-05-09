@@ -44,13 +44,9 @@ type parentProcess interface {
 
 	// startTime returns the process start time.
 	startTime() (uint64, error)
-
 	signal(os.Signal) error
-
 	externalDescriptors() []string
-
 	setExternalDescriptors(fds []string)
-
 	forwardChildLogs() chan error
 }
 

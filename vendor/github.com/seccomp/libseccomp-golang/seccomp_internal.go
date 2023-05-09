@@ -1,11 +1,10 @@
-// +build linux
-
 // Internal functions for libseccomp Go bindings
 // No exported functions
 
 package seccomp
 
 import (
+	"errors"
 	"fmt"
 	"syscall"
 )
@@ -20,10 +19,10 @@ import (
 #include <stdlib.h>
 #include <seccomp.h>
 
-#if SCMP_VER_MAJOR < 2
-#error Minimum supported version of Libseccomp is v2.2.0
-#elif SCMP_VER_MAJOR == 2 && SCMP_VER_MINOR < 2
-#error Minimum supported version of Libseccomp is v2.2.0
+#if (SCMP_VER_MAJOR < 2) || \
+    (SCMP_VER_MAJOR == 2 && SCMP_VER_MINOR < 3) || \
+    (SCMP_VER_MAJOR == 2 && SCMP_VER_MINOR == 3 && SCMP_VER_MICRO < 1)
+#error This package requires libseccomp >= v2.3.1
 #endif
 
 #define ARCH_BAD ~0
@@ -50,6 +49,18 @@ const uint32_t C_ARCH_BAD = ARCH_BAD;
 #define SCMP_ARCH_S390X ARCH_BAD
 #endif
 
+#ifndef SCMP_ARCH_PARISC
+#define SCMP_ARCH_PARISC ARCH_BAD
+#endif
+
+#ifndef SCMP_ARCH_PARISC64
+#define SCMP_ARCH_PARISC64 ARCH_BAD
+#endif
+
+#ifndef SCMP_ARCH_RISCV64
+#define SCMP_ARCH_RISCV64 ARCH_BAD
+#endif
+
 const uint32_t C_ARCH_NATIVE       = SCMP_ARCH_NATIVE;
 const uint32_t C_ARCH_X86          = SCMP_ARCH_X86;
 const uint32_t C_ARCH_X86_64       = SCMP_ARCH_X86_64;
@@ -67,6 +78,9 @@ const uint32_t C_ARCH_PPC64        = SCMP_ARCH_PPC64;
 const uint32_t C_ARCH_PPC64LE      = SCMP_ARCH_PPC64LE;
 const uint32_t C_ARCH_S390         = SCMP_ARCH_S390;
 const uint32_t C_ARCH_S390X        = SCMP_ARCH_S390X;
+const uint32_t C_ARCH_PARISC       = SCMP_ARCH_PARISC;
+const uint32_t C_ARCH_PARISC64     = SCMP_ARCH_PARISC64;
+const uint32_t C_ARCH_RISCV64      = SCMP_ARCH_RISCV64;
 
 #ifndef SCMP_ACT_LOG
 #define SCMP_ACT_LOG 0x7ffc0000U
@@ -81,16 +95,25 @@ const uint32_t C_ACT_ALLOW         = SCMP_ACT_ALLOW;
 
 // The libseccomp SCMP_FLTATR_CTL_LOG member of the scmp_filter_attr enum was
 // added in v2.4.0
-#if (SCMP_VER_MAJOR < 2) || \
-    (SCMP_VER_MAJOR == 2 && SCMP_VER_MINOR < 4)
+#if SCMP_VER_MAJOR == 2 && SCMP_VER_MINOR < 4
 #define SCMP_FLTATR_CTL_LOG _SCMP_FLTATR_MIN
 #endif
 
-const uint32_t C_ATTRIBUTE_DEFAULT = (uint32_t)SCMP_FLTATR_ACT_DEFAULT;
-const uint32_t C_ATTRIBUTE_BADARCH = (uint32_t)SCMP_FLTATR_ACT_BADARCH;
-const uint32_t C_ATTRIBUTE_NNP     = (uint32_t)SCMP_FLTATR_CTL_NNP;
-const uint32_t C_ATTRIBUTE_TSYNC   = (uint32_t)SCMP_FLTATR_CTL_TSYNC;
-const uint32_t C_ATTRIBUTE_LOG     = (uint32_t)SCMP_FLTATR_CTL_LOG;
+// The following SCMP_FLTATR_*  were added in libseccomp v2.5.0.
+#if SCMP_VER_MAJOR == 2 && SCMP_VER_MINOR < 5
+#define SCMP_FLTATR_CTL_SSB      _SCMP_FLTATR_MIN
+#define SCMP_FLTATR_CTL_OPTIMIZE _SCMP_FLTATR_MIN
+#define SCMP_FLTATR_API_SYSRAWRC _SCMP_FLTATR_MIN
+#endif
+
+const uint32_t C_ATTRIBUTE_DEFAULT  = (uint32_t)SCMP_FLTATR_ACT_DEFAULT;
+const uint32_t C_ATTRIBUTE_BADARCH  = (uint32_t)SCMP_FLTATR_ACT_BADARCH;
+const uint32_t C_ATTRIBUTE_NNP      = (uint32_t)SCMP_FLTATR_CTL_NNP;
+const uint32_t C_ATTRIBUTE_TSYNC    = (uint32_t)SCMP_FLTATR_CTL_TSYNC;
+const uint32_t C_ATTRIBUTE_LOG      = (uint32_t)SCMP_FLTATR_CTL_LOG;
+const uint32_t C_ATTRIBUTE_SSB      = (uint32_t)SCMP_FLTATR_CTL_SSB;
+const uint32_t C_ATTRIBUTE_OPTIMIZE = (uint32_t)SCMP_FLTATR_CTL_OPTIMIZE;
+const uint32_t C_ATTRIBUTE_SYSRAWRC = (uint32_t)SCMP_FLTATR_API_SYSRAWRC;
 
 const int      C_CMP_NE            = (int)SCMP_CMP_NE;
 const int      C_CMP_LT            = (int)SCMP_CMP_LT;
@@ -137,8 +160,7 @@ unsigned int get_micro_version()
 #endif
 
 // The libseccomp API level functions were added in v2.4.0
-#if (SCMP_VER_MAJOR < 2) || \
-    (SCMP_VER_MAJOR == 2 && SCMP_VER_MINOR < 4)
+#if SCMP_VER_MAJOR == 2 && SCMP_VER_MINOR < 4
 const unsigned int seccomp_api_get(void)
 {
 	// libseccomp-golang requires libseccomp v2.2.0, at a minimum, which
@@ -179,6 +201,50 @@ void add_struct_arg_cmp(
 
         return;
 }
+
+// The seccomp notify API functions were added in v2.5.0
+#if SCMP_VER_MAJOR == 2 && SCMP_VER_MINOR < 5
+
+struct seccomp_data {
+	int nr;
+	__u32 arch;
+	__u64 instruction_pointer;
+	__u64 args[6];
+};
+
+struct seccomp_notif {
+	__u64 id;
+	__u32 pid;
+	__u32 flags;
+	struct seccomp_data data;
+};
+
+struct seccomp_notif_resp {
+	__u64 id;
+	__s64 val;
+	__s32 error;
+	__u32 flags;
+};
+
+int seccomp_notify_alloc(struct seccomp_notif **req, struct seccomp_notif_resp **resp) {
+	return -EOPNOTSUPP;
+}
+int seccomp_notify_fd(const scmp_filter_ctx ctx) {
+	return -EOPNOTSUPP;
+}
+void seccomp_notify_free(struct seccomp_notif *req, struct seccomp_notif_resp *resp) {
+}
+int seccomp_notify_id_valid(int fd, uint64_t id) {
+	return -EOPNOTSUPP;
+}
+int seccomp_notify_receive(int fd, struct seccomp_notif *req) {
+	return -EOPNOTSUPP;
+}
+int seccomp_notify_respond(int fd, struct seccomp_notif_resp *resp) {
+	return -EOPNOTSUPP;
+}
+
+#endif
 */
 import "C"
 
@@ -189,10 +255,13 @@ type scmpFilterAttr uint32
 
 const (
 	filterAttrActDefault scmpFilterAttr = iota
-	filterAttrActBadArch scmpFilterAttr = iota
-	filterAttrNNP        scmpFilterAttr = iota
-	filterAttrTsync      scmpFilterAttr = iota
-	filterAttrLog        scmpFilterAttr = iota
+	filterAttrActBadArch
+	filterAttrNNP
+	filterAttrTsync
+	filterAttrLog
+	filterAttrSSB
+	filterAttrOptimize
+	filterAttrRawRC
 )
 
 const (
@@ -200,18 +269,19 @@ const (
 	scmpError C.int = -1
 	// Comparison boundaries to check for architecture validity
 	archStart ScmpArch = ArchNative
-	archEnd   ScmpArch = ArchS390X
+	archEnd   ScmpArch = ArchRISCV64
 	// Comparison boundaries to check for action validity
-	actionStart ScmpAction = ActKill
-	actionEnd   ScmpAction = ActLog
+	actionStart ScmpAction = ActKillThread
+	actionEnd   ScmpAction = ActKillProcess
 	// Comparison boundaries to check for comparison operator validity
 	compareOpStart ScmpCompareOp = CompareNotEqual
 	compareOpEnd   ScmpCompareOp = CompareMaskedEqual
 )
 
 var (
-	// Error thrown on bad filter context
-	errBadFilter = fmt.Errorf("filter is invalid or uninitialized")
+	// errBadFilter is thrown on bad filter context.
+	errBadFilter = errors.New("filter is invalid or uninitialized")
+	errDefAction = errors.New("requested action matches default action of filter")
 	// Constants representing library major, minor, and micro versions
 	verMajor = uint(C.get_major_version())
 	verMinor = uint(C.get_minor_version())
@@ -220,19 +290,28 @@ var (
 
 // Nonexported functions
 
-// Check if library version is greater than or equal to the given one
-func checkVersionAbove(major, minor, micro uint) bool {
-	return (verMajor > major) ||
+// checkVersion returns an error if the libseccomp version being used
+// is less than the one specified by major, minor, and micro arguments.
+// Argument op is an arbitrary non-empty operation description, which
+// is used as a part of the error message returned.
+//
+// Most users should use checkAPI instead.
+func checkVersion(op string, major, minor, micro uint) error {
+	if (verMajor > major) ||
 		(verMajor == major && verMinor > minor) ||
-		(verMajor == major && verMinor == minor && verMicro >= micro)
+		(verMajor == major && verMinor == minor && verMicro >= micro) {
+		return nil
+	}
+	return &VersionError{
+		op:    op,
+		major: major,
+		minor: minor,
+		micro: micro,
+	}
 }
 
-// Ensure that the library is supported, i.e. >= 2.2.0.
 func ensureSupportedVersion() error {
-	if !checkVersionAbove(2, 2, 0) {
-		return VersionError{}
-	}
-	return nil
+	return checkVersion("seccomp", 2, 3, 1)
 }
 
 // Get the API level
@@ -316,14 +395,19 @@ func (f *ScmpFilter) addRuleWrapper(call ScmpSyscall, action ScmpAction, exact b
 		retCode = C.seccomp_rule_add_array(f.filterCtx, action.toNative(), C.int(call), length, cond)
 	}
 
-	if syscall.Errno(-1*retCode) == syscall.EFAULT {
-		return fmt.Errorf("unrecognized syscall %#x", int32(call))
-	} else if syscall.Errno(-1*retCode) == syscall.EPERM {
-		return fmt.Errorf("requested action matches default action of filter")
-	} else if syscall.Errno(-1*retCode) == syscall.EINVAL {
-		return fmt.Errorf("two checks on same syscall argument")
-	} else if retCode != 0 {
-		return syscall.Errno(-1 * retCode)
+	if retCode != 0 {
+		switch e := errRc(retCode); e {
+		case syscall.EFAULT:
+			return fmt.Errorf("unrecognized syscall %#x", int32(call))
+		// libseccomp >= v2.5.0 returns EACCES, older versions return EPERM.
+		// TODO: remove EPERM once libseccomp < v2.5.0 is not supported.
+		case syscall.EPERM, syscall.EACCES:
+			return errDefAction
+		case syscall.EINVAL:
+			return fmt.Errorf("two checks on same syscall argument")
+		default:
+			return e
+		}
 	}
 
 	return nil
@@ -343,14 +427,6 @@ func (f *ScmpFilter) addRuleGeneric(call ScmpSyscall, action ScmpAction, exact b
 			return err
 		}
 	} else {
-		// We don't support conditional filtering in library version v2.1
-		if !checkVersionAbove(2, 2, 1) {
-			return VersionError{
-				message: "conditional filtering is not supported",
-				minimum: "2.2.1",
-			}
-		}
-
 		argsArr := C.make_arg_cmp_array(C.uint(len(conds)))
 		if argsArr == nil {
 			return fmt.Errorf("error allocating memory for conditions")
@@ -443,6 +519,12 @@ func archFromNative(a C.uint32_t) (ScmpArch, error) {
 		return ArchS390, nil
 	case C.C_ARCH_S390X:
 		return ArchS390X, nil
+	case C.C_ARCH_PARISC:
+		return ArchPARISC, nil
+	case C.C_ARCH_PARISC64:
+		return ArchPARISC64, nil
+	case C.C_ARCH_RISCV64:
+		return ArchRISCV64, nil
 	default:
 		return 0x0, fmt.Errorf("unrecognized architecture %#x", uint32(a))
 	}
@@ -483,6 +565,12 @@ func (a ScmpArch) toNative() C.uint32_t {
 		return C.C_ARCH_S390
 	case ArchS390X:
 		return C.C_ARCH_S390X
+	case ArchPARISC:
+		return C.C_ARCH_PARISC
+	case ArchPARISC64:
+		return C.C_ARCH_PARISC64
+	case ArchRISCV64:
+		return C.C_ARCH_RISCV64
 	case ArchNative:
 		return C.C_ARCH_NATIVE
 	default:
@@ -515,8 +603,10 @@ func (a ScmpCompareOp) toNative() C.int {
 func actionFromNative(a C.uint32_t) (ScmpAction, error) {
 	aTmp := a & 0xFFFF
 	switch a & 0xFFFF0000 {
-	case C.C_ACT_KILL:
-		return ActKill, nil
+	case C.C_ACT_KILL_PROCESS:
+		return ActKillProcess, nil
+	case C.C_ACT_KILL_THREAD:
+		return ActKillThread, nil
 	case C.C_ACT_TRAP:
 		return ActTrap, nil
 	case C.C_ACT_ERRNO:
@@ -535,8 +625,10 @@ func actionFromNative(a C.uint32_t) (ScmpAction, error) {
 // Only use with sanitized actions, no error handling
 func (a ScmpAction) toNative() C.uint32_t {
 	switch a & 0xFFFF {
-	case ActKill:
-		return C.C_ACT_KILL
+	case ActKillProcess:
+		return C.C_ACT_KILL_PROCESS
+	case ActKillThread:
+		return C.C_ACT_KILL_THREAD
 	case ActTrap:
 		return C.C_ACT_TRAP
 	case ActErrno:
@@ -565,7 +657,197 @@ func (a scmpFilterAttr) toNative() uint32 {
 		return uint32(C.C_ATTRIBUTE_TSYNC)
 	case filterAttrLog:
 		return uint32(C.C_ATTRIBUTE_LOG)
+	case filterAttrSSB:
+		return uint32(C.C_ATTRIBUTE_SSB)
+	case filterAttrOptimize:
+		return uint32(C.C_ATTRIBUTE_OPTIMIZE)
+	case filterAttrRawRC:
+		return uint32(C.C_ATTRIBUTE_SYSRAWRC)
 	default:
 		return 0x0
 	}
+}
+
+func syscallFromNative(a C.int) ScmpSyscall {
+	return ScmpSyscall(a)
+}
+
+func notifReqFromNative(req *C.struct_seccomp_notif) (*ScmpNotifReq, error) {
+	scmpArgs := make([]uint64, 6)
+	for i := 0; i < len(scmpArgs); i++ {
+		scmpArgs[i] = uint64(req.data.args[i])
+	}
+
+	arch, err := archFromNative(req.data.arch)
+	if err != nil {
+		return nil, err
+	}
+
+	scmpData := ScmpNotifData{
+		Syscall:      syscallFromNative(req.data.nr),
+		Arch:         arch,
+		InstrPointer: uint64(req.data.instruction_pointer),
+		Args:         scmpArgs,
+	}
+
+	scmpReq := &ScmpNotifReq{
+		ID:    uint64(req.id),
+		Pid:   uint32(req.pid),
+		Flags: uint32(req.flags),
+		Data:  scmpData,
+	}
+
+	return scmpReq, nil
+}
+
+func (scmpResp *ScmpNotifResp) toNative(resp *C.struct_seccomp_notif_resp) {
+	resp.id = C.__u64(scmpResp.ID)
+	resp.val = C.__s64(scmpResp.Val)
+	resp.error = (C.__s32(scmpResp.Error) * -1) // kernel requires a negated value
+	resp.flags = C.__u32(scmpResp.Flags)
+}
+
+// checkAPI checks that both the API level and the seccomp version is equal to
+// or greater than the specified minLevel and major, minor, micro,
+// respectively, and returns an error otherwise. Argument op is an arbitrary
+// non-empty operation description, used as a part of the error message
+// returned.
+func checkAPI(op string, minLevel uint, major, minor, micro uint) error {
+	// Ignore error from getAPI, as it returns level == 0 in case of error.
+	level, _ := getAPI()
+	if level >= minLevel {
+		return checkVersion(op, major, minor, micro)
+	}
+	return &VersionError{
+		op:     op,
+		curAPI: level,
+		minAPI: minLevel,
+		major:  major,
+		minor:  minor,
+		micro:  micro,
+	}
+}
+
+// Userspace Notification API
+// Calls to C.seccomp_notify* hidden from seccomp.go
+
+func notifSupported() error {
+	return checkAPI("seccomp notification", 6, 2, 5, 0)
+}
+
+func (f *ScmpFilter) getNotifFd() (ScmpFd, error) {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	if !f.valid {
+		return -1, errBadFilter
+	}
+	if err := notifSupported(); err != nil {
+		return -1, err
+	}
+
+	fd := C.seccomp_notify_fd(f.filterCtx)
+
+	return ScmpFd(fd), nil
+}
+
+func notifReceive(fd ScmpFd) (*ScmpNotifReq, error) {
+	var req *C.struct_seccomp_notif
+	var resp *C.struct_seccomp_notif_resp
+
+	if err := notifSupported(); err != nil {
+		return nil, err
+	}
+
+	// we only use the request here; the response is unused
+	if retCode := C.seccomp_notify_alloc(&req, &resp); retCode != 0 {
+		return nil, errRc(retCode)
+	}
+
+	defer func() {
+		C.seccomp_notify_free(req, resp)
+	}()
+
+	for {
+		retCode, errno := C.seccomp_notify_receive(C.int(fd), req)
+		if retCode == 0 {
+			break
+		}
+
+		if errno == syscall.EINTR {
+			continue
+		}
+
+		if errno == syscall.ENOENT {
+			return nil, errno
+		}
+
+		return nil, errRc(retCode)
+	}
+
+	return notifReqFromNative(req)
+}
+
+func notifRespond(fd ScmpFd, scmpResp *ScmpNotifResp) error {
+	var req *C.struct_seccomp_notif
+	var resp *C.struct_seccomp_notif_resp
+
+	if err := notifSupported(); err != nil {
+		return err
+	}
+
+	// we only use the response here; the request is discarded
+	if retCode := C.seccomp_notify_alloc(&req, &resp); retCode != 0 {
+		return errRc(retCode)
+	}
+
+	defer func() {
+		C.seccomp_notify_free(req, resp)
+	}()
+
+	scmpResp.toNative(resp)
+
+	for {
+		retCode, errno := C.seccomp_notify_respond(C.int(fd), resp)
+		if retCode == 0 {
+			break
+		}
+
+		if errno == syscall.EINTR {
+			continue
+		}
+
+		if errno == syscall.ENOENT {
+			return errno
+		}
+
+		return errRc(retCode)
+	}
+
+	return nil
+}
+
+func notifIDValid(fd ScmpFd, id uint64) error {
+	if err := notifSupported(); err != nil {
+		return err
+	}
+
+	for {
+		retCode, errno := C.seccomp_notify_id_valid(C.int(fd), C.uint64_t(id))
+		if retCode == 0 {
+			break
+		}
+
+		if errno == syscall.EINTR {
+			continue
+		}
+
+		if errno == syscall.ENOENT {
+			return errno
+		}
+
+		return errRc(retCode)
+	}
+
+	return nil
 }

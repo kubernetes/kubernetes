@@ -18,7 +18,7 @@ require (
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.0
-	golang.org/x/net v0.7.0
+	golang.org/x/net v0.8.0
 	gopkg.in/inf.v0 v0.9.1
 	k8s.io/klog/v2 v2.30.0
 	k8s.io/kube-openapi v0.0.0-20211115234752-e816edb12b65
@@ -39,7 +39,7 @@ require (
 	github.com/onsi/gomega v1.10.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	golang.org/x/text v0.7.0 // indirect
+	golang.org/x/text v0.8.0 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	google.golang.org/protobuf v1.27.1 // indirect
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect

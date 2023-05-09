@@ -15,13 +15,16 @@ type syncType string
 // during container setup. They come in pairs (with procError being a generic
 // response which is followed by a &genericError).
 //
-// [  child  ] <-> [   parent   ]
+//	[  child  ] <-> [   parent   ]
 //
-// procHooks   --> [run hooks]
-//             <-- procResume
+//	procHooks   --> [run hooks]
+//	            <-- procResume
 //
-// procReady   --> [final setup]
-//             <-- procRun
+//	procReady   --> [final setup]
+//	            <-- procRun
+//
+//	procSeccomp --> [pick up seccomp fd with pidfd_getfd()]
+//	            <-- procSeccompDone
 const (
 	procError  syncType = "procError"
 	procReady  syncType = "procReady"

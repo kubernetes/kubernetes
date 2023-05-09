@@ -8,7 +8,7 @@ require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/googleapis/gnostic v0.5.5
 	github.com/spf13/pflag v1.0.5
-	golang.org/x/tools v0.1.12
+	golang.org/x/tools v0.6.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/gengo v0.0.0-20210813121822-485abfe95c7c
 	k8s.io/klog/v2 v2.30.0
@@ -32,10 +32,10 @@ require (
 	github.com/onsi/ginkgo v1.14.0 // indirect
 	github.com/onsi/gomega v1.10.1 // indirect
 	github.com/stretchr/testify v1.8.0 // indirect
-	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
-	golang.org/x/net v0.7.0 // indirect
-	golang.org/x/sys v0.5.0 // indirect
-	golang.org/x/text v0.7.0 // indirect
+	golang.org/x/mod v0.8.0 // indirect
+	golang.org/x/net v0.8.0 // indirect
+	golang.org/x/sys v0.6.0 // indirect
+	golang.org/x/text v0.8.0 // indirect
 	google.golang.org/protobuf v1.27.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect

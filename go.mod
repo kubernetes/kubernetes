@@ -57,9 +57,8 @@ require (
 	github.com/mvdan/xurls v1.1.0
 	github.com/onsi/ginkgo v1.14.0
 	github.com/onsi/gomega v1.10.1
-	github.com/opencontainers/go-digest v1.0.0
-	github.com/opencontainers/runc v1.0.2
-	github.com/opencontainers/selinux v1.8.2
+	github.com/opencontainers/runc v1.1.6
+	github.com/opencontainers/selinux v1.10.0
 	github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/prometheus/client_golang v1.11.0
@@ -80,13 +79,13 @@ require (
 	go.opentelemetry.io/otel/trace v0.20.0
 	go.opentelemetry.io/proto/otlp v0.7.0
 	golang.org/x/crypto v0.0.0-20220214200702-86341886e292
-	golang.org/x/net v0.7.0
+	golang.org/x/net v0.8.0
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
-	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
-	golang.org/x/sys v0.5.0
-	golang.org/x/term v0.5.0
+	golang.org/x/sync v0.1.0
+	golang.org/x/sys v0.6.0
+	golang.org/x/term v0.6.0
 	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8
-	golang.org/x/tools v0.1.12
+	golang.org/x/tools v0.6.0
 	gonum.org/v1/gonum v0.6.2
 	google.golang.org/api v0.46.0
 	google.golang.org/genproto v0.0.0-20210831024726-fe130286e0e2
@@ -218,9 +217,8 @@ require (
 	github.com/prometheus/procfs v0.6.0 // indirect
 	github.com/rubiojr/go-vhd v0.0.0-20200706105327-02e210299021 // indirect
 	github.com/russross/blackfriday v1.5.2 // indirect
-	github.com/russross/blackfriday/v2 v2.0.1 // indirect
-	github.com/seccomp/libseccomp-golang v0.9.1 // indirect
-	github.com/shurcooL/sanitized_anchor_name v1.0.0 // indirect
+	github.com/russross/blackfriday/v2 v2.1.0 // indirect
+	github.com/seccomp/libseccomp-golang v0.9.2-0.20220502022130-f33da4d89646 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/soheilhy/cmux v0.1.5 // indirect
 	github.com/stoewer/go-strcase v1.2.0 // indirect
@@ -250,8 +248,8 @@ require (
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.19.0 // indirect
 	golang.org/x/exp v0.0.0-20210220032938-85be41e4509f // indirect
-	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
-	golang.org/x/text v0.7.0 // indirect
+	golang.org/x/mod v0.8.0 // indirect
+	golang.org/x/text v0.8.0 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	gonum.org/v1/netlib v0.0.0-20190331212654-76723241ea4e // indirect
 	google.golang.org/appengine v1.6.7 // indirect
@@ -497,8 +495,8 @@ replace (
 	github.com/onsi/ginkgo => github.com/onsi/ginkgo v1.14.0
 	github.com/onsi/gomega => github.com/onsi/gomega v1.10.1
 	github.com/opencontainers/go-digest => github.com/opencontainers/go-digest v1.0.0
-	github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.0.1
-	github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.2
+	github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.0.2
+	github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.6
 	github.com/opencontainers/runtime-spec => github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417
 	github.com/opencontainers/selinux => github.com/opencontainers/selinux v1.8.2
 	github.com/opentracing/opentracing-go => github.com/opentracing/opentracing-go v1.1.0
@@ -521,10 +519,8 @@ replace (
 	github.com/rogpeppe/go-internal => github.com/rogpeppe/go-internal v1.3.0
 	github.com/rubiojr/go-vhd => github.com/rubiojr/go-vhd v0.0.0-20200706105327-02e210299021
 	github.com/russross/blackfriday => github.com/russross/blackfriday v1.5.2
-	github.com/russross/blackfriday/v2 => github.com/russross/blackfriday/v2 v2.0.1
-	github.com/ryanuber/columnize => github.com/ryanuber/columnize v0.0.0-20160712163229-9b3edd62028f
-	github.com/sean-/seed => github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529
-	github.com/seccomp/libseccomp-golang => github.com/seccomp/libseccomp-golang v0.9.1
+	github.com/russross/blackfriday/v2 => github.com/russross/blackfriday/v2 v2.1.0
+	github.com/seccomp/libseccomp-golang => github.com/seccomp/libseccomp-golang v0.9.2-0.20220502022130-f33da4d89646
 	github.com/sergi/go-diff => github.com/sergi/go-diff v1.1.0
 	github.com/shurcooL/sanitized_anchor_name => github.com/shurcooL/sanitized_anchor_name v1.0.0
 	github.com/sirupsen/logrus => github.com/sirupsen/logrus v1.8.1
@@ -584,15 +580,15 @@ replace (
 	golang.org/x/image => golang.org/x/image v0.0.0-20190802002840-cff245a6509b
 	golang.org/x/lint => golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
 	golang.org/x/mobile => golang.org/x/mobile v0.0.0-20201217150744-e6ae53a27f4f
-	golang.org/x/mod => golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4
-	golang.org/x/net => golang.org/x/net v0.7.0
+	golang.org/x/mod => golang.org/x/mod v0.8.0
+	golang.org/x/net => golang.org/x/net v0.8.0
 	golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
-	golang.org/x/sync => golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
-	golang.org/x/sys => golang.org/x/sys v0.5.0
-	golang.org/x/term => golang.org/x/term v0.5.0
-	golang.org/x/text => golang.org/x/text v0.7.0
+	golang.org/x/sync => golang.org/x/sync v0.1.0
+	golang.org/x/sys => golang.org/x/sys v0.6.0
+	golang.org/x/term => golang.org/x/term v0.6.0
+	golang.org/x/text => golang.org/x/text v0.8.0
 	golang.org/x/time => golang.org/x/time v0.0.0-20220210224613-90d013bbcef8
-	golang.org/x/tools => golang.org/x/tools v0.1.12
+	golang.org/x/tools => golang.org/x/tools v0.6.0
 	golang.org/x/xerrors => golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
 	gonum.org/v1/gonum => gonum.org/v1/gonum v0.6.2
 	gonum.org/v1/netlib => gonum.org/v1/netlib v0.0.0-20190331212654-76723241ea4e

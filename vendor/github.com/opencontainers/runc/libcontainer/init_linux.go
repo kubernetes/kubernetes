@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 package libcontainer
@@ -381,8 +382,9 @@ func fixStdioPermissions(config *initConfig, u *user.ExecUser) error {
 			return err
 		}
 
-		// Skip chown of /dev/null if it was used as one of the STDIO fds.
-		if s.Rdev == null.Rdev {
+		// Skip chown if uid is already the one we want or any of the STDIO descriptors
+		// were redirected to /dev/null.
+		if int(s.Uid) == u.Uid || s.Rdev == null.Rdev {
 			continue
 		}
 

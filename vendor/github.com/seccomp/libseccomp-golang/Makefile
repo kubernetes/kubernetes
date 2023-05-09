@@ -4,7 +4,7 @@
 
 all: check-build
 
-check: vet test
+check: lint test
 
 check-build:
 	go build
@@ -16,11 +16,10 @@ fix-syntax:
 	gofmt -w .
 
 vet:
-	go vet -v
+	go vet -v ./...
 
 test:
 	go test -v
 
 lint:
-	@$(if $(shell which golint),true,$(error "install golint and include it in your PATH"))
-	golint -set_exit_status
+	golangci-lint run .
