@@ -145,7 +145,7 @@ func NewTestFieldManagerImpl(typeConverter managedfields.TypeConverter, gvk sche
 						internal.NewManagedFieldsUpdater(
 							internal.NewStripMetaManager(f),
 						), gvk.GroupVersion(), subresource,
-					), &FakeObjectCreater{}, gvk, internal.DefaultTrackOnCreateProbability,
+					), &FakeObjectCreater{}, internal.DefaultTrackOnCreateProbability,
 				), typeConverter, &FakeObjectConvertor{}, gvk.GroupVersion(),
 			),
 		), gvk,

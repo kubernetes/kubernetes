@@ -66,7 +66,7 @@ func NewDefaultFieldManager(f Manager, typeConverter TypeConverter, objectConver
 									NewStripMetaManager(f),
 								), kind.GroupVersion(), subresource,
 							), DefaultMaxUpdateManagers,
-						), objectCreater, kind, DefaultTrackOnCreateProbability,
+						), objectCreater, DefaultTrackOnCreateProbability,
 					), typeConverter, objectConverter, kind.GroupVersion(),
 				),
 			), kind,
