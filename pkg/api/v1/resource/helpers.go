@@ -67,7 +67,9 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 				if pod.Status.Resize == v1.PodResizeStatusInfeasible {
 					containerReqs = cs.AllocatedResources
 				} else {
-					containerReqs = max(container.Resources.Requests, cs.AllocatedResources)
+					if cs.Resources != nil {
+						containerReqs = max(container.Resources.Requests, cs.Resources.Requests)
+					}
 				}
 			}
 		}
