@@ -354,10 +354,7 @@ func (rc *ResourceConsumer) makeConsumeCustomMetric(ctx context.Context) {
 }
 
 func (rc *ResourceConsumer) sendConsumeCPURequest(ctx context.Context, millicores int) {
-	ctx, cancel := context.WithTimeout(ctx, framework.SingleCallTimeout)
-	defer cancel()
-
-	err := wait.PollImmediateWithContext(ctx, serviceInitializationInterval, serviceInitializationTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, serviceInitializationInterval, serviceInitializationTimeout, true, func(ctx context.Context) (bool, error) {
 		proxyRequest, err := e2eservice.GetServicesProxyRequest(rc.clientSet, rc.clientSet.CoreV1().RESTClient().Post())
 		framework.ExpectNoError(err)
 		req := proxyRequest.Namespace(rc.nsName).
@@ -375,15 +372,18 @@ func (rc *ResourceConsumer) sendConsumeCPURequest(ctx context.Context, millicore
 		return true, nil
 	})
 
+	// Test has already finished (ctx got canceled), so don't fail on err from PollUntilContextTimeout
+	// which is a side-effect to context cancelling from the cleanup task.
+	if ctx.Err() != nil {
+		return
+	}
+
 	framework.ExpectNoError(err)
 }
 
 // sendConsumeMemRequest sends POST request for memory consumption
 func (rc *ResourceConsumer) sendConsumeMemRequest(ctx context.Context, megabytes int) {
-	ctx, cancel := context.WithTimeout(ctx, framework.SingleCallTimeout)
-	defer cancel()
-
-	err := wait.PollImmediateWithContext(ctx, serviceInitializationInterval, serviceInitializationTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, serviceInitializationInterval, serviceInitializationTimeout, true, func(ctx context.Context) (bool, error) {
 		proxyRequest, err := e2eservice.GetServicesProxyRequest(rc.clientSet, rc.clientSet.CoreV1().RESTClient().Post())
 		framework.ExpectNoError(err)
 		req := proxyRequest.Namespace(rc.nsName).
@@ -401,15 +401,18 @@ func (rc *ResourceConsumer) sendConsumeMemRequest(ctx context.Context, megabytes
 		return true, nil
 	})
 
+	// Test has already finished (ctx got canceled), so don't fail on err from PollUntilContextTimeout
+	// which is a side-effect to context cancelling from the cleanup task.
+	if ctx.Err() != nil {
+		return
+	}
+
 	framework.ExpectNoError(err)
 }
 
 // sendConsumeCustomMetric sends POST request for custom metric consumption
 func (rc *ResourceConsumer) sendConsumeCustomMetric(ctx context.Context, delta int) {
-	ctx, cancel := context.WithTimeout(ctx, framework.SingleCallTimeout)
-	defer cancel()
-
-	err := wait.PollImmediateWithContext(ctx, serviceInitializationInterval, serviceInitializationTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, serviceInitializationInterval, serviceInitializationTimeout, true, func(ctx context.Context) (bool, error) {
 		proxyRequest, err := e2eservice.GetServicesProxyRequest(rc.clientSet, rc.clientSet.CoreV1().RESTClient().Post())
 		framework.ExpectNoError(err)
 		req := proxyRequest.Namespace(rc.nsName).
@@ -427,6 +430,13 @@ func (rc *ResourceConsumer) sendConsumeCustomMetric(ctx context.Context, delta i
 		}
 		return true, nil
 	})
+
+	// Test has already finished (ctx got canceled), so don't fail on err from PollUntilContextTimeout
+	// which is a side-effect to context cancelling from the cleanup task.
+	if ctx.Err() != nil {
+		return
+	}
+
 	framework.ExpectNoError(err)
 }
 

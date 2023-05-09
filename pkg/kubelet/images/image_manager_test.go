@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
+	crierrors "k8s.io/cri-api/pkg/errors"
 	. "k8s.io/kubernetes/pkg/kubelet/container"
 	ctest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	testingclock "k8s.io/utils/clock/testing"
@@ -412,4 +413,47 @@ func TestMaxParallelImagePullsLimit(t *testing.T) {
 
 	wg.Wait()
 	fakeRuntime.AssertCallCounts("PullImage", 7)
+}
+
+func TestEvalCRIPullErr(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name   string
+		input  error
+		assert func(string, error)
+	}{
+		{
+			name:  "fallback error",
+			input: errors.New("test"),
+			assert: func(msg string, err error) {
+				assert.ErrorIs(t, err, ErrImagePull)
+				assert.Contains(t, msg, "test")
+			},
+		},
+		{
+			name:  "registry is unavailable",
+			input: crierrors.ErrRegistryUnavailable,
+			assert: func(msg string, err error) {
+				assert.ErrorIs(t, err, crierrors.ErrRegistryUnavailable)
+				assert.Contains(t, msg, "registry is unavailable")
+			},
+		},
+		{
+			name:  "signature is invalid",
+			input: crierrors.ErrSignatureValidationFailed,
+			assert: func(msg string, err error) {
+				assert.ErrorIs(t, err, crierrors.ErrSignatureValidationFailed)
+				assert.Contains(t, msg, "signature validation failed")
+			},
+		},
+	} {
+		testInput := tc.input
+		testAssert := tc.assert
+
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			msg, err := evalCRIPullErr(&v1.Container{}, testInput)
+			testAssert(msg, err)
+		})
+	}
 }

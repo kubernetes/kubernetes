@@ -152,7 +152,10 @@ func (pl *PodTopologySpread) PreFilter(ctx context.Context, cycleState *framewor
 	s, err := pl.calPreFilterState(ctx, pod)
 	if err != nil {
 		return nil, framework.AsStatus(err)
+	} else if s != nil && len(s.Constraints) == 0 {
+		return nil, framework.NewStatus(framework.Skip)
 	}
+
 	cycleState.Write(preFilterStateKey, s)
 	return nil, nil
 }
@@ -236,11 +239,8 @@ func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error
 
 // calPreFilterState computes preFilterState describing how pods are spread on topologies.
 func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod) (*preFilterState, error) {
-	allNodes, err := pl.sharedLister.NodeInfos().List()
-	if err != nil {
-		return nil, fmt.Errorf("listing NodeInfos: %w", err)
-	}
 	var constraints []topologySpreadConstraint
+	var err error
 	if len(pod.Spec.TopologySpreadConstraints) > 0 {
 		// We have feature gating in APIServer to strip the spec
 		// so don't need to re-check feature gate, just check length of Constraints.
@@ -260,6 +260,11 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod)
 	}
 	if len(constraints) == 0 {
 		return &preFilterState{}, nil
+	}
+
+	allNodes, err := pl.sharedLister.NodeInfos().List()
+	if err != nil {
+		return nil, fmt.Errorf("listing NodeInfos: %w", err)
 	}
 
 	s := preFilterState{

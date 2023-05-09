@@ -17,7 +17,6 @@ limitations under the License.
 package scoring
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -95,7 +94,7 @@ func initTestSchedulerForPriorityTest(t *testing.T, scorePluginName string) *tes
 		0,
 		scheduler.WithProfiles(cfg.Profiles...),
 	)
-	testutils.SyncInformerFactory(testCtx)
+	testutils.SyncSchedulerInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 	return testCtx
 }
@@ -131,7 +130,7 @@ func initTestSchedulerForNodeResourcesTest(t *testing.T) *testutils.TestContext 
 		0,
 		scheduler.WithProfiles(cfg.Profiles...),
 	)
-	testutils.SyncInformerFactory(testCtx)
+	testutils.SyncSchedulerInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 	return testCtx
 }
@@ -140,7 +139,6 @@ func initTestSchedulerForNodeResourcesTest(t *testing.T) *testutils.TestContext 
 // works correctly.
 func TestNodeResourcesScoring(t *testing.T) {
 	testCtx := initTestSchedulerForNodeResourcesTest(t)
-	defer testutils.CleanupTest(t, testCtx)
 	// Add a few nodes.
 	_, err := createAndWaitForNodesInCache(testCtx, "testnode", st.MakeNode().Capacity(
 		map[v1.ResourceName]string{
@@ -204,7 +202,6 @@ func TestNodeResourcesScoring(t *testing.T) {
 // works correctly.
 func TestNodeAffinityScoring(t *testing.T) {
 	testCtx := initTestSchedulerForPriorityTest(t, nodeaffinity.Name)
-	defer testutils.CleanupTest(t, testCtx)
 	// Add a few nodes.
 	_, err := createAndWaitForNodesInCache(testCtx, "testnode", st.MakeNode(), 4)
 	if err != nil {
@@ -324,7 +321,6 @@ func TestPodAffinityScoring(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			testCtx := initTestSchedulerForPriorityTest(t, interpodaffinity.Name)
-			defer testutils.CleanupTest(t, testCtx)
 			// Add a few nodes.
 			nodesInTopology, err := createAndWaitForNodesInCache(testCtx, "in-topology", st.MakeNode().Label(topologyKey, topologyValue), 5)
 			if err != nil {
@@ -369,7 +365,6 @@ func TestPodAffinityScoring(t *testing.T) {
 // works correctly, i.e., the pod gets scheduled to the node where its container images are ready.
 func TestImageLocalityScoring(t *testing.T) {
 	testCtx := initTestSchedulerForPriorityTest(t, imagelocality.Name)
-	defer testutils.CleanupTest(t, testCtx)
 
 	// Create a node with the large image.
 	// We use a fake large image as the test image used by the pod, which has
@@ -602,7 +597,6 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpread, tt.enableMatchLabelKeys)()
 
 			testCtx := initTestSchedulerForPriorityTest(t, podtopologyspread.Name)
-			defer testutils.CleanupTest(t, testCtx)
 			cs := testCtx.ClientSet
 			ns := testCtx.NS.Name
 
@@ -619,9 +613,9 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 			tt.incomingPod.SetNamespace(ns)
 
 			allPods := append(tt.existingPods, tt.incomingPod)
-			defer testutils.CleanupPods(cs, t, allPods)
+			defer testutils.CleanupPods(testCtx.Ctx, cs, t, allPods)
 			for _, pod := range tt.existingPods {
-				createdPod, err := cs.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
+				createdPod, err := cs.CoreV1().Pods(pod.Namespace).Create(testCtx.Ctx, pod, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("Test Failed: error while creating pod during test: %v", err)
 				}
@@ -631,7 +625,7 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 				}
 			}
 
-			testPod, err := cs.CoreV1().Pods(tt.incomingPod.Namespace).Create(context.TODO(), tt.incomingPod, metav1.CreateOptions{})
+			testPod, err := cs.CoreV1().Pods(tt.incomingPod.Namespace).Create(testCtx.Ctx, tt.incomingPod, metav1.CreateOptions{})
 			if err != nil && !apierrors.IsInvalid(err) {
 				t.Fatalf("Test Failed: error while creating pod during test: %v", err)
 			}
@@ -653,9 +647,6 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 // The setup has 300 nodes over 3 zones.
 func TestDefaultPodTopologySpreadScoring(t *testing.T) {
 	testCtx := initTestSchedulerForPriorityTest(t, podtopologyspread.Name)
-	t.Cleanup(func() {
-		testutils.CleanupTest(t, testCtx)
-	})
 	cs := testCtx.ClientSet
 	ns := testCtx.NS.Name
 

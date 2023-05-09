@@ -779,15 +779,21 @@ func (proxier *Proxier) syncProxyRules() {
 		return
 	}
 
+	tryPartialSync := !proxier.needFullSync && utilfeature.DefaultFeatureGate.Enabled(features.MinimizeIPTablesRestore)
+
 	// Keep track of how long syncs take.
 	start := time.Now()
 	defer func() {
 		metrics.SyncProxyRulesLatency.Observe(metrics.SinceInSeconds(start))
+		if tryPartialSync {
+			metrics.SyncPartialProxyRulesLatency.Observe(metrics.SinceInSeconds(start))
+		} else {
+			metrics.SyncFullProxyRulesLatency.Observe(metrics.SinceInSeconds(start))
+		}
 		klog.V(2).InfoS("SyncProxyRules complete", "elapsed", time.Since(start))
 	}()
 
-	tryPartialSync := !proxier.needFullSync && utilfeature.DefaultFeatureGate.Enabled(features.MinimizeIPTablesRestore)
-	var serviceChanged, endpointsChanged sets.String
+	var serviceChanged, endpointsChanged sets.Set[string]
 	if tryPartialSync {
 		serviceChanged = proxier.serviceChanges.PendingChanges()
 		endpointsChanged = proxier.endpointsChanges.PendingChanges()
@@ -1419,7 +1425,7 @@ func (proxier *Proxier) syncProxyRules() {
 	for addr := range nodeAddresses {
 		if utilproxy.IsZeroCIDR(addr) && isIPv6 == netutils.IsIPv6CIDRString(addr) {
 			// if any of the addresses is zero cidr of this IP family, non-zero IPs can be excluded.
-			nodeAddresses = sets.NewString(addr)
+			nodeAddresses = sets.New[string](addr)
 			break
 		}
 	}

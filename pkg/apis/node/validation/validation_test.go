@@ -134,17 +134,15 @@ func TestValidateOverhead(t *testing.T) {
 	successCase := []struct {
 		Name     string
 		overhead *node.Overhead
-	}{
-		{
-			Name: "Overhead with valid cpu and memory resources",
-			overhead: &node.Overhead{
-				PodFixed: core.ResourceList{
-					core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
-					core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
-				},
+	}{{
+		Name: "Overhead with valid cpu and memory resources",
+		overhead: &node.Overhead{
+			PodFixed: core.ResourceList{
+				core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
+				core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
 			},
 		},
-	}
+	}}
 
 	for _, tc := range successCase {
 		rc := &node.RuntimeClass{
@@ -160,16 +158,14 @@ func TestValidateOverhead(t *testing.T) {
 	errorCase := []struct {
 		Name     string
 		overhead *node.Overhead
-	}{
-		{
-			Name: "Invalid Resources",
-			overhead: &node.Overhead{
-				PodFixed: core.ResourceList{
-					core.ResourceName("my.org"): resource.MustParse("10m"),
-				},
+	}{{
+		Name: "Invalid Resources",
+		overhead: &node.Overhead{
+			PodFixed: core.ResourceList{
+				core.ResourceName("my.org"): resource.MustParse("10m"),
 			},
 		},
-	}
+	}}
 	for _, tc := range errorCase {
 		rc := &node.RuntimeClass{
 			ObjectMeta: metav1.ObjectMeta{Name: "foo"},

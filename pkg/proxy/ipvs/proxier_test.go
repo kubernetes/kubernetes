@@ -36,10 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	netlinktest "k8s.io/kubernetes/pkg/proxy/ipvs/testing"
@@ -1783,7 +1780,7 @@ func TestExternalIPs(t *testing.T) {
 	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
 	svcIP := "10.20.30.41"
 	svcPort := 80
-	svcExternalIPs := sets.NewString("50.60.70.81", "2012::51", "127.0.0.1")
+	svcExternalIPs := sets.New[string]("50.60.70.81", "2012::51", "127.0.0.1")
 	svcPortName := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
 		Port:           "p80",
@@ -1854,7 +1851,7 @@ func TestOnlyLocalExternalIPs(t *testing.T) {
 	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
 	svcIP := "10.20.30.41"
 	svcPort := 80
-	svcExternalIPs := sets.NewString("50.60.70.81", "2012::51", "127.0.0.1")
+	svcExternalIPs := sets.New[string]("50.60.70.81", "2012::51", "127.0.0.1")
 	svcPortName := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
 		Port:           "p80",
@@ -2582,7 +2579,7 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 	// the not-deleted service, because one of it's ServicePorts was deleted.
 	expectedStaleUDPServices := []string{"172.16.55.10", "172.16.55.4", "172.16.55.11", "172.16.55.12"}
 	if len(result.DeletedUDPClusterIPs) != len(expectedStaleUDPServices) {
-		t.Errorf("expected stale UDP services length %d, got %v", len(expectedStaleUDPServices), result.DeletedUDPClusterIPs.List())
+		t.Errorf("expected stale UDP services length %d, got %v", len(expectedStaleUDPServices), result.DeletedUDPClusterIPs.UnsortedList())
 	}
 	for _, ip := range expectedStaleUDPServices {
 		if !result.DeletedUDPClusterIPs.Has(ip) {
@@ -2716,7 +2713,7 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 		t.Errorf("expected service map length 2, got %v", fp.svcPortMap)
 	}
 	if len(result.DeletedUDPClusterIPs) != 0 {
-		t.Errorf("expected stale UDP services length 0, got %v", result.DeletedUDPClusterIPs.List())
+		t.Errorf("expected stale UDP services length 0, got %v", result.DeletedUDPClusterIPs.UnsortedList())
 	}
 
 	healthCheckNodePorts = fp.svcPortMap.HealthCheckNodePorts()
@@ -2732,7 +2729,7 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 		t.Errorf("expected service map length 2, got %v", fp.svcPortMap)
 	}
 	if len(result.DeletedUDPClusterIPs) != 0 {
-		t.Errorf("expected stale UDP services length 0, got %v", result.DeletedUDPClusterIPs.List())
+		t.Errorf("expected stale UDP services length 0, got %v", result.DeletedUDPClusterIPs.UnsortedList())
 	}
 
 	healthCheckNodePorts = fp.svcPortMap.HealthCheckNodePorts()
@@ -4376,7 +4373,7 @@ func TestEndpointSliceE2E(t *testing.T) {
 		Spec: v1.ServiceSpec{
 			ClusterIP: "172.20.1.1",
 			Selector:  map[string]string{"foo": "bar"},
-			Ports:     []v1.ServicePort{{Name: "", TargetPort: intstr.FromInt(80), Protocol: v1.ProtocolTCP}},
+			Ports:     []v1.ServicePort{{Name: "", TargetPort: intstr.FromInt32(80), Protocol: v1.ProtocolTCP}},
 		},
 	})
 
@@ -4463,7 +4460,7 @@ func TestHealthCheckNodePortE2E(t *testing.T) {
 		Spec: v1.ServiceSpec{
 			ClusterIP:             "172.20.1.1",
 			Selector:              map[string]string{"foo": "bar"},
-			Ports:                 []v1.ServicePort{{Name: "", TargetPort: intstr.FromInt(80), Protocol: v1.ProtocolTCP}},
+			Ports:                 []v1.ServicePort{{Name: "", TargetPort: intstr.FromInt32(80), Protocol: v1.ProtocolTCP}},
 			Type:                  "LoadBalancer",
 			HealthCheckNodePort:   30000,
 			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
@@ -4517,7 +4514,7 @@ func Test_HealthCheckNodePortWhenTerminating(t *testing.T) {
 		Spec: v1.ServiceSpec{
 			ClusterIP: "172.20.1.1",
 			Selector:  map[string]string{"foo": "bar"},
-			Ports:     []v1.ServicePort{{Name: "", TargetPort: intstr.FromInt(80), Protocol: v1.ProtocolTCP}},
+			Ports:     []v1.ServicePort{{Name: "", TargetPort: intstr.FromInt32(80), Protocol: v1.ProtocolTCP}},
 		},
 	})
 
@@ -4768,7 +4765,7 @@ func TestTestInternalTrafficPolicyE2E(t *testing.T) {
 			Spec: v1.ServiceSpec{
 				ClusterIP: "172.20.1.1",
 				Selector:  map[string]string{"foo": "bar"},
-				Ports:     []v1.ServicePort{{Name: "", TargetPort: intstr.FromInt(80), Protocol: v1.ProtocolTCP}},
+				Ports:     []v1.ServicePort{{Name: "", TargetPort: intstr.FromInt32(80), Protocol: v1.ProtocolTCP}},
 			},
 		}
 		if tc.internalTrafficPolicy != nil {
@@ -4848,7 +4845,6 @@ func TestTestInternalTrafficPolicyE2E(t *testing.T) {
 // Test_EndpointSliceReadyAndTerminatingCluster tests that when there are ready and ready + terminating
 // endpoints and the traffic policy is "Cluster", only the ready endpoints are used.
 func Test_EndpointSliceReadyAndTerminatingCluster(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProxyTerminatingEndpoints, true)()
 
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
@@ -4878,7 +4874,7 @@ func Test_EndpointSliceReadyAndTerminatingCluster(t *testing.T) {
 				{
 					Name:       "",
 					Port:       80,
-					TargetPort: intstr.FromInt(80),
+					TargetPort: intstr.FromInt32(80),
 					Protocol:   v1.ProtocolTCP,
 				},
 			},
@@ -5025,7 +5021,6 @@ func Test_EndpointSliceReadyAndTerminatingCluster(t *testing.T) {
 // Test_EndpointSliceReadyAndTerminatingLocal tests that when there are local ready and ready + terminating
 // endpoints, only the ready endpoints are used.
 func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProxyTerminatingEndpoints, true)()
 
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
@@ -5055,7 +5050,7 @@ func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
 				{
 					Name:       "",
 					Port:       80,
-					TargetPort: intstr.FromInt(80),
+					TargetPort: intstr.FromInt32(80),
 					Protocol:   v1.ProtocolTCP,
 				},
 			},
@@ -5201,7 +5196,6 @@ func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
 // Test_EndpointSliceOnlyReadyTerminatingCluster tests that when there are only ready terminating
 // endpoints and the traffic policy is "Cluster",  we fall back to terminating endpoints.
 func Test_EndpointSliceOnlyReadyAndTerminatingCluster(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProxyTerminatingEndpoints, true)()
 
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
@@ -5231,7 +5225,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingCluster(t *testing.T) {
 				{
 					Name:       "",
 					Port:       80,
-					TargetPort: intstr.FromInt(80),
+					TargetPort: intstr.FromInt32(80),
 					Protocol:   v1.ProtocolTCP,
 				},
 			},
@@ -5377,7 +5371,6 @@ func Test_EndpointSliceOnlyReadyAndTerminatingCluster(t *testing.T) {
 // Test_EndpointSliceOnlyReadyTerminatingLocal tests that when there are only local ready terminating
 // endpoints, we fall back to those endpoints.
 func Test_EndpointSliceOnlyReadyAndTerminatingLocal(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProxyTerminatingEndpoints, true)()
 
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
@@ -5407,7 +5400,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocal(t *testing.T) {
 				{
 					Name:       "",
 					Port:       80,
-					TargetPort: intstr.FromInt(80),
+					TargetPort: intstr.FromInt32(80),
 					Protocol:   v1.ProtocolTCP,
 				},
 			},
@@ -5515,178 +5508,6 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocal(t *testing.T) {
 	assert.Len(t, realServers2, 2, "Expected 2 real servers")
 	assert.Equal(t, realServers2[0].String(), "10.0.1.1:80")
 	assert.Equal(t, realServers2[1].String(), "10.0.1.2:80")
-
-	fp.OnEndpointSliceDelete(endpointSlice)
-	fp.syncProxyRules()
-
-	// Ensure that Proxier updates ipvs appropriately after EndpointSlice delete
-	assert.NotNil(t, fp.ipsetList["KUBE-LOOP-BACK"])
-	activeEntries2 := fp.ipsetList["KUBE-LOOP-BACK"].activeEntries
-	assert.Equal(t, 0, activeEntries2.Len(), "Expected 0 active entries in KUBE-LOOP-BACK")
-
-	virtualServers, vsErr = ipvs.GetVirtualServers()
-	assert.Nil(t, vsErr, "Expected no error getting virtual servers")
-	assert.Len(t, virtualServers, 2, "Expected 2 virtual server")
-
-	for _, virtualServer := range virtualServers {
-		if virtualServer.Address.String() == "172.20.1.1" {
-			clusterIPServer = virtualServer
-		}
-
-		if virtualServer.Address.String() == "1.2.3.4" {
-			externalIPServer = virtualServer
-		}
-	}
-
-	realServers1, rsErr1 = ipvs.GetRealServers(clusterIPServer)
-	assert.Nil(t, rsErr1, "Expected no error getting real servers")
-	assert.Len(t, realServers1, 0, "Expected 0 real servers")
-
-	realServers2, rsErr2 = ipvs.GetRealServers(externalIPServer)
-	assert.Nil(t, rsErr2, "Expected no error getting real servers")
-	assert.Len(t, realServers2, 0, "Expected 0 real servers")
-}
-
-// Test_EndpointSliceOnlyReadyTerminatingLocalWithFeatureGateDisabled tests that when there are only local ready terminating
-// endpoints, we fall back to those endpoints.
-func Test_EndpointSliceOnlyReadyAndTerminatingLocalWithFeatureGateDisabled(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProxyTerminatingEndpoints, false)()
-
-	ipt := iptablestest.NewFake()
-	ipvs := ipvstest.NewFake()
-	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
-	fp.servicesSynced = true
-	// fp.endpointsSynced = true
-	fp.endpointSlicesSynced = true
-
-	clusterInternalTrafficPolicy := v1.ServiceInternalTrafficPolicyCluster
-
-	// Add initial service
-	serviceName := "svc1"
-	namespaceName := "ns1"
-	fp.OnServiceAdd(&v1.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: namespaceName},
-		Spec: v1.ServiceSpec{
-			ClusterIP:             "172.20.1.1",
-			Selector:              map[string]string{"foo": "bar"},
-			Type:                  v1.ServiceTypeNodePort,
-			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
-			InternalTrafficPolicy: &clusterInternalTrafficPolicy,
-			ExternalIPs: []string{
-				"1.2.3.4",
-			},
-			Ports: []v1.ServicePort{
-				{
-					Name:       "",
-					Port:       80,
-					TargetPort: intstr.FromInt(80),
-					Protocol:   v1.ProtocolTCP,
-				},
-			},
-		},
-	})
-
-	// Add initial endpoint slice
-	tcpProtocol := v1.ProtocolTCP
-	endpointSlice := &discovery.EndpointSlice{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-1", serviceName),
-			Namespace: namespaceName,
-			Labels:    map[string]string{discovery.LabelServiceName: serviceName},
-		},
-		Ports: []discovery.EndpointPort{{
-			Name:     pointer.String(""),
-			Port:     pointer.Int32(80),
-			Protocol: &tcpProtocol,
-		}},
-		AddressType: discovery.AddressTypeIPv4,
-		Endpoints: []discovery.Endpoint{
-			{
-				Addresses: []string{"10.0.1.1"},
-				Conditions: discovery.EndpointConditions{
-					Ready:       pointer.Bool(false),
-					Serving:     pointer.Bool(true),
-					Terminating: pointer.Bool(true),
-				},
-				NodeName: pointer.String(testHostname),
-			},
-			{
-				Addresses: []string{"10.0.1.2"},
-				Conditions: discovery.EndpointConditions{
-					Ready:       pointer.Bool(false),
-					Serving:     pointer.Bool(true),
-					Terminating: pointer.Bool(true),
-				},
-				NodeName: pointer.String(testHostname),
-			},
-			{
-				Addresses: []string{"10.0.1.3"},
-				Conditions: discovery.EndpointConditions{
-					Ready:       pointer.Bool(false),
-					Serving:     pointer.Bool(false),
-					Terminating: pointer.Bool(true),
-				},
-				NodeName: pointer.String(testHostname),
-			},
-			{
-				Addresses: []string{"10.0.1.4"},
-				Conditions: discovery.EndpointConditions{
-					Ready:       pointer.Bool(false),
-					Serving:     pointer.Bool(true),
-					Terminating: pointer.Bool(true),
-				},
-				NodeName: pointer.String("another-host"),
-			},
-			{
-				Addresses: []string{"10.0.1.5"},
-				Conditions: discovery.EndpointConditions{
-					Ready:       pointer.Bool(true),
-					Serving:     pointer.Bool(true),
-					Terminating: pointer.Bool(false),
-				},
-				NodeName: pointer.String("another-host"),
-			},
-		},
-	}
-
-	fp.OnEndpointSliceAdd(endpointSlice)
-	fp.syncProxyRules()
-
-	// Ensure that Proxier updates ipvs appropriately after EndpointSlice update
-	assert.NotNil(t, fp.ipsetList["KUBE-LOOP-BACK"])
-	activeEntries1 := fp.ipsetList["KUBE-LOOP-BACK"].activeEntries
-	assert.Equal(t, 3, activeEntries1.Len(), "Expected 3 active entry in KUBE-LOOP-BACK")
-	assert.Equal(t, true, activeEntries1.Has("10.0.1.1,tcp:80,10.0.1.1"), "Expected activeEntries to reference first (local) pod")
-	assert.Equal(t, true, activeEntries1.Has("10.0.1.2,tcp:80,10.0.1.2"), "Expected activeEntries to reference second (local) pod")
-	assert.Equal(t, true, activeEntries1.Has("10.0.1.3,tcp:80,10.0.1.3"), "Expected activeEntries to reference second (local) pod")
-
-	virtualServers, vsErr := ipvs.GetVirtualServers()
-	assert.Nil(t, vsErr, "Expected no error getting virtual servers")
-	assert.Len(t, virtualServers, 2, "Expected 2 virtual server")
-
-	var clusterIPServer, externalIPServer *utilipvs.VirtualServer
-	for _, virtualServer := range virtualServers {
-		if virtualServer.Address.String() == "172.20.1.1" {
-			clusterIPServer = virtualServer
-		}
-
-		if virtualServer.Address.String() == "1.2.3.4" {
-			externalIPServer = virtualServer
-		}
-	}
-
-	// clusterIP should route to cluster-wide Ready endpoints
-	realServers1, rsErr1 := ipvs.GetRealServers(clusterIPServer)
-	assert.Nil(t, rsErr1, "Expected no error getting real servers")
-	assert.Len(t, realServers1, 1, "Expected 1 real servers")
-	assert.Equal(t, realServers1[0].String(), "10.0.1.5:80")
-
-	// externalIP should have 1 (remote) endpoint since the feature gate is disabled.
-	realServers2, rsErr2 := ipvs.GetRealServers(externalIPServer)
-	assert.Nil(t, rsErr2, "Expected no error getting real servers")
-	assert.Len(t, realServers2, 1, "Expected 0 real servers")
-	assert.Equal(t, realServers2[0].String(), "10.0.1.5:80")
 
 	fp.OnEndpointSliceDelete(endpointSlice)
 	fp.syncProxyRules()
@@ -5915,7 +5736,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 			Spec: v1.ServiceSpec{
 				ClusterIP: "172.20.1.1",
 				Selector:  map[string]string{"foo": "bar"},
-				Ports:     []v1.ServicePort{{Name: "p80", Port: 80, TargetPort: intstr.FromInt(80), Protocol: v1.ProtocolTCP, NodePort: 30000}},
+				Ports:     []v1.ServicePort{{Name: "p80", Port: 80, TargetPort: intstr.FromInt32(80), Protocol: v1.ProtocolTCP, NodePort: 30000}},
 			},
 		}
 		if tc.internalTrafficPolicy != nil {

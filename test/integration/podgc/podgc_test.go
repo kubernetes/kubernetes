@@ -77,7 +77,6 @@ func TestPodGcOrphanedPodsWithFinalizer(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
 			testCtx := setup(t, "podgc-orphaned")
-			defer testutils.CleanupTest(t, testCtx)
 			cs := testCtx.ClientSet
 
 			node := &v1.Node{
@@ -180,7 +179,6 @@ func TestTerminatingOnOutOfServiceNode(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeOutOfServiceVolumeDetach, true)()
 			testCtx := setup(t, "podgc-out-of-service")
-			defer testutils.CleanupTest(t, testCtx)
 			cs := testCtx.ClientSet
 
 			node := &v1.Node{

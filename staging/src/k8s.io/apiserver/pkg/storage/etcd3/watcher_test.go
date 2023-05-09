@@ -99,6 +99,11 @@ func TestProgressNotify(t *testing.T) {
 	storagetesting.RunOptionalTestProgressNotify(ctx, t, store)
 }
 
+func TestSendInitialEventsBackwardCompatibility(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunSendInitialEventsBackwardCompatibility(ctx, t, store)
+}
+
 // =======================================================================
 // Implementation-specific tests are following.
 // The following tests are exercising the details of the implementation

@@ -602,7 +602,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			})
 			framework.ExpectNoError(err)
 
-			// Verify that statuful set will be scaled up in order.
+			// Verify that stateful set will be scaled up in order.
 			wg := sync.WaitGroup{}
 			var orderErr error
 			wg.Add(1)
@@ -656,7 +656,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			})
 			framework.ExpectNoError(err)
 
-			// Verify that statuful set will be scaled down in order.
+			// Verify that stateful set will be scaled down in order.
 			wg.Add(1)
 			go func() {
 				defer ginkgo.GinkgoRecover()
@@ -1942,7 +1942,7 @@ func rollbackTest(ctx context.Context, c clientset.Interface, ns string, ss *app
 }
 
 // confirmStatefulPodCount asserts that the current number of Pods in ss is count, waiting up to timeout for ss to
-// to scale to count.
+// scale to count.
 func confirmStatefulPodCount(ctx context.Context, c clientset.Interface, count int, ss *appsv1.StatefulSet, timeout time.Duration, hard bool) {
 	start := time.Now()
 	deadline := start.Add(timeout)
@@ -2037,7 +2037,7 @@ func getStatefulSetPodNameAtIndex(index int, ss *appsv1.StatefulSet) string {
 
 type updateStatefulSetFunc func(*appsv1.StatefulSet)
 
-// updateStatefulSetWithRetries updates statfulset template with retries.
+// updateStatefulSetWithRetries updates statefulset template with retries.
 func updateStatefulSetWithRetries(ctx context.Context, c clientset.Interface, namespace, name string, applyUpdate updateStatefulSetFunc) (statefulSet *appsv1.StatefulSet, err error) {
 	statefulSets := c.AppsV1().StatefulSets(namespace)
 	var updateErr error

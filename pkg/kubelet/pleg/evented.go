@@ -46,16 +46,16 @@ var (
 // e.g. Streaming data issues from the runtime or the runtime does not implement the
 // container events stream.
 func isEventedPLEGInUse() bool {
-	eventedPLEGUsageMu.Lock()
-	defer eventedPLEGUsageMu.Unlock()
+	eventedPLEGUsageMu.RLock()
+	defer eventedPLEGUsageMu.RUnlock()
 	return eventedPLEGUsage
 }
 
 // setEventedPLEGUsage should only be accessed from
 // Start/Stop of Evented PLEG.
 func setEventedPLEGUsage(enable bool) {
-	eventedPLEGUsageMu.RLock()
-	defer eventedPLEGUsageMu.RUnlock()
+	eventedPLEGUsageMu.Lock()
+	defer eventedPLEGUsageMu.Unlock()
 	eventedPLEGUsage = enable
 }
 

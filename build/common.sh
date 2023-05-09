@@ -30,6 +30,7 @@ GROUP_ID=$(id -g)
 DOCKER_OPTS=${DOCKER_OPTS:-""}
 IFS=" " read -r -a DOCKER <<< "docker ${DOCKER_OPTS}"
 DOCKER_HOST=${DOCKER_HOST:-""}
+GOPROXY=${GOPROXY:-""}
 
 # This will canonicalize the path
 KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd -P)
@@ -95,8 +96,8 @@ readonly KUBE_RSYNC_PORT="${KUBE_RSYNC_PORT:-}"
 readonly KUBE_CONTAINER_RSYNC_PORT=8730
 
 # These are the default versions (image tags) for their respective base images.
-readonly __default_distroless_iptables_version=v0.2.3
-readonly __default_go_runner_version=v2.3.1-go1.20.3-bullseye.0
+readonly __default_distroless_iptables_version=v0.2.4
+readonly __default_go_runner_version=v2.3.1-go1.20.4-bullseye.0
 readonly __default_setcap_version=bullseye-v1.4.2
 
 # These are the base images for the Docker-wrapped binaries.
@@ -502,6 +503,7 @@ function kube::build::run_build_command_ex() {
     "--name=${container_name}"
     "--user=$(id -u):$(id -g)"
     "--hostname=${HOSTNAME}"
+    "-e=GOPROXY=${GOPROXY}"
     "${DOCKER_MOUNT_ARGS[@]}"
   )
 

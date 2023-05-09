@@ -135,7 +135,7 @@ func TestServiceUpdatedNoPodChange(t *testing.T) {
 	// service's ports have changed.
 	service.Spec = v1.ServiceSpec{
 		Selector: map[string]string{},
-		Ports:    []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt(8080), Protocol: "TCP"}},
+		Ports:    []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt32(8080), Protocol: "TCP"}},
 	}
 
 	// Currently we're not able to calculate trigger time for service updates, hence the returned

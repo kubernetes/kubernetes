@@ -17,7 +17,6 @@ limitations under the License.
 package apiserver
 
 import (
-	"context"
 	"net/http"
 	"testing"
 
@@ -27,31 +26,32 @@ import (
 
 // Tests that the apiserver rejects the export param
 func TestExportRejection(t *testing.T) {
-	clientSet, _, tearDownFn := setup(t)
+	ctx, clientSet, _, tearDownFn := setup(t)
 	defer tearDownFn()
 
-	_, err := clientSet.CoreV1().Namespaces().Create(context.Background(), &corev1.Namespace{
+	_, err := clientSet.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{Name: "export-fail"},
 	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
-		clientSet.CoreV1().Namespaces().Delete(context.Background(), "export-fail", metav1.DeleteOptions{})
+		if err := clientSet.CoreV1().Namespaces().Delete(ctx, "export-fail", metav1.DeleteOptions{}); err != nil {
+			t.Errorf("error whiling deleting the namespace, err: %v", err)
+		}
 	}()
 
-	result := clientSet.Discovery().RESTClient().Get().AbsPath("/api/v1/namespaces/export-fail").Param("export", "true").Do(context.Background())
+	result := clientSet.Discovery().RESTClient().Get().AbsPath("/api/v1/namespaces/export-fail").Param("export", "true").Do(ctx)
 	statusCode := 0
 	result.StatusCode(&statusCode)
 	if statusCode != http.StatusBadRequest {
 		t.Errorf("expected %v, got %v", http.StatusBadRequest, statusCode)
 	}
 
-	result = clientSet.Discovery().RESTClient().Get().AbsPath("/api/v1/namespaces/export-fail").Param("export", "false").Do(context.Background())
+	result = clientSet.Discovery().RESTClient().Get().AbsPath("/api/v1/namespaces/export-fail").Param("export", "false").Do(ctx)
 	statusCode = 0
 	result.StatusCode(&statusCode)
 	if statusCode != http.StatusOK {
 		t.Errorf("expected %v, got %v", http.StatusOK, statusCode)
 	}
-
 }

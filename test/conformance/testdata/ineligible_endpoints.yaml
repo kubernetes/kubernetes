@@ -246,13 +246,13 @@
   link: https://github.com/kubernetes/kubernetes/issues/109379
 - endpoint: deleteCoreV1CollectionNode
   reason: Kubernetes distribution would reasonably not allow this action via the API
-  link: https://github.com/kubernetes/kubernetes/issues/109379 
+  link: https://github.com/kubernetes/kubernetes/issues/109379
 - endpoint: createCoreV1NamespacedBinding
   reason: Endpoint was deprecated in 1.7
-  link: https://github.com/kubernetes/kubernetes/pull/47041  
+  link: https://github.com/kubernetes/kubernetes/pull/47041
 - endpoint: createAuthorizationV1SelfSubjectRulesReview
   reason: Endpoint likely to be deprecated
-  link: https://github.com/kubernetes/kubernetes/issues/112657#issuecomment-1265441626  
+  link: https://github.com/kubernetes/kubernetes/issues/112657#issuecomment-1265441626
 - endpoint: connectCoreV1GetNamespacedPodPortforward
   reason: Explicitly designed to be a debug feature
   link: https://github.com/kubernetes/kubernetes/issues/112778#issuecomment-1427995711
@@ -262,3 +262,6 @@
 - endpoint: connectCoreV1PostNamespacedPodAttach
   reason: Explicitly designed to be a debug feature
   link: https://github.com/kubernetes/kubernetes/issues/112778#issuecomment-1427995711
+- endpoint: createAuthenticationV1SelfSubjectReview
+  reason: Cluster providers are allowed to choose to not serve this API, and the whoami command handles unavailability gracefully.
+  link: https://github.com/kubernetes/enhancements/blob/master/keps/sig-auth/3325-self-subject-attributes-review-api/README.md#ga

@@ -37,7 +37,7 @@ func init() {
 					// skipped. Nothing to check...
 					return
 				}
-				e2enode.AllNodesReady(ctx, f.ClientSet, 3*time.Minute)
+				e2enode.AllNodesReady(ctx, f.ClientSet, 7*time.Minute)
 			})
 		},
 	)

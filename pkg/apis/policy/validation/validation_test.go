@@ -107,40 +107,35 @@ func TestValidateUnhealthyPodEvictionPolicyDisruptionBudgetSpec(t *testing.T) {
 		name      string
 		pdbSpec   policy.PodDisruptionBudgetSpec
 		expectErr bool
-	}{
-		{
-			name: "valid nil UnhealthyPodEvictionPolicy",
-			pdbSpec: policy.PodDisruptionBudgetSpec{
-				MinAvailable:               &c1,
-				UnhealthyPodEvictionPolicy: nil,
-			},
-			expectErr: false,
+	}{{
+		name: "valid nil UnhealthyPodEvictionPolicy",
+		pdbSpec: policy.PodDisruptionBudgetSpec{
+			MinAvailable:               &c1,
+			UnhealthyPodEvictionPolicy: nil,
 		},
-		{
-			name: "valid UnhealthyPodEvictionPolicy",
-			pdbSpec: policy.PodDisruptionBudgetSpec{
-				MinAvailable:               &c1,
-				UnhealthyPodEvictionPolicy: &alwaysAllowPolicy,
-			},
-			expectErr: false,
+		expectErr: false,
+	}, {
+		name: "valid UnhealthyPodEvictionPolicy",
+		pdbSpec: policy.PodDisruptionBudgetSpec{
+			MinAvailable:               &c1,
+			UnhealthyPodEvictionPolicy: &alwaysAllowPolicy,
 		},
-		{
-			name: "empty UnhealthyPodEvictionPolicy",
-			pdbSpec: policy.PodDisruptionBudgetSpec{
-				MinAvailable:               &c1,
-				UnhealthyPodEvictionPolicy: new(policy.UnhealthyPodEvictionPolicyType),
-			},
-			expectErr: true,
+		expectErr: false,
+	}, {
+		name: "empty UnhealthyPodEvictionPolicy",
+		pdbSpec: policy.PodDisruptionBudgetSpec{
+			MinAvailable:               &c1,
+			UnhealthyPodEvictionPolicy: new(policy.UnhealthyPodEvictionPolicyType),
 		},
-		{
-			name: "invalid UnhealthyPodEvictionPolicy",
-			pdbSpec: policy.PodDisruptionBudgetSpec{
-				MinAvailable:               &c1,
-				UnhealthyPodEvictionPolicy: &invalidPolicy,
-			},
-			expectErr: true,
+		expectErr: true,
+	}, {
+		name: "invalid UnhealthyPodEvictionPolicy",
+		pdbSpec: policy.PodDisruptionBudgetSpec{
+			MinAvailable:               &c1,
+			UnhealthyPodEvictionPolicy: &invalidPolicy,
 		},
-	}
+		expectErr: true,
+	}}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -162,128 +157,112 @@ func TestValidatePodDisruptionBudgetStatus(t *testing.T) {
 		name                string
 		pdbStatus           policy.PodDisruptionBudgetStatus
 		expectErrForVersion map[schema.GroupVersion]bool
-	}{
-		{
-			name: "DisruptionsAllowed: 10",
-			pdbStatus: policy.PodDisruptionBudgetStatus{
-				DisruptionsAllowed: 10,
-			},
-			expectErrForVersion: map[schema.GroupVersion]bool{
-				policy.SchemeGroupVersion:        expectNoErrors,
-				policyv1beta1.SchemeGroupVersion: expectNoErrors,
-			},
+	}{{
+		name: "DisruptionsAllowed: 10",
+		pdbStatus: policy.PodDisruptionBudgetStatus{
+			DisruptionsAllowed: 10,
 		},
-		{
-			name: "CurrentHealthy: 5",
-			pdbStatus: policy.PodDisruptionBudgetStatus{
-				CurrentHealthy: 5,
-			},
-			expectErrForVersion: map[schema.GroupVersion]bool{
-				policy.SchemeGroupVersion:        expectNoErrors,
-				policyv1beta1.SchemeGroupVersion: expectNoErrors,
-			},
+		expectErrForVersion: map[schema.GroupVersion]bool{
+			policy.SchemeGroupVersion:        expectNoErrors,
+			policyv1beta1.SchemeGroupVersion: expectNoErrors,
 		},
-		{
-			name: "DesiredHealthy: 3",
-			pdbStatus: policy.PodDisruptionBudgetStatus{
-				DesiredHealthy: 3,
-			},
-			expectErrForVersion: map[schema.GroupVersion]bool{
-				policy.SchemeGroupVersion:        expectNoErrors,
-				policyv1beta1.SchemeGroupVersion: expectNoErrors,
-			},
+	}, {
+		name: "CurrentHealthy: 5",
+		pdbStatus: policy.PodDisruptionBudgetStatus{
+			CurrentHealthy: 5,
 		},
-		{
-			name: "ExpectedPods: 2",
-			pdbStatus: policy.PodDisruptionBudgetStatus{
-				ExpectedPods: 2,
-			},
-			expectErrForVersion: map[schema.GroupVersion]bool{
-				policy.SchemeGroupVersion:        expectNoErrors,
-				policyv1beta1.SchemeGroupVersion: expectNoErrors,
-			},
+		expectErrForVersion: map[schema.GroupVersion]bool{
+			policy.SchemeGroupVersion:        expectNoErrors,
+			policyv1beta1.SchemeGroupVersion: expectNoErrors,
 		},
-		{
-			name: "DisruptionsAllowed: -10",
-			pdbStatus: policy.PodDisruptionBudgetStatus{
-				DisruptionsAllowed: -10,
-			},
-			expectErrForVersion: map[schema.GroupVersion]bool{
-				policy.SchemeGroupVersion:        expectErrors,
-				policyv1beta1.SchemeGroupVersion: expectNoErrors,
-			},
+	}, {
+		name: "DesiredHealthy: 3",
+		pdbStatus: policy.PodDisruptionBudgetStatus{
+			DesiredHealthy: 3,
 		},
-		{
-			name: "CurrentHealthy: -5",
-			pdbStatus: policy.PodDisruptionBudgetStatus{
-				CurrentHealthy: -5,
-			},
-			expectErrForVersion: map[schema.GroupVersion]bool{
-				policy.SchemeGroupVersion:        expectErrors,
-				policyv1beta1.SchemeGroupVersion: expectNoErrors,
-			},
+		expectErrForVersion: map[schema.GroupVersion]bool{
+			policy.SchemeGroupVersion:        expectNoErrors,
+			policyv1beta1.SchemeGroupVersion: expectNoErrors,
 		},
-		{
-			name: "DesiredHealthy: -3",
-			pdbStatus: policy.PodDisruptionBudgetStatus{
-				DesiredHealthy: -3,
-			},
-			expectErrForVersion: map[schema.GroupVersion]bool{
-				policy.SchemeGroupVersion:        expectErrors,
-				policyv1beta1.SchemeGroupVersion: expectNoErrors,
-			},
+	}, {
+		name: "ExpectedPods: 2",
+		pdbStatus: policy.PodDisruptionBudgetStatus{
+			ExpectedPods: 2,
 		},
-		{
-			name: "ExpectedPods: -2",
-			pdbStatus: policy.PodDisruptionBudgetStatus{
-				ExpectedPods: -2,
-			},
-			expectErrForVersion: map[schema.GroupVersion]bool{
-				policy.SchemeGroupVersion:        expectErrors,
-				policyv1beta1.SchemeGroupVersion: expectNoErrors,
-			},
+		expectErrForVersion: map[schema.GroupVersion]bool{
+			policy.SchemeGroupVersion:        expectNoErrors,
+			policyv1beta1.SchemeGroupVersion: expectNoErrors,
 		},
-		{
-			name: "Conditions valid",
-			pdbStatus: policy.PodDisruptionBudgetStatus{
-				Conditions: []metav1.Condition{
-					{
-						Type:   policyv1beta1.DisruptionAllowedCondition,
-						Status: metav1.ConditionTrue,
-						LastTransitionTime: metav1.Time{
-							Time: time.Now().Add(-5 * time.Minute),
-						},
-						Reason:             policyv1beta1.SufficientPodsReason,
-						Message:            "message",
-						ObservedGeneration: 3,
-					},
+	}, {
+		name: "DisruptionsAllowed: -10",
+		pdbStatus: policy.PodDisruptionBudgetStatus{
+			DisruptionsAllowed: -10,
+		},
+		expectErrForVersion: map[schema.GroupVersion]bool{
+			policy.SchemeGroupVersion:        expectErrors,
+			policyv1beta1.SchemeGroupVersion: expectNoErrors,
+		},
+	}, {
+		name: "CurrentHealthy: -5",
+		pdbStatus: policy.PodDisruptionBudgetStatus{
+			CurrentHealthy: -5,
+		},
+		expectErrForVersion: map[schema.GroupVersion]bool{
+			policy.SchemeGroupVersion:        expectErrors,
+			policyv1beta1.SchemeGroupVersion: expectNoErrors,
+		},
+	}, {
+		name: "DesiredHealthy: -3",
+		pdbStatus: policy.PodDisruptionBudgetStatus{
+			DesiredHealthy: -3,
+		},
+		expectErrForVersion: map[schema.GroupVersion]bool{
+			policy.SchemeGroupVersion:        expectErrors,
+			policyv1beta1.SchemeGroupVersion: expectNoErrors,
+		},
+	}, {
+		name: "ExpectedPods: -2",
+		pdbStatus: policy.PodDisruptionBudgetStatus{
+			ExpectedPods: -2,
+		},
+		expectErrForVersion: map[schema.GroupVersion]bool{
+			policy.SchemeGroupVersion:        expectErrors,
+			policyv1beta1.SchemeGroupVersion: expectNoErrors,
+		},
+	}, {
+		name: "Conditions valid",
+		pdbStatus: policy.PodDisruptionBudgetStatus{
+			Conditions: []metav1.Condition{{
+				Type:   policyv1beta1.DisruptionAllowedCondition,
+				Status: metav1.ConditionTrue,
+				LastTransitionTime: metav1.Time{
+					Time: time.Now().Add(-5 * time.Minute),
 				},
-			},
-			expectErrForVersion: map[schema.GroupVersion]bool{
-				policy.SchemeGroupVersion:        expectNoErrors,
-				policyv1beta1.SchemeGroupVersion: expectNoErrors,
-			},
+				Reason:             policyv1beta1.SufficientPodsReason,
+				Message:            "message",
+				ObservedGeneration: 3,
+			}},
 		},
-		{
-			name: "Conditions not valid",
-			pdbStatus: policy.PodDisruptionBudgetStatus{
-				Conditions: []metav1.Condition{
-					{
-						Type:   policyv1beta1.DisruptionAllowedCondition,
-						Status: metav1.ConditionTrue,
-					},
-					{
-						Type:   policyv1beta1.DisruptionAllowedCondition,
-						Status: metav1.ConditionFalse,
-					},
-				},
-			},
-			expectErrForVersion: map[schema.GroupVersion]bool{
-				policy.SchemeGroupVersion:        expectErrors,
-				policyv1beta1.SchemeGroupVersion: expectErrors,
-			},
+		expectErrForVersion: map[schema.GroupVersion]bool{
+			policy.SchemeGroupVersion:        expectNoErrors,
+			policyv1beta1.SchemeGroupVersion: expectNoErrors,
 		},
-	}
+	}, {
+		name: "Conditions not valid",
+		pdbStatus: policy.PodDisruptionBudgetStatus{
+			Conditions: []metav1.Condition{{
+				Type:   policyv1beta1.DisruptionAllowedCondition,
+				Status: metav1.ConditionTrue,
+			}, {
+				Type:   policyv1beta1.DisruptionAllowedCondition,
+				Status: metav1.ConditionFalse,
+			}},
+		},
+		expectErrForVersion: map[schema.GroupVersion]bool{
+			policy.SchemeGroupVersion:        expectErrors,
+			policyv1beta1.SchemeGroupVersion: expectErrors,
+		},
+	}}
 
 	for _, tc := range testCases {
 		for apiVersion, expectErrors := range tc.expectErrForVersion {
@@ -1165,23 +1144,19 @@ func TestAllowEphemeralVolumeType(t *testing.T) {
 		description      string
 		hasGenericVolume bool
 		psp              func() *policy.PodSecurityPolicy
-	}{
-		{
-			description:      "PodSecurityPolicySpec Without GenericVolume",
-			hasGenericVolume: false,
-			psp:              pspWithoutGenericVolume,
-		},
-		{
-			description:      "PodSecurityPolicySpec With GenericVolume",
-			hasGenericVolume: true,
-			psp:              pspWithGenericVolume,
-		},
-		{
-			description:      "is nil",
-			hasGenericVolume: false,
-			psp:              pspNil,
-		},
-	}
+	}{{
+		description:      "PodSecurityPolicySpec Without GenericVolume",
+		hasGenericVolume: false,
+		psp:              pspWithoutGenericVolume,
+	}, {
+		description:      "PodSecurityPolicySpec With GenericVolume",
+		hasGenericVolume: true,
+		psp:              pspWithGenericVolume,
+	}, {
+		description:      "is nil",
+		hasGenericVolume: false,
+		psp:              pspNil,
+	}}
 
 	for _, oldPSPInfo := range pspInfo {
 		for _, newPSPInfo := range pspInfo {

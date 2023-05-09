@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/cel/environment"
 )
 
 type ExpressionAccessor interface {
@@ -57,8 +58,7 @@ type OptionalVariableDeclarations struct {
 // FilterCompiler contains a function to assist with converting types and values to/from CEL-typed values.
 type FilterCompiler interface {
 	// Compile is used for the cel expression compilation
-	// perCallLimit was added for testing purpose only. Callers should always use const PerCallLimit from k8s.io/apiserver/pkg/apis/cel/config.go as input.
-	Compile(expressions []ExpressionAccessor, optionalDecls OptionalVariableDeclarations, perCallLimit uint64) Filter
+	Compile(expressions []ExpressionAccessor, optionalDecls OptionalVariableDeclarations, envType environment.Type) Filter
 }
 
 // OptionalVariableBindings provides expression bindings for optional CEL variables.

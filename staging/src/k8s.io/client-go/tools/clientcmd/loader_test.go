@@ -897,12 +897,9 @@ func TestLoadingGetLoadingPrecedence(t *testing.T) {
 		},
 	}
 
-	kubeconfig := os.Getenv("KUBECONFIG")
-	defer os.Setenv("KUBECONFIG", kubeconfig)
-
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
-			os.Setenv("KUBECONFIG", test.env)
+			t.Setenv("KUBECONFIG", test.env)
 			rules := test.rules
 			if rules == nil {
 				rules = NewDefaultClientConfigLoadingRules()

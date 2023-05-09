@@ -142,7 +142,7 @@ type Option func(*frameworkOptions)
 // WithComponentConfigVersion sets the component config version to the
 // KubeSchedulerConfiguration version used. The string should be the full
 // scheme group/version of the external type we converted from (for example
-// "kubescheduler.config.k8s.io/v1beta2")
+// "kubescheduler.config.k8s.io/v1")
 func WithComponentConfigVersion(componentConfigVersion string) Option {
 	return func(o *frameworkOptions) {
 		o.componentConfigVersion = componentConfigVersion

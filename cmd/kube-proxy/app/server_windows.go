@@ -45,16 +45,18 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/winkernel"
 )
 
+func (o *Options) platformApplyDefaults(config *proxyconfigapi.KubeProxyConfiguration) {
+	if config.Mode == "" {
+		config.Mode = proxyconfigapi.ProxyModeKernelspace
+	}
+}
+
 // NewProxyServer returns a new ProxyServer.
 func NewProxyServer(o *Options) (*ProxyServer, error) {
 	return newProxyServer(o.config, o.master)
 }
 
 func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, master string) (*ProxyServer, error) {
-	if config == nil {
-		return nil, errors.New("config is required")
-	}
-
 	if c, err := configz.New(proxyconfigapi.GroupName); err == nil {
 		c.Set(config)
 	} else {
@@ -103,7 +105,6 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, master string
 	}
 
 	var proxier proxy.Provider
-	proxyMode := proxyconfigapi.ProxyModeKernelspace
 	dualStackMode := getDualStackMode(config.Winkernel.NetworkName, winkernel.DualStackCompatTester{})
 	if dualStackMode {
 		klog.InfoS("Creating dualStackProxier for Windows kernel.")
@@ -138,18 +139,13 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, master string
 	winkernel.RegisterMetrics()
 
 	return &ProxyServer{
-		Client:              client,
-		Proxier:             proxier,
-		Broadcaster:         eventBroadcaster,
-		Recorder:            recorder,
-		ProxyMode:           proxyMode,
-		NodeRef:             nodeRef,
-		MetricsBindAddress:  config.MetricsBindAddress,
-		BindAddressHardFail: config.BindAddressHardFail,
-		EnableProfiling:     config.EnableProfiling,
-		OOMScoreAdj:         config.OOMScoreAdj,
-		ConfigSyncPeriod:    config.ConfigSyncPeriod.Duration,
-		HealthzServer:       healthzServer,
+		Config:        config,
+		Client:        client,
+		Proxier:       proxier,
+		Broadcaster:   eventBroadcaster,
+		Recorder:      recorder,
+		NodeRef:       nodeRef,
+		HealthzServer: healthzServer,
 	}, nil
 }
 

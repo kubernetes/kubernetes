@@ -41,9 +41,12 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	core "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/cloud-provider/api"
 	fakecloud "k8s.io/cloud-provider/fake"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -64,13 +67,22 @@ func newService(name string, serviceType v1.ServiceType, tweaks ...serviceTweak)
 			Namespace: "default",
 		},
 		Spec: v1.ServiceSpec{
-			Type: serviceType,
+			Type:  serviceType,
+			Ports: makeServicePort(v1.ProtocolTCP, 0),
 		},
 	}
 	for _, tw := range tweaks {
 		tw(s)
 	}
 	return s
+}
+
+func copyService(oldSvc *v1.Service, tweaks ...serviceTweak) *v1.Service {
+	newSvc := oldSvc.DeepCopy()
+	for _, tw := range tweaks {
+		tw(newSvc)
+	}
+	return newSvc
 }
 
 func tweakAddETP(etpType v1.ServiceExternalTrafficPolicyType) serviceTweak {
@@ -123,7 +135,7 @@ func tweakAddAppProtocol(appProtocol string) serviceTweak {
 	}
 }
 
-func tweakAddIPFamilies(families ...v1.IPFamily) serviceTweak {
+func tweakSetIPFamilies(families ...v1.IPFamily) serviceTweak {
 	return func(s *v1.Service) {
 		s.Spec.IPFamilies = families
 	}
@@ -204,7 +216,7 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 		expectPatchFinalizer: true,
 	}, {
 		desc:                 "tcp service that wants LB",
-		service:              newService("basic-service1", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 0)),
+		service:              newService("basic-service1", v1.ServiceTypeLoadBalancer),
 		expectOp:             ensureLoadBalancer,
 		expectCreateAttempt:  true,
 		expectPatchStatus:    true,
@@ -234,7 +246,7 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 		expectPatchFinalizer: true,
 	}, {
 		desc:                 "service that needs cleanup",
-		service:              newService("basic-service1", v1.ServiceTypeLoadBalancer, tweakAddLBIngress("8.8.8.8"), tweakAddPorts(v1.ProtocolTCP, 0), tweakAddFinalizers(servicehelper.LoadBalancerCleanupFinalizer), tweakAddDeletionTimestamp(time.Now())),
+		service:              newService("basic-service1", v1.ServiceTypeLoadBalancer, tweakAddLBIngress("8.8.8.8"), tweakAddFinalizers(servicehelper.LoadBalancerCleanupFinalizer), tweakAddDeletionTimestamp(time.Now())),
 		lbExists:             true,
 		expectOp:             deleteLoadBalancer,
 		expectDeleteAttempt:  true,
@@ -242,7 +254,7 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 		expectPatchFinalizer: true,
 	}, {
 		desc:                 "service with finalizer that wants LB",
-		service:              newService("basic-service1", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 0), tweakAddFinalizers(servicehelper.LoadBalancerCleanupFinalizer)),
+		service:              newService("basic-service1", v1.ServiceTypeLoadBalancer, tweakAddFinalizers(servicehelper.LoadBalancerCleanupFinalizer)),
 		expectOp:             ensureLoadBalancer,
 		expectCreateAttempt:  true,
 		expectPatchStatus:    true,
@@ -1093,22 +1105,24 @@ func TestSyncService(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		t.Run(tc.testName, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
-		tc.updateFn()
-		obtainedErr := controller.syncService(ctx, tc.key)
+			tc.updateFn()
+			obtainedErr := controller.syncService(ctx, tc.key)
 
-		//expected matches obtained ??.
-		if exp := tc.expectedFn(obtainedErr); exp != nil {
-			t.Errorf("%v Error:%v", tc.testName, exp)
-		}
+			//expected matches obtained ??.
+			if exp := tc.expectedFn(obtainedErr); exp != nil {
+				t.Errorf("%v Error:%v", tc.testName, exp)
+			}
 
-		//Post processing, the element should not be in the sync queue.
-		_, exist := controller.cache.get(tc.key)
-		if exist {
-			t.Fatalf("%v working Queue should be empty, but contains %s", tc.testName, tc.key)
-		}
+			//Post processing, the element should not be in the sync queue.
+			_, exist := controller.cache.get(tc.key)
+			if exist {
+				t.Fatalf("%v working Queue should be empty, but contains %s", tc.testName, tc.key)
+			}
+		})
 	}
 }
 
@@ -1354,8 +1368,7 @@ func TestNeedsUpdate(t *testing.T) {
 		testName: "If TargetGroup is different 1",
 		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
 			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 20))
-			newSvc = oldSvc.DeepCopy()
-			newSvc.Spec.Ports[0].TargetPort = intstr.Parse("21")
+			newSvc = copyService(oldSvc, tweakAddPorts(v1.ProtocolTCP, 21))
 			return
 		},
 		expectedNeedsUpdate: true,
@@ -1371,54 +1384,48 @@ func TestNeedsUpdate(t *testing.T) {
 	}, {
 		testName: "If appProtocol is the same",
 		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
-			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 22))
-			newSvc = oldSvc.DeepCopy()
+			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer)
+			newSvc = copyService(oldSvc)
 			return
 		},
 		expectedNeedsUpdate: false,
 	}, {
 		testName: "If service IPFamilies from single stack to dual stack",
 		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
-			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 22), tweakAddAppProtocol("http"), tweakAddIPFamilies(v1.IPv4Protocol))
-			newSvc = oldSvc.DeepCopy()
-			newSvc.Spec.IPFamilies = []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol}
+			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakSetIPFamilies(v1.IPv4Protocol))
+			newSvc = copyService(oldSvc, tweakSetIPFamilies(v1.IPv4Protocol, v1.IPv6Protocol))
 			return
 		},
 		expectedNeedsUpdate: true,
 	}, {
 		testName: "If service IPFamilies from dual stack to single stack",
 		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
-			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 22), tweakAddAppProtocol("http"), tweakAddIPFamilies(v1.IPv4Protocol, v1.IPv6Protocol))
-			newSvc = oldSvc.DeepCopy()
-			newSvc.Spec.IPFamilies = []v1.IPFamily{v1.IPv4Protocol}
+			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakSetIPFamilies(v1.IPv4Protocol, v1.IPv6Protocol))
+			newSvc = copyService(oldSvc, tweakSetIPFamilies(v1.IPv4Protocol))
 			return
 		},
 		expectedNeedsUpdate: true,
 	}, {
 		testName: "If service IPFamilies not change",
 		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
-			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 22), tweakAddAppProtocol("http"), tweakAddIPFamilies(v1.IPv4Protocol))
-			newSvc = oldSvc.DeepCopy()
+			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakSetIPFamilies(v1.IPv4Protocol))
+			newSvc = copyService(oldSvc)
 			return
 		},
 		expectedNeedsUpdate: false,
 	}, {
 		testName: "If appProtocol is set when previously unset",
 		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
-			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 22))
-			newSvc = oldSvc.DeepCopy()
-			protocol := "http"
-			newSvc.Spec.Ports[0].AppProtocol = &protocol
+			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer)
+			newSvc = copyService(oldSvc, tweakAddAppProtocol("http"))
 			return
 		},
 		expectedNeedsUpdate: true,
 	}, {
 		testName: "If appProtocol is set to a different value",
 		updateFn: func() (oldSvc *v1.Service, newSvc *v1.Service) {
-			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddPorts(v1.ProtocolTCP, 22), tweakAddAppProtocol("http"))
-			newSvc = oldSvc.DeepCopy()
-			newProtocol := "tcp"
-			newSvc.Spec.Ports[0].AppProtocol = &newProtocol
+			oldSvc = newService("tcp-service", v1.ServiceTypeLoadBalancer, tweakAddAppProtocol("http"))
+			newSvc = copyService(oldSvc, tweakAddAppProtocol("tcp"))
 			return
 		},
 		expectedNeedsUpdate: true,
@@ -2253,6 +2260,87 @@ func Test_shouldSyncUpdatedNode_compoundedPredicates(t *testing.T) {
 	}
 }
 
+func TestServiceQueueDelay(t *testing.T) {
+	const ns = metav1.NamespaceDefault
+
+	tests := []struct {
+		name           string
+		lbCloudErr     error
+		wantRetryDelay time.Duration
+	}{
+		{
+			name:       "processing successful",
+			lbCloudErr: nil,
+		},
+		{
+			name:       "regular error",
+			lbCloudErr: errors.New("something went wrong"),
+		},
+		{
+			name:           "retry error",
+			lbCloudErr:     api.NewRetryError("LB create in progress", 42*time.Second),
+			wantRetryDelay: 42 * time.Second,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			controller, cloud, client := newController()
+			queue := &spyWorkQueue{RateLimitingInterface: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-service-queue-delay")}
+			controller.serviceQueue = queue
+			cloud.Err = tc.lbCloudErr
+
+			serviceCache := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+			controller.serviceLister = corelisters.NewServiceLister(serviceCache)
+
+			svc := defaultExternalService()
+			if err := serviceCache.Add(svc); err != nil {
+				t.Fatalf("adding service %s to cache: %s", svc.Name, err)
+			}
+
+			ctx := context.Background()
+			_, err := client.CoreV1().Services(ns).Create(ctx, svc, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			key, err := cache.MetaNamespaceKeyFunc(svc)
+			if err != nil {
+				t.Fatalf("creating meta namespace key: %s", err)
+			}
+			queue.Add(key)
+
+			done := controller.processNextServiceItem(ctx)
+			if !done {
+				t.Fatal("processNextServiceItem stopped prematurely")
+			}
+
+			// Expect no requeues unless we hit an error that is not a retry
+			// error.
+			wantNumRequeues := 0
+			var re *api.RetryError
+			isRetryError := errors.As(tc.lbCloudErr, &re)
+			if tc.lbCloudErr != nil && !isRetryError {
+				wantNumRequeues = 1
+			}
+
+			if gotNumRequeues := queue.NumRequeues(key); gotNumRequeues != wantNumRequeues {
+				t.Fatalf("got %d requeue(s), want %d", gotNumRequeues, wantNumRequeues)
+			}
+
+			if tc.wantRetryDelay > 0 {
+				items := queue.getItems()
+				if len(items) != 1 {
+					t.Fatalf("got %d item(s), want 1", len(items))
+				}
+				if gotDelay := items[0].Delay; gotDelay != tc.wantRetryDelay {
+					t.Fatalf("got delay %s, want %s", gotDelay, tc.wantRetryDelay)
+				}
+			}
+		})
+	}
+}
+
 type fakeNodeLister struct {
 	cache []*v1.Node
 	err   error
@@ -2280,4 +2368,34 @@ func (l *fakeNodeLister) Get(name string) (*v1.Node, error) {
 		}
 	}
 	return nil, nil
+}
+
+// spyWorkQueue implements a work queue and adds the ability to inspect processed
+// items for testing purposes.
+type spyWorkQueue struct {
+	workqueue.RateLimitingInterface
+	items []spyQueueItem
+}
+
+// spyQueueItem represents an item that was being processed.
+type spyQueueItem struct {
+	Key interface{}
+	// Delay represents the delayed duration if and only if AddAfter was invoked.
+	Delay time.Duration
+}
+
+// AddAfter is like workqueue.RateLimitingInterface.AddAfter but records the
+// added key and delay internally.
+func (f *spyWorkQueue) AddAfter(key interface{}, delay time.Duration) {
+	f.items = append(f.items, spyQueueItem{
+		Key:   key,
+		Delay: delay,
+	})
+
+	f.RateLimitingInterface.AddAfter(key, delay)
+}
+
+// getItems returns all items that were recorded.
+func (f *spyWorkQueue) getItems() []spyQueueItem {
+	return f.items
 }
