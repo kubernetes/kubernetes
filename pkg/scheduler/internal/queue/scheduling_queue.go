@@ -35,6 +35,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -85,6 +86,9 @@ const (
 // run against a Pod and the caller can choose to enqueue or skip the Pod
 // by the checking result.
 type PreEnqueueCheck func(pod *v1.Pod) framework.SchedulingHint
+
+// inFlightCheck is a variant of PreEnqueueCheck for pods that are currently being scheduled.
+type inFlightCheck func(inFlightPod inFlightPod) framework.SchedulingHint
 
 // SchedulingQueue is an interface for a queue to store pods waiting to be scheduled.
 // The interface follows a pattern similar to cache.FIFO and cache.Heap and
@@ -162,10 +166,7 @@ type PriorityQueue struct {
 
 	// inFlightPods holds the UID of all pods which have been popped out for which Done
 	// hasn't been called yet - in other words, all pods that are currently being
-	// processed. For each of those, it stores PodInfo.MoveRequestCycle (if one was observed)
-	// and the pod object. This is intentionally not a PodInfo pointer because accessing
-	// fields in the PodInfo is tricky and could result in race conditons. The Pod struct
-	// is read-only and represents the state of the pod when scheduling it started.
+	// processed. For each of those, it stores some information.
 	inFlightPods map[types.UID]inFlightPod
 	// activeQ is heap structure that scheduler actively looks at to find pods to
 	// schedule. Head of heap is the highest priority pod.
@@ -195,7 +196,14 @@ type PriorityQueue struct {
 }
 
 type inFlightPod struct {
-	pod              *v1.Pod
+	// pod is read-only and represents the state of the pod when scheduling was started.
+	pod *v1.Pod
+
+	// requiredAffinityTerms is a copy of the read-only pInfo.RequiredAffinityTerms.
+	requiredAffinityTerms []framework.AffinityTerm
+
+	// moveRequestCycle is the scheduling cycle in which a cluster event
+	// was observed which might affect the pod.
 	moveRequestCycle int64
 }
 
@@ -609,7 +617,10 @@ func (p *PriorityQueue) flushUnschedulablePodsLeftover() {
 	}
 
 	if len(podsToMove) > 0 {
-		p.movePodsToActiveOrBackoffQueue(podsToMove, UnschedulableTimeout)
+		p.movePodsToActiveOrBackoffQueue(podsToMove, UnschedulableTimeout, func(inFlightPod inFlightPod) framework.SchedulingHint {
+			// Flushing unschedulable pods never affects other in-flight pods.
+			return framework.PodNotAffected
+		})
 	}
 }
 
@@ -636,7 +647,7 @@ func (p *PriorityQueue) Pop() (*framework.QueuedPodInfo, error) {
 	pInfo.Attempts++
 	p.schedulingCycle++
 	// In flight, no move request yet.
-	p.inFlightPods[pInfo.Pod.UID] = inFlightPod{pod: pInfo.Pod}
+	p.inFlightPods[pInfo.Pod.UID] = inFlightPod{pod: pInfo.Pod, requiredAffinityTerms: pInfo.RequiredAffinityTerms}
 	return pInfo, nil
 }
 
@@ -745,7 +756,11 @@ func (p *PriorityQueue) Delete(pod *v1.Pod) error {
 // may make pending pods with matching affinity terms schedulable.
 func (p *PriorityQueue) AssignedPodAdded(pod *v1.Pod) {
 	p.lock.Lock()
-	p.movePodsToActiveOrBackoffQueue(p.getUnschedulablePodsWithMatchingAffinityTerm(pod), AssignedPodAdd)
+
+	nsLabels, podsToMove := p.getUnschedulablePodsWithMatchingAffinityTerm(pod)
+	p.movePodsToActiveOrBackoffQueue(podsToMove, AssignedPodAdd, func(inFlightPod inFlightPod) framework.SchedulingHint {
+		return checkRequiredAffinityTerms(inFlightPod, pod, nsLabels)
+	})
 	p.lock.Unlock()
 }
 
@@ -770,9 +785,23 @@ func (p *PriorityQueue) AssignedPodUpdated(pod *v1.Pod) {
 	if isPodResourcesResizedDown(pod) {
 		p.moveAllToActiveOrBackoffQueue(AssignedPodUpdate, nil)
 	} else {
-		p.movePodsToActiveOrBackoffQueue(p.getUnschedulablePodsWithMatchingAffinityTerm(pod), AssignedPodUpdate)
+		nsLabels, podsToMove := p.getUnschedulablePodsWithMatchingAffinityTerm(pod)
+		p.movePodsToActiveOrBackoffQueue(podsToMove, AssignedPodUpdate, func(inFlightPod inFlightPod) framework.SchedulingHint {
+			return checkRequiredAffinityTerms(inFlightPod, pod, nsLabels)
+		})
 	}
 	p.lock.Unlock()
+}
+
+func checkRequiredAffinityTerms(inFlightPod inFlightPod, pod *v1.Pod, nsLabels labels.Set) framework.SchedulingHint {
+	// If the in-flight pod has matching affinity terms, then it might be
+	// affected.
+	for _, term := range inFlightPod.requiredAffinityTerms {
+		if term.Matches(pod, nsLabels) {
+			return framework.PodMaybeSchedulable
+		}
+	}
+	return framework.PodNotAffected
 }
 
 // NOTE: this function assumes a lock has been acquired in the caller.
@@ -800,7 +829,13 @@ func (p *PriorityQueue) moveAllToActiveOrBackoffQueue(event framework.ClusterEve
 			activated = true
 		}
 	}
-	p.checkInFlightPods(event, preCheck)
+	if preCheck != nil {
+		p.checkInFlightPods(event, func(inFlightPod inFlightPod) framework.SchedulingHint {
+			return preCheck(inFlightPod.pod)
+		})
+	} else {
+		p.checkInFlightPods(event, nil)
+	}
 	if activated {
 		p.cond.Broadcast()
 	}
@@ -816,11 +851,14 @@ func (p *PriorityQueue) MoveAllToActiveOrBackoffQueue(event framework.ClusterEve
 	p.moveAllToActiveOrBackoffQueue(event, preCheck)
 }
 
-// movePodsToActiveOrBackoffQueue is a variant of moveAllToActiveOrBackoffQueue where the caller
-// has already determined the pods that need to be moved.
+// movePodsToActiveOrBackoffQueue is a variant of moveAllToActiveOrBackoffQueue
+// where the caller has already determined the pods that need to be
+// moved. In-flight pods are forced into the backoff queue if they become
+// unschedulable during the scheduling cycle, unless the optional pre-check
+// indicates that the pod was not affected by the event.
 //
 // NOTE: this function assumes lock has been acquired in caller
-func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(podInfoList []*framework.QueuedPodInfo, event framework.ClusterEvent) {
+func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(podInfoList []*framework.QueuedPodInfo, event framework.ClusterEvent, inFlightCheck inFlightCheck) {
 	activated := false
 	for _, pInfo := range podInfoList {
 		if p.eventMightMakePodSchedulable(pInfo, event) &&
@@ -828,7 +866,7 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(podInfoList []*framework.
 			activated = true
 		}
 	}
-	p.checkInFlightPods(event, nil)
+	p.checkInFlightPods(event, inFlightCheck)
 	if activated {
 		p.cond.Broadcast()
 	}
@@ -865,22 +903,15 @@ func (p *PriorityQueue) movePodToActiveOrBackoffQueue(pInfo *framework.QueuedPod
 	return false
 }
 
-func (p *PriorityQueue) checkInFlightPods(event framework.ClusterEvent, preCheck PreEnqueueCheck) {
+func (p *PriorityQueue) checkInFlightPods(event framework.ClusterEvent, inFlightCheck inFlightCheck) {
 	// Besides setting MoveRequestCycle for all pods which got moved in
 	// movePodToActiveOrBackoffQueue, we also need to set it for pods that
 	// are being processed because AddUnschedulableIfNotPresent might get
 	// called for them, and in AddUnschedulableIfNotPresent we need to know
 	// whether events where observed while processing them.
 	for uid, inFlight := range p.inFlightPods {
-		if preCheck != nil &&
-			preCheck(inFlight.pod) == framework.PodNotAffected {
-			continue
-		}
-		// TODO: forcing a pod into backoff because of some event that
-		// doesn't affect it slows down scheduling. Can we detect more
-		// unrelated events even when they don't have a preCheck?
-		// For example, PodSchedulingContextUpdate?
-		if event.Label == "PodSchedulingContextUpdate" {
+		if inFlightCheck != nil &&
+			inFlightCheck(inFlight) == framework.PodNotAffected {
 			continue
 		}
 		klog.V(6).InfoS("In-flight pod with concurrent event", "pod", klog.KObj(inFlight.pod), "event", event.Label, "schedulingCycle", p.schedulingCycle)
@@ -892,7 +923,7 @@ func (p *PriorityQueue) checkInFlightPods(event framework.ClusterEvent, preCheck
 // getUnschedulablePodsWithMatchingAffinityTerm returns unschedulable pods which have
 // any affinity term that matches "pod".
 // NOTE: this function assumes lock has been acquired in caller.
-func (p *PriorityQueue) getUnschedulablePodsWithMatchingAffinityTerm(pod *v1.Pod) []*framework.QueuedPodInfo {
+func (p *PriorityQueue) getUnschedulablePodsWithMatchingAffinityTerm(pod *v1.Pod) (labels.Set, []*framework.QueuedPodInfo) {
 	nsLabels := interpodaffinity.GetNamespaceLabelsSnapshot(pod.Namespace, p.nsLister)
 
 	var podsToMove []*framework.QueuedPodInfo
@@ -905,7 +936,7 @@ func (p *PriorityQueue) getUnschedulablePodsWithMatchingAffinityTerm(pod *v1.Pod
 		}
 
 	}
-	return podsToMove
+	return nsLabels, podsToMove
 }
 
 var pendingPodsSummary = "activeQ:%v; backoffQ:%v; unschedulablePods:%v"
