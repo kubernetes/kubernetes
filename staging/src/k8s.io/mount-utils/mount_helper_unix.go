@@ -173,8 +173,7 @@ func splitMountOptions(s string) []string {
 // isMountPointMatch returns true if the path in mp is the same as dir.
 // Handles case where mountpoint dir has been renamed due to stale NFS mount.
 func isMountPointMatch(mp MountPoint, dir string) bool {
-	deletedDir := fmt.Sprintf("%s\\040(deleted)", dir)
-	return ((mp.Path == dir) || (mp.Path == deletedDir))
+	return strings.TrimSuffix(mp.Path, "\\040(deleted)") == dir
 }
 
 // PathExists returns true if the specified path exists.
