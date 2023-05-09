@@ -7,6 +7,12 @@
 
 package execabs
 
+import "os/exec"
+
 func isGo119ErrDot(err error) bool {
+	return false
+}
+
+func isGo119ErrFieldSet(cmd *exec.Cmd) bool {
 	return false
 }

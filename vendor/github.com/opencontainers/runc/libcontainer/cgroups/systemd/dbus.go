@@ -2,6 +2,7 @@ package systemd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -80,8 +81,6 @@ func (d *dbusConnManager) resetConnection(conn *systemdDbus.Conn) {
 	}
 }
 
-var errDbusConnClosed = dbus.ErrClosed.Error()
-
 // retryOnDisconnect calls op, and if the error it returns is about closed dbus
 // connection, the connection is re-established and the op is retried. This helps
 // with the situation when dbus is restarted and we have a stale connection.
@@ -92,7 +91,10 @@ func (d *dbusConnManager) retryOnDisconnect(op func(*systemdDbus.Conn) error) er
 			return err
 		}
 		err = op(conn)
-		if !isDbusError(err, errDbusConnClosed) {
+		if err == nil {
+			return nil
+		}
+		if !errors.Is(err, dbus.ErrClosed) {
 			return err
 		}
 		d.resetConnection(conn)
