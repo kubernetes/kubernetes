@@ -8816,7 +8816,10 @@ func TestValidatePodSpec(t *testing.T) {
 	}
 	for k, v := range successCases {
 		t.Run(k, func(t *testing.T) {
-			if errs := ValidatePodSpec(&v, nil, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
+			opts := PodValidationOptions{
+				ResourceIsPod: true,
+			}
+			if errs := ValidatePodSpec(&v, nil, field.NewPath("field"), opts); len(errs) != 0 {
 				t.Errorf("expected success: %v", errs)
 			}
 		})
@@ -8867,6 +8870,18 @@ func TestValidatePodSpec(t *testing.T) {
 			RestartPolicy: "UnknowPolicy",
 			DNSPolicy:     core.DNSClusterFirst,
 			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+		},
+		"with hostNetwork hostPort unspecified": {
+			Containers: []core.Container{
+				{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", Ports: []core.ContainerPort{
+					{HostPort: 0, ContainerPort: 2600, Protocol: "TCP"}},
+				},
+			},
+			SecurityContext: &core.PodSecurityContext{
+				HostNetwork: true,
+			},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
 		},
 		"with hostNetwork hostPort not equal to containerPort": {
 			Containers: []core.Container{
@@ -9036,7 +9051,10 @@ func TestValidatePodSpec(t *testing.T) {
 		},
 	}
 	for k, v := range failureCases {
-		if errs := ValidatePodSpec(&v, nil, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
+		opts := PodValidationOptions{
+			ResourceIsPod: true,
+		}
+		if errs := ValidatePodSpec(&v, nil, field.NewPath("field"), opts); len(errs) == 0 {
 			t.Errorf("expected failure for %q", k)
 		}
 	}
