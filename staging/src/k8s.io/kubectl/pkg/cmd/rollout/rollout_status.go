@@ -231,6 +231,7 @@ func (o *RolloutStatusOptions) Run() error {
 		})
 	})
 
+	// Print out no resources found when we did not find any.
 	if !resourceFound {
 		fmt.Fprintf(o.ErrOut, "No resources found in %s namespace.\n", o.Namespace)
 	}
