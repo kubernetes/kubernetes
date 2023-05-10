@@ -231,9 +231,13 @@ func (o *RolloutStatusOptions) Run() error {
 		})
 	})
 
+	if err != nil {
+		return err
+	}
+
 	if !resourceFound {
 		fmt.Fprintf(o.ErrOut, "No resources found in %s namespace.\n", o.Namespace)
 	}
 
-	return err
+	return nil
 }
