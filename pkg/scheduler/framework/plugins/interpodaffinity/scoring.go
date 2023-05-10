@@ -131,7 +131,7 @@ func (pl *InterPodAffinity) PreScore(
 ) *framework.Status {
 	if len(nodes) == 0 {
 		// No nodes to score.
-		return nil
+		return framework.NewStatus(framework.Skip)
 	}
 
 	if pl.sharedLister == nil {
@@ -145,10 +145,7 @@ func (pl *InterPodAffinity) PreScore(
 	// Optionally ignore calculating preferences of existing pods' affinity rules
 	// if the incoming pod has no inter-pod affinities.
 	if pl.args.IgnorePreferredTermsOfExistingPods && !hasPreferredAffinityConstraints && !hasPreferredAntiAffinityConstraints {
-		cycleState.Write(preScoreStateKey, &preScoreState{
-			topologyScore: make(map[string]map[string]int64),
-		})
-		return nil
+		return framework.NewStatus(framework.Skip)
 	}
 
 	// Unless the pod being scheduled has preferred affinity terms, we only
@@ -212,6 +209,10 @@ func (pl *InterPodAffinity) PreScore(
 		}
 	}
 	pl.parallelizer.Until(pCtx, len(allNodes), processNode, pl.Name())
+
+	if index == -1 {
+		return framework.NewStatus(framework.Skip)
+	}
 
 	for i := 0; i <= int(index); i++ {
 		state.topologyScore.append(topoScores[i])
