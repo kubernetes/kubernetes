@@ -36,6 +36,11 @@ func init() {
 	mutationDetectionEnabled, _ = strconv.ParseBool(os.Getenv("KUBE_CACHE_MUTATION_DETECTOR"))
 }
 
+// IsCacheMutationDetectorEnabled returns true when KUBE_CACHE_MUTATION_DETECTOR was set.
+func IsCacheMutationDetectorEnabled() bool {
+	return mutationDetectionEnabled
+}
+
 // MutationDetector is able to monitor objects for mutation within a limited window of time
 type MutationDetector interface {
 	// AddObject adds the given object to the set being monitored for a while from now
@@ -45,20 +50,27 @@ type MutationDetector interface {
 	Run(stopCh <-chan struct{})
 }
 
-// NewCacheMutationDetector creates a new instance for the defaultCacheMutationDetector.
+// NewCacheMutationDetector creates a new instance for the defaultCacheMutationDetector
+// when KUBE_CACHE_MUTATION_DETECTOR was set. Otherwise, it returns no-op implementation
+// that matches the MutationDetector interface.
 func NewCacheMutationDetector(name string) MutationDetector {
 	if !mutationDetectionEnabled {
-		return dummyMutationDetector{}
+		return noopMutationDetector{}
 	}
-	klog.Warningln("Mutation detector is enabled, this will result in memory leakage.")
+	return NewAlwaysEnabledMutationDetector(name)
+}
+
+// NewAlwaysEnabledMutationDetector creates a new instance for the defaultCacheMutationDetector.
+func NewAlwaysEnabledMutationDetector(name string) MutationDetector {
+	klog.Warningln(fmt.Sprintf("Mutation detector %q is enabled, this will result in memory leakage.", name))
 	return &defaultCacheMutationDetector{name: name, period: 1 * time.Second, retainDuration: 2 * time.Minute}
 }
 
-type dummyMutationDetector struct{}
+type noopMutationDetector struct{}
 
-func (dummyMutationDetector) Run(stopCh <-chan struct{}) {
+func (noopMutationDetector) Run(<-chan struct{}) {
 }
-func (dummyMutationDetector) AddObject(obj interface{}) {
+func (noopMutationDetector) AddObject(interface{}) {
 }
 
 // defaultCacheMutationDetector gives a way to detect if a cached object has been mutated
