@@ -49,7 +49,7 @@ func NewFallbackQueryParamVerifier(primary Verifier, secondary Verifier) Verifie
 func (f *fallbackQueryParamVerifier) HasSupport(gvk schema.GroupVersionKind) error {
 	err := f.primary.HasSupport(gvk)
 	// If an error was returned from the primary OpenAPI endpoint,
-	// we fallback to check the secondary OpenAPI endpoint for an
+	// we fallback to check the secondary OpenAPI endpoint for
 	// any error *except* "paramUnsupportedError".
 	if err != nil && !IsParamUnsupportedError(err) {
 		klog.V(7).Infof("openapi v3 error...falling back to legacy: %s", err)
