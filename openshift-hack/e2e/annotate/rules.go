@@ -110,12 +110,6 @@ var (
 			`Netpol \[LinuxOnly\] NetworkPolicy between server and client using UDP should enforce policy based on Ports`,
 			`Netpol \[LinuxOnly\] NetworkPolicy between server and client using UDP should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector`,
 
-			// The new NetworkPolicy test suite is extremely resource
-			// intensive and causes itself and other concurrently-running
-			// tests to be flaky.
-			// https://bugzilla.redhat.com/show_bug.cgi?id=1980141
-			`\[sig-network\] Netpol `,
-
 			`Topology Hints should distribute endpoints evenly`,
 
 			// https://bugzilla.redhat.com/show_bug.cgi?id=1908645
@@ -141,9 +135,6 @@ var (
 
 			// https://bugzilla.redhat.com/show_bug.cgi?id=1953478
 			`\[sig-storage\] Dynamic Provisioning Invalid AWS KMS key should report an error and create no PV`,
-
-			// https://issues.redhat.com/browse/WRKLDS-665
-			`\[sig-scheduling\] SchedulerPreemption \[Serial\] validates pod disruption condition is added to the preempted pod`,
 		},
 		// tests that need to be temporarily disabled while the rebase is in progress.
 		"[Disabled:RebaseInProgress]": {
