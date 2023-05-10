@@ -57,7 +57,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		err            error
 	)
 	f := framework.NewDefaultFramework("pv")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		c = f.ClientSet

@@ -55,7 +55,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 
 	// The driver containers have to run with sufficient privileges to
 	// modify /var/lib/kubelet/plugins.
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("kubelet", func() {
 		nodes := NewNodes(f, 1, 1)

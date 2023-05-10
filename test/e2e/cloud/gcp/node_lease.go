@@ -37,7 +37,7 @@ import (
 
 var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 	f := framework.NewDefaultFramework("node-lease-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var systemPodsNo int32
 	var c clientset.Interface
 	var ns string

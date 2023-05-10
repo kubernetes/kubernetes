@@ -32,7 +32,7 @@ import (
 
 var _ = SIGDescribe("ImageCredentialProvider [Feature:KubeletCredentialProviders]", func() {
 	f := framework.NewDefaultFramework("image-credential-provider")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var podClient *e2epod.PodClient
 
 	ginkgo.BeforeEach(func() {

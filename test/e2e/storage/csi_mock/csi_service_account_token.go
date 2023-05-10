@@ -31,7 +31,7 @@ import (
 
 var _ = utils.SIGDescribe("CSI Mock volume service account token", func() {
 	f := framework.NewDefaultFramework("csi-mock-volumes-service-token")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	m := newMockDriverSetup(f)
 
 	ginkgo.Context("CSIServiceAccountToken", func() {

@@ -45,7 +45,7 @@ const (
 
 var _ = utils.SIGDescribe("PersistentVolumes-expansion ", func() {
 	f := framework.NewDefaultFramework("persistent-local-volumes-expansion")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("loopback local block volume", func() {
 		var (
 			config *localTestConfig

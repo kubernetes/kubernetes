@@ -54,7 +54,7 @@ import (
 
 var _ = utils.SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("volume-ops-storm")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	const defaultVolumeOpsScale = 30
 	var (
 		client            clientset.Interface

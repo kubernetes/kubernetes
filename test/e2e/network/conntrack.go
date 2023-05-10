@@ -68,7 +68,7 @@ const (
 var _ = common.SIGDescribe("Conntrack", func() {
 
 	fr := framework.NewDefaultFramework("conntrack")
-	fr.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	fr.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	type nodeInfo struct {
 		name   string

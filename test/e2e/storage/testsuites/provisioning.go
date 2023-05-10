@@ -19,11 +19,12 @@ package testsuites
 import (
 	"context"
 	"fmt"
-	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -135,7 +136,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewFrameworkWithCustomTimeouts("provisioning", storageframework.GetDriverTimeouts(driver))
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	init := func(ctx context.Context) {
 		l = local{}

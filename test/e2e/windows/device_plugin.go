@@ -41,7 +41,7 @@ const (
 
 var _ = SIGDescribe("[Feature:GPUDevicePlugin] Device Plugin", func() {
 	f := framework.NewDefaultFramework("device-plugin")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var cs clientset.Interface
 

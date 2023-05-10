@@ -95,7 +95,7 @@ var httpProbe = &v1.Probe{
 // GCE Api requirements: nodes and master need storage r/w permissions.
 var _ = SIGDescribe("StatefulSet", func() {
 	f := framework.NewDefaultFramework("statefulset")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var ns string
 	var c clientset.Interface
 

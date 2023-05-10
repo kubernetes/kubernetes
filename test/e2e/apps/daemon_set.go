@@ -135,7 +135,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	})
 
 	f = framework.NewDefaultFramework("daemonsets")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	image := WebserverImage
 	dsName := "daemon-set"

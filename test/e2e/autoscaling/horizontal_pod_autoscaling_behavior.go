@@ -31,7 +31,7 @@ import (
 
 var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (non-default behavior)", func() {
 	f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	hpaName := "consumer"
 

@@ -43,7 +43,7 @@ import (
 
 var _ = utils.SIGDescribe("CSI Mock volume storage capacity", func() {
 	f := framework.NewDefaultFramework("csi-mock-volumes-capacity")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	m := newMockDriverSetup(f)
 
 	ginkgo.Context("storage capacity", func() {

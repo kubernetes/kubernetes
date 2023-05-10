@@ -81,7 +81,7 @@ func restartAPIServer(ctx context.Context, node *v1.Node) error {
 // This test requires that --feature-gates=APIServerIdentity=true be set on the apiserver
 var _ = SIGDescribe("kube-apiserver identity [Feature:APIServerIdentity]", func() {
 	f := framework.NewDefaultFramework("kube-apiserver-identity")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("kube-apiserver identity should persist after restart [Disruptive]", func(ctx context.Context) {
 		e2eskipper.SkipUnlessProviderIs("gce")

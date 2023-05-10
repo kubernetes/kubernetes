@@ -54,7 +54,7 @@ const (
 
 var _ = SIGDescribe("CronJob", func() {
 	f := framework.NewDefaultFramework("cronjob")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	sleepCommand := []string{"sleep", "300"}
 

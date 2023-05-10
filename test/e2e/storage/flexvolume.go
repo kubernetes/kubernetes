@@ -158,7 +158,7 @@ func getHostFromHostPort(hostPort string) string {
 
 var _ = utils.SIGDescribe("Flexvolumes", func() {
 	f := framework.NewDefaultFramework("flexvolume")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	// note that namespace deletion is handled by delete-namespace flag
 

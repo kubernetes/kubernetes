@@ -54,7 +54,7 @@ const (
 var _ = common.SIGDescribe("Firewall rule", func() {
 	var firewallTestName = "firewall-test"
 	f := framework.NewDefaultFramework(firewallTestName)
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var cs clientset.Interface
 	var cloudConfig framework.CloudConfig

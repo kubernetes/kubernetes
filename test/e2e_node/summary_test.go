@@ -42,7 +42,7 @@ import (
 
 var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("summary-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when querying /stats/summary", func() {
 		ginkgo.AfterEach(func(ctx context.Context) {
 			if !ginkgo.CurrentSpecReport().Failed() {

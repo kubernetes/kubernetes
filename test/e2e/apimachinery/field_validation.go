@@ -39,7 +39,7 @@ import (
 
 var _ = SIGDescribe("FieldValidation", func() {
 	f := framework.NewDefaultFramework("field-validation")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	var client clientset.Interface
 	var ns string

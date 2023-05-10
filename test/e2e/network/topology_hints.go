@@ -42,7 +42,7 @@ import (
 
 var _ = common.SIGDescribe("[Feature:Topology Hints]", func() {
 	f := framework.NewDefaultFramework("topology-hints")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	// filled in BeforeEach
 	var c clientset.Interface
