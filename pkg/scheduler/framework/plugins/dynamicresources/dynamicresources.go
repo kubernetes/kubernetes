@@ -321,39 +321,39 @@ func (pl *dynamicResources) isSchedulableAfterClaimChange(oldObj, newObj interfa
 		return framework.PodNotAffected
 	}
 
-	if usesClaim {
-		if oldObj == nil {
-			pl.logger.V(4).Info("claim for pod got created", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim))
-			return framework.PodImmediatelySchedulable
-		}
+	if !usesClaim {
+		// This was not the claim the pod was waiting for.
+		pl.logger.V(6).Info("unrelated claim got modified", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim))
+		return framework.PodNotAffected
+	}
 
-		// Modifications may or may not be relevant. If the entire
-		// status is as before, then something else must have changed
-		// and we don't care. What happens in practice is that the
-		// resource driver adds the finalizer.
-		originalClaim, ok := oldObj.(*resourcev1alpha2.ResourceClaim)
-		if !ok {
-			// Shouldn't happen.
-			pl.logger.Error(nil, "unexpected old object in isSchedulableAfterClaimAddOrUpdate", "obj", oldObj)
-			return framework.PodMaybeSchedulable
-		}
-		if apiequality.Semantic.DeepEqual(&originalClaim.Status, &modifiedClaim.Status) {
-			if loggerV := pl.logger.V(7); loggerV.Enabled() {
-				// Log more information.
-				loggerV.Info("claim for pod got modified where the pod doesn't care", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim), "diff", cmp.Diff(originalClaim, modifiedClaim))
-			} else {
-				pl.logger.V(6).Info("claim for pod got modified where the pod doesn't care", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim))
-			}
-			return framework.PodNotAffected
-		}
-
-		pl.logger.V(4).Info("status of claim for pod got updated", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim))
+	if oldObj == nil {
+		pl.logger.V(4).Info("claim for pod got created", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim))
 		return framework.PodImmediatelySchedulable
 	}
 
-	// This was not the claim the pod was waiting for.
-	pl.logger.V(6).Info("unrelated claim got modified", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim))
-	return framework.PodNotAffected
+	// Modifications may or may not be relevant. If the entire
+	// status is as before, then something else must have changed
+	// and we don't care. What happens in practice is that the
+	// resource driver adds the finalizer.
+	originalClaim, ok := oldObj.(*resourcev1alpha2.ResourceClaim)
+	if !ok {
+		// Shouldn't happen.
+		pl.logger.Error(nil, "unexpected old object in isSchedulableAfterClaimAddOrUpdate", "obj", oldObj)
+		return framework.PodMaybeSchedulable
+	}
+	if apiequality.Semantic.DeepEqual(&originalClaim.Status, &modifiedClaim.Status) {
+		if loggerV := pl.logger.V(7); loggerV.Enabled() {
+			// Log more information.
+			loggerV.Info("claim for pod got modified where the pod doesn't care", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim), "diff", cmp.Diff(originalClaim, modifiedClaim))
+		} else {
+			pl.logger.V(6).Info("claim for pod got modified where the pod doesn't care", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim))
+		}
+		return framework.PodNotAffected
+	}
+
+	pl.logger.V(4).Info("status of claim for pod got updated", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim))
+	return framework.PodImmediatelySchedulable
 }
 
 // isSchedulableAfterPodSchedulingChange is invoked whenever a
