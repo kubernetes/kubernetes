@@ -258,3 +258,29 @@ func TestRolloutStatusWatchDisabledUnavailable(t *testing.T) {
 		t.Errorf("expected output: %s, but got: %s", expectedMsg, buf.String())
 	}
 }
+
+func TestRolloutStatusEmptyList(t *testing.T) {
+	ns := scheme.Codecs.WithoutConversion()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+
+	info, _ := runtime.SerializerInfoForMediaType(ns.SupportedMediaTypes(), runtime.ContentTypeJSON)
+	encoder := ns.EncoderForVersion(info.Serializer, rolloutStatusGroupVersionEncoder)
+	tf.Client = &fake.RESTClient{
+		GroupVersion:         rolloutStatusGroupVersionEncoder,
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			dep := &appsv1.DeploymentList{}
+			body := io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, dep))))
+			return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
+		}),
+	}
+	streams, _, _, err := genericiooptions.NewTestIOStreams()
+	cmd := NewCmdRolloutStatus(tf, streams)
+	cmd.Run(cmd, []string{"deployment"})
+
+	expectedMsg := "No resources found in test namespace.\n"
+	if err.String() != expectedMsg {
+		t.Errorf("expected output: %s, but got: %s", expectedMsg, err.String())
+	}
+}

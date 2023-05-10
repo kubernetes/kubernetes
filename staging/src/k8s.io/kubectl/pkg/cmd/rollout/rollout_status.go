@@ -174,7 +174,9 @@ func (o *RolloutStatusOptions) Run() error {
 		return err
 	}
 
-	return r.Visit(func(info *resource.Info, _ error) error {
+	resourceFound := false
+	err = r.Visit(func(info *resource.Info, _ error) error {
+		resourceFound = true
 		mapping := info.ResourceMapping()
 		statusViewer, err := o.StatusViewerFn(mapping)
 		if err != nil {
@@ -228,4 +230,14 @@ func (o *RolloutStatusOptions) Run() error {
 			return err
 		})
 	})
+
+	if err != nil {
+		return err
+	}
+
+	if !resourceFound {
+		fmt.Fprintf(o.ErrOut, "No resources found in %s namespace.\n", o.Namespace)
+	}
+
+	return nil
 }
