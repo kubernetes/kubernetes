@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/go-logr/logr"
 
@@ -30,6 +31,7 @@ var logRegistry = newLogFormatRegistry()
 
 // logFormatRegistry stores factories for all supported logging formats.
 type logFormatRegistry struct {
+	mutex    sync.Mutex
 	registry map[string]logFormat
 	frozen   bool
 }
@@ -83,6 +85,8 @@ func newLogFormatRegistry() *logFormatRegistry {
 
 // register adds a new log format. It's an error to modify an existing one.
 func (lfr *logFormatRegistry) register(name string, format logFormat) error {
+	lfr.mutex.Lock()
+	defer lfr.mutex.Unlock()
 	if lfr.frozen {
 		return fmt.Errorf("log format registry is frozen, unable to register log format %s", name)
 	}
@@ -98,6 +102,8 @@ func (lfr *logFormatRegistry) register(name string, format logFormat) error {
 
 // get specified log format factory
 func (lfr *logFormatRegistry) get(name string) (*logFormat, error) {
+	lfr.mutex.Lock()
+	defer lfr.mutex.Unlock()
 	format, ok := lfr.registry[name]
 	if !ok {
 		return nil, fmt.Errorf("log format: %s does not exists", name)
@@ -107,6 +113,8 @@ func (lfr *logFormatRegistry) get(name string) (*logFormat, error) {
 
 // list names of registered log formats, including feature gates (sorted)
 func (lfr *logFormatRegistry) list() string {
+	lfr.mutex.Lock()
+	defer lfr.mutex.Unlock()
 	formats := make([]string, 0, len(lfr.registry))
 	for name, format := range lfr.registry {
 		item := fmt.Sprintf(`"%s"`, name)
@@ -121,5 +129,7 @@ func (lfr *logFormatRegistry) list() string {
 
 // freeze prevents further modifications of the registered log formats.
 func (lfr *logFormatRegistry) freeze() {
+	lfr.mutex.Lock()
+	defer lfr.mutex.Unlock()
 	lfr.frozen = true
 }
