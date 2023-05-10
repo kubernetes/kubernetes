@@ -22,32 +22,51 @@ SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
 SCRIPT_ROOT="${SCRIPT_DIR}/.."
 CODEGEN_PKG="${CODEGEN_PKG:-"${SCRIPT_ROOT}/.."}"
 
+source "${CODEGEN_PKG}/kube_codegen.sh"
+
 # generate the code with:
 # - --output-base because this script should also be able to run inside the vendor dir of
 #   k8s.io/kubernetes. The output-base is needed for the generators to output into the vendor dir
 #   instead of the $GOPATH directly. For normal projects this can be dropped.
-"${CODEGEN_PKG}/generate-internal-groups.sh" "client,conversion,deepcopy,defaulter,informer,lister,openapi" \
-  k8s.io/code-generator/examples/apiserver \
-  k8s.io/code-generator/examples/apiserver/apis \
-  k8s.io/code-generator/examples/apiserver/apis \
-  "example:v1 example2:v1 example3.io:v1" \
-  --output-base "${SCRIPT_DIR}/../../../.." \
-  --go-header-file "${SCRIPT_DIR}/boilerplate.go.txt"
-"${CODEGEN_PKG}/generate-groups.sh" "applyconfiguration,client,deepcopy,defaulter,informer,lister" \
-  k8s.io/code-generator/examples/crd \
-  k8s.io/code-generator/examples/crd/apis \
-  "example:v1 example2:v1" \
-  --output-base "${SCRIPT_DIR}/../../../.." \
-  --go-header-file "${SCRIPT_DIR}/boilerplate.go.txt"
-"${CODEGEN_PKG}/generate-groups.sh" "applyconfiguration,client,deepcopy,defaulter,informer,lister" \
-  k8s.io/code-generator/examples/MixedCase \
-  k8s.io/code-generator/examples/MixedCase/apis \
-  "example:v1" \
-  --output-base "${SCRIPT_DIR}/../../../.." \
-  --go-header-file "${SCRIPT_DIR}/boilerplate.go.txt"
-"${CODEGEN_PKG}/generate-groups.sh" "applyconfiguration,client,deepcopy,defaulter,informer,lister" \
-  k8s.io/code-generator/examples/HyphenGroup \
-  k8s.io/code-generator/examples/HyphenGroup/apis \
-  "example:v1" \
-  --output-base "${SCRIPT_DIR}/../../../.." \
-  --go-header-file "${SCRIPT_DIR}/boilerplate.go.txt"
+
+kube::codegen::gen_helpers \
+    --input-pkg-root k8s.io/code-generator/examples \
+    --output-base "$(dirname "${BASH_SOURCE[0]}")/../../../.." \
+    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt"
+
+kube::codegen::gen_openapi \
+    --input-pkg-root k8s.io/code-generator/examples/apiserver/apis \
+    --output-pkg-root k8s.io/code-generator/examples/apiserver \
+    --output-base "$(dirname "${BASH_SOURCE[0]}")/../../../.." \
+    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt"
+
+kube::codegen::gen_client \
+    --with-watch \
+    --input-pkg-root k8s.io/code-generator/examples/apiserver/apis \
+    --output-pkg-root k8s.io/code-generator/examples/apiserver \
+    --output-base "$(dirname "${BASH_SOURCE[0]}")/../../../.." \
+    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt"
+
+kube::codegen::gen_client \
+    --with-watch \
+    --with-applyconfig \
+    --input-pkg-root k8s.io/code-generator/examples/crd/apis \
+    --output-pkg-root k8s.io/code-generator/examples/crd \
+    --output-base "$(dirname "${BASH_SOURCE[0]}")/../../../.." \
+    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt"
+
+kube::codegen::gen_client \
+    --with-watch \
+    --with-applyconfig \
+    --input-pkg-root k8s.io/code-generator/examples/MixedCase/apis \
+    --output-pkg-root k8s.io/code-generator/examples/MixedCase \
+    --output-base "$(dirname "${BASH_SOURCE[0]}")/../../../.." \
+    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt"
+
+kube::codegen::gen_client \
+    --with-watch \
+    --with-applyconfig \
+    --input-pkg-root k8s.io/code-generator/examples/HyphenGroup/apis \
+    --output-pkg-root k8s.io/code-generator/examples/HyphenGroup \
+    --output-base "$(dirname "${BASH_SOURCE[0]}")/../../../.." \
+    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt"

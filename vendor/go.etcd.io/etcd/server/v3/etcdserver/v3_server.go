@@ -454,6 +454,13 @@ func (s *EtcdServer) Authenticate(ctx context.Context, r *pb.AuthenticateRequest
 
 	lg := s.Logger()
 
+	// fix https://nvd.nist.gov/vuln/detail/CVE-2021-28235
+	defer func() {
+		if r != nil {
+			r.Password = ""
+		}
+	}()
+
 	var resp proto.Message
 	for {
 		checkedRevision, err := s.AuthStore().CheckPassword(r.Name, r.Password)

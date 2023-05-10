@@ -3481,15 +3481,35 @@ func validatePodDNSConfig(dnsConfig *core.PodDNSConfig, dnsPolicy *core.DNSPolic
 	return allErrs
 }
 
-func validateHostNetwork(hostNetwork bool, containers []core.Container, fldPath *field.Path) field.ErrorList {
+// validatePodHostNetworkDeps checks fields which depend on whether HostNetwork is
+// true or not.  It should be called on all PodSpecs, but opts can change what
+// is enforce.  E.g. opts.ResourceIsPod should only be set when called in the
+// context of a Pod, and not on PodSpecs which are embedded in other resources
+// (e.g. Deployments).
+func validatePodHostNetworkDeps(spec *core.PodSpec, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+	// For <reasons> we keep `.HostNetwork` in .SecurityContext on the internal
+	// version of Pod.
+	hostNetwork := false
+	if spec.SecurityContext != nil {
+		hostNetwork = spec.SecurityContext.HostNetwork
+	}
+
 	allErrors := field.ErrorList{}
+
 	if hostNetwork {
-		for i, container := range containers {
+		fldPath := fldPath.Child("containers")
+		for i, container := range spec.Containers {
 			portsPath := fldPath.Index(i).Child("ports")
 			for i, port := range container.Ports {
 				idxPath := portsPath.Index(i)
-				if port.HostPort != port.ContainerPort {
-					allErrors = append(allErrors, field.Invalid(idxPath.Child("containerPort"), port.ContainerPort, "must match `hostPort` when `hostNetwork` is true"))
+				// At this point, we know that HostNetwork is true. If this
+				// PodSpec is in a Pod (opts.ResourceIsPod), then HostPort must
+				// be the same value as ContainerPort. If this PodSpec is in
+				// some other resource (e.g. Deployment) we allow 0 (i.e.
+				// unspecified) because it will be defaulted when the Pod is
+				// ultimately created, but we do not allow any other values.
+				if hp, cp := port.HostPort, port.ContainerPort; (opts.ResourceIsPod || hp != 0) && hp != cp {
+					allErrors = append(allErrors, field.Invalid(idxPath.Child("hostPort"), port.HostPort, "must match `containerPort` when `hostNetwork` is true"))
 				}
 			}
 		}
@@ -3694,19 +3714,23 @@ type PodValidationOptions struct {
 	AllowInvalidTopologySpreadConstraintLabelSelector bool
 	// Allow node selector additions for gated pods.
 	AllowMutableNodeSelectorAndNodeAffinity bool
+	// The top-level resource being validated is a Pod, not just a PodSpec
+	// embedded in some other resource.
+	ResourceIsPod bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
 // and is called by ValidatePodCreate and ValidatePodUpdate.
 func validatePodMetadataAndSpec(pod *core.Pod, opts PodValidationOptions) field.ErrorList {
-	fldPath := field.NewPath("metadata")
-	allErrs := ValidateObjectMeta(&pod.ObjectMeta, true, ValidatePodName, fldPath)
-	allErrs = append(allErrs, ValidatePodSpecificAnnotations(pod.ObjectMeta.Annotations, &pod.Spec, fldPath.Child("annotations"), opts)...)
-	allErrs = append(allErrs, ValidatePodSpec(&pod.Spec, &pod.ObjectMeta, field.NewPath("spec"), opts)...)
+	metaPath := field.NewPath("metadata")
+	specPath := field.NewPath("spec")
+
+	allErrs := ValidateObjectMeta(&pod.ObjectMeta, true, ValidatePodName, metaPath)
+	allErrs = append(allErrs, ValidatePodSpecificAnnotations(pod.ObjectMeta.Annotations, &pod.Spec, metaPath.Child("annotations"), opts)...)
+	allErrs = append(allErrs, ValidatePodSpec(&pod.Spec, &pod.ObjectMeta, specPath, opts)...)
 
 	// we do additional validation only pertinent for pods and not pod templates
 	// this was done to preserve backwards compatibility
-	specPath := field.NewPath("spec")
 
 	if pod.Spec.ServiceAccountName == "" {
 		for vi, volume := range pod.Spec.Volumes {
@@ -3790,10 +3814,11 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 	allErrs = append(allErrs, validateContainers(spec.Containers, vols, podClaimNames, fldPath.Child("containers"), opts)...)
 	allErrs = append(allErrs, validateInitContainers(spec.InitContainers, spec.Containers, vols, podClaimNames, fldPath.Child("initContainers"), opts)...)
 	allErrs = append(allErrs, validateEphemeralContainers(spec.EphemeralContainers, spec.Containers, spec.InitContainers, vols, podClaimNames, fldPath.Child("ephemeralContainers"), opts)...)
+	allErrs = append(allErrs, validatePodHostNetworkDeps(spec, fldPath, opts)...)
 	allErrs = append(allErrs, validateRestartPolicy(&spec.RestartPolicy, fldPath.Child("restartPolicy"))...)
 	allErrs = append(allErrs, validateDNSPolicy(&spec.DNSPolicy, fldPath.Child("dnsPolicy"))...)
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabels(spec.NodeSelector, fldPath.Child("nodeSelector"))...)
-	allErrs = append(allErrs, ValidatePodSecurityContext(spec.SecurityContext, spec, fldPath, fldPath.Child("securityContext"), opts)...)
+	allErrs = append(allErrs, validatePodSpecSecurityContext(spec.SecurityContext, spec, fldPath, fldPath.Child("securityContext"), opts)...)
 	allErrs = append(allErrs, validateImagePullSecrets(spec.ImagePullSecrets, fldPath.Child("imagePullSecrets"))...)
 	allErrs = append(allErrs, validateAffinity(spec.Affinity, opts, fldPath.Child("affinity"))...)
 	allErrs = append(allErrs, validatePodDNSConfig(spec.DNSConfig, &spec.DNSPolicy, fldPath.Child("dnsConfig"), opts)...)
@@ -4396,12 +4421,13 @@ func validateSysctls(sysctls []core.Sysctl, fldPath *field.Path) field.ErrorList
 	return allErrs
 }
 
-// ValidatePodSecurityContext test that the specified PodSecurityContext has valid data.
-func ValidatePodSecurityContext(securityContext *core.PodSecurityContext, spec *core.PodSpec, specPath, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+// validatePodSpecSecurityContext verifies the SecurityContext of a PodSpec,
+// whether that is defined in a Pod or in an embedded PodSpec (e.g. a
+// Deployment's pod template).
+func validatePodSpecSecurityContext(securityContext *core.PodSecurityContext, spec *core.PodSpec, specPath, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if securityContext != nil {
-		allErrs = append(allErrs, validateHostNetwork(securityContext.HostNetwork, spec.Containers, specPath.Child("containers"))...)
 		if securityContext.FSGroup != nil {
 			for _, msg := range validation.IsValidGroupID(*securityContext.FSGroup) {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("fsGroup"), *(securityContext.FSGroup), msg))

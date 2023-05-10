@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Kubernetes Authors.
+Copyright 2023 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,22 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package library
+package util
 
 import (
-	"github.com/google/cel-go/cel"
-	"github.com/google/cel-go/ext"
-	"github.com/google/cel-go/interpreter"
+	"os"
 )
 
-// ExtensionLibs declares the set of CEL extension libraries available everywhere CEL is used in Kubernetes.
-var ExtensionLibs = append(k8sExtensionLibs, ext.Strings())
-
-var k8sExtensionLibs = []cel.EnvOption{
-	URLs(),
-	Regex(),
-	Lists(),
-	Authz(),
+// CopyFile copies a file from src to dest.
+func CopyFile(src, dest string) error {
+	fileInfo, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+	contents, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	err = os.WriteFile(dest, contents, fileInfo.Mode())
+	return err
 }
-
-var ExtensionLibRegexOptimizations = []*interpreter.RegexOptimization{FindRegexOptimization, FindAllRegexOptimization}

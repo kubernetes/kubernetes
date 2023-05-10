@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 
@@ -92,7 +92,7 @@ func isObjectOlder(newObject, oldObject runtime.Object) bool {
 	return newVersion < oldVersion
 }
 
-func (s *objectStore) AddReference(namespace, name string) {
+func (s *objectStore) AddReference(namespace, name string, _ types.UID) {
 	key := objectKey{namespace: namespace, name: name}
 
 	// AddReference is called from RegisterPod, thus it needs to be efficient.
@@ -114,7 +114,7 @@ func (s *objectStore) AddReference(namespace, name string) {
 	item.data = nil
 }
 
-func (s *objectStore) DeleteReference(namespace, name string) {
+func (s *objectStore) DeleteReference(namespace, name string, _ types.UID) {
 	key := objectKey{namespace: namespace, name: name}
 
 	s.lock.Lock()
@@ -225,7 +225,7 @@ func (c *cacheBasedManager) RegisterPod(pod *v1.Pod) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	for name := range names {
-		c.objectStore.AddReference(pod.Namespace, name)
+		c.objectStore.AddReference(pod.Namespace, name, pod.UID)
 	}
 	var prev *v1.Pod
 	key := objectKey{namespace: pod.Namespace, name: pod.Name, uid: pod.UID}
@@ -238,7 +238,7 @@ func (c *cacheBasedManager) RegisterPod(pod *v1.Pod) {
 			// names and prev need to have their ref counts decremented. Any that
 			// are only in prev need to be completely removed. This unconditional
 			// call takes care of both cases.
-			c.objectStore.DeleteReference(prev.Namespace, name)
+			c.objectStore.DeleteReference(prev.Namespace, name, prev.UID)
 		}
 	}
 }
@@ -252,7 +252,7 @@ func (c *cacheBasedManager) UnregisterPod(pod *v1.Pod) {
 	delete(c.registeredPods, key)
 	if prev != nil {
 		for name := range c.getReferencedObjects(prev) {
-			c.objectStore.DeleteReference(prev.Namespace, name)
+			c.objectStore.DeleteReference(prev.Namespace, name, prev.UID)
 		}
 	}
 }

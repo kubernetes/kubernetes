@@ -170,8 +170,8 @@ func TestEdit(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	os.Setenv("KUBE_EDITOR", "testdata/test_editor.sh")
-	os.Setenv("KUBE_EDITOR_CALLBACK", server.URL+"/callback")
+	t.Setenv("KUBE_EDITOR", "testdata/test_editor.sh")
+	t.Setenv("KUBE_EDITOR_CALLBACK", server.URL+"/callback")
 
 	testcases := sets.NewString()
 	filepath.Walk("testdata", func(path string, info os.FileInfo, err error) error {

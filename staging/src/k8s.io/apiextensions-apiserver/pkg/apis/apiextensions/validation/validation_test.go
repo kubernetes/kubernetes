@@ -24,6 +24,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/cel-go/cel"
+
 	"k8s.io/utils/pointer"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
@@ -35,6 +37,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apiserver/pkg/cel/environment"
+	"k8s.io/apiserver/pkg/cel/library"
 )
 
 type validationMatch struct {
@@ -6227,6 +6232,142 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 	}
 }
 
+func TestValidateCustomResourceDefinitionValidationRuleCompatibility(t *testing.T) {
+	allValidationsErrors := []validationMatch{
+		invalid("spec", "validation", "openAPIV3Schema", "properties[x]", "x-kubernetes-validations[0]", "rule"),
+		invalid("spec", "validation", "openAPIV3Schema", "properties[obj]", "x-kubernetes-validations[0]", "rule"),
+		invalid("spec", "validation", "openAPIV3Schema", "properties[obj]", "properties[a]", "x-kubernetes-validations[0]", "rule"),
+		invalid("spec", "validation", "openAPIV3Schema", "properties[array]", "x-kubernetes-validations[0]", "rule"),
+		invalid("spec", "validation", "openAPIV3Schema", "properties[array]", "items", "x-kubernetes-validations[0]", "rule"),
+		invalid("spec", "validation", "openAPIV3Schema", "properties[map]", "x-kubernetes-validations[0]", "rule"),
+		invalid("spec", "validation", "openAPIV3Schema", "properties[map]", "additionalProperties", "x-kubernetes-validations[0]", "rule"),
+	}
+
+	tests := []struct {
+		name        string
+		storedRule  string
+		updatedRule string
+		errors      []validationMatch
+	}{
+		{
+			name:        "functions declared for storage mode allowed if expression is unchanged from what is stored",
+			storedRule:  "test() == true",
+			updatedRule: "test() == true",
+		},
+		{
+			name:        "functions declared for storage mode not allowed if expression is changed",
+			storedRule:  "test() == false",
+			updatedRule: "test() == true",
+			errors:      allValidationsErrors,
+		},
+	}
+
+	// Include the test library, which includes the test() function in the storage environment during test
+	base := environment.MustBaseEnvSet(version.MajorMinor(1, 998))
+	envSet, err := base.Extend(environment.VersionedOptions{
+		IntroducedVersion: version.MajorMinor(1, 999),
+		EnvOptions:        []cel.EnvOption{library.Test()},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tc := range tests {
+		fn := func(rule string) *apiextensions.CustomResourceDefinition {
+			validationRules := []apiextensions.ValidationRule{
+				{
+					Rule: rule,
+				},
+			}
+			return &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com", ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:    "group.com",
+					Scope:    apiextensions.ResourceScope("Cluster"),
+					Names:    apiextensions.CustomResourceDefinitionNames{Plural: "plural", Singular: "singular", Kind: "Plural", ListKind: "PluralList"},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{{Name: "version", Served: true, Storage: true}},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"x": {
+									Type:         "string",
+									XValidations: validationRules,
+								},
+								"obj": {
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"a": {
+											Type:         "string",
+											XValidations: validationRules,
+										},
+									},
+									XValidations: validationRules,
+								},
+								"array": {
+									Type:     "array",
+									MaxItems: pointer.Int64(1),
+									Items: &apiextensions.JSONSchemaPropsOrArray{
+										Schema: &apiextensions.JSONSchemaProps{
+											Type:         "string",
+											XValidations: validationRules,
+										},
+									},
+									XValidations: validationRules,
+								},
+								"map": {
+									Type:          "object",
+									MaxProperties: pointer.Int64(1),
+									AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+										Schema: &apiextensions.JSONSchemaProps{
+											Type:         "string",
+											XValidations: validationRules,
+										},
+									},
+									XValidations: validationRules,
+								},
+							},
+						},
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{StoredVersions: []string{"version"}},
+			}
+		}
+		old := fn(tc.storedRule)
+		resource := fn(tc.updatedRule)
+
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.TODO()
+			errs := validateCustomResourceDefinitionUpdate(ctx, resource, old, validationOptions{
+				preexistingExpressions: findPreexistingExpressions(&old.Spec),
+				celEnvironmentSet:      envSet,
+			})
+			seenErrs := make([]bool, len(errs))
+
+			for _, expectedError := range tc.errors {
+				found := false
+				for i, err := range errs {
+					if expectedError.matches(err) && !seenErrs[i] {
+						found = true
+						seenErrs[i] = true
+						break
+					}
+				}
+
+				if !found {
+					t.Errorf("expected %v at %v, got %v", expectedError.errorType, expectedError.path.String(), errs)
+				}
+			}
+
+			for i, seen := range seenErrs {
+				if !seen {
+					t.Errorf("unexpected error: %v", errs[i])
+				}
+			}
+		})
+	}
+}
+
 func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -8736,6 +8877,9 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.TODO()
+			if tt.opts.celEnvironmentSet == nil {
+				tt.opts.celEnvironmentSet = environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())
+			}
 			got := validateCustomResourceDefinitionValidation(ctx, &tt.input, tt.statusEnabled, tt.opts, field.NewPath("spec", "validation"))
 
 			seenErrs := make([]bool, len(got))
@@ -9170,7 +9314,9 @@ func TestCelContext(t *testing.T) {
 			}
 			celContext := RootCELContext(tt.schema)
 			celContext.converter = converter
-			opts := validationOptions{}
+			opts := validationOptions{
+				celEnvironmentSet: environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()),
+			}
 			openAPIV3Schema := &specStandardValidatorV3{
 				allowDefaults:            opts.allowDefaults,
 				disallowDefaultsReason:   opts.disallowDefaultsReason,

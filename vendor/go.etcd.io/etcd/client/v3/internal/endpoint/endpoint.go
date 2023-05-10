@@ -45,8 +45,8 @@ func extractHostFromPath(pathStr string) string {
 	return extractHostFromHostPort(path.Base(pathStr))
 }
 
-//mustSplit2 returns the values from strings.SplitN(s, sep, 2).
-//If sep is not found, it returns ("", "", false) instead.
+// mustSplit2 returns the values from strings.SplitN(s, sep, 2).
+// If sep is not found, it returns ("", "", false) instead.
 func mustSplit2(s, sep string) (string, string) {
 	spl := strings.SplitN(s, sep, 2)
 	if len(spl) < 2 {
@@ -81,11 +81,12 @@ func schemeToCredsRequirement(schema string) CredsRequirement {
 // The main differences:
 //   - etcd supports unixs & https names as opposed to unix & http to
 //     distinguish need to configure certificates.
-//  -  etcd support http(s) names as opposed to tcp supported by grpc/dial method.
-//  -  etcd supports unix(s)://local-file naming schema
+//   - etcd support http(s) names as opposed to tcp supported by grpc/dial method.
+//   - etcd supports unix(s)://local-file naming schema
 //     (as opposed to unix:local-file canonical name used by grpc for current dir files).
-//  - Within the unix(s) schemas, the last segment (filename) without 'port' (content after colon)
-//    is considered serverName - to allow local testing of cert-protected communication.
+//   - Within the unix(s) schemas, the last segment (filename) without 'port' (content after colon)
+//     is considered serverName - to allow local testing of cert-protected communication.
+//
 // See more:
 //   - https://github.com/grpc/grpc-go/blob/26c143bd5f59344a4b8a1e491e0f5e18aa97abc7/internal/grpcutil/target.go#L47
 //   - https://golang.org/pkg/net/#Dial

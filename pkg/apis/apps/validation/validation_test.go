@@ -213,6 +213,30 @@ func TestValidateStatefulSet(t *testing.T) {
 		},
 	}
 
+	validHostNetPodTemplate := api.PodTemplate{
+		Template: api.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: validLabels,
+			},
+			Spec: api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{
+					HostNetwork: true,
+				},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+				Containers: []api.Container{{
+					Name:            "abc",
+					Image:           "image",
+					ImagePullPolicy: "IfNotPresent",
+					Ports: []api.ContainerPort{{
+						ContainerPort: 12345,
+						Protocol:      api.ProtocolTCP,
+					}},
+				}},
+			},
+		},
+	}
+
 	invalidLabels := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	invalidPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
@@ -254,6 +278,9 @@ func TestValidateStatefulSet(t *testing.T) {
 	}, {
 		name: "alphanumeric name",
 		set:  mkStatefulSet(&validPodTemplate, tweakName("abc-123")),
+	}, {
+		name: "hostNetwork true",
+		set:  mkStatefulSet(&validHostNetPodTemplate),
 	}, {
 		name: "parallel pod management",
 		set:  mkStatefulSet(&validPodTemplate, tweakPodManagementPolicy(apps.ParallelPodManagement)),
@@ -1988,6 +2015,30 @@ func TestValidateDaemonSet(t *testing.T) {
 			},
 		},
 	}
+	validHostNetPodTemplate := api.PodTemplate{
+		Template: api.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: validSelector,
+			},
+			Spec: api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{
+					HostNetwork: true,
+				},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+				Containers: []api.Container{{
+					Name:                     "abc",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: api.TerminationMessageReadFile,
+					Ports: []api.ContainerPort{{
+						ContainerPort: 12345,
+						Protocol:      api.ProtocolTCP,
+					}},
+				}},
+			},
+		},
+	}
 	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	invalidPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
@@ -2014,6 +2065,15 @@ func TestValidateDaemonSet(t *testing.T) {
 		Spec: apps.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 			Template: validPodTemplate.Template,
+			UpdateStrategy: apps.DaemonSetUpdateStrategy{
+				Type: apps.OnDeleteDaemonSetStrategyType,
+			},
+		},
+	}, {
+		ObjectMeta: metav1.ObjectMeta{Name: "hostnet", Namespace: metav1.NamespaceDefault},
+		Spec: apps.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{MatchLabels: validSelector},
+			Template: validHostNetPodTemplate.Template,
 			UpdateStrategy: apps.DaemonSetUpdateStrategy{
 				Type: apps.OnDeleteDaemonSetStrategyType,
 			},
@@ -2187,8 +2247,8 @@ func TestValidateDaemonSet(t *testing.T) {
 	}
 }
 
-func validDeployment() *apps.Deployment {
-	return &apps.Deployment{
+func validDeployment(tweaks ...func(d *apps.Deployment)) *apps.Deployment {
+	d := &apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "abc",
 			Namespace: metav1.NamespaceDefault,
@@ -2230,11 +2290,26 @@ func validDeployment() *apps.Deployment {
 			},
 		},
 	}
+
+	for _, tweak := range tweaks {
+		tweak(d)
+	}
+
+	return d
 }
 
 func TestValidateDeployment(t *testing.T) {
 	successCases := []*apps.Deployment{
 		validDeployment(),
+		validDeployment(func(d *apps.Deployment) {
+			d.Spec.Template.Spec.SecurityContext = &api.PodSecurityContext{
+				HostNetwork: true,
+			}
+			d.Spec.Template.Spec.Containers[0].Ports = []api.ContainerPort{{
+				ContainerPort: 12345,
+				Protocol:      api.ProtocolTCP,
+			}}
+		}),
 	}
 	for _, successCase := range successCases {
 		if errs := ValidateDeployment(successCase, corevalidation.PodValidationOptions{}); len(errs) != 0 {
@@ -3174,6 +3249,30 @@ func TestValidateReplicaSet(t *testing.T) {
 			},
 		},
 	}
+	validHostNetPodTemplate := api.PodTemplate{
+		Template: api.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: validLabels,
+			},
+			Spec: api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{
+					HostNetwork: true,
+				},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+				Containers: []api.Container{{
+					Name:                     "abc",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: api.TerminationMessageReadFile,
+					Ports: []api.ContainerPort{{
+						ContainerPort: 12345,
+						Protocol:      api.ProtocolTCP,
+					}},
+				}},
+			},
+		},
+	}
 	readWriteVolumePodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
@@ -3210,6 +3309,12 @@ func TestValidateReplicaSet(t *testing.T) {
 		Spec: apps.ReplicaSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 			Template: validPodTemplate.Template,
+		},
+	}, {
+		ObjectMeta: metav1.ObjectMeta{Name: "hostnet", Namespace: metav1.NamespaceDefault},
+		Spec: apps.ReplicaSetSpec{
+			Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+			Template: validHostNetPodTemplate.Template,
 		},
 	}, {
 		ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
