@@ -73,6 +73,9 @@ type worker struct {
 	// If set, skip probing.
 	onHold bool
 
+	ticker       *time.Ticker
+	tickerPeriod time.Duration
+
 	// proberResultsMetricLabels holds the labels attached to this worker
 	// for the ProberResults metric by result.
 	proberResultsSuccessfulMetricLabels metrics.Labels
@@ -160,6 +163,8 @@ func (w *worker) run() {
 	}
 
 	probeTicker := time.NewTicker(probeTickerPeriod)
+	w.ticker = probeTicker
+	w.tickerPeriod = probeTickerPeriod
 
 	defer func() {
 		// Clean up.
@@ -203,6 +208,16 @@ func (w *worker) stop() {
 func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 	defer func() { recover() }() // Actually eat panics (HandleCrash takes care of logging)
 	defer runtime.HandleCrash(func(_ interface{}) { keepGoing = true })
+	defer func() {
+		if keepGoing && w.ticker != nil {
+			w.ticker.Reset(w.tickerPeriod)
+		}
+	}()
+
+	// stop the ticker while the probe is running. The ticker will get reset to a new duration if keepGoing is true
+	if w.ticker != nil {
+		w.ticker.Stop()
+	}
 
 	startTime := time.Now()
 	status, ok := w.probeManager.statusManager.GetPodStatus(w.pod.UID)
