@@ -541,9 +541,12 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(pInfo *framework.QueuedPodI
 	// been recorded for it in p.inFlightPods, so in that case we need to
 	// honor the more recent cycle number.
 	moveRequestCycle := pInfo.MoveRequestCycle
-	inFlightMoveRequestCycle := p.inFlightPods[pInfo.Pod.UID].moveRequestCycle
-	if inFlightMoveRequestCycle > moveRequestCycle {
-		moveRequestCycle = inFlightMoveRequestCycle
+	inFlightMoveRequestCycle := int64(-1)
+	if inFlightPod, ok := p.inFlightPods[pInfo.Pod.UID]; ok {
+		inFlightMoveRequestCycle = inFlightPod.moveRequestCycle
+		if inFlightMoveRequestCycle > moveRequestCycle {
+			moveRequestCycle = inFlightMoveRequestCycle
+		}
 	}
 	if moveRequestCycle >= podSchedulingCycle {
 		if err := p.podBackoffQ.Add(pInfo); err != nil {
