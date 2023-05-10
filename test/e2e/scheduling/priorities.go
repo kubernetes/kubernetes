@@ -91,7 +91,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 	var systemPodsNo int
 	var ns string
 	f := framework.NewDefaultFramework("sched-priority")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		cs = f.ClientSet

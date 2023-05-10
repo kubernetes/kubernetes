@@ -47,7 +47,7 @@ const (
 
 var _ = SIGDescribe("[Feature:Example]", func() {
 	f := framework.NewDefaultFramework("examples")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	var c clientset.Interface
 	var ns string

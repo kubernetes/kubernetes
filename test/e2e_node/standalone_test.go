@@ -46,7 +46,7 @@ import (
 
 var _ = SIGDescribe("[Feature:StandaloneMode] ", func() {
 	f := framework.NewDefaultFramework("static-pod")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	ginkgo.Context("when creating a static pod", func() {
 		var ns, podPath, staticPodName string
 

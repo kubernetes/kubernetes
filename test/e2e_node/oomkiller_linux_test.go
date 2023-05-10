@@ -39,7 +39,7 @@ type testCase struct {
 
 var _ = SIGDescribe("OOMKiller [LinuxOnly] [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("oomkiller-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	testCases := []testCase{{
 		name:                   "single process container",

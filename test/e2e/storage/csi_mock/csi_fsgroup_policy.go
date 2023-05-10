@@ -35,7 +35,7 @@ import (
 
 var _ = utils.SIGDescribe("CSI Mock volume fsgroup policies", func() {
 	f := framework.NewDefaultFramework("csi-mock-volumes-fsgroup-policy")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	m := newMockDriverSetup(f)
 
 	// These tests *only* work on a cluster which has the CSIVolumeFSGroupPolicy feature enabled.

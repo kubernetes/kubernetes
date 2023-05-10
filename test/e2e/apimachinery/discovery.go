@@ -39,7 +39,7 @@ import (
 var storageVersionServerVersion = utilversion.MustParseSemantic("v1.13.99")
 var _ = SIGDescribe("Discovery", func() {
 	f := framework.NewDefaultFramework("discovery")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var namespaceName string
 

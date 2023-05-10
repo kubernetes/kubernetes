@@ -64,7 +64,7 @@ var defaultLabels = map[string]string{"foo": "bar"}
 
 var _ = SIGDescribe("DisruptionController", func() {
 	f := framework.NewDefaultFramework("disruption")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var ns string
 	var cs kubernetes.Interface
 	var dc dynamic.Interface
@@ -77,7 +77,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 
 	ginkgo.Context("Listing PodDisruptionBudgets for all namespaces", func() {
 		anotherFramework := framework.NewDefaultFramework("disruption-2")
-		anotherFramework.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+		anotherFramework.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 		/*
 		   Release : v1.21

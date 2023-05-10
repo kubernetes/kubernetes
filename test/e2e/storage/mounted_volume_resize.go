@@ -57,7 +57,7 @@ var _ = utils.SIGDescribe("Mounted volume expand [Feature:StorageProvider]", fun
 	)
 
 	f := framework.NewDefaultFramework("mounted-volume-expand")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		e2eskipper.SkipUnlessProviderIs("aws", "gce")
 		c = f.ClientSet

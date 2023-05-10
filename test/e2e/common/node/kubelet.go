@@ -36,7 +36,7 @@ import (
 
 var _ = SIGDescribe("Kubelet", func() {
 	f := framework.NewDefaultFramework("kubelet-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var podClient *e2epod.PodClient
 	ginkgo.BeforeEach(func() {
 		podClient = e2epod.NewPodClient(f)

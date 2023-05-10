@@ -71,7 +71,7 @@ func testingPod(name, value, defaultContainerName string) v1.Pod {
 
 var _ = SIGDescribe("Kubectl logs", func() {
 	f := framework.NewDefaultFramework("kubectl-logs")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	defer ginkgo.GinkgoRecover()
 
 	var c clientset.Interface

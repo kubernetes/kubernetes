@@ -70,7 +70,7 @@ const (
 
 var _ = utils.SIGDescribe("Volume FStype [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("volume-fstype")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var (
 		client    clientset.Interface
 		namespace string

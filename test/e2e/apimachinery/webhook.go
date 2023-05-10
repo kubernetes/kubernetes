@@ -80,7 +80,7 @@ const (
 var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 	var certCtx *certContext
 	f := framework.NewDefaultFramework("webhook")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	servicePort := int32(8443)
 	containerPort := int32(8444)
 

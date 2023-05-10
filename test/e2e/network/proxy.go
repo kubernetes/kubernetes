@@ -76,7 +76,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 			ClientQPS: -1.0,
 		}
 		f := framework.NewFramework("proxy", options, nil)
-		f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+		f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 		prefix := "/api/" + version
 
 		/*

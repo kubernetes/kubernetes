@@ -36,7 +36,7 @@ import (
 // This will require some smart.
 var _ = SIGDescribe("HostPath", func() {
 	f := framework.NewDefaultFramework("hostpath")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		// TODO permission denied cleanup failures

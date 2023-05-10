@@ -44,7 +44,7 @@ const (
 
 var _ = SIGDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:CriticalPod]", func() {
 	f := framework.NewDefaultFramework("critical-pod-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when we need to admit a critical pod", func() {
 		ginkgo.It("[Flaky] should be able to create and delete a critical pod", func(ctx context.Context) {
 			// because adminssion Priority enable, If the priority class is not found, the Pod is rejected.

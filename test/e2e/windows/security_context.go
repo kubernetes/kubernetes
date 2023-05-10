@@ -42,7 +42,7 @@ const runAsUserNameContainerName = "run-as-username-container"
 
 var _ = SIGDescribe("[Feature:Windows] SecurityContext", func() {
 	f := framework.NewDefaultFramework("windows-run-as-username")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should be able create pods and run containers with a given username", func(ctx context.Context) {
 		ginkgo.By("Creating 2 pods: 1 with the default user, and one with a custom one.")

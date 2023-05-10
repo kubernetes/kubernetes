@@ -71,7 +71,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 	)
 
 	f := framework.NewDefaultFramework("pvc-protection")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		client = f.ClientSet
 		nameSpace = f.Namespace.Name

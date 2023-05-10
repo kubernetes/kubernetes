@@ -57,7 +57,7 @@ const (
 
 var _ = utils.SIGDescribe("vcp-performance [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("vcp-performance")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var (
 		client           clientset.Interface

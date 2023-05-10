@@ -45,7 +45,7 @@ import (
 
 var _ = SIGDescribe("RuntimeClass", func() {
 	f := framework.NewDefaultFramework("runtimeclass")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	/*
 		Release: v1.20

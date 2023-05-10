@@ -76,7 +76,7 @@ func eventExistsInList(ctx context.Context, client typedeventsv1.EventInterface,
 
 var _ = common.SIGDescribe("Events API", func() {
 	f := framework.NewDefaultFramework("events")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var coreClient corev1.EventInterface
 	var client typedeventsv1.EventInterface
 	var clientAllNamespaces typedeventsv1.EventInterface

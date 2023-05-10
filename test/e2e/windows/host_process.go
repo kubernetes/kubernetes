@@ -91,7 +91,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 	})
 
 	f := framework.NewDefaultFramework("host-process-test-windows")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should run as a process on the host/node", func(ctx context.Context) {
 

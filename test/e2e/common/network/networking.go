@@ -29,7 +29,7 @@ import (
 
 var _ = SIGDescribe("Networking", func() {
 	f := framework.NewDefaultFramework("pod-network-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Describe("Granular Checks: Pods", func() {
 

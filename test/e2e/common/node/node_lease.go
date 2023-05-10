@@ -40,7 +40,7 @@ import (
 var _ = SIGDescribe("NodeLease", func() {
 	var nodeName string
 	f := framework.NewDefaultFramework("node-lease-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)

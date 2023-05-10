@@ -57,7 +57,7 @@ const (
 
 var _ = utils.SIGDescribe("vsphere statefulset [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("vsphere-statefulset")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var (
 		namespace string
 		client    clientset.Interface

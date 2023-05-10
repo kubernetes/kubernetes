@@ -118,7 +118,7 @@ var alternativeAPIVersions = []apiextensionsv1.CustomResourceDefinitionVersion{
 var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]", func() {
 	var certCtx *certContext
 	f := framework.NewDefaultFramework("crd-webhook")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	servicePort := int32(9443)
 	containerPort := int32(9444)
 

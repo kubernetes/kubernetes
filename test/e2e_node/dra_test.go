@@ -61,7 +61,7 @@ const (
 
 var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation][NodeAlphaFeature:DynamicResourceAllocation]", func() {
 	f := framework.NewDefaultFramework("dra-node")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	var kubeletPlugin *testdriver.ExamplePlugin
 

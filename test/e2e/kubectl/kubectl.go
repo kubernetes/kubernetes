@@ -257,7 +257,7 @@ func runKubectlRetryOrDie(ns string, args ...string) string {
 var _ = SIGDescribe("Kubectl client", func() {
 	defer ginkgo.GinkgoRecover()
 	f := framework.NewDefaultFramework("kubectl")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	// Reusable cluster state function.  This won't be adversely affected by lazy initialization of framework.
 	clusterState := func() *framework.ClusterVerification {

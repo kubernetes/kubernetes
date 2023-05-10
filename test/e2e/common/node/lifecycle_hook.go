@@ -37,7 +37,7 @@ import (
 
 var _ = SIGDescribe("Container Lifecycle Hook", func() {
 	f := framework.NewDefaultFramework("container-lifecycle-hook")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var podClient *e2epod.PodClient
 	const (
 		podCheckInterval     = 1 * time.Second

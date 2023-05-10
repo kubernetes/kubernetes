@@ -40,7 +40,7 @@ const (
 
 var _ = SIGDescribe("Deleted pods handling [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("deleted-pods-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.It("Should transition to Failed phase a pod which is deleted while pending", func(ctx context.Context) {
 		podName := "deleted-pending-" + string(uuid.NewUUID())

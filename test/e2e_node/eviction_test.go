@@ -71,7 +71,7 @@ const (
 // Node disk pressure is induced by consuming all inodes on the node.
 var _ = SIGDescribe("InodeEviction [Slow] [Serial] [Disruptive][NodeFeature:Eviction]", func() {
 	f := framework.NewDefaultFramework("inode-eviction-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	expectedNodeCondition := v1.NodeDiskPressure
 	expectedStarvedResource := resourceInodes
 	pressureTimeout := 15 * time.Minute
@@ -108,7 +108,7 @@ var _ = SIGDescribe("InodeEviction [Slow] [Serial] [Disruptive][NodeFeature:Evic
 // Disk pressure is induced by pulling large images
 var _ = SIGDescribe("ImageGCNoEviction [Slow] [Serial] [Disruptive][NodeFeature:Eviction]", func() {
 	f := framework.NewDefaultFramework("image-gc-eviction-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	pressureTimeout := 10 * time.Minute
 	expectedNodeCondition := v1.NodeDiskPressure
 	expectedStarvedResource := resourceInodes
@@ -139,7 +139,7 @@ var _ = SIGDescribe("ImageGCNoEviction [Slow] [Serial] [Disruptive][NodeFeature:
 // Node memory pressure is only encountered because we reserve the majority of the node's capacity via kube-reserved.
 var _ = SIGDescribe("MemoryAllocatableEviction [Slow] [Serial] [Disruptive][NodeFeature:Eviction]", func() {
 	f := framework.NewDefaultFramework("memory-allocatable-eviction-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	expectedNodeCondition := v1.NodeMemoryPressure
 	expectedStarvedResource := v1.ResourceMemory
 	pressureTimeout := 10 * time.Minute
@@ -173,7 +173,7 @@ var _ = SIGDescribe("MemoryAllocatableEviction [Slow] [Serial] [Disruptive][Node
 // Disk pressure is induced by running pods which consume disk space.
 var _ = SIGDescribe("LocalStorageEviction [Slow] [Serial] [Disruptive][NodeFeature:Eviction]", func() {
 	f := framework.NewDefaultFramework("localstorage-eviction-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	pressureTimeout := 15 * time.Minute
 	expectedNodeCondition := v1.NodeDiskPressure
 	expectedStarvedResource := v1.ResourceEphemeralStorage
@@ -212,7 +212,7 @@ var _ = SIGDescribe("LocalStorageEviction [Slow] [Serial] [Disruptive][NodeFeatu
 // Note: This test's purpose is to test Soft Evictions.  Local storage was chosen since it is the least costly to run.
 var _ = SIGDescribe("LocalStorageSoftEviction [Slow] [Serial] [Disruptive][NodeFeature:Eviction]", func() {
 	f := framework.NewDefaultFramework("localstorage-eviction-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	pressureTimeout := 10 * time.Minute
 	expectedNodeCondition := v1.NodeDiskPressure
 	expectedStarvedResource := v1.ResourceEphemeralStorage
@@ -251,7 +251,7 @@ var _ = SIGDescribe("LocalStorageSoftEviction [Slow] [Serial] [Disruptive][NodeF
 // not possible to exhaust the quota.
 var _ = SIGDescribe("LocalStorageCapacityIsolationMemoryBackedVolumeEviction [Slow] [Serial] [Disruptive] [Feature:LocalStorageCapacityIsolation][NodeFeature:Eviction]", func() {
 	f := framework.NewDefaultFramework("localstorage-eviction-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	evictionTestTimeout := 7 * time.Minute
 	ginkgo.Context(fmt.Sprintf(testContextFmt, "evictions due to pod local storage violations"), func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
@@ -294,7 +294,7 @@ var _ = SIGDescribe("LocalStorageCapacityIsolationMemoryBackedVolumeEviction [Sl
 // LocalStorageCapacityIsolationEviction tests that container and volume local storage limits are enforced through evictions
 var _ = SIGDescribe("LocalStorageCapacityIsolationEviction [Slow] [Serial] [Disruptive] [Feature:LocalStorageCapacityIsolation][NodeFeature:Eviction]", func() {
 	f := framework.NewDefaultFramework("localstorage-eviction-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	evictionTestTimeout := 10 * time.Minute
 	ginkgo.Context(fmt.Sprintf(testContextFmt, "evictions due to pod local storage violations"), func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
@@ -347,7 +347,7 @@ var _ = SIGDescribe("LocalStorageCapacityIsolationEviction [Slow] [Serial] [Disr
 // the higher priority pod.
 var _ = SIGDescribe("PriorityMemoryEvictionOrdering [Slow] [Serial] [Disruptive][NodeFeature:Eviction]", func() {
 	f := framework.NewDefaultFramework("priority-memory-eviction-ordering-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	expectedNodeCondition := v1.NodeMemoryPressure
 	expectedStarvedResource := v1.ResourceMemory
 	pressureTimeout := 10 * time.Minute
@@ -405,7 +405,7 @@ var _ = SIGDescribe("PriorityMemoryEvictionOrdering [Slow] [Serial] [Disruptive]
 // the higher priority pod.
 var _ = SIGDescribe("PriorityLocalStorageEvictionOrdering [Slow] [Serial] [Disruptive][NodeFeature:Eviction]", func() {
 	f := framework.NewDefaultFramework("priority-disk-eviction-ordering-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	expectedNodeCondition := v1.NodeDiskPressure
 	expectedStarvedResource := v1.ResourceEphemeralStorage
 	pressureTimeout := 15 * time.Minute
@@ -462,7 +462,7 @@ var _ = SIGDescribe("PriorityLocalStorageEvictionOrdering [Slow] [Serial] [Disru
 // PriorityPidEvictionOrdering tests that the node emits pid pressure in response to a fork bomb, and evicts pods by priority
 var _ = SIGDescribe("PriorityPidEvictionOrdering [Slow] [Serial] [Disruptive][NodeFeature:Eviction]", func() {
 	f := framework.NewDefaultFramework("pidpressure-eviction-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	pressureTimeout := 2 * time.Minute
 	expectedNodeCondition := v1.NodePIDPressure
 	expectedStarvedResource := noStarvedResource

@@ -43,7 +43,7 @@ import (
 
 var _ = SIGDescribe("Multi-AZ Clusters", func() {
 	f := framework.NewDefaultFramework("multi-az")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var zoneCount int
 	var err error
 	var zoneNames sets.Set[string]

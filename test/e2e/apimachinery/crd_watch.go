@@ -39,7 +39,7 @@ import (
 var _ = SIGDescribe("CustomResourceDefinition Watch [Privileged:ClusterAdmin]", func() {
 
 	f := framework.NewDefaultFramework("crd-watch")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("CustomResourceDefinition Watch", func() {
 		/*

@@ -31,7 +31,7 @@ import (
 
 var _ = SIGDescribe("Containers", func() {
 	f := framework.NewDefaultFramework("containers")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	/*
 		Release: v1.9

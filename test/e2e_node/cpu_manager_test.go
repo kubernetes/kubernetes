@@ -754,7 +754,7 @@ func isSMTAlignmentError(pod *v1.Pod) bool {
 // Serial because the test updates kubelet configuration.
 var _ = SIGDescribe("CPU Manager [Serial] [Feature:CPUManager]", func() {
 	f := framework.NewDefaultFramework("cpu-manager-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("With kubeconfig updated with static CPU Manager policy run the CPU Manager tests", func() {
 		runCPUManagerTests(f)

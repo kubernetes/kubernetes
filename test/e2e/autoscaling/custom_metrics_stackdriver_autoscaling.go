@@ -59,7 +59,7 @@ var _ = SIGDescribe("[HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod aut
 	})
 
 	f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Describe("with Custom Metric of type Pod from Stackdriver", func() {
 		ginkgo.It("should scale down", func(ctx context.Context) {

@@ -126,7 +126,7 @@ func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDri
 		ClientBurst: 400,
 	}
 	f := framework.NewFramework("volume-lifecycle-performance", frameworkOptions, nil)
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.AfterEach(func(ctx context.Context) {
 		if l != nil {

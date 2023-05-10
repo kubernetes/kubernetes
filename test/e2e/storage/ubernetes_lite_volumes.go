@@ -38,7 +38,7 @@ import (
 
 var _ = utils.SIGDescribe("Multi-AZ Cluster Volumes", func() {
 	f := framework.NewDefaultFramework("multi-az")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var zoneCount int
 	var err error
 	image := framework.ServeHostnameImage

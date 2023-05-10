@@ -35,7 +35,7 @@ import (
 
 var _ = SIGDescribe("Downward API", func() {
 	f := framework.NewDefaultFramework("downward-api")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	/*
 	   Release: v1.9
@@ -289,7 +289,7 @@ var _ = SIGDescribe("Downward API", func() {
 
 var _ = SIGDescribe("Downward API [Serial] [Disruptive] [NodeFeature:DownwardAPIHugePages]", func() {
 	f := framework.NewDefaultFramework("downward-api")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("Downward API tests for hugepages", func() {
 		ginkgo.It("should provide container's limits.hugepages-<pagesize> and requests.hugepages-<pagesize> as env vars", func(ctx context.Context) {

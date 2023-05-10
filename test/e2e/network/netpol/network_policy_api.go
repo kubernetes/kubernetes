@@ -36,7 +36,7 @@ import (
 
 var _ = common.SIGDescribe("Netpol API", func() {
 	f := framework.NewDefaultFramework("netpol")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	/*
 		Release: v1.20
 		Testname: NetworkPolicies API

@@ -62,7 +62,7 @@ const (
 var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeature:DeviceManager]", func() {
 	checkpointFullPath := filepath.Join(devicePluginDir, checkpointName)
 	f := framework.NewDefaultFramework("devicemanager-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("With SRIOV devices in the system", func() {
 		// this test wants to reproduce what happened in https://github.com/kubernetes/kubernetes/issues/102880

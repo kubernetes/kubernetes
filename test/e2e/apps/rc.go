@@ -51,7 +51,7 @@ import (
 
 var _ = SIGDescribe("ReplicationController", func() {
 	f := framework.NewDefaultFramework("replication-controller")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	var ns string
 	var dc dynamic.Interface

@@ -37,7 +37,7 @@ import (
 
 var _ = SIGDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptive] [NodeFeature:SystemNodeCriticalPod]", func() {
 	f := framework.NewDefaultFramework("system-node-critical-pod-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	// this test only manipulates pods in kube-system
 	f.SkipNamespaceCreation = true
 

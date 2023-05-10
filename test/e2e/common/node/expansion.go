@@ -37,7 +37,7 @@ import (
 // https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/expansion.md
 var _ = SIGDescribe("Variable Expansion", func() {
 	f := framework.NewDefaultFramework("var-expansion")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	/*
 		Release: v1.9

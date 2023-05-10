@@ -62,7 +62,7 @@ type dnsTestCommon struct {
 
 func newDNSTestCommon() dnsTestCommon {
 	framework := framework.NewDefaultFramework("dns-config-map")
-	framework.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	framework.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	return dnsTestCommon{
 		f:  framework,
 		ns: "kube-system",

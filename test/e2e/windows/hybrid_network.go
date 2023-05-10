@@ -46,7 +46,7 @@ var (
 
 var _ = SIGDescribe("Hybrid cluster network", func() {
 	f := framework.NewDefaultFramework("hybrid-network")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessNodeOSDistroIs("windows")

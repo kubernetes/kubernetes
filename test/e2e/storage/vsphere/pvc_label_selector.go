@@ -50,7 +50,7 @@ Test Steps
 */
 var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:LabelSelector]", func() {
 	f := framework.NewDefaultFramework("pvclabelselector")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var (
 		c          clientset.Interface
 		ns         string

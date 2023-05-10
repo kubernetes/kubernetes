@@ -218,7 +218,7 @@ var _ = SIGDescribe("Addon update", func() {
 	var dir string
 	var sshClient *ssh.Client
 	f := framework.NewDefaultFramework("addon-update-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		// This test requires:

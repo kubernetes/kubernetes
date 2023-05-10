@@ -162,7 +162,7 @@ func waitForMasters(ctx context.Context, masterPrefix string, c clientset.Interf
 
 var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
 	f := framework.NewDefaultFramework("ha-master")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var c clientset.Interface
 	var ns string
 	var additionalReplicaZones []string

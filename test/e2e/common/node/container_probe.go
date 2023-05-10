@@ -55,7 +55,7 @@ const (
 
 var _ = SIGDescribe("Probing container", func() {
 	f := framework.NewDefaultFramework("container-probe")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var podClient *e2epod.PodClient
 	probe := webserverProbeBuilder{}
 

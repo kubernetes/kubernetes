@@ -42,7 +42,7 @@ import (
 
 var _ = SIGDescribe("[Feature:Windows] Density [Serial] [Slow]", func() {
 	f := framework.NewDefaultFramework("density-test-windows")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("create a batch of pods", func() {
 		// TODO(coufon): the values are generous, set more precise limits with benchmark data

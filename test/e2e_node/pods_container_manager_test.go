@@ -166,7 +166,7 @@ func makePodToVerifyCgroupRemoved(baseName string) *v1.Pod {
 
 var _ = SIGDescribe("Kubelet Cgroup Manager", func() {
 	f := framework.NewDefaultFramework("kubelet-cgroup-manager")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Describe("QOS containers", func() {
 		ginkgo.Context("On enabling QOS cgroup hierarchy", func() {

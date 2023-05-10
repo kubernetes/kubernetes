@@ -37,7 +37,7 @@ import (
 
 var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:ReclaimPolicy]", func() {
 	f := framework.NewDefaultFramework("persistentvolumereclaim")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var (
 		c          clientset.Interface
 		ns         string

@@ -39,7 +39,7 @@ import (
 
 var _ = utils.SIGDescribe("CSIInlineVolumes", func() {
 	f := framework.NewDefaultFramework("csiinlinevolumes")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	/*
 		Release: v1.26
