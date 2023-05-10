@@ -295,7 +295,7 @@ func (g *genericDescriber) Describe(namespace, name string, describerSettings De
 		w.Write(LEVEL_0, "Namespace:\t%s\n", obj.GetNamespace())
 		printLabelsMultiline(w, "Labels", obj.GetLabels())
 		printAnnotationsMultiline(w, "Annotations", obj.GetAnnotations())
-		printUnstructuredContent(w, LEVEL_0, obj.UnstructuredContent(), "", ".metadata.managedFields", ".metadata.name",
+		printUnstructuredContent(w, LEVEL_0, obj.UnstructuredContent(), false, "", ".metadata.managedFields", ".metadata.name",
 			".metadata.namespace", ".metadata.labels", ".metadata.annotations")
 		if events != nil {
 			DescribeEvents(events, w)
@@ -304,14 +304,14 @@ func (g *genericDescriber) Describe(namespace, name string, describerSettings De
 	})
 }
 
-func printUnstructuredContent(w PrefixWriter, level int, content map[string]interface{}, skipPrefix string, skip ...string) {
+func printUnstructuredContent(w PrefixWriter, level int, content map[string]interface{}, isArrayItem bool, skipPrefix string, skip ...string) {
 	fields := []string{}
 	for field := range content {
 		fields = append(fields, field)
 	}
 	sort.Strings(fields)
 
-	for _, field := range fields {
+	for fi, field := range fields {
 		value := content[field]
 		switch typedValue := value.(type) {
 		case map[string]interface{}:
@@ -319,21 +319,57 @@ func printUnstructuredContent(w PrefixWriter, level int, content map[string]inte
 			if slice.ContainsString(skip, skipExpr, nil) {
 				continue
 			}
-			w.Write(level, "%s:\n", smartLabelFor(field))
-			printUnstructuredContent(w, level+1, typedValue, skipExpr, skip...)
+			if isArrayItem {
+				if fi == 0 {
+					w.Write(level, "- %s:\n", smartLabelFor(field))
+				} else {
+					w.Write(level+1, "%s:\n", smartLabelFor(field))
+				}
+				printUnstructuredContent(w, level+2, typedValue, false, skipExpr, skip...)
+			} else {
+				w.Write(level, "%s:\n", smartLabelFor(field))
+				printUnstructuredContent(w, level+1, typedValue, false, skipExpr, skip...)
+			}
 
 		case []interface{}:
 			skipExpr := fmt.Sprintf("%s.%s", skipPrefix, field)
 			if slice.ContainsString(skip, skipExpr, nil) {
 				continue
 			}
-			w.Write(level, "%s:\n", smartLabelFor(field))
+			if isArrayItem {
+				if fi == 0 {
+					w.Write(level, "- %s:\n", smartLabelFor(field))
+				} else {
+					w.Write(level+1, "%s:\n", smartLabelFor(field))
+				}
+			} else {
+				w.Write(level, "%s:\n", smartLabelFor(field))
+			}
+
+			childLevel := level + 1
+			if isArrayItem {
+				childLevel++
+			}
+
+			hasUnstructuredChild := false
+			for _, child := range typedValue {
+				if _, ok := child.(map[string]interface{}); ok {
+					hasUnstructuredChild = true
+					break
+				}
+			}
+			childIsArrayItem := hasUnstructuredChild && len(typedValue) > 1
+
 			for _, child := range typedValue {
 				switch typedChild := child.(type) {
 				case map[string]interface{}:
-					printUnstructuredContent(w, level+1, typedChild, skipExpr, skip...)
+					printUnstructuredContent(w, childLevel, typedChild, childIsArrayItem, skipExpr, skip...)
 				default:
-					w.Write(level+1, "%v\n", typedChild)
+					if childIsArrayItem {
+						w.Write(childLevel, "- %v\n", typedChild)
+					} else {
+						w.Write(childLevel, "%v\n", typedChild)
+					}
 				}
 			}
 
@@ -342,7 +378,15 @@ func printUnstructuredContent(w PrefixWriter, level int, content map[string]inte
 			if slice.ContainsString(skip, skipExpr, nil) {
 				continue
 			}
-			w.Write(level, "%s:\t%v\n", smartLabelFor(field), typedValue)
+			if isArrayItem {
+				if fi == 0 {
+					w.Write(level, "- %s:\t%v\n", smartLabelFor(field), typedValue)
+				} else {
+					w.Write(level+1, "%s:\t%v\n", smartLabelFor(field), typedValue)
+				}
+			} else {
+				w.Write(level, "%s:\t%v\n", smartLabelFor(field), typedValue)
+			}
 		}
 	}
 }

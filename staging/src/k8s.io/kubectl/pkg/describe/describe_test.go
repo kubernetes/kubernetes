@@ -4616,8 +4616,39 @@ dummy/dummy:	present
 dummy2:	present
 Dummy Dummy:	present
 Items:
+  - dummy4
+  - Item Bool:	true
+    Item Int:	42
+  - Item Bool:	false
+    Item Int:	-1
+  - Item Bool:	true
+  - Item Int:	1
+  - Item Int:	2
+    Item String Array:
+      dummy5
+      dummy6
+  - Item Object:
+      Item Int:	4
+    Item Object Two:
+      Item Bool:	true
+      Item Int:	4
+  - Item Object Array:
+      - Item Int:	4
+      - Item Bool:	true
+  - Item Object Array With One Element:
+      Item Int:	4
+  - [5 6 7]
+  - dummy7
+  - 5
+Items Strings:
+  dummy4
+  dummy5
+Items With One Object:
   Item Bool:	true
   Item Int:	42
+Items With Two Objects:
+  - Item Bool:	true
+  - Item Int:	42
 Kind:	Test
 Metadata:
   Creation Timestamp:	2017-04-01T00:00:00Z
@@ -4668,17 +4699,80 @@ URL:	http://localhost
 				"uid":               "00000000-0000-0000-0000-000000000001",
 				"dummy3":            "present",
 			},
-			"items": []interface{}{
+			"itemsStrings": []interface{}{
+				"dummy4", "dummy5",
+			},
+			"itemsWithOneObject": []interface{}{
 				map[string]interface{}{
 					"itemBool": true,
 					"itemInt":  42,
 				},
 			},
+			"itemsWithTwoObjects": []interface{}{
+				map[string]interface{}{
+					"itemBool": true,
+				},
+				map[string]interface{}{
+					"itemInt": 42,
+				},
+			},
+			"items": []interface{}{
+				"dummy4",
+				map[string]interface{}{
+					"itemBool": true,
+					"itemInt":  42,
+				},
+				map[string]interface{}{
+					"itemBool": false,
+					"itemInt":  -1,
+				},
+				map[string]interface{}{
+					"itemBool": true,
+				},
+				map[string]interface{}{
+					"itemInt": 1,
+				},
+				map[string]interface{}{
+					"itemInt":         2,
+					"itemStringArray": []interface{}{"dummy5", "dummy6"},
+				},
+				map[string]interface{}{
+					"itemObject": map[string]interface{}{
+						"itemInt": 4,
+					},
+					"itemObjectTwo": map[string]interface{}{
+						"itemInt":  4,
+						"itemBool": true,
+					},
+				},
+				map[string]interface{}{
+					"itemObjectArray": []interface{}{
+						map[string]interface{}{
+							"itemInt": 4,
+						},
+						map[string]interface{}{
+							"itemBool": true,
+						},
+					},
+				},
+				map[string]interface{}{
+					"itemObjectArrayWithOneElement": []interface{}{
+						map[string]interface{}{
+							"itemInt": 4,
+						},
+					},
+				},
+				[]interface{}{
+					5, 6, 7,
+				},
+				"dummy7",
+				5,
+			},
 			"url":    "http://localhost",
 			"status": "ok",
 		},
 	}
-	printUnstructuredContent(w, LEVEL_0, obj.UnstructuredContent(), "", ".dummy1", ".metadata.dummy3")
+	printUnstructuredContent(w, LEVEL_0, obj.UnstructuredContent(), false, "", ".dummy1", ".metadata.dummy3")
 	output := out.String()
 
 	for _, test := range testCases {
