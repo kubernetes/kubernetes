@@ -212,6 +212,10 @@ const (
 	RegressionIssue74839
 	// ResourceConsumer image
 	ResourceConsumer
+	// SampleDevicePlugin image
+	SampleDevicePlugin
+	// SdDummyExporter image
+	SdDummyExporter
 	// VolumeNFSServer image
 	VolumeNFSServer
 	// VolumeISCSIServer image
@@ -252,7 +256,9 @@ func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config
 	configs[Redis] = Config{list.PromoterE2eRegistry, "redis", "5.0.5-3"}
 	configs[RegressionIssue74839] = Config{list.PromoterE2eRegistry, "regression-issue-74839", "1.2"}
 	configs[ResourceConsumer] = Config{list.PromoterE2eRegistry, "resource-consumer", "1.13"}
-	configs[VolumeNFSServer] = Config{list.PromoterE2eRegistry, "volume/nfs", "1.4"}
+	configs[SampleDevicePlugin] = Config{list.PromoterE2eRegistry, "sample-device-plugin", "1.5"}
+	configs[SdDummyExporter] = Config{list.GcRegistry, "sd-dummy-exporter", "v0.2.0"}
+	configs[VolumeNFSServer] = Config{list.PromoterE2eRegistry, "volume/nfs", "1.3"}
 	configs[VolumeISCSIServer] = Config{list.PromoterE2eRegistry, "volume/iscsi", "2.6"}
 
 	// This adds more config entries. Those have no pre-defined ImageID number,
