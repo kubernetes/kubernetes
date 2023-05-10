@@ -34,10 +34,10 @@ import (
 
 // validatingWebhookConfigurationManager collects the validating webhook objects so that they can be called.
 type validatingWebhookConfigurationManager struct {
-	lister      admissionregistrationlisters.ValidatingWebhookConfigurationLister
-	hasSynced   func() bool
-	lazy        synctrack.Lazy[[]webhook.WebhookAccessor]
-	needRefresh sync.Map // NOTE maybe use simple map and a sync.Mutex
+	lister              admissionregistrationlisters.ValidatingWebhookConfigurationLister
+	hasSynced           func() bool
+	lazy                synctrack.Lazy[[]webhook.WebhookAccessor]
+	configurationsCache sync.Map // NOTE maybe use simple map and a sync.Mutex
 }
 
 var _ generic.Source = &validatingWebhookConfigurationManager{}
@@ -57,23 +57,18 @@ func NewValidatingWebhookConfigurationManager(f informers.SharedInformerFactory)
 			// etc... thinking about using reflect..
 			obj := new.(*v1.ValidatingWebhookConfiguration)
 			// lock R+W
-			manager.needRefresh.Store(obj.GetName(), true)
+			manager.configurationsCache.Delete(obj.GetName())
 			manager.lazy.Notify()
 		},
 		DeleteFunc: func(vwc interface{}) {
 			obj := vwc.(*v1.ValidatingWebhookConfiguration)
-			manager.needRefresh.Delete(obj.Name)
+			manager.configurationsCache.Delete(obj.Name)
 			manager.lazy.Notify()
 		},
 	})
 	manager.hasSynced = handle.HasSynced
 
 	return manager
-}
-
-func (v *validatingWebhookConfigurationManager) configurationNeedRefresh(namespacedName string) bool {
-	_, ok := v.needRefresh.Load(namespacedName)
-	return ok
 }
 
 // Webhooks returns the merged ValidatingWebhookConfiguration.
@@ -100,18 +95,13 @@ func (v *validatingWebhookConfigurationManager) getConfiguration() ([]webhook.We
 func (v *validatingWebhookConfigurationManager) smartReloadValidatingWebhookConfigurations(configurations []*v1.ValidatingWebhookConfiguration) []webhook.WebhookAccessor {
 	sort.SliceStable(configurations, ValidatingWebhookConfigurationSorter(configurations).ByName)
 	accessors := []webhook.WebhookAccessor{}
-	cachedAccessors, _ := v.lazy.Get()
 cfgLoop:
 	for _, c := range configurations {
-		if !v.configurationNeedRefresh(c.Name) {
+		cachedConfigurationAccessors, ok := v.configurationsCache.Load(c.Name)
+		if ok {
 			// Pick an already cached webhookAccessor
-			for _, ca := range cachedAccessors {
-				if ca.GetName() == c.Name {
-					accessors = append(accessors, ca)
-					v.needRefresh.Delete(c.Name)
-					continue cfgLoop
-				}
-			}
+			accessors = append(accessors, cachedConfigurationAccessors.([]webhook.WebhookAccessor)...)
+			continue cfgLoop
 		}
 
 		// webhook names are not validated for uniqueness, so we check for duplicates and
@@ -119,12 +109,16 @@ cfgLoop:
 		//
 		// NOTE: In `pkg/apis/admissionregistration/validation.go` webhook names are checked
 		// for uniqueness now. Is it safe to remove this?
+		configurationAccessors := []webhook.WebhookAccessor{}
 		names := map[string]int{}
 		for i := range c.Webhooks {
 			n := c.Webhooks[i].Name
 			uid := fmt.Sprintf("%s/%s/%d", c.Name, n, names[n])
 			names[n]++
-			accessors = append(accessors, webhook.NewValidatingWebhookAccessor(uid, c.Name, &c.Webhooks[i]))
+			configurationAccessors = append(configurationAccessors, webhook.NewValidatingWebhookAccessor(uid, c.Name, &c.Webhooks[i]))
+			// Cache the new accessors
+			v.configurationsCache.Store(c.Name, configurationAccessors)
+			accessors = append(accessors, configurationAccessors...)
 		}
 	}
 	return accessors
