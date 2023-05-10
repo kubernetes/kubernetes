@@ -52,6 +52,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/value/encrypt/identity"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
+	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/clock"
 	"k8s.io/utils/pointer"
@@ -71,6 +72,10 @@ func init() {
 }
 
 func newTestCacher(s storage.Interface) (*Cacher, storage.Versioner, error) {
+	return newTestCacherWithMutator(s, nil)
+}
+
+func newTestCacherWithMutator(s storage.Interface, m cache.MutationDetector) (*Cacher, storage.Versioner, error) {
 	prefix := "pods"
 	config := Config{
 		Storage:        s,
@@ -90,10 +95,11 @@ func newTestCacher(s storage.Interface) (*Cacher, storage.Versioner, error) {
 			fieldsSet["spec.nodeName"] = pod.Spec.NodeName
 			return labelsSet, fieldsSet, nil
 		},
-		NewFunc:     func() runtime.Object { return &example.Pod{} },
-		NewListFunc: func() runtime.Object { return &example.PodList{} },
-		Codec:       codecs.LegacyCodec(examplev1.SchemeGroupVersion),
-		Clock:       clock.RealClock{},
+		NewFunc:               func() runtime.Object { return &example.Pod{} },
+		NewListFunc:           func() runtime.Object { return &example.PodList{} },
+		Codec:                 codecs.LegacyCodec(examplev1.SchemeGroupVersion),
+		Clock:                 clock.RealClock{},
+		StoreMutationDetector: m,
 	}
 	cacher, err := NewCacherFromConfig(config)
 	return cacher, storage.APIObjectVersioner{}, err
@@ -1276,7 +1282,7 @@ func TestDispatchEventWillNotBeBlockedByTimedOutWatcher(t *testing.T) {
 	}
 }
 
-func verifyEvents(t *testing.T, w watch.Interface, events []watch.Event, strictOrder bool) {
+func verifyEvents(t *testing.T, w watch.Interface, events []watch.Event, strictOrder bool) []watch.Event {
 	_, _, line, _ := goruntime.Caller(1)
 	actualEvents := make([]watch.Event, len(events))
 	for idx := range events {
@@ -1329,6 +1335,7 @@ func verifyEvents(t *testing.T, w watch.Interface, events []watch.Event, strictO
 			t.Fatalf("Expected: %#v but didn't find", expectedEvent)
 		}
 	}
+	return actualEvents
 }
 
 func verifyNoEvents(t *testing.T, w watch.Interface) {
@@ -2075,4 +2082,175 @@ func TestDoNotPopExpiredWatchersWhenNoEventsSeen(t *testing.T) {
 			},
 		}},
 	}, true)
+}
+
+func TestWatchCacheMutations(t *testing.T) {
+	makePod := func(rv uint64) *example.Pod {
+		return &example.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            fmt.Sprintf("pod-%d", rv),
+				Namespace:       "ns",
+				ResourceVersion: fmt.Sprintf("%d", rv),
+				Annotations:     map[string]string{},
+			},
+		}
+	}
+
+	scenarios := []struct {
+		name                            string
+		populateWatchCacheBeforeWatchFn func(t *testing.T, wc *watchCache)
+		verifyAndMutateWatchEventsFn    func(t *testing.T, w watch.Interface)
+		expectPanic                     bool
+	}{
+		{
+			name: "negative, panics when an obj added via the Replace method is modified",
+			populateWatchCacheBeforeWatchFn: func(t *testing.T, wc *watchCache) {
+				err := wc.Replace([]interface{}{makePod(102)}, "102")
+				require.NoError(t, err)
+			},
+			verifyAndMutateWatchEventsFn: func(t *testing.T, w watch.Interface) {
+				events := verifyEvents(t, w, []watch.Event{
+					{Type: watch.Added, Object: makePod(102)},
+				}, true)
+
+				p := events[0].Object.(*example.Pod)
+				p.Annotations["foo"] = "bar"
+			},
+			expectPanic: true,
+		},
+		{
+			name: "negative, panics when an obj added via the Add method is modified",
+			populateWatchCacheBeforeWatchFn: func(t *testing.T, wc *watchCache) {
+				err := wc.Add(makePod(103))
+				require.NoError(t, err)
+			},
+			verifyAndMutateWatchEventsFn: func(t *testing.T, w watch.Interface) {
+				events := verifyEvents(t, w, []watch.Event{
+					{Type: watch.Added, Object: makePod(103)},
+				}, true)
+
+				p := events[0].Object.(*example.Pod)
+				p.Annotations["foo"] = "bar"
+			},
+			expectPanic: true,
+		},
+		{
+			name: "negative, panics when an obj added via the Update method is modified",
+			populateWatchCacheBeforeWatchFn: func(t *testing.T, wc *watchCache) {
+				p := makePod(103)
+				err := wc.Add(p)
+				require.NoError(t, err)
+
+				modP := p.DeepCopy()
+				modP.ResourceVersion = "104"
+				modP.Annotations["baz"] = "foo"
+				err = wc.Update(modP)
+				require.NoError(t, err)
+			},
+			verifyAndMutateWatchEventsFn: func(t *testing.T, w watch.Interface) {
+				events := verifyEvents(t, w, []watch.Event{
+					{Type: watch.Added, Object: func() runtime.Object {
+						p := makePod(103)
+						p.ResourceVersion = "104"
+						p.Annotations["baz"] = "foo"
+						return p
+					}()},
+				}, true)
+
+				p := events[0].Object.(*example.Pod)
+				p.Annotations["foo"] = "bar"
+			},
+			expectPanic: true,
+		},
+		{
+			name: "positive, no panic when an obj added via the Add method is NOT modified",
+			populateWatchCacheBeforeWatchFn: func(t *testing.T, wc *watchCache) {
+				err := wc.Add(makePod(103))
+				require.NoError(t, err)
+			},
+			verifyAndMutateWatchEventsFn: func(t *testing.T, w watch.Interface) {
+				verifyEvents(t, w, []watch.Event{
+					{Type: watch.Added, Object: makePod(103)},
+				}, true)
+			},
+		},
+	}
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			ctx := context.TODO()
+			backingStorage := &dummyStorage{}
+			mutationDetector := &mutationDetectorWrapper{MutationDetector: cache.NewAlwaysEnabledMutationDetector("testing-watch-cache-mutations"), mutex: sync.Mutex{}}
+			cacher, _, err := newTestCacherWithMutator(backingStorage, mutationDetector)
+			require.NoError(t, err)
+			err = wait.PollUntilContextTimeout(ctx, 1*time.Second /*the mutator loops every second*/, wait.ForeverTestTimeout, false, func(ctx context.Context) (done bool, err error) {
+				return mutationDetector.wasMutationDetectorRunMethodCalled(), nil
+			})
+			require.NoError(t, err, "the provided store mutation detector wasn't started")
+			defer cacher.Stop()
+			err = cacher.ready.wait(ctx)
+			require.NoError(t, err)
+
+			if scenario.populateWatchCacheBeforeWatchFn != nil {
+				scenario.populateWatchCacheBeforeWatchFn(t, cacher.watchCache)
+			}
+
+			pred := storage.Everything
+			w, err := cacher.Watch(ctx, "pods/ns", storage.ListOptions{Predicate: pred, ResourceVersion: "0"})
+			require.NoError(t, err, "failed to create watch: %v")
+			defer w.Stop()
+
+			scenario.verifyAndMutateWatchEventsFn(t, w)
+			go mutationDetector.startMutationDetector(ctx.Done())
+			if !scenario.expectPanic {
+				// give the detector 2 extra second
+				// to detect mutations if any.
+				time.Sleep(2 * time.Second)
+			}
+
+			err = wait.PollUntilContextTimeout(ctx, 1*time.Second /*the mutator loops every second*/, wait.ForeverTestTimeout, false, func(ctx context.Context) (done bool, err error) {
+				return mutationDetector.didPanic() == scenario.expectPanic, nil
+			})
+			require.NoError(t, err, "the mutation of the pod object wasn't detected!")
+		})
+	}
+}
+
+type mutationDetectorWrapper struct {
+	cache.MutationDetector
+	wasRunCalled bool
+	panicked     bool
+	mutex        sync.Mutex
+}
+
+// Run is called by the cacher. Since the tests compete with
+// the detector we actually don't want to start the detection
+// mechanism until all mutations are done by the tests.
+func (d *mutationDetectorWrapper) Run(_ <-chan struct{}) {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+	d.wasRunCalled = true
+	return
+}
+
+func (d *mutationDetectorWrapper) startMutationDetector(stopCh <-chan struct{}) {
+	defer func() {
+		if err := recover(); err != nil {
+			d.mutex.Lock()
+			d.panicked = true
+			d.mutex.Unlock()
+		}
+	}()
+	d.MutationDetector.Run(stopCh)
+}
+
+func (d *mutationDetectorWrapper) didPanic() bool {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+	return d.panicked
+}
+
+func (d *mutationDetectorWrapper) wasMutationDetectorRunMethodCalled() bool {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+	return d.wasRunCalled
 }

@@ -105,6 +105,10 @@ type Config struct {
 	Codec runtime.Codec
 
 	Clock clock.Clock
+
+	// StoreMutationDetector is used to monitor objects stored in the watch cache for undesired mutation.
+	// If this field wasn't provided then the detector will be created only when KUBE_CACHE_MUTATION_DETECTOR was set.
+	StoreMutationDetector cache.MutationDetector
 }
 
 type watchersMap map[int]*cacheWatcher
@@ -398,8 +402,24 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		<-cacher.timer.C
 	}
 
+	isWatchCacheStoreMutationDetectorEnabled := config.StoreMutationDetector != nil
+	watchCacheStoreMutationDetector := config.StoreMutationDetector
+	if !isWatchCacheStoreMutationDetectorEnabled {
+		if cache.IsCacheMutationDetectorEnabled() {
+			isWatchCacheStoreMutationDetectorEnabled = true
+			watchCacheStoreMutationDetector = cache.NewCacheMutationDetector(fmt.Sprintf("watchCache:%s", config.GroupResource))
+		}
+	}
 	watchCache := newWatchCache(
-		config.KeyFunc, cacher.processEvent, config.GetAttrsFunc, config.Versioner, config.Indexers, config.Clock, config.GroupResource)
+		config.KeyFunc,
+		cacher.processEvent,
+		config.GetAttrsFunc,
+		config.Versioner,
+		config.Indexers,
+		config.Clock,
+		config.GroupResource,
+		watchCacheStoreMutationDetector,
+	)
 	listerWatcher := NewListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
 	reflectorName := "storage/cacher.go:" + config.ResourcePrefix
 
@@ -432,6 +452,14 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 			}, time.Second, stopCh,
 		)
 	}()
+	if isWatchCacheStoreMutationDetectorEnabled {
+		cacher.stopWg.Add(1)
+		go func() {
+			klog.V(1).Infof("cacher (%v): starting a mutation detector for the watch cache's store", cacher.groupResource.String())
+			defer cacher.stopWg.Done()
+			watchCache.storeMutationDetector.Run(stopCh)
+		}()
+	}
 
 	return cacher, nil
 }
