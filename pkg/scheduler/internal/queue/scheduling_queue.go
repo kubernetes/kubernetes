@@ -747,6 +747,10 @@ func (p *PriorityQueue) AssignedPodUpdated(pod *v1.Pod) {
 func (p *PriorityQueue) moveAllToActiveOrBackoffQueue(event framework.ClusterEvent, preCheck PreEnqueueCheck) {
 	activated := false
 	for _, pInfo := range p.unschedulablePods.podInfoMap {
+		if !p.eventMightMakePodSchedulable(pInfo, event) {
+			continue
+		}
+
 		schedulingHint := framework.PodMaybeSchedulable
 		if preCheck != nil {
 			schedulingHint = preCheck(pInfo.Pod)
@@ -783,7 +787,8 @@ func (p *PriorityQueue) MoveAllToActiveOrBackoffQueue(event framework.ClusterEve
 func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(podInfoList []*framework.QueuedPodInfo, event framework.ClusterEvent) {
 	activated := false
 	for _, pInfo := range podInfoList {
-		if p.movePodToActiveOrBackoffQueue(pInfo, false, event) {
+		if p.eventMightMakePodSchedulable(pInfo, event) &&
+			p.movePodToActiveOrBackoffQueue(pInfo, false, event) {
 			activated = true
 		}
 	}
@@ -793,15 +798,15 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(podInfoList []*framework.
 	}
 }
 
-func (p *PriorityQueue) movePodToActiveOrBackoffQueue(pInfo *framework.QueuedPodInfo, avoidBackoff bool, event framework.ClusterEvent) bool {
+func (p *PriorityQueue) eventMightMakePodSchedulable(pInfo *framework.QueuedPodInfo, event framework.ClusterEvent) bool {
 	// If the event doesn't help making the Pod schedulable, then keep it in its current state.
 	// Note: we don't run the check if pInfo.UnschedulablePlugins is nil, which denotes
 	// either there is some abnormal error, or scheduling the pod failed by plugins other than PreFilter, Filter and Permit.
 	// In that case, it's desired to move it anyways.
-	if len(pInfo.UnschedulablePlugins) != 0 && !p.podMatchesEvent(pInfo, event) {
-		return false
-	}
+	return len(pInfo.UnschedulablePlugins) == 0 || p.podMatchesEvent(pInfo, event)
+}
 
+func (p *PriorityQueue) movePodToActiveOrBackoffQueue(pInfo *framework.QueuedPodInfo, avoidBackoff bool, event framework.ClusterEvent) bool {
 	pod := pInfo.Pod
 	if !avoidBackoff && p.isPodBackingoff(pInfo) {
 		if err := p.podBackoffQ.Add(pInfo); err != nil {
