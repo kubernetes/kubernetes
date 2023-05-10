@@ -45,7 +45,7 @@ func getDefaultPlugins() *v1.Plugins {
 				{Name: names.AzureDiskLimits},
 				{Name: names.VolumeBinding},
 				{Name: names.VolumeZone},
-				{Name: names.PodTopologySpread, Weight: pointer.Int32(2)},
+//				{Name: names.PodTopologySpread, Weight: pointer.Int32(2)},
 				{Name: names.InterPodAffinity, Weight: pointer.Int32(2)},
 				{Name: names.DefaultPreemption},
 				{Name: names.NodeResourcesBalancedAllocation, Weight: pointer.Int32(1)},
