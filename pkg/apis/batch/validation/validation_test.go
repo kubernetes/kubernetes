@@ -99,6 +99,17 @@ func TestValidateJob(t *testing.T) {
 	validPodTemplateSpecForGenerated := getValidPodTemplateSpecForGenerated(validGeneratedSelector)
 	validPodTemplateSpecForGeneratedRestartPolicyNever := getValidPodTemplateSpecForGenerated(validGeneratedSelector)
 	validPodTemplateSpecForGeneratedRestartPolicyNever.Spec.RestartPolicy = api.RestartPolicyNever
+	validHostNetPodTemplateSpec := func() api.PodTemplateSpec {
+		spec := getValidPodTemplateSpecForGenerated(validGeneratedSelector)
+		spec.Spec.SecurityContext = &api.PodSecurityContext{
+			HostNetwork: true,
+		}
+		spec.Spec.Containers[0].Ports = []api.ContainerPort{{
+			ContainerPort: 12345,
+			Protocol:      api.ProtocolTCP,
+		}}
+		return spec
+	}()
 
 	successCases := map[string]struct {
 		opts JobValidationOptions
@@ -176,6 +187,20 @@ func TestValidateJob(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector: validGeneratedSelector,
 					Template: validPodTemplateSpecForGenerated,
+				},
+			},
+		},
+		"valid hostnet": {
+			opts: JobValidationOptions{RequirePrefixedLabels: true},
+			job: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "myjob",
+					Namespace: metav1.NamespaceDefault,
+					UID:       types.UID("1a2b3c"),
+				},
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validHostNetPodTemplateSpec,
 				},
 			},
 		},
@@ -1784,6 +1809,17 @@ func TestValidateCronJob(t *testing.T) {
 	validManualSelector := getValidManualSelector()
 	validPodTemplateSpec := getValidPodTemplateSpecForGenerated(getValidGeneratedSelector())
 	validPodTemplateSpec.Labels = map[string]string{}
+	validHostNetPodTemplateSpec := func() api.PodTemplateSpec {
+		spec := getValidPodTemplateSpecForGenerated(getValidGeneratedSelector())
+		spec.Spec.SecurityContext = &api.PodSecurityContext{
+			HostNetwork: true,
+		}
+		spec.Spec.Containers[0].Ports = []api.ContainerPort{{
+			ContainerPort: 12345,
+			Protocol:      api.ProtocolTCP,
+		}}
+		return spec
+	}()
 
 	successCases := map[string]batch.CronJob{
 		"basic scheduled job": {
@@ -1798,6 +1834,22 @@ func TestValidateCronJob(t *testing.T) {
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
 						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"hostnet job": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mycronjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.CronJobSpec{
+				Schedule:          "* * * * ?",
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validHostNetPodTemplateSpec,
 					},
 				},
 			},
