@@ -38,11 +38,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/conntrack"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
@@ -7420,8 +7417,6 @@ func countEndpointsAndComments(iptablesData string, matchEndpoint string) (strin
 }
 
 func TestSyncProxyRulesLargeClusterMode(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MinimizeIPTablesRestore, true)()
-
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
 	fp.masqueradeAll = true
@@ -7609,8 +7604,6 @@ func TestSyncProxyRulesLargeClusterMode(t *testing.T) {
 
 // Test calling syncProxyRules() multiple times with various changes
 func TestSyncProxyRulesRepeated(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MinimizeIPTablesRestore, true)()
-
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
 	metrics.RegisterMetrics()
