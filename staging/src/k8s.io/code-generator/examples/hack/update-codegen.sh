@@ -34,15 +34,18 @@ kube::codegen::gen_helpers \
     --output-base "$(dirname "${BASH_SOURCE[0]}")/../../../.." \
     --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt"
 
-if [[ "${UPDATE_API_KNOWN_VIOLATIONS:-}" == "true" ]]; then
-    update_report="--update-report"
+if [[ -n "${API_KNOWN_VIOLATIONS_DIR:-}" ]]; then
+    report_filename="${API_KNOWN_VIOLATIONS_DIR}/codegen_violation_exceptions.list"
+    if [[ "${UPDATE_API_KNOWN_VIOLATIONS:-}" == "true" ]]; then
+        update_report="--update-report"
+    fi
 fi
 
 kube::codegen::gen_openapi \
     --input-pkg-root k8s.io/code-generator/examples/apiserver/apis \
     --output-pkg-root k8s.io/code-generator/examples/apiserver \
     --output-base "$(dirname "${BASH_SOURCE[0]}")/../../../.." \
-    --report-filename "${SCRIPT_ROOT}/api_violation_exceptions.list" \
+    --report-filename "${report_filename:-"/dev/null"}" \
     ${update_report:+"${update_report}"} \
     --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt"
 

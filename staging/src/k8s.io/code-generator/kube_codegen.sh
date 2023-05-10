@@ -255,6 +255,7 @@ function kube::codegen::gen_openapi() {
     local v="${KUBE_VERBOSE:-0}"
 
     while [ "$#" -gt 0 ]; do
+        echo "$1"
         case "$1" in
             "--input-pkg-root")
                 in_pkg_root="$2"
@@ -308,6 +309,7 @@ function kube::codegen::gen_openapi() {
         return 1
     fi
 
+    set -x
     local new_report
     new_report="$(mktemp -t "$(basename "$0").api_violations.XXXXXX")"
     if [ -n "${update_report}" ]; then

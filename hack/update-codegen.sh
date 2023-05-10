@@ -32,6 +32,7 @@ kube::golang::setup_env
 DBG_CODEGEN="${DBG_CODEGEN:-0}"
 GENERATED_FILE_PREFIX="${GENERATED_FILE_PREFIX:-zz_generated.}"
 UPDATE_API_KNOWN_VIOLATIONS="${UPDATE_API_KNOWN_VIOLATIONS:-}"
+API_KNOWN_VIOLATIONS_DIR="${API_KNOWN_VIOLATIONS_DIR:-"${KUBE_ROOT}/api/api-rules"}"
 
 OUT_DIR="_output"
 PRJ_SRC_PATH="k8s.io/kubernetes"
@@ -515,7 +516,7 @@ function codegen::openapi() {
     gen_openapi_bin="$(kube::util::find-binary "openapi-gen")"
 
     local output_dir="pkg/generated/openapi"
-    local known_violations_file="api/api-rules/violation_exceptions.list"
+    local known_violations_file="${API_KNOWN_VIOLATIONS_DIR}/violation_exceptions.list"
 
     local report_file="${OUT_DIR}/api_violations.report"
     # When UPDATE_API_KNOWN_VIOLATIONS is set to be true, let the generator to write
@@ -792,7 +793,10 @@ function codegen::subprojects() {
     for sub in "${subs[@]}"; do
         kube::log::status "Generating code for subproject ${sub}"
         pushd "${sub}" >/dev/null
-        CODEGEN_PKG="${codegen}" ./hack/update-codegen.sh > >(indent) 2> >(indent >&2)
+        CODEGEN_PKG="${codegen}" \
+        UPDATE_API_KNOWN_VIOLATIONS="${UPDATE_API_KNOWN_VIOLATIONS}" \
+        API_KNOWN_VIOLATIONS_DIR="${API_KNOWN_VIOLATIONS_DIR}" \
+            ./hack/update-codegen.sh > >(indent) 2> >(indent >&2)
         popd >/dev/null
     done
 }

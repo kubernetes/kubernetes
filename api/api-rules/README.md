@@ -1,10 +1,8 @@
 # Existing API Rule Violations
 
-This folder contains the checked-in report file of known API rule violations
-for the main Kubernetes repository.  Reports for staging repositories are
-checked in to those repositories.  These files are used during OpenAPI spec
-generation to make sure that no new API rule violation is introduced into our
-code base.
+This folder contains the checked-in report file of known API rule violations.
+The file violation\_exceptions.list is used by Make rule during OpenAPI spec generation to make
+sure that no new API rule violation is introduced into our code base.
 
 ## API Rule Violation Format
 
