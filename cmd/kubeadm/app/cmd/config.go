@@ -76,6 +76,7 @@ func newCmdConfig(out io.Writer) *cobra.Command {
 	kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
 	cmd.AddCommand(newCmdConfigPrint(out))
 	cmd.AddCommand(newCmdConfigMigrate(out))
+	cmd.AddCommand(newCmdConfigValidate(out))
 	cmd.AddCommand(newCmdConfigImages(out))
 	return cmd
 }
@@ -269,6 +270,46 @@ func newCmdConfigMigrate(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&oldCfgPath, "old-config", "", "Path to the kubeadm config file that is using an old API version and should be converted. This flag is mandatory.")
 	cmd.Flags().StringVar(&newCfgPath, "new-config", "", "Path to the resulting equivalent kubeadm config file using the new API version. Optional, if not specified output will be sent to STDOUT.")
+	return cmd
+}
+
+// newCmdConfigValidate returns cobra.Command for the "kubeadm config validate" command
+func newCmdConfigValidate(out io.Writer) *cobra.Command {
+	var cfgPath string
+
+	cmd := &cobra.Command{
+		Use:   "validate",
+		Short: "Read a file containing the kubeadm configuration API and report any validation problems",
+		Long: fmt.Sprintf(dedent.Dedent(`
+			This command lets you validate a kubeadm configuration API file and report any warnings and errors.
+			If there are no errors the exit status will be zero, otherwise it will be non-zero.
+			Any unmarshaling problems such as unknown API fields will trigger errors. Unknown API versions and
+			fields with invalid values will also trigger errors. Any other errors or warnings may be reported
+			depending on contents of the input file.
+
+			In this version of kubeadm, the following API versions are supported:
+			- %s
+		`), kubeadmapiv1.SchemeGroupVersion),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(cfgPath) == 0 {
+				return errors.Errorf("the --%s flag is mandatory", options.CfgPath)
+			}
+
+			cfgBytes, err := os.ReadFile(cfgPath)
+			if err != nil {
+				return err
+			}
+
+			if err := configutil.ValidateConfig(cfgBytes); err != nil {
+				return err
+			}
+			fmt.Fprintln(out, "ok")
+
+			return nil
+		},
+		Args: cobra.NoArgs,
+	}
+	options.AddConfigFlag(cmd.Flags(), &cfgPath)
 	return cmd
 }
 
