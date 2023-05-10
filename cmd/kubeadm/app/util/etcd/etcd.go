@@ -410,7 +410,7 @@ func (c *Client) addMember(name string, peerAddrs string, isLearner bool) ([]Mem
 		if isLearner {
 			// if learnerID is set, it means the etcd member is already added successfully.
 			if learnerID == 0 {
-				klog.V(1).Infof("[etcd] Adding etcd member as learner: %016x", peerAddrs)
+				klog.V(1).Info("[etcd] Adding etcd member as learner")
 				resp, err = cli.MemberAddAsLearner(ctx, []string{peerAddrs})
 				if err != nil {
 					lastError = err
