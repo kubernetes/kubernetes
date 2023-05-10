@@ -207,9 +207,18 @@ func TestPlugin(t *testing.T) {
 
 		prepare prepare
 		want    want
+		disable bool
 	}{
 		"empty": {
 			pod: st.MakePod().Name("foo").Namespace("default").Obj(),
+			want: want{
+				prefilter: result{
+					status: framework.NewStatus(framework.Skip),
+				},
+				postfilter: result{
+					status: framework.NewStatus(framework.Unschedulable, `no new claims to deallocate`),
+				},
+			},
 		},
 		"claim-reference": {
 			pod:    podWithClaimName,
@@ -437,6 +446,16 @@ func TestPlugin(t *testing.T) {
 			pod:    podWithClaimName,
 			claims: []*resourcev1alpha2.ResourceClaim{inUseClaim},
 		},
+		"disable": {
+			pod:    podWithClaimName,
+			claims: []*resourcev1alpha2.ResourceClaim{inUseClaim},
+			want: want{
+				prefilter: result{
+					status: framework.NewStatus(framework.Skip),
+				},
+			},
+			disable: true,
+		},
 	}
 
 	for name, tc := range testcases {
@@ -449,6 +468,7 @@ func TestPlugin(t *testing.T) {
 				nodes = []*v1.Node{workerNode}
 			}
 			testCtx := setup(t, nodes, tc.claims, tc.classes, tc.schedulings)
+			testCtx.p.enabled = !tc.disable
 
 			initialObjects := testCtx.listAll(t)
 			result, status := testCtx.p.PreFilter(testCtx.ctx, testCtx.state, tc.pod)
@@ -456,6 +476,9 @@ func TestPlugin(t *testing.T) {
 				assert.Equal(t, tc.want.preFilterResult, result)
 				testCtx.verify(t, tc.want.prefilter, initialObjects, result, status)
 			})
+			if status.IsSkip() {
+				return
+			}
 			unschedulable := status.Code() != framework.Success
 
 			var potentialNodes []*v1.Node
