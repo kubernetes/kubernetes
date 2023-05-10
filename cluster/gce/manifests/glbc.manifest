@@ -15,7 +15,7 @@ spec:
   terminationGracePeriodSeconds: 600
   hostNetwork: true
   containers:
-  - image: gcr.io/k8s-ingress-image-push/ingress-gce-glbc-amd64:v1.22.2
+  - image: gcr.io/k8s-ingress-image-push/ingress-gce-glbc-amd64:v1.23.0-32-g9f7d61155
     livenessProbe:
       httpGet:
         path: /healthz
