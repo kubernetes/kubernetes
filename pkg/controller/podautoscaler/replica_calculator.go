@@ -214,7 +214,7 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 			for podName := range missingPods {
 				metrics[podName] = metricsclient.PodMetric{Value: targetUsage}
 			}
-		} else {
+		} else if usageRatio > 1.0 {
 			// on a scale-up, treat missing pods as using 0% of the resource request
 			for podName := range missingPods {
 				metrics[podName] = metricsclient.PodMetric{Value: 0}
