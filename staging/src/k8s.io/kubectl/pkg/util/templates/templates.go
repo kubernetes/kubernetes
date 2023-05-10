@@ -28,7 +28,8 @@ const (
 		`{{$visibleFlags := visibleFlags (flagsNotIntersected .LocalFlags .PersistentFlags)}}` +
 		`{{$explicitlyExposedFlags := exposed .}}` +
 		`{{$optionsCmdFor := optionsCmdFor .}}` +
-		`{{$usageLine := usageLine .}}`
+		`{{$usageLine := usageLine .}}` +
+		`{{$reverseParentsNames := reverseParentsNames .}}`
 
 	// SectionAliases is the help template section that displays command aliases.
 	SectionAliases = `{{if gt .Aliases 0}}Aliases:
@@ -61,7 +62,7 @@ const (
 {{end}}`
 
 	// SectionTipsHelp is the help template section that displays the '--help' hint.
-	SectionTipsHelp = `{{if .HasSubCommands}}Use "{{$rootCmd}} <command> --help" for more information about a given command.
+	SectionTipsHelp = `{{if .HasSubCommands}}Use "{{range $reverseParentsNames}}{{.}} {{end}}<command> --help" for more information about a given command.
 {{end}}`
 
 	// SectionTipsGlobalOptions is the help template section that displays the 'options' hint for displaying global flags.
