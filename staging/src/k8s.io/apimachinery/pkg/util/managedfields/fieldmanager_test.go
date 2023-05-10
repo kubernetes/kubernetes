@@ -19,8 +19,8 @@ package managedfields_test
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -42,7 +42,7 @@ import (
 )
 
 var fakeTypeConverter = func() managedfields.TypeConverter {
-	data, err := ioutil.ReadFile(filepath.Join(strings.Repeat(".."+string(filepath.Separator), 7),
+	data, err := os.ReadFile(filepath.Join(strings.Repeat(".."+string(filepath.Separator), 7),
 		"api", "openapi-spec", "swagger.json"))
 	if err != nil {
 		panic(err)
@@ -264,7 +264,7 @@ func TestApplyDoesNotStripLabels(t *testing.T) {
 }
 
 func getObjectBytes(file string) []byte {
-	s, err := ioutil.ReadFile(file)
+	s, err := os.ReadFile(file)
 	if err != nil {
 		panic(err)
 	}
