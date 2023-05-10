@@ -172,6 +172,9 @@ type watchCache struct {
 	// NOTE: We assume that <store> is thread-safe.
 	store cache.Indexer
 
+	// storeMutationDetector when set is used to monitor objects stored the store for undesired mutation.
+	storeMutationDetector cache.MutationDetector
+
 	// ResourceVersion up to which the watchCache is propagated.
 	resourceVersion uint64
 
@@ -205,23 +208,25 @@ func newWatchCache(
 	versioner storage.Versioner,
 	indexers *cache.Indexers,
 	clock clock.Clock,
-	groupResource schema.GroupResource) *watchCache {
+	groupResource schema.GroupResource,
+	storeMutationDetector cache.MutationDetector) *watchCache {
 	wc := &watchCache{
-		capacity:            defaultLowerBoundCapacity,
-		keyFunc:             keyFunc,
-		getAttrsFunc:        getAttrsFunc,
-		cache:               make([]*watchCacheEvent, defaultLowerBoundCapacity),
-		lowerBoundCapacity:  defaultLowerBoundCapacity,
-		upperBoundCapacity:  defaultUpperBoundCapacity,
-		startIndex:          0,
-		endIndex:            0,
-		store:               cache.NewIndexer(storeElementKey, storeElementIndexers(indexers)),
-		resourceVersion:     0,
-		listResourceVersion: 0,
-		eventHandler:        eventHandler,
-		clock:               clock,
-		versioner:           versioner,
-		groupResource:       groupResource,
+		capacity:              defaultLowerBoundCapacity,
+		keyFunc:               keyFunc,
+		getAttrsFunc:          getAttrsFunc,
+		cache:                 make([]*watchCacheEvent, defaultLowerBoundCapacity),
+		lowerBoundCapacity:    defaultLowerBoundCapacity,
+		upperBoundCapacity:    defaultUpperBoundCapacity,
+		startIndex:            0,
+		endIndex:              0,
+		store:                 cache.NewIndexer(storeElementKey, storeElementIndexers(indexers)),
+		storeMutationDetector: storeMutationDetector,
+		resourceVersion:       0,
+		listResourceVersion:   0,
+		eventHandler:          eventHandler,
+		clock:                 clock,
+		versioner:             versioner,
+		groupResource:         groupResource,
 	}
 	metrics.WatchCacheCapacity.WithLabelValues(groupResource.String()).Set(float64(wc.capacity))
 	wc.cond = sync.NewCond(wc.RLocker())
@@ -238,7 +243,12 @@ func (w *watchCache) Add(obj interface{}) error {
 	}
 	event := watch.Event{Type: watch.Added, Object: object}
 
-	f := func(elem *storeElement) error { return w.store.Add(elem) }
+	f := func(elem *storeElement) error {
+		if w.storeMutationDetector != nil {
+			w.storeMutationDetector.AddObject(elem.Object)
+		}
+		return w.store.Add(elem)
+	}
 	return w.processEvent(event, resourceVersion, f)
 }
 
@@ -250,7 +260,12 @@ func (w *watchCache) Update(obj interface{}) error {
 	}
 	event := watch.Event{Type: watch.Modified, Object: object}
 
-	f := func(elem *storeElement) error { return w.store.Update(elem) }
+	f := func(elem *storeElement) error {
+		if w.storeMutationDetector != nil {
+			w.storeMutationDetector.AddObject(elem.Object)
+		}
+		return w.store.Update(elem)
+	}
 	return w.processEvent(event, resourceVersion, f)
 }
 
@@ -585,6 +600,14 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 
 	if err := w.store.Replace(toReplace, resourceVersion); err != nil {
 		return err
+	}
+	if w.storeMutationDetector != nil {
+		// we are interested only in detecting mutations to objects
+		// since we successfully constructed toReplace lice it is safe
+		// to range over the objs
+		for _, obj := range objs {
+			w.storeMutationDetector.AddObject(obj)
+		}
 	}
 	w.listResourceVersion = version
 	w.resourceVersion = version
