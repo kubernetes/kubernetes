@@ -53,6 +53,8 @@ var etcdBackoff = wait.Backoff{
 	Jitter:   0.1,
 }
 
+var ErrNoMemberIDForPeerURL = errors.New("no member id found for peer URL")
+
 // ClusterInterrogator is an interface to get etcd cluster related information
 type ClusterInterrogator interface {
 	CheckClusterHealth() error
@@ -310,7 +312,7 @@ func (c *Client) GetMemberID(peerURL string) (uint64, error) {
 			return member.GetID(), nil
 		}
 	}
-	return 0, nil
+	return 0, ErrNoMemberIDForPeerURL
 }
 
 // ListMembers returns the member list.
@@ -344,6 +346,10 @@ func (c *Client) RemoveMember(id uint64) ([]Member, error) {
 		resp, err = cli.MemberRemove(ctx, id)
 		cancel()
 		if err == nil {
+			return true, nil
+		}
+		if errors.Is(rpctypes.ErrMemberNotFound, err) {
+			klog.V(5).Infof("Member was already removed, because member %016x was not found", id)
 			return true, nil
 		}
 		klog.V(5).Infof("Failed to remove etcd member: %v", err)
