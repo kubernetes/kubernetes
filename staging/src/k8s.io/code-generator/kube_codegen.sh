@@ -237,6 +237,9 @@ function kube::codegen::gen_helpers() {
 #     An optional path at which to write an API violations report.  "-" means
 #     stdout.
 #
+#   --update-report
+#     If specified, update the report file in place, rather than diffing it.
+#
 #   --boilerplate <string = path_to_kube_codegen_boilerplate>
 #     An optional override for the header file to insert into generated files.
 #
@@ -247,10 +250,12 @@ function kube::codegen::gen_openapi() {
     local openapi_subdir="openapi"
     local extra_pkgs=()
     local report="/dev/null"
+    local update_report=""
     local boilerplate="${KUBE_CODEGEN_ROOT}/hack/boilerplate.go.txt"
     local v="${KUBE_VERBOSE:-0}"
 
     while [ "$#" -gt 0 ]; do
+        echo "$1"
         case "$1" in
             "--input-pkg-root")
                 in_pkg_root="$2"
@@ -276,6 +281,10 @@ function kube::codegen::gen_openapi() {
                 report="$2"
                 shift 2
                 ;;
+            "--update-report")
+                update_report="true"
+                shift
+                ;;
             "--boilerplate")
                 boilerplate="$2"
                 shift 2
@@ -298,6 +307,13 @@ function kube::codegen::gen_openapi() {
     if [ -z "${out_base}" ]; then
         echo "--output-base is required" >&2
         return 1
+    fi
+
+    set -x
+    local new_report
+    new_report="$(mktemp -t "$(basename "$0").api_violations.XXXXXX")"
+    if [ -n "${update_report}" ]; then
+        new_report="${report}"
     fi
 
     (
@@ -348,11 +364,19 @@ function kube::codegen::gen_openapi() {
             --go-header-file "${boilerplate}" \
             --output-base "${out_base}" \
             --output-package "${out_pkg_root}/${openapi_subdir}" \
-            --report-filename "${report}" \
+            --report-filename "${new_report}" \
             --input-dirs "k8s.io/apimachinery/pkg/apis/meta/v1" \
             --input-dirs "k8s.io/apimachinery/pkg/runtime" \
             --input-dirs "k8s.io/apimachinery/pkg/version" \
             "${inputs[@]}"
+    fi
+
+    touch "${report}" # in case it doesn't exist yet
+    if ! diff -u "${report}" "${new_report}"; then
+        echo -e "ERROR:"
+        echo -e "\tAPI rule check failed for ${report}: new reported violations"
+        echo -e "\tPlease read api/api-rules/README.md"
+        return 1
     fi
 }
 
