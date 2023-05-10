@@ -120,11 +120,11 @@ func (ce ClusterEvent) IsWildCard() bool {
 // ClusterEventMap maps a ClusterEvent to the names of all plugins that have
 // registered for that event. Each plugin may provide provide a
 // SchedulingHintFn for that event.
-type ClusterEventMap map[ClusterEvent]ClusterEventPlugins
+type ClusterEventMap map[ClusterEvent]HintingByPlugin
 
-// ClusterEventPlugins maps the name of a plugin to its SchedulingHintFn.
+// HintingByPlugin maps the name of a plugin to its SchedulingHintFn.
 // The function may be nil.
-type ClusterEventPlugins map[string]SchedulingHintFn
+type HintingByPlugin map[string]SchedulingHintFn
 
 // ClusterEvents maps events to the optional hint function for each event.
 type ClusterEvents map[ClusterEvent]SchedulingHintFn
@@ -161,7 +161,7 @@ func (m *ClusterEventMap) RegisterClusterEventWithHint(name string, event Cluste
 	}
 	plugins := (*m)[event]
 	if plugins == nil {
-		plugins = make(ClusterEventPlugins)
+		plugins = make(HintingByPlugin)
 	}
 	plugins[name] = schedulingHintFn
 	(*m)[event] = plugins
@@ -169,11 +169,11 @@ func (m *ClusterEventMap) RegisterClusterEventWithHint(name string, event Cluste
 
 // MakeClusterEventPlugins is a helper function for constructing a
 // ClusterEventPlugins instance from a list of plugin names.
-func MakeClusterEventPlugins(names ...string) ClusterEventPlugins {
+func MakeClusterEventPlugins(names ...string) HintingByPlugin {
 	if len(names) == 0 {
 		return nil
 	}
-	events := make(ClusterEventPlugins, len(names))
+	events := make(HintingByPlugin, len(names))
 	for _, name := range names {
 		events[name] = nil
 	}

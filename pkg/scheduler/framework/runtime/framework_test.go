@@ -1024,7 +1024,7 @@ func TestNewFrameworkFillEventToPluginMap(t *testing.T) {
 			name:    "filter pod plugins",
 			plugins: []framework.Plugin{fakeFilterPodPluginA, fakeFilterPodPluginB},
 			want: framework.ClusterEventMap{
-				{Resource: framework.Pod, ActionType: framework.All}:                   framework.ClusterEventPlugins{bindPlugin: nil, queueSortPlugin: nil, "fakeFilterPodPlugin": schedulingHint, "fakeFilterPodPlugin2": schedulingHint2},
+				{Resource: framework.Pod, ActionType: framework.All}:                   framework.HintingByPlugin{bindPlugin: nil, queueSortPlugin: nil, "fakeFilterPodPlugin": schedulingHint, "fakeFilterPodPlugin2": schedulingHint2},
 				{Resource: framework.Node, ActionType: framework.All}:                  framework.MakeClusterEventPlugins(bindPlugin, queueSortPlugin),
 				{Resource: framework.CSINode, ActionType: framework.All}:               framework.MakeClusterEventPlugins(bindPlugin, queueSortPlugin),
 				{Resource: framework.PersistentVolume, ActionType: framework.All}:      framework.MakeClusterEventPlugins(bindPlugin, queueSortPlugin),

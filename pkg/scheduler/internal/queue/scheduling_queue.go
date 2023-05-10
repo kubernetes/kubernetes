@@ -1191,7 +1191,7 @@ func (p *PriorityQueue) podMatchesEvent(podInfo *framework.QueuedPodInfo, cluste
 	return false
 }
 
-func intersect(x framework.ClusterEventPlugins, y sets.Set[string]) bool {
+func intersect(x framework.HintingByPlugin, y sets.Set[string]) bool {
 	if len(x) > len(y) {
 		for v := range y {
 			if _, ok := x[v]; ok {
