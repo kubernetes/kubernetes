@@ -155,6 +155,8 @@ func (o *cachingObject) CacheEncode(id runtime.Identifier, encode func(runtime.O
 // GetObject implements runtime.CacheableObject interface.
 // It returns deep-copy of the wrapped object to return ownership of it
 // to the called according to the contract of the interface.
+// TODO(#115478): rethink making an additional copy,
+// push it to the callers, they know better if/when then need a copy
 func (o *cachingObject) GetObject() runtime.Object {
 	o.lock.RLock()
 	defer o.lock.RUnlock()

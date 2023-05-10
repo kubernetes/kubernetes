@@ -392,9 +392,9 @@ func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event 
 
 	switch {
 	case curObjPasses && !oldObjPasses:
-		return &watch.Event{Type: watch.Added, Object: getMutableObject(event.Object)}
+		return &watch.Event{Type: watch.Added, Object: event.Object}
 	case curObjPasses && oldObjPasses:
-		return &watch.Event{Type: watch.Modified, Object: getMutableObject(event.Object)}
+		return &watch.Event{Type: watch.Modified, Object: event.Object}
 	case !curObjPasses && oldObjPasses:
 		// return a delete event with the previous object content, but with the event's resource version
 		oldObj := getMutableObject(event.PrevObject)
