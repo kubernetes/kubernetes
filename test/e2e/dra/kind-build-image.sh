@@ -31,9 +31,11 @@ cleanup() {
 }
 trap cleanup EXIT
 
+goarch=$(go env GOARCH)
+
 kind build node-image --image "$tag" "$(pwd)"
-curl -L --silent https://github.com/kind-ci/containerd-nightlies/releases/download/$containerd/$containerd-linux-amd64.tar.gz | tar -C "$tmpdir" -vzxf -
-curl -L --silent https://github.com/kind-ci/containerd-nightlies/releases/download/$containerd/runc.amd64 >"$tmpdir/runc"
+curl -L --silent https://github.com/kind-ci/containerd-nightlies/releases/download/$containerd/$containerd-linux-"$goarch".tar.gz | tar -C "$tmpdir" -vzxf -
+curl -L --silent https://github.com/kind-ci/containerd-nightlies/releases/download/$containerd/runc."$goarch" >"$tmpdir/runc"
 
 cat >"$tmpdir/Dockerfile" <<EOF
 FROM $tag
