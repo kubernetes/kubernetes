@@ -152,6 +152,24 @@ var (
 		},
 		[]string{"code", "call_status"},
 	)
+
+	transportCacheEntries = k8smetrics.NewGauge(
+		&k8smetrics.GaugeOpts{
+			Name:           "rest_client_transport_cache_entries",
+			StabilityLevel: k8smetrics.ALPHA,
+			Help:           "Number of transport entries in the internal cache.",
+		},
+	)
+
+	transportCacheCalls = k8smetrics.NewCounterVec(
+		&k8smetrics.CounterOpts{
+			Name:           "rest_client_transport_create_calls_total",
+			StabilityLevel: k8smetrics.ALPHA,
+			Help: "Number of calls to get a new transport, partitioned by the result of the operation " +
+				"hit: obtained from the cache, miss: created and added to the cache, uncacheable: created and not cached",
+		},
+		[]string{"result"},
+	)
 )
 
 func init() {
@@ -165,6 +183,8 @@ func init() {
 	legacyregistry.RawMustRegister(execPluginCertTTL)
 	legacyregistry.MustRegister(execPluginCertRotation)
 	legacyregistry.MustRegister(execPluginCalls)
+	legacyregistry.MustRegister(transportCacheEntries)
+	legacyregistry.MustRegister(transportCacheCalls)
 	metrics.Register(metrics.RegisterOpts{
 		ClientCertExpiry:      execPluginCertTTLAdapter,
 		ClientCertRotationAge: &rotationAdapter{m: execPluginCertRotation},
@@ -175,6 +195,8 @@ func init() {
 		RequestResult:         &resultAdapter{requestResult},
 		RequestRetry:          &retryAdapter{requestRetry},
 		ExecPluginCalls:       &callsAdapter{m: execPluginCalls},
+		TransportCacheEntries: &transportCacheAdapter{m: transportCacheEntries},
+		TransportCreateCalls:  &transportCacheCallsAdapter{m: transportCacheCalls},
 	})
 }
 
@@ -232,4 +254,20 @@ type retryAdapter struct {
 
 func (r *retryAdapter) IncrementRetry(ctx context.Context, code, method, host string) {
 	r.m.WithContext(ctx).WithLabelValues(code, method, host).Inc()
+}
+
+type transportCacheAdapter struct {
+	m *k8smetrics.Gauge
+}
+
+func (t *transportCacheAdapter) Observe(value int) {
+	t.m.Set(float64(value))
+}
+
+type transportCacheCallsAdapter struct {
+	m *k8smetrics.CounterVec
+}
+
+func (t *transportCacheCallsAdapter) Increment(result string) {
+	t.m.WithLabelValues(result).Inc()
 }
