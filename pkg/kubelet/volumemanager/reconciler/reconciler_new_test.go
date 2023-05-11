@@ -116,13 +116,15 @@ func TestReconcileWithUpdateReconstructedFromAPIServer(t *testing.T) {
 	assert.NoError(t, asw.AddAttachUncertainReconstructedVolume(volumeName2, volumeSpec2, nodeName, ""))
 	assert.NoError(t, asw.MarkDeviceAsUncertain(volumeName2, "/dev/reconstructed", "/var/lib/kubelet/plugins/global2", ""))
 
-	reconciler.volumesNeedDevicePath = append(reconciler.volumesNeedDevicePath, volumeName1, volumeName2)
+	assert.False(t, reconciler.StatesHasBeenSynced())
 
+	reconciler.volumesNeedDevicePath = append(reconciler.volumesNeedDevicePath, volumeName1, volumeName2)
 	// Act - run reconcile loop just once.
 	// "volumesNeedDevicePath" is not empty, so no unmount will be triggered.
 	reconciler.reconcileNew()
 
 	// Assert
+	assert.True(t, reconciler.StatesHasBeenSynced())
 	assert.Empty(t, reconciler.volumesNeedDevicePath)
 
 	attachedVolumes := asw.GetAttachedVolumes()
