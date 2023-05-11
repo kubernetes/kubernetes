@@ -13,11 +13,39 @@ for the test driver and that the e2e test has full control over all gRPC calls,
 in case that it needs that for operations like error injection or checking
 calls.
 
-# Cluster setup
+## Cluster setup
 
 The container runtime must support CDI. The latest cri-o releases contain
 support, containerd 1.6.x does not. To bring up a kind cluster with containerd
 built from their main branch, use:
 
-    test/e2e/dra/kind-build-image.sh dra/node:latest && \
-    kind create cluster --config test/e2e/dra/kind.yaml --image dra/node:latest
+- [Bash version requirement](https://github.com/kubernetes/community/blob/master/contributors/devel/development.md#bash-version-requirement)
+
+- Build node image
+
+```bash
+$ test/e2e/dra/kind-build-image.sh dra/node:latest
+```
+
+- Bring up a kind cluster
+
+```bash
+$ kind create cluster --config test/e2e/dra/kind.yaml --image dra/node:latest
+```
+
+
+## Run tests
+
+- Build ginkgo
+
+> NB: If you are using go workspace you must disable it `GOWORK=off make gingko`
+
+```bash
+$ make gingko
+```
+
+- Run e2e tests for the `Dynamic Resource Allocation` feature:
+
+```bash
+$ KUBECONFIG=~/.kube/config _output/bin/ginkgo -p -v -focus=Feature:DynamicResourceAllocation ./test/e2e
+```
