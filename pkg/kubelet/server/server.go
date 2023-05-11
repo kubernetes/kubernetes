@@ -190,10 +190,10 @@ func ListenAndServeKubeletReadOnlyServer(
 	host HostInterface,
 	resourceAnalyzer stats.ResourceAnalyzer,
 	address net.IP,
-	port uint) {
+	port uint,
+	tp oteltrace.TracerProvider) {
 	klog.InfoS("Starting to listen read-only", "address", address, "port", port)
-	// TODO: https://github.com/kubernetes/kubernetes/issues/109829 tracer should use WithPublicEndpoint
-	s := NewServer(host, resourceAnalyzer, nil, oteltrace.NewNoopTracerProvider(), nil)
+	s := NewServer(host, resourceAnalyzer, nil, tp, nil)
 
 	server := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
@@ -341,7 +341,7 @@ func (s *Server) InstallAuthFilter() {
 
 // InstallTracingFilter installs OpenTelemetry tracing filter with the restful Container.
 func (s *Server) InstallTracingFilter(tp oteltrace.TracerProvider) {
-	s.restfulCont.Filter(otelrestful.OTelFilter("kubelet", otelrestful.WithTracerProvider(tp)))
+	s.restfulCont.Filter(otelrestful.OTelFilter("kubelet", otelrestful.WithTracerProvider(tp), otelrestful.WithPublicEndpoint()))
 }
 
 // addMetricsBucketMatcher adds a regexp matcher and the relevant bucket to use when
