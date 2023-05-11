@@ -344,8 +344,9 @@ func validateObjectSource(src *autoscaling.ObjectMetricSource, fldPath *field.Pa
 	allErrs = append(allErrs, validateMetricIdentifier(src.Metric, fldPath.Child("metric"))...)
 	allErrs = append(allErrs, validateMetricTarget(src.Target, fldPath.Child("target"))...)
 
+	// Only two types are supported (more restritions that validateMetricTarget will check).
 	if src.Target.Value == nil && src.Target.AverageValue == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("target").Child("averageValue"), "must set either a target value or averageValue"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("target"), src.Target, "must set either value or averageValue"))
 	}
 
 	return allErrs
@@ -357,12 +358,9 @@ func validateExternalSource(src *autoscaling.ExternalMetricSource, fldPath *fiel
 	allErrs = append(allErrs, validateMetricIdentifier(src.Metric, fldPath.Child("metric"))...)
 	allErrs = append(allErrs, validateMetricTarget(src.Target, fldPath.Child("target"))...)
 
+	// Only two types are supported (more restritions that validateMetricTarget will check).
 	if src.Target.Value == nil && src.Target.AverageValue == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("target").Child("averageValue"), "must set either a target value for metric or a per-pod target"))
-	}
-
-	if src.Target.Value != nil && src.Target.AverageValue != nil {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("target").Child("value"), "may not set both a target value for metric and a per-pod target"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("target"), src.Target, "must set either value or averageValue (per-pod target)"))
 	}
 
 	return allErrs
@@ -374,6 +372,7 @@ func validatePodsSource(src *autoscaling.PodsMetricSource, fldPath *field.Path) 
 	allErrs = append(allErrs, validateMetricIdentifier(src.Metric, fldPath.Child("metric"))...)
 	allErrs = append(allErrs, validateMetricTarget(src.Target, fldPath.Child("target"))...)
 
+	// Only one type is supported (more restritions that validateMetricTarget will check).
 	if src.Target.AverageValue == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("target").Child("averageValue"), "must specify a positive target averageValue"))
 	}
@@ -398,12 +397,9 @@ func validateContainerResourceSource(src *autoscaling.ContainerResourceMetricSou
 
 	allErrs = append(allErrs, validateMetricTarget(src.Target, fldPath.Child("target"))...)
 
+	// Only two types are supported (more restritions that validateMetricTarget will check).
 	if src.Target.AverageUtilization == nil && src.Target.AverageValue == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("target").Child("averageUtilization"), "must set either a target raw value or a target utilization"))
-	}
-
-	if src.Target.AverageUtilization != nil && src.Target.AverageValue != nil {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("target").Child("averageValue"), "may not set both a target raw value and a target utilization"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("target"), src.Target, "must set either averageValue or averageUtilization"))
 	}
 
 	return allErrs
@@ -418,12 +414,9 @@ func validateResourceSource(src *autoscaling.ResourceMetricSource, fldPath *fiel
 
 	allErrs = append(allErrs, validateMetricTarget(src.Target, fldPath.Child("target"))...)
 
+	// Only two types are supported (more restritions that validateMetricTarget will check).
 	if src.Target.AverageUtilization == nil && src.Target.AverageValue == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("target").Child("averageUtilization"), "must set either a target raw value or a target utilization"))
-	}
-
-	if src.Target.AverageUtilization != nil && src.Target.AverageValue != nil {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("target").Child("averageValue"), "may not set both a target raw value and a target utilization"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("target"), src.Target, "must set either averageValue or averageUtilization"))
 	}
 
 	return allErrs
@@ -442,16 +435,34 @@ func validateMetricTarget(mt autoscaling.MetricTarget, fldPath *field.Path) fiel
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("type"), mt.Type, "must be either Utilization, Value, or AverageValue"))
 	}
 
-	if mt.Value != nil && mt.Value.Sign() != 1 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("value"), mt.Value, "must be positive"))
+	if mt.Type == autoscaling.ValueMetricType {
+		if mt.Value == nil {
+			allErrs = append(allErrs, field.Required(fldPath.Child("value"), "must specify value, according to target type"))
+		} else if mt.Value.Sign() != 1 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("value"), mt.Value, "must be positive"))
+		} else if mt.AverageValue != nil || mt.AverageUtilization != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath, mt, "must specify only value, according to target type"))
+		}
 	}
 
-	if mt.AverageValue != nil && mt.AverageValue.Sign() != 1 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("averageValue"), mt.AverageValue, "must be positive"))
+	if mt.Type == autoscaling.AverageValueMetricType {
+		if mt.AverageValue == nil {
+			allErrs = append(allErrs, field.Required(fldPath.Child("averageValue"), "must specify averageValue, according to target type"))
+		} else if mt.AverageValue.Sign() != 1 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("averageValue"), mt.AverageValue, "must be positive"))
+		} else if mt.Value != nil || mt.AverageUtilization != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath, mt, "must specify only averageValue, according to target type"))
+		}
 	}
 
-	if mt.AverageUtilization != nil && *mt.AverageUtilization < 1 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("averageUtilization"), mt.AverageUtilization, "must be greater than 0"))
+	if mt.Type == autoscaling.UtilizationMetricType {
+		if mt.AverageUtilization == nil {
+			allErrs = append(allErrs, field.Required(fldPath.Child("averageUtilization"), "must specify averageUtilization, according to target type"))
+		} else if *mt.AverageUtilization < 1 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("averageUtilization"), mt.AverageUtilization, "must be positive"))
+		} else if mt.Value != nil || mt.AverageValue != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath, mt, "must specify only averageUtilization, according to target type"))
+		}
 	}
 
 	return allErrs
