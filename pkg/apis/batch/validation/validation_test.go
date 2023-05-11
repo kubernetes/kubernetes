@@ -776,7 +776,7 @@ func TestValidateJob(t *testing.T) {
 				},
 				Spec: batch.JobSpec{
 					Selector:       validManualSelector,
-					ManualSelector: pointer.BoolPtr(true),
+					ManualSelector: pointer.Bool(true),
 					Template: api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{"y": "z"},
@@ -800,7 +800,7 @@ func TestValidateJob(t *testing.T) {
 				},
 				Spec: batch.JobSpec{
 					Selector:       validManualSelector,
-					ManualSelector: pointer.BoolPtr(true),
+					ManualSelector: pointer.Bool(true),
 					Template: api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{"controller-uid": "4d5e6f"},
@@ -824,7 +824,7 @@ func TestValidateJob(t *testing.T) {
 				},
 				Spec: batch.JobSpec{
 					Selector:       validManualSelector,
-					ManualSelector: pointer.BoolPtr(true),
+					ManualSelector: pointer.Bool(true),
 					Template: api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: validManualSelector.MatchLabels,
@@ -848,7 +848,7 @@ func TestValidateJob(t *testing.T) {
 				},
 				Spec: batch.JobSpec{
 					Selector:       validManualSelector,
-					ManualSelector: pointer.BoolPtr(true),
+					ManualSelector: pointer.Bool(true),
 					Template: api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: validManualSelector.MatchLabels,
@@ -904,8 +904,8 @@ func TestValidateJob(t *testing.T) {
 					Selector:       validGeneratedSelector,
 					Template:       validPodTemplateSpecForGenerated,
 					CompletionMode: completionModePtr(batch.IndexedCompletion),
-					Completions:    pointer.Int32Ptr(2),
-					Parallelism:    pointer.Int32Ptr(100001),
+					Completions:    pointer.Int32(2),
+					Parallelism:    pointer.Int32(100001),
 				},
 			},
 			opts: JobValidationOptions{RequirePrefixedLabels: true},
@@ -1099,7 +1099,7 @@ func TestValidateJobUpdate(t *testing.T) {
 				},
 			},
 			update: func(job *batch.Job) {
-				job.Spec.Completions = pointer.Int32Ptr(1)
+				job.Spec.Completions = pointer.Int32(1)
 			},
 			err: &field.Error{
 				Type:  field.ErrorTypeInvalid,
@@ -1259,11 +1259,11 @@ func TestValidateJobUpdate(t *testing.T) {
 					Selector:       validGeneratedSelector,
 					Template:       validPodTemplateSpecForGenerated,
 					CompletionMode: completionModePtr(batch.NonIndexedCompletion),
-					Completions:    pointer.Int32Ptr(2),
+					Completions:    pointer.Int32(2),
 				},
 			},
 			update: func(job *batch.Job) {
-				job.Spec.Completions = pointer.Int32Ptr(4)
+				job.Spec.Completions = pointer.Int32(4)
 			},
 			err: &field.Error{
 				Type:  field.ErrorTypeInvalid,
@@ -1513,14 +1513,14 @@ func TestValidateJobUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validGeneratedSelector,
 					Template:       validPodTemplateSpecForGenerated,
-					Completions:    pointer.Int32Ptr(1),
-					Parallelism:    pointer.Int32Ptr(1),
+					Completions:    pointer.Int32(1),
+					Parallelism:    pointer.Int32(1),
 					CompletionMode: completionModePtr(batch.IndexedCompletion),
 				},
 			},
 			update: func(job *batch.Job) {
-				job.Spec.Completions = pointer.Int32Ptr(2)
-				job.Spec.Parallelism = pointer.Int32Ptr(2)
+				job.Spec.Completions = pointer.Int32(2)
+				job.Spec.Parallelism = pointer.Int32(2)
 			},
 			opts: JobValidationOptions{
 				AllowElasticIndexedJobs: true,
@@ -1532,14 +1532,14 @@ func TestValidateJobUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validGeneratedSelector,
 					Template:       validPodTemplateSpecForGenerated,
-					Completions:    pointer.Int32Ptr(1),
-					Parallelism:    pointer.Int32Ptr(2),
+					Completions:    pointer.Int32(1),
+					Parallelism:    pointer.Int32(2),
 					CompletionMode: completionModePtr(batch.IndexedCompletion),
 				},
 			},
 			update: func(job *batch.Job) {
-				job.Spec.Completions = pointer.Int32Ptr(3)
-				job.Spec.Parallelism = pointer.Int32Ptr(3)
+				job.Spec.Completions = pointer.Int32(3)
+				job.Spec.Parallelism = pointer.Int32(3)
 			},
 			opts: JobValidationOptions{
 				AllowElasticIndexedJobs: true,
@@ -1551,14 +1551,14 @@ func TestValidateJobUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validGeneratedSelector,
 					Template:       validPodTemplateSpecForGenerated,
-					Completions:    pointer.Int32Ptr(1),
-					Parallelism:    pointer.Int32Ptr(1),
+					Completions:    pointer.Int32(1),
+					Parallelism:    pointer.Int32(1),
 					CompletionMode: completionModePtr(batch.IndexedCompletion),
 				},
 			},
 			update: func(job *batch.Job) {
-				job.Spec.Completions = pointer.Int32Ptr(2)
-				job.Spec.Parallelism = pointer.Int32Ptr(3)
+				job.Spec.Completions = pointer.Int32(2)
+				job.Spec.Parallelism = pointer.Int32(3)
 			},
 			opts: JobValidationOptions{
 				AllowElasticIndexedJobs: true,
@@ -1574,14 +1574,14 @@ func TestValidateJobUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validGeneratedSelector,
 					Template:       validPodTemplateSpecForGenerated,
-					Completions:    pointer.Int32Ptr(1),
-					Parallelism:    pointer.Int32Ptr(1),
+					Completions:    pointer.Int32(1),
+					Parallelism:    pointer.Int32(1),
 					CompletionMode: completionModePtr(batch.IndexedCompletion),
 				},
 			},
 			update: func(job *batch.Job) {
 				job.Spec.Completions = nil
-				job.Spec.Parallelism = pointer.Int32Ptr(3)
+				job.Spec.Parallelism = pointer.Int32(3)
 			},
 			opts: JobValidationOptions{
 				AllowElasticIndexedJobs: true,
@@ -1597,14 +1597,14 @@ func TestValidateJobUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validGeneratedSelector,
 					Template:       validPodTemplateSpecForGenerated,
-					Completions:    pointer.Int32Ptr(2),
-					Parallelism:    pointer.Int32Ptr(2),
+					Completions:    pointer.Int32(2),
+					Parallelism:    pointer.Int32(2),
 					CompletionMode: completionModePtr(batch.IndexedCompletion),
 				},
 			},
 			update: func(job *batch.Job) {
-				job.Spec.Completions = pointer.Int32Ptr(2)
-				job.Spec.Parallelism = pointer.Int32Ptr(1)
+				job.Spec.Completions = pointer.Int32(2)
+				job.Spec.Parallelism = pointer.Int32(1)
 			},
 			opts: JobValidationOptions{
 				AllowElasticIndexedJobs: true,
@@ -1616,14 +1616,14 @@ func TestValidateJobUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validGeneratedSelector,
 					Template:       validPodTemplateSpecForGenerated,
-					Completions:    pointer.Int32Ptr(2),
-					Parallelism:    pointer.Int32Ptr(2),
+					Completions:    pointer.Int32(2),
+					Parallelism:    pointer.Int32(2),
 					CompletionMode: completionModePtr(batch.IndexedCompletion),
 				},
 			},
 			update: func(job *batch.Job) {
-				job.Spec.Completions = pointer.Int32Ptr(2)
-				job.Spec.Parallelism = pointer.Int32Ptr(3)
+				job.Spec.Completions = pointer.Int32(2)
+				job.Spec.Parallelism = pointer.Int32(3)
 			},
 			opts: JobValidationOptions{
 				AllowElasticIndexedJobs: true,
