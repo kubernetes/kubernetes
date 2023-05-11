@@ -2,13 +2,11 @@
 
 approvers:
   - deads2k
-  - lavalamp
   - smarterclayton
   - sttts
 reviewers:
   - caesarxuchao
   - deads2k
-  - lavalamp
   - smarterclayton
   - liggitt
   - sttts
@@ -18,3 +16,5 @@ reviewers:
   - jefftree
 labels:
   - sig/api-machinery
+emeritus_approvers:
+  - lavalamp

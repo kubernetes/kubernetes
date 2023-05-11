@@ -2,12 +2,10 @@
 
 approvers:
   - deads2k
-  - lavalamp
   - liggitt
   - sttts
 reviewers:
   - deads2k
-  - lavalamp
   - liggitt
   - sttts
   - cheftako
@@ -15,3 +13,5 @@ reviewers:
 labels:
   - sig/api-machinery
   - area/apiserver
+emeritus_approvers:
+  - lavalamp

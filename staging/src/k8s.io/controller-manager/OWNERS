@@ -4,7 +4,6 @@ approvers:
   - andrewsykim
   - cheftako
   - deads2k
-  - lavalamp
   - liggitt
   - mtaufen
   - sttts
@@ -15,7 +14,6 @@ reviewers:
   - deads2k
   - jiahuif
   - jpbetz
-  - lavalamp
   - liggitt
   - luxas
   - mtaufen
@@ -23,3 +21,5 @@ reviewers:
 labels:
   - sig/api-machinery
   - sig/cloud-provider
+emeritus_approvers:
+  - lavalamp
