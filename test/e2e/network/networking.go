@@ -262,6 +262,7 @@ var _ = common.SIGDescribe("Networking", func() {
 			}
 		})
 
+		// todo: this fails for ipvs-ipv6 (daman1807)
 		ginkgo.It("should function for endpoint-Service: sctp [Feature:SCTPConnectivity]", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(ctx, f, e2enetwork.EnableSCTP)
 			ginkgo.By(fmt.Sprintf("dialing(sctp) %v (endpoint) --> %v:%v (config.clusterIP)", config.EndpointPods[0].Name, config.ClusterIP, e2enetwork.ClusterSCTPPort))
