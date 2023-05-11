@@ -17,12 +17,14 @@ limitations under the License.
 package resource
 
 import (
+	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/openapi/cached"
 	"k8s.io/client-go/openapi/openapitest"
 	"k8s.io/client-go/openapi3"
+	"k8s.io/kube-openapi/pkg/spec3"
 )
 
 func TestV3SupportsQueryParamBatchV1(t *testing.T) {
@@ -134,4 +136,65 @@ func TestV3SupportsQueryParamBatchV1(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestInvalidOpenAPIV3Document(t *testing.T) {
+	tests := map[string]struct {
+		spec *spec3.OpenAPI
+	}{
+		"nil document returns error": {
+			spec: nil,
+		},
+		"empty document returns error": {
+			spec: &spec3.OpenAPI{},
+		},
+		"minimal document returns error": {
+			spec: &spec3.OpenAPI{
+				Version: "openapi 3.0.0",
+				Paths:   nil,
+			},
+		},
+	}
+
+	gvk := schema.GroupVersionKind{
+		Group:   "batch",
+		Version: "v1",
+		Kind:    "Job",
+	}
+	for tn, tc := range tests {
+		t.Run(tn, func(t *testing.T) {
+
+			verifier := &queryParamVerifierV3{
+				finder: NewCRDFinder(func() ([]schema.GroupKind, error) {
+					return []schema.GroupKind{}, nil
+				}),
+				root:       &fakeRoot{tc.spec},
+				queryParam: QueryParamFieldValidation,
+			}
+			err := verifier.HasSupport(gvk)
+			if !strings.Contains(err.Error(), "Invalid OpenAPI V3 document") {
+				t.Errorf("Expected invalid document error, but none received.")
+			}
+		})
+	}
+}
+
+// fakeRoot implements Root interface; manually specifies the returned OpenAPI V3 document.
+type fakeRoot struct {
+	spec *spec3.OpenAPI
+}
+
+func (f *fakeRoot) GroupVersions() ([]schema.GroupVersion, error) {
+	// Unused
+	return nil, nil
+}
+
+// GVSpec returns hard-coded OpenAPI V3 document.
+func (f *fakeRoot) GVSpec(gv schema.GroupVersion) (*spec3.OpenAPI, error) {
+	return f.spec, nil
+}
+
+func (f *fakeRoot) GVSpecAsMap(gv schema.GroupVersion) (map[string]interface{}, error) {
+	// Unused
+	return nil, nil
 }
