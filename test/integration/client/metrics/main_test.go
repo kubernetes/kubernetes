@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2023 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,19 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package metrics
 
 import (
-	"os"
+	"testing"
 
-	"k8s.io/component-base/cli"
-	_ "k8s.io/component-base/metrics/prometheus/clientgo" // for client metric registration
-	_ "k8s.io/component-base/metrics/prometheus/version"  // for version metric registration
-	"k8s.io/kubernetes/cmd/kube-proxy/app"
+	"k8s.io/kubernetes/test/integration/framework"
 )
 
-func main() {
-	command := app.NewProxyCommand()
-	code := cli.Run(command)
-	os.Exit(code)
+func TestMain(m *testing.M) {
+	framework.EtcdMain(m.Run)
 }
