@@ -203,7 +203,7 @@ func (rc *reconciler) reconcile(ctx context.Context) {
 			// See https://github.com/kubernetes/kubernetes/issues/93902
 			attachState := rc.actualStateOfWorld.GetAttachState(attachedVolume.VolumeName, attachedVolume.NodeName)
 			if attachState == cache.AttachStateDetached {
-				logger.V(5).Info("Volume detached--skipping", "volume", attachedVolume)
+				logger.V(5).Info("Volume detached--skipping", "node", klog.KRef("", string(attachedVolume.NodeName)), "volumeName", attachedVolume.VolumeName)
 				continue
 			}
 
@@ -232,7 +232,7 @@ func (rc *reconciler) reconcile(ctx context.Context) {
 			// Check whether volume is still mounted. Skip detach if it is still mounted unless force detach timeout
 			// or the node has `node.kubernetes.io/out-of-service` taint.
 			if attachedVolume.MountedByNode && !forceDetach && !hasOutOfServiceTaint {
-				logger.V(5).Info("Cannot detach volume because it is still mounted", "volume", attachedVolume)
+				logger.V(5).Info("Cannot detach volume because it is still mounted", "node", klog.KRef("", string(attachedVolume.NodeName)), "volumeName", attachedVolume.VolumeName)
 				continue
 			}
 
@@ -252,7 +252,7 @@ func (rc *reconciler) reconcile(ctx context.Context) {
 			err = rc.nodeStatusUpdater.UpdateNodeStatusForNode(logger, attachedVolume.NodeName)
 			if err != nil {
 				// Skip detaching this volume if unable to update node status
-				logger.Error(err, "UpdateNodeStatusForNode failed while attempting to report volume as attached", "volume", attachedVolume)
+				logger.Error(err, "UpdateNodeStatusForNode failed while attempting to report volume as attached", "node", klog.KRef("", string(attachedVolume.NodeName)), "volumeName", attachedVolume.VolumeName)
 				// Add volume back to ReportAsAttached if UpdateNodeStatusForNode call failed so that node status updater will add it back to VolumeAttached list.
 				// It is needed here too because DetachVolume is not call actually and we keep the data consistency for every reconcile.
 				rc.actualStateOfWorld.AddVolumeToReportAsAttached(logger, attachedVolume.VolumeName, attachedVolume.NodeName)
@@ -262,7 +262,7 @@ func (rc *reconciler) reconcile(ctx context.Context) {
 			// Trigger detach volume which requires verifying safe to detach step
 			// If timeout is true, skip verifySafeToDetach check
 			// If the node has node.kubernetes.io/out-of-service taint with NoExecute effect, skip verifySafeToDetach check
-			logger.V(5).Info("Starting attacherDetacher.DetachVolume", "volume", attachedVolume)
+			logger.V(5).Info("Starting attacherDetacher.DetachVolume", "node", klog.KRef("", string(attachedVolume.NodeName)), "volumeName", attachedVolume.VolumeName)
 			if hasOutOfServiceTaint {
 				logger.V(4).Info("node has out-of-service taint", "node", klog.KRef("", string(attachedVolume.NodeName)))
 			}
@@ -270,10 +270,13 @@ func (rc *reconciler) reconcile(ctx context.Context) {
 			err = rc.attacherDetacher.DetachVolume(logger, attachedVolume.AttachedVolume, verifySafeToDetach, rc.actualStateOfWorld)
 			if err == nil {
 				if !timeout {
-					logger.Info("attacherDetacher.DetachVolume started", "volume", attachedVolume)
+					logger.Info("attacherDetacher.DetachVolume started", "node", klog.KRef("", string(attachedVolume.NodeName)), "volumeName", attachedVolume.VolumeName)
 				} else {
 					metrics.RecordForcedDetachMetric()
-					logger.Info("attacherDetacher.DetachVolume started: this volume is not safe to detach, but maxWaitForUnmountDuration expired, force detaching", "duration", rc.maxWaitForUnmountDuration, "volume", attachedVolume)
+					logger.Info("attacherDetacher.DetachVolume started: this volume is not safe to detach, but maxWaitForUnmountDuration expired, force detaching",
+						"duration", rc.maxWaitForUnmountDuration,
+						"node", klog.KRef("", string(attachedVolume.NodeName)),
+						"volumeName", attachedVolume.VolumeName)
 				}
 			}
 			if err != nil {
@@ -285,7 +288,7 @@ func (rc *reconciler) reconcile(ctx context.Context) {
 				if !exponentialbackoff.IsExponentialBackoff(err) {
 					// Ignore exponentialbackoff.IsExponentialBackoff errors, they are expected.
 					// Log all other errors.
-					logger.Error(err, "attacherDetacher.DetachVolume failed to start", "volume", attachedVolume)
+					logger.Error(err, "attacherDetacher.DetachVolume failed to start", "node", klog.KRef("", string(attachedVolume.NodeName)), "volumeName", attachedVolume.VolumeName)
 				}
 			}
 		}
