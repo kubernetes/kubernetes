@@ -571,7 +571,7 @@ func TestGetBitforCIDR(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			got, err := cs.getIndexForCIDR(subnetCIDR)
+			got, err := cs.getIndexForIP(subnetCIDR.IP)
 			if err == nil && tc.expectErr {
 				t.Errorf("expected error but got null")
 				return
