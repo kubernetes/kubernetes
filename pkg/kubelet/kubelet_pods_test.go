@@ -54,6 +54,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
+	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	netutils "k8s.io/utils/net"
@@ -5395,4 +5396,34 @@ func testMetric(t *testing.T, metricName string, expectedMetric string) {
 	if err != nil {
 		t.Error(err)
 	}
+}
+
+func TestGetNonExistentImagePullSecret(t *testing.T) {
+	secrets := make([]*v1.Secret, 0)
+	fakeRecorder := record.NewFakeRecorder(1)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet.kubelet.recorder = fakeRecorder
+	testKubelet.kubelet.secretManager = secret.NewFakeManagerWithSecrets(secrets)
+	defer testKubelet.Cleanup()
+
+	expectedEvent := "Warning FailedToRetrieveImagePullSecret Unable to retrieve image pull secrets secretFoo, the image pull may not succeed."
+	testPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:   "nsFoo",
+			Name:        "podFoo",
+			Annotations: map[string]string{},
+		},
+		Spec: v1.PodSpec{
+			ImagePullSecrets: []v1.LocalObjectReference{
+				{Name: "secretFoo"},
+			},
+		},
+	}
+
+	pullSecrets := testKubelet.kubelet.getPullSecretsForPod(testPod)
+	assert.Equal(t, 0, len(pullSecrets))
+
+	assert.Equal(t, 1, len(fakeRecorder.Events))
+	event := <-fakeRecorder.Events
+	assert.Equal(t, event, expectedEvent)
 }
