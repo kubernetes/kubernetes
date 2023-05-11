@@ -50,7 +50,6 @@ func (rc *reconciler) readyToUnmount() bool {
 // put the volumes to volumesFailedReconstruction to be cleaned up later when DesiredStateOfWorld
 // is populated.
 func (rc *reconciler) reconstructVolumes() {
-	defer rc.updateLastSyncTime()
 	// Get volumes information by reading the pod's directory
 	podVolumes, err := getVolumesFromPodDir(rc.kubeletPodsDir)
 	if err != nil {
@@ -174,10 +173,10 @@ func (rc *reconciler) cleanOrphanVolumes() {
 	rc.volumesFailedReconstruction = make([]podVolume, 0)
 }
 
-// updateReconstructedDevicePaths tries to file devicePaths of reconstructed volumes from
+// updateReconstructedFromAPIServer tries to file devicePaths of reconstructed volumes from
 // node.Status.VolumesAttached. This can be done only after connection to the API
 // server is established, i.e. it can't be part of reconstructVolumes().
-func (rc *reconciler) updateReconstructedDevicePaths() {
+func (rc *reconciler) updateReconstructedFromAPIServer() {
 	klog.V(4).InfoS("Updating reconstructed devicePaths")
 
 	if rc.kubeClient == nil {
