@@ -663,6 +663,46 @@ func TestV1WebhookCache(t *testing.T) {
 	}
 }
 
+func BenchmarkV1WebhookCache(b *testing.B) {
+	serv := &mockV1Service{
+		allow:      true,
+		statusCode: http.StatusOK,
+	}
+	s, err := NewV1TestServer(serv, serverCert, serverKey, caCert)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer s.Close()
+
+	// Create an authorizer that caches successful responses "forever" (100 days).
+	wh, err := newV1Authorizer(s.URL, clientCert, clientKey, caCert, 2400*time.Hour, noopAuthorizerMetrics())
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	ctx := context.Background()
+	attr := authorizer.AttributesRecord{
+		User: &user.DefaultInfo{
+			Name: "very-real-user",
+			UID:  "asdf",
+			Groups: []string{
+				"system:authenticated",
+				"very-real-group",
+			},
+		},
+		Verb:       "post",
+		APIGroup:   "foo.example.com",
+		APIVersion: "v1alpha1",
+		Resource:   "bars",
+		Name:       "benchmark-bar",
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		wh.Authorize(ctx, attr)
+	}
+}
+
 func noopAuthorizerMetrics() AuthorizerMetrics {
 	return AuthorizerMetrics{
 		RecordRequestTotal:   noopMetrics{}.RecordRequestTotal,

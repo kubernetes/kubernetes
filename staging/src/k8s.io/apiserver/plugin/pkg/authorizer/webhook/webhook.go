@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
@@ -190,11 +191,14 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 			Verb: attr.GetVerb(),
 		}
 	}
-	key, err := json.Marshal(r.Spec)
-	if err != nil {
+
+	var b strings.Builder
+	if err := json.NewEncoder(&b).Encode(r.Spec); err != nil {
 		return w.decisionOnError, "", err
 	}
-	if entry, ok := w.responseCache.Get(string(key)); ok {
+	key := b.String()
+
+	if entry, ok := w.responseCache.Get(key); ok {
 		r.Status = entry.(authorizationv1.SubjectAccessReviewStatus)
 	} else {
 		var result *authorizationv1.SubjectAccessReview
@@ -227,9 +231,9 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 		r.Status = result.Status
 		if shouldCache(attr) {
 			if r.Status.Allowed {
-				w.responseCache.Add(string(key), r.Status, w.authorizedTTL)
+				w.responseCache.Add(key, r.Status, w.authorizedTTL)
 			} else {
-				w.responseCache.Add(string(key), r.Status, w.unauthorizedTTL)
+				w.responseCache.Add(key, r.Status, w.unauthorizedTTL)
 			}
 		}
 	}
