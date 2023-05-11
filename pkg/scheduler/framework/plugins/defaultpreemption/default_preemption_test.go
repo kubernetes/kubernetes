@@ -352,7 +352,8 @@ func TestPostFilter(t *testing.T) {
 			if tt.extender != nil {
 				extenders = append(extenders, tt.extender)
 			}
-			ctx, cancel := context.WithCancel(context.Background())
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			f, err := st.NewFramework(registeredPlugins, "", ctx.Done(),
 				frameworkruntime.WithClientSet(cs),
@@ -361,6 +362,7 @@ func TestPostFilter(t *testing.T) {
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithExtenders(extenders),
 				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(tt.pods, tt.nodes)),
+				frameworkruntime.WithLogger(logger),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -1087,7 +1089,8 @@ func TestDryRunPreemption(t *testing.T) {
 				parallelism = 1
 			}
 
-			ctx, cancel := context.WithCancel(context.Background())
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			fwk, err := st.NewFramework(
 				registeredPlugins, "", ctx.Done(),
@@ -1095,6 +1098,7 @@ func TestDryRunPreemption(t *testing.T) {
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithParallelism(parallelism),
+				frameworkruntime.WithLogger(logger),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -1351,6 +1355,7 @@ func TestSelectBestCandidate(t *testing.T) {
 				ctx.Done(),
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithLogger(logger),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -1480,6 +1485,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
 			var nodes []*v1.Node
 			for _, n := range test.nodes {
 				nodes = append(nodes, st.MakeNode().Name(n).Obj())
@@ -1492,6 +1498,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 			defer close(stopCh)
 			f, err := st.NewFramework(registeredPlugins, "", stopCh,
 				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(test.pods, nodes)),
+				frameworkruntime.WithLogger(logger),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -1689,7 +1696,8 @@ func TestPreempt(t *testing.T) {
 				return true, nil, nil
 			})
 
-			ctx, cancel := context.WithCancel(context.Background())
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
 			cache := internalcache.New(time.Duration(0), ctx.Done())
@@ -1735,6 +1743,7 @@ func TestPreempt(t *testing.T) {
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(test.pods, nodes)),
 				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithLogger(logger),
 			)
 			if err != nil {
 				t.Fatal(err)
