@@ -51,12 +51,6 @@ require (
 	github.com/onsi/gomega v1.27.6 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	go.etcd.io/etcd/api/v3 v3.5.9
-	go.etcd.io/etcd/client/pkg/v3 v3.5.8
-	go.etcd.io/etcd/client/v3 v3.5.9
-	go.etcd.io/etcd/pkg/v3 v3.5.9
-	go.etcd.io/etcd/raft/v3 v3.5.9
-	go.etcd.io/etcd/server/v3 v3.5.9
 	golang.org/x/sys v0.7.0 // indirect
 	golang.org/x/text v0.9.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect

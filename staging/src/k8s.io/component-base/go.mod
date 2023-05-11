@@ -58,12 +58,6 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	go.etcd.io/etcd/api/v3 v3.5.9
-	go.etcd.io/etcd/client/pkg/v3 v3.5.8
-	go.etcd.io/etcd/client/v3 v3.5.9
-	go.etcd.io/etcd/pkg/v3 v3.5.9
-	go.etcd.io/etcd/raft/v3 v3.5.9
-	go.etcd.io/etcd/server/v3 v3.5.9
 	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.10.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.10.0 // indirect
 	go.opentelemetry.io/otel/metric v0.31.0 // indirect
