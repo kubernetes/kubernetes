@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -164,6 +165,11 @@ func IsUnixDomainSocket(filePath string) (bool, error) {
 	// for the file (using FSCTL_GET_REPARSE_POINT) and checking for reparse tag: reparseTagSocket
 	// does NOT work in 1809 if the socket file is created within a bind mounted directory by a container
 	// and the FSCTL is issued in the host by the kubelet.
+
+	// If the file does not exist, it cannot be a Unix domain socket.
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		return false, fmt.Errorf("File %s not found. Err: %v", filePath, err)
+	}
 
 	klog.V(6).InfoS("Function IsUnixDomainSocket starts", "filePath", filePath)
 	// As detailed in https://github.com/kubernetes/kubernetes/issues/104584 we cannot rely
