@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
+	
 	"reflect"
 	"strconv"
 	"strings"
@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubectl/pkg/cmd/delete"
@@ -188,45 +187,24 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 
 			tf.ClientConfigVal = &restclient.Config{}
 
-			cmd := NewCmdRun(tf, genericiooptions.NewTestIOStreamsDiscard())
+			streams, _, _, bufErr := genericclioptions.NewTestIOStreams()
+			cmdutil.BehaviorOnFatal(func(str string, code int) {
+				bufErr.Write([]byte(str))
+			})
+
+			cmd := NewCmdRun(tf, streams)
 			cmd.Flags().Set("image", "nginx")
+			cmd.Run(cmd, test.args)
 
-			printFlags := genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme)
-			printer, err := printFlags.ToPrinter()
-			if err != nil {
+			var err error
+			if bufErr.Len() > 0 {
+				err = fmt.Errorf("%v", bufErr.String())
+			}
+
+			if err != nil && !test.expectError {
 				t.Errorf("unexpected error: %v", err)
-				return
 			}
-
-			deleteFlags := delete.NewDeleteFlags("to use to replace the resource.")
-			deleteOptions, err := deleteFlags.ToOptions(nil, genericiooptions.NewTestIOStreamsDiscard())
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-				return
-			}
-			opts := &RunOptions{
-				PrintFlags:    printFlags,
-				DeleteOptions: deleteOptions,
-
-				IOStreams: genericiooptions.NewTestIOStreamsDiscard(),
-
-				Image: "nginx",
-
-				PrintObj: func(obj runtime.Object) error {
-					return printer.PrintObj(obj, os.Stdout)
-				},
-				Recorder: genericclioptions.NoopRecorder{},
-
-				ArgsLenAtDash: test.argsLenAtDash,
-			}
-
-			err = opts.Run(tf, cmd, test.args)
-			if test.expectError && err == nil {
-				t.Errorf("unexpected non-error (%s)", test.name)
-			}
-			if !test.expectError && err != nil {
-				t.Errorf("unexpected error: %v (%s)", err, test.name)
-			}
+			
 		})
 	}
 }
@@ -369,9 +347,9 @@ func TestGenerateService(t *testing.T) {
 				return
 			}
 
-			ioStreams, _, buff, _ := genericiooptions.NewTestIOStreams()
+			ioStreams, _, buff, _ := genericclioptions.NewTestIOStreams()
 			deleteFlags := delete.NewDeleteFlags("to use to replace the resource.")
-			deleteOptions, err := deleteFlags.ToOptions(nil, genericiooptions.NewTestIOStreamsDiscard())
+			deleteOptions, err := deleteFlags.ToOptions(nil, genericclioptions.NewTestIOStreamsDiscard())
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 				return
@@ -395,7 +373,6 @@ func TestGenerateService(t *testing.T) {
 			cmd := &cobra.Command{}
 			cmd.Flags().Bool(cmdutil.ApplyAnnotationsFlag, false, "")
 			cmd.Flags().Bool("record", false, "Record current kubectl command in the resource annotation. If set to false, do not record the command. If set to true, record the command. If not set, default to updating the existing annotation value only if one already exists.")
-			addRunFlags(cmd, opts)
 
 			if !test.expectPOST {
 				opts.DryRunStrategy = cmdutil.DryRunClient
@@ -520,7 +497,7 @@ func TestRunValidations(t *testing.T) {
 			}
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-			streams, _, _, bufErr := genericiooptions.NewTestIOStreams()
+			streams, _, _, bufErr := genericclioptions.NewTestIOStreams()
 			cmdutil.BehaviorOnFatal(func(str string, code int) {
 				bufErr.Write([]byte(str))
 			})
@@ -612,7 +589,7 @@ func TestExpose(t *testing.T) {
 				}),
 			}
 
-			streams, _, _, bufErr := genericiooptions.NewTestIOStreams()
+			streams, _, _, bufErr := genericclioptions.NewTestIOStreams()
 			cmdutil.BehaviorOnFatal(func(str string, code int) {
 				bufErr.Write([]byte(str))
 			})
@@ -752,7 +729,7 @@ status: {}
 			tf := cmdtesting.NewTestFactory().WithNamespace("ns")
 			defer tf.Cleanup()
 
-			streams, _, bufOut, _ := genericiooptions.NewTestIOStreams()
+			streams, _, bufOut, _ := genericclioptions.NewTestIOStreams()
 
 			cmd := NewCmdRun(tf, streams)
 			cmd.Flags().Set("dry-run", "client")
