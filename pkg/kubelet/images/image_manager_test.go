@@ -19,6 +19,7 @@ package images
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -435,7 +436,15 @@ func TestEvalCRIPullErr(t *testing.T) {
 			input: crierrors.ErrRegistryUnavailable,
 			assert: func(msg string, err error) {
 				assert.ErrorIs(t, err, crierrors.ErrRegistryUnavailable)
-				assert.Contains(t, msg, "registry is unavailable")
+				assert.Equal(t, msg, "image pull failed for test because the registry is unavailable")
+			},
+		},
+		{
+			name:  "registry is unavailable with additional error message",
+			input: fmt.Errorf("%v: foo", crierrors.ErrRegistryUnavailable),
+			assert: func(msg string, err error) {
+				assert.ErrorIs(t, err, crierrors.ErrRegistryUnavailable)
+				assert.Equal(t, msg, "image pull failed for test because the registry is unavailable: foo")
 			},
 		},
 		{
@@ -443,7 +452,15 @@ func TestEvalCRIPullErr(t *testing.T) {
 			input: crierrors.ErrSignatureValidationFailed,
 			assert: func(msg string, err error) {
 				assert.ErrorIs(t, err, crierrors.ErrSignatureValidationFailed)
-				assert.Contains(t, msg, "signature validation failed")
+				assert.Equal(t, msg, "image pull failed for test because the signature validation failed")
+			},
+		},
+		{
+			name:  "signature is invalid with additional error message (wrapped)",
+			input: fmt.Errorf("%w: bar", crierrors.ErrSignatureValidationFailed),
+			assert: func(msg string, err error) {
+				assert.ErrorIs(t, err, crierrors.ErrSignatureValidationFailed)
+				assert.Equal(t, msg, "image pull failed for test because the signature validation failed: bar")
 			},
 		},
 	} {
@@ -452,7 +469,7 @@ func TestEvalCRIPullErr(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			msg, err := evalCRIPullErr(&v1.Container{}, testInput)
+			msg, err := evalCRIPullErr(&v1.Container{Image: "test"}, testInput)
 			testAssert(msg, err)
 		})
 	}

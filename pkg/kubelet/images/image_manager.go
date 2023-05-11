@@ -19,6 +19,7 @@ package images
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	dockerref "github.com/docker/distribution/reference"
@@ -172,13 +173,27 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, pod *v1.Pod, conta
 func evalCRIPullErr(container *v1.Container, err error) (errMsg string, errRes error) {
 	// Error assertions via errors.Is is not supported by gRPC (remote runtime) errors right now.
 	// See https://github.com/grpc/grpc-go/issues/3616
-	if err.Error() == crierrors.ErrRegistryUnavailable.Error() {
-		errMsg = fmt.Sprintf("image pull failed for %s because the registry is unavailable.", container.Image)
+	if strings.HasPrefix(err.Error(), crierrors.ErrRegistryUnavailable.Error()) {
+		errMsg = fmt.Sprintf(
+			"image pull failed for %s because the registry is unavailable%s",
+			container.Image,
+			// Trim the error name from the message to convert errors like:
+			// "RegistryUnavailable: a more detailed explanation" to:
+			// "...because the registry is unavailable: a more detailed explanation"
+			strings.TrimPrefix(err.Error(), crierrors.ErrRegistryUnavailable.Error()),
+		)
 		return errMsg, crierrors.ErrRegistryUnavailable
 	}
 
-	if err.Error() == crierrors.ErrSignatureValidationFailed.Error() {
-		errMsg = fmt.Sprintf("image pull failed for %s because the signature validation failed.", container.Image)
+	if strings.HasPrefix(err.Error(), crierrors.ErrSignatureValidationFailed.Error()) {
+		errMsg = fmt.Sprintf(
+			"image pull failed for %s because the signature validation failed%s",
+			container.Image,
+			// Trim the error name from the message to convert errors like:
+			// "SignatureValidationFailed: a more detailed explanation" to:
+			// "...because the signature validation failed: a more detailed explanation"
+			strings.TrimPrefix(err.Error(), crierrors.ErrSignatureValidationFailed.Error()),
+		)
 		return errMsg, crierrors.ErrSignatureValidationFailed
 	}
 
