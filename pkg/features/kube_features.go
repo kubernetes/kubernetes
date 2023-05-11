@@ -952,7 +952,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	JobMutableNodeSchedulingDirectives: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 
-	JobReadyPods: {Default: true, PreRelease: featuregate.Beta},
+	JobReadyPods: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in ??
 
 	JobTrackingWithFinalizers: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 
