@@ -36,6 +36,12 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
+	go.etcd.io/etcd/api/v3 v3.5.9
+	go.etcd.io/etcd/client/pkg/v3 v3.5.8
+	go.etcd.io/etcd/client/v3 v3.5.9
+	go.etcd.io/etcd/pkg/v3 v3.5.9
+	go.etcd.io/etcd/raft/v3 v3.5.9
+	go.etcd.io/etcd/server/v3 v3.5.9
 	golang.org/x/mod v0.10.0 // indirect
 	golang.org/x/net v0.9.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b // indirect

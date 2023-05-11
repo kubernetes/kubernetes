@@ -33,6 +33,12 @@ require (
 	github.com/onsi/ginkgo/v2 v2.9.4 // indirect
 	github.com/onsi/gomega v1.27.6 // indirect
 	github.com/stretchr/testify v1.8.2 // indirect
+	go.etcd.io/etcd/api/v3 v3.5.9
+	go.etcd.io/etcd/client/pkg/v3 v3.5.8
+	go.etcd.io/etcd/client/v3 v3.5.9
+	go.etcd.io/etcd/pkg/v3 v3.5.9
+	go.etcd.io/etcd/raft/v3 v3.5.9
+	go.etcd.io/etcd/server/v3 v3.5.9
 	golang.org/x/mod v0.10.0 // indirect
 	golang.org/x/sys v0.7.0 // indirect
 	golang.org/x/tools v0.8.0 // indirect

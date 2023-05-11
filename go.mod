@@ -64,9 +64,9 @@ require (
 	github.com/stretchr/testify v1.8.2
 	github.com/vishvananda/netlink v1.1.0
 	github.com/vmware/govmomi v0.30.0
-	go.etcd.io/etcd/api/v3 v3.5.8
+	go.etcd.io/etcd/api/v3 v3.5.9
 	go.etcd.io/etcd/client/pkg/v3 v3.5.8
-	go.etcd.io/etcd/client/v3 v3.5.8
+	go.etcd.io/etcd/client/v3 v3.5.9
 	go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful v0.35.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.35.0
 	go.opentelemetry.io/otel v1.10.0
@@ -218,10 +218,10 @@ require (
 	github.com/xlab/treeprint v1.2.0 // indirect
 	go.etcd.io/bbolt v1.3.7 // indirect
 	go.etcd.io/etcd/client/v2 v2.305.8 // indirect
-	go.etcd.io/etcd/pkg/v3 v3.5.8 // indirect
-	go.etcd.io/etcd/raft/v3 v3.5.8 // indirect
-	go.etcd.io/etcd/server/v3 v3.5.8 // indirect
 	go.opencensus.io v0.24.0 // indirect
+	go.etcd.io/etcd/pkg/v3 v3.5.9 // indirect
+	go.etcd.io/etcd/raft/v3 v3.5.9 // indirect
+	go.etcd.io/etcd/server/v3 v3.5.9 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.35.1 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.10.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.10.0 // indirect

@@ -23,6 +23,12 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rogpeppe/go-internal v1.6.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
+	go.etcd.io/etcd/api/v3 v3.5.9
+	go.etcd.io/etcd/client/pkg/v3 v3.5.8
+	go.etcd.io/etcd/client/v3 v3.5.9
+	go.etcd.io/etcd/pkg/v3 v3.5.9
+	go.etcd.io/etcd/raft/v3 v3.5.9
+	go.etcd.io/etcd/server/v3 v3.5.9
 	golang.org/x/net v0.9.0 // indirect
 	golang.org/x/text v0.9.0 // indirect
 	google.golang.org/protobuf v1.30.0 // indirect
