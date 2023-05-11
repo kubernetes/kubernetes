@@ -84,6 +84,9 @@ func init() {
 	signalToNodeCondition[evictionapi.SignalImageFsInodesFree] = v1.NodeDiskPressure
 	signalToNodeCondition[evictionapi.SignalNodeFsInodesFree] = v1.NodeDiskPressure
 	signalToNodeCondition[evictionapi.SignalPIDAvailable] = v1.NodePIDPressure
+	signalToNodeCondition[evictionapi.SignalMemoryWarning] = v1.NodeMemoryWarning
+	signalToNodeCondition[evictionapi.SignalCPUWarning] = v1.NodeCPUWarning
+	signalToNodeCondition[evictionapi.SignalIOWarning] = v1.NodeDiskWarning
 
 	// map signals to resources (and vice-versa)
 	signalToResource = map[evictionapi.Signal]v1.ResourceName{}
@@ -153,6 +156,9 @@ func ParseThresholdConfig(allocatableConfig []string, evictionHard, evictionSoft
 			break
 		}
 	}
+	warningHard := map[string]string{"memory.warning": "40%", "cpu.waring": "40%", "io.waring" : "40%"}
+	warningThresholds, err := parseThresholdStatements(warningHard)
+	results = append(results, warningThresholds...)
 	return results, nil
 }
 
@@ -671,6 +677,20 @@ func makeSignalObservations(summary *statsapi.Summary) (signalObservations, stat
 			available: resource.NewQuantity(int64(*memory.AvailableBytes), resource.BinarySI),
 			capacity:  resource.NewQuantity(int64(*memory.AvailableBytes+*memory.WorkingSetBytes), resource.BinarySI),
 			time:      memory.Time,
+		}
+		if memory.PSI != nil && memory.PSI.Some != nil {
+			result[evictionapi.SignalMemoryWarning] = signalObservation {
+				available: resource.NewQuantity(int64(*memory.PSI.Some.Avg60), resource.DecimalSI),
+				capacity:  resource.NewQuantity(int64(100), resource.DecimalSI),
+				time:      memory.Time,
+			}
+		}
+	}
+	if cpu := summary.Node.CPU; cpu != nil && cpu.PSI != nil && cpu.PSI.Some != nil {
+		result[evictionapi.SignalCPUWarning] = signalObservation {
+			available: resource.NewQuantity(int64(*cpu.PSI.Some.Avg60), resource.DecimalSI),
+			capacity:  resource.NewQuantity(int64(100), resource.DecimalSI),
+			time:      cpu.Time,
 		}
 	}
 	if allocatableContainer, err := getSysContainer(summary.Node.SystemContainers, statsapi.SystemContainerPods); err != nil {

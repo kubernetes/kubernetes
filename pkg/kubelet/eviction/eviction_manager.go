@@ -336,6 +336,20 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		klog.V(3).InfoS("Eviction manager: no resources are starved")
 		return nil
 	}
+	// check thresholds are all warning thresholds, then return / Don't do evict
+  allWaringThresholds := true
+	for i := range thresholds {
+		signal := thresholds[i].Signal
+		if signal != evictionapi.SignalMemoryWarning && signal != evictionapi.SignalCPUWarning && signal != evictionapi.SignalIOWarning {
+			allWaringThresholds = false
+			break
+		}
+	}
+
+	if allWaringThresholds {
+		klog.V(3).InfoS("Eviction manager: no resources are starved as thresholds are all from warning")
+		return nil
+	}
 
 	// rank the thresholds by eviction priority
 	sort.Sort(byEvictionPriority(thresholds))

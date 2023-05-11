@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -59,6 +60,8 @@ type NodeStats struct {
 	// Stats about the rlimit of system.
 	// +optional
 	Rlimit *RlimitStats `json:"rlimit,omitempty"`
+  // Stats about the IO pressure of the node
+	IO *IOStats `json:"io,omitempty"`
 }
 
 // RlimitStats are stats rlimit of OS.
@@ -197,6 +200,15 @@ type NetworkStats struct {
 	Interfaces []InterfaceStats `json:"interfaces,omitempty"`
 }
 
+// IOStats contains data about IO usage.
+type IOStats struct {
+	// The time at which these stats were updated.
+	Time metav1.Time `json:"time"`
+
+  // PSI stats of the overall node
+	PSI cadvisorapi.PSIStats `json:"psi,omitempty"`
+}
+
 // CPUStats contains data about CPU usage.
 type CPUStats struct {
 	// The time at which these stats were updated.
@@ -208,6 +220,9 @@ type CPUStats struct {
 	// Cumulative CPU usage (sum of all cores) since object creation.
 	// +optional
 	UsageCoreNanoSeconds *uint64 `json:"usageCoreNanoSeconds,omitempty"`
+
+	// PSI stats of the overall node
+	PSI cadvisorapi.PSIStats `json:"psi,omitempty"`
 }
 
 // MemoryStats contains data about memory usage.
@@ -235,6 +250,9 @@ type MemoryStats struct {
 	// Cumulative number of major page faults.
 	// +optional
 	MajorPageFaults *uint64 `json:"majorPageFaults,omitempty"`
+
+	// PSI stats of the overall node
+	PSI cadvisorapi.PSIStats `json:"psi,omitempty"`
 }
 
 // AcceleratorStats contains stats for accelerators attached to the container.

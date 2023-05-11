@@ -46,6 +46,20 @@ func cadvisorInfoToCPUandMemoryStats(info *cadvisorapiv2.ContainerInfo) (*statsa
 		Time:                 metav1.NewTime(cstat.Timestamp),
 		UsageNanoCores:       uint64Ptr(0),
 		UsageCoreNanoSeconds: uint64Ptr(0),
+		PSI: cadvisorapiv1.PSIStats {
+			Some: cadvisorapiv1.PSIData {
+				Avg10: 0,
+				Avg60: 0,
+				Avg300: 0,
+				Total: 0,
+			},
+			Full: cadvisorapiv1.PSIData {
+				Avg10: 0,
+				Avg60: 0,
+				Avg300: 0,
+				Total: 0,
+			},
+		},
 	}
 	if info.Spec.HasCpu {
 		if cstat.CpuInst != nil {
@@ -53,7 +67,9 @@ func cadvisorInfoToCPUandMemoryStats(info *cadvisorapiv2.ContainerInfo) (*statsa
 		}
 		if cstat.Cpu != nil {
 			cpuStats.UsageCoreNanoSeconds = &cstat.Cpu.Usage.Total
+			cpuStats.PSI = &cstat.Cpu.PSI
 		}
+
 	}
 	if info.Spec.HasMemory && cstat.Memory != nil {
 		pageFaults := cstat.Memory.ContainerData.Pgfault
@@ -65,6 +81,7 @@ func cadvisorInfoToCPUandMemoryStats(info *cadvisorapiv2.ContainerInfo) (*statsa
 			RSSBytes:        &cstat.Memory.RSS,
 			PageFaults:      &pageFaults,
 			MajorPageFaults: &majorPageFaults,
+			PSI:             &cstat.Memory.PSI,
 		}
 		// availableBytes = memory limit (if known) - workingset
 		if !isMemoryUnlimited(info.Spec.Memory.Limit) {

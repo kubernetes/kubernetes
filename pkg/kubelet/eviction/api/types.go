@@ -40,6 +40,12 @@ const (
 	SignalAllocatableMemoryAvailable Signal = "allocatableMemory.available"
 	// SignalPIDAvailable is amount of PID available for pod allocation
 	SignalPIDAvailable Signal = "pid.available"
+	// SignalCPUWarning is PSI CPU exceed some thresolds
+	SignalCPUWarning Signal = "cpu.warning"
+	// SignalMemoryWarning is PSI memory exceed some thresolds
+	SignalMemoryWarning Signal = "memory.warning"
+	// SignalIOWarning is PSI IO exceed some thresolds
+	SignalIOWarning Signal = "io.warning"
 )
 
 // ThresholdOperator is the operator used to express a Threshold.
