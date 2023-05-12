@@ -39,6 +39,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 )
 
+var (
+	errNoImageToCleanup = goerrors.New("NoImageToCleanup")
+)
+
 // instrumentationScope is OpenTelemetry instrumentation scope name
 const instrumentationScope = "k8s.io/kubernetes/pkg/kubelet/images"
 
@@ -323,6 +327,11 @@ func (im *realImageGCManager) GarbageCollect(ctx context.Context) error {
 		klog.InfoS("Disk usage on image filesystem is over the high threshold, trying to free bytes down to the low threshold", "usage", usagePercent, "highThreshold", im.policy.HighThresholdPercent, "amountToFree", amountToFree, "lowThreshold", im.policy.LowThresholdPercent)
 		freed, err := im.freeSpace(ctx, amountToFree, time.Now())
 		if err != nil {
+			if goerrors.Is(err, errNoImageToCleanup) {
+				klog.InfoS("No images eligible for garbage collection")
+				im.recorder.Eventf(im.nodeRef, v1.EventTypeWarning, events.FreeDiskSpaceFailed, err.Error())
+				return err
+			}
 			return err
 		}
 
@@ -339,6 +348,10 @@ func (im *realImageGCManager) GarbageCollect(ctx context.Context) error {
 func (im *realImageGCManager) DeleteUnusedImages(ctx context.Context) error {
 	klog.InfoS("Attempting to delete unused images")
 	_, err := im.freeSpace(ctx, math.MaxInt64, time.Now())
+	if goerrors.Is(err, errNoImageToCleanup) {
+		klog.InfoS("All images are currently in use")
+		return nil
+	}
 	return err
 }
 
@@ -370,6 +383,19 @@ func (im *realImageGCManager) freeSpace(ctx context.Context, bytesToFree int64, 
 			continue
 
 		}
+		// Images that are currently in used were given a newer lastUsed.
+		if record.lastUsed.Equal(freeTime) || record.lastUsed.After(freeTime) {
+			klog.V(5).InfoS("Image ID was used too recently, not eligible for garbage collection", "imageID", image, "lastUsed", record.lastUsed, "freeTime", freeTime)
+			continue
+		}
+
+		// Avoid garbage collect the image if the image is not old enough.
+		// In such a case, the image may have just been pulled down, and will be used by a container right away.a
+		if freeTime.Sub(record.firstDetected) < im.policy.MinAge {
+			klog.V(5).InfoS("Image ID's age is less than the policy's minAge, not eligible for garbage collection", "imageID", image, "age", freeTime.Sub(record.firstDetected), "minAge", im.policy.MinAge)
+			continue
+		}
+
 		images = append(images, evictionInfo{
 			id:          image,
 			imageRecord: *record,
@@ -377,24 +403,15 @@ func (im *realImageGCManager) freeSpace(ctx context.Context, bytesToFree int64, 
 	}
 	sort.Sort(byLastUsedAndDetected(images))
 
+	if len(images) == 0 {
+		return 0, fmt.Errorf("wanted to free %d bytes, but %w", bytesToFree, errNoImageToCleanup)
+	}
+
 	// Delete unused images until we've freed up enough space.
 	var deletionErrors []error
 	spaceFreed := int64(0)
 	for _, image := range images {
 		klog.V(5).InfoS("Evaluating image ID for possible garbage collection", "imageID", image.id)
-		// Images that are currently in used were given a newer lastUsed.
-		if image.lastUsed.Equal(freeTime) || image.lastUsed.After(freeTime) {
-			klog.V(5).InfoS("Image ID was used too recently, not eligible for garbage collection", "imageID", image.id, "lastUsed", image.lastUsed, "freeTime", freeTime)
-			continue
-		}
-
-		// Avoid garbage collect the image if the image is not old enough.
-		// In such a case, the image may have just been pulled down, and will be used by a container right away.
-
-		if freeTime.Sub(image.firstDetected) < im.policy.MinAge {
-			klog.V(5).InfoS("Image ID's age is less than the policy's minAge, not eligible for garbage collection", "imageID", image.id, "age", freeTime.Sub(image.firstDetected), "minAge", im.policy.MinAge)
-			continue
-		}
 
 		// Remove image. Continue despite errors.
 		klog.InfoS("Removing image to free bytes", "imageID", image.id, "size", image.size)
