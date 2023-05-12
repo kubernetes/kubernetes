@@ -239,7 +239,7 @@ github.com/go-openapi/jsonreference/internal
 # github.com/go-openapi/swag v0.22.3
 ## explicit; go 1.18
 github.com/go-openapi/swag
-# github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0
+# github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572
 ## explicit; go 1.13
 github.com/go-task/slim-sprig
 # github.com/godbus/dbus/v5 v5.0.6
@@ -513,7 +513,7 @@ github.com/munnerz/goautoneg
 # github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 ## explicit
 github.com/mxk/go-flowrate/flowrate
-# github.com/onsi/ginkgo/v2 v2.9.1
+# github.com/onsi/ginkgo/v2 v2.9.4
 ## explicit; go 1.18
 github.com/onsi/ginkgo/v2
 github.com/onsi/ginkgo/v2/config
@@ -535,7 +535,7 @@ github.com/onsi/ginkgo/v2/internal/parallel_support
 github.com/onsi/ginkgo/v2/internal/testingtproxy
 github.com/onsi/ginkgo/v2/reporters
 github.com/onsi/ginkgo/v2/types
-# github.com/onsi/gomega v1.27.4
+# github.com/onsi/gomega v1.27.6
 ## explicit; go 1.18
 github.com/onsi/gomega
 github.com/onsi/gomega/format

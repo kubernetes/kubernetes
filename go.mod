@@ -49,8 +49,8 @@ require (
 	github.com/moby/ipvs v1.1.0
 	github.com/mrunalp/fileutils v0.5.0
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
-	github.com/onsi/ginkgo/v2 v2.9.1
-	github.com/onsi/gomega v1.27.4
+	github.com/onsi/ginkgo/v2 v2.9.4
+	github.com/onsi/gomega v1.27.6
 	github.com/opencontainers/runc v1.1.6
 	github.com/opencontainers/selinux v1.10.0
 	github.com/pkg/errors v0.9.1
@@ -167,7 +167,7 @@ require (
 	github.com/go-openapi/jsonpointer v0.19.6 // indirect
 	github.com/go-openapi/jsonreference v0.20.1 // indirect
 	github.com/go-openapi/swag v0.22.3 // indirect
-	github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0 // indirect
+	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/gofrs/uuid v4.4.0+incompatible // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/google/btree v1.0.1 // indirect
