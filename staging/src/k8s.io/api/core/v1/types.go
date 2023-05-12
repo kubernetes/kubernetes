@@ -2767,6 +2767,9 @@ const (
 	// DisruptionTarget indicates the pod is about to be terminated due to a
 	// disruption (such as preemption, eviction API or garbage-collection).
 	DisruptionTarget PodConditionType = "DisruptionTarget"
+	// ActiveDeadlineExceeded indicates the pod has exceeded the active deadline
+	// timeout specified by the .spec.activeDeadlineSeconds field.
+	ActiveDeadlineExceeded PodConditionType = "ActiveDeadlineExceeded"
 )
 
 // These are reasons for a pod's transition to a condition.

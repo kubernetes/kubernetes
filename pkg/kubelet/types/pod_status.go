@@ -42,6 +42,11 @@ func PodConditionByKubelet(conditionType v1.PodConditionType) bool {
 			return true
 		}
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+		if conditionType == v1.ActiveDeadlineExceeded {
+			return true
+		}
+	}
 	return false
 }
 

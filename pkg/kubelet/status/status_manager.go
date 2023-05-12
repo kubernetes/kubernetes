@@ -598,6 +598,7 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
 		// Set DisruptionTarget.LastTransitionTime.
 		updateLastTransitionTime(&status, &oldStatus, v1.DisruptionTarget)
+		updateLastTransitionTime(&status, &oldStatus, v1.ActiveDeadlineExceeded)
 	}
 
 	// ensure that the start time does not change across updates.

@@ -28,8 +28,8 @@ import (
 )
 
 const (
-	reason  = "DeadlineExceeded"
-	message = "Pod was active on the node longer than the specified deadline"
+	ActiveDeadlineReason = "DeadlineExceeded"
+	message              = "Pod was active on the node longer than the specified deadline"
 )
 
 // activeDeadlineHandler knows how to enforce active deadlines on pods.
@@ -71,8 +71,8 @@ func (m *activeDeadlineHandler) ShouldEvict(pod *v1.Pod) lifecycle.ShouldEvictRe
 	if !m.pastActiveDeadline(pod) {
 		return lifecycle.ShouldEvictResponse{Evict: false}
 	}
-	m.recorder.Eventf(pod, v1.EventTypeNormal, reason, message)
-	return lifecycle.ShouldEvictResponse{Evict: true, Reason: reason, Message: message}
+	m.recorder.Eventf(pod, v1.EventTypeNormal, ActiveDeadlineReason, message)
+	return lifecycle.ShouldEvictResponse{Evict: true, Reason: ActiveDeadlineReason, Message: message}
 }
 
 // pastActiveDeadline returns true if the pod has been active for more than its ActiveDeadlineSeconds

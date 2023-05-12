@@ -135,7 +135,7 @@ func TestActiveDeadlineHandler(t *testing.T) {
 			t.Errorf("[%d] ShouldEvict.Evict expected %#v, got %#v", i, testCase.expected, actual.Evict)
 		}
 		if testCase.expected {
-			if actual.Reason != reason {
+			if actual.Reason != ActiveDeadlineReason {
 				t.Errorf("[%d] ShouldEvict.Reason expected %#v, got %#v", i, message, actual.Reason)
 			}
 			if actual.Message != message {

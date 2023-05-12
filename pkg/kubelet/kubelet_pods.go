@@ -1605,6 +1605,17 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	}
 
 	// set all Kubelet-owned conditions
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+		// add the ActiveDeadlineExceeded condition
+		if s.Reason == ActiveDeadlineReason {
+			s.Conditions = append(s.Conditions, v1.PodCondition{
+				Type:    v1.ActiveDeadlineExceeded,
+				Status:  v1.ConditionTrue,
+				Reason:  ActiveDeadlineReason,
+				Message: message,
+			})
+		}
+	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodHasNetworkCondition) {
 		s.Conditions = append(s.Conditions, status.GeneratePodHasNetworkCondition(pod, podStatus))
 	}
