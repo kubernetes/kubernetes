@@ -50,14 +50,14 @@ USER=${USER:-$(whoami)}
 
 # required for cni installation
 CNI_CONFIG_DIR=${CNI_CONFIG_DIR:-/etc/cni/net.d}
-CNI_PLUGINS_VERSION=${CNI_PLUGINS_VERSION:-"v1.0.1"}
+CNI_PLUGINS_VERSION=${CNI_PLUGINS_VERSION:-"v1.2.0"}
 CNI_TARGETARCH=${CNI_TARGETARCH:-amd64}
 CNI_PLUGINS_TARBALL="${CNI_PLUGINS_VERSION}/cni-plugins-linux-${CNI_TARGETARCH}-${CNI_PLUGINS_VERSION}.tgz"
 CNI_PLUGINS_URL="https://github.com/containernetworking/plugins/releases/download/${CNI_PLUGINS_TARBALL}"
-CNI_PLUGINS_AMD64_SHA256SUM=${CNI_PLUGINS_AMD64_SHA256SUM:-"5238fbb2767cbf6aae736ad97a7aa29167525dcd405196dfbc064672a730d3cf"}
-CNI_PLUGINS_ARM64_SHA256SUM=${CNI_PLUGINS_ARM64_SHA256SUM:-"2d4528c45bdd0a8875f849a75082bc4eafe95cb61f9bcc10a6db38a031f67226"}
-CNI_PLUGINS_PPC64LE_SHA256SUM=${CNI_PLUGINS_PPC64LE_SHA256SUM:-"f078e33067e6daaef3a3a5010d6440f2464b7973dec3ca0b5d5be22fdcb1fd96"}
-CNI_PLUGINS_S390X_SHA256SUM=${CNI_PLUGINS_S390X_SHA256SUM:-"468d33e16440d9ca4395c6bb2d5b71b35ae4a4df26301e4da85ac70c5ce56822"}
+CNI_PLUGINS_AMD64_SHA256SUM=${CNI_PLUGINS_AMD64_SHA256SUM:-"f3a841324845ca6bf0d4091b4fc7f97e18a623172158b72fc3fdcdb9d42d2d37"}
+CNI_PLUGINS_ARM64_SHA256SUM=${CNI_PLUGINS_ARM64_SHA256SUM:-"525e2b62ba92a1b6f3dc9612449a84aa61652e680f7ebf4eff579795fe464b57"}
+CNI_PLUGINS_PPC64LE_SHA256SUM=${CNI_PLUGINS_PPC64LE_SHA256SUM:-"4960283b88d53b8c45ff7a938a6b398724005313e0388e0a36bd6d0b2bb5acdc"}
+CNI_PLUGINS_S390X_SHA256SUM=${CNI_PLUGINS_S390X_SHA256SUM:-"1524d1e6cc237ef756040ec1b4c397659bc14df25865bfcc5ea647357ef974f2"}
 
 # enables testing eviction scenarios locally.
 EVICTION_HARD=${EVICTION_HARD:-"memory.available<100Mi,nodefs.available<10%,nodefs.inodesFree<5%"}
@@ -186,10 +186,10 @@ do
     esac
 done
 
-if [ -z "${GO_OUT}" ]; then
+if [ -z "${GO_OUT:-$(guess_built_binary_path)}" ]; then
     make -C "${KUBE_ROOT}" WHAT="cmd/kubectl cmd/kube-apiserver cmd/kube-controller-manager cmd/cloud-controller-manager cmd/kubelet cmd/kube-proxy cmd/kube-scheduler"
 else
-    echo "skipped the build."
+    echo "skipped the build as we found existing binaries in $(guess_built_binary_path)"
 fi
 
 # Shut down anyway if there's an error.
@@ -695,6 +695,29 @@ function wait_node_ready(){
   fi
 }
 
+function wait_coredns_available(){
+  local interval_time=2
+  local coredns_wait_time=300
+
+  # kick the coredns pods to be recreated
+  ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" -n kube-system delete pods -l k8s-app=kube-dns
+  sleep 30
+
+  local coredns_pods_ready="${KUBECTL} --kubeconfig '${CERT_DIR}/admin.kubeconfig' wait --for=condition=Ready --timeout=60s pods -l k8s-app=kube-dns -n kube-system"
+  kube::util::wait_for_success "$coredns_wait_time" "$interval_time" "$coredns_pods_ready"
+  if [ $? == "1" ]; then
+    echo "time out on waiting for coredns pods"
+    exit 1
+  fi
+
+  local coredns_available="${KUBECTL} --kubeconfig '${CERT_DIR}/admin.kubeconfig' wait --for=condition=Available --timeout=60s deployments coredns -n kube-system"
+  kube::util::wait_for_success "$coredns_wait_time" "$interval_time" "$coredns_available"
+  if [ $? == "1" ]; then
+    echo "time out on waiting for coredns deployment"
+    exit 1
+  fi
+}
+
 function start_kubelet {
     KUBELET_LOG=${LOG_DIR}/kubelet.log
     mkdir -p "${POD_MANIFEST_PATH}" &>/dev/null || sudo mkdir -p "${POD_MANIFEST_PATH}"
@@ -1046,6 +1069,36 @@ function parse_eviction {
   done
 }
 
+function update_packages {
+  apt-get update && apt-get install -y sudo
+  apt-get remove -y systemd
+
+  # Do not update docker / containerd / runc
+  sed -i 's/\(.*\)docker\(.*\)/#\1docker\2/' /etc/apt/sources.list
+
+  # jump through hoops to avoid removing docker/containerd
+  # when installing nftables and kmod, as those docker/containerd
+  # packages depend on iptables
+  dpkg -r --force-depends iptables && \
+  apt -y --fix-broken install && \
+  apt -y install nftables kmod && \
+  apt -y install iptables
+}
+
+function tolerate_cgroups_v2 {
+  # https://github.com/moby/moby/blob/ed89041433a031cafc0a0f19cfe573c31688d377/hack/dind#L28-L37
+  # cgroup v2: enable nesting
+  if [ -f /sys/fs/cgroup/cgroup.controllers ]; then
+    # move the init process (PID 1) from the root group to the /init group,
+    # otherwise writing subtree_control fails with EBUSY.
+    mkdir -p /sys/fs/cgroup/init
+    echo 1 > /sys/fs/cgroup/init/cgroup.procs
+    # enable controllers
+    sed -e 's/ / +/g' -e 's/^/+/' < /sys/fs/cgroup/cgroup.controllers \
+      > /sys/fs/cgroup/cgroup.subtree_control
+  fi
+}
+
 function install_cni {
   cni_plugin_sha=CNI_PLUGINS_${CNI_TARGETARCH^^}_SHA256SUM
   echo "Installing CNI plugin binaries ..." \
@@ -1069,36 +1122,37 @@ function install_cni {
   sudo mkdir -p "$CNI_CONFIG_DIR"
   cat << EOF | sudo tee "$CNI_CONFIG_DIR"/10-containerd-net.conflist
 {
-  "cniVersion": "0.4.0",
-  "name": "containerd-net",
-  "plugins": [
-    {
-      "type": "bridge",
-      "bridge": "cni0",
-      "isGateway": true,
-      "ipMasq": true,
-      "promiscMode": true,
-      "ipam": {
-        "type": "host-local",
-        "ranges": [
-          [{
-            "subnet": "10.88.0.0/16"
-          }],
-          [{
-            "subnet": "2001:4860:4860::/64"
-          }]
-        ],
-        "routes": [
-          { "dst": "0.0.0.0/0" },
-          { "dst": "::/0" }
-        ]
-      }
-    },
-    {
-      "type": "portmap",
-      "capabilities": {"portMappings": true}
-    }
-  ]
+ "cniVersion": "1.0.0",
+ "name": "containerd-net",
+ "plugins": [
+   {
+     "type": "bridge",
+     "bridge": "cni0",
+     "isGateway": true,
+     "ipMasq": true,
+     "promiscMode": true,
+     "ipam": {
+       "type": "host-local",
+       "ranges": [
+         [{
+           "subnet": "10.88.0.0/16"
+         }],
+         [{
+           "subnet": "2001:db8:4860::/64"
+         }]
+       ],
+       "routes": [
+         { "dst": "0.0.0.0/0" },
+         { "dst": "::/0" }
+       ]
+     }
+   },
+   {
+     "type": "portmap",
+     "capabilities": {"portMappings": true},
+     "externalSetMarkChain": "KUBE-MARK-MASQ"
+   }
+ ]
 }
 EOF
 }
@@ -1118,8 +1172,8 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
   export PATH="${KUBE_ROOT}/third_party/etcd:${PATH}"
   KUBE_FASTBUILD=true make ginkgo cross
 
-  apt-get update && apt-get install -y sudo
-  apt-get remove -y systemd
+  # install things we need that are missing from the kubekins image
+  update_packages
 
   # configure shared mounts to prevent failure in DIND scenarios
   mount --make-rshared /
@@ -1132,9 +1186,16 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
   # install cni for docker in docker
   install_cni 
 
+  # If we are running in a cgroups v2 environment
+  # we need to enable nesting
+  tolerate_cgroups_v2
+
   # enable cri for docker in docker
   echo "enable cri"
   echo "DOCKER_OPTS=\"\${DOCKER_OPTS} --cri-containerd\"" >> /etc/default/docker
+
+  # let's log it where we can grab it later
+  echo "DOCKER_LOGFILE=${LOG_DIR}/docker.log" >> /etc/default/docker
 
   echo "restarting docker"
   service docker restart
@@ -1211,6 +1272,7 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
         ;;
       Linux)
         start_kubeproxy
+        wait_coredns_available
         ;;
       *)
         print_color "Unsupported host OS.  Must be Linux or Mac OS X, kube-proxy aborted."
