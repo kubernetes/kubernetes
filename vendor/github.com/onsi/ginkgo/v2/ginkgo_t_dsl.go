@@ -80,6 +80,9 @@ type FullGinkgoTInterface interface {
 	Fi(indentation uint, format string, args ...any) string
 	Fiw(indentation uint, maxWidth uint, format string, args ...any) string
 
+	//Generates a formatted string version of the current spec's timeline
+	RenderTimeline() string
+
 	GinkgoRecover()
 	DeferCleanup(args ...any)
 
