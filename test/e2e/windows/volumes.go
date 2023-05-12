@@ -30,6 +30,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -100,13 +101,13 @@ func doReadOnlyTest(ctx context.Context, f *framework.Framework, source v1.Volum
 
 	pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
 	ginkgo.By("verifying that pod has the correct nodeSelector")
-	framework.ExpectEqual(pod.Spec.NodeSelector["kubernetes.io/os"], "windows")
+	gomega.Expect(pod.Spec.NodeSelector).To(gomega.HaveKeyWithValue("kubernetes.io/os", "windows"), "pod.spec.nodeSelector")
 
 	cmd := []string{"cmd", "/c", "echo windows-volume-test", ">", filePath}
 
 	ginkgo.By("verifying that pod will get an error when writing to a volume that is readonly")
 	_, stderr, _ := e2epod.ExecCommandInContainerWithFullOutput(f, podName, containerName, cmd...)
-	framework.ExpectEqual(stderr, "Access is denied.")
+	gomega.Expect(stderr).To(gomega.Equal("Access is denied."))
 }
 
 func doReadWriteReadOnlyTest(ctx context.Context, f *framework.Framework, source v1.VolumeSource, volumePath string) {
@@ -135,7 +136,7 @@ func doReadWriteReadOnlyTest(ctx context.Context, f *framework.Framework, source
 	pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
 
 	ginkgo.By("verifying that pod has the correct nodeSelector")
-	framework.ExpectEqual(pod.Spec.NodeSelector["kubernetes.io/os"], "windows")
+	gomega.Expect(pod.Spec.NodeSelector).To(gomega.HaveKeyWithValue("kubernetes.io/os", "windows"), "pod.spec.nodeSelector")
 
 	ginkgo.By("verifying that pod can write to a volume with read/write access")
 	writecmd := []string{"cmd", "/c", "echo windows-volume-test", ">", filePath}
@@ -145,13 +146,13 @@ func doReadWriteReadOnlyTest(ctx context.Context, f *framework.Framework, source
 
 	ginkgo.By("verifying that pod will get an error when writing to a volume that is readonly")
 	_, stderr, _ := e2epod.ExecCommandInContainerWithFullOutput(f, podName, containerName, writecmd...)
-	framework.ExpectEqual(stderr, "Access is denied.")
+	gomega.Expect(stderr).To(gomega.Equal("Access is denied."))
 
 	ginkgo.By("verifying that pod can read from a volume that is readonly")
 	readcmd := []string{"cmd", "/c", "type", filePath}
 	readout, readerr, err := e2epod.ExecCommandInContainerWithFullOutput(f, podName, containerName, readcmd...)
 	readmsg := fmt.Sprintf("cmd: %v, stdout: %q, stderr: %q", readcmd, readout, readerr)
-	framework.ExpectEqual(readout, "windows-volume-test")
+	gomega.Expect(readout).To(gomega.Equal("windows-volume-test"))
 	framework.ExpectNoError(err, readmsg)
 }
 
