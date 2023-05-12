@@ -1207,8 +1207,8 @@ mvdan.cc/unparam v0.0.0-20221223090309-7455f1af531d/go.mod h1:IeHQjmn6TOD+e4Z3RF
 rsc.io/binaryregexp v0.2.0/go.mod h1:qTv7/COck+e2FymRvadv62gMdZztPaShugOCi3I+8D8=
 rsc.io/quote/v3 v3.1.0/go.mod h1:yEA65RcK8LyAZtP9Kv3t0HmxON59tX3rD+tICJqUlj0=
 rsc.io/sampler v1.3.0/go.mod h1:T1hPZKmBbMNahiBKFy5HrXp6adAjACjK9JXDnKaTXpA=
-sigs.k8s.io/logtools v0.4.1 h1:b1SFUhj3Iu1af7pJSf02EyNGlbdCkwGOuAq12dW9c9g=
-sigs.k8s.io/logtools v0.4.1/go.mod h1:2HGcCK1vi9YvsBoUDMXvrf588j890iRtsymJX2biE0Q=
+sigs.k8s.io/logtools v0.5.0 h1:qj8YpumQSaLucB14DoJuvHTQSlMSN2JrlWru9C4moaQ=
+sigs.k8s.io/logtools v0.5.0/go.mod h1:2HGcCK1vi9YvsBoUDMXvrf588j890iRtsymJX2biE0Q=
 sigs.k8s.io/yaml v1.2.0 h1:kr/MCeFWJWTwyaHoR9c8EjH9OumOmoF9YGiZd7lFm/Q=
 sigs.k8s.io/yaml v1.2.0/go.mod h1:yfXDCHCao9+ENCvLSE62v9VSji2MKu5jeNfTrofGhJc=
 sigs.k8s.io/zeitgeist v0.2.0 h1:gM+B8dB/3GB/UIqll1Y7g5HTjsXI8frqpUGK40w5Aus=

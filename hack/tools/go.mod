@@ -12,7 +12,7 @@ require (
 	go.uber.org/automaxprocs v1.5.2
 	gotest.tools/gotestsum v1.6.4
 	honnef.co/go/tools v0.4.2
-	sigs.k8s.io/logtools v0.4.1
+	sigs.k8s.io/logtools v0.5.0
 	sigs.k8s.io/zeitgeist v0.2.0
 )
 
