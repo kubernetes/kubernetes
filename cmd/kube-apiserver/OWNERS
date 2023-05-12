@@ -6,6 +6,7 @@ approvers:
   - liggitt
   - smarterclayton
   - sttts
+  - jpbetz
 reviewers:
   - cheftako
   - smarterclayton
@@ -20,6 +21,7 @@ reviewers:
   - hzxuzhonghu
   - logicalhan
   - yue9944882
+  - jpbetz
 labels:
   - sig/api-machinery
   - area/apiserver

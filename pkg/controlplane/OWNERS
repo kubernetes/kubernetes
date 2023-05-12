@@ -6,6 +6,7 @@ approvers:
   - mikedanese
   - sttts
   - wojtek-t
+  - jpbetz
 reviewers:
   - thockin
   - smarterclayton
@@ -26,6 +27,7 @@ reviewers:
   - mwielgus
   - soltysh
   - enj
+  - jpbetz
 labels:
   - sig/api-machinery
 emeritus_approvers:

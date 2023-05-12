@@ -5,6 +5,7 @@ approvers:
   - deads2k
   - liggitt
   - smarterclayton
+  - jpbetz
 reviewers:
   - thockin
   - smarterclayton
@@ -26,6 +27,7 @@ reviewers:
   - feiskyer
   - soltysh
   - jsafrane
+  - jpbetz
 emeritus_approvers:
   - krousey
   - lavalamp

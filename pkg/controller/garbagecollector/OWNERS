@@ -6,6 +6,7 @@ approvers:
 reviewers:
   - caesarxuchao
   - deads2k
+  - jpbetz
 labels:
   - sig/api-machinery
 emeritus_approvers:

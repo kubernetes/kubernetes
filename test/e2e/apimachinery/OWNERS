@@ -6,6 +6,7 @@ approvers:
   - sttts
   - liggitt
   - caesarxuchao
+  - jpbetz
 reviewers:
   - thockin
   - smarterclayton
@@ -19,6 +20,7 @@ reviewers:
   - sttts
   - ncdc
   - logicalhan
+  - jpbetz
 labels:
   - sig/api-machinery
 emeritus_approvers:
