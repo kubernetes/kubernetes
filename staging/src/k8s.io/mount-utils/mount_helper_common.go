@@ -31,7 +31,7 @@ import (
 func CleanupMountPoint(mountPath string, mounter Interface, extensiveMountPointCheck bool) error {
 	pathExists, pathErr := PathExists(mountPath)
 	if !pathExists && pathErr == nil {
-		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", mountPath)
+		klog.Warningf("Warning: mount cleanup skipped because path does not exist: %v", mountPath)
 		return nil
 	}
 	corruptedMnt := IsCorruptedMnt(pathErr)
@@ -44,36 +44,41 @@ func CleanupMountPoint(mountPath string, mounter Interface, extensiveMountPointC
 func CleanupMountWithForce(mountPath string, mounter MounterForceUnmounter, extensiveMountPointCheck bool, umountTimeout time.Duration) error {
 	pathExists, pathErr := PathExists(mountPath)
 	if !pathExists && pathErr == nil {
-		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", mountPath)
+		klog.Warningf("Warning: mount cleanup skipped because path does not exist: %v", mountPath)
 		return nil
 	}
 	corruptedMnt := IsCorruptedMnt(pathErr)
 	if pathErr != nil && !corruptedMnt {
 		return fmt.Errorf("Error checking path: %v", pathErr)
 	}
-	var notMnt bool
-	var err error
-	if !corruptedMnt {
-		notMnt, err = removePathIfNotMountPoint(mountPath, mounter, extensiveMountPointCheck)
-		// if mountPath was not a mount point - we would have attempted to remove mountPath
-		// and hence return errors if any.
-		if err != nil || notMnt {
+
+	if corruptedMnt || mounter.canSafelySkipMountPointCheck() {
+		klog.V(4).Infof("unmounting %q (corruptedMount: %t, mounterCanSkipMountPointChecks: %t)",
+			mountPath, corruptedMnt, mounter.canSafelySkipMountPointCheck())
+		if err := mounter.UnmountWithForce(mountPath, umountTimeout); err != nil {
 			return err
 		}
+		return removePath(mountPath)
 	}
 
-	// Unmount the mount path
+	notMnt, err := removePathIfNotMountPoint(mountPath, mounter, extensiveMountPointCheck)
+	// if mountPath is not a mount point, it's just been removed or there was an error
+	if err != nil || notMnt {
+		return err
+	}
+
 	klog.V(4).Infof("%q is a mountpoint, unmounting", mountPath)
 	if err := mounter.UnmountWithForce(mountPath, umountTimeout); err != nil {
 		return err
 	}
 
 	notMnt, err = removePathIfNotMountPoint(mountPath, mounter, extensiveMountPointCheck)
-	// mountPath is not a mount point we should return whatever error we saw
+	// if mountPath is not a mount point, it's either just been removed or there was an error
 	if notMnt {
 		return err
 	}
-	return fmt.Errorf("Failed to unmount path %v", mountPath)
+	// mountPath is still a mount point
+	return fmt.Errorf("failed to cleanup mount point %v", mountPath)
 }
 
 // doCleanupMountPoint unmounts the given path and
@@ -82,31 +87,35 @@ func CleanupMountWithForce(mountPath string, mounter MounterForceUnmounter, exte
 // IsNotMountPoint will be called instead of IsLikelyNotMountPoint.
 // IsNotMountPoint is more expensive but properly handles bind mounts within the same fs.
 // if corruptedMnt is true, it means that the mountPath is a corrupted mountpoint, and the mount point check
-// will be skipped
+// will be skipped. The mount point check will also be skipped if the mounter supports it.
 func doCleanupMountPoint(mountPath string, mounter Interface, extensiveMountPointCheck bool, corruptedMnt bool) error {
-	var notMnt bool
-	var err error
-	if !corruptedMnt {
-		notMnt, err = removePathIfNotMountPoint(mountPath, mounter, extensiveMountPointCheck)
-		// if mountPath was not a mount point - we would have attempted to remove mountPath
-		// and hence return errors if any.
-		if err != nil || notMnt {
+	if corruptedMnt || mounter.canSafelySkipMountPointCheck() {
+		klog.V(4).Infof("unmounting %q (corruptedMount: %t, mounterCanSkipMountPointChecks: %t)",
+			mountPath, corruptedMnt, mounter.canSafelySkipMountPointCheck())
+		if err := mounter.Unmount(mountPath); err != nil {
 			return err
 		}
+		return removePath(mountPath)
 	}
 
-	// Unmount the mount path
+	notMnt, err := removePathIfNotMountPoint(mountPath, mounter, extensiveMountPointCheck)
+	// if mountPath is not a mount point, it's just been removed or there was an error
+	if err != nil || notMnt {
+		return err
+	}
+
 	klog.V(4).Infof("%q is a mountpoint, unmounting", mountPath)
 	if err := mounter.Unmount(mountPath); err != nil {
 		return err
 	}
 
 	notMnt, err = removePathIfNotMountPoint(mountPath, mounter, extensiveMountPointCheck)
-	// mountPath is not a mount point we should return whatever error we saw
+	// if mountPath is not a mount point, it's either just been removed or there was an error
 	if notMnt {
 		return err
 	}
-	return fmt.Errorf("Failed to unmount path %v", mountPath)
+	// mountPath is still a mount point
+	return fmt.Errorf("failed to cleanup mount point %v", mountPath)
 }
 
 // removePathIfNotMountPoint verifies if given mountPath is a mount point if not it attempts
@@ -134,4 +143,15 @@ func removePathIfNotMountPoint(mountPath string, mounter Interface, extensiveMou
 		return notMnt, os.Remove(mountPath)
 	}
 	return notMnt, nil
+}
+
+// removePath attempts to remove the directory. Returns nil if the directory was removed or does not exist.
+func removePath(mountPath string) error {
+	klog.V(4).Infof("Warning: deleting path %q", mountPath)
+	err := os.Remove(mountPath)
+	if os.IsNotExist(err) {
+		klog.V(4).Infof("%q does not exist", mountPath)
+		return nil
+	}
+	return err
 }

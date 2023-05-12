@@ -32,8 +32,9 @@ type FakeMounter struct {
 	MountCheckErrors map[string]error
 	// Some tests run things in parallel, make sure the mounter does not produce
 	// any golang's DATA RACE warnings.
-	mutex       sync.Mutex
-	UnmountFunc UnmountFunc
+	mutex               sync.Mutex
+	UnmountFunc         UnmountFunc
+	skipMountPointCheck bool
 }
 
 // UnmountFunc is a function callback to be executed during the Unmount() call.
@@ -62,6 +63,11 @@ func NewFakeMounter(mps []MountPoint) *FakeMounter {
 	return &FakeMounter{
 		MountPoints: mps,
 	}
+}
+
+func (f *FakeMounter) WithSkipMountPointCheck() *FakeMounter {
+	f.skipMountPointCheck = true
+	return f
 }
 
 // ResetLog clears all the log entries in FakeMounter
@@ -210,6 +216,10 @@ func (f *FakeMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	}
 	klog.V(5).Infof("isLikelyNotMountPoint for %s: true", file)
 	return true, nil
+}
+
+func (f *FakeMounter) canSafelySkipMountPointCheck() bool {
+	return f.skipMountPointCheck
 }
 
 // GetMountRefs finds all mount references to the path, returns a

@@ -41,11 +41,14 @@ func TestDoCleanupMountPoint(t *testing.T) {
 		// the given base directory.
 		// Returns a fake MountPoint, a fake error for the mount point,
 		// and error if the prepare function encountered a fatal error.
-		prepare   func(base string) (MountPoint, error, error)
-		expectErr bool
+		prepareMnt func(base string) (MountPoint, error, error)
+		// Function that prepares the FakeMounter for the test.
+		// Returns error if prepareMntr function encountered a fatal error.
+		prepareMntr func(mntr *FakeMounter) error
+		expectErr   bool
 	}{
 		"mount-ok": {
-			prepare: func(base string) (MountPoint, error, error) {
+			prepareMnt: func(base string) (MountPoint, error, error) {
 				path := filepath.Join(base, testMount)
 				if err := os.MkdirAll(path, defaultPerm); err != nil {
 					return MountPoint{}, nil, err
@@ -54,13 +57,13 @@ func TestDoCleanupMountPoint(t *testing.T) {
 			},
 		},
 		"path-not-exist": {
-			prepare: func(base string) (MountPoint, error, error) {
+			prepareMnt: func(base string) (MountPoint, error, error) {
 				path := filepath.Join(base, testMount)
 				return MountPoint{Device: "/dev/sdb", Path: path}, nil, nil
 			},
 		},
 		"mount-corrupted": {
-			prepare: func(base string) (MountPoint, error, error) {
+			prepareMnt: func(base string) (MountPoint, error, error) {
 				path := filepath.Join(base, testMount)
 				if err := os.MkdirAll(path, defaultPerm); err != nil {
 					return MountPoint{}, nil, err
@@ -70,7 +73,7 @@ func TestDoCleanupMountPoint(t *testing.T) {
 			corruptedMnt: true,
 		},
 		"mount-err-not-corrupted": {
-			prepare: func(base string) (MountPoint, error, error) {
+			prepareMnt: func(base string) (MountPoint, error, error) {
 				path := filepath.Join(base, testMount)
 				if err := os.MkdirAll(path, defaultPerm); err != nil {
 					return MountPoint{}, nil, err
@@ -78,6 +81,20 @@ func TestDoCleanupMountPoint(t *testing.T) {
 				return MountPoint{Device: "/dev/sdb", Path: path}, os.NewSyscallError("fake", syscall.ETIMEDOUT), nil
 			},
 			expectErr: true,
+		},
+		"skip-mount-point-check": {
+			prepareMnt: func(base string) (MountPoint, error, error) {
+				path := filepath.Join(base, testMount)
+				if err := os.MkdirAll(path, defaultPerm); err != nil {
+					return MountPoint{Device: "/dev/sdb", Path: path}, nil, err
+				}
+				return MountPoint{Device: "/dev/sdb", Path: path}, nil, nil
+			},
+			prepareMntr: func(mntr *FakeMounter) error {
+				mntr.WithSkipMountPointCheck()
+				return nil
+			},
+			expectErr: false,
 		},
 	}
 
@@ -90,19 +107,22 @@ func TestDoCleanupMountPoint(t *testing.T) {
 			}
 			defer os.RemoveAll(tmpDir)
 
-			if tt.prepare == nil {
-				t.Fatalf("prepare function required")
+			if tt.prepareMnt == nil {
+				t.Fatalf("prepareMnt function required")
 			}
 
-			mountPoint, mountError, err := tt.prepare(tmpDir)
+			mountPoint, mountError, err := tt.prepareMnt(tmpDir)
 			if err != nil {
-				t.Fatalf("failed to prepare test: %v", err)
+				t.Fatalf("failed to prepareMnt for test: %v", err)
 			}
 
 			fake := NewFakeMounter(
 				[]MountPoint{mountPoint},
 			)
 			fake.MountCheckErrors = map[string]error{mountPoint.Path: mountError}
+			if tt.prepareMntr != nil {
+				tt.prepareMntr(fake)
+			}
 
 			err = doCleanupMountPoint(mountPoint.Path, fake, true, tt.corruptedMnt)
 			if tt.expectErr {
