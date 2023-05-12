@@ -141,18 +141,43 @@ func TestV3SupportsQueryParamBatchV1(t *testing.T) {
 func TestInvalidOpenAPIV3Document(t *testing.T) {
 	tests := map[string]struct {
 		spec *spec3.OpenAPI
+		err  string
 	}{
 		"nil document returns error": {
 			spec: nil,
+			err:  "Invalid OpenAPI V3 document",
 		},
 		"empty document returns error": {
 			spec: &spec3.OpenAPI{},
+			err:  "Invalid OpenAPI V3 document",
 		},
 		"minimal document returns error": {
 			spec: &spec3.OpenAPI{
 				Version: "openapi 3.0.0",
 				Paths:   nil,
 			},
+			err: "Invalid OpenAPI V3 document",
+		},
+		"empty Paths returns error": {
+			spec: &spec3.OpenAPI{
+				Version: "openapi 3.0.0",
+				Paths:   &spec3.Paths{},
+			},
+			err: "Path not found for GVK",
+		},
+		"nil Path returns error": {
+			spec: &spec3.OpenAPI{
+				Version: "openapi 3.0.0",
+				Paths:   &spec3.Paths{Paths: map[string]*spec3.Path{"/version": nil}},
+			},
+			err: "Path not found for GVK",
+		},
+		"empty Path returns error": {
+			spec: &spec3.OpenAPI{
+				Version: "openapi 3.0.0",
+				Paths:   &spec3.Paths{Paths: map[string]*spec3.Path{"/version": {}}},
+			},
+			err: "Path not found for GVK",
 		},
 	}
 
@@ -172,8 +197,8 @@ func TestInvalidOpenAPIV3Document(t *testing.T) {
 				queryParam: QueryParamFieldValidation,
 			}
 			err := verifier.HasSupport(gvk)
-			if !strings.Contains(err.Error(), "Invalid OpenAPI V3 document") {
-				t.Errorf("Expected invalid document error, but none received.")
+			if !strings.Contains(err.Error(), tc.err) {
+				t.Errorf("Expected error (%s), but received (%s)", tc.err, err.Error())
 			}
 		})
 	}

@@ -110,6 +110,9 @@ func supportsQueryParamV3(doc *spec3.OpenAPI, gvk schema.GroupVersionKind, query
 	}
 	for _, path := range doc.Paths.Paths {
 		// If operation is not PATCH, then continue.
+		if path == nil {
+			continue
+		}
 		op := path.PathProps.Patch
 		if op == nil {
 			continue
@@ -127,5 +130,5 @@ func supportsQueryParamV3(doc *spec3.OpenAPI, gvk schema.GroupVersionKind, query
 		}
 		return NewParamUnsupportedError(gvk, queryParam)
 	}
-	return NewParamUnsupportedError(gvk, queryParam)
+	return fmt.Errorf("Path not found for GVK (%s) in OpenAPI V3 doc", gvk)
 }
