@@ -28,7 +28,7 @@ package v2
 
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_ContainerResourceMetricSource = map[string]string{
-	"":          "ContainerResourceMetricSource indicates how to scale on a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  The values will be averaged together before being compared to the target.  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.  Only one \"target\" type should be set.",
+	"":          "ContainerResourceMetricSource indicates how to scale on a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  The values will be averaged together before being compared to the target.  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source. Supports \"AverageUtilization\" and \"AverageValue\" MetricTarget types.",
 	"name":      "name is the name of the resource in question.",
 	"target":    "target specifies the target value for the given metric",
 	"container": "container is the name of the container in the pods of the scaling target",
@@ -61,7 +61,7 @@ func (CrossVersionObjectReference) SwaggerDoc() map[string]string {
 }
 
 var map_ExternalMetricSource = map[string]string{
-	"":       "ExternalMetricSource indicates how to scale on a metric not associated with any Kubernetes object (for example length of queue in cloud messaging service, or QPS from loadbalancer running outside of cluster).",
+	"":       "ExternalMetricSource indicates how to scale on a metric not associated with any Kubernetes object (for example length of queue in cloud messaging service, or QPS from loadbalancer running outside of cluster). Supports \"Value\" and \"AverageValue\" MetricTarget types.",
 	"metric": "metric identifies the target metric by name and selector",
 	"target": "target specifies the target value for the given metric",
 }
@@ -189,7 +189,7 @@ var map_MetricSpec = map[string]string{
 	"object":            "object refers to a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object).",
 	"pods":              "pods refers to a metric describing each pod in the current scale target (for example, transactions-processed-per-second).  The values will be averaged together before being compared to the target value.",
 	"resource":          "resource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
-	"containerResource": "containerResource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing a single container in each pod of the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source. This is an alpha feature and can be enabled by the HPAContainerMetrics feature flag.",
+	"containerResource": "containerResource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing a single container in each pod of the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source. As of 1.27 this is a beta feature and is enabled by default via the HPAContainerMetrics feature flag.",
 	"external":          "external refers to a global metric that is not associated with any Kubernetes object. It allows autoscaling based on information coming from components running outside of cluster (for example length of queue in cloud messaging service, or QPS from loadbalancer running outside of cluster).",
 }
 
@@ -214,9 +214,9 @@ func (MetricStatus) SwaggerDoc() map[string]string {
 var map_MetricTarget = map[string]string{
 	"":                   "MetricTarget defines the target value, average value, or average utilization of a specific metric",
 	"type":               "type represents whether the metric type is Utilization, Value, or AverageValue",
-	"value":              "value is the target value of the metric (as a quantity).",
-	"averageValue":       "averageValue is the target value of the average of the metric across all relevant pods (as a quantity)",
-	"averageUtilization": "averageUtilization is the target value of the average of the resource metric across all relevant pods, represented as a percentage of the requested value of the resource for the pods. Currently only valid for Resource metric source type",
+	"value":              "value is the target value of the metric (as a quantity). Should only be used together with Value type.",
+	"averageValue":       "averageValue is the target value of the average of the metric across all relevant pods (as a quantity). Should only be used together with AverageValue type.",
+	"averageUtilization": "averageUtilization is the target value of the average of the resource metric across all relevant pods, represented as a percentage of the requested value of the resource for the pods. Currently only valid for Resource and ContainerResource metric source types. Should only be used together with Utilization type.",
 }
 
 func (MetricTarget) SwaggerDoc() map[string]string {
@@ -235,7 +235,7 @@ func (MetricValueStatus) SwaggerDoc() map[string]string {
 }
 
 var map_ObjectMetricSource = map[string]string{
-	"":                "ObjectMetricSource indicates how to scale on a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).",
+	"":                "ObjectMetricSource indicates how to scale on a metric describing a kubernetes object (for example, hits-per-second on an Ingress object). Supports \"Value\" and \"AverageValue\" MetricTarget types.",
 	"describedObject": "describedObject specifies the descriptions of a object,such as kind,name apiVersion",
 	"target":          "target specifies the target value for the given metric",
 	"metric":          "metric identifies the target metric by name and selector",
@@ -257,7 +257,7 @@ func (ObjectMetricStatus) SwaggerDoc() map[string]string {
 }
 
 var map_PodsMetricSource = map[string]string{
-	"":       "PodsMetricSource indicates how to scale on a metric describing each pod in the current scale target (for example, transactions-processed-per-second). The values will be averaged together before being compared to the target value.",
+	"":       "PodsMetricSource indicates how to scale on a metric describing each pod in the current scale target (for example, transactions-processed-per-second). The values will be averaged together before being compared to the target value. Supports only \"AverageValue\" MetricTarget type.",
 	"metric": "metric identifies the target metric by name and selector",
 	"target": "target specifies the target value for the given metric",
 }
@@ -277,7 +277,7 @@ func (PodsMetricStatus) SwaggerDoc() map[string]string {
 }
 
 var map_ResourceMetricSource = map[string]string{
-	"":       "ResourceMetricSource indicates how to scale on a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  The values will be averaged together before being compared to the target.  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.  Only one \"target\" type should be set.",
+	"":       "ResourceMetricSource indicates how to scale on a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  The values will be averaged together before being compared to the target.  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source. Supports \"AverageUtilization\" and \"AverageValue\" MetricTarget types.",
 	"name":   "name is the name of the resource in question.",
 	"target": "target specifies the target value for the given metric",
 }

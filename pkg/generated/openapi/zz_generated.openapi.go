@@ -11353,7 +11353,7 @@ func schema_k8sio_api_autoscaling_v2_ContainerResourceMetricSource(ref common.Re
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "ContainerResourceMetricSource indicates how to scale on a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  The values will be averaged together before being compared to the target.  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.  Only one \"target\" type should be set.",
+				Description: "ContainerResourceMetricSource indicates how to scale on a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  The values will be averaged together before being compared to the target.  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source. Supports \"AverageUtilization\" and \"AverageValue\" MetricTarget types.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
@@ -11468,7 +11468,7 @@ func schema_k8sio_api_autoscaling_v2_ExternalMetricSource(ref common.ReferenceCa
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "ExternalMetricSource indicates how to scale on a metric not associated with any Kubernetes object (for example length of queue in cloud messaging service, or QPS from loadbalancer running outside of cluster).",
+				Description: "ExternalMetricSource indicates how to scale on a metric not associated with any Kubernetes object (for example length of queue in cloud messaging service, or QPS from loadbalancer running outside of cluster). Supports \"Value\" and \"AverageValue\" MetricTarget types.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"metric": {
@@ -12006,7 +12006,7 @@ func schema_k8sio_api_autoscaling_v2_MetricSpec(ref common.ReferenceCallback) co
 					},
 					"containerResource": {
 						SchemaProps: spec.SchemaProps{
-							Description: "containerResource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing a single container in each pod of the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source. This is an alpha feature and can be enabled by the HPAContainerMetrics feature flag.",
+							Description: "containerResource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing a single container in each pod of the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source. As of 1.27 this is a beta feature and is enabled by default via the HPAContainerMetrics feature flag.",
 							Ref:         ref("k8s.io/api/autoscaling/v2.ContainerResourceMetricSource"),
 						},
 					},
@@ -12096,19 +12096,19 @@ func schema_k8sio_api_autoscaling_v2_MetricTarget(ref common.ReferenceCallback) 
 					},
 					"value": {
 						SchemaProps: spec.SchemaProps{
-							Description: "value is the target value of the metric (as a quantity).",
+							Description: "value is the target value of the metric (as a quantity). Should only be used together with Value type.",
 							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
 						},
 					},
 					"averageValue": {
 						SchemaProps: spec.SchemaProps{
-							Description: "averageValue is the target value of the average of the metric across all relevant pods (as a quantity)",
+							Description: "averageValue is the target value of the average of the metric across all relevant pods (as a quantity). Should only be used together with AverageValue type.",
 							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
 						},
 					},
 					"averageUtilization": {
 						SchemaProps: spec.SchemaProps{
-							Description: "averageUtilization is the target value of the average of the resource metric across all relevant pods, represented as a percentage of the requested value of the resource for the pods. Currently only valid for Resource metric source type",
+							Description: "averageUtilization is the target value of the average of the resource metric across all relevant pods, represented as a percentage of the requested value of the resource for the pods. Currently only valid for Resource and ContainerResource metric source types. Should only be used together with Utilization type.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -12160,7 +12160,7 @@ func schema_k8sio_api_autoscaling_v2_ObjectMetricSource(ref common.ReferenceCall
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "ObjectMetricSource indicates how to scale on a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).",
+				Description: "ObjectMetricSource indicates how to scale on a metric describing a kubernetes object (for example, hits-per-second on an Ingress object). Supports \"Value\" and \"AverageValue\" MetricTarget types.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"describedObject": {
@@ -12234,7 +12234,7 @@ func schema_k8sio_api_autoscaling_v2_PodsMetricSource(ref common.ReferenceCallba
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "PodsMetricSource indicates how to scale on a metric describing each pod in the current scale target (for example, transactions-processed-per-second). The values will be averaged together before being compared to the target value.",
+				Description: "PodsMetricSource indicates how to scale on a metric describing each pod in the current scale target (for example, transactions-processed-per-second). The values will be averaged together before being compared to the target value. Supports only \"AverageValue\" MetricTarget type.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"metric": {
@@ -12294,7 +12294,7 @@ func schema_k8sio_api_autoscaling_v2_ResourceMetricSource(ref common.ReferenceCa
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "ResourceMetricSource indicates how to scale on a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  The values will be averaged together before being compared to the target.  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.  Only one \"target\" type should be set.",
+				Description: "ResourceMetricSource indicates how to scale on a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  The values will be averaged together before being compared to the target.  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source. Supports \"AverageUtilization\" and \"AverageValue\" MetricTarget types.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {

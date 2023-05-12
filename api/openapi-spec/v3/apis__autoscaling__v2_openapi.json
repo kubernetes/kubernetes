@@ -2,7 +2,7 @@
   "components": {
     "schemas": {
       "io.k8s.api.autoscaling.v2.ContainerResourceMetricSource": {
-        "description": "ContainerResourceMetricSource indicates how to scale on a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  The values will be averaged together before being compared to the target.  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.  Only one \"target\" type should be set.",
+        "description": "ContainerResourceMetricSource indicates how to scale on a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  The values will be averaged together before being compared to the target.  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source. Supports \"AverageUtilization\" and \"AverageValue\" MetricTarget types.",
         "properties": {
           "container": {
             "default": "",
@@ -86,7 +86,7 @@
         "type": "object"
       },
       "io.k8s.api.autoscaling.v2.ExternalMetricSource": {
-        "description": "ExternalMetricSource indicates how to scale on a metric not associated with any Kubernetes object (for example length of queue in cloud messaging service, or QPS from loadbalancer running outside of cluster).",
+        "description": "ExternalMetricSource indicates how to scale on a metric not associated with any Kubernetes object (for example length of queue in cloud messaging service, or QPS from loadbalancer running outside of cluster). Supports \"Value\" and \"AverageValue\" MetricTarget types.",
         "properties": {
           "metric": {
             "allOf": [
@@ -495,7 +495,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2.ContainerResourceMetricSource"
               }
             ],
-            "description": "containerResource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing a single container in each pod of the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source. This is an alpha feature and can be enabled by the HPAContainerMetrics feature flag."
+            "description": "containerResource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing a single container in each pod of the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source. As of 1.27 this is a beta feature and is enabled by default via the HPAContainerMetrics feature flag."
           },
           "external": {
             "allOf": [
@@ -598,7 +598,7 @@
         "description": "MetricTarget defines the target value, average value, or average utilization of a specific metric",
         "properties": {
           "averageUtilization": {
-            "description": "averageUtilization is the target value of the average of the resource metric across all relevant pods, represented as a percentage of the requested value of the resource for the pods. Currently only valid for Resource metric source type",
+            "description": "averageUtilization is the target value of the average of the resource metric across all relevant pods, represented as a percentage of the requested value of the resource for the pods. Currently only valid for Resource and ContainerResource metric source types. Should only be used together with Utilization type.",
             "format": "int32",
             "type": "integer"
           },
@@ -608,7 +608,7 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
               }
             ],
-            "description": "averageValue is the target value of the average of the metric across all relevant pods (as a quantity)"
+            "description": "averageValue is the target value of the average of the metric across all relevant pods (as a quantity). Should only be used together with AverageValue type."
           },
           "type": {
             "default": "",
@@ -621,7 +621,7 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
               }
             ],
-            "description": "value is the target value of the metric (as a quantity)."
+            "description": "value is the target value of the metric (as a quantity). Should only be used together with Value type."
           }
         },
         "required": [
@@ -657,7 +657,7 @@
         "type": "object"
       },
       "io.k8s.api.autoscaling.v2.ObjectMetricSource": {
-        "description": "ObjectMetricSource indicates how to scale on a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).",
+        "description": "ObjectMetricSource indicates how to scale on a metric describing a kubernetes object (for example, hits-per-second on an Ingress object). Supports \"Value\" and \"AverageValue\" MetricTarget types.",
         "properties": {
           "describedObject": {
             "allOf": [
@@ -733,7 +733,7 @@
         "type": "object"
       },
       "io.k8s.api.autoscaling.v2.PodsMetricSource": {
-        "description": "PodsMetricSource indicates how to scale on a metric describing each pod in the current scale target (for example, transactions-processed-per-second). The values will be averaged together before being compared to the target value.",
+        "description": "PodsMetricSource indicates how to scale on a metric describing each pod in the current scale target (for example, transactions-processed-per-second). The values will be averaged together before being compared to the target value. Supports only \"AverageValue\" MetricTarget type.",
         "properties": {
           "metric": {
             "allOf": [
@@ -789,7 +789,7 @@
         "type": "object"
       },
       "io.k8s.api.autoscaling.v2.ResourceMetricSource": {
-        "description": "ResourceMetricSource indicates how to scale on a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  The values will be averaged together before being compared to the target.  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.  Only one \"target\" type should be set.",
+        "description": "ResourceMetricSource indicates how to scale on a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  The values will be averaged together before being compared to the target.  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source. Supports \"AverageUtilization\" and \"AverageValue\" MetricTarget types.",
         "properties": {
           "name": {
             "default": "",

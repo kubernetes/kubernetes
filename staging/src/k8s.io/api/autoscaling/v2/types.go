@@ -129,7 +129,8 @@ type MetricSpec struct {
 	// each pod of the current scale target (e.g. CPU or memory). Such metrics are
 	// built in to Kubernetes, and have special scaling options on top of those
 	// available to normal per-pod metrics using the "pods" source.
-	// This is an alpha feature and can be enabled by the HPAContainerMetrics feature flag.
+	// As of 1.27 this is a beta feature and is enabled by default via the
+	// HPAContainerMetrics feature flag.
 	// +optional
 	ContainerResource *ContainerResourceMetricSource `json:"containerResource,omitempty" protobuf:"bytes,7,opt,name=containerResource"`
 
@@ -232,33 +233,39 @@ type MetricSourceType string
 const (
 	// ObjectMetricSourceType is a metric describing a kubernetes object
 	// (for example, hits-per-second on an Ingress object).
+	// Supports "Value" and "AverageValue" MetricTarget types.
 	ObjectMetricSourceType MetricSourceType = "Object"
 	// PodsMetricSourceType is a metric describing each pod in the current scale
 	// target (for example, transactions-processed-per-second).  The values
 	// will be averaged together before being compared to the target value.
+	// Supports only "AverageValue" MetricTarget type.
 	PodsMetricSourceType MetricSourceType = "Pods"
 	// ResourceMetricSourceType is a resource metric known to Kubernetes, as
 	// specified in requests and limits, describing each pod in the current
 	// scale target (e.g. CPU or memory).  Such metrics are built in to
 	// Kubernetes, and have special scaling options on top of those available
 	// to normal per-pod metrics (the "pods" source).
+	// Supports "AverageUtilization" and "AverageValue" MetricTarget types.
 	ResourceMetricSourceType MetricSourceType = "Resource"
 	// ContainerResourceMetricSourceType is a resource metric known to Kubernetes, as
 	// specified in requests and limits, describing a single container in each pod in the current
 	// scale target (e.g. CPU or memory).  Such metrics are built in to
 	// Kubernetes, and have special scaling options on top of those available
 	// to normal per-pod metrics (the "pods" source).
+	// Supports "Value" and "AverageValue" MetricTarget types.
 	ContainerResourceMetricSourceType MetricSourceType = "ContainerResource"
 	// ExternalMetricSourceType is a global metric that is not associated
 	// with any Kubernetes object. It allows autoscaling based on information
 	// coming from components running outside of cluster
 	// (for example length of queue in cloud messaging service, or
 	// QPS from loadbalancer running outside of cluster).
+	// Supports "AverageUtilization" and "AverageValue" MetricTarget types.
 	ExternalMetricSourceType MetricSourceType = "External"
 )
 
 // ObjectMetricSource indicates how to scale on a metric describing a
 // kubernetes object (for example, hits-per-second on an Ingress object).
+// Supports "Value" and "AverageValue" MetricTarget types.
 type ObjectMetricSource struct {
 	// describedObject specifies the descriptions of a object,such as kind,name apiVersion
 	DescribedObject CrossVersionObjectReference `json:"describedObject" protobuf:"bytes,1,name=describedObject"`
@@ -274,6 +281,7 @@ type ObjectMetricSource struct {
 // the current scale target (for example, transactions-processed-per-second).
 // The values will be averaged together before being compared to the target
 // value.
+// Supports only "AverageValue" MetricTarget type.
 type PodsMetricSource struct {
 	// metric identifies the target metric by name and selector
 	Metric MetricIdentifier `json:"metric" protobuf:"bytes,1,name=metric"`
@@ -287,8 +295,8 @@ type PodsMetricSource struct {
 // current scale target (e.g. CPU or memory).  The values will be averaged
 // together before being compared to the target.  Such metrics are built in to
 // Kubernetes, and have special scaling options on top of those available to
-// normal per-pod metrics using the "pods" source.  Only one "target" type
-// should be set.
+// normal per-pod metrics using the "pods" source.
+// Supports "AverageUtilization" and "AverageValue" MetricTarget types.
 type ResourceMetricSource struct {
 	// name is the name of the resource in question.
 	Name v1.ResourceName `json:"name" protobuf:"bytes,1,name=name"`
@@ -302,8 +310,8 @@ type ResourceMetricSource struct {
 // current scale target (e.g. CPU or memory).  The values will be averaged
 // together before being compared to the target.  Such metrics are built in to
 // Kubernetes, and have special scaling options on top of those available to
-// normal per-pod metrics using the "pods" source.  Only one "target" type
-// should be set.
+// normal per-pod metrics using the "pods" source.
+// Supports "AverageUtilization" and "AverageValue" MetricTarget types.
 type ContainerResourceMetricSource struct {
 	// name is the name of the resource in question.
 	Name v1.ResourceName `json:"name" protobuf:"bytes,1,name=name"`
@@ -318,6 +326,7 @@ type ContainerResourceMetricSource struct {
 // ExternalMetricSource indicates how to scale on a metric not associated with
 // any Kubernetes object (for example length of queue in cloud
 // messaging service, or QPS from loadbalancer running outside of cluster).
+// Supports "Value" and "AverageValue" MetricTarget types.
 type ExternalMetricSource struct {
 	// metric identifies the target metric by name and selector
 	Metric MetricIdentifier `json:"metric" protobuf:"bytes,1,name=metric"`
@@ -344,18 +353,21 @@ type MetricTarget struct {
 	Type MetricTargetType `json:"type" protobuf:"bytes,1,name=type"`
 
 	// value is the target value of the metric (as a quantity).
+	// Should only be used together with Value type.
 	// +optional
 	Value *resource.Quantity `json:"value,omitempty" protobuf:"bytes,2,opt,name=value"`
 
 	// averageValue is the target value of the average of the
-	// metric across all relevant pods (as a quantity)
+	// metric across all relevant pods (as a quantity).
+	// Should only be used together with AverageValue type.
 	// +optional
 	AverageValue *resource.Quantity `json:"averageValue,omitempty" protobuf:"bytes,3,opt,name=averageValue"`
 
 	// averageUtilization is the target value of the average of the
 	// resource metric across all relevant pods, represented as a percentage of
 	// the requested value of the resource for the pods.
-	// Currently only valid for Resource metric source type
+	// Currently only valid for Resource and ContainerResource metric source types.
+	// Should only be used together with Utilization type.
 	// +optional
 	AverageUtilization *int32 `json:"averageUtilization,omitempty" protobuf:"bytes,4,opt,name=averageUtilization"`
 }
