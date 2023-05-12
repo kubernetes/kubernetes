@@ -433,7 +433,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 				veryLongData[i] = 'a'
 			}
 			execOutput = e2ekubectl.RunKubectlOrDie(ns, "exec", podRunningTimeoutArg, simplePodName, "--", "echo", string(veryLongData))
-			framework.ExpectEqual(string(veryLongData), strings.TrimSpace(execOutput), "Unexpected kubectl exec output")
+			gomega.Expect(string(veryLongData)).To(gomega.Equal(strings.TrimSpace(execOutput)), "Unexpected kubectl exec output")
 
 			ginkgo.By("executing a command in the container with noninteractive stdin")
 			execOutput = e2ekubectl.NewKubectlCommand(ns, "exec", "-i", podRunningTimeoutArg, simplePodName, "--", "cat").
@@ -544,7 +544,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 				if !ok {
 					framework.Failf("Got unexpected error type, expected uexec.ExitError, got %T: %v", err, err)
 				}
-				framework.ExpectEqual(ee.ExitStatus(), 42)
+				gomega.Expect(ee.ExitStatus()).To(gomega.Equal(42))
 			})
 
 			ginkgo.It("should support port-forward", func(ctx context.Context) {
@@ -671,7 +671,7 @@ metadata:
 				ginkgo.By("trying to use kubectl with invalid token")
 				_, err = e2eoutput.RunHostCmd(ns, simplePodName, "/tmp/kubectl get pods --token=invalid --v=7 2>&1")
 				framework.Logf("got err %v", err)
-				framework.ExpectError(err)
+				gomega.Expect(err).To(gomega.HaveOccurred())
 				gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster namespace"))
 				gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster configuration"))
 				gomega.Expect(err).To(gomega.ContainSubstring("Response Status: 401 Unauthorized"))
@@ -679,7 +679,7 @@ metadata:
 				ginkgo.By("trying to use kubectl with invalid server")
 				_, err = e2eoutput.RunHostCmd(ns, simplePodName, "/tmp/kubectl get pods --server=invalid --v=6 2>&1")
 				framework.Logf("got err %v", err)
-				framework.ExpectError(err)
+				gomega.Expect(err).To(gomega.HaveOccurred())
 				gomega.Expect(err).To(gomega.ContainSubstring("Unable to connect to the server"))
 				gomega.Expect(err).To(gomega.ContainSubstring("GET http://invalid/api"))
 
@@ -710,7 +710,7 @@ metadata:
 				if !ok {
 					framework.Failf("Got unexpected error type, expected uexec.ExitError, got %T: %v", err, err)
 				}
-				framework.ExpectEqual(ee.ExitStatus(), 42)
+				gomega.Expect(ee.ExitStatus()).To(gomega.Equal(42))
 			})
 
 			ginkgo.It("[Slow] running a failing command without --restart=Never", func(ctx context.Context) {
@@ -1164,7 +1164,7 @@ metadata:
 			time.Sleep(10 * time.Second)
 
 			schema := schemaForGVK(schema.GroupVersionKind{Group: crd.Crd.Spec.Group, Version: crd.Crd.Spec.Versions[0].Name, Kind: crd.Crd.Spec.Names.Kind})
-			framework.ExpectNotEqual(schema, nil, "retrieving a schema for the crd")
+			gomega.Expect(schema).ToNot(gomega.BeNil(), "retrieving a schema for the crd")
 
 			meta := fmt.Sprintf(metaPattern, crd.Crd.Spec.Names.Kind, crd.Crd.Spec.Group, crd.Crd.Spec.Versions[0].Name, "test-cr")
 
@@ -1172,7 +1172,8 @@ metadata:
 			// are still considered invalid
 			invalidArbitraryCR := fmt.Sprintf(`{%s,"spec":{"bars":[{"name":"test-bar"}],"extraProperty":"arbitrary-value"}}`, meta)
 			err = createApplyCustomResource(invalidArbitraryCR, f.Namespace.Name, "test-cr", crd)
-			framework.ExpectError(err, "creating custom resource")
+			gomega.Expect(err).To(gomega.HaveOccurred(), "creating custom resource")
+
 			if !strings.Contains(err.Error(), `unknown field "spec.extraProperty"`) {
 				framework.Failf("incorrect error from createApplyCustomResource: %v", err)
 			}
@@ -1215,7 +1216,7 @@ metadata:
 			ginkgo.By("attempting to create a CR with unknown metadata fields at the root level")
 			gvk := schema.GroupVersionKind{Group: testCRD.Crd.Spec.Group, Version: testCRD.Crd.Spec.Versions[0].Name, Kind: testCRD.Crd.Spec.Names.Kind}
 			schema := schemaForGVK(gvk)
-			framework.ExpectNotEqual(schema, nil, "retrieving a schema for the crd")
+			gomega.Expect(schema).ToNot(gomega.BeNil(), "retrieving a schema for the crd")
 			embeddedCRPattern := `
 
 {%s,
