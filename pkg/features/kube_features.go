@@ -512,8 +512,9 @@ const (
 	// Enable MatchLabelKeys in PodTopologySpread.
 	MatchLabelKeysInPodTopologySpread featuregate.Feature = "MatchLabelKeysInPodTopologySpread"
 
-	// owner: @krmayankk
+	// owner: @krmayankk @kerthcet
 	// alpha: v1.24
+	// beta: v1.28
 	//
 	// Enables maxUnavailable for StatefulSet
 	MaxUnavailableStatefulSet featuregate.Feature = "MaxUnavailableStatefulSet"
@@ -998,7 +999,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	MatchLabelKeysInPodTopologySpread: {Default: true, PreRelease: featuregate.Beta},
 
-	MaxUnavailableStatefulSet: {Default: false, PreRelease: featuregate.Alpha},
+	MaxUnavailableStatefulSet: {Default: true, PreRelease: featuregate.Beta},
 
 	MemoryManager: {Default: true, PreRelease: featuregate.Beta},
 
