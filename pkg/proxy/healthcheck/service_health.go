@@ -235,8 +235,8 @@ func (h hcHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		return
 	}
 	count := svc.endpoints
-	kubeProxyHealthy := h.hcs.healthzServer.IsHealthy()
 	h.hcs.lock.RUnlock()
+	kubeProxyHealthy := h.hcs.healthzServer.IsHealthy()
 
 	resp.Header().Set("Content-Type", "application/json")
 	resp.Header().Set("X-Content-Type-Options", "nosniff")
