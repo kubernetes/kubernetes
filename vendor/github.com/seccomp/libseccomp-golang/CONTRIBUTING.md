@@ -1,31 +1,23 @@
-How to Submit Patches to the libseccomp Project
+How to Submit Patches to the libseccomp-golang Project
 ===============================================================================
 https://github.com/seccomp/libseccomp-golang
 
 This document is intended to act as a guide to help you contribute to the
-libseccomp project.  It is not perfect, and there will always be exceptions
-to the rules described here, but by following the instructions below you
-should have a much easier time getting your work merged with the upstream
+libseccomp-golang project.  It is not perfect, and there will always be
+exceptions to the rules described here, but by following the instructions below
+you should have a much easier time getting your work merged with the upstream
 project.
 
 ## Test Your Code Using Existing Tests
 
-There are two possible tests you can run to verify your code.  The first
-test is used to check the formatting and coding style of your changes, you
-can run the test with the following command:
-
-	# make check-syntax
-
-... if there are any problems with your changes a diff/patch will be shown
-which indicates the problems and how to fix them.
-
-The second possible test is used to ensure the sanity of your code changes
-and to test these changes against the included tests.  You can run the test
-with the following command:
+A number of tests and lint related recipes are provided in the Makefile, if
+you want to run the standard regression tests, you can execute the following:
 
 	# make check
 
-... if there are any faults or errors they will be displayed.
+In order to use it, the 'golangci-lint' tool is needed, which can be found at:
+
+* https://github.com/golangci/golangci-lint
 
 ## Add New Tests for New Functionality
 

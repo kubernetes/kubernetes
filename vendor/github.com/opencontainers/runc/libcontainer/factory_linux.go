@@ -179,6 +179,12 @@ func (l *LinuxFactory) Create(id string, config *configs.Config) (Container, err
 			return nil, fmt.Errorf("unable to get cgroup PIDs: %w", err)
 		}
 		if len(pids) != 0 {
+			if config.Cgroups.Systemd {
+				// systemd cgroup driver can't add a pid to an
+				// existing systemd unit and will return an
+				// error anyway, so let's error out early.
+				return nil, fmt.Errorf("container's cgroup is not empty: %d process(es) found", len(pids))
+			}
 			// TODO: return an error.
 			logrus.Warnf("container's cgroup is not empty: %d process(es) found", len(pids))
 			logrus.Warn("DEPRECATED: running container in a non-empty cgroup won't be supported in runc 1.2; https://github.com/opencontainers/runc/issues/3132")
@@ -338,7 +344,11 @@ func (l *LinuxFactory) StartInitialization() (err error) {
 
 	defer func() {
 		if e := recover(); e != nil {
-			err = fmt.Errorf("panic from initialization: %w, %v", e, string(debug.Stack()))
+			if ee, ok := e.(error); ok {
+				err = fmt.Errorf("panic from initialization: %w, %s", ee, debug.Stack())
+			} else {
+				err = fmt.Errorf("panic from initialization: %v, %s", e, debug.Stack())
+			}
 		}
 	}()
 
