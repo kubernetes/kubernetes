@@ -6,7 +6,6 @@ options:
 approvers:
   - dchen1107
   - dims
-  - lavalamp
   - liggitt
   - smarterclayton
   - thockin
@@ -16,10 +15,11 @@ reviewers:
   - dchen1107
   - deads2k
   - dims
-  - lavalamp
   - liggitt
   - mikedanese
   - smarterclayton
   - sttts
   - thockin
   - wojtek-t
+emeritus_approvers:
+  - lavalamp

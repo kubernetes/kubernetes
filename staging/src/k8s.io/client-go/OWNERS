@@ -3,7 +3,6 @@
 approvers:
   - caesarxuchao
   - deads2k
-  - lavalamp
   - liggitt
   - smarterclayton
   - sttts
@@ -14,10 +13,11 @@ reviewers:
   - caesarxuchao
   - deads2k
   - jpbetz
-  - lavalamp
   - liggitt
   - soltysh
   - sttts
   - yliaog
 labels:
   - sig/api-machinery
+emeritus_approvers:
+  - lavalamp

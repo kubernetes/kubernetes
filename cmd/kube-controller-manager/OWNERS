@@ -3,7 +3,6 @@
 approvers:
   - cheftako
   - deads2k
-  - lavalamp
   - mikedanese
   - soltysh
   - sttts
@@ -20,7 +19,6 @@ reviewers:
   - jayunit100
   - jsafrane
   - justinsb
-  - lavalamp
   - liggitt
   - luxas
   - mikedanese
@@ -36,3 +34,5 @@ reviewers:
   - wojtek-t
 labels:
   - sig/api-machinery
+emeritus_approvers:
+  - lavalamp

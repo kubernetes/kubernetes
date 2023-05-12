@@ -2,13 +2,11 @@
 
 approvers:
   - deads2k
-  - lavalamp
   - smarterclayton
   - wojtek-t
   - liggitt
 reviewers:
   - thockin
-  - lavalamp
   - smarterclayton
   - wojtek-t
   - deads2k
@@ -27,3 +25,5 @@ reviewers:
   - soltysh
   - dims
   - enj
+emeritus_approvers:
+  - lavalamp

@@ -2,7 +2,6 @@
 
 reviewers:
   - sig-network-reviewers
-  - lavalamp
   - smarterclayton
 labels:
   - sig/network
