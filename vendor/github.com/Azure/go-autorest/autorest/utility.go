@@ -60,9 +60,9 @@ func NewDecoder(encodedAs EncodedAs, r io.Reader) Decoder {
 // is especially useful if there is a chance the data will fail to decode.
 // encodedAs specifies the expected encoding, r provides the io.Reader to the data, and v
 // is the decoding destination.
-func CopyAndDecode(encodedAs EncodedAs, r io.Reader, v interface{}) (bytes.Buffer, error) {
-	b := bytes.Buffer{}
-	return b, NewDecoder(encodedAs, io.TeeReader(r, &b)).Decode(v)
+func CopyAndDecode(encodedAs EncodedAs, r io.Reader, v interface{}) (b bytes.Buffer, err error) {
+	err = NewDecoder(encodedAs, io.TeeReader(r, &b)).Decode(v)
+	return
 }
 
 // TeeReadCloser returns a ReadCloser that writes to w what it reads from rc.
