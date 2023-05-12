@@ -100,7 +100,7 @@ type RunObject struct {
 	Mapping *meta.RESTMapping
 }
 
-// cli flags being passed
+// cli flags being passed into command
 type RunFlags struct {
 	cmdutil.OverrideOptions
 
@@ -173,7 +173,7 @@ func NewRunFlags(streams genericiooptions.IOStreams) *RunFlags {
 }
 
 func NewCmdRun(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
-	flags := NewRunFlags(streams)
+	flags := NewRunFlags(streams) 
 
 	cmd := &cobra.Command{
 		Use:                   "run NAME --image=image [--env=\"key=value\"] [--port=port] [--dry-run=server|client] [--overrides=inline-json] [--command] -- [COMMAND] [args...]",
