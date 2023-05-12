@@ -43,6 +43,7 @@ func TestBasic(t *testing.T) {
 	}
 	for _, test := range tests {
 		// If something is seriously wrong this test will never complete.
+		
 		test := test
 		// Start producers
 		const producers = 50
@@ -106,6 +107,7 @@ func TestAddWhileProcessing(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
+		
 		test := test
 		// Start producers
 		const producers = 50
