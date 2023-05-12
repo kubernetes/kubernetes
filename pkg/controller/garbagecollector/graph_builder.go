@@ -265,6 +265,14 @@ func (gb *GraphBuilder) startMonitors(logger klog.Logger) {
 	logger.V(4).Info("started new monitors", "new", started, "current", len(monitors))
 }
 
+// IsResourceSynced returns true if a monitor exists for the given resource and has synced
+func (gb *GraphBuilder) IsResourceSynced(resource schema.GroupVersionResource) bool {
+	gb.monitorLock.Lock()
+	defer gb.monitorLock.Unlock()
+	monitor, ok := gb.monitors[resource]
+	return ok && monitor.controller.HasSynced()
+}
+
 // IsSynced returns true if any monitors exist AND all those monitors'
 // controllers HasSynced functions return true. This means IsSynced could return
 // true at one time, and then later return false if all monitors were
