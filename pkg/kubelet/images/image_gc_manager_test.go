@@ -18,6 +18,7 @@ package images
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	goruntime "runtime"
 	"testing"
@@ -307,10 +308,10 @@ func TestAllPinnedImages(t *testing.T) {
 	}
 
 	spaceFreed, err := manager.freeSpace(ctx, 2048, time.Now())
-	assert := assert.New(t)
-	require.NoError(t, err)
-	assert.EqualValues(0, spaceFreed)
-	assert.Len(fakeRuntime.ImageList, 2)
+	assert.Error(t, err)
+	assert.True(t, errors.Is(err, errNoImageToCleanup))
+	assert.EqualValues(t, 0, spaceFreed)
+	assert.Len(t, fakeRuntime.ImageList, 2)
 }
 
 func TestDetectImagesContainerStopped(t *testing.T) {
@@ -650,21 +651,21 @@ func TestGarbageCollectImageNotOldEnough(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	t.Log(fakeClock.Now())
 	_, err := manager.detectImages(ctx, fakeClock.Now())
-	require.NoError(t, err)
-	require.Equal(t, manager.imageRecordsLen(), 2)
+	assert.NoError(t, err)
+	assert.Equal(t, manager.imageRecordsLen(), 2)
 	// no space freed since one image is in used, and another one is not old enough
 	spaceFreed, err := manager.freeSpace(ctx, 1024, fakeClock.Now())
-	assert := assert.New(t)
-	require.NoError(t, err)
-	assert.EqualValues(0, spaceFreed)
-	assert.Len(fakeRuntime.ImageList, 2)
+	assert.Error(t, err)
+	assert.True(t, errors.Is(err, errNoImageToCleanup))
+	assert.EqualValues(t, 0, spaceFreed)
+	assert.Len(t, fakeRuntime.ImageList, 2)
 
 	// move clock by minAge duration, then 1 image will be garbage collected
 	fakeClock.Step(policy.MinAge)
 	spaceFreed, err = manager.freeSpace(ctx, 1024, fakeClock.Now())
-	require.NoError(t, err)
-	assert.EqualValues(1024, spaceFreed)
-	assert.Len(fakeRuntime.ImageList, 1)
+	assert.NoError(t, err)
+	assert.EqualValues(t, 1024, spaceFreed)
+	assert.Len(t, fakeRuntime.ImageList, 1)
 }
 
 func TestValidateImageGCPolicy(t *testing.T) {
