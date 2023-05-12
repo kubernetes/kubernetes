@@ -27,7 +27,7 @@ DOCKER2ACI_VERSION="v0.13.0"
 MOUNTER_VERSION=$1
 DOCKER_IMAGE=docker://$2
 MOUNTER_ACI_IMAGE=gci-mounter-${MOUNTER_VERSION}.aci
-MOUNTER_GCS_DIR=gs://kubernetes-release/gci-mounter/
+MOUNTER_GCS_DIR=https://dl.k8s.io//gci-mounter/
 
 TMPDIR=/tmp
 # Setup a working directory

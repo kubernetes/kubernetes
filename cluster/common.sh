@@ -290,7 +290,7 @@ function set_binary_version() {
   if [[ "${1}" =~ "/" ]]; then
     IFS='/' read -r -a path <<< "${1}"
     if [[ "${path[0]}" == "release" ]]; then
-      KUBE_VERSION=$(gsutil cat "gs://kubernetes-release/${1}.txt")
+      KUBE_VERSION=$(gsutil cat "https://dl.k8s.io//${1}.txt")
     else
       KUBE_VERSION=$(gsutil cat "gs://k8s-release-dev/${1}.txt")
     fi

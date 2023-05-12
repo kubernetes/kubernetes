@@ -840,29 +840,29 @@ filename | sha256 hash
 
 filename | sha256 hash
 -------- | -----------
-[kubernetes.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-beta.2/kubernetes.tar.gz) | `4a6cb512dee2312ffe291f4209759309576ca477cf51fb8447b30a7cb2a887ed`
-[kubernetes-src.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-beta.2/kubernetes-src.tar.gz) | `fe71f19b607183da4abf5f537e7ccbe72ac3306b0933ee1f519253c78bf9252f`
+[kubernetes.tar.gz](https://dl.k8s.io//release/v1.5.0-beta.2/kubernetes.tar.gz) | `4a6cb512dee2312ffe291f4209759309576ca477cf51fb8447b30a7cb2a887ed`
+[kubernetes-src.tar.gz](https://dl.k8s.io//release/v1.5.0-beta.2/kubernetes-src.tar.gz) | `fe71f19b607183da4abf5f537e7ccbe72ac3306b0933ee1f519253c78bf9252f`
 
 ### Client Binaries
 
 filename | sha256 hash
 -------- | -----------
-[kubernetes-client-darwin-386.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-beta.2/kubernetes-client-darwin-386.tar.gz) | `37bcd12754a28ba6b4d030c68526bc6369f1fa3b7b0e405277bb13989ed0f9da`
-[kubernetes-client-darwin-amd64.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-beta.2/kubernetes-client-darwin-amd64.tar.gz) | `760817040ca040dd4ba8929cfb714b8bf6704c6ac2ec9985b56fa77b4da03d2c`
-[kubernetes-client-linux-386.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-beta.2/kubernetes-client-linux-386.tar.gz) | `87d694445a3e532748d07e0d0da05c1ae8b84b46c54ec1415c9603533747a465`
-[kubernetes-client-linux-amd64.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-beta.2/kubernetes-client-linux-amd64.tar.gz) | `b2bcd07a525428fe24da628afca22b019b8f2847d1999da8fce72b7342cf64ed`
-[kubernetes-client-linux-arm64.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-beta.2/kubernetes-client-linux-arm64.tar.gz) | `262c4fa70039389aa5d5b73a0def325471bd24b858157d60c0389fbee5ca671e`
-[kubernetes-client-linux-arm.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-beta.2/kubernetes-client-linux-arm.tar.gz) | `52c9341c1e6aa923aed4497c061121c192f209c90fcf31135edc45241a684bfa`
-[kubernetes-client-windows-386.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-beta.2/kubernetes-client-windows-386.tar.gz) | `7d8e3bcdfa9dc3d5fde70c60a37e543cc59d23b25e2b0a2274e672d0bae013c2`
-[kubernetes-client-windows-amd64.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-beta.2/kubernetes-client-windows-amd64.tar.gz) | `75143c176bc817fc49a79229dfae8c7429d0a3deeaba54a397dddce3e37e8550`
+[kubernetes-client-darwin-386.tar.gz](https://dl.k8s.io//release/v1.5.0-beta.2/kubernetes-client-darwin-386.tar.gz) | `37bcd12754a28ba6b4d030c68526bc6369f1fa3b7b0e405277bb13989ed0f9da`
+[kubernetes-client-darwin-amd64.tar.gz](https://dl.k8s.io//release/v1.5.0-beta.2/kubernetes-client-darwin-amd64.tar.gz) | `760817040ca040dd4ba8929cfb714b8bf6704c6ac2ec9985b56fa77b4da03d2c`
+[kubernetes-client-linux-386.tar.gz](https://dl.k8s.io//release/v1.5.0-beta.2/kubernetes-client-linux-386.tar.gz) | `87d694445a3e532748d07e0d0da05c1ae8b84b46c54ec1415c9603533747a465`
+[kubernetes-client-linux-amd64.tar.gz](https://dl.k8s.io//release/v1.5.0-beta.2/kubernetes-client-linux-amd64.tar.gz) | `b2bcd07a525428fe24da628afca22b019b8f2847d1999da8fce72b7342cf64ed`
+[kubernetes-client-linux-arm64.tar.gz](https://dl.k8s.io//release/v1.5.0-beta.2/kubernetes-client-linux-arm64.tar.gz) | `262c4fa70039389aa5d5b73a0def325471bd24b858157d60c0389fbee5ca671e`
+[kubernetes-client-linux-arm.tar.gz](https://dl.k8s.io//release/v1.5.0-beta.2/kubernetes-client-linux-arm.tar.gz) | `52c9341c1e6aa923aed4497c061121c192f209c90fcf31135edc45241a684bfa`
+[kubernetes-client-windows-386.tar.gz](https://dl.k8s.io//release/v1.5.0-beta.2/kubernetes-client-windows-386.tar.gz) | `7d8e3bcdfa9dc3d5fde70c60a37e543cc59d23b25e2b0a2274e672d0bae013c2`
+[kubernetes-client-windows-amd64.tar.gz](https://dl.k8s.io//release/v1.5.0-beta.2/kubernetes-client-windows-amd64.tar.gz) | `75143c176bc817fc49a79229dfae8c7429d0a3deeaba54a397dddce3e37e8550`
 
 ### Server Binaries
 
 filename | sha256 hash
 -------- | -----------
-[kubernetes-server-linux-amd64.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-beta.2/kubernetes-server-linux-amd64.tar.gz) | `61c209048da1612796a30b880076b7f9b59038821da63bbecac4c56f24216312`
-[kubernetes-server-linux-arm64.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-beta.2/kubernetes-server-linux-arm64.tar.gz) | `2c6952e16c0b0c153ca3d424b3deca9b43a8e421b1a59359bc10260309bf470c`
-[kubernetes-server-linux-arm.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-beta.2/kubernetes-server-linux-arm.tar.gz) | `cf3e37a89358cae1d2d36aaad10f3e906269bc3df611279dbed9f50e81449fad`
+[kubernetes-server-linux-amd64.tar.gz](https://dl.k8s.io//release/v1.5.0-beta.2/kubernetes-server-linux-amd64.tar.gz) | `61c209048da1612796a30b880076b7f9b59038821da63bbecac4c56f24216312`
+[kubernetes-server-linux-arm64.tar.gz](https://dl.k8s.io//release/v1.5.0-beta.2/kubernetes-server-linux-arm64.tar.gz) | `2c6952e16c0b0c153ca3d424b3deca9b43a8e421b1a59359bc10260309bf470c`
+[kubernetes-server-linux-arm.tar.gz](https://dl.k8s.io//release/v1.5.0-beta.2/kubernetes-server-linux-arm.tar.gz) | `cf3e37a89358cae1d2d36aaad10f3e906269bc3df611279dbed9f50e81449fad`
 
 ## Changelog since v1.5.0-beta.1
 
@@ -904,29 +904,29 @@ filename | sha256 hash
 
 filename | sha256 hash
 -------- | -----------
-[kubernetes.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-beta.1/kubernetes.tar.gz) | `62c51bcee460794cda30e720c65509b679b51015c62c075e6e735fe29d089e2b`
-[kubernetes-src.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-beta.1/kubernetes-src.tar.gz) | `8c950c7377eb40670d0438ccb68bbeaf1100ed2e919e012bc98479ff07ddd393`
+[kubernetes.tar.gz](https://dl.k8s.io//release/v1.5.0-beta.1/kubernetes.tar.gz) | `62c51bcee460794cda30e720c65509b679b51015c62c075e6e735fe29d089e2b`
+[kubernetes-src.tar.gz](https://dl.k8s.io//release/v1.5.0-beta.1/kubernetes-src.tar.gz) | `8c950c7377eb40670d0438ccb68bbeaf1100ed2e919e012bc98479ff07ddd393`
 
 ### Client Binaries
 
 filename | sha256 hash
 -------- | -----------
-[kubernetes-client-darwin-386.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-beta.1/kubernetes-client-darwin-386.tar.gz) | `e71af85542837842ff3b0fb8137332f4e1ce4c453d225da292e1fa781f1c74d7`
-[kubernetes-client-darwin-amd64.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-beta.1/kubernetes-client-darwin-amd64.tar.gz) | `033d02c1382553f977057827b6a5b82f1b69aecd44b649c937781d1cccb763d1`
-[kubernetes-client-linux-386.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-beta.1/kubernetes-client-linux-386.tar.gz) | `1e7a435f2f7d06e3de9bd8c8d0457b6548aa15ad5cdab4241391f290a28b804f`
-[kubernetes-client-linux-amd64.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-beta.1/kubernetes-client-linux-amd64.tar.gz) | `3c07a89e8eb785a7b37842d4b0bc0471fcc7b4e3a4bd973e6f8936cbc6030d76`
-[kubernetes-client-linux-arm64.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-beta.1/kubernetes-client-linux-arm64.tar.gz) | `680a2786d9782395b613e27509df2d0f671a2471a43533ccdbc6b71cfb332072`
-[kubernetes-client-linux-arm.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-beta.1/kubernetes-client-linux-arm.tar.gz) | `2a5b10fbd69ce9b1da0403a80d71684ee2cf4d75298a5ec19e069ae826da81ed`
-[kubernetes-client-windows-386.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-beta.1/kubernetes-client-windows-386.tar.gz) | `10acbf09ffbc04f549d1cffff98a533b456562d5c09a2d0f315523b70072c35d`
-[kubernetes-client-windows-amd64.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-beta.1/kubernetes-client-windows-amd64.tar.gz) | `3317f90da242b0fb95a3cbc669fc4941d7b56b5ff90ac528c166e915bee31fdf`
+[kubernetes-client-darwin-386.tar.gz](https://dl.k8s.io//release/v1.5.0-beta.1/kubernetes-client-darwin-386.tar.gz) | `e71af85542837842ff3b0fb8137332f4e1ce4c453d225da292e1fa781f1c74d7`
+[kubernetes-client-darwin-amd64.tar.gz](https://dl.k8s.io//release/v1.5.0-beta.1/kubernetes-client-darwin-amd64.tar.gz) | `033d02c1382553f977057827b6a5b82f1b69aecd44b649c937781d1cccb763d1`
+[kubernetes-client-linux-386.tar.gz](https://dl.k8s.io//release/v1.5.0-beta.1/kubernetes-client-linux-386.tar.gz) | `1e7a435f2f7d06e3de9bd8c8d0457b6548aa15ad5cdab4241391f290a28b804f`
+[kubernetes-client-linux-amd64.tar.gz](https://dl.k8s.io//release/v1.5.0-beta.1/kubernetes-client-linux-amd64.tar.gz) | `3c07a89e8eb785a7b37842d4b0bc0471fcc7b4e3a4bd973e6f8936cbc6030d76`
+[kubernetes-client-linux-arm64.tar.gz](https://dl.k8s.io//release/v1.5.0-beta.1/kubernetes-client-linux-arm64.tar.gz) | `680a2786d9782395b613e27509df2d0f671a2471a43533ccdbc6b71cfb332072`
+[kubernetes-client-linux-arm.tar.gz](https://dl.k8s.io//release/v1.5.0-beta.1/kubernetes-client-linux-arm.tar.gz) | `2a5b10fbd69ce9b1da0403a80d71684ee2cf4d75298a5ec19e069ae826da81ed`
+[kubernetes-client-windows-386.tar.gz](https://dl.k8s.io//release/v1.5.0-beta.1/kubernetes-client-windows-386.tar.gz) | `10acbf09ffbc04f549d1cffff98a533b456562d5c09a2d0f315523b70072c35d`
+[kubernetes-client-windows-amd64.tar.gz](https://dl.k8s.io//release/v1.5.0-beta.1/kubernetes-client-windows-amd64.tar.gz) | `3317f90da242b0fb95a3cbc669fc4941d7b56b5ff90ac528c166e915bee31fdf`
 
 ### Server Binaries
 
 filename | sha256 hash
 -------- | -----------
-[kubernetes-server-linux-amd64.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-beta.1/kubernetes-server-linux-amd64.tar.gz) | `fdb257c0bbf64304441fd377a5ee330de10696aa0b5c1b6c27fa73a6c00121ae`
-[kubernetes-server-linux-arm64.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-beta.1/kubernetes-server-linux-arm64.tar.gz) | `a174cf6c9351da786b8780f5edca158a4e021d4af597bcc66f238601fb37c2b1`
-[kubernetes-server-linux-arm.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-beta.1/kubernetes-server-linux-arm.tar.gz) | `1dc520b9a4428321225ba6cfa0f79b702965d7f6994357c15e0195c5af1528ff`
+[kubernetes-server-linux-amd64.tar.gz](https://dl.k8s.io//release/v1.5.0-beta.1/kubernetes-server-linux-amd64.tar.gz) | `fdb257c0bbf64304441fd377a5ee330de10696aa0b5c1b6c27fa73a6c00121ae`
+[kubernetes-server-linux-arm64.tar.gz](https://dl.k8s.io//release/v1.5.0-beta.1/kubernetes-server-linux-arm64.tar.gz) | `a174cf6c9351da786b8780f5edca158a4e021d4af597bcc66f238601fb37c2b1`
+[kubernetes-server-linux-arm.tar.gz](https://dl.k8s.io//release/v1.5.0-beta.1/kubernetes-server-linux-arm.tar.gz) | `1dc520b9a4428321225ba6cfa0f79b702965d7f6994357c15e0195c5af1528ff`
 
 ## Changelog since v1.5.0-alpha.2
 
@@ -1051,29 +1051,29 @@ filename | sha256 hash
 
 filename | sha256 hash
 -------- | -----------
-[kubernetes.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-alpha.2/kubernetes.tar.gz) | `77f04c646657b683210a17aeca62e56bf985702b267942b41729406970c40cee`
-[kubernetes-src.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-alpha.2/kubernetes-src.tar.gz) | `f6090cc853e56159099bf12169f0d84e29fd2c055b0c7dbdac755ee94439a6a6`
+[kubernetes.tar.gz](https://dl.k8s.io//release/v1.5.0-alpha.2/kubernetes.tar.gz) | `77f04c646657b683210a17aeca62e56bf985702b267942b41729406970c40cee`
+[kubernetes-src.tar.gz](https://dl.k8s.io//release/v1.5.0-alpha.2/kubernetes-src.tar.gz) | `f6090cc853e56159099bf12169f0d84e29fd2c055b0c7dbdac755ee94439a6a6`
 
 ### Client Binaries
 
 filename | sha256 hash
 -------- | -----------
-[kubernetes-client-darwin-386.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-alpha.2/kubernetes-client-darwin-386.tar.gz) | `917adbc70156d55371c1aea62279a521e930e7ff130728aa176505f0268182e3`
-[kubernetes-client-darwin-amd64.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-alpha.2/kubernetes-client-darwin-amd64.tar.gz) | `9c8084eeab05b6db0508f789cb8a05b4f864ee23ea37b43e17af0026fb67defa`
-[kubernetes-client-linux-386.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-alpha.2/kubernetes-client-linux-386.tar.gz) | `3498f9cd73bb947b7cd8c4e5fb3ebe0676fbc98cf346a807f1b7c252aa068d68`
-[kubernetes-client-linux-amd64.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-alpha.2/kubernetes-client-linux-amd64.tar.gz) | `e9bf2e48212bb275b113d0a1f6091c4692126c8af3c4e0a986e483ec27190e82`
-[kubernetes-client-linux-arm64.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-alpha.2/kubernetes-client-linux-arm64.tar.gz) | `9c514a482d4dd44d64f3d47eb3d64b434343f10abdecf1b5176ff0078d3b7008`
-[kubernetes-client-linux-arm.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-alpha.2/kubernetes-client-linux-arm.tar.gz) | `c51a8ebc2c3ca2f914042a6017852feb315fd3ceba8b0d5186349b553da11fdb`
-[kubernetes-client-windows-386.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-alpha.2/kubernetes-client-windows-386.tar.gz) | `32b006e1f9e6c14fe399806bb82ec4bf8658ab9828753d1b14732bb8dbb72062`
-[kubernetes-client-windows-amd64.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-alpha.2/kubernetes-client-windows-amd64.tar.gz) | `1e142f1fe76bdd660b4f1be51eef4e51705585fccb94e674a7d891ffe8c3b4e3`
+[kubernetes-client-darwin-386.tar.gz](https://dl.k8s.io//release/v1.5.0-alpha.2/kubernetes-client-darwin-386.tar.gz) | `917adbc70156d55371c1aea62279a521e930e7ff130728aa176505f0268182e3`
+[kubernetes-client-darwin-amd64.tar.gz](https://dl.k8s.io//release/v1.5.0-alpha.2/kubernetes-client-darwin-amd64.tar.gz) | `9c8084eeab05b6db0508f789cb8a05b4f864ee23ea37b43e17af0026fb67defa`
+[kubernetes-client-linux-386.tar.gz](https://dl.k8s.io//release/v1.5.0-alpha.2/kubernetes-client-linux-386.tar.gz) | `3498f9cd73bb947b7cd8c4e5fb3ebe0676fbc98cf346a807f1b7c252aa068d68`
+[kubernetes-client-linux-amd64.tar.gz](https://dl.k8s.io//release/v1.5.0-alpha.2/kubernetes-client-linux-amd64.tar.gz) | `e9bf2e48212bb275b113d0a1f6091c4692126c8af3c4e0a986e483ec27190e82`
+[kubernetes-client-linux-arm64.tar.gz](https://dl.k8s.io//release/v1.5.0-alpha.2/kubernetes-client-linux-arm64.tar.gz) | `9c514a482d4dd44d64f3d47eb3d64b434343f10abdecf1b5176ff0078d3b7008`
+[kubernetes-client-linux-arm.tar.gz](https://dl.k8s.io//release/v1.5.0-alpha.2/kubernetes-client-linux-arm.tar.gz) | `c51a8ebc2c3ca2f914042a6017852feb315fd3ceba8b0d5186349b553da11fdb`
+[kubernetes-client-windows-386.tar.gz](https://dl.k8s.io//release/v1.5.0-alpha.2/kubernetes-client-windows-386.tar.gz) | `32b006e1f9e6c14fe399806bb82ec4bf8658ab9828753d1b14732bb8dbb72062`
+[kubernetes-client-windows-amd64.tar.gz](https://dl.k8s.io//release/v1.5.0-alpha.2/kubernetes-client-windows-amd64.tar.gz) | `1e142f1fe76bdd660b4f1be51eef4e51705585fccb94e674a7d891ffe8c3b4e3`
 
 ### Server Binaries
 
 filename | sha256 hash
 -------- | -----------
-[kubernetes-server-linux-amd64.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-alpha.2/kubernetes-server-linux-amd64.tar.gz) | `4a3b550a1ede8bebd14413a37e3fc10c8403a3e3fbbce096de443351d076817a`
-[kubernetes-server-linux-arm64.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-alpha.2/kubernetes-server-linux-arm64.tar.gz) | `00e58bb04bf150c554f28d8fd2f72fbdd1e7918999aaea9c88c91c8f71946ffe`
-[kubernetes-server-linux-arm.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-alpha.2/kubernetes-server-linux-arm.tar.gz) | `6837ff73249c0f3e7ba2d7c00321274db0f97b5cd0b4dc58d5cc3a2119e1c820`
+[kubernetes-server-linux-amd64.tar.gz](https://dl.k8s.io//release/v1.5.0-alpha.2/kubernetes-server-linux-amd64.tar.gz) | `4a3b550a1ede8bebd14413a37e3fc10c8403a3e3fbbce096de443351d076817a`
+[kubernetes-server-linux-arm64.tar.gz](https://dl.k8s.io//release/v1.5.0-alpha.2/kubernetes-server-linux-arm64.tar.gz) | `00e58bb04bf150c554f28d8fd2f72fbdd1e7918999aaea9c88c91c8f71946ffe`
+[kubernetes-server-linux-arm.tar.gz](https://dl.k8s.io//release/v1.5.0-alpha.2/kubernetes-server-linux-arm.tar.gz) | `6837ff73249c0f3e7ba2d7c00321274db0f97b5cd0b4dc58d5cc3a2119e1c820`
 
 ## Changelog since v1.5.0-alpha.1
 
@@ -1161,7 +1161,7 @@ filename | sha256 hash
 
 binary | sha256 hash
 ------ | -----------
-[kubernetes.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.5.0-alpha.1/kubernetes.tar.gz) | `86bfcfffaa210ddf18983ff066470ef9c06ee00449b2238043e2777aac2c906d`
+[kubernetes.tar.gz](https://dl.k8s.io//release/v1.5.0-alpha.1/kubernetes.tar.gz) | `86bfcfffaa210ddf18983ff066470ef9c06ee00449b2238043e2777aac2c906d`
 
 ## Changelog since v1.4.0-alpha.3
 
