@@ -29,21 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
-type wantStatusError struct {
-	err error
-}
-
-func (e wantStatusError) Error() string {
-	return e.err.Error()
-}
-
-func (e wantStatusError) Is(target error) bool {
-	if e.Error() == target.Error() {
-		return true
-	}
-	return false
-}
-
 // isCSIMigrationOn returns a boolean value indicating whether
 // the CSI migration has been enabled for a particular storage plugin.
 func isCSIMigrationOn(csiNode *storagev1.CSINode, pluginName string) bool {
