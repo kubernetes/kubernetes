@@ -531,10 +531,10 @@ function tars_from_version() {
     find-release-tars
     upload-tars
   elif [[ ${KUBE_VERSION} =~ ${KUBE_RELEASE_VERSION_REGEX} ]]; then
-    SERVER_BINARY_TAR_URL="https://storage.googleapis.com/kubernetes-release/release/${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz"
+    SERVER_BINARY_TAR_URL="https://dl.k8s.io/release/${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz"
     # TODO: Clean this up.
     KUBE_MANIFESTS_TAR_URL="${SERVER_BINARY_TAR_URL/server-linux-amd64/manifests}"
-    KUBE_MANIFESTS_TAR_HASH=$(curl "${KUBE_MANIFESTS_TAR_URL}" --silent --show-error | ${sha512sum})
+    KUBE_MANIFESTS_TAR_HASH=$(curl -L "${KUBE_MANIFESTS_TAR_URL}" --silent --show-error | ${sha512sum})
     KUBE_MANIFESTS_TAR_HASH=${KUBE_MANIFESTS_TAR_HASH%%[[:blank:]]*}
   elif [[ ${KUBE_VERSION} =~ ${KUBE_CI_VERSION_REGEX} ]]; then
     SERVER_BINARY_TAR_URL="https://storage.googleapis.com/k8s-release-dev/ci/${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz"
@@ -1715,7 +1715,7 @@ function setup-easyrsa {
   # Note: This was heavily cribbed from make-ca-cert.sh
   (set -x
     cd "${KUBE_TEMP}"
-    curl -L -O --connect-timeout 20 --retry 6 --retry-delay 2 https://storage.googleapis.com/kubernetes-release/easy-rsa/easy-rsa.tar.gz
+    curl -L -O --connect-timeout 20 --retry 6 --retry-delay 2 https://dl.k8s.io/easy-rsa/easy-rsa.tar.gz
     tar xzf easy-rsa.tar.gz
     mkdir easy-rsa-master/kubelet
     cp -r easy-rsa-master/easyrsa3/* easy-rsa-master/kubelet

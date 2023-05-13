@@ -29,7 +29,7 @@
 #    stable release, (e.g. 'v1.3.7').
 #    See https://github.com/kubernetes/kubernetes/releases for release options.
 #  Set KUBERNETES_RELEASE_URL to choose where to download binaries from.
-#    (Defaults to https://storage.googleapis.com/kubernetes-release/release).
+#    (Defaults to https://dl.k8s.io/release).
 #
 #  Set KUBERNETES_SERVER_ARCH to choose the server (Kubernetes cluster)
 #  architecture to download:

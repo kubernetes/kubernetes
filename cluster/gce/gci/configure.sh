@@ -254,7 +254,7 @@ function install-gci-mounter-tools {
   mkdir -p "${CONTAINERIZED_MOUNTER_HOME}"
   chmod a+x "${CONTAINERIZED_MOUNTER_HOME}"
   mkdir -p "${CONTAINERIZED_MOUNTER_HOME}/rootfs"
-  download-or-bust "${mounter_tar_sha}" "https://storage.googleapis.com/kubernetes-release/gci-mounter/mounter.tar"
+  download-or-bust "${mounter_tar_sha}" "https://dl.k8s.io/gci-mounter/mounter.tar"
   cp "${KUBE_HOME}/kubernetes/server/bin/mounter" "${CONTAINERIZED_MOUNTER_HOME}/mounter"
   chmod a+x "${CONTAINERIZED_MOUNTER_HOME}/mounter"
   mv "${KUBE_HOME}/mounter.tar" /tmp/mounter.tar
@@ -297,7 +297,7 @@ function install-node-problem-detector {
   fi
 
   echo "Downloading ${npd_tar}."
-  local -r npd_release_path="${NODE_PROBLEM_DETECTOR_RELEASE_PATH:-https://storage.googleapis.com/kubernetes-release}"
+  local -r npd_release_path="${NODE_PROBLEM_DETECTOR_RELEASE_PATH:-https://dl.k8s.io}"
   download-or-bust "${npd_hash}" "${npd_release_path}/node-problem-detector/${npd_tar}"
   local -r npd_dir="${KUBE_HOME}/node-problem-detector"
   mkdir -p "${npd_dir}"
