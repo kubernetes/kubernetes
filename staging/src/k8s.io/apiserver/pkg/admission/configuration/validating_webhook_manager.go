@@ -32,12 +32,19 @@ import (
 	"k8s.io/client-go/tools/cache/synctrack"
 )
 
+type webhookAccessorCreator func(uid string, configurationName string, h *v1.ValidatingWebhook) webhook.WebhookAccessor
+
 // validatingWebhookConfigurationManager collects the validating webhook objects so that they can be called.
 type validatingWebhookConfigurationManager struct {
 	lister              admissionregistrationlisters.ValidatingWebhookConfigurationLister
 	hasSynced           func() bool
 	lazy                synctrack.Lazy[[]webhook.WebhookAccessor]
-	configurationsCache sync.Map // NOTE maybe use simple map and a sync.Mutex
+	configurationsCache sync.Map
+
+	// createValidatingWebhookAccessor is used to instantiate webhook accessors.
+	// This function is defined as field instead of a struct method to allow us
+	// to replace it with a mock during unit tests.
+	createValidatingWebhookAccessor webhookAccessorCreator
 }
 
 var _ generic.Source = &validatingWebhookConfigurationManager{}
@@ -45,7 +52,8 @@ var _ generic.Source = &validatingWebhookConfigurationManager{}
 func NewValidatingWebhookConfigurationManager(f informers.SharedInformerFactory) generic.Source {
 	informer := f.Admissionregistration().V1().ValidatingWebhookConfigurations()
 	manager := &validatingWebhookConfigurationManager{
-		lister: informer.Lister(),
+		lister:                          informer.Lister(),
+		createValidatingWebhookAccessor: webhook.NewValidatingWebhookAccessor,
 	}
 	manager.lazy.Evaluate = manager.getConfiguration
 
@@ -115,12 +123,13 @@ cfgLoop:
 			n := c.Webhooks[i].Name
 			uid := fmt.Sprintf("%s/%s/%d", c.Name, n, names[n])
 			names[n]++
-			configurationAccessors = append(configurationAccessors, webhook.NewValidatingWebhookAccessor(uid, c.Name, &c.Webhooks[i]))
+			configurationAccessors = append(configurationAccessors, v.createValidatingWebhookAccessor(uid, c.Name, &c.Webhooks[i]))
 			// Cache the new accessors
 			v.configurationsCache.Store(c.Name, configurationAccessors)
 			accessors = append(accessors, configurationAccessors...)
 		}
 	}
+
 	return accessors
 }
 
