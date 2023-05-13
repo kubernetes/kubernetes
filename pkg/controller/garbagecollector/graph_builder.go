@@ -180,12 +180,11 @@ func (gb *GraphBuilder) controllerFor(logger klog.Logger, resource schema.GroupV
 	// need to clone because it's from a shared cache
 	registration, err := shared.Informer().AddEventHandlerWithResyncPeriod(handlers, ResourceResyncTime)
 	if err != nil {
-		//klog.V(4).Infof("unable to use a shared informer for resource %q, kind %q: %v", resource.String(), kind.String(), err)
-		klog.ErrorS(err, "unable to register event handler to shared informer", "resource", resource.String(), "kind", kind.String())
+		logger.Error(err, "unable to register event handler to shared informer", "resource", resource.String(), "kind", kind.String())
 		return nil, nil, nil, err
 	}
 	return shared.Informer().GetController(), shared.Informer().GetStore(), func() {
-		klog.V(4).InfoS("destroy event handler", "resource", resource.String(), "kind", kind.String())
+		logger.V(4).Info("destroy event handler", "resource", resource.String(), "kind", kind.String())
 		shared.Informer().RemoveEventHandler(registration)
 	}, nil
 }

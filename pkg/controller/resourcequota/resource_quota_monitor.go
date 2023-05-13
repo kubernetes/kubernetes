@@ -174,7 +174,7 @@ func (qm *QuotaMonitor) controllerFor(ctx context.Context, resource schema.Group
 			return nil, nil, err
 		}
 		return shared.Informer().GetController(), func() {
-			klog.V(4).InfoS("QuotaMonitor removed resource", "resource", resource.String())
+			logger.V(4).Info("QuotaMonitor removed resource", "resource", resource.String())
 			shared.Informer().RemoveEventHandler(registration)
 		}, nil
 	}
