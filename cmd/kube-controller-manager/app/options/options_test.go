@@ -63,6 +63,7 @@ import (
 	serviceaccountconfig "k8s.io/kubernetes/pkg/controller/serviceaccount/config"
 	statefulsetconfig "k8s.io/kubernetes/pkg/controller/statefulset/config"
 	ttlafterfinishedconfig "k8s.io/kubernetes/pkg/controller/ttlafterfinished/config"
+	validatingadmissionpolicystatusconfig "k8s.io/kubernetes/pkg/controller/validatingadmissionpolicystatus/config"
 	attachdetachconfig "k8s.io/kubernetes/pkg/controller/volume/attachdetach/config"
 	ephemeralvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/ephemeral/config"
 	persistentvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/config"
@@ -101,6 +102,7 @@ var args = []string{
 	"--concurrent-service-syncs=2",
 	"--concurrent-serviceaccount-token-syncs=10",
 	"--concurrent_rc_syncs=10",
+	"--concurrent-validating-admission-policy-status-syncs=9",
 	"--configure-cloud-routes=false",
 	"--contention-profiling=true",
 	"--controller-start-interval=2m",
@@ -409,6 +411,11 @@ func TestAddFlags(t *testing.T) {
 				ConcurrentTTLSyncs: 8,
 			},
 		},
+		ValidatingAdmissionPolicyStatusController: &ValidatingAdmissionPolicyStatusControllerOptions{
+			&validatingadmissionpolicystatusconfig.ValidatingAdmissionPolicyStatusControllerConfiguration{
+				ConcurrentPolicySyncs: 9,
+			},
+		},
 		SecureServing: (&apiserveroptions.SecureServingOptions{
 			BindPort:    10001,
 			BindAddress: netutils.ParseIPSloppy("192.168.4.21"),
@@ -639,6 +646,9 @@ func TestApplyTo(t *testing.T) {
 			},
 			TTLAfterFinishedController: ttlafterfinishedconfig.TTLAfterFinishedControllerConfiguration{
 				ConcurrentTTLSyncs: 8,
+			},
+			ValidatingAdmissionPolicyStatusController: validatingadmissionpolicystatusconfig.ValidatingAdmissionPolicyStatusControllerConfiguration{
+				ConcurrentPolicySyncs: 9,
 			},
 		},
 	}

@@ -62,31 +62,32 @@ type KubeControllerManagerOptions struct {
 	KubeCloudShared   *cpoptions.KubeCloudSharedOptions
 	ServiceController *cpoptions.ServiceControllerOptions
 
-	AttachDetachController           *AttachDetachControllerOptions
-	CSRSigningController             *CSRSigningControllerOptions
-	DaemonSetController              *DaemonSetControllerOptions
-	DeploymentController             *DeploymentControllerOptions
-	StatefulSetController            *StatefulSetControllerOptions
-	DeprecatedFlags                  *DeprecatedControllerOptions
-	EndpointController               *EndpointControllerOptions
-	EndpointSliceController          *EndpointSliceControllerOptions
-	EndpointSliceMirroringController *EndpointSliceMirroringControllerOptions
-	EphemeralVolumeController        *EphemeralVolumeControllerOptions
-	GarbageCollectorController       *GarbageCollectorControllerOptions
-	HPAController                    *HPAControllerOptions
-	JobController                    *JobControllerOptions
-	CronJobController                *CronJobControllerOptions
-	LegacySATokenCleaner             *LegacySATokenCleanerOptions
-	NamespaceController              *NamespaceControllerOptions
-	NodeIPAMController               *NodeIPAMControllerOptions
-	NodeLifecycleController          *NodeLifecycleControllerOptions
-	PersistentVolumeBinderController *PersistentVolumeBinderControllerOptions
-	PodGCController                  *PodGCControllerOptions
-	ReplicaSetController             *ReplicaSetControllerOptions
-	ReplicationController            *ReplicationControllerOptions
-	ResourceQuotaController          *ResourceQuotaControllerOptions
-	SAController                     *SAControllerOptions
-	TTLAfterFinishedController       *TTLAfterFinishedControllerOptions
+	AttachDetachController                    *AttachDetachControllerOptions
+	CSRSigningController                      *CSRSigningControllerOptions
+	DaemonSetController                       *DaemonSetControllerOptions
+	DeploymentController                      *DeploymentControllerOptions
+	StatefulSetController                     *StatefulSetControllerOptions
+	DeprecatedFlags                           *DeprecatedControllerOptions
+	EndpointController                        *EndpointControllerOptions
+	EndpointSliceController                   *EndpointSliceControllerOptions
+	EndpointSliceMirroringController          *EndpointSliceMirroringControllerOptions
+	EphemeralVolumeController                 *EphemeralVolumeControllerOptions
+	GarbageCollectorController                *GarbageCollectorControllerOptions
+	HPAController                             *HPAControllerOptions
+	JobController                             *JobControllerOptions
+	CronJobController                         *CronJobControllerOptions
+	LegacySATokenCleaner                      *LegacySATokenCleanerOptions
+	NamespaceController                       *NamespaceControllerOptions
+	NodeIPAMController                        *NodeIPAMControllerOptions
+	NodeLifecycleController                   *NodeLifecycleControllerOptions
+	PersistentVolumeBinderController          *PersistentVolumeBinderControllerOptions
+	PodGCController                           *PodGCControllerOptions
+	ReplicaSetController                      *ReplicaSetControllerOptions
+	ReplicationController                     *ReplicationControllerOptions
+	ResourceQuotaController                   *ResourceQuotaControllerOptions
+	SAController                              *SAControllerOptions
+	TTLAfterFinishedController                *TTLAfterFinishedControllerOptions
+	ValidatingAdmissionPolicyStatusController *ValidatingAdmissionPolicyStatusControllerOptions
 
 	SecureServing  *apiserveroptions.SecureServingOptionsWithLoopback
 	Authentication *apiserveroptions.DelegatingAuthenticationOptions
@@ -186,6 +187,9 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 		TTLAfterFinishedController: &TTLAfterFinishedControllerOptions{
 			&componentConfig.TTLAfterFinishedController,
 		},
+		ValidatingAdmissionPolicyStatusController: &ValidatingAdmissionPolicyStatusControllerOptions{
+			&componentConfig.ValidatingAdmissionPolicyStatusController,
+		},
 		SecureServing:  apiserveroptions.NewSecureServingOptions().WithLoopback(),
 		Authentication: apiserveroptions.NewDelegatingAuthenticationOptions(),
 		Authorization:  apiserveroptions.NewDelegatingAuthorizationOptions(),
@@ -261,6 +265,7 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	s.ResourceQuotaController.AddFlags(fss.FlagSet(names.ResourceQuotaController))
 	s.SAController.AddFlags(fss.FlagSet(names.ServiceAccountController))
 	s.TTLAfterFinishedController.AddFlags(fss.FlagSet(names.TTLAfterFinishedController))
+	s.ValidatingAdmissionPolicyStatusController.AddFlags(fss.FlagSet(names.ValidatingAdmissionPolicyStatusController))
 
 	s.Metrics.AddFlags(fss.FlagSet("metrics"))
 	logsapi.AddFlags(s.Logs, fss.FlagSet("logs"))
@@ -357,6 +362,9 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config, a
 		return err
 	}
 	if err := s.TTLAfterFinishedController.ApplyTo(&c.ComponentConfig.TTLAfterFinishedController); err != nil {
+		return err
+	}
+	if err := s.ValidatingAdmissionPolicyStatusController.ApplyTo(&c.ComponentConfig.ValidatingAdmissionPolicyStatusController); err != nil {
 		return err
 	}
 	if err := s.SecureServing.ApplyTo(&c.SecureServing, &c.LoopbackClientConfig); err != nil {
