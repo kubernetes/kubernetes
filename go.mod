@@ -221,7 +221,7 @@ require (
 	go.etcd.io/etcd/pkg/v3 v3.5.8 // indirect
 	go.etcd.io/etcd/raft/v3 v3.5.8 // indirect
 	go.etcd.io/etcd/server/v3 v3.5.8 // indirect
-	go.opencensus.io v0.23.0 // indirect
+	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.35.1 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.10.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.10.0 // indirect
