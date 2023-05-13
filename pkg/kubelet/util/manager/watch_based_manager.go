@@ -121,6 +121,15 @@ func (i *objectCacheItem) startReflector() {
 	i.waitGroup.Wait()
 	i.waitGroup.Add(1)
 	defer i.waitGroup.Done()
+	resourceVersion := ""
+	// store has only a single item at most
+	for _, obj := range i.store.List() {
+		if item, ok := obj.(metav1.Object); ok {
+			resourceVersion = item.GetResourceVersion()
+		}
+	}
+	// Avoid "Too large resource version" error caused by bookmark
+	i.reflector.SetLastSyncResourceVersion(resourceVersion)
 	i.reflector.Run(i.stopCh)
 }
 

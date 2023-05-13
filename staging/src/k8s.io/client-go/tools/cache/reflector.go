@@ -442,7 +442,7 @@ func (r *Reflector) watch(w watch.Interface, stopCh <-chan struct{}, resyncerrc 
 			}
 		}
 
-		err = watchHandler(start, w, r.store, r.expectedType, r.expectedGVK, r.name, r.typeDescription, r.setLastSyncResourceVersion, nil, r.clock, resyncerrc, stopCh)
+		err = watchHandler(start, w, r.store, r.expectedType, r.expectedGVK, r.name, r.typeDescription, r.SetLastSyncResourceVersion, nil, r.clock, resyncerrc, stopCh)
 		// Ensure that watch will not be reused across iterations.
 		w.Stop()
 		w = nil
@@ -578,7 +578,7 @@ func (r *Reflector) list(stopCh <-chan struct{}) error {
 		return fmt.Errorf("unable to sync list result: %v", err)
 	}
 	initTrace.Step("SyncWith done")
-	r.setLastSyncResourceVersion(resourceVersion)
+	r.SetLastSyncResourceVersion(resourceVersion)
 	initTrace.Step("Resource version updated")
 	return nil
 }
@@ -692,7 +692,7 @@ func (r *Reflector) watchList(stopCh <-chan struct{}) (watch.Interface, error) {
 		return nil, fmt.Errorf("unable to sync watch-list result: %v", err)
 	}
 	initTrace.Step("SyncWith done")
-	r.setLastSyncResourceVersion(resourceVersion)
+	r.SetLastSyncResourceVersion(resourceVersion)
 
 	return w, nil
 }
@@ -817,7 +817,7 @@ func (r *Reflector) LastSyncResourceVersion() string {
 	return r.lastSyncResourceVersion
 }
 
-func (r *Reflector) setLastSyncResourceVersion(v string) {
+func (r *Reflector) SetLastSyncResourceVersion(v string) {
 	r.lastSyncResourceVersionMutex.Lock()
 	defer r.lastSyncResourceVersionMutex.Unlock()
 	r.lastSyncResourceVersion = v

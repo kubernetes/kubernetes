@@ -165,7 +165,7 @@ func TestReflectorWatchHandlerError(t *testing.T) {
 	go func() {
 		fw.Stop()
 	}()
-	err := watchHandler(time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, nil, g.clock, nevererrc, wait.NeverStop)
+	err := watchHandler(time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.SetLastSyncResourceVersion, nil, g.clock, nevererrc, wait.NeverStop)
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
@@ -184,7 +184,7 @@ func TestReflectorWatchHandler(t *testing.T) {
 		fw.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "baz", ResourceVersion: "32"}})
 		fw.Stop()
 	}()
-	err := watchHandler(time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, nil, g.clock, nevererrc, wait.NeverStop)
+	err := watchHandler(time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.SetLastSyncResourceVersion, nil, g.clock, nevererrc, wait.NeverStop)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -232,7 +232,7 @@ func TestReflectorStopWatch(t *testing.T) {
 	fw := watch.NewFake()
 	stopWatch := make(chan struct{}, 1)
 	stopWatch <- struct{}{}
-	err := watchHandler(time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, nil, g.clock, nevererrc, stopWatch)
+	err := watchHandler(time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.SetLastSyncResourceVersion, nil, g.clock, nevererrc, stopWatch)
 	if err != errorStopRequested {
 		t.Errorf("expected stop error, got %q", err)
 	}
@@ -655,7 +655,7 @@ func TestReflectorWatchListPageSize(t *testing.T) {
 	}
 	r := NewReflector(lw, &v1.Pod{}, s, 0)
 	// Set resource version to test pagination also for not consistent reads.
-	r.setLastSyncResourceVersion("10")
+	r.SetLastSyncResourceVersion("10")
 	// Set the reflector to paginate the list request in 4 item chunks.
 	r.WatchListPageSize = 4
 	r.ListAndWatch(stopCh)
@@ -692,7 +692,7 @@ func TestReflectorNotPaginatingNotConsistentReads(t *testing.T) {
 		},
 	}
 	r := NewReflector(lw, &v1.Pod{}, s, 0)
-	r.setLastSyncResourceVersion("10")
+	r.SetLastSyncResourceVersion("10")
 	r.ListAndWatch(stopCh)
 
 	results := s.List()
