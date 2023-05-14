@@ -3380,8 +3380,8 @@ func TestPreFilterDisabled(t *testing.T) {
 	cycleState := framework.NewCycleState()
 	gotStatus := p.(*PodTopologySpread).Filter(context.Background(), cycleState, pod, nodeInfo)
 	wantStatus := framework.AsStatus(fmt.Errorf(`reading "PreFilterPodTopologySpread" from cycleState: %w`, framework.ErrNotFound))
-	if !reflect.DeepEqual(gotStatus, wantStatus) {
-		t.Errorf("status does not match: %v, want: %v", gotStatus, wantStatus)
+	if gotStatus.Equal(wantStatus) {
+		t.Errorf("status does not match got: %v, want: %v", gotStatus, wantStatus)
 	}
 }
 
