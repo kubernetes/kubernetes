@@ -159,7 +159,14 @@ var _ = SIGDescribe("Discovery", func() {
 		}
 	})
 
-	ginkgo.It("should locate the groupVersion and a resource within each APIGroup", func(ctx context.Context) {
+	/*
+		Release: v1.28
+		Testname: Discovery, confirm the groupVerion and a resourcefrom each apiGroup
+		Description: A resourceList MUST be found for each apiGroup that is retrieved.
+		For each apiGroup the groupVersion MUST equal the groupVersion as reported by
+		the schema. From each resourceList a valid resource MUST be found.
+	*/
+	framework.ConformanceIt("should locate the groupVersion and a resource within each APIGroup", func(ctx context.Context) {
 
 		tests := []struct {
 			apiBasePath   string
