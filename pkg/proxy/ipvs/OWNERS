@@ -4,6 +4,7 @@ reviewers:
   - sig-network-reviewers
   - andrewsykim
   - uablrek
+  - daman1807
 approvers:
   - sig-network-approvers
   - andrewsykim
