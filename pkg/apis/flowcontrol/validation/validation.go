@@ -369,7 +369,14 @@ func ValidatePriorityLevelConfigurationSpec(spec *flowcontrol.PriorityLevelConfi
 		if spec.Limited != nil {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("limited"), "must be nil if the type is not Limited"))
 		}
+		if spec.Exempt != nil {
+			allErrs = append(allErrs, ValidateExemptPriorityLevelConfiguration(spec.Exempt, fldPath.Child("exempt"))...)
+		}
 	case flowcontrol.PriorityLevelEnablementLimited:
+		if spec.Exempt != nil {
+			allErrs = append(allErrs, field.Required(fldPath.Child("exempt"), "must be nil if the type is Limited"))
+		}
+
 		if spec.Limited == nil {
 			allErrs = append(allErrs, field.Required(fldPath.Child("limited"), "must not be empty when type is Limited"))
 		} else {
@@ -396,6 +403,17 @@ func ValidateLimitedPriorityLevelConfiguration(lplc *flowcontrol.LimitedPriority
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("borrowingLimitPercent"), *lplc.BorrowingLimitPercent, "if specified, must be a non-negative integer"))
 	}
 
+	return allErrs
+}
+
+func ValidateExemptPriorityLevelConfiguration(eplc *flowcontrol.ExemptPriorityLevelConfiguration, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if eplc.NominalConcurrencyShares != nil && *eplc.NominalConcurrencyShares < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("nominalConcurrencyShares"), *eplc.NominalConcurrencyShares, "must be a non-negative integer"))
+	}
+	if eplc.LendablePercent != nil && !(*eplc.LendablePercent >= 0 && *eplc.LendablePercent <= 100) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("lendablePercent"), *eplc.LendablePercent, "must be between 0 and 100, inclusive"))
+	}
 	return allErrs
 }
 

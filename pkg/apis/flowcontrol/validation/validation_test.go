@@ -743,6 +743,22 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 				Type: flowcontrol.LimitResponseTypeReject},
 		},
 	}
+
+	badExemptSpec1 := flowcontrol.PriorityLevelConfigurationSpec{
+		Type: flowcontrol.PriorityLevelEnablementExempt,
+		Exempt: &flowcontrol.ExemptPriorityLevelConfiguration{
+			NominalConcurrencyShares: pointer.Int32(-1),
+			LendablePercent:          pointer.Int32(101),
+		},
+	}
+	badExemptSpec2 := flowcontrol.PriorityLevelConfigurationSpec{
+		Type: flowcontrol.PriorityLevelEnablementExempt,
+		Exempt: &flowcontrol.ExemptPriorityLevelConfiguration{
+			NominalConcurrencyShares: pointer.Int32(-1),
+			LendablePercent:          pointer.Int32(-1),
+		},
+	}
+
 	testCases := []struct {
 		name                       string
 		priorityLevelConfiguration *flowcontrol.PriorityLevelConfiguration
@@ -755,6 +771,10 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 			},
 			Spec: flowcontrol.PriorityLevelConfigurationSpec{
 				Type: flowcontrol.PriorityLevelEnablementExempt,
+				Exempt: &flowcontrol.ExemptPriorityLevelConfiguration{
+					NominalConcurrencyShares: pointer.Int32(0),
+					LendablePercent:          pointer.Int32(0),
+				},
 			},
 		},
 		expectedErrors: field.ErrorList{},
@@ -769,6 +789,65 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 		expectedErrors: field.ErrorList{
 			field.Invalid(field.NewPath("spec").Child("type"), flowcontrol.PriorityLevelEnablementLimited, "type must be 'Exempt' if and only if name is 'exempt'"),
 			field.Invalid(field.NewPath("spec"), badSpec, "spec of 'exempt' must equal the fixed value"),
+		},
+	}, {
+		name: "limited must not set exempt priority level configuration for borrowing",
+		priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "broken-limited",
+			},
+			Spec: flowcontrol.PriorityLevelConfigurationSpec{
+				Type: flowcontrol.PriorityLevelEnablementLimited,
+				Exempt: &flowcontrol.ExemptPriorityLevelConfiguration{
+					NominalConcurrencyShares: pointer.Int32(10),
+					LendablePercent:          pointer.Int32(20),
+				},
+			},
+		},
+		expectedErrors: field.ErrorList{
+			field.Required(field.NewPath("spec").Child("exempt"), "must be nil if the type is Limited"),
+			field.Required(field.NewPath("spec").Child("limited"), "must not be empty when type is Limited"),
+		},
+	}, {
+		name: "exempt priority level should have appropriate values for Exempt field",
+		priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: flowcontrol.PriorityLevelConfigurationNameExempt,
+			},
+			Spec: badExemptSpec1,
+		},
+		expectedErrors: field.ErrorList{
+			field.Invalid(field.NewPath("spec").Child("exempt").Child("nominalConcurrencyShares"), int32(-1), "must be a non-negative integer"),
+			field.Invalid(field.NewPath("spec").Child("exempt").Child("lendablePercent"), int32(101), "must be between 0 and 100, inclusive"),
+			field.Invalid(field.NewPath("spec"), badExemptSpec1, "spec of 'exempt' must equal the fixed value"),
+		},
+	}, {
+		name: "exempt priority level should have appropriate values for Exempt field",
+		priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: flowcontrol.PriorityLevelConfigurationNameExempt,
+			},
+			Spec: badExemptSpec2,
+		},
+		expectedErrors: field.ErrorList{
+			field.Invalid(field.NewPath("spec").Child("exempt").Child("nominalConcurrencyShares"), int32(-1), "must be a non-negative integer"),
+			field.Invalid(field.NewPath("spec").Child("exempt").Child("lendablePercent"), int32(-1), "must be between 0 and 100, inclusive"),
+			field.Invalid(field.NewPath("spec"), badExemptSpec2, "spec of 'exempt' must equal the fixed value"),
+		},
+	}, {
+		name: "limited must not set exempt priority level configuration for borrowing",
+		priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "broken-limited",
+			},
+			Spec: flowcontrol.PriorityLevelConfigurationSpec{
+				Type:   flowcontrol.PriorityLevelEnablementLimited,
+				Exempt: &flowcontrol.ExemptPriorityLevelConfiguration{},
+			},
+		},
+		expectedErrors: field.ErrorList{
+			field.Required(field.NewPath("spec").Child("exempt"), "must be nil if the type is Limited"),
+			field.Required(field.NewPath("spec").Child("limited"), "must not be empty when type is Limited"),
 		},
 	}, {
 		name: "limited requires more details",
