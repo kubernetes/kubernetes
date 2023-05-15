@@ -1417,17 +1417,11 @@ func (proxier *Proxier) syncProxyRules() {
 	// other service portal rules.
 	if proxier.nodePortAddresses.MatchAll() {
 		destinations := []string{"-m", "addrtype", "--dst-type", "LOCAL"}
+		// Block localhost nodePorts if they are not supported. (For IPv6 they never
+		// work, and for IPv4 they only work if we previously set `route_localnet`.)
 		if isIPv6 {
-			// For IPv6, Regardless of the value of localhostNodePorts is true
-			// or false, we should disable access to the nodePort via localhost. Since it never works and always
-			// cause kernel warnings.
 			destinations = append(destinations, "!", "-d", "::1/128")
-		}
-
-		if !proxier.localhostNodePorts && !isIPv6 {
-			// If set localhostNodePorts to "false"(route_localnet=0), We should generate iptables rules that
-			// disable NodePort services to be accessed via localhost. Since it doesn't work and causes
-			// the kernel to log warnings if anyone tries.
+		} else if !proxier.localhostNodePorts {
 			destinations = append(destinations, "!", "-d", "127.0.0.0/8")
 		}
 
@@ -1442,17 +1436,14 @@ func (proxier *Proxier) syncProxyRules() {
 			klog.ErrorS(err, "Failed to get node ip address matching nodeport cidrs, services with nodeport may not work as intended", "CIDRs", proxier.nodePortAddresses)
 		}
 		for _, ip := range nodeIPs {
-			// For ipv6, Regardless of the value of localhostNodePorts is true or false, we should disallow access
-			// to the nodePort via lookBack address.
-			if isIPv6 && ip.IsLoopback() {
-				klog.ErrorS(nil, "disallow nodePort services to be accessed via ipv6 localhost address", "IP", ip.String())
-				continue
-			}
-
-			// For ipv4, When localhostNodePorts is set to false, Ignore ipv4 lookBack address
-			if !isIPv6 && ip.IsLoopback() && !proxier.localhostNodePorts {
-				klog.ErrorS(nil, "disallow nodePort services to be accessed via ipv4 localhost address", "IP", ip.String())
-				continue
+			if ip.IsLoopback() {
+				if isIPv6 {
+					klog.ErrorS(nil, "--nodeport-addresses includes localhost but localhost NodePorts are not supported on IPv6", "address", ip.String())
+					continue
+				} else if !proxier.localhostNodePorts {
+					klog.ErrorS(nil, "--nodeport-addresses includes localhost but --iptables-localhost-nodeports=false was passed", "address", ip.String())
+					continue
+				}
 			}
 
 			// create nodeport rules for each IP one by one
