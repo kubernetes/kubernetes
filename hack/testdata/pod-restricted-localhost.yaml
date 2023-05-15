@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    run: target
+  name: target
+spec:
+  securityContext:
+    seccompProfile: 
+      type: Localhost
+      localhostProfile: dummy.json
+  containers:
+  - image: busybox
+    name: target
+    command: ["/bin/sh", "-c", "while :; do sleep 10; done"]
+    securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: 
+          - "ALL"
+          add:
+          - "NET_BIND_SERVICE"
+          

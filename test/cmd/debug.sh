@@ -88,6 +88,44 @@ run_kubectl_debug_pod_tests() {
   # Clean up
   kubectl delete pod target target-copy "${kube_flags[@]:?}"
 
+  ### Pod Troubleshooting by ephemeral containers with debugging profile
+  
+  # Pre-Condition: Pod "nginx" is created
+  kubectl run target "--image=${IMAGE_NGINX:?}" "${kube_flags[@]:?}"
+  kube::test::get_object_assert pod "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:'
+  # Restricted profile just works in not restricted namespace
+  # Command: add a new debug container with restricted profile
+  kubectl debug target -it --image=gcr.io/distroless/static-debian11:debug-nonroot --attach=false -c debug-container --profile=restricted "${kube_flags[@]:?}"
+  # Post-Conditions
+  kube::test::get_object_assert pod/target '{{range.spec.ephemeralContainers}}{{.name}}:{{end}}' 'debug-container:'
+  # Clean up
+  kubectl delete pod target "${kube_flags[@]:?}"
+
+  # Create and use a namespace with restricted policy
+  create_and_use_new_restricted_namespace
+
+  # Pre-Condition: Pod "busybox" is created that complies with the restricted policy
+  kubectl create -f hack/testdata/pod-restricted-runtime-default.yaml
+  kube::test::get_object_assert pod "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:'
+  # Restricted profile works when pod's seccompProfile is RuntimeDefault
+  # Command: add a new debug container with restricted profile
+  kubectl debug target -it --image=gcr.io/distroless/static-debian11:debug-nonroot --attach=false -c debug-container --profile=restricted "${kube_flags[@]:?}"
+  # Post-Conditions
+  kube::test::get_object_assert pod/target '{{range.spec.ephemeralContainers}}{{.name}}:{{end}}' 'debug-container:'
+  # Clean up
+  kubectl delete pod target "${kube_flags[@]:?}"
+
+  # Pre-Condition: Pod "busybox" is created that complies with the restricted policy
+  kubectl create -f hack/testdata/pod-restricted-localhost.yaml
+  kube::test::get_object_assert pod "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:'
+  # Restricted profile works when pod's seccompProfile is Localhost
+  # Command: add a new debug container with restricted profile
+  kubectl debug target -it --image=gcr.io/distroless/static-debian11:debug-nonroot --attach=false -c debug-container --profile=restricted "${kube_flags[@]:?}"
+  # Post-Conditions
+  kube::test::get_object_assert pod/target '{{range.spec.ephemeralContainers}}{{.name}}:{{end}}' 'debug-container:'
+  # Clean up
+  kubectl delete pod target "${kube_flags[@]:?}"
+
   set +o nounset
   set +o errexit
 }
