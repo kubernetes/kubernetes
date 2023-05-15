@@ -37,8 +37,11 @@ limitations under the License.
 // # Atomicity
 //
 // Most of the operations are not atomic/thread-safe, except for
-// [Replaceable.Replace] which can be performed while the objects
-// are being read.
+// [Replaceable.Replace] which can be performed while the objects are
+// being read. Specifically, `Get` methods are NOT thread-safe. Never
+// call `Get()` without a lock on a multi-threaded environment, since
+// it's usually performing updates to caches that will require write
+// operations.
 //
 // # Etags
 //
@@ -97,6 +100,13 @@ func (r Result[T]) Get() Result[T] {
 type Data[T any] interface {
 	// Returns the cached data, as well as an "etag" to identify the
 	// version of the cache, or an error if something happened.
+	//
+	// # Important note
+	//
+	// This method is NEVER thread-safe, never assume it is OK to
+	// call `Get()` without holding a proper mutex in a
+	// multi-threaded environment, especially since `Get()` will
+	// usually update the cache and perform write operations.
 	Get() Result[T]
 }
 
@@ -249,6 +259,13 @@ type Replaceable[T any] struct {
 // previously had returned a success, that success will be returned
 // instead. If the cache fails but we never returned a success, that
 // failure is returned.
+//
+// # Important note
+//
+// As all implementations of Get, this implementation is NOT
+// thread-safe. Please properly lock a mutex before calling this method
+// if you are in a multi-threaded environment, since this method will
+// update the cache and perform write operations.
 func (c *Replaceable[T]) Get() Result[T] {
 	result := (*c.cache.Load()).Get()
 	if result.Err != nil && c.result != nil && c.result.Err == nil {

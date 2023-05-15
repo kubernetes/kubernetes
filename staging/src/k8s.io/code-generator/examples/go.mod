@@ -8,7 +8,7 @@ require (
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/client-go v0.0.0
-	k8s.io/kube-openapi v0.0.0-20230501164219-8b0f38b5fd1f
+	k8s.io/kube-openapi v0.0.0-20230515203736-54b630e78af5
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3
 )
 
