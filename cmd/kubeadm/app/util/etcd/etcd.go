@@ -349,7 +349,7 @@ func (c *Client) RemoveMember(id uint64) ([]Member, error) {
 			return true, nil
 		}
 		if errors.Is(rpctypes.ErrMemberNotFound, err) {
-			klog.V(5).Infof("Member was already removed, because member %016x was not found", id)
+			klog.V(5).Infof("Member was already removed, because member %s was not found", strconv.FormatUint(id, 16))
 			return true, nil
 		}
 		klog.V(5).Infof("Failed to remove etcd member: %v", err)
@@ -410,7 +410,7 @@ func (c *Client) addMember(name string, peerAddrs string, isLearner bool) ([]Mem
 		if isLearner {
 			// if learnerID is set, it means the etcd member is already added successfully.
 			if learnerID == 0 {
-				klog.V(1).Infof("[etcd] Adding etcd member as learner: %016x", peerAddrs)
+				klog.V(1).Info("[etcd] Adding etcd member as learner")
 				resp, err = cli.MemberAddAsLearner(ctx, []string{peerAddrs})
 				if err != nil {
 					lastError = err
@@ -496,11 +496,11 @@ func (c *Client) MemberPromote(learnerID uint64) error {
 		return err
 	}
 	if !isLearner {
-		klog.V(1).Infof("[etcd] Member %016x already promoted.", learnerID)
+		klog.V(1).Infof("[etcd] Member %s already promoted.", strconv.FormatUint(learnerID, 16))
 		return nil
 	}
 
-	klog.V(1).Infof("[etcd] Promoting a learner as a voting member: %016x", learnerID)
+	klog.V(1).Infof("[etcd] Promoting a learner as a voting member: %s", strconv.FormatUint(learnerID, 16))
 	cli, err := c.newEtcdClient(c.Endpoints)
 	if err != nil {
 		return err
@@ -522,10 +522,10 @@ func (c *Client) MemberPromote(learnerID uint64) error {
 
 		_, err = cli.MemberPromote(ctx, learnerID)
 		if err == nil {
-			klog.V(1).Infof("[etcd] The learner was promoted as a voting member: %016x", learnerID)
+			klog.V(1).Infof("[etcd] The learner was promoted as a voting member: %s", strconv.FormatUint(learnerID, 16))
 			return true, nil
 		}
-		klog.V(5).Infof("[etcd] Promoting the learner %016x failed: %v", learnerID, err)
+		klog.V(5).Infof("[etcd] Promoting the learner %s failed: %v", strconv.FormatUint(learnerID, 16), err)
 		lastError = err
 		return false, nil
 	})
