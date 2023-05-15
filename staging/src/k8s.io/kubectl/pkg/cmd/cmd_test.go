@@ -61,11 +61,11 @@ func TestNormalizationFuncGlobalExistence(t *testing.T) {
 
 func TestKubectlSubcommandShadowPlugin(t *testing.T) {
 	tests := []struct {
-		name             string
-		args             []string
-		expectPlugin     string
-		expectPluginArgs []string
-		expectError      string
+		name              string
+		args              []string
+		expectPlugin      string
+		expectPluginArgs  []string
+		expectLookupError string
 	}{
 		{
 			name:             "test that a plugin executable is found based on command args when builtin subcommand does not exist",
@@ -74,9 +74,9 @@ func TestKubectlSubcommandShadowPlugin(t *testing.T) {
 			expectPluginArgs: []string{"--bar", "--bar2", "--namespace", "test-namespace"},
 		},
 		{
-			name:        "test that a plugin executable is not found based on command args when also builtin subcommand does not exist",
-			args:        []string{"kubectl", "create", "foo2", "--bar", "--bar2", "--namespace", "test-namespace"},
-			expectError: "unable to find a plugin executable \"kubectl-create-foo2\"",
+			name:              "test that a plugin executable is not found based on command args when also builtin subcommand does not exist",
+			args:              []string{"kubectl", "create", "foo2", "--bar", "--bar2", "--namespace", "test-namespace"},
+			expectLookupError: "unable to find a plugin executable \"kubectl-create-foo2\"",
 		},
 		{
 			name:             "test that normal commands are able to be executed, when builtin subcommand exists",
@@ -148,12 +148,12 @@ func TestKubectlSubcommandShadowPlugin(t *testing.T) {
 					}
 				}
 
-				if (pluginsHandler.err != nil && pluginsHandler.err.Error() != test.expectError) ||
-					(pluginsHandler.err == nil && len(test.expectError) > 0) {
-					t.Fatalf("unexpected error: expected %q to occur, but got %q", test.expectError, pluginsHandler.err)
+				if (pluginsHandler.lookupErr != nil && pluginsHandler.lookupErr.Error() != test.expectLookupError) ||
+					(pluginsHandler.lookupErr == nil && len(test.expectLookupError) > 0) {
+					t.Fatalf("unexpected error: expected %q to occur, but got %q", test.expectLookupError, pluginsHandler.lookupErr)
 				}
 
-				if pluginsHandler.lookedup && !pluginsHandler.executed && len(test.expectError) == 0 {
+				if pluginsHandler.lookedup && !pluginsHandler.executed && len(test.expectLookupError) == 0 {
 					// we have to fail here, because we have found the plugin, but not executed the plugin, nor the command (this would normally result in an error: unknown command)
 					t.Fatalf("expected plugin execution, but did not occur")
 				}
@@ -176,11 +176,11 @@ func TestKubectlSubcommandShadowPlugin(t *testing.T) {
 
 func TestKubectlCommandHandlesPlugins(t *testing.T) {
 	tests := []struct {
-		name             string
-		args             []string
-		expectPlugin     string
-		expectPluginArgs []string
-		expectError      string
+		name              string
+		args              []string
+		expectPlugin      string
+		expectPluginArgs  []string
+		expectLookupError string
 	}{
 		{
 			name:             "test that normal commands are able to be executed, when no plugin overshadows them",
@@ -269,12 +269,12 @@ func TestKubectlCommandHandlesPlugins(t *testing.T) {
 				}
 			}
 
-			if (pluginsHandler.err != nil && pluginsHandler.err.Error() != test.expectError) ||
-				(pluginsHandler.err == nil && len(test.expectError) > 0) {
-				t.Fatalf("unexpected error: expected %q to occur, but got %q", test.expectError, pluginsHandler.err)
+			if (pluginsHandler.lookupErr != nil && pluginsHandler.lookupErr.Error() != test.expectLookupError) ||
+				(pluginsHandler.lookupErr == nil && len(test.expectLookupError) > 0) {
+				t.Fatalf("unexpected error: expected %q to occur, but got %q", test.expectLookupError, pluginsHandler.lookupErr)
 			}
 
-			if pluginsHandler.lookedup && !pluginsHandler.executed && len(test.expectError) == 0 {
+			if pluginsHandler.lookedup && !pluginsHandler.executed && len(test.expectLookupError) == 0 {
 				// we have to fail here, because we have found the plugin, but not executed the plugin, nor the command (this would normally result in an error: unknown command)
 				t.Fatalf("expected plugin execution, but did not occur")
 			}
@@ -299,8 +299,8 @@ type testPluginHandler struct {
 	validPrefixes    []string
 
 	// lookup results
-	lookedup bool
-	err      error
+	lookedup  bool
+	lookupErr error
 
 	// execution results
 	executed       bool
@@ -314,18 +314,18 @@ func (h *testPluginHandler) Lookup(filename string) (string, bool) {
 
 	dir, err := os.Stat(h.pluginsDirectory)
 	if err != nil {
-		h.err = err
+		h.lookupErr = err
 		return "", false
 	}
 
 	if !dir.IsDir() {
-		h.err = fmt.Errorf("expected %q to be a directory", h.pluginsDirectory)
+		h.lookupErr = fmt.Errorf("expected %q to be a directory", h.pluginsDirectory)
 		return "", false
 	}
 
 	plugins, err := os.ReadDir(h.pluginsDirectory)
 	if err != nil {
-		h.err = err
+		h.lookupErr = err
 		return "", false
 	}
 
@@ -339,7 +339,7 @@ func (h *testPluginHandler) Lookup(filename string) (string, bool) {
 		}
 	}
 
-	h.err = fmt.Errorf("unable to find a plugin executable %q", filenameWithSuportedPrefix)
+	h.lookupErr = fmt.Errorf("unable to find a plugin executable %q", filenameWithSuportedPrefix)
 	return "", false
 }
 
