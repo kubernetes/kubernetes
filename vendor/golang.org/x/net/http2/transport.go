@@ -1266,6 +1266,27 @@ func (cc *ClientConn) RoundTrip(req *http.Request) (*http.Response, error) {
 		return res, nil
 	}
 
+	cancelRequest := func(cs *clientStream, err error) error {
+		cs.cc.mu.Lock()
+		defer cs.cc.mu.Unlock()
+		cs.abortStreamLocked(err)
+		if cs.ID != 0 {
+			// This request may have failed because of a problem with the connection,
+			// or for some unrelated reason. (For example, the user might have canceled
+			// the request without waiting for a response.) Mark the connection as
+			// not reusable, since trying to reuse a dead connection is worse than
+			// unnecessarily creating a new one.
+			//
+			// If cs.ID is 0, then the request was never allocated a stream ID and
+			// whatever went wrong was unrelated to the connection. We might have
+			// timed out waiting for a stream slot when StrictMaxConcurrentStreams
+			// is set, for example, in which case retrying on a different connection
+			// will not help.
+			cs.cc.doNotReuse = true
+		}
+		return err
+	}
+
 	for {
 		select {
 		case <-cs.respHeaderRecv:
@@ -1280,15 +1301,12 @@ func (cc *ClientConn) RoundTrip(req *http.Request) (*http.Response, error) {
 				return handleResponseHeaders()
 			default:
 				waitDone()
-				return nil, cs.abortErr
+				return nil, cancelRequest(cs, cs.abortErr)
 			}
 		case <-ctx.Done():
-			err := ctx.Err()
-			cs.abortStream(err)
-			return nil, err
+			return nil, cancelRequest(cs, ctx.Err())
 		case <-cs.reqCancel:
-			cs.abortStream(errRequestCanceled)
-			return nil, errRequestCanceled
+			return nil, cancelRequest(cs, errRequestCanceled)
 		}
 	}
 }
