@@ -54521,6 +54521,13 @@ func schema_k8sio_kube_scheduler_config_v1_KubeSchedulerConfiguration(ref common
 							},
 						},
 					},
+					"delayCacheUntilActive": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DelayCacheUntilActive specifies when to start caching. If this is true and leader election is enabled, the scheduler will wait to fill informer caches until it is the leader. Doing so will have slower failover with the benefit of lower memory overhead while waiting to become leader. Defaults to false.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
 				Required: []string{"leaderElection", "clientConnection"},
 			},
