@@ -45,7 +45,7 @@ require (
 	github.com/google/gofuzz v1.2.0
 	github.com/google/uuid v1.3.0
 	github.com/imdario/mergo v0.3.6
-	github.com/ishidawataru/sctp v0.0.0-20190723014705-7c296d48a2b5
+	github.com/ishidawataru/sctp v0.0.0-20230406120618-7ff4192f6ff2
 	github.com/libopenstorage/openstorage v1.0.0
 	github.com/lithammer/dedent v1.1.0
 	github.com/moby/ipvs v1.1.0

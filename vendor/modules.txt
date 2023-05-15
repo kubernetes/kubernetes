@@ -440,8 +440,8 @@ github.com/imdario/mergo
 # github.com/inconshreveable/mousetrap v1.1.0
 ## explicit; go 1.18
 github.com/inconshreveable/mousetrap
-# github.com/ishidawataru/sctp v0.0.0-20190723014705-7c296d48a2b5
-## explicit
+# github.com/ishidawataru/sctp v0.0.0-20230406120618-7ff4192f6ff2
+## explicit; go 1.12
 github.com/ishidawataru/sctp
 # github.com/jonboulle/clockwork v0.2.2
 ## explicit; go 1.13
