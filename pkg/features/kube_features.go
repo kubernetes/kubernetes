@@ -170,14 +170,6 @@ const (
 	// Enables SecretRef field in CSI NodeExpandVolume request.
 	CSINodeExpandSecret featuregate.Feature = "CSINodeExpandSecret"
 
-	// owner: @pohly
-	// alpha: v1.19
-	// beta: v1.21
-	// GA: v1.24
-	//
-	// Enables tracking of available storage capacity that CSI drivers provide.
-	CSIStorageCapacity featuregate.Feature = "CSIStorageCapacity"
-
 	// owner: @fengzixu
 	// alpha: v1.21
 	//
@@ -887,8 +879,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIMigrationvSphere: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 
 	CSINodeExpandSecret: {Default: true, PreRelease: featuregate.Beta},
-
-	CSIStorageCapacity: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 
 	CSIVolumeHealth: {Default: false, PreRelease: featuregate.Alpha},
 
