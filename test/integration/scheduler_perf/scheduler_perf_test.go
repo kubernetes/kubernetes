@@ -769,6 +769,15 @@ func unrollWorkloadTemplate(b *testing.B, wt []op, w *workload) []op {
 }
 
 func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload) []DataItem {
+	start := time.Now()
+	b.Cleanup(func() {
+		duration := time.Now().Sub(start)
+		// This includes startup and shutdown time and thus does not
+		// reflect scheduling performance. It's useful to get a feeling
+		// for how long each workload runs overall.
+		b.ReportMetric(duration.Seconds(), "runtime_seconds")
+	})
+
 	var cfg *config.KubeSchedulerConfiguration
 	var err error
 	if tc.SchedulerConfigPath != nil {
