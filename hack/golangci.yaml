@@ -31,6 +31,7 @@ linters:
     - govet
     - ineffassign
     - logcheck
+    - misspell
     - staticcheck
     - stylecheck
     - unused
@@ -46,6 +47,11 @@ linters-settings: # please keep this alphabetized
     enabled-checks:             # not limited in golangci-strict.yaml
       - equalFold               # not limited in golangci-strict.yaml
       - boolExprSimplify        # not limited in golangci-strict.yaml
+  misspell:
+    ignore-words:
+      - Creater
+      - creater
+      - ect
   staticcheck:
     checks:
       - "all"

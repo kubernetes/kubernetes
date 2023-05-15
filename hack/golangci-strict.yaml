@@ -30,6 +30,7 @@ linters:
     - govet
     - ineffassign
     - logcheck
+    - misspell
     - staticcheck
     - stylecheck
     - unused
@@ -42,6 +43,11 @@ linters-settings: # please keep this alphabetized
       description: structured logging checker
       original-url: k8s.io/logtools/logcheck
   gocritic:
+  misspell:
+    ignore-words:
+      - Creater
+      - creater
+      - ect
   staticcheck:
     checks:
       - "all"
