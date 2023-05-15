@@ -91,7 +91,6 @@ func appendLegacyProviderVolumes(logger klog.Logger, allPlugins []volume.VolumeP
 	// Then append non-attachable volumes
 	pluginName := plugins.AzureFileInTreePluginName
 	pluginInfo := pluginInfo{
-		pluginMigrationFeature:  features.CSIMigrationAzureFile,
 		pluginUnregisterFeature: features.InTreePluginAzureFileUnregister,
 		pluginProbeFunction:     azure_file.ProbeVolumePlugins,
 	}
