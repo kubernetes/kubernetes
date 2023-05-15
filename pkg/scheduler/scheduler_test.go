@@ -36,6 +36,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
+	"k8s.io/klog/v2/ktesting"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
@@ -173,14 +174,15 @@ func TestSchedulerCreation(t *testing.T) {
 
 			eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
 
-			stopCh := make(chan struct{})
-			defer close(stopCh)
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
 			s, err := New(
+				ctx,
 				client,
 				informerFactory,
 				nil,
 				profile.NewRecorderFactory(eventBroadcaster),
-				stopCh,
 				tc.opts...,
 			)
 
@@ -284,7 +286,7 @@ func TestFailureHandler(t *testing.T) {
 				queue.Delete(testPod)
 			}
 
-			s, fwk, err := initScheduler(ctx.Done(), schedulerCache, queue, client, informerFactory)
+			s, fwk, err := initScheduler(ctx, schedulerCache, queue, client, informerFactory)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -359,7 +361,7 @@ func TestFailureHandler_NodeNotFound(t *testing.T) {
 				}
 			}
 
-			s, fwk, err := initScheduler(ctx.Done(), schedulerCache, queue, client, informerFactory)
+			s, fwk, err := initScheduler(ctx, schedulerCache, queue, client, informerFactory)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -398,7 +400,7 @@ func TestFailureHandler_PodAlreadyBound(t *testing.T) {
 	// Add node to schedulerCache no matter it's deleted in API server or not.
 	schedulerCache.AddNode(&nodeFoo)
 
-	s, fwk, err := initScheduler(ctx.Done(), schedulerCache, queue, client, informerFactory)
+	s, fwk, err := initScheduler(ctx, schedulerCache, queue, client, informerFactory)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -436,14 +438,15 @@ func TestWithPercentageOfNodesToScore(t *testing.T) {
 			client := fake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
-			stopCh := make(chan struct{})
-			defer close(stopCh)
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
 			sched, err := New(
+				ctx,
 				client,
 				informerFactory,
 				nil,
 				profile.NewRecorderFactory(eventBroadcaster),
-				stopCh,
 				WithPercentageOfNodesToScore(tt.percentageOfNodesToScoreConfig),
 			)
 			if err != nil {
@@ -483,16 +486,16 @@ func getPodFromPriorityQueue(queue *internalqueue.PriorityQueue, pod *v1.Pod) *v
 	return nil
 }
 
-func initScheduler(stop <-chan struct{}, cache internalcache.Cache, queue internalqueue.SchedulingQueue,
+func initScheduler(ctx context.Context, cache internalcache.Cache, queue internalqueue.SchedulingQueue,
 	client kubernetes.Interface, informerFactory informers.SharedInformerFactory) (*Scheduler, framework.Framework, error) {
 	registerPluginFuncs := []st.RegisterPluginFunc{
 		st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 		st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 	}
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
-	fwk, err := st.NewFramework(registerPluginFuncs,
+	fwk, err := st.NewFramework(ctx,
+		registerPluginFuncs,
 		testSchedulerName,
-		stop,
 		frameworkruntime.WithClientSet(client),
 		frameworkruntime.WithInformerFactory(informerFactory),
 		frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, testSchedulerName)),
@@ -504,7 +507,7 @@ func initScheduler(stop <-chan struct{}, cache internalcache.Cache, queue intern
 	s := &Scheduler{
 		Cache:           cache,
 		client:          client,
-		StopEverything:  stop,
+		StopEverything:  ctx.Done(),
 		SchedulingQueue: queue,
 		Profiles:        profile.Map{testSchedulerName: fwk},
 	}
@@ -591,9 +594,10 @@ func TestInitPluginsWithIndexers(t *testing.T) {
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			)
-			stopCh := make(chan struct{})
-			defer close(stopCh)
-			_, err := st.NewFramework(registerPluginFuncs, "test", stopCh, frameworkruntime.WithInformerFactory(fakeInformerFactory))
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			_, err := st.NewFramework(ctx, registerPluginFuncs, "test", frameworkruntime.WithInformerFactory(fakeInformerFactory))
 
 			if len(tt.wantErr) > 0 {
 				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {

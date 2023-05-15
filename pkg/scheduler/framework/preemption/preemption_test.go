@@ -281,10 +281,12 @@ func TestDryRunPreemption(t *testing.T) {
 			}
 			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewSimpleClientset(objs...), 0)
 			parallelism := parallelize.DefaultParallelism
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			fwk, err := st.NewFramework(
-				registeredPlugins, "", ctx.Done(),
+				ctx,
+				registeredPlugins, "",
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithParallelism(parallelism),

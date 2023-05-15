@@ -250,13 +250,13 @@ func defaultFrameworkOptions(stopCh <-chan struct{}) frameworkOptions {
 var _ framework.Framework = &frameworkImpl{}
 
 // NewFramework initializes plugins given the configuration and the registry.
-func NewFramework(r Registry, profile *config.KubeSchedulerProfile, stopCh <-chan struct{}, opts ...Option) (framework.Framework, error) {
-	options := defaultFrameworkOptions(stopCh)
+func NewFramework(ctx context.Context, r Registry, profile *config.KubeSchedulerProfile, opts ...Option) (framework.Framework, error) {
+	options := defaultFrameworkOptions(ctx.Done())
 	for _, opt := range opts {
 		opt(&options)
 	}
 
-	logger := klog.TODO()
+	logger := klog.FromContext(ctx)
 	if options.logger != nil {
 		logger = *options.logger
 	}

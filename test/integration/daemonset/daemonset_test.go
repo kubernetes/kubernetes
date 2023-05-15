@@ -98,11 +98,11 @@ func setupWithServerSetup(t *testing.T, serverSetup framework.TestServerSetup) (
 	})
 
 	sched, err := scheduler.New(
+		ctx,
 		clientSet,
 		informers,
 		nil,
 		profile.NewRecorderFactory(eventBroadcaster),
-		ctx.Done(),
 	)
 	if err != nil {
 		t.Fatalf("Couldn't create scheduler: %v", err)
