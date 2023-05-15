@@ -4,6 +4,7 @@ approvers:
   - deads2k
   - smarterclayton
   - sttts
+  - jpbetz
 reviewers:
   - caesarxuchao
   - deads2k
@@ -14,6 +15,7 @@ reviewers:
   - logicalhan
   - alexzielenski
   - jefftree
+  - jpbetz
 labels:
   - sig/api-machinery
 emeritus_approvers:

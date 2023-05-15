@@ -5,12 +5,14 @@ approvers:
   - deads2k
   - sttts
   - liggitt
+  - jpbetz
 reviewers:
   - smarterclayton
   - deads2k
   - sttts
   - liggitt
   - cheftako
+  - jpbetz
 labels:
   - sig/api-machinery
 emeritus_approvers:

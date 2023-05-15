@@ -6,6 +6,7 @@ approvers:
   - mikedanese
   - soltysh
   - sttts
+  - jpbetz
 reviewers:
   - caesarxuchao
   - cheftako
@@ -32,6 +33,7 @@ reviewers:
   - sttts
   - thockin
   - wojtek-t
+  - jpbetz
 labels:
   - sig/api-machinery
 emeritus_approvers:
