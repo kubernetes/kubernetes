@@ -84,10 +84,6 @@ import (
 
 const kubectlCmdHeaders = "KUBECTL_COMMAND_HEADERS"
 
-var (
-	allowedCmdsSubcommandPlugin = map[string]struct{}{"create": {}}
-)
-
 type KubectlOptions struct {
 	PluginHandler PluginHandler
 	Arguments     []string
@@ -146,7 +142,7 @@ func NewDefaultKubectlCommandWithArgs(o KubectlOptions) *cobra.Command {
 			if cmdutil.CmdPluginAsSubcommand.IsEnabled() {
 				// Command exists(e.g. kubectl create), but it is not certain that
 				// subcommand also exists (e.g. kubectl create networkpolicy)
-				if _, ok := allowedCmdsSubcommandPlugin[foundCmd.Name()]; ok {
+				if IsSubcommandPluginAllowed(foundCmd.Name()) {
 					var subcommand string
 					for _, arg := range foundArgs { // first "non-flag" argument as subcommand
 						if !strings.HasPrefix(arg, "-") {
@@ -174,6 +170,14 @@ func NewDefaultKubectlCommandWithArgs(o KubectlOptions) *cobra.Command {
 	}
 
 	return cmd
+}
+
+// IsSubcommandPluginAllowed returns the given command is allowed
+// to use plugin as subcommand if the subcommand does not exist as builtin.
+func IsSubcommandPluginAllowed(foundCmd string) bool {
+	allowedCmds := map[string]struct{}{"create": {}}
+	_, ok := allowedCmds[foundCmd]
+	return ok
 }
 
 // PluginHandler is capable of parsing command line arguments
