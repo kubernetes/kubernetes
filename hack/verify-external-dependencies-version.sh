@@ -40,7 +40,7 @@ ZEITGEIST_BIN="$(which zeitgeist)"
 
 # TODO: revert sed hack when zetigeist respects CLICOLOR/ttys
 CLICOLOR=0 "${ZEITGEIST_BIN}" validate \
-  --local \
+  --local-only \
   --base-path "${KUBE_ROOT}" \
   --config "${KUBE_ROOT}"/build/dependencies.yaml \
   2> >(sed -e $'s/\x1b\[[0-9;]*m//g' >&2)
