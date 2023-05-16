@@ -10,6 +10,10 @@
     {
       "groupVersion": "policy/v1",
       "version": "v1"
+    },
+    {
+      "groupVersion": "policy/v1beta1",
+      "version": "v1beta1"
     }
   ]
 }
