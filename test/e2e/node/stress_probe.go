@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,9 +37,16 @@ import (
 const (
 	probeTestInitialDelaySeconds = 15
 	numTestPods                  = 1
-	numContainers                = 100
+	numContainers                = 400
 	containerPort                = 2000
+	defaultObservationTimeout    = time.Minute * 4
 )
+
+type containerConfig struct {
+	Name         string
+	ProbeType    string
+	ContainerIdx int
+}
 
 var _ = SIGDescribe("[Serial] [Slow] [Disruptive] Stress test probes", func() {
 	f := framework.NewDefaultFramework("stress-test-probe")
@@ -55,9 +63,7 @@ var _ = SIGDescribe("[Serial] [Slow] [Disruptive] Stress test probes", func() {
 			InitialDelaySeconds: 15,
 			FailureThreshold:    1,
 		}
-		ports := []v1.ContainerPort{{ContainerPort: int32(containerPort)}}
-		probeArgs := []string{"serve-hostname", "--http", "--port", ""}
-		pod := livenessPodSpec("http", f.Namespace.Name, livenessProbe, ports, probeArgs...)
+		pod := livenessPodSpec("http", f.Namespace.Name, livenessProbe)
 		runLivenessTest(ctx, f, pod)
 	})
 
@@ -72,9 +78,7 @@ var _ = SIGDescribe("[Serial] [Slow] [Disruptive] Stress test probes", func() {
 			InitialDelaySeconds: 15,
 			FailureThreshold:    1,
 		}
-		ports := []v1.ContainerPort{{ContainerPort: int32(containerPort)}}
-		probeArgs := []string{"serve-hostname", "--tcp", "--port", "", "--http=false"}
-		pod := livenessPodSpec("tcp", f.Namespace.Name, livenessProbe, ports, probeArgs...)
+		pod := livenessPodSpec("tcp", f.Namespace.Name, livenessProbe)
 		runLivenessTest(ctx, f, pod)
 	})
 
@@ -95,43 +99,43 @@ var _ = SIGDescribe("[Serial] [Slow] [Disruptive] Stress test probes", func() {
 			TimeoutSeconds:      5, // default 1s can be pretty aggressive in CI environments with low resources
 			FailureThreshold:    1,
 		}
-		ports := []v1.ContainerPort{{ContainerPort: int32(containerPort)}}
-		probeArgs := []string{"grpc-health-checking", "--port", "", "--http-port", ""}
-		pod := livenessPodSpec("grpc", f.Namespace.Name, livenessProbe, ports, probeArgs...)
+		pod := livenessPodSpec("grpc", f.Namespace.Name, livenessProbe)
 		runLivenessTest(ctx, f, pod)
 	})
 })
 
-func livenessPodSpec(probeType, namespace string, livenessProbe v1.Probe, ports []v1.ContainerPort, args ...string) *v1.Pod {
-	pod := e2epod.NewAgnhostPod(namespace, "liveness-stress-"+string(uuid.NewUUID()), nil, nil, ports, args...)
+func livenessPodSpec(probeType, namespace string, livenessProbe v1.Probe) *v1.Pod {
+	pod := e2epod.NewAgnhostPod(namespace, "liveness-stress-"+string(uuid.NewUUID()), nil, nil, nil)
 	pod.ObjectMeta.Labels = map[string]string{"test": "liveness-stress"}
 	pod.Spec.Containers[0].LivenessProbe = &livenessProbe
-	pod.Spec.Containers[0].Name = "agnhost-container-0"
 	pod.Spec.Containers = append(pod.Spec.Containers, make([]v1.Container, numContainers-1)...)
 	for idx := 0; idx < numContainers; idx++ {
-		name := "agnhost-container-" + strconv.Itoa(idx+1)
+		cc := containerConfig{
+			Name:         "agnhost-container-" + strconv.Itoa(idx+1),
+			ProbeType:    probeType,
+			ContainerIdx: idx,
+		}
 		instance := *pod.Spec.Containers[0].DeepCopy()
-		pod.Spec.Containers[idx] = newContainer(name, probeType, idx, instance)
+		pod.Spec.Containers[idx] = newContainer(cc, instance)
 	}
 	return pod
 }
 
-func newContainer(name, probeType string, containerIdx int, instance v1.Container) v1.Container {
-	newContainerPort := containerIdx + containerPort + 1
-	instance.Name = name
+func newContainer(config containerConfig, instance v1.Container) v1.Container {
+	newContainerPort := config.ContainerIdx + containerPort + 1
+	instance.Name = config.Name
 	instance.Ports = []v1.ContainerPort{{ContainerPort: int32(newContainerPort)}}
 
-	switch probeType {
+	switch config.ProbeType {
 	case "tcp":
 		instance.LivenessProbe.TCPSocket.Port = intstr.FromInt(newContainerPort)
-		instance.Args[3] = strconv.Itoa(newContainerPort)
+		instance.Args = []string{"serve-hostname", "--tcp", "--port", strconv.Itoa(newContainerPort), "--http=false"}
 	case "http":
 		instance.LivenessProbe.HTTPGet.Port = intstr.FromInt(newContainerPort)
-		instance.Args[3] = strconv.Itoa(newContainerPort)
+		instance.Args = []string{"serve-hostname", "--http", "--port", strconv.Itoa(newContainerPort)}
 	case "grpc":
 		instance.LivenessProbe.GRPC.Port = int32(newContainerPort)
-		instance.Args[2] = strconv.Itoa(newContainerPort)
-		instance.Args[4] = strconv.Itoa(newContainerPort + containerPort)
+		instance.Args = []string{"grpc-health-checking", "--port", strconv.Itoa(newContainerPort), "--http-port", strconv.Itoa(newContainerPort + containerPort)}
 	}
 
 	return instance
@@ -175,22 +179,22 @@ func runLivenessTest(ctx context.Context, f *framework.Framework, pod *v1.Pod) {
 	ginkgo.By(fmt.Sprintf("Creating pod %s in namespace %s", pod.Name, ns))
 	podClient.Create(ctx, pod)
 
-	// Wait until the pod is not pending. (Here we need to check for something other than
-	// 'Pending' other than checking for 'Running', since when failures occur, we go to
-	// 'Terminated' which can cause indefinite blocking.)
-	framework.ExpectNoError(e2epod.WaitForPodNotPending(ctx, f.ClientSet, ns, pod.Name),
+	// Wait until the pod is running.
+	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod),
 		fmt.Sprintf("starting pod %s in namespace %s", pod.Name, ns))
 	framework.Logf("Started pod %s in namespace %s", pod.Name, ns)
 
-	// Check the pod's current state and verify that restartCount is present.
-	ginkgo.By("checking the pod's current state and verifying that restartCount is present")
-	pod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err, fmt.Sprintf("getting pod %s in namespace %s", pod.Name, ns))
+	deadline := time.Now().Add(defaultObservationTimeout)
+	for start := time.Now(); time.Now().Before(deadline); time.Sleep(10 * time.Second) {
+		// Check the pod's current state and verify that restartCount is present.
+		ginkgo.By("checking the pod's current state and verifying that restartCount is present")
+		pod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, fmt.Sprintf("getting pod %s in namespace %s", pod.Name, ns))
+		restartCount := getRestartCount(pod)
 
-	restartCount := getRestartCount(pod)
-
-	if restartCount != 0 {
-		framework.Failf("Restart count of pod %s/%s is now %d",
-			ns, pod.Name, restartCount)
+		if restartCount != 0 {
+			framework.Failf("Restart count of pod %s/%s is now %d (%v elapsed)",
+				ns, pod.Name, restartCount, time.Since(start))
+		}
 	}
 }
