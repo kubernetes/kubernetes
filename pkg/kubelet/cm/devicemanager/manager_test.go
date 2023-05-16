@@ -573,9 +573,10 @@ func constructDevices(devices []string) checkpoint.DevicesPerNUMA {
 
 // containerAllocateResponseBuilder is a helper to build a ContainerAllocateResponse
 type containerAllocateResponseBuilder struct {
-	devices map[string]string
-	mounts  map[string]string
-	envs    map[string]string
+	devices    map[string]string
+	mounts     map[string]string
+	envs       map[string]string
+	cdiDevices []string
 }
 
 // containerAllocateResponseBuilderOption defines a functional option for a containerAllocateResponseBuilder
@@ -599,6 +600,13 @@ func withMounts(mounts map[string]string) containerAllocateResponseBuilderOption
 func withEnvs(envs map[string]string) containerAllocateResponseBuilderOption {
 	return func(b *containerAllocateResponseBuilder) {
 		b.envs = envs
+	}
+}
+
+// withCDIDevices sets the cdiDevices for the containerAllocateResponseBuilder
+func withCDIDevices(cdiDevices ...string) containerAllocateResponseBuilderOption {
+	return func(b *containerAllocateResponseBuilder) {
+		b.cdiDevices = cdiDevices
 	}
 }
 
@@ -633,6 +641,16 @@ func (b *containerAllocateResponseBuilder) Build() *pluginapi.ContainerAllocateR
 	for k, v := range b.envs {
 		resp.Envs[k] = v
 	}
+
+	var cdiDevices []*pluginapi.CDIDevice
+	for _, dev := range b.cdiDevices {
+		cdiDevice := pluginapi.CDIDevice{
+			Name: dev,
+		}
+		cdiDevices = append(cdiDevices, &cdiDevice)
+	}
+	resp.CDIDevices = cdiDevices
+
 	return resp
 }
 
@@ -660,6 +678,7 @@ func TestCheckpoint(t *testing.T) {
 		newContainerAllocateResponse(
 			withDevices(map[string]string{"/dev/r1dev1": "/dev/r1dev1", "/dev/r1dev2": "/dev/r1dev2"}),
 			withMounts(map[string]string{"/home/r1lib1": "/usr/r1lib1"}),
+			withCDIDevices("domain1.com/resource1=dev1", "domain1.com/resource1=dev2"),
 		),
 	)
 	testManager.podDevices.insert("pod1", "con1", resourceName2,

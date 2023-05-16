@@ -673,6 +673,7 @@ func (cm *containerManagerImpl) GetResources(pod *v1.Pod, container *v1.Containe
 	opts.Mounts = append(opts.Mounts, devOpts.Mounts...)
 	opts.Envs = append(opts.Envs, devOpts.Envs...)
 	opts.Annotations = append(opts.Annotations, devOpts.Annotations...)
+	opts.CDIDevices = append(opts.CDIDevices, devOpts.CDIDevices...)
 	return opts, nil
 }
 
