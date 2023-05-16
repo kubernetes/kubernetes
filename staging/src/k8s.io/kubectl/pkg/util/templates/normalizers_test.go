@@ -64,7 +64,7 @@ func TestLongDescMarkdown(t *testing.T) {
 		{
 			desc: "Multi lines without order",
 			in:   "\t\t\t\t\tDescriptions.\n\n * Item.\n * Item2.",
-			out:  "Descriptions.\n  \n  *  Item.\n  *  Item2.",
+			out:  "Descriptions.\n        \n  *  Item.\n  *  Item2.",
 		},
 		{
 			desc: "With code block",
