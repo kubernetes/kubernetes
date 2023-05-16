@@ -23,11 +23,8 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"net"
 	"sync"
 	"time"
-
-	"github.com/google/go-cmp/cmp"
 
 	"k8s.io/klog/v2"
 
@@ -270,50 +267,33 @@ func (ca *cloudCIDRAllocator) updateCIDRAllocation(logger klog.Logger, nodeName 
 		return fmt.Errorf("node %s doesn't have providerID", nodeName)
 	}
 
-	cidrStrings, err := ca.cloud.AliasRangesByProviderID(node.Spec.ProviderID)
+	aliasRangesStrings, err := ca.cloud.AliasRangesByProviderID(node.Spec.ProviderID)
 	if err != nil {
 		controllerutil.RecordNodeStatusChange(ca.recorder, node, "CIDRNotAvailable")
 		return fmt.Errorf("failed to get cidr(s) from provider: %v", err)
 	}
-	if len(cidrStrings) == 0 {
+	if len(aliasRangesStrings) == 0 {
 		controllerutil.RecordNodeStatusChange(ca.recorder, node, "CIDRNotAvailable")
 		return fmt.Errorf("failed to allocate cidr: Node %v has no CIDRs", node.Name)
 	}
-	//Can have at most 2 ips (one for v4 and one for v6)
-	if len(cidrStrings) > 2 {
-		logger.Info("Got more than 2 ips, truncating to 2", "cidrStrings", cidrStrings)
-		cidrStrings = cidrStrings[:2]
-	}
+	logger.Info("Got alias ranges", "node", klog.KObj(node), "aliasRanges", aliasRangesStrings)
 
-	cidrs, err := netutils.ParseCIDRs(cidrStrings)
-	if err != nil {
-		return fmt.Errorf("failed to parse strings %v as CIDRs: %v", cidrStrings, err)
-	}
+	// multiple cidrs can be returned as alias ranges but node.Spec.PodCIDRs
+	// only allow one IP per family, max 2.
+	cidrStrings := filterCIDRs(aliasRangesStrings)
+	logger.Info("Setting the node PodCIDRs", "node", klog.KObj(node), "cidrStrings", cidrStrings)
 
-	needUpdate, err := needPodCIDRsUpdate(logger, node, cidrs)
+	needUpdate, err := needPodCIDRsUpdate(logger, node, cidrStrings)
 	if err != nil {
-		return fmt.Errorf("err: %v, CIDRS: %v", err, cidrStrings)
+		return err
 	}
 	if needUpdate {
-		if node.Spec.PodCIDR != "" {
-			logger.Error(nil, "PodCIDR being reassigned", "node", klog.KObj(node), "podCIDRs", node.Spec.PodCIDRs, "cidrStrings", cidrStrings)
-			// We fall through and set the CIDR despite this error. This
-			// implements the same logic as implemented in the
-			// rangeAllocator.
-			//
-			// See https://github.com/kubernetes/kubernetes/pull/42147#discussion_r103357248
+		err := nodeutil.PatchNodeCIDRs(ca.client, types.NodeName(node.Name), cidrStrings)
+		if err != nil {
+			controllerutil.RecordNodeStatusChange(ca.recorder, node, "CIDRAssignmentFailed")
+			logger.Error(err, "Failed to update the node PodCIDR after multiple attempts", "node", klog.KObj(node), "cidrStrings", cidrStrings)
+			return err
 		}
-		for i := 0; i < cidrUpdateRetries; i++ {
-			if err = nodeutil.PatchNodeCIDRs(ca.client, types.NodeName(node.Name), cidrStrings); err == nil {
-				logger.Info("Set the node PodCIDRs", "node", klog.KObj(node), "cidrStrings", cidrStrings)
-				break
-			}
-		}
-	}
-	if err != nil {
-		controllerutil.RecordNodeStatusChange(ca.recorder, node, "CIDRAssignmentFailed")
-		logger.Error(err, "Failed to update the node PodCIDR after multiple attempts", "node", klog.KObj(node), "cidrStrings", cidrStrings)
-		return err
 	}
 
 	err = nodeutil.SetNodeCondition(ca.client, types.NodeName(node.Name), v1.NodeCondition{
@@ -329,46 +309,62 @@ func (ca *cloudCIDRAllocator) updateCIDRAllocation(logger klog.Logger, nodeName 
 	return err
 }
 
-func needPodCIDRsUpdate(logger klog.Logger, node *v1.Node, podCIDRs []*net.IPNet) (bool, error) {
-	if node.Spec.PodCIDR == "" {
+// needPodCIDRsUpdate checks if the node object should be updated with the new assigned PodCIDRs
+// Since node.Spec.PodCIDRs are inmutable it is only possible to update if there are no values set.
+// The CIDRs are already validated and guaranteed to be or either single stack or dual-stack.
+func needPodCIDRsUpdate(logger klog.Logger, node *v1.Node, cidrStrings []string) (bool, error) {
+	// none set, update with the new ones
+	if len(node.Spec.PodCIDRs) == 0 {
 		return true, nil
 	}
-	_, nodePodCIDR, err := netutils.ParseCIDRSloppy(node.Spec.PodCIDR)
-	if err != nil {
-		logger.Error(err, "Found invalid node.Spec.PodCIDR", "podCIDR", node.Spec.PodCIDR)
-		// We will try to overwrite with new CIDR(s)
-		return true, nil
-	}
-	nodePodCIDRs, err := netutils.ParseCIDRs(node.Spec.PodCIDRs)
-	if err != nil {
-		logger.Error(err, "Found invalid node.Spec.PodCIDRs", "podCIDRs", node.Spec.PodCIDRs)
-		// We will try to overwrite with new CIDR(s)
-		return true, nil
-	}
-
-	if len(podCIDRs) == 1 {
-		if cmp.Equal(nodePodCIDR, podCIDRs[0]) {
-			logger.V(4).Info("Node already has allocated CIDR. It matches the proposed one", "node", klog.KObj(node), "podCIDR", podCIDRs[0])
-			return false, nil
-		}
-	} else if len(nodePodCIDRs) == len(podCIDRs) {
-		if dualStack, _ := netutils.IsDualStackCIDRs(podCIDRs); !dualStack {
-			return false, fmt.Errorf("IPs are not dual stack")
-		}
-		for idx, cidr := range podCIDRs {
-			if !cmp.Equal(nodePodCIDRs[idx], cidr) {
-				return true, nil
-			}
-		}
-		logger.V(4).Info("Node already has allocated CIDRs. It matches the proposed one", "node", klog.KObj(node), "podCIDRs", podCIDRs)
+	// nothing to do, no new cidrs assigned
+	if len(cidrStrings) == 0 {
 		return false, nil
 	}
-
-	return true, nil
+	// only one set but dual stack assigned, check if the new one
+	// has different IP family and the existing one is the same
+	if len(node.Spec.PodCIDRs) == 1 && len(cidrStrings) == 2 {
+		if node.Spec.PodCIDRs[0] != cidrStrings[0] {
+			return false, fmt.Errorf("Node already has allocated CIDRs that are different than the assigned ones, got: %s want: %s", node.Spec.PodCIDRs[0], cidrStrings[0])
+		}
+		return true, nil
+	}
+	// validate that the assigned CIDRs match the existing ones
+	// at this point or we have
+	for idx, cidr := range cidrStrings {
+		if node.Spec.PodCIDRs[idx] != cidr {
+			return false, fmt.Errorf("Node already has allocated CIDRs that are different than the assigned ones, got: %s want: %s", node.Spec.PodCIDRs[idx], cidr)
+		}
+	}
+	logger.V(4).Info("Node already has allocated CIDRs. It matches the proposed one", "node", klog.KObj(node), "podCIDRs", cidrStrings)
+	return false, nil
 }
 
 func (ca *cloudCIDRAllocator) ReleaseCIDR(logger klog.Logger, node *v1.Node) error {
 	logger.V(2).Info("Node's PodCIDR will be released by external cloud provider (not managed by controller)",
 		"node", klog.KObj(node), "podCIDR", node.Spec.PodCIDR)
 	return nil
+}
+
+// filterCIDRs return the CIDRs truncated, there can be only one address per IP family
+// The addresses are returned by order of appearance.
+func filterCIDRs(cidrs []string) []string {
+	result := make([]string, 0, 2)
+
+	var foundV4, foundV6 bool
+	for _, cidr := range cidrs {
+		if !foundV4 && netutils.IsIPv4CIDRString(cidr) {
+			result = append(result, cidr)
+			foundV4 = true
+		}
+		if !foundV6 && netutils.IsIPv6CIDRString(cidr) {
+			result = append(result, cidr)
+			foundV6 = true
+		}
+		if foundV4 && foundV6 {
+			break
+		}
+	}
+
+	return result
 }

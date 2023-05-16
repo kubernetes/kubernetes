@@ -21,6 +21,7 @@ package ipam
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -29,7 +30,6 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/klog/v2/ktesting"
-	netutils "k8s.io/utils/net"
 )
 
 func hasNodeInProcessing(ca *cloudCIDRAllocator, name string) bool {
@@ -91,95 +91,59 @@ func TestNeedPodCIDRsUpdate(t *testing.T) {
 	for _, tc := range []struct {
 		desc         string
 		cidrs        []string
-		nodePodCIDR  string
 		nodePodCIDRs []string
 		want         bool
 		wantErr      bool
 	}{
 		{
-			desc:         "want error - invalid cidr",
+			desc:  "ipv4 and not assigned CIDRs to node",
+			cidrs: []string{"10.10.10.0/24"},
+			want:  true,
+		}, {
+			desc:  "ipv6 and not assigned CIDRs to node",
+			cidrs: []string{"2001:db8::/64"},
+			want:  true,
+		}, {
+			desc:  "dual stack and not assigned CIDRs to node",
+			cidrs: []string{"10.10.10.0/24", "2001:db8::/64"},
+			want:  true,
+		}, {
+			desc:         "ipv4 and assigned CIDRs to node",
 			cidrs:        []string{"10.10.10.0/24"},
-			nodePodCIDR:  "10.10..0/24",
-			nodePodCIDRs: []string{"10.10..0/24"},
+			nodePodCIDRs: []string{"10.10.10.0/24"},
+			want:         false,
+		}, {
+			desc:         "ipv6 and assigned CIDRs to node",
+			cidrs:        []string{"2001:db8::/64"},
+			nodePodCIDRs: []string{"2001:db8::/64"},
+			want:         false,
+		}, {
+			desc:         "dual stack and one empty",
+			cidrs:        []string{"10.10.10.0/24", "2001:db8::/64"},
+			nodePodCIDRs: []string{"10.10.10.0/24"},
 			want:         true,
-		},
-		{
-			desc:         "want error - cidr len 2 but not dual stack",
-			cidrs:        []string{"10.10.10.0/24", "10.10.11.0/24"},
-			nodePodCIDR:  "10.10.10.0/24",
+		}, {
+			desc:         "dual stack and one empty wrong order",
+			cidrs:        []string{"10.10.10.0/24", "2001:db8::/64"},
+			nodePodCIDRs: []string{"2001:db8::/64"},
+			wantErr:      true,
+		}, {
+			desc:         "dual stack and none empty matching",
+			cidrs:        []string{"10.10.10.0/24", "2001:db8::/64"},
+			nodePodCIDRs: []string{"10.10.10.0/24", "2001:db8::/64"},
+			want:         false,
+		}, {
+			desc:         "dual stack and none empty no matching",
+			cidrs:        []string{"10.10.1.0/24", "2001:db8::/64"},
 			nodePodCIDRs: []string{"10.10.10.0/24", "2001:db8::/64"},
 			wantErr:      true,
 		},
-		{
-			desc:         "want false - matching v4 only cidr",
-			cidrs:        []string{"10.10.10.0/24"},
-			nodePodCIDR:  "10.10.10.0/24",
-			nodePodCIDRs: []string{"10.10.10.0/24"},
-			want:         false,
-		},
-		{
-			desc:  "want false - nil node.Spec.PodCIDR",
-			cidrs: []string{"10.10.10.0/24"},
-			want:  true,
-		},
-		{
-			desc:         "want true - non matching v4 only cidr",
-			cidrs:        []string{"10.10.10.0/24"},
-			nodePodCIDR:  "10.10.11.0/24",
-			nodePodCIDRs: []string{"10.10.11.0/24"},
-			want:         true,
-		},
-		{
-			desc:         "want false - matching v4 and v6 cidrs",
-			cidrs:        []string{"10.10.10.0/24", "2001:db8::/64"},
-			nodePodCIDR:  "10.10.10.0/24",
-			nodePodCIDRs: []string{"10.10.10.0/24", "2001:db8::/64"},
-			want:         false,
-		},
-		{
-			desc:         "want false - matching v4 and v6 cidrs, different strings but same CIDRs",
-			cidrs:        []string{"10.10.10.0/24", "2001:db8::/64"},
-			nodePodCIDR:  "10.10.10.0/24",
-			nodePodCIDRs: []string{"10.10.10.0/24", "2001:db8:0::/64"},
-			want:         false,
-		},
-		{
-			desc:         "want true - matching v4 and non matching v6 cidrs",
-			cidrs:        []string{"10.10.10.0/24", "2001:db8::/64"},
-			nodePodCIDR:  "10.10.10.0/24",
-			nodePodCIDRs: []string{"10.10.10.0/24", "2001:dba::/64"},
-			want:         true,
-		},
-		{
-			desc:  "want true - nil node.Spec.PodCIDRs",
-			cidrs: []string{"10.10.10.0/24", "2001:db8::/64"},
-			want:  true,
-		},
-		{
-			desc:         "want true - matching v6 and non matching v4 cidrs",
-			cidrs:        []string{"10.10.10.0/24", "2001:db8::/64"},
-			nodePodCIDR:  "10.10.1.0/24",
-			nodePodCIDRs: []string{"10.10.1.0/24", "2001:db8::/64"},
-			want:         true,
-		},
-		{
-			desc:         "want true - missing v6",
-			cidrs:        []string{"10.10.10.0/24", "2001:db8::/64"},
-			nodePodCIDR:  "10.10.10.0/24",
-			nodePodCIDRs: []string{"10.10.10.0/24"},
-			want:         true,
-		},
 	} {
 		var node v1.Node
-		node.Spec.PodCIDR = tc.nodePodCIDR
 		node.Spec.PodCIDRs = tc.nodePodCIDRs
-		netCIDRs, err := netutils.ParseCIDRs(tc.cidrs)
-		if err != nil {
-			t.Errorf("failed to parse %v as CIDRs: %v", tc.cidrs, err)
-		}
 		logger, _ := ktesting.NewTestContext(t)
 		t.Run(tc.desc, func(t *testing.T) {
-			got, err := needPodCIDRsUpdate(logger, &node, netCIDRs)
+			got, err := needPodCIDRsUpdate(logger, &node, tc.cidrs)
 			if tc.wantErr == (err == nil) {
 				t.Errorf("err: %v, wantErr: %v", err, tc.wantErr)
 			}
@@ -188,4 +152,55 @@ func TestNeedPodCIDRsUpdate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_filterCIDRs(t *testing.T) {
+	for _, tc := range []struct {
+		desc  string
+		cidrs []string
+		want  []string
+	}{
+		{
+			desc:  "ipv4 only",
+			cidrs: []string{"10.10.0.0/24"},
+			want:  []string{"10.10.0.0/24"},
+		}, {
+			desc:  "ipv6 only",
+			cidrs: []string{"2001:db8::/64"},
+			want:  []string{"2001:db8::/64"},
+		}, {
+			desc:  "ipv4 ipv6",
+			cidrs: []string{"10.10.0.0/24", "2001:db8::/64"},
+			want:  []string{"10.10.0.0/24", "2001:db8::/64"},
+		}, {
+			desc:  "ipv6 ipv4",
+			cidrs: []string{"2001:db8::/64", "10.10.0.0/24"},
+			want:  []string{"2001:db8::/64", "10.10.0.0/24"},
+		}, {
+			desc:  "multiple ipv4",
+			cidrs: []string{"10.10.0.0/24", "192.168.0.0/26"},
+			want:  []string{"10.10.0.0/24"},
+		}, {
+			desc:  "ipv6 only",
+			cidrs: []string{"2001:db8::/64", "2001:db8:1234::/64"},
+			want:  []string{"2001:db8::/64"},
+		}, {
+			desc:  "ipv4 ipv6 ipv6",
+			cidrs: []string{"10.10.0.0/24", "2001:db8::/64", "2001:db8:1234::/64"},
+			want:  []string{"10.10.0.0/24", "2001:db8::/64"},
+		}, {
+			desc:  "ipv6 ipv4 ipv6",
+			cidrs: []string{"2001:db8::/64", "10.10.0.0/24", "2001:db8:1234::/64"},
+			want:  []string{"2001:db8::/64", "10.10.0.0/24"},
+		},
+	} {
+
+		t.Run(tc.desc, func(t *testing.T) {
+			got := filterCIDRs(tc.cidrs)
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("got: %v, want: %v", got, tc.want)
+			}
+		})
+	}
+
 }
