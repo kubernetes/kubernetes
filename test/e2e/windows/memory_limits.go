@@ -19,7 +19,6 @@ package windows
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
@@ -93,10 +92,8 @@ func checkNodeAllocatableTest(ctx context.Context, f *framework.Framework) {
 	calculatedNodeAlloc.Sub(nodeMem.softEviction)
 	calculatedNodeAlloc.Sub(nodeMem.hardEviction)
 
-	ginkgo.By(fmt.Sprintf("Checking stated allocatable memory %v against calculated allocatable memory %v", &nodeMem.allocatable, calculatedNodeAlloc))
-
 	// sanity check against stated allocatable
-	framework.ExpectEqual(calculatedNodeAlloc.Cmp(nodeMem.allocatable), 0)
+	gomega.Expect(calculatedNodeAlloc.Cmp(nodeMem.allocatable)).To(gomega.Equal(0), "calculated allocatable memory %+v and stated allocatable memory %+v are same", calculatedNodeAlloc, nodeMem.allocatable)
 }
 
 // Deploys `allocatablePods + 1` pods, each with a memory limit of `1/allocatablePods` of the total allocatable
@@ -185,7 +182,7 @@ func getNodeMemory(ctx context.Context, f *framework.Framework) nodeMemory {
 
 	// Assuming that agent nodes have the same config
 	// Make sure there is >0 agent nodes, then use the first one for info
-	framework.ExpectNotEqual(nodeList.Size(), 0)
+	gomega.Expect(nodeList).To(gomega.BeEmpty())
 
 	ginkgo.By("Getting memory details from node status and kubelet config")
 	status := nodeList.Items[0].Status
