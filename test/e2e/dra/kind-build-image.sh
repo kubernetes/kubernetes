@@ -23,30 +23,9 @@ set -ex
 set -o pipefail
 
 tag="$1"
-containerd="containerd-1.7.0-79-g2503bef58" # from https://github.com/kind-ci/containerd-nightlies/releases
 
-tmpdir="$(mktemp -d)"
-cleanup() {
-    rm -rf "$tmpdir"
-}
-trap cleanup EXIT
+# Created manually in the kind repo by bentheelder with
+# make -C images/base push EXTRA_BUILD_OPT=--build-arg=CONTAINERD_VERSION=v1.7.1 TAG=$(date +v%Y%m%d)-$(git describe --always --dirty)-containerd_v1.7.1
+base_image="gcr.io/k8s-staging-kind/base:v20230515-01914134-containerd_v1.7.1@sha256:468fc430a6848884b786c5cd2f1c03e7a0977f04fb129a2cda2a19ec986ddacb"
 
-goarch=$(go env GOARCH)
-
-kind build node-image --image "$tag" "$(pwd)"
-curl -L --silent https://github.com/kind-ci/containerd-nightlies/releases/download/$containerd/$containerd-linux-"$goarch".tar.gz | tar -C "$tmpdir" -vzxf -
-curl -L --silent https://github.com/kind-ci/containerd-nightlies/releases/download/$containerd/runc."$goarch" >"$tmpdir/runc"
-
-cat >"$tmpdir/Dockerfile" <<EOF
-FROM $tag
-
-COPY bin/* /usr/local/bin/
-RUN chmod a+rx /usr/local/bin/*
-COPY runc /usr/local/sbin
-RUN chmod a+rx /usr/local/sbin/runc
-
-# Enable CDI as described in https://github.com/container-orchestrated-devices/container-device-interface#containerd-configuration
-RUN sed -i -e '/\[plugins."io.containerd.grpc.v1.cri"\]/a \ \ enable_cdi = true' /etc/containerd/config.toml
-EOF
-
-docker build --tag "$tag" "$tmpdir"
+kind build node-image --base-image "$base_image"  --image "$tag" "$(pwd)"
