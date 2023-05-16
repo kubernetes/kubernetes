@@ -1181,6 +1181,12 @@ func (p *podWorkers) startPodSync(podUID types.UID) (ctx context.Context, update
 	status.startedAt = p.clock.Now()
 	status.mergeLastUpdate(update.Options)
 
+	// If we are admitting the pod and it is new, record the count of containers
+	// TODO: We should probably move this into syncPod and add an execution count
+	// to the syncPod arguments, and this should be recorded on the first sync.
+	// Leaving it here complicates a particularly important loop.
+	metrics.ContainersPerPodCount.Observe(float64(len(update.Options.Pod.Spec.Containers)))
+
 	return ctx, update, true, true, true
 }
 

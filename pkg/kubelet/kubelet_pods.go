@@ -984,23 +984,6 @@ func (kl *Kubelet) removeOrphanedPodStatuses(pods []*v1.Pod, mirrorPods []*v1.Po
 	kl.statusManager.RemoveOrphanedStatuses(podUIDs)
 }
 
-// deleteOrphanedMirrorPods checks whether pod killer has done with orphaned mirror pod.
-// If pod killing is done, podManager.DeleteMirrorPod() is called to delete mirror pod
-// from the API server
-func (kl *Kubelet) deleteOrphanedMirrorPods() {
-	mirrorPods := kl.podManager.GetOrphanedMirrorPodNames()
-	for _, podFullname := range mirrorPods {
-		if !kl.podWorkers.IsPodForMirrorPodTerminatingByFullName(podFullname) {
-			_, err := kl.podManager.DeleteMirrorPod(podFullname, nil)
-			if err != nil {
-				klog.ErrorS(err, "Encountered error when deleting mirror pod", "podName", podFullname)
-			} else {
-				klog.V(3).InfoS("Deleted mirror pod", "podName", podFullname)
-			}
-		}
-	}
-}
-
 // HandlePodCleanups performs a series of cleanup work, including terminating
 // pod workers, killing unwanted pods, and removing orphaned volumes/pod
 // directories. No config changes are sent to pod workers while this method
@@ -1031,7 +1014,7 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 		}
 	}
 
-	allPods, mirrorPods := kl.podManager.GetPodsAndMirrorPods()
+	allPods, mirrorPods, orphanedMirrorPodFullnames := kl.podManager.GetPodsAndMirrorPods()
 
 	// Pod phase progresses monotonically. Once a pod has reached a final state,
 	// it should never leave regardless of the restart policy. The statuses
@@ -1127,7 +1110,16 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	// Remove any orphaned mirror pods (mirror pods are tracked by name via the
 	// pod worker)
 	klog.V(3).InfoS("Clean up orphaned mirror pods")
-	kl.deleteOrphanedMirrorPods()
+	for _, podFullname := range orphanedMirrorPodFullnames {
+		if !kl.podWorkers.IsPodForMirrorPodTerminatingByFullName(podFullname) {
+			_, err := kl.mirrorPodClient.DeleteMirrorPod(podFullname, nil)
+			if err != nil {
+				klog.ErrorS(err, "Encountered error when deleting mirror pod", "podName", podFullname)
+			} else {
+				klog.V(3).InfoS("Deleted mirror pod", "podName", podFullname)
+			}
+		}
+	}
 
 	// After pruning pod workers for terminated pods get the list of active pods for
 	// metrics and to determine restarts.
@@ -1156,10 +1148,14 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 
 		klog.V(3).InfoS("Pod will be restarted because it is in the desired set and not known to the pod workers (likely due to UID reuse)", "podUID", desiredPod.UID)
 		isStatic := kubetypes.IsStaticPod(desiredPod)
-		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(desiredPod)
+		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(desiredPod)
+		if pod == nil || wasMirror {
+			klog.V(2).InfoS("Programmer error, restartable pod was a mirror pod but activePods should never contain a mirror pod", "podUID", desiredPod.UID)
+			continue
+		}
 		kl.podWorkers.UpdatePod(UpdatePodOptions{
 			UpdateType: kubetypes.SyncPodCreate,
-			Pod:        desiredPod,
+			Pod:        pod,
 			MirrorPod:  mirrorPod,
 		})
 
@@ -1246,7 +1242,6 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 
 	// Cleanup any backoff entries.
 	kl.backOff.GC()
-
 	return nil
 }
 
@@ -1352,15 +1347,26 @@ func (kl *Kubelet) GetKubeletContainerLogs(ctx context.Context, podFullName, con
 		return fmt.Errorf("pod %q cannot be found - no logs available", name)
 	}
 
-	podUID := pod.UID
-	if mirrorPod, ok := kl.podManager.GetMirrorPodByPod(pod); ok {
+	// TODO: this should be using the podWorker's pod store as authoritative, since
+	// the mirrorPod might still exist, the pod may have been force deleted but
+	// is still terminating (users should be able to view logs of force deleted static pods
+	// based on full name).
+	var podUID types.UID
+	pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
+	if wasMirror {
+		if pod == nil {
+			return fmt.Errorf("mirror pod %q does not have a corresponding pod", name)
+		}
 		podUID = mirrorPod.UID
+	} else {
+		podUID = pod.UID
 	}
+
 	podStatus, found := kl.statusManager.GetPodStatus(podUID)
 	if !found {
 		// If there is no cached status, use the status from the
-		// apiserver. This is useful if kubelet has recently been
-		// restarted.
+		// config source (apiserver). This is useful if kubelet
+		// has recently been restarted.
 		podStatus = pod.Status
 	}
 
