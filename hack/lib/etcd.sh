@@ -160,7 +160,7 @@ kube::etcd::install() {
 
     if [[ ${os} == "darwin" ]]; then
       download_file="etcd-v${ETCD_VERSION}-${os}-${arch}.zip"
-      url="https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/${download_file}"
+      url="https://github.com/etcd-io/etcd/releases/download/v${ETCD_VERSION}/${download_file}"
       kube::util::download_file "${url}" "${download_file}"
       unzip -o "${download_file}"
       ln -fns "etcd-v${ETCD_VERSION}-${os}-${arch}" etcd
