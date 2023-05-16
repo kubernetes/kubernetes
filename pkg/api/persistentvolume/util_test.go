@@ -146,6 +146,9 @@ func TestWarnings(t *testing.T) {
 			template: &api.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
+					Annotations: map[string]string{
+						api.BetaStorageClassAnnotation: "",
+					},
 				},
 				Spec: api.PersistentVolumeSpec{
 					NodeAffinity: &api.VolumeNodeAffinity{
@@ -169,6 +172,7 @@ func TestWarnings(t *testing.T) {
 				},
 			},
 			expected: []string{
+				`metadata.annotations[volume.beta.kubernetes.io/storage-class]: deprecated since v1.8; use "storageClassName" attribute instead`,
 				`spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[0].key: beta.kubernetes.io/os is deprecated since v1.14; use "kubernetes.io/os" instead`,
 			},
 		},
