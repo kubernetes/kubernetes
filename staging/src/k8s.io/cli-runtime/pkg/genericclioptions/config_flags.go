@@ -27,6 +27,8 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/discovery"
 	diskcached "k8s.io/client-go/discovery/cached/disk"
 	"k8s.io/client-go/rest"
@@ -34,9 +36,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 	utilpointer "k8s.io/utils/pointer"
-
-	"k8s.io/cli-runtime/pkg/genericiooptions"
-	"k8s.io/cli-runtime/pkg/printers"
 )
 
 const (
