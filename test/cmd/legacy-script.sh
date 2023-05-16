@@ -350,17 +350,6 @@ runTests() {
     kubectl config set-context "${CONTEXT}" --namespace="${ns_name}"
   }
 
-  # Generate a namespace with restricted policy
-  create_and_use_new_restricted_namespace() {
-    local ns_name
-    ns_name="namespace-$(date +%s)-${RANDOM}"
-    kube::log::status "Creating namespace ${ns_name}"
-    kubectl create namespace "${ns_name}"
-    kubectl label namespace "${ns_name}" pod-security.kubernetes.io/enforce=restricted
-    kubectl config set-context "${CONTEXT}" --namespace="${ns_name}"
-  }
-
-
   kube_flags=( '-s' "https://127.0.0.1:${SECURE_API_PORT}" '--insecure-skip-tls-verify' )
 
   kube_flags_without_token=( "${kube_flags[@]}" )
@@ -1024,11 +1013,13 @@ runTests() {
     record_command run_kubectl_debug_pod_tests
     record_command run_kubectl_debug_general_tests
     record_command run_kubectl_debug_baseline_tests
+    record_command run_kubectl_debug_restricted_tests
   fi
   if kube::test::if_supports_resource "${nodes}" ; then
     record_command run_kubectl_debug_node_tests
     record_command run_kubectl_debug_general_node_tests
     record_command run_kubectl_debug_baseline_node_tests
+    record_command run_kubectl_debug_restricted_node_tests
   fi
 
   cleanup_tests

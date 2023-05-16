@@ -12,7 +12,7 @@ spec:
   containers:
   - image: busybox
     name: target
-    command: ["/bin/sh", "-c", "while :; do sleep 10; done"]
+    command: ["/bin/sh", "-c", "sleep 100"]
     securityContext:
         runAsUser: 1000
         runAsGroup: 1000
@@ -21,6 +21,3 @@ spec:
         capabilities:
           drop: 
           - "ALL"
-          add:
-          - "NET_BIND_SERVICE"
-          
