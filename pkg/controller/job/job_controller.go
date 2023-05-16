@@ -989,23 +989,8 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 			// This pod was processed in a previous sync.
 			continue
 		}
-		// Terminating pods are counted as failed. This guarantees that orphan Pods
-		// count as failures.
-		// Active pods are terminated when the job has completed, thus they count as
-		// failures as well.
-		considerTerminated := pod.DeletionTimestamp != nil || finishedCond != nil
-
-		if feature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) && feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) && job.Spec.PodFailurePolicy != nil {
-			// TODO(#113855): Stop limiting this behavior to Jobs with podFailurePolicy.
-			// For now, we do so to avoid affecting all running Jobs without the
-			// avaibility to opt-out into the old behavior.
-			// We can also simplify the check to remove finalizers to:
-			// considerTerminated || job.DeletionTimestamp != nil
-			considerTerminated = podutil.IsPodTerminal(pod) ||
-				finishedCond != nil || // The Job is terminating. Any running Pod is considered failed.
-				isPodFailed(pod, job)
-		}
-		if podutil.IsPodTerminal(pod) || considerTerminated || job.DeletionTimestamp != nil {
+		considerPodFailed := isPodFailed(pod, job)
+		if podutil.IsPodTerminal(pod) || considerPodFailed || finishedCond != nil || job.DeletionTimestamp != nil {
 			podsToRemoveFinalizer = append(podsToRemoveFinalizer, pod)
 		}
 		if pod.Status.Phase == v1.PodSucceeded && !uncounted.failed.Has(string(pod.UID)) {
@@ -1021,7 +1006,8 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 				needsFlush = true
 				uncountedStatus.Succeeded = append(uncountedStatus.Succeeded, pod.UID)
 			}
-		} else if pod.Status.Phase == v1.PodFailed || considerTerminated {
+		} else if considerPodFailed || finishedCond != nil {
+			// When the job is considered finished, every non-terminated pod is considered failed
 			ix := getCompletionIndex(pod.Annotations)
 			if !uncounted.failed.Has(string(pod.UID)) && (!isIndexed || (ix != unknownCompletionIndex && ix < int(*job.Spec.Completions))) {
 				if feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) && job.Spec.PodFailurePolicy != nil {
@@ -1702,7 +1688,7 @@ func isPodFailed(p *v1.Pod, job *batch.Job) bool {
 		// terminating Pods are marked as Failed. So we only need to check the phase.
 		// TODO(#113855): Stop limiting this behavior to Jobs with podFailurePolicy.
 		// For now, we do so to avoid affecting all running Jobs without the
-		// avaibility to opt-out into the old behavior.
+		// availability to opt-out into the old behavior.
 		return p.Status.Phase == v1.PodFailed
 	}
 	if p.Status.Phase == v1.PodFailed {
