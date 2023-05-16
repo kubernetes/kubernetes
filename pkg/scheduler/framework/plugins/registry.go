@@ -56,6 +56,7 @@ func NewInTreeRegistry() runtime.Registry {
 		EnablePodSchedulingReadiness:                 feature.DefaultFeatureGate.Enabled(features.PodSchedulingReadiness),
 		EnablePodDisruptionConditions:                feature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions),
 		EnableInPlacePodVerticalScaling:              feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+		EnableSidecarContainers:                      feature.DefaultFeatureGate.Enabled(features.SidecarContainers),
 	}
 
 	registry := runtime.Registry{
