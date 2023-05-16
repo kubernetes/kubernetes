@@ -358,6 +358,12 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, stopCh <-cha
 		options.captureProfile(outputProfile)
 	}
 
+	f.setInstrumentedPlugins()
+	return f, nil
+}
+
+// setInstrumentedPlugins initializes instrumented plugins from current plugins that frameworkImpl has.
+func (f *frameworkImpl) setInstrumentedPlugins() {
 	// Cache metric streams for prefilter and filter plugins.
 	for i, pl := range f.preFilterPlugins {
 		f.preFilterPlugins[i] = &instrumentedPreFilterPlugin{
@@ -372,7 +378,19 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, stopCh <-cha
 		}
 	}
 
-	return f, nil
+	// Cache metric streams for prescore and score plugins.
+	for i, pl := range f.preScorePlugins {
+		f.preScorePlugins[i] = &instrumentedPreScorePlugin{
+			PreScorePlugin: f.preScorePlugins[i],
+			metric:         metrics.PluginEvaluationTotal.WithLabelValues(pl.Name(), metrics.PreScore, f.profileName),
+		}
+	}
+	for i, pl := range f.scorePlugins {
+		f.scorePlugins[i] = &instrumentedScorePlugin{
+			ScorePlugin: f.scorePlugins[i],
+			metric:      metrics.PluginEvaluationTotal.WithLabelValues(pl.Name(), metrics.Score, f.profileName),
+		}
+	}
 }
 
 func (f *frameworkImpl) SetPodNominator(n framework.PodNominator) {
