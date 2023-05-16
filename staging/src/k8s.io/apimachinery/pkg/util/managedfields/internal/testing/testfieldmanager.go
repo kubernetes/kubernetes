@@ -137,16 +137,18 @@ func NewTestFieldManagerImpl(typeConverter managedfields.TypeConverter, gvk sche
 	// 1. We don't want to create a `internal.FieldManager`
 	// 2. We don't want to use the CapManager that is tested separately with
 	// a smaller than the default cap.
-	f = internal.NewLastAppliedUpdater(
-		internal.NewLastAppliedManager(
-			internal.NewProbabilisticSkipNonAppliedManager(
-				internal.NewBuildManagerInfoManager(
-					internal.NewManagedFieldsUpdater(
-						internal.NewStripMetaManager(f),
-					), gvk.GroupVersion(), subresource,
-				), &FakeObjectCreater{}, gvk, internal.DefaultTrackOnCreateProbability,
-			), typeConverter, &FakeObjectConvertor{}, gvk.GroupVersion(),
-		),
+	f = internal.NewVersionCheckManager(
+		internal.NewLastAppliedUpdater(
+			internal.NewLastAppliedManager(
+				internal.NewProbabilisticSkipNonAppliedManager(
+					internal.NewBuildManagerInfoManager(
+						internal.NewManagedFieldsUpdater(
+							internal.NewStripMetaManager(f),
+						), gvk.GroupVersion(), subresource,
+					), &FakeObjectCreater{}, gvk, internal.DefaultTrackOnCreateProbability,
+				), typeConverter, &FakeObjectConvertor{}, gvk.GroupVersion(),
+			),
+		), gvk,
 	)
 	if chainFieldManager != nil {
 		f = chainFieldManager(f)
