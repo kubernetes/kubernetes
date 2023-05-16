@@ -22,6 +22,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/time/rate"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -106,6 +107,20 @@ func TestSyncConfigMap(t *testing.T) {
 			existingConfigMap: &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: ConfigMapName},
 				Data:       map[string]string{ConfigMapDataKey: now.Format(time.RFC3339)},
+			},
+			expectedActions: []core.Action{
+				core.NewUpdateAction(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}, metav1.NamespaceSystem, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: ConfigMapName}, Data: map[string]string{ConfigMapDataKey: now.Format(dateFormat)}}),
+			},
+		},
+		{
+			name:    "update configmap with no data",
+			enabled: true,
+			clientObjects: []runtime.Object{
+				&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: ConfigMapName}, Data: nil},
+			},
+			existingConfigMap: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: ConfigMapName},
+				Data:       nil,
 			},
 			expectedActions: []core.Action{
 				core.NewUpdateAction(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}, metav1.NamespaceSystem, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: ConfigMapName}, Data: map[string]string{ConfigMapDataKey: now.Format(dateFormat)}}),
