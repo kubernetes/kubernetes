@@ -302,6 +302,11 @@ func (m *ManagerImpl) Stop() error {
 // Allocate is the call that you can use to allocate a set of devices
 // from the registered device plugins.
 func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
+	// Skip allocate devices resource for inactive pods
+	if !m.checkPodActive(pod) {
+		 klog.V(2).InfoS("Skip allocate devices resource for inactive pod", "podUID", pod.UID)
+		 return nil
+	}
 	// The pod is during the admission phase. We need to save the pod to avoid it
 	// being cleaned before the admission ended
 	m.setPodPendingAdmission(pod)
