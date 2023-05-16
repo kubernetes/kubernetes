@@ -24,11 +24,9 @@ import (
 	"reflect"
 	"testing"
 
-	netutils "k8s.io/utils/net"
-
-	libipvs "github.com/moby/ipvs"
-
 	"golang.org/x/sys/unix"
+	libipvs "k8s.io/kubernetes/pkg/util/ipvs/libipvs"
+	netutils "k8s.io/utils/net"
 )
 
 func Test_toVirtualServer(t *testing.T) {

@@ -20,17 +20,16 @@ limitations under the License.
 package ipvs
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"strings"
 	"sync"
 	"time"
 
-	"errors"
-	libipvs "github.com/moby/ipvs"
-
 	"golang.org/x/sys/unix"
 	"k8s.io/klog/v2"
+	libipvs "k8s.io/kubernetes/pkg/util/ipvs/libipvs"
 )
 
 // runner implements ipvs.Interface.
