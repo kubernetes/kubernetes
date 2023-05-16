@@ -13,7 +13,7 @@ require (
 	k8s.io/code-generator v0.0.0
 	k8s.io/component-base v0.0.0
 	k8s.io/kube-openapi v0.0.0-20230515203736-54b630e78af5
-	k8s.io/utils v0.0.0-20230406110748-d93618cff8a2
+	k8s.io/utils v0.0.0-20230505201702-9f6742963106
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3
 )
 

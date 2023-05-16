@@ -19,7 +19,7 @@ require (
 	google.golang.org/grpc v1.51.0 // indirect
 	google.golang.org/protobuf v1.30.0 // indirect
 	k8s.io/client-go v0.0.0 // indirect
-	k8s.io/utils v0.0.0-20230406110748-d93618cff8a2 // indirect
+	k8s.io/utils v0.0.0-20230505201702-9f6742963106 // indirect
 )
 
 replace (
