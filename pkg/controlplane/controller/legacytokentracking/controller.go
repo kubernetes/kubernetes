@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"golang.org/x/time/rate"
+
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -187,6 +188,9 @@ func (c *Controller) syncConfigMap() error {
 			configMap := obj.(*corev1.ConfigMap)
 			if _, err = time.Parse(dateFormat, configMap.Data[ConfigMapDataKey]); err != nil {
 				configMap := configMap.DeepCopy()
+				if configMap.Data == nil {
+					configMap.Data = map[string]string{}
+				}
 				configMap.Data[ConfigMapDataKey] = now.UTC().Format(dateFormat)
 				if _, err = c.configMapClient.ConfigMaps(metav1.NamespaceSystem).Update(context.TODO(), configMap, metav1.UpdateOptions{}); err != nil {
 					if apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
