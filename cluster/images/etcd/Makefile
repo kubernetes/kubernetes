@@ -171,7 +171,7 @@ else
 			"git clone https://github.com/coreos/etcd $$etcd_build_dir \
 			&& cd $$etcd_build_dir \
 			&& git checkout v$${version} \
-			&& $(arch_prefix) GOARCH=$(ARCH) ./build \
+			&& $(arch_prefix) GOARCH=$(ARCH) ./build.sh \
 			&& cp -f bin/$(ARCH)/etcd* bin/etcd* /etcdbin; echo 'done'"; \
 		$(BIN_INSTALL) $$etcd_release_tmp_dir/etcd $$etcd_release_tmp_dir/etcdctl $(TEMP_DIR)/; \
 		$(BIN_INSTALL) $(TEMP_DIR)/etcd $(TEMP_DIR)/etcd-$$version; \
