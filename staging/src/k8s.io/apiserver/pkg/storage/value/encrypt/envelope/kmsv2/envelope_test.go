@@ -191,7 +191,11 @@ func TestEnvelopeCaching(t *testing.T) {
 				t.Fatalf("envelopeTransformer transformed data incorrectly. Expected: %v, got %v", originalText, untransformedData)
 			}
 
+			// advance the clock to allow cache entries to expire depending on TTL
 			fakeClock.Step(2 * time.Minute)
+			// force GC to run by performing a write
+			transformer.(*envelopeTransformer).cache.set([]byte("some-other-unrelated-key"), &envelopeTransformer{})
+
 			state, err = testStateFunc(ctx, envelopeService, fakeClock)()
 			if err != nil {
 				t.Fatal(err)
@@ -867,6 +871,8 @@ func TestEnvelopeLogging(t *testing.T) {
 
 			// advance the clock to trigger cache to expire, so we make a decrypt call that will log
 			fakeClock.Step(2 * time.Second)
+			// force GC to run by performing a write
+			transformer.(*envelopeTransformer).cache.set([]byte("some-other-unrelated-key"), &envelopeTransformer{})
 
 			_, _, err = transformer.TransformFromStorage(tc.ctx, transformedData, dataCtx)
 			if err != nil {
