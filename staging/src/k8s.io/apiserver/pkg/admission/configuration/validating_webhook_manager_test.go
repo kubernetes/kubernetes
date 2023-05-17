@@ -101,6 +101,14 @@ func (mock *mockCreateValidatingWebhookAccessor) fn(uid string, configurationNam
 	return webhook.NewValidatingWebhookAccessor(uid, configurationName, h)
 }
 
+func configurationTotalWebhooks(configurations []*v1.ValidatingWebhookConfiguration) int {
+	total := 0
+	for _, configuration := range configurations {
+		total += len(configuration.Webhooks)
+	}
+	return total
+}
+
 func TestGetValidatingWebhookConfigSmartReload(t *testing.T) {
 	type args struct {
 		createWebhookConfigurations []*v1.ValidatingWebhookConfiguration
@@ -112,7 +120,8 @@ func TestGetValidatingWebhookConfigSmartReload(t *testing.T) {
 		numberOfCreations int
 		// number of refreshes are number of times we pulled a webhook configuration
 		// from the cache without having to create new ones from scratch.
-		numberOfRefreshes int
+		numberOfRefreshes             int
+		finalNumberOfWebhookAccessors int
 	}{
 		{
 			name: "no creations and no updates",
@@ -120,8 +129,9 @@ func TestGetValidatingWebhookConfigSmartReload(t *testing.T) {
 				nil,
 				nil,
 			},
-			numberOfCreations: 0,
-			numberOfRefreshes: 0,
+			numberOfCreations:             0,
+			numberOfRefreshes:             0,
+			finalNumberOfWebhookAccessors: 0,
 		},
 		{
 			name: "create configurations and no updates",
@@ -138,11 +148,12 @@ func TestGetValidatingWebhookConfigSmartReload(t *testing.T) {
 				},
 				nil,
 			},
-			numberOfCreations: 2,
-			numberOfRefreshes: 0,
+			numberOfCreations:             2,
+			numberOfRefreshes:             0,
+			finalNumberOfWebhookAccessors: 2,
 		},
 		{
-			name: "create configuration and update some of them",
+			name: "create configurations and update some of them",
 			args: args{
 				[]*v1.ValidatingWebhookConfiguration{
 					&v1.ValidatingWebhookConfiguration{
@@ -161,8 +172,9 @@ func TestGetValidatingWebhookConfigSmartReload(t *testing.T) {
 					},
 				},
 			},
-			numberOfCreations: 2,
-			numberOfRefreshes: 1,
+			numberOfCreations:             2,
+			numberOfRefreshes:             1,
+			finalNumberOfWebhookAccessors: 2,
 		},
 		{
 			name: "create configuration and update moar of them",
@@ -188,30 +200,29 @@ func TestGetValidatingWebhookConfigSmartReload(t *testing.T) {
 					},
 					&v1.ValidatingWebhookConfiguration{
 						ObjectMeta: metav1.ObjectMeta{Name: "webhook7"},
-						Webhooks:   []v1.ValidatingWebhook{{Name: "webhook7.1-updated"}, {Name: "webhook7.2-updated"}},
+						Webhooks:   []v1.ValidatingWebhook{{Name: "webhook7.1-updated"}, {Name: "webhook7.2-updated"}, {Name: "webhook7.3"}},
 					},
 				},
 			},
-			numberOfCreations: 5,
-			numberOfRefreshes: 3,
+			numberOfCreations:             5,
+			numberOfRefreshes:             4,
+			finalNumberOfWebhookAccessors: 5,
 		},
 	}
 
-	client := fake.NewSimpleClientset()
-	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	stop := make(chan struct{})
-	defer close(stop)
-
-	manager := NewValidatingWebhookConfigurationManager(informerFactory)
-	managerStructPtr := manager.(*validatingWebhookConfigurationManager)
-	fakeWebhookAccessorCreator := &mockCreateValidatingWebhookAccessor{}
-	managerStructPtr.createValidatingWebhookAccessor = fakeWebhookAccessorCreator.fn
-
-	informerFactory.Start(stop)
-	informerFactory.WaitForCacheSync(stop)
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			client := fake.NewSimpleClientset()
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			stop := make(chan struct{})
+			defer close(stop)
+			manager := NewValidatingWebhookConfigurationManager(informerFactory)
+			managerStructPtr := manager.(*validatingWebhookConfigurationManager)
+			fakeWebhookAccessorCreator := &mockCreateValidatingWebhookAccessor{}
+			managerStructPtr.createValidatingWebhookAccessor = fakeWebhookAccessorCreator.fn
+			informerFactory.Start(stop)
+			informerFactory.WaitForCacheSync(stop)
+
 			// Create webhooks
 			for _, configurations := range tt.args.createWebhookConfigurations {
 				client.
@@ -222,7 +233,13 @@ func TestGetValidatingWebhookConfigSmartReload(t *testing.T) {
 			// TODO use channels to wait for manager.createValidatingWebhookAccessor
 			// to be called instead of using time.Sleep
 			time.Sleep(1 * time.Second)
-			_ = manager.Webhooks()
+			webhooks := manager.Webhooks()
+			if configurationTotalWebhooks(tt.args.createWebhookConfigurations) != len(webhooks) {
+				t.Errorf("Expected number of webhooks %d received %d",
+					configurationTotalWebhooks(tt.args.createWebhookConfigurations),
+					len(webhooks),
+				)
+			}
 			// assert creations
 			if tt.numberOfCreations != fakeWebhookAccessorCreator.calledNTimes() {
 				t.Errorf(
@@ -230,8 +247,10 @@ func TestGetValidatingWebhookConfigSmartReload(t *testing.T) {
 					tt.numberOfCreations, fakeWebhookAccessorCreator.calledNTimes(),
 				)
 			}
+
 			// reset mock counter
 			fakeWebhookAccessorCreator.resetCounter()
+
 			// Update webhooks
 			for _, configurations := range tt.args.updateWebhookConfigurations {
 				client.
@@ -242,7 +261,14 @@ func TestGetValidatingWebhookConfigSmartReload(t *testing.T) {
 			// TODO use channels to wait for manager.createValidatingWebhookAccessor
 			// to be called instead of using time.Sleep
 			time.Sleep(1 * time.Second)
-			_ = manager.Webhooks()
+			webhooks = manager.Webhooks()
+			if tt.finalNumberOfWebhookAccessors != len(webhooks) {
+				t.Errorf("Expected final number of webhooks %d received %d",
+					tt.finalNumberOfWebhookAccessors,
+					len(webhooks),
+				)
+			}
+
 			// assert updates
 			if tt.numberOfRefreshes != fakeWebhookAccessorCreator.calledNTimes() {
 				t.Errorf(

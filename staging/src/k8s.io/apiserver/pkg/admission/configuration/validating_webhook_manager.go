@@ -64,7 +64,6 @@ func NewValidatingWebhookConfigurationManager(f informers.SharedInformerFactory)
 			// the webhooks have changed + whether CEL expressions changed
 			// etc... thinking about using reflect..
 			obj := new.(*v1.ValidatingWebhookConfiguration)
-			// lock R+W
 			manager.configurationsCache.Delete(obj.GetName())
 			manager.lazy.Notify()
 		},
@@ -103,13 +102,12 @@ func (v *validatingWebhookConfigurationManager) getConfiguration() ([]webhook.We
 func (v *validatingWebhookConfigurationManager) smartReloadValidatingWebhookConfigurations(configurations []*v1.ValidatingWebhookConfiguration) []webhook.WebhookAccessor {
 	sort.SliceStable(configurations, ValidatingWebhookConfigurationSorter(configurations).ByName)
 	accessors := []webhook.WebhookAccessor{}
-cfgLoop:
 	for _, c := range configurations {
 		cachedConfigurationAccessors, ok := v.configurationsCache.Load(c.Name)
 		if ok {
 			// Pick an already cached webhookAccessor
 			accessors = append(accessors, cachedConfigurationAccessors.([]webhook.WebhookAccessor)...)
-			continue cfgLoop
+			continue
 		}
 
 		// webhook names are not validated for uniqueness, so we check for duplicates and
@@ -117,17 +115,19 @@ cfgLoop:
 		//
 		// NOTE: In `pkg/apis/admissionregistration/validation.go` webhook names are checked
 		// for uniqueness now. Is it safe to remove this?
-		configurationAccessors := []webhook.WebhookAccessor{}
+		// If we ever get rid of this, we can change the cache map value type to
+		// map[string]WebhookAccessor instead. Where keys will be of format "config.name/webhook.name"
 		names := map[string]int{}
+		configurationAccessors := []webhook.WebhookAccessor{}
 		for i := range c.Webhooks {
 			n := c.Webhooks[i].Name
 			uid := fmt.Sprintf("%s/%s/%d", c.Name, n, names[n])
 			names[n]++
-			configurationAccessors = append(configurationAccessors, v.createValidatingWebhookAccessor(uid, c.Name, &c.Webhooks[i]))
-			// Cache the new accessors
-			v.configurationsCache.Store(c.Name, configurationAccessors)
-			accessors = append(accessors, configurationAccessors...)
+			configurationAccessor := v.createValidatingWebhookAccessor(uid, c.Name, &c.Webhooks[i])
+			configurationAccessors = append(configurationAccessors, configurationAccessor)
 		}
+		accessors = append(accessors, configurationAccessors...)
+		v.configurationsCache.Store(c.Name, configurationAccessors)
 	}
 
 	return accessors
