@@ -695,6 +695,31 @@ function wait_node_ready(){
   fi
 }
 
+function refresh_docker_containerd_runc {
+  apt update
+  apt-get install ca-certificates curl gnupg ripgrep tree vim
+  install -m 0755 -d /etc/apt/keyrings
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  chmod a+r /etc/apt/keyrings/docker.gpg
+
+  # shellcheck disable=SC2027 disable=SC2046
+  echo \
+    "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+    "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
+    tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+  apt-get update
+  apt-get -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin
+  groupadd docker
+  usermod -aG docker "$USER"
+
+  if ! grep -q "cri-containerd" "/lib/systemd/system/docker.service"; then
+    sed -i "s/ExecStart=\(.*\)/ExecStart=\1 --cri-containerd/" /lib/systemd/system/docker.service
+  fi
+
+  apt install -y conntrack vim htop ripgrep dnsutils tree ripgrep build-essential
+}
+
 function wait_coredns_available(){
   local interval_time=2
   local coredns_wait_time=300
@@ -716,6 +741,13 @@ function wait_coredns_available(){
     echo "time out on waiting for coredns deployment"
     exit 1
   fi
+
+  # bump log level
+  echo "6" | sudo tee /proc/sys/kernel/printk
+
+  # loop through and grab all things in dmesg
+  dmesg > "${LOG_DIR}/dmesg.log"
+  dmesg -w --human >> "${LOG_DIR}/dmesg.log" &
 }
 
 function start_kubelet {
@@ -1193,10 +1225,22 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
 
   # enable cri for docker in docker
   echo "enable cri"
+  # shellcheck disable=SC2129
   echo "DOCKER_OPTS=\"\${DOCKER_OPTS} --cri-containerd\"" >> /etc/default/docker
+
+  # enable debug
+  echo "DOCKER_OPTS=\"\${DOCKER_OPTS} --debug\"" >> /etc/default/docker
 
   # let's log it where we can grab it later
   echo "DOCKER_LOGFILE=${LOG_DIR}/docker.log" >> /etc/default/docker
+
+  # bump up things
+  refresh_docker_containerd_runc
+
+  # check if the new stuff is there
+  docker version
+  containerd --version
+  runc --version
 
   echo "restarting docker"
   service docker restart
