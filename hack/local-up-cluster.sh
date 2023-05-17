@@ -742,12 +742,64 @@ function wait_coredns_available(){
     exit 1
   fi
 
+  echo "================= BEGIN DEBUG ========================"
+  echo "====== set overcommit_memory ====="
+  echo 1 | sudo tee /proc/sys/vm/overcommit_memory
+  sudo cat /proc/sys/vm/overcommit_memory
+  echo "====== ps ====="
+  sudo ps -ef
+  echo "====== ps coredns ====="
+  sudo ps -ef | grep -i coredns | grep -v grep
+  echo "====== set oom_score_adj for coredns related processes ====="
+  ps -ef | grep -i coredns | grep -v grep | awk '{print $2}' \
+  | while read PID; do
+    echo "setting oom_score_adj for $PID"
+    echo -1000 | sudo tee /proc/$PID/oom_score_adj
+  done
+  echo "====== print oom_score for coredns related processes ======"
+  ps -ef | grep -i coredns | grep -v grep | awk '{print $2}' \
+  | while read PID; do
+    echo "getting oom_score_adj for $PID"
+    sudo cat /proc/$PID/oom_score_adj
+  done
+  echo "================== END DEBUG ======================="
+
   # bump log level
   echo "6" | sudo tee /proc/sys/kernel/printk
 
   # loop through and grab all things in dmesg
   dmesg > "${LOG_DIR}/dmesg.log"
   dmesg -w --human >> "${LOG_DIR}/dmesg.log" &
+
+  # grab coredns logs every 5 seconds
+  mkdir -p "${KUBE_ROOT}/_output"
+  cat <<EOF > "${KUBE_ROOT}/_output/log-coredns.sh"
+#!/usr/bin/env bash
+set +o pipefail
+set -x
+
+function done() {
+    echo "exiting log-coredns.sh at $(date)"
+}
+trap done EXIT
+
+export KUBECONFIG="${CERT_DIR}/admin.kubeconfig"
+while true; do
+  echo "========= coredns pods sleep $(date -Is) ========="
+  sleep 60
+  echo "========= coredns pods begin at $(date -Is) ========="
+  POD_NAME=\$(kubectl get pods -n kube-system | tail -1 | awk '{print \$1}')
+  echo "========= coredns get pods ========="
+  kubectl get pods -n kube-system -o yaml || true
+  echo "========= coredns logs ========="
+  kubectl logs -n kube-system pod/\${POD_NAME} || true
+  echo "========= coredns pods end at $(date -Is) ========="
+done
+EOF
+  chmod +x "${KUBE_ROOT}/_output/log-coredns.sh"
+  nohup "${KUBE_ROOT}/_output/log-coredns.sh" > "${LOG_DIR}/coredns.log" 2>&1 &
+
+
 }
 
 function start_kubelet {
