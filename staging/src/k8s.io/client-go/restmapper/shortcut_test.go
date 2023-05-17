@@ -324,6 +324,32 @@ func TestWarnAmbigious(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:        "resource-multiple-versions-shortform",
+			arg:         "hpa",
+			expected:    schema.GroupVersionResource{Resource: "horizontalpodautoscalers", Group: "autoscaling"},
+			expectedLog: "",
+			srvRes: []*metav1.APIResourceList{
+				{
+					GroupVersion: "autoscaling/v1alphav1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "horizontalpodautoscalers",
+							ShortNames: []string{"hpa"},
+						},
+					},
+				},
+				{
+					GroupVersion: "autoscaling/v1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "horizontalpodautoscalers",
+							ShortNames: []string{"hpa"},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {

@@ -156,6 +156,12 @@ func (e shortcutExpander) expandResourceShortcut(resource schema.GroupVersionRes
 			}
 			if resource.Resource == item.ShortForm.Resource {
 				if found {
+					if item.LongForm.Group == rsc.Group && item.LongForm.Resource == rsc.Resource {
+						// It is common and acceptable that group/resource has multiple
+						// versions registered in cluster. This does not introduce ambiguity
+						// in terms of shortname usage.
+						continue
+					}
 					if e.warningHandler != nil {
 						e.warningHandler(fmt.Sprintf("ambiguous resource %q for %s is skipped", item.LongForm, resource))
 					}
