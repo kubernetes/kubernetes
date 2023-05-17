@@ -103,7 +103,6 @@ func (mc *basicMirrorClient) CreateMirrorPod(pod *v1.Pod) error {
 			return nil
 		}
 	}
-	klog.V(2).InfoS("Created mirror pod", "static_pod", klog.KObj(pod), "static_pod_uid", pod.UID, "mirror_pod", klog.KObj(apiPod), "mirror_pod_uid", apiPod.UID)
 	return err
 }
 
