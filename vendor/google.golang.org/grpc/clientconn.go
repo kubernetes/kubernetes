@@ -788,10 +788,16 @@ func (cc *ClientConn) incrCallsFailed() {
 func (ac *addrConn) connect() error {
 	ac.mu.Lock()
 	if ac.state == connectivity.Shutdown {
+		if logger.V(2) {
+			logger.Infof("connect called on shutdown addrConn; ignoring.")
+		}
 		ac.mu.Unlock()
 		return errConnClosing
 	}
 	if ac.state != connectivity.Idle {
+		if logger.V(2) {
+			logger.Infof("connect called on addrConn in non-idle state (%v); ignoring.", ac.state)
+		}
 		ac.mu.Unlock()
 		return nil
 	}
@@ -1268,6 +1274,9 @@ func (ac *addrConn) createTransport(addr resolver.Address, copts transport.Conne
 
 	newTr, err := transport.NewClientTransport(connectCtx, ac.cc.ctx, addr, copts, onGoAway, onClose)
 	if err != nil {
+		if logger.V(2) {
+			logger.Infof("Creating new client transport to %q: %v", addr, err)
+		}
 		// newTr is either nil, or closed.
 		hcancel()
 		channelz.Warningf(logger, ac.channelzID, "grpc: addrConn.createTransport failed to connect to %s. Err: %v", addr, err)

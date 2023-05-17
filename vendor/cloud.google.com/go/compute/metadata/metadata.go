@@ -16,7 +16,7 @@
 // metadata and API service accounts.
 //
 // This package is a wrapper around the GCE metadata service,
-// as documented at https://developers.google.com/compute/docs/metadata.
+// as documented at https://cloud.google.com/compute/docs/metadata/overview.
 package metadata // import "cloud.google.com/go/compute/metadata"
 
 import (
@@ -61,14 +61,19 @@ var (
 	instID  = &cachedValue{k: "instance/id", trim: true}
 )
 
-var defaultClient = &Client{hc: &http.Client{
-	Transport: &http.Transport{
-		Dial: (&net.Dialer{
-			Timeout:   2 * time.Second,
-			KeepAlive: 30 * time.Second,
-		}).Dial,
-	},
-}}
+var defaultClient = &Client{hc: newDefaultHTTPClient()}
+
+func newDefaultHTTPClient() *http.Client {
+	return &http.Client{
+		Transport: &http.Transport{
+			Dial: (&net.Dialer{
+				Timeout:   2 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).Dial,
+		},
+		Timeout: 5 * time.Second,
+	}
+}
 
 // NotDefinedError is returned when requested metadata is not defined.
 //
@@ -130,7 +135,7 @@ func testOnGCE() bool {
 	go func() {
 		req, _ := http.NewRequest("GET", "http://"+metadataIP, nil)
 		req.Header.Set("User-Agent", userAgent)
-		res, err := defaultClient.hc.Do(req.WithContext(ctx))
+		res, err := newDefaultHTTPClient().Do(req.WithContext(ctx))
 		if err != nil {
 			resc <- false
 			return
@@ -140,7 +145,8 @@ func testOnGCE() bool {
 	}()
 
 	go func() {
-		addrs, err := net.DefaultResolver.LookupHost(ctx, "metadata.google.internal")
+		resolver := &net.Resolver{}
+		addrs, err := resolver.LookupHost(ctx, "metadata.google.internal")
 		if err != nil || len(addrs) == 0 {
 			resc <- false
 			return
@@ -323,7 +329,7 @@ func (c *Client) getETag(suffix string) (value, etag string, err error) {
 		break
 	}
 	if reqErr != nil {
-		return "", "", nil
+		return "", "", reqErr
 	}
 	defer res.Body.Close()
 	if res.StatusCode == http.StatusNotFound {

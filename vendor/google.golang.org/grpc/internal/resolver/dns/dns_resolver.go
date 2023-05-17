@@ -32,7 +32,7 @@ import (
 	"sync"
 	"time"
 
-	grpclbstate "google.golang.org/grpc/balancer/grpclb/state"
+	grpclbstate "google.golang.org/grpc/balancer/grpclb/grpclbstate"
 	"google.golang.org/grpc/grpclog"
 	"google.golang.org/grpc/internal/backoff"
 	"google.golang.org/grpc/internal/envconfig"
@@ -140,10 +140,10 @@ func (b *dnsBuilder) Build(target resolver.Target, cc resolver.ClientConn, opts 
 		disableServiceConfig: opts.DisableServiceConfig,
 	}
 
-	if target.Authority == "" {
+	if target.URL.Host == "" {
 		d.resolver = defaultResolver
 	} else {
-		d.resolver, err = customAuthorityResolver(target.Authority)
+		d.resolver, err = customAuthorityResolver(target.URL.Host)
 		if err != nil {
 			return nil, err
 		}

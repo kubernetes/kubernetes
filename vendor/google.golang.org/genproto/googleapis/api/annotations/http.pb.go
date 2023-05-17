@@ -127,19 +127,19 @@ func (x *Http) GetFullyDecodeReservedExpansion() bool {
 //
 // Example:
 //
-//     service Messaging {
-//       rpc GetMessage(GetMessageRequest) returns (Message) {
-//         option (google.api.http) = {
-//             get: "/v1/{name=messages/*}"
-//         };
-//       }
-//     }
-//     message GetMessageRequest {
-//       string name = 1; // Mapped to URL path.
-//     }
-//     message Message {
-//       string text = 1; // The resource content.
-//     }
+//	service Messaging {
+//	  rpc GetMessage(GetMessageRequest) returns (Message) {
+//	    option (google.api.http) = {
+//	        get: "/v1/{name=messages/*}"
+//	    };
+//	  }
+//	}
+//	message GetMessageRequest {
+//	  string name = 1; // Mapped to URL path.
+//	}
+//	message Message {
+//	  string text = 1; // The resource content.
+//	}
 //
 // This enables an HTTP REST to gRPC mapping as below:
 //
@@ -151,21 +151,21 @@ func (x *Http) GetFullyDecodeReservedExpansion() bool {
 // automatically become HTTP query parameters if there is no HTTP request body.
 // For example:
 //
-//     service Messaging {
-//       rpc GetMessage(GetMessageRequest) returns (Message) {
-//         option (google.api.http) = {
-//             get:"/v1/messages/{message_id}"
-//         };
-//       }
-//     }
-//     message GetMessageRequest {
-//       message SubMessage {
-//         string subfield = 1;
-//       }
-//       string message_id = 1; // Mapped to URL path.
-//       int64 revision = 2;    // Mapped to URL query parameter `revision`.
-//       SubMessage sub = 3;    // Mapped to URL query parameter `sub.subfield`.
-//     }
+//	service Messaging {
+//	  rpc GetMessage(GetMessageRequest) returns (Message) {
+//	    option (google.api.http) = {
+//	        get:"/v1/messages/{message_id}"
+//	    };
+//	  }
+//	}
+//	message GetMessageRequest {
+//	  message SubMessage {
+//	    string subfield = 1;
+//	  }
+//	  string message_id = 1; // Mapped to URL path.
+//	  int64 revision = 2;    // Mapped to URL query parameter `revision`.
+//	  SubMessage sub = 3;    // Mapped to URL query parameter `sub.subfield`.
+//	}
 //
 // This enables a HTTP JSON to RPC mapping as below:
 //
@@ -186,18 +186,18 @@ func (x *Http) GetFullyDecodeReservedExpansion() bool {
 // specifies the mapping. Consider a REST update method on the
 // message resource collection:
 //
-//     service Messaging {
-//       rpc UpdateMessage(UpdateMessageRequest) returns (Message) {
-//         option (google.api.http) = {
-//           patch: "/v1/messages/{message_id}"
-//           body: "message"
-//         };
-//       }
-//     }
-//     message UpdateMessageRequest {
-//       string message_id = 1; // mapped to the URL
-//       Message message = 2;   // mapped to the body
-//     }
+//	service Messaging {
+//	  rpc UpdateMessage(UpdateMessageRequest) returns (Message) {
+//	    option (google.api.http) = {
+//	      patch: "/v1/messages/{message_id}"
+//	      body: "message"
+//	    };
+//	  }
+//	}
+//	message UpdateMessageRequest {
+//	  string message_id = 1; // mapped to the URL
+//	  Message message = 2;   // mapped to the body
+//	}
 //
 // The following HTTP JSON to RPC mapping is enabled, where the
 // representation of the JSON in the request body is determined by
@@ -213,19 +213,18 @@ func (x *Http) GetFullyDecodeReservedExpansion() bool {
 // request body.  This enables the following alternative definition of
 // the update method:
 //
-//     service Messaging {
-//       rpc UpdateMessage(Message) returns (Message) {
-//         option (google.api.http) = {
-//           patch: "/v1/messages/{message_id}"
-//           body: "*"
-//         };
-//       }
-//     }
-//     message Message {
-//       string message_id = 1;
-//       string text = 2;
-//     }
-//
+//	service Messaging {
+//	  rpc UpdateMessage(Message) returns (Message) {
+//	    option (google.api.http) = {
+//	      patch: "/v1/messages/{message_id}"
+//	      body: "*"
+//	    };
+//	  }
+//	}
+//	message Message {
+//	  string message_id = 1;
+//	  string text = 2;
+//	}
 //
 // The following HTTP JSON to RPC mapping is enabled:
 //
@@ -243,20 +242,20 @@ func (x *Http) GetFullyDecodeReservedExpansion() bool {
 // It is possible to define multiple HTTP methods for one RPC by using
 // the `additional_bindings` option. Example:
 //
-//     service Messaging {
-//       rpc GetMessage(GetMessageRequest) returns (Message) {
-//         option (google.api.http) = {
-//           get: "/v1/messages/{message_id}"
-//           additional_bindings {
-//             get: "/v1/users/{user_id}/messages/{message_id}"
-//           }
-//         };
-//       }
-//     }
-//     message GetMessageRequest {
-//       string message_id = 1;
-//       string user_id = 2;
-//     }
+//	service Messaging {
+//	  rpc GetMessage(GetMessageRequest) returns (Message) {
+//	    option (google.api.http) = {
+//	      get: "/v1/messages/{message_id}"
+//	      additional_bindings {
+//	        get: "/v1/users/{user_id}/messages/{message_id}"
+//	      }
+//	    };
+//	  }
+//	}
+//	message GetMessageRequest {
+//	  string message_id = 1;
+//	  string user_id = 2;
+//	}
 //
 // This enables the following two alternative HTTP JSON to RPC mappings:
 //
@@ -268,15 +267,15 @@ func (x *Http) GetFullyDecodeReservedExpansion() bool {
 //
 // ## Rules for HTTP mapping
 //
-// 1. Leaf request fields (recursive expansion nested messages in the request
-//    message) are classified into three categories:
-//    - Fields referred by the path template. They are passed via the URL path.
-//    - Fields referred by the [HttpRule.body][google.api.HttpRule.body]. They are passed via the HTTP
-//      request body.
-//    - All other fields are passed via the URL query parameters, and the
-//      parameter name is the field path in the request message. A repeated
-//      field can be represented as multiple query parameters under the same
-//      name.
+//  1. Leaf request fields (recursive expansion nested messages in the request
+//     message) are classified into three categories:
+//     - Fields referred by the path template. They are passed via the URL path.
+//     - Fields referred by the [HttpRule.body][google.api.HttpRule.body]. They are passed via the HTTP
+//     request body.
+//     - All other fields are passed via the URL query parameters, and the
+//     parameter name is the field path in the request message. A repeated
+//     field can be represented as multiple query parameters under the same
+//     name.
 //  2. If [HttpRule.body][google.api.HttpRule.body] is "*", there is no URL query parameter, all fields
 //     are passed via URL path and HTTP request body.
 //  3. If [HttpRule.body][google.api.HttpRule.body] is omitted, there is no HTTP request body, all
@@ -284,12 +283,12 @@ func (x *Http) GetFullyDecodeReservedExpansion() bool {
 //
 // ### Path template syntax
 //
-//     Template = "/" Segments [ Verb ] ;
-//     Segments = Segment { "/" Segment } ;
-//     Segment  = "*" | "**" | LITERAL | Variable ;
-//     Variable = "{" FieldPath [ "=" Segments ] "}" ;
-//     FieldPath = IDENT { "." IDENT } ;
-//     Verb     = ":" LITERAL ;
+//	Template = "/" Segments [ Verb ] ;
+//	Segments = Segment { "/" Segment } ;
+//	Segment  = "*" | "**" | LITERAL | Variable ;
+//	Variable = "{" FieldPath [ "=" Segments ] "}" ;
+//	FieldPath = IDENT { "." IDENT } ;
+//	Verb     = ":" LITERAL ;
 //
 // The syntax `*` matches a single URL path segment. The syntax `**` matches
 // zero or more URL path segments, which must be the last part of the URL path
@@ -338,11 +337,11 @@ func (x *Http) GetFullyDecodeReservedExpansion() bool {
 //
 // Example:
 //
-//     http:
-//       rules:
-//         # Selects a gRPC method and applies HttpRule to it.
-//         - selector: example.v1.Messaging.GetMessage
-//           get: /v1/messages/{message_id}/{sub.subfield}
+//	http:
+//	  rules:
+//	    # Selects a gRPC method and applies HttpRule to it.
+//	    - selector: example.v1.Messaging.GetMessage
+//	      get: /v1/messages/{message_id}/{sub.subfield}
 //
 // ## Special notes
 //

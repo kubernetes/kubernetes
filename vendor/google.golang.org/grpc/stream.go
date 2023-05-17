@@ -416,7 +416,7 @@ func (cs *clientStream) newAttemptLocked(isTransparent bool) (*csAttempt, error)
 		ctx = trace.NewContext(ctx, trInfo.tr)
 	}
 
-	if cs.cc.parsedTarget.Scheme == "xds" {
+	if cs.cc.parsedTarget.URL.Scheme == "xds" {
 		// Add extra metadata (metadata that will be added by transport) to context
 		// so the balancer can see them.
 		ctx = grpcutil.WithExtraMetadata(ctx, metadata.Pairs(
