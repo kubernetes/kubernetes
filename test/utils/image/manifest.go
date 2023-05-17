@@ -173,8 +173,6 @@ const (
 	DistrolessIptables
 	// Etcd image
 	Etcd
-	// GlusterDynamicProvisioner image
-	GlusterDynamicProvisioner
 	// Httpd image
 	Httpd
 	// HttpdNew image
@@ -226,8 +224,6 @@ const (
 	VolumeNFSServer
 	// VolumeISCSIServer image
 	VolumeISCSIServer
-	// VolumeGlusterServer image
-	VolumeGlusterServer
 	// VolumeRBDServer image
 	VolumeRBDServer
 	// WindowsServer image
@@ -247,7 +243,6 @@ func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config
 	configs[CudaVectorAdd2] = Config{list.PromoterE2eRegistry, "cuda-vector-add", "2.2"}
 	configs[DistrolessIptables] = Config{list.BuildImageRegistry, "distroless-iptables", "v0.2.4"}
 	configs[Etcd] = Config{list.GcEtcdRegistry, "etcd", "3.5.9-0"}
-	configs[GlusterDynamicProvisioner] = Config{list.PromoterE2eRegistry, "glusterdynamic-provisioner", "v1.3"}
 	configs[Httpd] = Config{list.PromoterE2eRegistry, "httpd", "2.4.38-4"}
 	configs[HttpdNew] = Config{list.PromoterE2eRegistry, "httpd", "2.4.39-4"}
 	configs[InvalidRegistryImage] = Config{list.InvalidRegistry, "alpine", "3.1"}
@@ -273,9 +268,8 @@ func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config
 	configs[ResourceConsumer] = Config{list.PromoterE2eRegistry, "resource-consumer", "1.13"}
 	configs[SdDummyExporter] = Config{list.GcRegistry, "sd-dummy-exporter", "v0.2.0"}
 	configs[VolumeNFSServer] = Config{list.PromoterE2eRegistry, "volume/nfs", "1.3"}
-	configs[VolumeISCSIServer] = Config{list.PromoterE2eRegistry, "volume/iscsi", "2.3"}
-	configs[VolumeGlusterServer] = Config{list.PromoterE2eRegistry, "volume/gluster", "1.3"}
-	configs[VolumeRBDServer] = Config{list.PromoterE2eRegistry, "volume/rbd", "1.0.4"}
+	configs[VolumeISCSIServer] = Config{list.PromoterE2eRegistry, "volume/iscsi", "2.5"}
+	configs[VolumeRBDServer] = Config{list.PromoterE2eRegistry, "volume/rbd", "1.0.6"}
 	configs[WindowsServer] = Config{list.MicrosoftRegistry, "windows", "1809"}
 
 	// This adds more config entries. Those have no pre-defined ImageID number,
