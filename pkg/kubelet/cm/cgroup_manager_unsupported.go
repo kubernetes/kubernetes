@@ -89,6 +89,9 @@ func (m *unsupportedCgroupManager) SetCgroupConfig(name CgroupName, resource v1.
 	return errNotSupported
 }
 
+func (m *unsupportedCgroupManager) SetCPULoadBalanceDisable() {
+}
+
 var RootCgroupName = CgroupName([]string{})
 
 func NewCgroupName(base CgroupName, components ...string) CgroupName {
