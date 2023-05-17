@@ -327,6 +327,11 @@ func (d CPUDetails) CPUsInCores(ids ...int) cpuset.CPUSet {
 	return cpuset.New(cpuIDs...)
 }
 
+// IsNUMANodesInSameSocket returns true for all NUMANodes in the same socket
+func (d CPUDetails) IsNUMANodesInSameSocket(numaNodes []int) bool {
+	return d.SocketsInNUMANodes(numaNodes...).Size() <= 1
+}
+
 func getUncoreCacheID(core cadvisorapi.Core) int {
 	if len(core.UncoreCaches) < 1 {
 		// In case cAdvisor is nil, failback to socket alignment since uncorecache is not shared
