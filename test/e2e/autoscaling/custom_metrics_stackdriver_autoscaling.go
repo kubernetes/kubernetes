@@ -639,10 +639,10 @@ func noExporterDeployment(name, namespace string, replicas int32) *appsv1.Deploy
 	d.Spec.Template.Spec = v1.PodSpec{Containers: []v1.Container{
 		{
 			Name:            "sleeper",
-			Image:           "k8s.gcr.io/ubuntu-slim:0.1",
+			Image:           "registry.k8s.io/e2e-test-images/agnhost:2.40",
 			ImagePullPolicy: v1.PullAlways,
-			Command:         []string{"/bin/sh"},
-			Args:            []string{"-c", "sleep 1d"}, // effectively forever
+			Command:         []string{"/agnhost"},
+			Args:            []string{"pause"}, // do nothing forever
 		},
 	}}
 	return d
