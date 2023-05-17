@@ -193,11 +193,6 @@ func (in *KubeProxyNFTablesConfiguration) DeepCopyInto(out *KubeProxyNFTablesCon
 		*out = new(int32)
 		**out = **in
 	}
-	if in.LocalhostNodePorts != nil {
-		in, out := &in.LocalhostNodePorts, &out.LocalhostNodePorts
-		*out = new(bool)
-		**out = **in
-	}
 	out.SyncPeriod = in.SyncPeriod
 	out.MinSyncPeriod = in.MinSyncPeriod
 	return

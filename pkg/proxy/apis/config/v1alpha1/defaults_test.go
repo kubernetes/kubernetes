@@ -63,11 +63,10 @@ func TestDefaultsKubeProxyConfiguration(t *testing.T) {
 					SyncPeriod: metav1.Duration{Duration: 30 * time.Second},
 				},
 				NFTables: kubeproxyconfigv1alpha1.KubeProxyNFTablesConfiguration{
-					MasqueradeBit:      ptr.To[int32](14),
-					MasqueradeAll:      false,
-					LocalhostNodePorts: ptr.To(true),
-					SyncPeriod:         metav1.Duration{Duration: 30 * time.Second},
-					MinSyncPeriod:      metav1.Duration{Duration: 1 * time.Second},
+					MasqueradeBit: ptr.To[int32](14),
+					MasqueradeAll: false,
+					SyncPeriod:    metav1.Duration{Duration: 30 * time.Second},
+					MinSyncPeriod: metav1.Duration{Duration: 1 * time.Second},
 				},
 				OOMScoreAdj: &oomScore,
 				Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{
@@ -110,11 +109,10 @@ func TestDefaultsKubeProxyConfiguration(t *testing.T) {
 					SyncPeriod: metav1.Duration{Duration: 30 * time.Second},
 				},
 				NFTables: kubeproxyconfigv1alpha1.KubeProxyNFTablesConfiguration{
-					MasqueradeBit:      ptr.To[int32](14),
-					MasqueradeAll:      false,
-					LocalhostNodePorts: ptr.To(true),
-					SyncPeriod:         metav1.Duration{Duration: 30 * time.Second},
-					MinSyncPeriod:      metav1.Duration{Duration: 1 * time.Second},
+					MasqueradeBit: ptr.To[int32](14),
+					MasqueradeAll: false,
+					SyncPeriod:    metav1.Duration{Duration: 30 * time.Second},
+					MinSyncPeriod: metav1.Duration{Duration: 1 * time.Second},
 				},
 				OOMScoreAdj: &oomScore,
 				Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{

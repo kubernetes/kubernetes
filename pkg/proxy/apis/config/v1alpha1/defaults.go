@@ -77,9 +77,6 @@ func SetDefaults_KubeProxyConfiguration(obj *kubeproxyconfigv1alpha1.KubeProxyCo
 	if obj.NFTables.MinSyncPeriod.Duration == 0 {
 		obj.NFTables.MinSyncPeriod = metav1.Duration{Duration: 1 * time.Second}
 	}
-	if obj.NFTables.LocalhostNodePorts == nil {
-		obj.NFTables.LocalhostNodePorts = ptr.To(true)
-	}
 
 	if obj.Conntrack.MaxPerCore == nil {
 		obj.Conntrack.MaxPerCore = ptr.To[int32](32 * 1024)

@@ -77,14 +77,8 @@ const (
 
 	// kube proxy canary chain is used for monitoring rule reload
 	kubeProxyCanaryChain utiliptables.Chain = "KUBE-PROXY-CANARY"
-
-	// kubeletFirewallChain is a duplicate of kubelet's firewall containing
-	// the anti-martian-packet rule. It should not be used for any other
-	// rules.
-	kubeletFirewallChain utiliptables.Chain = "KUBE-FIREWALL"
 )
 
-const sysctlRouteLocalnet = "net/ipv4/conf/all/route_localnet"
 const sysctlNFConntrackTCPBeLiberal = "net/netfilter/nf_conntrack_tcp_be_liberal"
 
 // internal struct for string service information
@@ -183,10 +177,6 @@ type Proxier struct {
 	natChains                proxyutil.LineBuffer
 	natRules                 proxyutil.LineBuffer
 
-	// localhostNodePorts indicates whether we allow NodePort services to be accessed
-	// via localhost.
-	localhostNodePorts bool
-
 	// conntrackTCPLiberal indicates whether the system sets the kernel nf_conntrack_tcp_be_liberal
 	conntrackTCPLiberal bool
 
@@ -212,7 +202,6 @@ func NewProxier(ipFamily v1.IPFamily,
 	syncPeriod time.Duration,
 	minSyncPeriod time.Duration,
 	masqueradeAll bool,
-	localhostNodePorts bool,
 	masqueradeBit int,
 	localDetector proxyutiliptables.LocalTrafficDetector,
 	hostname string,
@@ -223,18 +212,6 @@ func NewProxier(ipFamily v1.IPFamily,
 	initOnly bool,
 ) (*Proxier, error) {
 	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nodePortAddressStrings)
-
-	if !nodePortAddresses.ContainsIPv4Loopback() {
-		localhostNodePorts = false
-	}
-	if localhostNodePorts {
-		// Set the route_localnet sysctl we need for exposing NodePorts on loopback addresses
-		// Refer to https://issues.k8s.io/90259
-		klog.InfoS("Setting route_localnet=1 to allow node-ports on localhost; to change this either disable iptables.localhostNodePorts (--iptables-localhost-nodeports) or set nodePortAddresses (--nodeport-addresses) to filter loopback addresses")
-		if err := proxyutil.EnsureSysctl(sysctl, sysctlRouteLocalnet, 1); err != nil {
-			return nil, err
-		}
-	}
 
 	// Be conservative in what you do, be liberal in what you accept from others.
 	// If it's non-zero, we mark only out of window RST segments as INVALID.
@@ -281,7 +258,6 @@ func NewProxier(ipFamily v1.IPFamily,
 		filterRules:              proxyutil.NewLineBuffer(),
 		natChains:                proxyutil.NewLineBuffer(),
 		natRules:                 proxyutil.NewLineBuffer(),
-		localhostNodePorts:       localhostNodePorts,
 		nodePortAddresses:        nodePortAddresses,
 		networkInterfacer:        proxyutil.RealNetwork{},
 		conntrackTCPLiberal:      conntrackTCPLiberal,
@@ -314,7 +290,6 @@ func NewDualStackProxier(
 	syncPeriod time.Duration,
 	minSyncPeriod time.Duration,
 	masqueradeAll bool,
-	localhostNodePorts bool,
 	masqueradeBit int,
 	localDetectors [2]proxyutiliptables.LocalTrafficDetector,
 	hostname string,
@@ -326,14 +301,14 @@ func NewDualStackProxier(
 ) (proxy.Provider, error) {
 	// Create an ipv4 instance of the single-stack proxier
 	ipv4Proxier, err := NewProxier(v1.IPv4Protocol, ipt[0], sysctl,
-		exec, syncPeriod, minSyncPeriod, masqueradeAll, localhostNodePorts, masqueradeBit, localDetectors[0], hostname,
+		exec, syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit, localDetectors[0], hostname,
 		nodeIPs[v1.IPv4Protocol], recorder, healthzServer, nodePortAddresses, initOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
 
 	ipv6Proxier, err := NewProxier(v1.IPv6Protocol, ipt[1], sysctl,
-		exec, syncPeriod, minSyncPeriod, masqueradeAll, false, masqueradeBit, localDetectors[1], hostname,
+		exec, syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit, localDetectors[1], hostname,
 		nodeIPs[v1.IPv6Protocol], recorder, healthzServer, nodePortAddresses, initOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
@@ -365,13 +340,6 @@ var iptablesJumpChains = []iptablesJumpChain{
 	{utiliptables.TableNAT, kubeServicesChain, utiliptables.ChainOutput, "kubernetes service portals", nil},
 	{utiliptables.TableNAT, kubeServicesChain, utiliptables.ChainPrerouting, "kubernetes service portals", nil},
 	{utiliptables.TableNAT, kubePostroutingChain, utiliptables.ChainPostrouting, "kubernetes postrouting rules", nil},
-}
-
-// Duplicates of chains created in pkg/kubelet/kubelet_network_linux.go; we create these
-// on startup but do not delete them in CleanupLeftovers.
-var iptablesKubeletJumpChains = []iptablesJumpChain{
-	{utiliptables.TableFilter, kubeletFirewallChain, utiliptables.ChainInput, "", nil},
-	{utiliptables.TableFilter, kubeletFirewallChain, utiliptables.ChainOutput, "", nil},
 }
 
 // When chains get removed from iptablesJumpChains, add them here so they get cleaned up
@@ -761,7 +729,7 @@ func (proxier *Proxier) syncProxyRules() {
 	// Ensure that our jump rules (eg from PREROUTING to KUBE-SERVICES) exist.
 	// We can't do this as part of the iptables-restore because we don't want
 	// to specify/replace *all* of the rules in PREROUTING, etc.
-	for _, jump := range append(iptablesJumpChains, iptablesKubeletJumpChains...) {
+	for _, jump := range iptablesJumpChains {
 		if _, err := proxier.iptables.EnsureChain(jump.table, jump.dstChain); err != nil {
 			klog.ErrorS(err, "Failed to ensure chain exists", "table", jump.table, "chain", jump.dstChain)
 			return
@@ -827,30 +795,6 @@ func (proxier *Proxier) syncProxyRules() {
 		"-A", string(kubeMarkMasqChain),
 		"-j", "MARK", "--or-mark", proxier.masqueradeMark,
 	)
-
-	isIPv6 := proxier.iptables.IsIPv6()
-	if !isIPv6 && proxier.localhostNodePorts {
-		// Kube-proxy's use of `route_localnet` to enable NodePorts on localhost
-		// creates a security hole (https://issue.k8s.io/90259) which this
-		// iptables rule mitigates.
-
-		// NOTE: kubelet creates an identical copy of this rule. If you want to
-		// change this rule in the future, you MUST do so in a way that will
-		// interoperate correctly with skewed versions of the rule created by
-		// kubelet. (Actually, kubelet uses "--dst"/"--src" rather than "-d"/"-s"
-		// but that's just a command-line thing and results in the same rule being
-		// created in the kernel.)
-		proxier.filterChains.Write(utiliptables.MakeChainLine(kubeletFirewallChain))
-		proxier.filterRules.Write(
-			"-A", string(kubeletFirewallChain),
-			"-m", "comment", "--comment", `"block incoming localnet connections"`,
-			"-d", "127.0.0.0/8",
-			"!", "-s", "127.0.0.0/8",
-			"-m", "conntrack",
-			"!", "--ctstate", "RELATED,ESTABLISHED,DNAT",
-			"-j", "DROP",
-		)
-	}
 
 	// Accumulate NAT chains to keep.
 	activeNATChains := map[utiliptables.Chain]bool{} // use a map as a set
@@ -1330,12 +1274,13 @@ func (proxier *Proxier) syncProxyRules() {
 	// Finally, tail-call to the nodePorts chain.  This needs to be after all
 	// other service portal rules.
 	if proxier.nodePortAddresses.MatchAll() {
+		isIPv6 := proxier.iptables.IsIPv6()
+
 		destinations := []string{"-m", "addrtype", "--dst-type", "LOCAL"}
-		// Block localhost nodePorts if they are not supported. (For IPv6 they never
-		// work, and for IPv4 they only work if we previously set `route_localnet`.)
+		// Block localhost nodePorts
 		if isIPv6 {
 			destinations = append(destinations, "!", "-d", "::1/128")
-		} else if !proxier.localhostNodePorts {
+		} else {
 			destinations = append(destinations, "!", "-d", "127.0.0.0/8")
 		}
 
@@ -1351,13 +1296,8 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 		for _, ip := range nodeIPs {
 			if ip.IsLoopback() {
-				if isIPv6 {
-					klog.ErrorS(nil, "--nodeport-addresses includes localhost but localhost NodePorts are not supported on IPv6", "address", ip.String())
-					continue
-				} else if !proxier.localhostNodePorts {
-					klog.ErrorS(nil, "--nodeport-addresses includes localhost but --iptables-localhost-nodeports=false was passed", "address", ip.String())
-					continue
-				}
+				klog.ErrorS(nil, "--nodeport-addresses includes localhost but localhost NodePorts are not supported", "address", ip.String())
+				continue
 			}
 
 			// create nodeport rules for each IP one by one

@@ -86,9 +86,6 @@ type KubeProxyNFTablesConfiguration struct {
 	// masqueradeAll tells kube-proxy to SNAT all traffic sent to Service cluster IPs,
 	// when using the nftables mode. This may be required with some CNI plugins.
 	MasqueradeAll bool `json:"masqueradeAll"`
-	// localhostNodePorts, if false, tells kube-proxy to disable the legacy behavior
-	// of allowing NodePort services to be accessed via localhost. FIXME: remove.
-	LocalhostNodePorts *bool `json:"localhostNodePorts"`
 	// syncPeriod is an interval (e.g. '5s', '1m', '2h22m') indicating how frequently
 	// various re-synchronizing and cleanup operations are performed. Must be greater
 	// than 0.

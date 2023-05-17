@@ -79,7 +79,6 @@ nftables:
   masqueradeBit: 18
   minSyncPeriod: 10s
   syncPeriod: 60s
-  localhostNodePorts: false
 kind: KubeProxyConfiguration
 metricsBindAddress: "%s"
 mode: "%s"
@@ -225,11 +224,10 @@ nodePortAddresses:
 				ExcludeCIDRs:  []string{"10.20.30.40/16", "fd00:1::0/64"},
 			},
 			NFTables: kubeproxyconfig.KubeProxyNFTablesConfiguration{
-				MasqueradeAll:      true,
-				MasqueradeBit:      ptr.To[int32](18),
-				LocalhostNodePorts: ptr.To(false),
-				MinSyncPeriod:      metav1.Duration{Duration: 10 * time.Second},
-				SyncPeriod:         metav1.Duration{Duration: 60 * time.Second},
+				MasqueradeAll: true,
+				MasqueradeBit: ptr.To[int32](18),
+				MinSyncPeriod: metav1.Duration{Duration: 10 * time.Second},
+				SyncPeriod:    metav1.Duration{Duration: 60 * time.Second},
 			},
 			MetricsBindAddress: tc.metricsBindAddress,
 			Mode:               kubeproxyconfig.ProxyMode(tc.mode),

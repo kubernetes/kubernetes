@@ -50,7 +50,6 @@ logging:
 metricsBindAddress: 127.0.0.1:10249
 mode: ""
 nftables:
-  localhostNodePorts: true
   masqueradeAll: false
   masqueradeBit: 14
   minSyncPeriod: 1s

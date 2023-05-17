@@ -323,7 +323,6 @@ func Convert_config_KubeProxyIPVSConfiguration_To_v1alpha1_KubeProxyIPVSConfigur
 func autoConvert_v1alpha1_KubeProxyNFTablesConfiguration_To_config_KubeProxyNFTablesConfiguration(in *v1alpha1.KubeProxyNFTablesConfiguration, out *config.KubeProxyNFTablesConfiguration, s conversion.Scope) error {
 	out.MasqueradeBit = (*int32)(unsafe.Pointer(in.MasqueradeBit))
 	out.MasqueradeAll = in.MasqueradeAll
-	out.LocalhostNodePorts = (*bool)(unsafe.Pointer(in.LocalhostNodePorts))
 	out.SyncPeriod = in.SyncPeriod
 	out.MinSyncPeriod = in.MinSyncPeriod
 	return nil
@@ -337,7 +336,6 @@ func Convert_v1alpha1_KubeProxyNFTablesConfiguration_To_config_KubeProxyNFTables
 func autoConvert_config_KubeProxyNFTablesConfiguration_To_v1alpha1_KubeProxyNFTablesConfiguration(in *config.KubeProxyNFTablesConfiguration, out *v1alpha1.KubeProxyNFTablesConfiguration, s conversion.Scope) error {
 	out.MasqueradeBit = (*int32)(unsafe.Pointer(in.MasqueradeBit))
 	out.MasqueradeAll = in.MasqueradeAll
-	out.LocalhostNodePorts = (*bool)(unsafe.Pointer(in.LocalhostNodePorts))
 	out.SyncPeriod = in.SyncPeriod
 	out.MinSyncPeriod = in.MinSyncPeriod
 	return nil
