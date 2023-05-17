@@ -928,6 +928,7 @@ func takeByTopologyNUMADistributed(logger logr.Logger, topo *topology.CPUTopolog
 		var bestBalance float64 = math.MaxFloat64
 		var bestRemainder []int = nil
 		var bestCombo []int = nil
+		var bestBalanceInOneSocket = false
 		acc.iterateCombinations(numas, k, func(combo []int) LoopControl {
 			// If we've already found a combo with a balance of 0 in a
 			// different iteration, then don't bother checking any others.
@@ -1056,10 +1057,22 @@ func takeByTopologyNUMADistributed(logger logr.Logger, topo *topology.CPUTopolog
 				})
 			}
 
+			// If alignBySocket is enabled, combo in same socket will be considered firstly.
 			// If the best "balance score" for this combo is less than the
 			// lowest "balance score" of all previous combos, then update this
 			// combo (and remainder set) to be the best one found so far.
-			if bestLocalBalance < bestBalance {
+			if alignBySocket {
+				if topo.CPUDetails.IsNUMANodesInSameSocket(combo) && !bestBalanceInOneSocket {
+					bestBalance = bestLocalBalance
+					bestRemainder = bestLocalRemainder
+					bestCombo = combo
+					bestBalanceInOneSocket = true
+				} else if topo.CPUDetails.IsNUMANodesInSameSocket(combo) == bestBalanceInOneSocket && bestLocalBalance < bestBalance {
+					bestBalance = bestLocalBalance
+					bestRemainder = bestLocalRemainder
+					bestCombo = combo
+				}
+			} else if bestLocalBalance < bestBalance {
 				bestBalance = bestLocalBalance
 				bestRemainder = bestLocalRemainder
 				bestCombo = combo
