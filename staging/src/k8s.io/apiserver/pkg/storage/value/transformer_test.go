@@ -159,7 +159,7 @@ func TestPrefixFromMetrics(t *testing.T) {
 			want: `
 	# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
   # TYPE apiserver_storage_transformation_operations_total counter
-  apiserver_storage_transformation_operations_total{status="Unknown",transformation_type="from_storage",transformer_prefix="other:"} 1
+  apiserver_storage_transformation_operations_total{status="unknown-non-grpc",transformation_type="from_storage",transformer_prefix="other:"} 1
   `,
 			err: nil,
 		},
@@ -173,7 +173,7 @@ func TestPrefixFromMetrics(t *testing.T) {
 			want: `
 	# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
   # TYPE apiserver_storage_transformation_operations_total counter
-  apiserver_storage_transformation_operations_total{status="Unknown",transformation_type="from_storage",transformer_prefix="unknown"} 1
+  apiserver_storage_transformation_operations_total{status="unknown-non-grpc",transformation_type="from_storage",transformer_prefix="unknown"} 1
   `,
 			err: nil,
 		},
@@ -231,7 +231,7 @@ func TestPrefixToMetrics(t *testing.T) {
 			want: `
 	# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
   # TYPE apiserver_storage_transformation_operations_total counter
-  apiserver_storage_transformation_operations_total{status="Unknown",transformation_type="to_storage",transformer_prefix="other:"} 1
+  apiserver_storage_transformation_operations_total{status="unknown-non-grpc",transformation_type="to_storage",transformer_prefix="other:"} 1
   `,
 			err: nil,
 		},
