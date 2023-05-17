@@ -30,9 +30,11 @@ import (
 	admissionregistrationlisters "k8s.io/client-go/listers/admissionregistration/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/cache/synctrack"
+	"k8s.io/klog/v2"
 )
 
-type webhookAccessorCreator func(uid string, configurationName string, h *v1.ValidatingWebhook) webhook.WebhookAccessor
+// Type for test injection.
+type validatingWebhookAccessorCreator func(uid string, configurationName string, h *v1.ValidatingWebhook) webhook.WebhookAccessor
 
 // validatingWebhookConfigurationManager collects the validating webhook objects so that they can be called.
 type validatingWebhookConfigurationManager struct {
@@ -40,11 +42,10 @@ type validatingWebhookConfigurationManager struct {
 	hasSynced           func() bool
 	lazy                synctrack.Lazy[[]webhook.WebhookAccessor]
 	configurationsCache sync.Map
-
 	// createValidatingWebhookAccessor is used to instantiate webhook accessors.
-	// This function is defined as field instead of a struct method to allow us
-	// to replace it with a mock during unit tests.
-	createValidatingWebhookAccessor webhookAccessorCreator
+	// This function is defined as field instead of a struct method to allow injection
+	// during tests
+	createValidatingWebhookAccessor validatingWebhookAccessorCreator
 }
 
 var _ generic.Source = &validatingWebhookConfigurationManager{}
@@ -60,16 +61,25 @@ func NewValidatingWebhookConfigurationManager(f informers.SharedInformerFactory)
 	handle, _ := informer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(_ interface{}) { manager.lazy.Notify() },
 		UpdateFunc: func(old, new interface{}) {
-			//TODO: we can still dig deeper and figure out which ones of
-			// the webhooks have changed + whether CEL expressions changed
-			// etc... thinking about using reflect..
 			obj := new.(*v1.ValidatingWebhookConfiguration)
 			manager.configurationsCache.Delete(obj.GetName())
 			manager.lazy.Notify()
 		},
-		DeleteFunc: func(vwc interface{}) {
-			obj := vwc.(*v1.ValidatingWebhookConfiguration)
-			manager.configurationsCache.Delete(obj.Name)
+		DeleteFunc: func(obj interface{}) {
+			vwc, ok := obj.(*v1.ValidatingWebhookConfiguration)
+			if !ok {
+				tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+				if !ok {
+					klog.Errorf("Couldn't get object from tombstone %#v", obj)
+					return
+				}
+				vwc, ok = tombstone.Obj.(*v1.ValidatingWebhookConfiguration)
+				if !ok {
+					klog.Errorf("Tombstone contained object that is not expected %#v", obj)
+					return
+				}
+			}
+			manager.configurationsCache.Delete(vwc.Name)
 			manager.lazy.Notify()
 		},
 	})
@@ -87,7 +97,7 @@ func (v *validatingWebhookConfigurationManager) Webhooks() []webhook.WebhookAcce
 	return out
 }
 
-// HasSynced returns true if the initial set of mutating webhook configurations
+// HasSynced returns true if the initial set of validating webhook configurations
 // has been loaded.
 func (v *validatingWebhookConfigurationManager) HasSynced() bool { return v.hasSynced() }
 
@@ -112,11 +122,6 @@ func (v *validatingWebhookConfigurationManager) smartReloadValidatingWebhookConf
 
 		// webhook names are not validated for uniqueness, so we check for duplicates and
 		// add a int suffix to distinguish between them
-		//
-		// NOTE: In `pkg/apis/admissionregistration/validation.go` webhook names are checked
-		// for uniqueness now. Is it safe to remove this?
-		// If we ever get rid of this, we can change the cache map value type to
-		// map[string]WebhookAccessor instead. Where keys will be of format "config.name/webhook.name"
 		names := map[string]int{}
 		configurationAccessors := []webhook.WebhookAccessor{}
 		for i := range c.Webhooks {
