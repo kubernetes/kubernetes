@@ -5406,7 +5406,7 @@ func TestGetNonExistentImagePullSecret(t *testing.T) {
 	testKubelet.kubelet.secretManager = secret.NewFakeManagerWithSecrets(secrets)
 	defer testKubelet.Cleanup()
 
-	expectedEvent := "Warning FailedToRetrieveImagePullSecret Unable to retrieve image pull secrets secretFoo, the image pull may not succeed."
+	expectedEvent := "Warning FailedToRetrieveImagePullSecret Unable to retrieve image pull secrets secretFoo; attempting to pull the image may not succeed."
 	testPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:   "nsFoo",

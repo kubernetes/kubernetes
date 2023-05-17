@@ -895,7 +895,7 @@ func (kl *Kubelet) getPullSecretsForPod(pod *v1.Pod) []v1.Secret {
 	}
 
 	if len(failedPullSecrets) > 0 {
-		kl.recorder.Eventf(pod, v1.EventTypeWarning, "FailedToRetrieveImagePullSecret", "Unable to retrieve image pull secrets %s, the image pull may not succeed.", strings.Join(failedPullSecrets, ", "))
+		kl.recorder.Eventf(pod, v1.EventTypeWarning, "FailedToRetrieveImagePullSecret", "Unable to retrieve image pull secrets %s; attempting to pull the image may not succeed.", strings.Join(failedPullSecrets, ", "))
 	}
 
 	return pullSecrets
