@@ -78,7 +78,7 @@ type pvcval struct{}
 type PVCMap map[types.NamespacedName]pvcval
 
 // PersistentVolumeConfig is consumed by MakePersistentVolume() to generate a PV object
-// for varying storage options (NFS, ceph, glusterFS, etc.).
+// for varying storage options (NFS, ceph, etc.).
 // (+optional) prebind holds a pre-bound PVC
 // Example pvSource:
 //

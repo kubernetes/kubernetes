@@ -16,9 +16,6 @@ limitations under the License.
 
 // This test checks that various VolumeSources are working.
 
-// test/e2e/common/volumes.go duplicates the GlusterFS test from this file.  Any changes made to this
-// test should be made there as well.
-
 package testsuites
 
 import (
