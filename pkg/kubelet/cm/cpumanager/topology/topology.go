@@ -245,6 +245,11 @@ func (d CPUDetails) CPUsInCores(ids ...int) cpuset.CPUSet {
 	return cpuset.New(cpuIDs...)
 }
 
+// IsNUMANodesInSameSocket returns true for all NUMANodes in the same socket
+func (d CPUDetails) IsNUMANodesInSameSocket(NUMANodes []int) bool {
+	return d.SocketsInNUMANodes(NUMANodes...).Size() <= 1
+}
+
 // Discover returns CPUTopology based on cadvisor node info
 func Discover(machineInfo *cadvisorapi.MachineInfo) (*CPUTopology, error) {
 	if machineInfo.NumCores == 0 {

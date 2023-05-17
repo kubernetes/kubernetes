@@ -551,7 +551,7 @@ func takeByTopologyNUMAPacked(topo *topology.CPUTopology, availableCPUs cpuset.C
 // of size 'cpuGroupSize' according to the algorithm described above. This is
 // important, for example, to ensure that all CPUs (i.e. all hyperthreads) from
 // a single core are allocated together.
-func takeByTopologyNUMADistributed(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuGroupSize int) (cpuset.CPUSet, error) {
+func takeByTopologyNUMADistributed(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuGroupSize int, alignBySocket bool) (cpuset.CPUSet, error) {
 	// If the number of CPUs requested cannot be handed out in chunks of
 	// 'cpuGroupSize', then we just call out the packing algorithm since we
 	// can't distribute CPUs in this chunk size.
@@ -587,6 +587,7 @@ func takeByTopologyNUMADistributed(topo *topology.CPUTopology, availableCPUs cpu
 		var bestBalance float64 = math.MaxFloat64
 		var bestRemainder []int = nil
 		var bestCombo []int = nil
+		var bestBalanceInOneSocket bool = false
 		acc.iterateCombinations(numas, k, func(combo []int) LoopControl {
 			// If we've already found a combo with a balance of 0 in a
 			// different iteration, then don't bother checking any others.
@@ -715,10 +716,22 @@ func takeByTopologyNUMADistributed(topo *topology.CPUTopology, availableCPUs cpu
 				})
 			}
 
+			// If alignBySocket is enabled, combo in same socket will be considered firstly.
 			// If the best "balance score" for this combo is less than the
 			// lowest "balance score" of all previous combos, then update this
 			// combo (and remainder set) to be the best one found so far.
-			if bestLocalBalance < bestBalance {
+			if alignBySocket {
+				if topo.CPUDetails.IsNUMANodesInSameSocket(combo) && !bestBalanceInOneSocket {
+					bestBalance = bestLocalBalance
+					bestRemainder = bestLocalRemainder
+					bestCombo = combo
+					bestBalanceInOneSocket = true
+				} else if topo.CPUDetails.IsNUMANodesInSameSocket(combo) == bestBalanceInOneSocket && bestLocalBalance < bestBalance {
+					bestBalance = bestLocalBalance
+					bestRemainder = bestLocalRemainder
+					bestCombo = combo
+				}
+			} else if bestLocalBalance < bestBalance {
 				bestBalance = bestLocalBalance
 				bestRemainder = bestLocalRemainder
 				bestCombo = combo

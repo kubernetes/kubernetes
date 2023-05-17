@@ -1143,6 +1143,30 @@ func TestStaticPolicyOptions(t *testing.T) {
 	}
 }
 
+func TestPolicyWithAlignBySocketAndDistributeCPUsAcrossNUMAEnabled(t *testing.T) {
+	testCases := []staticPolicyTest{
+		{
+			description: "AlignBySocket and DistributeCPUsAcrossNUMA both enabled",
+			topo:        topoDualSocketDualNUMAPerSocketNoHT,
+			options: map[string]string{
+				AlignBySocketOption:            "true",
+				DistributeCPUsAcrossNUMAOption: "true",
+			},
+			numReservedCPUs: 1,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15),
+			pod:             makePod("fakePod", "fakeContainer", "6000m", "6000m"),
+			topologyHint:    &topologymanager.TopologyHint{},
+			expErr:          nil,
+			expCPUAlloc:     true,
+			expCSet:         cpuset.New(1, 3, 5, 7, 9, 11),
+		},
+	}
+	for _, testCase := range testCases {
+		runStaticPolicyTestCaseWithFeatureGate(t, testCase)
+	}
+}
+
 func newCPUSetPtr(cpus ...int) *cpuset.CPUSet {
 	ret := cpuset.New(cpus...)
 	return &ret
