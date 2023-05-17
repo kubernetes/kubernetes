@@ -302,6 +302,19 @@ run_kubectl_debug_restricted_tests() {
   # Clean up
   kubectl delete pod target "${kube_flags[@]:?}"
 
+  # Pre-Condition: Pod "nginx" is created
+  kubectl run target "--image=${IMAGE_NGINX:?}" "${kube_flags[@]:?}"
+  kube::test::get_object_assert pod "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:'
+  # Restricted profile just works in not restricted namespace
+  # Command: create a copy of target with a new debug container
+  kubectl debug target -it --copy-to=target-copy --image=busybox --container=debug-container --attach=false --profile=restricted "${kube_flags[@]:?}"
+  # Post-Conditions
+  kube::test::get_object_assert pod "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:target-copy:'
+  kube::test::get_object_assert pod/target-copy '{{range.spec.containers}}{{.name}}:{{end}}' 'target:debug-container:'
+  kube::test::get_object_assert pod/target-copy '{{range.spec.containers}}{{.image}}:{{end}}' "${IMAGE_NGINX:?}:busybox:"
+  # Clean up
+  kubectl delete pod target target-copy "${kube_flags[@]:?}"
+
   ns_name="namespace-restricted"
   # Command: create namespace and add a label
   kubectl create namespace "${ns_name}"
@@ -321,6 +334,19 @@ run_kubectl_debug_restricted_tests() {
   # Clean up
   kubectl delete pod target -n "${ns_name}" "${kube_flags[@]:?}"
 
+  # Pre-Condition: Pod "nginx" is created
+  kubectl create -f hack/testdata/pod-restricted-runtime-default.yaml -n "${ns_name}"
+  kube::test::get_object_assert "pod -n ${ns_name}" "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:'
+  # Restricted profile works when pod's seccompProfile is RuntimeDefault
+  # Command: create a copy of target with a new debug container
+  kubectl debug target -it --copy-to=target-copy --image=busybox --container=debug-container --attach=false --profile=restricted -n ${ns_name} "${kube_flags[@]:?}"
+  # Post-Conditions
+  kube::test::get_object_assert "pod -n ${ns_name}" "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:target-copy:'
+  kube::test::get_object_assert "pod/target-copy -n ${ns_name}" '{{range.spec.containers}}{{.name}}:{{end}}' 'target:debug-container:'
+  kube::test::get_object_assert "pod/target-copy -n ${ns_name}" '{{range.spec.containers}}{{.image}}:{{end}}' "busybox:busybox:"
+  # Clean up
+  kubectl delete pod target target-copy -n "${ns_name}" "${kube_flags[@]:?}"
+
   # Pre-Condition: Pod "busybox" is created that complies with the restricted policy
   kubectl create -f hack/testdata/pod-restricted-localhost.yaml -n "${ns_name}"
   kube::test::get_object_assert "pod -n ${ns_name}" "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:'
@@ -332,6 +358,19 @@ run_kubectl_debug_restricted_tests() {
   kube::test::get_object_assert "pod/target -n ${ns_name}" '{{range.spec.ephemeralContainers}}{{.name}}:{{end}}' 'debug-container:'
   # Clean up
   kubectl delete pod target -n ${ns_name} "${kube_flags[@]:?}"
+
+  # Pre-Condition: Pod "nginx" is created
+  kubectl create -f hack/testdata/pod-restricted-localhost.yaml -n "${ns_name}"
+  kube::test::get_object_assert "pod -n ${ns_name}" "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:'
+  # Restricted profile works when pod's seccompProfile is Localhost
+  # Command: create a copy of target with a new debug container
+  kubectl debug target -it --copy-to=target-copy --image=busybox --container=debug-container --attach=false --profile=restricted -n ${ns_name} "${kube_flags[@]:?}"
+  # Post-Conditions
+  kube::test::get_object_assert "pod -n ${ns_name}" "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:target-copy:'
+  kube::test::get_object_assert "pod/target-copy -n ${ns_name}" '{{range.spec.containers}}{{.name}}:{{end}}' 'target:debug-container:'
+  kube::test::get_object_assert "pod/target-copy -n ${ns_name}" '{{range.spec.containers}}{{.image}}:{{end}}' "busybox:busybox:"
+  # Clean up
+  kubectl delete pod target target-copy -n "${ns_name}" "${kube_flags[@]:?}"
 
   # Clean up restricted namespace
   kubectl delete namespace "${ns_name}"
