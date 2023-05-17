@@ -137,11 +137,11 @@ func TestGetMutatingWebhookConfigSmartReload(t *testing.T) {
 			name: "create configurations and no updates",
 			args: args{
 				[]*v1.MutatingWebhookConfiguration{
-					&v1.MutatingWebhookConfiguration{
+					{
 						ObjectMeta: metav1.ObjectMeta{Name: "webhook1"},
 						Webhooks:   []v1.MutatingWebhook{{Name: "webhook1.1"}, {Name: "webhook1.2"}},
 					},
-					&v1.MutatingWebhookConfiguration{
+					{
 						ObjectMeta: metav1.ObjectMeta{Name: "webhook2"},
 						Webhooks:   []v1.MutatingWebhook{{Name: "webhook2.1"}, {Name: "webhook2.2"}},
 					},
@@ -156,17 +156,17 @@ func TestGetMutatingWebhookConfigSmartReload(t *testing.T) {
 			name: "create configurations and update some of them",
 			args: args{
 				[]*v1.MutatingWebhookConfiguration{
-					&v1.MutatingWebhookConfiguration{
+					{
 						ObjectMeta: metav1.ObjectMeta{Name: "webhook3"},
 						Webhooks:   []v1.MutatingWebhook{{Name: "webhook3.1"}},
 					},
-					&v1.MutatingWebhookConfiguration{
+					{
 						ObjectMeta: metav1.ObjectMeta{Name: "webhook4"},
 						Webhooks:   []v1.MutatingWebhook{{Name: "webhook4.1"}},
 					},
 				},
 				[]*v1.MutatingWebhookConfiguration{
-					&v1.MutatingWebhookConfiguration{
+					{
 						ObjectMeta: metav1.ObjectMeta{Name: "webhook4"},
 						Webhooks:   []v1.MutatingWebhook{{Name: "webhook4.1-updated"}, {Name: "webhook4.2"}},
 					},
@@ -180,25 +180,25 @@ func TestGetMutatingWebhookConfigSmartReload(t *testing.T) {
 			name: "create configuration and update moar of them",
 			args: args{
 				[]*v1.MutatingWebhookConfiguration{
-					&v1.MutatingWebhookConfiguration{
+					{
 						ObjectMeta: metav1.ObjectMeta{Name: "webhook5"},
 						Webhooks:   []v1.MutatingWebhook{{Name: "webhook5.1"}, {Name: "webhook5.2"}},
 					},
-					&v1.MutatingWebhookConfiguration{
+					{
 						ObjectMeta: metav1.ObjectMeta{Name: "webhook6"},
 						Webhooks:   []v1.MutatingWebhook{{Name: "webhook6.1"}},
 					},
-					&v1.MutatingWebhookConfiguration{
+					{
 						ObjectMeta: metav1.ObjectMeta{Name: "webhook7"},
 						Webhooks:   []v1.MutatingWebhook{{Name: "webhook7.1"}},
 					},
 				},
 				[]*v1.MutatingWebhookConfiguration{
-					&v1.MutatingWebhookConfiguration{
+					{
 						ObjectMeta: metav1.ObjectMeta{Name: "webhook6"},
 						Webhooks:   []v1.MutatingWebhook{{Name: "webhook6.1-updated"}},
 					},
-					&v1.MutatingWebhookConfiguration{
+					{
 						ObjectMeta: metav1.ObjectMeta{Name: "webhook7"},
 						Webhooks:   []v1.MutatingWebhook{{Name: "webhook7.1-updated"}, {Name: "webhook7.2"}},
 					},
