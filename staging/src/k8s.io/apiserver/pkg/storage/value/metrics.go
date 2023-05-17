@@ -17,9 +17,11 @@ limitations under the License.
 package value
 
 import (
+	"errors"
 	"sync"
 	"time"
 
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"k8s.io/component-base/metrics"
@@ -112,7 +114,7 @@ func RegisterMetrics() {
 // RecordTransformation records latencies and count of TransformFromStorage and TransformToStorage operations.
 // Note that transformation_failures_total metric is deprecated, use transformation_operations_total instead.
 func RecordTransformation(transformationType, transformerPrefix string, elapsed time.Duration, err error) {
-	transformerOperationsTotal.WithLabelValues(transformationType, transformerPrefix, status.Code(err).String()).Inc()
+	transformerOperationsTotal.WithLabelValues(transformationType, transformerPrefix, getErrorCode(err)).Inc()
 
 	if err == nil {
 		transformerLatencies.WithLabelValues(transformationType, transformerPrefix).Observe(elapsed.Seconds())
@@ -137,4 +139,24 @@ func RecordDataKeyGeneration(start time.Time, err error) {
 // sinceInSeconds gets the time since the specified start in seconds.
 func sinceInSeconds(start time.Time) float64 {
 	return time.Since(start).Seconds()
+}
+
+type gRPCError interface {
+	GRPCStatus() *status.Status
+}
+
+func getErrorCode(err error) string {
+	if err == nil {
+		return codes.OK.String()
+	}
+
+	// handle errors wrapped with fmt.Errorf and similar
+	var s gRPCError
+	if errors.As(err, &s) {
+		return s.GRPCStatus().Code().String()
+	}
+
+	// This is not gRPC error. The operation must have failed before gRPC
+	// method was called, otherwise we would get gRPC error.
+	return "unknown-non-grpc"
 }
