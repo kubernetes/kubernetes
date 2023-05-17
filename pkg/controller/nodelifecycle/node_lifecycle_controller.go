@@ -730,8 +730,9 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 			pods, err := nc.getPodsAssignedToNode(node.Name)
 			if err != nil {
 				utilruntime.HandleError(fmt.Errorf("unable to list pods of node %v: %v", node.Name, err))
-				if currentReadyCondition.Status != v1.ConditionTrue && observedReadyCondition.Status == v1.ConditionTrue {
-					// If error happened during node status transition (Ready -> NotReady)
+				if (currentReadyCondition.Status != v1.ConditionTrue && observedReadyCondition.Status == v1.ConditionTrue) ||
+					(currentReadyCondition.Status == v1.ConditionUnknown && observedReadyCondition.Status == v1.ConditionFalse) {
+					// If error happened during node status transition (Ready -> NotReady, include: true->false or true->unknown or false->unknown)
 					// we need to mark node for retry to force MarkPodsNotReady execution
 					// in the next iteration.
 					nc.nodesToRetry.Store(node.Name, struct{}{})
@@ -742,7 +743,8 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 
 			_, needsRetry := nc.nodesToRetry.Load(node.Name)
 			switch {
-			case currentReadyCondition.Status != v1.ConditionTrue && observedReadyCondition.Status == v1.ConditionTrue:
+			case currentReadyCondition.Status != v1.ConditionTrue && observedReadyCondition.Status == v1.ConditionTrue,
+				currentReadyCondition.Status == v1.ConditionUnknown && observedReadyCondition.Status == v1.ConditionFalse:
 				// Report node event only once when status changed.
 				controllerutil.RecordNodeStatusChange(nc.recorder, node, "NodeNotReady")
 				fallthrough
