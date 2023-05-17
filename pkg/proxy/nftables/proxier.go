@@ -74,9 +74,6 @@ const (
 
 	// kubeProxyFirewallChain is the kube-proxy firewall chain
 	kubeProxyFirewallChain utiliptables.Chain = "KUBE-PROXY-FIREWALL"
-
-	// kube proxy canary chain is used for monitoring rule reload
-	kubeProxyCanaryChain utiliptables.Chain = "KUBE-PROXY-CANARY"
 )
 
 const sysctlNFConntrackTCPBeLiberal = "net/netfilter/nf_conntrack_tcp_be_liberal"
@@ -265,13 +262,7 @@ func NewProxier(ipFamily v1.IPFamily,
 
 	burstSyncs := 2
 	klog.V(2).InfoS("Iptables sync params", "ipFamily", ipt.Protocol(), "minSyncPeriod", minSyncPeriod, "syncPeriod", syncPeriod, "burstSyncs", burstSyncs)
-	// We pass syncPeriod to ipt.Monitor, which will call us only if it needs to.
-	// We need to pass *some* maxInterval to NewBoundedFrequencyRunner anyway though.
-	// time.Hour is arbitrary.
-	proxier.syncRunner = async.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, time.Hour, burstSyncs)
-
-	go ipt.Monitor(kubeProxyCanaryChain, []utiliptables.Table{utiliptables.TableMangle, utiliptables.TableNAT, utiliptables.TableFilter},
-		proxier.syncProxyRules, syncPeriod, wait.NeverStop)
+	proxier.syncRunner = async.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, syncPeriod, burstSyncs)
 
 	return proxier, nil
 }
