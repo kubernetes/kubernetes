@@ -29,33 +29,30 @@ import (
 func main() {
 	maxTextSize := flag.Int("max-text-size", 1, "maximum size of attribute or text (in MB)")
 	flag.Parse()
-
-	if flag.NArg() > 0 {
-		for _, path := range flag.Args() {
-			fmt.Printf("processing junit xml file : %s\n", path)
-			xmlReader, err := os.Open(path)
-			if err != nil {
-				panic(err)
-			}
-			defer xmlReader.Close()
-			suites, err := fetchXML(xmlReader) // convert MB into bytes (roughly!)
-			if err != nil {
-				panic(err)
-			}
-
-			pruneXML(suites, *maxTextSize*1e6) // convert MB into bytes (roughly!)
-
-			xmlWriter, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
-			if err != nil {
-				panic(err)
-			}
-			defer xmlWriter.Close()
-			err = streamXML(xmlWriter, suites)
-			if err != nil {
-				panic(err)
-			}
-			fmt.Println("done.")
+	for _, path := range flag.Args() {
+		fmt.Printf("processing junit xml file : %s\n", path)
+		xmlReader, err := os.Open(path)
+		if err != nil {
+			panic(err)
 		}
+		defer xmlReader.Close()
+		suites, err := fetchXML(xmlReader) // convert MB into bytes (roughly!)
+		if err != nil {
+			panic(err)
+		}
+
+		pruneXML(suites, *maxTextSize*1e6) // convert MB into bytes (roughly!)
+
+		xmlWriter, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+		if err != nil {
+			panic(err)
+		}
+		defer xmlWriter.Close()
+		err = streamXML(xmlWriter, suites)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("done.")
 	}
 }
 
