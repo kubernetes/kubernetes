@@ -53,7 +53,8 @@ var _ generic.Source = &mutatingWebhookConfigurationManager{}
 func NewMutatingWebhookConfigurationManager(f informers.SharedInformerFactory) generic.Source {
 	informer := f.Admissionregistration().V1().MutatingWebhookConfigurations()
 	manager := &mutatingWebhookConfigurationManager{
-		lister: informer.Lister(),
+		lister:                        informer.Lister(),
+		createMutatingWebhookAccessor: webhook.NewMutatingWebhookAccessor,
 	}
 	manager.lazy.Evaluate = manager.getConfiguration
 
