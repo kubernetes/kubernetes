@@ -383,10 +383,9 @@ var iptablesKubeletJumpChains = []iptablesJumpChain{
 	{utiliptables.TableNAT, kubePostroutingChain, utiliptables.ChainPostrouting, "kubernetes postrouting rules", nil},
 }
 
-var iptablesCleanupOnlyChains = []iptablesJumpChain{
-	// Present in kube 1.13 - 1.19. Removed by #95252 in favor of adding reject rules for incoming/forwarding packets to kubeExternalServicesChain
-	{utiliptables.TableFilter, kubeServicesChain, utiliptables.ChainInput, "kubernetes service portals", []string{"-m", "conntrack", "--ctstate", "NEW"}},
-}
+// When chains get removed from iptablesJumpChains, add them here so they get cleaned up
+// on upgrade.
+var iptablesCleanupOnlyChains = []iptablesJumpChain{}
 
 // CleanupLeftovers removes all iptables rules and chains created by the Proxier
 // It returns true if an error was encountered. Errors are logged.
@@ -682,9 +681,6 @@ const (
 	serviceFirewallChainNamePrefix          = "KUBE-FW-"
 	serviceExternalChainNamePrefix          = "KUBE-EXT-"
 	servicePortEndpointChainNamePrefix      = "KUBE-SEP-"
-
-	// For cleanup.  This can be removed after 1.26 is released.
-	deprecatedServiceLBChainNamePrefix = "KUBE-XLB-"
 )
 
 // servicePortPolicyClusterChain returns the name of the KUBE-SVC-XXXX chain for a service, which is the
@@ -730,7 +726,6 @@ func isServiceChainName(chainString string) bool {
 		servicePortEndpointChainNamePrefix,
 		serviceFirewallChainNamePrefix,
 		serviceExternalChainNamePrefix,
-		deprecatedServiceLBChainNamePrefix,
 	}
 
 	for _, p := range prefixes {
