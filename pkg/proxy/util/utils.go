@@ -19,7 +19,6 @@ package util
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"net"
 	"strconv"
@@ -43,14 +42,6 @@ const (
 
 	// IPv6ZeroCIDR is the CIDR block for the whole IPv6 address space
 	IPv6ZeroCIDR = "::/0"
-)
-
-var (
-	// ErrAddressNotAllowed indicates the address is not allowed
-	ErrAddressNotAllowed = errors.New("address not allowed")
-
-	// ErrNoAddresses indicates there are no addresses for the hostname
-	ErrNoAddresses = errors.New("no addresses for hostname")
 )
 
 // isValidEndpoint checks that the given host / port pair are valid endpoint
@@ -95,44 +86,9 @@ func IsLoopBack(ip string) bool {
 	return false
 }
 
-// IsProxyableIP checks if a given IP address is permitted to be proxied
-func IsProxyableIP(ip string) error {
-	netIP := netutils.ParseIPSloppy(ip)
-	if netIP == nil {
-		return ErrAddressNotAllowed
-	}
-	return isProxyableIP(netIP)
-}
-
-func isProxyableIP(ip net.IP) error {
-	if !ip.IsGlobalUnicast() {
-		return ErrAddressNotAllowed
-	}
-	return nil
-}
-
 // Resolver is an interface for net.Resolver
 type Resolver interface {
 	LookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, error)
-}
-
-// IsProxyableHostname checks if the IP addresses for a given hostname are permitted to be proxied
-func IsProxyableHostname(ctx context.Context, resolv Resolver, hostname string) error {
-	resp, err := resolv.LookupIPAddr(ctx, hostname)
-	if err != nil {
-		return err
-	}
-
-	if len(resp) == 0 {
-		return ErrNoAddresses
-	}
-
-	for _, host := range resp {
-		if err := isProxyableIP(host.IP); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // GetLocalAddrs returns a list of all network addresses on the local system
