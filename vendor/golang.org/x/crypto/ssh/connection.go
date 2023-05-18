@@ -97,7 +97,7 @@ func (c *connection) Close() error {
 	return c.sshConn.conn.Close()
 }
 
-// sshconn provides net.Conn metadata, but disallows direct reads and
+// sshConn provides net.Conn metadata, but disallows direct reads and
 // writes.
 type sshConn struct {
 	conn net.Conn

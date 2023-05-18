@@ -28,7 +28,7 @@ const (
 // supportedCiphers lists ciphers we support but might not recommend.
 var supportedCiphers = []string{
 	"aes128-ctr", "aes192-ctr", "aes256-ctr",
-	"aes128-gcm@openssh.com",
+	"aes128-gcm@openssh.com", gcm256CipherID,
 	chacha20Poly1305ID,
 	"arcfour256", "arcfour128", "arcfour",
 	aes128cbcID,
@@ -37,7 +37,7 @@ var supportedCiphers = []string{
 
 // preferredCiphers specifies the default preference for ciphers.
 var preferredCiphers = []string{
-	"aes128-gcm@openssh.com",
+	"aes128-gcm@openssh.com", gcm256CipherID,
 	chacha20Poly1305ID,
 	"aes128-ctr", "aes192-ctr", "aes256-ctr",
 }
@@ -168,7 +168,7 @@ func (a *directionAlgorithms) rekeyBytes() int64 {
 	// 2^(BLOCKSIZE/4) blocks. For all AES flavors BLOCKSIZE is
 	// 128.
 	switch a.Cipher {
-	case "aes128-ctr", "aes192-ctr", "aes256-ctr", gcmCipherID, aes128cbcID:
+	case "aes128-ctr", "aes192-ctr", "aes256-ctr", gcm128CipherID, gcm256CipherID, aes128cbcID:
 		return 16 * (1 << 32)
 
 	}
@@ -178,7 +178,8 @@ func (a *directionAlgorithms) rekeyBytes() int64 {
 }
 
 var aeadCiphers = map[string]bool{
-	gcmCipherID:        true,
+	gcm128CipherID:     true,
+	gcm256CipherID:     true,
 	chacha20Poly1305ID: true,
 }
 
