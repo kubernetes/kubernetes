@@ -321,7 +321,6 @@ func NewFakeProxier(ipFamily v1.IPFamily) (*knftables.Fake, *Proxier) {
 		hostname:                 testHostname,
 		serviceHealthServer:      healthcheck.NewFakeServiceHealthServer(),
 		precomputedProbabilities: make([]string, 0, 1001),
-		filterRules:              proxyutil.NewLineBuffer(),
 		natRules:                 proxyutil.NewLineBuffer(),
 		nodeIP:                   netutils.ParseIPSloppy(testNodeIP),
 		nodePortAddresses:        proxyutil.NewNodePortAddresses(ipFamily, nil),
@@ -540,6 +539,9 @@ func TestOverallNFTablesRules(t *testing.T) {
 		add chain ip kube-proxy service-42NFTM6N-ns2/svc2/tcp/p80
 		add chain ip kube-proxy external-42NFTM6N-ns2/svc2/tcp/p80
 		add chain ip kube-proxy endpoint-SGOXE6O3-ns2/svc2/tcp/p80__10.180.0.2/80
+		add rule ip kube-proxy external-services ip daddr 192.168.99.22 tcp dport 80 drop comment "ns2/svc2:p80 has no local endpoints"
+		add rule ip kube-proxy external-services ip daddr 1.2.3.4 tcp dport 80 drop comment "ns2/svc2:p80 has no local endpoints"
+		add rule ip kube-proxy external-services fib daddr type local tcp dport 3001 drop comment "ns2/svc2:p80 has no local endpoints"
 
 		# svc3
 		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
@@ -557,6 +559,10 @@ func TestOverallNFTablesRules(t *testing.T) {
 		add chain ip kube-proxy external-HVFWP5L3-ns5/svc5/tcp/p80
 		add chain ip kube-proxy firewall-HVFWP5L3-ns5/svc5/tcp/p80
 		add chain ip kube-proxy endpoint-GTK6MW7G-ns5/svc5/tcp/p80__10.180.0.3/80
+		add rule ip kube-proxy firewall ip daddr 5.6.7.8 tcp dport 80 drop comment "ns5/svc5:p80 traffic not accepted by firewall-HVFWP5L3-ns5/svc5/tcp/p80"
+
+		# svc6
+		add rule ip kube-proxy services-filter ip daddr 172.30.0.46 tcp dport 80 reject comment "ns6/svc6:p80 has no endpoints"
 		`)
 
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
@@ -4397,6 +4403,8 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 
 		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
 		add chain ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80
+
+		add rule ip kube-proxy services-filter ip daddr 172.30.0.44 tcp dport 80 reject comment "ns4/svc4:p80 has no endpoints"
 		`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
 

@@ -174,8 +174,7 @@ type Proxier struct {
 
 	// The following buffers are used to reuse memory and avoid allocations
 	// that are significantly impacting performance.
-	filterRules proxyutil.LineBuffer
-	natRules    proxyutil.LineBuffer
+	natRules proxyutil.LineBuffer
 
 	// conntrackTCPLiberal indicates whether the system sets the kernel nf_conntrack_tcp_be_liberal
 	conntrackTCPLiberal bool
@@ -263,7 +262,6 @@ func NewProxier(ipFamily v1.IPFamily,
 		serviceHealthServer:      serviceHealthServer,
 		healthzServer:            healthzServer,
 		precomputedProbabilities: make([]string, 0, 1001),
-		filterRules:              proxyutil.NewLineBuffer(),
 		natRules:                 proxyutil.NewLineBuffer(),
 		nodePortAddresses:        nodePortAddresses,
 		networkInterfacer:        proxyutil.RealNetwork{},
@@ -842,9 +840,14 @@ func (proxier *Proxier) syncProxyRules() {
 	tx := proxier.nftables.NewTransaction()
 	proxier.setupNFTables(tx)
 
+	// We need to use, eg, "ip daddr" for IPv4 but "ip6 daddr" for IPv6
+	ipX := "ip"
+	if proxier.ipFamily == v1.IPv6Protocol {
+		ipX = "ip6"
+	}
+
 	// Reset all buffers used later.
 	// This is to avoid memory reallocations and thus improve performance.
-	proxier.filterRules.Reset()
 	proxier.natRules.Reset()
 
 	// Accumulate service/endpoint chains to keep.
@@ -953,25 +956,25 @@ func (proxier *Proxier) syncProxyRules() {
 			loadBalancerTrafficChain = fwChain
 		}
 
-		var internalTrafficFilterTarget, internalTrafficFilterComment string
-		var externalTrafficFilterTarget, externalTrafficFilterComment string
+		var internalTrafficFilterVerdict, internalTrafficFilterComment string
+		var externalTrafficFilterVerdict, externalTrafficFilterComment string
 		if !hasEndpoints {
 			// The service has no endpoints at all; hasInternalEndpoints and
 			// hasExternalEndpoints will also be false, and we will not
 			// generate any chains in the "nat" table for the service; only
 			// rules in the "filter" table rejecting incoming packets for
 			// the service's IPs.
-			internalTrafficFilterTarget = "REJECT"
-			internalTrafficFilterComment = fmt.Sprintf(`"%s has no endpoints"`, svcPortNameString)
-			externalTrafficFilterTarget = "REJECT"
+			internalTrafficFilterVerdict = "reject"
+			internalTrafficFilterComment = fmt.Sprintf("%s has no endpoints", svcPortNameString)
+			externalTrafficFilterVerdict = "reject"
 			externalTrafficFilterComment = internalTrafficFilterComment
 		} else {
 			if !hasInternalEndpoints {
 				// The internalTrafficPolicy is "Local" but there are no local
 				// endpoints. Traffic to the clusterIP will be dropped, but
 				// external traffic may still be accepted.
-				internalTrafficFilterTarget = "DROP"
-				internalTrafficFilterComment = fmt.Sprintf(`"%s has no local endpoints"`, svcPortNameString)
+				internalTrafficFilterVerdict = "drop"
+				internalTrafficFilterComment = fmt.Sprintf("%s has no local endpoints", svcPortNameString)
 				serviceNoLocalEndpointsTotalInternal++
 			}
 			if !hasExternalEndpoints {
@@ -979,8 +982,8 @@ func (proxier *Proxier) syncProxyRules() {
 				// local endpoints. Traffic to "external" IPs from outside
 				// the cluster will be dropped, but traffic from inside
 				// the cluster may still be accepted.
-				externalTrafficFilterTarget = "DROP"
-				externalTrafficFilterComment = fmt.Sprintf(`"%s has no local endpoints"`, svcPortNameString)
+				externalTrafficFilterVerdict = "drop"
+				externalTrafficFilterComment = fmt.Sprintf("%s has no local endpoints", svcPortNameString)
 				serviceNoLocalEndpointsTotalExternal++
 			}
 		}
@@ -996,14 +999,15 @@ func (proxier *Proxier) syncProxyRules() {
 				"-j", string(internalTrafficChain))
 		} else {
 			// No endpoints.
-			proxier.filterRules.Write(
-				"-A", string(kubeServicesFilterChain),
-				"-m", "comment", "--comment", internalTrafficFilterComment,
-				"-m", protocol, "-p", protocol,
-				"-d", svcInfo.ClusterIP().String(),
-				"--dport", strconv.Itoa(svcInfo.Port()),
-				"-j", internalTrafficFilterTarget,
-			)
+			tx.Add(&knftables.Rule{
+				Chain: kubeServicesFilterChain,
+				Rule: knftables.Concat(
+					ipX, "daddr", svcInfo.ClusterIP(),
+					protocol, "dport", svcInfo.Port(),
+					internalTrafficFilterVerdict,
+				),
+				Comment: &internalTrafficFilterComment,
+			})
 		}
 
 		// Capture externalIPs.
@@ -1023,14 +1027,15 @@ func (proxier *Proxier) syncProxyRules() {
 				// Either no endpoints at all (REJECT) or no endpoints for
 				// external traffic (DROP anything that didn't get
 				// short-circuited by the EXT chain.)
-				proxier.filterRules.Write(
-					"-A", string(kubeExternalServicesChain),
-					"-m", "comment", "--comment", externalTrafficFilterComment,
-					"-m", protocol, "-p", protocol,
-					"-d", externalIP,
-					"--dport", strconv.Itoa(svcInfo.Port()),
-					"-j", externalTrafficFilterTarget,
-				)
+				tx.Add(&knftables.Rule{
+					Chain: kubeExternalServicesChain,
+					Rule: knftables.Concat(
+						ipX, "daddr", externalIP,
+						protocol, "dport", svcInfo.Port(),
+						externalTrafficFilterVerdict,
+					),
+					Comment: &externalTrafficFilterComment,
+				})
 			}
 		}
 
@@ -1047,13 +1052,16 @@ func (proxier *Proxier) syncProxyRules() {
 
 			}
 			if usesFWChain {
-				proxier.filterRules.Write(
-					"-A", string(kubeFirewallChain),
-					"-m", "comment", "--comment", fmt.Sprintf(`"%s traffic not accepted by %s"`, svcPortNameString, svcInfo.firewallChainName),
-					"-m", protocol, "-p", protocol,
-					"-d", lbip,
-					"--dport", strconv.Itoa(svcInfo.Port()),
-					"-j", "DROP")
+				comment := fmt.Sprintf("%s traffic not accepted by %s", svcPortNameString, svcInfo.firewallChainName)
+				tx.Add(&knftables.Rule{
+					Chain: kubeFirewallChain,
+					Rule: knftables.Concat(
+						ipX, "daddr", lbip,
+						protocol, "dport", svcInfo.Port(),
+						"drop",
+					),
+					Comment: &comment,
+				})
 			}
 		}
 		if !hasExternalEndpoints {
@@ -1061,14 +1069,15 @@ func (proxier *Proxier) syncProxyRules() {
 			// external traffic (DROP anything that didn't get short-circuited
 			// by the EXT chain.)
 			for _, lbip := range svcInfo.LoadBalancerVIPStrings() {
-				proxier.filterRules.Write(
-					"-A", string(kubeExternalServicesChain),
-					"-m", "comment", "--comment", externalTrafficFilterComment,
-					"-m", protocol, "-p", protocol,
-					"-d", lbip,
-					"--dport", strconv.Itoa(svcInfo.Port()),
-					"-j", externalTrafficFilterTarget,
-				)
+				tx.Add(&knftables.Rule{
+					Chain: kubeExternalServicesChain,
+					Rule: knftables.Concat(
+						ipX, "daddr", lbip,
+						protocol, "dport", svcInfo.Port(),
+						externalTrafficFilterVerdict,
+					),
+					Comment: &externalTrafficFilterComment,
+				})
 			}
 		}
 
@@ -1089,14 +1098,15 @@ func (proxier *Proxier) syncProxyRules() {
 				// Either no endpoints at all (REJECT) or no endpoints for
 				// external traffic (DROP anything that didn't get
 				// short-circuited by the EXT chain.)
-				proxier.filterRules.Write(
-					"-A", string(kubeExternalServicesChain),
-					"-m", "comment", "--comment", externalTrafficFilterComment,
-					"-m", "addrtype", "--dst-type", "LOCAL",
-					"-m", protocol, "-p", protocol,
-					"--dport", strconv.Itoa(svcInfo.NodePort()),
-					"-j", externalTrafficFilterTarget,
-				)
+				tx.Add(&knftables.Rule{
+					Chain: kubeExternalServicesChain,
+					Rule: knftables.Concat(
+						"fib daddr type local",
+						protocol, "dport", svcInfo.NodePort(),
+						externalTrafficFilterVerdict,
+					),
+					Comment: &externalTrafficFilterComment,
+				})
 			}
 		}
 
@@ -1331,14 +1341,12 @@ func (proxier *Proxier) syncProxyRules() {
 		klog.ErrorS(err, "Failed to list nftables chains: stale chains will not be deleted")
 	}
 
-	metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableFilter)).Set(float64(proxier.filterRules.Lines()))
 	metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableNAT)).Set(float64(proxier.natRules.Lines()))
 
 	// Sync rules.
 	klog.V(2).InfoS("Reloading service nftables data",
 		"numServices", len(proxier.svcPortMap),
 		"numEndpoints", totalEndpoints,
-		"numFilterRules", proxier.filterRules.Lines(),
 		"numNATRules", proxier.natRules.Lines(),
 	)
 
