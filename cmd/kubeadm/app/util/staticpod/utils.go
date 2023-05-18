@@ -18,7 +18,9 @@ package staticpod
 
 import (
 	"bytes"
+	"crypto/md5"
 	"fmt"
+	"hash"
 	"io"
 	"math"
 	"net/url"
@@ -27,6 +29,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
@@ -350,16 +353,22 @@ func GetEtcdProbeEndpoint(cfg *kubeadmapi.Etcd, isIPv6 bool) (string, int, v1.UR
 
 // ManifestFilesAreEqual compares 2 files. It returns true if their contents are equal, false otherwise
 func ManifestFilesAreEqual(path1, path2 string) (bool, error) {
-	content1, err := os.ReadFile(path1)
+	pod1, err := ReadStaticPodFromDisk(path1)
 	if err != nil {
 		return false, err
 	}
-	content2, err := os.ReadFile(path2)
+	pod2, err := ReadStaticPodFromDisk(path2)
 	if err != nil {
 		return false, err
 	}
 
-	return bytes.Equal(content1, content2), nil
+	hasher := md5.New()
+	DeepHashObject(hasher, pod1)
+	hash1 := hasher.Sum(nil)[0:]
+	DeepHashObject(hasher, pod2)
+	hash2 := hasher.Sum(nil)[0:]
+
+	return bytes.Equal(hash1, hash2), nil
 }
 
 // getProbeAddress returns a valid probe address.
@@ -381,4 +390,19 @@ func GetUsersAndGroups() (*users.UsersAndGroups, error) {
 		usersAndGroups, err = users.AddUsersAndGroups()
 	})
 	return usersAndGroups, err
+}
+
+// DeepHashObject writes specified object to hash using the spew library
+// which follows pointers and prints actual values of the nested objects
+// ensuring the hash does not change when a pointer changes.
+// Copied from k8s.io/kubernetes/pkg/util/hash/hash.go#DeepHashObject
+func DeepHashObject(hasher hash.Hash, objectToWrite interface{}) {
+	hasher.Reset()
+	printer := spew.ConfigState{
+		Indent:         " ",
+		SortKeys:       true,
+		DisableMethods: true,
+		SpewKeys:       true,
+	}
+	printer.Fprintf(hasher, "%#v", objectToWrite)
 }
