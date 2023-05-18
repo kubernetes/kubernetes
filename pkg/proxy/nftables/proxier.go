@@ -273,12 +273,6 @@ func NewProxier(ipFamily v1.IPFamily,
 	go ipt.Monitor(kubeProxyCanaryChain, []utiliptables.Table{utiliptables.TableMangle, utiliptables.TableNAT, utiliptables.TableFilter},
 		proxier.syncProxyRules, syncPeriod, wait.NeverStop)
 
-	if ipt.HasRandomFully() {
-		klog.V(2).InfoS("Iptables supports --random-fully", "ipFamily", ipt.Protocol())
-	} else {
-		klog.V(2).InfoS("Iptables does not support --random-fully", "ipFamily", ipt.Protocol())
-	}
-
 	return proxier, nil
 }
 
@@ -777,15 +771,11 @@ func (proxier *Proxier) syncProxyRules() {
 		"-A", string(kubePostroutingChain),
 		"-j", "MARK", "--xor-mark", proxier.masqueradeMark,
 	)
-	masqRule := []string{
+	proxier.natRules.Write(
 		"-A", string(kubePostroutingChain),
 		"-m", "comment", "--comment", `"kubernetes service traffic requiring SNAT"`,
-		"-j", "MASQUERADE",
-	}
-	if proxier.iptables.HasRandomFully() {
-		masqRule = append(masqRule, "--random-fully")
-	}
-	proxier.natRules.Write(masqRule)
+		"-j", "MASQUERADE", "--random-fully",
+	)
 
 	// Install the kubernetes-specific masquerade mark rule. We use a whole chain for
 	// this so that it is easier to flush and change, for example if the mark

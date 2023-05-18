@@ -1968,7 +1968,7 @@ func TestOverallIPTablesRules(t *testing.T) {
 		-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 		-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
-		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE --random-fully
 		-A KUBE-SEP-C6EBXVWJJZMIWKLZ -m comment --comment ns4/svc4:p80 -s 10.180.0.5 -j KUBE-MARK-MASQ
 		-A KUBE-SEP-C6EBXVWJJZMIWKLZ -m comment --comment ns4/svc4:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.5:80
 		-A KUBE-SEP-I77PXRDZVX7PMWMN -m comment --comment ns5/svc5:p80 -s 10.180.0.3 -j KUBE-MARK-MASQ
@@ -2614,29 +2614,6 @@ func TestDropInvalidRule(t *testing.T) {
 			}
 
 			assertIPTablesChainEqual(t, getLine(), utiliptables.TableFilter, kubeForwardChain, expected, fp.iptablesData.String())
-		})
-	}
-}
-
-func TestMasqueradeRule(t *testing.T) {
-	for _, randomFully := range []bool{false, true} {
-		t.Run(fmt.Sprintf("randomFully %t", randomFully), func(t *testing.T) {
-			ipt := iptablestest.NewFake().SetHasRandomFully(randomFully)
-			fp := NewFakeProxier(ipt)
-			fp.syncProxyRules()
-
-			expectedFmt := dedent.Dedent(`
-				-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
-				-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
-				-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE%s
-				`)
-			var expected string
-			if randomFully {
-				expected = fmt.Sprintf(expectedFmt, " --random-fully")
-			} else {
-				expected = fmt.Sprintf(expectedFmt, "")
-			}
-			assertIPTablesChainEqual(t, getLine(), utiliptables.TableNAT, kubePostroutingChain, expected, fp.iptablesData.String())
 		})
 	}
 }
@@ -5856,7 +5833,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 		-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
-		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE --random-fully
 		-A KUBE-SEP-SNQ3ZNILQDEJNDQO -m comment --comment ns1/svc1:p80 -s 10.0.1.1 -j KUBE-MARK-MASQ
 		-A KUBE-SEP-SNQ3ZNILQDEJNDQO -m comment --comment ns1/svc1:p80 -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
 		-A KUBE-SEP-UHEGFW77JX3KXTOV -m comment --comment ns2/svc2:p8080 -s 10.0.2.1 -j KUBE-MARK-MASQ
@@ -5930,7 +5907,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 		-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
-		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE --random-fully
 		-A KUBE-SEP-BSWRHOQ77KEXZLNL -m comment --comment ns3/svc3:p80 -s 10.0.3.1 -j KUBE-MARK-MASQ
 		-A KUBE-SEP-BSWRHOQ77KEXZLNL -m comment --comment ns3/svc3:p80 -m tcp -p tcp -j DNAT --to-destination 10.0.3.1:80
 		-A KUBE-SEP-SNQ3ZNILQDEJNDQO -m comment --comment ns1/svc1:p80 -s 10.0.1.1 -j KUBE-MARK-MASQ
@@ -5984,7 +5961,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 		-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
-		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE --random-fully
 		-A KUBE-SEP-BSWRHOQ77KEXZLNL -m comment --comment ns3/svc3:p80 -s 10.0.3.1 -j KUBE-MARK-MASQ
 		-A KUBE-SEP-BSWRHOQ77KEXZLNL -m comment --comment ns3/svc3:p80 -m tcp -p tcp -j DNAT --to-destination 10.0.3.1:80
 		-A KUBE-SEP-SNQ3ZNILQDEJNDQO -m comment --comment ns1/svc1:p80 -s 10.0.1.1 -j KUBE-MARK-MASQ
@@ -6044,7 +6021,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 		-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
-		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE --random-fully
 		-A KUBE-SEP-BSWRHOQ77KEXZLNL -m comment --comment ns3/svc3:p80 -s 10.0.3.1 -j KUBE-MARK-MASQ
 		-A KUBE-SEP-BSWRHOQ77KEXZLNL -m comment --comment ns3/svc3:p80 -m tcp -p tcp -j DNAT --to-destination 10.0.3.1:80
 		-A KUBE-SEP-SNQ3ZNILQDEJNDQO -m comment --comment ns1/svc1:p80 -s 10.0.1.1 -j KUBE-MARK-MASQ
@@ -6104,7 +6081,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 		-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
-		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE --random-fully
 		-A KUBE-SEP-AYCN5HPXMIRJNJXU -m comment --comment ns4/svc4:p80 -s 10.0.4.1 -j KUBE-MARK-MASQ
 		-A KUBE-SEP-AYCN5HPXMIRJNJXU -m comment --comment ns4/svc4:p80 -m tcp -p tcp -j DNAT --to-destination 10.0.4.1:80
 		-A KUBE-SEP-BSWRHOQ77KEXZLNL -m comment --comment ns3/svc3:p80 -s 10.0.3.1 -j KUBE-MARK-MASQ
@@ -6162,7 +6139,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 		-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
-		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE --random-fully
 		-A KUBE-SEP-AYCN5HPXMIRJNJXU -m comment --comment ns4/svc4:p80 -s 10.0.4.1 -j KUBE-MARK-MASQ
 		-A KUBE-SEP-AYCN5HPXMIRJNJXU -m comment --comment ns4/svc4:p80 -m tcp -p tcp -j DNAT --to-destination 10.0.4.1:80
 		-A KUBE-SEP-DKCFIS26GWF2WLWC -m comment --comment ns3/svc3:p80 -s 10.0.3.2 -j KUBE-MARK-MASQ
@@ -6219,7 +6196,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 		-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
-		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE --random-fully
 		-A KUBE-SEP-AYCN5HPXMIRJNJXU -m comment --comment ns4/svc4:p80 -s 10.0.4.1 -j KUBE-MARK-MASQ
 		-A KUBE-SEP-AYCN5HPXMIRJNJXU -m comment --comment ns4/svc4:p80 -m tcp -p tcp -j DNAT --to-destination 10.0.4.1:80
 		-A KUBE-SEP-DKCFIS26GWF2WLWC -m comment --comment ns3/svc3:p80 -s 10.0.3.2 -j KUBE-MARK-MASQ
@@ -6278,7 +6255,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 		-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
-		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE --random-fully
 		-A KUBE-SEP-AYCN5HPXMIRJNJXU -m comment --comment ns4/svc4:p80 -s 10.0.4.1 -j KUBE-MARK-MASQ
 		-A KUBE-SEP-AYCN5HPXMIRJNJXU -m comment --comment ns4/svc4:p80 -m tcp -p tcp -j DNAT --to-destination 10.0.4.1:80
 		-A KUBE-SEP-DKCFIS26GWF2WLWC -m comment --comment ns3/svc3:p80 -s 10.0.3.2 -j KUBE-MARK-MASQ
