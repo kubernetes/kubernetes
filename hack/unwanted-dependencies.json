@@ -20,6 +20,7 @@
       "github.com/gorilla/rpc": "unmaintained, archive mode",
       "github.com/gorilla/schema": "unmaintained, archive mode",
       "github.com/gorilla/websocket": "unmaintained, archive mode",
+      "github.com/grpc-ecosystem/grpc-gateway": "use github.com/grpc-ecosystem/grpc-gateway/v2",
       "github.com/hashicorp/consul": "MPL license not in CNCF allowlist",
       "github.com/hashicorp/errwrap": "MPL license not in CNCF allowlist",
       "github.com/hashicorp/go-immutable-radix": "MPL license not in CNCF allowlist",
@@ -82,6 +83,10 @@
       "github.com/gorilla/websocket": [
         "github.com/moby/spdystream",
         "github.com/tmc/grpc-websocket-proxy",
+        "go.etcd.io/etcd/server/v3"
+      ],
+      "github.com/grpc-ecosystem/grpc-gateway": [
+        "go.etcd.io/etcd/api/v3",
         "go.etcd.io/etcd/server/v3"
       ],
       "github.com/json-iterator/go": [
