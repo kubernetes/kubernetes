@@ -17,7 +17,6 @@ limitations under the License.
 package nftables
 
 import (
-	"bytes"
 	"fmt"
 	"net"
 	"reflect"
@@ -322,14 +321,12 @@ func NewFakeProxier(ipFamily v1.IPFamily) (*knftables.Fake, *Proxier) {
 		hostname:                 testHostname,
 		serviceHealthServer:      healthcheck.NewFakeServiceHealthServer(),
 		precomputedProbabilities: make([]string, 0, 1001),
-		iptablesData:             bytes.NewBuffer(nil),
-		filterChains:             proxyutil.NewLineBuffer(),
 		filterRules:              proxyutil.NewLineBuffer(),
-		natChains:                proxyutil.NewLineBuffer(),
 		natRules:                 proxyutil.NewLineBuffer(),
 		nodeIP:                   netutils.ParseIPSloppy(testNodeIP),
 		nodePortAddresses:        proxyutil.NewNodePortAddresses(ipFamily, nil),
 		networkInterfacer:        networkInterfacer,
+		staleChains:              make(map[string]time.Time),
 	}
 	p.setInitialized(true)
 	p.syncRunner = async.NewBoundedFrequencyRunner("test-sync-runner", p.syncProxyRules, 0, time.Minute, 1)
@@ -534,6 +531,32 @@ func TestOverallNFTablesRules(t *testing.T) {
 		add rule ip kube-proxy nat-postrouting jump masquerading
 		add chain ip kube-proxy nat-prerouting { type nat hook prerouting priority -100 ; }
 		add rule ip kube-proxy nat-prerouting jump services
+
+		# svc1
+		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
+		add chain ip kube-proxy endpoint-5OJB2KTY-ns1/svc1/tcp/p80__10.180.0.1/80
+
+		# svc2
+		add chain ip kube-proxy service-42NFTM6N-ns2/svc2/tcp/p80
+		add chain ip kube-proxy external-42NFTM6N-ns2/svc2/tcp/p80
+		add chain ip kube-proxy endpoint-SGOXE6O3-ns2/svc2/tcp/p80__10.180.0.2/80
+
+		# svc3
+		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
+		add chain ip kube-proxy external-4AT6LBPK-ns3/svc3/tcp/p80
+		add chain ip kube-proxy endpoint-UEIP74TE-ns3/svc3/tcp/p80__10.180.0.3/80
+
+		# svc4
+		add chain ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80
+		add chain ip kube-proxy external-LAUZTJTB-ns4/svc4/tcp/p80
+		add chain ip kube-proxy endpoint-5RFCDDV7-ns4/svc4/tcp/p80__10.180.0.5/80
+		add chain ip kube-proxy endpoint-UNZV3OEC-ns4/svc4/tcp/p80__10.180.0.4/80
+
+		# svc5
+		add chain ip kube-proxy service-HVFWP5L3-ns5/svc5/tcp/p80
+		add chain ip kube-proxy external-HVFWP5L3-ns5/svc5/tcp/p80
+		add chain ip kube-proxy firewall-HVFWP5L3-ns5/svc5/tcp/p80
+		add chain ip kube-proxy endpoint-GTK6MW7G-ns5/svc5/tcp/p80__10.180.0.3/80
 		`)
 
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
@@ -4229,6 +4252,14 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add rule ip kube-proxy nat-prerouting jump services
 		`)
 
+	// Helper function to make it look like time has passed (from the point of view of
+	// the stale-chain-deletion code).
+	ageStaleChains := func() {
+		for chain, t := range fp.staleChains {
+			fp.staleChains[chain] = t.Add(-2 * time.Second)
+		}
+	}
+
 	// Create initial state
 	var svc2 *v1.Service
 
@@ -4282,8 +4313,12 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	fp.syncProxyRules()
 
 	expected := baseRules + dedent.Dedent(`
-		# FIXME
-		`)
+		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
+		add chain ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80
+
+		add chain ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080
+		add chain ip kube-proxy endpoint-7RVP4LUQ-ns2/svc2/tcp/p8080__10.0.2.1/8080
+                `)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
 
 	// Add a new service and its endpoints
@@ -4316,16 +4351,30 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	fp.syncProxyRules()
 
 	expected = baseRules + dedent.Dedent(`
-		# FIXME
+		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
+		add chain ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80
+
+		add chain ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080
+		add chain ip kube-proxy endpoint-7RVP4LUQ-ns2/svc2/tcp/p8080__10.0.2.1/8080
+
+		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
+		add chain ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80
 		`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
 
-	// Delete a service.
+	// Delete a service; its chains will be flushed, but not immediately deleted.
 	fp.OnServiceDelete(svc2)
 	fp.syncProxyRules()
+	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
 
+	ageStaleChains()
+	fp.syncProxyRules()
 	expected = baseRules + dedent.Dedent(`
-		# FIXME
+		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
+		add chain ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80
+
+		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
+		add chain ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80
 		`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
 
@@ -4343,7 +4392,11 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	)
 	fp.syncProxyRules()
 	expected = baseRules + dedent.Dedent(`
-		# FIXME
+		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
+		add chain ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80
+
+		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
+		add chain ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80
 		`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
 
@@ -4362,7 +4415,14 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	)
 	fp.syncProxyRules()
 	expected = baseRules + dedent.Dedent(`
-		# FIXME
+		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
+		add chain ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80
+
+		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
+		add chain ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80
+
+		add chain ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80
+		add chain ip kube-proxy endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80
 		`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
 
@@ -4372,10 +4432,22 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	fp.OnEndpointSliceUpdate(eps3, eps3update)
 	fp.syncProxyRules()
 
+	// The old endpoint chain (for 10.0.3.1) will not be deleted yet.
 	expected = baseRules + dedent.Dedent(`
-		# FIXME
+		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
+		add chain ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80
+
+		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
+		add chain ip kube-proxy endpoint-2OCDJSZQ-ns3/svc3/tcp/p80__10.0.3.1/80
+		add chain ip kube-proxy endpoint-SWWHDC7X-ns3/svc3/tcp/p80__10.0.3.2/80
+
+		add chain ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80
+		add chain ip kube-proxy endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80
 		`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
+
+	// (Ensure the old svc3 chain gets deleted in the next sync.)
+	ageStaleChains()
 
 	// Add an endpoint to a service.
 	eps3update2 := eps3update.DeepCopy()
@@ -4384,7 +4456,15 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	fp.syncProxyRules()
 
 	expected = baseRules + dedent.Dedent(`
-		# FIXME
+		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
+		add chain ip kube-proxy endpoint-5TPGNJF2-ns1/svc1/tcp/p80__10.0.1.1/80
+
+		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
+		add chain ip kube-proxy endpoint-SWWHDC7X-ns3/svc3/tcp/p80__10.0.3.2/80
+		add chain ip kube-proxy endpoint-TQ2QKHCZ-ns3/svc3/tcp/p80__10.0.3.3/80
+
+		add chain ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80
+		add chain ip kube-proxy endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80
 		`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
 
@@ -4667,6 +4747,159 @@ func TestLoadBalancerIngressRouteTypeProxy(t *testing.T) {
 				t.Errorf("unexpected rule for %s", testCase.svcLBIP)
 			}
 			*/
+		})
+	}
+}
+
+func Test_servicePortChainNameBase(t *testing.T) {
+	testCases := []struct {
+		name     string
+		spn      proxy.ServicePortName
+		protocol string
+		expected string
+	}{
+		{
+			name: "simple",
+			spn: proxy.ServicePortName{
+				NamespacedName: types.NamespacedName{
+					Namespace: "testing",
+					Name:      "service",
+				},
+				Port: "http",
+			},
+			protocol: "tcp",
+			expected: "P4ZYZVCF-testing/service/tcp/http",
+		},
+		{
+			name: "different port, different hash",
+			spn: proxy.ServicePortName{
+				NamespacedName: types.NamespacedName{
+					Namespace: "testing",
+					Name:      "service",
+				},
+				Port: "https",
+			},
+			protocol: "tcp",
+			expected: "LZBRENCP-testing/service/tcp/https",
+		},
+		{
+			name: "max length",
+			spn: proxy.ServicePortName{
+				NamespacedName: types.NamespacedName{
+					Namespace: "very-long-namespace-name-abcdefghijklmnopqrstuvwxyz0123456789xx",
+					Name:      "very-long-service-name-why-would-you-even-do-this-i-mean-really",
+				},
+				Port: "port-443-providing-the-hypertext-transmission-protocol-with-tls",
+			},
+			protocol: "sctp",
+			expected: "KR6NACJP-very-long-namespace-name-abcdefghijklmnopqrstuvwxyz0123456789xx/very-long-service-name-why-would-you-even-do-this-i-mean-really/sctp/port-443-providing-the-hypertext-transmission-protocol-with-tls",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			name := servicePortChainNameBase(&tc.spn, tc.protocol)
+			if name != tc.expected {
+				t.Errorf("expected %q, got %q", tc.expected, name)
+			}
+		})
+	}
+}
+
+func Test_servicePortEndpointChainNameBase(t *testing.T) {
+	testCases := []struct {
+		name     string
+		spn      proxy.ServicePortName
+		protocol string
+		endpoint string
+		expected string
+	}{
+		{
+			name: "simple",
+			spn: proxy.ServicePortName{
+				NamespacedName: types.NamespacedName{
+					Namespace: "testing",
+					Name:      "service",
+				},
+				Port: "http",
+			},
+			protocol: "tcp",
+			endpoint: "10.180.0.1:80",
+			expected: "JO2XBXZR-testing/service/tcp/http__10.180.0.1/80",
+		},
+		{
+			name: "different endpoint, different hash",
+			spn: proxy.ServicePortName{
+				NamespacedName: types.NamespacedName{
+					Namespace: "testing",
+					Name:      "service",
+				},
+				Port: "http",
+			},
+			protocol: "tcp",
+			endpoint: "10.180.0.2:80",
+			expected: "5S6H3H22-testing/service/tcp/http__10.180.0.2/80",
+		},
+		{
+			name: "ipv6",
+			spn: proxy.ServicePortName{
+				NamespacedName: types.NamespacedName{
+					Namespace: "testing",
+					Name:      "service",
+				},
+				Port: "http",
+			},
+			protocol: "tcp",
+			endpoint: "[fd80:abcd:12::a1b2:c3d4:e5f6:9999]:80",
+			expected: "U7E2ET36-testing/service/tcp/http__fd80.abcd.12..a1b2.c3d4.e5f6.9999/80",
+		},
+		{
+			name: "max length without truncation",
+			spn: proxy.ServicePortName{
+				NamespacedName: types.NamespacedName{
+					Namespace: "very-long-namespace-name-abcdefghijklmnopqrstuvwxyz0123456789xx",
+					Name:      "very-long-service-name-why-would-you-even-do-this-i-mean-really",
+				},
+				Port: "port-443-providing-the-hypertext-transmission-protocol-with-tls",
+			},
+			protocol: "sctp",
+			endpoint: "[1234:5678:9abc:def0::abc:1234]:443",
+			expected: "5YS7AFEA-very-long-namespace-name-abcdefghijklmnopqrstuvwxyz0123456789xx/very-long-service-name-why-would-you-even-do-this-i-mean-really/sctp/port-443-providing-the-hypertext-transmission-protocol-with-tls__1234.5678.9abc.def0..abc.1234/443",
+		},
+		{
+			name: "truncated, 1",
+			spn: proxy.ServicePortName{
+				NamespacedName: types.NamespacedName{
+					Namespace: "very-long-namespace-name-abcdefghijklmnopqrstuvwxyz0123456789xx",
+					Name:      "very-long-service-name-why-would-you-even-do-this-i-mean-really",
+				},
+				Port: "port-443-providing-the-hypertext-transmission-protocol-with-tls",
+			},
+			protocol: "sctp",
+			endpoint: "[1234:5678:9abc:def0::abcd:1234:5678]:443",
+			expected: "CI6C53Q3-very-long-namespace-name-abcdefghijklmnopqrstuvwxyz0123456789xx/very-long-service-name-why-would-you-even-do-this-i-mean-really/sctp/port-443-providing-the-hypertext-transmission-protocol-with-tls__1234.5678.9abc.def0..abcd.1234...",
+		},
+		{
+			name: "truncated, 2 (different IP, which is not visible in the result)",
+			spn: proxy.ServicePortName{
+				NamespacedName: types.NamespacedName{
+					Namespace: "very-long-namespace-name-abcdefghijklmnopqrstuvwxyz0123456789xx",
+					Name:      "very-long-service-name-why-would-you-even-do-this-i-mean-really",
+				},
+				Port: "port-443-providing-the-hypertext-transmission-protocol-with-tls",
+			},
+			protocol: "sctp",
+			endpoint: "[1234:5678:9abc:def0::abcd:1234:8765]:443",
+			expected: "2FLXFK6X-very-long-namespace-name-abcdefghijklmnopqrstuvwxyz0123456789xx/very-long-service-name-why-would-you-even-do-this-i-mean-really/sctp/port-443-providing-the-hypertext-transmission-protocol-with-tls__1234.5678.9abc.def0..abcd.1234...",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			name := servicePortEndpointChainNameBase(&tc.spn, tc.protocol, tc.endpoint)
+			if name != tc.expected {
+				t.Errorf("expected %q, got %q", tc.expected, name)
+			}
 		})
 	}
 }
