@@ -342,7 +342,6 @@ func startVolumeExpandController(ctx context.Context, controllerContext Controll
 	expandController, expandControllerErr := expand.NewExpandController(
 		controllerContext.ClientBuilder.ClientOrDie("expand-controller"),
 		controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims(),
-		controllerContext.InformerFactory.Core().V1().PersistentVolumes(),
 		controllerContext.Cloud,
 		plugins,
 		csiTranslator,

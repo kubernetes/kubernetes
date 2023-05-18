@@ -95,7 +95,6 @@ func TestSyncHandler(t *testing.T) {
 		fakeKubeClient := controllervolumetesting.CreateTestClient()
 		informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 		pvcInformer := informerFactory.Core().V1().PersistentVolumeClaims()
-		pvInformer := informerFactory.Core().V1().PersistentVolumes()
 
 		pvc := test.pvc
 		if tc.pv != nil {
@@ -107,7 +106,7 @@ func TestSyncHandler(t *testing.T) {
 		}
 		allPlugins := []volume.VolumePlugin{}
 		translator := csitrans.New()
-		expc, err := NewExpandController(fakeKubeClient, pvcInformer, pvInformer, nil, allPlugins, translator, csimigration.NewPluginManager(translator, utilfeature.DefaultFeatureGate), nil)
+		expc, err := NewExpandController(fakeKubeClient, pvcInformer, nil, allPlugins, translator, csimigration.NewPluginManager(translator, utilfeature.DefaultFeatureGate), nil)
 		if err != nil {
 			t.Fatalf("error creating expand controller : %v", err)
 		}
