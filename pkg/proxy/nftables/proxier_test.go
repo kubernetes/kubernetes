@@ -29,6 +29,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/danwinship/knftables"
 	"github.com/google/go-cmp/cmp"
 	"github.com/lithammer/dedent"
 	v1 "k8s.io/api/core/v1"
@@ -293,10 +294,12 @@ var testNodeIPs = []string{testNodeIP, testNodeIPAlt, testExternalIP, testNodeIP
 func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 	// TODO: Call NewProxier after refactoring out the goroutine
 	// invocation into a Run() method.
-	ipfamily := v1.IPv4Protocol
+	ipFamily := v1.IPv4Protocol
+	nftablesFamily := knftables.IPv4Family
 	podCIDR := "10.0.0.0/8"
 	if ipt.IsIPv6() {
-		ipfamily = v1.IPv6Protocol
+		ipFamily = v1.IPv6Protocol
+		nftablesFamily = knftables.IPv6Family
 		podCIDR = "fd00:10::/64"
 	}
 	detectLocal, _ := proxyutiliptables.NewDetectLocalByCIDR(podCIDR)
@@ -319,12 +322,14 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 	networkInterfacer.AddInterfaceAddr(&itf1, addrs1)
 
 	p := &Proxier{
+		ipFamily:                 ipFamily,
 		exec:                     &fakeexec.FakeExec{},
 		svcPortMap:               make(proxy.ServicePortMap),
-		serviceChanges:           proxy.NewServiceChangeTracker(newServiceInfo, ipfamily, nil, nil),
+		serviceChanges:           proxy.NewServiceChangeTracker(newServiceInfo, ipFamily, nil, nil),
 		endpointsMap:             make(proxy.EndpointsMap),
-		endpointsChanges:         proxy.NewEndpointsChangeTracker(testHostname, newEndpointInfo, ipfamily, nil, nil),
+		endpointsChanges:         proxy.NewEndpointsChangeTracker(testHostname, newEndpointInfo, ipFamily, nil, nil),
 		iptables:                 ipt,
+		nftables:                 knftables.NewFake(nftablesFamily, kubeProxyTable),
 		masqueradeMark:           "0x4000",
 		localDetector:            detectLocal,
 		hostname:                 testHostname,
@@ -337,7 +342,7 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		natChains:                proxyutil.NewLineBuffer(),
 		natRules:                 proxyutil.NewLineBuffer(),
 		nodeIP:                   netutils.ParseIPSloppy(testNodeIP),
-		nodePortAddresses:        proxyutil.NewNodePortAddresses(ipfamily, nil),
+		nodePortAddresses:        proxyutil.NewNodePortAddresses(ipFamily, nil),
 		networkInterfacer:        networkInterfacer,
 	}
 	p.setInitialized(true)

@@ -17,7 +17,7 @@ limitations under the License.
 package nftables
 
 //
-// NOTE: this needs to be tested in e2e since it uses iptables for everything.
+// NOTE: this needs to be tested in e2e since it uses nftables for everything.
 //
 
 import (
@@ -32,6 +32,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/danwinship/knftables"
 
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
@@ -50,11 +52,15 @@ import (
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	"k8s.io/kubernetes/pkg/util/async"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
+	utiliptablestesting "k8s.io/kubernetes/pkg/util/iptables/testing"
 	utilexec "k8s.io/utils/exec"
 	netutils "k8s.io/utils/net"
 )
 
 const (
+	// the nftables table
+	kubeProxyTable = "kube-proxy"
+
 	// the services chain in the filter table
 	kubeServicesFilterChain = "KUBE-SERVICES"
 
@@ -125,14 +131,13 @@ func newEndpointInfo(baseInfo *proxy.BaseEndpointInfo, svcPortName *proxy.Servic
 	}
 }
 
-// Proxier is an iptables based proxy for connections between a localhost:lport
-// and services that provide the actual backends.
+// Proxier is an nftables based proxy
 type Proxier struct {
 	// ipFamily defines the IP family which this proxier is tracking.
 	ipFamily v1.IPFamily
 
 	// endpointsChanges and serviceChanges contains all changes to endpoints and
-	// services that happened since iptables was synced. For a single object,
+	// services that happened since nftables was synced. For a single object,
 	// changes are accumulated, i.e. previous is state from before all of them,
 	// current is state after applying all of those.
 	endpointsChanges *proxy.EndpointsChangeTracker
@@ -144,7 +149,7 @@ type Proxier struct {
 	nodeLabels   map[string]string
 	// endpointSlicesSynced, and servicesSynced are set to true
 	// when corresponding objects are synced after startup. This is used to avoid
-	// updating iptables with some partial data after kube-proxy restart.
+	// updating nftables with some partial data after kube-proxy restart.
 	endpointSlicesSynced bool
 	servicesSynced       bool
 	initialized          int32
@@ -153,6 +158,7 @@ type Proxier struct {
 
 	// These are effectively const and do not need the mutex to be held.
 	iptables       utiliptables.Interface
+	nftables       knftables.Interface
 	masqueradeAll  bool
 	masqueradeMark string
 	exec           utilexec.Interface
@@ -191,15 +197,11 @@ type Proxier struct {
 // Proxier implements proxy.Provider
 var _ proxy.Provider = &Proxier{}
 
-// NewProxier returns a new Proxier given an iptables Interface instance.
-// Because of the iptables logic, it is assumed that there is only a single Proxier active on a machine.
-// An error will be returned if iptables fails to update or acquire the initial lock.
-// Once a proxier is created, it will keep iptables up to date in the background and
-// will not terminate if a particular iptables call fails.
+// NewProxier returns a new nftables Proxier. Once a proxier is created, it will keep
+// nftables up to date in the background and will not terminate if a particular nftables
+// call fails.
 func NewProxier(ipFamily v1.IPFamily,
-	ipt utiliptables.Interface,
 	sysctl utilsysctl.Interface,
-	exec utilexec.Interface,
 	syncPeriod time.Duration,
 	minSyncPeriod time.Duration,
 	masqueradeAll bool,
@@ -231,9 +233,20 @@ func NewProxier(ipFamily v1.IPFamily,
 	// Generate the masquerade mark to use for SNAT rules.
 	masqueradeValue := 1 << uint(masqueradeBit)
 	masqueradeMark := fmt.Sprintf("%#08x", masqueradeValue)
-	klog.V(2).InfoS("Using iptables mark for masquerade", "ipFamily", ipt.Protocol(), "mark", masqueradeMark)
+	klog.V(2).InfoS("Using nftables mark for masquerade", "ipFamily", ipFamily, "mark", masqueradeMark)
 
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses, healthzServer)
+
+	var nftablesFamily knftables.Family
+	if ipFamily == v1.IPv4Protocol {
+		nftablesFamily = knftables.IPv4Family
+	} else {
+		nftablesFamily = knftables.IPv6Family
+	}
+	nft, err := knftables.New(nftablesFamily, kubeProxyTable)
+	if err != nil {
+		return nil, err
+	}
 
 	proxier := &Proxier{
 		ipFamily:                 ipFamily,
@@ -242,10 +255,11 @@ func NewProxier(ipFamily v1.IPFamily,
 		endpointsMap:             make(proxy.EndpointsMap),
 		endpointsChanges:         proxy.NewEndpointsChangeTracker(hostname, newEndpointInfo, ipFamily, recorder, nil),
 		syncPeriod:               syncPeriod,
-		iptables:                 ipt,
+		iptables:                 utiliptablestesting.NewFake(),
+		nftables:                 nft,
 		masqueradeAll:            masqueradeAll,
 		masqueradeMark:           masqueradeMark,
-		exec:                     exec,
+		exec:                     utilexec.New(),
 		localDetector:            localDetector,
 		hostname:                 hostname,
 		nodeIP:                   nodeIP,
@@ -265,7 +279,7 @@ func NewProxier(ipFamily v1.IPFamily,
 	}
 
 	burstSyncs := 2
-	klog.V(2).InfoS("Iptables sync params", "ipFamily", ipt.Protocol(), "minSyncPeriod", minSyncPeriod, "syncPeriod", syncPeriod, "burstSyncs", burstSyncs)
+	klog.V(2).InfoS("NFTables sync params", "ipFamily", ipFamily, "minSyncPeriod", minSyncPeriod, "syncPeriod", syncPeriod, "burstSyncs", burstSyncs)
 	proxier.syncRunner = async.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, syncPeriod, burstSyncs)
 
 	return proxier, nil
@@ -273,9 +287,7 @@ func NewProxier(ipFamily v1.IPFamily,
 
 // NewDualStackProxier creates a MetaProxier instance, with IPv4 and IPv6 proxies.
 func NewDualStackProxier(
-	ipt [2]utiliptables.Interface,
 	sysctl utilsysctl.Interface,
-	exec utilexec.Interface,
 	syncPeriod time.Duration,
 	minSyncPeriod time.Duration,
 	masqueradeAll bool,
@@ -289,15 +301,15 @@ func NewDualStackProxier(
 	initOnly bool,
 ) (proxy.Provider, error) {
 	// Create an ipv4 instance of the single-stack proxier
-	ipv4Proxier, err := NewProxier(v1.IPv4Protocol, ipt[0], sysctl,
-		exec, syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit, localDetectors[0], hostname,
+	ipv4Proxier, err := NewProxier(v1.IPv4Protocol, sysctl,
+		syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit, localDetectors[0], hostname,
 		nodeIPs[v1.IPv4Protocol], recorder, healthzServer, nodePortAddresses, initOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
 
-	ipv6Proxier, err := NewProxier(v1.IPv6Protocol, ipt[1], sysctl,
-		exec, syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit, localDetectors[1], hostname,
+	ipv6Proxier, err := NewProxier(v1.IPv6Protocol, sysctl,
+		syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit, localDetectors[1], hostname,
 		nodeIPs[v1.IPv6Protocol], recorder, healthzServer, nodePortAddresses, initOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
@@ -439,7 +451,7 @@ func (proxier *Proxier) probability(n int) string {
 	return proxier.precomputedProbabilities[n]
 }
 
-// Sync is called to synchronize the proxier state to iptables as soon as possible.
+// Sync is called to synchronize the proxier state to nftables as soon as possible.
 func (proxier *Proxier) Sync() {
 	if proxier.healthzServer != nil {
 		proxier.healthzServer.QueuedUpdate(proxier.ipFamily)
@@ -681,8 +693,7 @@ func isServiceChainName(chainString string) bool {
 	return false
 }
 
-// This is where all of the iptables-save/restore calls happen.
-// The only other iptables rules are those that are setup in iptablesInit()
+// This is where all of the nftables calls happen.
 // This assumes proxier.mu is NOT held
 func (proxier *Proxier) syncProxyRules() {
 	proxier.mu.Lock()
@@ -690,7 +701,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// don't sync rules till we've received services and endpoints
 	if !proxier.isInitialized() {
-		klog.V(2).InfoS("Not syncing iptables until Services and Endpoints have been received from master")
+		klog.V(2).InfoS("Not syncing nftables until Services and Endpoints have been received from master")
 		return
 	}
 
@@ -704,7 +715,7 @@ func (proxier *Proxier) syncProxyRules() {
 	serviceUpdateResult := proxier.svcPortMap.Update(proxier.serviceChanges)
 	endpointUpdateResult := proxier.endpointsMap.Update(proxier.endpointsChanges)
 
-	klog.V(2).InfoS("Syncing iptables rules")
+	klog.V(2).InfoS("Syncing nftables rules")
 
 	success := false
 	defer func() {
@@ -734,7 +745,7 @@ func (proxier *Proxier) syncProxyRules() {
 	}
 
 	//
-	// Below this point we will not return until we try to write the iptables rules.
+	// Below this point we will not return until we try to write the nftables rules.
 	//
 
 	// Reset all buffers used later.
@@ -1246,7 +1257,7 @@ func (proxier *Proxier) syncProxyRules() {
 	// Finally, tail-call to the nodePorts chain.  This needs to be after all
 	// other service portal rules.
 	if proxier.nodePortAddresses.MatchAll() {
-		isIPv6 := proxier.iptables.IsIPv6()
+		isIPv6 := proxier.ipFamily == v1.IPv6Protocol
 
 		destinations := []string{"-m", "addrtype", "--dst-type", "LOCAL"}
 		// Block localhost nodePorts
@@ -1308,7 +1319,7 @@ func (proxier *Proxier) syncProxyRules() {
 	proxier.iptablesData.Write(proxier.natRules.Bytes())
 	proxier.iptablesData.WriteString("COMMIT\n")
 
-	klog.V(2).InfoS("Reloading service iptables data",
+	klog.V(2).InfoS("Reloading service nftables data",
 		"numServices", len(proxier.svcPortMap),
 		"numEndpoints", totalEndpoints,
 		"numFilterChains", proxier.filterChains.Lines(),
@@ -1358,7 +1369,7 @@ func (proxier *Proxier) syncProxyRules() {
 	}
 
 	// Finish housekeeping, clear stale conntrack entries for UDP Services
-	conntrack.CleanStaleEntries(proxier.iptables.IsIPv6(), proxier.exec, proxier.svcPortMap, serviceUpdateResult, endpointUpdateResult)
+	conntrack.CleanStaleEntries(proxier.ipFamily == v1.IPv6Protocol, proxier.exec, proxier.svcPortMap, serviceUpdateResult, endpointUpdateResult)
 }
 
 func (proxier *Proxier) writeServiceToEndpointRules(svcPortNameString string, svcInfo proxy.ServicePort, svcChain string, endpoints []proxy.Endpoint) {

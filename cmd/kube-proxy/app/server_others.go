@@ -299,9 +299,7 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 
 			// TODO this has side effects that should only happen when Run() is invoked.
 			proxier, err = nftables.NewDualStackProxier(
-				ipt,
 				utilsysctl.New(),
-				execer,
 				config.NFTables.SyncPeriod.Duration,
 				config.NFTables.MinSyncPeriod.Duration,
 				config.NFTables.MasqueradeAll,
@@ -325,9 +323,7 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 			// TODO this has side effects that should only happen when Run() is invoked.
 			proxier, err = nftables.NewProxier(
 				s.PrimaryIPFamily,
-				iptInterface,
 				utilsysctl.New(),
-				execer,
 				config.NFTables.SyncPeriod.Duration,
 				config.NFTables.MinSyncPeriod.Duration,
 				config.NFTables.MasqueradeAll,
