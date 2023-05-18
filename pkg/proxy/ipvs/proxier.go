@@ -409,7 +409,7 @@ func NewProxier(ipFamily v1.IPFamily,
 		scheduler = defaultScheduler
 	}
 
-	nodePortAddresses := utilproxy.NewNodePortAddresses(nodePortAddressStrings)
+	nodePortAddresses := utilproxy.NewNodePortAddresses(ipFamily, nodePortAddressStrings)
 
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses, healthzServer)
 
@@ -490,14 +490,12 @@ func NewDualStackProxier(
 
 	safeIpset := newSafeIpset(ipset)
 
-	ipFamilyMap := utilproxy.MapCIDRsByIPFamily(nodePortAddresses)
-
 	// Create an ipv4 instance of the single-stack proxier
 	ipv4Proxier, err := NewProxier(v1.IPv4Protocol, ipt[0], ipvs, safeIpset, sysctl,
 		exec, syncPeriod, minSyncPeriod, filterCIDRs(false, excludeCIDRs), strictARP,
 		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
 		localDetectors[0], hostname, nodeIP[0],
-		recorder, healthzServer, scheduler, ipFamilyMap[v1.IPv4Protocol], kernelHandler)
+		recorder, healthzServer, scheduler, nodePortAddresses, kernelHandler)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
@@ -506,7 +504,7 @@ func NewDualStackProxier(
 		exec, syncPeriod, minSyncPeriod, filterCIDRs(true, excludeCIDRs), strictARP,
 		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
 		localDetectors[1], hostname, nodeIP[1],
-		recorder, healthzServer, scheduler, ipFamilyMap[v1.IPv6Protocol], kernelHandler)
+		recorder, healthzServer, scheduler, nodePortAddresses, kernelHandler)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
 	}
@@ -1004,35 +1002,23 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 	}
 
-	// Both nodeAddresses and nodeIPs can be reused for all nodePort services
-	// and only need to be computed if we have at least one nodePort service.
-	var (
-		// List of node addresses to listen on if a nodePort is set.
-		nodeAddresses []string
-		// List of node IP addresses to be used as IPVS services if nodePort is set.
-		nodeIPs []net.IP
-	)
-
+	// List of node IP addresses to be used as IPVS services if nodePort is set. This
+	// can be reused for all nodePort services.
+	var nodeIPs []net.IP
 	if hasNodePort {
-		nodeAddrSet, err := proxier.nodePortAddresses.GetNodeAddresses(proxier.networkInterfacer)
-		if err != nil {
-			klog.ErrorS(err, "Failed to get node IP address matching nodeport cidr")
+		if proxier.nodePortAddresses.MatchAll() {
+			for _, ipStr := range nodeAddressSet.UnsortedList() {
+				nodeIPs = append(nodeIPs, netutils.ParseIPSloppy(ipStr))
+			}
 		} else {
-			nodeAddresses = nodeAddrSet.UnsortedList()
-			for _, address := range nodeAddresses {
-				a := netutils.ParseIPSloppy(address)
-				if a.IsLoopback() {
-					continue
-				}
-				if utilproxy.IsZeroCIDR(address) {
-					nodeIPs = nil
-					for _, ipStr := range nodeAddressSet.UnsortedList() {
-						nodeIPs = append(nodeIPs, netutils.ParseIPSloppy(ipStr))
+			allNodeIPs, err := proxier.nodePortAddresses.GetNodeIPs(proxier.networkInterfacer)
+			if err != nil {
+				klog.ErrorS(err, "Failed to get node IP address matching nodeport cidr")
+			} else {
+				for _, ip := range allNodeIPs {
+					if !ip.IsLoopback() {
+						nodeIPs = append(nodeIPs, ip)
 					}
-					break
-				}
-				if getIPFamily(a) == proxier.ipFamily {
-					nodeIPs = append(nodeIPs, a)
 				}
 			}
 		}
@@ -1292,7 +1278,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		if svcInfo.NodePort() != 0 {
-			if len(nodeAddresses) == 0 || len(nodeIPs) == 0 {
+			if len(nodeIPs) == 0 {
 				// Skip nodePort configuration since an error occurred when
 				// computing nodeAddresses or nodeIPs.
 				continue

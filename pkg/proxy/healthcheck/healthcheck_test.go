@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -140,7 +141,7 @@ func (fake fakeProxierHealthChecker) IsHealthy() bool {
 func TestServer(t *testing.T) {
 	listener := newFakeListener()
 	httpFactory := newFakeHTTPServerFactory()
-	nodePortAddresses := utilproxy.NewNodePortAddresses([]string{})
+	nodePortAddresses := utilproxy.NewNodePortAddresses(v1.IPv4Protocol, []string{})
 	proxyChecker := &fakeProxierHealthChecker{true}
 
 	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory, nodePortAddresses, proxyChecker)
@@ -177,7 +178,7 @@ func TestServer(t *testing.T) {
 	if len(listener.openPorts) != 1 {
 		t.Errorf("expected 1 open port, got %d\n%s", len(listener.openPorts), dump.Pretty(listener.openPorts))
 	}
-	if !listener.hasPort(":9376") {
+	if !listener.hasPort("0.0.0.0:9376") {
 		t.Errorf("expected port :9376 to be open\n%s", dump.Pretty(listener.openPorts))
 	}
 	// test the handler
@@ -470,7 +471,7 @@ func TestServerWithSelectiveListeningAddress(t *testing.T) {
 
 	// limiting addresses to loop back. We don't want any cleverness here around getting IP for
 	// machine nor testing ipv6 || ipv4. using loop back guarantees the test will work on any machine
-	nodePortAddresses := utilproxy.NewNodePortAddresses([]string{"127.0.0.0/8"})
+	nodePortAddresses := utilproxy.NewNodePortAddresses(v1.IPv4Protocol, []string{"127.0.0.0/8"})
 
 	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory, nodePortAddresses, proxyChecker)
 	hcs := hcsi.(*server)

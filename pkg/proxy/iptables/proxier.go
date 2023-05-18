@@ -240,7 +240,7 @@ func NewProxier(ipFamily v1.IPFamily,
 	healthzServer healthcheck.ProxierHealthUpdater,
 	nodePortAddressStrings []string,
 ) (*Proxier, error) {
-	nodePortAddresses := utilproxy.NewNodePortAddresses(nodePortAddressStrings)
+	nodePortAddresses := utilproxy.NewNodePortAddresses(ipFamily, nodePortAddressStrings)
 
 	if !nodePortAddresses.ContainsIPv4Loopback() {
 		localhostNodePorts = false
@@ -334,17 +334,16 @@ func NewDualStackProxier(
 	nodePortAddresses []string,
 ) (proxy.Provider, error) {
 	// Create an ipv4 instance of the single-stack proxier
-	ipFamilyMap := utilproxy.MapCIDRsByIPFamily(nodePortAddresses)
 	ipv4Proxier, err := NewProxier(v1.IPv4Protocol, ipt[0], sysctl,
 		exec, syncPeriod, minSyncPeriod, masqueradeAll, localhostNodePorts, masqueradeBit, localDetectors[0], hostname,
-		nodeIP[0], recorder, healthzServer, ipFamilyMap[v1.IPv4Protocol])
+		nodeIP[0], recorder, healthzServer, nodePortAddresses)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
 
 	ipv6Proxier, err := NewProxier(v1.IPv6Protocol, ipt[1], sysctl,
 		exec, syncPeriod, minSyncPeriod, masqueradeAll, false, masqueradeBit, localDetectors[1], hostname,
-		nodeIP[1], recorder, healthzServer, ipFamilyMap[v1.IPv6Protocol])
+		nodeIP[1], recorder, healthzServer, nodePortAddresses)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
 	}
@@ -1416,70 +1415,44 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// Finally, tail-call to the nodePorts chain.  This needs to be after all
 	// other service portal rules.
-	nodeAddresses, err := proxier.nodePortAddresses.GetNodeAddresses(proxier.networkInterfacer)
-	if err != nil {
-		klog.ErrorS(err, "Failed to get node ip address matching nodeport cidrs, services with nodeport may not work as intended", "CIDRs", proxier.nodePortAddresses)
-	}
-	// nodeAddresses may contain dual-stack zero-CIDRs if proxier.nodePortAddresses is empty.
-	// Ensure nodeAddresses only contains the addresses for this proxier's IP family.
-	for addr := range nodeAddresses {
-		if utilproxy.IsZeroCIDR(addr) && isIPv6 == netutils.IsIPv6CIDRString(addr) {
-			// if any of the addresses is zero cidr of this IP family, non-zero IPs can be excluded.
-			nodeAddresses = sets.New[string](addr)
-			break
-		}
-	}
-
-	for address := range nodeAddresses {
-		if utilproxy.IsZeroCIDR(address) {
-			destinations := []string{"-m", "addrtype", "--dst-type", "LOCAL"}
-			if isIPv6 {
-				// For IPv6, Regardless of the value of localhostNodePorts is true
-				// or false, we should disable access to the nodePort via localhost. Since it never works and always
-				// cause kernel warnings.
-				destinations = append(destinations, "!", "-d", "::1/128")
-			}
-
-			if !proxier.localhostNodePorts && !isIPv6 {
-				// If set localhostNodePorts to "false"(route_localnet=0), We should generate iptables rules that
-				// disable NodePort services to be accessed via localhost. Since it doesn't work and causes
-				// the kernel to log warnings if anyone tries.
-				destinations = append(destinations, "!", "-d", "127.0.0.0/8")
-			}
-
-			proxier.natRules.Write(
-				"-A", string(kubeServicesChain),
-				"-m", "comment", "--comment", `"kubernetes service nodeports; NOTE: this must be the last rule in this chain"`,
-				destinations,
-				"-j", string(kubeNodePortsChain))
-			break
+	if proxier.nodePortAddresses.MatchAll() {
+		destinations := []string{"-m", "addrtype", "--dst-type", "LOCAL"}
+		// Block localhost nodePorts if they are not supported. (For IPv6 they never
+		// work, and for IPv4 they only work if we previously set `route_localnet`.)
+		if isIPv6 {
+			destinations = append(destinations, "!", "-d", "::1/128")
+		} else if !proxier.localhostNodePorts {
+			destinations = append(destinations, "!", "-d", "127.0.0.0/8")
 		}
 
-		// Ignore IP addresses with incorrect version
-		if isIPv6 && !netutils.IsIPv6String(address) || !isIPv6 && netutils.IsIPv6String(address) {
-			klog.ErrorS(nil, "IP has incorrect IP version", "IP", address)
-			continue
-		}
-
-		// For ipv6, Regardless of the value of localhostNodePorts is true or false, we should disallow access
-		// to the nodePort via lookBack address.
-		if isIPv6 && utilproxy.IsLoopBack(address) {
-			klog.ErrorS(nil, "disallow nodePort services to be accessed via ipv6 localhost address", "IP", address)
-			continue
-		}
-
-		// For ipv4, When localhostNodePorts is set to false, Ignore ipv4 lookBack address
-		if !isIPv6 && utilproxy.IsLoopBack(address) && !proxier.localhostNodePorts {
-			klog.ErrorS(nil, "disallow nodePort services to be accessed via ipv4 localhost address", "IP", address)
-			continue
-		}
-
-		// create nodeport rules for each IP one by one
 		proxier.natRules.Write(
 			"-A", string(kubeServicesChain),
 			"-m", "comment", "--comment", `"kubernetes service nodeports; NOTE: this must be the last rule in this chain"`,
-			"-d", address,
+			destinations,
 			"-j", string(kubeNodePortsChain))
+	} else {
+		nodeIPs, err := proxier.nodePortAddresses.GetNodeIPs(proxier.networkInterfacer)
+		if err != nil {
+			klog.ErrorS(err, "Failed to get node ip address matching nodeport cidrs, services with nodeport may not work as intended", "CIDRs", proxier.nodePortAddresses)
+		}
+		for _, ip := range nodeIPs {
+			if ip.IsLoopback() {
+				if isIPv6 {
+					klog.ErrorS(nil, "--nodeport-addresses includes localhost but localhost NodePorts are not supported on IPv6", "address", ip.String())
+					continue
+				} else if !proxier.localhostNodePorts {
+					klog.ErrorS(nil, "--nodeport-addresses includes localhost but --iptables-localhost-nodeports=false was passed", "address", ip.String())
+					continue
+				}
+			}
+
+			// create nodeport rules for each IP one by one
+			proxier.natRules.Write(
+				"-A", string(kubeServicesChain),
+				"-m", "comment", "--comment", `"kubernetes service nodeports; NOTE: this must be the last rule in this chain"`,
+				"-d", ip.String(),
+				"-j", string(kubeNodePortsChain))
+		}
 	}
 
 	// Drop the packets in INVALID state, which would potentially cause
@@ -1537,7 +1510,7 @@ func (proxier *Proxier) syncProxyRules() {
 	klog.V(9).InfoS("Restoring iptables", "rules", proxier.iptablesData.Bytes())
 
 	// NOTE: NoFlushTables is used so we don't flush non-kubernetes chains in the table
-	err = proxier.iptables.RestoreAll(proxier.iptablesData.Bytes(), utiliptables.NoFlushTables, utiliptables.RestoreCounters)
+	err := proxier.iptables.RestoreAll(proxier.iptablesData.Bytes(), utiliptables.NoFlushTables, utiliptables.RestoreCounters)
 	if err != nil {
 		if pErr, ok := err.(utiliptables.ParseError); ok {
 			lines := utiliptables.ExtractLines(proxier.iptablesData.Bytes(), pErr.Line(), 3)
