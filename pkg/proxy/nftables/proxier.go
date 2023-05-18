@@ -56,6 +56,7 @@ import (
 	utiliptablestesting "k8s.io/kubernetes/pkg/util/iptables/testing"
 	utilexec "k8s.io/utils/exec"
 	netutils "k8s.io/utils/net"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -178,12 +179,11 @@ type Proxier struct {
 
 	// The following buffers are used to reuse memory and avoid allocations
 	// that are significantly impacting performance.
-	iptablesData             *bytes.Buffer
-	existingFilterChainsData *bytes.Buffer
-	filterChains             proxyutil.LineBuffer
-	filterRules              proxyutil.LineBuffer
-	natChains                proxyutil.LineBuffer
-	natRules                 proxyutil.LineBuffer
+	iptablesData *bytes.Buffer
+	filterChains proxyutil.LineBuffer
+	filterRules  proxyutil.LineBuffer
+	natChains    proxyutil.LineBuffer
+	natRules     proxyutil.LineBuffer
 
 	// conntrackTCPLiberal indicates whether the system sets the kernel nf_conntrack_tcp_be_liberal
 	conntrackTCPLiberal bool
@@ -269,7 +269,6 @@ func NewProxier(ipFamily v1.IPFamily,
 		healthzServer:            healthzServer,
 		precomputedProbabilities: make([]string, 0, 1001),
 		iptablesData:             bytes.NewBuffer(nil),
-		existingFilterChainsData: bytes.NewBuffer(nil),
 		filterChains:             proxyutil.NewLineBuffer(),
 		filterRules:              proxyutil.NewLineBuffer(),
 		natChains:                proxyutil.NewLineBuffer(),
@@ -341,6 +340,12 @@ var iptablesJumpChains = []iptablesJumpChain{
 	{utiliptables.TableNAT, kubeServicesChain, utiliptables.ChainOutput, "kubernetes service portals", nil},
 	{utiliptables.TableNAT, kubeServicesChain, utiliptables.ChainPrerouting, "kubernetes service portals", nil},
 	{utiliptables.TableNAT, kubePostroutingChain, utiliptables.ChainPostrouting, "kubernetes postrouting rules", nil},
+}
+
+func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
+	tx.Add(&knftables.Table{
+		Comment: ptr.To("rules for kube-proxy"),
+	})
 }
 
 // CleanupLeftovers removes all nftables rules and chains created by the Proxier
@@ -659,6 +664,9 @@ func (proxier *Proxier) syncProxyRules() {
 			proxier.syncRunner.RetryAfter(proxier.syncPeriod)
 		}
 	}()
+
+	tx := proxier.nftables.NewTransaction()
+	proxier.setupNFTables(tx)
 
 	// Ensure that our jump rules (eg from PREROUTING to KUBE-SERVICES) exist.
 	// We can't do this as part of the iptables-restore because we don't want
@@ -1244,16 +1252,6 @@ func (proxier *Proxier) syncProxyRules() {
 	metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableNAT)).Set(float64(proxier.natRules.Lines() - deletedChains))
 
 	// Sync rules.
-	proxier.iptablesData.Reset()
-	proxier.iptablesData.WriteString("*filter\n")
-	proxier.iptablesData.Write(proxier.filterChains.Bytes())
-	proxier.iptablesData.Write(proxier.filterRules.Bytes())
-	proxier.iptablesData.WriteString("COMMIT\n")
-	proxier.iptablesData.WriteString("*nat\n")
-	proxier.iptablesData.Write(proxier.natChains.Bytes())
-	proxier.iptablesData.Write(proxier.natRules.Bytes())
-	proxier.iptablesData.WriteString("COMMIT\n")
-
 	klog.V(2).InfoS("Reloading service nftables data",
 		"numServices", len(proxier.svcPortMap),
 		"numEndpoints", totalEndpoints,
@@ -1262,17 +1260,13 @@ func (proxier *Proxier) syncProxyRules() {
 		"numNATChains", proxier.natChains.Lines(),
 		"numNATRules", proxier.natRules.Lines(),
 	)
-	klog.V(9).InfoS("Restoring iptables", "rules", proxier.iptablesData.Bytes())
 
-	// NOTE: NoFlushTables is used so we don't flush non-kubernetes chains in the table
-	err := proxier.iptables.RestoreAll(proxier.iptablesData.Bytes(), utiliptables.NoFlushTables, utiliptables.RestoreCounters)
+	// FIXME
+	// klog.V(9).InfoS("Running nftables transaction", "transaction", tx.Bytes())
+
+	err := proxier.nftables.Run(context.TODO(), tx)
 	if err != nil {
-		if pErr, ok := err.(utiliptables.ParseError); ok {
-			lines := utiliptables.ExtractLines(proxier.iptablesData.Bytes(), pErr.Line(), 3)
-			klog.ErrorS(pErr, "Failed to execute iptables-restore", "rules", lines)
-		} else {
-			klog.ErrorS(err, "Failed to execute iptables-restore")
-		}
+		klog.ErrorS(err, "nftables sync failed")
 		metrics.IptablesRestoreFailuresTotal.Inc()
 		return
 	}
