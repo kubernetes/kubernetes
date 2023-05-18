@@ -1027,10 +1027,10 @@ func TestWaitForDifferentJSONPathExpression(t *testing.T) {
 	}
 
 	tests := []struct {
-		name         string
-		fakeClient   func() *dynamicfakeclient.FakeDynamicClient
-		jsonPathExp  string
-		jsonPathCond string
+		name                   string
+		fakeClient             func() *dynamicfakeclient.FakeDynamicClient
+		jsonPathExp            string
+		jsonPathExpectedResult string
 
 		expectedErr string
 	}{
@@ -1041,20 +1041,20 @@ func TestWaitForDifferentJSONPathExpression(t *testing.T) {
 				fakeClient.PrependReactor("list", "theresource", listReactionfunc)
 				return fakeClient
 			},
-			jsonPathExp:  "{.foo.bar}",
-			jsonPathCond: "baz",
+			jsonPathExp:            "{.foo.bar}",
+			jsonPathExpectedResult: "baz",
 
 			expectedErr: "timed out waiting for the condition on theresource/foo-b6699dcfb-rnv7t",
 		},
 		{
-			name: "JSONPath condition not given",
+			name: "JSONPathExpectedResult not given",
 			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
 				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
 				fakeClient.PrependReactor("list", "theresource", listReactionfunc)
 				return fakeClient
 			},
-			jsonPathExp:  "{.status.containerStatuses[0].ready}",
-			jsonPathCond: "",
+			jsonPathExp:            "{.status.containerStatuses[0].ready}",
+			jsonPathExpectedResult: "",
 
 			expectedErr: None,
 		},
@@ -1065,8 +1065,8 @@ func TestWaitForDifferentJSONPathExpression(t *testing.T) {
 				fakeClient.PrependReactor("list", "theresource", listReactionfunc)
 				return fakeClient
 			},
-			jsonPathExp:  "{.status.containerStatuses[0].ready}",
-			jsonPathCond: "true",
+			jsonPathExp:            "{.status.containerStatuses[0].ready}",
+			jsonPathExpectedResult: "true",
 
 			expectedErr: None,
 		},
@@ -1077,8 +1077,8 @@ func TestWaitForDifferentJSONPathExpression(t *testing.T) {
 				fakeClient.PrependReactor("list", "theresource", listReactionfunc)
 				return fakeClient
 			},
-			jsonPathExp:  "{.status.containerStatuses[0].ready}",
-			jsonPathCond: "false",
+			jsonPathExp:            "{.status.containerStatuses[0].ready}",
+			jsonPathExpectedResult: "false",
 
 			expectedErr: "timed out waiting for the condition on theresource/foo-b6699dcfb-rnv7t",
 		},
@@ -1089,8 +1089,8 @@ func TestWaitForDifferentJSONPathExpression(t *testing.T) {
 				fakeClient.PrependReactor("list", "theresource", listReactionfunc)
 				return fakeClient
 			},
-			jsonPathExp:  "{.spec.containers[0].ports[0].containerPort}",
-			jsonPathCond: "80",
+			jsonPathExp:            "{.spec.containers[0].ports[0].containerPort}",
+			jsonPathExpectedResult: "80",
 
 			expectedErr: None,
 		},
@@ -1101,8 +1101,8 @@ func TestWaitForDifferentJSONPathExpression(t *testing.T) {
 				fakeClient.PrependReactor("list", "theresource", listReactionfunc)
 				return fakeClient
 			},
-			jsonPathExp:  "{.spec.containers[0].ports[0].containerPort}",
-			jsonPathCond: "81",
+			jsonPathExp:            "{.spec.containers[0].ports[0].containerPort}",
+			jsonPathExpectedResult: "81",
 
 			expectedErr: "timed out waiting for the condition on theresource/foo-b6699dcfb-rnv7t",
 		},
@@ -1113,8 +1113,8 @@ func TestWaitForDifferentJSONPathExpression(t *testing.T) {
 				fakeClient.PrependReactor("list", "theresource", listReactionfunc)
 				return fakeClient
 			},
-			jsonPathExp:  "{.spec.nodeName}",
-			jsonPathCond: "knode0",
+			jsonPathExp:            "{.spec.nodeName}",
+			jsonPathExpectedResult: "knode0",
 
 			expectedErr: None,
 		},
@@ -1125,8 +1125,8 @@ func TestWaitForDifferentJSONPathExpression(t *testing.T) {
 				fakeClient.PrependReactor("list", "theresource", listReactionfunc)
 				return fakeClient
 			},
-			jsonPathExp:  "{.spec.nodeName}",
-			jsonPathCond: "kmaster",
+			jsonPathExp:            "{.spec.nodeName}",
+			jsonPathExpectedResult: "kmaster",
 
 			expectedErr: "timed out waiting for the condition on theresource/foo-b6699dcfb-rnv7t",
 		},
@@ -1137,8 +1137,8 @@ func TestWaitForDifferentJSONPathExpression(t *testing.T) {
 				fakeClient.PrependReactor("list", "theresource", listReactionfunc)
 				return fakeClient
 			},
-			jsonPathExp:  "{.status.conditions[*]}",
-			jsonPathCond: "foo",
+			jsonPathExp:            "{.status.conditions[*]}",
+			jsonPathExpectedResult: "foo",
 
 			expectedErr: "given jsonpath expression matches more than one value",
 		},
@@ -1149,8 +1149,8 @@ func TestWaitForDifferentJSONPathExpression(t *testing.T) {
 				fakeClient.PrependReactor("list", "theresource", listReactionfunc)
 				return fakeClient
 			},
-			jsonPathExp:  "{range .status.conditions[*]}[{.status}] {end}",
-			jsonPathCond: "foo",
+			jsonPathExp:            "{range .status.conditions[*]}[{.status}] {end}",
+			jsonPathExpectedResult: "foo",
 
 			expectedErr: "given jsonpath expression matches more than one list",
 		},
@@ -1161,8 +1161,8 @@ func TestWaitForDifferentJSONPathExpression(t *testing.T) {
 				fakeClient.PrependReactor("list", "theresource", listReactionfunc)
 				return fakeClient
 			},
-			jsonPathExp:  "{.status.conditions}",
-			jsonPathCond: "True",
+			jsonPathExp:            "{.status.conditions}",
+			jsonPathExpectedResult: "True",
 
 			expectedErr: "jsonpath leads to a nested object or list which is not supported",
 		},
@@ -1175,8 +1175,8 @@ func TestWaitForDifferentJSONPathExpression(t *testing.T) {
 				})
 				return fakeClient
 			},
-			jsonPathExp:  "{.spec}",
-			jsonPathCond: "foo",
+			jsonPathExp:            "{.spec}",
+			jsonPathExpectedResult: "foo",
 
 			expectedErr: "jsonpath leads to a nested object or list which is not supported",
 		},
@@ -1192,9 +1192,9 @@ func TestWaitForDifferentJSONPathExpression(t *testing.T) {
 
 				Printer: printers.NewDiscardingPrinter(),
 				ConditionFn: JSONPathWait{
-					jsonPathCondition: test.jsonPathCond,
-					jsonPathParser:    j,
-					errOut:            io.Discard}.IsJSONPathConditionMet,
+					jsonPathExpectedResult: test.jsonPathExpectedResult,
+					jsonPathParser:         j,
+					errOut:                 io.Discard}.IsJSONPathExpectedResultMet,
 				IOStreams: genericiooptions.NewTestIOStreamsDiscard(),
 			}
 
@@ -1224,12 +1224,12 @@ func TestWaitForJSONPathCondition(t *testing.T) {
 	}
 
 	tests := []struct {
-		name         string
-		infos        []*resource.Info
-		fakeClient   func() *dynamicfakeclient.FakeDynamicClient
-		timeout      time.Duration
-		jsonPathExp  string
-		jsonPathCond string
+		name                   string
+		infos                  []*resource.Info
+		fakeClient             func() *dynamicfakeclient.FakeDynamicClient
+		timeout                time.Duration
+		jsonPathExp            string
+		jsonPathExpectedResult string
 
 		expectedErr string
 	}{
@@ -1252,9 +1252,9 @@ func TestWaitForJSONPathCondition(t *testing.T) {
 				})
 				return fakeClient
 			},
-			timeout:      3 * time.Second,
-			jsonPathExp:  "{.metadata.name}",
-			jsonPathCond: "foo-b6699dcfb-rnv7t",
+			timeout:                3 * time.Second,
+			jsonPathExp:            "{.metadata.name}",
+			jsonPathExpectedResult: "foo-b6699dcfb-rnv7t",
 
 			expectedErr: None,
 		},
@@ -1342,9 +1342,9 @@ func TestWaitForJSONPathCondition(t *testing.T) {
 				})
 				return fakeClient
 			},
-			timeout:      3 * time.Second,
-			jsonPathExp:  "{.metadata.name}",
-			jsonPathCond: "foo", // use incorrect name so it'll keep waiting
+			timeout:                3 * time.Second,
+			jsonPathExp:            "{.metadata.name}",
+			jsonPathExpectedResult: "foo", // use incorrect name so it'll keep waiting
 
 			expectedErr: "timed out waiting for the condition on theresource/foo-b6699dcfb-rnv7t",
 		},
@@ -1372,9 +1372,9 @@ func TestWaitForJSONPathCondition(t *testing.T) {
 				})
 				return fakeClient
 			},
-			timeout:      10 * time.Second,
-			jsonPathExp:  "{.metadata.name}",
-			jsonPathCond: "foo-b6699dcfb-rnv7t",
+			timeout:                10 * time.Second,
+			jsonPathExp:            "{.metadata.name}",
+			jsonPathExpectedResult: "foo-b6699dcfb-rnv7t",
 
 			expectedErr: None,
 		},
@@ -1397,9 +1397,9 @@ func TestWaitForJSONPathCondition(t *testing.T) {
 				})
 				return fakeClient
 			},
-			timeout:      1 * time.Second,
-			jsonPathExp:  "{.spec.containers[0].image}",
-			jsonPathCond: "nginx",
+			timeout:                1 * time.Second,
+			jsonPathExp:            "{.spec.containers[0].image}",
+			jsonPathExpectedResult: "nginx",
 
 			expectedErr: None,
 		},
@@ -1438,9 +1438,9 @@ func TestWaitForJSONPathCondition(t *testing.T) {
 				})
 				return fakeClient
 			},
-			timeout:      10 * time.Second,
-			jsonPathExp:  "{.metadata.name}",
-			jsonPathCond: "foo-b6699dcfb-rnv7t",
+			timeout:                10 * time.Second,
+			jsonPathExp:            "{.metadata.name}",
+			jsonPathExpectedResult: "foo-b6699dcfb-rnv7t",
 
 			expectedErr: None,
 		},
@@ -1456,8 +1456,9 @@ func TestWaitForJSONPathCondition(t *testing.T) {
 
 				Printer: printers.NewDiscardingPrinter(),
 				ConditionFn: JSONPathWait{
-					jsonPathCondition: test.jsonPathCond,
-					jsonPathParser:    j, errOut: io.Discard}.IsJSONPathConditionMet,
+					jsonPathExpectedResult: test.jsonPathExpectedResult,
+					jsonPathParser:         j,
+					errOut:                 io.Discard}.IsJSONPathExpectedResultMet,
 				IOStreams: genericiooptions.NewTestIOStreamsDiscard(),
 			}
 

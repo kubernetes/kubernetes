@@ -207,14 +207,7 @@ func conditionFuncFor(condition string, errOut io.Writer) (ConditionFunc, error)
 	}
 	if strings.HasPrefix(condition, "jsonpath=") {
 		splitStr := strings.Split(condition, "=")
-		if len(splitStr) < 2 || len(splitStr) > 3 {
-			return nil, fmt.Errorf("jsonpath wait format must be --for=jsonpath='{.status.readyReplicas}'[=3]")
-		}
-		jsonPathExpectedResult, err := processJSONPathExpectedResult(splitStr)
-		if err != nil {
-			return nil, err
-		}
-		jsonPathExp, err := processJSONPathExpression(splitStr[1])
+		jsonPathExp, jsonPathExpectedResult, err := processJSONPathInput(splitStr)
 		if err != nil {
 			return nil, err
 		}
@@ -224,8 +217,8 @@ func conditionFuncFor(condition string, errOut io.Writer) (ConditionFunc, error)
 		}
 		return JSONPathWait{
 			jsonPathExpectedResult: jsonPathExpectedResult,
-			jsonPathParser:    j,
-			errOut:            errOut,
+			jsonPathParser:         j,
+			errOut:                 errOut,
 		}.IsJSONPathExpectedResultMet, nil
 	}
 
@@ -244,6 +237,31 @@ func newJSONPathParser(jsonPathExpression string) (*jsonpath.JSONPath, error) {
 	return j, nil
 }
 
+func processJSONPathInput(jsonPathSplitStr []string) (string, string, error) {
+	err := validateJSONPathInput(jsonPathSplitStr)
+	if err != nil {
+		return "", "", err
+	}
+	// jsonPathSplitStr can be either [jsonpath, jsonPathExpression, jsonPathExpectedResult] or [jsonpath, jsonPathExpression]
+	jsonPathExp, err := processJSONPathExpression(jsonPathSplitStr[1])
+	if err != nil {
+		return "", "", err
+	}
+	jsonPathExpectedResult, err := processJSONPathExpectedResult(jsonPathSplitStr[2:])
+	if err != nil {
+		return "", "", err
+	}
+
+	return jsonPathExp, jsonPathExpectedResult, nil
+}
+
+func validateJSONPathInput(jsonPathSplitStr []string) error {
+	if len(jsonPathSplitStr) < 2 || len(jsonPathSplitStr) > 3 {
+		return errors.New("jsonpath wait format must be --for=jsonpath='{.status.readyReplicas}' or --for=jsonpath='{.status.readyReplicas}'=3")
+	}
+	return nil
+}
+
 // processJSONPathExpression will parse the user inputted JSONPath expression and process the string
 func processJSONPathExpression(jsonPathExpression string) (string, error) {
 	relaxedJSONPathExp, err := cmdget.RelaxedJSONPathExpression(jsonPathExpression)
@@ -255,18 +273,19 @@ func processJSONPathExpression(jsonPathExpression string) (string, error) {
 }
 
 // processJSONPathExpectedResult will parse the user inputted JSONPath expected result and process the string
-func processJSONPathExpectedResult(jsonPathSplitStr []string) (string, error) {
-	if len(jsonPathSplitStr) == 2 {
+func processJSONPathExpectedResult(jsonPathExpectedResult []string) (string, error) {
+	// jsonPathExpectedResult contains either the expected result or is empty (if user has not provided any value)
+	if len(jsonPathExpectedResult) == 0 {
 		return "", nil
 	}
 
-	jsonPathExpectedResult := jsonPathSplitStr[2]
-	if jsonPathExpectedResult == "" {
+	expectedResult := jsonPathExpectedResult[0]
+	if expectedResult == "" {
 		return "", errors.New("jsonpath wait expected result cannot be empty")
 	}
 
-	jsonPathExpectedResult = strings.Trim(jsonPathExpectedResult, `'"`)
-	return jsonPathExpectedResult, nil
+	expectedResult = strings.Trim(expectedResult, `'"`)
+	return expectedResult, nil
 }
 
 // ResourceLocation holds the location of a resource
@@ -606,7 +625,7 @@ func getObservedGeneration(obj *unstructured.Unstructured, condition map[string]
 // to check for the JSONPath expected result and compare with the API server provided JSON output.
 type JSONPathWait struct {
 	jsonPathExpectedResult string
-	jsonPathParser    *jsonpath.JSONPath
+	jsonPathParser         *jsonpath.JSONPath
 	// errOut is written to if an error occurs
 	errOut io.Writer
 }
@@ -647,6 +666,9 @@ func (j JSONPathWait) checkCondition(obj *unstructured.Unstructured) (bool, erro
 	if len(parseResults) == 0 || len(parseResults[0]) == 0 {
 		return false, nil
 	}
+	if j.jsonPathExpectedResult == "" {
+		return assertNonEmptyResults(parseResults), nil
+	}
 	if err := verifyParsedJSONPath(parseResults); err != nil {
 		return false, err
 	}
@@ -655,6 +677,14 @@ func (j JSONPathWait) checkCondition(obj *unstructured.Unstructured) (bool, erro
 		return false, err
 	}
 	return isConditionMet, nil
+}
+
+func assertNonEmptyResults(results [][]reflect.Value) bool {
+	if len(results) > 1 || len(results[0]) > 1 {
+		return true
+	}
+	result := fmt.Sprintf("%v", results[0][0].String())
+	return result != ""
 }
 
 // verifyParsedJSONPath verifies the JSON received from the API server is valid.
@@ -671,8 +701,6 @@ func verifyParsedJSONPath(results [][]reflect.Value) error {
 
 // compareResults will compare the reflect.Value from the result parsed by the
 // JSONPath parser with the expected value given by the user
-// In case the expected value is empty, this will return true if the result parsed
-// is a non empty value
 //
 // Since this is coming from an unstructured this can only ever be a primitive,
 // map[string]interface{}, or []interface{}.
@@ -684,8 +712,5 @@ func compareResults(r reflect.Value, expectedVal string) (bool, error) {
 		return false, errors.New("jsonpath leads to a nested object or list which is not supported")
 	}
 	s := fmt.Sprintf("%v", r.Interface())
-	if s != "" && expectedVal == "" {
-		return true, nil
-	}
 	return strings.TrimSpace(s) == strings.TrimSpace(expectedVal), nil
 }
