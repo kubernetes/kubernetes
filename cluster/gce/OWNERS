@@ -5,15 +5,17 @@ reviewers:
   - cjcullen
   - mwielgus
   - yujuhong
-  - mtaufen
+  - SergeyKanzhelev
   - ibabou
+  - ndixita
   - sig-scalability-reviewers
 approvers:
+  - bobbypage
   - bowei
   - cjcullen
   - mwielgus
+  - SergeyKanzhelev
   - yujuhong
-  - mtaufen
   - ibabou
   - sig-scalability-approvers
 emeritus_approvers:
