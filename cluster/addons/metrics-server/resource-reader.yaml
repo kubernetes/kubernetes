@@ -11,6 +11,19 @@ rules:
       - nodes/metrics
     verbs:
       - get
+  - apiGroups:
+      - "apps"
+    resources:
+      - deployments
+    resourceNames:
+      - metrics-server
+    verbs:
+      - get
+      - patch
+  - nonResourceURLs:
+    - /metrics
+    verbs:
+    - get
   - apiGroups: [""]
     resources:
       - pods
