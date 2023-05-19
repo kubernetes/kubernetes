@@ -20,9 +20,14 @@ limitations under the License.
 package reconciler
 
 import (
+	"context"
+	"time"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 )
 
@@ -66,6 +71,53 @@ func (rc *reconciler) reconcile() {
 	if len(rc.skippedDuringReconstruction) > 0 {
 		rc.processReconstructedVolumes()
 	}
+}
+
+// volumemount function
+func (kl *Kubelet) mountVolume(pod *v1.Pod, volume *v1.Volume, podVolume *kubecontainer.VolumeMount, mountPath string) error {
+	klog.V(3).InfoS("Performing mountVolume", "pod", klog.KObj(pod), "volume", volume.Name, "mountPath", mountPath)
+	const mountTimeout = 30 * time.Second
+	// Create a context with a timeout for the mount operation
+	ctx, cancel := context.WithTimeout(context.Background(), mountTimeout)
+	defer cancel()
+
+	// Mount the volume using the CSI driver
+	err := kl.mountDevice(ctx, volume, pod, podVolume, mountPath)
+	if err != nil {
+		klog.ErrorS(err, "MountVolume.MountDevice failed", "pod", klog.KObj(pod), "volume", volume.Name)
+		return err
+	}
+
+	// Add event and log for long-running fsgroup processing
+	kl.recorder.Eventf(pod, v1.EventTypeWarning, "FsGroupProcessing", "Filesystem group processing is taking a long time")
+
+	// Periodically update the event and log while fsgroup processing is in progress
+	startTime := time.Now()
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			klog.ErrorS(ctx.Err(), "MountVolume.MountDevice context done", "pod", klog.KObj(pod), "volume", volume.Name)
+			return ctx.Err()
+		case <-ticker.C:
+			kl.recorder.Eventf(pod, v1.EventTypeWarning, "FsGroupProcessing", "Filesystem group processing is still in progress")
+			if time.Since(startTime) > 30*time.Second {
+				klog.V(4).InfoS("Filesystem group processing is still in progress", "pod", pod.Name)
+				kl.recorder.Eventf(pod, v1.EventTypeWarning, "FsGroupProcessing", "Filesystem group processing is still in progress")
+			}
+		default:
+			// Continue with the mount operation
+		}
+
+		// Check if the fsgroup processing is completed
+		if kl.isFsGroupProcessingComplete(pod) {
+			break
+		}
+
+		time.Sleep(100 * time.Millisecond) // Sleep before the next iteration
+	}
+	return nil
 }
 
 // processReconstructedVolumes checks volumes which were skipped during the reconstruction
