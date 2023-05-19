@@ -40,7 +40,7 @@ func getLoggingCmd(n *nodeLogQuery, services []string) (string, []string, error)
 	}
 
 	if len(n.Until) > 0 {
-		args = append(args, fmt.Sprintf("--since=%s", n.Since))
+		args = append(args, fmt.Sprintf("--until=%s", n.Until))
 	} else if n.UntilTime != nil {
 		args = append(args, fmt.Sprintf("--until=%s", n.SinceTime.Format(dateLayout)))
 	}
