@@ -19,7 +19,6 @@ package iptables
 import (
 	"fmt"
 
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	netutils "k8s.io/utils/net"
 )
 
@@ -62,10 +61,7 @@ type detectLocalByCIDR struct {
 
 // NewDetectLocalByCIDR implements the LocalTrafficDetector interface using a CIDR. This can be used when a single CIDR
 // range can be used to capture the notion of local traffic.
-func NewDetectLocalByCIDR(cidr string, ipt utiliptables.Interface) (LocalTrafficDetector, error) {
-	if netutils.IsIPv6CIDRString(cidr) != ipt.IsIPv6() {
-		return nil, fmt.Errorf("CIDR %s has incorrect IP version: expect isIPv6=%t", cidr, ipt.IsIPv6())
-	}
+func NewDetectLocalByCIDR(cidr string) (LocalTrafficDetector, error) {
 	_, _, err := netutils.ParseCIDRSloppy(cidr)
 	if err != nil {
 		return nil, err
