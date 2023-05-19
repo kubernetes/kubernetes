@@ -62,9 +62,9 @@ var objectOrder = map[string]int{
 // with per-service rules, we don't know what order syncProxyRules is going to output them
 // in, but the order doesn't matter anyway. So we sort the rules in those chains.
 var sortedChains = sets.New(
-	kubeServicesFilterChain,
-	kubeExternalServicesChain,
 	kubeFirewallChain,
+	kubeServicesChain,
+	kubeNodePortsChain,
 )
 
 // sortNFTablesTransaction sorts an nftables transaction into a standard order for comparison
@@ -236,8 +236,16 @@ var destAddrRegexp = regexp.MustCompile(`^ip6* daddr (!= )?(\S+)`)
 var destAddrLocalRegexp = regexp.MustCompile(`^fib daddr type local`)
 var destPortRegexp = regexp.MustCompile(`^(tcp|udp|sctp) dport (\d+)`)
 
+var sourceAddrRegexp = regexp.MustCompile(`^ip6* saddr (!= )?(\S+)`)
+var sourceAddrLocalRegexp = regexp.MustCompile(`^fib saddr type local`)
+
+var endpointVMAPRegexp = regexp.MustCompile(`^numgen random mod \d+ vmap \{(.*)\}$`)
+var endpointVMapEntryRegexp = regexp.MustCompile(`\d+ : goto (\S+)`)
+
+var masqueradeRegexp = regexp.MustCompile(`^jump ` + kubeMarkMasqChain + `$`)
 var jumpRegexp = regexp.MustCompile(`^(jump|goto) (\S+)$`)
 var verdictRegexp = regexp.MustCompile(`^(drop|reject)$`)
+var dnatRegexp = regexp.MustCompile(`^meta l4proto (tcp|udp|sctp) dnat to (\S+)$`)
 
 var ignoredRegexp = regexp.MustCompile(strings.Join(
 	[]string{
@@ -251,6 +259,10 @@ var ignoredRegexp = regexp.MustCompile(strings.Join(
 		// Likewise, this rule never matches and thus never drops anything, and so
 		// can be ignored.
 		`^ct state invalid drop$`,
+
+		// We use a bare "continue" rule in the firewall chains as a place to
+		// attach a comment.
+		`^continue$`,
 	},
 	"|",
 ))
@@ -268,6 +280,11 @@ func (tracer *nftablesTracer) runChain(chname, sourceIP, protocol, destIP, destP
 		rule := ignoredRegexp.ReplaceAllLiteralString(ruleObj.Rule, "")
 		for rule != "" {
 			rule = strings.TrimLeft(rule, " ")
+
+			// Note that the order of (some of) the cases is important. e.g.,
+			// masqueradeRegexp must be checked before jumpRegexp, since
+			// jumpRegexp would also match masqueradeRegexp but do the wrong
+			// thing with it.
 
 			switch {
 			case destAddrRegexp.MatchString(rule):
@@ -302,6 +319,38 @@ func (tracer *nftablesTracer) runChain(chname, sourceIP, protocol, destIP, destP
 					break
 				}
 
+			case sourceAddrRegexp.MatchString(rule):
+				// `^ip6* saddr (!= )?(\S+)`
+				// Tests whether sourceIP does/doesn't match a literal.
+				match := sourceAddrRegexp.FindStringSubmatch(rule)
+				rule = strings.TrimPrefix(rule, match[0])
+				not, ip := match[1], match[2]
+				if !tracer.addressMatches(sourceIP, not, ip) {
+					rule = ""
+					break
+				}
+
+			case sourceAddrLocalRegexp.MatchString(rule):
+				// `^fib saddr type local`
+				// Tests whether sourceIP is a local IP.
+				match := sourceAddrLocalRegexp.FindStringSubmatch(rule)
+				rule = strings.TrimPrefix(rule, match[0])
+				if !tracer.nodeIPs.Has(sourceIP) {
+					rule = ""
+					break
+				}
+
+			case masqueradeRegexp.MatchString(rule):
+				// `^jump mark-for-masquerade$`
+				// Mark for masquerade: we just treat the jump rule itself as
+				// being what creates the mark, rather than trying to handle
+				// the rules inside that chain and the "masquerading" chain.
+				match := jumpRegexp.FindStringSubmatch(rule)
+				rule = strings.TrimPrefix(rule, match[0])
+
+				tracer.matches = append(tracer.matches, ruleObj.Rule)
+				tracer.markMasq = true
+
 			case jumpRegexp.MatchString(rule):
 				// `^(jump|goto) (\S+)$`
 				// Jumps to another chain.
@@ -330,6 +379,35 @@ func (tracer *nftablesTracer) runChain(chname, sourceIP, protocol, destIP, destP
 
 				tracer.matches = append(tracer.matches, ruleObj.Rule)
 				tracer.outputs = append(tracer.outputs, strings.ToUpper(verdict))
+				return true
+
+			case dnatRegexp.MatchString(rule):
+				// `meta l4proto (tcp|udp|sctp) dnat to (\S+)`
+				// DNAT to an endpoint IP and terminate processing.
+				match := dnatRegexp.FindStringSubmatch(rule)
+				destEndpoint := match[2]
+
+				tracer.matches = append(tracer.matches, ruleObj.Rule)
+				tracer.outputs = append(tracer.outputs, destEndpoint)
+				return true
+
+			case endpointVMAPRegexp.MatchString(rule):
+				// `^numgen random mod \d+ vmap \{(.*)\}$`
+				// Selects a random endpoint and jumps to it. For tracePacket's
+				// purposes, we jump to *all* of the endpoints.
+				match := endpointVMAPRegexp.FindStringSubmatch(rule)
+				elements := match[1]
+
+				for _, match = range endpointVMapEntryRegexp.FindAllStringSubmatch(elements, -1) {
+					// `\d+ : goto (\S+)`
+					destChain := match[1]
+
+					tracer.matches = append(tracer.matches, ruleObj.Rule)
+					// Ignore return value; we know each endpoint has a
+					// terminating dnat verdict, but we want to gather all
+					// of the endpoints into tracer.output.
+					_ = tracer.runChain(destChain, sourceIP, protocol, destIP, destPort)
+				}
 				return true
 
 			default:
@@ -393,10 +471,6 @@ type packetFlowTest struct {
 
 func runPacketFlowTests(t *testing.T, line string, nft *knftables.Fake, nodeIPs []string, testCases []packetFlowTest) {
 	for _, tc := range testCases {
-		if tc.output != "DROP" && tc.output != "REJECT" && tc.output != "" {
-			t.Logf("Skipping test %s which doesn't work yet", tc.name)
-			continue
-		}
 		t.Run(tc.name, func(t *testing.T) {
 			protocol := strings.ToLower(string(tc.protocol))
 			if protocol == "" {
