@@ -59,6 +59,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 	uexec "k8s.io/utils/exec"
 
 	"github.com/onsi/ginkgo/v2"
@@ -398,8 +399,9 @@ func runVolumeTesterPod(ctx context.Context, client clientset.Interface, timeout
 	When SELinux is enabled on the host, client-pod can not read the content, with permission denied.
 	Invoking client-pod as privileged, so that it can access the volume content, even when SELinux is enabled on the host.
 	*/
-	if config.Prefix == "hostpathsymlink" || config.Prefix == "hostpath" {
-		privileged = true
+	securityLevel := admissionapi.LevelBaseline // TODO (#118184): also support LevelRestricted
+	if privileged || config.Prefix == "hostpathsymlink" || config.Prefix == "hostpath" {
+		securityLevel = admissionapi.LevelPrivileged
 	}
 	command = "while true ; do sleep 2; done "
 	seLinuxOptions := &v1.SELinuxOptions{Level: "s0:c0,c1"}
@@ -443,9 +445,9 @@ func runVolumeTesterPod(ctx context.Context, client clientset.Interface, timeout
 		// a privileged container, so we don't go privileged for block volumes.
 		// https://github.com/moby/moby/issues/35991
 		if privileged && test.Mode == v1.PersistentVolumeBlock {
-			privileged = false
+			securityLevel = admissionapi.LevelBaseline
 		}
-		clientPod.Spec.Containers[0].SecurityContext = e2epod.GenerateContainerSecurityContext(privileged)
+		clientPod.Spec.Containers[0].SecurityContext = e2epod.GenerateContainerSecurityContext(securityLevel)
 
 		if test.Mode == v1.PersistentVolumeBlock {
 			clientPod.Spec.Containers[0].VolumeDevices = append(clientPod.Spec.Containers[0].VolumeDevices, v1.VolumeDevice{

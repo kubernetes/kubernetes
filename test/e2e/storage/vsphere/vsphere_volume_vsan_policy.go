@@ -276,7 +276,7 @@ func invokeValidPolicyTest(ctx context.Context, f *framework.Framework, client c
 
 	ginkgo.By("Creating pod to attach PV to the node")
 	// Create pod to attach Volume to Node
-	pod, err := e2epod.CreatePod(ctx, client, namespace, nil, pvclaims, false, "")
+	pod, err := e2epod.CreatePod(ctx, client, namespace, nil, pvclaims, f.NamespacePodSecurityLevel, "")
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Verify the volume is accessible and available in the pod")

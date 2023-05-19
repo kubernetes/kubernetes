@@ -285,7 +285,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			// (and test) succeed.
 			ginkgo.It("should test that a PV becomes Available and is clean after the PVC is deleted.", func(ctx context.Context) {
 				ginkgo.By("Writing to the volume.")
-				pod := e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, "touch /mnt/volume1/SUCCESS && (id -G | grep -E '\\b777\\b')")
+				pod := e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, f.NamespacePodSecurityLevel, "touch /mnt/volume1/SUCCESS && (id -G | grep -E '\\b777\\b')")
 				pod, err = c.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{})
 				framework.ExpectNoError(err)
 				framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, c, pod.Name, ns, f.Timeouts.PodStart))
@@ -303,7 +303,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				// If a file is detected in /mnt, fail the pod and do not restart it.
 				ginkgo.By("Verifying the mount has been cleaned.")
 				mount := pod.Spec.Containers[0].VolumeMounts[0].MountPath
-				pod = e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, fmt.Sprintf("[ $(ls -A %s | wc -l) -eq 0 ] && exit 0 || exit 1", mount))
+				pod = e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, f.NamespacePodSecurityLevel, fmt.Sprintf("[ $(ls -A %s | wc -l) -eq 0 ] && exit 0 || exit 1", mount))
 				pod, err = c.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{})
 				framework.ExpectNoError(err)
 				framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, c, pod.Name, ns, f.Timeouts.PodStart))
@@ -447,7 +447,7 @@ func makeStatefulSetWithPVCs(ns, cmd string, mounts []v1.VolumeMount, claims []v
 //	Has been shown to be necessary using Go 1.7.
 func createWaitAndDeletePod(ctx context.Context, c clientset.Interface, t *framework.TimeoutContext, ns string, pvc *v1.PersistentVolumeClaim, command string) (err error) {
 	framework.Logf("Creating nfs test pod")
-	pod := e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, command)
+	pod := e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, admissionapi.LevelPrivileged, command)
 	runPod, err := c.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("pod Create API error: %w", err)

@@ -95,7 +95,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 
 		ginkgo.By("Creating a Pod that becomes Running and therefore is actively using the PVC")
 		pvcClaims := []*v1.PersistentVolumeClaim{pvc}
-		pod, err = e2epod.CreatePod(ctx, client, nameSpace, nil, pvcClaims, false, "")
+		pod, err = e2epod.CreatePod(ctx, client, nameSpace, nil, pvcClaims, f.NamespacePodSecurityLevel, "")
 		framework.ExpectNoError(err, "While creating pod that uses the PVC or waiting for the Pod to become Running")
 
 		ginkgo.By("Waiting for PVC to become Bound")
@@ -156,7 +156,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		framework.ExpectNotEqual(pvc.ObjectMeta.DeletionTimestamp, nil)
 
 		ginkgo.By("Creating second Pod whose scheduling fails because it uses a PVC that is being deleted")
-		secondPod, err2 := e2epod.CreateUnschedulablePod(ctx, client, nameSpace, nil, []*v1.PersistentVolumeClaim{pvc}, false, "")
+		secondPod, err2 := e2epod.CreateUnschedulablePod(ctx, client, nameSpace, nil, []*v1.PersistentVolumeClaim{pvc}, f.NamespacePodSecurityLevel, "")
 		framework.ExpectNoError(err2, "While creating second pod that uses a PVC that is being deleted and that is Unschedulable")
 
 		ginkgo.By("Deleting the second pod that uses the PVC that is being deleted")
