@@ -25,13 +25,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gogo/protobuf/proto"
 	openapi_v2 "github.com/google/gnostic/openapiv2"
 	openapi_v3 "github.com/google/gnostic/openapiv3"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	golangproto "google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 	apidiscovery "k8s.io/api/apidiscovery/v2beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -589,7 +588,7 @@ func TestGetOpenAPISchema(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error getting openapi: %v", err)
 	}
-	if e, a := returnedOpenAPI(), got; !golangproto.Equal(e, a) {
+	if e, a := returnedOpenAPI(), got; !proto.Equal(e, a) {
 		t.Errorf("expected \n%v, got \n%v", e, a)
 	}
 }
@@ -647,7 +646,7 @@ func TestGetOpenAPISchemaV3(t *testing.T) {
 						t.Fatal(err)
 					}
 
-					expectedPB, err := golangproto.Marshal(expectedGnostic)
+					expectedPB, err := proto.Marshal(expectedGnostic)
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -685,7 +684,7 @@ func TestGetOpenAPISchemaForbiddenFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error getting openapi: %v", err)
 	}
-	if e, a := returnedOpenAPI(), got; !golangproto.Equal(e, a) {
+	if e, a := returnedOpenAPI(), got; !proto.Equal(e, a) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 }
@@ -702,7 +701,7 @@ func TestGetOpenAPISchemaNotFoundFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error getting openapi: %v", err)
 	}
-	if e, a := returnedOpenAPI(), got; !golangproto.Equal(e, a) {
+	if e, a := returnedOpenAPI(), got; !proto.Equal(e, a) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 }
@@ -719,7 +718,7 @@ func TestGetOpenAPISchemaNotAcceptableFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error getting openapi: %v", err)
 	}
-	if e, a := returnedOpenAPI(), got; !golangproto.Equal(e, a) {
+	if e, a := returnedOpenAPI(), got; !proto.Equal(e, a) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 }

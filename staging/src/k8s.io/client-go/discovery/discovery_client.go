@@ -28,8 +28,7 @@ import (
 	"sync"
 	"time"
 
-	//nolint:staticcheck // SA1019 Keep using module since it's still being maintained and the api of google.golang.org/protobuf/proto differs
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 	openapi_v2 "github.com/google/gnostic/openapiv2"
 
 	apidiscovery "k8s.io/api/apidiscovery/v2beta1"
