@@ -48,7 +48,7 @@ var (
 func main(cmd *cobra.Command, args []string) {
 	scheme := runtime.NewScheme()
 	auditinstall.Install(scheme)
-	serializer := json.NewSerializer(json.DefaultMetaFactory, scheme, scheme, false)
+	serializer := json.NewSerializerWithOptions(json.DefaultMetaFactory, scheme, scheme, json.SerializerOptions{Pretty: false})
 	encoder = audit.Codecs.EncoderForVersion(serializer, auditv1.SchemeGroupVersion)
 	decoder = audit.Codecs.UniversalDecoder(auditv1.SchemeGroupVersion)
 
