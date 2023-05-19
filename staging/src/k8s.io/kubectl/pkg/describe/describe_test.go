@@ -1283,6 +1283,19 @@ func TestDefaultDescribers(t *testing.T) {
 	if !strings.Contains(out, "foo") {
 		t.Errorf("unexpected output: %s", out)
 	}
+
+	var ssReplicas int32
+	ss := &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+		Spec:       appsv1.StatefulSetSpec{Replicas: &ssReplicas},
+	}
+	out, err = DefaultObjectDescriber.DescribeObject(ss)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "foo") {
+		t.Errorf("unexpected output: %s", out)
+	}
 }
 
 func TestGetPodsTotalRequests(t *testing.T) {
