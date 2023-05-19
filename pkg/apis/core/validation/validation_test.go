@@ -2736,7 +2736,7 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 
 			opts := ValidationOptionsForPersistentVolumeClaim(nil, tc.oldPvc)
 			if opts != tc.expectValidationOpts {
-				t.Errorf("Expected opts: %+v, received: %+v", opts, tc.expectValidationOpts)
+				t.Errorf("Expected opts: %+v, received: %+v", tc.expectValidationOpts, opts)
 			}
 		})
 	}
