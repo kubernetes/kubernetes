@@ -503,6 +503,37 @@ func TestOverallNFTablesRules(t *testing.T) {
 
 	expected := dedent.Dedent(`
 		add table ip kube-proxy { comment "rules for kube-proxy" ; }
+
+		add chain ip kube-proxy external-services
+		add chain ip kube-proxy forward
+		add rule ip kube-proxy forward ct state invalid drop
+		add chain ip kube-proxy mark-for-masquerade
+		add rule ip kube-proxy mark-for-masquerade mark set mark or 0x4000
+		add chain ip kube-proxy nodeports
+		add chain ip kube-proxy masquerading
+		add rule ip kube-proxy masquerading mark and 0x4000 == 0 return
+		add rule ip kube-proxy masquerading mark set mark xor 0x4000
+		add rule ip kube-proxy masquerading masquerade fully-random
+		add chain ip kube-proxy firewall
+		add chain ip kube-proxy services
+		add chain ip kube-proxy services-filter
+		add chain ip kube-proxy filter-forward { type filter hook forward priority 0 ; }
+		add rule ip kube-proxy filter-forward ct state new jump external-services
+		add rule ip kube-proxy filter-forward ct state new jump services-filter
+		add rule ip kube-proxy filter-forward jump forward
+		add rule ip kube-proxy filter-forward ct state new jump firewall
+		add chain ip kube-proxy filter-input { type filter hook input priority 0 ; }
+		add rule ip kube-proxy filter-input ct state new jump external-services
+		add rule ip kube-proxy filter-input ct state new jump firewall
+		add chain ip kube-proxy filter-output { type filter hook output priority 0 ; }
+		add rule ip kube-proxy filter-output ct state new jump services-filter
+		add rule ip kube-proxy filter-output ct state new jump firewall
+		add chain ip kube-proxy nat-output { type nat hook output priority -100 ; }
+		add rule ip kube-proxy nat-output jump services
+		add chain ip kube-proxy nat-postrouting { type nat hook postrouting priority 100 ; }
+		add rule ip kube-proxy nat-postrouting jump masquerading
+		add chain ip kube-proxy nat-prerouting { type nat hook prerouting priority -100 ; }
+		add rule ip kube-proxy nat-prerouting jump services
 		`)
 
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
@@ -930,7 +961,7 @@ func TestNodePorts(t *testing.T) {
 		// node IP to be accepted
 		allowAltNodeIP bool
 
-		// expectFirewall is true if we expect KUBE-FIREWALL to be filled in with
+		// expectFirewall is true if we expect firewall to be filled in with
 		// an anti-martian-packet rule
 		expectFirewall bool
 	}{
@@ -1100,18 +1131,16 @@ func TestNodePorts(t *testing.T) {
 func TestDropInvalidRule(t *testing.T) {
 	for _, tcpLiberal := range []bool{false, true} {
 		t.Run(fmt.Sprintf("tcpLiberal %t", tcpLiberal), func(t *testing.T) {
-			_, fp := NewFakeProxier(v1.IPv4Protocol)
+			nft, fp := NewFakeProxier(v1.IPv4Protocol)
 			fp.conntrackTCPLiberal = tcpLiberal
 			fp.syncProxyRules()
 
-			/* FIXME
 			var expected string
 			if !tcpLiberal {
-				expected = "-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP\n"
+				expected = "ct state invalid drop"
 			}
 
-			assertIPTablesChainEqual(t, getLine(), utiliptables.TableFilter, kubeForwardChain, expected, fp.iptablesData.String())
-			*/
+			assertNFTablesChainEqual(t, getLine(), nft, kubeForwardChain, expected)
 		})
 	}
 }
@@ -4166,6 +4195,38 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 
 	baseRules := dedent.Dedent(`
 		add table ip kube-proxy { comment "rules for kube-proxy" ; }
+
+		add chain ip kube-proxy external-services
+		add chain ip kube-proxy filter-forward { type filter hook forward priority 0 ; }
+		add chain ip kube-proxy filter-input { type filter hook input priority 0 ; }
+		add chain ip kube-proxy filter-output { type filter hook output priority 0 ; }
+		add chain ip kube-proxy firewall
+		add chain ip kube-proxy forward
+		add chain ip kube-proxy mark-for-masquerade
+		add chain ip kube-proxy masquerading
+		add chain ip kube-proxy nat-output { type nat hook output priority -100 ; }
+		add chain ip kube-proxy nat-postrouting { type nat hook postrouting priority 100 ; }
+		add chain ip kube-proxy nat-prerouting { type nat hook prerouting priority -100 ; }
+		add chain ip kube-proxy nodeports
+		add chain ip kube-proxy services
+		add chain ip kube-proxy services-filter
+
+		add rule ip kube-proxy filter-forward ct state new jump external-services
+		add rule ip kube-proxy filter-forward ct state new jump services-filter
+		add rule ip kube-proxy filter-forward jump forward
+		add rule ip kube-proxy filter-forward ct state new jump firewall
+		add rule ip kube-proxy filter-input ct state new jump external-services
+		add rule ip kube-proxy filter-input ct state new jump firewall
+		add rule ip kube-proxy filter-output ct state new jump services-filter
+		add rule ip kube-proxy filter-output ct state new jump firewall
+		add rule ip kube-proxy forward ct state invalid drop
+		add rule ip kube-proxy mark-for-masquerade mark set mark or 0x4000
+		add rule ip kube-proxy masquerading mark and 0x4000 == 0 return
+		add rule ip kube-proxy masquerading mark set mark xor 0x4000
+		add rule ip kube-proxy masquerading masquerade fully-random
+		add rule ip kube-proxy nat-output jump services
+		add rule ip kube-proxy nat-postrouting jump masquerading
+		add rule ip kube-proxy nat-prerouting jump services
 		`)
 
 	// Create initial state
