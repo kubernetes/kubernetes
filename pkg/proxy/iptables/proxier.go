@@ -36,13 +36,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/conntrack"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/events"
-	utilsysctl "k8s.io/component-helpers/node/utilx/sysctl"
+	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy"
+	"k8s.io/kubernetes/pkg/proxy/conntrack"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/metaproxier"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
@@ -1071,25 +1071,15 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 		}
 
-		// Declare and initialize the longLivedConnections variable
-		longLivedConnections := true
 		// Capture the clusterIP.
 		if hasInternalEndpoints {
-			if !longLivedConnections {
-				proxier.natRules.Write(
-					"-A", string(kubeServicesChain),
-					"-m", "comment", "--comment", fmt.Sprintf(`"%s cluster IP"`, svcPortNameString),
-					"-m", protocol, "-p", protocol,
-					"-m", "set", "--match-set", "ipset_name", "dst", // Add this line to use IPSets
-					"--dport", strconv.Itoa(svcInfo.Port()),
-					"-j", string(internalTrafficChain))
-			} else {
-				proxier.natRules.Write(
-					"-A", string(kubeServicesChain),
-					"-m", "comment", "--comment", fmt.Sprintf(`"%s cluster IP"`, svcPortNameString),
-					"-m", "conntrack", "--ctstate", "RELATED,ESTABLISHED",
-					"-j", string(internalTrafficChain))
-			}
+			proxier.natRules.Write(
+				"-A", string(kubeServicesChain),
+				"-m", "comment", "--comment", fmt.Sprintf(`"%s cluster IP"`, svcPortNameString),
+				"-m", protocol, "-p", protocol,
+				"-d", svcInfo.ClusterIP().String(),
+				"--dport", strconv.Itoa(svcInfo.Port()),
+				"-j", string(internalTrafficChain))
 		} else {
 			// No endpoints.
 			proxier.filterRules.Write(
