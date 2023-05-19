@@ -46,7 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/metaproxier"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
-	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	"k8s.io/kubernetes/pkg/util/async"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
@@ -196,10 +196,10 @@ type Proxier struct {
 	// that are significantly impacting performance.
 	iptablesData             *bytes.Buffer
 	existingFilterChainsData *bytes.Buffer
-	filterChains             utilproxy.LineBuffer
-	filterRules              utilproxy.LineBuffer
-	natChains                utilproxy.LineBuffer
-	natRules                 utilproxy.LineBuffer
+	filterChains             proxyutil.LineBuffer
+	filterRules              proxyutil.LineBuffer
+	natChains                proxyutil.LineBuffer
+	natRules                 proxyutil.LineBuffer
 
 	// largeClusterMode is set at the beginning of syncProxyRules if we are
 	// going to end up outputting "lots" of iptables rules and so we need to
@@ -210,10 +210,10 @@ type Proxier struct {
 	// via localhost.
 	localhostNodePorts bool
 	// nodePortAddresses selects the interfaces where nodePort works.
-	nodePortAddresses *utilproxy.NodePortAddresses
+	nodePortAddresses *proxyutil.NodePortAddresses
 	// networkInterfacer defines an interface for several net library functions.
 	// Inject for test purpose.
-	networkInterfacer utilproxy.NetworkInterfacer
+	networkInterfacer proxyutil.NetworkInterfacer
 }
 
 // Proxier implements proxy.Provider
@@ -240,7 +240,7 @@ func NewProxier(ipFamily v1.IPFamily,
 	healthzServer healthcheck.ProxierHealthUpdater,
 	nodePortAddressStrings []string,
 ) (*Proxier, error) {
-	nodePortAddresses := utilproxy.NewNodePortAddresses(ipFamily, nodePortAddressStrings)
+	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nodePortAddressStrings)
 
 	if !nodePortAddresses.ContainsIPv4Loopback() {
 		localhostNodePorts = false
@@ -249,7 +249,7 @@ func NewProxier(ipFamily v1.IPFamily,
 		// Set the route_localnet sysctl we need for exposing NodePorts on loopback addresses
 		// Refer to https://issues.k8s.io/90259
 		klog.InfoS("Setting route_localnet=1 to allow node-ports on localhost; to change this either disable iptables.localhostNodePorts (--iptables-localhost-nodeports) or set nodePortAddresses (--nodeport-addresses) to filter loopback addresses")
-		if err := utilproxy.EnsureSysctl(sysctl, sysctlRouteLocalnet, 1); err != nil {
+		if err := proxyutil.EnsureSysctl(sysctl, sysctlRouteLocalnet, 1); err != nil {
 			return nil, err
 		}
 	}
@@ -288,13 +288,13 @@ func NewProxier(ipFamily v1.IPFamily,
 		precomputedProbabilities: make([]string, 0, 1001),
 		iptablesData:             bytes.NewBuffer(nil),
 		existingFilterChainsData: bytes.NewBuffer(nil),
-		filterChains:             utilproxy.LineBuffer{},
-		filterRules:              utilproxy.LineBuffer{},
-		natChains:                utilproxy.LineBuffer{},
-		natRules:                 utilproxy.LineBuffer{},
+		filterChains:             proxyutil.LineBuffer{},
+		filterRules:              proxyutil.LineBuffer{},
+		natChains:                proxyutil.LineBuffer{},
+		natRules:                 proxyutil.LineBuffer{},
 		localhostNodePorts:       localhostNodePorts,
 		nodePortAddresses:        nodePortAddresses,
-		networkInterfacer:        utilproxy.RealNetwork{},
+		networkInterfacer:        proxyutil.RealNetwork{},
 	}
 
 	burstSyncs := 2
@@ -411,8 +411,8 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 		encounteredError = true
 	} else {
 		existingNATChains := utiliptables.GetChainsFromTable(iptablesData.Bytes())
-		natChains := &utilproxy.LineBuffer{}
-		natRules := &utilproxy.LineBuffer{}
+		natChains := &proxyutil.LineBuffer{}
+		natRules := &proxyutil.LineBuffer{}
 		natChains.Write("*nat")
 		// Start with chains we know we need to remove.
 		for _, chain := range []utiliptables.Chain{kubeServicesChain, kubeNodePortsChain, kubePostroutingChain} {
@@ -448,8 +448,8 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 		encounteredError = true
 	} else {
 		existingFilterChains := utiliptables.GetChainsFromTable(iptablesData.Bytes())
-		filterChains := &utilproxy.LineBuffer{}
-		filterRules := &utilproxy.LineBuffer{}
+		filterChains := &proxyutil.LineBuffer{}
+		filterRules := &proxyutil.LineBuffer{}
 		filterChains.Write("*filter")
 		for _, chain := range []utiliptables.Chain{kubeServicesChain, kubeExternalServicesChain, kubeForwardChain, kubeNodePortsChain} {
 			if _, found := existingFilterChains[chain]; found {

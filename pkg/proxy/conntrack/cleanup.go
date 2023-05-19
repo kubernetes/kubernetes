@@ -21,7 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy"
-	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	utilexec "k8s.io/utils/exec"
 )
 
@@ -81,7 +81,7 @@ func deleteStaleServiceConntrackEntries(isIPv6 bool, exec utilexec.Interface, sv
 func deleteStaleEndpointConntrackEntries(exec utilexec.Interface, svcPortMap proxy.ServicePortMap, endpointUpdateResult proxy.UpdateEndpointMapResult) {
 	for _, epSvcPair := range endpointUpdateResult.DeletedUDPEndpoints {
 		if svcInfo, ok := svcPortMap[epSvcPair.ServicePortName]; ok {
-			endpointIP := utilproxy.IPPart(epSvcPair.Endpoint)
+			endpointIP := proxyutil.IPPart(epSvcPair.Endpoint)
 			nodePort := svcInfo.NodePort()
 			var err error
 			if nodePort != 0 {

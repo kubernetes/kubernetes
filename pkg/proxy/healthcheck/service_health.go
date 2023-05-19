@@ -24,15 +24,14 @@ import (
 	"sync"
 
 	"github.com/lithammer/dedent"
+
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/klog/v2"
-
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/events"
-	api "k8s.io/kubernetes/pkg/apis/core"
-
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
+	"k8s.io/client-go/tools/events"
+	"k8s.io/klog/v2"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 )
 
 // ServiceHealthServer serves HTTP endpoints for each service name, with results
@@ -57,13 +56,13 @@ type proxierHealthChecker interface {
 	IsHealthy() bool
 }
 
-func newServiceHealthServer(hostname string, recorder events.EventRecorder, listener listener, factory httpServerFactory, nodePortAddresses *utilproxy.NodePortAddresses, healthzServer proxierHealthChecker) ServiceHealthServer {
+func newServiceHealthServer(hostname string, recorder events.EventRecorder, listener listener, factory httpServerFactory, nodePortAddresses *proxyutil.NodePortAddresses, healthzServer proxierHealthChecker) ServiceHealthServer {
 	// It doesn't matter whether we listen on "0.0.0.0", "::", or ""; go
 	// treats them all the same.
 	nodeIPs := []net.IP{net.IPv4zero}
 
 	if !nodePortAddresses.MatchAll() {
-		ips, err := nodePortAddresses.GetNodeIPs(utilproxy.RealNetwork{})
+		ips, err := nodePortAddresses.GetNodeIPs(proxyutil.RealNetwork{})
 		if err == nil {
 			nodeIPs = ips
 		} else {
@@ -83,7 +82,7 @@ func newServiceHealthServer(hostname string, recorder events.EventRecorder, list
 }
 
 // NewServiceHealthServer allocates a new service healthcheck server manager
-func NewServiceHealthServer(hostname string, recorder events.EventRecorder, nodePortAddresses *utilproxy.NodePortAddresses, healthzServer proxierHealthChecker) ServiceHealthServer {
+func NewServiceHealthServer(hostname string, recorder events.EventRecorder, nodePortAddresses *proxyutil.NodePortAddresses, healthzServer proxierHealthChecker) ServiceHealthServer {
 	return newServiceHealthServer(hostname, recorder, stdNetListener{}, stdHTTPServerFactory{}, nodePortAddresses, healthzServer)
 }
 

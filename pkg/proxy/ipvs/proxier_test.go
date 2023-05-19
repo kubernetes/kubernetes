@@ -41,7 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	netlinktest "k8s.io/kubernetes/pkg/proxy/ipvs/testing"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
-	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	proxyutiltest "k8s.io/kubernetes/pkg/proxy/util/testing"
 	"k8s.io/kubernetes/pkg/util/async"
@@ -163,13 +163,13 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 		ipvsScheduler:         defaultScheduler,
 		iptablesData:          bytes.NewBuffer(nil),
 		filterChainsData:      bytes.NewBuffer(nil),
-		natChains:             utilproxy.LineBuffer{},
-		natRules:              utilproxy.LineBuffer{},
-		filterChains:          utilproxy.LineBuffer{},
-		filterRules:           utilproxy.LineBuffer{},
+		natChains:             proxyutil.LineBuffer{},
+		natRules:              proxyutil.LineBuffer{},
+		filterChains:          proxyutil.LineBuffer{},
+		filterRules:           proxyutil.LineBuffer{},
 		netlinkHandle:         netlinkHandle,
 		ipsetList:             ipsetList,
-		nodePortAddresses:     utilproxy.NewNodePortAddresses(ipFamily, nil),
+		nodePortAddresses:     proxyutil.NewNodePortAddresses(ipFamily, nil),
 		networkInterfacer:     proxyutiltest.NewFakeNetwork(),
 		gracefuldeleteManager: NewGracefulTerminationManager(ipvs),
 		ipFamily:              ipFamily,
@@ -960,7 +960,7 @@ func TestNodePortIPv4(t *testing.T) {
 			ipvs := ipvstest.NewFake()
 			ipset := ipsettest.NewFake(testIPSetVersion)
 			fp := NewFakeProxier(ipt, ipvs, ipset, test.nodeIPs, nil, v1.IPv4Protocol)
-			fp.nodePortAddresses = utilproxy.NewNodePortAddresses(v1.IPv4Protocol, test.nodePortAddresses)
+			fp.nodePortAddresses = proxyutil.NewNodePortAddresses(v1.IPv4Protocol, test.nodePortAddresses)
 
 			makeServiceMap(fp, test.services...)
 			populateEndpointSlices(fp, test.endpoints...)
@@ -1305,7 +1305,7 @@ func TestNodePortIPv6(t *testing.T) {
 			ipvs := ipvstest.NewFake()
 			ipset := ipsettest.NewFake(testIPSetVersion)
 			fp := NewFakeProxier(ipt, ipvs, ipset, test.nodeIPs, nil, v1.IPv6Protocol)
-			fp.nodePortAddresses = utilproxy.NewNodePortAddresses(v1.IPv6Protocol, test.nodePortAddresses)
+			fp.nodePortAddresses = proxyutil.NewNodePortAddresses(v1.IPv6Protocol, test.nodePortAddresses)
 
 			makeServiceMap(fp, test.services...)
 			populateEndpointSlices(fp, test.endpoints...)
@@ -2068,7 +2068,7 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 	addrs1 := []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("2001:db8::"), Mask: net.CIDRMask(64, 128)}}
 	fp.networkInterfacer.(*proxyutiltest.FakeNetwork).AddInterfaceAddr(&itf, addrs)
 	fp.networkInterfacer.(*proxyutiltest.FakeNetwork).AddInterfaceAddr(&itf1, addrs1)
-	fp.nodePortAddresses = utilproxy.NewNodePortAddresses(v1.IPv4Protocol, []string{"100.101.102.0/24"})
+	fp.nodePortAddresses = proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{"100.101.102.0/24"})
 
 	fp.syncProxyRules()
 
@@ -2156,7 +2156,7 @@ func TestHealthCheckNodePort(t *testing.T) {
 	addrs1 := []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("2001:db8::"), Mask: net.CIDRMask(64, 128)}}
 	fp.networkInterfacer.(*proxyutiltest.FakeNetwork).AddInterfaceAddr(&itf, addrs)
 	fp.networkInterfacer.(*proxyutiltest.FakeNetwork).AddInterfaceAddr(&itf1, addrs1)
-	fp.nodePortAddresses = utilproxy.NewNodePortAddresses(v1.IPv4Protocol, []string{"100.101.102.0/24"})
+	fp.nodePortAddresses = proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{"100.101.102.0/24"})
 
 	fp.syncProxyRules()
 
