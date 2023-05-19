@@ -411,12 +411,12 @@ func TestReflectorListAndWatchInitConnBackoff(t *testing.T) {
 					},
 				}
 				r := &Reflector{
-					name:                   "test-reflector",
-					listerWatcher:          lw,
-					store:                  NewFIFO(MetaNamespaceKeyFunc),
-					initConnBackoffManager: bm,
-					clock:                  fakeClock,
-					watchErrorHandler:      WatchErrorHandler(DefaultWatchErrorHandler),
+					name:              "test-reflector",
+					listerWatcher:     lw,
+					store:             NewFIFO(MetaNamespaceKeyFunc),
+					backoffManager:    bm,
+					clock:             fakeClock,
+					watchErrorHandler: WatchErrorHandler(DefaultWatchErrorHandler),
 				}
 				start := fakeClock.Now()
 				err := r.ListAndWatch(stopCh)
@@ -471,12 +471,12 @@ func TestBackoffOnTooManyRequests(t *testing.T) {
 	}
 
 	r := &Reflector{
-		name:                   "test-reflector",
-		listerWatcher:          lw,
-		store:                  NewFIFO(MetaNamespaceKeyFunc),
-		initConnBackoffManager: bm,
-		clock:                  clock,
-		watchErrorHandler:      WatchErrorHandler(DefaultWatchErrorHandler),
+		name:              "test-reflector",
+		listerWatcher:     lw,
+		store:             NewFIFO(MetaNamespaceKeyFunc),
+		backoffManager:    bm,
+		clock:             clock,
+		watchErrorHandler: WatchErrorHandler(DefaultWatchErrorHandler),
 	}
 
 	stopCh := make(chan struct{})
@@ -540,12 +540,12 @@ func TestRetryInternalError(t *testing.T) {
 		}
 
 		r := &Reflector{
-			name:                   "test-reflector",
-			listerWatcher:          lw,
-			store:                  NewFIFO(MetaNamespaceKeyFunc),
-			initConnBackoffManager: bm,
-			clock:                  fakeClock,
-			watchErrorHandler:      WatchErrorHandler(DefaultWatchErrorHandler),
+			name:              "test-reflector",
+			listerWatcher:     lw,
+			store:             NewFIFO(MetaNamespaceKeyFunc),
+			backoffManager:    bm,
+			clock:             fakeClock,
+			watchErrorHandler: WatchErrorHandler(DefaultWatchErrorHandler),
 		}
 
 		r.MaxInternalErrorRetryDuration = tc.maxInternalDuration
