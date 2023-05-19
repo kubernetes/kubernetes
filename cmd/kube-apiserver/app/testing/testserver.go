@@ -62,6 +62,9 @@ type TearDownFunc func()
 
 // TestServerInstanceOptions Instance options the TestServer
 type TestServerInstanceOptions struct {
+	// SkipHealthzCheck returns without waiting for the server to become healthy.
+	// Useful for testing server configurations expected to prevent /healthz from completing.
+	SkipHealthzCheck bool
 	// Enable cert-auth for the kube-apiserver
 	EnableCertAuth bool
 	// Wrap the storage version interface of the created server's generic server.
@@ -263,60 +266,62 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		}
 	}(stopCh)
 
-	t.Logf("Waiting for /healthz to be ok...")
-
 	client, err := kubernetes.NewForConfig(server.GenericAPIServer.LoopbackClientConfig)
 	if err != nil {
 		return result, fmt.Errorf("failed to create a client: %v", err)
 	}
 
-	// wait until healthz endpoint returns ok
-	err = wait.Poll(100*time.Millisecond, time.Minute, func() (bool, error) {
-		select {
-		case err := <-errCh:
-			return false, err
-		default:
-		}
+	if !instanceOptions.SkipHealthzCheck {
+		t.Logf("Waiting for /healthz to be ok...")
 
-		req := client.CoreV1().RESTClient().Get().AbsPath("/healthz")
-		// The storage version bootstrap test wraps the storage version post-start
-		// hook, so the hook won't become health when the server bootstraps
-		if instanceOptions.StorageVersionWrapFunc != nil {
-			// We hardcode the param instead of having a new instanceOptions field
-			// to avoid confusing users with more options.
-			storageVersionCheck := fmt.Sprintf("poststarthook/%s", apiserver.StorageVersionPostStartHookName)
-			req.Param("exclude", storageVersionCheck)
-		}
-		result := req.Do(context.TODO())
-		status := 0
-		result.StatusCode(&status)
-		if status == 200 {
-			return true, nil
-		}
-		return false, nil
-	})
-	if err != nil {
-		return result, fmt.Errorf("failed to wait for /healthz to return ok: %v", err)
-	}
+		// wait until healthz endpoint returns ok
+		err = wait.Poll(100*time.Millisecond, time.Minute, func() (bool, error) {
+			select {
+			case err := <-errCh:
+				return false, err
+			default:
+			}
 
-	// wait until default namespace is created
-	err = wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
-		select {
-		case err := <-errCh:
-			return false, err
-		default:
-		}
-
-		if _, err := client.CoreV1().Namespaces().Get(context.TODO(), "default", metav1.GetOptions{}); err != nil {
-			if !errors.IsNotFound(err) {
-				t.Logf("Unable to get default namespace: %v", err)
+			req := client.CoreV1().RESTClient().Get().AbsPath("/healthz")
+			// The storage version bootstrap test wraps the storage version post-start
+			// hook, so the hook won't become health when the server bootstraps
+			if instanceOptions.StorageVersionWrapFunc != nil {
+				// We hardcode the param instead of having a new instanceOptions field
+				// to avoid confusing users with more options.
+				storageVersionCheck := fmt.Sprintf("poststarthook/%s", apiserver.StorageVersionPostStartHookName)
+				req.Param("exclude", storageVersionCheck)
+			}
+			result := req.Do(context.TODO())
+			status := 0
+			result.StatusCode(&status)
+			if status == 200 {
+				return true, nil
 			}
 			return false, nil
+		})
+		if err != nil {
+			return result, fmt.Errorf("failed to wait for /healthz to return ok: %v", err)
 		}
-		return true, nil
-	})
-	if err != nil {
-		return result, fmt.Errorf("failed to wait for default namespace to be created: %v", err)
+
+		// wait until default namespace is created
+		err = wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+			select {
+			case err := <-errCh:
+				return false, err
+			default:
+			}
+
+			if _, err := client.CoreV1().Namespaces().Get(context.TODO(), "default", metav1.GetOptions{}); err != nil {
+				if !errors.IsNotFound(err) {
+					t.Logf("Unable to get default namespace: %v", err)
+				}
+				return false, nil
+			}
+			return true, nil
+		})
+		if err != nil {
+			return result, fmt.Errorf("failed to wait for default namespace to be created: %v", err)
+		}
 	}
 
 	tlsInfo := transport.TLSInfo{
