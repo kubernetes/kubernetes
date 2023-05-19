@@ -84,7 +84,7 @@ func (kl *Kubelet) mountVolume(pod *v1.Pod, volume *v1.Volume, podVolume *kubeco
 	// Mount the volume using the CSI driver
 	err := kl.mountDevice(ctx, volume, pod, podVolume, mountPath)
 	if err != nil {
-		klog.ErrorS(err, "MountVolume.MountDevice failed", "pod", klog.KObj(pod), "volume", volume.Name)
+		klog.ErrorS(err, "MountVolume.MountDevice-failed", "pod", klog.KObj(pod), "volume", volume.Name)
 		return err
 	}
 
