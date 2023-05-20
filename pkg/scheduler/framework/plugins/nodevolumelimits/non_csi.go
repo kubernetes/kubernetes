@@ -249,9 +249,6 @@ func (pl *nonCSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod
 	}
 
 	node := nodeInfo.Node()
-	if node == nil {
-		return framework.NewStatus(framework.Error, "node not found")
-	}
 
 	var csiNode *storage.CSINode
 	var err error

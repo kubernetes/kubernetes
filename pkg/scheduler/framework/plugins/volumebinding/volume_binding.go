@@ -233,9 +233,6 @@ func getStateData(cs *framework.CycleState) (*stateData, error) {
 // PVCs can be matched with an available and node-compatible PV.
 func (pl *VolumeBinding) Filter(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	node := nodeInfo.Node()
-	if node == nil {
-		return framework.NewStatus(framework.Error, "node not found")
-	}
 
 	state, err := getStateData(cs)
 	if err != nil {

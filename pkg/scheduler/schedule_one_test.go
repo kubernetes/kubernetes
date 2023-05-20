@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"math/rand"
 	"reflect"
 	"regexp"
 	"sort"
@@ -296,6 +297,44 @@ func newFakeNodeSelector(args runtime.Object, _ framework.Handle) (framework.Plu
 	return pl, nil
 }
 
+const (
+	fakeSpecifiedNodeNameAnnotation = "fake-specified-node-name"
+)
+
+// fakeNodeSelectorDependOnPodAnnotation schedules pod to the specified one node from pod.Annotations[fakeSpecifiedNodeNameAnnotation].
+type fakeNodeSelectorDependOnPodAnnotation struct{}
+
+func (f *fakeNodeSelectorDependOnPodAnnotation) Name() string {
+	return "FakeNodeSelectorDependOnPodAnnotation"
+}
+
+// Filter selects the specified one node and rejects other non-specified nodes.
+func (f *fakeNodeSelectorDependOnPodAnnotation) Filter(_ context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+	resolveNodeNameFromPodAnnotation := func(pod *v1.Pod) (string, error) {
+		if pod == nil {
+			return "", fmt.Errorf("empty pod")
+		}
+		nodeName, ok := pod.Annotations[fakeSpecifiedNodeNameAnnotation]
+		if !ok {
+			return "", fmt.Errorf("no specified node name on pod %s/%s annotation", pod.Namespace, pod.Name)
+		}
+		return nodeName, nil
+	}
+
+	nodeName, err := resolveNodeNameFromPodAnnotation(pod)
+	if err != nil {
+		return framework.AsStatus(err)
+	}
+	if nodeInfo.Node().Name != nodeName {
+		return framework.NewStatus(framework.UnschedulableAndUnresolvable)
+	}
+	return nil
+}
+
+func newFakeNodeSelectorDependOnPodAnnotation(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+	return &fakeNodeSelectorDependOnPodAnnotation{}, nil
+}
+
 type TestPlugin struct {
 	name string
 }
@@ -446,6 +485,136 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 	if diff := cmp.Diff(wantControllers, controllers); diff != "" {
 		t.Errorf("events were reported with wrong controllers (-want, +got):\n%s", diff)
 	}
+}
+
+// TestSchedulerGuaranteeNonNilNodeInSchedulingCycle is for detecting potential panic on nil Node when iterating Nodes.
+func TestSchedulerGuaranteeNonNilNodeInSchedulingCycle(t *testing.T) {
+	random := rand.New(rand.NewSource(time.Now().UnixNano()))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var (
+		initialNodeNumber        = 1000
+		initialPodNumber         = 500
+		waitSchedulingPodNumber  = 200
+		deleteNodeNumberPerRound = 20
+		createPodNumberPerRound  = 50
+
+		fakeSchedulerName = "fake-scheduler"
+		fakeNamespace     = "fake-namespace"
+
+		initialNodes []runtime.Object
+		initialPods  []runtime.Object
+	)
+
+	for i := 0; i < initialNodeNumber; i++ {
+		nodeName := fmt.Sprintf("node%d", i)
+		initialNodes = append(initialNodes, st.MakeNode().Name(nodeName).UID(nodeName).Obj())
+	}
+	// Randomly scatter initial pods onto nodes.
+	for i := 0; i < initialPodNumber; i++ {
+		podName := fmt.Sprintf("scheduled-pod%d", i)
+		assignedNodeName := fmt.Sprintf("node%d", random.Intn(initialNodeNumber))
+		initialPods = append(initialPods, st.MakePod().Name(podName).UID(podName).Node(assignedNodeName).Obj())
+	}
+
+	objs := []runtime.Object{&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: fakeNamespace}}}
+	objs = append(objs, initialNodes...)
+	objs = append(objs, initialPods...)
+	client := clientsetfake.NewSimpleClientset(objs...)
+	broadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	sched, err := New(
+		client,
+		informerFactory,
+		nil,
+		profile.NewRecorderFactory(broadcaster),
+		ctx.Done(),
+		WithProfiles(
+			schedulerapi.KubeSchedulerProfile{SchedulerName: fakeSchedulerName,
+				Plugins: &schedulerapi.Plugins{
+					Filter:    schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "FakeNodeSelectorDependOnPodAnnotation"}}},
+					QueueSort: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "PrioritySort"}}},
+					Bind:      schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultBinder"}}},
+				},
+			},
+		),
+		WithFrameworkOutOfTreeRegistry(frameworkruntime.Registry{
+			"FakeNodeSelectorDependOnPodAnnotation": newFakeNodeSelectorDependOnPodAnnotation,
+		}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Run scheduler.
+	informerFactory.Start(ctx.Done())
+	informerFactory.WaitForCacheSync(ctx.Done())
+	go sched.Run(ctx)
+
+	var deleteNodeIndex int
+	deleteNodesOneRound := func() {
+		for i := 0; i < deleteNodeNumberPerRound; i++ {
+			if deleteNodeIndex >= initialNodeNumber {
+				// all initial nodes are already deleted
+				return
+			}
+			deleteNodeName := fmt.Sprintf("node%d", deleteNodeIndex)
+			if err := client.CoreV1().Nodes().Delete(ctx, deleteNodeName, metav1.DeleteOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			deleteNodeIndex++
+		}
+	}
+	var createPodIndex int
+	createPodsOneRound := func() {
+		if createPodIndex > waitSchedulingPodNumber {
+			return
+		}
+		for i := 0; i < createPodNumberPerRound; i++ {
+			podName := fmt.Sprintf("pod%d", createPodIndex)
+			// Note: the node(specifiedNodeName) may already be deleted, which leads pod scheduled failed.
+			specifiedNodeName := fmt.Sprintf("node%d", random.Intn(initialNodeNumber))
+
+			waitSchedulingPod := st.MakePod().Namespace(fakeNamespace).Name(podName).UID(podName).Annotation(fakeSpecifiedNodeNameAnnotation, specifiedNodeName).SchedulerName(fakeSchedulerName).Obj()
+			if _, err := client.CoreV1().Pods(fakeNamespace).Create(ctx, waitSchedulingPod, metav1.CreateOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			createPodIndex++
+		}
+	}
+
+	// Following we start 2 goroutines asynchronously to detect potential racing issues:
+	// 1) One is responsible for deleting several nodes in each round;
+	// 2) Another is creating several pods in each round to trigger scheduling;
+	// Those two goroutines will stop until ctx.Done() is called, which means all waiting pods are scheduled at least once.
+	go wait.Until(deleteNodesOneRound, 10*time.Millisecond, ctx.Done())
+	go wait.Until(createPodsOneRound, 9*time.Millisecond, ctx.Done())
+
+	// Capture the events to wait all pods to be scheduled at least once.
+	allWaitSchedulingPods := sets.NewString()
+	for i := 0; i < waitSchedulingPodNumber; i++ {
+		allWaitSchedulingPods.Insert(fmt.Sprintf("pod%d", i))
+	}
+	var wg sync.WaitGroup
+	wg.Add(waitSchedulingPodNumber)
+	stopFn, err := broadcaster.StartEventWatcher(func(obj runtime.Object) {
+		e, ok := obj.(*eventsv1.Event)
+		if !ok || (e.Reason != "Scheduled" && e.Reason != "FailedScheduling") {
+			return
+		}
+		if allWaitSchedulingPods.Has(e.Regarding.Name) {
+			wg.Done()
+			allWaitSchedulingPods.Delete(e.Regarding.Name)
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stopFn()
+
+	wg.Wait()
 }
 
 func TestSchedulerScheduleOne(t *testing.T) {

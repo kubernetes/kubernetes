@@ -149,9 +149,6 @@ func (pl *PodTopologySpread) PreScore(
 	processAllNode := func(i int) {
 		nodeInfo := allNodes[i]
 		node := nodeInfo.Node()
-		if node == nil {
-			return
-		}
 
 		if !pl.enableNodeInclusionPolicyInPodTopologySpread {
 			// `node` should satisfy incoming pod's NodeSelector/NodeAffinity

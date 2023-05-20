@@ -63,9 +63,6 @@ func (pl *TaintToleration) EventsToRegister() []framework.ClusterEvent {
 // Filter invoked at the filter extension point.
 func (pl *TaintToleration) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	node := nodeInfo.Node()
-	if node == nil {
-		return framework.AsStatus(fmt.Errorf("invalid nodeInfo"))
-	}
 
 	taint, isUntolerated := v1helper.FindMatchingUntoleratedTaint(node.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc())
 	if !isUntolerated {

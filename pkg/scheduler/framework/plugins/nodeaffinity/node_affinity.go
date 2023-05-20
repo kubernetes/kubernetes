@@ -149,9 +149,7 @@ func (pl *NodeAffinity) PreFilterExtensions() framework.PreFilterExtensions {
 // the plugin's added affinity.
 func (pl *NodeAffinity) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	node := nodeInfo.Node()
-	if node == nil {
-		return framework.NewStatus(framework.Error, "node not found")
-	}
+
 	if pl.addedNodeSelector != nil && !pl.addedNodeSelector.Match(node) {
 		return framework.NewStatus(framework.UnschedulableAndUnresolvable, errReasonEnforced)
 	}
