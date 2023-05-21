@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy2"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/klog/v2"
 )
 
@@ -106,11 +107,29 @@ func (h *StreamTranslatorHandler) ServeHTTP(w http.ResponseWriter, req *http.Req
 	err = spdyExecutor.Stream(opts)
 	if err != nil {
 		klog.Infof("spdyExecutor Stream() error: %v", err)
-		h.Responder.Error(w, req, err)
+		// Report error back to the WebSocket client.
+		if exitErr, ok := err.(spdy2.CodeExitError); ok && exitErr.Exited() {
+			rc := exitErr.ExitStatus()
+			ctx.writeStatus(&apierrors.StatusError{ErrStatus: metav1.Status{
+				Status: metav1.StatusFailure,
+				Reason: remotecommand.NonZeroExitCodeReason,
+				Details: &metav1.StatusDetails{
+					Causes: []metav1.StatusCause{
+						{
+							Type:    remotecommand.ExitCodeCauseType,
+							Message: fmt.Sprintf("%d", rc),
+						},
+					},
+				},
+				Message: fmt.Sprintf("command terminated with non-zero exit code: %v", exitErr),
+			}})
+		} else {
+			ctx.writeStatus(apierrors.NewInternalError(err))
+		}
 		return
 	}
 
-	// Write the status back to the WebSocket client.
+	// Write the success status back to the WebSocket client.
 	ctx.writeStatus(&apierrors.StatusError{ErrStatus: metav1.Status{
 		Status: metav1.StatusSuccess,
 	}})
