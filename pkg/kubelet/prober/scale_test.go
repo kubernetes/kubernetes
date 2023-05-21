@@ -87,7 +87,7 @@ func TestTCPPortExhaustion(t *testing.T) {
 			} else {
 				testRootDir = tempDir
 			}
-			podManager := kubepod.NewBasicPodManager(nil)
+			podManager := kubepod.NewBasicPodManager()
 			podStartupLatencyTracker := kubeletutil.NewPodStartupLatencyTracker()
 			m := NewManager(
 				status.NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker, testRootDir),
@@ -168,7 +168,7 @@ func TestTCPPortExhaustion(t *testing.T) {
 					switch result.Result.String() {
 					// The test will fail if any of the probes fails
 					case "Failure":
-						t.Errorf("Failure %s on contantinerID: %v Pod %v", probeType, result.ContainerID, result.Pod.UID)
+						t.Errorf("Failure %s on contantinerID: %v Pod %v", probeType, result.ContainerID, result.PodUID)
 					case "UNKNOWN": // startup probes
 						t.Logf("UNKNOWN state for %v", result)
 					default:

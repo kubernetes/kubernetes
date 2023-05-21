@@ -20,6 +20,7 @@ import (
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -79,7 +80,7 @@ func (r Result) ToPrometheusType() float64 {
 type Update struct {
 	ContainerID kubecontainer.ContainerID
 	Result      Result
-	Pod         *v1.Pod
+	PodUID      types.UID
 }
 
 // Manager implementation.
@@ -111,7 +112,7 @@ func (m *manager) Get(id kubecontainer.ContainerID) (Result, bool) {
 
 func (m *manager) Set(id kubecontainer.ContainerID, result Result, pod *v1.Pod) {
 	if m.setInternal(id, result) {
-		m.updates <- Update{id, result, pod}
+		m.updates <- Update{id, result, pod.UID}
 	}
 }
 

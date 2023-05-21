@@ -43,12 +43,12 @@ func (m *fakeManager) SetPodStatus(pod *v1.Pod, status v1.PodStatus) {
 	return
 }
 
-func (m *fakeManager) SetContainerReadiness(pod *v1.Pod, containerID kubecontainer.ContainerID, ready bool) {
+func (m *fakeManager) SetContainerReadiness(podUID types.UID, containerID kubecontainer.ContainerID, ready bool) {
 	klog.InfoS("SetContainerReadiness()")
 	return
 }
 
-func (m *fakeManager) SetContainerStartup(pod *v1.Pod, containerID kubecontainer.ContainerID, started bool) {
+func (m *fakeManager) SetContainerStartup(podUID types.UID, containerID kubecontainer.ContainerID, started bool) {
 	klog.InfoS("SetContainerStartup()")
 	return
 }

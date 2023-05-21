@@ -40,7 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/status/state"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	statusutil "k8s.io/kubernetes/pkg/util/pod"
@@ -70,7 +69,7 @@ type versionedPodStatus struct {
 // All methods are thread-safe.
 type manager struct {
 	kubeClient clientset.Interface
-	podManager kubepod.Manager
+	podManager PodManager
 	// Map from pod UID to sync status of the corresponding pod.
 	podStatuses      map[types.UID]versionedPodStatus
 	podStatusesLock  sync.RWMutex
@@ -87,8 +86,18 @@ type manager struct {
 	stateFileDirectory string
 }
 
-// PodStatusProvider knows how to provide status for a pod. It's intended to be used by other components
-// that need to introspect status.
+// PodManager is the subset of methods the manager needs to observe the actual state of the kubelet.
+// See pkg/k8s.io/kubernetes/pkg/kubelet/pod.Manager for method godoc.
+type PodManager interface {
+	GetPodByUID(types.UID) (*v1.Pod, bool)
+	GetMirrorPodByPod(*v1.Pod) (*v1.Pod, bool)
+	TranslatePodUID(uid types.UID) kubetypes.ResolvedPodUID
+	GetUIDTranslations() (podToMirror map[kubetypes.ResolvedPodUID]kubetypes.MirrorPodUID, mirrorToPod map[kubetypes.MirrorPodUID]kubetypes.ResolvedPodUID)
+}
+
+// PodStatusProvider knows how to provide status for a pod. It is intended to be used by other components
+// that need to introspect the authoritative status of a pod.  The PodStatusProvider represents the actual
+// status of a running pod as the kubelet sees it.
 type PodStatusProvider interface {
 	// GetPodStatus returns the cached status for the provided pod UID, as well as whether it
 	// was a cache hit.
@@ -119,11 +128,11 @@ type Manager interface {
 
 	// SetContainerReadiness updates the cached container status with the given readiness, and
 	// triggers a status update.
-	SetContainerReadiness(pod *v1.Pod, containerID kubecontainer.ContainerID, ready bool)
+	SetContainerReadiness(podUID types.UID, containerID kubecontainer.ContainerID, ready bool)
 
 	// SetContainerStartup updates the cached container status with the given startup, and
 	// triggers a status update.
-	SetContainerStartup(pod *v1.Pod, containerID kubecontainer.ContainerID, started bool)
+	SetContainerStartup(podUID types.UID, containerID kubecontainer.ContainerID, started bool)
 
 	// TerminatePod resets the container status for the provided pod to terminated and triggers
 	// a status update.
@@ -149,7 +158,7 @@ type Manager interface {
 const syncPeriod = 10 * time.Second
 
 // NewManager returns a functional Manager.
-func NewManager(kubeClient clientset.Interface, podManager kubepod.Manager, podDeletionSafety PodDeletionSafetyProvider, podStartupLatencyHelper PodStartupLatencyStateHelper, stateFileDirectory string) Manager {
+func NewManager(kubeClient clientset.Interface, podManager PodManager, podDeletionSafety PodDeletionSafetyProvider, podStartupLatencyHelper PodStartupLatencyStateHelper, stateFileDirectory string) Manager {
 	return &manager{
 		kubeClient:              kubeClient,
 		podManager:              podManager,
@@ -283,9 +292,15 @@ func (m *manager) SetPodStatus(pod *v1.Pod, status v1.PodStatus) {
 	m.updateStatusInternal(pod, status, pod.DeletionTimestamp != nil, false)
 }
 
-func (m *manager) SetContainerReadiness(pod *v1.Pod, containerID kubecontainer.ContainerID, ready bool) {
+func (m *manager) SetContainerReadiness(podUID types.UID, containerID kubecontainer.ContainerID, ready bool) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
+
+	pod, ok := m.podManager.GetPodByUID(podUID)
+	if !ok {
+		klog.V(4).InfoS("Pod has been deleted, no need to update readiness", "podUID", string(podUID))
+		return
+	}
 
 	oldStatus, found := m.podStatuses[pod.UID]
 	if !found {
@@ -338,11 +353,10 @@ func (m *manager) SetContainerReadiness(pod *v1.Pod, containerID kubecontainer.C
 	m.updateStatusInternal(pod, status, false, false)
 }
 
-func (m *manager) SetContainerStartup(pod *v1.Pod, containerID kubecontainer.ContainerID, started bool) {
+func (m *manager) SetContainerStartup(podUID types.UID, containerID kubecontainer.ContainerID, started bool) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
 
-	podUID := pod.UID
 	pod, ok := m.podManager.GetPodByUID(podUID)
 	if !ok {
 		klog.V(4).InfoS("Pod has been deleted, no need to update startup", "podUID", string(podUID))
@@ -805,6 +819,17 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 			"podUID", uid,
 			"pod", klog.KRef(status.podNamespace, status.podName),
 			"err", err)
+		return
+	}
+
+	translatedUID := m.podManager.TranslatePodUID(pod.UID)
+	// Type convert original uid just for the purpose of comparison.
+	if len(translatedUID) > 0 && translatedUID != kubetypes.ResolvedPodUID(uid) {
+		klog.V(2).InfoS("Pod was deleted and then recreated, skipping status update",
+			"pod", klog.KObj(pod),
+			"oldPodUID", uid,
+			"podUID", translatedUID)
+		m.deletePodStatus(uid)
 		return
 	}
 

@@ -320,7 +320,7 @@ func (m *manager) extractedReadinessHandling() {
 	update := <-m.readinessManager.Updates()
 	// This code corresponds to an extract from kubelet.syncLoopIteration()
 	ready := update.Result == results.Success
-	m.statusManager.SetContainerReadiness(update.Pod, update.ContainerID, ready)
+	m.statusManager.SetContainerReadiness(update.PodUID, update.ContainerID, ready)
 }
 
 func TestUpdateReadiness(t *testing.T) {

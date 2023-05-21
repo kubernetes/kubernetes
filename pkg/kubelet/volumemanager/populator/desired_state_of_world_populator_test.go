@@ -17,9 +17,10 @@ limitations under the License.
 package populator
 
 import (
-	"k8s.io/klog/v2/ktesting"
 	"testing"
 	"time"
+
+	"k8s.io/klog/v2/ktesting"
 
 	"fmt"
 
@@ -37,7 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
-	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
@@ -288,7 +288,7 @@ func TestFindAndAddNewPods_WithReprocessPodAndVolumeRetrievalError(t *testing.T)
 	if !dswp.podPreviouslyProcessed(podName) {
 		t.Fatalf("Failed to record that the volumes for the specified pod: %s have been processed by the populator", podName)
 	}
-	fakePodManager.DeletePod(pod)
+	fakePodManager.RemovePod(pod)
 }
 
 func TestFindAndAddNewPods_WithVolumeRetrievalError(t *testing.T) {
@@ -324,17 +324,22 @@ func TestFindAndAddNewPods_WithVolumeRetrievalError(t *testing.T) {
 	}
 }
 
+type mutablePodManager interface {
+	GetPodByName(string, string) (*v1.Pod, bool)
+	RemovePod(*v1.Pod)
+}
+
 func TestFindAndAddNewPods_FindAndRemoveDeletedPods(t *testing.T) {
 	dswp, fakePodState, pod, expectedVolumeName, _ := prepareDSWPWithPodPV(t)
 	podName := util.GetUniquePodName(pod)
 
 	//let the pod be terminated
-	podGet, exist := dswp.podManager.GetPodByName(pod.Namespace, pod.Name)
+	podGet, exist := dswp.podManager.(mutablePodManager).GetPodByName(pod.Namespace, pod.Name)
 	if !exist {
 		t.Fatalf("Failed to get pod by pod name: %s and namespace: %s", pod.Name, pod.Namespace)
 	}
 	podGet.Status.Phase = v1.PodFailed
-	dswp.podManager.DeletePod(pod)
+	dswp.podManager.(mutablePodManager).RemovePod(pod)
 
 	dswp.findAndRemoveDeletedPods()
 
@@ -381,7 +386,7 @@ func TestFindAndRemoveDeletedPodsWithActualState(t *testing.T) {
 	podName := util.GetUniquePodName(pod)
 
 	//let the pod be terminated
-	podGet, exist := dswp.podManager.GetPodByName(pod.Namespace, pod.Name)
+	podGet, exist := dswp.podManager.(mutablePodManager).GetPodByName(pod.Namespace, pod.Name)
 	if !exist {
 		t.Fatalf("Failed to get pod by pod name: %s and namespace: %s", pod.Name, pod.Namespace)
 	}
@@ -443,12 +448,12 @@ func TestFindAndRemoveDeletedPodsWithUncertain(t *testing.T) {
 	podName := util.GetUniquePodName(pod)
 
 	//let the pod be terminated
-	podGet, exist := dswp.podManager.GetPodByName(pod.Namespace, pod.Name)
+	podGet, exist := dswp.podManager.(mutablePodManager).GetPodByName(pod.Namespace, pod.Name)
 	if !exist {
 		t.Fatalf("Failed to get pod by pod name: %s and namespace: %s", pod.Name, pod.Namespace)
 	}
 	podGet.Status.Phase = v1.PodFailed
-	dswp.podManager.DeletePod(pod)
+	dswp.podManager.(mutablePodManager).RemovePod(pod)
 	fakePodState.removed = map[kubetypes.UID]struct{}{pod.UID: {}}
 
 	// Add the volume to ASW by reconciling.
@@ -745,7 +750,7 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods_Valid_Block_VolumeDevices(t 
 		t.Fatalf("Failed to get pod by pod name: %s and namespace: %s", pod.Name, pod.Namespace)
 	}
 	podGet.Status.Phase = v1.PodFailed
-	fakePodManager.DeletePod(pod)
+	fakePodManager.RemovePod(pod)
 	fakePodState.removed = map[kubetypes.UID]struct{}{pod.UID: {}}
 
 	//pod is added to fakePodManager but pod state knows the pod is removed, so here findAndRemoveDeletedPods() will remove the pod and volumes it is mounted
@@ -1604,8 +1609,7 @@ func createDswpWithVolumeWithCustomPluginMgr(t *testing.T, pv *v1.PersistentVolu
 		return true, pv, nil
 	})
 
-	fakePodManager := kubepod.NewBasicPodManager(
-		podtest.NewFakeMirrorClient())
+	fakePodManager := kubepod.NewBasicPodManager()
 
 	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
 	fakesDSW := cache.NewDesiredStateOfWorld(fakeVolumePluginMgr, seLinuxTranslator)
