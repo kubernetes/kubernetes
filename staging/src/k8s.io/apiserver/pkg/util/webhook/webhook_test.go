@@ -47,7 +47,7 @@ import (
 )
 
 const (
-	errBadCertificate    = "Get .*: remote error: tls: bad certificate"
+	errBadCertificate    = "Get .*: remote error: tls: (bad certificate|unknown certificate authority)"
 	errNoConfiguration   = "invalid configuration: no configuration has been provided"
 	errMissingCertPath   = "invalid configuration: unable to read %s %s for %s due to open %s: .*"
 	errSignedByUnknownCA = "Get .*: x509: .*(unknown authority|not standards compliant|not trusted)"
