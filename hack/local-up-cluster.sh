@@ -746,6 +746,8 @@ function wait_coredns_available(){
   echo "====== set overcommit_memory ====="
   echo 1 | sudo tee /proc/sys/vm/overcommit_memory
   sudo cat /proc/sys/vm/overcommit_memory
+  echo "====== resolv.conf ====="
+  sudo cat /etc/resolv.conf
   echo "====== ps ====="
   sudo ps -ef
   echo "====== ps coredns ====="
