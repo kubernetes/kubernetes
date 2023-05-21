@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -78,17 +79,21 @@ const filterPluginName = "filter-plugin"
 var lowPriority, mediumPriority, highPriority = int32(100), int32(200), int32(300)
 
 func waitForNominatedNodeNameWithTimeout(cs clientset.Interface, pod *v1.Pod, timeout time.Duration) error {
-	if err := wait.Poll(100*time.Millisecond, timeout, func() (bool, error) {
-		pod, err := cs.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
-		if err != nil {
+	var failMsg string
+	if !gomega.NewGomega(func(message string, callerSkip ...int) {
+		failMsg = message
+	}).Eventually(
+		func() (bool, error) {
+			pod, err := cs.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			if len(pod.Status.NominatedNodeName) > 0 {
+				return true, nil
+			}
 			return false, err
-		}
-		if len(pod.Status.NominatedNodeName) > 0 {
-			return true, nil
-		}
-		return false, err
-	}); err != nil {
-		return fmt.Errorf(".status.nominatedNodeName of Pod %v/%v did not get set: %v", pod.Namespace, pod.Name, err)
+		}).WithTimeout(timeout).WithPolling(100 * time.Millisecond).Should(gomega.BeTrue()) {
+		return fmt.Errorf(".status.nominatedNodeName of Pod %v/%v did not get set: %s", pod.Namespace, pod.Name, failMsg)
 	}
 	return nil
 }
@@ -462,7 +467,9 @@ func TestPreemption(t *testing.T) {
 			// Wait for preemption of pods and make sure the other ones are not preempted.
 			for i, p := range pods {
 				if _, found := test.preemptedPodIndexes[i]; found {
-					if err = wait.Poll(time.Second, wait.ForeverTestTimeout, podIsGettingEvicted(cs, p.Namespace, p.Name)); err != nil {
+					if !gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
+						return podIsGettingEvicted(cs, p.Namespace, p.Name)()
+					}).WithTimeout(wait.ForeverTestTimeout).WithPolling(time.Second).Should(gomega.BeTrue()) {
 						t.Errorf("Pod %v/%v is not getting evicted.", p.Namespace, p.Name)
 					}
 					pod, err := cs.CoreV1().Pods(p.Namespace).Get(testCtx.Ctx, p.Name, metav1.GetOptions{})
@@ -841,9 +848,10 @@ func TestPreemptionStarvation(t *testing.T) {
 			}
 			// Make sure that all pending pods are being marked unschedulable.
 			for _, p := range pendingPods {
-				if err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout,
-					podUnschedulable(cs, p.Namespace, p.Name)); err != nil {
-					t.Errorf("Pod %v/%v didn't get marked unschedulable: %v", p.Namespace, p.Name, err)
+				if !gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
+					return podUnschedulable(cs, p.Namespace, p.Name)()
+				}).WithTimeout(wait.ForeverTestTimeout).WithPolling(100 * time.Millisecond).Should(gomega.BeTrue()) {
+					t.Errorf("Pod %v/%v didn't get marked unschedulable", p.Namespace, p.Name)
 				}
 			}
 			// Create the preemptor.
@@ -1172,7 +1180,7 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 			}
 
 			// Verify if .status.nominatedNodeName is cleared.
-			if err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+			if !gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
 				pod, err := cs.CoreV1().Pods(ns).Get(context.TODO(), "medium", metav1.GetOptions{})
 				if err != nil {
 					t.Errorf("Error getting the medium pod: %v", err)
@@ -1181,8 +1189,8 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 					return true, nil
 				}
 				return false, err
-			}); err != nil {
-				t.Errorf(".status.nominatedNodeName of the medium pod was not cleared: %v", err)
+			}).WithTimeout(wait.ForeverTestTimeout).WithPolling(100 * time.Millisecond).Should(gomega.BeTrue()) {
+				t.Errorf(".status.nominatedNodeName of the medium pod was not cleared")
 			}
 		})
 	}
@@ -1443,7 +1451,9 @@ func TestPDBInPreemption(t *testing.T) {
 			// Wait for preemption of pods and make sure the other ones are not preempted.
 			for i, p := range pods {
 				if _, found := test.preemptedPodIndexes[i]; found {
-					if err = wait.Poll(time.Second, wait.ForeverTestTimeout, podIsGettingEvicted(cs, p.Namespace, p.Name)); err != nil {
+					if !gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
+						return podIsGettingEvicted(cs, p.Namespace, p.Name)()
+					}).WithTimeout(wait.ForeverTestTimeout).WithPolling(time.Second).Should(gomega.BeTrue()) {
 						t.Errorf("Test [%v]: Pod %v/%v is not getting evicted.", test.name, p.Namespace, p.Name)
 					}
 				} else {
@@ -1580,8 +1590,8 @@ func TestPreferNominatedNode(t *testing.T) {
 			if err != nil {
 				t.Errorf("Error while creating high priority pod: %v", err)
 			}
-			err = wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-				preemptor, err = cs.CoreV1().Pods(test.pod.Namespace).Get(context.TODO(), test.pod.Name, metav1.GetOptions{})
+			if !gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
+				preemptor, err = cs.CoreV1().Pods(test.pod.Namespace).Get(ctx, test.pod.Name, metav1.GetOptions{})
 				if err != nil {
 					t.Errorf("Error getting the preemptor pod info: %v", err)
 				}
@@ -1589,9 +1599,8 @@ func TestPreferNominatedNode(t *testing.T) {
 					return false, err
 				}
 				return true, nil
-			})
-			if err != nil {
-				t.Errorf("Cannot schedule Pod %v/%v, error: %v", test.pod.Namespace, test.pod.Name, err)
+			}).WithTimeout(wait.ForeverTestTimeout).WithPolling(100 * time.Millisecond).Should(gomega.BeTrue()) {
+				t.Errorf("Cannot schedule Pod %v/%v", test.pod.Namespace, test.pod.Name)
 			}
 			// Make sure the pod has been scheduled to the right node.
 			if preemptor.Spec.NodeName != test.runningNode {
@@ -1933,7 +1942,9 @@ func TestReadWriteOncePodPreemption(t *testing.T) {
 			// Wait for preemption of pods and make sure the other ones are not preempted.
 			for i, p := range pods {
 				if _, found := test.preemptedPodIndexes[i]; found {
-					if err = wait.Poll(time.Second, wait.ForeverTestTimeout, podIsGettingEvicted(cs, p.Namespace, p.Name)); err != nil {
+					if !gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
+						return podIsGettingEvicted(cs, p.Namespace, p.Name)()
+					}).WithTimeout(wait.ForeverTestTimeout).WithPolling(time.Second).Should(gomega.BeTrue()) {
 						t.Errorf("Pod %v/%v is not getting evicted.", p.Namespace, p.Name)
 					}
 				} else {
