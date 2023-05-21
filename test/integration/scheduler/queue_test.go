@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -135,11 +136,11 @@ func TestSchedulingGates(t *testing.T) {
 			}
 
 			// Wait for the pods to be present in the scheduling queue.
-			if err := wait.Poll(time.Millisecond*200, wait.ForeverTestTimeout, func() (bool, error) {
+			if !gomega.NewGomegaWithT(t).Eventually(ctx, func(ctx context.Context) (bool, error) {
 				pendingPods, _ := testCtx.Scheduler.SchedulingQueue.PendingPods()
 				return len(pendingPods) == len(tt.pods), nil
-			}); err != nil {
-				t.Fatal(err)
+			}).WithTimeout(wait.ForeverTestTimeout).WithPolling(time.Millisecond * 200).Should(gomega.BeTrue()) {
+				t.Fatal()
 			}
 
 			// Pop the expected pods out. They should be de-queueable.
@@ -212,11 +213,11 @@ func TestCoreResourceEnqueue(t *testing.T) {
 	}
 
 	// Wait for the three pods to be present in the scheduling queue.
-	if err := wait.Poll(time.Millisecond*200, wait.ForeverTestTimeout, func() (bool, error) {
+	if !gomega.NewGomegaWithT(t).Eventually(ctx, func(ctx context.Context) (bool, error) {
 		pendingPods, _ := testCtx.Scheduler.SchedulingQueue.PendingPods()
 		return len(pendingPods) == 3, nil
-	}); err != nil {
-		t.Fatal(err)
+	}).WithTimeout(wait.ForeverTestTimeout).WithPolling(time.Millisecond * 200).Should(gomega.BeTrue()) {
+		t.Fatal()
 	}
 
 	// Pop the three pods out. They should be unschedulable.
@@ -392,11 +393,11 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	}
 
 	// Wait for the testing Pod to be present in the scheduling queue.
-	if err := wait.Poll(time.Millisecond*200, wait.ForeverTestTimeout, func() (bool, error) {
+	if !gomega.NewGomegaWithT(t).Eventually(ctx, func(ctx context.Context) (bool, error) {
 		pendingPods, _ := testCtx.Scheduler.SchedulingQueue.PendingPods()
 		return len(pendingPods) == 1, nil
-	}); err != nil {
-		t.Fatal(err)
+	}).WithTimeout(wait.ForeverTestTimeout).WithPolling(time.Millisecond * 200).Should(gomega.BeTrue()) {
+		t.Fatal()
 	}
 
 	// Pop fake-pod out. It should be unschedulable.

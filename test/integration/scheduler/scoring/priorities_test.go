@@ -17,11 +17,13 @@ limitations under the License.
 package scoring
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -619,9 +621,10 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Test Failed: error while creating pod during test: %v", err)
 				}
-				err = wait.Poll(pollInterval, wait.ForeverTestTimeout, testutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name))
-				if err != nil {
-					t.Errorf("Test Failed: error while waiting for pod during test: %v", err)
+				if !gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
+					return testutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name)()
+				}).WithTimeout(wait.ForeverTestTimeout).WithPolling(pollInterval).Should(gomega.BeTrue()) {
+					t.Errorf("Test Failed: error while waiting for pod during test")
 				}
 			}
 
@@ -630,13 +633,18 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 				t.Fatalf("Test Failed: error while creating pod during test: %v", err)
 			}
 
+			match := false
 			if tt.fits {
-				err = wait.Poll(pollInterval, wait.ForeverTestTimeout, podScheduledIn(cs, testPod.Namespace, testPod.Name, tt.want))
+				match = gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
+					return podScheduledIn(cs, testPod.Namespace, testPod.Name, tt.want)()
+				}).WithTimeout(wait.ForeverTestTimeout).WithPolling(pollInterval).Should(gomega.BeTrue())
 			} else {
-				err = wait.Poll(pollInterval, wait.ForeverTestTimeout, podUnschedulable(cs, testPod.Namespace, testPod.Name))
+				match = gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
+					return podUnschedulable(cs, testPod.Namespace, testPod.Name)()
+				}).WithTimeout(wait.ForeverTestTimeout).WithPolling(pollInterval).Should(gomega.BeTrue())
 			}
-			if err != nil {
-				t.Errorf("Test Failed: %v", err)
+			if !match {
+				t.Errorf("Test Failed")
 			}
 		})
 	}
@@ -697,7 +705,7 @@ func TestDefaultPodTopologySpreadScoring(t *testing.T) {
 			}
 			var pods []v1.Pod
 			// Wait for all Pods scheduled.
-			err = wait.Poll(pollInterval, wait.ForeverTestTimeout, func() (bool, error) {
+			if !gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
 				podList, err := cs.CoreV1().Pods(ns).List(testCtx.Ctx, metav1.ListOptions{})
 				if err != nil {
 					t.Fatalf("Cannot list pods to verify scheduling: %v", err)
@@ -709,7 +717,9 @@ func TestDefaultPodTopologySpreadScoring(t *testing.T) {
 				}
 				pods = podList.Items
 				return true, nil
-			})
+			}).WithTimeout(wait.ForeverTestTimeout).WithPolling(pollInterval).Should(gomega.BeTrue()) {
+				t.Errorf("timeout waiting for all pods scheduled")
+			}
 			// Verify zone spreading.
 			zoneCnts := make(map[string]int)
 			for _, p := range pods {

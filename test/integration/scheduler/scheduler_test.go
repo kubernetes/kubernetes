@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -321,7 +322,7 @@ func TestMultipleSchedulingProfiles(t *testing.T) {
 	}
 
 	gotProfiles := make(map[string]string)
-	if err := wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+	if !gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
 		var ev watch.Event
 		select {
 		case ev = <-evs.ResultChan():
@@ -334,8 +335,8 @@ func TestMultipleSchedulingProfiles(t *testing.T) {
 		}
 		gotProfiles[e.InvolvedObject.Name] = e.ReportingController
 		return len(gotProfiles) >= len(wantProfiles), nil
-	}); err != nil {
-		t.Errorf("waiting for scheduling events: %v", err)
+	}).WithTimeout(30 * time.Second).WithPolling(100 * time.Millisecond).Should(gomega.BeTrue()) {
+		t.Errorf("failed to get profiles")
 	}
 
 	if diff := cmp.Diff(wantProfiles, gotProfiles); diff != "" {
