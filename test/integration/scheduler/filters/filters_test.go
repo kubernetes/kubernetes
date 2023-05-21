@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -832,9 +833,10 @@ func TestInterPodAffinity(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Error while creating pod: %v", err)
 				}
-				err = wait.Poll(pollInterval, wait.ForeverTestTimeout, testutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name))
-				if err != nil {
-					t.Errorf("Error while creating pod: %v", err)
+				if !gomega.NewGomegaWithT(t).Eventually(ctx, func(ctx context.Context) (bool, error) {
+					return testutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name)()
+				}).WithTimeout(wait.ForeverTestTimeout).WithPolling(pollInterval).Should(gomega.BeTrue()) {
+					t.Errorf("Error while creating pod")
 				}
 			}
 			if test.pod.Namespace == "" {
@@ -848,33 +850,38 @@ func TestInterPodAffinity(t *testing.T) {
 				}
 			}
 
+			match := false
 			if test.fits {
-				err = wait.Poll(pollInterval, wait.ForeverTestTimeout, testutils.PodScheduled(cs, testPod.Namespace, testPod.Name))
+				match = gomega.NewGomegaWithT(t).Eventually(ctx, func(ctx context.Context) (bool, error) {
+					return testutils.PodScheduled(cs, testPod.Namespace, testPod.Name)()
+				}).WithTimeout(wait.ForeverTestTimeout).WithPolling(pollInterval).Should(gomega.BeTrue())
 			} else {
-				err = wait.Poll(pollInterval, wait.ForeverTestTimeout, podUnschedulable(cs, testPod.Namespace, testPod.Name))
+				match = gomega.NewGomegaWithT(t).Eventually(ctx, func(ctx context.Context) (bool, error) {
+					return podUnschedulable(cs, testPod.Namespace, testPod.Name)()
+				}).WithTimeout(wait.ForeverTestTimeout).WithPolling(pollInterval).Should(gomega.BeTrue())
 			}
-			if err != nil {
-				t.Errorf("Error while trying to fit a pod: %v", err)
+			if !match {
+				t.Errorf("Error while trying to fit a pod")
 			}
 
 			err = cs.CoreV1().Pods(test.pod.Namespace).Delete(ctx, test.pod.Name, *metav1.NewDeleteOptions(0))
 			if err != nil {
 				t.Errorf("Error while deleting pod: %v", err)
 			}
-			err = wait.PollUntilContextTimeout(ctx, pollInterval, wait.ForeverTestTimeout, true,
-				testutils.PodDeleted(ctx, cs, testCtx.NS.Name, test.pod.Name))
-			if err != nil {
-				t.Errorf("Error while waiting for pod to get deleted: %v", err)
+			if !gomega.NewGomegaWithT(t).Eventually(ctx, func(ctx context.Context) (bool, error) {
+				return testutils.PodDeleted(ctx, cs, testCtx.NS.Name, test.pod.Name)(ctx)
+			}).WithContext(ctx).WithTimeout(wait.ForeverTestTimeout).WithPolling(pollInterval).Should(gomega.BeTrue()) {
+				t.Errorf("Error while waiting for pod to get deleted")
 			}
 			for _, pod := range test.pods {
 				err = cs.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, *metav1.NewDeleteOptions(0))
 				if err != nil {
 					t.Errorf("Error while deleting pod: %v", err)
 				}
-				err = wait.PollUntilContextTimeout(ctx, pollInterval, wait.ForeverTestTimeout, true,
-					testutils.PodDeleted(ctx, cs, pod.Namespace, pod.Name))
-				if err != nil {
-					t.Errorf("Error while waiting for pod to get deleted: %v", err)
+				if !gomega.NewGomegaWithT(t).Eventually(ctx, func(ctx context.Context) (bool, error) {
+					return testutils.PodDeleted(ctx, cs, pod.Namespace, pod.Name)(ctx)
+				}).WithContext(ctx).WithTimeout(wait.ForeverTestTimeout).WithPolling(pollInterval).Should(gomega.BeTrue()) {
+					t.Errorf("Error while waiting for pod to get deleted")
 				}
 			}
 		})
@@ -1016,9 +1023,10 @@ func TestInterPodAffinityWithNamespaceSelector(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Error while creating pod: %v", err)
 			}
-			err = wait.Poll(pollInterval, wait.ForeverTestTimeout, testutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name))
-			if err != nil {
-				t.Errorf("Error while creating pod: %v", err)
+			if !gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
+				return testutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name)()
+			}).WithTimeout(wait.ForeverTestTimeout).WithPolling(pollInterval).Should(gomega.BeTrue()) {
+				t.Errorf("Error while creating pod")
 			}
 
 			if test.pod.Namespace == "" {
@@ -1032,31 +1040,36 @@ func TestInterPodAffinityWithNamespaceSelector(t *testing.T) {
 				}
 			}
 
+			match := false
 			if test.fits {
-				err = wait.Poll(pollInterval, wait.ForeverTestTimeout, testutils.PodScheduled(cs, testPod.Namespace, testPod.Name))
+				match = gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
+					return testutils.PodScheduled(cs, testPod.Namespace, testPod.Name)()
+				}).WithTimeout(wait.ForeverTestTimeout).WithPolling(pollInterval).Should(gomega.BeTrue())
 			} else {
-				err = wait.Poll(pollInterval, wait.ForeverTestTimeout, podUnschedulable(cs, testPod.Namespace, testPod.Name))
+				match = gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
+					return podUnschedulable(cs, testPod.Namespace, testPod.Name)()
+				}).WithTimeout(wait.ForeverTestTimeout).WithPolling(pollInterval).Should(gomega.BeTrue())
 			}
-			if err != nil {
-				t.Errorf("Error while trying to fit a pod: %v", err)
+			if !match {
+				t.Errorf("Error while trying to fit a pod")
 			}
 			err = cs.CoreV1().Pods(test.pod.Namespace).Delete(testCtx.Ctx, test.pod.Name, *metav1.NewDeleteOptions(0))
 			if err != nil {
 				t.Errorf("Error while deleting pod: %v", err)
 			}
-			err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, true,
-				testutils.PodDeleted(testCtx.Ctx, cs, testCtx.NS.Name, test.pod.Name))
-			if err != nil {
-				t.Errorf("Error while waiting for pod to get deleted: %v", err)
+			if !gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
+				return testutils.PodDeleted(ctx, cs, testCtx.NS.Name, test.pod.Name)(ctx)
+			}).WithContext(testCtx.Ctx).WithTimeout(wait.ForeverTestTimeout).WithPolling(pollInterval).Should(gomega.BeTrue()) {
+				t.Errorf("Error while waiting for pod to get deleted")
 			}
 			err = cs.CoreV1().Pods(test.existingPod.Namespace).Delete(testCtx.Ctx, test.existingPod.Name, *metav1.NewDeleteOptions(0))
 			if err != nil {
 				t.Errorf("Error while deleting pod: %v", err)
 			}
-			err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, true,
-				testutils.PodDeleted(testCtx.Ctx, cs, test.existingPod.Namespace, test.existingPod.Name))
-			if err != nil {
-				t.Errorf("Error while waiting for pod to get deleted: %v", err)
+			if !gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
+				return testutils.PodDeleted(testCtx.Ctx, cs, test.existingPod.Namespace, test.existingPod.Name)(ctx)
+			}).WithContext(testCtx.Ctx).WithTimeout(wait.ForeverTestTimeout).WithPolling(pollInterval).Should(gomega.BeTrue()) {
+				t.Errorf("Error while waiting for pod to get deleted")
 			}
 		})
 	}
@@ -1517,9 +1530,10 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Error while creating pod during test: %v", err)
 				}
-				err = wait.Poll(pollInterval, wait.ForeverTestTimeout, testutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name))
-				if err != nil {
-					t.Errorf("Error while waiting for pod during test: %v", err)
+				if !gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
+					return testutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name)()
+				}).WithTimeout(wait.ForeverTestTimeout).WithPolling(pollInterval).Should(gomega.BeTrue()) {
+					t.Errorf("Error while waiting for pod during test")
 				}
 			}
 			testPod, err := cs.CoreV1().Pods(tt.incomingPod.Namespace).Create(testCtx.Ctx, tt.incomingPod, metav1.CreateOptions{})
@@ -1527,13 +1541,18 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 				t.Fatalf("Error while creating pod during test: %v", err)
 			}
 
+			match := false
 			if tt.fits {
-				err = wait.Poll(pollInterval, wait.ForeverTestTimeout, podScheduledIn(cs, testPod.Namespace, testPod.Name, tt.candidateNodes))
+				match = gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
+					return podScheduledIn(cs, testPod.Namespace, testPod.Name, tt.candidateNodes)()
+				}).WithTimeout(wait.ForeverTestTimeout).WithPolling(pollInterval).Should(gomega.BeTrue())
 			} else {
-				err = wait.Poll(pollInterval, wait.ForeverTestTimeout, podUnschedulable(cs, testPod.Namespace, testPod.Name))
+				match = gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
+					return podUnschedulable(cs, testPod.Namespace, testPod.Name)()
+				}).WithTimeout(wait.ForeverTestTimeout).WithPolling(pollInterval).Should(gomega.BeTrue())
 			}
-			if err != nil {
-				t.Errorf("Test Failed: %v", err)
+			if !match {
+				t.Errorf("Test Failed")
 			}
 		})
 	}
