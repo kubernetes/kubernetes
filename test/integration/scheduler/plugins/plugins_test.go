@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -678,8 +679,10 @@ func TestPreFilterPlugin(t *testing.T) {
 					t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
 				}
 			} else if test.fail {
-				if err = wait.Poll(10*time.Millisecond, 30*time.Second, podSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
-					t.Errorf("Expected a scheduling error, but got: %v", err)
+				if !gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
+					return podSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)()
+				}).WithTimeout(wait.ForeverTestTimeout).WithPolling(10 * time.Millisecond).Should(gomega.BeTrue()) {
+					t.Errorf("Expected a scheduling error")
 				}
 			} else {
 				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
@@ -845,7 +848,9 @@ func TestPostFilterPlugin(t *testing.T) {
 			}
 
 			if tt.rejectFilter {
-				if err = wait.Poll(10*time.Millisecond, 10*time.Second, podUnschedulable(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
+				if !gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
+					return podUnschedulable(testCtx.ClientSet, pod.Namespace, pod.Name)()
+				}).WithTimeout(10 * time.Second).WithPolling(10 * time.Millisecond).Should(gomega.BeTrue()) {
 					t.Errorf("Didn't expect the pod to be scheduled.")
 				}
 
@@ -913,8 +918,10 @@ func TestScorePlugin(t *testing.T) {
 			}
 
 			if test.fail {
-				if err = wait.Poll(10*time.Millisecond, 30*time.Second, podSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
-					t.Errorf("Expected a scheduling error, but got: %v", err)
+				if !gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
+					return podSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)()
+				}).WithTimeout(wait.ForeverTestTimeout).WithPolling(10 * time.Millisecond).Should(gomega.BeTrue()) {
+					t.Errorf("Expected a scheduling error")
 				}
 			} else {
 				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
@@ -1004,9 +1011,10 @@ func TestReservePluginReserve(t *testing.T) {
 			}
 
 			if test.fail {
-				if err = wait.Poll(10*time.Millisecond, 30*time.Second,
-					podSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
-					t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
+				if !gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
+					return podSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)()
+				}).WithTimeout(wait.ForeverTestTimeout).WithPolling(10 * time.Millisecond).Should(gomega.BeTrue()) {
+					t.Errorf("Didn't expect the pod to be scheduled.")
 				}
 			} else {
 				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
@@ -1132,8 +1140,10 @@ func TestPrebindPlugin(t *testing.T) {
 					if err = testutils.WaitForPodToScheduleWithTimeout(testCtx.ClientSet, pod, 10*time.Second); err != nil {
 						t.Errorf("Expected the pod to be schedulable on retry, but got an error: %v", err)
 					}
-				} else if err = wait.Poll(10*time.Millisecond, 30*time.Second, podSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
-					t.Errorf("Expected a scheduling error, but didn't get it. error: %v", err)
+				} else if !gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
+					return podSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)()
+				}).WithTimeout(wait.ForeverTestTimeout).WithPolling(10 * time.Millisecond).Should(gomega.BeTrue()) {
+					t.Errorf("Expected a scheduling error, but didn't get it.")
 				}
 			} else if test.reject {
 				if err = testutils.WaitForPodUnschedulable(testCtx.ClientSet, pod); err != nil {
@@ -1149,11 +1159,11 @@ func TestPrebindPlugin(t *testing.T) {
 			}
 
 			if test.unschedulablePod != nil {
-				if err := wait.Poll(10*time.Millisecond, 15*time.Second, func() (bool, error) {
+				if !gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
 					// 2 means the unschedulable pod is expected to be retried at least twice.
 					// (one initial attempt plus the one moved by the preBind pod)
 					return filterPlugin.deepCopy().numFilterCalled >= 2*nodesNum, nil
-				}); err != nil {
+				}).WithTimeout(15 * time.Second).WithPolling(10 * time.Millisecond).Should(gomega.BeTrue()) {
 					t.Errorf("Timed out waiting for the unschedulable Pod to be retried at least twice.")
 				}
 			}
@@ -1274,10 +1284,11 @@ func TestUnReserveReservePlugins(t *testing.T) {
 			}
 
 			if test.fail {
-				if err = wait.Poll(10*time.Millisecond, 30*time.Second, podSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
-					t.Errorf("Expected a reasons other than Unschedulable, but got: %v", err)
+				if !gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
+					return podSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)()
+				}).WithTimeout(wait.ForeverTestTimeout).WithPolling(10 * time.Millisecond).Should(gomega.BeTrue()) {
+					t.Errorf("Expected a reasons other than Unschedulable")
 				}
-
 				for i, pl := range test.plugins {
 					if i <= test.failPluginIdx {
 						if pl.numReserveCalled != 1 {
@@ -1510,8 +1521,10 @@ func TestUnReserveBindPlugins(t *testing.T) {
 			}
 
 			if test.fail {
-				if err = wait.Poll(10*time.Millisecond, 30*time.Second, podSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
-					t.Errorf("Expected a reasons other than Unschedulable, but got: %v", err)
+				if !gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
+					return podSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)()
+				}).WithTimeout(wait.ForeverTestTimeout).WithPolling(10 * time.Millisecond).Should(gomega.BeTrue()) {
+					t.Errorf("Expected a reasons other than Unschedulable")
 				}
 
 				// Verify the Reserve Plugins
@@ -1682,10 +1695,10 @@ func TestBindPlugin(t *testing.T) {
 						t.Errorf("Expected %s not to be called, was called %d times.", p2.Name(), p2.numBindCalled)
 					}
 				}
-				if err = wait.Poll(10*time.Millisecond, 30*time.Second, func() (done bool, err error) {
+				if !gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
 					p := postBindPlugin.deepCopy()
 					return p.numPostBindCalled == 1, nil
-				}); err != nil {
+				}).WithTimeout(wait.ForeverTestTimeout).WithPolling(10 * time.Millisecond).Should(gomega.BeTrue()) {
 					t.Errorf("Expected the postbind plugin to be called once, was called %d times.", postBindPlugin.numPostBindCalled)
 				}
 				if reservePlugin.numUnreserveCalled != 0 {
@@ -1693,8 +1706,10 @@ func TestBindPlugin(t *testing.T) {
 				}
 			} else {
 				// bind plugin fails to bind the pod
-				if err = wait.Poll(10*time.Millisecond, 30*time.Second, podSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
-					t.Errorf("Expected a scheduling error, but didn't get it. error: %v", err)
+				if !gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
+					return podSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)()
+				}).WithTimeout(wait.ForeverTestTimeout).WithPolling(10 * time.Millisecond).Should(gomega.BeTrue()) {
+					t.Errorf("Expected a scheduling error, but didn't get it.")
 				}
 				p := postBindPlugin.deepCopy()
 				if p.numPostBindCalled > 0 {
@@ -1763,8 +1778,10 @@ func TestPostBindPlugin(t *testing.T) {
 			}
 
 			if test.preBindFail {
-				if err = wait.Poll(10*time.Millisecond, 30*time.Second, podSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
-					t.Errorf("Expected a scheduling error, but didn't get it. error: %v", err)
+				if !gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
+					return podSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)()
+				}).WithTimeout(wait.ForeverTestTimeout).WithPolling(10 * time.Millisecond).Should(gomega.BeTrue()) {
+					t.Errorf("Expected a scheduling error, but didn't get it.")
 				}
 				if postBindPlugin.numPostBindCalled > 0 {
 					t.Errorf("Didn't expect the postbind plugin to be called %d times.", postBindPlugin.numPostBindCalled)
@@ -1859,8 +1876,10 @@ func TestPermitPlugin(t *testing.T) {
 				t.Errorf("Error while creating a test pod: %v", err)
 			}
 			if test.fail {
-				if err = wait.Poll(10*time.Millisecond, 30*time.Second, podSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
-					t.Errorf("Expected a scheduling error, but didn't get it. error: %v", err)
+				if !gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
+					return podSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)()
+				}).WithTimeout(wait.ForeverTestTimeout).WithPolling(10 * time.Millisecond).Should(gomega.BeTrue()) {
+					t.Errorf("Expected a scheduling error, but didn't get it.")
 				}
 			} else {
 				if test.reject || test.timeout {
@@ -1908,11 +1927,12 @@ func TestMultiplePermitPlugins(t *testing.T) {
 
 	var waitingPod framework.WaitingPod
 	// Wait until the test pod is actually waiting.
-	wait.Poll(10*time.Millisecond, 30*time.Second, func() (bool, error) {
+	if !gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
 		waitingPod = perPlugin1.fh.GetWaitingPod(pod.UID)
 		return waitingPod != nil, nil
-	})
-
+	}).WithTimeout(wait.ForeverTestTimeout).WithPolling(10 * time.Millisecond).Should(gomega.BeTrue()) {
+		t.Errorf("Expected the test pod is actually waiting.")
+	}
 	// Check the number of pending permits
 	if l := len(waitingPod.GetPendingPlugins()); l != 2 {
 		t.Errorf("Expected the number of pending plugins is 2, but got %d", l)
@@ -1960,19 +1980,19 @@ func TestPermitPluginsCancelled(t *testing.T) {
 
 	var waitingPod framework.WaitingPod
 	// Wait until the test pod is actually waiting.
-	wait.Poll(10*time.Millisecond, 30*time.Second, func() (bool, error) {
+	if !gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
 		waitingPod = perPlugin1.fh.GetWaitingPod(pod.UID)
 		return waitingPod != nil, nil
-	})
-
+	}).WithTimeout(wait.ForeverTestTimeout).WithPolling(10 * time.Millisecond).Should(gomega.BeTrue()) {
+		t.Errorf("Expected the test pod is actually waiting.")
+	}
 	perPlugin1.rejectAllPods()
 	// Wait some time for the permit plugins to be cancelled
-	err = wait.Poll(10*time.Millisecond, 30*time.Second, func() (bool, error) {
+	if !gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
 		p1 := perPlugin1.deepCopy()
 		p2 := perPlugin2.deepCopy()
 		return p1.cancelled && p2.cancelled, nil
-	})
-	if err != nil {
+	}).WithTimeout(wait.ForeverTestTimeout).WithPolling(10 * time.Millisecond).Should(gomega.BeTrue()) {
 		t.Errorf("Expected all permit plugins to be cancelled")
 	}
 }
@@ -2101,8 +2121,10 @@ func TestFilterPlugin(t *testing.T) {
 			}
 
 			if test.fail {
-				if err = wait.Poll(10*time.Millisecond, 30*time.Second, podSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
-					t.Errorf("Expected a scheduling error, but got: %v", err)
+				if !gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
+					return podSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)()
+				}).WithTimeout(wait.ForeverTestTimeout).WithPolling(10 * time.Millisecond).Should(gomega.BeTrue()) {
+					t.Errorf("Expected a scheduling error, but didn't get it.")
 				}
 				if filterPlugin.numFilterCalled < 1 {
 					t.Errorf("Expected the filter plugin to be called at least 1 time, but got %v.", filterPlugin.numFilterCalled)
@@ -2157,8 +2179,10 @@ func TestPreScorePlugin(t *testing.T) {
 			}
 
 			if test.fail {
-				if err = wait.Poll(10*time.Millisecond, 30*time.Second, podSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
-					t.Errorf("Expected a scheduling error, but got: %v", err)
+				if !gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
+					return podSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)()
+				}).WithTimeout(wait.ForeverTestTimeout).WithPolling(10 * time.Millisecond).Should(gomega.BeTrue()) {
+					t.Errorf("Expected a scheduling error, but didn't get it.")
 				}
 			} else {
 				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
@@ -2362,12 +2386,12 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 					t.Fatalf("Error while creating the waiting pod: %v", err)
 				}
 				// Wait until the waiting-pod is actually waiting.
-				if err := wait.Poll(10*time.Millisecond, 30*time.Second, func() (bool, error) {
+				if !gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
 					w := false
 					permitPlugin.fh.IterateOverWaitingPods(func(wp framework.WaitingPod) { w = true })
 					return w, nil
-				}); err != nil {
-					t.Fatalf("The waiting pod is expected to be waiting: %v", err)
+				}).WithTimeout(wait.ForeverTestTimeout).WithPolling(10 * time.Millisecond).Should(gomega.BeTrue()) {
+					t.Fatalf("The waiting pod is expected to be waiting")
 				}
 			}
 
@@ -2387,14 +2411,13 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 			}
 
 			if w := tt.waitingPod; w != nil {
-				if err := wait.Poll(200*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+				if !gomega.NewGomegaWithT(t).Eventually(testCtx.Ctx, func(ctx context.Context) (bool, error) {
 					w := false
 					permitPlugin.fh.IterateOverWaitingPods(func(wp framework.WaitingPod) { w = true })
 					return !w, nil
-				}); err != nil {
+				}).WithTimeout(wait.ForeverTestTimeout).WithPolling(200 * time.Millisecond).Should(gomega.BeTrue()) {
 					t.Fatalf("Expected the waiting pod to get preempted.")
 				}
-
 				p := filterPlugin.deepCopy()
 				waitingPodCalled := p.numCalledPerPod[fmt.Sprintf("%v/%v", w.Namespace, w.Name)]
 				if waitingPodCalled > tt.maxNumWaitingPodCalled {
@@ -2590,10 +2613,10 @@ func initTestSchedulerForFrameworkTest(t *testing.T, testCtx *testutils.TestCont
 		}
 		// Wait for all pods to be deleted, or will failed to create same name pods
 		// required in other test cases.
-		err = wait.PollUntilContextTimeout(testCtx.SchedulerCtx, time.Millisecond, wait.ForeverTestTimeout, true,
-			testutils.PodsCleanedUp(testCtx.SchedulerCtx, testCtx.ClientSet, testCtx.NS.Name))
-		if err != nil {
-			t.Errorf("error while waiting for all pods to be deleted: %v", err)
+		if !gomega.NewGomegaWithT(t).Eventually(testCtx.SchedulerCtx, func(ctx context.Context) (bool, error) {
+			return testutils.PodsCleanedUp(testCtx.SchedulerCtx, testCtx.ClientSet, testCtx.NS.Name)(ctx)
+		}).WithContext(testCtx.SchedulerCtx).WithTimeout(wait.ForeverTestTimeout).WithPolling(time.Millisecond).Should(gomega.BeTrue()) {
+			t.Errorf("error while waiting for all pods to be deleted")
 		}
 		// Kill the scheduler.
 		testCtx.SchedulerCloseFn()
