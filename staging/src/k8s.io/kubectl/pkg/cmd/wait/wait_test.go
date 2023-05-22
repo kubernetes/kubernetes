@@ -1143,6 +1143,18 @@ func TestWaitForDifferentJSONPathExpression(t *testing.T) {
 			expectedErr: "given jsonpath expression matches more than one value",
 		},
 		{
+			name: "matches more than one value, expectedResult not given",
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
+				fakeClient.PrependReactor("list", "theresource", listReactionfunc)
+				return fakeClient
+			},
+			jsonPathExp:            "{.status.conditions[*]}",
+			jsonPathExpectedResult: "",
+
+			expectedErr: None,
+		},
+		{
 			name: "matches more than one list",
 			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
 				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
@@ -1153,6 +1165,18 @@ func TestWaitForDifferentJSONPathExpression(t *testing.T) {
 			jsonPathExpectedResult: "foo",
 
 			expectedErr: "given jsonpath expression matches more than one list",
+		},
+		{
+			name: "matches more than one list, expectedResult not given",
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
+				fakeClient.PrependReactor("list", "theresource", listReactionfunc)
+				return fakeClient
+			},
+			jsonPathExp:            "{range .status.conditions[*]}[{.status}] {end}",
+			jsonPathExpectedResult: "",
+
+			expectedErr: None,
 		},
 		{
 			name: "unsupported type []interface{}",
@@ -1180,6 +1204,20 @@ func TestWaitForDifferentJSONPathExpression(t *testing.T) {
 
 			expectedErr: "jsonpath leads to a nested object or list which is not supported",
 		},
+		{
+			name: "matches unsupported type map[string]interface{}/[]interface{}, expectedResult not given",
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
+				fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, newUnstructuredList(createUnstructured(t, podYAML)), nil
+				})
+				return fakeClient
+			},
+			jsonPathExp:            "{.spec}",
+			jsonPathExpectedResult: "",
+
+			expectedErr: None,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -1192,6 +1230,7 @@ func TestWaitForDifferentJSONPathExpression(t *testing.T) {
 
 				Printer: printers.NewDiscardingPrinter(),
 				ConditionFn: JSONPathWait{
+					matchAnyValue:          test.jsonPathExpectedResult == "",
 					jsonPathExpectedResult: test.jsonPathExpectedResult,
 					jsonPathParser:         j,
 					errOut:                 io.Discard}.IsJSONPathExpectedResultMet,
@@ -1456,6 +1495,7 @@ func TestWaitForJSONPathCondition(t *testing.T) {
 
 				Printer: printers.NewDiscardingPrinter(),
 				ConditionFn: JSONPathWait{
+					matchAnyValue:          test.jsonPathExpectedResult == "",
 					jsonPathExpectedResult: test.jsonPathExpectedResult,
 					jsonPathParser:         j,
 					errOut:                 io.Discard}.IsJSONPathExpectedResultMet,
@@ -1463,6 +1503,71 @@ func TestWaitForJSONPathCondition(t *testing.T) {
 			}
 
 			err := o.RunWait()
+
+			switch {
+			case err == nil && len(test.expectedErr) == 0:
+			case err != nil && len(test.expectedErr) == 0:
+				t.Fatal(err)
+			case err == nil && len(test.expectedErr) != 0:
+				t.Fatalf("missing: %q", test.expectedErr)
+			case err != nil && len(test.expectedErr) != 0:
+				if !strings.Contains(err.Error(), test.expectedErr) {
+					t.Fatalf("expected %q, got %q", test.expectedErr, err.Error())
+				}
+			}
+		})
+	}
+}
+
+// TestJSONPathWaitInput will run tests on different inputs which the user can give
+// and check whether the inputs are valid
+func TestJSONPathWaitInput(t *testing.T) {
+	tests := []struct {
+		name          string
+		jsonPathInput string
+
+		expectedErr string
+	}{
+		{
+			name:          "wrong command",
+			jsonPathInput: "foobar={foo.bar}=baz",
+
+			expectedErr: `unrecognized condition: "foobar={foo.bar}=baz"`,
+		},
+		{
+			name:          "JSONPath expression missing",
+			jsonPathInput: "jsonpath=",
+
+			expectedErr: "jsonpath expression cannot be empty",
+		},
+		{
+			name:          "JSONPath input with extra args",
+			jsonPathInput: "jsonpath='{.status.readyReplicas}'=3=Running",
+
+			expectedErr: "jsonpath wait format must be --for=jsonpath='{.status.readyReplicas}' or --for=jsonpath='{.status.readyReplicas}'=3",
+		},
+		{
+			name:          "JSONPath expectedResult missing",
+			jsonPathInput: "jsonpath={.foo.bar}=",
+
+			expectedErr: "jsonpath wait expected result cannot be empty",
+		},
+		{
+			name:          "JSONPath input correct, without expectedResult",
+			jsonPathInput: "jsonpath={.foo.bar}",
+
+			expectedErr: None,
+		},
+		{
+			name:          "JSONPath input correct, with expectedResult",
+			jsonPathInput: "jsonpath={.foo.bar}=baz",
+
+			expectedErr: None,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := conditionFuncFor(test.jsonPathInput, io.Discard)
 
 			switch {
 			case err == nil && len(test.expectedErr) == 0:

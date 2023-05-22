@@ -74,6 +74,9 @@ var (
 		# Wait for the pod "busybox1" to contain the status phase to be "Running".
 		kubectl wait --for=jsonpath='{.status.phase}'=Running pod/busybox1
 
+		# Wait for the service "loadbalancer" to have ingress.
+		kubectl wait --for=jsonpath='{.status.loadBalancer.ingress}' service/loadbalancer
+
 		# Wait for the pod "busybox1" to be deleted, with a timeout of 60s, after having issued the "delete" command
 		kubectl delete pod/busybox1
 		kubectl wait --for=delete pod/busybox1 --timeout=60s`))
@@ -207,7 +210,7 @@ func conditionFuncFor(condition string, errOut io.Writer) (ConditionFunc, error)
 	}
 	if strings.HasPrefix(condition, "jsonpath=") {
 		splitStr := strings.Split(condition, "=")
-		jsonPathExp, jsonPathExpectedResult, err := processJSONPathInput(splitStr)
+		jsonPathExp, jsonPathExpectedResult, err := processJSONPathInput(splitStr[1:])
 		if err != nil {
 			return nil, err
 		}
@@ -216,6 +219,7 @@ func conditionFuncFor(condition string, errOut io.Writer) (ConditionFunc, error)
 			return nil, err
 		}
 		return JSONPathWait{
+			matchAnyValue:          jsonPathExpectedResult == "",
 			jsonPathExpectedResult: jsonPathExpectedResult,
 			jsonPathParser:         j,
 			errOut:                 errOut,
@@ -238,38 +242,28 @@ func newJSONPathParser(jsonPathExpression string) (*jsonpath.JSONPath, error) {
 }
 
 func processJSONPathInput(jsonPathSplitStr []string) (string, string, error) {
-	err := validateJSONPathInput(jsonPathSplitStr)
+	err := validateJSONPathInputLength(jsonPathSplitStr)
 	if err != nil {
 		return "", "", err
 	}
 	// jsonPathSplitStr can be either [jsonpath, jsonPathExpression, jsonPathExpectedResult] or [jsonpath, jsonPathExpression]
-	jsonPathExp, err := processJSONPathExpression(jsonPathSplitStr[1])
+	relaxedJSONPathExp, err := cmdget.RelaxedJSONPathExpression(jsonPathSplitStr[0])
 	if err != nil {
 		return "", "", err
 	}
-	jsonPathExpectedResult, err := processJSONPathExpectedResult(jsonPathSplitStr[2:])
+	jsonPathExpectedResult, err := processJSONPathExpectedResult(jsonPathSplitStr[1:])
 	if err != nil {
 		return "", "", err
 	}
 
-	return jsonPathExp, jsonPathExpectedResult, nil
+	return relaxedJSONPathExp, jsonPathExpectedResult, nil
 }
 
-func validateJSONPathInput(jsonPathSplitStr []string) error {
-	if len(jsonPathSplitStr) < 2 || len(jsonPathSplitStr) > 3 {
+func validateJSONPathInputLength(jsonPathSplitStr []string) error {
+	if len(jsonPathSplitStr) < 1 || len(jsonPathSplitStr) > 2 {
 		return errors.New("jsonpath wait format must be --for=jsonpath='{.status.readyReplicas}' or --for=jsonpath='{.status.readyReplicas}'=3")
 	}
 	return nil
-}
-
-// processJSONPathExpression will parse the user inputted JSONPath expression and process the string
-func processJSONPathExpression(jsonPathExpression string) (string, error) {
-	relaxedJSONPathExp, err := cmdget.RelaxedJSONPathExpression(jsonPathExpression)
-	if err != nil {
-		return "", err
-	}
-
-	return relaxedJSONPathExp, nil
 }
 
 // processJSONPathExpectedResult will parse the user inputted JSONPath expected result and process the string
@@ -624,6 +618,7 @@ func getObservedGeneration(obj *unstructured.Unstructured, condition map[string]
 // JSONPathWait holds a JSONPath Parser which has the ability
 // to check for the JSONPath expected result and compare with the API server provided JSON output.
 type JSONPathWait struct {
+	matchAnyValue          bool
 	jsonPathExpectedResult string
 	jsonPathParser         *jsonpath.JSONPath
 	// errOut is written to if an error occurs
@@ -666,7 +661,7 @@ func (j JSONPathWait) checkCondition(obj *unstructured.Unstructured) (bool, erro
 	if len(parseResults) == 0 || len(parseResults[0]) == 0 {
 		return false, nil
 	}
-	if j.jsonPathExpectedResult == "" {
+	if j.matchAnyValue {
 		return assertNonEmptyResults(parseResults), nil
 	}
 	if err := verifyParsedJSONPath(parseResults); err != nil {
@@ -684,7 +679,7 @@ func assertNonEmptyResults(results [][]reflect.Value) bool {
 		return true
 	}
 	result := fmt.Sprintf("%v", results[0][0].String())
-	return result != ""
+	return strings.TrimSpace(result) != ""
 }
 
 // verifyParsedJSONPath verifies the JSON received from the API server is valid.
