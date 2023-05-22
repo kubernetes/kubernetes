@@ -202,13 +202,13 @@ func (ec *Controller) enqueuePod(logger klog.Logger, obj interface{}, deleted bo
 		return
 	}
 
-	if deleted {
-		ec.deletedObjects.Add(pod.UID)
-	}
-
 	if len(pod.Spec.ResourceClaims) == 0 {
 		// Nothing to do for it at all.
 		return
+	}
+
+	if deleted {
+		ec.deletedObjects.Add(pod.UID)
 	}
 
 	logger.V(6).Info("pod with resource claims changed", "pod", klog.KObj(pod), "deleted", deleted)
