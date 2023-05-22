@@ -329,6 +329,13 @@ func (d CPUDetails) CPUsInCores(ids ...int) cpuset.CPUSet {
 
 // IsNUMANodesInSameSocket returns true for all NUMANodes in the same socket
 func (d CPUDetails) IsNUMANodesInSameSocket(numaNodes []int) bool {
+	allNUMAs := d.NUMANodes()
+	for _, id := range numaNodes {
+		if !allNUMAs.Contains(id) {
+			// return false if any NUMANode is out if range
+			return false
+		}
+	}
 	return d.SocketsInNUMANodes(numaNodes...).Size() <= 1
 }
 
