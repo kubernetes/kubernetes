@@ -924,6 +924,71 @@ func TestCPUDetailsCPUsInCores(t *testing.T) {
 	}
 }
 
+func TestCPUDetailsIsNUMANodesInSameSocket(t *testing.T) {
+
+	var details CPUDetails
+	details = map[int]CPUInfo{
+		0: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+		4: {CoreID: 4, SocketID: 0, NUMANodeID: 0},
+		1: {CoreID: 1, SocketID: 1, NUMANodeID: 1},
+		5: {CoreID: 5, SocketID: 1, NUMANodeID: 1},
+		2: {CoreID: 2, SocketID: 0, NUMANodeID: 2},
+		6: {CoreID: 6, SocketID: 0, NUMANodeID: 2},
+		3: {CoreID: 3, SocketID: 1, NUMANodeID: 3},
+		7: {CoreID: 7, SocketID: 1, NUMANodeID: 3},
+	}
+
+	tests := []struct {
+		name      string
+		NUMANodes []int
+		want      bool
+	}{
+		{
+			name:      "empty NUMANodes in same socket",
+			NUMANodes: []int{},
+			want:      true,
+		},
+		{
+			name:      "1 NUMANode in same socket",
+			NUMANodes: []int{3},
+			want:      true,
+		},
+		{
+			name:      "same NUMANodes in same socket",
+			NUMANodes: []int{2, 2},
+			want:      true,
+		},
+		{
+			name:      "two NUMANodes in same socket",
+			NUMANodes: []int{0, 2},
+			want:      true,
+		},
+		{
+			name:      "two NUMANodes not in same socket",
+			NUMANodes: []int{0, 1},
+			want:      false,
+		},
+		{
+			name:      "all NUMANodes not in same socket",
+			NUMANodes: []int{0, 1, 2, 3},
+			want:      false,
+		},
+		{
+			name:      "NUMANodes out of range not in same socket",
+			NUMANodes: []int{0, 2, 5},
+			want:      false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := details.IsNUMANodesInSameSocket(tt.NUMANodes)
+			if got != tt.want {
+				t.Errorf("IsNUMANodesInSameSocket() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestCPUCoreID(t *testing.T) {
 	topoDualSocketHT := &CPUTopology{
 		NumCPUs:    12,

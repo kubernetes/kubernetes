@@ -1147,7 +1147,7 @@ func TestPolicyWithAlignBySocketAndDistributeCPUsAcrossNUMAEnabled(t *testing.T)
 	testCases := []staticPolicyTest{
 		{
 			description: "AlignBySocket and DistributeCPUsAcrossNUMA both enabled",
-			topo:        topoDualSocketDualNUMAPerSocketNoHT,
+			topo:        topoDualSocketMultiNumaPerSocketHTType2,
 			options: map[string]string{
 				AlignBySocketOption:            "true",
 				DistributeCPUsAcrossNUMAOption: "true",

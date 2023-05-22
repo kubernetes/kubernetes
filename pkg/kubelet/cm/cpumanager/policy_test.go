@@ -100,31 +100,6 @@ var (
 		},
 	}
 
-	topoDualSocketDualNUMAPerSocketNoHT = &topology.CPUTopology{
-		NumCPUs:      16,
-		NumSockets:   2,
-		NumCores:     16,
-		NumNUMANodes: 4,
-		CPUDetails: map[int]topology.CPUInfo{
-			0:  {CoreID: 0, SocketID: 0, NUMANodeID: 0},
-			4:  {CoreID: 4, SocketID: 0, NUMANodeID: 0},
-			8:  {CoreID: 8, SocketID: 0, NUMANodeID: 0},
-			12: {CoreID: 12, SocketID: 0, NUMANodeID: 0},
-			1:  {CoreID: 1, SocketID: 1, NUMANodeID: 1},
-			5:  {CoreID: 5, SocketID: 1, NUMANodeID: 1},
-			9:  {CoreID: 9, SocketID: 1, NUMANodeID: 1},
-			13: {CoreID: 13, SocketID: 1, NUMANodeID: 1},
-			2:  {CoreID: 2, SocketID: 0, NUMANodeID: 2},
-			6:  {CoreID: 6, SocketID: 0, NUMANodeID: 2},
-			10: {CoreID: 10, SocketID: 0, NUMANodeID: 2},
-			14: {CoreID: 14, SocketID: 0, NUMANodeID: 2},
-			3:  {CoreID: 3, SocketID: 1, NUMANodeID: 3},
-			7:  {CoreID: 7, SocketID: 1, NUMANodeID: 3},
-			11: {CoreID: 11, SocketID: 1, NUMANodeID: 3},
-			15: {CoreID: 15, SocketID: 1, NUMANodeID: 3},
-		},
-	}
-
 	/*
 		Topology from https://www.open-mpi.org/projects/hwloc/lstopo/images/KNL.SNC4.H50.v1.11.png.
 		Socket0:
@@ -537,6 +512,108 @@ var (
 			76: {CoreID: 36, SocketID: 1, NUMANodeID: 3},
 			77: {CoreID: 37, SocketID: 1, NUMANodeID: 3},
 			78: {CoreID: 38, SocketID: 1, NUMANodeID: 3},
+			79: {CoreID: 39, SocketID: 1, NUMANodeID: 3},
+		},
+	}
+	/*
+		Topology type 2 from dual xeon gold 6230; lscpu excerpt
+		Topology from https://www-lb.open-mpi.org/projects/hwloc/lstopo/images/2XeonSPv2+2kmem.v2.1.png.
+		CPU(s):              80
+		On-line CPU(s) list: 0-79
+		Thread(s) per core:  2
+		Core(s) per socket:  20
+		Socket(s):           2
+		NUMA node(s):        4
+		NUMA node0 CPU(s):   0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76
+		NUMA node1 CPU(s):   1,5,9,13,17,21,25,29,33,37,41,45,49,53,57,61,65,69,73,77
+		NUMA node2 CPU(s):   2,6,10,14,18,22,26,30,34,38,42,46,50,54,58,62,66,70,74,78
+		NUMA node3 CPU(s):   3,7,11,15,19,23,27,31,35,39,43,47,51,55,59,63,67,71,75,79
+	*/
+	topoDualSocketMultiNumaPerSocketHTType2 = &topology.CPUTopology{
+		NumCPUs:      80,
+		NumSockets:   2,
+		NumCores:     40,
+		NumNUMANodes: 4,
+		CPUDetails: map[int]topology.CPUInfo{
+			0:  {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+			1:  {CoreID: 1, SocketID: 1, NUMANodeID: 1},
+			2:  {CoreID: 2, SocketID: 0, NUMANodeID: 2},
+			3:  {CoreID: 3, SocketID: 1, NUMANodeID: 3},
+			4:  {CoreID: 4, SocketID: 0, NUMANodeID: 0},
+			5:  {CoreID: 5, SocketID: 1, NUMANodeID: 1},
+			6:  {CoreID: 6, SocketID: 0, NUMANodeID: 2},
+			7:  {CoreID: 7, SocketID: 1, NUMANodeID: 3},
+			8:  {CoreID: 8, SocketID: 0, NUMANodeID: 0},
+			9:  {CoreID: 9, SocketID: 1, NUMANodeID: 1},
+			10: {CoreID: 10, SocketID: 0, NUMANodeID: 2},
+			11: {CoreID: 11, SocketID: 1, NUMANodeID: 3},
+			12: {CoreID: 12, SocketID: 0, NUMANodeID: 0},
+			13: {CoreID: 13, SocketID: 1, NUMANodeID: 1},
+			14: {CoreID: 14, SocketID: 0, NUMANodeID: 2},
+			15: {CoreID: 15, SocketID: 1, NUMANodeID: 3},
+			16: {CoreID: 16, SocketID: 0, NUMANodeID: 0},
+			17: {CoreID: 17, SocketID: 1, NUMANodeID: 1},
+			18: {CoreID: 18, SocketID: 0, NUMANodeID: 2},
+			19: {CoreID: 19, SocketID: 1, NUMANodeID: 3},
+			20: {CoreID: 20, SocketID: 0, NUMANodeID: 0},
+			21: {CoreID: 21, SocketID: 1, NUMANodeID: 1},
+			22: {CoreID: 22, SocketID: 0, NUMANodeID: 2},
+			23: {CoreID: 23, SocketID: 1, NUMANodeID: 3},
+			24: {CoreID: 24, SocketID: 0, NUMANodeID: 0},
+			25: {CoreID: 25, SocketID: 1, NUMANodeID: 1},
+			26: {CoreID: 26, SocketID: 0, NUMANodeID: 2},
+			27: {CoreID: 27, SocketID: 1, NUMANodeID: 3},
+			28: {CoreID: 28, SocketID: 0, NUMANodeID: 0},
+			29: {CoreID: 29, SocketID: 1, NUMANodeID: 1},
+			30: {CoreID: 30, SocketID: 0, NUMANodeID: 2},
+			31: {CoreID: 31, SocketID: 1, NUMANodeID: 3},
+			32: {CoreID: 32, SocketID: 0, NUMANodeID: 0},
+			33: {CoreID: 33, SocketID: 1, NUMANodeID: 1},
+			34: {CoreID: 34, SocketID: 0, NUMANodeID: 2},
+			35: {CoreID: 35, SocketID: 1, NUMANodeID: 3},
+			36: {CoreID: 36, SocketID: 0, NUMANodeID: 0},
+			37: {CoreID: 37, SocketID: 1, NUMANodeID: 1},
+			38: {CoreID: 38, SocketID: 0, NUMANodeID: 2},
+			39: {CoreID: 39, SocketID: 1, NUMANodeID: 3},
+			40: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+			41: {CoreID: 1, SocketID: 1, NUMANodeID: 1},
+			42: {CoreID: 2, SocketID: 0, NUMANodeID: 2},
+			43: {CoreID: 3, SocketID: 1, NUMANodeID: 3},
+			44: {CoreID: 4, SocketID: 0, NUMANodeID: 0},
+			45: {CoreID: 5, SocketID: 1, NUMANodeID: 1},
+			46: {CoreID: 6, SocketID: 0, NUMANodeID: 2},
+			47: {CoreID: 7, SocketID: 1, NUMANodeID: 3},
+			48: {CoreID: 8, SocketID: 0, NUMANodeID: 0},
+			49: {CoreID: 9, SocketID: 1, NUMANodeID: 1},
+			50: {CoreID: 10, SocketID: 0, NUMANodeID: 2},
+			51: {CoreID: 11, SocketID: 1, NUMANodeID: 3},
+			52: {CoreID: 12, SocketID: 0, NUMANodeID: 0},
+			53: {CoreID: 13, SocketID: 1, NUMANodeID: 1},
+			54: {CoreID: 14, SocketID: 0, NUMANodeID: 2},
+			55: {CoreID: 15, SocketID: 1, NUMANodeID: 3},
+			56: {CoreID: 16, SocketID: 0, NUMANodeID: 0},
+			57: {CoreID: 17, SocketID: 1, NUMANodeID: 1},
+			58: {CoreID: 18, SocketID: 0, NUMANodeID: 2},
+			59: {CoreID: 19, SocketID: 1, NUMANodeID: 3},
+			60: {CoreID: 20, SocketID: 0, NUMANodeID: 0},
+			61: {CoreID: 21, SocketID: 1, NUMANodeID: 1},
+			62: {CoreID: 22, SocketID: 0, NUMANodeID: 2},
+			63: {CoreID: 23, SocketID: 1, NUMANodeID: 3},
+			64: {CoreID: 24, SocketID: 0, NUMANodeID: 0},
+			65: {CoreID: 25, SocketID: 1, NUMANodeID: 1},
+			66: {CoreID: 26, SocketID: 0, NUMANodeID: 2},
+			67: {CoreID: 27, SocketID: 1, NUMANodeID: 3},
+			68: {CoreID: 28, SocketID: 0, NUMANodeID: 0},
+			69: {CoreID: 29, SocketID: 1, NUMANodeID: 1},
+			70: {CoreID: 30, SocketID: 0, NUMANodeID: 2},
+			71: {CoreID: 31, SocketID: 1, NUMANodeID: 3},
+			72: {CoreID: 32, SocketID: 0, NUMANodeID: 0},
+			73: {CoreID: 33, SocketID: 1, NUMANodeID: 1},
+			74: {CoreID: 34, SocketID: 0, NUMANodeID: 2},
+			75: {CoreID: 35, SocketID: 1, NUMANodeID: 3},
+			76: {CoreID: 36, SocketID: 0, NUMANodeID: 0},
+			77: {CoreID: 37, SocketID: 1, NUMANodeID: 1},
+			78: {CoreID: 38, SocketID: 0, NUMANodeID: 2},
 			79: {CoreID: 39, SocketID: 1, NUMANodeID: 3},
 		},
 	}
