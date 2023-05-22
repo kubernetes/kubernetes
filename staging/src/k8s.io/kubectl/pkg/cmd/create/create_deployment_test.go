@@ -161,3 +161,34 @@ func TestCreateDeploymentNoImage(t *testing.T) {
 	err = options.Run()
 	assert.Error(t, err, "at least one image must be specified")
 }
+
+func TestCreateDeploymentWithServiceAccount(t *testing.T) {
+	depName := "jonny-dep"
+	saName := "jonny-sa"
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	ns := scheme.Codecs.WithoutConversion()
+	fakeDiscovery := "{\"kind\":\"APIResourceList\",\"apiVersion\":\"v1\",\"groupVersion\":\"apps/v1\",\"resources\":[{\"name\":\"deployments\",\"singularName\":\"\",\"namespaced\":true,\"kind\":\"Deployment\",\"verbs\":[\"create\",\"delete\",\"deletecollection\",\"get\",\"list\",\"patch\",\"update\",\"watch\"],\"shortNames\":[\"deploy\"],\"categories\":[\"all\"]}]}"
+	tf.Client = &fake.RESTClient{
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(bytes.NewBuffer([]byte(fakeDiscovery))),
+			}, nil
+		}),
+	}
+	tf.ClientConfigVal = &restclient.Config{}
+
+	ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
+	cmd := NewCmdCreateDeployment(tf, ioStreams)
+	cmd.Flags().Set("dry-run", "client")
+	cmd.Flags().Set("output", "jsonpath={.spec.template.spec.serviceAccountName}")
+	cmd.Flags().Set("image", "hollywood/jonny.depp:v2")
+	cmd.Flags().Set("serviceaccount", saName)
+	cmd.Run(cmd, []string{depName})
+	if buf.String() != saName {
+		t.Errorf("expected output: %s, but got: %s", saName, buf.String())
+	}
+}

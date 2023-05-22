@@ -71,6 +71,7 @@ type CreateDeploymentOptions struct {
 	EnforceNamespace bool
 	FieldManager     string
 	CreateAnnotation bool
+	ServiceAccount   string
 
 	Client              appsv1client.AppsV1Interface
 	DryRunStrategy      cmdutil.DryRunStrategy
@@ -117,6 +118,7 @@ func NewCmdCreateDeployment(f cmdutil.Factory, ioStreams genericiooptions.IOStre
 	cmd.Flags().Int32Var(&o.Port, "port", o.Port, "The port that this container exposes.")
 	cmd.Flags().Int32VarP(&o.Replicas, "replicas", "r", o.Replicas, "Number of replicas to create. Default is 1.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
+	cmd.Flags().StringVar(&o.ServiceAccount, "serviceaccount", o.ServiceAccount, "Service account to set in the deployment spec.")
 
 	return cmd
 }
@@ -241,7 +243,10 @@ func (o *CreateDeploymentOptions) createDeployment() *appsv1.Deployment {
 // buildPodSpec parses the image strings and assemble them into the Containers
 // of a PodSpec. This is all you need to create the PodSpec for a deployment.
 func (o *CreateDeploymentOptions) buildPodSpec() corev1.PodSpec {
-	podSpec := corev1.PodSpec{Containers: []corev1.Container{}}
+	podSpec := corev1.PodSpec{
+		ServiceAccountName: o.ServiceAccount,
+		Containers:         []corev1.Container{},
+	}
 	for _, imageString := range o.Images {
 		// Retain just the image name
 		imageSplit := strings.Split(imageString, "/")
