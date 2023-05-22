@@ -77,7 +77,7 @@ type pvcEvaluator struct {
 	listFuncByNamespace generic.ListFuncByNamespace
 }
 
-// Constraints verifies that all required resources are present on the item.
+// Constraints verify that all required resources are present on the item.
 func (p *pvcEvaluator) Constraints(required []corev1.ResourceName, item runtime.Object) error {
 	// no-op for persistent volume claims
 	return nil
@@ -229,7 +229,7 @@ func toExternalPersistentVolumeClaimOrError(obj runtime.Object) (*corev1.Persist
 // RequiresQuotaReplenish enables quota monitoring for PVCs.
 func RequiresQuotaReplenish(pvc, oldPVC *corev1.PersistentVolumeClaim) bool {
 	if utilfeature.DefaultFeatureGate.Enabled(k8sfeatures.RecoverVolumeExpansionFailure) {
-		if oldPVC.Status.AllocatedResources.Storage() != pvc.Status.AllocatedResources.Storage() {
+		if !oldPVC.Status.AllocatedResources.Storage().Equal(*pvc.Status.AllocatedResources.Storage()) {
 			return true
 		}
 	}

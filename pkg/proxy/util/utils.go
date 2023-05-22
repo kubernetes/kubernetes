@@ -478,7 +478,7 @@ func (buf *LineBuffer) Reset() {
 	buf.lines = 0
 }
 
-// Bytes returns the contents of buf as a []byte
+// Bytes return the contents of buf as a []byte
 func (buf *LineBuffer) Bytes() []byte {
 	return buf.b.Bytes()
 }

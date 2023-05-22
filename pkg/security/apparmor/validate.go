@@ -33,7 +33,7 @@ import (
 // Set to true if the wrong build tags are set (see validate_disabled.go).
 var isDisabledBuild bool
 
-// Validator is a interface for validating that a pod with an AppArmor profile can be run by a Node.
+// Validator is an interface for validating that a pod with an AppArmor profile can be run by a Node.
 type Validator interface {
 	Validate(pod *v1.Pod) error
 	ValidateHost() error
@@ -88,7 +88,7 @@ func (v *validator) ValidateHost() error {
 	return v.validateHostErr
 }
 
-// validateHost verifies that the host and runtime is capable of enforcing AppArmor profiles.
+// validateHost verifies that the host and runtime are capable of enforcing AppArmor profiles.
 func validateHost() error {
 	// Check feature-gates
 	if !utilfeature.DefaultFeatureGate.Enabled(features.AppArmor) {

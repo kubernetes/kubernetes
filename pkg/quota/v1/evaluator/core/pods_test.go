@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
+	"k8s.io/utils/pointer"
 )
 
 func TestPodConstraintsFunc(t *testing.T) {
@@ -1187,5 +1188,49 @@ func makePod(name, pcName string, resList api.ResourceList, phase api.PodPhase) 
 		Status: api.PodStatus{
 			Phase: phase,
 		},
+	}
+}
+
+func TestQuotaV1Pod(t *testing.T) {
+	tests := []struct {
+		name string
+		pod  *corev1.Pod
+		want bool
+	}{
+		{
+			name: "test pod status is terminated",
+			pod: &corev1.Pod{
+				Status: corev1.PodStatus{
+					Phase: corev1.PodSucceeded,
+				},
+			},
+			want: false,
+		},
+		{
+			name: "test pod status is running",
+			pod: &corev1.Pod{
+				Status: corev1.PodStatus{
+					Phase: corev1.PodRunning,
+				},
+			},
+			want: true,
+		},
+		{
+			name: "test pod status is deleting",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					DeletionTimestamp:          &metav1.Time{Time: time.Now().Add(-time.Second * 10)},
+					DeletionGracePeriodSeconds: pointer.Int64Ptr(5),
+				},
+			},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := QuotaV1Pod(tt.pod, clock.RealClock{}); got != tt.want {
+				t.Errorf("QuotaV1Pod() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

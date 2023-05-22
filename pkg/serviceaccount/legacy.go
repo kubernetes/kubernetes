@@ -89,7 +89,7 @@ func (v *legacyValidator) Validate(ctx context.Context, tokenData string, public
 		return nil, errors.New("Token could not be validated.")
 	}
 
-	// Make sure the claims we need exist
+	// Make sure the claims we need to exist
 	if len(public.Subject) == 0 {
 		return nil, errors.New("sub claim is missing")
 	}
@@ -116,7 +116,7 @@ func (v *legacyValidator) Validate(ctx context.Context, tokenData string, public
 	}
 
 	if v.lookup {
-		// Make sure token hasn't been invalidated by deletion of the secret
+		// Make sure the token hasn't been invalidated by deletion of the secret
 		secret, err := v.getter.GetSecret(namespace, secretName)
 		if err != nil {
 			klog.V(4).Infof("Could not retrieve token %s/%s for service account %s/%s: %v", namespace, secretName, namespace, serviceAccountName, err)
@@ -131,7 +131,7 @@ func (v *legacyValidator) Validate(ctx context.Context, tokenData string, public
 			return nil, errors.New("Token does not match server's copy")
 		}
 
-		// Make sure service account still exists (name and UID)
+		// Make sure a service account still exists (name and UID)
 		serviceAccount, err := v.getter.GetServiceAccount(namespace, serviceAccountName)
 		if err != nil {
 			klog.V(4).Infof("Could not retrieve service account %s/%s: %v", namespace, serviceAccountName, err)

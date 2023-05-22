@@ -451,7 +451,7 @@ func usesCrossNamespacePodAffinity(pod *corev1.Pod) bool {
 }
 
 // QuotaV1Pod returns true if the pod is eligible to track against a quota
-// if it's not in a terminal state according to its phase.
+// if it's not in a terminal state, according to its phase.
 func QuotaV1Pod(pod *corev1.Pod, clock clock.Clock) bool {
 	// if pod is terminal, ignore it for quota
 	if corev1.PodFailed == pod.Status.Phase || corev1.PodSucceeded == pod.Status.Phase {

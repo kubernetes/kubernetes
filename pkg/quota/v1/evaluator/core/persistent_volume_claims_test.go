@@ -223,3 +223,73 @@ func TestPersistentVolumeClaimEvaluatorMatchingResources(t *testing.T) {
 		}
 	}
 }
+
+func TestRequiresQuotaReplenish(t *testing.T) {
+	tests := []struct {
+		name    string
+		pvc     *corev1.PersistentVolumeClaim
+		oldPVC  *corev1.PersistentVolumeClaim
+		preFunc func()
+		want    bool
+	}{
+		{
+			name: "test disable quota replenish",
+			preFunc: func() {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, false)
+			},
+			want: false,
+		},
+		{
+			name: "test enable quota replenish but storage size not equal",
+			preFunc: func() {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, true)
+			},
+			pvc: &corev1.PersistentVolumeClaim{
+				Status: corev1.PersistentVolumeClaimStatus{
+					AllocatedResources: corev1.ResourceList{
+						corev1.ResourceStorage: resource.MustParse("10G"),
+					},
+				},
+			},
+			oldPVC: &corev1.PersistentVolumeClaim{
+				Status: corev1.PersistentVolumeClaimStatus{
+					AllocatedResources: corev1.ResourceList{
+						corev1.ResourceStorage: resource.MustParse("5G"),
+					},
+				},
+			},
+			want: true,
+		},
+		{
+			name: "test enable quota replenish and storage size equal",
+			preFunc: func() {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, true)
+			},
+			pvc: &corev1.PersistentVolumeClaim{
+				Status: corev1.PersistentVolumeClaimStatus{
+					AllocatedResources: corev1.ResourceList{
+						corev1.ResourceStorage: resource.MustParse("10G"),
+					},
+				},
+			},
+			oldPVC: &corev1.PersistentVolumeClaim{
+				Status: corev1.PersistentVolumeClaimStatus{
+					AllocatedResources: corev1.ResourceList{
+						corev1.ResourceStorage: resource.MustParse("10G"),
+					},
+				},
+			},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.preFunc != nil {
+				tt.preFunc()
+			}
+			if got := RequiresQuotaReplenish(tt.pvc, tt.oldPVC); got != tt.want {
+				t.Errorf("RequiresQuotaReplenish() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

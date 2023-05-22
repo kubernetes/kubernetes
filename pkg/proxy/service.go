@@ -68,7 +68,7 @@ func (bsvcPortInfo *BaseServicePortInfo) ClusterIP() net.IP {
 	return bsvcPortInfo.clusterIP
 }
 
-// Port is part of ServicePort interface.
+// Port is part of the ServicePort interface.
 func (bsvcPortInfo *BaseServicePortInfo) Port() int {
 	return bsvcPortInfo.port
 }
@@ -93,7 +93,7 @@ func (bsvcPortInfo *BaseServicePortInfo) LoadBalancerSourceRanges() []string {
 	return bsvcPortInfo.loadBalancerSourceRanges
 }
 
-// HealthCheckNodePort is part of ServicePort interface.
+// HealthCheckNodePort is part of the ServicePort interface.
 func (bsvcPortInfo *BaseServicePortInfo) HealthCheckNodePort() int {
 	return bsvcPortInfo.healthCheckNodePort
 }
@@ -108,7 +108,7 @@ func (bsvcPortInfo *BaseServicePortInfo) ExternalIPStrings() []string {
 	return bsvcPortInfo.externalIPs
 }
 
-// LoadBalancerIPStrings is part of ServicePort interface.
+// LoadBalancerIPStrings is part of the ServicePort interface.
 func (bsvcPortInfo *BaseServicePortInfo) LoadBalancerIPStrings() []string {
 	var ips []string
 	for _, ing := range bsvcPortInfo.loadBalancerStatus.Ingress {
@@ -137,7 +137,7 @@ func (bsvcPortInfo *BaseServicePortInfo) HintsAnnotation() string {
 	return bsvcPortInfo.hintsAnnotation
 }
 
-// ExternallyAccessible is part of ServicePort interface.
+// ExternallyAccessible is part of the ServicePort interface.
 func (bsvcPortInfo *BaseServicePortInfo) ExternallyAccessible() bool {
 	return bsvcPortInfo.nodePort != 0 || len(bsvcPortInfo.loadBalancerStatus.Ingress) != 0 || len(bsvcPortInfo.externalIPs) != 0
 }
@@ -263,7 +263,7 @@ type serviceChange struct {
 type ServiceChangeTracker struct {
 	// lock protects items.
 	lock sync.Mutex
-	// items maps a service to its serviceChange.
+	// items map a service to its serviceChange.
 	items map[types.NamespacedName]*serviceChange
 	// makeServiceInfo allows proxier to inject customized information when processing service.
 	makeServiceInfo         makeServicePortFunc

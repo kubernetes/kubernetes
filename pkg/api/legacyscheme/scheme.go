@@ -29,7 +29,7 @@ var (
 	// TODO(lavalamp): make the above error impossible.
 	Scheme = runtime.NewScheme()
 
-	// Codecs provides access to encoding and decoding for the scheme
+	// Codecs provide access to encoding and decoding for the scheme
 	Codecs = serializer.NewCodecFactory(Scheme)
 
 	// ParameterCodec handles versioning of objects that are converted to query parameters.
