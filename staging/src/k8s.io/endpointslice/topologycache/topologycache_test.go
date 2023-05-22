@@ -690,6 +690,9 @@ func TestTopologyCacheRace(t *testing.T) {
 	go func() {
 		cache.AddHints(logger, sliceInfo)
 	}()
+	go func() {
+		cache.HasPopulatedHints(sliceInfo.ServiceKey)
+	}()
 }
 
 // Test Helpers
