@@ -98,16 +98,31 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 		})
 
 		ginkgo.It("must not run a pod if a claim is not reserved for it", func(ctx context.Context) {
-			parameters := b.parameters()
-			claim := b.externalClaim(resourcev1alpha2.AllocationModeImmediate)
+			// Pretend that the resource is allocated and reserved for some other entity.
+			// Until the resourceclaim controller learns to remove reservations for
+			// arbitrary types we can simply fake somthing here.
+			claim := b.externalClaim(resourcev1alpha2.AllocationModeWaitForFirstConsumer)
+			b.create(ctx, claim)
+			claim, err := f.ClientSet.ResourceV1alpha2().ResourceClaims(f.Namespace.Name).Get(ctx, claim.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err, "get claim")
+			claim.Status.Allocation = &resourcev1alpha2.AllocationResult{}
+			claim.Status.DriverName = driver.Name
+			claim.Status.ReservedFor = append(claim.Status.ReservedFor, resourcev1alpha2.ResourceClaimConsumerReference{
+				APIGroup: "example.com",
+				Resource: "some",
+				Name:     "thing",
+				UID:      "12345",
+			})
+			_, err = f.ClientSet.ResourceV1alpha2().ResourceClaims(f.Namespace.Name).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
+			framework.ExpectNoError(err, "update claim")
+
 			pod := b.podExternal()
 
 			// This bypasses scheduling and therefore the pod gets
 			// to run on the node although it never gets added to
 			// the `ReservedFor` field of the claim.
 			pod.Spec.NodeName = nodes.NodeNames[0]
-
-			b.create(ctx, parameters, claim, pod)
+			b.create(ctx, pod)
 
 			gomega.Consistently(func() error {
 				testPod, err := b.f.ClientSet.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
@@ -178,7 +193,9 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 	})
 
 	ginkgo.Context("cluster", func() {
-		nodes := NewNodes(f, 1, 4)
+		nodes := NewNodes(f, 1, 1)
+		driver := NewDriver(f, nodes, networkResources)
+		b := newBuilder(f, driver)
 
 		ginkgo.It("truncates the name of a generated resource claim", func(ctx context.Context) {
 			parameters := b.parameters()
@@ -208,6 +225,10 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 			framework.ExpectNoError(err)
 			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
 		})
+	})
+
+	ginkgo.Context("cluster", func() {
+		nodes := NewNodes(f, 1, 4)
 
 		// claimTests tries out several different combinations of pods with
 		// claims, both inline and external.
@@ -340,6 +361,32 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 				gomega.Eventually(ctx, func(ctx context.Context) (*resourcev1alpha2.ResourceClaim, error) {
 					return b.f.ClientSet.ResourceV1alpha2().ResourceClaims(b.f.Namespace.Name).Get(ctx, claim.Name, metav1.GetOptions{})
 				}).WithTimeout(f.Timeouts.PodDelete).Should(gomega.HaveField("Status.Allocation", (*resourcev1alpha2.AllocationResult)(nil)))
+			})
+
+			// kube-controller-manager can trigger delayed allocation for pods where the
+			// node name was already selected when creating the pod. For immediate
+			// allocation, the creator has to ensure that the node matches the claims.
+			// This does not work for resource claim templates and only isn't
+			// a problem here because the resource is network-attached and available
+			// on all nodes.
+
+			ginkgo.It("supports scheduled pod referencing inline resource claim", func(ctx context.Context) {
+				parameters := b.parameters()
+				pod, template := b.podInline(allocationMode)
+				pod.Spec.NodeName = nodes.NodeNames[0]
+				b.create(ctx, parameters, pod, template)
+
+				b.testPod(ctx, f.ClientSet, pod)
+			})
+
+			ginkgo.It("supports scheduled pod referencing external resource claim", func(ctx context.Context) {
+				parameters := b.parameters()
+				claim := b.externalClaim(allocationMode)
+				pod := b.podExternal()
+				pod.Spec.NodeName = nodes.NodeNames[0]
+				b.create(ctx, parameters, claim, pod)
+
+				b.testPod(ctx, f.ClientSet, pod)
 			})
 		}
 

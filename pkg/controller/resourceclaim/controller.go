@@ -87,6 +87,13 @@ type Controller struct {
 	podLister v1listers.PodLister
 	podSynced cache.InformerSynced
 
+	// podSchedulingList is the shared PodSchedulingContext lister used to
+	// fetch scheduling objects from the API server. It is shared with other
+	// controllers and therefore the objects in its store should be treated
+	// as immutable.
+	podSchedulingLister resourcev1alpha2listers.PodSchedulingContextLister
+	podSchedulingSynced cache.InformerSynced
+
 	// templateLister is the shared ResourceClaimTemplate lister used to
 	// fetch template objects from the API server. It is shared with other
 	// controllers and therefore the objects in its store should be treated
@@ -119,20 +126,23 @@ func NewController(
 	logger klog.Logger,
 	kubeClient clientset.Interface,
 	podInformer v1informers.PodInformer,
+	podSchedulingInformer resourcev1alpha2informers.PodSchedulingContextInformer,
 	claimInformer resourcev1alpha2informers.ResourceClaimInformer,
 	templateInformer resourcev1alpha2informers.ResourceClaimTemplateInformer) (*Controller, error) {
 
 	ec := &Controller{
-		kubeClient:      kubeClient,
-		podLister:       podInformer.Lister(),
-		podIndexer:      podInformer.Informer().GetIndexer(),
-		podSynced:       podInformer.Informer().HasSynced,
-		claimLister:     claimInformer.Lister(),
-		claimsSynced:    claimInformer.Informer().HasSynced,
-		templateLister:  templateInformer.Lister(),
-		templatesSynced: templateInformer.Informer().HasSynced,
-		queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "resource_claim"),
-		deletedObjects:  newUIDCache(maxUIDCacheEntries),
+		kubeClient:          kubeClient,
+		podLister:           podInformer.Lister(),
+		podIndexer:          podInformer.Informer().GetIndexer(),
+		podSynced:           podInformer.Informer().HasSynced,
+		podSchedulingLister: podSchedulingInformer.Lister(),
+		podSchedulingSynced: podSchedulingInformer.Informer().HasSynced,
+		claimLister:         claimInformer.Lister(),
+		claimsSynced:        claimInformer.Informer().HasSynced,
+		templateLister:      templateInformer.Lister(),
+		templatesSynced:     templateInformer.Informer().HasSynced,
+		queue:               workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "resource_claim"),
+		deletedObjects:      newUIDCache(maxUIDCacheEntries),
 	}
 
 	metrics.RegisterMetrics()
@@ -300,9 +310,40 @@ func (ec *Controller) podNeedsWork(pod *v1.Pod) (bool, string) {
 			return false, "conflicting claim needs to be removed by user"
 		}
 
+		// This check skips over the reasons below that only apply
+		// when a pod has been scheduled already. We need to keep checking
+		// for more claims that might need to be created.
 		if pod.Spec.NodeName == "" {
-			// Scheduler will handle PodSchedulingContext and reservations.
-			return false, "pod not scheduled"
+			continue
+		}
+
+		// Create PodSchedulingContext if the pod got scheduled without triggering
+		// delayed allocation.
+		//
+		// These can happen when:
+		// - a user created a pod with spec.nodeName set, perhaps for testing
+		// - some scheduler was used which is unaware of DRA
+		// - DRA was not enabled in kube-scheduler (version skew, configuration)
+		if claim.Spec.AllocationMode == resourcev1alpha2.AllocationModeWaitForFirstConsumer &&
+			claim.Status.Allocation == nil {
+			scheduling, err := ec.podSchedulingLister.PodSchedulingContexts(pod.Namespace).Get(pod.Name)
+			if apierrors.IsNotFound(err) {
+				return true, "need to create PodSchedulingContext for scheduled pod"
+			}
+			if err != nil {
+				// Shouldn't happen.
+				return true, fmt.Sprintf("internal error while checking for PodSchedulingContext: %v", err)
+			}
+			if scheduling.Spec.SelectedNode != pod.Spec.NodeName {
+				// Need to update PodSchedulingContext.
+				return true, "need to updated PodSchedulingContext for scheduled pod"
+			}
+		}
+		if claim.Status.Allocation != nil &&
+			!resourceclaim.IsReservedForPod(pod, claim) &&
+			resourceclaim.CanBeReserved(claim) {
+			// Need to reserve it.
+			return true, "need to reserve claim for pod"
 		}
 	}
 
@@ -456,6 +497,49 @@ func (ec *Controller) syncPod(ctx context.Context, namespace, name string) error
 		podApply := corev1apply.Pod(name, namespace).WithStatus(corev1apply.PodStatus().WithResourceClaimStatuses(statuses...))
 		if _, err := ec.kubeClient.CoreV1().Pods(namespace).ApplyStatus(ctx, podApply, metav1.ApplyOptions{FieldManager: fieldManager, Force: true}); err != nil {
 			return fmt.Errorf("update pod %s/%s ResourceClaimStatuses: %v", namespace, name, err)
+		}
+	}
+
+	if pod.Spec.NodeName == "" {
+		// Scheduler will handle PodSchedulingContext and reservations.
+		logger.V(5).Info("nothing to do for pod, scheduler will deal with it")
+		return nil
+	}
+
+	for _, podClaim := range pod.Spec.ResourceClaims {
+		claimName, checkOwner, err := resourceclaim.Name(pod, &podClaim)
+		if err != nil {
+			return err
+		}
+		// If nil, then it has been determined that the claim is not needed
+		// and can be skipped.
+		if claimName == nil {
+			continue
+		}
+		claim, err := ec.claimLister.ResourceClaims(pod.Namespace).Get(*claimName)
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("retrieve claim: %v", err)
+		}
+		if checkOwner {
+			if err := resourceclaim.IsForPod(pod, claim); err != nil {
+				return err
+			}
+		}
+		if claim.Spec.AllocationMode == resourcev1alpha2.AllocationModeWaitForFirstConsumer &&
+			claim.Status.Allocation == nil {
+			logger.V(5).Info("create PodSchedulingContext because claim needs to be allocated", "resourceClaim", klog.KObj(claim))
+			return ec.ensurePodSchedulingContext(ctx, pod)
+		}
+		if claim.Status.Allocation != nil &&
+			!resourceclaim.IsReservedForPod(pod, claim) &&
+			resourceclaim.CanBeReserved(claim) {
+			logger.V(5).Info("reserve claim for pod", "resourceClaim", klog.KObj(claim))
+			if err := ec.reserveForPod(ctx, pod, claim); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -618,6 +702,64 @@ func (ec *Controller) findPodResourceClaim(pod *v1.Pod, podClaim v1.PodResourceC
 	return nil, nil
 }
 
+func (ec *Controller) ensurePodSchedulingContext(ctx context.Context, pod *v1.Pod) error {
+	scheduling, err := ec.podSchedulingLister.PodSchedulingContexts(pod.Namespace).Get(pod.Name)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return fmt.Errorf("retrieve PodSchedulingContext: %v", err)
+	}
+	if scheduling == nil {
+		scheduling = &resourcev1alpha2.PodSchedulingContext{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      pod.Name,
+				Namespace: pod.Namespace,
+				OwnerReferences: []metav1.OwnerReference{
+					{
+						APIVersion: "v1",
+						Kind:       "Pod",
+						Name:       pod.Name,
+						UID:        pod.UID,
+						Controller: pointer.Bool(true),
+					},
+				},
+			},
+			Spec: resourcev1alpha2.PodSchedulingContextSpec{
+				SelectedNode: pod.Spec.NodeName,
+				// There is no need for negotiation about
+				// potential and suitable nodes anymore, so
+				// PotentialNodes can be left empty.
+			},
+		}
+		if _, err := ec.kubeClient.ResourceV1alpha2().PodSchedulingContexts(pod.Namespace).Create(ctx, scheduling, metav1.CreateOptions{}); err != nil {
+			return fmt.Errorf("create PodSchedulingContext: %v", err)
+		}
+		return nil
+	}
+
+	if scheduling.Spec.SelectedNode != pod.Spec.NodeName {
+		scheduling := scheduling.DeepCopy()
+		scheduling.Spec.SelectedNode = pod.Spec.NodeName
+		if _, err := ec.kubeClient.ResourceV1alpha2().PodSchedulingContexts(pod.Namespace).Update(ctx, scheduling, metav1.UpdateOptions{}); err != nil {
+			return fmt.Errorf("update spec.selectedNode in PodSchedulingContext: %v", err)
+		}
+	}
+
+	return nil
+}
+
+func (ec *Controller) reserveForPod(ctx context.Context, pod *v1.Pod, claim *resourcev1alpha2.ResourceClaim) error {
+	claim = claim.DeepCopy()
+	claim.Status.ReservedFor = append(claim.Status.ReservedFor,
+		resourcev1alpha2.ResourceClaimConsumerReference{
+			Resource: "pods",
+			Name:     pod.Name,
+			UID:      pod.UID,
+		})
+	if _, err := ec.kubeClient.ResourceV1alpha2().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{}); err != nil {
+		return fmt.Errorf("reserve claim for pod: %v", err)
+	}
+	return nil
+}
+
 func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) error {
 	logger := klog.LoggerWithValues(klog.FromContext(ctx), "claim", klog.KRef(namespace, name))
 	ctx = klog.NewContext(ctx, logger)
@@ -772,7 +914,7 @@ func owningPod(claim *resourcev1alpha2.ResourceClaim) (string, types.UID) {
 }
 
 // podResourceClaimIndexFunc is an index function that returns ResourceClaim keys (=
-// namespace/name) for ResourceClaimTemplates in a given pod.
+// namespace/name) for ResourceClaim or ResourceClaimTemplates in a given pod.
 func podResourceClaimIndexFunc(obj interface{}) ([]string, error) {
 	pod, ok := obj.(*v1.Pod)
 	if !ok {
@@ -780,16 +922,14 @@ func podResourceClaimIndexFunc(obj interface{}) ([]string, error) {
 	}
 	keys := []string{}
 	for _, podClaim := range pod.Spec.ResourceClaims {
-		if podClaim.Source.ResourceClaimTemplateName != nil {
-			claimName, _, err := resourceclaim.Name(pod, &podClaim)
-			if err != nil || claimName == nil {
-				// Index functions are not supposed to fail, the caller will panic.
-				// For both error reasons (claim not created yet, unknown API)
-				// we simply don't index.
-				continue
-			}
-			keys = append(keys, fmt.Sprintf("%s/%s", pod.Namespace, *claimName))
+		claimName, _, err := resourceclaim.Name(pod, &podClaim)
+		if err != nil || claimName == nil {
+			// Index functions are not supposed to fail, the caller will panic.
+			// For both error reasons (claim not created yet, unknown API)
+			// we simply don't index.
+			continue
 		}
+		keys = append(keys, fmt.Sprintf("%s/%s", pod.Namespace, *claimName))
 	}
 	return keys, nil
 }
