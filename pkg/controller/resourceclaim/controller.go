@@ -152,13 +152,16 @@ func NewController(
 	}
 	if _, err := claimInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			ec.onResourceClaimAddOrUpdate(logger, obj)
+			logger.V(6).Info("new claim", "claimDump", obj)
+			ec.enqueueResourceClaim(logger, obj, false)
 		},
 		UpdateFunc: func(old, updated interface{}) {
-			ec.onResourceClaimAddOrUpdate(logger, updated)
+			logger.V(6).Info("updated claim", "claimDump", updated)
+			ec.enqueueResourceClaim(logger, updated, false)
 		},
 		DeleteFunc: func(obj interface{}) {
-			ec.onResourceClaimDelete(logger, obj)
+			logger.V(6).Info("deleted claim", "claimDump", obj)
+			ec.enqueueResourceClaim(logger, obj, true)
 		},
 	}); err != nil {
 		return nil, err
@@ -199,6 +202,7 @@ func (ec *Controller) enqueuePod(logger klog.Logger, obj interface{}, deleted bo
 	pod, ok := obj.(*v1.Pod)
 	if !ok {
 		// Not a pod?!
+		logger.Error(nil, "enqueuePod called for unexpected object", "type", fmt.Sprintf("%T", obj))
 		return
 	}
 
@@ -208,13 +212,14 @@ func (ec *Controller) enqueuePod(logger klog.Logger, obj interface{}, deleted bo
 	}
 
 	if deleted {
+		logger.V(6).Info("pod got deleted", "pod", klog.KObj(pod))
 		ec.deletedObjects.Add(pod.UID)
 	}
 
 	logger.V(6).Info("pod with resource claims changed", "pod", klog.KObj(pod), "deleted", deleted)
 
 	// Release reservations of a deleted or completed pod?
-	if deleted || isPodDone(pod) {
+	if needsClaims, reason := podNeedsClaims(pod, deleted); !needsClaims {
 		for _, podClaim := range pod.Spec.ResourceClaims {
 			claimName, _, err := resourceclaim.Name(pod, &podClaim)
 			switch {
@@ -222,68 +227,119 @@ func (ec *Controller) enqueuePod(logger klog.Logger, obj interface{}, deleted bo
 				// Either the claim was not created (nothing to do here) or
 				// the API changed. The later will also get reported elsewhere,
 				// so here it's just a debug message.
-				klog.TODO().V(6).Info("Nothing to do for claim during pod change", "err", err)
+				logger.V(6).Info("Nothing to do for claim during pod change", "err", err, "reason", reason)
 			case claimName != nil:
 				key := claimKeyPrefix + pod.Namespace + "/" + *claimName
-				logger.V(6).Info("pod is deleted or done, process claim", "pod", klog.KObj(pod), "key", key)
-				ec.queue.Add(claimKeyPrefix + pod.Namespace + "/" + *claimName)
+				logger.V(6).Info("Process claim", "pod", klog.KObj(pod), "key", key, "reason", reason)
+				ec.queue.Add(key)
 			default:
 				// Nothing to do, claim wasn't generated.
-				klog.TODO().V(6).Info("Nothing to do for skipped claim during pod change")
+				logger.V(6).Info("Nothing to do for skipped claim during pod change", "reason", reason)
 			}
 		}
 	}
 
-	// Create ResourceClaim for inline templates?
-	if pod.DeletionTimestamp == nil {
-		for _, podClaim := range pod.Spec.ResourceClaims {
+	needsWork, reason := ec.podNeedsWork(pod)
+	if needsWork {
+		logger.V(6).Info("enqueing pod", "pod", klog.KObj(pod), "reason", reason)
+		ec.queue.Add(podKeyPrefix + pod.Namespace + "/" + pod.Name)
+		return
+	}
+	logger.V(6).Info("not enqueing pod", "pod", klog.KObj(pod), "reason", reason)
+}
+
+func podNeedsClaims(pod *v1.Pod, deleted bool) (bool, string) {
+	if deleted {
+		return false, "pod got removed"
+	}
+	if podutil.IsPodTerminal(pod) {
+		return false, "pod has terminated"
+	}
+	if pod.DeletionTimestamp != nil && pod.Spec.NodeName == "" {
+		return false, "pod got deleted before scheduling"
+	}
+	// Still needs claims.
+	return true, "pod might run"
+}
+
+// podNeedsWork checks whether a new or modified pod needs to be processed
+// further by a worker. It returns a boolean with the result and an explanation
+// for it.
+func (ec *Controller) podNeedsWork(pod *v1.Pod) (bool, string) {
+	if pod.DeletionTimestamp != nil {
+		// Nothing else to do for the pod.
+		return false, "pod is deleted"
+	}
+
+	for _, podClaim := range pod.Spec.ResourceClaims {
+		claimName, checkOwner, err := resourceclaim.Name(pod, &podClaim)
+		if err != nil {
+			return true, err.Error()
+		}
+		// If the claimName is nil, then it has been determined before
+		// that the claim is not needed.
+		if claimName == nil {
+			return false, "claim is not needed"
+		}
+		claim, err := ec.claimLister.ResourceClaims(pod.Namespace).Get(*claimName)
+		if apierrors.IsNotFound(err) {
 			if podClaim.Source.ResourceClaimTemplateName != nil {
-				// It has at least one inline template, work on it.
-				key := podKeyPrefix + pod.Namespace + "/" + pod.Name
-				logger.V(6).Info("pod is not deleted, process it", "pod", klog.KObj(pod), "key", key)
-				ec.queue.Add(key)
-				break
+				return true, "must create ResourceClaim from template"
 			}
+			// User needs to create claim.
+			return false, "claim is missing and must be created by user"
+		}
+		if err != nil {
+			// Shouldn't happen.
+			return true, fmt.Sprintf("internal error while checking for claim: %v", err)
+		}
+
+		if checkOwner &&
+			resourceclaim.IsForPod(pod, claim) != nil {
+			// Cannot proceed with the pod unless that other claim gets deleted.
+			return false, "conflicting claim needs to be removed by user"
+		}
+
+		if pod.Spec.NodeName == "" {
+			// Scheduler will handle PodSchedulingContext and reservations.
+			return false, "pod not scheduled"
 		}
 	}
+
+	return false, "nothing to do"
 }
 
-func (ec *Controller) onResourceClaimAddOrUpdate(logger klog.Logger, obj interface{}) {
+func (ec *Controller) enqueueResourceClaim(logger klog.Logger, obj interface{}, deleted bool) {
+	if d, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+		obj = d.Obj
+	}
 	claim, ok := obj.(*resourcev1alpha2.ResourceClaim)
 	if !ok {
 		return
 	}
 
-	// When starting up, we have to check all claims to find those with
-	// stale pods in ReservedFor. During an update, a pod might get added
-	// that already no longer exists.
-	key := claimKeyPrefix + claim.Namespace + "/" + claim.Name
-	logger.V(6).Info("claim is new or updated, process it", "key", key)
-	ec.queue.Add(key)
-}
-
-func (ec *Controller) onResourceClaimDelete(logger klog.Logger, obj interface{}) {
-	claim, ok := obj.(*resourcev1alpha2.ResourceClaim)
-	if !ok {
-		return
+	if !deleted {
+		// When starting up, we have to check all claims to find those with
+		// stale pods in ReservedFor. During an update, a pod might get added
+		// that already no longer exists.
+		key := claimKeyPrefix + claim.Namespace + "/" + claim.Name
+		logger.V(6).Info("enqueing new or updated claim", "claim", klog.KObj(claim), "key", key)
+		ec.queue.Add(key)
+	} else {
+		logger.V(6).Info("not enqueing deleted claim", "claim", klog.KObj(claim))
 	}
 
-	// Someone deleted a ResourceClaim, either intentionally or
-	// accidentally. If there is a pod referencing it because of
-	// an inline resource, then we should re-create the ResourceClaim.
-	// The common indexer does some prefiltering for us by
-	// limiting the list to those pods which reference
-	// the ResourceClaim.
+	// Also check whether this causes work for any of the currently
+	// known pods which use the ResourceClaim.
 	objs, err := ec.podIndexer.ByIndex(podResourceClaimIndex, fmt.Sprintf("%s/%s", claim.Namespace, claim.Name))
 	if err != nil {
-		runtime.HandleError(fmt.Errorf("listing pods from cache: %v", err))
+		logger.Error(err, "listing pods from cache")
 		return
 	}
 	if len(objs) == 0 {
 		logger.V(6).Info("claim got deleted while not needed by any pod, nothing to do", "claim", klog.KObj(claim))
 		return
 	}
-	logger = klog.LoggerWithValues(logger, "claim", klog.KObj(claim))
 	for _, obj := range objs {
 		ec.enqueuePod(logger, obj, false)
 	}
