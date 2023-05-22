@@ -96,10 +96,10 @@ func (p Proc) NewStatus() (ProcStatus, error) {
 		kv := strings.SplitN(line, ":", 2)
 
 		// removes spaces
-		k := string(strings.TrimSpace(kv[0]))
-		v := string(strings.TrimSpace(kv[1]))
+		k := strings.TrimSpace(kv[0])
+		v := strings.TrimSpace(kv[1])
 		// removes "kB"
-		v = string(bytes.Trim([]byte(v), " kB"))
+		v = strings.TrimSuffix(v, " kB")
 
 		// value to int when possible
 		// we can skip error check here, 'cause vKBytes is not used when value is a string

@@ -22,10 +22,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	//nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
-	"github.com/golang/protobuf/proto"
-
 	dto "github.com/prometheus/client_model/go"
+
+	"google.golang.org/protobuf/proto"
 )
 
 // nativeHistogramBounds for the frac of observed values. Only relevant for
@@ -469,6 +468,18 @@ type HistogramOpts struct {
 	NativeHistogramMaxZeroThreshold float64
 }
 
+// HistogramVecOpts bundles the options to create a HistogramVec metric.
+// It is mandatory to set HistogramOpts, see there for mandatory fields. VariableLabels
+// is optional and can safely be left to its default value.
+type HistogramVecOpts struct {
+	HistogramOpts
+
+	// VariableLabels are used to partition the metric vector by the given set
+	// of labels. Each label value will be constrained with the optional Contraint
+	// function, if provided.
+	VariableLabels ConstrainableLabels
+}
+
 // NewHistogram creates a new Histogram based on the provided HistogramOpts. It
 // panics if the buckets in HistogramOpts are not in strictly increasing order.
 //
@@ -489,11 +500,11 @@ func NewHistogram(opts HistogramOpts) Histogram {
 
 func newHistogram(desc *Desc, opts HistogramOpts, labelValues ...string) Histogram {
 	if len(desc.variableLabels) != len(labelValues) {
-		panic(makeInconsistentCardinalityError(desc.fqName, desc.variableLabels, labelValues))
+		panic(makeInconsistentCardinalityError(desc.fqName, desc.variableLabels.labelNames(), labelValues))
 	}
 
 	for _, n := range desc.variableLabels {
-		if n == bucketLabel {
+		if n.Name == bucketLabel {
 			panic(errBucketLabelNotAllowed)
 		}
 	}
@@ -544,16 +555,12 @@ func newHistogram(desc *Desc, opts HistogramOpts, labelValues ...string) Histogr
 	}
 	// Finally we know the final length of h.upperBounds and can make buckets
 	// for both counts as well as exemplars:
-	h.counts[0] = &histogramCounts{
-		buckets:                          make([]uint64, len(h.upperBounds)),
-		nativeHistogramZeroThresholdBits: math.Float64bits(h.nativeHistogramZeroThreshold),
-		nativeHistogramSchema:            h.nativeHistogramSchema,
-	}
-	h.counts[1] = &histogramCounts{
-		buckets:                          make([]uint64, len(h.upperBounds)),
-		nativeHistogramZeroThresholdBits: math.Float64bits(h.nativeHistogramZeroThreshold),
-		nativeHistogramSchema:            h.nativeHistogramSchema,
-	}
+	h.counts[0] = &histogramCounts{buckets: make([]uint64, len(h.upperBounds))}
+	atomic.StoreUint64(&h.counts[0].nativeHistogramZeroThresholdBits, math.Float64bits(h.nativeHistogramZeroThreshold))
+	atomic.StoreInt32(&h.counts[0].nativeHistogramSchema, h.nativeHistogramSchema)
+	h.counts[1] = &histogramCounts{buckets: make([]uint64, len(h.upperBounds))}
+	atomic.StoreUint64(&h.counts[1].nativeHistogramZeroThresholdBits, math.Float64bits(h.nativeHistogramZeroThreshold))
+	atomic.StoreInt32(&h.counts[1].nativeHistogramSchema, h.nativeHistogramSchema)
 	h.exemplars = make([]atomic.Value, len(h.upperBounds)+1)
 
 	h.init(h) // Init self-collection.
@@ -1034,15 +1041,23 @@ type HistogramVec struct {
 // NewHistogramVec creates a new HistogramVec based on the provided HistogramOpts and
 // partitioned by the given label names.
 func NewHistogramVec(opts HistogramOpts, labelNames []string) *HistogramVec {
-	desc := NewDesc(
+	return V2.NewHistogramVec(HistogramVecOpts{
+		HistogramOpts:  opts,
+		VariableLabels: UnconstrainedLabels(labelNames),
+	})
+}
+
+// NewHistogramVec creates a new HistogramVec based on the provided HistogramVecOpts.
+func (v2) NewHistogramVec(opts HistogramVecOpts) *HistogramVec {
+	desc := V2.NewDesc(
 		BuildFQName(opts.Namespace, opts.Subsystem, opts.Name),
 		opts.Help,
-		labelNames,
+		opts.VariableLabels,
 		opts.ConstLabels,
 	)
 	return &HistogramVec{
 		MetricVec: NewMetricVec(desc, func(lvs ...string) Metric {
-			return newHistogram(desc, opts, lvs...)
+			return newHistogram(desc, opts.HistogramOpts, lvs...)
 		}),
 	}
 }

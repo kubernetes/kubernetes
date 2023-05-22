@@ -55,19 +55,22 @@ ifneq ($(shell which gotestsum),)
 endif
 endif
 
-PROMU_VERSION ?= 0.13.0
+PROMU_VERSION ?= 0.14.0
 PROMU_URL     := https://github.com/prometheus/promu/releases/download/v$(PROMU_VERSION)/promu-$(PROMU_VERSION).$(GO_BUILD_PLATFORM).tar.gz
 
+SKIP_GOLANGCI_LINT :=
 GOLANGCI_LINT :=
 GOLANGCI_LINT_OPTS ?=
-GOLANGCI_LINT_VERSION ?= v1.45.2
+GOLANGCI_LINT_VERSION ?= v1.49.0
 # golangci-lint only supports linux, darwin and windows platforms on i386/amd64.
 # windows isn't included here because of the path separator being different.
 ifeq ($(GOHOSTOS),$(filter $(GOHOSTOS),linux darwin))
 	ifeq ($(GOHOSTARCH),$(filter $(GOHOSTARCH),amd64 i386))
 		# If we're in CI and there is an Actions file, that means the linter
 		# is being run in Actions, so we don't need to run it here.
-		ifeq (,$(CIRCLE_JOB))
+		ifneq (,$(SKIP_GOLANGCI_LINT))
+			GOLANGCI_LINT :=
+		else ifeq (,$(CIRCLE_JOB))
 			GOLANGCI_LINT := $(FIRST_GOPATH)/bin/golangci-lint
 		else ifeq (,$(wildcard .github/workflows/golangci-lint.yml))
 			GOLANGCI_LINT := $(FIRST_GOPATH)/bin/golangci-lint

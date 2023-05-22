@@ -15,6 +15,7 @@ package procfs
 
 import (
 	"bufio"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -42,27 +43,43 @@ func (fs FS) NetStat() ([]NetStat, error) {
 			return nil, err
 		}
 
-		netStatFile := NetStat{
-			Filename: filepath.Base(filePath),
-			Stats:    make(map[string][]uint64),
+		procNetstat, err := parseNetstat(file)
+		if err != nil {
+			return nil, err
 		}
-		scanner := bufio.NewScanner(file)
-		scanner.Scan()
-		// First string is always a header for stats
-		var headers []string
-		headers = append(headers, strings.Fields(scanner.Text())...)
+		procNetstat.Filename = filepath.Base(filePath)
 
-		// Other strings represent per-CPU counters
-		for scanner.Scan() {
-			for num, counter := range strings.Fields(scanner.Text()) {
-				value, err := strconv.ParseUint(counter, 16, 64)
-				if err != nil {
-					return nil, err
-				}
-				netStatFile.Stats[headers[num]] = append(netStatFile.Stats[headers[num]], value)
-			}
-		}
-		netStatsTotal = append(netStatsTotal, netStatFile)
+		netStatsTotal = append(netStatsTotal, procNetstat)
 	}
 	return netStatsTotal, nil
+}
+
+// parseNetstat parses the metrics from `/proc/net/stat/` file
+// and returns a NetStat structure.
+func parseNetstat(r io.Reader) (NetStat, error) {
+	var (
+		scanner = bufio.NewScanner(r)
+		netStat = NetStat{
+			Stats: make(map[string][]uint64),
+		}
+	)
+
+	scanner.Scan()
+
+	// First string is always a header for stats
+	var headers []string
+	headers = append(headers, strings.Fields(scanner.Text())...)
+
+	// Other strings represent per-CPU counters
+	for scanner.Scan() {
+		for num, counter := range strings.Fields(scanner.Text()) {
+			value, err := strconv.ParseUint(counter, 16, 64)
+			if err != nil {
+				return NetStat{}, err
+			}
+			netStat.Stats[headers[num]] = append(netStat.Stats[headers[num]], value)
+		}
+	}
+
+	return netStat, nil
 }

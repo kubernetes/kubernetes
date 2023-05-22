@@ -284,7 +284,8 @@ func parseMountStats(r io.Reader) ([]*Mount, error) {
 }
 
 // parseMount parses an entry in /proc/[pid]/mountstats in the format:
-//   device [device] mounted on [mount] with fstype [type]
+//
+//	device [device] mounted on [mount] with fstype [type]
 func parseMount(ss []string) (*Mount, error) {
 	if len(ss) < deviceEntryLen {
 		return nil, fmt.Errorf("invalid device entry: %v", ss)
