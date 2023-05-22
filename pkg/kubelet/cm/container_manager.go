@@ -190,7 +190,7 @@ func parsePercentage(v string) (int64, error) {
 	return percentage, nil
 }
 
-// ParseQOSReserved parses the --qos-reserve-requests option
+// ParseQOSReserved parses the --qos-reserved option
 func ParseQOSReserved(m map[string]string) (*map[v1.ResourceName]int64, error) {
 	reservations := make(map[v1.ResourceName]int64)
 	for k, v := range m {
