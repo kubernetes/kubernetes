@@ -743,27 +743,8 @@ function wait_coredns_available(){
   fi
 
   echo "================= BEGIN DEBUG ========================"
-  echo "====== set overcommit_memory ====="
-  echo 1 | sudo tee /proc/sys/vm/overcommit_memory
-  sudo cat /proc/sys/vm/overcommit_memory
   echo "====== resolv.conf ====="
   sudo cat /etc/resolv.conf
-  echo "====== ps ====="
-  sudo ps -ef
-  echo "====== ps coredns ====="
-  sudo ps -ef | grep -i coredns | grep -v grep
-  echo "====== set oom_score_adj for coredns related processes ====="
-  ps -ef | grep -i coredns | grep -v grep | awk '{print $2}' \
-  | while read PID; do
-    echo "setting oom_score_adj for $PID"
-    echo -1000 | sudo tee /proc/$PID/oom_score_adj
-  done
-  echo "====== print oom_score for coredns related processes ======"
-  ps -ef | grep -i coredns | grep -v grep | awk '{print $2}' \
-  | while read PID; do
-    echo "getting oom_score_adj for $PID"
-    sudo cat /proc/$PID/oom_score_adj
-  done
   echo "================== END DEBUG ======================="
 
   # bump log level
@@ -1285,8 +1266,14 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
   # enable debug
   echo "DOCKER_OPTS=\"\${DOCKER_OPTS} --debug\"" >> /etc/default/docker
 
+  # enable debug
+  echo "DOCKER_OPTS=\"\${DOCKER_OPTS} --dns=8.8.8.8 --dns-opt=use-vc --dns-opt=single-request --dns-opt=single-request-reopen\"" >> /etc/default/docker
+
   # let's log it where we can grab it later
   echo "DOCKER_LOGFILE=${LOG_DIR}/docker.log" >> /etc/default/docker
+
+  cp /etc/resolv.conf /etc/resolv.conf.original
+  echo "options use-vc single-request single-request-reopen" >> /etc/resolv.conf
 
   # bump up things
   refresh_docker_containerd_runc
