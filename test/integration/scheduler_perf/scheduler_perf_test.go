@@ -724,7 +724,7 @@ func BenchmarkPerfScheduling(b *testing.B) {
 			}
 		})
 	}
-	if err := dataItems2JSONFile(dataItems, b.Name()); err != nil {
+	if err := dataItems2JSONFile(dataItems, b.Name()+"_benchmark"); err != nil {
 		b.Fatalf("unable to write measured data %+v: %v", dataItems, err)
 	}
 }
