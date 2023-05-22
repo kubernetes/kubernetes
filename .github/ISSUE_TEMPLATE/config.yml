@@ -2,3 +2,6 @@ contact_links:
   - name: Support Request
     url: https://discuss.kubernetes.io
     about: Support request or question relating to Kubernetes
+  - name: Self-service Troubleshooter
+    url: https://nekton.ai/start/143-HpJtyXEzfRv7UKvqOHySkw
+    about: Resolve common problems before requesting support
