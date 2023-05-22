@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
+	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 )
 
 const kubeProxySubsystem = "kubeproxy"
@@ -237,26 +238,42 @@ var (
 var registerMetricsOnce sync.Once
 
 // RegisterMetrics registers kube-proxy metrics.
-func RegisterMetrics() {
+func RegisterMetrics(mode kubeproxyconfig.ProxyMode) {
 	registerMetricsOnce.Do(func() {
+		// Core kube-proxy metrics for all backends
 		legacyregistry.MustRegister(SyncProxyRulesLatency)
-		legacyregistry.MustRegister(SyncFullProxyRulesLatency)
-		legacyregistry.MustRegister(SyncPartialProxyRulesLatency)
+		legacyregistry.MustRegister(SyncProxyRulesLastQueuedTimestamp)
 		legacyregistry.MustRegister(SyncProxyRulesLastTimestamp)
-		legacyregistry.MustRegister(NetworkProgrammingLatency)
 		legacyregistry.MustRegister(EndpointChangesPending)
 		legacyregistry.MustRegister(EndpointChangesTotal)
 		legacyregistry.MustRegister(ServiceChangesPending)
 		legacyregistry.MustRegister(ServiceChangesTotal)
-		legacyregistry.MustRegister(IptablesRulesTotal)
-		legacyregistry.MustRegister(IptablesRulesLastSync)
-		legacyregistry.MustRegister(IptablesRestoreFailuresTotal)
-		legacyregistry.MustRegister(IptablesPartialRestoreFailuresTotal)
-		legacyregistry.MustRegister(SyncProxyRulesLastQueuedTimestamp)
-		legacyregistry.MustRegister(SyncProxyRulesNoLocalEndpointsTotal)
 		legacyregistry.MustRegister(ProxyHealthzTotal)
 		legacyregistry.MustRegister(ProxyLivezTotal)
 
+		// FIXME: winkernel does not implement these
+		legacyregistry.MustRegister(NetworkProgrammingLatency)
+		legacyregistry.MustRegister(SyncProxyRulesNoLocalEndpointsTotal)
+
+		switch mode {
+		case kubeproxyconfig.ProxyModeIPTables:
+			legacyregistry.MustRegister(SyncFullProxyRulesLatency)
+			legacyregistry.MustRegister(SyncPartialProxyRulesLatency)
+			legacyregistry.MustRegister(IptablesRestoreFailuresTotal)
+			legacyregistry.MustRegister(IptablesPartialRestoreFailuresTotal)
+			legacyregistry.MustRegister(IptablesRulesTotal)
+			legacyregistry.MustRegister(IptablesRulesLastSync)
+
+		case kubeproxyconfig.ProxyModeIPVS:
+			legacyregistry.MustRegister(IptablesRestoreFailuresTotal)
+
+		case kubeproxyconfig.ProxyModeNFTables:
+			// FIXME: should not use the iptables-specific metric
+			legacyregistry.MustRegister(IptablesRestoreFailuresTotal)
+
+		case kubeproxyconfig.ProxyModeKernelspace:
+			// currently no winkernel-specific metrics
+		}
 	})
 }
 

@@ -49,10 +49,10 @@ import (
 	klogtesting "k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
+	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/conntrack"
-	"k8s.io/kubernetes/pkg/proxy/metrics"
-
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
+	"k8s.io/kubernetes/pkg/proxy/metrics"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	proxyutiltest "k8s.io/kubernetes/pkg/proxy/util/testing"
@@ -1544,7 +1544,7 @@ func TestOverallIPTablesRules(t *testing.T) {
 	logger, _ := klogtesting.NewTestContext(t)
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
-	metrics.RegisterMetrics()
+	metrics.RegisterMetrics(kubeproxyconfig.ProxyModeIPTables)
 
 	makeServiceMap(fp,
 		// create ClusterIP service
@@ -4148,7 +4148,7 @@ func TestProxierMetricsIptablesTotalRules(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
 
-	metrics.RegisterMetrics()
+	metrics.RegisterMetrics(kubeproxyconfig.ProxyModeIPTables)
 
 	svcIP := "172.30.0.41"
 	svcPort := 80
@@ -5828,7 +5828,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	logger, _ := klogtesting.NewTestContext(t)
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
-	metrics.RegisterMetrics()
+	metrics.RegisterMetrics(kubeproxyconfig.ProxyModeIPTables)
 	defer legacyregistry.Reset()
 
 	// Create initial state
@@ -6472,7 +6472,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 		hostname string
 	}
 
-	metrics.RegisterMetrics()
+	metrics.RegisterMetrics(kubeproxyconfig.ProxyModeIPTables)
 	testCases := []struct {
 		name                                                string
 		internalTrafficPolicy                               *v1.ServiceInternalTrafficPolicy
