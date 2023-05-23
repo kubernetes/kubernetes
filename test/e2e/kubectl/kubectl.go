@@ -2268,6 +2268,27 @@ func curl(url string) (string, error) {
 	return curlTransport(url, utilnet.SetTransportDefaults(&http.Transport{}))
 }
 
+func post(url string, reader io.Reader, transport *http.Transport) (string, error) {
+	if transport == nil {
+		transport = utilnet.SetTransportDefaults(&http.Transport{})
+	}
+	client := &http.Client{Transport: transport}
+	req, err := http.NewRequest(http.MethodPost, url, reader)
+	if err != nil {
+		return "", err
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close() //nolint: errcheck
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	return string(body), nil
+}
+
 func validateGuestbookApp(ctx context.Context, c clientset.Interface, ns string) {
 	framework.Logf("Waiting for all frontend pods to be Running.")
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"tier": "frontend", "app": "guestbook"}))
