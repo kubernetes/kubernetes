@@ -22,10 +22,9 @@
 set -ex
 set -o pipefail
 
+# TODO (betheelder,pohly): this script is a bit of a no-op now, but people may
+# still be referencing it (CI is not). Clean up later.
+
 tag="$1"
 
-# Created manually in the kind repo by bentheelder with
-# make -C images/base push EXTRA_BUILD_OPT=--build-arg=CONTAINERD_VERSION=v1.7.1 TAG=$(date +v%Y%m%d)-$(git describe --always --dirty)-containerd_v1.7.1
-base_image="gcr.io/k8s-staging-kind/base:v20230515-01914134-containerd_v1.7.1@sha256:468fc430a6848884b786c5cd2f1c03e7a0977f04fb129a2cda2a19ec986ddacb"
-
-kind build node-image --base-image "$base_image"  --image "$tag" "$(pwd)"
+kind build node-image --image "$tag" "$(pwd)"
