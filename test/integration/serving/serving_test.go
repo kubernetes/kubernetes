@@ -361,7 +361,7 @@ users:
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "kube-controller-manager",
 		},
-		Paths: []string{"/configz", "/healthz", "/metrics"},
+		Paths: []string{"/configz", "/healthz", "/livez", "/metrics", "/readyz"},
 	}
 
 	testCases := []struct {
