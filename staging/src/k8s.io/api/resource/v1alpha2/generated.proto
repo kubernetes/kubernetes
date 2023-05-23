@@ -383,6 +383,10 @@ message ResourceHandle {
   // plugin should be invoked to process this ResourceHandle's data once it
   // lands on a node. This may differ from the DriverName set in
   // ResourceClaimStatus this ResourceHandle is embedded in.
+  //
+  // The special "nop.k8s.io" constant may be used here. This tells the
+  // kubelet that it does no resource driver is required when starting or
+  // stopping containers that use this resource.
   optional string driverName = 1;
 
   // Data contains the opaque data associated with this ResourceHandle. It is

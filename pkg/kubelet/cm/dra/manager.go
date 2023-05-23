@@ -123,7 +123,11 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod) error {
 			// If no DriverName is provided in the resourceHandle, we
 			// use the DriverName from the status
 			pluginName := resourceHandle.DriverName
-			if pluginName == "" {
+			switch pluginName {
+			case resourcev1alpha2.ResourceHandleNopDriver:
+				// Nothing to do.
+				continue
+			case "":
 				pluginName = resourceClaim.Status.DriverName
 			}
 
@@ -260,7 +264,11 @@ func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
 			// If no DriverName is provided in the resourceHandle, we
 			// use the DriverName from the status
 			pluginName := resourceHandle.DriverName
-			if pluginName == "" {
+			switch pluginName {
+			case resourcev1alpha2.ResourceHandleNopDriver:
+				// Nothing to do.
+				continue
+			case "":
 				pluginName = claimInfo.DriverName
 			}
 

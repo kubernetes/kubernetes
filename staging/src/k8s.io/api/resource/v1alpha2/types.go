@@ -177,6 +177,10 @@ type ResourceHandle struct {
 	// plugin should be invoked to process this ResourceHandle's data once it
 	// lands on a node. This may differ from the DriverName set in
 	// ResourceClaimStatus this ResourceHandle is embedded in.
+	//
+	// The special "nop.k8s.io" constant may be used here. This tells the
+	// kubelet that it does no resource driver is required when starting or
+	// stopping containers that use this resource.
 	DriverName string `json:"driverName,omitempty" protobuf:"bytes,1,opt,name=driverName"`
 
 	// Data contains the opaque data associated with this ResourceHandle. It is
@@ -194,6 +198,10 @@ type ResourceHandle struct {
 
 // ResourceHandleDataMaxSize represents the maximum size of resourceHandle.data.
 const ResourceHandleDataMaxSize = 16 * 1024
+
+// ResourceHandleNopDriver is the special driver name for
+// ResourceHandle.DriverName that causes the kubelet to skip the resource.
+const ResourceHandleNopDriver = "nop.k8s.io"
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.26

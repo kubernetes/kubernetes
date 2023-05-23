@@ -221,7 +221,7 @@ func (ResourceClassParametersReference) SwaggerDoc() map[string]string {
 
 var map_ResourceHandle = map[string]string{
 	"":           "ResourceHandle holds opaque resource data for processing by a specific kubelet plugin.",
-	"driverName": "DriverName specifies the name of the resource driver whose kubelet plugin should be invoked to process this ResourceHandle's data once it lands on a node. This may differ from the DriverName set in ResourceClaimStatus this ResourceHandle is embedded in.",
+	"driverName": "DriverName specifies the name of the resource driver whose kubelet plugin should be invoked to process this ResourceHandle's data once it lands on a node. This may differ from the DriverName set in ResourceClaimStatus this ResourceHandle is embedded in.\n\nThe special \"nop.k8s.io\" constant may be used here. This tells the kubelet that it does no resource driver is required when starting or stopping containers that use this resource.",
 	"data":       "Data contains the opaque data associated with this ResourceHandle. It is set by the controller component of the resource driver whose name matches the DriverName set in the ResourceClaimStatus this ResourceHandle is embedded in. It is set at allocation time and is intended for processing by the kubelet plugin whose name matches the DriverName set in this ResourceHandle.\n\nThe maximum size of this field is 16KiB. This may get increased in the future, but not reduced.",
 }
 
