@@ -191,11 +191,12 @@ func (s *specAggregator) buildOpenAPISpec() (specToReturn *spec.Swagger, err err
 		if specToReturn == nil {
 			specToReturn = &spec.Swagger{}
 			*specToReturn = *specInfo.spec
-			// Paths and Definitions are set by MergeSpecsIgnorePathConflict
+			// Paths, Definitions and parameters are set by MergeSpecsIgnorePathConflict
 			specToReturn.Paths = nil
 			specToReturn.Definitions = nil
+			specToReturn.Parameters = nil
 		}
-		if err := aggregator.MergeSpecsIgnorePathConflict(specToReturn, specInfo.spec); err != nil {
+		if err := aggregator.MergeSpecsIgnorePathConflictRenamingDefinitionsAndParameters(specToReturn, specInfo.spec); err != nil {
 			return nil, err
 		}
 	}
