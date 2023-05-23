@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2014-2018 VMware, Inc. All Rights Reserved.
+Copyright (c) 2014-2022 VMware, Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,6 +21,18 @@ import (
 
 	"github.com/vmware/govmomi/vim25/types"
 )
+
+type PbmAssociateAndApplyPolicyStatusPolicyStatus string
+
+const (
+	PbmAssociateAndApplyPolicyStatusPolicyStatusSuccess = PbmAssociateAndApplyPolicyStatusPolicyStatus("success")
+	PbmAssociateAndApplyPolicyStatusPolicyStatusFailed  = PbmAssociateAndApplyPolicyStatusPolicyStatus("failed")
+	PbmAssociateAndApplyPolicyStatusPolicyStatusInvalid = PbmAssociateAndApplyPolicyStatusPolicyStatus("invalid")
+)
+
+func init() {
+	types.Add("pbm:PbmAssociateAndApplyPolicyStatusPolicyStatus", reflect.TypeOf((*PbmAssociateAndApplyPolicyStatusPolicyStatus)(nil)).Elem())
+}
 
 type PbmBuiltinGenericType string
 
@@ -104,6 +116,30 @@ func init() {
 	types.Add("pbm:PbmComplianceStatus", reflect.TypeOf((*PbmComplianceStatus)(nil)).Elem())
 }
 
+type PbmDebugManagerKeystoreName string
+
+const (
+	PbmDebugManagerKeystoreNameSMS           = PbmDebugManagerKeystoreName("SMS")
+	PbmDebugManagerKeystoreNameTRUSTED_ROOTS = PbmDebugManagerKeystoreName("TRUSTED_ROOTS")
+)
+
+func init() {
+	types.Add("pbm:PbmDebugManagerKeystoreName", reflect.TypeOf((*PbmDebugManagerKeystoreName)(nil)).Elem())
+}
+
+type PbmHealthStatusForEntity string
+
+const (
+	PbmHealthStatusForEntityRed     = PbmHealthStatusForEntity("red")
+	PbmHealthStatusForEntityYellow  = PbmHealthStatusForEntity("yellow")
+	PbmHealthStatusForEntityGreen   = PbmHealthStatusForEntity("green")
+	PbmHealthStatusForEntityUnknown = PbmHealthStatusForEntity("unknown")
+)
+
+func init() {
+	types.Add("pbm:PbmHealthStatusForEntity", reflect.TypeOf((*PbmHealthStatusForEntity)(nil)).Elem())
+}
+
 type PbmIofilterInfoFilterType string
 
 const (
@@ -131,10 +167,40 @@ const (
 	PbmLineOfServiceInfoLineOfServiceEnumPERSISTENCE          = PbmLineOfServiceInfoLineOfServiceEnum("PERSISTENCE")
 	PbmLineOfServiceInfoLineOfServiceEnumDATA_PROVIDER        = PbmLineOfServiceInfoLineOfServiceEnum("DATA_PROVIDER")
 	PbmLineOfServiceInfoLineOfServiceEnumDATASTORE_IO_CONTROL = PbmLineOfServiceInfoLineOfServiceEnum("DATASTORE_IO_CONTROL")
+	PbmLineOfServiceInfoLineOfServiceEnumDATA_PROTECTION      = PbmLineOfServiceInfoLineOfServiceEnum("DATA_PROTECTION")
 )
 
 func init() {
 	types.Add("pbm:PbmLineOfServiceInfoLineOfServiceEnum", reflect.TypeOf((*PbmLineOfServiceInfoLineOfServiceEnum)(nil)).Elem())
+}
+
+type PbmLoggingConfigurationComponent string
+
+const (
+	PbmLoggingConfigurationComponentPbm                = PbmLoggingConfigurationComponent("pbm")
+	PbmLoggingConfigurationComponentVslm               = PbmLoggingConfigurationComponent("vslm")
+	PbmLoggingConfigurationComponentSms                = PbmLoggingConfigurationComponent("sms")
+	PbmLoggingConfigurationComponentSpbm               = PbmLoggingConfigurationComponent("spbm")
+	PbmLoggingConfigurationComponentSps                = PbmLoggingConfigurationComponent("sps")
+	PbmLoggingConfigurationComponentHttpclient_header  = PbmLoggingConfigurationComponent("httpclient_header")
+	PbmLoggingConfigurationComponentHttpclient_content = PbmLoggingConfigurationComponent("httpclient_content")
+	PbmLoggingConfigurationComponentVmomi              = PbmLoggingConfigurationComponent("vmomi")
+)
+
+func init() {
+	types.Add("pbm:PbmLoggingConfigurationComponent", reflect.TypeOf((*PbmLoggingConfigurationComponent)(nil)).Elem())
+}
+
+type PbmLoggingConfigurationLogLevel string
+
+const (
+	PbmLoggingConfigurationLogLevelINFO  = PbmLoggingConfigurationLogLevel("INFO")
+	PbmLoggingConfigurationLogLevelDEBUG = PbmLoggingConfigurationLogLevel("DEBUG")
+	PbmLoggingConfigurationLogLevelTRACE = PbmLoggingConfigurationLogLevel("TRACE")
+)
+
+func init() {
+	types.Add("pbm:PbmLoggingConfigurationLogLevel", reflect.TypeOf((*PbmLoggingConfigurationLogLevel)(nil)).Elem())
 }
 
 type PbmObjectType string
@@ -145,6 +211,8 @@ const (
 	PbmObjectTypeVirtualDiskId          = PbmObjectType("virtualDiskId")
 	PbmObjectTypeVirtualDiskUUID        = PbmObjectType("virtualDiskUUID")
 	PbmObjectTypeDatastore              = PbmObjectType("datastore")
+	PbmObjectTypeVsanObjectId           = PbmObjectType("vsanObjectId")
+	PbmObjectTypeFileShareId            = PbmObjectType("fileShareId")
 	PbmObjectTypeUnknown                = PbmObjectType("unknown")
 )
 
@@ -164,6 +232,18 @@ const (
 
 func init() {
 	types.Add("pbm:PbmOperation", reflect.TypeOf((*PbmOperation)(nil)).Elem())
+}
+
+type PbmPolicyAssociationVolumeAllocationType string
+
+const (
+	PbmPolicyAssociationVolumeAllocationTypeFullyInitialized          = PbmPolicyAssociationVolumeAllocationType("FullyInitialized")
+	PbmPolicyAssociationVolumeAllocationTypeReserveSpace              = PbmPolicyAssociationVolumeAllocationType("ReserveSpace")
+	PbmPolicyAssociationVolumeAllocationTypeConserveSpaceWhenPossible = PbmPolicyAssociationVolumeAllocationType("ConserveSpaceWhenPossible")
+)
+
+func init() {
+	types.Add("pbm:PbmPolicyAssociationVolumeAllocationType", reflect.TypeOf((*PbmPolicyAssociationVolumeAllocationType)(nil)).Elem())
 }
 
 type PbmProfileCategoryEnum string
@@ -191,9 +271,10 @@ func init() {
 type PbmSystemCreatedProfileType string
 
 const (
-	PbmSystemCreatedProfileTypeVsanDefaultProfile = PbmSystemCreatedProfileType("VsanDefaultProfile")
-	PbmSystemCreatedProfileTypeVVolDefaultProfile = PbmSystemCreatedProfileType("VVolDefaultProfile")
-	PbmSystemCreatedProfileTypePmemDefaultProfile = PbmSystemCreatedProfileType("PmemDefaultProfile")
+	PbmSystemCreatedProfileTypeVsanDefaultProfile    = PbmSystemCreatedProfileType("VsanDefaultProfile")
+	PbmSystemCreatedProfileTypeVVolDefaultProfile    = PbmSystemCreatedProfileType("VVolDefaultProfile")
+	PbmSystemCreatedProfileTypePmemDefaultProfile    = PbmSystemCreatedProfileType("PmemDefaultProfile")
+	PbmSystemCreatedProfileTypeVsanMaxDefaultProfile = PbmSystemCreatedProfileType("VsanMaxDefaultProfile")
 )
 
 func init() {

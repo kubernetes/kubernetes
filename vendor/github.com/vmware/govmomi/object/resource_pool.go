@@ -22,6 +22,7 @@ import (
 	"github.com/vmware/govmomi/nfc"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/methods"
+	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
 )
 
@@ -33,6 +34,18 @@ func NewResourcePool(c *vim25.Client, ref types.ManagedObjectReference) *Resourc
 	return &ResourcePool{
 		Common: NewCommon(c, ref),
 	}
+}
+
+// Owner returns the ResourcePool owner as a ClusterComputeResource or ComputeResource.
+func (p ResourcePool) Owner(ctx context.Context) (Reference, error) {
+	var pool mo.ResourcePool
+
+	err := p.Properties(ctx, p.Reference(), []string{"owner"}, &pool)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewReference(p.Client(), pool.Owner), nil
 }
 
 func (p ResourcePool) ImportVApp(ctx context.Context, spec types.BaseImportSpec, folder *Folder, host *HostSystem) (*nfc.Lease, error) {
