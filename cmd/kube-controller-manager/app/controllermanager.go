@@ -200,11 +200,12 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 	}
 
 	// Setup any healthz checks we will want to use.
-	var checks []healthz.HealthChecker
+	var checks, readzChecks []healthz.HealthChecker
 	var electionChecker *leaderelection.HealthzAdaptor
 	if c.ComponentConfig.Generic.LeaderElection.LeaderElect {
 		electionChecker = leaderelection.NewLeaderHealthzAdaptor(time.Second * 20)
 		checks = append(checks, electionChecker)
+		readzChecks = append(readzChecks, electionChecker)
 	}
 	healthzHandler := controllerhealthz.NewMutableHealthzHandler(checks...)
 
@@ -212,7 +213,7 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 	// unsecuredMux is the handler for these controller *after* authn/authz filters have been applied
 	var unsecuredMux *mux.PathRecorderMux
 	if c.SecureServing != nil {
-		unsecuredMux = genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, healthzHandler)
+		unsecuredMux = genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, checks)
 		if utilfeature.DefaultFeatureGate.Enabled(features.ComponentSLIs) {
 			slis.SLIMetricsWithReset{}.Install(unsecuredMux)
 		}
@@ -241,6 +242,7 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 
 		controllerContext.InformerFactory.Start(stopCh)
 		controllerContext.ObjectOrMetadataInformerFactory.Start(stopCh)
+		healthz.InstallReadyzHandler(unsecuredMux, append(readzChecks, healthz.NewInformerSyncHealthz(controllerContext.InformerFactory))...)
 		close(controllerContext.InformersStarted)
 
 		<-ctx.Done()
