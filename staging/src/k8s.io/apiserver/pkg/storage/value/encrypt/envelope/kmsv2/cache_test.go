@@ -126,6 +126,18 @@ func TestSimpleCache(t *testing.T) {
 
 	// Wait for the cache to expire
 	fakeClock.Step(6 * time.Second)
+
+	// expired reads still work until GC runs on write
+	for i := 0; i < 10; i++ {
+		k := fmt.Sprintf("key-%d", i)
+		if cache.get([]byte(k)) != transformer {
+			t.Fatalf("Expected to get the transformer for key %v", k)
+		}
+	}
+
+	// run GC by performing a write
+	cache.set([]byte("some-other-unrelated-key"), transformer)
+
 	for i := 0; i < 10; i++ {
 		k := fmt.Sprintf("key-%d", i)
 		if cache.get([]byte(k)) != nil {

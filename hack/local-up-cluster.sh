@@ -186,10 +186,10 @@ do
     esac
 done
 
-if [ -z "${GO_OUT:-$(guess_built_binary_path)}" ]; then
+if [ -z "${GO_OUT}" ]; then
     make -C "${KUBE_ROOT}" WHAT="cmd/kubectl cmd/kube-apiserver cmd/kube-controller-manager cmd/cloud-controller-manager cmd/kubelet cmd/kube-proxy cmd/kube-scheduler"
 else
-    echo "skipped the build as we found existing binaries in $(guess_built_binary_path)"
+    echo "skipped the build because GO_OUT was set (${GO_OUT})"
 fi
 
 # Shut down anyway if there's an error.
