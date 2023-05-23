@@ -27,6 +27,10 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 )
 
+const (
+	testTransformerPrefix = "k8s:enc:test:"
+)
+
 type testTransformer struct {
 	from, to                 []byte
 	err                      error
@@ -48,10 +52,10 @@ func TestPrefixFrom(t *testing.T) {
 	testErr := fmt.Errorf("test error")
 	transformErr := fmt.Errorf("transform error")
 	transformers := []PrefixTransformer{
-		{Prefix: []byte("first:"), Transformer: &testTransformer{from: []byte("value1")}},
-		{Prefix: []byte("second:"), Transformer: &testTransformer{from: []byte("value2")}},
-		{Prefix: []byte("fails:"), Transformer: &testTransformer{err: transformErr}},
-		{Prefix: []byte("stale:"), Transformer: &testTransformer{from: []byte("value3"), stale: true}},
+		{Prefix: []byte(testTransformerPrefix + "first:"), Transformer: &testTransformer{from: []byte("value1")}},
+		{Prefix: []byte(testTransformerPrefix + "second:"), Transformer: &testTransformer{from: []byte("value2")}},
+		{Prefix: []byte(testTransformerPrefix + "fails:"), Transformer: &testTransformer{err: transformErr}},
+		{Prefix: []byte(testTransformerPrefix + "stale:"), Transformer: &testTransformer{from: []byte("value3"), stale: true}},
 	}
 	p := NewPrefixTransformers(testErr, transformers...)
 
@@ -62,11 +66,11 @@ func TestPrefixFrom(t *testing.T) {
 		err    error
 		match  int
 	}{
-		{[]byte("first:value"), []byte("value1"), false, nil, 0},
-		{[]byte("second:value"), []byte("value2"), true, nil, 1},
-		{[]byte("third:value"), nil, false, testErr, -1},
-		{[]byte("fails:value"), nil, false, transformErr, 2},
-		{[]byte("stale:value"), []byte("value3"), true, nil, 3},
+		{[]byte(testTransformerPrefix + "first:value"), []byte("value1"), false, nil, 0},
+		{[]byte(testTransformerPrefix + "second:value"), []byte("value2"), true, nil, 1},
+		{[]byte(testTransformerPrefix + "third:value"), nil, false, testErr, -1},
+		{[]byte(testTransformerPrefix + "fails:value"), nil, false, transformErr, 2},
+		{[]byte(testTransformerPrefix + "stale:value"), []byte("value3"), true, nil, 3},
 	}
 	for i, test := range testCases {
 		got, stale, err := p.TransformFromStorage(context.Background(), test.input, nil)
@@ -88,9 +92,9 @@ func TestPrefixTo(t *testing.T) {
 		expect       []byte
 		err          error
 	}{
-		{[]PrefixTransformer{{Prefix: []byte("first:"), Transformer: &testTransformer{to: []byte("value1")}}}, []byte("first:value1"), nil},
-		{[]PrefixTransformer{{Prefix: []byte("second:"), Transformer: &testTransformer{to: []byte("value2")}}}, []byte("second:value2"), nil},
-		{[]PrefixTransformer{{Prefix: []byte("fails:"), Transformer: &testTransformer{err: transformErr}}}, nil, transformErr},
+		{[]PrefixTransformer{{Prefix: []byte(testTransformerPrefix + "first:"), Transformer: &testTransformer{to: []byte("value1")}}}, []byte(testTransformerPrefix + "first:value1"), nil},
+		{[]PrefixTransformer{{Prefix: []byte(testTransformerPrefix + "second:"), Transformer: &testTransformer{to: []byte("value2")}}}, []byte(testTransformerPrefix + "second:value2"), nil},
+		{[]PrefixTransformer{{Prefix: []byte(testTransformerPrefix + "fails:"), Transformer: &testTransformer{err: transformErr}}}, nil, transformErr},
 	}
 	for i, test := range testCases {
 		p := NewPrefixTransformers(testErr, test.transformers...)
@@ -110,8 +114,8 @@ func TestPrefixFromMetrics(t *testing.T) {
 	transformerErr := fmt.Errorf("test error")
 	identityTransformer := PrefixTransformer{Prefix: []byte{}, Transformer: &testTransformer{from: []byte("value1")}}
 	identityTransformerErr := PrefixTransformer{Prefix: []byte{}, Transformer: &testTransformer{err: transformerErr}}
-	otherTransformer := PrefixTransformer{Prefix: []byte("other:"), Transformer: &testTransformer{from: []byte("value1")}}
-	otherTransformerErr := PrefixTransformer{Prefix: []byte("other:"), Transformer: &testTransformer{err: transformerErr}}
+	otherTransformer := PrefixTransformer{Prefix: []byte(testTransformerPrefix + "other:"), Transformer: &testTransformer{from: []byte("value1")}}
+	otherTransformerErr := PrefixTransformer{Prefix: []byte(testTransformerPrefix + "other:"), Transformer: &testTransformer{err: transformerErr}}
 
 	testCases := []struct {
 		desc    string
@@ -137,7 +141,7 @@ func TestPrefixFromMetrics(t *testing.T) {
 		},
 		{
 			desc:   "other prefix (ok)",
-			input:  []byte("other:value"),
+			input:  []byte(testTransformerPrefix + "other:value"),
 			prefix: NewPrefixTransformers(testErr, identityTransformerErr, otherTransformer),
 			metrics: []string{
 				"apiserver_storage_transformation_operations_total",
@@ -145,13 +149,13 @@ func TestPrefixFromMetrics(t *testing.T) {
 			want: `
 	# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
   # TYPE apiserver_storage_transformation_operations_total counter
-  apiserver_storage_transformation_operations_total{status="OK",transformation_type="from_storage",transformer_prefix="other:"} 1
+  apiserver_storage_transformation_operations_total{status="OK",transformation_type="from_storage",transformer_prefix="k8s:enc:test:other:"} 1
   `,
 			err: nil,
 		},
 		{
 			desc:   "other prefix (error)",
-			input:  []byte("other:value"),
+			input:  []byte(testTransformerPrefix + "other:value"),
 			prefix: NewPrefixTransformers(testErr, identityTransformerErr, otherTransformerErr),
 			metrics: []string{
 				"apiserver_storage_transformation_operations_total",
@@ -159,13 +163,13 @@ func TestPrefixFromMetrics(t *testing.T) {
 			want: `
 	# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
   # TYPE apiserver_storage_transformation_operations_total counter
-  apiserver_storage_transformation_operations_total{status="unknown-non-grpc",transformation_type="from_storage",transformer_prefix="other:"} 1
+  apiserver_storage_transformation_operations_total{status="unknown-non-grpc",transformation_type="from_storage",transformer_prefix="k8s:enc:test:other:"} 1
   `,
 			err: nil,
 		},
 		{
 			desc:   "unknown prefix",
-			input:  []byte("foo:value"),
+			input:  []byte(testTransformerPrefix + "foo:value"),
 			prefix: NewPrefixTransformers(testErr, identityTransformerErr, otherTransformer),
 			metrics: []string{
 				"apiserver_storage_transformation_operations_total",

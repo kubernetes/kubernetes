@@ -18,9 +18,9 @@ limitations under the License.
 package value
 
 import (
-	"bytes"
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/errors"
@@ -63,7 +63,11 @@ type PrefixTransformer struct {
 }
 
 type prefixTransformers struct {
-	transformers []PrefixTransformer
+	// The first transfom on the list of input transformers
+	firstTransformer PrefixTransformer
+	// The map of input transformers with prefix as key and a slice of transformers
+	// with the same prefix with the original order
+	transformers map[string][]PrefixTransformer
 	err          error
 }
 
@@ -77,9 +81,22 @@ func NewPrefixTransformers(err error, transformers ...PrefixTransformer) Transfo
 	if err == nil {
 		err = fmt.Errorf("the provided value does not match any of the supported transformers")
 	}
+
+	tfm := map[string][]PrefixTransformer{}
+	for _, transformer := range transformers {
+		val, ok := tfm[string(transformer.Prefix)]
+		if ok {
+			tfm[string(transformer.Prefix)] = append(val, transformer)
+		} else {
+			var tfs []PrefixTransformer
+			tfm[string(transformer.Prefix)] = append(tfs, transformer)
+		}
+	}
+
 	return &prefixTransformers{
-		transformers: transformers,
-		err:          err,
+		firstTransformer: transformers[0],
+		transformers:     tfm,
+		err:              err,
 	}
 }
 
@@ -89,60 +106,68 @@ func NewPrefixTransformers(err error, transformers ...PrefixTransformer) Transfo
 func (t *prefixTransformers) TransformFromStorage(ctx context.Context, data []byte, dataCtx Context) ([]byte, bool, error) {
 	start := time.Now()
 	var errs []error
-	for i, transformer := range t.transformers {
-		if bytes.HasPrefix(data, transformer.Prefix) {
-			result, stale, err := transformer.Transformer.TransformFromStorage(ctx, data[len(transformer.Prefix):], dataCtx)
-			// To migrate away from encryption, user can specify an identity transformer higher up
-			// (in the config file) than the encryption transformer. In that scenario, the identity transformer needs to
-			// identify (during reads from disk) whether the data being read is encrypted or not. If the data is encrypted,
-			// it shall throw an error, but that error should not prevent the next subsequent transformer from being tried.
-			if len(transformer.Prefix) == 0 && err != nil {
-				continue
-			}
-			if len(transformer.Prefix) == 0 {
-				RecordTransformation("from_storage", "identity", time.Since(start), err)
-			} else {
-				RecordTransformation("from_storage", string(transformer.Prefix), time.Since(start), err)
-			}
 
-			// It is valid to have overlapping prefixes when the same encryption provider
-			// is specified multiple times but with different keys (the first provider is
-			// being rotated to and some later provider is being rotated away from).
-			//
-			// Example:
-			//
-			//  {
-			//    "aescbc": {
-			//      "keys": [
-			//        {
-			//          "name": "2",
-			//          "secret": "some key 2"
-			//        }
-			//      ]
-			//    }
-			//  },
-			//  {
-			//    "aescbc": {
-			//      "keys": [
-			//        {
-			//          "name": "1",
-			//          "secret": "some key 1"
-			//        }
-			//      ]
-			//    }
-			//  },
-			//
-			// The transformers for both aescbc configs share the prefix k8s:enc:aescbc:v1:
-			// but a failure in the first one should not prevent a later match from being attempted.
-			// Thus we never short-circuit on a prefix match that results in an error.
-			if err != nil {
-				errs = append(errs, err)
-				continue
-			}
-
-			return result, stale || i != 0, err
+	// Loop through all the transformers with the same prefix
+	transformers := t.transformers[getDataPrefix(data)]
+	for i, transformer := range transformers {
+		result, stale, err := transformer.Transformer.TransformFromStorage(ctx, data[len(transformer.Prefix):], dataCtx)
+		// To migrate away from encryption, user can specify an identity transformer higher up
+		// (in the config file) than the encryption transformer. In that scenario, the identity transformer needs to
+		// identify (during reads from disk) whether the data being read is encrypted or not. If the data is encrypted,
+		// it shall throw an error, but that error should not prevent the next subsequent transformer from being tried.
+		if len(transformer.Prefix) == 0 && err != nil {
+			continue
 		}
+		if len(transformer.Prefix) == 0 {
+			RecordTransformation("from_storage", "identity", time.Since(start), err)
+		} else {
+			RecordTransformation("from_storage", string(transformer.Prefix), time.Since(start), err)
+		}
+
+		// It is valid to have overlapping prefixes when the same encryption provider
+		// is specified multiple times but with different keys (the first provider is
+		// being rotated to and some later provider is being rotated away from).
+		//
+		// Example:
+		//
+		//  {
+		//    "aescbc": {
+		//      "keys": [
+		//        {
+		//          "name": "2",
+		//          "secret": "some key 2"
+		//        }
+		//      ]
+		//    }
+		//  },
+		//  {
+		//    "aescbc": {
+		//      "keys": [
+		//        {
+		//          "name": "1",
+		//          "secret": "some key 1"
+		//        }
+		//      ]
+		//    }
+		//  },
+		//
+		// The transformers for both aescbc configs share the prefix k8s:enc:aescbc:v1:
+		// but a failure in the first one should not prevent a later match from being attempted.
+		// Thus we never short-circuit on a prefix match that results in an error.
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+
+		// Detect if the transformation is stale by verifying if the current
+		// transformer is the first transformer
+		if string(transformer.Prefix) != string(t.firstTransformer.Prefix) || i != 0 {
+			stale = true
+		}
+
+		return result, stale, err
 	}
+
 	if err := errors.Reduce(errors.NewAggregate(errs)); err != nil {
 		return nil, false, err
 	}
@@ -153,7 +178,7 @@ func (t *prefixTransformers) TransformFromStorage(ctx context.Context, data []by
 // TransformToStorage uses the first transformer and adds its prefix to the data.
 func (t *prefixTransformers) TransformToStorage(ctx context.Context, data []byte, dataCtx Context) ([]byte, error) {
 	start := time.Now()
-	transformer := t.transformers[0]
+	transformer := t.firstTransformer
 	result, err := transformer.Transformer.TransformToStorage(ctx, data, dataCtx)
 	RecordTransformation("to_storage", string(transformer.Prefix), time.Since(start), err)
 	if err != nil {
@@ -163,4 +188,16 @@ func (t *prefixTransformers) TransformToStorage(ctx context.Context, data []byte
 	copy(prefixedData, transformer.Prefix)
 	prefixedData = append(prefixedData, result...)
 	return prefixedData, nil
+}
+
+// getDataPrefix returns the encryption prefix
+// Format: k8s:enc:<encryption-type>:<encryption-version>:
+// For example: k8s:enc:kms:v2:
+func getDataPrefix(data []byte) string {
+	sData := strings.SplitAfterN(string(data), ":", 5)
+	if len(sData) < 5 {
+		return ""
+	} else {
+		return strings.Join(sData[0:4], "")
+	}
 }
