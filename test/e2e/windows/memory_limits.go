@@ -182,7 +182,7 @@ func getNodeMemory(ctx context.Context, f *framework.Framework) nodeMemory {
 
 	// Assuming that agent nodes have the same config
 	// Make sure there is >0 agent nodes, then use the first one for info
-	gomega.Expect(nodeList).To(gomega.BeEmpty())
+	gomega.Expect(nodeList.Items).ToNot(gomega.BeEmpty())
 
 	ginkgo.By("Getting memory details from node status and kubelet config")
 	status := nodeList.Items[0].Status
