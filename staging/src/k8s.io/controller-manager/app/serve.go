@@ -24,6 +24,7 @@ import (
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	apiserver "k8s.io/apiserver/pkg/server"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
+	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -55,18 +56,20 @@ func BuildHandlerChain(apiHandler http.Handler, authorizationInfo *apiserver.Aut
 }
 
 // NewBaseHandler takes in CompletedConfig and returns a handler.
-func NewBaseHandler(c *componentbaseconfig.DebuggingConfiguration, healthzHandler http.Handler) *mux.PathRecorderMux {
-	mux := mux.NewPathRecorderMux("controller-manager")
-	mux.Handle("/healthz", healthzHandler)
+func NewBaseHandler(c *componentbaseconfig.DebuggingConfiguration, checks, readyzChecks []healthz.HealthChecker) *mux.PathRecorderMux {
+	pathRecorderMux := mux.NewPathRecorderMux("controller-manager")
+	healthz.InstallHandler(pathRecorderMux, checks...)
+	healthz.InstallLivezHandler(pathRecorderMux)
+	healthz.InstallReadyzHandler(pathRecorderMux, readyzChecks...)
 	if c.EnableProfiling {
-		routes.Profiling{}.Install(mux)
+		routes.Profiling{}.Install(pathRecorderMux)
 		if c.EnableContentionProfiling {
 			goruntime.SetBlockProfileRate(1)
 		}
-		routes.DebugFlags{}.Install(mux, "v", routes.StringFlagPutHandler(logs.GlogSetter))
+		routes.DebugFlags{}.Install(pathRecorderMux, "v", routes.StringFlagPutHandler(logs.GlogSetter))
 	}
-	configz.InstallHandler(mux)
-	mux.Handle("/metrics", legacyregistry.Handler())
+	configz.InstallHandler(pathRecorderMux)
+	pathRecorderMux.Handle("/metrics", legacyregistry.Handler())
 
-	return mux
+	return pathRecorderMux
 }
