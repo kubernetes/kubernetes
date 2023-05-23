@@ -17,6 +17,7 @@ limitations under the License.
 package simulator
 
 import (
+	"log"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -24,6 +25,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/mo"
@@ -42,11 +44,8 @@ type VcenterVStorageObjectManager struct {
 	objects map[types.ManagedObjectReference]map[types.ID]*VStorageObject
 }
 
-func NewVcenterVStorageObjectManager(ref types.ManagedObjectReference) object.Reference {
-	m := &VcenterVStorageObjectManager{}
-	m.Self = ref
+func (m *VcenterVStorageObjectManager) init(*Registry) {
 	m.objects = make(map[types.ManagedObjectReference]map[types.ID]*VStorageObject)
-	return m
 }
 
 func (m *VcenterVStorageObjectManager) object(ds types.ManagedObjectReference, id types.ID) *VStorageObject {
@@ -70,19 +69,69 @@ func (m *VcenterVStorageObjectManager) ListVStorageObject(req *types.ListVStorag
 	return body
 }
 
-func (m *VcenterVStorageObjectManager) RetrieveVStorageObject(req *types.RetrieveVStorageObject) soap.HasFault {
+func (m *VcenterVStorageObjectManager) RetrieveVStorageObject(ctx *Context, req *types.RetrieveVStorageObject) soap.HasFault {
 	body := new(methods.RetrieveVStorageObjectBody)
 
 	obj := m.object(req.Datastore, req.Id)
 	if obj == nil {
-		body.Fault_ = Fault("", new(types.InvalidArgument))
+		body.Fault_ = Fault("", new(types.NotFound))
 	} else {
+		stat := m.statDatastoreBacking(ctx, req.Datastore, &req.Id)
+		if err := stat[req.Id]; err != nil {
+			body.Fault_ = Fault(err.Error(), new(types.NotFound))
+			return body
+		}
 		body.Res = &types.RetrieveVStorageObjectResponse{
 			Returnval: obj.VStorageObject,
 		}
 	}
 
 	return body
+}
+
+// statDatastoreBacking checks if object(s) backing file exists on the given datastore ref.
+func (m *VcenterVStorageObjectManager) statDatastoreBacking(ctx *Context, ref types.ManagedObjectReference, id *types.ID) map[types.ID]error {
+	objs := m.objects[ref] // default to checking all objects
+	if id != nil {
+		// check for a specific object
+		objs = map[types.ID]*VStorageObject{
+			*id: objs[*id],
+		}
+	}
+	res := make(map[types.ID]error, len(objs))
+	ds := ctx.Map.Get(ref).(*Datastore)
+	dc := ctx.Map.getEntityDatacenter(ds)
+	fm := ctx.Map.FileManager()
+
+	for _, obj := range objs {
+		backing := obj.Config.Backing.(*types.BaseConfigInfoDiskFileBackingInfo)
+		file, _ := fm.resolve(&dc.Self, backing.FilePath)
+		_, res[obj.Config.Id] = os.Stat(file)
+	}
+
+	return res
+}
+
+func (m *VcenterVStorageObjectManager) ReconcileDatastoreInventoryTask(ctx *Context, req *types.ReconcileDatastoreInventory_Task) soap.HasFault {
+	task := CreateTask(m, "reconcileDatastoreInventory", func(*Task) (types.AnyType, types.BaseMethodFault) {
+		objs := m.objects[req.Datastore]
+		stat := m.statDatastoreBacking(ctx, req.Datastore, nil)
+
+		for id, err := range stat {
+			if os.IsNotExist(err) {
+				log.Printf("removing disk %s from inventory: %s", id.Id, err)
+				delete(objs, id)
+			}
+		}
+
+		return nil, nil
+	})
+
+	return &methods.ReconcileDatastoreInventory_TaskBody{
+		Res: &types.ReconcileDatastoreInventory_TaskResponse{
+			Returnval: task.Run(ctx),
+		},
+	}
 }
 
 func (m *VcenterVStorageObjectManager) RegisterDisk(ctx *Context, req *types.RegisterDisk) soap.HasFault {
@@ -116,7 +165,7 @@ func (m *VcenterVStorageObjectManager) RegisterDisk(ctx *Context, req *types.Reg
 	path := (&object.DatastorePath{Datastore: ds.Name, Path: u.Path}).String()
 
 	for _, obj := range m.objects[ds.Self] {
-		backing := obj.Config.BaseConfigInfo.Backing.(*types.BaseConfigInfoDiskFileBackingInfo)
+		backing := obj.Config.Backing.(*types.BaseConfigInfoDiskFileBackingInfo)
 		if backing.FilePath == path {
 			return invalid()
 		}
@@ -152,13 +201,12 @@ func (m *VcenterVStorageObjectManager) createObject(req *types.CreateDisk_Task, 
 	ref := req.Spec.BackingSpec.GetVslmCreateSpecBackingSpec().Datastore
 	ds := Map.Get(ref).(*Datastore)
 	dc := Map.getEntityDatacenter(ds)
-	dm := Map.VirtualDiskManager()
 
 	objects, ok := m.objects[ds.Self]
 	if !ok {
 		objects = make(map[types.ID]*VStorageObject)
 		m.objects[ds.Self] = objects
-		_ = os.Mkdir(filepath.Join(ds.Info.GetDatastoreInfo().Url, dir), 0755)
+		_ = os.Mkdir(filepath.Join(ds.Info.GetDatastoreInfo().Url, dir), 0750)
 	}
 
 	id := uuid.New().String()
@@ -191,8 +239,8 @@ func (m *VcenterVStorageObjectManager) createObject(req *types.CreateDisk_Task, 
 		path.Path = dir + "/" + id + ".vmdk"
 	}
 
-	if register == false {
-		err := dm.createVirtualDisk(types.VirtualDeviceConfigSpecFileOperationCreate, &types.CreateVirtualDisk_Task{
+	if !register {
+		err := vdmCreateVirtualDisk(types.VirtualDeviceConfigSpecFileOperationCreate, &types.CreateVirtualDisk_Task{
 			Datacenter: &dc.Self,
 			Name:       path.String(),
 		})
@@ -201,7 +249,7 @@ func (m *VcenterVStorageObjectManager) createObject(req *types.CreateDisk_Task, 
 		}
 	}
 
-	obj.Config.BaseConfigInfo.Backing = &types.BaseConfigInfoDiskFileBackingInfo{
+	obj.Config.Backing = &types.BaseConfigInfoDiskFileBackingInfo{
 		BaseConfigInfoFileBackingInfo: types.BaseConfigInfoFileBackingInfo{
 			BaseConfigInfoBackingInfo: types.BaseConfigInfoBackingInfo{
 				Datastore: ds.Self,
@@ -220,19 +268,19 @@ func (m *VcenterVStorageObjectManager) createObject(req *types.CreateDisk_Task, 
 
 }
 
-func (m *VcenterVStorageObjectManager) CreateDiskTask(req *types.CreateDisk_Task) soap.HasFault {
+func (m *VcenterVStorageObjectManager) CreateDiskTask(ctx *Context, req *types.CreateDisk_Task) soap.HasFault {
 	task := CreateTask(m, "createDisk", func(*Task) (types.AnyType, types.BaseMethodFault) {
 		return m.createObject(req, false)
 	})
 
 	return &methods.CreateDisk_TaskBody{
 		Res: &types.CreateDisk_TaskResponse{
-			Returnval: task.Run(),
+			Returnval: task.Run(ctx),
 		},
 	}
 }
 
-func (m *VcenterVStorageObjectManager) DeleteVStorageObjectTask(req *types.DeleteVStorageObject_Task) soap.HasFault {
+func (m *VcenterVStorageObjectManager) DeleteVStorageObjectTask(ctx *Context, req *types.DeleteVStorageObject_Task) soap.HasFault {
 	task := CreateTask(m, "deleteDisk", func(*Task) (types.AnyType, types.BaseMethodFault) {
 		obj := m.object(req.Datastore, req.Id)
 		if obj == nil {
@@ -240,10 +288,10 @@ func (m *VcenterVStorageObjectManager) DeleteVStorageObjectTask(req *types.Delet
 		}
 
 		backing := obj.Config.Backing.(*types.BaseConfigInfoDiskFileBackingInfo)
-		ds := Map.Get(req.Datastore).(*Datastore)
-		dc := Map.getEntityDatacenter(ds)
-		dm := Map.VirtualDiskManager()
-		dm.DeleteVirtualDiskTask(&types.DeleteVirtualDisk_Task{
+		ds := ctx.Map.Get(req.Datastore).(*Datastore)
+		dc := ctx.Map.getEntityDatacenter(ds)
+		dm := ctx.Map.VirtualDiskManager()
+		dm.DeleteVirtualDiskTask(ctx, &types.DeleteVirtualDisk_Task{
 			Name:       backing.FilePath,
 			Datacenter: &dc.Self,
 		})
@@ -255,7 +303,7 @@ func (m *VcenterVStorageObjectManager) DeleteVStorageObjectTask(req *types.Delet
 
 	return &methods.DeleteVStorageObject_TaskBody{
 		Res: &types.DeleteVStorageObject_TaskResponse{
-			Returnval: task.Run(),
+			Returnval: task.Run(ctx),
 		},
 	}
 }
@@ -275,7 +323,7 @@ func (m *VcenterVStorageObjectManager) RetrieveSnapshotInfo(req *types.RetrieveS
 	return body
 }
 
-func (m *VcenterVStorageObjectManager) VStorageObjectCreateSnapshotTask(req *types.VStorageObjectCreateSnapshot_Task) soap.HasFault {
+func (m *VcenterVStorageObjectManager) VStorageObjectCreateSnapshotTask(ctx *Context, req *types.VStorageObjectCreateSnapshot_Task) soap.HasFault {
 	task := CreateTask(m, "createSnapshot", func(*Task) (types.AnyType, types.BaseMethodFault) {
 		obj := m.object(req.Datastore, req.Id)
 		if obj == nil {
@@ -297,12 +345,29 @@ func (m *VcenterVStorageObjectManager) VStorageObjectCreateSnapshotTask(req *typ
 
 	return &methods.VStorageObjectCreateSnapshot_TaskBody{
 		Res: &types.VStorageObjectCreateSnapshot_TaskResponse{
-			Returnval: task.Run(),
+			Returnval: task.Run(ctx),
 		},
 	}
 }
 
-func (m *VcenterVStorageObjectManager) DeleteSnapshotTask(req *types.DeleteSnapshot_Task) soap.HasFault {
+func (m *VcenterVStorageObjectManager) ExtendDiskTask(ctx *Context, req *types.ExtendDisk_Task) soap.HasFault {
+	task := CreateTask(m, "extendDisk", func(*Task) (types.AnyType, types.BaseMethodFault) {
+		obj := m.object(req.Datastore, req.Id)
+		if obj == nil {
+			return nil, new(types.InvalidArgument)
+		}
+
+		obj.Config.CapacityInMB = req.NewCapacityInMB
+		return nil, nil
+	})
+	return &methods.ExtendDisk_TaskBody{
+		Res: &types.ExtendDisk_TaskResponse{
+			Returnval: task.Run(ctx),
+		},
+	}
+}
+
+func (m *VcenterVStorageObjectManager) DeleteSnapshotTask(ctx *Context, req *types.DeleteSnapshot_Task) soap.HasFault {
 	task := CreateTask(m, "deleteSnapshot", func(*Task) (types.AnyType, types.BaseMethodFault) {
 		obj := m.object(req.Datastore, req.Id)
 		if obj != nil {
@@ -318,7 +383,7 @@ func (m *VcenterVStorageObjectManager) DeleteSnapshotTask(req *types.DeleteSnaps
 
 	return &methods.DeleteSnapshot_TaskBody{
 		Res: &types.DeleteSnapshot_TaskResponse{
-			Returnval: task.Run(),
+			Returnval: task.Run(ctx),
 		},
 	}
 }

@@ -16,7 +16,11 @@ limitations under the License.
 
 package vpx
 
-import "github.com/vmware/govmomi/vim25/types"
+import (
+	"github.com/google/uuid"
+
+	"github.com/vmware/govmomi/vim25/types"
+)
 
 // ServiceContent is the default template for the ServiceInstance content property.
 // Capture method:
@@ -37,7 +41,7 @@ var ServiceContent = types.ServiceContent{
 		ProductLineId:         "vpx",
 		ApiType:               "VirtualCenter",
 		ApiVersion:            "6.5",
-		InstanceUuid:          "dbed6e0c-bd88-4ef6-b594-21283e1c677f",
+		InstanceUuid:          uuid.NewSHA1(uuid.NameSpaceOID, uuid.NodeID()).String(),
 		LicenseProductName:    "VMware VirtualCenter Server",
 		LicenseProductVersion: "6.0",
 	},

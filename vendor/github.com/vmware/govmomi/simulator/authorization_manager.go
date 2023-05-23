@@ -36,11 +36,12 @@ type AuthorizationManager struct {
 	nextID      int32
 }
 
-func NewAuthorizationManager(ref types.ManagedObjectReference) object.Reference {
-	m := &AuthorizationManager{}
-	m.Self = ref
-	m.RoleList = make([]types.AuthorizationRole, len(esx.RoleList))
-	copy(m.RoleList, esx.RoleList)
+func (m *AuthorizationManager) init(r *Registry) {
+	if len(m.RoleList) == 0 {
+		m.RoleList = make([]types.AuthorizationRole, len(esx.RoleList))
+		copy(m.RoleList, esx.RoleList)
+	}
+
 	m.permissions = make(map[types.ManagedObjectReference][]types.Permission)
 
 	l := object.AuthorizationRoleList(m.RoleList)
@@ -52,7 +53,7 @@ func NewAuthorizationManager(ref types.ManagedObjectReference) object.Reference 
 		m.privileges[id] = struct{}{}
 	}
 
-	root := Map.content().RootFolder
+	root := r.content().RootFolder
 
 	for _, u := range DefaultUserGroup {
 		m.permissions[root] = append(m.permissions[root], types.Permission{
@@ -63,8 +64,6 @@ func NewAuthorizationManager(ref types.ManagedObjectReference) object.Reference 
 			Propagate: true,
 		})
 	}
-
-	return m
 }
 
 func (m *AuthorizationManager) RetrieveEntityPermissions(req *types.RetrieveEntityPermissions) soap.HasFault {
@@ -144,6 +143,85 @@ func (m *AuthorizationManager) RetrieveRolePermissions(req *types.RetrieveRolePe
 
 	return &methods.RetrieveRolePermissionsBody{
 		Res: &types.RetrieveRolePermissionsResponse{
+			Returnval: p,
+		},
+	}
+}
+
+func (m *AuthorizationManager) HasPrivilegeOnEntities(req *types.HasPrivilegeOnEntities) soap.HasFault {
+	var p []types.EntityPrivilege
+
+	for _, e := range req.Entity {
+		priv := types.EntityPrivilege{Entity: e}
+
+		for _, id := range req.PrivId {
+			priv.PrivAvailability = append(priv.PrivAvailability, types.PrivilegeAvailability{
+				PrivId:    id,
+				IsGranted: true,
+			})
+		}
+
+		p = append(p, priv)
+	}
+
+	return &methods.HasPrivilegeOnEntitiesBody{
+		Res: &types.HasPrivilegeOnEntitiesResponse{
+			Returnval: p,
+		},
+	}
+}
+
+func (m *AuthorizationManager) HasPrivilegeOnEntity(req *types.HasPrivilegeOnEntity) soap.HasFault {
+	p := make([]bool, len(req.PrivId))
+
+	for i := range req.PrivId {
+		p[i] = true
+	}
+
+	return &methods.HasPrivilegeOnEntityBody{
+		Res: &types.HasPrivilegeOnEntityResponse{
+			Returnval: p,
+		},
+	}
+}
+
+func (m *AuthorizationManager) HasUserPrivilegeOnEntities(req *types.HasUserPrivilegeOnEntities) soap.HasFault {
+	var p []types.EntityPrivilege
+
+	for _, e := range req.Entities {
+		priv := types.EntityPrivilege{Entity: e}
+
+		for _, id := range req.PrivId {
+			priv.PrivAvailability = append(priv.PrivAvailability, types.PrivilegeAvailability{
+				PrivId:    id,
+				IsGranted: true,
+			})
+		}
+
+		p = append(p, priv)
+	}
+
+	return &methods.HasUserPrivilegeOnEntitiesBody{
+		Res: &types.HasUserPrivilegeOnEntitiesResponse{
+			Returnval: p,
+		},
+	}
+}
+
+func (m *AuthorizationManager) FetchUserPrivilegeOnEntities(req *types.FetchUserPrivilegeOnEntities) soap.HasFault {
+	admin := object.AuthorizationRoleList(m.RoleList).ByName("Admin").Privilege
+
+	var p []types.UserPrivilegeResult
+
+	for _, e := range req.Entities {
+		p = append(p, types.UserPrivilegeResult{
+			Entity:     e,
+			Privileges: admin,
+		})
+	}
+
+	return &methods.FetchUserPrivilegeOnEntitiesBody{
+		Res: &types.FetchUserPrivilegeOnEntitiesResponse{
 			Returnval: p,
 		},
 	}

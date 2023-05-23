@@ -21,6 +21,7 @@ import (
 	"crypto/sha1"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -187,12 +188,9 @@ func verifyWrappedX509UnkownAuthorityErr(t *testing.T, err error) {
 	if !ok {
 		t.Fatalf("Expected to receive an url.Error, got '%s' (%#v)", err.Error(), err)
 	}
-	x509Err, ok := urlErr.Err.(x509.UnknownAuthorityError)
-	if !ok {
-		t.Fatalf("Expected to receive a wrapped x509.UnknownAuthorityError, got: '%s' (%#v)", urlErr.Error(), urlErr)
-	}
-	if msg := x509Err.Error(); msg != "x509: certificate signed by unknown authority" {
-		t.Fatalf("Expected 'signed by unknown authority' error, got: '%s'", msg)
+	var x509err x509.UnknownAuthorityError
+	if !errors.As(urlErr.Err, &x509err) {
+		t.Fatalf("Expected to receive a wrapped x509.UnknownAuthorityError, got: '%s' (%#v)", urlErr.Err.Error(), urlErr.Err)
 	}
 }
 

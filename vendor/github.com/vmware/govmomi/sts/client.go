@@ -38,6 +38,8 @@ const (
 // Client is a soap.Client targeting the STS (Secure Token Service) API endpoint.
 type Client struct {
 	*soap.Client
+
+	RoundTripper soap.RoundTripper
 }
 
 // NewClient returns a client targeting the STS API endpoint.
@@ -48,7 +50,7 @@ func NewClient(ctx context.Context, c *vim25.Client) (*Client, error) {
 	filter := &types.LookupServiceRegistrationFilter{
 		ServiceType: &types.LookupServiceRegistrationServiceType{
 			Product: "com.vmware.cis",
-			Type:    "sso:sts",
+			Type:    "cs.identity",
 		},
 		EndpointType: &types.LookupServiceRegistrationEndpointType{
 			Protocol: "wsTrust",
@@ -59,11 +61,19 @@ func NewClient(ctx context.Context, c *vim25.Client) (*Client, error) {
 	url := lookup.EndpointURL(ctx, c, Path, filter)
 	sc := c.Client.NewServiceClient(url, Namespace)
 
-	return &Client{sc}, nil
+	return &Client{sc, sc}, nil
+}
+
+// RoundTrip dispatches to the RoundTripper field.
+func (c *Client) RoundTrip(ctx context.Context, req, res soap.HasFault) error {
+	return c.RoundTripper.RoundTrip(ctx, req, res)
 }
 
 // TokenRequest parameters for issuing a SAML token.
 // At least one of Userinfo or Certificate must be specified.
+// When `TokenRequest.Certificate` is set, the `tls.Certificate.PrivateKey` field must be set as it is required to sign the request.
+// When the `tls.Certificate.Certificate` field is not set, the request Assertion header is set to that of the TokenRequest.Token.
+// Otherwise `tls.Certificate.Certificate` is used as the BinarySecurityToken in the request.
 type TokenRequest struct {
 	Userinfo    *url.Userinfo    // Userinfo when set issues a Bearer token
 	Certificate *tls.Certificate // Certificate when set issues a HoK token
