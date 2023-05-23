@@ -121,6 +121,11 @@ func (s *SpdyRoundTripper) TLSClientConfig() *tls.Config {
 	return s.tlsConfig
 }
 
+// PingPeriod returns the period for sending Ping frames over established connections.
+func (s *SpdyRoundTripper) PingPeriod() time.Duration {
+	return s.pingPeriod
+}
+
 // Dial implements k8s.io/apimachinery/pkg/util/net.Dialer.
 func (s *SpdyRoundTripper) Dial(req *http.Request) (net.Conn, error) {
 	conn, err := s.dial(req)

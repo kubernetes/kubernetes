@@ -39,6 +39,7 @@ import (
 	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
+	clientgospdy "k8s.io/client-go/transport/spdy"
 )
 
 type AttachFunc func(in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan TerminalSize) error
@@ -425,4 +426,48 @@ func TestStreamRandomData(t *testing.T) {
 		t.Errorf("unexpected data received: %d sent: %d", len(data), len(randomData))
 	}
 
+}
+
+func TestNewSPDYExecutorUsesDefaultPingPeriod(t *testing.T) {
+	uri, _ := url.Parse("https://example.com")
+	exec, err := NewSPDYExecutor(&rest.Config{Host: uri.Host}, "POST", uri)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exec == nil {
+		t.Errorf("executor is nil")
+	}
+	actualPingPeriod := exec.(*streamExecutor).upgrader.(*spdy.SpdyRoundTripper).PingPeriod()
+	if actualPingPeriod != clientgospdy.DefaultPingPeriod {
+		t.Errorf("wrong ping period: expected %v, got %v", clientgospdy.DefaultPingPeriod, actualPingPeriod)
+	}
+}
+
+func TestNewSPDYExecutorWithPingUsesSpecifiedPingPeriod(t *testing.T) {
+	testCases := []struct {
+		Name       string
+		PingPeriod time.Duration
+	}{
+		{
+			Name:       "10s ping period",
+			PingPeriod: 10 * time.Second,
+		},
+		{
+			Name:       "0 ping period",
+			PingPeriod: 0,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			uri, _ := url.Parse("https://example.com")
+			exec, err := NewSPDYExecutorWithPing(&rest.Config{Host: uri.Host}, "POST", uri, tc.PingPeriod)
+			if err != nil {
+				t.Fatal(err)
+			}
+			actualPingPeriod := exec.(*streamExecutor).upgrader.(*spdy.SpdyRoundTripper).PingPeriod()
+			if actualPingPeriod != tc.PingPeriod {
+				t.Errorf("wrong ping period: expected %v, got %v", tc.PingPeriod, actualPingPeriod)
+			}
+		})
+	}
 }

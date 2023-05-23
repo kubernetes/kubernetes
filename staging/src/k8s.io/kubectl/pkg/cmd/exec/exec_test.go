@@ -25,6 +25,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,21 +34,23 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/client-go/tools/remotecommand"
-
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/term"
+	"k8s.io/utils/pointer"
 )
 
 type fakeRemoteExecutor struct {
-	method  string
-	url     *url.URL
-	execErr error
+	method     string
+	url        *url.URL
+	execErr    error
+	pingPeriod *time.Duration
 }
 
-func (f *fakeRemoteExecutor) Execute(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue remotecommand.TerminalSizeQueue) error {
+func (f *fakeRemoteExecutor) Execute(method string, url *url.URL, _ *restclient.Config, _ io.Reader, _, _ io.Writer, _ bool, _ remotecommand.TerminalSizeQueue, pingPeriod *time.Duration) error {
 	f.method = method
 	f.url = url
+	f.pingPeriod = pingPeriod
 	return f.execErr
 }
 
@@ -182,6 +185,7 @@ func TestExec(t *testing.T) {
 		name, version, podPath, fetchPodPath, execPath string
 		pod                                            *corev1.Pod
 		execErr                                        bool
+		pingPeriod                                     *time.Duration
 	}{
 		{
 			name:         "pod exec",
@@ -199,6 +203,24 @@ func TestExec(t *testing.T) {
 			execPath:     "/api/" + version + "/namespaces/test/pods/foo/exec",
 			pod:          execPod(),
 			execErr:      true,
+		},
+		{
+			name:         "pod exec with specified ping period",
+			version:      version,
+			podPath:      "/api/" + version + "/namespaces/test/pods/foo",
+			fetchPodPath: "/namespaces/test/pods/foo",
+			execPath:     "/api/" + version + "/namespaces/test/pods/foo/exec",
+			pod:          execPod(),
+			pingPeriod:   pointer.Duration(10 * time.Second),
+		},
+		{
+			name:         "pod exec with no pings",
+			version:      version,
+			podPath:      "/api/" + version + "/namespaces/test/pods/foo",
+			fetchPodPath: "/namespaces/test/pods/foo",
+			execPath:     "/api/" + version + "/namespaces/test/pods/foo/exec",
+			pod:          execPod(),
+			pingPeriod:   pointer.Duration(0),
 		},
 	}
 	for _, test := range tests {
@@ -239,6 +261,9 @@ func TestExec(t *testing.T) {
 				},
 				Executor: ex,
 			}
+			if test.pingPeriod != nil {
+				params.PingPeriod = test.pingPeriod
+			}
 			cmd := NewCmdExec(tf, genericiooptions.NewTestIOStreamsDiscard())
 			args := []string{"pod/foo", "command"}
 			if err := params.Complete(tf, cmd, args, -1); err != nil {
@@ -266,6 +291,9 @@ func TestExec(t *testing.T) {
 			}
 			if ex.method != "POST" {
 				t.Errorf("%s: Did not get method for exec request: %s", test.name, ex.method)
+			}
+			if ex.pingPeriod != test.pingPeriod {
+				t.Errorf("%s: Did not get expected ping period for exec request: %v", test.name, ex.pingPeriod)
 			}
 		})
 	}

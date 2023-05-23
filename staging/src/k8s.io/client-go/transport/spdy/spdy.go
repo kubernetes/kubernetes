@@ -25,7 +25,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
 )
+
+const DefaultPingPeriod = 5 * time.Second
 
 // Upgrader validates a response from the server after a SPDY upgrade.
 type Upgrader interface {
@@ -33,8 +36,13 @@ type Upgrader interface {
 	NewConnection(resp *http.Response) (httpstream.Connection, error)
 }
 
-// RoundTripperFor returns a round tripper and upgrader to use with SPDY.
+// RoundTripperFor returns a round tripper and upgrader, with the default ping period, to use with SPDY.
 func RoundTripperFor(config *restclient.Config) (http.RoundTripper, Upgrader, error) {
+	return RoundTripperWithPingFor(config, DefaultPingPeriod)
+}
+
+// RoundTripperWithPingFor returns a round tripper and upgrader, with the specified ping period, to use with SPDY.
+func RoundTripperWithPingFor(config *restclient.Config, pingPeriod time.Duration) (http.RoundTripper, Upgrader, error) {
 	tlsConfig, err := restclient.TLSConfigFor(config)
 	if err != nil {
 		return nil, nil, err
@@ -46,8 +54,13 @@ func RoundTripperFor(config *restclient.Config) (http.RoundTripper, Upgrader, er
 	upgradeRoundTripper := spdy.NewRoundTripperWithConfig(spdy.RoundTripperConfig{
 		TLS:        tlsConfig,
 		Proxier:    proxy,
-		PingPeriod: time.Second * 5,
+		PingPeriod: pingPeriod,
 	})
+	if pingPeriod == 0 {
+		klog.V(9).Info("SPDY keep-alive pings have been disabled")
+	} else {
+		klog.V(9).Infof("SPDY keep-alive ping interval is %v", pingPeriod)
+	}
 	wrapper, err := restclient.HTTPWrappersForConfig(config, upgradeRoundTripper)
 	if err != nil {
 		return nil, nil, err

@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
+	"k8s.io/utils/pointer"
 )
 
 var (
@@ -45,12 +46,13 @@ var (
 		#
 		# For advanced use cases, such as symlinks, wildcard expansion or
 		# file mode preservation, consider using 'kubectl exec'.
+		# --ping=0 (disable keep-alive pings) is recommended when copying files using 'kubectl exec' to ensure complete transmission.
 
 		# Copy /tmp/foo local file to /tmp/bar in a remote pod in namespace <some-namespace>
 		tar cf - /tmp/foo | kubectl exec -i -n <some-namespace> <some-pod> -- tar xf - -C /tmp/bar
 
 		# Copy /tmp/foo from a remote pod to /tmp/bar locally
-		kubectl exec -n <some-namespace> <some-pod> -- tar cf - /tmp/foo | tar xf - -C /tmp/bar
+		kubectl exec -n <some-namespace> <some-pod> --ping=0 -- tar cf - /tmp/foo | tar xf - -C /tmp/bar
 
 		# Copy /tmp/foo_dir local directory to /tmp/bar_dir in a remote pod in the default namespace
 		kubectl cp /tmp/foo_dir <some-pod>:/tmp/bar_dir
@@ -327,6 +329,10 @@ func (o *CopyOptions) copyToPod(src, dest fileSpec, options *exec.ExecOptions) e
 
 	options.Command = cmdArr
 	options.Executor = &exec.DefaultRemoteExecutor{}
+
+	// Ping is unnecessary for this command, because the connection will not be idle.
+	options.PingPeriod = pointer.Duration(0)
+
 	return o.execute(options)
 }
 
@@ -373,6 +379,11 @@ func (t *TarPipe) initReadFrom(n uint64) {
 
 		Command:  []string{"tar", "cf", "-", t.src.File.String()},
 		Executor: &exec.DefaultRemoteExecutor{},
+
+		// Ping is unnecessary for this command, because the connection will not be idle. It actually causes a problem
+		// when copying a large file from a remote container (see https://github.com/kubernetes/kubernetes/issues/60140).
+		// For this reason, ping is disabled by setting it to zero.
+		PingPeriod: pointer.Duration(0),
 	}
 	if t.o.MaxTries != 0 {
 		options.Command = []string{"sh", "-c", fmt.Sprintf("tar cf - %s | tail -c+%d", t.src.File, n)}

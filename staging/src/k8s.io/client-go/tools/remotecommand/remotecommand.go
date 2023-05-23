@@ -22,13 +22,13 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-
-	"k8s.io/klog/v2"
+	"time"
 
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/remotecommand"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport/spdy"
+	"k8s.io/klog/v2"
 )
 
 // StreamOptions holds information pertaining to the current streaming session:
@@ -75,9 +75,19 @@ type streamExecutor struct {
 }
 
 // NewSPDYExecutor connects to the provided server and upgrades the connection to
-// multiplexed bidirectional streams.
+// multiplexed bidirectional streams, using the default ping period.
 func NewSPDYExecutor(config *restclient.Config, method string, url *url.URL) (Executor, error) {
 	wrapper, upgradeRoundTripper, err := spdy.RoundTripperFor(config)
+	if err != nil {
+		return nil, err
+	}
+	return NewSPDYExecutorForTransports(wrapper, upgradeRoundTripper, method, url)
+}
+
+// NewSPDYExecutorWithPing connects to the provided server and upgrades the connection to
+// multiplexed bidirectional streams, using the specified ping period.
+func NewSPDYExecutorWithPing(config *restclient.Config, method string, url *url.URL, pingPeriod time.Duration) (Executor, error) {
+	wrapper, upgradeRoundTripper, err := spdy.RoundTripperWithPingFor(config, pingPeriod)
 	if err != nil {
 		return nil, err
 	}

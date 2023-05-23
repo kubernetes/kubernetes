@@ -25,7 +25,9 @@ import (
 
 	dockerterm "github.com/moby/term"
 	"github.com/spf13/cobra"
+
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
@@ -33,8 +35,6 @@ import (
 	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
-
-	"k8s.io/apimachinery/pkg/api/meta"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/util/podcmd"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubectl/pkg/util/interrupt"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubectl/pkg/util/term"
+	"k8s.io/utils/pointer"
 )
 
 var (
@@ -75,6 +76,7 @@ var (
 
 const (
 	defaultPodExecTimeout = 60 * time.Second
+	defaultPingPeriod     = 5 * time.Second
 )
 
 func NewCmdExec(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
@@ -83,7 +85,8 @@ func NewCmdExec(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Co
 			IOStreams: streams,
 		},
 
-		Executor: &DefaultRemoteExecutor{},
+		Executor:   &DefaultRemoteExecutor{},
+		PingPeriod: pointer.Duration(defaultPingPeriod),
 	}
 	cmd := &cobra.Command{
 		Use:                   "exec (POD | TYPE/NAME) [-c CONTAINER] [flags] -- COMMAND [args...]",
@@ -108,19 +111,26 @@ func NewCmdExec(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Co
 	cmd.Flags().BoolVarP(&options.Stdin, "stdin", "i", options.Stdin, "Pass stdin to the container")
 	cmd.Flags().BoolVarP(&options.TTY, "tty", "t", options.TTY, "Stdin is a TTY")
 	cmd.Flags().BoolVarP(&options.Quiet, "quiet", "q", options.Quiet, "Only print output from the remote session")
+	cmd.Flags().DurationVar(options.PingPeriod, "ping", *options.PingPeriod, "The keep-alive ping period, to prevent the connection from becoming idle (use 0 to disable keep-alive pings)")
 	return cmd
 }
 
 // RemoteExecutor defines the interface accepted by the Exec command - provided for test stubbing
 type RemoteExecutor interface {
-	Execute(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue remotecommand.TerminalSizeQueue) error
+	Execute(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue remotecommand.TerminalSizeQueue, pingPeriod *time.Duration) error
 }
 
 // DefaultRemoteExecutor is the standard implementation of remote command execution
 type DefaultRemoteExecutor struct{}
 
-func (*DefaultRemoteExecutor) Execute(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue remotecommand.TerminalSizeQueue) error {
-	exec, err := remotecommand.NewSPDYExecutor(config, method, url)
+func (*DefaultRemoteExecutor) Execute(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue remotecommand.TerminalSizeQueue, pingPeriod *time.Duration) error {
+	var exec remotecommand.Executor
+	var err error
+	if pingPeriod == nil {
+		exec, err = remotecommand.NewSPDYExecutor(config, method, url)
+	} else {
+		exec, err = remotecommand.NewSPDYExecutorWithPing(config, method, url, *pingPeriod)
+	}
 	if err != nil {
 		return err
 	}
@@ -169,6 +179,7 @@ type ExecOptions struct {
 	PodClient     coreclient.PodsGetter
 	GetPodTimeout time.Duration
 	Config        *restclient.Config
+	PingPeriod    *time.Duration
 }
 
 // Complete verifies command line arguments and loads data from the command environment
@@ -371,7 +382,7 @@ func (p *ExecOptions) Run() error {
 			TTY:       t.Raw,
 		}, scheme.ParameterCodec)
 
-		return p.Executor.Execute("POST", req.URL(), p.Config, p.In, p.Out, p.ErrOut, t.Raw, sizeQueue)
+		return p.Executor.Execute("POST", req.URL(), p.Config, p.In, p.Out, p.ErrOut, t.Raw, sizeQueue, p.PingPeriod)
 	}
 
 	if err := t.Safe(fn); err != nil {
