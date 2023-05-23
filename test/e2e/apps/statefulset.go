@@ -20,12 +20,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
@@ -1498,7 +1500,6 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ginkgo.By("Confirming 2 replicas, with start ordinal 0")
 			pods := e2estatefulset.GetPodList(ctx, c, ss)
-			e2estatefulset.SortStatefulPods(pods)
 			expectPodNames(pods, []string{"ss-0", "ss-1"})
 
 			ginkgo.By("Setting .spec.replicas = 3 .spec.ordinals.start = 2")
@@ -1514,7 +1515,6 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ginkgo.By("Confirming 3 replicas, with start ordinal 2")
 			pods = e2estatefulset.GetPodList(ctx, c, ss)
-			e2estatefulset.SortStatefulPods(pods)
 			expectPodNames(pods, []string{"ss-2", "ss-3", "ss-4"})
 		})
 
@@ -1532,7 +1532,6 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ginkgo.By("Confirming 2 replicas, with start ordinal 2")
 			pods := e2estatefulset.GetPodList(ctx, c, ss)
-			e2estatefulset.SortStatefulPods(pods)
 			expectPodNames(pods, []string{"ss-2", "ss-3"})
 
 			ginkgo.By("Increasing .spec.ordinals.start = 4")
@@ -1548,7 +1547,6 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ginkgo.By("Confirming 2 replicas, with start ordinal 4")
 			pods = e2estatefulset.GetPodList(ctx, c, ss)
-			e2estatefulset.SortStatefulPods(pods)
 			expectPodNames(pods, []string{"ss-4", "ss-5"})
 		})
 
@@ -1566,7 +1564,6 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ginkgo.By("Confirming 2 replicas, with start ordinal 3")
 			pods := e2estatefulset.GetPodList(ctx, c, ss)
-			e2estatefulset.SortStatefulPods(pods)
 			expectPodNames(pods, []string{"ss-3", "ss-4"})
 
 			ginkgo.By("Decreasing .spec.ordinals.start = 2")
@@ -1582,7 +1579,6 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ginkgo.By("Confirming 2 replicas, with start ordinal 2")
 			pods = e2estatefulset.GetPodList(ctx, c, ss)
-			e2estatefulset.SortStatefulPods(pods)
 			expectPodNames(pods, []string{"ss-2", "ss-3"})
 		})
 
@@ -1599,7 +1595,6 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ginkgo.By("Confirming 2 replicas, with start ordinal 3")
 			pods := e2estatefulset.GetPodList(ctx, c, ss)
-			e2estatefulset.SortStatefulPods(pods)
 			expectPodNames(pods, []string{"ss-3", "ss-4"})
 
 			ginkgo.By("Removing .spec.ordinals")
@@ -1612,7 +1607,6 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ginkgo.By("Confirming 2 replicas, with start ordinal 0")
 			pods = e2estatefulset.GetPodList(ctx, c, ss)
-			e2estatefulset.SortStatefulPods(pods)
 			expectPodNames(pods, []string{"ss-0", "ss-1"})
 		})
 	})
@@ -2177,9 +2171,21 @@ func verifyStatefulSetPVCsExistWithOwnerRefs(ctx context.Context, c clientset.In
 	})
 }
 
-func expectPodNames(pods *v1.PodList, expectedPodNames []string) {
-	framework.ExpectEqual(len(pods.Items), len(expectedPodNames), "unexpected number of pods")
-	for i, pod := range pods.Items {
-		framework.ExpectEqual(pod.Name, expectedPodNames[i], "unexpected pod name")
+// expectPodNames compares the names of the pods from actualPods with expectedPodNames.
+// actualPods can be in any list, since we'll sort by their ordinals and filter
+// active ones. expectedPodNames should be ordered by statefulset ordinals.
+func expectPodNames(actualPods *v1.PodList, expectedPodNames []string) {
+	e2estatefulset.SortStatefulPods(actualPods)
+	pods := []string{}
+	for _, pod := range actualPods.Items {
+		// ignore terminating pods, similarly to how the controller does it
+		// when calculating status information
+		if e2epod.IsPodActive(&pod) {
+			pods = append(pods, pod.Name)
+		}
+	}
+	if !reflect.DeepEqual(expectedPodNames, pods) {
+		diff := cmp.Diff(expectedPodNames, pods)
+		framework.Failf("Pod names don't match. Diff (- for expected, + for actual):\n%s", diff)
 	}
 }
