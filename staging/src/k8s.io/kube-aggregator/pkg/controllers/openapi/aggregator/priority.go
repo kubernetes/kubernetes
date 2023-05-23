@@ -18,56 +18,60 @@ package aggregator
 
 import (
 	"sort"
+
+	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 )
 
 // byPriority can be used in sort.Sort to sort specs with their priorities.
 type byPriority struct {
-	specs           []openAPISpecInfo
+	apiServices     []*apiregistrationv1.APIService
 	groupPriorities map[string]int32
 }
 
-func (a byPriority) Len() int      { return len(a.specs) }
-func (a byPriority) Swap(i, j int) { a.specs[i], a.specs[j] = a.specs[j], a.specs[i] }
+func (a byPriority) Len() int { return len(a.apiServices) }
+func (a byPriority) Swap(i, j int) {
+	a.apiServices[i], a.apiServices[j] = a.apiServices[j], a.apiServices[i]
+}
 func (a byPriority) Less(i, j int) bool {
 	// All local specs will come first
-	if a.specs[i].apiService.Spec.Service == nil && a.specs[j].apiService.Spec.Service != nil {
+	if a.apiServices[i].Spec.Service == nil && a.apiServices[j].Spec.Service != nil {
 		return true
 	}
-	if a.specs[i].apiService.Spec.Service != nil && a.specs[j].apiService.Spec.Service == nil {
+	if a.apiServices[i].Spec.Service != nil && a.apiServices[j].Spec.Service == nil {
 		return false
 	}
 	// WARNING: This will result in not following priorities for local APIServices.
-	if a.specs[i].apiService.Spec.Service == nil {
+	if a.apiServices[i].Spec.Service == nil {
 		// Sort local specs with their name. This is the order in the delegation chain (aggregator first).
-		return a.specs[i].apiService.Name < a.specs[j].apiService.Name
+		return a.apiServices[i].Name < a.apiServices[j].Name
 	}
 	var iPriority, jPriority int32
-	if a.specs[i].apiService.Spec.Group == a.specs[j].apiService.Spec.Group {
-		iPriority = a.specs[i].apiService.Spec.VersionPriority
-		jPriority = a.specs[i].apiService.Spec.VersionPriority
+	if a.apiServices[i].Spec.Group == a.apiServices[j].Spec.Group {
+		iPriority = a.apiServices[i].Spec.VersionPriority
+		jPriority = a.apiServices[i].Spec.VersionPriority
 	} else {
-		iPriority = a.groupPriorities[a.specs[i].apiService.Spec.Group]
-		jPriority = a.groupPriorities[a.specs[j].apiService.Spec.Group]
+		iPriority = a.groupPriorities[a.apiServices[i].Spec.Group]
+		jPriority = a.groupPriorities[a.apiServices[j].Spec.Group]
 	}
 	if iPriority != jPriority {
 		// Sort by priority, higher first
 		return iPriority > jPriority
 	}
 	// Sort by service name.
-	return a.specs[i].apiService.Name < a.specs[j].apiService.Name
+	return a.apiServices[i].Name < a.apiServices[j].Name
 }
 
-func sortByPriority(specs []openAPISpecInfo) {
+func sortByPriority(apiServices []*apiregistrationv1.APIService) {
 	b := byPriority{
-		specs:           specs,
+		apiServices:     apiServices,
 		groupPriorities: map[string]int32{},
 	}
-	for _, spec := range specs {
-		if spec.apiService.Spec.Service == nil {
+	for _, apiService := range apiServices {
+		if apiService.Spec.Service == nil {
 			continue
 		}
-		if pr, found := b.groupPriorities[spec.apiService.Spec.Group]; !found || spec.apiService.Spec.GroupPriorityMinimum > pr {
-			b.groupPriorities[spec.apiService.Spec.Group] = spec.apiService.Spec.GroupPriorityMinimum
+		if pr, found := b.groupPriorities[apiService.Spec.Group]; !found || apiService.Spec.GroupPriorityMinimum > pr {
+			b.groupPriorities[apiService.Spec.Group] = apiService.Spec.GroupPriorityMinimum
 		}
 	}
 	sort.Sort(b)
