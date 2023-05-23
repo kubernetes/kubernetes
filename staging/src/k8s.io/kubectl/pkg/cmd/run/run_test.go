@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	
+
 	"reflect"
 	"strconv"
 	"strings"
@@ -204,7 +204,7 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 			if err != nil && !test.expectError {
 				t.Errorf("unexpected error: %v", err)
 			}
-			
+
 		})
 	}
 }
