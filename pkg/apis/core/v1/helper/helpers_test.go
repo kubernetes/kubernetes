@@ -21,6 +21,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
@@ -803,6 +805,89 @@ func TestLoadBalancerStatusEqual(t *testing.T) {
 				t.Errorf("test %s failed. left input=%v, right input=%v, Got %v but expected %v",
 					tc.name, tc.left, tc.right, v, tc.expectVal)
 			}
+		})
+	}
+}
+
+func TestIsExtendedResourceName(t *testing.T) {
+	type testCase struct {
+		name     v1.ResourceName
+		expected bool
+	}
+
+	testCases := []testCase{
+		{
+			name:     "pod.alpha.kubernetes.io/opaque-int-resource-foo",
+			expected: false,
+		},
+		{
+			name:     "a/b",
+			expected: true,
+		},
+		{
+			name:     "a/",
+			expected: false,
+		},
+		{
+			name:     v1.DefaultResourceRequestsPrefix + "name",
+			expected: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(string(tc.name), func(t *testing.T) {
+			result := IsExtendedResourceName(tc.name)
+			if result != tc.expected {
+				t.Errorf("Expected %v for resource name %s, got %v", tc.expected, tc.name, result)
+			}
+		})
+	}
+}
+
+func TestIsHugePageResourceName(t *testing.T) {
+	tests := []struct {
+		name         string
+		resourceName v1.ResourceName
+		want         bool
+	}{
+		{
+			name:         "HugePageResourceName",
+			resourceName: v1.ResourceHugePagesPrefix + "2Mi",
+			want:         true,
+		},
+		{
+			name:         "NotHugePageResourceName",
+			resourceName: "2Mi",
+			want:         false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, tt.want, IsHugePageResourceName(tt.resourceName), "IsHugePageResourceName(%v)", tt.resourceName)
+		})
+	}
+}
+
+func TestIsAttachableVolumeResourceName(t *testing.T) {
+	tests := []struct {
+		name         string
+		resourceName v1.ResourceName
+		want         bool
+	}{
+		{
+			name:         "AttachableVolumeResourceName",
+			resourceName: v1.ResourceAttachableVolumesPrefix + "foo",
+			want:         true,
+		},
+		{
+			name:         "NotAttachableVolumeResourceName",
+			resourceName: "foo",
+			want:         false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, tt.want, IsAttachableVolumeResourceName(tt.resourceName), "IsAttachableVolumeResourceName(%v)", tt.resourceName)
 		})
 	}
 }
