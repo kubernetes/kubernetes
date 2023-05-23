@@ -78,12 +78,7 @@ var _ = utils.SIGDescribe("StaticPods [Feature:Kind]", func() {
 		}
 		pod, err := e2epod.CreateSecPod(ctx, f.ClientSet, podConfig, f.Timeouts.PodStart)
 		framework.ExpectNoError(err, "Creating a pod with a CSI volume")
-		ginkgo.DeferCleanup(func(ctx context.Context) {
-			if pod != nil {
-				err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{})
-				framework.ExpectNoError(err, "Deleting the pod with the CSI volume")
-			}
-		})
+		ginkgo.DeferCleanup(f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete, pod.Name, metav1.DeleteOptions{})
 
 		ginkgo.By("Stop the control plane by removing the static pod manifests")
 		err = stopControlPlane(ctx)
