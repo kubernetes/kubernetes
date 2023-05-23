@@ -362,7 +362,7 @@ users:
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "kube-controller-manager",
 		},
-		Paths: []string{"/configz", "/flagz", "/healthz", "/metrics"},
+		Paths: []string{"/configz", "/flagz", "/healthz", "/livez", "/metrics", "/readyz"},
 	}
 
 	flagzWantBodyStr := "kube-controller-manager flagz\nWarning: This endpoint is not meant to be machine parseable"

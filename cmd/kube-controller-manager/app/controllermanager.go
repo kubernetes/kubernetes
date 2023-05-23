@@ -21,6 +21,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -201,21 +202,36 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		logger.Error(err, "Unable to register configz")
 	}
 
-	// Setup any healthz checks we will want to use.
-	var checks []healthz.HealthChecker
+	// Setup any health checks we will want to use.
+	var healthzChecks, readyzChecks []healthz.HealthChecker
 	var electionChecker *leaderelection.HealthzAdaptor
 	if c.ComponentConfig.Generic.LeaderElection.LeaderElect {
 		electionChecker = leaderelection.NewLeaderHealthzAdaptor(time.Second * 20)
-		checks = append(checks, electionChecker)
+		healthzChecks = append(healthzChecks, electionChecker)
+		readyzChecks = append(readyzChecks, electionChecker)
 	}
-	healthzHandler := controllerhealthz.NewMutableHealthzHandler(checks...)
+	readyzChecks = append(readyzChecks, healthz.NewShutdownHealthz(ctx.Done()))
+
+	handlerSyncReadyCh := make(chan struct{})
+	handlerSyncCheck := healthz.NamedCheck("kcm-handler-sync", func(_ *http.Request) error {
+		select {
+		case <-handlerSyncReadyCh:
+			return nil
+		default:
+		}
+		return errors.New("waiting for handlers to sync")
+	})
+	readyzChecks = append(readyzChecks, handlerSyncCheck)
+
+	healthzHandler := controllerhealthz.NewMutableHealthzHandler(healthzChecks...)
 
 	// Start the controller manager HTTP server
 	// unsecuredMux is the handler for these controller *after* authn/authz filters have been applied
 	var unsecuredMux *mux.PathRecorderMux
 	if c.SecureServing != nil {
-		unsecuredMux = genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, healthzHandler)
+		unsecuredMux = genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, healthzChecks, readyzChecks)
 		slis.SLIMetricsWithReset{}.Install(unsecuredMux)
+
 		if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
 			if c.Flagz != nil {
 				flagz.Install(unsecuredMux, kubeControllerManager, c.Flagz)
@@ -263,6 +279,19 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		controllerContext.InformerFactory.Start(stopCh)
 		controllerContext.ObjectOrMetadataInformerFactory.Start(stopCh)
 		close(controllerContext.InformersStarted)
+
+		go func() {
+			allSynced := true
+			for typ, synced := range controllerContext.InformerFactory.WaitForCacheSync(stopCh) {
+				if !synced {
+					allSynced = false
+					logger.Error(nil, "informer failed to sync", "type", typ)
+				}
+			}
+			if allSynced {
+				close(handlerSyncReadyCh)
+			}
+		}()
 
 		// Actually start the controllers.
 		if len(controllers) > 0 {
