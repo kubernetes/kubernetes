@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/vmware/govmomi/internal"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/mo"
@@ -81,17 +82,17 @@ func (h HostSystem) ManagementIPs(ctx context.Context) ([]net.IP, error) {
 		return nil, err
 	}
 
-	var ips []net.IP
-	for _, nc := range mh.Config.VirtualNicManagerInfo.NetConfig {
-		if nc.NicType == "management" && len(nc.CandidateVnic) > 0 {
-			ip := net.ParseIP(nc.CandidateVnic[0].Spec.Ip.IpAddress)
-			if ip != nil {
-				ips = append(ips, ip)
-			}
-		}
+	config := mh.Config
+	if config == nil {
+		return nil, nil
 	}
 
-	return ips, nil
+	info := config.VirtualNicManagerInfo
+	if info == nil {
+		return nil, nil
+	}
+
+	return internal.HostSystemManagementIPs(info.NetConfig), nil
 }
 
 func (h HostSystem) Disconnect(ctx context.Context) (*Task, error) {

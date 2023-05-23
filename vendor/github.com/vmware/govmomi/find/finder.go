@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2014-2017 VMware, Inc. All Rights Reserved.
+Copyright (c) 2014-2020 VMware, Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,9 +22,11 @@ import (
 	"path"
 	"strings"
 
+	"github.com/vmware/govmomi/internal"
 	"github.com/vmware/govmomi/list"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/property"
+	"github.com/vmware/govmomi/view"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
@@ -38,14 +40,24 @@ type Finder struct {
 	folders *object.DatacenterFolders
 }
 
-func NewFinder(client *vim25.Client, all bool) *Finder {
+func NewFinder(client *vim25.Client, all ...bool) *Finder {
+	props := false
+	if len(all) == 1 {
+		props = all[0]
+	}
+
 	f := &Finder{
 		client: client,
 		si:     object.NewSearchIndex(client),
 		r: recurser{
 			Collector: property.DefaultCollector(client),
-			All:       all,
+			All:       props,
 		},
+	}
+
+	if len(all) == 0 {
+		// attempt to avoid SetDatacenter() requirement
+		f.dc, _ = f.DefaultDatacenter(context.Background())
 	}
 
 	return f
@@ -55,6 +67,18 @@ func (f *Finder) SetDatacenter(dc *object.Datacenter) *Finder {
 	f.dc = dc
 	f.folders = nil
 	return f
+}
+
+// InventoryPath composes the given object's inventory path.
+// There is no vSphere property or method that provides an inventory path directly.
+// This method uses the ManagedEntity.Parent field to determine the ancestry tree of the object and
+// the ManagedEntity.Name field for each ancestor to compose the path.
+func InventoryPath(ctx context.Context, client *vim25.Client, obj types.ManagedObjectReference) (string, error) {
+	entities, err := mo.Ancestors(ctx, client, client.ServiceContent.PropertyCollector, obj)
+	if err != nil {
+		return "", err
+	}
+	return internal.InventoryPath(entities), nil
 }
 
 // findRoot makes it possible to use "find" mode with a different root path.
@@ -93,8 +117,8 @@ func (f *Finder) find(ctx context.Context, arg string, s *spec) ([]list.Element,
 	isPath := strings.Contains(arg, "/")
 
 	root := list.Element{
-		Path:   "/",
 		Object: object.NewRootFolder(f.client),
+		Path:   "/",
 	}
 
 	parts := list.ToParts(arg)
@@ -109,19 +133,10 @@ func (f *Finder) find(ctx context.Context, arg string, s *spec) ([]list.Element,
 				return nil, err
 			}
 
-			mes, err := mo.Ancestors(ctx, f.client, f.client.ServiceContent.PropertyCollector, pivot.Reference())
+			root.Path, err = InventoryPath(ctx, f.client, pivot.Reference())
 			if err != nil {
 				return nil, err
 			}
-
-			for _, me := range mes {
-				// Skip root entity in building inventory path.
-				if me.Parent == nil {
-					continue
-				}
-				root.Path = path.Join(root.Path, me.Name)
-			}
-
 			root.Object = pivot
 			parts = parts[1:]
 		}
@@ -253,7 +268,7 @@ func (f *Finder) managedObjectList(ctx context.Context, path string, tl bool, in
 		fn = f.dcReference
 	}
 
-	if len(path) == 0 {
+	if path == "" {
 		path = "."
 	}
 
@@ -271,8 +286,7 @@ func (f *Finder) managedObjectList(ctx context.Context, path string, tl bool, in
 	return f.find(ctx, path, s)
 }
 
-// Element returns an Element for the given ManagedObjectReference
-// This method is only useful for looking up the InventoryPath of a ManagedObjectReference.
+// Element is deprecated, use InventoryPath() instead.
 func (f *Finder) Element(ctx context.Context, ref types.ManagedObjectReference) (*list.Element, error) {
 	rl := func(_ context.Context) (object.Reference, error) {
 		return ref, nil
@@ -301,7 +315,7 @@ func (f *Finder) Element(ctx context.Context, ref types.ManagedObjectReference) 
 // ObjectReference converts the given ManagedObjectReference to a type from the object package via object.NewReference
 // with the object.Common.InventoryPath field set.
 func (f *Finder) ObjectReference(ctx context.Context, ref types.ManagedObjectReference) (object.Reference, error) {
-	e, err := f.Element(ctx, ref)
+	path, err := InventoryPath(ctx, f.client, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -312,7 +326,7 @@ func (f *Finder) ObjectReference(ctx context.Context, ref types.ManagedObjectRef
 		SetInventoryPath(string)
 	}
 
-	r.(common).SetInventoryPath(e.Path)
+	r.(common).SetInventoryPath(path)
 
 	if f.dc != nil {
 		if ds, ok := r.(*object.Datastore); ok {
@@ -776,9 +790,26 @@ func (f *Finder) NetworkList(ctx context.Context, path string) ([]object.Network
 	return ns, nil
 }
 
+// Network finds a NetworkReference using a Name, Inventory Path, ManagedObject ID, Logical Switch UUID or Segment ID.
+// With standard vSphere networking, Portgroups cannot have the same name within the same network folder.
+// With NSX, Portgroups can have the same name, even within the same Switch. In this case, using an inventory path
+// results in a MultipleFoundError. A MOID, switch UUID or segment ID can be used instead, as both are unique.
+// See also: https://kb.vmware.com/s/article/79872#Duplicate_names
+// Examples:
+// - Name:                "dvpg-1"
+// - Inventory Path:      "vds-1/dvpg-1"
+// - ManagedObject ID:    "DistributedVirtualPortgroup:dvportgroup-53"
+// - Logical Switch UUID: "da2a59b8-2450-4cb2-b5cc-79c4c1d2144c"
+// - Segment ID:          "/infra/segments/vnet_ce50e69b-1784-4a14-9206-ffd7f1f146f7"
 func (f *Finder) Network(ctx context.Context, path string) (object.NetworkReference, error) {
 	networks, err := f.NetworkList(ctx, path)
 	if err != nil {
+		if _, ok := err.(*NotFoundError); ok {
+			net, nerr := f.networkByID(ctx, path)
+			if nerr == nil {
+				return net, nil
+			}
+		}
 		return nil, err
 	}
 
@@ -787,6 +818,41 @@ func (f *Finder) Network(ctx context.Context, path string) (object.NetworkRefere
 	}
 
 	return networks[0], nil
+}
+
+func (f *Finder) networkByID(ctx context.Context, path string) (object.NetworkReference, error) {
+	if ref := object.ReferenceFromString(path); ref != nil {
+		// This is a MOID
+		return object.NewReference(f.client, *ref).(object.NetworkReference), nil
+	}
+
+	kind := []string{"DistributedVirtualPortgroup"}
+
+	m := view.NewManager(f.client)
+	v, err := m.CreateContainerView(ctx, f.client.ServiceContent.RootFolder, kind, true)
+	if err != nil {
+		return nil, err
+	}
+	defer v.Destroy(ctx)
+
+	filter := property.Filter{
+		"config.logicalSwitchUuid": path,
+		"config.segmentId":         path,
+	}
+
+	refs, err := v.FindAny(ctx, kind, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(refs) == 0 {
+		return nil, &NotFoundError{"network", path}
+	}
+	if len(refs) > 1 {
+		return nil, &MultipleFoundError{"network", path}
+	}
+
+	return object.NewReference(f.client, refs[0]).(object.NetworkReference), nil
 }
 
 func (f *Finder) DefaultNetwork(ctx context.Context) (object.NetworkReference, error) {
