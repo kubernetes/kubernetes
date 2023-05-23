@@ -33,6 +33,7 @@ const (
 	OldObjectVarName                 = "oldObject"
 	ParamsVarName                    = "params"
 	RequestVarName                   = "request"
+	NamespaceVarName                 = "namespaceObject"
 	AuthorizerVarName                = "authorizer"
 	RequestResourceAuthorizerVarName = "authorizer.requestResource"
 	VariableVarName                  = "variables"
@@ -183,6 +184,7 @@ func mustBuildEnvs(baseEnv *environment.EnvSet) variableDeclEnvs {
 			envOpts = append(envOpts,
 				cel.Variable(ObjectVarName, cel.DynType),
 				cel.Variable(OldObjectVarName, cel.DynType),
+				cel.Variable(NamespaceVarName, cel.DynType),
 				cel.Variable(RequestVarName, requestType.CelType()))
 
 			extended, err := baseEnv.Extend(

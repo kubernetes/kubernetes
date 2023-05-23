@@ -77,7 +77,7 @@ func (m *matcher) Match(ctx context.Context, versionedAttr *admission.VersionedA
 	evalResults, _, err := m.filter.ForInput(ctx, versionedAttr, celplugin.CreateAdmissionRequest(versionedAttr.Attributes), celplugin.OptionalVariableBindings{
 		VersionedParams: versionedParams,
 		Authorizer:      authz,
-	}, celconfig.RuntimeCELCostBudgetMatchConditions)
+	}, nil, celconfig.RuntimeCELCostBudgetMatchConditions)
 
 	if err != nil {
 		// filter returning error is unexpected and not an evaluation error so not incrementing metric here

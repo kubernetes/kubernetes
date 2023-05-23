@@ -50,6 +50,11 @@ func TestCompileValidatingPolicyExpression(t *testing.T) {
 			hasParams:   true,
 		},
 		{
+			name:        "namespaceObject",
+			expressions: []string{"namespaceObject.metadata.name.startsWith('test')"},
+			hasParams:   true,
+		},
+		{
 			name:             "without params",
 			errorExpressions: map[string]string{"object.foo < params.x": "undeclared reference to 'params'"},
 			hasParams:        false,

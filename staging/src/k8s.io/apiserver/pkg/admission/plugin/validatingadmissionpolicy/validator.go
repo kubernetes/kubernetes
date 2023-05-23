@@ -24,6 +24,7 @@ import (
 	celtypes "github.com/google/cel-go/common/types"
 
 	v1 "k8s.io/api/admissionregistration/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
@@ -70,7 +71,8 @@ func auditAnnotationEvaluationForError(f v1.FailurePolicyType) PolicyAuditAnnota
 
 // Validate takes a list of Evaluation and a failure policy and converts them into actionable PolicyDecisions
 // runtimeCELCostBudget was added for testing purpose only. Callers should always use const RuntimeCELCostBudget from k8s.io/apiserver/pkg/apis/cel/config.go as input.
-func (v *validator) Validate(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
+
+func (v *validator) Validate(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *corev1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
 	var f v1.FailurePolicyType
 	if v.failPolicy == nil {
 		f = v1.Fail
@@ -101,7 +103,7 @@ func (v *validator) Validate(ctx context.Context, versionedAttr *admission.Versi
 	optionalVars := cel.OptionalVariableBindings{VersionedParams: versionedParams, Authorizer: authz}
 	expressionOptionalVars := cel.OptionalVariableBindings{VersionedParams: versionedParams}
 	admissionRequest := cel.CreateAdmissionRequest(versionedAttr.Attributes)
-	evalResults, remainingBudget, err := v.validationFilter.ForInput(ctx, versionedAttr, admissionRequest, optionalVars, runtimeCELCostBudget)
+	evalResults, remainingBudget, err := v.validationFilter.ForInput(ctx, versionedAttr, admissionRequest, optionalVars, namespace, runtimeCELCostBudget)
 	if err != nil {
 		return ValidateResult{
 			Decisions: []PolicyDecision{
@@ -114,7 +116,7 @@ func (v *validator) Validate(ctx context.Context, versionedAttr *admission.Versi
 		}
 	}
 	decisions := make([]PolicyDecision, len(evalResults))
-	messageResults, _, err := v.messageFilter.ForInput(ctx, versionedAttr, admissionRequest, expressionOptionalVars, remainingBudget)
+	messageResults, _, err := v.messageFilter.ForInput(ctx, versionedAttr, admissionRequest, expressionOptionalVars, namespace, remainingBudget)
 	for i, evalResult := range evalResults {
 		var decision = &decisions[i]
 		// TODO: move this to generics
@@ -191,7 +193,7 @@ func (v *validator) Validate(ctx context.Context, versionedAttr *admission.Versi
 	}
 
 	options := cel.OptionalVariableBindings{VersionedParams: versionedParams}
-	auditAnnotationEvalResults, _, err := v.auditAnnotationFilter.ForInput(ctx, versionedAttr, cel.CreateAdmissionRequest(versionedAttr.Attributes), options, runtimeCELCostBudget)
+	auditAnnotationEvalResults, _, err := v.auditAnnotationFilter.ForInput(ctx, versionedAttr, cel.CreateAdmissionRequest(versionedAttr.Attributes), options, namespace, runtimeCELCostBudget)
 	if err != nil {
 		return ValidateResult{
 			Decisions: []PolicyDecision{

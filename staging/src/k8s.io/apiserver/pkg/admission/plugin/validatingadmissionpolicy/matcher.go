@@ -18,6 +18,7 @@ package validatingadmissionpolicy
 
 import (
 	"k8s.io/api/admissionregistration/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -75,4 +76,8 @@ func (c *matcher) BindingMatches(a admission.Attributes, o admission.ObjectInter
 	criteria := matchCriteria{constraints: binding.Spec.MatchResources}
 	isMatch, _, err := c.Matcher.Matches(a, o, &criteria)
 	return isMatch, err
+}
+
+func (c *matcher) GetNamespace(name string) (*corev1.Namespace, error) {
+	return c.Matcher.GetNamespace(name)
 }

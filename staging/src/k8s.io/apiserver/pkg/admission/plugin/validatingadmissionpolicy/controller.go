@@ -320,6 +320,12 @@ func (c *celAdmissionController) Validate(
 				}
 			}
 
+			namespace, err := c.policyController.matcher.GetNamespace(a.GetNamespace())
+			// if it is cluster scoped, namespace will be null
+			if err != nil {
+				namespace = nil
+			}
+
 			if versionedAttr == nil {
 				va, err := admission.NewVersionedAttributes(a, matchKind, o)
 				if err != nil {
@@ -330,7 +336,7 @@ func (c *celAdmissionController) Validate(
 				versionedAttr = va
 			}
 
-			validationResult := bindingInfo.validator.Validate(ctx, versionedAttr, param, celconfig.RuntimeCELCostBudget, authz)
+			validationResult := bindingInfo.validator.Validate(ctx, versionedAttr, param, namespace, celconfig.RuntimeCELCostBudget, authz)
 
 			for i, decision := range validationResult.Decisions {
 				switch decision.Action {
