@@ -32,7 +32,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/util/managedfields/managedfieldstest"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/openapi"
+	"k8s.io/client-go/openapi/openapitest"
 )
 
 func getArbitraryResource(s schema.GroupVersionResource, name, namespace string) *unstructured.Unstructured {
@@ -273,6 +277,51 @@ func TestPatchWithMissingObject(t *testing.T) {
 	assert.True(t, handled)
 	assert.Nil(t, node)
 	assert.EqualError(t, err, `nodes "node-1" not found`)
+}
+
+func TestApply(t *testing.T) {
+	configmap := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configmaps"}
+
+	scheme := runtime.NewScheme()
+	codecs := serializer.NewCodecFactory(scheme)
+	tc, err := openapi.NewTypeConverter(openapitest.NewEmbeddedFileClient(), false)
+	if err != nil {
+		t.Fatalf("Failed to create TypeConverter: %v", err)
+	}
+	fieldManager := managedfieldstest.NewFakeFieldManager(tc, schema.GroupVersionKind{Version: "v1", Kind: "ConfigMap"})
+	if err != nil {
+		t.Fatalf("Failed to create fieldmanager: %v", err)
+	}
+	o := NewObjectTrackerWithFieldManager(scheme, codecs.UniversalDecoder(), fieldManager)
+	reaction := ObjectReaction(o)
+
+	// First, create the object with server-side apply
+	action := NewApplyAction(configmap, "default", "cm-1", []byte(`{"kind": "ConfigMap", "apiVersion": "v1", "metadata": {"name": "cm-1"}, "data": {"one": "one", "two": "two"}}`), "manager", false)
+	handled, cm, err := reaction(action)
+	assert.True(t, handled)
+	assert.Nil(t, err)
+
+	// Second, run an update that changes a field
+	u := unstructured.Unstructured{}
+	assert.Nil(t, json.Unmarshal([]byte(`{"kind": "ConfigMap", "apiVersion": "v1", "metadata": {"name": "cm-1"}, "data": {"one": "one", "two": "three"}}`), &u.Object))
+	uaction := NewUpdateAction(configmap, "default", &u)
+	handled, cm, err = reaction(uaction)
+	assert.True(t, handled)
+	assert.Nil(t, err)
+	assert.NotNil(t, cm)
+
+	// Third, apply and get a conflict
+	action = NewApplyAction(configmap, "default", "cm-1", []byte(`{"kind": "ConfigMap", "apiVersion": "v1", "metadata": {"name": "cm-1"}, "data": {"one": "one", "two": "two"}}`), "manager", false)
+	handled, cm, err = reaction(action)
+	assert.True(t, handled)
+	assert.Errorf(t, err, "Apply failed with 1 conflict: conflict with \"test-manager\" using v1: .data.two")
+
+	// Fourth, force-apply and override the conflict
+	action = NewApplyAction(configmap, "default", "cm-1", []byte(`{"kind": "ConfigMap", "apiVersion": "v1", "metadata": {"name": "cm-1"}, "data": {"one": "one", "two": "two"}}`), "manager", true)
+	handled, cm, err = reaction(action)
+	assert.True(t, handled)
+	assert.Nil(t, err)
+	assert.NotNil(t, cm)
 }
 
 func TestGetWithExactMatch(t *testing.T) {

@@ -201,6 +201,62 @@ func NewPatchSubresourceAction(resource schema.GroupVersionResource, namespace, 
 	return action
 }
 
+func NewRootApplyAction(resource schema.GroupVersionResource, name string, patch []byte, manager string, force bool) ApplyActionImpl {
+	action := ApplyActionImpl{}
+	action.Verb = "patch"
+	action.Resource = resource
+	action.Name = name
+	action.PatchType = types.ApplyPatchType
+	action.Patch = patch
+	action.Manager = manager
+	action.Force = force
+
+	return action
+}
+
+func NewApplyAction(resource schema.GroupVersionResource, namespace string, name string, patch []byte, manager string, force bool) ApplyActionImpl {
+	action := ApplyActionImpl{}
+	action.Verb = "patch"
+	action.Resource = resource
+	action.Namespace = namespace
+	action.Name = name
+	action.PatchType = types.ApplyPatchType
+	action.Patch = patch
+	action.Manager = manager
+	action.Force = force
+
+	return action
+}
+
+func NewRootApplySubresourceAction(resource schema.GroupVersionResource, name string, patch []byte, manager string, force bool, subresources ...string) ApplyActionImpl {
+	action := ApplyActionImpl{}
+	action.Verb = "patch"
+	action.Resource = resource
+	action.Subresource = path.Join(subresources...)
+	action.Name = name
+	action.PatchType = types.ApplyPatchType
+	action.Patch = patch
+	action.Manager = manager
+	action.Force = force
+
+	return action
+}
+
+func NewApplySubresourceAction(resource schema.GroupVersionResource, namespace string, name string, patch []byte, manager string, force bool, subresources ...string) ApplyActionImpl {
+	action := ApplyActionImpl{}
+	action.Verb = "patch"
+	action.Resource = resource
+	action.Subresource = path.Join(subresources...)
+	action.Namespace = namespace
+	action.Name = name
+	action.PatchType = types.ApplyPatchType
+	action.Patch = patch
+	action.Manager = manager
+	action.Force = force
+
+	return action
+}
+
 func NewRootUpdateSubresourceAction(resource schema.GroupVersionResource, subresource string, object runtime.Object) UpdateActionImpl {
 	action := UpdateActionImpl{}
 	action.Verb = "update"
@@ -416,6 +472,12 @@ type PatchAction interface {
 	GetPatch() []byte
 }
 
+type ApplyAction interface {
+	PatchAction
+	Force() bool
+	Manager() string
+}
+
 type WatchAction interface {
 	Action
 	GetWatchRestrictions() WatchRestrictions
@@ -589,6 +651,28 @@ func (a PatchActionImpl) DeepCopy() Action {
 		Name:       a.Name,
 		PatchType:  a.PatchType,
 		Patch:      patch,
+	}
+}
+
+type ApplyActionImpl struct {
+	PatchActionImpl
+	Force   bool
+	Manager string
+}
+
+func (a ApplyActionImpl) GetForce() bool {
+	return a.Force
+}
+
+func (a ApplyActionImpl) GetManager() string {
+	return a.Manager
+}
+
+func (a ApplyActionImpl) DeepCopy() Action {
+	return ApplyActionImpl{
+		PatchActionImpl: a.PatchActionImpl.DeepCopy().(PatchActionImpl),
+		Manager:         a.Manager,
+		Force:           a.Force,
 	}
 }
 

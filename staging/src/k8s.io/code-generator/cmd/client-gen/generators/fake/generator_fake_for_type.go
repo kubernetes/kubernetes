@@ -146,6 +146,10 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 		"NewPatchAction":                 c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewPatchAction"}),
 		"NewRootPatchSubresourceAction":  c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewRootPatchSubresourceAction"}),
 		"NewPatchSubresourceAction":      c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewPatchSubresourceAction"}),
+		"NewRootApplyAction":             c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewRootApplyAction"}),
+		"NewApplyAction":                 c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewApplyAction"}),
+		"NewRootApplySubresourceAction":  c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewRootApplySubresourceAction"}),
+		"NewApplySubresourceAction":      c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewApplySubresourceAction"}),
 		"ExtractFromListOptions":         c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "ExtractFromListOptions"}),
 	}
 
@@ -509,13 +513,19 @@ func (c *Fake$.type|publicPlural$) Apply(ctx context.Context, $.inputType|privat
 	if err != nil {
 		return nil, err
 	}
-    name := $.inputType|private$.Name
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
+	name := $.inputType|private$.Name
 	if name == nil {
 		return nil, fmt.Errorf("$.inputType|private$.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		$if .namespaced$Invokes($.NewPatchSubresourceAction|raw$($.type|allLowercasePlural$Resource, c.ns, *name, $.ApplyPatchType|raw$, data), &$.resultType|raw${})
-		$else$Invokes($.NewRootPatchSubresourceAction|raw$($.type|allLowercasePlural$Resource, *name, $.ApplyPatchType|raw$, data), &$.resultType|raw${})$end$
+		$if .namespaced$Invokes($.NewApplySubresourceAction|raw$($.type|allLowercasePlural$Resource, c.ns, *name, data, manager, opts.Force), &$.resultType|raw${})
+		$else$Invokes($.NewRootApplySubresourceAction|raw$($.type|allLowercasePlural$Resource, *name, data, manager, opts.Force), &$.resultType|raw${})$end$
 	if obj == nil {
 		return nil, err
 	}
@@ -534,13 +544,19 @@ func (c *Fake$.type|publicPlural$) ApplyStatus(ctx context.Context, $.inputType|
 	if err != nil {
 		return nil, err
 	}
-    name := $.inputType|private$.Name
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
+	name := $.inputType|private$.Name
 	if name == nil {
 		return nil, fmt.Errorf("$.inputType|private$.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		$if .namespaced$Invokes($.NewPatchSubresourceAction|raw$($.type|allLowercasePlural$Resource, c.ns, *name, $.ApplyPatchType|raw$, data, "status"), &$.resultType|raw${})
-		$else$Invokes($.NewRootPatchSubresourceAction|raw$($.type|allLowercasePlural$Resource, *name, $.ApplyPatchType|raw$, data, "status"), &$.resultType|raw${})$end$
+		$if .namespaced$Invokes($.NewApplySubresourceAction|raw$($.type|allLowercasePlural$Resource, c.ns, *name, data, manager, opts.Force, "status"), &$.resultType|raw${})
+		$else$Invokes($.NewRootApplySubresourceAction|raw$($.type|allLowercasePlural$Resource, *name, data, manager, opts.Force, "status"), &$.resultType|raw${})$end$
 	if obj == nil {
 		return nil, err
 	}
@@ -559,9 +575,15 @@ func (c *Fake$.type|publicPlural$) Apply(ctx context.Context, $.type|private$Nam
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	obj, err := c.Fake.
-		$if .namespaced$Invokes($.NewPatchSubresourceAction|raw$($.type|allLowercasePlural$Resource, c.ns, $.type|private$Name, $.ApplyPatchType|raw$, data, "status"), &$.resultType|raw${})
-		$else$Invokes($.NewRootPatchSubresourceAction|raw$($.type|allLowercasePlural$Resource, $.type|private$Name, $.ApplyPatchType|raw$, data, "status"), &$.resultType|raw${})$end$
+		$if .namespaced$Invokes($.NewApplySubresourceAction|raw$($.type|allLowercasePlural$Resource, c.ns, $.type|private$Name, data, manager, opts.Force, "status"), &$.resultType|raw${})
+		$else$Invokes($.NewRootApplySubresourceAction|raw$($.type|allLowercasePlural$Resource, $.type|private$Name, data, manager, opts.Force, "status"), &$.resultType|raw${})$end$
 	if obj == nil {
 		return nil, err
 	}

@@ -26,13 +26,17 @@ import (
 	jsonpatch "github.com/evanphx/json-patch"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apimachinery/pkg/watch"
 	restclient "k8s.io/client-go/rest"
 )
@@ -53,6 +57,10 @@ type ObjectTracker interface {
 
 	// Update updates an existing object in the tracker in the specified namespace.
 	Update(gvr schema.GroupVersionResource, obj runtime.Object, ns string) error
+
+	// Apply runs server-side apply against an existing object, or
+	// creates it, in the specified namespace.
+	Apply(gvr schema.GroupVersionResource, obj, config runtime.Object, ns string, manager string, force bool) error
 
 	// List retrieves all objects of a given kind in the given
 	// namespace. Only non-List kinds are accepted.
@@ -142,6 +150,28 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 			}
 			return true, nil, nil
 
+		// Check for Apply before Patch because Apply is made of Patch.
+		case ApplyActionImpl:
+			if action.GetSubresource() != "" {
+				return true, nil, errors.NewBadRequest(fmt.Sprintf("sub-resources are not supported yet."))
+			}
+			patchObj := &unstructured.Unstructured{Object: map[string]interface{}{}}
+			if err := yaml.Unmarshal(action.GetPatch(), &patchObj.Object); err != nil {
+				return true, nil, errors.NewBadRequest(fmt.Sprintf("error decoding YAML: %v", err))
+			}
+
+			obj, err := tracker.Get(gvr, ns, action.GetName())
+			if err != nil && !apierrors.IsNotFound(err) {
+				return true, nil, err
+			}
+			// if the object was not found, then use nil for the object.
+			err = tracker.Apply(gvr, obj, patchObj, ns, action.GetManager(), action.GetForce())
+			if err != nil {
+				return true, nil, err
+			}
+			obj, err = tracker.Get(gvr, ns, action.GetName())
+			return true, obj, err
+
 		case PatchActionImpl:
 			obj, err := tracker.Get(gvr, ns, action.GetName())
 			if err != nil {
@@ -181,7 +211,7 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 				if err := json.Unmarshal(modified, obj); err != nil {
 					return true, nil, err
 				}
-			case types.StrategicMergePatchType, types.ApplyPatchType:
+			case types.StrategicMergePatchType:
 				mergedByte, err := strategicpatch.StrategicMergePatch(old, action.GetPatch(), obj)
 				if err != nil {
 					return true, nil, err
@@ -189,6 +219,8 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 				if err = json.Unmarshal(mergedByte, obj); err != nil {
 					return true, nil, err
 				}
+			case types.ApplyPatchType:
+				return true, nil, errors.NewBadRequest("Action should be of type ApplyActionImpl for Apply")
 			default:
 				return true, nil, fmt.Errorf("PatchType is not supported")
 			}
@@ -215,7 +247,8 @@ type tracker struct {
 	// Manipulations on resources will broadcast the notification events into the
 	// watchers' channel. Note that too many unhandled events (currently 100,
 	// see apimachinery/pkg/watch.DefaultChanSize) will cause a panic.
-	watchers map[schema.GroupVersionResource]map[string][]*watch.RaceFreeFakeWatcher
+	watchers     map[schema.GroupVersionResource]map[string][]*watch.RaceFreeFakeWatcher
+	fieldManager *managedfields.FieldManager
 }
 
 var _ ObjectTracker = &tracker{}
@@ -223,11 +256,16 @@ var _ ObjectTracker = &tracker{}
 // NewObjectTracker returns an ObjectTracker that can be used to keep track
 // of objects for the fake clientset. Mostly useful for unit tests.
 func NewObjectTracker(scheme ObjectScheme, decoder runtime.Decoder) ObjectTracker {
+	return NewObjectTrackerWithFieldManager(scheme, decoder, nil)
+}
+
+func NewObjectTrackerWithFieldManager(scheme ObjectScheme, decoder runtime.Decoder, fieldManager *managedfields.FieldManager) ObjectTracker {
 	return &tracker{
-		scheme:   scheme,
-		decoder:  decoder,
-		objects:  make(map[schema.GroupVersionResource]map[types.NamespacedName]runtime.Object),
-		watchers: make(map[schema.GroupVersionResource]map[string][]*watch.RaceFreeFakeWatcher),
+		scheme:       scheme,
+		decoder:      decoder,
+		objects:      make(map[schema.GroupVersionResource]map[types.NamespacedName]runtime.Object),
+		watchers:     make(map[schema.GroupVersionResource]map[string][]*watch.RaceFreeFakeWatcher),
+		fieldManager: fieldManager,
 	}
 }
 
@@ -352,12 +390,94 @@ func (t *tracker) Add(obj runtime.Object) error {
 	return nil
 }
 
+func (t *tracker) trackFields(obj, newObj runtime.Object, manager string) error {
+	if t.fieldManager == nil {
+		// Do nothing if we don't have a field manager.
+		return nil
+	}
+
+	// Get the version off of the newObj
+	updObj, err := t.fieldManager.Update(obj, newObj, manager)
+	if err != nil {
+		return err
+	}
+
+	return setObject(obj, updObj.(*unstructured.Unstructured))
+	// transform the object
+}
+
 func (t *tracker) Create(gvr schema.GroupVersionResource, obj runtime.Object, ns string) error {
+	emptyObj := obj.DeepCopyObject()
+
+	// Empty the copy of the object.
+	value := reflect.ValueOf(emptyObj)
+	value.Elem().Set(reflect.New(value.Type().Elem()).Elem())
+
+	if err := t.trackFields(emptyObj, obj, "test-manager"); err != nil {
+		return err
+	}
+
 	return t.add(gvr, obj, ns, false)
 }
 
 func (t *tracker) Update(gvr schema.GroupVersionResource, obj runtime.Object, ns string) error {
+	objMeta, err := meta.Accessor(obj)
+	if err != nil {
+		return err
+	}
+	orig, err := t.Get(gvr, ns, objMeta.GetName())
+	if err != nil {
+		return err
+	}
+	if err := t.trackFields(orig, obj, "test-manager"); err != nil {
+		return err
+	}
+
 	return t.add(gvr, obj, ns, true)
+}
+
+func (t *tracker) Apply(gvr schema.GroupVersionResource, obj, patch runtime.Object, ns string, manager string, force bool) error {
+	if t.fieldManager == nil {
+		panic("FieldManager should be installed in test to use Apply")
+	}
+
+	// Whether we should create the new object or not.
+	replace := obj != nil
+
+	if obj == nil {
+		// Create an empty object as the base object.
+		obj = patch.DeepCopyObject()
+		emptyObject(obj)
+		obj.GetObjectKind().SetGroupVersionKind(patch.GetObjectKind().GroupVersionKind())
+	}
+
+	newObj, err := t.fieldManager.Apply(obj, patch, manager, force)
+	if err != nil {
+		return err
+	}
+
+	// We need to get back the same underlying type of object as was
+	// given in, so we need to put the result back into obj. Reset
+	// it first.
+	if err := setObject(obj, newObj.(*unstructured.Unstructured)); err != nil {
+		return err
+	}
+
+	fmt.Printf("Final object after apply: %v\n", obj)
+
+	return t.add(gvr, obj, ns, replace)
+}
+
+func emptyObject(obj runtime.Object) {
+	v := reflect.ValueOf(obj)
+	v.Elem().Set(reflect.New(v.Type().Elem()).Elem())
+}
+
+// Convert the newObj into the actual type of obj.
+func setObject(obj runtime.Object, value *unstructured.Unstructured) error {
+	// Empty the object, v is just temporary.
+	emptyObject(obj)
+	return runtime.DefaultUnstructuredConverter.FromUnstructured(value.Object, obj)
 }
 
 func (t *tracker) getWatches(gvr schema.GroupVersionResource, ns string) []*watch.RaceFreeFakeWatcher {
