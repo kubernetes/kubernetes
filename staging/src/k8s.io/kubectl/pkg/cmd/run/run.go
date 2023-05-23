@@ -123,7 +123,6 @@ type RunFlags struct {
 	Namespace        string
 	EnforceNamespace bool
 
-
 	genericiooptions.IOStreams
 }
 
@@ -173,7 +172,7 @@ func NewRunFlags(streams genericiooptions.IOStreams) *RunFlags {
 }
 
 func NewCmdRun(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
-	flags := NewRunFlags(streams) 
+	flags := NewRunFlags(streams)
 
 	cmd := &cobra.Command{
 		Use:                   "run NAME --image=image [--env=\"key=value\"] [--port=port] [--dry-run=server|client] [--overrides=inline-json] [--command] -- [COMMAND] [args...]",
@@ -314,6 +313,7 @@ func (flags *RunFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, args []s
 
 		Namespace:        namespace,
 		EnforceNamespace: enforceNamespace,
+		IOStreams:        flags.IOStreams,
 	}
 
 	return options, nil
