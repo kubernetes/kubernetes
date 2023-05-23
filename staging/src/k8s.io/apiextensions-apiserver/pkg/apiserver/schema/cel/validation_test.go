@@ -2591,6 +2591,390 @@ func TestMessageExpression(t *testing.T) {
 	}
 }
 
+func TestReasonAndFldPath(t *testing.T) {
+	forbiddenReason := func() *field.ErrorType {
+		r := field.ErrorTypeForbidden
+		return &r
+	}()
+	tests := []struct {
+		name      string
+		schema    *schema.Structural
+		obj       interface{}
+		errors    []string
+		errorType field.ErrorType
+	}{
+		{name: "Return error based on input reason",
+			obj: map[string]interface{}{
+				"f": map[string]interface{}{
+					"m": 1,
+				},
+			},
+			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
+				"f": withReasonAndFldPath(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 2", "", forbiddenReason),
+			}), "1 == 1"),
+			errorType: field.ErrorTypeForbidden,
+			errors:    []string{"root.f: Forbidden"},
+		},
+		{name: "Return error default is invalid",
+			obj: map[string]interface{}{
+				"f": map[string]interface{}{
+					"m": 1,
+				},
+			},
+			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
+				"f": withReasonAndFldPath(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 2", "", nil),
+			}), "1 == 1"),
+			errorType: field.ErrorTypeInvalid,
+			errors:    []string{"root.f: Invalid"},
+		},
+		{name: "Return error based on input fieldPath",
+			obj: map[string]interface{}{
+				"f": map[string]interface{}{
+					"m": 1,
+				},
+			},
+			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
+				"f": withReasonAndFldPath(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 2", ". m", forbiddenReason),
+			}), "1 == 1"),
+			errorType: field.ErrorTypeForbidden,
+			errors:    []string{"root.f.m: Forbidden"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.TODO()
+			celValidator := validator(tt.schema, true, model.SchemaDeclType(tt.schema, true), celconfig.PerCallLimit)
+			if celValidator == nil {
+				t.Fatal("expected non nil validator")
+			}
+			errs, _ := celValidator.Validate(ctx, field.NewPath("root"), tt.schema, tt.obj, nil, celconfig.RuntimeCELCostBudget)
+			unmatched := map[string]struct{}{}
+			for _, e := range tt.errors {
+				unmatched[e] = struct{}{}
+			}
+			for _, err := range errs {
+				if err.Type != tt.errorType {
+					t.Errorf("expected error type %v, but got: %v", tt.errorType, err.Type)
+					continue
+				}
+				matched := false
+				for expected := range unmatched {
+					if strings.Contains(err.Error(), expected) {
+						delete(unmatched, expected)
+						matched = true
+						break
+					}
+				}
+				if !matched {
+					t.Errorf("expected error to contain one of %v, but got: %v", unmatched, err)
+				}
+			}
+			if len(unmatched) > 0 {
+				t.Errorf("expected errors %v", unmatched)
+			}
+		})
+	}
+}
+
+func TestValidateFieldPath(t *testing.T) {
+	sts := schema.Structural{
+		Generic: schema.Generic{
+			Type: "object",
+		},
+		Properties: map[string]schema.Structural{
+			"foo": {
+				Generic: schema.Generic{
+					Type: "object",
+					AdditionalProperties: &schema.StructuralOrBool{
+						Structural: &schema.Structural{
+							Generic: schema.Generic{
+								Type: "object",
+							},
+							Properties: map[string]schema.Structural{
+								"subAdd": {
+									Generic: schema.Generic{
+										Type: "number",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			"a": {
+				Generic: schema.Generic{
+					Type: "object",
+				},
+				Properties: map[string]schema.Structural{
+					"foo's": {
+						Generic: schema.Generic{
+							Type: "number",
+						},
+					},
+					"test\a": {
+						Generic: schema.Generic{
+							Type: "number",
+						},
+					},
+					"bbb": {
+						Generic: schema.Generic{
+							Type: "object",
+						},
+						Properties: map[string]schema.Structural{
+							"c": {
+								Generic: schema.Generic{
+									Type: "number",
+								},
+							},
+							"34": {
+								Generic: schema.Generic{
+									Type: "number",
+								},
+							},
+						},
+					},
+					"bbb.c": {
+						Generic: schema.Generic{
+							Type: "object",
+						},
+						Properties: map[string]schema.Structural{
+							"a-b.3'4": {
+								Generic: schema.Generic{
+									Type: "number",
+								},
+							},
+						},
+					},
+				},
+			},
+			"list": {
+				Generic: schema.Generic{
+					Type: "array",
+				},
+				Items: &schema.Structural{
+					Generic: schema.Generic{
+						Type: "object",
+					},
+					Properties: map[string]schema.Structural{
+						"a": {
+							Generic: schema.Generic{
+								Type: "number",
+							},
+						},
+						"a-b.3'4": {
+							Generic: schema.Generic{
+								Type: "number",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	path := field.NewPath("")
+
+	tests := []struct {
+		name            string
+		fieldPath       string
+		pathOfFieldPath *field.Path
+		schema          *schema.Structural
+		error           validationMatch
+		validFieldPath  *field.Path
+	}{
+		{
+			name:            "Valid .a",
+			fieldPath:       ". a  ",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			error:           validationMatch{},
+			validFieldPath:  path.Child("a"),
+		},
+		{
+			name:            "Valid .a.bbb",
+			fieldPath:       ". a. bbb",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			error:           validationMatch{},
+			validFieldPath:  path.Child("a", "bbb"),
+		},
+		{
+			name:            "Valid map syntax .a.bbb",
+			fieldPath:       ".a['bbb']",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			error:           validationMatch{},
+			validFieldPath:  path.Child("a").Child("bbb"),
+		},
+		{
+			name:            "Valid map key",
+			fieldPath:       ".foo.subAdd",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			error:           validationMatch{},
+			validFieldPath:  path.Child("foo").Key("subAdd"),
+		},
+		{
+			name:            "Valid map key",
+			fieldPath:       ".foo['subAdd']",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			error:           validationMatch{},
+			validFieldPath:  path.Child("foo").Key("subAdd"),
+		},
+		{
+			name:            "Invalid",
+			fieldPath:       ".a.foo's",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			error:           invalid(path.String()),
+		},
+		{
+			name:            "Escaping",
+			fieldPath:       ".a['foo\\'s']",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			error:           validationMatch{},
+			validFieldPath:  path.Child("a").Child("foo's"),
+		},
+		{
+			name:            "Escaping",
+			fieldPath:       ".a['test\\a']",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			error:           validationMatch{},
+			validFieldPath:  path.Child("a").Child("test\a"),
+		},
+
+		{
+			name:            "Invalid map key",
+			fieldPath:       ".a.foo",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			error:           invalid(path.String()),
+		},
+		{
+			name:            "Malformed map key",
+			fieldPath:       ".a.bbb[0]",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			error:           invalid(path.String()),
+		},
+		{
+			name:            "Invalid refer for special map key",
+			fieldPath:       ".a.bbb.34",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			error:           invalid(path.String()),
+		},
+		{
+			name:            "Map syntax for special field names",
+			fieldPath:       ".a.bbb['34']",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			error:           validationMatch{},
+		},
+		{
+			name:            "Valid .list",
+			fieldPath:       ". list   ",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			error:           validationMatch{},
+			validFieldPath:  path.Child("list"),
+		},
+		{
+			name:            "Invalid list index",
+			fieldPath:       ".list[0]",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			error:           invalid(path.String()),
+		},
+		{
+			name:            "Invalid list reference",
+			fieldPath:       ".list. a",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			error:           invalid(path.String()),
+		},
+		{
+			name:            "Invalid .list.a",
+			fieldPath:       ".list['a']",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			error:           invalid(path.String()),
+		},
+		{
+			name:            "Missing leading dot",
+			fieldPath:       "a",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			error:           invalid(path.String()),
+		},
+		{
+			name:            "Nonexistent field",
+			fieldPath:       ".c",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			error:           invalid(path.String()),
+		},
+		{
+			name:            "Duplicate dots",
+			fieldPath:       ".a..b",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			error:           invalid(path.String()),
+		},
+		{
+			name:            "object of array",
+			fieldPath:       ".list.a-b.34",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			error:           invalid(path.String()),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			validField, err := ValidFieldPath(tc.fieldPath, tc.pathOfFieldPath, tc.schema)
+
+			if err == nil && !tc.error.empty() {
+				t.Errorf("expected %v at %v but got nil", tc.error.errorType, tc.error.path.String())
+			} else if err != nil && tc.error.empty() {
+				t.Errorf("unexpected error: %v at %v", tc.error.errorType, tc.error.path.String())
+			} else if !tc.error.matches(err) {
+				t.Errorf("expected %v at %v, got %v", tc.error.errorType, tc.error.path.String(), err)
+			}
+			if tc.validFieldPath != nil && tc.validFieldPath.String() != validField.String() {
+				t.Errorf("expected %v, got %v", tc.validFieldPath, validField)
+			}
+		})
+	}
+}
+
+type validationMatch struct {
+	path      *field.Path
+	errorType field.ErrorType
+	contains  string
+}
+
+func invalid(path ...string) validationMatch {
+	return validationMatch{path: field.NewPath(path[0], path[1:]...), errorType: field.ErrorTypeInvalid}
+}
+
+func (v validationMatch) matches(err *field.Error) bool {
+	if err == nil && v.empty() {
+		return true
+	}
+	return err.Type == v.errorType && err.Field == v.path.String() && strings.Contains(err.Error(), v.contains)
+}
+
+func (v validationMatch) empty() bool {
+	if v.path == nil && v.errorType == "" && v.contains == "" {
+		return true
+	}
+	return false
+}
+
 func genString(n int, c rune) string {
 	b := strings.Builder{}
 	for i := 0; i < n; i++ {
@@ -2887,6 +3271,17 @@ func withRuleMessageAndMessageExpression(s schema.Structural, rule, message, mes
 			Rule:              rule,
 			Message:           message,
 			MessageExpression: messageExpression,
+		},
+	}
+	return s
+}
+
+func withReasonAndFldPath(s schema.Structural, rule, jsonPath string, reason *field.ErrorType) schema.Structural {
+	s.Extensions.XValidations = apiextensions.ValidationRules{
+		{
+			Rule:      rule,
+			FieldPath: jsonPath,
+			Reason:    reason,
 		},
 	}
 	return s

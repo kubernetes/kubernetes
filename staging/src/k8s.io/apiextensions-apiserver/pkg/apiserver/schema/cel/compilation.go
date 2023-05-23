@@ -18,6 +18,7 @@ package cel
 
 import (
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"strings"
 	"time"
 
@@ -65,6 +66,10 @@ type CompilationResult struct {
 	// MessageExpressionMaxCost represents the worst-case cost of the compiled MessageExpression in terms of CEL's cost units,
 	// as used by cel.EstimateCost.
 	MessageExpressionMaxCost uint64
+	// NormalizedRuleFieldPath represents the relative fieldPath specified by user after normalization.
+	NormalizedRuleFieldPath *field.Path
+	// FieldPathError represents the error while validating fieldPath specified.
+	FieldPathError *apiservercel.Error
 }
 
 // EnvLoader delegates the decision of which CEL environment to use for each expression.
@@ -134,7 +139,7 @@ func Compile(s *schema.Structural, declType *apiservercel.DeclType, perCallLimit
 	compResults := make([]CompilationResult, len(celRules))
 	maxCardinality := maxCardinality(declType.MinSerializedSize)
 	for i, rule := range celRules {
-		compResults[i] = compileRule(rule, envSet, envLoader, estimator, maxCardinality, perCallLimit)
+		compResults[i] = compileRule(s, rule, envSet, envLoader, estimator, maxCardinality, perCallLimit)
 	}
 
 	return compResults, nil
@@ -163,7 +168,7 @@ func prepareEnvSet(baseEnvSet *environment.EnvSet, declType *apiservercel.DeclTy
 	)
 }
 
-func compileRule(rule apiextensions.ValidationRule, envSet *environment.EnvSet, envLoader EnvLoader, estimator *library.CostEstimator, maxCardinality uint64, perCallLimit uint64) (compilationResult CompilationResult) {
+func compileRule(s *schema.Structural, rule apiextensions.ValidationRule, envSet *environment.EnvSet, envLoader EnvLoader, estimator *library.CostEstimator, maxCardinality uint64, perCallLimit uint64) (compilationResult CompilationResult) {
 	if len(strings.TrimSpace(rule.Rule)) == 0 {
 		// include a compilation result, but leave both program and error nil per documented return semantics of this
 		// function
@@ -245,6 +250,15 @@ func compileRule(rule apiextensions.ValidationRule, envSet *environment.EnvSet, 
 		}
 		compilationResult.MessageExpression = msgProg
 		compilationResult.MessageExpressionMaxCost = costEst.Max
+	}
+	if rule.FieldPath != "" {
+		fldPath := field.NewPath("")
+		validFieldPath, err := ValidFieldPath(rule.FieldPath, fldPath, s)
+		if err != nil {
+			compilationResult.FieldPathError = &apiservercel.Error{Type: apiservercel.ErrorTypeInvalid, Detail: "failed formatting fieldPath: " + err.Error()}
+		} else {
+			compilationResult.NormalizedRuleFieldPath = validFieldPath
+		}
 	}
 	return
 }
