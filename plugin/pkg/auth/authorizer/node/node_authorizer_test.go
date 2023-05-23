@@ -178,6 +178,21 @@ func TestAuthorizer(t *testing.T) {
 			expect: authorizer.DecisionAllow,
 		},
 		{
+			name:   "watch allowed attachment",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node0"},
+			expect: authorizer.DecisionAllow,
+		},
+		{
+			name:   "disallowed list many attachments",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: ""},
+			expect: authorizer.DecisionNoOpinion,
+		},
+		{
+			name:   "disallowed watch many attachments",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: ""},
+			expect: authorizer.DecisionNoOpinion,
+		},
+		{
 			name:   "allowed svcacct token create",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", Resource: "serviceaccounts", Subresource: "token", Name: "svcacct0-node0", Namespace: "ns0"},
 			expect: authorizer.DecisionAllow,

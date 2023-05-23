@@ -157,7 +157,7 @@ func NodeRules() []rbacv1.PolicyRule {
 		rbacv1helpers.NewRule("get", "create", "update", "patch", "delete").Groups("coordination.k8s.io").Resources("leases").RuleOrDie(),
 
 		// CSI
-		rbacv1helpers.NewRule("get").Groups(storageGroup).Resources("volumeattachments").RuleOrDie(),
+		rbacv1helpers.NewRule("get", "watch").Groups(storageGroup).Resources("volumeattachments").RuleOrDie(),
 
 		// Use the Node authorization to limit a node to create tokens for service accounts running on that node
 		// Use the NodeRestriction admission plugin to limit a node to create tokens bound to pods on that node
