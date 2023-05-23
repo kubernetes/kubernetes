@@ -115,38 +115,6 @@ func (f *FakeRuntimeCache) ForceUpdateIfOlder(context.Context, time.Time) error 
 	return nil
 }
 
-// ClearCalls resets the FakeRuntime to the initial state.
-func (f *FakeRuntime) ClearCalls() {
-	f.Lock()
-	defer f.Unlock()
-
-	f.CalledFunctions = []string{}
-	f.PodList = []*FakePod{}
-	f.AllPodList = []*FakePod{}
-	f.APIPodStatus = v1.PodStatus{}
-	f.StartedPods = []string{}
-	f.KilledPods = []string{}
-	f.StartedContainers = []string{}
-	f.KilledContainers = []string{}
-	f.RuntimeStatus = nil
-	f.VersionInfo = ""
-	f.RuntimeType = ""
-	f.Err = nil
-	f.InspectErr = nil
-	f.StatusErr = nil
-	f.BlockImagePulls = false
-	if f.imagePullTokenBucket != nil {
-		for {
-			select {
-			case f.imagePullTokenBucket <- true:
-			default:
-				f.imagePullTokenBucket = nil
-				return
-			}
-		}
-	}
-}
-
 // UpdatePodCIDR fulfills the cri interface.
 func (f *FakeRuntime) UpdatePodCIDR(_ context.Context, c string) error {
 	return nil
