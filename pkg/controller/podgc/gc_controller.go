@@ -127,9 +127,7 @@ func (gcc *PodGCController) gc(ctx context.Context) {
 	if gcc.terminatedPodThreshold > 0 {
 		gcc.gcTerminated(ctx, pods)
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.NodeOutOfServiceVolumeDetach) {
-		gcc.gcTerminating(ctx, pods)
-	}
+	gcc.gcTerminating(ctx, pods)
 	gcc.gcOrphaned(ctx, pods, nodes)
 	gcc.gcUnscheduledTerminating(ctx, pods)
 }
