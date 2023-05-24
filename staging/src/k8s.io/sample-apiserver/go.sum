@@ -719,8 +719,8 @@ k8s.io/gengo v0.0.0-20220902162205-c0856e24416d/go.mod h1:FiNAH4ZV3gBg2Kwh89tzAE
 k8s.io/klog/v2 v2.2.0/go.mod h1:Od+F08eJP+W3HUb4pSrPpgp9DGU4GzlpG/TmITuYh/Y=
 k8s.io/klog/v2 v2.100.1 h1:7WCHKK6K8fNhTqfBhISHQ97KrnJNFZMcQvKp7gP/tmg=
 k8s.io/klog/v2 v2.100.1/go.mod h1:y1WjHnz7Dj687irZUWR/WLkLc5N1YHtjLdmgWjndZn0=
-k8s.io/kube-openapi v0.0.0-20230515203736-54b630e78af5 h1:azYPdzztXxPSa8wb+hksEKayiz0o+PPisO/d+QhWnoo=
-k8s.io/kube-openapi v0.0.0-20230515203736-54b630e78af5/go.mod h1:kzo02I3kQ4BTtEfVLaPbjvCkX97YqGve33wzlb3fofQ=
+k8s.io/kube-openapi v0.0.0-20230524182850-78281498afbb h1:uV7fQu8Ldz5z8jAjwKQ0qftj249dTMzwlPEGhNIO4Ug=
+k8s.io/kube-openapi v0.0.0-20230524182850-78281498afbb/go.mod h1:kzo02I3kQ4BTtEfVLaPbjvCkX97YqGve33wzlb3fofQ=
 k8s.io/utils v0.0.0-20230406110748-d93618cff8a2 h1:qY1Ad8PODbnymg2pRbkyMT/ylpTrCM8P2RJ0yroCyIk=
 k8s.io/utils v0.0.0-20230406110748-d93618cff8a2/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
 rsc.io/binaryregexp v0.2.0/go.mod h1:qTv7/COck+e2FymRvadv62gMdZztPaShugOCi3I+8D8=

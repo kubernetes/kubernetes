@@ -2100,7 +2100,7 @@ k8s.io/kube-aggregator/pkg/registry/apiservice/rest
 # k8s.io/kube-controller-manager v0.0.0 => ./staging/src/k8s.io/kube-controller-manager
 ## explicit; go 1.20
 k8s.io/kube-controller-manager/config/v1alpha1
-# k8s.io/kube-openapi v0.0.0-20230515203736-54b630e78af5
+# k8s.io/kube-openapi v0.0.0-20230524182850-78281498afbb
 ## explicit; go 1.19
 k8s.io/kube-openapi/cmd/openapi-gen
 k8s.io/kube-openapi/cmd/openapi-gen/args
