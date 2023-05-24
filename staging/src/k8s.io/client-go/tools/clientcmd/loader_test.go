@@ -18,6 +18,7 @@ package clientcmd
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"os"
 	"path"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	clientcmdlatest "k8s.io/client-go/tools/clientcmd/api/latest"
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -120,13 +122,76 @@ func TestNonExistentCommandLineFile(t *testing.T) {
 }
 
 func TestToleratingMissingFiles(t *testing.T) {
+	envVarValue := "bogus"
 	loadingRules := ClientConfigLoadingRules{
-		Precedence: []string{"bogus1", "bogus2", "bogus3"},
+		Precedence:       []string{"bogus1", "bogus2", "bogus3"},
+		WarnIfAllMissing: true,
+		Warner:           func(err error) { klog.Warning(err) },
 	}
+
+	buffer := &bytes.Buffer{}
+
+	klog.LogToStderr(false)
+	klog.SetOutput(buffer)
 
 	_, err := loadingRules.Load()
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
+	}
+	klog.Flush()
+	expectedLog := fmt.Sprintf("Config not found: %s", envVarValue)
+	if !strings.Contains(buffer.String(), expectedLog) {
+		t.Fatalf("expected log: \"%s\"", expectedLog)
+	}
+}
+
+func TestWarningMissingFiles(t *testing.T) {
+	envVarValue := "bogus"
+	os.Setenv(RecommendedConfigPathEnvVar, envVarValue)
+	loadingRules := NewDefaultClientConfigLoadingRules()
+
+	buffer := &bytes.Buffer{}
+
+	flags := &flag.FlagSet{}
+	klog.InitFlags(flags)
+	flags.Set("v", "1")
+	klog.LogToStderr(false)
+	klog.SetOutput(buffer)
+
+	_, err := loadingRules.Load()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	klog.Flush()
+
+	expectedLog := fmt.Sprintf("Config not found: %s", envVarValue)
+	if !strings.Contains(buffer.String(), expectedLog) {
+		t.Fatalf("expected log: \"%s\"", expectedLog)
+	}
+}
+
+func TestNoWarningMissingFiles(t *testing.T) {
+	envVarValue := "bogus"
+	os.Setenv(RecommendedConfigPathEnvVar, envVarValue)
+	loadingRules := NewDefaultClientConfigLoadingRules()
+
+	buffer := &bytes.Buffer{}
+
+	flags := &flag.FlagSet{}
+	klog.InitFlags(flags)
+	flags.Set("v", "0")
+	klog.LogToStderr(false)
+	klog.SetOutput(buffer)
+
+	_, err := loadingRules.Load()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	klog.Flush()
+
+	logNotExpected := fmt.Sprintf("Config not found: %s", envVarValue)
+	if strings.Contains(buffer.String(), logNotExpected) {
+		t.Fatalf("log not expected: \"%s\"", logNotExpected)
 	}
 }
 
