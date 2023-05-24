@@ -391,7 +391,7 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 				`"versions": [{"name":"v1alpha1","storage":true,"served":true,"schema":{"openAPIV3Schema":{"type":"object"}}}],` +
 				`"names": {"kind": "OpenShiftWebConsoleConfig","plural": "openshiftwebconsoleconfigs","singular": "openshiftwebconsoleconfig"}}}`,
 			ExpectedEtcdPath: "/registry/apiextensions.k8s.io/customresourcedefinitions/openshiftwebconsoleconfigs.webconsole2.operator.openshift.io",
-			ExpectedGVK:      gvkP("apiextensions.k8s.io", "v1beta1", "CustomResourceDefinition"),
+			ExpectedGVK:      gvkP("apiextensions.k8s.io", "v1", "CustomResourceDefinition"),
 		},
 		gvr("cr.bar.com", "v1", "foos"): {
 			Stub:             `{"kind": "Foo", "apiVersion": "cr.bar.com/v1", "metadata": {"name": "cr1foo"}, "color": "blue"}`, // requires TypeMeta due to CRD scheme's UnstructuredObjectTyper
