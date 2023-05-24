@@ -134,14 +134,22 @@ type ClientConfigLoadingRules struct {
 }
 
 // WarningHandler allows to set the logging function to use
-type WarningHandler func(...interface{})
+type WarningHandler func(error)
 
-func (handler WarningHandler) Warn(message string) {
+func (handler WarningHandler) Warn(err error) {
 	if handler == nil {
-		klog.V(1).Info(message)
+		klog.V(1).Info(err)
 	} else {
-		handler(message)
+		handler(err)
 	}
+}
+
+type MissingConfigError struct {
+	Missing []string
+}
+
+func (c MissingConfigError) Error() string {
+	return fmt.Sprintf("Config not found: %s", strings.Join(c.Missing, ", "))
 }
 
 // ClientConfigLoadingRules implements the ClientConfigLoader interface.
@@ -233,7 +241,7 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 	}
 
 	if rules.WarnIfAllMissing && len(missingList) > 0 && len(kubeconfigs) == 0 {
-		rules.Warner.Warn(fmt.Sprintf("Config not found: %s", strings.Join(missingList, ", ")))
+		rules.Warner.Warn(MissingConfigError{Missing: missingList})
 	}
 
 	// first merge all of our maps
