@@ -660,15 +660,10 @@ func nodeNames(nodes []*v1.Node) sets.String {
 }
 
 func shouldSyncUpdatedNode(oldNode, newNode *v1.Node) bool {
-	if utilfeature.DefaultFeatureGate.Enabled(features.StableLoadBalancerNodeSet) {
-		// Only Nodes with changes to the label
-		// "node.kubernetes.io/exclude-from-external-load-balancers" will
-		// trigger a load balancer re-sync.
-		return respectsPredicates(oldNode, nodeIncludedPredicate) != respectsPredicates(newNode, nodeIncludedPredicate)
-	}
 	// Evaluate the individual node exclusion predicate before evaluating the
-	// compounded result of all predicates. We don't sync ETP=local services
-	// for changes on the readiness condition, hence if a node remains NotReady
+	// compounded result of all predicates. We don't sync changes on the
+	// readiness condition for eTP:Local services or when
+	// StableLoadBalancerNodeSet is enabled, hence if a node remains NotReady
 	// and a user adds the exclusion label we will need to sync as to make sure
 	// this change is reflected correctly on ETP=local services. The sync
 	// function compares lastSyncedNodes with the new (existing) set of nodes
@@ -679,7 +674,14 @@ func shouldSyncUpdatedNode(oldNode, newNode *v1.Node) bool {
 	if respectsPredicates(oldNode, nodeIncludedPredicate) != respectsPredicates(newNode, nodeIncludedPredicate) {
 		return true
 	}
-	return respectsPredicates(oldNode, allNodePredicates...) != respectsPredicates(newNode, allNodePredicates...)
+	// For the same reason as above, also check for changes to the providerID
+	if respectsPredicates(oldNode, nodeHasProviderIDPredicate) != respectsPredicates(newNode, nodeHasProviderIDPredicate) {
+		return true
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.StableLoadBalancerNodeSet) {
+		return respectsPredicates(oldNode, allNodePredicates...) != respectsPredicates(newNode, allNodePredicates...)
+	}
+	return false
 }
 
 // syncNodes handles updating the hosts pointed to by all load
@@ -937,14 +939,17 @@ var (
 		nodeIncludedPredicate,
 		nodeUnTaintedPredicate,
 		nodeReadyPredicate,
+		nodeHasProviderIDPredicate,
 	}
 	etpLocalNodePredicates []NodeConditionPredicate = []NodeConditionPredicate{
 		nodeIncludedPredicate,
 		nodeUnTaintedPredicate,
+		nodeHasProviderIDPredicate,
 	}
 	stableNodeSetPredicates []NodeConditionPredicate = []NodeConditionPredicate{
 		nodeNotDeletedPredicate,
 		nodeIncludedPredicate,
+		nodeHasProviderIDPredicate,
 		// This is not perfect, but probably good enough. We won't update the
 		// LBs just because the taint was added (see shouldSyncUpdatedNode) but
 		// if any other situation causes an LB sync, tainted nodes will be
@@ -968,6 +973,10 @@ func getNodePredicatesForService(service *v1.Service) []NodeConditionPredicate {
 func nodeIncludedPredicate(node *v1.Node) bool {
 	_, hasExcludeBalancerLabel := node.Labels[v1.LabelNodeExcludeBalancers]
 	return !hasExcludeBalancerLabel
+}
+
+func nodeHasProviderIDPredicate(node *v1.Node) bool {
+	return node.Spec.ProviderID != ""
 }
 
 // We consider the node for load balancing only when its not tainted for deletion by the cluster autoscaler.

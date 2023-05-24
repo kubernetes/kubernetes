@@ -173,14 +173,10 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, patchesDir strin
 	dest := filepath.Join(backupDir, kubeadmconstants.KubeletConfigurationFileName)
 
 	if !dryRun {
-		// call `cp` instead of `rename` here since the kubelet config file and back up directory (/etc/kubernetes/tmp/)
-		// might on the filesystem with different mount points in the test environment, such as kinder.
-		// This will lead to a failure to move the file from the source to dest since `rename` normally doesn't work
-		// across different mount points on most Unix system.
 		fmt.Printf("[upgrade] Backing up kubelet config file to %s\n", dest)
-		output, err := kubeadmutil.CopyDir(src, dest)
+		err := kubeadmutil.CopyFile(src, dest)
 		if err != nil {
-			return errors.Wrapf(err, "error backing up the kubelet config file, output: %q", output)
+			return errors.Wrap(err, "error backing up the kubelet config file")
 		}
 	} else {
 		fmt.Printf("[dryrun] Would back up kubelet config file to %s\n", dest)

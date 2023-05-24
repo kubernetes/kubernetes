@@ -754,23 +754,41 @@ func TestUpdatePod(t *testing.T) {
 			expectKnownTerminated: true,
 		},
 		{
-			name: "a pod that is terminal and has never started is finished immediately if the runtime has a cached terminal state",
+			name: "a pod that is terminal and has never started advances to finished if the runtime has a cached terminal state",
 			update: UpdatePodOptions{
 				UpdateType: kubetypes.SyncPodCreate,
 				Pod:        newPodWithPhase("1", "done-pod", v1.PodSucceeded),
 			},
 			runtimeStatus: &kubecontainer.PodStatus{ /* we know about this pod */ },
-			expect: &podSyncStatus{
+			expectBeforeWorker: &podSyncStatus{
+				fullname:      "done-pod_ns",
+				syncedAt:      time.Unix(1, 0),
+				terminatingAt: time.Unix(1, 0),
+				terminatedAt:  time.Unix(1, 0),
+				pendingUpdate: &UpdatePodOptions{
+					UpdateType: kubetypes.SyncPodCreate,
+					Pod:        newPodWithPhase("1", "done-pod", v1.PodSucceeded),
+				},
+				finished:           false, // Should be marked as not finished initially (to ensure `SyncTerminatedPod` will run) and status will progress to terminated.
+				startedTerminating: true,
+				working:            true,
+			},
+			expect: hasContext(&podSyncStatus{
 				fullname:           "done-pod_ns",
 				syncedAt:           time.Unix(1, 0),
 				terminatingAt:      time.Unix(1, 0),
 				terminatedAt:       time.Unix(1, 0),
+				startedAt:          time.Unix(3, 0),
 				startedTerminating: true,
 				finished:           true,
+				activeUpdate: &UpdatePodOptions{
+					UpdateType: kubetypes.SyncPodSync,
+					Pod:        newPodWithPhase("1", "done-pod", v1.PodSucceeded),
+				},
 
 				// if we have never seen the pod before, a restart makes no sense
 				restartRequested: false,
-			},
+			}),
 			expectKnownTerminated: true,
 		},
 		{

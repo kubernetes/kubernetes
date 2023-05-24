@@ -39,7 +39,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/version"
 	"k8s.io/client-go/transport"
+<<<<<<< HEAD
 	"k8s.io/klog/v2"
+=======
+>>>>>>> v1.27.2
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
@@ -228,6 +231,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	}
 
 	s := &APIAggregator{
+<<<<<<< HEAD
 		GenericAPIServer:                genericServer,
 		delegateHandler:                 delegationTarget.UnprotectedHandler(),
 		proxyTransportDial:              proxyTransportDial,
@@ -241,6 +245,20 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		openAPIV3Config:                 c.GenericConfig.OpenAPIV3Config,
 		proxyCurrentCertKeyContent:      func() (bytes []byte, bytes2 []byte) { return nil, nil },
 		rejectForwardingRedirects:       c.ExtraConfig.RejectForwardingRedirects,
+=======
+		GenericAPIServer:           genericServer,
+		delegateHandler:            delegationTarget.UnprotectedHandler(),
+		proxyTransportDial:         proxyTransportDial,
+		proxyHandlers:              map[string]*proxyHandler{},
+		handledGroups:              sets.String{},
+		lister:                     informerFactory.Apiregistration().V1().APIServices().Lister(),
+		APIRegistrationInformers:   informerFactory,
+		serviceResolver:            c.ExtraConfig.ServiceResolver,
+		openAPIConfig:              c.GenericConfig.OpenAPIConfig,
+		openAPIV3Config:            c.GenericConfig.OpenAPIV3Config,
+		proxyCurrentCertKeyContent: func() (bytes []byte, bytes2 []byte) { return nil, nil },
+		rejectForwardingRedirects:  c.ExtraConfig.RejectForwardingRedirects,
+>>>>>>> v1.27.2
 	}
 
 	// used later  to filter the served resource by those that have expired.
@@ -315,7 +333,10 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		proxyTransportDial,
 		(func() ([]byte, []byte))(s.proxyCurrentCertKeyContent),
 		s.serviceResolver,
+<<<<<<< HEAD
 		c.GenericConfig.HasBeenReadySignal(),
+=======
+>>>>>>> v1.27.2
 	)
 	if err != nil {
 		return nil, err
