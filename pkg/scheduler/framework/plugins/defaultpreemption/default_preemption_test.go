@@ -355,7 +355,7 @@ func TestPostFilter(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			f, err := st.NewFramework(registeredPlugins, "", ctx.Done(),
+			f, err := st.NewFramework(ctx, registeredPlugins, "",
 				frameworkruntime.WithClientSet(cs),
 				frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
 				frameworkruntime.WithInformerFactory(informerFactory),
@@ -1093,7 +1093,8 @@ func TestDryRunPreemption(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			fwk, err := st.NewFramework(
-				registeredPlugins, "", ctx.Done(),
+				ctx,
+				registeredPlugins, "",
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithInformerFactory(informerFactory),
@@ -1346,13 +1347,13 @@ func TestSelectBestCandidate(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			fwk, err := st.NewFramework(
+				ctx,
 				[]st.RegisterPluginFunc{
 					tt.registerPlugin,
 					st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 					st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 				},
 				"",
-				ctx.Done(),
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithLogger(logger),
@@ -1485,7 +1486,9 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
 			var nodes []*v1.Node
 			for _, n := range test.nodes {
 				nodes = append(nodes, st.MakeNode().Name(n).Obj())
@@ -1494,9 +1497,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			}
-			stopCh := make(chan struct{})
-			defer close(stopCh)
-			f, err := st.NewFramework(registeredPlugins, "", stopCh,
+			f, err := st.NewFramework(ctx, registeredPlugins, "",
 				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(test.pods, nodes)),
 				frameworkruntime.WithLogger(logger),
 			)
@@ -1730,13 +1731,13 @@ func TestPreempt(t *testing.T) {
 				extenders = append(extenders, extender)
 			}
 			fwk, err := st.NewFramework(
+				ctx,
 				[]st.RegisterPluginFunc{
 					test.registerPlugin,
 					st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 					st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 				},
 				"",
-				ctx.Done(),
 				frameworkruntime.WithClientSet(client),
 				frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
 				frameworkruntime.WithExtenders(extenders),

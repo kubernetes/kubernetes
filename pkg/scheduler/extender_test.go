@@ -288,7 +288,8 @@ func TestSchedulerWithExtenders(t *testing.T) {
 				cache.AddNode(createNode(name))
 			}
 			fwk, err := st.NewFramework(
-				test.registerPlugins, "", ctx.Done(),
+				ctx,
+				test.registerPlugins, "",
 				runtime.WithClientSet(client),
 				runtime.WithInformerFactory(informerFactory),
 				runtime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),

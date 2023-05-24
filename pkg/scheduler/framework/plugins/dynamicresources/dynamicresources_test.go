@@ -680,7 +680,7 @@ func setup(t *testing.T, nodes []*v1.Node, claims []*resourcev1alpha2.ResourceCl
 		runtime.WithClientSet(tc.client),
 		runtime.WithInformerFactory(informerFactory),
 	}
-	fh, err := runtime.NewFramework(nil, nil, tc.ctx.Done(), opts...)
+	fh, err := runtime.NewFramework(ctx, nil, nil, opts...)
 	if err != nil {
 		t.Fatal(err)
 	}

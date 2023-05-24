@@ -345,11 +345,11 @@ func Setup(ctx context.Context, opts *options.Options, outOfTreeRegistryOptions 
 	recorderFactory := getRecorderFactory(&cc)
 	completedProfiles := make([]kubeschedulerconfig.KubeSchedulerProfile, 0)
 	// Create the scheduler.
-	sched, err := scheduler.New(cc.Client,
+	sched, err := scheduler.New(ctx,
+		cc.Client,
 		cc.InformerFactory,
 		cc.DynInformerFactory,
 		recorderFactory,
-		ctx.Done(),
 		scheduler.WithComponentConfigVersion(cc.ComponentConfig.TypeMeta.APIVersion),
 		scheduler.WithKubeConfig(cc.KubeConfig),
 		scheduler.WithProfiles(cc.ComponentConfig.Profiles...),

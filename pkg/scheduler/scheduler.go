@@ -239,17 +239,14 @@ var defaultSchedulerOptions = schedulerOptions{
 }
 
 // New returns a Scheduler
-func New(client clientset.Interface,
+func New(ctx context.Context,
+	client clientset.Interface,
 	informerFactory informers.SharedInformerFactory,
 	dynInformerFactory dynamicinformer.DynamicSharedInformerFactory,
 	recorderFactory profile.RecorderFactory,
-	stopCh <-chan struct{},
 	opts ...Option) (*Scheduler, error) {
 
-	stopEverything := stopCh
-	if stopEverything == nil {
-		stopEverything = wait.NeverStop
-	}
+	stopEverything := ctx.Done()
 
 	options := defaultSchedulerOptions
 	for _, opt := range opts {
@@ -283,9 +280,9 @@ func New(client clientset.Interface,
 
 	snapshot := internalcache.NewEmptySnapshot()
 	clusterEventMap := make(map[framework.ClusterEvent]sets.Set[string])
-	metricsRecorder := metrics.NewMetricsAsyncRecorder(1000, time.Second, stopCh)
+	metricsRecorder := metrics.NewMetricsAsyncRecorder(1000, time.Second, stopEverything)
 
-	profiles, err := profile.NewMap(options.profiles, registry, recorderFactory, stopCh,
+	profiles, err := profile.NewMap(ctx, options.profiles, registry, recorderFactory,
 		frameworkruntime.WithComponentConfigVersion(options.componentConfigVersion),
 		frameworkruntime.WithClientSet(client),
 		frameworkruntime.WithKubeConfig(options.kubeConfig),

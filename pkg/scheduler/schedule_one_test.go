@@ -395,11 +395,11 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	sched, err := New(
+		ctx,
 		client,
 		informerFactory,
 		nil,
 		profile.NewRecorderFactory(broadcaster),
-		ctx.Done(),
 		WithProfiles(
 			schedulerapi.KubeSchedulerProfile{SchedulerName: "match-node2",
 				Plugins: &schedulerapi.Plugins{
@@ -526,11 +526,11 @@ func TestSchedulerGuaranteeNonNilNodeInSchedulingCycle(t *testing.T) {
 
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	sched, err := New(
+		ctx,
 		client,
 		informerFactory,
 		nil,
 		profile.NewRecorderFactory(broadcaster),
-		ctx.Done(),
 		WithProfiles(
 			schedulerapi.KubeSchedulerProfile{SchedulerName: fakeSchedulerName,
 				Plugins: &schedulerapi.Plugins{
@@ -748,9 +748,9 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			fwk, err := st.NewFramework(registerPluginFuncs,
+			fwk, err := st.NewFramework(ctx,
+				registerPluginFuncs,
 				testSchedulerName,
-				ctx.Done(),
 				frameworkruntime.WithClientSet(client),
 				frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, testSchedulerName)))
 			if err != nil {
@@ -1223,10 +1223,11 @@ func TestSchedulerBinding(t *testing.T) {
 			})
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			fwk, err := st.NewFramework([]st.RegisterPluginFunc{
-				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-			}, "", ctx.Done(), frameworkruntime.WithClientSet(client), frameworkruntime.WithEventRecorder(&events.FakeRecorder{}))
+			fwk, err := st.NewFramework(ctx,
+				[]st.RegisterPluginFunc{
+					st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+					st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				}, "", frameworkruntime.WithClientSet(client), frameworkruntime.WithEventRecorder(&events.FakeRecorder{}))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -2229,7 +2230,8 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			}
 			snapshot := internalcache.NewSnapshot(test.pods, nodes)
 			fwk, err := st.NewFramework(
-				test.registerPlugins, "", ctx.Done(),
+				ctx,
+				test.registerPlugins, "",
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
@@ -2282,6 +2284,7 @@ func TestFindFitAllError(t *testing.T) {
 	scheduler := makeScheduler(ctx, nodes)
 
 	fwk, err := st.NewFramework(
+		ctx,
 		[]st.RegisterPluginFunc{
 			st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 			st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
@@ -2289,7 +2292,6 @@ func TestFindFitAllError(t *testing.T) {
 			st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 		},
 		"",
-		ctx.Done(),
 		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(nil)),
 	)
 	if err != nil {
@@ -2322,6 +2324,7 @@ func TestFindFitSomeError(t *testing.T) {
 	scheduler := makeScheduler(ctx, nodes)
 
 	fwk, err := st.NewFramework(
+		ctx,
 		[]st.RegisterPluginFunc{
 			st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 			st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
@@ -2329,7 +2332,6 @@ func TestFindFitSomeError(t *testing.T) {
 			st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 		},
 		"",
-		ctx.Done(),
 		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(nil)),
 	)
 	if err != nil {
@@ -2404,7 +2406,8 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			fwk, err := st.NewFramework(
-				registerPlugins, "", ctx.Done(),
+				ctx,
+				registerPlugins, "",
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(nil)),
 			)
 			if err != nil {
@@ -2540,7 +2543,8 @@ func TestZeroRequest(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			fwk, err := st.NewFramework(
-				pluginRegistrations, "", ctx.Done(),
+				ctx,
+				pluginRegistrations, "",
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithClientSet(client),
@@ -2773,8 +2777,8 @@ func Test_prioritizeNodes(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			fwk, err := st.NewFramework(
+				ctx,
 				test.pluginRegistrations, "",
-				ctx.Done(),
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithClientSet(client),
@@ -2888,13 +2892,13 @@ func TestFairEvaluationForNodes(t *testing.T) {
 	sched := makeScheduler(ctx, nodes)
 
 	fwk, err := st.NewFramework(
+		ctx,
 		[]st.RegisterPluginFunc{
 			st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 			st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
 			st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 		},
 		"",
-		ctx.Done(),
 		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(nil)),
 	)
 	if err != nil {
@@ -2972,7 +2976,8 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			}
 			fwk, err := st.NewFramework(
-				registerPlugins, "", ctx.Done(),
+				ctx,
+				registerPlugins, "",
 				frameworkruntime.WithClientSet(client),
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 			)
@@ -3123,9 +3128,9 @@ func setupTestScheduler(ctx context.Context, t *testing.T, queuedPodStore *clien
 	schedulingQueue := internalqueue.NewTestQueueWithInformerFactory(ctx, nil, informerFactory)
 
 	fwk, _ := st.NewFramework(
+		ctx,
 		fns,
 		testSchedulerName,
-		ctx.Done(),
 		frameworkruntime.WithClientSet(client),
 		frameworkruntime.WithEventRecorder(recorder),
 		frameworkruntime.WithInformerFactory(informerFactory),

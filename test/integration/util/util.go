@@ -81,11 +81,11 @@ func StartScheduler(ctx context.Context, clientSet clientset.Interface, kubeConf
 	evtBroadcaster.StartRecordingToSink(ctx.Done())
 
 	sched, err := scheduler.New(
+		ctx,
 		clientSet,
 		informerFactory,
 		nil,
 		profile.NewRecorderFactory(evtBroadcaster),
-		ctx.Done(),
 		scheduler.WithKubeConfig(kubeConfig),
 		scheduler.WithProfiles(cfg.Profiles...),
 		scheduler.WithPercentageOfNodesToScore(cfg.PercentageOfNodesToScore),
@@ -446,11 +446,11 @@ func InitTestSchedulerWithOptions(
 
 	opts = append(opts, scheduler.WithKubeConfig(testCtx.KubeConfig))
 	testCtx.Scheduler, err = scheduler.New(
+		ctx,
 		testCtx.ClientSet,
 		testCtx.InformerFactory,
 		testCtx.DynInformerFactory,
 		profile.NewRecorderFactory(eventBroadcaster),
-		ctx.Done(),
 		opts...,
 	)
 
