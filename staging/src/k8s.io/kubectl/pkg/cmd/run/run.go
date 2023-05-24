@@ -191,7 +191,6 @@ func NewCmdRun(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Com
 				cmdutil.CheckErr(err)
 				return
 			}
-			cmdutil.CheckErr(o.Validate(cmd, args))
 			cmdutil.CheckErr(o.Run(f, cmd, args))
 		},
 	}
