@@ -126,7 +126,7 @@ func TestToleratingMissingFiles(t *testing.T) {
 	loadingRules := ClientConfigLoadingRules{
 		Precedence:       []string{"bogus1", "bogus2", "bogus3"},
 		WarnIfAllMissing: true,
-		Warner:           klog.Warning,
+		Warner:           func(err error) { klog.Warning(err) },
 	}
 
 	buffer := &bytes.Buffer{}
