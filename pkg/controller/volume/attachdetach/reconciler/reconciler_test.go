@@ -19,7 +19,6 @@ package reconciler
 import (
 	"context"
 	"fmt"
-	goruntime "runtime"
 	"testing"
 	"time"
 
@@ -691,10 +690,6 @@ func Test_Run_UpdateNodeStatusFailBeforeOneVolumeDetachNodeWithReadWriteOnce(t *
 }
 
 func Test_Run_OneVolumeDetachFailNodeWithReadWriteOnce(t *testing.T) {
-	// TODO: Remove skip once https://github.com/kubernetes/kubernetes/issues/116693 is fixed.
-	if goruntime.GOOS == "windows" {
-		t.Skip("Skipping test on Windows.")
-	}
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
