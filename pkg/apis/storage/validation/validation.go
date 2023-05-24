@@ -325,7 +325,7 @@ func validateCSINodeSpec(
 // ValidateCSINodeDrivers tests that the specified CSINodeDrivers have valid data.
 func validateCSINodeDrivers(drivers []storage.CSINodeDriver, fldPath *field.Path, validationOpts CSINodeValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
-	driverNamesInSpecs := make(sets.String)
+	driverNamesInSpecs := sets.New[string]()
 	for i, driver := range drivers {
 		idxPath := fldPath.Index(i)
 		allErrs = append(allErrs, validateCSINodeDriver(driver, driverNamesInSpecs, idxPath, validationOpts)...)
@@ -365,7 +365,7 @@ func validateCSINodeDriverAllocatable(a *storage.VolumeNodeResources, fldPath *f
 }
 
 // validateCSINodeDriver tests if CSINodeDriver has valid entries
-func validateCSINodeDriver(driver storage.CSINodeDriver, driverNamesInSpecs sets.String, fldPath *field.Path,
+func validateCSINodeDriver(driver storage.CSINodeDriver, driverNamesInSpecs sets.Set[string], fldPath *field.Path,
 	validationOpts CSINodeValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
@@ -378,7 +378,7 @@ func validateCSINodeDriver(driver storage.CSINodeDriver, driverNamesInSpecs sets
 		allErrs = append(allErrs, field.Duplicate(fldPath.Child("name"), driver.Name))
 	}
 	driverNamesInSpecs.Insert(driver.Name)
-	topoKeys := make(sets.String)
+	topoKeys := sets.New[string]()
 	for _, key := range driver.TopologyKeys {
 		if len(key) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath, key))
