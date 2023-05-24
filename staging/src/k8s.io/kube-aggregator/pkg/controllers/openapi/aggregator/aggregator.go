@@ -128,10 +128,7 @@ func BuildAndRegisterAggregator(downloader *Downloader, delegationTarget server.
 
 	// Install handler
 	s.openAPIVersionedService = handler.NewOpenAPIService(specToServe)
-	err = s.openAPIVersionedService.RegisterOpenAPIVersionedService("/openapi/v2", pathHandler)
-	if err != nil {
-		return nil, err
-	}
+	s.openAPIVersionedService.RegisterOpenAPIVersionedService("/openapi/v2", pathHandler)
 
 	return s, nil
 }

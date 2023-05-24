@@ -495,8 +495,8 @@ honnef.co/go/tools v0.0.1-2020.1.3/go.mod h1:X/FiERA/W4tHapMX5mGpAtMSVEeEUOyHaw9
 honnef.co/go/tools v0.0.1-2020.1.4/go.mod h1:X/FiERA/W4tHapMX5mGpAtMSVEeEUOyHaw9vFzvIQ3k=
 k8s.io/klog/v2 v2.100.1 h1:7WCHKK6K8fNhTqfBhISHQ97KrnJNFZMcQvKp7gP/tmg=
 k8s.io/klog/v2 v2.100.1/go.mod h1:y1WjHnz7Dj687irZUWR/WLkLc5N1YHtjLdmgWjndZn0=
-k8s.io/kube-openapi v0.0.0-20230515203736-54b630e78af5 h1:azYPdzztXxPSa8wb+hksEKayiz0o+PPisO/d+QhWnoo=
-k8s.io/kube-openapi v0.0.0-20230515203736-54b630e78af5/go.mod h1:kzo02I3kQ4BTtEfVLaPbjvCkX97YqGve33wzlb3fofQ=
+k8s.io/kube-openapi v0.0.0-20230524182850-78281498afbb h1:uV7fQu8Ldz5z8jAjwKQ0qftj249dTMzwlPEGhNIO4Ug=
+k8s.io/kube-openapi v0.0.0-20230524182850-78281498afbb/go.mod h1:kzo02I3kQ4BTtEfVLaPbjvCkX97YqGve33wzlb3fofQ=
 k8s.io/utils v0.0.0-20230406110748-d93618cff8a2 h1:qY1Ad8PODbnymg2pRbkyMT/ylpTrCM8P2RJ0yroCyIk=
 k8s.io/utils v0.0.0-20230406110748-d93618cff8a2/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
 rsc.io/binaryregexp v0.2.0/go.mod h1:qTv7/COck+e2FymRvadv62gMdZztPaShugOCi3I+8D8=
