@@ -2,8 +2,8 @@
 
 reviewers:
   - sig-network-reviewers
+  - aroradaman
   - uablrek
-  - daman1807
 approvers:
   - sig-network-approvers
   - uablrek
