@@ -29,8 +29,13 @@ message EncryptedObject {
   string keyID = 2;
 
   // EncryptedDEK is the encrypted DEK.
+  // Mutually exclusive with encryptedSeed.
   bytes encryptedDEK = 3;
 
   // Annotations is additional metadata that was provided by the KMS plugin.
   map<string, bytes> annotations = 4;
+
+  // encryptedSeed is the encrypted seed.
+  // Mutually exclusive with encryptedDEK.
+  bytes encryptedSeed = 5;
 }
