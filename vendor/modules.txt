@@ -2035,7 +2035,7 @@ k8s.io/dynamic-resource-allocation/controller
 k8s.io/dynamic-resource-allocation/kubeletplugin
 k8s.io/dynamic-resource-allocation/leaderelection
 k8s.io/dynamic-resource-allocation/resourceclaim
-# k8s.io/gengo v0.0.0-20220902162205-c0856e24416d
+# k8s.io/gengo v0.0.0-20230306165830-ab3349d207d4
 ## explicit; go 1.13
 k8s.io/gengo/args
 k8s.io/gengo/examples/deepcopy-gen/generators
