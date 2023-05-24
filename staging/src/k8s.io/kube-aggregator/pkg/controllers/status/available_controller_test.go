@@ -135,12 +135,8 @@ func setupAPIServices(apiServices []*apiregistration.APIService) (*AvailableCond
 			// the maximum disruption time to a minimum, but it does prevent hot loops.
 			workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 30*time.Second),
 			"AvailableConditionController"),
-<<<<<<< HEAD
 		metrics:      newAvailabilityMetrics(),
 		hasBeenReady: alwaysReadyChan,
-=======
-		metrics: newAvailabilityMetrics(),
->>>>>>> v1.27.2
 	}
 	for _, svc := range apiServices {
 		c.addAPIService(svc)
