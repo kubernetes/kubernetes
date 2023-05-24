@@ -70,12 +70,12 @@ func NewValidatingWebhookConfigurationManager(f informers.SharedInformerFactory)
 			if !ok {
 				tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 				if !ok {
-					klog.Errorf("Couldn't get object from tombstone %#v", obj)
+					klog.V(2).Infof("Couldn't get object from tombstone %#v", obj)
 					return
 				}
 				vwc, ok = tombstone.Obj.(*v1.ValidatingWebhookConfiguration)
 				if !ok {
-					klog.Errorf("Tombstone contained object that is not expected %#v", obj)
+					klog.V(2).Infof("Tombstone contained object that is not expected %#v", obj)
 					return
 				}
 			}
