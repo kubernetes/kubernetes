@@ -92,11 +92,7 @@ var (
 
 		# Run a proxy to the Kubernetes API server on an arbitrary local port
 		# The chosen port for the server will be output to stdout
-		kubectl proxy --port=0
-
-		# Run a proxy to the Kubernetes API server, changing the API prefix to k8s-api
-		# This makes e.g. the pods API available at localhost:8001/k8s-api/v1/pods/
-		kubectl proxy --api-prefix=/k8s-api`))
+		kubectl proxy --port=0`))
 )
 
 // NewProxyOptions creates the options for proxy
