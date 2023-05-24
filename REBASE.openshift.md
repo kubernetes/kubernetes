@@ -304,7 +304,7 @@ regression in behavior) can often be skipped and addressed post-merge.
   - Alternatively, run it in the same container as CI is using for build_root that already has
     the etcd at correct version
 ```
-podman run -it --rm -v $( pwd ):/go/k8s.io/kubernetes:Z --workdir=/go/k8s.io/kubernetes registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.19-openshift-4.12 make update OS_RUN_WITHOUT_DOCKER=yes
+podman run -it --rm -v $( pwd ):/go/k8s.io/kubernetes:Z --workdir=/go/k8s.io/kubernetes registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.19-openshift-4.12 make update OS_RUN_WITHOUT_DOCKER=yes FORCE_HOST_GO=1
 ```
 - Commit the resulting changes as `UPSTREAM: <drop>: make update`.
 
@@ -469,7 +469,7 @@ git commit -m "UPSTREAM: <drop>: manually resolve conflicts"
 ```
 podman run -it --rm -v $( pwd ):/go/k8s.io/kubernetes:Z --workdir=/go/k8s.io/kubernetes registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.19-openshift-4.12 /bin/bash
 ```
-   In the container run `hack/update-vendor.sh` and `make update OS_RUN_WITHOUT_DOCKER=yes`.
+   In the container run `hack/update-vendor.sh` and `make update OS_RUN_WITHOUT_DOCKER=yes FORCE_HOST_GO=1`.
 
 NOTE: Make sure to use the correct version of the image (both openshift and golang
 versions must be appropriate), as a reference check `openshift-hack/images/hyperkube/Dockerfile.rhel`
