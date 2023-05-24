@@ -482,7 +482,7 @@ func (o *ExposeServiceOptions) createService() (*corev1.Service, error) {
 		// should be the same as Port
 		for i := range service.Spec.Ports {
 			port := service.Spec.Ports[i].Port
-			service.Spec.Ports[i].TargetPort = intstr.FromInt(int(port))
+			service.Spec.Ports[i].TargetPort = intstr.FromInt32(port)
 		}
 	}
 	if len(o.ExternalIP) > 0 {

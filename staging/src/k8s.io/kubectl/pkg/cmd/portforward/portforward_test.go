@@ -158,7 +158,7 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 					Ports: []corev1.ServicePort{
 						{
 							Port:       80,
-							TargetPort: intstr.FromInt(8080),
+							TargetPort: intstr.FromInt32(8080),
 						},
 					},
 				},
@@ -187,7 +187,7 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 					Ports: []corev1.ServicePort{
 						{
 							Port:       80,
-							TargetPort: intstr.FromInt(8080),
+							TargetPort: intstr.FromInt32(8080),
 						},
 					},
 				},
@@ -216,7 +216,7 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 					Ports: []corev1.ServicePort{
 						{
 							Port:       8080,
-							TargetPort: intstr.FromInt(8080),
+							TargetPort: intstr.FromInt32(8080),
 						},
 					},
 				},
@@ -246,7 +246,7 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 					Ports: []corev1.ServicePort{
 						{
 							Port:       80,
-							TargetPort: intstr.FromInt(8080),
+							TargetPort: intstr.FromInt32(8080),
 						},
 					},
 				},
@@ -276,7 +276,7 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 					Ports: []corev1.ServicePort{
 						{
 							Port:       80,
-							TargetPort: intstr.FromInt(8080),
+							TargetPort: intstr.FromInt32(8080),
 						},
 					},
 				},
@@ -378,12 +378,12 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 						{
 							Port:       80,
 							Name:       "http",
-							TargetPort: intstr.FromInt(8080),
+							TargetPort: intstr.FromInt32(8080),
 						},
 						{
 							Port:       443,
 							Name:       "https",
-							TargetPort: intstr.FromInt(8443),
+							TargetPort: intstr.FromInt32(8443),
 						},
 					},
 				},
@@ -414,12 +414,12 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 						{
 							Port:       80,
 							Name:       "http",
-							TargetPort: intstr.FromInt(8080),
+							TargetPort: intstr.FromInt32(8080),
 						},
 						{
 							Port:       443,
 							Name:       "https",
-							TargetPort: intstr.FromInt(8443),
+							TargetPort: intstr.FromInt32(8443),
 						},
 					},
 				},
