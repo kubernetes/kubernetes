@@ -62,7 +62,8 @@ var objectOrder = map[string]int{
 // with per-service rules, we don't know what order syncProxyRules is going to output them
 // in, but the order doesn't matter anyway. So we sort the rules in those chains.
 var sortedChains = sets.New(
-	kubeFirewallChain,
+	kubeServicesFilterChain,
+	kubeExternalServicesChain,
 	kubeServicesChain,
 	kubeNodePortsChain,
 )
@@ -232,6 +233,29 @@ func (tracer *nftablesTracer) matchDestIPOnly(elements []*knftables.Element, des
 	return nil
 }
 
+// matchDest checks an "ip daddr . meta l4proto . th dport" against a set/map, and returns
+// the matching Element, if found.
+func (tracer *nftablesTracer) matchDest(elements []*knftables.Element, destIP, protocol, destPort string) *knftables.Element {
+	for _, element := range elements {
+		if element.Key[0] == destIP && element.Key[1] == protocol && element.Key[2] == destPort {
+			return element
+		}
+	}
+	return nil
+}
+
+// matchDestAndSource checks an "ip daddr . meta l4proto . th dport . ip saddr" against a
+// set/map, where the source is allowed to be a CIDR, and returns the matching Element, if
+// found.
+func (tracer *nftablesTracer) matchDestAndSource(elements []*knftables.Element, destIP, protocol, destPort, sourceIP string) *knftables.Element {
+	for _, element := range elements {
+		if element.Key[0] == destIP && element.Key[1] == protocol && element.Key[2] == destPort && tracer.addressMatches(sourceIP, "", element.Key[3]) {
+			return element
+		}
+	}
+	return nil
+}
+
 // We intentionally don't try to parse arbitrary nftables rules, as the syntax is quite
 // complicated and context sensitive. (E.g., "ip daddr" could be the start of an address
 // comparison, or it could be the start of a set/map lookup.) Instead, we just have
@@ -247,6 +271,8 @@ var destAddrRegexp = regexp.MustCompile(`^ip6* daddr (!= )?(\S+)`)
 var destAddrLocalRegexp = regexp.MustCompile(`^fib daddr type local`)
 var destPortRegexp = regexp.MustCompile(`^(tcp|udp|sctp) dport (\d+)`)
 var destIPOnlyLookupRegexp = regexp.MustCompile(`^ip6* daddr @(\S+)`)
+var destLookupRegexp = regexp.MustCompile(`^ip6* daddr \. meta l4proto \. th dport @(\S+)`)
+var destSourceLookupRegexp = regexp.MustCompile(`^ip6* daddr \. meta l4proto \. th dport \. ip6* saddr @(\S+)`)
 
 var sourceAddrRegexp = regexp.MustCompile(`^ip6* saddr (!= )?(\S+)`)
 var sourceAddrLocalRegexp = regexp.MustCompile(`^fib saddr type local`)
@@ -256,6 +282,7 @@ var endpointVMapEntryRegexp = regexp.MustCompile(`\d+ : goto (\S+)`)
 
 var masqueradeRegexp = regexp.MustCompile(`^jump ` + kubeMarkMasqChain + `$`)
 var jumpRegexp = regexp.MustCompile(`^(jump|goto) (\S+)$`)
+var returnRegexp = regexp.MustCompile(`^return$`)
 var verdictRegexp = regexp.MustCompile(`^(drop|reject)$`)
 var dnatRegexp = regexp.MustCompile(`^meta l4proto (tcp|udp|sctp) dnat to (\S+)$`)
 
@@ -271,10 +298,6 @@ var ignoredRegexp = regexp.MustCompile(strings.Join(
 		// Likewise, this rule never matches and thus never drops anything, and so
 		// can be ignored.
 		`^ct state invalid drop$`,
-
-		// We use a bare "continue" rule in the firewall chains as a place to
-		// attach a comment.
-		`^continue$`,
 	},
 	"|",
 ))
@@ -306,6 +329,30 @@ func (tracer *nftablesTracer) runChain(chname, sourceIP, protocol, destIP, destP
 				rule = strings.TrimPrefix(rule, match[0])
 				set := match[1]
 				if tracer.matchDestIPOnly(tracer.nft.Table.Sets[set].Elements, destIP) == nil {
+					rule = ""
+					break
+				}
+
+			case destSourceLookupRegexp.MatchString(rule):
+				// `^ip6* daddr . meta l4proto . th dport . ip6* saddr @(\S+)`
+				// Tests whether "destIP . protocol . destPort . sourceIP" is
+				// a member of the indicated set.
+				match := destSourceLookupRegexp.FindStringSubmatch(rule)
+				rule = strings.TrimPrefix(rule, match[0])
+				set := match[1]
+				if tracer.matchDestAndSource(tracer.nft.Table.Sets[set].Elements, destIP, protocol, destPort, sourceIP) == nil {
+					rule = ""
+					break
+				}
+
+			case destLookupRegexp.MatchString(rule):
+				// `^ip6* daddr . meta l4proto . th dport @(\S+)`
+				// Tests whether "destIP . protocol . destPort" is a member
+				// of the indicated set.
+				match := destLookupRegexp.FindStringSubmatch(rule)
+				rule = strings.TrimPrefix(rule, match[0])
+				set := match[1]
+				if tracer.matchDest(tracer.nft.Table.Sets[set].Elements, destIP, protocol, destPort) == nil {
 					rule = ""
 					break
 				}
@@ -403,6 +450,12 @@ func (tracer *nftablesTracer) runChain(chname, sourceIP, protocol, destIP, destP
 				tracer.matches = append(tracer.matches, ruleObj.Rule)
 				tracer.outputs = append(tracer.outputs, strings.ToUpper(verdict))
 				return true
+
+			case returnRegexp.MatchString(rule):
+				// `^return$`
+				// Returns to the calling chain.
+				tracer.matches = append(tracer.matches, ruleObj.Rule)
+				return false
 
 			case dnatRegexp.MatchString(rule):
 				// `meta l4proto (tcp|udp|sctp) dnat to (\S+)`

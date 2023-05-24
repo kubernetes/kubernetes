@@ -505,26 +505,33 @@ func TestOverallNFTablesRules(t *testing.T) {
 		add rule ip kube-proxy masquerading mark and 0x4000 == 0 return
 		add rule ip kube-proxy masquerading mark set mark xor 0x4000
 		add rule ip kube-proxy masquerading masquerade fully-random
-		add chain ip kube-proxy firewall
 		add chain ip kube-proxy services
 		add chain ip kube-proxy services-filter
-		add chain ip kube-proxy filter-forward { type filter hook forward priority 0 ; }
+		add chain ip kube-proxy firewall-check
+		add chain ip kube-proxy firewall-allow-check
+		add chain ip kube-proxy filter-forward { type filter hook forward priority -101 ; }
 		add rule ip kube-proxy filter-forward ct state new jump external-services
 		add rule ip kube-proxy filter-forward ct state new jump services-filter
 		add rule ip kube-proxy filter-forward jump forward
-		add rule ip kube-proxy filter-forward ct state new jump firewall
-		add chain ip kube-proxy filter-input { type filter hook input priority 0 ; }
+		add chain ip kube-proxy filter-input { type filter hook input priority -101 ; }
 		add rule ip kube-proxy filter-input ct state new jump external-services
-		add rule ip kube-proxy filter-input ct state new jump firewall
-		add chain ip kube-proxy filter-output { type filter hook output priority 0 ; }
+		add chain ip kube-proxy filter-output { type filter hook output priority -101 ; }
 		add rule ip kube-proxy filter-output ct state new jump services-filter
-		add rule ip kube-proxy filter-output ct state new jump firewall
 		add chain ip kube-proxy nat-output { type nat hook output priority -100 ; }
 		add rule ip kube-proxy nat-output jump services
 		add chain ip kube-proxy nat-postrouting { type nat hook postrouting priority 100 ; }
 		add rule ip kube-proxy nat-postrouting jump masquerading
 		add chain ip kube-proxy nat-prerouting { type nat hook prerouting priority -100 ; }
 		add rule ip kube-proxy nat-prerouting jump services
+
+		add set ip kube-proxy firewall { type ipv4_addr . inet_proto . inet_service ; comment "destinations that are subject to LoadBalancerSourceRanges" ; }
+		add set ip kube-proxy firewall-allow { type ipv4_addr . inet_proto . inet_service . ipv4_addr ; flags interval ; comment "destinations+sources that are allowed by LoadBalancerSourceRanges" ; }
+		add rule ip kube-proxy firewall-allow-check ip daddr . meta l4proto . th dport . ip saddr @firewall-allow return
+		add rule ip kube-proxy firewall-allow-check drop
+		add rule ip kube-proxy firewall-check ip daddr . meta l4proto . th dport @firewall jump firewall-allow-check
+		add rule ip kube-proxy filter-forward ct state new jump firewall-check
+		add rule ip kube-proxy filter-input ct state new jump firewall-check
+		add rule ip kube-proxy filter-output ct state new jump firewall-check
 
 		# svc1
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
@@ -594,18 +601,16 @@ func TestOverallNFTablesRules(t *testing.T) {
 		add chain ip kube-proxy external-HVFWP5L3-ns5/svc5/tcp/p80
 		add rule ip kube-proxy external-HVFWP5L3-ns5/svc5/tcp/p80 jump mark-for-masquerade
 		add rule ip kube-proxy external-HVFWP5L3-ns5/svc5/tcp/p80 goto service-HVFWP5L3-ns5/svc5/tcp/p80
-		add chain ip kube-proxy firewall-HVFWP5L3-ns5/svc5/tcp/p80
-		add rule ip kube-proxy firewall-HVFWP5L3-ns5/svc5/tcp/p80 ip saddr 203.0.113.0/25 goto external-HVFWP5L3-ns5/svc5/tcp/p80
-		add rule ip kube-proxy firewall-HVFWP5L3-ns5/svc5/tcp/p80 continue comment "other traffic will be dropped by firewall"
 
 		add chain ip kube-proxy endpoint-GTK6MW7G-ns5/svc5/tcp/p80__10.180.0.3/80
 		add rule ip kube-proxy endpoint-GTK6MW7G-ns5/svc5/tcp/p80__10.180.0.3/80 ip saddr 10.180.0.3 jump mark-for-masquerade
 		add rule ip kube-proxy endpoint-GTK6MW7G-ns5/svc5/tcp/p80__10.180.0.3/80 update @affinity-GTK6MW7G-ns5/svc5/tcp/p80__10.180.0.3/80 { ip saddr }
 		add rule ip kube-proxy endpoint-GTK6MW7G-ns5/svc5/tcp/p80__10.180.0.3/80 meta l4proto tcp dnat to 10.180.0.3:80
-		add rule ip kube-proxy firewall ip daddr 5.6.7.8 tcp dport 80 drop comment "ns5/svc5:p80 traffic not accepted by firewall-HVFWP5L3-ns5/svc5/tcp/p80"
 		add rule ip kube-proxy services ip daddr 172.30.0.45 tcp dport 80 goto service-HVFWP5L3-ns5/svc5/tcp/p80
-		add rule ip kube-proxy services ip daddr 5.6.7.8 tcp dport 80 goto firewall-HVFWP5L3-ns5/svc5/tcp/p80
+		add rule ip kube-proxy services ip daddr 5.6.7.8 tcp dport 80 goto external-HVFWP5L3-ns5/svc5/tcp/p80
 		add rule ip kube-proxy nodeports tcp dport 3002 goto external-HVFWP5L3-ns5/svc5/tcp/p80
+		add element ip kube-proxy firewall { 5.6.7.8 . tcp . 80 comment "ns5/svc5:p80" }
+		add element ip kube-proxy firewall-allow { 5.6.7.8 . tcp . 80 . 203.0.113.0/25 comment "ns5/svc5:p80" }
 
 		# svc6
 		add rule ip kube-proxy services-filter ip daddr 172.30.0.46 tcp dport 80 reject comment "ns6/svc6:p80 has no endpoints"
@@ -4242,10 +4247,11 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add table ip kube-proxy { comment "rules for kube-proxy" ; }
 
 		add chain ip kube-proxy external-services
-		add chain ip kube-proxy filter-forward { type filter hook forward priority 0 ; }
-		add chain ip kube-proxy filter-input { type filter hook input priority 0 ; }
-		add chain ip kube-proxy filter-output { type filter hook output priority 0 ; }
-		add chain ip kube-proxy firewall
+		add chain ip kube-proxy filter-forward { type filter hook forward priority -101 ; }
+		add chain ip kube-proxy filter-input { type filter hook input priority -101 ; }
+		add chain ip kube-proxy filter-output { type filter hook output priority -101 ; }
+		add chain ip kube-proxy firewall-allow-check
+		add chain ip kube-proxy firewall-check
 		add chain ip kube-proxy forward
 		add chain ip kube-proxy mark-for-masquerade
 		add chain ip kube-proxy masquerading
@@ -4259,11 +4265,14 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add rule ip kube-proxy filter-forward ct state new jump external-services
 		add rule ip kube-proxy filter-forward ct state new jump services-filter
 		add rule ip kube-proxy filter-forward jump forward
-		add rule ip kube-proxy filter-forward ct state new jump firewall
+		add rule ip kube-proxy filter-forward ct state new jump firewall-check
 		add rule ip kube-proxy filter-input ct state new jump external-services
-		add rule ip kube-proxy filter-input ct state new jump firewall
+		add rule ip kube-proxy filter-input ct state new jump firewall-check
 		add rule ip kube-proxy filter-output ct state new jump services-filter
-		add rule ip kube-proxy filter-output ct state new jump firewall
+		add rule ip kube-proxy filter-output ct state new jump firewall-check
+		add rule ip kube-proxy firewall-allow-check ip daddr . meta l4proto . th dport . ip saddr @firewall-allow return
+		add rule ip kube-proxy firewall-allow-check drop
+		add rule ip kube-proxy firewall-check ip daddr . meta l4proto . th dport @firewall jump firewall-allow-check
 		add rule ip kube-proxy forward ct state invalid drop
 		add rule ip kube-proxy mark-for-masquerade mark set mark or 0x4000
 		add rule ip kube-proxy masquerading mark and 0x4000 == 0 return
@@ -4272,6 +4281,9 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add rule ip kube-proxy nat-output jump services
 		add rule ip kube-proxy nat-postrouting jump masquerading
 		add rule ip kube-proxy nat-prerouting jump services
+
+		add set ip kube-proxy firewall { type ipv4_addr . inet_proto . inet_service ; comment "destinations that are subject to LoadBalancerSourceRanges" ; }
+		add set ip kube-proxy firewall-allow { type ipv4_addr . inet_proto . inet_service . ipv4_addr ; flags interval ; comment "destinations+sources that are allowed by LoadBalancerSourceRanges" ; }
 		`)
 
 	// Helper function to make it look like time has passed (from the point of view of

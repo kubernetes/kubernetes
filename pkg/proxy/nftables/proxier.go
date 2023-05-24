@@ -73,7 +73,10 @@ const (
 	kubeExternalServicesChain = "external-services"
 
 	// LoadBalancerSourceRanges handling
-	kubeFirewallChain = "firewall"
+	kubeFirewallSet             = "firewall"
+	kubeFirewallCheckChain      = "firewall-check"
+	kubeFirewallAllowSet        = "firewall-allow"
+	kubeFirewallAllowCheckChain = "firewall-allow-check"
 
 	// masquerading
 	kubeMarkMasqChain     = "mark-for-masquerade"
@@ -92,7 +95,6 @@ type servicePortInfo struct {
 	nameString             string
 	clusterPolicyChainName string
 	localPolicyChainName   string
-	firewallChainName      string
 	externalChainName      string
 }
 
@@ -108,7 +110,6 @@ func newServiceInfo(port *v1.ServicePort, service *v1.Service, bsvcPortInfo *pro
 	chainNameBase := servicePortChainNameBase(&svcPortName, strings.ToLower(string(svcPort.Protocol())))
 	svcPort.clusterPolicyChainName = servicePortPolicyClusterChainNamePrefix + chainNameBase
 	svcPort.localPolicyChainName = servicePortPolicyLocalChainNamePrefix + chainNameBase
-	svcPort.firewallChainName = serviceFirewallChainNamePrefix + chainNameBase
 	svcPort.externalChainName = serviceExternalChainNamePrefix + chainNameBase
 
 	return svcPort
@@ -319,9 +320,11 @@ type nftablesBaseChain struct {
 }
 
 var nftablesBaseChains = []nftablesBaseChain{
-	{"filter-input", knftables.FilterType, knftables.InputHook, knftables.FilterPriority},
-	{"filter-forward", knftables.FilterType, knftables.ForwardHook, knftables.FilterPriority},
-	{"filter-output", knftables.FilterType, knftables.OutputHook, knftables.FilterPriority},
+	// We want our filtering rules to operate on pre-DNAT dest IPs, so our filter
+	// chains have to run before DNAT.
+	{"filter-input", knftables.FilterType, knftables.InputHook, knftables.DNATPriority + "-1"},
+	{"filter-forward", knftables.FilterType, knftables.ForwardHook, knftables.DNATPriority + "-1"},
+	{"filter-output", knftables.FilterType, knftables.OutputHook, knftables.DNATPriority + "-1"},
 	{"nat-prerouting", knftables.NATType, knftables.PreroutingHook, knftables.DNATPriority},
 	{"nat-output", knftables.NATType, knftables.OutputHook, knftables.DNATPriority},
 	{"nat-postrouting", knftables.NATType, knftables.PostroutingHook, knftables.SNATPriority},
@@ -342,9 +345,10 @@ var nftablesJumpChains = []nftablesJumpChain{
 	{kubeServicesFilterChain, "filter-forward", "ct state new"},
 	{kubeServicesFilterChain, "filter-output", "ct state new"},
 	{kubeForwardChain, "filter-forward", ""},
-	{kubeFirewallChain, "filter-input", "ct state new"},
-	{kubeFirewallChain, "filter-output", "ct state new"},
-	{kubeFirewallChain, "filter-forward", "ct state new"},
+
+	{kubeFirewallCheckChain, "filter-input", "ct state new"},
+	{kubeFirewallCheckChain, "filter-output", "ct state new"},
+	{kubeFirewallCheckChain, "filter-forward", "ct state new"},
 
 	{kubeServicesChain, "nat-output", ""},
 	{kubeServicesChain, "nat-prerouting", ""},
@@ -368,8 +372,10 @@ func ensureChain(chain string, tx *knftables.Transaction, createdChains sets.Set
 }
 
 func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
+	ipX := "ip"
 	ipvX_addr := "ipv4_addr" //nolint:stylecheck // var name intentionally resembles value
 	if proxier.ipFamily == v1.IPv6Protocol {
+		ipX = "ip6"
 		ipvX_addr = "ipv6_addr"
 	}
 
@@ -403,7 +409,7 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 	}
 
 	// Ensure all of our other "top-level" chains exist
-	for _, chain := range []string{kubeServicesFilterChain, kubeServicesChain, kubeExternalServicesChain, kubeForwardChain, kubeNodePortsChain, kubeFirewallChain, kubeMasqueradingChain, kubeMarkMasqChain} {
+	for _, chain := range []string{kubeServicesFilterChain, kubeServicesChain, kubeExternalServicesChain, kubeForwardChain, kubeNodePortsChain, kubeMasqueradingChain, kubeMarkMasqChain} {
 		ensureChain(chain, tx, createdChains)
 	}
 
@@ -477,6 +483,40 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 			})
 		}
 	}
+
+	// Set up LoadBalancerSourceRanges firewalling
+	tx.Add(&knftables.Set{
+		Name:    kubeFirewallSet,
+		Type:    ipvX_addr + " . inet_proto . inet_service",
+		Comment: ptr.To("destinations that are subject to LoadBalancerSourceRanges"),
+	})
+	tx.Add(&knftables.Set{
+		Name:    kubeFirewallAllowSet,
+		Type:    ipvX_addr + " . inet_proto . inet_service . " + ipvX_addr,
+		Flags:   []knftables.SetFlag{knftables.IntervalFlag},
+		Comment: ptr.To("destinations+sources that are allowed by LoadBalancerSourceRanges"),
+	})
+
+	ensureChain(kubeFirewallCheckChain, tx, createdChains)
+	ensureChain(kubeFirewallAllowCheckChain, tx, createdChains)
+	tx.Add(&knftables.Rule{
+		Chain: kubeFirewallCheckChain,
+		Rule: knftables.Concat(
+			ipX, "daddr", ".", "meta l4proto", ".", "th dport", "@", kubeFirewallSet,
+			"jump", kubeFirewallAllowCheckChain,
+		),
+	})
+	tx.Add(&knftables.Rule{
+		Chain: kubeFirewallAllowCheckChain,
+		Rule: knftables.Concat(
+			ipX, "daddr", ".", "meta l4proto", ".", "th dport", ".", ipX, "saddr", "@", kubeFirewallAllowSet,
+			"return",
+		),
+	})
+	tx.Add(&knftables.Rule{
+		Chain: kubeFirewallAllowCheckChain,
+		Rule:  "drop",
+	})
 }
 
 // CleanupLeftovers removes all nftables rules and chains created by the Proxier
@@ -684,7 +724,6 @@ const (
 const (
 	servicePortPolicyClusterChainNamePrefix = "service-"
 	servicePortPolicyLocalChainNamePrefix   = "local-"
-	serviceFirewallChainNamePrefix          = "firewall-"
 	serviceExternalChainNamePrefix          = "external-"
 	servicePortEndpointChainNamePrefix      = "endpoint-"
 	servicePortEndpointAffinityNamePrefix   = "affinity-"
@@ -861,6 +900,14 @@ func (proxier *Proxier) syncProxyRules() {
 		ipvX_addr = "ipv6_addr"
 	}
 
+	// We currently fully-rebuild our sets and maps on each resync
+	tx.Flush(&knftables.Set{
+		Name: kubeFirewallSet,
+	})
+	tx.Flush(&knftables.Set{
+		Name: kubeFirewallAllowSet,
+	})
+
 	// Accumulate service/endpoint chains and affinity sets to keep.
 	activeChains := sets.New[string]()
 	activeAffinitySets := sets.New[string]()
@@ -957,17 +1004,6 @@ func (proxier *Proxier) syncProxyRules() {
 			ensureChain(externalTrafficChain, tx, activeChains)
 		}
 
-		// Traffic to LoadBalancer IPs can go directly to externalTrafficChain
-		// unless LoadBalancerSourceRanges is in use in which case we will
-		// create a firewall chain.
-		loadBalancerTrafficChain := externalTrafficChain
-		fwChain := svcInfo.firewallChainName
-		usesFWChain := hasEndpoints && len(svcInfo.LoadBalancerVIPStrings()) > 0 && len(svcInfo.LoadBalancerSourceRanges()) > 0
-		if usesFWChain {
-			ensureChain(fwChain, tx, activeChains)
-			loadBalancerTrafficChain = fwChain
-		}
-
 		var internalTrafficFilterVerdict, internalTrafficFilterComment string
 		var externalTrafficFilterVerdict, externalTrafficFilterComment string
 		if !hasEndpoints {
@@ -1061,21 +1097,58 @@ func (proxier *Proxier) syncProxyRules() {
 					Rule: knftables.Concat(
 						ipX, "daddr", lbip,
 						protocol, "dport", svcInfo.Port(),
-						"goto", loadBalancerTrafficChain,
+						"goto", externalTrafficChain,
 					),
 				})
 			}
-			if usesFWChain {
-				comment := fmt.Sprintf("%s traffic not accepted by %s", svcPortNameString, svcInfo.firewallChainName)
-				tx.Add(&knftables.Rule{
-					Chain: kubeFirewallChain,
-					Rule: knftables.Concat(
-						ipX, "daddr", lbip,
-						protocol, "dport", svcInfo.Port(),
-						"drop",
-					),
-					Comment: &comment,
+
+			if len(svcInfo.LoadBalancerSourceRanges()) > 0 {
+				tx.Add(&knftables.Element{
+					Set: kubeFirewallSet,
+					Key: []string{
+						lbip,
+						protocol,
+						strconv.Itoa(svcInfo.Port()),
+					},
+					Comment: &svcPortNameString,
 				})
+
+				allowFromNode := false
+				for _, src := range svcInfo.LoadBalancerSourceRanges() {
+					_, cidr, _ := netutils.ParseCIDRSloppy(src)
+					if cidr == nil {
+						continue
+					}
+					tx.Add(&knftables.Element{
+						Set: kubeFirewallAllowSet,
+						Key: []string{
+							lbip,
+							protocol,
+							strconv.Itoa(svcInfo.Port()),
+							src,
+						},
+						Comment: &svcPortNameString,
+					})
+					if cidr.Contains(proxier.nodeIP) {
+						allowFromNode = true
+					}
+				}
+				// For VIP-like LBs, the VIP is often added as a local
+				// address (via an IP route rule).  In that case, a request
+				// from a node to the VIP will not hit the loadbalancer but
+				// will loop back with the source IP set to the VIP.  We
+				// need the following rules to allow requests from this node.
+				if allowFromNode {
+					tx.Add(&knftables.Element{
+						Set: kubeFirewallAllowSet,
+						Key: []string{
+							lbip,
+							protocol,
+							strconv.Itoa(svcInfo.Port()),
+							lbip,
+						},
+					})
+				}
 			}
 		}
 		if !hasExternalEndpoints {
@@ -1223,57 +1296,6 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 		}
 
-		// Set up firewall chain, if needed
-		if usesFWChain {
-			// The service firewall rules are created based on the
-			// loadBalancerSourceRanges field. This only works for VIP-like
-			// loadbalancers that preserve source IPs. For loadbalancers which
-			// direct traffic to service NodePort, the firewall rules will not
-			// apply.
-
-			// firewall filter based on each source range
-			allowFromNode := false
-			for _, src := range svcInfo.LoadBalancerSourceRanges() {
-				tx.Add(&knftables.Rule{
-					Chain: fwChain,
-					Rule: knftables.Concat(
-						ipX, "saddr", src,
-						"goto", externalTrafficChain,
-					),
-				})
-				_, cidr, err := netutils.ParseCIDRSloppy(src)
-				if err != nil {
-					klog.ErrorS(err, "Error parsing CIDR in LoadBalancerSourceRanges, dropping it", "cidr", cidr)
-				} else if cidr.Contains(proxier.nodeIP) {
-					allowFromNode = true
-				}
-			}
-			// For VIP-like LBs, the VIP is often added as a local
-			// address (via an IP route rule).  In that case, a request
-			// from a node to the VIP will not hit the loadbalancer but
-			// will loop back with the source IP set to the VIP.  We
-			// need the following rules to allow requests from this node.
-			if allowFromNode {
-				for _, lbip := range svcInfo.LoadBalancerVIPStrings() {
-					tx.Add(&knftables.Rule{
-						Chain: fwChain,
-						Rule: knftables.Concat(
-							ipX, "saddr", lbip,
-							"goto", externalTrafficChain,
-						),
-					})
-				}
-			}
-			// If the packet was able to reach the end of firewall chain,
-			// then it did not get DNATed, so it will match the
-			// corresponding KUBE-PROXY-FIREWALL rule.
-			tx.Add(&knftables.Rule{
-				Chain:   fwChain,
-				Rule:    "continue",
-				Comment: ptr.To("other traffic will be dropped by firewall"),
-			})
-		}
-
 		if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
 			// Generate the per-endpoint affinity sets
 			for _, ep := range allLocallyReachableEndpoints {
@@ -1323,7 +1345,7 @@ func (proxier *Proxier) syncProxyRules() {
 			proxier.writeServiceToEndpointRules(tx, svcPortNameString, svcInfo, localPolicyChain, localEndpoints)
 		}
 
-		// Generate the per-endpoint chains and affinity sets
+		// Generate the per-endpoint chains
 		for _, ep := range allLocallyReachableEndpoints {
 			epInfo, ok := ep.(*endpointInfo)
 			if !ok {
