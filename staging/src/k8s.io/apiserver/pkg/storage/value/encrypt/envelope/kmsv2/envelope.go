@@ -19,6 +19,7 @@ package kmsv2
 
 import (
 	"context"
+	"crypto/aes"
 	"fmt"
 	"sort"
 	"time"
@@ -227,7 +228,16 @@ func (t *envelopeTransformer) TransformToStorage(ctx context.Context, data []byt
 
 // addTransformerForDecryption inserts a new transformer to the Envelope cache of DEKs for future reads.
 func (t *envelopeTransformer) addTransformerForDecryption(cacheKey []byte, key []byte) (value.Read, error) {
-	transformer := aestransformer.NewReadOnlyKDFExtendedNonceGCMTransformerFromUniqueKeyUnsafe(key)
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	// this is compatible with NewGCMTransformerWithUniqueKeyUnsafe for decryption
+	// it would use random nonces for encryption but we never do that
+	transformer, err := aestransformer.NewGCMTransformer(block)
+	if err != nil {
+		return nil, err
+	}
 	// TODO(aramase): Add metrics for cache fill percentage with custom cache implementation.
 	t.cache.set(cacheKey, transformer)
 	return transformer, nil
@@ -258,7 +268,7 @@ func (t *envelopeTransformer) doDecode(originalData []byte) (*kmstypes.Encrypted
 // GenerateTransformer generates a new transformer and encrypts the DEK using the envelope service.
 // It returns the transformer, the encrypted DEK, cache key and error.
 func GenerateTransformer(ctx context.Context, uid string, envelopeService kmsservice.Service) (value.Transformer, *kmsservice.EncryptResponse, []byte, error) {
-	transformer, newKey, err := aestransformer.NewKDFExtendedNonceGCMTransformerWithUniqueKeyUnsafe()
+	transformer, newKey, err := aestransformer.NewGCMTransformerWithUniqueKeyUnsafe()
 	if err != nil {
 		return nil, nil, nil, err
 	}
