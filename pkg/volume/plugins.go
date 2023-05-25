@@ -694,13 +694,11 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 	return match, nil
 }
 
-// FindPluginByName fetches a plugin by name or by legacy name.  If no plugin
-// is found, returns error.
+// FindPluginByName fetches a plugin by name. If no plugin is found, returns error.
 func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 	pm.mutex.RLock()
 	defer pm.mutex.RUnlock()
 
-	// Once we can get rid of legacy names we can reduce this to a map lookup.
 	var match VolumePlugin
 	if v, found := pm.plugins[name]; found {
 		match = v
