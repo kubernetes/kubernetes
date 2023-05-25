@@ -18,19 +18,23 @@ package storage
 
 import (
 	"context"
+	"fmt"
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	types "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 var _ = utils.SIGDescribe("CSIInlineVolumes", func() {
@@ -223,6 +227,121 @@ var _ = utils.SIGDescribe("CSIInlineVolumes", func() {
 			// Okay, normal case.
 		default:
 			framework.Failf("Pod should have been deleted or have DeletionTimestamp, but instead got: %s", retrievedPod)
+		}
+	})
+
+	ginkgo.It("should run through the lifecycle of a CSIDriver", func(ctx context.Context) {
+		// Create client
+		client := f.ClientSet.StorageV1().CSIDrivers()
+		defaultFSGroupPolicy := storagev1.ReadWriteOnceWithFSTypeFSGroupPolicy
+		csiDriverLabel := map[string]string{"e2e-test": f.UniqueName}
+		csiDriverLabelSelector := labels.SelectorFromSet(csiDriverLabel).String()
+
+		// Driver that supports only Ephemeral
+		driver1 := &storagev1.CSIDriver{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "inline-driver-" + string(uuid.NewUUID()),
+				Labels: csiDriverLabel,
+			},
+
+			Spec: storagev1.CSIDriverSpec{
+				VolumeLifecycleModes: []storagev1.VolumeLifecycleMode{storagev1.VolumeLifecycleEphemeral},
+				FSGroupPolicy:        &defaultFSGroupPolicy,
+			},
+		}
+
+		// Driver that supports both Ephemeral and Persistent
+		driver2 := &storagev1.CSIDriver{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "inline-driver-" + string(uuid.NewUUID()),
+				Labels: csiDriverLabel,
+			},
+
+			Spec: storagev1.CSIDriverSpec{
+				VolumeLifecycleModes: []storagev1.VolumeLifecycleMode{
+					storagev1.VolumeLifecyclePersistent,
+					storagev1.VolumeLifecycleEphemeral,
+				},
+				FSGroupPolicy: &defaultFSGroupPolicy,
+			},
+		}
+
+		ginkgo.By("Creating two CSIDrivers")
+		createdDriver1, err := client.Create(ctx, driver1, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "Failed to create first CSIDriver")
+		createdDriver2, err := client.Create(ctx, driver2, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "Failed to create second CSIDriver")
+		_, err = client.Create(ctx, driver1, metav1.CreateOptions{})
+		if !apierrors.IsAlreadyExists(err) {
+			framework.Failf("expected 409, got %#v", err)
+		}
+
+		ginkgo.By(fmt.Sprintf("Getting %q & %q", createdDriver1.Name, createdDriver2.Name))
+		retrievedDriver1, err := client.Get(ctx, createdDriver1.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "Failed to get CSIDriver %q", createdDriver1.Name)
+		gomega.Expect(retrievedDriver1.UID).To(gomega.Equal(createdDriver1.UID))
+
+		retrievedDriver2, err := client.Get(ctx, createdDriver2.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "Failed to get CSIDriver %q", createdDriver2.Name)
+		gomega.Expect(retrievedDriver2.UID).To(gomega.Equal(createdDriver2.UID))
+
+		ginkgo.By(fmt.Sprintf("Patching the CSIDriver %q", createdDriver2.Name))
+		payload := "{\"metadata\":{\"labels\":{\"" + createdDriver2.Name + "\":\"patched\"}}}"
+		patchedCSIDriver, err := client.Patch(ctx, createdDriver2.Name, types.StrategicMergePatchType, []byte(payload), metav1.PatchOptions{})
+		framework.ExpectNoError(err, "failed to patch CSIDriver %q", createdDriver2.Name)
+		gomega.Expect(patchedCSIDriver.Labels[createdDriver2.Name]).To(gomega.ContainSubstring("patched"), "Checking that patched label has been applied")
+
+		ginkgo.By(fmt.Sprintf("Updating the CSIDriver %q", createdDriver2.Name))
+		var updatedCSIDriver *storagev1.CSIDriver
+
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			csiDriver, err := client.Get(ctx, createdDriver2.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err, "Unable to get CSIDriver %q", createdDriver2.Name)
+			csiDriver.Labels[retrievedDriver2.Name] = "updated"
+			updatedCSIDriver, err = client.Update(ctx, csiDriver, metav1.UpdateOptions{})
+
+			return err
+		})
+		framework.ExpectNoError(err, "failed to update CSIDriver %q", createdDriver2.Name)
+		gomega.Expect(updatedCSIDriver.Labels[createdDriver2.Name]).To(gomega.ContainSubstring("updated"), "Checking that updated label has been applied")
+
+		ginkgo.By(fmt.Sprintf("Listing all CSIDrivers with the labelSelector: %q", csiDriverLabelSelector))
+		driverList, err := client.List(ctx, metav1.ListOptions{LabelSelector: csiDriverLabelSelector})
+		framework.ExpectNoError(err, "Failed to list all CSIDrivers with the labelSelector %q", csiDriverLabelSelector)
+		gomega.Expect(driverList.Items).To(gomega.HaveLen(2), "filtered list should have 2 items, got: %s", driverList)
+
+		ginkgo.By(fmt.Sprintf("Deleting CSIDriver %q", createdDriver1.Name))
+		err = client.Delete(ctx, createdDriver1.Name, metav1.DeleteOptions{})
+		framework.ExpectNoError(err, "Failed to delete CSIDriver %q", createdDriver1.Name)
+
+		ginkgo.By(fmt.Sprintf("Confirm deletion of CSIDriver %q", createdDriver1.Name))
+		retrievedDriver, err := client.Get(ctx, createdDriver1.Name, metav1.GetOptions{})
+		switch {
+		case apierrors.IsNotFound(err):
+			// Okay, normal case.
+		case err != nil:
+			framework.Failf("expected 404, got %#v", err)
+		case retrievedDriver.DeletionTimestamp != nil:
+			// Okay, normal case.
+		default:
+			framework.Failf("CSIDriver should have been deleted or have DeletionTimestamp, but instead got: %s", retrievedDriver)
+		}
+
+		ginkgo.By(fmt.Sprintf("Deleting CSIDriver %q via DeleteCollection", createdDriver2.Name))
+		err = client.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: createdDriver2.Name + "=updated"})
+		framework.ExpectNoError(err, "Failed to delete CSIDriver %q", createdDriver2.Name)
+
+		ginkgo.By(fmt.Sprintf("Confirm deletion of CSIDriver %q", createdDriver2.Name))
+		retrievedDriver, err = client.Get(ctx, createdDriver2.Name, metav1.GetOptions{})
+		switch {
+		case apierrors.IsNotFound(err):
+			// Okay, normal case.
+		case err != nil:
+			framework.Failf("expected 404, got %#v", err)
+		case retrievedDriver.DeletionTimestamp != nil:
+			// Okay, normal case.
+		default:
+			framework.Failf("CSIDriver should have been deleted or have DeletionTimestamp, but instead got: %s", retrievedDriver)
 		}
 	})
 })
