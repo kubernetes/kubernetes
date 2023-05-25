@@ -18,7 +18,6 @@ package api
 
 import (
 	"reflect"
-	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -47,10 +46,7 @@ func TestCompatibility(t *testing.T) {
 	// Fill unstructured JSON field types
 	opts.FillFuncs = map[reflect.Type]roundtrip.FillFunc{
 		reflect.TypeOf(&apiextensionv1.JSON{}): func(s string, i int, obj interface{}) {
-			obj.(*apiextensionv1.JSON).Raw = []byte(strconv.Quote(s + "Value"))
-		},
-		reflect.TypeOf(&apiextensionv1beta1.JSON{}): func(s string, i int, obj interface{}) {
-			obj.(*apiextensionv1beta1.JSON).Raw = []byte(strconv.Quote(s + "Value"))
+			obj.(*apiextensionv1.JSON).Object = s + "Value"
 		},
 	}
 

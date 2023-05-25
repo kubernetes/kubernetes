@@ -30,7 +30,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
@@ -704,10 +703,5 @@ func TestCustomResourceDefaultingOfMetaFields(t *testing.T) {
 }
 
 func jsonPtr(x interface{}) *apiextensionsv1.JSON {
-	bs, err := json.Marshal(x)
-	if err != nil {
-		panic(err)
-	}
-	ret := apiextensionsv1.JSON{Raw: bs}
-	return &ret
+	return apiextensionsv1.JSON{Object: x}
 }

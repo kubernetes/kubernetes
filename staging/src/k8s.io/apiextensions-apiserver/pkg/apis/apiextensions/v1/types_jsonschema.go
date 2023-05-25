@@ -249,25 +249,6 @@ type ValidationRule struct {
 	MessageExpression string `json:"messageExpression,omitempty" protobuf:"bytes,3,opt,name=messageExpression"`
 }
 
-// JSON represents any valid JSON value.
-// These types are supported: bool, int64, float64, string, []interface{}, map[string]interface{} and nil.
-type JSON struct {
-	Raw []byte `json:"-" protobuf:"bytes,1,opt,name=raw"`
-}
-
-// OpenAPISchemaType is used by the kube-openapi generator when constructing
-// the OpenAPI spec of this type.
-//
-// See: https://github.com/kubernetes/kube-openapi/tree/master/pkg/generators
-func (_ JSON) OpenAPISchemaType() []string {
-	// TODO: return actual types when anyOf is supported
-	return nil
-}
-
-// OpenAPISchemaFormat is used by the kube-openapi generator when constructing
-// the OpenAPI spec of this type.
-func (_ JSON) OpenAPISchemaFormat() string { return "" }
-
 // JSONSchemaURL represents a schema url.
 type JSONSchemaURL string
 

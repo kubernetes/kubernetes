@@ -119,7 +119,7 @@ func TestOverlappingCustomResourceAPIService(t *testing.T) {
 							Required: []string{"foo"},
 							Properties: map[string]apiextensionsv1.JSONSchemaProps{
 								"foo": {Type: "string"},
-								"bar": {Type: "string", Default: &apiextensionsv1.JSON{Raw: []byte(`"default"`)}},
+								"bar": {Type: "string", Default: &apiextensionsv1.JSON{Object: "default"}},
 							},
 						},
 					},
@@ -282,7 +282,7 @@ func TestOverlappingCustomResourceCustomResourceDefinition(t *testing.T) {
 							Required: []string{"foo"},
 							Properties: map[string]apiextensionsv1.JSONSchemaProps{
 								"foo": {Type: "string"},
-								"bar": {Type: "string", Default: &apiextensionsv1.JSON{Raw: []byte(`"default"`)}},
+								"bar": {Type: "string", Default: &apiextensionsv1.JSON{Object: "default"}},
 							},
 						},
 					},
