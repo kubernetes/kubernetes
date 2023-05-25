@@ -56,6 +56,7 @@ type JSONSchemaProps struct {
 	// default is a default value for undefined object fields.
 	// Defaulting is a beta feature under the CustomResourceDefaulting feature gate.
 	// CustomResourceDefinitions with defaults must be created using the v1 (or newer) CustomResourceDefinition API.
+	// Defaulting requires spec.preserveUnknownFields to be false.
 	Default              *JSON                      `json:"default,omitempty" protobuf:"bytes,8,opt,name=default"`
 	Maximum              *float64                   `json:"maximum,omitempty" protobuf:"bytes,9,opt,name=maximum"`
 	ExclusiveMaximum     bool                       `json:"exclusiveMaximum,omitempty" protobuf:"bytes,10,opt,name=exclusiveMaximum"`
@@ -248,25 +249,6 @@ type ValidationRule struct {
 	// +optional
 	MessageExpression string `json:"messageExpression,omitempty" protobuf:"bytes,3,opt,name=messageExpression"`
 }
-
-// JSON represents any valid JSON value.
-// These types are supported: bool, int64, float64, string, []interface{}, map[string]interface{} and nil.
-type JSON struct {
-	Raw []byte `json:"-" protobuf:"bytes,1,opt,name=raw"`
-}
-
-// OpenAPISchemaType is used by the kube-openapi generator when constructing
-// the OpenAPI spec of this type.
-//
-// See: https://github.com/kubernetes/kube-openapi/tree/master/pkg/generators
-func (_ JSON) OpenAPISchemaType() []string {
-	// TODO: return actual types when anyOf is supported
-	return nil
-}
-
-// OpenAPISchemaFormat is used by the kube-openapi generator when constructing
-// the OpenAPI spec of this type.
-func (_ JSON) OpenAPISchemaFormat() string { return "" }
 
 // JSONSchemaURL represents a schema url.
 type JSONSchemaURL string

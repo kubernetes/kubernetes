@@ -8966,7 +8966,7 @@ func BenchmarkSchemaHas(b *testing.B) {
 	}
 }
 
-var example = apiextensions.JSON(`"This is an example"`)
+var example = apiextensions.JSON{Object: `"This is an example"`}
 
 var validValidationSchema = &apiextensions.JSONSchemaProps{
 	Description:      "This is a description",
@@ -9044,7 +9044,7 @@ func int64Ptr(f int64) *int64 {
 }
 
 func jsonPtr(x interface{}) *apiextensions.JSON {
-	ret := apiextensions.JSON(x)
+	ret := apiextensions.JSON{Object: x}
 	return &ret
 }
 
@@ -9054,7 +9054,7 @@ func jsonSlice(l ...interface{}) []apiextensions.JSON {
 	}
 	ret := make([]apiextensions.JSON, 0, len(l))
 	for _, x := range l {
-		ret = append(ret, x)
+		ret = append(ret, apiextensions.JSON{Object: x})
 	}
 	return ret
 }
