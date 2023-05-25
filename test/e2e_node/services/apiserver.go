@@ -19,6 +19,9 @@ package services
 import (
 	"fmt"
 	"os"
+	"testing"
+
+	utiltesting "k8s.io/client-go/util/testing"
 
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	netutils "k8s.io/utils/net"
@@ -79,7 +82,7 @@ func (a *APIServer) Start() error {
 	if err != nil {
 		return fmt.Errorf("create temp file failed: %w", err)
 	}
-	defer os.RemoveAll(saSigningKeyFile.Name())
+	defer utiltesting.CloseAndRemove(&testing.T{}, saSigningKeyFile)
 	if err = os.WriteFile(saSigningKeyFile.Name(), []byte(ecdsaPrivateKey), 0666); err != nil {
 		return fmt.Errorf("write file %s failed: %w", saSigningKeyFile.Name(), err)
 	}

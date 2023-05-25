@@ -26,6 +26,8 @@ import (
 	"testing"
 	"time"
 
+	utiltesting "k8s.io/client-go/util/testing"
+
 	clientv3 "go.etcd.io/etcd/client/v3"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -81,7 +83,7 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 	if err != nil {
 		t.Fatalf("create temp file failed: %v", err)
 	}
-	defer os.RemoveAll(saSigningKeyFile.Name())
+	defer utiltesting.CloseAndRemove(t, saSigningKeyFile)
 	if err = os.WriteFile(saSigningKeyFile.Name(), []byte(ecdsaPrivateKey), 0666); err != nil {
 		t.Fatalf("write file %s failed: %v", saSigningKeyFile.Name(), err)
 	}

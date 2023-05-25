@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	client "k8s.io/client-go/kubernetes"
+	utiltesting "k8s.io/client-go/util/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -73,7 +74,7 @@ egressSelections:
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tracingConfigFile.Name())
+	defer utiltesting.CloseAndRemove(t, tracingConfigFile)
 
 	if err := os.WriteFile(tracingConfigFile.Name(), []byte(fmt.Sprintf(`
 apiVersion: apiserver.config.k8s.io/v1beta1

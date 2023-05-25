@@ -21,6 +21,8 @@ import (
 	"os"
 	"testing"
 
+	utiltesting "k8s.io/client-go/util/testing"
+
 	"reflect"
 
 	"k8s.io/client-go/tools/clientcmd"
@@ -58,7 +60,7 @@ func (test setConfigTest) run(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer os.Remove(fakeKubeFile.Name())
+	defer utiltesting.CloseAndRemove(t, fakeKubeFile)
 	err = clientcmd.WriteToFile(test.config, fakeKubeFile.Name())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

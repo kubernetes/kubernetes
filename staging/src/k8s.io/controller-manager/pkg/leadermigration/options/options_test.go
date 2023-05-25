@@ -21,6 +21,8 @@ import (
 	"reflect"
 	"testing"
 
+	utiltesting "k8s.io/client-go/util/testing"
+
 	"github.com/spf13/pflag"
 
 	"k8s.io/controller-manager/config"
@@ -188,7 +190,7 @@ controllerLeaders:
 				if err != nil {
 					t.Fatal(err)
 				}
-				defer os.Remove(configFile.Name())
+				defer utiltesting.CloseAndRemove(t, configFile)
 				err = os.WriteFile(configFile.Name(), []byte(tc.configContent), os.FileMode(0755))
 				if err != nil {
 					t.Fatal(err)
