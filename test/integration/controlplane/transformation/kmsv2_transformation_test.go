@@ -378,7 +378,7 @@ resources:
 
 	// 6. when kms-plugin is down, expect creation of new pod and encryption to fail because the DEK is invalid
 	_, err = test.createPod(testNamespace, dynamicClient)
-	if err == nil || !strings.Contains(err.Error(), `EDEK with keyID "2" expired at 2`) {
+	if err == nil || !strings.Contains(err.Error(), `EDEK/ESEED with keyID "2" expired at 2`) {
 		t.Fatalf("Create test pod should have failed due to encryption, ns: %s, got: %v", testNamespace, err)
 	}
 

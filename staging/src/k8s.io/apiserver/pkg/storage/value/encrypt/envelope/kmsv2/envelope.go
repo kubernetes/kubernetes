@@ -140,6 +140,8 @@ func (t *envelopeTransformer) TransformFromStorage(ctx context.Context, data []b
 		return nil, false, err
 	}
 
+	useSeed := len(encryptedObject.EncryptedSeed) > 0
+
 	// TODO: consider marking state.EncryptedDEK != encryptedObject.EncryptedDEK as a stale read to support DEK defragmentation
 	//  at a minimum we should have a metric that helps the user understand if DEK fragmentation is high
 	state, err := t.stateFunc() // no need to call state.ValidateEncryptCapability on reads
@@ -164,8 +166,6 @@ func (t *envelopeTransformer) TransformFromStorage(ctx context.Context, data []b
 		klog.V(6).InfoS("decrypting content using envelope service", "uid", uid, "key", string(dataCtx.AuthenticatedData()),
 			"group", requestInfo.APIGroup, "version", requestInfo.APIVersion, "resource", requestInfo.Resource, "subresource", requestInfo.Subresource,
 			"verb", requestInfo.Verb, "namespace", requestInfo.Namespace, "name", requestInfo.Name)
-
-		useSeed := len(encryptedObject.EncryptedSeed) > 0
 
 		req := &kmsservice.DecryptRequest{
 			KeyID:       encryptedObject.KeyID,
@@ -195,7 +195,7 @@ func (t *envelopeTransformer) TransformFromStorage(ctx context.Context, data []b
 	}
 
 	// data is considered stale if the key ID does not match our current write transformer
-	return out, stale || encryptedObject.KeyID != state.KeyID, nil
+	return out, stale || encryptedObject.KeyID != state.KeyID || useSeed != state.UseSeed, nil
 
 }
 
