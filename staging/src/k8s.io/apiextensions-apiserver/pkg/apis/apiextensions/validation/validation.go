@@ -1207,7 +1207,7 @@ func validateMapListKeysMapSet(schema *apiextensions.JSONSchemaProps, fldPath *f
 				continue
 			}
 
-			if isRequired[k] == false && obj.Default == nil {
+			if isRequired[k] == false && (obj.Default == nil || obj.Default.Object == nil) {
 				allErrs = append(allErrs, field.Required(fldPath.Child("items").Child("properties").Key(k).Child("default"), "this property is in x-kubernetes-list-map-keys, so it must have a default or be a required property"))
 			}
 

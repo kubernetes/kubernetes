@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,54 +17,16 @@ limitations under the License.
 package v1beta1
 
 import (
-	"bytes"
-
-	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/util/json"
-
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	"k8s.io/apimachinery/pkg/conversion"
 )
 
-func Convert_apiextensions_JSONSchemaProps_To_v1beta1_JSONSchemaProps(in *apiextensions.JSONSchemaProps, out *JSONSchemaProps, s conversion.Scope) error {
-	if err := autoConvert_apiextensions_JSONSchemaProps_To_v1beta1_JSONSchemaProps(in, out, s); err != nil {
-		return err
-	}
-	if in.Default != nil && *(in.Default) == nil {
-		out.Default = nil
-	}
-	if in.Example != nil && *(in.Example) == nil {
-		out.Example = nil
-	}
-	return nil
-}
-
-var nullLiteral = []byte(`null`)
-
 func Convert_apiextensions_JSON_To_v1beta1_JSON(in *apiextensions.JSON, out *JSON, s conversion.Scope) error {
-	raw, err := json.Marshal(*in)
-	if err != nil {
-		return err
-	}
-	if len(raw) == 0 || bytes.Equal(raw, nullLiteral) {
-		// match JSON#UnmarshalJSON treatment of literal nulls
-		out.Raw = nil
-	} else {
-		out.Raw = raw
-	}
+	out.Object = interface{}(*in)
 	return nil
 }
 
 func Convert_v1beta1_JSON_To_apiextensions_JSON(in *JSON, out *apiextensions.JSON, s conversion.Scope) error {
-	if in != nil {
-		var i interface{}
-		if len(in.Raw) > 0 && !bytes.Equal(in.Raw, nullLiteral) {
-			if err := json.Unmarshal(in.Raw, &i); err != nil {
-				return err
-			}
-		}
-		*out = i
-	} else {
-		out = nil
-	}
+	*out = in.Object
 	return nil
 }

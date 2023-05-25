@@ -418,6 +418,12 @@ message ExternalDocumentation {
 
 // JSON represents any valid JSON value.
 // These types are supported: bool, int64, float64, string, []interface{}, map[string]interface{} and nil.
+//
+// +protobuf=true
+// +protobuf.options.marshal=false
+// +protobuf.as=ProtoJSON
+// +protobuf.options.(gogoproto.goproto_stringer)=false
+// +k8s:conversion-gen=false
 message JSON {
   optional bytes raw = 1;
 }
@@ -467,6 +473,7 @@ message JSONSchemaProps {
   // default is a default value for undefined object fields.
   // Defaulting is a beta feature under the CustomResourceDefaulting feature gate.
   // CustomResourceDefinitions with defaults must be created using the v1 (or newer) CustomResourceDefinition API.
+  // Defaulting requires spec.preserveUnknownFields to be false.
   optional JSON default = 8;
 
   optional double maximum = 9;
@@ -632,6 +639,13 @@ message JSONSchemaPropsOrStringArray {
   optional JSONSchemaProps schema = 1;
 
   repeated string property = 2;
+}
+
+// ProtoJSON is a wrapper for JSON data, but intended for
+// protobuf marshalling/unmarshalling. It is generated into a serialization
+// that matches JSON. Do not use in Go structs.
+message ProtoJSON {
+  optional bytes raw = 1;
 }
 
 // ServiceReference holds a reference to Service.legacy.k8s.io
