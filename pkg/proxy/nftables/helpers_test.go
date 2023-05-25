@@ -58,14 +58,6 @@ var objectOrder = map[string]int{
 	// anything else: 0
 }
 
-// For most chains we leave the rules in order (because the order matters), but for chains
-// with per-service rules, we don't know what order syncProxyRules is going to output them
-// in, but the order doesn't matter anyway. So we sort the rules in those chains.
-var sortedChains = sets.New(
-	kubeServicesChain,
-	kubeNodePortsChain,
-)
-
 // sortNFTablesTransaction sorts an nftables transaction into a standard order for comparison
 func sortNFTablesTransaction(tx string) string {
 	lines := strings.Split(tx, "\n")
@@ -104,13 +96,8 @@ func sortNFTablesTransaction(tx string) string {
 			return wi[4] < wj[4]
 		}
 
+		// Leave rules in the order they were originally added.
 		if wi[1] == "rule" {
-			// Sort rules in chains that need to be sorted
-			if sortedChains.Has(wi[4]) {
-				return li < lj
-			}
-
-			// Otherwise leave rules in the order they were originally added.
 			return false
 		}
 

@@ -62,8 +62,9 @@ const (
 	kubeProxyTable = "kube-proxy"
 
 	// service dispatch
-	kubeServicesChain  = "services"
-	kubeNodePortsChain = "nodeports"
+	kubeServicesChain       = "services"
+	kubeServiceIPsMap       = "service-ips"
+	kubeServiceNodePortsMap = "service-nodeports"
 
 	// set of IPs that accept NodePort traffic
 	kubeNodePortIPsSet = "nodeport-ips"
@@ -413,7 +414,7 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 	}
 
 	// Ensure all of our other "top-level" chains exist
-	for _, chain := range []string{kubeServicesChain, kubeForwardChain, kubeNodePortsChain, kubeMasqueradingChain, kubeMarkMasqChain} {
+	for _, chain := range []string{kubeServicesChain, kubeForwardChain, kubeMasqueradingChain, kubeMarkMasqChain} {
 		ensureChain(chain, tx, createdChains)
 	}
 
@@ -574,6 +575,45 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 		Chain: kubeFirewallAllowCheckChain,
 		Rule:  "drop",
 	})
+
+	// Set up service dispatch
+	tx.Add(&knftables.Map{
+		Name:    kubeServiceIPsMap,
+		Type:    ipvX_addr + " . inet_proto . inet_service : verdict",
+		Comment: ptr.To("ClusterIP, ExternalIP and LoadBalancer IP traffic"),
+	})
+	tx.Add(&knftables.Map{
+		Name:    kubeServiceNodePortsMap,
+		Type:    "inet_proto . inet_service : verdict",
+		Comment: ptr.To("NodePort traffic"),
+	})
+	tx.Add(&knftables.Rule{
+		Chain: kubeServicesChain,
+		Rule: knftables.Concat(
+			ipX, "daddr", ".", "meta l4proto", ".", "th dport",
+			"vmap", "@", kubeServiceIPsMap,
+		),
+	})
+	if proxier.nodePortAddresses.MatchAll() {
+		tx.Add(&knftables.Rule{
+			Chain: kubeServicesChain,
+			Rule: knftables.Concat(
+				"fib daddr type local",
+				noLocalhost,
+				"meta l4proto . th dport",
+				"vmap", "@", kubeServiceNodePortsMap,
+			),
+		})
+	} else {
+		tx.Add(&knftables.Rule{
+			Chain: kubeServicesChain,
+			Rule: knftables.Concat(
+				ipX, "daddr @nodeport-ips",
+				"meta l4proto . th dport",
+				"vmap", "@", kubeServiceNodePortsMap,
+			),
+		})
+	}
 }
 
 // CleanupLeftovers removes all nftables rules and chains created by the Proxier
@@ -970,6 +1010,12 @@ func (proxier *Proxier) syncProxyRules() {
 	tx.Flush(&knftables.Map{
 		Name: kubeNoEndpointNodePortsMap,
 	})
+	tx.Flush(&knftables.Map{
+		Name: kubeServiceIPsMap,
+	})
+	tx.Flush(&knftables.Map{
+		Name: kubeServiceNodePortsMap,
+	})
 
 	// Accumulate service/endpoint chains and affinity sets to keep.
 	activeChains := sets.New[string]()
@@ -1096,13 +1142,16 @@ func (proxier *Proxier) syncProxyRules() {
 
 		// Capture the clusterIP.
 		if hasInternalEndpoints {
-			tx.Add(&knftables.Rule{
-				Chain: kubeServicesChain,
-				Rule: knftables.Concat(
-					ipX, "daddr", svcInfo.ClusterIP(),
-					protocol, "dport", svcInfo.Port(),
-					"goto", internalTrafficChain,
-				),
+			tx.Add(&knftables.Element{
+				Map: kubeServiceIPsMap,
+				Key: []string{
+					svcInfo.ClusterIP().String(),
+					protocol,
+					strconv.Itoa(svcInfo.Port()),
+				},
+				Value: []string{
+					fmt.Sprintf("goto %s", internalTrafficChain),
+				},
 			})
 		} else {
 			// No endpoints.
@@ -1125,13 +1174,16 @@ func (proxier *Proxier) syncProxyRules() {
 			if hasEndpoints {
 				// Send traffic bound for external IPs to the "external
 				// destinations" chain.
-				tx.Add(&knftables.Rule{
-					Chain: kubeServicesChain,
-					Rule: knftables.Concat(
-						ipX, "daddr", externalIP,
-						protocol, "dport", svcInfo.Port(),
-						"goto", externalTrafficChain,
-					),
+				tx.Add(&knftables.Element{
+					Map: kubeServiceIPsMap,
+					Key: []string{
+						externalIP,
+						protocol,
+						strconv.Itoa(svcInfo.Port()),
+					},
+					Value: []string{
+						fmt.Sprintf("goto %s", externalTrafficChain),
+					},
 				})
 			}
 			if !hasExternalEndpoints {
@@ -1156,13 +1208,16 @@ func (proxier *Proxier) syncProxyRules() {
 		// Capture load-balancer ingress.
 		for _, lbip := range svcInfo.LoadBalancerVIPStrings() {
 			if hasEndpoints {
-				tx.Add(&knftables.Rule{
-					Chain: kubeServicesChain,
-					Rule: knftables.Concat(
-						ipX, "daddr", lbip,
-						protocol, "dport", svcInfo.Port(),
-						"goto", externalTrafficChain,
-					),
+				tx.Add(&knftables.Element{
+					Map: kubeServiceIPsMap,
+					Key: []string{
+						lbip,
+						protocol,
+						strconv.Itoa(svcInfo.Port()),
+					},
+					Value: []string{
+						fmt.Sprintf("goto %s", externalTrafficChain),
+					},
 				})
 			}
 
@@ -1241,12 +1296,15 @@ func (proxier *Proxier) syncProxyRules() {
 				// Jump to the external destination chain.  For better or for
 				// worse, nodeports are not subect to loadBalancerSourceRanges,
 				// and we can't change that.
-				tx.Add(&knftables.Rule{
-					Chain: kubeNodePortsChain,
-					Rule: knftables.Concat(
-						protocol, "dport", svcInfo.NodePort(),
-						"goto", externalTrafficChain,
-					),
+				tx.Add(&knftables.Element{
+					Map: kubeServiceNodePortsMap,
+					Key: []string{
+						protocol,
+						strconv.Itoa(svcInfo.NodePort()),
+					},
+					Value: []string{
+						fmt.Sprintf("goto %s", externalTrafficChain),
+					},
 				})
 			}
 			if !hasExternalEndpoints {
@@ -1453,37 +1511,6 @@ func (proxier *Proxier) syncProxyRules() {
 				),
 			})
 		}
-	}
-
-	// Finally, tail-call to the nodePorts chain.  This needs to be after all
-	// other service portal rules.
-	if proxier.nodePortAddresses.MatchAll() {
-		// Block localhost nodePorts
-		var noLocalhost string
-		if proxier.ipFamily == v1.IPv6Protocol {
-			noLocalhost = "ip6 daddr != ::1"
-		} else {
-			noLocalhost = "ip daddr != 127.0.0.0/8"
-		}
-
-		tx.Add(&knftables.Rule{
-			Chain: kubeServicesChain,
-			Rule: knftables.Concat(
-				"fib daddr type local",
-				noLocalhost,
-				"jump", kubeNodePortsChain,
-			),
-			Comment: ptr.To("kubernetes service nodeports; NOTE: this must be the last rule in this chain"),
-		})
-	} else {
-		tx.Add(&knftables.Rule{
-			Chain: kubeServicesChain,
-			Rule: knftables.Concat(
-				ipX, "daddr", "@", kubeNodePortIPsSet,
-				"jump", kubeNodePortsChain,
-			),
-			Comment: ptr.To("kubernetes service nodeports; NOTE: this must be the last rule in this chain"),
-		})
 	}
 
 	// Figure out which chains are now stale. Unfortunately, we can't delete them
