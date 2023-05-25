@@ -124,10 +124,10 @@ var _ = common.SIGDescribe("Netpol", func() {
 			// Only testing port 80
 			ports := []int32{80}
 
-			// Create pods for this test
+			// Create pods and namespaces for this test
 			k8s = initializeResources(ctx, f, protocols, ports)
 
-			// Only going tomake a policy in namespace X
+			// Only going to make a policy in namespace X
 			nsX, _, _ := getK8sNamespaces(k8s)
 			policy := GenNetworkPolicyWithNameAndPodSelector("deny-ingress", metav1.LabelSelector{}, SetSpecIngressRules())
 
