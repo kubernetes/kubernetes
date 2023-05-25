@@ -229,7 +229,7 @@ func toExternalPersistentVolumeClaimOrError(obj runtime.Object) (*corev1.Persist
 // RequiresQuotaReplenish enables quota monitoring for PVCs.
 func RequiresQuotaReplenish(pvc, oldPVC *corev1.PersistentVolumeClaim) bool {
 	if utilfeature.DefaultFeatureGate.Enabled(k8sfeatures.RecoverVolumeExpansionFailure) {
-		if oldPVC.Status.AllocatedResources.Storage() != pvc.Status.AllocatedResources.Storage() {
+		if !oldPVC.Status.AllocatedResources.Storage().Equal(*pvc.Status.AllocatedResources.Storage()) {
 			return true
 		}
 	}
