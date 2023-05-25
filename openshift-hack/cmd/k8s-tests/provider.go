@@ -101,7 +101,7 @@ func initializeTestFramework(provider string) error {
 
 	// Ensure that Kube tests run privileged (like they do upstream)
 	testContext.CreateTestingNS = func(ctx context.Context, baseName string, c kclientset.Interface, labels map[string]string) (*corev1.Namespace, error) {
-		return e2e.CreateTestingNS(baseName, c, labels, true)
+		return e2e.CreateTestingNS(ctx, baseName, c, labels, true)
 	}
 
 	gomega.RegisterFailHandler(ginkgo.Fail)

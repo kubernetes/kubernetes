@@ -1165,9 +1165,9 @@ var Annotations = map[string]string{
 
 	"[sig-network] NetworkPolicyLegacy [LinuxOnly] NetworkPolicy between server and client should enforce policy to allow traffic only from a different namespace, based on NamespaceSelector [Feature:NetworkPolicy]": " [Skipped:Network/OpenShiftSDN/Multitenant] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-network] NetworkPolicyLegacy [LinuxOnly] NetworkPolicy between server and client should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]": " [Skipped:Network/OpenShiftSDN/Multitenant] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-network] NetworkPolicyLegacy [LinuxOnly] NetworkPolicy between server and client should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]": " [Disabled:RebaseInProgress] [Skipped:Network/OpenShiftSDN/Multitenant] [Suite:k8s]",
 
-	"[sig-network] NetworkPolicyLegacy [LinuxOnly] NetworkPolicy between server and client should enforce updated policy [Feature:NetworkPolicy]": " [Skipped:Network/OpenShiftSDN/Multitenant] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-network] NetworkPolicyLegacy [LinuxOnly] NetworkPolicy between server and client should enforce updated policy [Feature:NetworkPolicy]": " [Disabled:RebaseInProgress] [Skipped:Network/OpenShiftSDN/Multitenant] [Suite:k8s]",
 
 	"[sig-network] NetworkPolicyLegacy [LinuxOnly] NetworkPolicy between server and client should ensure an IP overlapping both IPBlock.CIDR and IPBlock.Except is allowed [Feature:NetworkPolicy]": " [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
