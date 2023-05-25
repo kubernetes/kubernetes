@@ -35,23 +35,16 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/events"
 
 	"k8s.io/apimachinery/pkg/fields"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	toolswatch "k8s.io/client-go/tools/watch"
-	"k8s.io/component-base/configz"
-	"k8s.io/component-base/metrics"
-	nodeutil "k8s.io/component-helpers/node/util"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
-	"k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
-	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/iptables"
 	"k8s.io/kubernetes/pkg/proxy/ipvs"
 	proxymetrics "k8s.io/kubernetes/pkg/proxy/metrics"
@@ -83,63 +76,15 @@ func (o *Options) platformApplyDefaults(config *proxyconfigapi.KubeProxyConfigur
 	klog.V(2).InfoS("DetectLocalMode", "localMode", string(config.DetectLocalMode))
 }
 
-// NewProxyServer returns a new ProxyServer.
-func NewProxyServer(o *Options) (*ProxyServer, error) {
-	return newProxyServer(o.config, o.master)
-}
-
-func newProxyServer(
-	config *proxyconfigapi.KubeProxyConfiguration,
-	master string) (*ProxyServer, error) {
-
-	if c, err := configz.New(proxyconfigapi.GroupName); err == nil {
-		c.Set(config)
-	} else {
-		return nil, fmt.Errorf("unable to register configz: %s", err)
-	}
-
-	var ipvsInterface utilipvs.Interface
-	var ipsetInterface utilipset.Interface
-
-	if len(config.ShowHiddenMetricsForVersion) > 0 {
-		metrics.SetShowHidden()
-	}
-
-	hostname, err := nodeutil.GetHostname(config.HostnameOverride)
-	if err != nil {
-		return nil, err
-	}
-
-	client, err := createClient(config.ClientConnection, master)
-	if err != nil {
-		return nil, err
-	}
-
-	nodeIP := detectNodeIP(client, hostname, config.BindAddress)
-	klog.InfoS("Detected node IP", "address", nodeIP.String())
-
-	// Create event recorder
-	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, "kube-proxy")
-
-	nodeRef := &v1.ObjectReference{
-		Kind:      "Node",
-		Name:      hostname,
-		UID:       types.UID(hostname),
-		Namespace: "",
-	}
-
-	var healthzServer healthcheck.ProxierHealthUpdater
-	if len(config.HealthzBindAddress) > 0 {
-		healthzServer = healthcheck.NewProxierHealthServer(config.HealthzBindAddress, 2*config.IPTables.SyncPeriod.Duration, recorder, nodeRef)
-	}
-
+// createProxier creates the proxy.Provider
+func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguration) (proxy.Provider, error) {
 	var proxier proxy.Provider
+	var err error
 
 	var nodeInfo *v1.Node
 	if config.DetectLocalMode == proxyconfigapi.LocalModeNodeCIDR {
-		klog.InfoS("Watching for node, awaiting podCIDR allocation", "hostname", hostname)
-		nodeInfo, err = waitForPodCIDR(client, hostname)
+		klog.InfoS("Watching for node, awaiting podCIDR allocation", "hostname", s.Hostname)
+		nodeInfo, err = waitForPodCIDR(s.Client, s.Hostname)
 		if err != nil {
 			return nil, err
 		}
@@ -148,7 +93,7 @@ func newProxyServer(
 
 	primaryFamily := v1.IPv4Protocol
 	primaryProtocol := utiliptables.ProtocolIPv4
-	if netutils.IsIPv6(nodeIP) {
+	if netutils.IsIPv6(s.NodeIP) {
 		primaryFamily = v1.IPv6Protocol
 		primaryProtocol = utiliptables.ProtocolIPv6
 	}
@@ -210,10 +155,10 @@ func newProxyServer(
 				*config.IPTables.LocalhostNodePorts,
 				int(*config.IPTables.MasqueradeBit),
 				localDetectors,
-				hostname,
+				s.Hostname,
 				nodeIPTuple(config.BindAddress),
-				recorder,
-				healthzServer,
+				s.Recorder,
+				s.HealthzServer,
 				nodePortAddresses,
 			)
 		} else {
@@ -236,10 +181,10 @@ func newProxyServer(
 				*config.IPTables.LocalhostNodePorts,
 				int(*config.IPTables.MasqueradeBit),
 				localDetector,
-				hostname,
-				nodeIP,
-				recorder,
-				healthzServer,
+				s.Hostname,
+				s.NodeIP,
+				s.Recorder,
+				s.HealthzServer,
 				nodePortAddresses,
 			)
 		}
@@ -247,11 +192,10 @@ func newProxyServer(
 		if err != nil {
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
-		proxymetrics.RegisterMetrics()
 	} else if config.Mode == proxyconfigapi.ProxyModeIPVS {
 		kernelHandler := ipvs.NewLinuxKernelHandler()
-		ipsetInterface = utilipset.New(execer)
-		ipvsInterface = utilipvs.New()
+		ipsetInterface := utilipset.New(execer)
+		ipvsInterface := utilipvs.New()
 		if err := ipvs.CanUseIPVSProxier(ipvsInterface, ipsetInterface, config.IPVS.Scheduler); err != nil {
 			return nil, fmt.Errorf("can't use the IPVS proxier: %v", err)
 		}
@@ -285,10 +229,10 @@ func newProxyServer(
 				config.IPTables.MasqueradeAll,
 				int(*config.IPTables.MasqueradeBit),
 				localDetectors,
-				hostname,
+				s.Hostname,
 				nodeIPs,
-				recorder,
-				healthzServer,
+				s.Recorder,
+				s.HealthzServer,
 				config.IPVS.Scheduler,
 				nodePortAddresses,
 				kernelHandler,
@@ -317,10 +261,10 @@ func newProxyServer(
 				config.IPTables.MasqueradeAll,
 				int(*config.IPTables.MasqueradeBit),
 				localDetector,
-				hostname,
-				nodeIP,
-				recorder,
-				healthzServer,
+				s.Hostname,
+				s.NodeIP,
+				s.Recorder,
+				s.HealthzServer,
 				config.IPVS.Scheduler,
 				nodePortAddresses,
 				kernelHandler,
@@ -329,19 +273,70 @@ func newProxyServer(
 		if err != nil {
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
-		proxymetrics.RegisterMetrics()
 	}
 
-	return &ProxyServer{
-		Config:        config,
-		Client:        client,
-		Proxier:       proxier,
-		Broadcaster:   eventBroadcaster,
-		Recorder:      recorder,
-		Conntracker:   &realConntracker{},
-		NodeRef:       nodeRef,
-		HealthzServer: healthzServer,
-	}, nil
+	return proxier, nil
+}
+
+func (s *ProxyServer) platformSetup() error {
+	ct := &realConntracker{}
+
+	max, err := getConntrackMax(s.Config.Conntrack)
+	if err != nil {
+		return err
+	}
+	if max > 0 {
+		err := ct.SetMax(max)
+		if err != nil {
+			if err != errReadOnlySysFS {
+				return err
+			}
+			// errReadOnlySysFS is caused by a known docker issue (https://github.com/docker/docker/issues/24000),
+			// the only remediation we know is to restart the docker daemon.
+			// Here we'll send an node event with specific reason and message, the
+			// administrator should decide whether and how to handle this issue,
+			// whether to drain the node and restart docker.  Occurs in other container runtimes
+			// as well.
+			// TODO(random-liu): Remove this when the docker bug is fixed.
+			const message = "CRI error: /sys is read-only: " +
+				"cannot modify conntrack limits, problems may arise later (If running Docker, see docker issue #24000)"
+			s.Recorder.Eventf(s.NodeRef, nil, v1.EventTypeWarning, err.Error(), "StartKubeProxy", message)
+		}
+	}
+
+	if s.Config.Conntrack.TCPEstablishedTimeout != nil && s.Config.Conntrack.TCPEstablishedTimeout.Duration > 0 {
+		timeout := int(s.Config.Conntrack.TCPEstablishedTimeout.Duration / time.Second)
+		if err := ct.SetTCPEstablishedTimeout(timeout); err != nil {
+			return err
+		}
+	}
+
+	if s.Config.Conntrack.TCPCloseWaitTimeout != nil && s.Config.Conntrack.TCPCloseWaitTimeout.Duration > 0 {
+		timeout := int(s.Config.Conntrack.TCPCloseWaitTimeout.Duration / time.Second)
+		if err := ct.SetTCPCloseWaitTimeout(timeout); err != nil {
+			return err
+		}
+	}
+
+	proxymetrics.RegisterMetrics()
+	return nil
+}
+
+func getConntrackMax(config proxyconfigapi.KubeProxyConntrackConfiguration) (int, error) {
+	if config.MaxPerCore != nil && *config.MaxPerCore > 0 {
+		floor := 0
+		if config.Min != nil {
+			floor = int(*config.Min)
+		}
+		scaled := int(*config.MaxPerCore) * detectNumCPU()
+		if scaled > floor {
+			klog.V(3).InfoS("GetConntrackMax: using scaled conntrack-max-per-core")
+			return scaled, nil
+		}
+		klog.V(3).InfoS("GetConntrackMax: using conntrack-min")
+		return floor, nil
+	}
+	return 0, nil
 }
 
 func waitForPodCIDR(client clientset.Interface, nodeName string) (*v1.Node, error) {
