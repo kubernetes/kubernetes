@@ -370,7 +370,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 
 	klog.InfoS("Eviction manager: pods ranked for eviction", "pods", klog.KObjSlice(activePods))
 
-	//record age of metrics for met thresholds that we are using for evictions.
+	// record age of metrics for met thresholds that we are using for evictions.
 	for _, t := range thresholds {
 		timeObserved := observations[t.Signal].time
 		if !timeObserved.IsZero() {
@@ -384,6 +384,10 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		gracePeriodOverride := int64(0)
 		if !isHardEvictionThreshold(thresholdToReclaim) {
 			gracePeriodOverride = m.config.MaxPodGracePeriodSeconds
+
+			if m.config.MaxPodGracePeriodSeconds < 0 && pod.Spec.TerminationGracePeriodSeconds != nil {
+				gracePeriodOverride = *pod.Spec.TerminationGracePeriodSeconds
+			}
 		}
 		message, annotations := evictionMessage(resourceToReclaim, pod, statsFunc, thresholds, observations)
 		var condition *v1.PodCondition
