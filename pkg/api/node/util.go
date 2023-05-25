@@ -62,6 +62,10 @@ func GetWarningsForNodeSelector(nodeSelector *metav1.LabelSelector, fieldPath *f
 		return nil
 	}
 
+	if fieldPath == nil {
+		return nil
+	}
+
 	var warnings []string
 	// use of deprecated node labels in matchLabelExpressions
 	for i, expression := range nodeSelector.MatchExpressions {
@@ -89,6 +93,10 @@ func GetWarningsForNodeSelector(nodeSelector *metav1.LabelSelector, fieldPath *f
 
 // GetWarningsForNodeSelectorTerm checks match expressions of node selector term
 func GetWarningsForNodeSelectorTerm(nodeSelectorTerm api.NodeSelectorTerm, fieldPath *field.Path) []string {
+	if fieldPath == nil {
+		return nil
+	}
+
 	var warnings []string
 	// use of deprecated node labels in matchLabelExpressions
 	for i, expression := range nodeSelectorTerm.MatchExpressions {
