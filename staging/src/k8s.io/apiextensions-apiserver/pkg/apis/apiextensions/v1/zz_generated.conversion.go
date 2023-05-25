@@ -25,7 +25,6 @@ import (
 	unsafe "unsafe"
 
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	schema "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/schema"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -541,7 +540,7 @@ func Convert_apiextensions_CustomResourceSubresources_To_v1_CustomResourceSubres
 }
 
 func autoConvert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(in *CustomResourceValidation, out *apiextensions.CustomResourceValidation, s conversion.Scope) error {
-	out.OpenAPIV3Schema = (*schema.JSONSchemaProps)(unsafe.Pointer(in.OpenAPIV3Schema))
+	out.OpenAPIV3Schema = (*apiextensions.JSONSchemaProps)(unsafe.Pointer(in.OpenAPIV3Schema))
 	return nil
 }
 
@@ -551,7 +550,7 @@ func Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidati
 }
 
 func autoConvert_apiextensions_CustomResourceValidation_To_v1_CustomResourceValidation(in *apiextensions.CustomResourceValidation, out *CustomResourceValidation, s conversion.Scope) error {
-	out.OpenAPIV3Schema = (*schema.JSONSchemaProps)(unsafe.Pointer(in.OpenAPIV3Schema))
+	out.OpenAPIV3Schema = (*apiextensions.JSONSchemaProps)(unsafe.Pointer(in.OpenAPIV3Schema))
 	return nil
 }
 
