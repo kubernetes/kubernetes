@@ -52,6 +52,44 @@ var (
 	// kubeadm lookup dl.k8s.io to resolve what the latest stable release is
 	dummyKubernetesVersion    = constants.MinimumControlPlaneVersion
 	dummyKubernetesVersionStr = dummyKubernetesVersion.String()
+
+	// predefined configuration contents for migration and validation
+	cfgInvalidSubdomain = []byte(dedent.Dedent(fmt.Sprintf(`
+apiVersion: %s
+kind: InitConfiguration
+nodeRegistration:
+  criSocket: %s
+  name: foo bar # not a valid subdomain
+`, kubeadmapiv1.SchemeGroupVersion.String(), constants.UnknownCRISocket)))
+
+	cfgUnknownAPI = []byte(dedent.Dedent(fmt.Sprintf(`
+apiVersion: foo/bar # not a valid GroupVersion
+kind: zzz # not a valid Kind
+nodeRegistration:
+  criSocket: %s
+`, constants.UnknownCRISocket)))
+
+	cfgLegacyAPI = []byte(dedent.Dedent(fmt.Sprintf(`
+apiVersion: kubeadm.k8s.io/v1beta1 # legacy API
+kind: InitConfiguration
+nodeRegistration:
+  criSocket: %s
+`, constants.UnknownCRISocket)))
+
+	cfgUnknownField = []byte(dedent.Dedent(fmt.Sprintf(`
+apiVersion: %s
+kind: InitConfiguration
+foo: bar
+nodeRegistration:
+  criSocket: %s
+`, kubeadmapiv1.SchemeGroupVersion.String(), constants.UnknownCRISocket)))
+
+	cfgValid = []byte(dedent.Dedent(fmt.Sprintf(`
+apiVersion: %s
+kind: InitConfiguration
+nodeRegistration:
+  criSocket: %s
+`, kubeadmapiv1.SchemeGroupVersion.String(), constants.UnknownCRISocket)))
 )
 
 func TestNewCmdConfigImagesList(t *testing.T) {
@@ -391,30 +429,132 @@ func TestImagesPull(t *testing.T) {
 }
 
 func TestMigrate(t *testing.T) {
-	cfg := []byte(dedent.Dedent(fmt.Sprintf(`
-        # This is intentionally testing an old API version. Sometimes this may be the latest version (if no old configs are supported).
-        apiVersion: %s
-        kind: InitConfiguration
-        nodeRegistration:
-          criSocket: %s
-	`, kubeadmapiv1.SchemeGroupVersion.String(), constants.UnknownCRISocket)))
-	configFile, cleanup := tempConfig(t, cfg)
+	cfgFileInvalidSubdomain, cleanup := tempConfig(t, cfgInvalidSubdomain)
+	defer cleanup()
+	cfgFileUnknownAPI, cleanup := tempConfig(t, cfgUnknownAPI)
+	defer cleanup()
+	cfgFileLegacyAPI, cleanup := tempConfig(t, cfgLegacyAPI)
+	defer cleanup()
+	cfgFileUnknownField, cleanup := tempConfig(t, cfgUnknownField)
+	defer cleanup()
+	cfgFileValid, cleanup := tempConfig(t, cfgValid)
 	defer cleanup()
 
-	var output bytes.Buffer
-	command := newCmdConfigMigrate(&output)
-	if err := command.Flags().Set("old-config", configFile); err != nil {
-		t.Fatalf("failed to set old-config flag")
+	testcases := []struct {
+		name          string
+		cfg           string
+		expectedError bool
+	}{
+		{
+			name:          "invalid subdomain",
+			cfg:           cfgFileInvalidSubdomain,
+			expectedError: true,
+		},
+		{
+			name:          "unknown API GVK",
+			cfg:           cfgFileUnknownAPI,
+			expectedError: true,
+		},
+		{
+			name:          "legacy API GVK",
+			cfg:           cfgFileLegacyAPI,
+			expectedError: true,
+		},
+		{
+			name:          "unknown field",
+			cfg:           cfgFileUnknownField,
+			expectedError: true,
+		},
+		{
+			name:          "valid",
+			cfg:           cfgFileValid,
+			expectedError: false,
+		},
 	}
-	newConfigPath := filepath.Join(filepath.Dir(configFile), "new-migrated-config")
-	if err := command.Flags().Set("new-config", newConfigPath); err != nil {
-		t.Fatalf("failed to set new-config flag")
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			var output bytes.Buffer
+			command := newCmdConfigMigrate(&output)
+			if err := command.Flags().Set("old-config", tc.cfg); err != nil {
+				t.Fatalf("failed to set old-config flag")
+			}
+			newConfigPath := filepath.Join(filepath.Dir(tc.cfg), "new-migrated-config")
+			if err := command.Flags().Set("new-config", newConfigPath); err != nil {
+				t.Fatalf("failed to set new-config flag")
+			}
+			err := command.RunE(nil, nil)
+			if (err != nil) != tc.expectedError {
+				t.Fatalf("Expected error from validate command: %v, got: %v, error: %v",
+					tc.expectedError, err != nil, err)
+			}
+			if err != nil {
+				return
+			}
+			if _, err := configutil.LoadInitConfigurationFromFile(newConfigPath); err != nil {
+				t.Fatalf("Could not read output back into internal type: %v", err)
+			}
+		})
 	}
-	if err := command.RunE(nil, nil); err != nil {
-		t.Fatalf("Error from running the migrate command: %v", err)
+
+}
+
+func TestValidate(t *testing.T) {
+	cfgFileInvalidSubdomain, cleanup := tempConfig(t, cfgInvalidSubdomain)
+	defer cleanup()
+	cfgFileUnknownAPI, cleanup := tempConfig(t, cfgUnknownAPI)
+	defer cleanup()
+	cfgFileLegacyAPI, cleanup := tempConfig(t, cfgLegacyAPI)
+	defer cleanup()
+	cfgFileUnknownField, cleanup := tempConfig(t, cfgUnknownField)
+	defer cleanup()
+	cfgFileValid, cleanup := tempConfig(t, cfgValid)
+	defer cleanup()
+
+	testcases := []struct {
+		name          string
+		cfg           string
+		expectedError bool
+	}{
+		{
+			name:          "invalid subdomain",
+			cfg:           cfgFileInvalidSubdomain,
+			expectedError: true,
+		},
+		{
+			name:          "unknown API GVK",
+			cfg:           cfgFileUnknownAPI,
+			expectedError: true,
+		},
+		{
+			name:          "legacy API GVK",
+			cfg:           cfgFileLegacyAPI,
+			expectedError: true,
+		},
+		{
+			name:          "unknown field",
+			cfg:           cfgFileUnknownField,
+			expectedError: true,
+		},
+		{
+			name:          "valid",
+			cfg:           cfgFileValid,
+			expectedError: false,
+		},
 	}
-	if _, err := configutil.LoadInitConfigurationFromFile(newConfigPath); err != nil {
-		t.Fatalf("Could not read output back into internal type: %v", err)
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			var output bytes.Buffer
+			command := newCmdConfigValidate(&output)
+			if err := command.Flags().Set("config", tc.cfg); err != nil {
+				t.Fatalf("Failed to set config flag")
+			}
+			if err := command.RunE(nil, nil); (err != nil) != tc.expectedError {
+				t.Fatalf("Expected error from validate command: %v, got: %v, error: %v",
+					tc.expectedError, err != nil, err)
+			}
+		})
 	}
 }
 
