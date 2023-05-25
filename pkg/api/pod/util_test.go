@@ -2666,3 +2666,110 @@ func TestMarkPodProposedForResize(t *testing.T) {
 		})
 	}
 }
+
+func TestGetPodCondition(t *testing.T) {
+	tests := []struct {
+		name          string
+		status        *api.PodStatus
+		conditionType api.PodConditionType
+		wantIndex     int
+		podCondition  *api.PodCondition
+	}{
+		{
+			name:         "test pod status is nil",
+			status:       nil,
+			wantIndex:    -1,
+			podCondition: nil,
+		},
+		{
+			name: "test got expected condition",
+			status: &api.PodStatus{
+				Conditions: []api.PodCondition{
+					{
+						Type:   "Scheduled",
+						Status: "True",
+					},
+					{
+						Type:   "Ready",
+						Status: "True",
+					},
+				},
+			},
+			conditionType: api.PodReady,
+			wantIndex:     1,
+			podCondition: &api.PodCondition{
+				Type:   "Ready",
+				Status: "True",
+			},
+		},
+		{
+			name: "test expected condition not found",
+			status: &api.PodStatus{
+				Conditions: []api.PodCondition{
+					{
+						Type:   "Scheduled",
+						Status: "True",
+					},
+				},
+			},
+			conditionType: api.PodReady,
+			wantIndex:     -1,
+			podCondition:  nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			index, condition := GetPodCondition(tt.status, tt.conditionType)
+			if index != tt.wantIndex {
+				t.Errorf("GetPodCondition() got = %v, want %v", index, tt.wantIndex)
+			}
+			if !reflect.DeepEqual(tt.podCondition, condition) {
+				t.Errorf("GetPodCondition() want = %v, got %v", tt.podCondition, condition)
+			}
+		})
+	}
+}
+
+func TestIsPodReadyConditionTrue(t *testing.T) {
+	tests := []struct {
+		name   string
+		status api.PodStatus
+		want   bool
+	}{
+		{
+			name: "test pod status is not ready",
+			status: api.PodStatus{
+				Conditions: []api.PodCondition{
+					{
+						Type:   "Scheduled",
+						Status: "True",
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "test pod status is ready",
+			status: api.PodStatus{
+				Conditions: []api.PodCondition{
+					{
+						Type:   "Scheduled",
+						Status: "True",
+					},
+					{
+						Type:   "Ready",
+						Status: "True",
+					},
+				},
+			},
+			want: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsPodReadyConditionTrue(tt.status); got != tt.want {
+				t.Errorf("IsPodReadyConditionTrue() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
