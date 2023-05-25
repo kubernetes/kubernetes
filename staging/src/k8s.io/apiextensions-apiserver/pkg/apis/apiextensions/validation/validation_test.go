@@ -30,7 +30,6 @@ import (
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsfuzzer "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/fuzzer"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -8925,10 +8924,7 @@ func TestSchemaHasDefaults(t *testing.T) {
 		schema := &apiextensions.JSONSchemaProps{}
 		f.Fuzz(schema)
 
-		v1beta1Schema := &apiextensionsv1beta1.JSONSchemaProps{}
-		if err := apiextensionsv1beta1.Convert_apiextensions_JSONSchemaProps_To_v1beta1_JSONSchemaProps(schema, v1beta1Schema, nil); err != nil {
-			t.Fatal(err)
-		}
+		v1beta1Schema := schema
 
 		bs, err := json.Marshal(v1beta1Schema)
 		if err != nil {

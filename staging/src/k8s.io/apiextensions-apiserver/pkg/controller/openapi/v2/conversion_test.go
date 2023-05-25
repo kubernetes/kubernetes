@@ -91,10 +91,7 @@ properties:
 		t.Fatal(err)
 	}
 
-	specInternal := apiextensions.JSONSchemaProps{}
-	if err := apiextensionsv1beta1.Convert_v1beta1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(&specV1beta1, &specInternal, nil); err != nil {
-		t.Fatal(err)
-	}
+	specInternal := specV1beta1
 
 	ss, err := structuralschema.NewStructural(&specInternal)
 	if err != nil {
@@ -741,10 +738,7 @@ func TestKubeOpenapiRejectionFiltering(t *testing.T) {
 		}
 
 		// convert to internal
-		internalSchema := &apiextensions.JSONSchemaProps{}
-		if err := apiextensionsv1beta1.Convert_v1beta1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(schema, internalSchema, nil); err != nil {
-			t.Fatalf("failed to convert from apiextensions/v1beta1 to internal: %v", err)
-		}
+		internalSchema := schema
 
 		// apply the filter
 		ss, err := structuralschema.NewStructural(internalSchema)

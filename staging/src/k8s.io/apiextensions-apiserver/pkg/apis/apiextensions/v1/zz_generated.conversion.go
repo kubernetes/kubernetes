@@ -25,6 +25,7 @@ import (
 	unsafe "unsafe"
 
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	schema "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/schema"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -147,56 +148,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*ExternalDocumentation)(nil), (*apiextensions.ExternalDocumentation)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_ExternalDocumentation_To_apiextensions_ExternalDocumentation(a.(*ExternalDocumentation), b.(*apiextensions.ExternalDocumentation), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*apiextensions.ExternalDocumentation)(nil), (*ExternalDocumentation)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_ExternalDocumentation_To_v1_ExternalDocumentation(a.(*apiextensions.ExternalDocumentation), b.(*ExternalDocumentation), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*JSONSchemaProps)(nil), (*apiextensions.JSONSchemaProps)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(a.(*JSONSchemaProps), b.(*apiextensions.JSONSchemaProps), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*apiextensions.JSONSchemaProps)(nil), (*JSONSchemaProps)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_JSONSchemaProps_To_v1_JSONSchemaProps(a.(*apiextensions.JSONSchemaProps), b.(*JSONSchemaProps), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*JSONSchemaPropsOrArray)(nil), (*apiextensions.JSONSchemaPropsOrArray)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_JSONSchemaPropsOrArray_To_apiextensions_JSONSchemaPropsOrArray(a.(*JSONSchemaPropsOrArray), b.(*apiextensions.JSONSchemaPropsOrArray), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*apiextensions.JSONSchemaPropsOrArray)(nil), (*JSONSchemaPropsOrArray)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_JSONSchemaPropsOrArray_To_v1_JSONSchemaPropsOrArray(a.(*apiextensions.JSONSchemaPropsOrArray), b.(*JSONSchemaPropsOrArray), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*JSONSchemaPropsOrBool)(nil), (*apiextensions.JSONSchemaPropsOrBool)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_JSONSchemaPropsOrBool_To_apiextensions_JSONSchemaPropsOrBool(a.(*JSONSchemaPropsOrBool), b.(*apiextensions.JSONSchemaPropsOrBool), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*apiextensions.JSONSchemaPropsOrBool)(nil), (*JSONSchemaPropsOrBool)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_JSONSchemaPropsOrBool_To_v1_JSONSchemaPropsOrBool(a.(*apiextensions.JSONSchemaPropsOrBool), b.(*JSONSchemaPropsOrBool), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*JSONSchemaPropsOrStringArray)(nil), (*apiextensions.JSONSchemaPropsOrStringArray)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_JSONSchemaPropsOrStringArray_To_apiextensions_JSONSchemaPropsOrStringArray(a.(*JSONSchemaPropsOrStringArray), b.(*apiextensions.JSONSchemaPropsOrStringArray), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*apiextensions.JSONSchemaPropsOrStringArray)(nil), (*JSONSchemaPropsOrStringArray)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_JSONSchemaPropsOrStringArray_To_v1_JSONSchemaPropsOrStringArray(a.(*apiextensions.JSONSchemaPropsOrStringArray), b.(*JSONSchemaPropsOrStringArray), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*ServiceReference)(nil), (*apiextensions.ServiceReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_ServiceReference_To_apiextensions_ServiceReference(a.(*ServiceReference), b.(*apiextensions.ServiceReference), scope)
 	}); err != nil {
@@ -204,16 +155,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*apiextensions.ServiceReference)(nil), (*ServiceReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_apiextensions_ServiceReference_To_v1_ServiceReference(a.(*apiextensions.ServiceReference), b.(*ServiceReference), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*ValidationRule)(nil), (*apiextensions.ValidationRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_ValidationRule_To_apiextensions_ValidationRule(a.(*ValidationRule), b.(*apiextensions.ValidationRule), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*apiextensions.ValidationRule)(nil), (*ValidationRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_ValidationRule_To_v1_ValidationRule(a.(*apiextensions.ValidationRule), b.(*ValidationRule), scope)
 	}); err != nil {
 		return err
 	}
@@ -237,16 +178,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*apiextensions.JSON)(nil), (*JSON)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_JSON_To_v1_JSON(a.(*apiextensions.JSON), b.(*JSON), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddConversionFunc((*apiextensions.ValidationRules)(nil), (*ValidationRules)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_ValidationRules_To_v1_ValidationRules(a.(*apiextensions.ValidationRules), b.(*ValidationRules), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddConversionFunc((*CustomResourceConversion)(nil), (*apiextensions.CustomResourceConversion)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_CustomResourceConversion_To_apiextensions_CustomResourceConversion(a.(*CustomResourceConversion), b.(*apiextensions.CustomResourceConversion), scope)
 	}); err != nil {
@@ -254,11 +185,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddConversionFunc((*CustomResourceDefinitionSpec)(nil), (*apiextensions.CustomResourceDefinitionSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_CustomResourceDefinitionSpec_To_apiextensions_CustomResourceDefinitionSpec(a.(*CustomResourceDefinitionSpec), b.(*apiextensions.CustomResourceDefinitionSpec), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddConversionFunc((*JSON)(nil), (*apiextensions.JSON)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_JSON_To_apiextensions_JSON(a.(*JSON), b.(*apiextensions.JSON), scope)
 	}); err != nil {
 		return err
 	}
@@ -446,17 +372,7 @@ func autoConvert_v1_CustomResourceDefinitionSpec_To_apiextensions_CustomResource
 		return err
 	}
 	out.Scope = apiextensions.ResourceScope(in.Scope)
-	if in.Versions != nil {
-		in, out := &in.Versions, &out.Versions
-		*out = make([]apiextensions.CustomResourceDefinitionVersion, len(*in))
-		for i := range *in {
-			if err := Convert_v1_CustomResourceDefinitionVersion_To_apiextensions_CustomResourceDefinitionVersion(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Versions = nil
-	}
+	out.Versions = *(*[]apiextensions.CustomResourceDefinitionVersion)(unsafe.Pointer(&in.Versions))
 	if in.Conversion != nil {
 		in, out := &in.Conversion, &out.Conversion
 		*out = new(apiextensions.CustomResourceConversion)
@@ -481,17 +397,7 @@ func autoConvert_apiextensions_CustomResourceDefinitionSpec_To_v1_CustomResource
 	out.Scope = ResourceScope(in.Scope)
 	// WARNING: in.Validation requires manual conversion: does not exist in peer-type
 	// WARNING: in.Subresources requires manual conversion: does not exist in peer-type
-	if in.Versions != nil {
-		in, out := &in.Versions, &out.Versions
-		*out = make([]CustomResourceDefinitionVersion, len(*in))
-		for i := range *in {
-			if err := Convert_apiextensions_CustomResourceDefinitionVersion_To_v1_CustomResourceDefinitionVersion(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Versions = nil
-	}
+	out.Versions = *(*[]CustomResourceDefinitionVersion)(unsafe.Pointer(&in.Versions))
 	// WARNING: in.AdditionalPrinterColumns requires manual conversion: does not exist in peer-type
 	if in.Conversion != nil {
 		in, out := &in.Conversion, &out.Conversion
@@ -542,15 +448,7 @@ func autoConvert_v1_CustomResourceDefinitionVersion_To_apiextensions_CustomResou
 	out.Storage = in.Storage
 	out.Deprecated = in.Deprecated
 	out.DeprecationWarning = (*string)(unsafe.Pointer(in.DeprecationWarning))
-	if in.Schema != nil {
-		in, out := &in.Schema, &out.Schema
-		*out = new(apiextensions.CustomResourceValidation)
-		if err := Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Schema = nil
-	}
+	out.Schema = (*apiextensions.CustomResourceValidation)(unsafe.Pointer(in.Schema))
 	out.Subresources = (*apiextensions.CustomResourceSubresources)(unsafe.Pointer(in.Subresources))
 	out.AdditionalPrinterColumns = *(*[]apiextensions.CustomResourceColumnDefinition)(unsafe.Pointer(&in.AdditionalPrinterColumns))
 	return nil
@@ -567,15 +465,7 @@ func autoConvert_apiextensions_CustomResourceDefinitionVersion_To_v1_CustomResou
 	out.Storage = in.Storage
 	out.Deprecated = in.Deprecated
 	out.DeprecationWarning = (*string)(unsafe.Pointer(in.DeprecationWarning))
-	if in.Schema != nil {
-		in, out := &in.Schema, &out.Schema
-		*out = new(CustomResourceValidation)
-		if err := Convert_apiextensions_CustomResourceValidation_To_v1_CustomResourceValidation(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Schema = nil
-	}
+	out.Schema = (*CustomResourceValidation)(unsafe.Pointer(in.Schema))
 	out.Subresources = (*CustomResourceSubresources)(unsafe.Pointer(in.Subresources))
 	out.AdditionalPrinterColumns = *(*[]CustomResourceColumnDefinition)(unsafe.Pointer(&in.AdditionalPrinterColumns))
 	return nil
@@ -651,15 +541,7 @@ func Convert_apiextensions_CustomResourceSubresources_To_v1_CustomResourceSubres
 }
 
 func autoConvert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(in *CustomResourceValidation, out *apiextensions.CustomResourceValidation, s conversion.Scope) error {
-	if in.OpenAPIV3Schema != nil {
-		in, out := &in.OpenAPIV3Schema, &out.OpenAPIV3Schema
-		*out = new(apiextensions.JSONSchemaProps)
-		if err := Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.OpenAPIV3Schema = nil
-	}
+	out.OpenAPIV3Schema = (*schema.JSONSchemaProps)(unsafe.Pointer(in.OpenAPIV3Schema))
 	return nil
 }
 
@@ -669,555 +551,13 @@ func Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidati
 }
 
 func autoConvert_apiextensions_CustomResourceValidation_To_v1_CustomResourceValidation(in *apiextensions.CustomResourceValidation, out *CustomResourceValidation, s conversion.Scope) error {
-	if in.OpenAPIV3Schema != nil {
-		in, out := &in.OpenAPIV3Schema, &out.OpenAPIV3Schema
-		*out = new(JSONSchemaProps)
-		if err := Convert_apiextensions_JSONSchemaProps_To_v1_JSONSchemaProps(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.OpenAPIV3Schema = nil
-	}
+	out.OpenAPIV3Schema = (*schema.JSONSchemaProps)(unsafe.Pointer(in.OpenAPIV3Schema))
 	return nil
 }
 
 // Convert_apiextensions_CustomResourceValidation_To_v1_CustomResourceValidation is an autogenerated conversion function.
 func Convert_apiextensions_CustomResourceValidation_To_v1_CustomResourceValidation(in *apiextensions.CustomResourceValidation, out *CustomResourceValidation, s conversion.Scope) error {
 	return autoConvert_apiextensions_CustomResourceValidation_To_v1_CustomResourceValidation(in, out, s)
-}
-
-func autoConvert_v1_ExternalDocumentation_To_apiextensions_ExternalDocumentation(in *ExternalDocumentation, out *apiextensions.ExternalDocumentation, s conversion.Scope) error {
-	out.Description = in.Description
-	out.URL = in.URL
-	return nil
-}
-
-// Convert_v1_ExternalDocumentation_To_apiextensions_ExternalDocumentation is an autogenerated conversion function.
-func Convert_v1_ExternalDocumentation_To_apiextensions_ExternalDocumentation(in *ExternalDocumentation, out *apiextensions.ExternalDocumentation, s conversion.Scope) error {
-	return autoConvert_v1_ExternalDocumentation_To_apiextensions_ExternalDocumentation(in, out, s)
-}
-
-func autoConvert_apiextensions_ExternalDocumentation_To_v1_ExternalDocumentation(in *apiextensions.ExternalDocumentation, out *ExternalDocumentation, s conversion.Scope) error {
-	out.Description = in.Description
-	out.URL = in.URL
-	return nil
-}
-
-// Convert_apiextensions_ExternalDocumentation_To_v1_ExternalDocumentation is an autogenerated conversion function.
-func Convert_apiextensions_ExternalDocumentation_To_v1_ExternalDocumentation(in *apiextensions.ExternalDocumentation, out *ExternalDocumentation, s conversion.Scope) error {
-	return autoConvert_apiextensions_ExternalDocumentation_To_v1_ExternalDocumentation(in, out, s)
-}
-
-func autoConvert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(in *JSONSchemaProps, out *apiextensions.JSONSchemaProps, s conversion.Scope) error {
-	out.ID = in.ID
-	out.Schema = apiextensions.JSONSchemaURL(in.Schema)
-	out.Ref = (*string)(unsafe.Pointer(in.Ref))
-	out.Description = in.Description
-	out.Type = in.Type
-	out.Format = in.Format
-	out.Title = in.Title
-	if in.Default != nil {
-		in, out := &in.Default, &out.Default
-		*out = new(apiextensions.JSON)
-		if err := Convert_v1_JSON_To_apiextensions_JSON(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Default = nil
-	}
-	out.Maximum = (*float64)(unsafe.Pointer(in.Maximum))
-	out.ExclusiveMaximum = in.ExclusiveMaximum
-	out.Minimum = (*float64)(unsafe.Pointer(in.Minimum))
-	out.ExclusiveMinimum = in.ExclusiveMinimum
-	out.MaxLength = (*int64)(unsafe.Pointer(in.MaxLength))
-	out.MinLength = (*int64)(unsafe.Pointer(in.MinLength))
-	out.Pattern = in.Pattern
-	out.MaxItems = (*int64)(unsafe.Pointer(in.MaxItems))
-	out.MinItems = (*int64)(unsafe.Pointer(in.MinItems))
-	out.UniqueItems = in.UniqueItems
-	out.MultipleOf = (*float64)(unsafe.Pointer(in.MultipleOf))
-	if in.Enum != nil {
-		in, out := &in.Enum, &out.Enum
-		*out = make([]apiextensions.JSON, len(*in))
-		for i := range *in {
-			if err := Convert_v1_JSON_To_apiextensions_JSON(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Enum = nil
-	}
-	out.MaxProperties = (*int64)(unsafe.Pointer(in.MaxProperties))
-	out.MinProperties = (*int64)(unsafe.Pointer(in.MinProperties))
-	out.Required = *(*[]string)(unsafe.Pointer(&in.Required))
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = new(apiextensions.JSONSchemaPropsOrArray)
-		if err := Convert_v1_JSONSchemaPropsOrArray_To_apiextensions_JSONSchemaPropsOrArray(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Items = nil
-	}
-	if in.AllOf != nil {
-		in, out := &in.AllOf, &out.AllOf
-		*out = make([]apiextensions.JSONSchemaProps, len(*in))
-		for i := range *in {
-			if err := Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.AllOf = nil
-	}
-	if in.OneOf != nil {
-		in, out := &in.OneOf, &out.OneOf
-		*out = make([]apiextensions.JSONSchemaProps, len(*in))
-		for i := range *in {
-			if err := Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.OneOf = nil
-	}
-	if in.AnyOf != nil {
-		in, out := &in.AnyOf, &out.AnyOf
-		*out = make([]apiextensions.JSONSchemaProps, len(*in))
-		for i := range *in {
-			if err := Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.AnyOf = nil
-	}
-	if in.Not != nil {
-		in, out := &in.Not, &out.Not
-		*out = new(apiextensions.JSONSchemaProps)
-		if err := Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Not = nil
-	}
-	if in.Properties != nil {
-		in, out := &in.Properties, &out.Properties
-		*out = make(map[string]apiextensions.JSONSchemaProps, len(*in))
-		for key, val := range *in {
-			newVal := new(apiextensions.JSONSchemaProps)
-			if err := Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(&val, newVal, s); err != nil {
-				return err
-			}
-			(*out)[key] = *newVal
-		}
-	} else {
-		out.Properties = nil
-	}
-	if in.AdditionalProperties != nil {
-		in, out := &in.AdditionalProperties, &out.AdditionalProperties
-		*out = new(apiextensions.JSONSchemaPropsOrBool)
-		if err := Convert_v1_JSONSchemaPropsOrBool_To_apiextensions_JSONSchemaPropsOrBool(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.AdditionalProperties = nil
-	}
-	if in.PatternProperties != nil {
-		in, out := &in.PatternProperties, &out.PatternProperties
-		*out = make(map[string]apiextensions.JSONSchemaProps, len(*in))
-		for key, val := range *in {
-			newVal := new(apiextensions.JSONSchemaProps)
-			if err := Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(&val, newVal, s); err != nil {
-				return err
-			}
-			(*out)[key] = *newVal
-		}
-	} else {
-		out.PatternProperties = nil
-	}
-	if in.Dependencies != nil {
-		in, out := &in.Dependencies, &out.Dependencies
-		*out = make(apiextensions.JSONSchemaDependencies, len(*in))
-		for key, val := range *in {
-			newVal := new(apiextensions.JSONSchemaPropsOrStringArray)
-			if err := Convert_v1_JSONSchemaPropsOrStringArray_To_apiextensions_JSONSchemaPropsOrStringArray(&val, newVal, s); err != nil {
-				return err
-			}
-			(*out)[key] = *newVal
-		}
-	} else {
-		out.Dependencies = nil
-	}
-	if in.AdditionalItems != nil {
-		in, out := &in.AdditionalItems, &out.AdditionalItems
-		*out = new(apiextensions.JSONSchemaPropsOrBool)
-		if err := Convert_v1_JSONSchemaPropsOrBool_To_apiextensions_JSONSchemaPropsOrBool(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.AdditionalItems = nil
-	}
-	if in.Definitions != nil {
-		in, out := &in.Definitions, &out.Definitions
-		*out = make(apiextensions.JSONSchemaDefinitions, len(*in))
-		for key, val := range *in {
-			newVal := new(apiextensions.JSONSchemaProps)
-			if err := Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(&val, newVal, s); err != nil {
-				return err
-			}
-			(*out)[key] = *newVal
-		}
-	} else {
-		out.Definitions = nil
-	}
-	out.ExternalDocs = (*apiextensions.ExternalDocumentation)(unsafe.Pointer(in.ExternalDocs))
-	if in.Example != nil {
-		in, out := &in.Example, &out.Example
-		*out = new(apiextensions.JSON)
-		if err := Convert_v1_JSON_To_apiextensions_JSON(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Example = nil
-	}
-	out.Nullable = in.Nullable
-	out.XPreserveUnknownFields = (*bool)(unsafe.Pointer(in.XPreserveUnknownFields))
-	out.XEmbeddedResource = in.XEmbeddedResource
-	out.XIntOrString = in.XIntOrString
-	out.XListMapKeys = *(*[]string)(unsafe.Pointer(&in.XListMapKeys))
-	out.XListType = (*string)(unsafe.Pointer(in.XListType))
-	out.XMapType = (*string)(unsafe.Pointer(in.XMapType))
-	out.XValidations = *(*apiextensions.ValidationRules)(unsafe.Pointer(&in.XValidations))
-	return nil
-}
-
-// Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps is an autogenerated conversion function.
-func Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(in *JSONSchemaProps, out *apiextensions.JSONSchemaProps, s conversion.Scope) error {
-	return autoConvert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(in, out, s)
-}
-
-func autoConvert_apiextensions_JSONSchemaProps_To_v1_JSONSchemaProps(in *apiextensions.JSONSchemaProps, out *JSONSchemaProps, s conversion.Scope) error {
-	out.ID = in.ID
-	out.Schema = JSONSchemaURL(in.Schema)
-	out.Ref = (*string)(unsafe.Pointer(in.Ref))
-	out.Description = in.Description
-	out.Type = in.Type
-	out.Format = in.Format
-	out.Title = in.Title
-	if in.Default != nil {
-		in, out := &in.Default, &out.Default
-		*out = new(JSON)
-		if err := Convert_apiextensions_JSON_To_v1_JSON(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Default = nil
-	}
-	out.Maximum = (*float64)(unsafe.Pointer(in.Maximum))
-	out.ExclusiveMaximum = in.ExclusiveMaximum
-	out.Minimum = (*float64)(unsafe.Pointer(in.Minimum))
-	out.ExclusiveMinimum = in.ExclusiveMinimum
-	out.MaxLength = (*int64)(unsafe.Pointer(in.MaxLength))
-	out.MinLength = (*int64)(unsafe.Pointer(in.MinLength))
-	out.Pattern = in.Pattern
-	out.MaxItems = (*int64)(unsafe.Pointer(in.MaxItems))
-	out.MinItems = (*int64)(unsafe.Pointer(in.MinItems))
-	out.UniqueItems = in.UniqueItems
-	out.MultipleOf = (*float64)(unsafe.Pointer(in.MultipleOf))
-	if in.Enum != nil {
-		in, out := &in.Enum, &out.Enum
-		*out = make([]JSON, len(*in))
-		for i := range *in {
-			if err := Convert_apiextensions_JSON_To_v1_JSON(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Enum = nil
-	}
-	out.MaxProperties = (*int64)(unsafe.Pointer(in.MaxProperties))
-	out.MinProperties = (*int64)(unsafe.Pointer(in.MinProperties))
-	out.Required = *(*[]string)(unsafe.Pointer(&in.Required))
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = new(JSONSchemaPropsOrArray)
-		if err := Convert_apiextensions_JSONSchemaPropsOrArray_To_v1_JSONSchemaPropsOrArray(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Items = nil
-	}
-	if in.AllOf != nil {
-		in, out := &in.AllOf, &out.AllOf
-		*out = make([]JSONSchemaProps, len(*in))
-		for i := range *in {
-			if err := Convert_apiextensions_JSONSchemaProps_To_v1_JSONSchemaProps(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.AllOf = nil
-	}
-	if in.OneOf != nil {
-		in, out := &in.OneOf, &out.OneOf
-		*out = make([]JSONSchemaProps, len(*in))
-		for i := range *in {
-			if err := Convert_apiextensions_JSONSchemaProps_To_v1_JSONSchemaProps(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.OneOf = nil
-	}
-	if in.AnyOf != nil {
-		in, out := &in.AnyOf, &out.AnyOf
-		*out = make([]JSONSchemaProps, len(*in))
-		for i := range *in {
-			if err := Convert_apiextensions_JSONSchemaProps_To_v1_JSONSchemaProps(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.AnyOf = nil
-	}
-	if in.Not != nil {
-		in, out := &in.Not, &out.Not
-		*out = new(JSONSchemaProps)
-		if err := Convert_apiextensions_JSONSchemaProps_To_v1_JSONSchemaProps(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Not = nil
-	}
-	if in.Properties != nil {
-		in, out := &in.Properties, &out.Properties
-		*out = make(map[string]JSONSchemaProps, len(*in))
-		for key, val := range *in {
-			newVal := new(JSONSchemaProps)
-			if err := Convert_apiextensions_JSONSchemaProps_To_v1_JSONSchemaProps(&val, newVal, s); err != nil {
-				return err
-			}
-			(*out)[key] = *newVal
-		}
-	} else {
-		out.Properties = nil
-	}
-	if in.AdditionalProperties != nil {
-		in, out := &in.AdditionalProperties, &out.AdditionalProperties
-		*out = new(JSONSchemaPropsOrBool)
-		if err := Convert_apiextensions_JSONSchemaPropsOrBool_To_v1_JSONSchemaPropsOrBool(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.AdditionalProperties = nil
-	}
-	if in.PatternProperties != nil {
-		in, out := &in.PatternProperties, &out.PatternProperties
-		*out = make(map[string]JSONSchemaProps, len(*in))
-		for key, val := range *in {
-			newVal := new(JSONSchemaProps)
-			if err := Convert_apiextensions_JSONSchemaProps_To_v1_JSONSchemaProps(&val, newVal, s); err != nil {
-				return err
-			}
-			(*out)[key] = *newVal
-		}
-	} else {
-		out.PatternProperties = nil
-	}
-	if in.Dependencies != nil {
-		in, out := &in.Dependencies, &out.Dependencies
-		*out = make(JSONSchemaDependencies, len(*in))
-		for key, val := range *in {
-			newVal := new(JSONSchemaPropsOrStringArray)
-			if err := Convert_apiextensions_JSONSchemaPropsOrStringArray_To_v1_JSONSchemaPropsOrStringArray(&val, newVal, s); err != nil {
-				return err
-			}
-			(*out)[key] = *newVal
-		}
-	} else {
-		out.Dependencies = nil
-	}
-	if in.AdditionalItems != nil {
-		in, out := &in.AdditionalItems, &out.AdditionalItems
-		*out = new(JSONSchemaPropsOrBool)
-		if err := Convert_apiextensions_JSONSchemaPropsOrBool_To_v1_JSONSchemaPropsOrBool(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.AdditionalItems = nil
-	}
-	if in.Definitions != nil {
-		in, out := &in.Definitions, &out.Definitions
-		*out = make(JSONSchemaDefinitions, len(*in))
-		for key, val := range *in {
-			newVal := new(JSONSchemaProps)
-			if err := Convert_apiextensions_JSONSchemaProps_To_v1_JSONSchemaProps(&val, newVal, s); err != nil {
-				return err
-			}
-			(*out)[key] = *newVal
-		}
-	} else {
-		out.Definitions = nil
-	}
-	out.ExternalDocs = (*ExternalDocumentation)(unsafe.Pointer(in.ExternalDocs))
-	if in.Example != nil {
-		in, out := &in.Example, &out.Example
-		*out = new(JSON)
-		if err := Convert_apiextensions_JSON_To_v1_JSON(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Example = nil
-	}
-	out.Nullable = in.Nullable
-	out.XPreserveUnknownFields = (*bool)(unsafe.Pointer(in.XPreserveUnknownFields))
-	out.XEmbeddedResource = in.XEmbeddedResource
-	out.XIntOrString = in.XIntOrString
-	out.XListMapKeys = *(*[]string)(unsafe.Pointer(&in.XListMapKeys))
-	out.XListType = (*string)(unsafe.Pointer(in.XListType))
-	out.XMapType = (*string)(unsafe.Pointer(in.XMapType))
-	out.XValidations = *(*ValidationRules)(unsafe.Pointer(&in.XValidations))
-	return nil
-}
-
-// Convert_apiextensions_JSONSchemaProps_To_v1_JSONSchemaProps is an autogenerated conversion function.
-func Convert_apiextensions_JSONSchemaProps_To_v1_JSONSchemaProps(in *apiextensions.JSONSchemaProps, out *JSONSchemaProps, s conversion.Scope) error {
-	return autoConvert_apiextensions_JSONSchemaProps_To_v1_JSONSchemaProps(in, out, s)
-}
-
-func autoConvert_v1_JSONSchemaPropsOrArray_To_apiextensions_JSONSchemaPropsOrArray(in *JSONSchemaPropsOrArray, out *apiextensions.JSONSchemaPropsOrArray, s conversion.Scope) error {
-	if in.Schema != nil {
-		in, out := &in.Schema, &out.Schema
-		*out = new(apiextensions.JSONSchemaProps)
-		if err := Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Schema = nil
-	}
-	if in.JSONSchemas != nil {
-		in, out := &in.JSONSchemas, &out.JSONSchemas
-		*out = make([]apiextensions.JSONSchemaProps, len(*in))
-		for i := range *in {
-			if err := Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.JSONSchemas = nil
-	}
-	return nil
-}
-
-// Convert_v1_JSONSchemaPropsOrArray_To_apiextensions_JSONSchemaPropsOrArray is an autogenerated conversion function.
-func Convert_v1_JSONSchemaPropsOrArray_To_apiextensions_JSONSchemaPropsOrArray(in *JSONSchemaPropsOrArray, out *apiextensions.JSONSchemaPropsOrArray, s conversion.Scope) error {
-	return autoConvert_v1_JSONSchemaPropsOrArray_To_apiextensions_JSONSchemaPropsOrArray(in, out, s)
-}
-
-func autoConvert_apiextensions_JSONSchemaPropsOrArray_To_v1_JSONSchemaPropsOrArray(in *apiextensions.JSONSchemaPropsOrArray, out *JSONSchemaPropsOrArray, s conversion.Scope) error {
-	if in.Schema != nil {
-		in, out := &in.Schema, &out.Schema
-		*out = new(JSONSchemaProps)
-		if err := Convert_apiextensions_JSONSchemaProps_To_v1_JSONSchemaProps(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Schema = nil
-	}
-	if in.JSONSchemas != nil {
-		in, out := &in.JSONSchemas, &out.JSONSchemas
-		*out = make([]JSONSchemaProps, len(*in))
-		for i := range *in {
-			if err := Convert_apiextensions_JSONSchemaProps_To_v1_JSONSchemaProps(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.JSONSchemas = nil
-	}
-	return nil
-}
-
-// Convert_apiextensions_JSONSchemaPropsOrArray_To_v1_JSONSchemaPropsOrArray is an autogenerated conversion function.
-func Convert_apiextensions_JSONSchemaPropsOrArray_To_v1_JSONSchemaPropsOrArray(in *apiextensions.JSONSchemaPropsOrArray, out *JSONSchemaPropsOrArray, s conversion.Scope) error {
-	return autoConvert_apiextensions_JSONSchemaPropsOrArray_To_v1_JSONSchemaPropsOrArray(in, out, s)
-}
-
-func autoConvert_v1_JSONSchemaPropsOrBool_To_apiextensions_JSONSchemaPropsOrBool(in *JSONSchemaPropsOrBool, out *apiextensions.JSONSchemaPropsOrBool, s conversion.Scope) error {
-	out.Allows = in.Allows
-	if in.Schema != nil {
-		in, out := &in.Schema, &out.Schema
-		*out = new(apiextensions.JSONSchemaProps)
-		if err := Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Schema = nil
-	}
-	return nil
-}
-
-// Convert_v1_JSONSchemaPropsOrBool_To_apiextensions_JSONSchemaPropsOrBool is an autogenerated conversion function.
-func Convert_v1_JSONSchemaPropsOrBool_To_apiextensions_JSONSchemaPropsOrBool(in *JSONSchemaPropsOrBool, out *apiextensions.JSONSchemaPropsOrBool, s conversion.Scope) error {
-	return autoConvert_v1_JSONSchemaPropsOrBool_To_apiextensions_JSONSchemaPropsOrBool(in, out, s)
-}
-
-func autoConvert_apiextensions_JSONSchemaPropsOrBool_To_v1_JSONSchemaPropsOrBool(in *apiextensions.JSONSchemaPropsOrBool, out *JSONSchemaPropsOrBool, s conversion.Scope) error {
-	out.Allows = in.Allows
-	if in.Schema != nil {
-		in, out := &in.Schema, &out.Schema
-		*out = new(JSONSchemaProps)
-		if err := Convert_apiextensions_JSONSchemaProps_To_v1_JSONSchemaProps(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Schema = nil
-	}
-	return nil
-}
-
-// Convert_apiextensions_JSONSchemaPropsOrBool_To_v1_JSONSchemaPropsOrBool is an autogenerated conversion function.
-func Convert_apiextensions_JSONSchemaPropsOrBool_To_v1_JSONSchemaPropsOrBool(in *apiextensions.JSONSchemaPropsOrBool, out *JSONSchemaPropsOrBool, s conversion.Scope) error {
-	return autoConvert_apiextensions_JSONSchemaPropsOrBool_To_v1_JSONSchemaPropsOrBool(in, out, s)
-}
-
-func autoConvert_v1_JSONSchemaPropsOrStringArray_To_apiextensions_JSONSchemaPropsOrStringArray(in *JSONSchemaPropsOrStringArray, out *apiextensions.JSONSchemaPropsOrStringArray, s conversion.Scope) error {
-	if in.Schema != nil {
-		in, out := &in.Schema, &out.Schema
-		*out = new(apiextensions.JSONSchemaProps)
-		if err := Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Schema = nil
-	}
-	out.Property = *(*[]string)(unsafe.Pointer(&in.Property))
-	return nil
-}
-
-// Convert_v1_JSONSchemaPropsOrStringArray_To_apiextensions_JSONSchemaPropsOrStringArray is an autogenerated conversion function.
-func Convert_v1_JSONSchemaPropsOrStringArray_To_apiextensions_JSONSchemaPropsOrStringArray(in *JSONSchemaPropsOrStringArray, out *apiextensions.JSONSchemaPropsOrStringArray, s conversion.Scope) error {
-	return autoConvert_v1_JSONSchemaPropsOrStringArray_To_apiextensions_JSONSchemaPropsOrStringArray(in, out, s)
-}
-
-func autoConvert_apiextensions_JSONSchemaPropsOrStringArray_To_v1_JSONSchemaPropsOrStringArray(in *apiextensions.JSONSchemaPropsOrStringArray, out *JSONSchemaPropsOrStringArray, s conversion.Scope) error {
-	if in.Schema != nil {
-		in, out := &in.Schema, &out.Schema
-		*out = new(JSONSchemaProps)
-		if err := Convert_apiextensions_JSONSchemaProps_To_v1_JSONSchemaProps(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Schema = nil
-	}
-	out.Property = *(*[]string)(unsafe.Pointer(&in.Property))
-	return nil
-}
-
-// Convert_apiextensions_JSONSchemaPropsOrStringArray_To_v1_JSONSchemaPropsOrStringArray is an autogenerated conversion function.
-func Convert_apiextensions_JSONSchemaPropsOrStringArray_To_v1_JSONSchemaPropsOrStringArray(in *apiextensions.JSONSchemaPropsOrStringArray, out *JSONSchemaPropsOrStringArray, s conversion.Scope) error {
-	return autoConvert_apiextensions_JSONSchemaPropsOrStringArray_To_v1_JSONSchemaPropsOrStringArray(in, out, s)
 }
 
 func autoConvert_v1_ServiceReference_To_apiextensions_ServiceReference(in *ServiceReference, out *apiextensions.ServiceReference, s conversion.Scope) error {
@@ -1248,30 +588,6 @@ func autoConvert_apiextensions_ServiceReference_To_v1_ServiceReference(in *apiex
 // Convert_apiextensions_ServiceReference_To_v1_ServiceReference is an autogenerated conversion function.
 func Convert_apiextensions_ServiceReference_To_v1_ServiceReference(in *apiextensions.ServiceReference, out *ServiceReference, s conversion.Scope) error {
 	return autoConvert_apiextensions_ServiceReference_To_v1_ServiceReference(in, out, s)
-}
-
-func autoConvert_v1_ValidationRule_To_apiextensions_ValidationRule(in *ValidationRule, out *apiextensions.ValidationRule, s conversion.Scope) error {
-	out.Rule = in.Rule
-	out.Message = in.Message
-	out.MessageExpression = in.MessageExpression
-	return nil
-}
-
-// Convert_v1_ValidationRule_To_apiextensions_ValidationRule is an autogenerated conversion function.
-func Convert_v1_ValidationRule_To_apiextensions_ValidationRule(in *ValidationRule, out *apiextensions.ValidationRule, s conversion.Scope) error {
-	return autoConvert_v1_ValidationRule_To_apiextensions_ValidationRule(in, out, s)
-}
-
-func autoConvert_apiextensions_ValidationRule_To_v1_ValidationRule(in *apiextensions.ValidationRule, out *ValidationRule, s conversion.Scope) error {
-	out.Rule = in.Rule
-	out.Message = in.Message
-	out.MessageExpression = in.MessageExpression
-	return nil
-}
-
-// Convert_apiextensions_ValidationRule_To_v1_ValidationRule is an autogenerated conversion function.
-func Convert_apiextensions_ValidationRule_To_v1_ValidationRule(in *apiextensions.ValidationRule, out *ValidationRule, s conversion.Scope) error {
-	return autoConvert_apiextensions_ValidationRule_To_v1_ValidationRule(in, out, s)
 }
 
 func autoConvert_v1_WebhookClientConfig_To_apiextensions_WebhookClientConfig(in *WebhookClientConfig, out *apiextensions.WebhookClientConfig, s conversion.Scope) error {

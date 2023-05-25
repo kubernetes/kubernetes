@@ -33,26 +33,26 @@ const (
 // CustomResourceDefinitionSpec describes how a user wants their resource to appear
 type CustomResourceDefinitionSpec struct {
 	// Group is the group this resource belongs in
-	Group string
+	Group string `protobuf:"bytes,1,opt,name=group"`
 	// Version is the version this resource belongs in
 	// Should be always first item in Versions field if provided.
 	// Optional, but at least one of Version or Versions must be set.
 	// Deprecated: Please use `Versions`.
-	Version string
+	Version string `protobuf:"bytes,2,opt,name=version"`
 	// Names are the names used to describe this custom resource
-	Names CustomResourceDefinitionNames
+	Names CustomResourceDefinitionNames `protobuf:"bytes,3,opt,name=names"`
 	// Scope indicates whether this resource is cluster or namespace scoped.  Default is namespaced
-	Scope ResourceScope
+	Scope ResourceScope `protobuf:"bytes,4,opt,name=scope,casttype=ResourceScope"`
 	// Validation describes the validation methods for CustomResources
 	// Optional, the global validation schema for all versions.
 	// Top-level and per-version schemas are mutually exclusive.
 	// +optional
-	Validation *CustomResourceValidation
+	Validation *CustomResourceValidation `protobuf:"bytes,5,opt,name=validation"`
 	// Subresources describes the subresources for CustomResource
 	// Optional, the global subresources for all versions.
 	// Top-level and per-version subresources are mutually exclusive.
 	// +optional
-	Subresources *CustomResourceSubresources
+	Subresources *CustomResourceSubresources `protobuf:"bytes,6,opt,name=subresources"`
 	// Versions is the list of all supported versions for this resource.
 	// If Version field is provided, this field is optional.
 	// Validation: All versions must use the same validation schema for now. i.e., top
@@ -64,21 +64,21 @@ type CustomResourceDefinitionSpec struct {
 	// by GA > beta > alpha (where GA is a version with no suffix such as beta or alpha), and then by comparing
 	// major version, then minor version. An example sorted list of versions:
 	// v10, v2, v1, v11beta2, v10beta3, v3beta1, v12alpha1, v11alpha2, foo1, foo10.
-	Versions []CustomResourceDefinitionVersion
+	Versions []CustomResourceDefinitionVersion `protobuf:"bytes,7,rep,name=versions"`
 	// AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.
 	// Optional, the global columns for all versions.
 	// Top-level and per-version columns are mutually exclusive.
 	// +optional
-	AdditionalPrinterColumns []CustomResourceColumnDefinition
+	AdditionalPrinterColumns []CustomResourceColumnDefinition `protobuf:"bytes,8,rep,name=additionalPrinterColumns"`
 
 	// `conversion` defines conversion settings for the CRD.
-	Conversion *CustomResourceConversion
+	Conversion *CustomResourceConversion `protobuf:"bytes,9,opt,name=conversion"`
 
 	// preserveUnknownFields disables pruning of object fields which are not
 	// specified in the OpenAPI schema. apiVersion, kind, metadata and known
 	// fields inside metadata are always preserved.
 	// Defaults to true in v1beta and will default to false in v1.
-	PreserveUnknownFields *bool
+	PreserveUnknownFields *bool `protobuf:"varint,10,opt,name=preserveUnknownFields"`
 }
 
 // CustomResourceConversion describes how to convert different versions of a CR.
@@ -87,10 +87,10 @@ type CustomResourceConversion struct {
 	// - `None`: The converter only change the apiVersion and would not touch any other field in the CR.
 	// - `Webhook`: API Server will call to an external webhook to do the conversion. Additional information
 	//   is needed for this option. This requires spec.preserveUnknownFields to be false.
-	Strategy ConversionStrategyType
+	Strategy ConversionStrategyType `protobuf:"bytes,1,opt,name=strategy,casttype=ConversionStrategyType"`
 
 	// `webhookClientConfig` is the instructions for how to call the webhook if strategy is `Webhook`.
-	WebhookClientConfig *WebhookClientConfig
+	WebhookClientConfig *WebhookClientConfig `protobuf:"bytes,2,opt,name=webhookClientConfig"`
 
 	// ConversionReviewVersions is an ordered list of preferred `ConversionReview`
 	// versions the Webhook expects. API server will try to use first version in
@@ -99,7 +99,7 @@ type CustomResourceConversion struct {
 	// If a persisted Webhook configuration specifies allowed versions and does not
 	// include any versions known to the API Server, calls to the webhook will fail.
 	// +optional
-	ConversionReviewVersions []string
+	ConversionReviewVersions []string `protobuf:"bytes,3,rep,name=conversionReviewVersions"`
 }
 
 // WebhookClientConfig contains the information to make a TLS
@@ -132,7 +132,7 @@ type WebhookClientConfig struct {
 	// allowed, either.
 	//
 	// +optional
-	URL *string
+	URL *string `protobuf:"bytes,1,opt,name=uRL"`
 
 	// `service` is a reference to the service for this webhook. Either
 	// `service` or `url` must be specified.
@@ -140,64 +140,64 @@ type WebhookClientConfig struct {
 	// If the webhook is running within the cluster, then you should use `service`.
 	//
 	// +optional
-	Service *ServiceReference
+	Service *ServiceReference `protobuf:"bytes,2,opt,name=service"`
 
 	// `caBundle` is a PEM encoded CA bundle which will be used to validate the webhook's server certificate.
 	// If unspecified, system trust roots on the apiserver are used.
 	// +optional
-	CABundle []byte
+	CABundle []byte `protobuf:"bytes,3,opt,name=cABundle"`
 }
 
 // ServiceReference holds a reference to Service.legacy.k8s.io
 type ServiceReference struct {
 	// `namespace` is the namespace of the service.
 	// Required
-	Namespace string
+	Namespace string `protobuf:"bytes,1,opt,name=namespace"`
 	// `name` is the name of the service.
 	// Required
-	Name string
+	Name string `protobuf:"bytes,2,opt,name=name"`
 
 	// `path` is an optional URL path which will be sent in any request to
 	// this service.
 	// +optional
-	Path *string
+	Path *string `protobuf:"bytes,3,opt,name=path"`
 
 	// If specified, the port on the service that hosting webhook.
 	// `port` should be a valid port number (1-65535, inclusive).
 	// +optional
-	Port int32
+	Port int32 `protobuf:"varint,4,opt,name=port"`
 }
 
 // CustomResourceDefinitionVersion describes a version for CRD.
 type CustomResourceDefinitionVersion struct {
 	// Name is the version name, e.g. “v1”, “v2beta1”, etc.
-	Name string
+	Name string `protobuf:"bytes,1,opt,name=name"`
 	// Served is a flag enabling/disabling this version from being served via REST APIs
-	Served bool
+	Served bool `protobuf:"varint,2,opt,name=served"`
 	// Storage flags the version as storage version. There must be exactly one flagged
 	// as storage version.
-	Storage bool
+	Storage bool `protobuf:"varint,3,opt,name=storage"`
 	// deprecated indicates this version of the custom resource API is deprecated.
 	// When set to true, API requests to this version receive a warning header in the server response.
 	// Defaults to false.
-	Deprecated bool
+	Deprecated bool `protobuf:"varint,4,opt,name=deprecated"`
 	// deprecationWarning overrides the default warning returned to API clients.
 	// May only be set when `deprecated` is true.
 	// The default warning indicates this version is deprecated and recommends use
 	// of the newest served version of equal or greater stability, if one exists.
-	DeprecationWarning *string
+	DeprecationWarning *string `protobuf:"bytes,5,opt,name=deprecationWarning"`
 	// Schema describes the schema for CustomResource used in validation, pruning, and defaulting.
 	// Top-level and per-version schemas are mutually exclusive.
 	// Per-version schemas must not all be set to identical values (top-level validation schema should be used instead)
 	// This field is alpha-level and is only honored by servers that enable the CustomResourceWebhookConversion feature.
 	// +optional
-	Schema *CustomResourceValidation
+	Schema *CustomResourceValidation `protobuf:"bytes,6,opt,name=schema"`
 	// Subresources describes the subresources for CustomResource
 	// Top-level and per-version subresources are mutually exclusive.
 	// Per-version subresources must not all be set to identical values (top-level subresources should be used instead)
 	// This field is alpha-level and is only honored by servers that enable the CustomResourceWebhookConversion feature.
 	// +optional
-	Subresources *CustomResourceSubresources
+	Subresources *CustomResourceSubresources `protobuf:"bytes,7,opt,name=subresources"`
 	// AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.
 	// Top-level and per-version columns are mutually exclusive.
 	// Per-version columns must not all be set to identical values (top-level columns should be used instead)
@@ -206,47 +206,47 @@ type CustomResourceDefinitionVersion struct {
 	// update that changes to per-version additionalPrinterColumns, the top-level additionalPrinterColumns field must
 	// be explicitly set to null
 	// +optional
-	AdditionalPrinterColumns []CustomResourceColumnDefinition
+	AdditionalPrinterColumns []CustomResourceColumnDefinition `protobuf:"bytes,8,rep,name=additionalPrinterColumns"`
 }
 
 // CustomResourceColumnDefinition specifies a column for server side printing.
 type CustomResourceColumnDefinition struct {
 	// name is a human readable name for the column.
-	Name string
+	Name string `protobuf:"bytes,1,opt,name=name"`
 	// type is an OpenAPI type definition for this column.
 	// See https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#data-types for more.
-	Type string
+	Type string `protobuf:"bytes,2,opt,name=type"`
 	// format is an optional OpenAPI type definition for this column. The 'name' format is applied
 	// to the primary identifier column to assist in clients identifying column is the resource name.
 	// See https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#data-types for more.
-	Format string
+	Format string `protobuf:"bytes,3,opt,name=format"`
 	// description is a human readable description of this column.
-	Description string
+	Description string `protobuf:"bytes,4,opt,name=description"`
 	// priority is an integer defining the relative importance of this column compared to others. Lower
 	// numbers are considered higher priority. Columns that may be omitted in limited space scenarios
 	// should be given a higher priority.
-	Priority int32
+	Priority int32 `protobuf:"varint,5,opt,name=priority"`
 
 	// JSONPath is a simple JSON path, i.e. without array notation.
-	JSONPath string
+	JSONPath string `protobuf:"bytes,6,opt,name=jSONPath"`
 }
 
 // CustomResourceDefinitionNames indicates the names to serve this CustomResourceDefinition
 type CustomResourceDefinitionNames struct {
 	// Plural is the plural name of the resource to serve.  It must match the name of the CustomResourceDefinition-registration
 	// too: plural.group and it must be all lowercase.
-	Plural string
+	Plural string `protobuf:"bytes,1,opt,name=plural"`
 	// Singular is the singular name of the resource.  It must be all lowercase  Defaults to lowercased <kind>
-	Singular string
+	Singular string `protobuf:"bytes,2,opt,name=singular"`
 	// ShortNames are short names for the resource.  It must be all lowercase.
-	ShortNames []string
+	ShortNames []string `protobuf:"bytes,3,rep,name=shortNames"`
 	// Kind is the serialized kind of the resource.  It is normally CamelCase and singular.
-	Kind string
+	Kind string `protobuf:"bytes,4,opt,name=kind"`
 	// ListKind is the serialized kind of the list for this resource.  Defaults to <kind>List.
-	ListKind string
+	ListKind string `protobuf:"bytes,5,opt,name=listKind"`
 	// Categories is a list of grouped resources custom resources belong to (e.g. 'all')
 	// +optional
-	Categories []string
+	Categories []string `protobuf:"bytes,6,rep,name=categories"`
 }
 
 // ResourceScope is an enum defining the different scopes available to a custom resource
@@ -308,19 +308,19 @@ const (
 // CustomResourceDefinitionCondition contains details for the current condition of this pod.
 type CustomResourceDefinitionCondition struct {
 	// Type is the type of the condition. Types include Established, NamesAccepted and Terminating.
-	Type CustomResourceDefinitionConditionType
+	Type CustomResourceDefinitionConditionType `protobuf:"bytes,1,opt,name=type,casttype=CustomResourceDefinitionConditionType"`
 	// Status is the status of the condition.
 	// Can be True, False, Unknown.
-	Status ConditionStatus
+	Status ConditionStatus `protobuf:"bytes,2,opt,name=status,casttype=ConditionStatus"`
 	// Last time the condition transitioned from one status to another.
 	// +optional
-	LastTransitionTime metav1.Time
+	LastTransitionTime metav1.Time `protobuf:"bytes,3,opt,name=lastTransitionTime"`
 	// Unique, one-word, CamelCase reason for the condition's last transition.
 	// +optional
-	Reason string
+	Reason string `protobuf:"bytes,4,opt,name=reason"`
 	// Human-readable message indicating details about last transition.
 	// +optional
-	Message string
+	Message string `protobuf:"bytes,5,opt,name=message"`
 }
 
 // CustomResourceDefinitionStatus indicates the state of the CustomResourceDefinition
@@ -328,11 +328,11 @@ type CustomResourceDefinitionStatus struct {
 	// Conditions indicate state for particular aspects of a CustomResourceDefinition
 	// +listType=map
 	// +listMapKey=type
-	Conditions []CustomResourceDefinitionCondition
+	Conditions []CustomResourceDefinitionCondition `protobuf:"bytes,1,rep,name=conditions"`
 
 	// AcceptedNames are the names that are actually being used to serve discovery
 	// They may be different than the names in spec.
-	AcceptedNames CustomResourceDefinitionNames
+	AcceptedNames CustomResourceDefinitionNames `protobuf:"bytes,2,opt,name=acceptedNames"`
 
 	// StoredVersions are all versions of CustomResources that were ever persisted. Tracking these
 	// versions allows a migration path for stored versions in etcd. The field is mutable
@@ -340,7 +340,7 @@ type CustomResourceDefinitionStatus struct {
 	// that no old objects are left in the storage), and then remove the rest of the
 	// versions from this list.
 	// None of the versions in this list can be removed from the spec.Versions field.
-	StoredVersions []string
+	StoredVersions []string `protobuf:"bytes,3,rep,name=storedVersions"`
 }
 
 // CustomResourceCleanupFinalizer is the name of the finalizer which will delete instances of
@@ -355,12 +355,12 @@ const CustomResourceCleanupFinalizer = "customresourcecleanup.apiextensions.k8s.
 // <.spec.name>.<.spec.group>.
 type CustomResourceDefinition struct {
 	metav1.TypeMeta
-	metav1.ObjectMeta
+	metav1.ObjectMeta `protobuf:"bytes,1,opt,name=objectMeta"`
 
 	// Spec describes how the user wants the resources to appear
-	Spec CustomResourceDefinitionSpec
+	Spec CustomResourceDefinitionSpec `protobuf:"bytes,2,opt,name=spec"`
 	// Status indicates the actual state of the CustomResourceDefinition
-	Status CustomResourceDefinitionStatus
+	Status CustomResourceDefinitionStatus `protobuf:"bytes,3,opt,name=status"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -368,24 +368,24 @@ type CustomResourceDefinition struct {
 // CustomResourceDefinitionList is a list of CustomResourceDefinition objects.
 type CustomResourceDefinitionList struct {
 	metav1.TypeMeta
-	metav1.ListMeta
+	metav1.ListMeta `protobuf:"bytes,1,opt,name=listMeta"`
 
 	// Items individual CustomResourceDefinitions
-	Items []CustomResourceDefinition
+	Items []CustomResourceDefinition `protobuf:"bytes,2,rep,name=items"`
 }
 
 // CustomResourceValidation is a list of validation methods for CustomResources.
 type CustomResourceValidation struct {
 	// OpenAPIV3Schema is the OpenAPI v3 schema to be validated against.
-	OpenAPIV3Schema *JSONSchemaProps
+	OpenAPIV3Schema *JSONSchemaProps `protobuf:"bytes,1,opt,name=openAPIV3Schema"`
 }
 
 // CustomResourceSubresources defines the status and scale subresources for CustomResources.
 type CustomResourceSubresources struct {
 	// Status denotes the status subresource for CustomResources
-	Status *CustomResourceSubresourceStatus
+	Status *CustomResourceSubresourceStatus `protobuf:"bytes,1,opt,name=status"`
 	// Scale denotes the scale subresource for CustomResources
-	Scale *CustomResourceSubresourceScale
+	Scale *CustomResourceSubresourceScale `protobuf:"bytes,2,opt,name=scale"`
 }
 
 // CustomResourceSubresourceStatus defines how to serve the status subresource for CustomResources.
@@ -401,13 +401,13 @@ type CustomResourceSubresourceScale struct {
 	// Only JSON paths without the array notation are allowed.
 	// Must be a JSON Path under .spec.
 	// If there is no value under the given path in the CustomResource, the /scale subresource will return an error on GET.
-	SpecReplicasPath string
+	SpecReplicasPath string `protobuf:"bytes,1,opt,name=specReplicasPath"`
 	// StatusReplicasPath defines the JSON path inside of a CustomResource that corresponds to Scale.Status.Replicas.
 	// Only JSON paths without the array notation are allowed.
 	// Must be a JSON Path under .status.
 	// If there is no value under the given path in the CustomResource, the status replica value in the /scale subresource
 	// will default to 0.
-	StatusReplicasPath string
+	StatusReplicasPath string `protobuf:"bytes,2,opt,name=statusReplicasPath"`
 	// LabelSelectorPath defines the JSON path inside of a CustomResource that corresponds to Scale.Status.Selector.
 	// Only JSON paths without the array notation are allowed.
 	// Must be a JSON Path under .status or .spec.
@@ -418,5 +418,5 @@ type CustomResourceSubresourceScale struct {
 	// If there is no value under the given path in the CustomResource, the status label selector value in the /scale
 	// subresource will default to the empty string.
 	// +optional
-	LabelSelectorPath *string
+	LabelSelectorPath *string `protobuf:"bytes,3,opt,name=labelSelectorPath"`
 }
