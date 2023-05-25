@@ -178,16 +178,16 @@ func ConvertJSONSchemaPropsWithPostProcess(in *apiextensions.JSONSchemaProps, ou
 	out.Required = in.Required
 
 	if in.Default != nil {
-		out.Default = *(in.Default)
+		out.Default = in.Default.Object
 	}
 	if in.Example != nil {
-		out.Example = *(in.Example)
+		out.Example = in.Example.Object
 	}
 
 	if in.Enum != nil {
 		out.Enum = make([]interface{}, len(in.Enum))
 		for k, v := range in.Enum {
-			out.Enum[k] = v
+			out.Enum[k] = v.Object
 		}
 	}
 

@@ -22,11 +22,11 @@ import (
 )
 
 func Convert_apiextensions_JSON_To_v1beta1_JSON(in *apiextensions.JSON, out *JSON, s conversion.Scope) error {
-	out.Object = interface{}(*in)
+	out.Object = in.Object
 	return nil
 }
 
 func Convert_v1beta1_JSON_To_apiextensions_JSON(in *JSON, out *apiextensions.JSON, s conversion.Scope) error {
-	*out = in.Object
+	out.Object = in.Object
 	return nil
 }

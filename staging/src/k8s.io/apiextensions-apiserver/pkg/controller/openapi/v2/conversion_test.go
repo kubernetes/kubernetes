@@ -117,7 +117,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2SchemaByType(t *testing.T) {
 	testStr2 := "test2"
 	testFloat64 := float64(6.4)
 	testInt64 := int64(64)
-	testApiextensionsJSON := apiextensions.JSON(testStr)
+	testApiextensionsJSON := apiextensions.JSON{Object: testStr}
 
 	tests := []struct {
 		name        string
@@ -322,7 +322,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2SchemaByType(t *testing.T) {
 		{
 			name: "enum",
 			in: &apiextensions.JSONSchemaProps{
-				Enum: []apiextensions.JSON{apiextensions.JSON(testStr), apiextensions.JSON(testStr2)},
+				Enum: []apiextensions.JSON{{Object: testStr}, {Object: testStr2}},
 			},
 			expected: new(spec.Schema).
 				WithEnum(testStr, testStr2),

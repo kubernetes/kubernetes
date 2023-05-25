@@ -17,6 +17,7 @@ limitations under the License.
 package fuzzer
 
 import (
+	"encoding/json"
 	"reflect"
 	"strings"
 
@@ -127,14 +128,14 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				}
 			}
 			if c.RandBool() {
-				validJSON := apiextensions.JSON(`{"some": {"json": "test"}, "string": 42}`)
-				obj.Default = &validJSON
+				obj.Default = &apiextensions.JSON{}
+				json.Unmarshal([]byte(`{"some": {"json": "test"}, "string": 42}`), &obj.Default) // nolint:errcheck
 			}
 			if c.RandBool() {
-				obj.Enum = []apiextensions.JSON{c.Float64(), c.RandString(), c.RandBool()}
+				obj.Enum = []apiextensions.JSON{{Object: c.Float64()}, {Object: c.RandString()}, {Object: c.RandBool()}}
 			}
 			if c.RandBool() {
-				validJSON := apiextensions.JSON(`"foobarbaz"`)
+				validJSON := apiextensions.JSON{Object: `"foobarbaz"`}
 				obj.Example = &validJSON
 			}
 			if c.RandBool() {

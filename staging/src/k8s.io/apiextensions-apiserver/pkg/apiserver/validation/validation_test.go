@@ -411,11 +411,11 @@ func TestValidateCustomResource(t *testing.T) {
 						Properties: map[string]apiextensions.JSONSchemaProps{
 							"nestedint": {
 								Type: "integer",
-								Enum: []apiextensions.JSON{1, 2},
+								Enum: []apiextensions.JSON{{Object: 1}, {Object: 2}},
 							},
 							"nestedstring": {
 								Type: "string",
-								Enum: []apiextensions.JSON{"a", "b"},
+								Enum: []apiextensions.JSON{{Object: "a"}, {Object: "b"}},
 							},
 						},
 					},
