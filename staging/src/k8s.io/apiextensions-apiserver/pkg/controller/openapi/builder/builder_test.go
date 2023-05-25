@@ -25,7 +25,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	apiextensionsinternal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -362,8 +361,7 @@ func TestNewBuilder(t *testing.T) {
 				if err := json.Unmarshal([]byte(tt.schema), &v1beta1Schema); err != nil {
 					t.Fatal(err)
 				}
-				internalSchema := &apiextensionsinternal.JSONSchemaProps{}
-				apiextensionsv1.Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(v1beta1Schema, internalSchema, nil)
+				internalSchema := v1beta1Schema
 				var err error
 				schema, err = structuralschema.NewStructural(internalSchema)
 				if err != nil {

@@ -112,10 +112,7 @@ func TestRoundTrip(t *testing.T) {
 		}
 
 		// external -> internal
-		internalRoundTripped := &apiextensions.JSONSchemaProps{}
-		if err := scheme.Convert(external, internalRoundTripped, nil); err != nil {
-			t.Fatal(err)
-		}
+		internalRoundTripped := external
 
 		if !apiequality.Semantic.DeepEqual(internal, internalRoundTripped) {
 			t.Log(string(openAPIJSON))

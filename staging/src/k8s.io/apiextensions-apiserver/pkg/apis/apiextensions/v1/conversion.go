@@ -17,24 +17,10 @@ limitations under the License.
 package v1
 
 import (
-	unsafe "unsafe"
-
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/conversion"
 )
-
-var nullLiteral = []byte(`null`)
-
-func Convert_apiextensions_JSON_To_v1_JSON(in *apiextensions.JSON, out *JSON, s conversion.Scope) error {
-	out.Object = in.Object
-	return nil
-}
-
-func Convert_v1_JSON_To_apiextensions_JSON(in *JSON, out *apiextensions.JSON, s conversion.Scope) error {
-	out.Object = in.Object
-	return nil
-}
 
 func Convert_apiextensions_CustomResourceDefinitionSpec_To_v1_CustomResourceDefinitionSpec(in *apiextensions.CustomResourceDefinitionSpec, out *CustomResourceDefinitionSpec, s conversion.Scope) error {
 	if err := autoConvert_apiextensions_CustomResourceDefinitionSpec_To_v1_CustomResourceDefinitionSpec(in, out, s); err != nil {
@@ -44,6 +30,10 @@ func Convert_apiextensions_CustomResourceDefinitionSpec_To_v1_CustomResourceDefi
 	if len(out.Versions) == 0 && len(in.Version) > 0 {
 		// no versions were specified, and a version name was specified
 		out.Versions = []CustomResourceDefinitionVersion{{Name: in.Version, Served: true, Storage: true}}
+	} else if out.Versions != nil {
+		orig := out.Versions
+		out.Versions = make([]CustomResourceDefinitionVersion, len(in.Versions))
+		copy(out.Versions, orig)
 	}
 
 	// If spec.{subresources,validation,additionalPrinterColumns} exists, move to versions
@@ -100,7 +90,7 @@ func Convert_v1_CustomResourceDefinitionSpec_To_apiextensions_CustomResourceDefi
 	additionalPrinterColumnsIdentical := true
 
 	// Detect if per-version fields are identical
-	for _, v := range out.Versions {
+	for _, v := range out.Versions[1:] {
 		if subresourcesIdentical && !apiequality.Semantic.DeepEqual(v.Subresources, subresources) {
 			subresourcesIdentical = false
 		}
@@ -172,10 +162,5 @@ func Convert_apiextensions_CustomResourceConversion_To_v1_CustomResourceConversi
 			}
 		}
 	}
-	return nil
-}
-
-func Convert_apiextensions_ValidationRules_To_v1_ValidationRules(in *apiextensions.ValidationRules, out *ValidationRules, s conversion.Scope) error {
-	*out = *(*ValidationRules)(unsafe.Pointer(in))
 	return nil
 }

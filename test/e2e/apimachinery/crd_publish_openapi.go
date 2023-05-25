@@ -31,7 +31,6 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/yaml"
 
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -688,16 +687,12 @@ func waitForOpenAPISchema(c k8sclientset.Interface, pred func(*spec.Swagger) (bo
 
 // convertJSONSchemaProps converts JSONSchemaProps in YAML to spec.Schema
 func convertJSONSchemaProps(in []byte, out *spec.Schema) error {
-	external := apiextensionsv1.JSONSchemaProps{}
-	if err := yaml.UnmarshalStrict(in, &external); err != nil {
-		return err
-	}
-	internal := apiextensions.JSONSchemaProps{}
-	if err := apiextensionsv1.Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(&external, &internal, nil); err != nil {
+	schema := apiextensionsv1.JSONSchemaProps{}
+	if err := yaml.UnmarshalStrict(in, &schema); err != nil {
 		return err
 	}
 	kubeOut := spec.Schema{}
-	if err := validation.ConvertJSONSchemaPropsWithPostProcess(&internal, &kubeOut, validation.StripUnsupportedFormatsPostProcess); err != nil {
+	if err := validation.ConvertJSONSchemaPropsWithPostProcess(&schema, &kubeOut, validation.StripUnsupportedFormatsPostProcess); err != nil {
 		return err
 	}
 	bs, err := json.Marshal(kubeOut)

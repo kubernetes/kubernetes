@@ -19,7 +19,6 @@ package schema
 import (
 	"fmt"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 )
 
 // NewStructural converts an OpenAPI v3 schema into a structural schema. A pre-validated JSONSchemaProps will
@@ -248,9 +247,7 @@ func newExtensions(s *apiextensions.JSONSchemaProps) (*Extensions, error) {
 		XListType:         s.XListType,
 		XMapType:          s.XMapType,
 	}
-	if err := apiextensionsv1.Convert_apiextensions_ValidationRules_To_v1_ValidationRules(&s.XValidations, &ret.XValidations, nil); err != nil {
-		return nil, err
-	}
+	ret.XValidations = s.XValidations
 
 	if s.XPreserveUnknownFields != nil {
 		if !*s.XPreserveUnknownFields {

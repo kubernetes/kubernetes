@@ -38,7 +38,7 @@ func TestStructuralRoundtripOrError(t *testing.T) {
 	f.RandSource(rand.New(rand.NewSource(seed)))
 	f.Funcs(
 		func(s *apiextensions.JSON, c fuzz.Continue) {
-			*s = apiextensions.JSON(map[string]interface{}{"foo": float64(42.2)})
+			*s = apiextensions.JSON{Object: map[string]interface{}{"foo": float64(42.2)}}
 		},
 		func(s *apiextensions.JSONSchemaPropsOrArray, c fuzz.Continue) {
 			c.FuzzNoCustom(s)
@@ -93,11 +93,7 @@ func TestStructuralRoundtripOrError(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		internalSchema := &apiextensions.JSONSchemaProps{}
-		err = apiextensionsv1beta1.Convert_v1beta1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(v1beta1Schema, internalSchema, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		internalSchema := v1beta1Schema
 
 		if !reflect.DeepEqual(origSchema, internalSchema) {
 			t.Fatalf("original and result differ: %v", cmp.Diff(origSchema, internalSchema))

@@ -19,6 +19,7 @@ package cel
 import (
 	"context"
 	"fmt"
+	apiextensionsschema "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"math"
 	"reflect"
 	"regexp"
@@ -32,7 +33,6 @@ import (
 
 	"k8s.io/klog/v2"
 
-	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -347,7 +347,7 @@ func hasNewlines(s string) bool {
 	return newlineMatcher.MatchString(s)
 }
 
-func ruleMessageOrDefault(rule apiextensions.ValidationRule) string {
+func ruleMessageOrDefault(rule apiextensionsschema.ValidationRule) string {
 	if len(rule.Message) == 0 {
 		return fmt.Sprintf("failed rule: %s", ruleErrorString(rule))
 	} else {
@@ -355,7 +355,7 @@ func ruleMessageOrDefault(rule apiextensions.ValidationRule) string {
 	}
 }
 
-func ruleErrorString(rule apiextensions.ValidationRule) string {
+func ruleErrorString(rule apiextensionsschema.ValidationRule) string {
 	if len(rule.Message) > 0 {
 		return strings.TrimSpace(rule.Message)
 	}

@@ -1327,10 +1327,5 @@ func closeOnCall(h http.Handler) (chan struct{}, http.Handler) {
 }
 
 func jsonPtr(x interface{}) *apiextensionsv1.JSON {
-	bs, err := json.Marshal(x)
-	if err != nil {
-		panic(err)
-	}
-	ret := apiextensionsv1.JSON{Raw: bs}
-	return &ret
+	return &apiextensionsv1.JSON{Object: x}
 }

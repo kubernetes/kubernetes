@@ -17,7 +17,7 @@ limitations under the License.
 package v1
 
 import (
-	fmt "fmt"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -525,7 +525,7 @@ func TestMemoryEqual(t *testing.T) {
 		a interface{}
 		b interface{}
 	}{
-		{apiextensions.JSONSchemaProps{}.XValidations, JSONSchemaProps{}.XValidations},
+		{JSONSchemaProps{}.XValidations, JSONSchemaProps{}.XValidations},
 	}
 
 	for _, tc := range testcases {
