@@ -105,7 +105,7 @@ func newGenerics(s *apiextensions.JSONSchemaProps) (*Generic, error) {
 		Nullable:    s.Nullable,
 	}
 	if s.Default != nil {
-		g.Default = JSON{interface{}(*s.Default)}
+		g.Default = JSON{Object: s.Default.Object}
 	}
 
 	if s.AdditionalProperties != nil {
@@ -151,7 +151,7 @@ func newValueValidation(s *apiextensions.JSONSchemaProps) (*ValueValidation, err
 	}
 
 	for _, e := range s.Enum {
-		v.Enum = append(v.Enum, JSON{e})
+		v.Enum = append(v.Enum, JSON{e.Object})
 	}
 
 	for _, x := range s.AllOf {

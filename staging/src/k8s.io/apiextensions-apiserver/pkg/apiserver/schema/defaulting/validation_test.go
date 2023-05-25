@@ -28,7 +28,7 @@ import (
 )
 
 func jsonPtr(x interface{}) *apiextensions.JSON {
-	ret := apiextensions.JSON(x)
+	ret := apiextensions.JSON{Object: x}
 	return &ret
 }
 
