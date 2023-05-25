@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -237,6 +238,10 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store S
 
 	if r.expectedGVK == nil {
 		r.expectedGVK = getExpectedGVKFromObject(expectedType)
+	}
+
+	if s := os.Getenv("ENABLE_CLIENT_GO_WATCH_LIST_ALPHA"); len(s) > 0 {
+		r.UseWatchList = true
 	}
 
 	return r
