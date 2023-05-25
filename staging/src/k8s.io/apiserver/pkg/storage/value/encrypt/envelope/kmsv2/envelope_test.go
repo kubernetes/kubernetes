@@ -236,7 +236,7 @@ func testStateFunc(ctx context.Context, envelopeService kmsservice.Service, cloc
 		}
 		return State{
 			Transformer:         transformer,
-			EncryptedDEK:        resp.Ciphertext,
+			EncryptedDEKorSeed:  resp.Ciphertext,
 			KeyID:               resp.KeyID,
 			Annotations:         resp.Annotations,
 			UID:                 "panda",
@@ -924,7 +924,7 @@ func TestCacheNotCorrupted(t *testing.T) {
 
 	// this is to mimic a plugin that sets a static response for ciphertext
 	// but uses the annotation field to send the actual encrypted DEK.
-	envelopeService.SetCiphertext(state.EncryptedDEK)
+	envelopeService.SetCiphertext(state.EncryptedDEKorSeed)
 	// for this plugin, it indicates a change in the remote key ID as the returned
 	// encrypted DEK is different.
 	envelopeService.SetAnnotations(map[string][]byte{

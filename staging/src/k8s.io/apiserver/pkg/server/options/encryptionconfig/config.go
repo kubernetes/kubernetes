@@ -332,7 +332,7 @@ func (h *kmsv2PluginProbe) check(ctx context.Context) error {
 	return nil
 }
 
-// rotateDEKOnKeyIDChange tries to rotate to a new DEK if the key ID returned by Status does not match the
+// rotateDEKOnKeyIDChange tries to rotate to a new DEK/seed if the key ID returned by Status does not match the
 // current state.  If a successful rotation is performed, the new DEK and keyID overwrite the existing state.
 // On any failure during rotation (including mismatch between status and encrypt calls), the current state is
 // preserved and will remain valid to use for encryption until its expiration (the system attempts to coast).
@@ -350,15 +350,21 @@ func (h *kmsv2PluginProbe) rotateDEKOnKeyIDChange(ctx context.Context, statusKey
 	// we start the timer before we make the network call because kmsv2PluginWriteDEKMaxTTL is meant to be the upper bound
 	expirationTimestamp := envelopekmsv2.NowFunc().Add(kmsv2PluginWriteDEKMaxTTL)
 
-	// state is valid and status keyID is unchanged from when we generated this DEK so there is no need to rotate it
+	// dynamically check if we want to use KDF seed to derive DEKs or just a single DEK
+	// this gate can only change during tests, but the check is cheap enough to always make
+	// this allows us to easily exercise both modes without restarting the API server
+	useSeed := utilfeature.DefaultFeatureGate.Enabled(features.KMSv2KDF)
+
+	// state is valid and status keyID is unchanged from when we generated this DEK/seed so there is no need to rotate it
 	// just move the expiration of the current state forward by the reuse interval
-	if errState == nil && state.KeyID == statusKeyID {
+	// useSeed can only change at runtime during tests, so we check it here to allow us to easily exercise both modes
+	if errState == nil && state.KeyID == statusKeyID && state.UseSeed == useSeed {
 		state.ExpirationTimestamp = expirationTimestamp
 		h.state.Store(&state)
 		return nil
 	}
 
-	transformer, resp, cacheKey, errGen := envelopekmsv2.GenerateTransformer(ctx, uid, h.service)
+	transformer, resp, cacheKey, errGen := envelopekmsv2.GenerateTransformer(ctx, uid, h.service, useSeed)
 
 	if resp == nil {
 		resp = &kmsservice.EncryptResponse{} // avoid nil panics
@@ -369,7 +375,8 @@ func (h *kmsv2PluginProbe) rotateDEKOnKeyIDChange(ctx context.Context, statusKey
 	if errGen == nil && resp.KeyID == statusKeyID {
 		h.state.Store(&envelopekmsv2.State{
 			Transformer:         transformer,
-			EncryptedDEK:        resp.Ciphertext,
+			UseSeed:             useSeed,
+			EncryptedDEKorSeed:  resp.Ciphertext,
 			KeyID:               resp.KeyID,
 			Annotations:         resp.Annotations,
 			UID:                 uid,
@@ -399,8 +406,8 @@ func (h *kmsv2PluginProbe) getCurrentState() (envelopekmsv2.State, error) {
 		return envelopekmsv2.State{}, fmt.Errorf("got unexpected nil transformer")
 	}
 
-	if len(state.EncryptedDEK) == 0 {
-		return envelopekmsv2.State{}, fmt.Errorf("got unexpected empty EncryptedDEK")
+	if len(state.EncryptedDEKorSeed) == 0 {
+		return envelopekmsv2.State{}, fmt.Errorf("got unexpected empty EncryptedDEKorSeed")
 	}
 
 	if len(state.KeyID) == 0 {

@@ -1838,7 +1838,7 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 func validState(keyID string, exp time.Time) envelopekmsv2.State {
 	return envelopekmsv2.State{
 		Transformer:         &resourceTransformer{},
-		EncryptedDEK:        []byte{1},
+		EncryptedDEKorSeed:  []byte{1},
 		KeyID:               keyID,
 		ExpirationTimestamp: exp,
 		CacheKey:            []byte{1},
