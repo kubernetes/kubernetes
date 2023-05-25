@@ -20,7 +20,7 @@ import (
 	"github.com/opencontainers/runc/libcontainer/configs"
 )
 
-type UnifiedManager struct {
+type unifiedManager struct {
 	mu      sync.Mutex
 	cgroups *configs.Cgroup
 	// path is like "/sys/fs/cgroup/user.slice/user-1001.slice/session-1.scope"
@@ -29,8 +29,8 @@ type UnifiedManager struct {
 	fsMgr cgroups.Manager
 }
 
-func NewUnifiedManager(config *configs.Cgroup, path string) (*UnifiedManager, error) {
-	m := &UnifiedManager{
+func NewUnifiedManager(config *configs.Cgroup, path string) (cgroups.Manager, error) {
+	m := &unifiedManager{
 		cgroups: config,
 		path:    path,
 		dbus:    newDbusConnManager(config.Rootless),
@@ -174,14 +174,7 @@ func unifiedResToSystemdProps(cm *dbusConnManager, res map[string]string) (props
 	return props, nil
 }
 
-func genV2ResourcesProperties(dirPath string, r *configs.Resources, cm *dbusConnManager) ([]systemdDbus.Property, error) {
-	// We need this check before setting systemd properties, otherwise
-	// the container is OOM-killed and the systemd unit is removed
-	// before we get to fsMgr.Set().
-	if err := fs2.CheckMemoryUsage(dirPath, r); err != nil {
-		return nil, err
-	}
-
+func genV2ResourcesProperties(r *configs.Resources, cm *dbusConnManager) ([]systemdDbus.Property, error) {
 	var properties []systemdDbus.Property
 
 	// NOTE: This is of questionable correctness because we insert our own
@@ -244,7 +237,7 @@ func genV2ResourcesProperties(dirPath string, r *configs.Resources, cm *dbusConn
 	return properties, nil
 }
 
-func (m *UnifiedManager) Apply(pid int) error {
+func (m *unifiedManager) Apply(pid int) error {
 	var (
 		c          = m.cgroups
 		unitName   = getUnitName(c)
@@ -347,7 +340,7 @@ func cgroupFilesToChown() ([]string, error) {
 	return filesToChown, nil
 }
 
-func (m *UnifiedManager) Destroy() error {
+func (m *unifiedManager) Destroy() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -366,13 +359,13 @@ func (m *UnifiedManager) Destroy() error {
 	return nil
 }
 
-func (m *UnifiedManager) Path(_ string) string {
+func (m *unifiedManager) Path(_ string) string {
 	return m.path
 }
 
 // getSliceFull value is used in initPath.
 // The value is incompatible with systemdDbus.PropSlice.
-func (m *UnifiedManager) getSliceFull() (string, error) {
+func (m *unifiedManager) getSliceFull() (string, error) {
 	c := m.cgroups
 	slice := "system.slice"
 	if c.Rootless {
@@ -400,7 +393,7 @@ func (m *UnifiedManager) getSliceFull() (string, error) {
 	return slice, nil
 }
 
-func (m *UnifiedManager) initPath() error {
+func (m *unifiedManager) initPath() error {
 	if m.path != "" {
 		return nil
 	}
@@ -424,27 +417,27 @@ func (m *UnifiedManager) initPath() error {
 	return nil
 }
 
-func (m *UnifiedManager) Freeze(state configs.FreezerState) error {
+func (m *unifiedManager) Freeze(state configs.FreezerState) error {
 	return m.fsMgr.Freeze(state)
 }
 
-func (m *UnifiedManager) GetPids() ([]int, error) {
+func (m *unifiedManager) GetPids() ([]int, error) {
 	return cgroups.GetPids(m.path)
 }
 
-func (m *UnifiedManager) GetAllPids() ([]int, error) {
+func (m *unifiedManager) GetAllPids() ([]int, error) {
 	return cgroups.GetAllPids(m.path)
 }
 
-func (m *UnifiedManager) GetStats() (*cgroups.Stats, error) {
+func (m *unifiedManager) GetStats() (*cgroups.Stats, error) {
 	return m.fsMgr.GetStats()
 }
 
-func (m *UnifiedManager) Set(r *configs.Resources) error {
+func (m *unifiedManager) Set(r *configs.Resources) error {
 	if r == nil {
 		return nil
 	}
-	properties, err := genV2ResourcesProperties(m.fsMgr.Path(""), r, m.dbus)
+	properties, err := genV2ResourcesProperties(r, m.dbus)
 	if err != nil {
 		return err
 	}
@@ -456,24 +449,24 @@ func (m *UnifiedManager) Set(r *configs.Resources) error {
 	return m.fsMgr.Set(r)
 }
 
-func (m *UnifiedManager) GetPaths() map[string]string {
+func (m *unifiedManager) GetPaths() map[string]string {
 	paths := make(map[string]string, 1)
 	paths[""] = m.path
 	return paths
 }
 
-func (m *UnifiedManager) GetCgroups() (*configs.Cgroup, error) {
+func (m *unifiedManager) GetCgroups() (*configs.Cgroup, error) {
 	return m.cgroups, nil
 }
 
-func (m *UnifiedManager) GetFreezerState() (configs.FreezerState, error) {
+func (m *unifiedManager) GetFreezerState() (configs.FreezerState, error) {
 	return m.fsMgr.GetFreezerState()
 }
 
-func (m *UnifiedManager) Exists() bool {
+func (m *unifiedManager) Exists() bool {
 	return cgroups.PathExists(m.path)
 }
 
-func (m *UnifiedManager) OOMKillCount() (uint64, error) {
+func (m *unifiedManager) OOMKillCount() (uint64, error) {
 	return m.fsMgr.OOMKillCount()
 }

@@ -123,10 +123,10 @@ github.com/chai2010/gettext-go
 github.com/chai2010/gettext-go/mo
 github.com/chai2010/gettext-go/plural
 github.com/chai2010/gettext-go/po
-# github.com/checkpoint-restore/go-criu/v6 v6.3.0
-## explicit; go 1.16
-github.com/checkpoint-restore/go-criu/v6
-github.com/checkpoint-restore/go-criu/v6/rpc
+# github.com/checkpoint-restore/go-criu/v5 v5.3.0
+## explicit; go 1.13
+github.com/checkpoint-restore/go-criu/v5
+github.com/checkpoint-restore/go-criu/v5/rpc
 # github.com/cilium/ebpf v0.10.0
 ## explicit; go 1.18
 github.com/cilium/ebpf
@@ -299,8 +299,8 @@ github.com/golang/protobuf/ptypes/wrappers
 # github.com/google/btree v1.0.1
 ## explicit; go 1.12
 github.com/google/btree
-# github.com/google/cadvisor v0.47.1 => github.com/Dragoncell/cadvisor v0.0.0-20230319185436-b4c955f149c0
-## explicit; go 1.17
+# github.com/google/cadvisor v0.0.0-20230322072926-bffd0b102e03 => github.com/Dragoncell/cadvisor v0.0.0-20230322072926-bffd0b102e03
+## explicit; go 1.16
 github.com/google/cadvisor/cache/memory
 github.com/google/cadvisor/client/v2
 github.com/google/cadvisor/collector
@@ -553,13 +553,15 @@ github.com/onsi/gomega/types
 # github.com/opencontainers/go-digest v1.0.0
 ## explicit; go 1.13
 github.com/opencontainers/go-digest
-# github.com/opencontainers/runc v1.1.4 => github.com/Dragoncell/runc v0.0.0-20230320211543-efad7a3b80f4
-## explicit; go 1.19
+# github.com/opencontainers/runc v1.1.4 => github.com/Dragoncell/runc v0.0.0-20230322065003-7af9322b6fcb
+## explicit; go 1.16
 github.com/opencontainers/runc/libcontainer
 github.com/opencontainers/runc/libcontainer/apparmor
 github.com/opencontainers/runc/libcontainer/capabilities
 github.com/opencontainers/runc/libcontainer/cgroups
 github.com/opencontainers/runc/libcontainer/cgroups/devices
+github.com/opencontainers/runc/libcontainer/cgroups/ebpf
+github.com/opencontainers/runc/libcontainer/cgroups/ebpf/devicefilter
 github.com/opencontainers/runc/libcontainer/cgroups/fs
 github.com/opencontainers/runc/libcontainer/cgroups/fs2
 github.com/opencontainers/runc/libcontainer/cgroups/fscommon
@@ -2477,8 +2479,8 @@ sigs.k8s.io/structured-merge-diff/v4/value
 # sigs.k8s.io/yaml v1.3.0
 ## explicit; go 1.12
 sigs.k8s.io/yaml
-# github.com/google/cadvisor => github.com/Dragoncell/cadvisor v0.0.0-20230319185436-b4c955f149c0
-# github.com/opencontainers/runc => github.com/Dragoncell/runc v0.0.0-20230320211543-efad7a3b80f4
+# github.com/google/cadvisor => github.com/Dragoncell/cadvisor v0.0.0-20230322072926-bffd0b102e03
+# github.com/opencontainers/runc => github.com/Dragoncell/runc v0.0.0-20230322065003-7af9322b6fcb
 # k8s.io/api => ./staging/src/k8s.io/api
 # k8s.io/apiextensions-apiserver => ./staging/src/k8s.io/apiextensions-apiserver
 # k8s.io/apimachinery => ./staging/src/k8s.io/apimachinery

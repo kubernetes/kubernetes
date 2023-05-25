@@ -40,11 +40,6 @@ func setMemory(dirPath string, r *configs.Resources) error {
 	if !isMemorySet(r) {
 		return nil
 	}
-
-	if err := CheckMemoryUsage(dirPath, r); err != nil {
-		return err
-	}
-
 	swap, err := cgroups.ConvertMemorySwapToCgroupV2Value(r.MemorySwap, r.Memory)
 	if err != nil {
 		return err

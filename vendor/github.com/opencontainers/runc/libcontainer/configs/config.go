@@ -31,13 +31,12 @@ type IDMap struct {
 // for syscalls. Additional architectures can be added by specifying them in
 // Architectures.
 type Seccomp struct {
-	DefaultAction    Action                   `json:"default_action"`
-	Architectures    []string                 `json:"architectures"`
-	Flags            []specs.LinuxSeccompFlag `json:"flags"`
-	Syscalls         []*Syscall               `json:"syscalls"`
-	DefaultErrnoRet  *uint                    `json:"default_errno_ret"`
-	ListenerPath     string                   `json:"listener_path,omitempty"`
-	ListenerMetadata string                   `json:"listener_metadata,omitempty"`
+	DefaultAction    Action     `json:"default_action"`
+	Architectures    []string   `json:"architectures"`
+	Syscalls         []*Syscall `json:"syscalls"`
+	DefaultErrnoRet  *uint      `json:"default_errno_ret"`
+	ListenerPath     string     `json:"listener_path,omitempty"`
+	ListenerMetadata string     `json:"listener_metadata,omitempty"`
 }
 
 // Action is taken upon rule match in Seccomp
@@ -83,6 +82,9 @@ type Syscall struct {
 	ErrnoRet *uint  `json:"errnoRet"`
 	Args     []*Arg `json:"args"`
 }
+
+// TODO Windows. Many of these fields should be factored out into those parts
+// which are common across platforms, and those which are platform specific.
 
 // Config defines configuration options for executing a process inside a contained environment.
 type Config struct {

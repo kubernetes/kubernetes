@@ -1,4 +1,4 @@
-package devices
+package ebpf
 
 import (
 	"errors"
@@ -93,7 +93,7 @@ var (
 )
 
 // Loosely based on the BPF_F_REPLACE support check in
-// https://github.com/cilium/ebpf/blob/v0.6.0/link/syscalls.go.
+//   <https://github.com/cilium/ebpf/blob/v0.6.0/link/syscalls.go>.
 //
 // TODO: move this logic to cilium/ebpf
 func haveBpfProgReplace() bool {
@@ -143,12 +143,12 @@ func haveBpfProgReplace() bool {
 	return haveBpfProgReplaceBool
 }
 
-// loadAttachCgroupDeviceFilter installs eBPF device filter program to /sys/fs/cgroup/<foo> directory.
+// LoadAttachCgroupDeviceFilter installs eBPF device filter program to /sys/fs/cgroup/<foo> directory.
 //
 // Requires the system to be running in cgroup2 unified-mode with kernel >= 4.15 .
 //
 // https://github.com/torvalds/linux/commit/ebc614f687369f9df99828572b1d85a7c2de3d92
-func loadAttachCgroupDeviceFilter(insts asm.Instructions, license string, dirFd int) (func() error, error) {
+func LoadAttachCgroupDeviceFilter(insts asm.Instructions, license string, dirFd int) (func() error, error) {
 	// Increase `ulimit -l` limit to avoid BPF_PROG_LOAD error (#2167).
 	// This limit is not inherited into the container.
 	memlockLimit := &unix.Rlimit{

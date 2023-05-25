@@ -1,22 +1,7 @@
 package cgroups
 
 import (
-	"errors"
-
 	"github.com/opencontainers/runc/libcontainer/configs"
-)
-
-var (
-	// ErrDevicesUnsupported is an error returned when a cgroup manager
-	// is not configured to set device rules.
-	ErrDevicesUnsupported = errors.New("cgroup manager is not configured to set device rules")
-
-	// DevicesSetV1 and DevicesSetV2 are functions to set devices for
-	// cgroup v1 and v2, respectively. Unless libcontainer/cgroups/devices
-	// package is imported, it is set to nil, so cgroup managers can't
-	// manage devices.
-	DevicesSetV1 func(path string, r *configs.Resources) error
-	DevicesSetV2 func(path string, r *configs.Resources) error
 )
 
 type Manager interface {

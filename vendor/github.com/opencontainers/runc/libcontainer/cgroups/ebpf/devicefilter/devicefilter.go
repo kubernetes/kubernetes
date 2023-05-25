@@ -1,10 +1,10 @@
-// Implements creation of eBPF device filter program.
+// Package devicefilter contains eBPF device filter program
 //
-// Based on https://github.com/containers/crun/blob/0.10.2/src/libcrun/ebpf.c
+// The implementation is based on https://github.com/containers/crun/blob/0.10.2/src/libcrun/ebpf.c
 //
 // Although ebpf.c is originally licensed under LGPL-3.0-or-later, the author (Giuseppe Scrivano)
 // agreed to relicense the file in Apache License 2.0: https://github.com/opencontainers/runc/issues/2144#issuecomment-543116397
-package devices
+package devicefilter
 
 import (
 	"errors"
@@ -13,6 +13,7 @@ import (
 	"strconv"
 
 	"github.com/cilium/ebpf/asm"
+	devicesemulator "github.com/opencontainers/runc/libcontainer/cgroups/devices"
 	"github.com/opencontainers/runc/libcontainer/devices"
 	"golang.org/x/sys/unix"
 )
@@ -22,14 +23,14 @@ const (
 	license = "Apache"
 )
 
-// deviceFilter returns eBPF device filter program and its license string.
-func deviceFilter(rules []*devices.Rule) (asm.Instructions, string, error) {
+// DeviceFilter returns eBPF device filter program and its license string
+func DeviceFilter(rules []*devices.Rule) (asm.Instructions, string, error) {
 	// Generate the minimum ruleset for the device rules we are given. While we
 	// don't care about minimum transitions in cgroupv2, using the emulator
 	// gives us a guarantee that the behaviour of devices filtering is the same
 	// as cgroupv1, including security hardenings to avoid misconfiguration
 	// (such as punching holes in wildcard rules).
-	emu := new(emulator)
+	emu := new(devicesemulator.Emulator)
 	for _, rule := range rules {
 		if err := emu.Apply(*rule); err != nil {
 			return nil, "", err
@@ -174,7 +175,7 @@ func (p *program) appendRule(rule *devices.Rule) error {
 	}
 	p.insts = append(p.insts, acceptBlock(rule.Allow)...)
 	// set blockSym to the first instruction we added in this iteration
-	p.insts[prevBlockLastIdx+1] = p.insts[prevBlockLastIdx+1].WithSymbol(blockSym)
+	p.insts[prevBlockLastIdx+1] = p.insts[prevBlockLastIdx+1].Sym(blockSym)
 	p.blockID++
 	return nil
 }
@@ -187,7 +188,7 @@ func (p *program) finalize() asm.Instructions {
 	blockSym := "block-" + strconv.Itoa(p.blockID)
 	p.insts = append(p.insts,
 		// R0 <- v
-		asm.Mov.Imm32(asm.R0, v).WithSymbol(blockSym),
+		asm.Mov.Imm32(asm.R0, v).Sym(blockSym),
 		asm.Return(),
 	)
 	p.blockID = -1

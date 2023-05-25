@@ -60,7 +60,7 @@ type initConfig struct {
 	Config           *configs.Config       `json:"config"`
 	Networks         []*network            `json:"network"`
 	PassedFilesCount int                   `json:"passed_files_count"`
-	ContainerID      string                `json:"containerid"`
+	ContainerId      string                `json:"containerid"`
 	Rlimits          []configs.Rlimit      `json:"rlimits"`
 	CreateConsole    bool                  `json:"create_console"`
 	ConsoleWidth     uint16                `json:"console_width"`
@@ -87,7 +87,7 @@ func newContainerInit(t initType, pipe *os.File, consoleSocket *os.File, fifoFd,
 	case initSetns:
 		// mountFds must be nil in this case. We don't mount while doing runc exec.
 		if mountFds != nil {
-			return nil, errors.New("mountFds must be nil; can't mount from exec")
+			return nil, errors.New("mountFds must be nil. Can't mount while doing runc exec.")
 		}
 
 		return &linuxSetnsInit{
@@ -411,9 +411,8 @@ func fixStdioPermissions(u *user.ExecUser) error {
 			return &os.PathError{Op: "fstat", Path: file.Name(), Err: err}
 		}
 
-		// Skip chown if uid is already the one we want or any of the STDIO descriptors
-		// were redirected to /dev/null.
-		if int(s.Uid) == u.Uid || s.Rdev == null.Rdev {
+		// Skip chown if uid is already the one we want.
+		if int(s.Uid) == u.Uid {
 			continue
 		}
 
@@ -523,8 +522,7 @@ func isWaitable(pid int) (bool, error) {
 
 // signalAllProcesses freezes then iterates over all the processes inside the
 // manager's cgroups sending the signal s to them.
-// If s is SIGKILL and subreaper is not enabled then it will wait for each
-// process to exit.
+// If s is SIGKILL then it will wait for each process to exit.
 // For all other signals it will check if the process is ready to report its
 // exit status and only if it is will a wait be performed.
 func signalAllProcesses(m cgroups.Manager, s os.Signal) error {

@@ -49,11 +49,6 @@ enum criu_cg_mode {
 	DEFAULT = 6;
 };
 
-enum criu_network_lock_method {
-	IPTABLES = 	1;
-	NFTABLES = 	2;
-};
-
 enum criu_pre_dump_mode {
 	SPLICE = 	1;
 	VM_READ =	2;
@@ -136,8 +131,6 @@ message criu_opts {
 	optional criu_pre_dump_mode	pre_dump_mode		= 61 [default = SPLICE];
 	optional int32			pidfd_store_sk		= 62;
 	optional string			lsm_mount_context	= 63;
-	optional criu_network_lock_method	network_lock		= 64 [default = IPTABLES];
-	optional bool			mntns_compat_mode	= 65;
 /*	optional bool			check_mounts		= 128;	*/
 }
 
@@ -173,8 +166,6 @@ enum criu_req_type {
 
 	WAIT_PID	= 11;
 	PAGE_SERVER_CHLD = 12;
-
-	SINGLE_PRE_DUMP = 13;
 }
 
 /*

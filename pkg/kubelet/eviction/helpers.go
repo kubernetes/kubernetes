@@ -685,6 +685,7 @@ func makeSignalObservations(summary *statsapi.Summary) (signalObservations, stat
 				time:      memory.Time,
 			}
 		}
+		klog.V(3).InfoS("Eviction manager", "PSI Memory Observation", result[evictionapi.SignalMemoryWarning])
 	}
 	if cpu := summary.Node.CPU; cpu != nil && cpu.PSI != nil && cpu.PSI.Some != nil {
 		result[evictionapi.SignalCPUWarning] = signalObservation {
@@ -692,6 +693,7 @@ func makeSignalObservations(summary *statsapi.Summary) (signalObservations, stat
 			capacity:  resource.NewQuantity(int64(100), resource.DecimalSI),
 			time:      cpu.Time,
 		}
+		klog.V(3).InfoS("Eviction manager", "PSI CPU Observation", result[evictionapi.SignalCPUWarning])
 	}
 	if allocatableContainer, err := getSysContainer(summary.Node.SystemContainers, statsapi.SystemContainerPods); err != nil {
 		klog.ErrorS(err, "Eviction manager: failed to construct signal", "signal", evictionapi.SignalAllocatableMemoryAvailable)

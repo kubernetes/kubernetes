@@ -5443,6 +5443,12 @@ const (
 	NodePIDPressure NodeConditionType = "PIDPressure"
 	// NodeNetworkUnavailable means that network for the node is not correctly configured.
 	NodeNetworkUnavailable NodeConditionType = "NetworkUnavailable"
+	// NodeMemoryPressure means the kubelet is under pressure due to insufficient available memory.
+	NodeMemoryWarning NodeConditionType = "MemoryWarning"
+	// NodeDiskPressure means the kubelet is under pressure due to insufficient available disk.
+	NodeDiskWarning NodeConditionType = "DiskWarning"
+	// NodeCPUPressure means the kubelet is under pressure due to insufficient available CPU.
+	NodeCPUWarning NodeConditionType = "CPUWarning"
 )
 
 // NodeCondition contains condition information for a node.

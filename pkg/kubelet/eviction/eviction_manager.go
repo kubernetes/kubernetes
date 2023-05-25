@@ -257,7 +257,10 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 
 	activePods := podFunc()
 	updateStats := true
+	klog.V(3).InfoS("Eviction manager: PSI getting summary stats")
 	summary, err := m.summaryProvider.Get(ctx, updateStats)
+	klog.V(3).InfoS("Eviction manager", "PSI CPU", summary.Node.CPU)
+	klog.V(3).InfoS("Eviction manager", "PSI Memory", summary.Node.Memory)
 	if err != nil {
 		klog.ErrorS(err, "Eviction manager: failed to get summary stats")
 		return nil

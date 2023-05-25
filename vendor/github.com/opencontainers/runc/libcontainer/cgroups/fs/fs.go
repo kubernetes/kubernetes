@@ -53,13 +53,13 @@ type subsystem interface {
 	Set(path string, r *configs.Resources) error
 }
 
-type Manager struct {
+type manager struct {
 	mu      sync.Mutex
 	cgroups *configs.Cgroup
 	paths   map[string]string
 }
 
-func NewManager(cg *configs.Cgroup, paths map[string]string) (*Manager, error) {
+func NewManager(cg *configs.Cgroup, paths map[string]string) (cgroups.Manager, error) {
 	// Some v1 controllers (cpu, cpuset, and devices) expect
 	// cgroups.Resources to not be nil in Apply.
 	if cg.Resources == nil {
@@ -77,7 +77,7 @@ func NewManager(cg *configs.Cgroup, paths map[string]string) (*Manager, error) {
 		}
 	}
 
-	return &Manager{
+	return &manager{
 		cgroups: cg,
 		paths:   paths,
 	}, nil
@@ -104,7 +104,7 @@ func isIgnorableError(rootless bool, err error) bool {
 	return false
 }
 
-func (m *Manager) Apply(pid int) (err error) {
+func (m *manager) Apply(pid int) (err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -138,19 +138,19 @@ func (m *Manager) Apply(pid int) (err error) {
 	return nil
 }
 
-func (m *Manager) Destroy() error {
+func (m *manager) Destroy() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return cgroups.RemovePaths(m.paths)
 }
 
-func (m *Manager) Path(subsys string) string {
+func (m *manager) Path(subsys string) string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.paths[subsys]
 }
 
-func (m *Manager) GetStats() (*cgroups.Stats, error) {
+func (m *manager) GetStats() (*cgroups.Stats, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	stats := cgroups.NewStats()
@@ -166,7 +166,7 @@ func (m *Manager) GetStats() (*cgroups.Stats, error) {
 	return stats, nil
 }
 
-func (m *Manager) Set(r *configs.Resources) error {
+func (m *manager) Set(r *configs.Resources) error {
 	if r == nil {
 		return nil
 	}
@@ -182,7 +182,7 @@ func (m *Manager) Set(r *configs.Resources) error {
 		if err := sys.Set(path, r); err != nil {
 			// When rootless is true, errors from the device subsystem
 			// are ignored, as it is really not expected to work.
-			if m.cgroups.Rootless && sys.Name() == "devices" && !errors.Is(err, cgroups.ErrDevicesUnsupported) {
+			if m.cgroups.Rootless && sys.Name() == "devices" {
 				continue
 			}
 			// However, errors from other subsystems are not ignored.
@@ -201,7 +201,7 @@ func (m *Manager) Set(r *configs.Resources) error {
 
 // Freeze toggles the container's freezer cgroup depending on the state
 // provided
-func (m *Manager) Freeze(state configs.FreezerState) error {
+func (m *manager) Freeze(state configs.FreezerState) error {
 	path := m.Path("freezer")
 	if path == "" {
 		return errors.New("cannot toggle freezer: cgroups not configured for container")
@@ -217,25 +217,25 @@ func (m *Manager) Freeze(state configs.FreezerState) error {
 	return nil
 }
 
-func (m *Manager) GetPids() ([]int, error) {
+func (m *manager) GetPids() ([]int, error) {
 	return cgroups.GetPids(m.Path("devices"))
 }
 
-func (m *Manager) GetAllPids() ([]int, error) {
+func (m *manager) GetAllPids() ([]int, error) {
 	return cgroups.GetAllPids(m.Path("devices"))
 }
 
-func (m *Manager) GetPaths() map[string]string {
+func (m *manager) GetPaths() map[string]string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.paths
 }
 
-func (m *Manager) GetCgroups() (*configs.Cgroup, error) {
+func (m *manager) GetCgroups() (*configs.Cgroup, error) {
 	return m.cgroups, nil
 }
 
-func (m *Manager) GetFreezerState() (configs.FreezerState, error) {
+func (m *manager) GetFreezerState() (configs.FreezerState, error) {
 	dir := m.Path("freezer")
 	// If the container doesn't have the freezer cgroup, say it's undefined.
 	if dir == "" {
@@ -245,7 +245,7 @@ func (m *Manager) GetFreezerState() (configs.FreezerState, error) {
 	return freezer.GetState(dir)
 }
 
-func (m *Manager) Exists() bool {
+func (m *manager) Exists() bool {
 	return cgroups.PathExists(m.Path("devices"))
 }
 
@@ -253,7 +253,7 @@ func OOMKillCount(path string) (uint64, error) {
 	return fscommon.GetValueByKey(path, "memory.oom_control", "oom_kill")
 }
 
-func (m *Manager) OOMKillCount() (uint64, error) {
+func (m *manager) OOMKillCount() (uint64, error) {
 	c, err := OOMKillCount(m.Path("memory"))
 	// Ignore ENOENT when rootless as it couldn't create cgroup.
 	if err != nil && m.cgroups.Rootless && os.IsNotExist(err) {

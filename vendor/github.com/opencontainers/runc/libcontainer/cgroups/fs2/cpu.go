@@ -11,18 +11,12 @@ import (
 )
 
 func isCpuSet(r *configs.Resources) bool {
-	return r.CpuWeight != 0 || r.CpuQuota != 0 || r.CpuPeriod != 0 || r.CPUIdle != nil
+	return r.CpuWeight != 0 || r.CpuQuota != 0 || r.CpuPeriod != 0
 }
 
 func setCpu(dirPath string, r *configs.Resources) error {
 	if !isCpuSet(r) {
 		return nil
-	}
-
-	if r.CPUIdle != nil {
-		if err := cgroups.WriteFile(dirPath, "cpu.idle", strconv.FormatInt(*r.CPUIdle, 10)); err != nil {
-			return err
-		}
 	}
 
 	// NOTE: .CpuShares is not used here. Conversion is the caller's responsibility.

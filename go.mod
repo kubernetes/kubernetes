@@ -38,7 +38,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
 	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.3
-	github.com/google/cadvisor v0.47.1
+	github.com/google/cadvisor v0.0.0-20230322072926-bffd0b102e03
 	github.com/google/cel-go v0.12.6
 	github.com/google/gnostic v0.5.7-v3refs
 	github.com/google/go-cmp v0.5.9
@@ -147,7 +147,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/chai2010/gettext-go v1.0.2 // indirect
-	github.com/checkpoint-restore/go-criu/v6 v6.3.0 // indirect
+	github.com/checkpoint-restore/go-criu/v5 v5.3.0 // indirect
 	github.com/cilium/ebpf v0.10.0 // indirect
 	github.com/containerd/cgroups v1.0.1 // indirect
 	github.com/containerd/console v1.0.3 // indirect
@@ -243,8 +243,8 @@ require (
 )
 
 replace (
-	github.com/google/cadvisor => github.com/Dragoncell/cadvisor v0.0.0-20230319185436-b4c955f149c0
-	github.com/opencontainers/runc => github.com/Dragoncell/runc v0.0.0-20230320211543-efad7a3b80f4
+	github.com/google/cadvisor => github.com/Dragoncell/cadvisor v0.0.0-20230322072926-bffd0b102e03
+	github.com/opencontainers/runc => github.com/Dragoncell/runc v0.0.0-20230322065003-7af9322b6fcb
 	k8s.io/api => ./staging/src/k8s.io/api
 	k8s.io/apiextensions-apiserver => ./staging/src/k8s.io/apiextensions-apiserver
 	k8s.io/apimachinery => ./staging/src/k8s.io/apimachinery

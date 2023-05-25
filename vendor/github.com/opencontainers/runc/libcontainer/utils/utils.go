@@ -132,16 +132,19 @@ func WithProcfd(root, unsafePath string, fn func(procfd string) error) error {
 	return fn(procfd)
 }
 
-// SearchLabels searches through a list of key=value pairs for a given key,
-// returning its value, and the binary flag telling whether the key exist.
-func SearchLabels(labels []string, key string) (string, bool) {
-	key += "="
-	for _, s := range labels {
-		if strings.HasPrefix(s, key) {
-			return s[len(key):], true
+// SearchLabels searches a list of key-value pairs for the provided key and
+// returns the corresponding value. The pairs must be separated with '='.
+func SearchLabels(labels []string, query string) string {
+	for _, l := range labels {
+		parts := strings.SplitN(l, "=", 2)
+		if len(parts) < 2 {
+			continue
+		}
+		if parts[0] == query {
+			return parts[1]
 		}
 	}
-	return "", false
+	return ""
 }
 
 // Annotations returns the bundle path and user defined annotations from the

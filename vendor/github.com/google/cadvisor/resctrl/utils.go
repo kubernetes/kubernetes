@@ -42,8 +42,6 @@ const (
 	cpusListFileName         = "cpus_list"
 	schemataFileName         = "schemata"
 	tasksFileName            = "tasks"
-	modeFileName             = "mode"
-	sizeFileName             = "size"
 	infoDirName              = "info"
 	monDataDirName           = "mon_data"
 	monGroupsDirName         = "mon_groups"
@@ -74,8 +72,6 @@ var (
 		monGroupsDirName: {},
 		schemataFileName: {},
 		tasksFileName:    {},
-		modeFileName:     {},
-		sizeFileName:     {},
 	}
 )
 

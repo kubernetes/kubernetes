@@ -17,7 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	cadvisorapi "github.com/google/cadvisor/info/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -27,6 +26,18 @@ type Summary struct {
 	Node NodeStats `json:"node"`
 	// Per-pod stats.
 	Pods []PodStats `json:"pods"`
+}
+
+type PSIData struct {
+	Avg10  *float64 `json:"avg10"`
+	Avg60  *float64 `json:"avg60"`
+	Avg300 *float64 `json:"avg300"`
+	Total  *uint64  `json:"total"`
+}
+
+type PSIStats struct {
+	Some *PSIData `json:"some,omitempty"`
+	Full *PSIData `json:"full,omitempty"`
 }
 
 // NodeStats holds node-level unprocessed sample stats.
@@ -206,7 +217,7 @@ type IOStats struct {
 	Time metav1.Time `json:"time"`
 
   // PSI stats of the overall node
-	PSI cadvisorapi.PSIStats `json:"psi,omitempty"`
+	PSI *PSIStats `json:"psi,omitempty"`
 }
 
 // CPUStats contains data about CPU usage.
@@ -222,7 +233,7 @@ type CPUStats struct {
 	UsageCoreNanoSeconds *uint64 `json:"usageCoreNanoSeconds,omitempty"`
 
 	// PSI stats of the overall node
-	PSI cadvisorapi.PSIStats `json:"psi,omitempty"`
+	PSI *PSIStats `json:"psi,omitempty"`
 }
 
 // MemoryStats contains data about memory usage.
@@ -252,7 +263,7 @@ type MemoryStats struct {
 	MajorPageFaults *uint64 `json:"majorPageFaults,omitempty"`
 
 	// PSI stats of the overall node
-	PSI cadvisorapi.PSIStats `json:"psi,omitempty"`
+	PSI *PSIStats `json:"psi,omitempty"`
 }
 
 // AcceleratorStats contains stats for accelerators attached to the container.

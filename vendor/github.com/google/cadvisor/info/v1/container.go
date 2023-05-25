@@ -261,6 +261,18 @@ func (ci *ContainerInfo) StatsEndTime() time.Time {
 	return ret
 }
 
+type PSIData struct {
+	Avg10  float64 `json:"avg10"`
+	Avg60  float64 `json:"avg60"`
+	Avg300 float64 `json:"avg300"`
+	Total  uint64  `json:"total"`
+}
+
+type PSIStats struct {
+	Some PSIData `json:"some,omitempty"`
+	Full PSIData `json:"full,omitempty"`
+}
+
 // This mirrors kernel internal structure.
 type LoadStats struct {
 	// Number of sleeping tasks.
@@ -333,6 +345,8 @@ type CpuStats struct {
 	// Load is smoothed over the last 10 seconds. Instantaneous value can be read
 	// from LoadStats.NrRunning.
 	LoadAverage int32 `json:"load_average"`
+
+	PSI PSIStats `json:"psi,omitempty"`
 }
 
 type PerDiskStats struct {
@@ -351,6 +365,8 @@ type DiskIoStats struct {
 	IoWaitTime     []PerDiskStats `json:"io_wait_time,omitempty"`
 	IoMerged       []PerDiskStats `json:"io_merged,omitempty"`
 	IoTime         []PerDiskStats `json:"io_time,omitempty"`
+
+	PSI PSIStats `json:"psi,omitempty"`
 }
 
 type HugetlbStats struct {
@@ -397,6 +413,8 @@ type MemoryStats struct {
 
 	ContainerData    MemoryStatsMemoryData `json:"container_data,omitempty"`
 	HierarchicalData MemoryStatsMemoryData `json:"hierarchical_data,omitempty"`
+
+	PSI PSIStats `json:"psi,omitempty"`
 }
 
 type CPUSetStats struct {

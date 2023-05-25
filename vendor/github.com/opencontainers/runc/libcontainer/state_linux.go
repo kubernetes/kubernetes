@@ -35,7 +35,7 @@ type containerState interface {
 	status() Status
 }
 
-func destroy(c *Container) error {
+func destroy(c *linuxContainer) error {
 	if !c.config.Namespaces.Contains(configs.NEWPID) ||
 		c.config.Namespaces.PathOf(configs.NEWPID) != "" {
 		if err := signalAllProcesses(c.cgroupManager, unix.SIGKILL); err != nil {
@@ -59,7 +59,7 @@ func destroy(c *Container) error {
 	return err
 }
 
-func runPoststopHooks(c *Container) error {
+func runPoststopHooks(c *linuxContainer) error {
 	hooks := c.config.Hooks
 	if hooks == nil {
 		return nil
@@ -80,7 +80,7 @@ func runPoststopHooks(c *Container) error {
 
 // stoppedState represents a container is a stopped/destroyed state.
 type stoppedState struct {
-	c *Container
+	c *linuxContainer
 }
 
 func (b *stoppedState) status() Status {
@@ -104,7 +104,7 @@ func (b *stoppedState) destroy() error {
 
 // runningState represents a container that is currently running.
 type runningState struct {
-	c *Container
+	c *linuxContainer
 }
 
 func (r *runningState) status() Status {
@@ -136,7 +136,7 @@ func (r *runningState) destroy() error {
 }
 
 type createdState struct {
-	c *Container
+	c *linuxContainer
 }
 
 func (i *createdState) status() Status {
@@ -162,7 +162,7 @@ func (i *createdState) destroy() error {
 // pausedState represents a container that is currently pause.  It cannot be destroyed in a
 // paused state and must transition back to running first.
 type pausedState struct {
-	c *Container
+	c *linuxContainer
 }
 
 func (p *pausedState) status() Status {
@@ -195,7 +195,7 @@ func (p *pausedState) destroy() error {
 // information that maybe need destroyed when the container is stopped and destroy is called.
 type restoredState struct {
 	imageDir string
-	c        *Container
+	c        *linuxContainer
 }
 
 func (r *restoredState) status() Status {
@@ -222,7 +222,7 @@ func (r *restoredState) destroy() error {
 // loadedState is used whenever a container is restored, loaded, or setting additional
 // processes inside and it should not be destroyed when it is exiting.
 type loadedState struct {
-	c *Container
+	c *linuxContainer
 	s Status
 }
 
