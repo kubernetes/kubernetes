@@ -35,7 +35,7 @@ type Timestamp struct {
 	Nanos int32 `json:"nanos" protobuf:"varint,2,opt,name=nanos"`
 }
 
-// Timestamp returns the Time as a new Timestamp value.
+// ProtoTime returns the Time as a new Timestamp value.
 func (m *Time) ProtoTime() *Timestamp {
 	if m == nil {
 		return &Timestamp{}
@@ -57,7 +57,7 @@ func (m *Time) Size() (n int) {
 	return m.ProtoTime().Size()
 }
 
-// Reset implements the protobuf marshalling interface.
+// Unmarshal implements the protobuf marshalling interface.
 func (m *Time) Unmarshal(data []byte) error {
 	if len(data) == 0 {
 		m.Time = time.Time{}
