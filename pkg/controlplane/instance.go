@@ -27,6 +27,7 @@ import (
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
+	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	authenticationv1 "k8s.io/api/authentication/v1"
@@ -715,6 +716,7 @@ var (
 		flowcontrolv1beta1.SchemeGroupVersion,
 		flowcontrolv1beta2.SchemeGroupVersion,
 		flowcontrolv1beta3.SchemeGroupVersion,
+		admissionregistrationv1beta1.SchemeGroupVersion,
 	}
 
 	// alphaAPIGroupVersionsDisabledByDefault holds the alpha APIs we have.  They are always disabled by default.

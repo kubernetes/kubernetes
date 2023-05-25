@@ -103,3 +103,27 @@ func SetDefaults_ServiceReference(obj *admissionregistrationv1beta1.ServiceRefer
 		obj.Port = utilpointer.Int32(443)
 	}
 }
+
+// SetDefaults_ValidatingAdmissionPolicySpec sets defaults for ValidatingAdmissionPolicySpec
+func SetDefaults_ValidatingAdmissionPolicySpec(obj *admissionregistrationv1beta1.ValidatingAdmissionPolicySpec) {
+	if obj.FailurePolicy == nil {
+		policy := admissionregistrationv1beta1.Fail
+		obj.FailurePolicy = &policy
+	}
+}
+
+// SetDefaults_MatchResources sets defaults for MatchResources
+func SetDefaults_MatchResources(obj *admissionregistrationv1beta1.MatchResources) {
+	if obj.MatchPolicy == nil {
+		policy := admissionregistrationv1beta1.Equivalent
+		obj.MatchPolicy = &policy
+	}
+	if obj.NamespaceSelector == nil {
+		selector := metav1.LabelSelector{}
+		obj.NamespaceSelector = &selector
+	}
+	if obj.ObjectSelector == nil {
+		selector := metav1.LabelSelector{}
+		obj.ObjectSelector = &selector
+	}
+}

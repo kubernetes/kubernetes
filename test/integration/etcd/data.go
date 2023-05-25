@@ -362,10 +362,23 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicies"): {
 			Stub:             `{"metadata":{"name":"vap1","creationTimestamp":null},"spec":{"paramKind":{"apiVersion":"test.example.com/v1","kind":"Example"},"matchConstraints":{"resourceRules": [{"resourceNames": ["fakeName"], "apiGroups":["apps"],"apiVersions":["v1"],"operations":["CREATE", "UPDATE"], "resources":["deployments"]}]},"validations":[{"expression":"object.spec.replicas <= params.maxReplicas","message":"Too many replicas"}]}}`,
 			ExpectedEtcdPath: "/registry/validatingadmissionpolicies/vap1",
+			ExpectedGVK:      gvkP("admissionregistration.k8s.io", "v1beta1", "ValidatingAdmissionPolicy"),
 		},
 		gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicybindings"): {
 			Stub:             `{"metadata":{"name":"pb1","creationTimestamp":null},"spec":{"policyName":"replicalimit-policy.example.com","paramRef":{"name":"replica-limit-test.example.com"},"validationActions":["Deny"]}}`,
 			ExpectedEtcdPath: "/registry/validatingadmissionpolicybindings/pb1",
+			ExpectedGVK:      gvkP("admissionregistration.k8s.io", "v1beta1", "ValidatingAdmissionPolicyBinding"),
+		},
+		// --
+
+		// k8s.io/kubernetes/pkg/apis/admissionregistration/v1beta1
+		gvr("admissionregistration.k8s.io", "v1beta1", "validatingadmissionpolicies"): {
+			Stub:             `{"metadata":{"name":"vapbeta1","creationTimestamp":null},"spec":{"paramKind":{"apiVersion":"test.example.com/v1","kind":"Example"},"matchConstraints":{"resourceRules": [{"resourceNames": ["fakeName"], "apiGroups":["apps"],"apiVersions":["v1"],"operations":["CREATE", "UPDATE"], "resources":["deployments"]}]},"validations":[{"expression":"object.spec.replicas <= params.maxReplicas","message":"Too many replicas"}]}}`,
+			ExpectedEtcdPath: "/registry/validatingadmissionpolicies/vapbeta1",
+		},
+		gvr("admissionregistration.k8s.io", "v1beta1", "validatingadmissionpolicybindings"): {
+			Stub:             `{"metadata":{"name":"pbbeta1","creationTimestamp":null},"spec":{"policyName":"replicalimit-policy.example.com","paramRef":{"name":"replica-limit-test.example.com"},"validationActions":["Deny"]}}`,
+			ExpectedEtcdPath: "/registry/validatingadmissionpolicybindings/pbbeta1",
 		},
 		// --
 
