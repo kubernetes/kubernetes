@@ -111,13 +111,13 @@ func newNoxuValidationCRDs() []*apiextensionsv1.CustomResourceDefinition {
 				Type:        "string",
 				Enum: []apiextensionsv1.JSON{
 					{
-						Raw: []byte(`"foo"`),
+						Object: "foo",
 					},
 					{
-						Raw: []byte(`"bar"`),
+						Object: "bar",
 					},
 					{
-						Raw: []byte(`"baz"`),
+						Object: "baz",
 					},
 				},
 			},
