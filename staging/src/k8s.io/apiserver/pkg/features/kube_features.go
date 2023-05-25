@@ -238,7 +238,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	AdvancedAuditing: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 
-	ValidatingAdmissionPolicy: {Default: false, PreRelease: featuregate.Alpha},
+	ValidatingAdmissionPolicy: {Default: true, PreRelease: featuregate.Beta},
 
 	CustomResourceValidationExpressions: {Default: true, PreRelease: featuregate.Beta},
 
