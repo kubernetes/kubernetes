@@ -104,7 +104,7 @@ var (
 				Obj()
 	inUseClaim = st.FromResourceClaim(pendingImmediateClaim).
 			Allocation(&resourcev1alpha1.AllocationResult{}).
-			ReservedFor(resourcev1alpha1.ResourceClaimConsumerReference{UID: types.UID(podUID)}).
+			ReservedFor(resourcev1alpha1.ResourceClaimConsumerReference{Resource: "pods", Name: podName, UID: types.UID(podUID)}).
 			Obj()
 	allocatedClaim = st.FromResourceClaim(pendingDelayedClaim).
 			OwnerReference(podName, podUID, podKind).
@@ -214,10 +214,36 @@ func TestPlugin(t *testing.T) {
 		"claim-reference": {
 			pod:    podWithClaimName,
 			claims: []*resourcev1alpha1.ResourceClaim{allocatedClaim, otherClaim},
+			want: want{
+				reserve: result{
+					changes: change{
+						claim: func(claim *resourcev1alpha1.ResourceClaim) *resourcev1alpha1.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Status.ReservedFor = inUseClaim.Status.ReservedFor
+							}
+							return claim
+						},
+					},
+				},
+			},
 		},
 		"claim-template": {
 			pod:    podWithClaimTemplate,
 			claims: []*resourcev1alpha1.ResourceClaim{allocatedClaim, otherClaim},
+			want: want{
+				reserve: result{
+					changes: change{
+						claim: func(claim *resourcev1alpha1.ResourceClaim) *resourcev1alpha1.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Status.ReservedFor = inUseClaim.Status.ReservedFor
+							}
+							return claim
+						},
+					},
+				},
+			},
 		},
 		"missing-claim": {
 			pod: podWithClaimTemplate,
@@ -589,11 +615,13 @@ func (tc *testContext) listAll(t *testing.T) (objects []metav1.Object) {
 	claims, err := tc.client.ResourceV1alpha1().ResourceClaims("").List(tc.ctx, metav1.ListOptions{})
 	require.NoError(t, err, "list claims")
 	for _, claim := range claims.Items {
+		claim := claim
 		objects = append(objects, &claim)
 	}
 	schedulings, err := tc.client.ResourceV1alpha1().PodSchedulings("").List(tc.ctx, metav1.ListOptions{})
 	require.NoError(t, err, "list pod scheduling")
 	for _, scheduling := range schedulings.Items {
+		scheduling := scheduling
 		objects = append(objects, &scheduling)
 	}
 
