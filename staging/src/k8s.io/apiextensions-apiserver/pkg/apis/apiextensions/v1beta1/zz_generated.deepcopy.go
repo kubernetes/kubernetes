@@ -22,7 +22,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	schema "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/schema"
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -436,7 +436,7 @@ func (in *CustomResourceValidation) DeepCopyInto(out *CustomResourceValidation) 
 	*out = *in
 	if in.OpenAPIV3Schema != nil {
 		in, out := &in.OpenAPIV3Schema, &out.OpenAPIV3Schema
-		*out = new(schema.JSONSchemaProps)
+		*out = new(apiextensions.JSONSchemaProps)
 		(*in).DeepCopyInto(*out)
 	}
 	return

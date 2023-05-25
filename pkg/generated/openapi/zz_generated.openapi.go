@@ -24,10 +24,9 @@ limitations under the License.
 package openapi
 
 import (
-	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	v1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	resource "k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
 	common "k8s.io/kube-openapi/pkg/common"
 	spec "k8s.io/kube-openapi/pkg/validation/spec"
@@ -905,6 +904,29 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/storage/v1beta1.VolumeAttachmentStatus":                                               schema_k8sio_api_storage_v1beta1_VolumeAttachmentStatus(ref),
 		"k8s.io/api/storage/v1beta1.VolumeError":                                                          schema_k8sio_api_storage_v1beta1_VolumeError(ref),
 		"k8s.io/api/storage/v1beta1.VolumeNodeResources":                                                  schema_k8sio_api_storage_v1beta1_VolumeNodeResources(ref),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceColumnDefinition":            schema_apiextensions_apiserver_pkg_apis_apiextensions_CustomResourceColumnDefinition(ref),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceConversion":                  schema_apiextensions_apiserver_pkg_apis_apiextensions_CustomResourceConversion(ref),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceDefinition":                  schema_apiextensions_apiserver_pkg_apis_apiextensions_CustomResourceDefinition(ref),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceDefinitionCondition":         schema_apiextensions_apiserver_pkg_apis_apiextensions_CustomResourceDefinitionCondition(ref),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceDefinitionList":              schema_apiextensions_apiserver_pkg_apis_apiextensions_CustomResourceDefinitionList(ref),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceDefinitionNames":             schema_apiextensions_apiserver_pkg_apis_apiextensions_CustomResourceDefinitionNames(ref),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceDefinitionSpec":              schema_apiextensions_apiserver_pkg_apis_apiextensions_CustomResourceDefinitionSpec(ref),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceDefinitionStatus":            schema_apiextensions_apiserver_pkg_apis_apiextensions_CustomResourceDefinitionStatus(ref),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceDefinitionVersion":           schema_apiextensions_apiserver_pkg_apis_apiextensions_CustomResourceDefinitionVersion(ref),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceSubresourceScale":            schema_apiextensions_apiserver_pkg_apis_apiextensions_CustomResourceSubresourceScale(ref),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceSubresourceStatus":           schema_apiextensions_apiserver_pkg_apis_apiextensions_CustomResourceSubresourceStatus(ref),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceSubresources":                schema_apiextensions_apiserver_pkg_apis_apiextensions_CustomResourceSubresources(ref),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceValidation":                  schema_apiextensions_apiserver_pkg_apis_apiextensions_CustomResourceValidation(ref),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.ExternalDocumentation":                     schema_apiextensions_apiserver_pkg_apis_apiextensions_ExternalDocumentation(ref),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.JSON":                                      schema_apiextensions_apiserver_pkg_apis_apiextensions_JSON(ref),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.JSONSchemaProps":                           schema_apiextensions_apiserver_pkg_apis_apiextensions_JSONSchemaProps(ref),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.JSONSchemaPropsOrArray":                    schema_apiextensions_apiserver_pkg_apis_apiextensions_JSONSchemaPropsOrArray(ref),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.JSONSchemaPropsOrBool":                     schema_apiextensions_apiserver_pkg_apis_apiextensions_JSONSchemaPropsOrBool(ref),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.JSONSchemaPropsOrStringArray":              schema_apiextensions_apiserver_pkg_apis_apiextensions_JSONSchemaPropsOrStringArray(ref),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.ProtoJSON":                                 schema_apiextensions_apiserver_pkg_apis_apiextensions_ProtoJSON(ref),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.ServiceReference":                          schema_apiextensions_apiserver_pkg_apis_apiextensions_ServiceReference(ref),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.ValidationRule":                            schema_apiextensions_apiserver_pkg_apis_apiextensions_ValidationRule(ref),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.WebhookClientConfig":                       schema_apiextensions_apiserver_pkg_apis_apiextensions_WebhookClientConfig(ref),
 		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.ConversionRequest":                      schema_pkg_apis_apiextensions_v1_ConversionRequest(ref),
 		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.ConversionResponse":                     schema_pkg_apis_apiextensions_v1_ConversionResponse(ref),
 		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.ConversionReview":                       schema_pkg_apis_apiextensions_v1_ConversionReview(ref),
@@ -921,15 +943,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceSubresourceStatus":        schema_pkg_apis_apiextensions_v1_CustomResourceSubresourceStatus(ref),
 		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceSubresources":             schema_pkg_apis_apiextensions_v1_CustomResourceSubresources(ref),
 		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceValidation":               schema_pkg_apis_apiextensions_v1_CustomResourceValidation(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.ExternalDocumentation":                  schema_pkg_apis_apiextensions_v1_ExternalDocumentation(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSON":                                   schema_pkg_apis_apiextensions_v1_JSON(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaProps":                        schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaPropsOrArray":                 schema_pkg_apis_apiextensions_v1_JSONSchemaPropsOrArray(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaPropsOrBool":                  schema_pkg_apis_apiextensions_v1_JSONSchemaPropsOrBool(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaPropsOrStringArray":           schema_pkg_apis_apiextensions_v1_JSONSchemaPropsOrStringArray(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.ProtoJSON":                              schema_pkg_apis_apiextensions_v1_ProtoJSON(ref),
 		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.ServiceReference":                       schema_pkg_apis_apiextensions_v1_ServiceReference(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.ValidationRule":                         schema_pkg_apis_apiextensions_v1_ValidationRule(ref),
 		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.WebhookClientConfig":                    schema_pkg_apis_apiextensions_v1_WebhookClientConfig(ref),
 		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.WebhookConversion":                      schema_pkg_apis_apiextensions_v1_WebhookConversion(ref),
 		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.ConversionRequest":                 schema_pkg_apis_apiextensions_v1beta1_ConversionRequest(ref),
@@ -948,15 +962,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceSubresourceStatus":   schema_pkg_apis_apiextensions_v1beta1_CustomResourceSubresourceStatus(ref),
 		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceSubresources":        schema_pkg_apis_apiextensions_v1beta1_CustomResourceSubresources(ref),
 		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceValidation":          schema_pkg_apis_apiextensions_v1beta1_CustomResourceValidation(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.ExternalDocumentation":             schema_pkg_apis_apiextensions_v1beta1_ExternalDocumentation(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSON":                              schema_pkg_apis_apiextensions_v1beta1_JSON(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaProps":                   schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaPropsOrArray":            schema_pkg_apis_apiextensions_v1beta1_JSONSchemaPropsOrArray(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaPropsOrBool":             schema_pkg_apis_apiextensions_v1beta1_JSONSchemaPropsOrBool(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaPropsOrStringArray":      schema_pkg_apis_apiextensions_v1beta1_JSONSchemaPropsOrStringArray(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.ProtoJSON":                         schema_pkg_apis_apiextensions_v1beta1_ProtoJSON(ref),
 		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.ServiceReference":                  schema_pkg_apis_apiextensions_v1beta1_ServiceReference(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.ValidationRule":                    schema_pkg_apis_apiextensions_v1beta1_ValidationRule(ref),
 		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.WebhookClientConfig":               schema_pkg_apis_apiextensions_v1beta1_WebhookClientConfig(ref),
 		"k8s.io/apimachinery/pkg/api/resource.Quantity":                                                   schema_apimachinery_pkg_api_resource_Quantity(ref),
 		"k8s.io/apimachinery/pkg/api/resource.int64Amount":                                                schema_apimachinery_pkg_api_resource_int64Amount(ref),
@@ -45083,6 +45089,1241 @@ func schema_k8sio_api_storage_v1beta1_VolumeNodeResources(ref common.ReferenceCa
 	}
 }
 
+func schema_apiextensions_apiserver_pkg_apis_apiextensions_CustomResourceColumnDefinition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CustomResourceColumnDefinition specifies a column for server side printing.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"Name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "name is a human readable name for the column.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"Type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "type is an OpenAPI type definition for this column. See https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#data-types for more.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"Format": {
+						SchemaProps: spec.SchemaProps{
+							Description: "format is an optional OpenAPI type definition for this column. The 'name' format is applied to the primary identifier column to assist in clients identifying column is the resource name. See https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#data-types for more.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"Description": {
+						SchemaProps: spec.SchemaProps{
+							Description: "description is a human readable description of this column.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"Priority": {
+						SchemaProps: spec.SchemaProps{
+							Description: "priority is an integer defining the relative importance of this column compared to others. Lower numbers are considered higher priority. Columns that may be omitted in limited space scenarios should be given a higher priority.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"JSONPath": {
+						SchemaProps: spec.SchemaProps{
+							Description: "JSONPath is a simple JSON path, i.e. without array notation.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"Name", "Type", "Format", "Description", "Priority", "JSONPath"},
+			},
+		},
+	}
+}
+
+func schema_apiextensions_apiserver_pkg_apis_apiextensions_CustomResourceConversion(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CustomResourceConversion describes how to convert different versions of a CR.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"Strategy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`strategy` specifies the conversion strategy. Allowed values are: - `None`: The converter only change the apiVersion and would not touch any other field in the CR. - `Webhook`: API Server will call to an external webhook to do the conversion. Additional information\n  is needed for this option. This requires spec.preserveUnknownFields to be false.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"WebhookClientConfig": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`webhookClientConfig` is the instructions for how to call the webhook if strategy is `Webhook`.",
+							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.WebhookClientConfig"),
+						},
+					},
+					"ConversionReviewVersions": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ConversionReviewVersions is an ordered list of preferred `ConversionReview` versions the Webhook expects. API server will try to use first version in the list which it supports. If none of the versions specified in this list supported by API server, conversion will fail for this object. If a persisted Webhook configuration specifies allowed versions and does not include any versions known to the API Server, calls to the webhook will fail.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"Strategy", "WebhookClientConfig"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.WebhookClientConfig"},
+	}
+}
+
+func schema_apiextensions_apiserver_pkg_apis_apiextensions_CustomResourceDefinition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CustomResourceDefinition represents a resource that should be exposed on the API server.  Its name MUST be in the format <.spec.name>.<.spec.group>.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"TypeMeta": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.TypeMeta"),
+						},
+					},
+					"ObjectMeta": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
+					"Spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Spec describes how the user wants the resources to appear",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceDefinitionSpec"),
+						},
+					},
+					"Status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status indicates the actual state of the CustomResourceDefinition",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceDefinitionStatus"),
+						},
+					},
+				},
+				Required: []string{"TypeMeta", "ObjectMeta", "Spec", "Status"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceDefinitionSpec", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceDefinitionStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/apimachinery/pkg/apis/meta/v1.TypeMeta"},
+	}
+}
+
+func schema_apiextensions_apiserver_pkg_apis_apiextensions_CustomResourceDefinitionCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CustomResourceDefinitionCondition contains details for the current condition of this pod.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"Type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Type is the type of the condition. Types include Established, NamesAccepted and Terminating.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"Status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status is the status of the condition. Can be True, False, Unknown.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"LastTransitionTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Last time the condition transitioned from one status to another.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
+					"Reason": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Unique, one-word, CamelCase reason for the condition's last transition.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"Message": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Human-readable message indicating details about last transition.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"Type", "Status"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+	}
+}
+
+func schema_apiextensions_apiserver_pkg_apis_apiextensions_CustomResourceDefinitionList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CustomResourceDefinitionList is a list of CustomResourceDefinition objects.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"TypeMeta": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.TypeMeta"),
+						},
+					},
+					"ListMeta": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+						},
+					},
+					"Items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Items individual CustomResourceDefinitions",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceDefinition"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"TypeMeta", "ListMeta", "Items"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceDefinition", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/apimachinery/pkg/apis/meta/v1.TypeMeta"},
+	}
+}
+
+func schema_apiextensions_apiserver_pkg_apis_apiextensions_CustomResourceDefinitionNames(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CustomResourceDefinitionNames indicates the names to serve this CustomResourceDefinition",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"Plural": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Plural is the plural name of the resource to serve.  It must match the name of the CustomResourceDefinition-registration too: plural.group and it must be all lowercase.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"Singular": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Singular is the singular name of the resource.  It must be all lowercase  Defaults to lowercased <kind>",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"ShortNames": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ShortNames are short names for the resource.  It must be all lowercase.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"Kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is the serialized kind of the resource.  It is normally CamelCase and singular.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"ListKind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ListKind is the serialized kind of the list for this resource.  Defaults to <kind>List.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"Categories": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Categories is a list of grouped resources custom resources belong to (e.g. 'all')",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"Plural", "Singular", "ShortNames", "Kind", "ListKind"},
+			},
+		},
+	}
+}
+
+func schema_apiextensions_apiserver_pkg_apis_apiextensions_CustomResourceDefinitionSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CustomResourceDefinitionSpec describes how a user wants their resource to appear",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"Group": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Group is the group this resource belongs in",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"Version": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Version is the version this resource belongs in Should be always first item in Versions field if provided. Optional, but at least one of Version or Versions must be set. Deprecated: Please use `Versions`.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"Names": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Names are the names used to describe this custom resource",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceDefinitionNames"),
+						},
+					},
+					"Scope": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Scope indicates whether this resource is cluster or namespace scoped.  Default is namespaced",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"Validation": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Validation describes the validation methods for CustomResources Optional, the global validation schema for all versions. Top-level and per-version schemas are mutually exclusive.",
+							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceValidation"),
+						},
+					},
+					"Subresources": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Subresources describes the subresources for CustomResource Optional, the global subresources for all versions. Top-level and per-version subresources are mutually exclusive.",
+							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceSubresources"),
+						},
+					},
+					"Versions": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Versions is the list of all supported versions for this resource. If Version field is provided, this field is optional. Validation: All versions must use the same validation schema for now. i.e., top level Validation field is applied to all of these versions. Order: The version name will be used to compute the order. If the version string is \"kube-like\", it will sort above non \"kube-like\" version strings, which are ordered lexicographically. \"Kube-like\" versions start with a \"v\", then are followed by a number (the major version), then optionally the string \"alpha\" or \"beta\" and another number (the minor version). These are sorted first by GA > beta > alpha (where GA is a version with no suffix such as beta or alpha), and then by comparing major version, then minor version. An example sorted list of versions: v10, v2, v1, v11beta2, v10beta3, v3beta1, v12alpha1, v11alpha2, foo1, foo10.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceDefinitionVersion"),
+									},
+								},
+							},
+						},
+					},
+					"AdditionalPrinterColumns": {
+						SchemaProps: spec.SchemaProps{
+							Description: "AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column. Optional, the global columns for all versions. Top-level and per-version columns are mutually exclusive.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceColumnDefinition"),
+									},
+								},
+							},
+						},
+					},
+					"Conversion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`conversion` defines conversion settings for the CRD.",
+							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceConversion"),
+						},
+					},
+					"PreserveUnknownFields": {
+						SchemaProps: spec.SchemaProps{
+							Description: "preserveUnknownFields disables pruning of object fields which are not specified in the OpenAPI schema. apiVersion, kind, metadata and known fields inside metadata are always preserved. Defaults to true in v1beta and will default to false in v1.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"Group", "Version", "Names", "Scope", "Versions", "Conversion", "PreserveUnknownFields"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceColumnDefinition", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceConversion", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceDefinitionNames", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceDefinitionVersion", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceSubresources", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceValidation"},
+	}
+}
+
+func schema_apiextensions_apiserver_pkg_apis_apiextensions_CustomResourceDefinitionStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CustomResourceDefinitionStatus indicates the state of the CustomResourceDefinition",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"Conditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"type",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Conditions indicate state for particular aspects of a CustomResourceDefinition",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceDefinitionCondition"),
+									},
+								},
+							},
+						},
+					},
+					"AcceptedNames": {
+						SchemaProps: spec.SchemaProps{
+							Description: "AcceptedNames are the names that are actually being used to serve discovery They may be different than the names in spec.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceDefinitionNames"),
+						},
+					},
+					"StoredVersions": {
+						SchemaProps: spec.SchemaProps{
+							Description: "StoredVersions are all versions of CustomResources that were ever persisted. Tracking these versions allows a migration path for stored versions in etcd. The field is mutable so the migration controller can first finish a migration to another version (i.e. that no old objects are left in the storage), and then remove the rest of the versions from this list. None of the versions in this list can be removed from the spec.Versions field.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"Conditions", "AcceptedNames", "StoredVersions"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceDefinitionCondition", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceDefinitionNames"},
+	}
+}
+
+func schema_apiextensions_apiserver_pkg_apis_apiextensions_CustomResourceDefinitionVersion(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CustomResourceDefinitionVersion describes a version for CRD.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"Name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name is the version name, e.g. “v1”, “v2beta1”, etc.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"Served": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Served is a flag enabling/disabling this version from being served via REST APIs",
+							Default:     false,
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"Storage": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Storage flags the version as storage version. There must be exactly one flagged as storage version.",
+							Default:     false,
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"Deprecated": {
+						SchemaProps: spec.SchemaProps{
+							Description: "deprecated indicates this version of the custom resource API is deprecated. When set to true, API requests to this version receive a warning header in the server response. Defaults to false.",
+							Default:     false,
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"DeprecationWarning": {
+						SchemaProps: spec.SchemaProps{
+							Description: "deprecationWarning overrides the default warning returned to API clients. May only be set when `deprecated` is true. The default warning indicates this version is deprecated and recommends use of the newest served version of equal or greater stability, if one exists.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"Schema": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Schema describes the schema for CustomResource used in validation, pruning, and defaulting. Top-level and per-version schemas are mutually exclusive. Per-version schemas must not all be set to identical values (top-level validation schema should be used instead) This field is alpha-level and is only honored by servers that enable the CustomResourceWebhookConversion feature.",
+							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceValidation"),
+						},
+					},
+					"Subresources": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Subresources describes the subresources for CustomResource Top-level and per-version subresources are mutually exclusive. Per-version subresources must not all be set to identical values (top-level subresources should be used instead) This field is alpha-level and is only honored by servers that enable the CustomResourceWebhookConversion feature.",
+							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceSubresources"),
+						},
+					},
+					"AdditionalPrinterColumns": {
+						SchemaProps: spec.SchemaProps{
+							Description: "AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column. Top-level and per-version columns are mutually exclusive. Per-version columns must not all be set to identical values (top-level columns should be used instead) This field is alpha-level and is only honored by servers that enable the CustomResourceWebhookConversion feature. NOTE: CRDs created prior to 1.13 populated the top-level additionalPrinterColumns field by default. To apply an update that changes to per-version additionalPrinterColumns, the top-level additionalPrinterColumns field must be explicitly set to null",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceColumnDefinition"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"Name", "Served", "Storage", "Deprecated", "DeprecationWarning"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceColumnDefinition", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceSubresources", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceValidation"},
+	}
+}
+
+func schema_apiextensions_apiserver_pkg_apis_apiextensions_CustomResourceSubresourceScale(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CustomResourceSubresourceScale defines how to serve the scale subresource for CustomResources.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"SpecReplicasPath": {
+						SchemaProps: spec.SchemaProps{
+							Description: "SpecReplicasPath defines the JSON path inside of a CustomResource that corresponds to Scale.Spec.Replicas. Only JSON paths without the array notation are allowed. Must be a JSON Path under .spec. If there is no value under the given path in the CustomResource, the /scale subresource will return an error on GET.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"StatusReplicasPath": {
+						SchemaProps: spec.SchemaProps{
+							Description: "StatusReplicasPath defines the JSON path inside of a CustomResource that corresponds to Scale.Status.Replicas. Only JSON paths without the array notation are allowed. Must be a JSON Path under .status. If there is no value under the given path in the CustomResource, the status replica value in the /scale subresource will default to 0.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"LabelSelectorPath": {
+						SchemaProps: spec.SchemaProps{
+							Description: "LabelSelectorPath defines the JSON path inside of a CustomResource that corresponds to Scale.Status.Selector. Only JSON paths without the array notation are allowed. Must be a JSON Path under .status or .spec. Must be set to work with HPA. The field pointed by this JSON path must be a string field (not a complex selector struct) which contains a serialized label selector in string form. More info: https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions#scale-subresource If there is no value under the given path in the CustomResource, the status label selector value in the /scale subresource will default to the empty string.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"SpecReplicasPath", "StatusReplicasPath"},
+			},
+		},
+	}
+}
+
+func schema_apiextensions_apiserver_pkg_apis_apiextensions_CustomResourceSubresourceStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CustomResourceSubresourceStatus defines how to serve the status subresource for CustomResources. Status is represented by the `.status` JSON path inside of a CustomResource. When set, * exposes a /status subresource for the custom resource * PUT requests to the /status subresource take a custom resource object, and ignore changes to anything except the status stanza * PUT/POST/PATCH requests to the custom resource ignore changes to the status stanza",
+				Type:        []string{"object"},
+			},
+		},
+	}
+}
+
+func schema_apiextensions_apiserver_pkg_apis_apiextensions_CustomResourceSubresources(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CustomResourceSubresources defines the status and scale subresources for CustomResources.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"Status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status denotes the status subresource for CustomResources",
+							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceSubresourceStatus"),
+						},
+					},
+					"Scale": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Scale denotes the scale subresource for CustomResources",
+							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceSubresourceScale"),
+						},
+					},
+				},
+				Required: []string{"Status", "Scale"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceSubresourceScale", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.CustomResourceSubresourceStatus"},
+	}
+}
+
+func schema_apiextensions_apiserver_pkg_apis_apiextensions_CustomResourceValidation(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CustomResourceValidation is a list of validation methods for CustomResources.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"OpenAPIV3Schema": {
+						SchemaProps: spec.SchemaProps{
+							Description: "OpenAPIV3Schema is the OpenAPI v3 schema to be validated against.",
+							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.JSONSchemaProps"),
+						},
+					},
+				},
+				Required: []string{"OpenAPIV3Schema"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.JSONSchemaProps"},
+	}
+}
+
+func schema_apiextensions_apiserver_pkg_apis_apiextensions_ExternalDocumentation(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ExternalDocumentation allows referencing an external resource for extended documentation.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"description": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"url": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func schema_apiextensions_apiserver_pkg_apis_apiextensions_JSON(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "JSON represents any valid JSON value. These types are supported: bool, int64, float64, string, []interface{}, map[string]interface{} and nil.",
+				Type:        apiextensions.JSON{}.OpenAPISchemaType(),
+				Format:      apiextensions.JSON{}.OpenAPISchemaFormat(),
+			},
+		},
+	}
+}
+
+func schema_apiextensions_apiserver_pkg_apis_apiextensions_JSONSchemaProps(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "JSONSchemaProps is a JSON-Schema following Specification Draft 4 (http://json-schema.org/).",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"id": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"$schema": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"$ref": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"description": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"format": {
+						SchemaProps: spec.SchemaProps{
+							Description: "format is an OpenAPI v3 format string. Unknown formats are ignored. The following formats are validated:\n\n- bsonobjectid: a bson object ID, i.e. a 24 characters hex string - uri: an URI as parsed by Golang net/url.ParseRequestURI - email: an email address as parsed by Golang net/mail.ParseAddress - hostname: a valid representation for an Internet host name, as defined by RFC 1034, section 3.1 [RFC1034]. - ipv4: an IPv4 IP as parsed by Golang net.ParseIP - ipv6: an IPv6 IP as parsed by Golang net.ParseIP - cidr: a CIDR as parsed by Golang net.ParseCIDR - mac: a MAC address as parsed by Golang net.ParseMAC - uuid: an UUID that allows uppercase defined by the regex (?i)^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$ - uuid3: an UUID3 that allows uppercase defined by the regex (?i)^[0-9a-f]{8}-?[0-9a-f]{4}-?3[0-9a-f]{3}-?[0-9a-f]{4}-?[0-9a-f]{12}$ - uuid4: an UUID4 that allows uppercase defined by the regex (?i)^[0-9a-f]{8}-?[0-9a-f]{4}-?4[0-9a-f]{3}-?[89ab][0-9a-f]{3}-?[0-9a-f]{12}$ - uuid5: an UUID5 that allows uppercase defined by the regex (?i)^[0-9a-f]{8}-?[0-9a-f]{4}-?5[0-9a-f]{3}-?[89ab][0-9a-f]{3}-?[0-9a-f]{12}$ - isbn: an ISBN10 or ISBN13 number string like \"0321751043\" or \"978-0321751041\" - isbn10: an ISBN10 number string like \"0321751043\" - isbn13: an ISBN13 number string like \"978-0321751041\" - creditcard: a credit card number defined by the regex ^(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|6(?:011|5[0-9][0-9])[0-9]{12}|3[47][0-9]{13}|3(?:0[0-5]|[68][0-9])[0-9]{11}|(?:2131|1800|35\\d{3})\\d{11})$ with any non digit characters mixed in - ssn: a U.S. social security number following the regex ^\\d{3}[- ]?\\d{2}[- ]?\\d{4}$ - hexcolor: an hexadecimal color code like \"#FFFFFF: following the regex ^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$ - rgbcolor: an RGB color code like rgb like \"rgb(255,255,2559\" - byte: base64 encoded binary data - password: any kind of string - date: a date string like \"2006-01-02\" as defined by full-date in RFC3339 - duration: a duration string like \"22 ns\" as parsed by Golang time.ParseDuration or compatible with Scala duration format - datetime: a date time string like \"2014-12-15T19:30:20.000Z\" as defined by date-time in RFC3339.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"title": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"default": {
+						SchemaProps: spec.SchemaProps{
+							Description: "default is a default value for undefined object fields. Defaulting is a beta feature under the CustomResourceDefaulting feature gate. CustomResourceDefinitions with defaults must be created using the v1 (or newer) CustomResourceDefinition API. Defaulting requires spec.preserveUnknownFields to be false.",
+							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.JSON"),
+						},
+					},
+					"maximum": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"number"},
+							Format: "double",
+						},
+					},
+					"exclusiveMaximum": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"boolean"},
+							Format: "",
+						},
+					},
+					"minimum": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"number"},
+							Format: "double",
+						},
+					},
+					"exclusiveMinimum": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"boolean"},
+							Format: "",
+						},
+					},
+					"maxLength": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int64",
+						},
+					},
+					"minLength": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int64",
+						},
+					},
+					"pattern": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"maxItems": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int64",
+						},
+					},
+					"minItems": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int64",
+						},
+					},
+					"uniqueItems": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"boolean"},
+							Format: "",
+						},
+					},
+					"multipleOf": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"number"},
+							Format: "double",
+						},
+					},
+					"enum": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.JSON"),
+									},
+								},
+							},
+						},
+					},
+					"maxProperties": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int64",
+						},
+					},
+					"minProperties": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int64",
+						},
+					},
+					"required": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.JSONSchemaPropsOrArray"),
+						},
+					},
+					"allOf": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.JSONSchemaProps"),
+									},
+								},
+							},
+						},
+					},
+					"oneOf": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.JSONSchemaProps"),
+									},
+								},
+							},
+						},
+					},
+					"anyOf": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.JSONSchemaProps"),
+									},
+								},
+							},
+						},
+					},
+					"not": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.JSONSchemaProps"),
+						},
+					},
+					"properties": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.JSONSchemaProps"),
+									},
+								},
+							},
+						},
+					},
+					"additionalProperties": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.JSONSchemaPropsOrBool"),
+						},
+					},
+					"patternProperties": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.JSONSchemaProps"),
+									},
+								},
+							},
+						},
+					},
+					"dependencies": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.JSONSchemaPropsOrStringArray"),
+									},
+								},
+							},
+						},
+					},
+					"additionalItems": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.JSONSchemaPropsOrBool"),
+						},
+					},
+					"definitions": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.JSONSchemaProps"),
+									},
+								},
+							},
+						},
+					},
+					"externalDocs": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.ExternalDocumentation"),
+						},
+					},
+					"example": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.JSON"),
+						},
+					},
+					"nullable": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"boolean"},
+							Format: "",
+						},
+					},
+					"x-kubernetes-preserve-unknown-fields": {
+						SchemaProps: spec.SchemaProps{
+							Description: "x-kubernetes-preserve-unknown-fields stops the API server decoding step from pruning fields which are not specified in the validation schema. This affects fields recursively, but switches back to normal pruning behaviour if nested properties or additionalProperties are specified in the schema. This can either be true or undefined. False is forbidden.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"x-kubernetes-embedded-resource": {
+						SchemaProps: spec.SchemaProps{
+							Description: "x-kubernetes-embedded-resource defines that the value is an embedded Kubernetes runtime.Object, with TypeMeta and ObjectMeta. The type must be object. It is allowed to further restrict the embedded object. kind, apiVersion and metadata are validated automatically. x-kubernetes-preserve-unknown-fields is allowed to be true, but does not have to be if the object is fully specified (up to kind, apiVersion, metadata).",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"x-kubernetes-int-or-string": {
+						SchemaProps: spec.SchemaProps{
+							Description: "x-kubernetes-int-or-string specifies that this value is either an integer or a string. If this is true, an empty type is allowed and type as child of anyOf is permitted if following one of the following patterns:\n\n1) anyOf:\n   - type: integer\n   - type: string\n2) allOf:\n   - anyOf:\n     - type: integer\n     - type: string\n   - ... zero or more",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"x-kubernetes-list-map-keys": {
+						SchemaProps: spec.SchemaProps{
+							Description: "x-kubernetes-list-map-keys annotates an array with the x-kubernetes-list-type `map` by specifying the keys used as the index of the map.\n\nThis tag MUST only be used on lists that have the \"x-kubernetes-list-type\" extension set to \"map\". Also, the values specified for this attribute must be a scalar typed field of the child structure (no nesting is supported).\n\nThe properties specified must either be required or have a default value, to ensure those properties are present for all list items.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"x-kubernetes-list-type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "x-kubernetes-list-type annotates an array to further describe its topology. This extension must only be used on lists and may have 3 possible values:\n\n1) `atomic`: the list is treated as a single entity, like a scalar.\n     Atomic lists will be entirely replaced when updated. This extension\n     may be used on any type of list (struct, scalar, ...).\n2) `set`:\n     Sets are lists that must not have multiple items with the same value. Each\n     value must be a scalar, an object with x-kubernetes-map-type `atomic` or an\n     array with x-kubernetes-list-type `atomic`.\n3) `map`:\n     These lists are like maps in that their elements have a non-index key\n     used to identify them. Order is preserved upon merge. The map tag\n     must only be used on a list with elements of type object.\nDefaults to atomic for arrays.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"x-kubernetes-map-type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "x-kubernetes-map-type annotates an object to further describe its topology. This extension must only be used when type is object and may have 2 possible values:\n\n1) `granular`:\n     These maps are actual maps (key-value pairs) and each fields are independent\n     from each other (they can each be manipulated by separate actors). This is\n     the default behaviour for all maps.\n2) `atomic`: the list is treated as a single entity, like a scalar.\n     Atomic maps will be entirely replaced when updated.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"x-kubernetes-validations": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"rule",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "rule",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "x-kubernetes-validations describes a list of validation rules written in the CEL expression language. This field is an alpha-level. Using this field requires the feature gate `CustomResourceValidationExpressions` to be enabled.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.ValidationRule"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.ExternalDocumentation", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.JSON", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.JSONSchemaProps", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.JSONSchemaPropsOrArray", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.JSONSchemaPropsOrBool", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.JSONSchemaPropsOrStringArray", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.ValidationRule"},
+	}
+}
+
+func schema_apiextensions_apiserver_pkg_apis_apiextensions_JSONSchemaPropsOrArray(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "JSONSchemaPropsOrArray represents a value that can either be a JSONSchemaProps or an array of JSONSchemaProps. Mainly here for serialization purposes.",
+				Type:        apiextensions.JSONSchemaPropsOrArray{}.OpenAPISchemaType(),
+				Format:      apiextensions.JSONSchemaPropsOrArray{}.OpenAPISchemaFormat(),
+			},
+		},
+	}
+}
+
+func schema_apiextensions_apiserver_pkg_apis_apiextensions_JSONSchemaPropsOrBool(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "JSONSchemaPropsOrBool represents JSONSchemaProps or a boolean value. Defaults to true for the boolean property.",
+				Type:        apiextensions.JSONSchemaPropsOrBool{}.OpenAPISchemaType(),
+				Format:      apiextensions.JSONSchemaPropsOrBool{}.OpenAPISchemaFormat(),
+			},
+		},
+	}
+}
+
+func schema_apiextensions_apiserver_pkg_apis_apiextensions_JSONSchemaPropsOrStringArray(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "JSONSchemaPropsOrStringArray represents a JSONSchemaProps or a string array.",
+				Type:        apiextensions.JSONSchemaPropsOrStringArray{}.OpenAPISchemaType(),
+				Format:      apiextensions.JSONSchemaPropsOrStringArray{}.OpenAPISchemaFormat(),
+			},
+		},
+	}
+}
+
+func schema_apiextensions_apiserver_pkg_apis_apiextensions_ProtoJSON(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ProtoJSON is a wrapper for JSON data, but intended for protobuf marshalling/unmarshalling. It is generated into a serialization that matches JSON. Do not use in Go structs.",
+				Type:        []string{"object"},
+			},
+		},
+	}
+}
+
+func schema_apiextensions_apiserver_pkg_apis_apiextensions_ServiceReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ServiceReference holds a reference to Service.legacy.k8s.io",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"Namespace": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`namespace` is the namespace of the service. Required",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"Name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`name` is the name of the service. Required",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"Path": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`path` is an optional URL path which will be sent in any request to this service.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"Port": {
+						SchemaProps: spec.SchemaProps{
+							Description: "If specified, the port on the service that hosting webhook. `port` should be a valid port number (1-65535, inclusive).",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+				Required: []string{"Namespace", "Name"},
+			},
+		},
+	}
+}
+
+func schema_apiextensions_apiserver_pkg_apis_apiextensions_ValidationRule(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ValidationRule describes a validation rule written in the CEL expression language.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"rule": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Rule represents the expression which will be evaluated by CEL. ref: https://github.com/google/cel-spec The Rule is scoped to the location of the x-kubernetes-validations extension in the schema. The `self` variable in the CEL expression is bound to the scoped value. Example: - Rule scoped to the root of a resource with a status subresource: {\"rule\": \"self.status.actual <= self.spec.maxDesired\"}\n\nIf the Rule is scoped to an object with properties, the accessible properties of the object are field selectable via `self.field` and field presence can be checked via `has(self.field)`. Null valued fields are treated as absent fields in CEL expressions. If the Rule is scoped to an object with additionalProperties (i.e. a map) the value of the map are accessible via `self[mapKey]`, map containment can be checked via `mapKey in self` and all entries of the map are accessible via CEL macros and functions such as `self.all(...)`. If the Rule is scoped to an array, the elements of the array are accessible via `self[i]` and also by macros and functions. If the Rule is scoped to a scalar, `self` is bound to the scalar value. Examples: - Rule scoped to a map of objects: {\"rule\": \"self.components['Widget'].priority < 10\"} - Rule scoped to a list of integers: {\"rule\": \"self.values.all(value, value >= 0 && value < 100)\"} - Rule scoped to a string value: {\"rule\": \"self.startsWith('kube')\"}\n\nThe `apiVersion`, `kind`, `metadata.name` and `metadata.generateName` are always accessible from the root of the object and from any x-kubernetes-embedded-resource annotated objects. No other metadata properties are accessible.\n\nUnknown data preserved in custom resources via x-kubernetes-preserve-unknown-fields is not accessible in CEL expressions. This includes: - Unknown field values that are preserved by object schemas with x-kubernetes-preserve-unknown-fields. - Object properties where the property schema is of an \"unknown type\". An \"unknown type\" is recursively defined as:\n  - A schema with no type and x-kubernetes-preserve-unknown-fields set to true\n  - An array where the items schema is of an \"unknown type\"\n  - An object where the additionalProperties schema is of an \"unknown type\"\n\nOnly property names of the form `[a-zA-Z_.-/][a-zA-Z0-9_.-/]*` are accessible. Accessible property names are escaped according to the following rules when accessed in the expression: - '__' escapes to '__underscores__' - '.' escapes to '__dot__' - '-' escapes to '__dash__' - '/' escapes to '__slash__' - Property names that exactly match a CEL RESERVED keyword escape to '__{keyword}__'. The keywords are:\n\t  \"true\", \"false\", \"null\", \"in\", \"as\", \"break\", \"const\", \"continue\", \"else\", \"for\", \"function\", \"if\",\n\t  \"import\", \"let\", \"loop\", \"package\", \"namespace\", \"return\".\nExamples:\n  - Rule accessing a property named \"namespace\": {\"rule\": \"self.__namespace__ > 0\"}\n  - Rule accessing a property named \"x-prop\": {\"rule\": \"self.x__dash__prop > 0\"}\n  - Rule accessing a property named \"redact__d\": {\"rule\": \"self.redact__underscores__d > 0\"}\n\nEquality on arrays with x-kubernetes-list-type of 'set' or 'map' ignores element order, i.e. [1, 2] == [2, 1]. Concatenation on arrays with x-kubernetes-list-type use the semantics of the list type:\n  - 'set': `X + Y` performs a union where the array positions of all elements in `X` are preserved and\n    non-intersecting elements in `Y` are appended, retaining their partial order.\n  - 'map': `X + Y` performs a merge where the array positions of all keys in `X` are preserved but the values\n    are overwritten by values in `Y` when the key sets of `X` and `Y` intersect. Elements in `Y` with\n    non-intersecting keys are appended, retaining their partial order.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"message": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Message represents the message displayed when validation fails. The message is required if the Rule contains line breaks. The message must not contain line breaks. If unset, the message is \"failed rule: {Rule}\". e.g. \"must be a URL with the host matching spec.host\"",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"messageExpression": {
+						SchemaProps: spec.SchemaProps{
+							Description: "MessageExpression declares a CEL expression that evaluates to the validation failure message that is returned when this rule fails. Since messageExpression is used as a failure message, it must evaluate to a string. If both message and messageExpression are present on a rule, then messageExpression will be used if validation fails. If messageExpression results in a runtime error, the runtime error is logged, and the validation failure message is produced as if the messageExpression field were unset. If messageExpression evaluates to an empty string, a string with only spaces, or a string that contains line breaks, then the validation failure message will also be produced as if the messageExpression field were unset, and the fact that messageExpression produced an empty string/string with only spaces/string with line breaks will be logged. messageExpression has access to all the same variables as the rule; the only difference is the return type. Example: \"x must be less than max (\"+string(self.max)+\")\"",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"rule"},
+			},
+		},
+	}
+}
+
+func schema_apiextensions_apiserver_pkg_apis_apiextensions_WebhookClientConfig(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "WebhookClientConfig contains the information to make a TLS connection with the webhook. It has the same field as admissionregistration.internal.WebhookClientConfig.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"URL": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`url` gives the location of the webhook, in standard URL form (`scheme://host:port/path`). Exactly one of `url` or `service` must be specified.\n\nThe `host` should not refer to a service running in the cluster; use the `service` field instead. The host might be resolved via external DNS in some apiservers (e.g., `kube-apiserver` cannot resolve in-cluster DNS as that would be a layering violation). `host` may also be an IP address.\n\nPlease note that using `localhost` or `127.0.0.1` as a `host` is risky unless you take great care to run this webhook on all hosts which run an apiserver which might need to make calls to this webhook. Such installs are likely to be non-portable, i.e., not easy to turn up in a new cluster.\n\nThe scheme must be \"https\"; the URL must begin with \"https://\".\n\nA path is optional, and if present may be any string permissible in a URL. You may use the path to pass an arbitrary string to the webhook, for example, a cluster identifier.\n\nAttempting to use a user or basic auth e.g. \"user:password@\" is not allowed. Fragments (\"#...\") and query parameters (\"?...\") are not allowed, either.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"Service": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`service` is a reference to the service for this webhook. Either `service` or `url` must be specified.\n\nIf the webhook is running within the cluster, then you should use `service`.",
+							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.ServiceReference"),
+						},
+					},
+					"CABundle": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`caBundle` is a PEM encoded CA bundle which will be used to validate the webhook's server certificate. If unspecified, system trust roots on the apiserver are used.",
+							Type:        []string{"string"},
+							Format:      "byte",
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.ServiceReference"},
+	}
+}
+
 func schema_pkg_apis_apiextensions_v1_ConversionRequest(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -45823,472 +47064,14 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceValidation(ref common.Refere
 					"openAPIV3Schema": {
 						SchemaProps: spec.SchemaProps{
 							Description: "openAPIV3Schema is the OpenAPI v3 schema to use for validation and pruning.",
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaProps"),
+							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.JSONSchemaProps"),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaProps"},
-	}
-}
-
-func schema_pkg_apis_apiextensions_v1_ExternalDocumentation(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ExternalDocumentation allows referencing an external resource for extended documentation.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"description": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
-						},
-					},
-					"url": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
-						},
-					},
-				},
-			},
-		},
-	}
-}
-
-func schema_pkg_apis_apiextensions_v1_JSON(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "JSON represents any valid JSON value. These types are supported: bool, int64, float64, string, []interface{}, map[string]interface{} and nil.",
-				Type:        v1.JSON{}.OpenAPISchemaType(),
-				Format:      v1.JSON{}.OpenAPISchemaFormat(),
-			},
-		},
-	}
-}
-
-func schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "JSONSchemaProps is a JSON-Schema following Specification Draft 4 (http://json-schema.org/).",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"id": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
-						},
-					},
-					"$schema": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
-						},
-					},
-					"$ref": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
-						},
-					},
-					"description": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
-						},
-					},
-					"type": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
-						},
-					},
-					"format": {
-						SchemaProps: spec.SchemaProps{
-							Description: "format is an OpenAPI v3 format string. Unknown formats are ignored. The following formats are validated:\n\n- bsonobjectid: a bson object ID, i.e. a 24 characters hex string - uri: an URI as parsed by Golang net/url.ParseRequestURI - email: an email address as parsed by Golang net/mail.ParseAddress - hostname: a valid representation for an Internet host name, as defined by RFC 1034, section 3.1 [RFC1034]. - ipv4: an IPv4 IP as parsed by Golang net.ParseIP - ipv6: an IPv6 IP as parsed by Golang net.ParseIP - cidr: a CIDR as parsed by Golang net.ParseCIDR - mac: a MAC address as parsed by Golang net.ParseMAC - uuid: an UUID that allows uppercase defined by the regex (?i)^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$ - uuid3: an UUID3 that allows uppercase defined by the regex (?i)^[0-9a-f]{8}-?[0-9a-f]{4}-?3[0-9a-f]{3}-?[0-9a-f]{4}-?[0-9a-f]{12}$ - uuid4: an UUID4 that allows uppercase defined by the regex (?i)^[0-9a-f]{8}-?[0-9a-f]{4}-?4[0-9a-f]{3}-?[89ab][0-9a-f]{3}-?[0-9a-f]{12}$ - uuid5: an UUID5 that allows uppercase defined by the regex (?i)^[0-9a-f]{8}-?[0-9a-f]{4}-?5[0-9a-f]{3}-?[89ab][0-9a-f]{3}-?[0-9a-f]{12}$ - isbn: an ISBN10 or ISBN13 number string like \"0321751043\" or \"978-0321751041\" - isbn10: an ISBN10 number string like \"0321751043\" - isbn13: an ISBN13 number string like \"978-0321751041\" - creditcard: a credit card number defined by the regex ^(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|6(?:011|5[0-9][0-9])[0-9]{12}|3[47][0-9]{13}|3(?:0[0-5]|[68][0-9])[0-9]{11}|(?:2131|1800|35\\d{3})\\d{11})$ with any non digit characters mixed in - ssn: a U.S. social security number following the regex ^\\d{3}[- ]?\\d{2}[- ]?\\d{4}$ - hexcolor: an hexadecimal color code like \"#FFFFFF: following the regex ^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$ - rgbcolor: an RGB color code like rgb like \"rgb(255,255,2559\" - byte: base64 encoded binary data - password: any kind of string - date: a date string like \"2006-01-02\" as defined by full-date in RFC3339 - duration: a duration string like \"22 ns\" as parsed by Golang time.ParseDuration or compatible with Scala duration format - datetime: a date time string like \"2014-12-15T19:30:20.000Z\" as defined by date-time in RFC3339.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"title": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
-						},
-					},
-					"default": {
-						SchemaProps: spec.SchemaProps{
-							Description: "default is a default value for undefined object fields. Defaulting is a beta feature under the CustomResourceDefaulting feature gate. CustomResourceDefinitions with defaults must be created using the v1 (or newer) CustomResourceDefinition API. Defaulting requires spec.preserveUnknownFields to be false.",
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSON"),
-						},
-					},
-					"maximum": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"number"},
-							Format: "double",
-						},
-					},
-					"exclusiveMaximum": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"boolean"},
-							Format: "",
-						},
-					},
-					"minimum": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"number"},
-							Format: "double",
-						},
-					},
-					"exclusiveMinimum": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"boolean"},
-							Format: "",
-						},
-					},
-					"maxLength": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"integer"},
-							Format: "int64",
-						},
-					},
-					"minLength": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"integer"},
-							Format: "int64",
-						},
-					},
-					"pattern": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
-						},
-					},
-					"maxItems": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"integer"},
-							Format: "int64",
-						},
-					},
-					"minItems": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"integer"},
-							Format: "int64",
-						},
-					},
-					"uniqueItems": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"boolean"},
-							Format: "",
-						},
-					},
-					"multipleOf": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"number"},
-							Format: "double",
-						},
-					},
-					"enum": {
-						SchemaProps: spec.SchemaProps{
-							Type: []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSON"),
-									},
-								},
-							},
-						},
-					},
-					"maxProperties": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"integer"},
-							Format: "int64",
-						},
-					},
-					"minProperties": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"integer"},
-							Format: "int64",
-						},
-					},
-					"required": {
-						SchemaProps: spec.SchemaProps{
-							Type: []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
-									},
-								},
-							},
-						},
-					},
-					"items": {
-						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaPropsOrArray"),
-						},
-					},
-					"allOf": {
-						SchemaProps: spec.SchemaProps{
-							Type: []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaProps"),
-									},
-								},
-							},
-						},
-					},
-					"oneOf": {
-						SchemaProps: spec.SchemaProps{
-							Type: []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaProps"),
-									},
-								},
-							},
-						},
-					},
-					"anyOf": {
-						SchemaProps: spec.SchemaProps{
-							Type: []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaProps"),
-									},
-								},
-							},
-						},
-					},
-					"not": {
-						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaProps"),
-						},
-					},
-					"properties": {
-						SchemaProps: spec.SchemaProps{
-							Type: []string{"object"},
-							AdditionalProperties: &spec.SchemaOrBool{
-								Allows: true,
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaProps"),
-									},
-								},
-							},
-						},
-					},
-					"additionalProperties": {
-						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaPropsOrBool"),
-						},
-					},
-					"patternProperties": {
-						SchemaProps: spec.SchemaProps{
-							Type: []string{"object"},
-							AdditionalProperties: &spec.SchemaOrBool{
-								Allows: true,
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaProps"),
-									},
-								},
-							},
-						},
-					},
-					"dependencies": {
-						SchemaProps: spec.SchemaProps{
-							Type: []string{"object"},
-							AdditionalProperties: &spec.SchemaOrBool{
-								Allows: true,
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaPropsOrStringArray"),
-									},
-								},
-							},
-						},
-					},
-					"additionalItems": {
-						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaPropsOrBool"),
-						},
-					},
-					"definitions": {
-						SchemaProps: spec.SchemaProps{
-							Type: []string{"object"},
-							AdditionalProperties: &spec.SchemaOrBool{
-								Allows: true,
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaProps"),
-									},
-								},
-							},
-						},
-					},
-					"externalDocs": {
-						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.ExternalDocumentation"),
-						},
-					},
-					"example": {
-						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSON"),
-						},
-					},
-					"nullable": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"boolean"},
-							Format: "",
-						},
-					},
-					"x-kubernetes-preserve-unknown-fields": {
-						SchemaProps: spec.SchemaProps{
-							Description: "x-kubernetes-preserve-unknown-fields stops the API server decoding step from pruning fields which are not specified in the validation schema. This affects fields recursively, but switches back to normal pruning behaviour if nested properties or additionalProperties are specified in the schema. This can either be true or undefined. False is forbidden.",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
-					"x-kubernetes-embedded-resource": {
-						SchemaProps: spec.SchemaProps{
-							Description: "x-kubernetes-embedded-resource defines that the value is an embedded Kubernetes runtime.Object, with TypeMeta and ObjectMeta. The type must be object. It is allowed to further restrict the embedded object. kind, apiVersion and metadata are validated automatically. x-kubernetes-preserve-unknown-fields is allowed to be true, but does not have to be if the object is fully specified (up to kind, apiVersion, metadata).",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
-					"x-kubernetes-int-or-string": {
-						SchemaProps: spec.SchemaProps{
-							Description: "x-kubernetes-int-or-string specifies that this value is either an integer or a string. If this is true, an empty type is allowed and type as child of anyOf is permitted if following one of the following patterns:\n\n1) anyOf:\n   - type: integer\n   - type: string\n2) allOf:\n   - anyOf:\n     - type: integer\n     - type: string\n   - ... zero or more",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
-					"x-kubernetes-list-map-keys": {
-						SchemaProps: spec.SchemaProps{
-							Description: "x-kubernetes-list-map-keys annotates an array with the x-kubernetes-list-type `map` by specifying the keys used as the index of the map.\n\nThis tag MUST only be used on lists that have the \"x-kubernetes-list-type\" extension set to \"map\". Also, the values specified for this attribute must be a scalar typed field of the child structure (no nesting is supported).\n\nThe properties specified must either be required or have a default value, to ensure those properties are present for all list items.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
-									},
-								},
-							},
-						},
-					},
-					"x-kubernetes-list-type": {
-						SchemaProps: spec.SchemaProps{
-							Description: "x-kubernetes-list-type annotates an array to further describe its topology. This extension must only be used on lists and may have 3 possible values:\n\n1) `atomic`: the list is treated as a single entity, like a scalar.\n     Atomic lists will be entirely replaced when updated. This extension\n     may be used on any type of list (struct, scalar, ...).\n2) `set`:\n     Sets are lists that must not have multiple items with the same value. Each\n     value must be a scalar, an object with x-kubernetes-map-type `atomic` or an\n     array with x-kubernetes-list-type `atomic`.\n3) `map`:\n     These lists are like maps in that their elements have a non-index key\n     used to identify them. Order is preserved upon merge. The map tag\n     must only be used on a list with elements of type object.\nDefaults to atomic for arrays.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"x-kubernetes-map-type": {
-						SchemaProps: spec.SchemaProps{
-							Description: "x-kubernetes-map-type annotates an object to further describe its topology. This extension must only be used when type is object and may have 2 possible values:\n\n1) `granular`:\n     These maps are actual maps (key-value pairs) and each fields are independent\n     from each other (they can each be manipulated by separate actors). This is\n     the default behaviour for all maps.\n2) `atomic`: the list is treated as a single entity, like a scalar.\n     Atomic maps will be entirely replaced when updated.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"x-kubernetes-validations": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-map-keys": []interface{}{
-									"rule",
-								},
-								"x-kubernetes-list-type":       "map",
-								"x-kubernetes-patch-merge-key": "rule",
-								"x-kubernetes-patch-strategy":  "merge",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "x-kubernetes-validations describes a list of validation rules written in the CEL expression language. This field is an alpha-level. Using this field requires the feature gate `CustomResourceValidationExpressions` to be enabled.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.ValidationRule"),
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.ExternalDocumentation", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSON", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaProps", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaPropsOrArray", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaPropsOrBool", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaPropsOrStringArray", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.ValidationRule"},
-	}
-}
-
-func schema_pkg_apis_apiextensions_v1_JSONSchemaPropsOrArray(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "JSONSchemaPropsOrArray represents a value that can either be a JSONSchemaProps or an array of JSONSchemaProps. Mainly here for serialization purposes.",
-				Type:        v1.JSONSchemaPropsOrArray{}.OpenAPISchemaType(),
-				Format:      v1.JSONSchemaPropsOrArray{}.OpenAPISchemaFormat(),
-			},
-		},
-	}
-}
-
-func schema_pkg_apis_apiextensions_v1_JSONSchemaPropsOrBool(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "JSONSchemaPropsOrBool represents JSONSchemaProps or a boolean value. Defaults to true for the boolean property.",
-				Type:        v1.JSONSchemaPropsOrBool{}.OpenAPISchemaType(),
-				Format:      v1.JSONSchemaPropsOrBool{}.OpenAPISchemaFormat(),
-			},
-		},
-	}
-}
-
-func schema_pkg_apis_apiextensions_v1_JSONSchemaPropsOrStringArray(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "JSONSchemaPropsOrStringArray represents a JSONSchemaProps or a string array.",
-				Type:        v1.JSONSchemaPropsOrStringArray{}.OpenAPISchemaType(),
-				Format:      v1.JSONSchemaPropsOrStringArray{}.OpenAPISchemaFormat(),
-			},
-		},
-	}
-}
-
-func schema_pkg_apis_apiextensions_v1_ProtoJSON(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ProtoJSON is a wrapper for JSON data, but intended for protobuf marshalling/unmarshalling. It is generated into a serialization that matches JSON. Do not use in Go structs.",
-				Type:        []string{"object"},
-			},
-		},
+			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.JSONSchemaProps"},
 	}
 }
 
@@ -46331,42 +47114,6 @@ func schema_pkg_apis_apiextensions_v1_ServiceReference(ref common.ReferenceCallb
 					},
 				},
 				Required: []string{"namespace", "name"},
-			},
-		},
-	}
-}
-
-func schema_pkg_apis_apiextensions_v1_ValidationRule(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ValidationRule describes a validation rule written in the CEL expression language.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"rule": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Rule represents the expression which will be evaluated by CEL. ref: https://github.com/google/cel-spec The Rule is scoped to the location of the x-kubernetes-validations extension in the schema. The `self` variable in the CEL expression is bound to the scoped value. Example: - Rule scoped to the root of a resource with a status subresource: {\"rule\": \"self.status.actual <= self.spec.maxDesired\"}\n\nIf the Rule is scoped to an object with properties, the accessible properties of the object are field selectable via `self.field` and field presence can be checked via `has(self.field)`. Null valued fields are treated as absent fields in CEL expressions. If the Rule is scoped to an object with additionalProperties (i.e. a map) the value of the map are accessible via `self[mapKey]`, map containment can be checked via `mapKey in self` and all entries of the map are accessible via CEL macros and functions such as `self.all(...)`. If the Rule is scoped to an array, the elements of the array are accessible via `self[i]` and also by macros and functions. If the Rule is scoped to a scalar, `self` is bound to the scalar value. Examples: - Rule scoped to a map of objects: {\"rule\": \"self.components['Widget'].priority < 10\"} - Rule scoped to a list of integers: {\"rule\": \"self.values.all(value, value >= 0 && value < 100)\"} - Rule scoped to a string value: {\"rule\": \"self.startsWith('kube')\"}\n\nThe `apiVersion`, `kind`, `metadata.name` and `metadata.generateName` are always accessible from the root of the object and from any x-kubernetes-embedded-resource annotated objects. No other metadata properties are accessible.\n\nUnknown data preserved in custom resources via x-kubernetes-preserve-unknown-fields is not accessible in CEL expressions. This includes: - Unknown field values that are preserved by object schemas with x-kubernetes-preserve-unknown-fields. - Object properties where the property schema is of an \"unknown type\". An \"unknown type\" is recursively defined as:\n  - A schema with no type and x-kubernetes-preserve-unknown-fields set to true\n  - An array where the items schema is of an \"unknown type\"\n  - An object where the additionalProperties schema is of an \"unknown type\"\n\nOnly property names of the form `[a-zA-Z_.-/][a-zA-Z0-9_.-/]*` are accessible. Accessible property names are escaped according to the following rules when accessed in the expression: - '__' escapes to '__underscores__' - '.' escapes to '__dot__' - '-' escapes to '__dash__' - '/' escapes to '__slash__' - Property names that exactly match a CEL RESERVED keyword escape to '__{keyword}__'. The keywords are:\n\t  \"true\", \"false\", \"null\", \"in\", \"as\", \"break\", \"const\", \"continue\", \"else\", \"for\", \"function\", \"if\",\n\t  \"import\", \"let\", \"loop\", \"package\", \"namespace\", \"return\".\nExamples:\n  - Rule accessing a property named \"namespace\": {\"rule\": \"self.__namespace__ > 0\"}\n  - Rule accessing a property named \"x-prop\": {\"rule\": \"self.x__dash__prop > 0\"}\n  - Rule accessing a property named \"redact__d\": {\"rule\": \"self.redact__underscores__d > 0\"}\n\nEquality on arrays with x-kubernetes-list-type of 'set' or 'map' ignores element order, i.e. [1, 2] == [2, 1]. Concatenation on arrays with x-kubernetes-list-type use the semantics of the list type:\n  - 'set': `X + Y` performs a union where the array positions of all elements in `X` are preserved and\n    non-intersecting elements in `Y` are appended, retaining their partial order.\n  - 'map': `X + Y` performs a merge where the array positions of all keys in `X` are preserved but the values\n    are overwritten by values in `Y` when the key sets of `X` and `Y` intersect. Elements in `Y` with\n    non-intersecting keys are appended, retaining their partial order.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"message": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Message represents the message displayed when validation fails. The message is required if the Rule contains line breaks. The message must not contain line breaks. If unset, the message is \"failed rule: {Rule}\". e.g. \"must be a URL with the host matching spec.host\"",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"messageExpression": {
-						SchemaProps: spec.SchemaProps{
-							Description: "MessageExpression declares a CEL expression that evaluates to the validation failure message that is returned when this rule fails. Since messageExpression is used as a failure message, it must evaluate to a string. If both message and messageExpression are present on a rule, then messageExpression will be used if validation fails. If messageExpression results in a runtime error, the runtime error is logged, and the validation failure message is produced as if the messageExpression field were unset. If messageExpression evaluates to an empty string, a string with only spaces, or a string that contains line breaks, then the validation failure message will also be produced as if the messageExpression field were unset, and the fact that messageExpression produced an empty string/string with only spaces/string with line breaks will be logged. messageExpression has access to all the same variables as the rule; the only difference is the return type. Example: \"x must be less than max (\"+string(self.max)+\")\"",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-				},
-				Required: []string{"rule"},
 			},
 		},
 	}
@@ -47232,472 +47979,14 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceValidation(ref common.R
 					"openAPIV3Schema": {
 						SchemaProps: spec.SchemaProps{
 							Description: "openAPIV3Schema is the OpenAPI v3 schema to use for validation and pruning.",
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaProps"),
+							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.JSONSchemaProps"),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaProps"},
-	}
-}
-
-func schema_pkg_apis_apiextensions_v1beta1_ExternalDocumentation(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ExternalDocumentation allows referencing an external resource for extended documentation.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"description": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
-						},
-					},
-					"url": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
-						},
-					},
-				},
-			},
-		},
-	}
-}
-
-func schema_pkg_apis_apiextensions_v1beta1_JSON(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "JSON represents any valid JSON value. These types are supported: bool, int64, float64, string, []interface{}, map[string]interface{} and nil.",
-				Type:        v1beta1.JSON{}.OpenAPISchemaType(),
-				Format:      v1beta1.JSON{}.OpenAPISchemaFormat(),
-			},
-		},
-	}
-}
-
-func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "JSONSchemaProps is a JSON-Schema following Specification Draft 4 (http://json-schema.org/).",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"id": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
-						},
-					},
-					"$schema": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
-						},
-					},
-					"$ref": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
-						},
-					},
-					"description": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
-						},
-					},
-					"type": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
-						},
-					},
-					"format": {
-						SchemaProps: spec.SchemaProps{
-							Description: "format is an OpenAPI v3 format string. Unknown formats are ignored. The following formats are validated:\n\n- bsonobjectid: a bson object ID, i.e. a 24 characters hex string - uri: an URI as parsed by Golang net/url.ParseRequestURI - email: an email address as parsed by Golang net/mail.ParseAddress - hostname: a valid representation for an Internet host name, as defined by RFC 1034, section 3.1 [RFC1034]. - ipv4: an IPv4 IP as parsed by Golang net.ParseIP - ipv6: an IPv6 IP as parsed by Golang net.ParseIP - cidr: a CIDR as parsed by Golang net.ParseCIDR - mac: a MAC address as parsed by Golang net.ParseMAC - uuid: an UUID that allows uppercase defined by the regex (?i)^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$ - uuid3: an UUID3 that allows uppercase defined by the regex (?i)^[0-9a-f]{8}-?[0-9a-f]{4}-?3[0-9a-f]{3}-?[0-9a-f]{4}-?[0-9a-f]{12}$ - uuid4: an UUID4 that allows uppercase defined by the regex (?i)^[0-9a-f]{8}-?[0-9a-f]{4}-?4[0-9a-f]{3}-?[89ab][0-9a-f]{3}-?[0-9a-f]{12}$ - uuid5: an UUID5 that allows uppercase defined by the regex (?i)^[0-9a-f]{8}-?[0-9a-f]{4}-?5[0-9a-f]{3}-?[89ab][0-9a-f]{3}-?[0-9a-f]{12}$ - isbn: an ISBN10 or ISBN13 number string like \"0321751043\" or \"978-0321751041\" - isbn10: an ISBN10 number string like \"0321751043\" - isbn13: an ISBN13 number string like \"978-0321751041\" - creditcard: a credit card number defined by the regex ^(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|6(?:011|5[0-9][0-9])[0-9]{12}|3[47][0-9]{13}|3(?:0[0-5]|[68][0-9])[0-9]{11}|(?:2131|1800|35\\d{3})\\d{11})$ with any non digit characters mixed in - ssn: a U.S. social security number following the regex ^\\d{3}[- ]?\\d{2}[- ]?\\d{4}$ - hexcolor: an hexadecimal color code like \"#FFFFFF: following the regex ^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$ - rgbcolor: an RGB color code like rgb like \"rgb(255,255,2559\" - byte: base64 encoded binary data - password: any kind of string - date: a date string like \"2006-01-02\" as defined by full-date in RFC3339 - duration: a duration string like \"22 ns\" as parsed by Golang time.ParseDuration or compatible with Scala duration format - datetime: a date time string like \"2014-12-15T19:30:20.000Z\" as defined by date-time in RFC3339.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"title": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
-						},
-					},
-					"default": {
-						SchemaProps: spec.SchemaProps{
-							Description: "default is a default value for undefined object fields. Defaulting is a beta feature under the CustomResourceDefaulting feature gate. CustomResourceDefinitions with defaults must be created using the v1 (or newer) CustomResourceDefinition API. Defaulting requires spec.preserveUnknownFields to be false.",
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSON"),
-						},
-					},
-					"maximum": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"number"},
-							Format: "double",
-						},
-					},
-					"exclusiveMaximum": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"boolean"},
-							Format: "",
-						},
-					},
-					"minimum": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"number"},
-							Format: "double",
-						},
-					},
-					"exclusiveMinimum": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"boolean"},
-							Format: "",
-						},
-					},
-					"maxLength": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"integer"},
-							Format: "int64",
-						},
-					},
-					"minLength": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"integer"},
-							Format: "int64",
-						},
-					},
-					"pattern": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
-						},
-					},
-					"maxItems": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"integer"},
-							Format: "int64",
-						},
-					},
-					"minItems": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"integer"},
-							Format: "int64",
-						},
-					},
-					"uniqueItems": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"boolean"},
-							Format: "",
-						},
-					},
-					"multipleOf": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"number"},
-							Format: "double",
-						},
-					},
-					"enum": {
-						SchemaProps: spec.SchemaProps{
-							Type: []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSON"),
-									},
-								},
-							},
-						},
-					},
-					"maxProperties": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"integer"},
-							Format: "int64",
-						},
-					},
-					"minProperties": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"integer"},
-							Format: "int64",
-						},
-					},
-					"required": {
-						SchemaProps: spec.SchemaProps{
-							Type: []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
-									},
-								},
-							},
-						},
-					},
-					"items": {
-						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaPropsOrArray"),
-						},
-					},
-					"allOf": {
-						SchemaProps: spec.SchemaProps{
-							Type: []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaProps"),
-									},
-								},
-							},
-						},
-					},
-					"oneOf": {
-						SchemaProps: spec.SchemaProps{
-							Type: []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaProps"),
-									},
-								},
-							},
-						},
-					},
-					"anyOf": {
-						SchemaProps: spec.SchemaProps{
-							Type: []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaProps"),
-									},
-								},
-							},
-						},
-					},
-					"not": {
-						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaProps"),
-						},
-					},
-					"properties": {
-						SchemaProps: spec.SchemaProps{
-							Type: []string{"object"},
-							AdditionalProperties: &spec.SchemaOrBool{
-								Allows: true,
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaProps"),
-									},
-								},
-							},
-						},
-					},
-					"additionalProperties": {
-						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaPropsOrBool"),
-						},
-					},
-					"patternProperties": {
-						SchemaProps: spec.SchemaProps{
-							Type: []string{"object"},
-							AdditionalProperties: &spec.SchemaOrBool{
-								Allows: true,
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaProps"),
-									},
-								},
-							},
-						},
-					},
-					"dependencies": {
-						SchemaProps: spec.SchemaProps{
-							Type: []string{"object"},
-							AdditionalProperties: &spec.SchemaOrBool{
-								Allows: true,
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaPropsOrStringArray"),
-									},
-								},
-							},
-						},
-					},
-					"additionalItems": {
-						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaPropsOrBool"),
-						},
-					},
-					"definitions": {
-						SchemaProps: spec.SchemaProps{
-							Type: []string{"object"},
-							AdditionalProperties: &spec.SchemaOrBool{
-								Allows: true,
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaProps"),
-									},
-								},
-							},
-						},
-					},
-					"externalDocs": {
-						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.ExternalDocumentation"),
-						},
-					},
-					"example": {
-						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSON"),
-						},
-					},
-					"nullable": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"boolean"},
-							Format: "",
-						},
-					},
-					"x-kubernetes-preserve-unknown-fields": {
-						SchemaProps: spec.SchemaProps{
-							Description: "x-kubernetes-preserve-unknown-fields stops the API server decoding step from pruning fields which are not specified in the validation schema. This affects fields recursively, but switches back to normal pruning behaviour if nested properties or additionalProperties are specified in the schema. This can either be true or undefined. False is forbidden.",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
-					"x-kubernetes-embedded-resource": {
-						SchemaProps: spec.SchemaProps{
-							Description: "x-kubernetes-embedded-resource defines that the value is an embedded Kubernetes runtime.Object, with TypeMeta and ObjectMeta. The type must be object. It is allowed to further restrict the embedded object. kind, apiVersion and metadata are validated automatically. x-kubernetes-preserve-unknown-fields is allowed to be true, but does not have to be if the object is fully specified (up to kind, apiVersion, metadata).",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
-					"x-kubernetes-int-or-string": {
-						SchemaProps: spec.SchemaProps{
-							Description: "x-kubernetes-int-or-string specifies that this value is either an integer or a string. If this is true, an empty type is allowed and type as child of anyOf is permitted if following one of the following patterns:\n\n1) anyOf:\n   - type: integer\n   - type: string\n2) allOf:\n   - anyOf:\n     - type: integer\n     - type: string\n   - ... zero or more",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
-					"x-kubernetes-list-map-keys": {
-						SchemaProps: spec.SchemaProps{
-							Description: "x-kubernetes-list-map-keys annotates an array with the x-kubernetes-list-type `map` by specifying the keys used as the index of the map.\n\nThis tag MUST only be used on lists that have the \"x-kubernetes-list-type\" extension set to \"map\". Also, the values specified for this attribute must be a scalar typed field of the child structure (no nesting is supported).\n\nThe properties specified must either be required or have a default value, to ensure those properties are present for all list items.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
-									},
-								},
-							},
-						},
-					},
-					"x-kubernetes-list-type": {
-						SchemaProps: spec.SchemaProps{
-							Description: "x-kubernetes-list-type annotates an array to further describe its topology. This extension must only be used on lists and may have 3 possible values:\n\n1) `atomic`: the list is treated as a single entity, like a scalar.\n     Atomic lists will be entirely replaced when updated. This extension\n     may be used on any type of list (struct, scalar, ...).\n2) `set`:\n     Sets are lists that must not have multiple items with the same value. Each\n     value must be a scalar, an object with x-kubernetes-map-type `atomic` or an\n     array with x-kubernetes-list-type `atomic`.\n3) `map`:\n     These lists are like maps in that their elements have a non-index key\n     used to identify them. Order is preserved upon merge. The map tag\n     must only be used on a list with elements of type object.\nDefaults to atomic for arrays.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"x-kubernetes-map-type": {
-						SchemaProps: spec.SchemaProps{
-							Description: "x-kubernetes-map-type annotates an object to further describe its topology. This extension must only be used when type is object and may have 2 possible values:\n\n1) `granular`:\n     These maps are actual maps (key-value pairs) and each fields are independent\n     from each other (they can each be manipulated by separate actors). This is\n     the default behaviour for all maps.\n2) `atomic`: the list is treated as a single entity, like a scalar.\n     Atomic maps will be entirely replaced when updated.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"x-kubernetes-validations": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-map-keys": []interface{}{
-									"rule",
-								},
-								"x-kubernetes-list-type":       "map",
-								"x-kubernetes-patch-merge-key": "rule",
-								"x-kubernetes-patch-strategy":  "merge",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "x-kubernetes-validations describes a list of validation rules written in the CEL expression language. This field is an alpha-level. Using this field requires the feature gate `CustomResourceValidationExpressions` to be enabled.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.ValidationRule"),
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.ExternalDocumentation", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSON", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaProps", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaPropsOrArray", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaPropsOrBool", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaPropsOrStringArray", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.ValidationRule"},
-	}
-}
-
-func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaPropsOrArray(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "JSONSchemaPropsOrArray represents a value that can either be a JSONSchemaProps or an array of JSONSchemaProps. Mainly here for serialization purposes.",
-				Type:        v1beta1.JSONSchemaPropsOrArray{}.OpenAPISchemaType(),
-				Format:      v1beta1.JSONSchemaPropsOrArray{}.OpenAPISchemaFormat(),
-			},
-		},
-	}
-}
-
-func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaPropsOrBool(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "JSONSchemaPropsOrBool represents JSONSchemaProps or a boolean value. Defaults to true for the boolean property.",
-				Type:        v1beta1.JSONSchemaPropsOrBool{}.OpenAPISchemaType(),
-				Format:      v1beta1.JSONSchemaPropsOrBool{}.OpenAPISchemaFormat(),
-			},
-		},
-	}
-}
-
-func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaPropsOrStringArray(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "JSONSchemaPropsOrStringArray represents a JSONSchemaProps or a string array.",
-				Type:        v1beta1.JSONSchemaPropsOrStringArray{}.OpenAPISchemaType(),
-				Format:      v1beta1.JSONSchemaPropsOrStringArray{}.OpenAPISchemaFormat(),
-			},
-		},
-	}
-}
-
-func schema_pkg_apis_apiextensions_v1beta1_ProtoJSON(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ProtoJSON is a wrapper for JSON data, but intended for protobuf marshalling/unmarshalling. It is generated into a serialization that matches JSON. Do not use in Go structs.",
-				Type:        []string{"object"},
-			},
-		},
+			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions.JSONSchemaProps"},
 	}
 }
 
@@ -47740,42 +48029,6 @@ func schema_pkg_apis_apiextensions_v1beta1_ServiceReference(ref common.Reference
 					},
 				},
 				Required: []string{"namespace", "name"},
-			},
-		},
-	}
-}
-
-func schema_pkg_apis_apiextensions_v1beta1_ValidationRule(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ValidationRule describes a validation rule written in the CEL expression language.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"rule": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Rule represents the expression which will be evaluated by CEL. ref: https://github.com/google/cel-spec The Rule is scoped to the location of the x-kubernetes-validations extension in the schema. The `self` variable in the CEL expression is bound to the scoped value. Example: - Rule scoped to the root of a resource with a status subresource: {\"rule\": \"self.status.actual <= self.spec.maxDesired\"}\n\nIf the Rule is scoped to an object with properties, the accessible properties of the object are field selectable via `self.field` and field presence can be checked via `has(self.field)`. Null valued fields are treated as absent fields in CEL expressions. If the Rule is scoped to an object with additionalProperties (i.e. a map) the value of the map are accessible via `self[mapKey]`, map containment can be checked via `mapKey in self` and all entries of the map are accessible via CEL macros and functions such as `self.all(...)`. If the Rule is scoped to an array, the elements of the array are accessible via `self[i]` and also by macros and functions. If the Rule is scoped to a scalar, `self` is bound to the scalar value. Examples: - Rule scoped to a map of objects: {\"rule\": \"self.components['Widget'].priority < 10\"} - Rule scoped to a list of integers: {\"rule\": \"self.values.all(value, value >= 0 && value < 100)\"} - Rule scoped to a string value: {\"rule\": \"self.startsWith('kube')\"}\n\nThe `apiVersion`, `kind`, `metadata.name` and `metadata.generateName` are always accessible from the root of the object and from any x-kubernetes-embedded-resource annotated objects. No other metadata properties are accessible.\n\nUnknown data preserved in custom resources via x-kubernetes-preserve-unknown-fields is not accessible in CEL expressions. This includes: - Unknown field values that are preserved by object schemas with x-kubernetes-preserve-unknown-fields. - Object properties where the property schema is of an \"unknown type\". An \"unknown type\" is recursively defined as:\n  - A schema with no type and x-kubernetes-preserve-unknown-fields set to true\n  - An array where the items schema is of an \"unknown type\"\n  - An object where the additionalProperties schema is of an \"unknown type\"\n\nOnly property names of the form `[a-zA-Z_.-/][a-zA-Z0-9_.-/]*` are accessible. Accessible property names are escaped according to the following rules when accessed in the expression: - '__' escapes to '__underscores__' - '.' escapes to '__dot__' - '-' escapes to '__dash__' - '/' escapes to '__slash__' - Property names that exactly match a CEL RESERVED keyword escape to '__{keyword}__'. The keywords are:\n\t  \"true\", \"false\", \"null\", \"in\", \"as\", \"break\", \"const\", \"continue\", \"else\", \"for\", \"function\", \"if\",\n\t  \"import\", \"let\", \"loop\", \"package\", \"namespace\", \"return\".\nExamples:\n  - Rule accessing a property named \"namespace\": {\"rule\": \"self.__namespace__ > 0\"}\n  - Rule accessing a property named \"x-prop\": {\"rule\": \"self.x__dash__prop > 0\"}\n  - Rule accessing a property named \"redact__d\": {\"rule\": \"self.redact__underscores__d > 0\"}\n\nEquality on arrays with x-kubernetes-list-type of 'set' or 'map' ignores element order, i.e. [1, 2] == [2, 1]. Concatenation on arrays with x-kubernetes-list-type use the semantics of the list type:\n  - 'set': `X + Y` performs a union where the array positions of all elements in `X` are preserved and\n    non-intersecting elements in `Y` are appended, retaining their partial order.\n  - 'map': `X + Y` performs a merge where the array positions of all keys in `X` are preserved but the values\n    are overwritten by values in `Y` when the key sets of `X` and `Y` intersect. Elements in `Y` with\n    non-intersecting keys are appended, retaining their partial order.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"message": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Message represents the message displayed when validation fails. The message is required if the Rule contains line breaks. The message must not contain line breaks. If unset, the message is \"failed rule: {Rule}\". e.g. \"must be a URL with the host matching spec.host\"",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"messageExpression": {
-						SchemaProps: spec.SchemaProps{
-							Description: "MessageExpression declares a CEL expression that evaluates to the validation failure message that is returned when this rule fails. Since messageExpression is used as a failure message, it must evaluate to a string. If both message and messageExpression are present on a rule, then messageExpression will be used if validation fails. If messageExpression results in a runtime error, the runtime error is logged, and the validation failure message is produced as if the messageExpression field were unset. If messageExpression evaluates to an empty string, a string with only spaces, or a string that contains line breaks, then the validation failure message will also be produced as if the messageExpression field were unset, and the fact that messageExpression produced an empty string/string with only spaces/string with line breaks will be logged. messageExpression has access to all the same variables as the rule; the only difference is the return type. Example: \"x must be less than max (\"+string(self.max)+\")\"",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-				},
-				Required: []string{"rule"},
 			},
 		},
 	}
@@ -48457,8 +48710,8 @@ func schema_pkg_apis_meta_v1_Duration(ref common.ReferenceCallback) common.OpenA
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Description: "Duration is a wrapper around time.Duration which supports correct marshaling to YAML and JSON. In particular, it marshals into strings, which can be used as map keys in json.",
-				Type:        metav1.Duration{}.OpenAPISchemaType(),
-				Format:      metav1.Duration{}.OpenAPISchemaFormat(),
+				Type:        v1.Duration{}.OpenAPISchemaType(),
+				Format:      v1.Duration{}.OpenAPISchemaFormat(),
 			},
 		},
 	}
@@ -49073,8 +49326,8 @@ func schema_pkg_apis_meta_v1_MicroTime(ref common.ReferenceCallback) common.Open
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Description: "MicroTime is version of Time with microsecond level precision.",
-				Type:        metav1.MicroTime{}.OpenAPISchemaType(),
-				Format:      metav1.MicroTime{}.OpenAPISchemaFormat(),
+				Type:        v1.MicroTime{}.OpenAPISchemaType(),
+				Format:      v1.MicroTime{}.OpenAPISchemaFormat(),
 			},
 		},
 	}
@@ -49983,8 +50236,8 @@ func schema_pkg_apis_meta_v1_Time(ref common.ReferenceCallback) common.OpenAPIDe
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Description: "Time is a wrapper around time.Time which supports correct marshaling to YAML and JSON.  Wrappers are provided for many of the factory methods that the time package offers.",
-				Type:        metav1.Time{}.OpenAPISchemaType(),
-				Format:      metav1.Time{}.OpenAPISchemaFormat(),
+				Type:        v1.Time{}.OpenAPISchemaType(),
+				Format:      v1.Time{}.OpenAPISchemaFormat(),
 			},
 		},
 	}
