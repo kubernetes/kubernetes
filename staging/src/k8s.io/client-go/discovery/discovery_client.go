@@ -419,8 +419,8 @@ func (e *ErrGroupDiscoveryFailed) Error() string {
 // IsGroupDiscoveryFailedError returns true if the provided error indicates the server was unable to discover
 // a complete list of APIs for the client to use.
 func IsGroupDiscoveryFailedError(err error) bool {
-	_, ok := err.(*ErrGroupDiscoveryFailed)
-	return err != nil && ok
+	as := &ErrGroupDiscoveryFailed{}
+	return goerrors.As(err, &as)
 }
 
 // GroupDiscoveryFailedErrorGroups returns true if the error is an ErrGroupDiscoveryFailed error,

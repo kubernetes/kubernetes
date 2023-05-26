@@ -18,6 +18,7 @@ package discovery
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -2831,6 +2832,46 @@ func TestUseLegacyDiscovery(t *testing.T) {
 	client = NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
 	client.UseLegacyDiscovery = true
 	client.ServerGroups()
+}
+
+func TestIsGroupDiscoveryFailedError(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{
+			name: "ErrNil",
+			err:  nil,
+			want: false,
+		},
+		{
+			name: "NoGroupDiscoveryFailedError",
+			err:  errors.New("foo"),
+			want: false,
+		},
+		{
+			name: "GroupDiscoveryFailedError",
+			err:  &ErrGroupDiscoveryFailed{},
+			want: true,
+		},
+		{
+			name: "WrappedGroupDiscoveryFailedError",
+			err:  fmt.Errorf("foo: %w", &ErrGroupDiscoveryFailed{}),
+			want: true,
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := IsGroupDiscoveryFailedError(tc.err)
+			require.Equal(t, tc.want, got)
+		})
+	}
+
 }
 
 func groupNames(groups []*metav1.APIGroup) []string {
