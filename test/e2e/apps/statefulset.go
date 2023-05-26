@@ -115,7 +115,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			statefulPodMounts = []v1.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
 			podMounts = []v1.VolumeMount{{Name: "home", MountPath: "/home"}}
-			ss = e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 2, statefulPodMounts, podMounts, labels)
+			ss = e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 2, statefulPodMounts, podMounts, labels, nil)
 
 			ginkgo.By("Creating service " + headlessSvcName + " in namespace " + ns)
 			headlessService := e2eservice.CreateServiceSpec(headlessSvcName, "", true, labels)
@@ -315,7 +315,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		*/
 		framework.ConformanceIt("should perform rolling updates and roll backs of template modifications", func(ctx context.Context) {
 			ginkgo.By("Creating a new StatefulSet")
-			ss := e2estatefulset.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
+			ss := e2estatefulset.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels, nil)
 			rollbackTest(ctx, c, ns, ss)
 		})
 
@@ -326,7 +326,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		*/
 		framework.ConformanceIt("should perform canary updates and phased rolling updates of template modifications", func(ctx context.Context) {
 			ginkgo.By("Creating a new StatefulSet")
-			ss := e2estatefulset.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
+			ss := e2estatefulset.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels, nil)
 			setHTTPProbe(ss)
 			ss.Spec.UpdateStrategy = appsv1.StatefulSetUpdateStrategy{
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,
@@ -512,7 +512,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		// The legacy OnDelete strategy only exists for backward compatibility with pre-v1 APIs.
 		ginkgo.It("should implement legacy replacement when the update strategy is OnDelete", func(ctx context.Context) {
 			ginkgo.By("Creating a new StatefulSet")
-			ss := e2estatefulset.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
+			ss := e2estatefulset.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels, nil)
 			setHTTPProbe(ss)
 			ss.Spec.UpdateStrategy = appsv1.StatefulSetUpdateStrategy{
 				Type: appsv1.OnDeleteStatefulSetStrategyType,
@@ -627,7 +627,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			}()
 
 			ginkgo.By("Creating stateful set " + ssName + " in namespace " + ns)
-			ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, psLabels)
+			ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, psLabels, nil)
 			setHTTPProbe(ss)
 			ss, err = c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
@@ -702,7 +702,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			psLabels := klabels.Set(labels)
 
 			ginkgo.By("Creating stateful set " + ssName + " in namespace " + ns)
-			ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, psLabels)
+			ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, psLabels, nil)
 			ss.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
 			setHTTPProbe(ss)
 			ss, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
@@ -772,7 +772,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			}
 
 			ginkgo.By("Creating statefulset with conflicting port in namespace " + f.Namespace.Name)
-			ss := e2estatefulset.NewStatefulSet(ssName, f.Namespace.Name, headlessSvcName, 1, nil, nil, labels)
+			ss := e2estatefulset.NewStatefulSet(ssName, f.Namespace.Name, headlessSvcName, 1, nil, nil, labels, nil)
 			statefulPodContainer := &ss.Spec.Template.Spec.Containers[0]
 			statefulPodContainer.Ports = append(statefulPodContainer.Ports, conflictingPort)
 			ss.Spec.Template.Spec.NodeName = node.Name
@@ -851,7 +851,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		*/
 		framework.ConformanceIt("should have a working scale subresource", func(ctx context.Context) {
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
-			ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, labels)
+			ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, labels, nil)
 			setHTTPProbe(ss)
 			ss, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
@@ -921,7 +921,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 				"name": "sample-pod",
 				"pod":  WebserverImageName,
 			}
-			ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, ssPodLabels)
+			ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, ssPodLabels, nil)
 			setHTTPProbe(ss)
 			ss, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
@@ -992,7 +992,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectNoError(err, "failed to list StatefulSets")
 
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
-			ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, labels)
+			ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, labels, nil)
 			setHTTPProbe(ss)
 			ss, err = c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
@@ -1163,7 +1163,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			"name": "sample-pod",
 			"pod":  WebserverImageName,
 		}
-		ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, ssPodLabels)
+		ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, ssPodLabels, nil)
 		setHTTPProbe(ss)
 		ss, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
@@ -1178,7 +1178,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			"name": "sample-pod",
 			"pod":  WebserverImageName,
 		}
-		ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 2, nil, nil, ssPodLabels)
+		ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 2, nil, nil, ssPodLabels, nil)
 		ss.Spec.MinReadySeconds = 30
 		setHTTPProbe(ss)
 		ss, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
@@ -1227,7 +1227,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			statefulPodMounts = []v1.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
 			podMounts = []v1.VolumeMount{{Name: "home", MountPath: "/home"}}
-			ss = e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 2, statefulPodMounts, podMounts, labels)
+			ss = e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 2, statefulPodMounts, podMounts, labels, nil)
 
 			ginkgo.By("Creating service " + headlessSvcName + " in namespace " + ns)
 			headlessService := e2eservice.CreateServiceSpec(headlessSvcName, "", true, labels)
@@ -1364,7 +1364,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			statefulPodMounts = []v1.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
-			ss = e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, statefulPodMounts, nil, labels)
+			ss = e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, statefulPodMounts, nil, labels, nil)
 		})
 
 		ginkgo.AfterEach(func(ctx context.Context) {
@@ -1471,7 +1471,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		var ss *appsv1.StatefulSet
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
-			ss = e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 2, nil, nil, labels)
+			ss = e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 2, nil, nil, labels, nil)
 
 			ginkgo.By("Creating service " + headlessSvcName + " in namespace " + ns)
 			headlessService := e2eservice.CreateServiceSpec(headlessSvcName, "", true, labels)

@@ -80,7 +80,7 @@ func (t *StatefulSetUpgradeTest) Setup(ctx context.Context, f *framework.Framewo
 	statefulPodMounts := []v1.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
 	podMounts := []v1.VolumeMount{{Name: "home", MountPath: "/home"}}
 	ns := f.Namespace.Name
-	t.set = e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 2, statefulPodMounts, podMounts, labels)
+	t.set = e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 2, statefulPodMounts, podMounts, labels, nil)
 	t.service = createStatefulSetService(ssName, labels)
 	*(t.set.Spec.Replicas) = 3
 	e2estatefulset.PauseNewPods(t.set)
