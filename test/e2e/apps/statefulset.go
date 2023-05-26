@@ -1103,6 +1103,44 @@ var _ = SIGDescribe("StatefulSet", func() {
 				return false, nil
 			})
 		})
+
+		/*
+		   Release: v1.28
+		   Testname: StatefulSet, rolling update with maxUnavailable set
+		   Description: StatefulSet will have maxUnavailable number pods update at one time
+		*/
+		framework.ConformanceIt("Should rolling update with maxUnavailable number of pods at a time", func(ctx context.Context) {
+			ginkgo.By("Looking for a node to schedule stateful set and pod")
+			node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Creating statefulset with correct image in namespace " + f.Namespace.Name)
+			ss := e2estatefulset.NewStatefulSet(ssName, f.Namespace.Name, headlessSvcName, 4, nil, nil, labels, intstr.FromInt32(2))
+			ss.Spec.Template.Spec.NodeName = node.Name
+			_, err = f.ClientSet.AppsV1().StatefulSets(f.Namespace.Name).Create(ctx, ss, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+
+			e2estatefulset.WaitForRunningAndReady(ctx, c, *ss.Spec.Replicas, ss)
+
+			ginkgo.By("Break statefulSet's image")
+			ss = getStatefulSet(ctx, c, ss.Namespace, ss.Name)
+			oldImage := ss.Spec.Template.Spec.Containers[0].Image
+			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
+				update.Spec.Template.Spec.Containers[0].Image = "broken-image.io"
+			})
+			framework.ExpectNoError(err)
+
+			e2estatefulset.WaitForPodsReady(ctx, c, ss, []string{ssName + "-0", ssName + "-1"})
+			e2estatefulset.WaitForPodsUnReady(ctx, c, ss, []string{ssName + "-2", ssName + "-3"})
+
+			ginkgo.By("Restore statefulSet's image")
+			ss = getStatefulSet(ctx, c, ss.Namespace, ss.Name)
+			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
+				update.Spec.Template.Spec.Containers[0].Image = oldImage
+			})
+			framework.ExpectNoError(err)
+			e2estatefulset.WaitForRunningAndReady(ctx, c, *ss.Spec.Replicas, ss)
+		})
 	})
 
 	ginkgo.Describe("Deploy clustered applications [Feature:StatefulSet] [Slow]", func() {

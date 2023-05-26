@@ -80,6 +80,34 @@ func WaitForRunningAndReady(ctx context.Context, c clientset.Interface, numState
 	WaitForRunning(ctx, c, numStatefulPods, numStatefulPods, ss)
 }
 
+// WaitForPodReady waits for a set of pods ready.
+func WaitForPodsReady(ctx context.Context, c clientset.Interface, set *appsv1.StatefulSet, podNames []string) {
+	for _, name := range podNames {
+		WaitForState(ctx, c, set, func(set *appsv1.StatefulSet, pods *v1.PodList) (bool, error) {
+			for i := range pods.Items {
+				if pods.Items[i].Name == name {
+					return podutils.IsPodReady(&pods.Items[i]), nil
+				}
+			}
+			return false, nil
+		})
+	}
+}
+
+// WaitForPodUnReady waits for a set of pods unready.
+func WaitForPodsUnReady(ctx context.Context, c clientset.Interface, set *appsv1.StatefulSet, podNames []string) {
+	for _, name := range podNames {
+		WaitForState(ctx, c, set, func(set *appsv1.StatefulSet, pods *v1.PodList) (bool, error) {
+			for i := range pods.Items {
+				if pods.Items[i].Name == name {
+					return !podutils.IsPodReady(&pods.Items[i]), nil
+				}
+			}
+			return false, nil
+		})
+	}
+}
+
 // WaitForPodReady waits for the Pod named podName in set to exist and have a Ready condition.
 func WaitForPodReady(ctx context.Context, c clientset.Interface, set *appsv1.StatefulSet, podName string) (*appsv1.StatefulSet, *v1.PodList) {
 	var pods *v1.PodList
