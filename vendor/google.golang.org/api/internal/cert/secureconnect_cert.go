@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC.
+// Copyright 2022 Google LLC.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -32,65 +32,48 @@ const (
 	metadataFile = "context_aware_metadata.json"
 )
 
-// defaultCertData holds all the variables pertaining to
-// the default certficate source created by DefaultSource.
-type defaultCertData struct {
-	once            sync.Once
-	source          Source
-	err             error
-	cachedCertMutex sync.Mutex
-	cachedCert      *tls.Certificate
-}
-
-var (
-	defaultCert defaultCertData
-)
-
-// Source is a function that can be passed into crypto/tls.Config.GetClientCertificate.
-type Source func(*tls.CertificateRequestInfo) (*tls.Certificate, error)
-
-// DefaultSource returns a certificate source that execs the command specified
-// in the file at ~/.secureConnect/context_aware_metadata.json
-//
-// If that file does not exist, a nil source is returned.
-func DefaultSource() (Source, error) {
-	defaultCert.once.Do(func() {
-		defaultCert.source, defaultCert.err = newSecureConnectSource()
-	})
-	return defaultCert.source, defaultCert.err
-}
-
 type secureConnectSource struct {
 	metadata secureConnectMetadata
+
+	// Cache the cert to avoid executing helper command repeatedly.
+	cachedCertMutex sync.Mutex
+	cachedCert      *tls.Certificate
 }
 
 type secureConnectMetadata struct {
 	Cmd []string `json:"cert_provider_command"`
 }
 
-// newSecureConnectSource creates a secureConnectSource by reading the well-known file.
-func newSecureConnectSource() (Source, error) {
-	user, err := user.Current()
-	if err != nil {
-		// Ignore.
-		return nil, nil
+// NewSecureConnectSource creates a certificate source using
+// the Secure Connect Helper and its associated metadata file.
+//
+// The configFilePath points to the location of the context aware metadata file.
+// If configFilePath is empty, use the default context aware metadata location.
+func NewSecureConnectSource(configFilePath string) (Source, error) {
+	if configFilePath == "" {
+		user, err := user.Current()
+		if err != nil {
+			// Error locating the default config means Secure Connect is not supported.
+			return nil, errSourceUnavailable
+		}
+		configFilePath = filepath.Join(user.HomeDir, metadataPath, metadataFile)
 	}
-	filename := filepath.Join(user.HomeDir, metadataPath, metadataFile)
-	file, err := ioutil.ReadFile(filename)
-	if os.IsNotExist(err) {
-		// Ignore.
-		return nil, nil
-	}
+
+	file, err := ioutil.ReadFile(configFilePath)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			// Config file missing means Secure Connect is not supported.
+			return nil, errSourceUnavailable
+		}
 		return nil, err
 	}
 
 	var metadata secureConnectMetadata
 	if err := json.Unmarshal(file, &metadata); err != nil {
-		return nil, fmt.Errorf("cert: could not parse JSON in %q: %v", filename, err)
+		return nil, fmt.Errorf("cert: could not parse JSON in %q: %w", configFilePath, err)
 	}
 	if err := validateMetadata(metadata); err != nil {
-		return nil, fmt.Errorf("cert: invalid config in %q: %v", filename, err)
+		return nil, fmt.Errorf("cert: invalid config in %q: %w", configFilePath, err)
 	}
 	return (&secureConnectSource{
 		metadata: metadata,
@@ -105,10 +88,10 @@ func validateMetadata(metadata secureConnectMetadata) error {
 }
 
 func (s *secureConnectSource) getClientCertificate(info *tls.CertificateRequestInfo) (*tls.Certificate, error) {
-	defaultCert.cachedCertMutex.Lock()
-	defer defaultCert.cachedCertMutex.Unlock()
-	if defaultCert.cachedCert != nil && !isCertificateExpired(defaultCert.cachedCert) {
-		return defaultCert.cachedCert, nil
+	s.cachedCertMutex.Lock()
+	defer s.cachedCertMutex.Unlock()
+	if s.cachedCert != nil && !isCertificateExpired(s.cachedCert) {
+		return s.cachedCert, nil
 	}
 	// Expand OS environment variables in the cert provider command such as "$HOME".
 	for i := 0; i < len(s.metadata.Cmd); i++ {
@@ -117,14 +100,13 @@ func (s *secureConnectSource) getClientCertificate(info *tls.CertificateRequestI
 	command := s.metadata.Cmd
 	data, err := exec.Command(command[0], command[1:]...).Output()
 	if err != nil {
-		// TODO(cbro): read stderr for error message? Might contain sensitive info.
 		return nil, err
 	}
 	cert, err := tls.X509KeyPair(data, data)
 	if err != nil {
 		return nil, err
 	}
-	defaultCert.cachedCert = &cert
+	s.cachedCert = &cert
 	return &cert, nil
 }
 

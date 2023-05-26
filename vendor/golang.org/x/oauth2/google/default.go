@@ -54,11 +54,18 @@ type CredentialsParams struct {
 	// Optional.
 	Subject string
 
-	// AuthHandler is the AuthorizationHandler used for 3-legged OAuth flow. Optional.
+	// AuthHandler is the AuthorizationHandler used for 3-legged OAuth flow. Required for 3LO flow.
 	AuthHandler authhandler.AuthorizationHandler
 
-	// State is a unique string used with AuthHandler. Optional.
+	// State is a unique string used with AuthHandler. Required for 3LO flow.
 	State string
+
+	// PKCE is used to support PKCE flow. Optional for 3LO flow.
+	PKCE *authhandler.PKCEParams
+
+	// The OAuth2 TokenURL default override. This value overrides the default TokenURL,
+	// unless explicitly specified by the credentials config file. Optional.
+	TokenURL string
 }
 
 func (params CredentialsParams) deepCopy() CredentialsParams {
@@ -94,20 +101,20 @@ func DefaultTokenSource(ctx context.Context, scope ...string) (oauth2.TokenSourc
 // It looks for credentials in the following places,
 // preferring the first location found:
 //
-//   1. A JSON file whose path is specified by the
-//      GOOGLE_APPLICATION_CREDENTIALS environment variable.
-//      For workload identity federation, refer to
-//      https://cloud.google.com/iam/docs/how-to#using-workload-identity-federation on
-//      how to generate the JSON configuration file for on-prem/non-Google cloud
-//      platforms.
-//   2. A JSON file in a location known to the gcloud command-line tool.
-//      On Windows, this is %APPDATA%/gcloud/application_default_credentials.json.
-//      On other systems, $HOME/.config/gcloud/application_default_credentials.json.
-//   3. On Google App Engine standard first generation runtimes (<= Go 1.9) it uses
-//      the appengine.AccessToken function.
-//   4. On Google Compute Engine, Google App Engine standard second generation runtimes
-//      (>= Go 1.11), and Google App Engine flexible environment, it fetches
-//      credentials from the metadata server.
+//  1. A JSON file whose path is specified by the
+//     GOOGLE_APPLICATION_CREDENTIALS environment variable.
+//     For workload identity federation, refer to
+//     https://cloud.google.com/iam/docs/how-to#using-workload-identity-federation on
+//     how to generate the JSON configuration file for on-prem/non-Google cloud
+//     platforms.
+//  2. A JSON file in a location known to the gcloud command-line tool.
+//     On Windows, this is %APPDATA%/gcloud/application_default_credentials.json.
+//     On other systems, $HOME/.config/gcloud/application_default_credentials.json.
+//  3. On Google App Engine standard first generation runtimes (<= Go 1.9) it uses
+//     the appengine.AccessToken function.
+//  4. On Google Compute Engine, Google App Engine standard second generation runtimes
+//     (>= Go 1.11), and Google App Engine flexible environment, it fetches
+//     credentials from the metadata server.
 func FindDefaultCredentialsWithParams(ctx context.Context, params CredentialsParams) (*Credentials, error) {
 	// Make defensive copy of the slices in params.
 	params = params.deepCopy()
@@ -134,7 +141,7 @@ func FindDefaultCredentialsWithParams(ctx context.Context, params CredentialsPar
 	// use those credentials. App Engine standard second generation runtimes (>= Go 1.11)
 	// and App Engine flexible use ComputeTokenSource and the metadata server.
 	if appengineTokenFunc != nil {
-		return &DefaultCredentials{
+		return &Credentials{
 			ProjectID:   appengineAppIDFunc(ctx),
 			TokenSource: AppEngineTokenSource(ctx, params.Scopes...),
 		}, nil
@@ -144,7 +151,7 @@ func FindDefaultCredentialsWithParams(ctx context.Context, params CredentialsPar
 	// or App Engine flexible, use the metadata server.
 	if metadata.OnGCE() {
 		id, _ := metadata.ProjectID()
-		return &DefaultCredentials{
+		return &Credentials{
 			ProjectID:   id,
 			TokenSource: ComputeTokenSource("", params.Scopes...),
 		}, nil
@@ -176,7 +183,7 @@ func CredentialsFromJSONWithParams(ctx context.Context, jsonData []byte, params 
 	if config != nil {
 		return &Credentials{
 			ProjectID:   "",
-			TokenSource: authhandler.TokenSource(ctx, config, params.State, params.AuthHandler),
+			TokenSource: authhandler.TokenSourceWithPKCE(ctx, config, params.State, params.AuthHandler, params.PKCE),
 			JSON:        jsonData,
 		}, nil
 	}
@@ -190,7 +197,8 @@ func CredentialsFromJSONWithParams(ctx context.Context, jsonData []byte, params 
 	if err != nil {
 		return nil, err
 	}
-	return &DefaultCredentials{
+	ts = newErrWrappingTokenSource(ts)
+	return &Credentials{
 		ProjectID:   f.ProjectID,
 		TokenSource: ts,
 		JSON:        jsonData,
@@ -212,7 +220,7 @@ func wellKnownFile() string {
 	return filepath.Join(guessUnixHomeDir(), ".config", "gcloud", f)
 }
 
-func readCredentialsFile(ctx context.Context, filename string, params CredentialsParams) (*DefaultCredentials, error) {
+func readCredentialsFile(ctx context.Context, filename string, params CredentialsParams) (*Credentials, error) {
 	b, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return nil, err

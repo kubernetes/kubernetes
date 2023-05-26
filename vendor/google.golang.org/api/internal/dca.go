@@ -6,32 +6,33 @@
 // Authentication according to https://google.aip.dev/auth/4114
 //
 // The overall logic for DCA is as follows:
-// 1. If both endpoint override and client certificate are specified, use them as is.
-// 2. If user does not specify client certificate, we will attempt to use default
-//    client certificate.
-// 3. If user does not specify endpoint override, we will use defaultMtlsEndpoint if
-//    client certificate is available and defaultEndpoint otherwise.
+//  1. If both endpoint override and client certificate are specified, use them as is.
+//  2. If user does not specify client certificate, we will attempt to use default
+//     client certificate.
+//  3. If user does not specify endpoint override, we will use defaultMtlsEndpoint if
+//     client certificate is available and defaultEndpoint otherwise.
 //
 // Implications of the above logic:
-// 1. If the user specifies a non-mTLS endpoint override but client certificate is
-//    available, we will pass along the cert anyway and let the server decide what to do.
-// 2. If the user specifies an mTLS endpoint override but client certificate is not
-//    available, we will not fail-fast, but let backend throw error when connecting.
+//  1. If the user specifies a non-mTLS endpoint override but client certificate is
+//     available, we will pass along the cert anyway and let the server decide what to do.
+//  2. If the user specifies an mTLS endpoint override but client certificate is not
+//     available, we will not fail-fast, but let backend throw error when connecting.
 //
 // We would like to avoid introducing client-side logic that parses whether the
 // endpoint override is an mTLS url, since the url pattern may change at anytime.
 //
 // This package is not intended for use by end developers. Use the
 // google.golang.org/api/option package to configure API clients.
-package dca
+
+// Package internal supports the options and transport packages.
+package internal
 
 import (
 	"net/url"
 	"os"
 	"strings"
 
-	"google.golang.org/api/internal"
-	"google.golang.org/api/transport/cert"
+	"google.golang.org/api/internal/cert"
 )
 
 const (
@@ -43,7 +44,7 @@ const (
 // GetClientCertificateSourceAndEndpoint is a convenience function that invokes
 // getClientCertificateSource and getEndpoint sequentially and returns the client
 // cert source and endpoint as a tuple.
-func GetClientCertificateSourceAndEndpoint(settings *internal.DialSettings) (cert.Source, string, error) {
+func GetClientCertificateSourceAndEndpoint(settings *DialSettings) (cert.Source, string, error) {
 	clientCertSource, err := getClientCertificateSource(settings)
 	if err != nil {
 		return nil, "", err
@@ -65,7 +66,7 @@ func GetClientCertificateSourceAndEndpoint(settings *internal.DialSettings) (cer
 // Important Note: For now, the environment variable GOOGLE_API_USE_CLIENT_CERTIFICATE
 // must be set to "true" to allow certificate to be used (including user provided
 // certificates). For details, see AIP-4114.
-func getClientCertificateSource(settings *internal.DialSettings) (cert.Source, error) {
+func getClientCertificateSource(settings *DialSettings) (cert.Source, error) {
 	if !isClientCertificateEnabled() {
 		return nil, nil
 	} else if settings.ClientCertSource != nil {
@@ -94,7 +95,7 @@ func isClientCertificateEnabled() bool {
 // URL (ex. https://...), then the user-provided address will be merged into
 // the default endpoint. For example, WithEndpoint("myhost:8000") and
 // WithDefaultEndpoint("https://foo.com/bar/baz") will return "https://myhost:8080/bar/baz"
-func getEndpoint(settings *internal.DialSettings, clientCertSource cert.Source) (string, error) {
+func getEndpoint(settings *DialSettings, clientCertSource cert.Source) (string, error) {
 	if settings.Endpoint == "" {
 		mtlsMode := getMTLSMode()
 		if mtlsMode == mTLSModeAlways || (clientCertSource != nil && mtlsMode == mTLSModeAuto) {

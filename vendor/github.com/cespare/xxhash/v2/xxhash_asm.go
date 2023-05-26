@@ -1,3 +1,5 @@
+//go:build (amd64 || arm64) && !appengine && gc && !purego
+// +build amd64 arm64
 // +build !appengine
 // +build gc
 // +build !purego
