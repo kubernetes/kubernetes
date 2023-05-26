@@ -620,7 +620,7 @@ func generateWriteCmd(content, path string) []string {
 	return commands
 }
 
-// generateReadBlockCmd generates the corresponding command lines to read from a block device with the given file path.
+// GenerateReadBlockCmd generates the corresponding command lines to read from a block device with the given file path.
 func GenerateReadBlockCmd(fullPath string, numberOfCharacters int) []string {
 	var commands []string
 	commands = []string{"head", "-c", strconv.Itoa(numberOfCharacters), fullPath}

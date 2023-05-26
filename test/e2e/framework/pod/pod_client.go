@@ -331,7 +331,7 @@ func removeString(slice []string, s string) []string {
 	return newSlice
 }
 
-// RemovePodFinalizer removes the pod's finalizer
+// RemoveFinalizer removes the pod's finalizer
 func (c *PodClient) RemoveFinalizer(ctx context.Context, podName string, finalizerName string) {
 	framework.Logf("Removing pod's %q finalizer: %q", podName, finalizerName)
 	c.Update(ctx, podName, func(pod *v1.Pod) {
