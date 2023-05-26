@@ -91,9 +91,9 @@ func Enabled(featureList map[string]bool, featureName string) bool {
 // Supports indicates whether a feature name is supported on the given
 // feature set
 func Supports(featureList FeatureList, featureName string) bool {
-	for k, v := range featureList {
+	for k := range featureList {
 		if featureName == k {
-			return v.PreRelease != featuregate.Deprecated
+			return true
 		}
 	}
 	return false
