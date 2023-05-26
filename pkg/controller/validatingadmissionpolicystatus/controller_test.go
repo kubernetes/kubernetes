@@ -49,8 +49,8 @@ func TestTypeChecking(t *testing.T) {
 					Expression: "object.spec.replicas > 1",
 				},
 			}, makePolicy("replicated-deployment"))),
-			assertFieldRef: toHasLengthOf(0),
-			assertWarnings: toHasLengthOf(0),
+			assertFieldRef: toHaveLengthOf(0),
+			assertWarnings: toHaveLengthOf(0),
 		},
 		{
 			name: "deployment with type confusion",
@@ -63,7 +63,36 @@ func TestTypeChecking(t *testing.T) {
 				},
 			}, makePolicy("confused-deployment"))),
 			assertFieldRef: toBe("spec.validations[1].expression"),
-			assertWarnings: toHasSubstring(`found no matching overload for '_>_' applied to '(int, string)'`),
+			assertWarnings: toHaveSubstring(`found no matching overload for '_>_' applied to '(int, string)'`),
+		},
+		{
+			name: "two expressions different type checking errors",
+			policy: withGVRMatch([]string{"apps"}, []string{"v1"}, []string{"deployments"}, withValidations([]admissionregistrationv1alpha1.Validation{
+				{
+					Expression: "object.spec.nonExistingFirst > 1",
+				},
+				{
+					Expression: "object.spec.replicas > '1'", // '1' should be int
+				},
+			}, makePolicy("confused-deployment"))),
+			assertFieldRef: toBe("spec.validations[0].expression", "spec.validations[1].expression"),
+			assertWarnings: toHaveSubstring(
+				"undefined field 'nonExistingFirst'",
+				`found no matching overload for '_>_' applied to '(int, string)'`,
+			),
+		},
+		{
+			name: "one expression, two warnings",
+			policy: withGVRMatch([]string{"apps"}, []string{"v1"}, []string{"deployments"}, withValidations([]admissionregistrationv1alpha1.Validation{
+				{
+					Expression: "object.spec.replicas < 100", // this one passes
+				},
+				{
+					Expression: "object.spec.replicas > '1' && object.spec.nonExisting == 1",
+				},
+			}, makePolicy("confused-deployment"))),
+			assertFieldRef: toBe("spec.validations[1].expression"),
+			assertWarnings: toHaveMultipleSubstrings([]string{"undefined field 'nonExisting'", `found no matching overload for '_>_' applied to '(int, string)'`}),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -127,7 +156,7 @@ func toBe(expected ...string) func(warnings []admissionregistrationv1alpha1.Expr
 	}
 }
 
-func toHasSubstring(substrings ...string) func(warnings []admissionregistrationv1alpha1.ExpressionWarning, t *testing.T) {
+func toHaveSubstring(substrings ...string) func(warnings []admissionregistrationv1alpha1.ExpressionWarning, t *testing.T) {
 	return func(warnings []admissionregistrationv1alpha1.ExpressionWarning, t *testing.T) {
 		if len(substrings) != len(warnings) {
 			t.Fatalf("mismatched length, expect %d, got %d", len(substrings), len(warnings))
@@ -140,7 +169,22 @@ func toHasSubstring(substrings ...string) func(warnings []admissionregistrationv
 	}
 }
 
-func toHasLengthOf(n int) func(warnings []admissionregistrationv1alpha1.ExpressionWarning, t *testing.T) {
+func toHaveMultipleSubstrings(substrings ...[]string) func(warnings []admissionregistrationv1alpha1.ExpressionWarning, t *testing.T) {
+	return func(warnings []admissionregistrationv1alpha1.ExpressionWarning, t *testing.T) {
+		if len(substrings) != len(warnings) {
+			t.Fatalf("mismatched length, expect %d, got %d", len(substrings), len(warnings))
+		}
+		for i, expectedSubstrings := range substrings {
+			for _, s := range expectedSubstrings {
+				if !strings.Contains(warnings[i].Warning, s) {
+					t.Errorf("missing expected substring %q in %v", substrings[i], warnings[i])
+				}
+			}
+		}
+	}
+}
+
+func toHaveLengthOf(n int) func(warnings []admissionregistrationv1alpha1.ExpressionWarning, t *testing.T) {
 	return func(warnings []admissionregistrationv1alpha1.ExpressionWarning, t *testing.T) {
 		if n != len(warnings) {
 			t.Fatalf("mismatched length, expect %d, got %d", n, len(warnings))
