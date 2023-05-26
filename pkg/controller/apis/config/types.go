@@ -98,6 +98,8 @@ type KubeControllerManagerConfiguration struct {
 	// CronJobControllerConfiguration holds configuration for CronJobController
 	// related features.
 	CronJobController cronjobconfig.CronJobControllerConfiguration
+	// LegacySATokenCleanerConfiguration holds configuration for LegacySATokenCleaner related features.
+	LegacySATokenCleaner serviceaccountconfig.LegacySATokenCleanerConfiguration
 	// NamespaceControllerConfiguration holds configuration for NamespaceController
 	// related features.
 	NamespaceController namespaceconfig.NamespaceControllerConfiguration

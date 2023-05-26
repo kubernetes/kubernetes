@@ -129,6 +129,7 @@ var args = []string{
 	"--leader-elect-renew-deadline=15s",
 	"--leader-elect-resource-lock=configmap",
 	"--leader-elect-retry-period=5s",
+	"--legacy-service-account-token-clean-up-period=8760h",
 	"--master=192.168.4.20",
 	"--max-endpoints-per-slice=200",
 	"--min-resync-period=8h",
@@ -397,6 +398,11 @@ func TestAddFlags(t *testing.T) {
 				ConcurrentSATokenSyncs: 10,
 			},
 		},
+		LegacySATokenCleaner: &LegacySATokenCleanerOptions{
+			&serviceaccountconfig.LegacySATokenCleanerConfiguration{
+				CleanUpPeriod: metav1.Duration{Duration: 365 * 24 * time.Hour},
+			},
+		},
 		TTLAfterFinishedController: &TTLAfterFinishedControllerOptions{
 			&ttlafterfinishedconfig.TTLAfterFinishedControllerConfiguration{
 				ConcurrentTTLSyncs: 8,
@@ -626,6 +632,9 @@ func TestApplyTo(t *testing.T) {
 			SAController: serviceaccountconfig.SAControllerConfiguration{
 				ServiceAccountKeyFile:  "/service-account-private-key",
 				ConcurrentSATokenSyncs: 10,
+			},
+			LegacySATokenCleaner: serviceaccountconfig.LegacySATokenCleanerConfiguration{
+				CleanUpPeriod: metav1.Duration{Duration: 365 * 24 * time.Hour},
 			},
 			TTLAfterFinishedController: ttlafterfinishedconfig.TTLAfterFinishedControllerConfiguration{
 				ConcurrentTTLSyncs: 8,
@@ -1222,6 +1231,15 @@ func TestValidateControllersOptions(t *testing.T) {
 				&serviceaccountconfig.SAControllerConfiguration{
 					ServiceAccountKeyFile:  "/service-account-private-key",
 					ConcurrentSATokenSyncs: 10,
+				},
+			}).Validate,
+		},
+		{
+			name:         "LegacySATokenCleanerOptions",
+			expectErrors: false,
+			validate: (&LegacySATokenCleanerOptions{
+				&serviceaccountconfig.LegacySATokenCleanerConfiguration{
+					CleanUpPeriod: metav1.Duration{Duration: 24 * 365 * time.Hour},
 				},
 			}).Validate,
 		},

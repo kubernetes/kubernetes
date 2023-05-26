@@ -74,6 +74,7 @@ type KubeControllerManagerOptions struct {
 	HPAController                    *HPAControllerOptions
 	JobController                    *JobControllerOptions
 	CronJobController                *CronJobControllerOptions
+	LegacySATokenCleaner             *LegacySATokenCleanerOptions
 	NamespaceController              *NamespaceControllerOptions
 	NodeIPAMController               *NodeIPAMControllerOptions
 	NodeLifecycleController          *NodeLifecycleControllerOptions
@@ -149,6 +150,9 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 		},
 		CronJobController: &CronJobControllerOptions{
 			&componentConfig.CronJobController,
+		},
+		LegacySATokenCleaner: &LegacySATokenCleanerOptions{
+			&componentConfig.LegacySATokenCleaner,
 		},
 		NamespaceController: &NamespaceControllerOptions{
 			&componentConfig.NamespaceController,
@@ -244,6 +248,7 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	s.HPAController.AddFlags(fss.FlagSet("horizontalpodautoscaling controller"))
 	s.JobController.AddFlags(fss.FlagSet("job controller"))
 	s.CronJobController.AddFlags(fss.FlagSet("cronjob controller"))
+	s.LegacySATokenCleaner.AddFlags(fss.FlagSet("legacy service account token cleaner"))
 	s.NamespaceController.AddFlags(fss.FlagSet("namespace controller"))
 	s.NodeIPAMController.AddFlags(fss.FlagSet("nodeipam controller"))
 	s.NodeLifecycleController.AddFlags(fss.FlagSet("nodelifecycle controller"))
@@ -315,6 +320,9 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config) e
 	if err := s.CronJobController.ApplyTo(&c.ComponentConfig.CronJobController); err != nil {
 		return err
 	}
+	if err := s.LegacySATokenCleaner.ApplyTo(&c.ComponentConfig.LegacySATokenCleaner); err != nil {
+		return err
+	}
 	if err := s.NamespaceController.ApplyTo(&c.ComponentConfig.NamespaceController); err != nil {
 		return err
 	}
@@ -382,6 +390,7 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 	errs = append(errs, s.HPAController.Validate()...)
 	errs = append(errs, s.JobController.Validate()...)
 	errs = append(errs, s.CronJobController.Validate()...)
+	errs = append(errs, s.LegacySATokenCleaner.Validate()...)
 	errs = append(errs, s.NamespaceController.Validate()...)
 	errs = append(errs, s.NodeIPAMController.Validate()...)
 	errs = append(errs, s.NodeLifecycleController.Validate()...)
