@@ -166,14 +166,15 @@ aliases:
     - alculquicondor
     - Huang-Wei
     - ahg-g
-    - damemi
   # emeritus:
+  # - damemi
   # - bsalamat
   # - k82cn
   # - ravisantoshgudimetla
   # - wojtek-t
   sig-scheduling:
     - chendave
+    - damemi
     - denkensk
     - sanposhiho
     - kerthcet
