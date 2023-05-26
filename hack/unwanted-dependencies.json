@@ -1,7 +1,11 @@
 {
   "spec": {
     "unwantedModules": {
+      "cloud.google.com/go": "cloud dependency",
+      "cloud.google.com/go/bigquery": "cloud dependency",
+      "cloud.google.com/go/compute": "cloud dependency",
       "cloud.google.com/go/firestore": "db/datastore clients should not be required",
+      "cloud.google.com/go/storage": "cloud dependency",
       "github.com/armon/consul-api": "MPL license not in CNCF allowlist",
       "github.com/bketelsen/crypt": "unused, crypto",
       "github.com/form3tech-oss/jwt-go": "unmaintained, archive mode",
@@ -15,6 +19,8 @@
       "github.com/gogo/googleapis": "depends on unmaintained github.com/gogo/protobuf",
       "github.com/gogo/protobuf": "unmaintained",
       "github.com/google/shlex": "unmaintained, archive mode",
+      "github.com/googleapis/enterprise-certificate-proxy": "references cloud dependencies",
+      "github.com/googleapis/gax-go/v2": "references cloud dependencies",
       "github.com/gorilla/handlers": "unmaintained, archive mode",
       "github.com/gorilla/mux": "unmaintained, archive mode",
       "github.com/gorilla/rpc": "unmaintained, archive mode",
@@ -49,6 +55,8 @@
       "github.com/xeipuuv/gojsonschema": "unmaintained",
       "go.mongodb.org/mongo-driver": "",
       "golang.org/x/lint": "unmaintained, archive mode",
+      "google.golang.org/api": "cloud dependency",
+      "google.golang.org/genproto": "refer to #113366",
       "gopkg.in/fsnotify.v1": "obsolete, use github.com/fsnotify/fsnotify",
       "k8s.io/klog": "we have switched to klog v2, so avoid klog v1",
       "rsc.io/quote": "refer to #102833",
@@ -57,6 +65,27 @@
   },
   "status": {
     "unwantedReferences": {
+      "cloud.google.com/go": [
+        "cloud.google.com/go/compute",
+        "github.com/google/cadvisor",
+        "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
+        "google.golang.org/genproto"
+      ],
+      "cloud.google.com/go/bigquery": [
+        "cloud.google.com/go/storage",
+        "google.golang.org/genproto"
+      ],
+      "cloud.google.com/go/compute": [
+        "cloud.google.com/go/compute/metadata",
+        "google.golang.org/genproto",
+        "google.golang.org/grpc"
+      ],
+      "cloud.google.com/go/firestore": [
+        "google.golang.org/genproto"
+      ],
+      "cloud.google.com/go/storage": [
+        "cloud.google.com/go"
+      ],
       "github.com/go-kit/kit": [
         "github.com/grpc-ecosystem/go-grpc-middleware"
       ],
@@ -79,6 +108,16 @@
       "github.com/google/shlex": [
         "sigs.k8s.io/kustomize/api",
         "sigs.k8s.io/kustomize/kustomize/v5"
+      ],
+      "github.com/googleapis/enterprise-certificate-proxy": [
+        "cloud.google.com/go/compute",
+        "google.golang.org/api"
+      ],
+      "github.com/googleapis/gax-go/v2": [
+        "cloud.google.com/go",
+        "cloud.google.com/go/bigquery",
+        "cloud.google.com/go/compute",
+        "cloud.google.com/go/storage"
       ],
       "github.com/gorilla/websocket": [
         "github.com/moby/spdystream",
@@ -112,6 +151,39 @@
         "k8s.io/system-validators",
         "sigs.k8s.io/kustomize/api",
         "sigs.k8s.io/kustomize/kustomize/v5"
+      ],
+      "google.golang.org/api": [
+        "cloud.google.com/go",
+        "cloud.google.com/go/bigquery",
+        "cloud.google.com/go/compute",
+        "cloud.google.com/go/storage",
+        "github.com/GoogleCloudPlatform/k8s-cloud-provider",
+        "github.com/googleapis/gax-go/v2"
+      ],
+      "google.golang.org/genproto": [
+        "cloud.google.com/go",
+        "cloud.google.com/go/bigquery",
+        "cloud.google.com/go/compute",
+        "cloud.google.com/go/storage",
+        "github.com/container-storage-interface/spec",
+        "github.com/containerd/ttrpc",
+        "github.com/google/cadvisor",
+        "github.com/google/cel-go",
+        "github.com/google/gnostic",
+        "github.com/googleapis/gax-go/v2",
+        "github.com/grpc-ecosystem/go-grpc-middleware",
+        "github.com/grpc-ecosystem/grpc-gateway",
+        "github.com/grpc-ecosystem/grpc-gateway/v2",
+        "go.etcd.io/etcd/api/v3",
+        "go.etcd.io/etcd/client/v3",
+        "go.etcd.io/etcd/pkg/v3",
+        "go.etcd.io/etcd/server/v3",
+        "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
+        "go.opentelemetry.io/otel/exporters/otlp/otlptrace",
+        "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc",
+        "google.golang.org/api",
+        "google.golang.org/grpc",
+        "sigs.k8s.io/apiserver-network-proxy/konnectivity-client"
       ]
     }
   }
