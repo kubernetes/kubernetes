@@ -36,7 +36,7 @@ type ActualCostEstimator interface {
 
 // CostObserver provides an observer that tracks runtime cost.
 func CostObserver(tracker *CostTracker) EvalObserver {
-	observer := func(id int64, programStep interface{}, val ref.Val) {
+	observer := func(id int64, programStep any, val ref.Val) {
 		switch t := programStep.(type) {
 		case ConstantQualifier:
 			// TODO: Push identifiers on to the stack before observing constant qualifiers that apply to them
@@ -52,6 +52,11 @@ func CostObserver(tracker *CostTracker) EvalObserver {
 			default:
 				tracker.stack.drop(t.Attr().ID())
 				tracker.cost += common.SelectAndIdentCost
+			}
+			if !tracker.presenceTestHasCost {
+				if _, isTestOnly := programStep.(*evalTestOnly); isTestOnly {
+					tracker.cost -= common.SelectAndIdentCost
+				}
 			}
 		case *evalExhaustiveConditional:
 			// Ternary has no direct cost. All cost is from the conditional and the true/false branch expressions.
@@ -95,21 +100,58 @@ func CostObserver(tracker *CostTracker) EvalObserver {
 	return observer
 }
 
-// CostTracker represents the information needed for tacking runtime cost
+// CostTrackerOption configures the behavior of CostTracker objects.
+type CostTrackerOption func(*CostTracker) error
+
+// CostTrackerLimit sets the runtime limit on the evaluation cost during execution and will terminate the expression
+// evaluation if the limit is exceeded.
+func CostTrackerLimit(limit uint64) CostTrackerOption {
+	return func(tracker *CostTracker) error {
+		tracker.Limit = &limit
+		return nil
+	}
+}
+
+// PresenceTestHasCost determines whether presence testing has a cost of one or zero.
+// Defaults to presence test has a cost of one.
+func PresenceTestHasCost(hasCost bool) CostTrackerOption {
+	return func(tracker *CostTracker) error {
+		tracker.presenceTestHasCost = hasCost
+		return nil
+	}
+}
+
+// NewCostTracker creates a new CostTracker with a given estimator and a set of functional CostTrackerOption values.
+func NewCostTracker(estimator ActualCostEstimator, opts ...CostTrackerOption) (*CostTracker, error) {
+	tracker := &CostTracker{
+		Estimator:           estimator,
+		presenceTestHasCost: true,
+	}
+	for _, opt := range opts {
+		err := opt(tracker)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return tracker, nil
+}
+
+// CostTracker represents the information needed for tracking runtime cost.
 type CostTracker struct {
-	Estimator ActualCostEstimator
-	Limit     *uint64
+	Estimator           ActualCostEstimator
+	Limit               *uint64
+	presenceTestHasCost bool
 
 	cost  uint64
 	stack refValStack
 }
 
 // ActualCost returns the runtime cost
-func (c CostTracker) ActualCost() uint64 {
+func (c *CostTracker) ActualCost() uint64 {
 	return c.cost
 }
 
-func (c CostTracker) costCall(call InterpretableCall, argValues []ref.Val, result ref.Val) uint64 {
+func (c *CostTracker) costCall(call InterpretableCall, argValues []ref.Val, result ref.Val) uint64 {
 	var cost uint64
 	if c.Estimator != nil {
 		callCost := c.Estimator.CallCost(call.Function(), call.OverloadID(), argValues, result)
@@ -122,7 +164,7 @@ func (c CostTracker) costCall(call InterpretableCall, argValues []ref.Val, resul
 	// if user has their own implementation of ActualCostEstimator, make sure to cover the mapping between overloadId and cost calculation
 	switch call.OverloadID() {
 	// O(n) functions
-	case overloads.StartsWithString, overloads.EndsWithString, overloads.StringToBytes, overloads.BytesToString:
+	case overloads.StartsWithString, overloads.EndsWithString, overloads.StringToBytes, overloads.BytesToString, overloads.ExtQuoteString, overloads.ExtFormatString:
 		cost += uint64(math.Ceil(float64(c.actualSize(argValues[0])) * common.StringTraversalCostFactor))
 	case overloads.InList:
 		// If a list is composed entirely of constant values this is O(1), but we don't account for that here.
@@ -179,7 +221,7 @@ func (c CostTracker) costCall(call InterpretableCall, argValues []ref.Val, resul
 }
 
 // actualSize returns the size of value
-func (c CostTracker) actualSize(value ref.Val) uint64 {
+func (c *CostTracker) actualSize(value ref.Val) uint64 {
 	if sz, ok := value.(traits.Sizer); ok {
 		return uint64(sz.Size().(types.Int))
 	}

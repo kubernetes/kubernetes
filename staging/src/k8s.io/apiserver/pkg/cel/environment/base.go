@@ -77,7 +77,7 @@ var baseOpts = []VersionedOptions{
 		IntroducedVersion: version.MajorMinor(1, 28),
 		EnvOptions: []cel.EnvOption{
 			cel.CrossTypeNumericComparisons(true),
-			// TODO: Add CEL Optionals once we bump cel-go
+			cel.OptionalTypes(),
 		},
 	},
 }
