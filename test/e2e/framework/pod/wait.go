@@ -541,7 +541,7 @@ func WaitForPodNotFoundInNamespace(ctx context.Context, c clientset.Interface, p
 	return nil
 }
 
-// PodsResponding waits for the pods to response.
+// WaitForPodsResponding waits for the pods to response.
 func WaitForPodsResponding(ctx context.Context, c clientset.Interface, ns string, controllerName string, wantName bool, timeout time.Duration, pods *v1.PodList) error {
 	if timeout == 0 {
 		timeout = podRespondingTimeout
