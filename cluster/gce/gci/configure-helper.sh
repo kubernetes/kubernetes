@@ -3116,7 +3116,7 @@ spec:
     - /bin/sh
     args:
     - -c
-    - test -e /scrub && rm -rf /scrub/..?* /scrub/.[!.]* /scrub/* && test -z $(ls -A /scrub) || exit 1
+    - test -e /scrub && find /scrub -mindepth 1 -delete && test -z $(ls -A /scrub) || exit 1
     volumeMounts:
     - name: vol
       mountPath: /scrub
