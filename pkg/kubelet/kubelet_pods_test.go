@@ -408,6 +408,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 	testCases := []struct {
 		name               string                 // the name of the test case
 		ns                 string                 // the namespace to generate environment for
+		enablePodHostIPs   bool                   // enable PodHostIPs feature gate
 		enableServiceLinks *bool                  // enabling service links
 		container          *v1.Container          // the container to use
 		nilLister          bool                   // whether the lister should be nil
@@ -642,6 +643,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		},
 		{
 			name:               "downward api pod",
+			enablePodHostIPs:   true,
 			ns:                 "downward-api",
 			enableServiceLinks: &falseValue,
 			container: &v1.Container{
@@ -709,6 +711,15 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 							},
 						},
 					},
+					{
+						Name: "HOST_IPS",
+						ValueFrom: &v1.EnvVarSource{
+							FieldRef: &v1.ObjectFieldSelector{
+								APIVersion: "v1",
+								FieldPath:  "status.hostIPs",
+							},
+						},
+					},
 				},
 			},
 			podIPs:    []string{"1.2.3.4", "fd00::6"},
@@ -721,10 +732,12 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				{Name: "POD_IP", Value: "1.2.3.4"},
 				{Name: "POD_IPS", Value: "1.2.3.4,fd00::6"},
 				{Name: "HOST_IP", Value: testKubeletHostIP},
+				{Name: "HOST_IPS", Value: testKubeletHostIP + "," + testKubeletHostIPv6},
 			},
 		},
 		{
 			name:               "downward api pod ips reverse order",
+			enablePodHostIPs:   true,
 			ns:                 "downward-api",
 			enableServiceLinks: &falseValue,
 			container: &v1.Container{
@@ -753,6 +766,15 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 							FieldRef: &v1.ObjectFieldSelector{
 								APIVersion: "v1",
 								FieldPath:  "status.hostIP",
+							},
+						},
+					},
+					{
+						Name: "HOST_IPS",
+						ValueFrom: &v1.EnvVarSource{
+							FieldRef: &v1.ObjectFieldSelector{
+								APIVersion: "v1",
+								FieldPath:  "status.hostIPs",
 							},
 						},
 					},
@@ -764,10 +786,12 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				{Name: "POD_IP", Value: "1.2.3.4"},
 				{Name: "POD_IPS", Value: "1.2.3.4,fd00::6"},
 				{Name: "HOST_IP", Value: testKubeletHostIP},
+				{Name: "HOST_IPS", Value: testKubeletHostIP + "," + testKubeletHostIPv6},
 			},
 		},
 		{
 			name:               "downward api pod ips multiple ips",
+			enablePodHostIPs:   true,
 			ns:                 "downward-api",
 			enableServiceLinks: &falseValue,
 			container: &v1.Container{
@@ -799,6 +823,15 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 							},
 						},
 					},
+					{
+						Name: "HOST_IPS",
+						ValueFrom: &v1.EnvVarSource{
+							FieldRef: &v1.ObjectFieldSelector{
+								APIVersion: "v1",
+								FieldPath:  "status.hostIPs",
+							},
+						},
+					},
 				},
 			},
 			podIPs:    []string{"1.2.3.4", "192.168.1.1.", "fd00::6"},
@@ -807,6 +840,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				{Name: "POD_IP", Value: "1.2.3.4"},
 				{Name: "POD_IPS", Value: "1.2.3.4,fd00::6"},
 				{Name: "HOST_IP", Value: testKubeletHostIP},
+				{Name: "HOST_IPS", Value: testKubeletHostIP + "," + testKubeletHostIPv6},
 			},
 		},
 		{
@@ -1954,10 +1988,36 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			},
 			expectedError: true,
 		},
+		{
+			name:               "downward api pod without host ips",
+			enablePodHostIPs:   false,
+			ns:                 "downward-api",
+			enableServiceLinks: &falseValue,
+			container: &v1.Container{
+				Env: []v1.EnvVar{
+					{
+						Name: "HOST_IPS",
+						ValueFrom: &v1.EnvVarSource{
+							FieldRef: &v1.ObjectFieldSelector{
+								APIVersion: "v1",
+								FieldPath:  "status.hostIPs",
+							},
+						},
+					},
+				},
+			},
+			podIPs:    []string{"1.2.3.4", "fd00::6"},
+			nilLister: true,
+			expectedEnvs: []kubecontainer.EnvVar{
+				{Name: "HOST_IPS", Value: ""},
+			},
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodHostIPs, tc.enablePodHostIPs)()
+
 			fakeRecorder := record.NewFakeRecorder(1)
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			testKubelet.kubelet.recorder = fakeRecorder
