@@ -1024,39 +1024,48 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 		plugins = append(plugins, pl)
 		pluginToNodeScores[pl.Name()] = make(framework.NodeScoreList, len(nodes))
 	}
+
+	if len(plugins) == 0 {
+		// all Score plugins return Skip in PreScore.
+		for i := range nodes {
+			allNodePluginScores[i] = framework.NodePluginScores{
+				Name: nodes[i].Name,
+			}
+		}
+		return allNodePluginScores, nil
+	}
+
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	errCh := parallelize.NewErrorChannel()
 
-	if len(plugins) > 0 {
-		logger := klog.FromContext(ctx)
-		logger = klog.LoggerWithName(logger, "Score")
-		// TODO(knelasevero): Remove duplicated keys from log entry calls
-		// When contextualized logging hits GA
-		// https://github.com/kubernetes/kubernetes/issues/111672
-		logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod))
-		// Run Score method for each node in parallel.
-		f.Parallelizer().Until(ctx, len(nodes), func(index int) {
-			nodeName := nodes[index].Name
-			logger := klog.LoggerWithValues(logger, "node", klog.ObjectRef{Name: nodeName})
-			for _, pl := range plugins {
-				logger := klog.LoggerWithName(logger, pl.Name())
-				ctx := klog.NewContext(ctx, logger)
-				s, status := f.runScorePlugin(ctx, pl, state, pod, nodeName)
-				if !status.IsSuccess() {
-					err := fmt.Errorf("plugin %q failed with: %w", pl.Name(), status.AsError())
-					errCh.SendErrorWithCancel(err, cancel)
-					return
-				}
-				pluginToNodeScores[pl.Name()][index] = framework.NodeScore{
-					Name:  nodeName,
-					Score: s,
-				}
+	logger := klog.FromContext(ctx)
+	logger = klog.LoggerWithName(logger, "Score")
+	// TODO(knelasevero): Remove duplicated keys from log entry calls
+	// When contextualized logging hits GA
+	// https://github.com/kubernetes/kubernetes/issues/111672
+	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod))
+	// Run Score method for each node in parallel.
+	f.Parallelizer().Until(ctx, len(nodes), func(index int) {
+		nodeName := nodes[index].Name
+		logger := klog.LoggerWithValues(logger, "node", klog.ObjectRef{Name: nodeName})
+		for _, pl := range plugins {
+			logger := klog.LoggerWithName(logger, pl.Name())
+			ctx := klog.NewContext(ctx, logger)
+			s, status := f.runScorePlugin(ctx, pl, state, pod, nodeName)
+			if !status.IsSuccess() {
+				err := fmt.Errorf("plugin %q failed with: %w", pl.Name(), status.AsError())
+				errCh.SendErrorWithCancel(err, cancel)
+				return
 			}
-		}, metrics.Score)
-		if err := errCh.ReceiveError(); err != nil {
-			return nil, framework.AsStatus(fmt.Errorf("running Score plugins: %w", err))
+			pluginToNodeScores[pl.Name()][index] = framework.NodeScore{
+				Name:  nodeName,
+				Score: s,
+			}
 		}
+	}, metrics.Score)
+	if err := errCh.ReceiveError(); err != nil {
+		return nil, framework.AsStatus(fmt.Errorf("running Score plugins: %w", err))
 	}
 
 	// Run NormalizeScore method for each ScorePlugin in parallel.
