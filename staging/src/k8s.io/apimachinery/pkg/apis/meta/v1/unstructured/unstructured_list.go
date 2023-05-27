@@ -53,7 +53,12 @@ func (u *UnstructuredList) EachListItem(fn func(runtime.Object) error) error {
 }
 
 func (u *UnstructuredList) EachListItemWithAlloc(fn func(runtime.Object) error) error {
-	return u.EachListItem(fn)
+	for i := range u.Items {
+		if err := fn(&Unstructured{Object: u.Items[i].Object}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // NewEmptyInstance returns a new instance of the concrete type containing only kind/apiVersion and no other data.

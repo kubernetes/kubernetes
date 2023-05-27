@@ -160,8 +160,19 @@ func eachListItem(obj runtime.Object, fn func(runtime.Object) error, allocNew bo
 	for i := 0; i < len; i++ {
 		raw := items.Index(i)
 		if takeAddr {
-			raw = raw.Addr()
+			if allocNew {
+				// shallow copy to avoid retaining a reference to the original list item
+				itemCopy := reflect.New(raw.Type())
+				// assign to itemCopy and type-assert
+				itemCopy.Elem().Set(raw)
+				// reflect.New will guarantee that itemCopy must be a pointer.
+				raw = itemCopy
+			} else {
+				raw = raw.Addr()
+			}
 		}
+		// raw must be a pointer or an interface
+		// allocate a pointer is cheap
 		switch item := raw.Interface().(type) {
 		case *runtime.RawExtension:
 			if err := fn(item.Object); err != nil {
@@ -228,6 +239,16 @@ func extractList(obj runtime.Object, allocNew bool) ([]runtime.Object, error) {
 			}
 		case raw.Type().Implements(objectType):
 			list[i] = raw.Interface().(runtime.Object)
+		case allocNew:
+			// shallow copy to avoid retaining a reference to the original list item
+			itemCopy := reflect.New(raw.Type())
+			// assign to itemCopy and type-assert
+			itemCopy.Elem().Set(raw)
+			var ok bool
+			// reflect.New will guarantee that itemCopy must be a pointer.
+			if list[i], ok = itemCopy.Interface().(runtime.Object); !ok {
+				return nil, fmt.Errorf("%v: item[%v]: Expected object, got %#v(%s)", obj, i, raw.Interface(), raw.Kind())
+			}
 		default:
 			var found bool
 			if list[i], found = raw.Addr().Interface().(runtime.Object); !found {
