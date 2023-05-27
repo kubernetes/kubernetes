@@ -21352,6 +21352,113 @@ func TestPodIPsValidation(t *testing.T) {
 	}
 }
 
+func makePodWithHostIPs(podName string, podNamespace string, hostIPs []core.HostIP) core.Pod {
+	hostIP := ""
+	if len(hostIPs) > 0 {
+		hostIP = hostIPs[0].IP
+	}
+	return core.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: podName, Namespace: podNamespace},
+		Spec: core.PodSpec{
+			Containers: []core.Container{
+				{
+					Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+				},
+			},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+		},
+		Status: core.PodStatus{
+			HostIP:  hostIP,
+			HostIPs: hostIPs,
+		},
+	}
+}
+
+func TestHostIPsValidation(t *testing.T) {
+	testCases := []struct {
+		pod         core.Pod
+		expectError bool
+	}{
+		{
+			expectError: false,
+			pod:         makePodWithHostIPs("nil-ips", "ns", nil),
+		},
+		{
+			expectError: false,
+			pod:         makePodWithHostIPs("empty-HostIPs-list", "ns", []core.HostIP{}),
+		},
+		{
+			expectError: false,
+			pod:         makePodWithHostIPs("single-ip-family-6", "ns", []core.HostIP{{IP: "::1"}}),
+		},
+		{
+			expectError: false,
+			pod:         makePodWithHostIPs("single-ip-family-4", "ns", []core.HostIP{{IP: "1.1.1.1"}}),
+		},
+		{
+			expectError: false,
+			pod:         makePodWithHostIPs("dual-stack-4-6", "ns", []core.HostIP{{IP: "1.1.1.1"}, {IP: "::1"}}),
+		},
+		{
+			expectError: false,
+			pod:         makePodWithHostIPs("dual-stack-6-4", "ns", []core.HostIP{{IP: "::1"}, {IP: "1.1.1.1"}}),
+		},
+		/* failure cases start here */
+		{
+			expectError: true,
+			pod:         makePodWithHostIPs("invalid-pod-ip", "ns", []core.HostIP{{IP: "this-is-not-an-ip"}}),
+		},
+		{
+			expectError: true,
+			pod:         makePodWithHostIPs("dualstack-same-ip-family-6", "ns", []core.HostIP{{IP: "::1"}, {IP: "::2"}}),
+		},
+		{
+			expectError: true,
+			pod:         makePodWithHostIPs("dualstack-same-ip-family-4", "ns", []core.HostIP{{IP: "1.1.1.1"}, {IP: "2.2.2.2"}}),
+		},
+		{
+			expectError: true,
+			pod:         makePodWithHostIPs("dualstack-repeated-ip-family-6", "ns", []core.HostIP{{IP: "1.1.1.1"}, {IP: "::1"}, {IP: "::2"}}),
+		},
+		{
+			expectError: true,
+			pod:         makePodWithHostIPs("dualstack-repeated-ip-family-4", "ns", []core.HostIP{{IP: "1.1.1.1"}, {IP: "::1"}, {IP: "2.2.2.2"}}),
+		},
+
+		{
+			expectError: true,
+			pod:         makePodWithHostIPs("dualstack-duplicate-ip-family-4", "ns", []core.HostIP{{IP: "1.1.1.1"}, {IP: "1.1.1.1"}, {IP: "::1"}}),
+		},
+		{
+			expectError: true,
+			pod:         makePodWithHostIPs("dualstack-duplicate-ip-family-6", "ns", []core.HostIP{{IP: "1.1.1.1"}, {IP: "::1"}, {IP: "::1"}}),
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.pod.Name, func(t *testing.T) {
+			for _, oldTestCase := range testCases {
+				newPod := testCase.pod.DeepCopy()
+				newPod.ResourceVersion = "1"
+
+				oldPod := oldTestCase.pod.DeepCopy()
+				oldPod.ResourceVersion = "1"
+				oldPod.Name = newPod.Name
+
+				errs := ValidatePodStatusUpdate(newPod, oldPod, PodValidationOptions{})
+
+				if len(errs) == 0 && testCase.expectError {
+					t.Fatalf("expected failure for %s, but there were none", testCase.pod.Name)
+				}
+				if len(errs) != 0 && !testCase.expectError {
+					t.Fatalf("expected success for %s, but there were errors: %v", testCase.pod.Name, errs)
+				}
+			}
+		})
+	}
+}
+
 // makes a node with pod cidr and a name
 func makeNode(nodeName string, podCIDRs []string) core.Node {
 	return core.Node{

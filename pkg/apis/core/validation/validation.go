@@ -3817,6 +3817,58 @@ func validatePodIPs(pod *core.Pod) field.ErrorList {
 	return allErrs
 }
 
+// validateHostIPs validates IPs in pod status
+func validateHostIPs(pod *core.Pod) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(pod.Status.HostIPs) == 0 {
+		return allErrs
+	}
+
+	hostIPsField := field.NewPath("status", "hostIPs")
+
+	// hostIP must be equal to hostIPs[0].IP
+	if pod.Status.HostIP != pod.Status.HostIPs[0].IP {
+		allErrs = append(allErrs, field.Invalid(hostIPsField.Index(0).Child("ip"), pod.Status.HostIPs[0].IP, "must be equal to `hostIP`"))
+	}
+
+	// all HostPs must be valid IPs
+	for i, hostIP := range pod.Status.HostIPs {
+		for _, msg := range validation.IsValidIP(hostIP.IP) {
+			allErrs = append(allErrs, field.Invalid(hostIPsField.Index(i), hostIP.IP, msg))
+		}
+	}
+
+	// if we have more than one Pod.HostIP then
+	// - validate for dual stack
+	// - validate for duplication
+	if len(pod.Status.HostIPs) > 1 {
+		seen := sets.String{}
+		hostIPs := make([]string, 0, len(pod.Status.HostIPs))
+
+		// There should be no duplicates in list of Pod.HostIPs
+		for i, hostIP := range pod.Status.HostIPs {
+			hostIPs = append(hostIPs, hostIP.IP)
+			if seen.Has(hostIP.IP) {
+				allErrs = append(allErrs, field.Duplicate(hostIPsField.Index(i), hostIP))
+			}
+			seen.Insert(hostIP.IP)
+		}
+
+		dualStack, err := netutils.IsDualStackIPStrings(hostIPs)
+		if err != nil {
+			allErrs = append(allErrs, field.InternalError(hostIPsField, fmt.Errorf("failed to check for dual stack with error:%v", err)))
+		}
+
+		// We only support one from each IP family (i.e. max two IPs in this list).
+		if !dualStack || len(hostIPs) > 2 {
+			allErrs = append(allErrs, field.Invalid(hostIPsField, pod.Status.HostIPs, "may specify no more than one IP for each IP family"))
+		}
+	}
+
+	return allErrs
+}
+
 // ValidatePodSpec tests that the specified PodSpec has valid data.
 // This includes checking formatting and uniqueness.  It also canonicalizes the
 // structure by setting default values and implementing any backwards-compatibility
@@ -4850,6 +4902,10 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions
 	allErrs = append(allErrs, validatePodResourceClaimStatuses(newPod.Status.ResourceClaimStatuses, newPod.Spec.ResourceClaims, fldPath.Child("resourceClaimStatuses"))...)
 
 	if newIPErrs := validatePodIPs(newPod); len(newIPErrs) > 0 {
+		allErrs = append(allErrs, newIPErrs...)
+	}
+
+	if newIPErrs := validateHostIPs(newPod); len(newIPErrs) > 0 {
 		allErrs = append(allErrs, newIPErrs...)
 	}
 
