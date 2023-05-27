@@ -113,8 +113,27 @@ func getItemsPtr(list runtime.Object) (interface{}, error) {
 
 // EachListItem invokes fn on each runtime.Object in the list. Any error immediately terminates
 // the loop.
+//
+// If items passed to fn are retained for different durations, and you want to avoid
+// retaining all items in obj as long as any item is referenced, use EachListItemWithAlloc instead.
 func EachListItem(obj runtime.Object, fn func(runtime.Object) error) error {
+	return eachListItem(obj, fn, false)
+}
+
+// EachListItemWithAlloc works like EachListItem, but avoids retaining references to the items slice in obj.
+// It does this by making a shallow copy of non-pointer items in obj.
+//
+// If the items passed to fn are not retained, or are retained for the same duration, use EachListItem instead for memory efficiency.
+func EachListItemWithAlloc(obj runtime.Object, fn func(runtime.Object) error) error {
+	return eachListItem(obj, fn, true)
+}
+
+// allocNew: Whether shallow copy is required when the elements in Object.Items are struct
+func eachListItem(obj runtime.Object, fn func(runtime.Object) error, allocNew bool) error {
 	if unstructured, ok := obj.(runtime.Unstructured); ok {
+		if allocNew {
+			return unstructured.EachListItemWithAlloc(fn)
+		}
 		return unstructured.EachListItem(fn)
 	}
 	// TODO: Change to an interface call?
@@ -167,7 +186,23 @@ func EachListItem(obj runtime.Object, fn func(runtime.Object) error) error {
 
 // ExtractList returns obj's Items element as an array of runtime.Objects.
 // Returns an error if obj is not a List type (does not have an Items member).
+//
+// If items in the returned list are retained for different durations, and you want to avoid
+// retaining all items in obj as long as any item is referenced, use ExtractListWithAlloc instead.
 func ExtractList(obj runtime.Object) ([]runtime.Object, error) {
+	return extractList(obj, false)
+}
+
+// ExtractListWithAlloc works like ExtractList, but avoids retaining references to the items slice in obj.
+// It does this by making a shallow copy of non-pointer items in obj.
+//
+// If the items in the returned list are not retained, or are retained for the same duration, use ExtractList instead for memory efficiency.
+func ExtractListWithAlloc(obj runtime.Object) ([]runtime.Object, error) {
+	return extractList(obj, true)
+}
+
+// allocNew: Whether shallow copy is required when the elements in Object.Items are struct
+func extractList(obj runtime.Object, allocNew bool) ([]runtime.Object, error) {
 	itemsPtr, err := GetItemsPtr(obj)
 	if err != nil {
 		return nil, err
