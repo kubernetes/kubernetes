@@ -223,10 +223,16 @@ func extractList(obj runtime.Object, allocNew bool) ([]runtime.Object, error) {
 		return nil, err
 	}
 	list := make([]runtime.Object, items.Len())
+	if len(list) == 0 {
+		return list, nil
+	}
+	elemType := items.Type().Elem()
+	isRawExtension := elemType == rawExtensionObjectType
+	implementsObject := elemType.Implements(objectType)
 	for i := range list {
 		raw := items.Index(i)
 		switch {
-		case raw.Type() == rawExtensionObjectType:
+		case isRawExtension:
 			item := raw.Interface().(runtime.RawExtension)
 			switch {
 			case item.Object != nil:
@@ -237,7 +243,7 @@ func extractList(obj runtime.Object, allocNew bool) ([]runtime.Object, error) {
 			default:
 				list[i] = nil
 			}
-		case raw.Type().Implements(objectType):
+		case implementsObject:
 			list[i] = raw.Interface().(runtime.Object)
 		case allocNew:
 			// shallow copy to avoid retaining a reference to the original list item
