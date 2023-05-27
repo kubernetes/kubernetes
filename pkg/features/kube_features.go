@@ -611,6 +611,13 @@ const (
 	// sandbox creation and network configuration completes successfully
 	PodReadyToStartContainersCondition featuregate.Feature = "PodReadyToStartContainersCondition"
 
+	// owner: @wzshiming
+	// kep: http://kep.k8s.io/2681
+	// alpha: v1.28
+	//
+	// Adds pod.status.hostIPs and downward API
+	PodHostIPs featuregate.Feature = "PodHostIPs"
+
 	// owner: @Huang-Wei
 	// kep: https://kep.k8s.io/3521
 	// alpha: v1.26
@@ -1021,6 +1028,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	PodDisruptionConditions: {Default: true, PreRelease: featuregate.Beta},
 
 	PodReadyToStartContainersCondition: {Default: false, PreRelease: featuregate.Alpha},
+
+	PodHostIPs: {Default: false, PreRelease: featuregate.Alpha},
 
 	PodSchedulingReadiness: {Default: true, PreRelease: featuregate.Beta},
 
