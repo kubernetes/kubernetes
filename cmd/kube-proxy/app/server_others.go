@@ -47,12 +47,12 @@ import (
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/iptables"
 	"k8s.io/kubernetes/pkg/proxy/ipvs"
+	utilipvs "k8s.io/kubernetes/pkg/proxy/ipvs/util"
 	proxymetrics "k8s.io/kubernetes/pkg/proxy/metrics"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
-	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
 	"k8s.io/utils/exec"
 	netutils "k8s.io/utils/net"
 

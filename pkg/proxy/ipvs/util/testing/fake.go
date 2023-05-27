@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"time"
 
-	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
+	utilipvs "k8s.io/kubernetes/pkg/proxy/ipvs/util"
 )
 
 // FakeIPVS no-op implementation of ipvs Interface
