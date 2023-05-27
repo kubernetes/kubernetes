@@ -109,6 +109,7 @@ func init() {
 const (
 	testKubeletHostname = "127.0.0.1"
 	testKubeletHostIP   = "127.0.0.1"
+	testKubeletHostIPv6 = "::1"
 
 	// TODO(harry) any global place for these two?
 	// Reasonable size range of all container images. 90%ile of images on dockerhub drops into this range.
@@ -231,6 +232,10 @@ func newTestKubeletWithImageList(
 						{
 							Type:    v1.NodeInternalIP,
 							Address: testKubeletHostIP,
+						},
+						{
+							Type:    v1.NodeInternalIP,
+							Address: testKubeletHostIPv6,
 						},
 					},
 					VolumesAttached: []v1.AttachedVolume{
