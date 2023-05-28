@@ -25,7 +25,9 @@ import (
 	"time"
 	"unicode"
 
-	restful "github.com/emicklei/go-restful/v3"
+	"github.com/emicklei/go-restful/v3"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+
 	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
@@ -46,7 +48,6 @@ import (
 	"k8s.io/apiserver/pkg/storageversion"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	versioninfo "k8s.io/component-base/version"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 const (
@@ -1183,6 +1184,8 @@ func typeToJSON(typeName string) string {
 	case "v1.ResourceVersionMatch", "*v1.ResourceVersionMatch":
 		return "string"
 	case "v1.IncludeObjectPolicy", "*v1.IncludeObjectPolicy":
+		return "string"
+	case "v1.LogStreamType", "*v1.LogStreamType":
 		return "string"
 
 	// TODO: Fix these when go-restful supports a way to specify an array query param:
