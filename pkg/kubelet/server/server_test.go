@@ -49,12 +49,14 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/utils/pointer"
+
+	api "k8s.io/kubernetes/pkg/apis/core"
 
 	// Do some initialization to decode the query parameters correctly.
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -818,29 +820,34 @@ func TestContainerLogs(t *testing.T) {
 	}
 
 	for desc, test := range tests {
-		t.Run(desc, func(t *testing.T) {
-			output := "foo bar"
-			podNamespace := "other"
-			podName := "foo"
-			expectedPodName := getPodName(podName, podNamespace)
-			expectedContainerName := "baz"
-			setPodByNameFunc(fw, podNamespace, podName, expectedContainerName)
-			setGetContainerLogsFunc(fw, t, expectedPodName, expectedContainerName, test.podLogOption, output)
-			resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podNamespace + "/" + podName + "/" + expectedContainerName + test.query)
-			if err != nil {
-				t.Errorf("Got error GETing: %v", err)
-			}
-			defer resp.Body.Close()
+		// To make sure the original behavior doesn't change no matter the feature SplitStdoutAndStderr is enabled or not.
+		for _, enableSplitStdoutAndStderr := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s (enableSplitStdoutAndStderr=%v)", desc, enableSplitStdoutAndStderr), func(t *testing.T) {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SplitStdoutAndStderr, enableSplitStdoutAndStderr)()
 
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				t.Errorf("Error reading container logs: %v", err)
-			}
-			result := string(body)
-			if result != output {
-				t.Errorf("Expected: '%v', got: '%v'", output, result)
-			}
-		})
+				output := "foo bar"
+				podNamespace := "other"
+				podName := "foo"
+				expectedPodName := getPodName(podName, podNamespace)
+				expectedContainerName := "baz"
+				setPodByNameFunc(fw, podNamespace, podName, expectedContainerName)
+				setGetContainerLogsFunc(fw, t, expectedPodName, expectedContainerName, test.podLogOption, output)
+				resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podNamespace + "/" + podName + "/" + expectedContainerName + test.query)
+				if err != nil {
+					t.Errorf("Got error GETing: %v", err)
+				}
+				defer resp.Body.Close()
+
+				body, err := io.ReadAll(resp.Body)
+				if err != nil {
+					t.Errorf("Error reading container logs: %v", err)
+				}
+				result := string(body)
+				if result != output {
+					t.Errorf("Expected: '%v', got: '%v'", output, result)
+				}
+			})
+		}
 	}
 }
 
@@ -861,6 +868,182 @@ func TestContainerLogsWithInvalidTail(t *testing.T) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusUnprocessableEntity {
 		t.Errorf("Unexpected non-error reading container logs: %#v", resp)
+	}
+}
+
+func TestContainerLogsWithSeparateStream(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SplitStdoutAndStderr, true)()
+
+	type logEntry struct {
+		stream v1.LogStreamType
+		msg    string
+	}
+
+	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
+
+	var (
+		streamStdout = v1.LogStreamTypeStdout
+		streamStderr = v1.LogStreamTypeStderr
+		streamAll    = v1.LogStreamTypeAll
+	)
+
+	testCases := []struct {
+		name               string
+		query              string
+		logs               []logEntry
+		expectedOutput     string
+		expectedLogOptions *v1.PodLogOptions
+	}{
+		{
+			name: "default PodLogOptions should return all logs",
+			logs: []logEntry{
+				{stream: v1.LogStreamTypeStdout, msg: "foo\n"},
+				{stream: v1.LogStreamTypeStderr, msg: "bar\n"},
+			},
+			query:              "",
+			expectedLogOptions: &v1.PodLogOptions{},
+			expectedOutput:     "foo\nbar\n",
+		},
+		{
+			name: "only stdout logs",
+			logs: []logEntry{
+				{stream: v1.LogStreamTypeStdout, msg: "out1\n"},
+				{stream: v1.LogStreamTypeStderr, msg: "err1\n"},
+				{stream: v1.LogStreamTypeStdout, msg: "out2\n"},
+			},
+			query: "?stream=stdout",
+			expectedLogOptions: &v1.PodLogOptions{
+				Stream: &streamStdout,
+			},
+			expectedOutput: "out1\nout2\n",
+		},
+		{
+			name: "only stderr logs",
+			logs: []logEntry{
+				{stream: v1.LogStreamTypeStderr, msg: "err1\n"},
+				{stream: v1.LogStreamTypeStderr, msg: "err2\n"},
+				{stream: v1.LogStreamTypeStdout, msg: "out1\n"},
+			},
+			query: "?stream=stderr",
+			expectedLogOptions: &v1.PodLogOptions{
+				Stream: &streamStderr,
+			},
+			expectedOutput: "err1\nerr2\n",
+		},
+		{
+			name: "return all logs",
+			logs: []logEntry{
+				{stream: v1.LogStreamTypeStdout, msg: "out1\n"},
+				{stream: v1.LogStreamTypeStderr, msg: "err1\n"},
+				{stream: v1.LogStreamTypeStdout, msg: "out2\n"},
+			},
+			query: "?stream=All",
+			expectedLogOptions: &v1.PodLogOptions{
+				Stream: &streamAll,
+			},
+			expectedOutput: "out1\nerr1\nout2\n",
+		},
+		{
+			name: "stdout logs with legacy tail",
+			logs: []logEntry{
+				{stream: v1.LogStreamTypeStdout, msg: "out1\n"},
+				{stream: v1.LogStreamTypeStderr, msg: "err1\n"},
+				{stream: v1.LogStreamTypeStdout, msg: "out2\n"},
+			},
+			query: "?stream=All&tail=1",
+			expectedLogOptions: &v1.PodLogOptions{
+				Stream:    &streamAll,
+				TailLines: pointer.Int64(1),
+			},
+			expectedOutput: "out2\n",
+		},
+		{
+			name: "last line of logs does not match the stream filter",
+			logs: []logEntry{
+				{stream: v1.LogStreamTypeStdout, msg: "out1\n"},
+				{stream: v1.LogStreamTypeStdout, msg: "out2\n"},
+				{stream: v1.LogStreamTypeStderr, msg: "err1\n"},
+			},
+			query: "?stream=stdout&tailLines=1",
+			expectedLogOptions: &v1.PodLogOptions{
+				Stream:    &streamStdout,
+				TailLines: pointer.Int64(1),
+			},
+			expectedOutput: "",
+		},
+		{
+			name: "last line of logs matches the stream filter",
+			logs: []logEntry{
+				{stream: v1.LogStreamTypeStdout, msg: "out1\n"},
+				{stream: v1.LogStreamTypeStderr, msg: "err1\n"},
+				{stream: v1.LogStreamTypeStdout, msg: "out2\n"},
+			},
+			query: "?stream=stdout&tailLines=1",
+			expectedLogOptions: &v1.PodLogOptions{
+				Stream:    &streamStdout,
+				TailLines: pointer.Int64(1),
+			},
+			expectedOutput: "out2\n",
+		},
+		{
+			name: "return the logs from the last 2 lines of logs that matches the stream filter",
+			logs: []logEntry{
+				{stream: v1.LogStreamTypeStdout, msg: "out1\n"},
+				{stream: v1.LogStreamTypeStderr, msg: "err1\n"},
+				{stream: v1.LogStreamTypeStdout, msg: "out2\n"},
+			},
+			query: "?stream=stderr&tailLines=2",
+			expectedLogOptions: &v1.PodLogOptions{
+				Stream:    &streamStderr,
+				TailLines: pointer.Int64(2),
+			},
+			expectedOutput: "err1\n",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			podNamespace := "other"
+			podName := "foo"
+			expectedContainerName := "baz"
+			setPodByNameFunc(fw, podNamespace, podName, expectedContainerName)
+			fw.fakeKubelet.containerLogsFunc = func(_ context.Context, podFullName, containerName string, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error {
+				if !reflect.DeepEqual(tc.expectedLogOptions, logOptions) {
+					t.Errorf("expected %#v, got %#v", tc.expectedLogOptions, logOptions)
+				}
+
+				var dst io.Writer
+				tailLines := len(tc.logs)
+				if logOptions.TailLines != nil {
+					tailLines = int(*logOptions.TailLines)
+				}
+				logs := tc.logs[len(tc.logs)-tailLines:]
+				for _, log := range logs {
+					switch log.stream {
+					case v1.LogStreamTypeStdout:
+						dst = stdout
+					case v1.LogStreamTypeStderr:
+						dst = stderr
+					}
+					io.WriteString(dst, log.msg)
+				}
+				return nil
+			}
+			resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podNamespace + "/" + podName + "/" + expectedContainerName + tc.query)
+			if err != nil {
+				t.Errorf("Got error GETing: %v", err)
+			}
+			defer resp.Body.Close()
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				t.Errorf("Error reading container logs: %v", err)
+			}
+			result := string(body)
+			if result != tc.expectedOutput {
+				t.Errorf("Expected: %q, got: %q", tc.expectedOutput, result)
+			}
+		})
 	}
 }
 
