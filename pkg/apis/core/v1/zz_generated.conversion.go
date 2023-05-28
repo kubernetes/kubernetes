@@ -2142,6 +2142,11 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*[]string)(nil), (**v1.LogStreamType)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_Slice_string_To_Pointer_v1_LogStreamType(a.(*[]string), b.(**v1.LogStreamType), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*apps.ReplicaSetSpec)(nil), (*v1.ReplicationControllerSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_apps_ReplicaSetSpec_To_v1_ReplicationControllerSpec(a.(*apps.ReplicaSetSpec), b.(*v1.ReplicationControllerSpec), scope)
 	}); err != nil {
@@ -5965,6 +5970,7 @@ func autoConvert_v1_PodLogOptions_To_core_PodLogOptions(in *v1.PodLogOptions, ou
 	out.TailLines = (*int64)(unsafe.Pointer(in.TailLines))
 	out.LimitBytes = (*int64)(unsafe.Pointer(in.LimitBytes))
 	out.InsecureSkipTLSVerifyBackend = in.InsecureSkipTLSVerifyBackend
+	out.Stream = (*core.LogStreamType)(unsafe.Pointer(in.Stream))
 	return nil
 }
 
@@ -5983,6 +5989,7 @@ func autoConvert_core_PodLogOptions_To_v1_PodLogOptions(in *core.PodLogOptions, 
 	out.TailLines = (*int64)(unsafe.Pointer(in.TailLines))
 	out.LimitBytes = (*int64)(unsafe.Pointer(in.LimitBytes))
 	out.InsecureSkipTLSVerifyBackend = in.InsecureSkipTLSVerifyBackend
+	out.Stream = (*v1.LogStreamType)(unsafe.Pointer(in.Stream))
 	return nil
 }
 
@@ -6056,6 +6063,13 @@ func autoConvert_url_Values_To_v1_PodLogOptions(in *url.Values, out *v1.PodLogOp
 		}
 	} else {
 		out.InsecureSkipTLSVerifyBackend = false
+	}
+	if values, ok := map[string][]string(*in)["stream"]; ok && len(values) > 0 {
+		if err := Convert_Slice_string_To_Pointer_v1_LogStreamType(&values, &out.Stream, s); err != nil {
+			return err
+		}
+	} else {
+		out.Stream = nil
 	}
 	return nil
 }

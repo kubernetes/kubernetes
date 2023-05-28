@@ -34,12 +34,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
+	utilpointer "k8s.io/utils/pointer"
+
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	apps "k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/core"
 	corefuzzer "k8s.io/kubernetes/pkg/apis/core/fuzzer"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	utilpointer "k8s.io/utils/pointer"
 
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
@@ -52,6 +53,8 @@ func TestPodLogOptions(t *testing.T) {
 	sinceTime := metav1.NewTime(time.Date(2000, 1, 1, 12, 34, 56, 0, time.UTC).Local())
 	tailLines := int64(2)
 	limitBytes := int64(3)
+	v1StreamStderr := v1.LogStreamTypeStderr
+	coreStreamStderr := core.LogStreamTypeStderr
 
 	versionedLogOptions := &v1.PodLogOptions{
 		Container:    "mycontainer",
@@ -62,6 +65,7 @@ func TestPodLogOptions(t *testing.T) {
 		Timestamps:   true,
 		TailLines:    &tailLines,
 		LimitBytes:   &limitBytes,
+		Stream:       &v1StreamStderr,
 	}
 	unversionedLogOptions := &core.PodLogOptions{
 		Container:    "mycontainer",
@@ -72,6 +76,7 @@ func TestPodLogOptions(t *testing.T) {
 		Timestamps:   true,
 		TailLines:    &tailLines,
 		LimitBytes:   &limitBytes,
+		Stream:       &coreStreamStderr,
 	}
 	expectedParameters := url.Values{
 		"container":    {"mycontainer"},
@@ -82,6 +87,7 @@ func TestPodLogOptions(t *testing.T) {
 		"timestamps":   {"true"},
 		"tailLines":    {"2"},
 		"limitBytes":   {"3"},
+		"stream":       {"stderr"},
 	}
 
 	codec := runtime.NewParameterCodec(legacyscheme.Scheme)
@@ -520,7 +526,7 @@ func Test_v1_PodStatus_to_core_PodStatus(t *testing.T) {
 		}
 
 		if len(testInput.PodIP) == 0 && len(testInput.PodIPs) == 0 {
-			continue //no more work needed
+			continue // no more work needed
 		}
 
 		// List should have at least 1 IP == v1.PodIP || v1.PodIPs[0] (whichever provided)
