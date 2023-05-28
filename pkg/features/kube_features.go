@@ -152,6 +152,7 @@ const (
 
 	// owner: @humblec
 	// alpha: v1.23
+	// deprecated: v1.28
 	//
 	// Enables the RBD in-tree driver to RBD CSI Driver  migration feature.
 	CSIMigrationRBD featuregate.Feature = "CSIMigrationRBD"
@@ -355,6 +356,7 @@ const (
 
 	// owner: @humblec
 	// alpha: v1.23
+	// deprecated: v1.28
 	//
 	// Disables the RBD in-tree driver.
 	InTreePluginRBDUnregister featuregate.Feature = "InTreePluginRBDUnregister"
@@ -882,7 +884,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	CSIMigrationPortworx: {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires Portworx CSI driver)
 
-	CSIMigrationRBD: {Default: false, PreRelease: featuregate.Alpha}, // Off by default (requires RBD CSI driver)
+	CSIMigrationRBD: {Default: false, PreRelease: featuregate.Deprecated}, //  deprecated in 1.28, remove in 1.31
 
 	CSIMigrationvSphere: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 
@@ -940,7 +942,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	InTreePluginPortworxUnregister: {Default: false, PreRelease: featuregate.Alpha},
 
-	InTreePluginRBDUnregister: {Default: false, PreRelease: featuregate.Alpha},
+	InTreePluginRBDUnregister: {Default: false, PreRelease: featuregate.Deprecated}, // deprecated in 1.28, remove in 1.31
 
 	InTreePluginvSphereUnregister: {Default: false, PreRelease: featuregate.Alpha},
 
