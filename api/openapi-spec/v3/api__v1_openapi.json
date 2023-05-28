@@ -16757,6 +16757,15 @@
           }
         },
         {
+          "description": "Specify which container log stream to return to the client. By default, both stdout and stderr are returned interleaved. Acceptable values are: - \"All\": the default value, combined stdout and stderr would be returned. - \"stdout\": only the stdout stream would be returned. - \"stderr\": only the stderr stream would be returned. This is an alpha field and requires enabling SplitStdoutAndStderr feature gate.",
+          "in": "query",
+          "name": "stream",
+          "schema": {
+            "type": "string",
+            "uniqueItems": true
+          }
+        },
+        {
           "description": "If set, the number of lines from the end of the logs to show. If not specified, logs are shown from the creation of the container or sinceSeconds or sinceTime",
           "in": "query",
           "name": "tailLines",
