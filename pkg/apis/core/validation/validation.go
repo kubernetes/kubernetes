@@ -46,6 +46,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	schedulinghelper "k8s.io/component-helpers/scheduling/corev1"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
+	netutils "k8s.io/utils/net"
+
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
@@ -56,7 +58,6 @@ import (
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/fieldpath"
-	netutils "k8s.io/utils/net"
 )
 
 const isNegativeErrorMsg string = apimachineryvalidation.IsNegativeErrorMsg
@@ -4649,7 +4650,7 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		return allErrs
 	}
 
-	//TODO(vinaykul,InPlacePodVerticalScaling): With KEP 2527, we can rely on persistence of PodStatus.QOSClass
+	// TODO(vinaykul,InPlacePodVerticalScaling): With KEP 2527, we can rely on persistence of PodStatus.QOSClass
 	// We can use PodStatus.QOSClass instead of GetPodQOS here, in kubelet, and elsewhere, as PodStatus.QOSClass
 	// does not change once it is bootstrapped in podCreate. This needs to be addressed before beta as a
 	// separate PR covering all uses of GetPodQOS. With that change, we can drop the below block.
@@ -6852,6 +6853,12 @@ func validateOS(podSpec *core.PodSpec, fldPath *field.Path, opts PodValidationOp
 	return allErrs
 }
 
+var supportedLogStreamType = sets.NewString(
+	string(v1.LogStreamTypeStdout),
+	string(v1.LogStreamTypeStderr),
+	string(v1.LogStreamTypeAll),
+)
+
 func ValidatePodLogOptions(opts *core.PodLogOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if opts.TailLines != nil && *opts.TailLines < 0 {
@@ -6866,6 +6873,10 @@ func ValidatePodLogOptions(opts *core.PodLogOptions) field.ErrorList {
 	case opts.SinceSeconds != nil:
 		if *opts.SinceSeconds < 1 {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("sinceSeconds"), *opts.SinceSeconds, "must be greater than 0"))
+		}
+	case utilfeature.DefaultFeatureGate.Enabled(features.SplitStdoutAndStderr) && opts.Stream != nil:
+		if !supportedLogStreamType.Has(string(*opts.Stream)) {
+			allErrs = append(allErrs, field.NotSupported(field.NewPath("stream"), *opts.Stream, supportedLogStreamType.List()))
 		}
 	}
 	return allErrs

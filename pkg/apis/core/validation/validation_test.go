@@ -42,10 +42,11 @@ import (
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
+	utilpointer "k8s.io/utils/pointer"
+
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
-	utilpointer "k8s.io/utils/pointer"
 )
 
 const (
@@ -19797,29 +19798,81 @@ func TestValidPodLogOptions(t *testing.T) {
 	negative := int64(-1)
 	zero := int64(0)
 	positive := int64(1)
+	stdoutStream := core.LogStreamTypeStdout
+	stderrStream := core.LogStreamTypeStderr
+	allStream := core.LogStreamTypeAll
+	invalidStream := core.LogStreamType("")
 	tests := []struct {
 		opt  core.PodLogOptions
 		errs int
+
+		enableSplitStdoutAndStderr bool
 	}{
-		{core.PodLogOptions{}, 0},
-		{core.PodLogOptions{Previous: true}, 0},
-		{core.PodLogOptions{Follow: true}, 0},
-		{core.PodLogOptions{TailLines: &zero}, 0},
-		{core.PodLogOptions{TailLines: &negative}, 1},
-		{core.PodLogOptions{TailLines: &positive}, 0},
-		{core.PodLogOptions{LimitBytes: &zero}, 1},
-		{core.PodLogOptions{LimitBytes: &negative}, 1},
-		{core.PodLogOptions{LimitBytes: &positive}, 0},
-		{core.PodLogOptions{SinceSeconds: &negative}, 1},
-		{core.PodLogOptions{SinceSeconds: &positive}, 0},
-		{core.PodLogOptions{SinceSeconds: &zero}, 1},
-		{core.PodLogOptions{SinceTime: &now}, 0},
+		{opt: core.PodLogOptions{}},
+		{opt: core.PodLogOptions{Previous: true}},
+		{opt: core.PodLogOptions{Follow: true}},
+		{opt: core.PodLogOptions{TailLines: &zero}},
+		{opt: core.PodLogOptions{TailLines: &negative}, errs: 1},
+		{opt: core.PodLogOptions{TailLines: &positive}},
+		{opt: core.PodLogOptions{LimitBytes: &zero}, errs: 1},
+		{opt: core.PodLogOptions{LimitBytes: &negative}, errs: 1},
+		{opt: core.PodLogOptions{LimitBytes: &positive}},
+		{opt: core.PodLogOptions{SinceSeconds: &negative}, errs: 1},
+		{opt: core.PodLogOptions{SinceSeconds: &positive}},
+		{opt: core.PodLogOptions{SinceSeconds: &zero}, errs: 1},
+		{opt: core.PodLogOptions{SinceTime: &now}},
+
+		// Stream can be set to arbitrary values without the feature SplitStdoutAndStderr enabled.
+		{
+			opt: core.PodLogOptions{
+				Stream: &stdoutStream,
+			},
+		},
+		{
+			opt: core.PodLogOptions{
+				Stream: &invalidStream,
+			},
+		},
+
+		// The Stream field is only validated if the feature SplitStdoutAndStderr is enabled.
+		{
+			opt: core.PodLogOptions{
+				Stream: &stdoutStream,
+			},
+			enableSplitStdoutAndStderr: true,
+		},
+		{
+			opt: core.PodLogOptions{
+				Stream:    &stderrStream,
+				TailLines: &positive,
+				Follow:    true,
+			},
+			enableSplitStdoutAndStderr: true,
+		},
+		{
+			opt: core.PodLogOptions{
+				Stream:     &allStream,
+				LimitBytes: &positive,
+				SinceTime:  &now,
+			},
+			enableSplitStdoutAndStderr: true,
+		},
+		{
+			opt: core.PodLogOptions{
+				Stream: &invalidStream,
+			},
+			errs: 1,
+
+			enableSplitStdoutAndStderr: true,
+		},
 	}
 	for i, test := range tests {
+		resetFeature := featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SplitStdoutAndStderr, test.enableSplitStdoutAndStderr)
 		errs := ValidatePodLogOptions(&test.opt)
 		if test.errs != len(errs) {
 			t.Errorf("%d: Unexpected errors: %v", i, errs)
 		}
+		resetFeature()
 	}
 }
 

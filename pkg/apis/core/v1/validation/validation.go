@@ -24,9 +24,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 const isNegativeErrorMsg string = `must be greater than or equal to 0`
@@ -123,6 +126,12 @@ func validateResourceName(value string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
+var supportedLogStreamType = sets.NewString(
+	string(v1.LogStreamTypeStdout),
+	string(v1.LogStreamTypeStderr),
+	string(v1.LogStreamTypeAll),
+)
+
 // ValidatePodLogOptions checks if options that are set are at the correct
 // value. Any incorrect value will be returned to the ErrorList.
 func ValidatePodLogOptions(opts *v1.PodLogOptions) field.ErrorList {
@@ -139,6 +148,10 @@ func ValidatePodLogOptions(opts *v1.PodLogOptions) field.ErrorList {
 	case opts.SinceSeconds != nil:
 		if *opts.SinceSeconds < 1 {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("sinceSeconds"), *opts.SinceSeconds, "must be greater than 0"))
+		}
+	case utilfeature.DefaultFeatureGate.Enabled(features.SplitStdoutAndStderr) && opts.Stream != nil:
+		if !supportedLogStreamType.Has(string(*opts.Stream)) {
+			allErrs = append(allErrs, field.NotSupported(field.NewPath("stream"), *opts.Stream, supportedLogStreamType.List()))
 		}
 	}
 	return allErrs
