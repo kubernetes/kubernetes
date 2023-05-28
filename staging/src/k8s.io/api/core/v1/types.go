@@ -5729,6 +5729,18 @@ type Preconditions struct {
 	UID *types.UID `json:"uid,omitempty" protobuf:"bytes,1,opt,name=uid,casttype=k8s.io/apimachinery/pkg/types.UID"`
 }
 
+// LogStreamType represents the desired log stream type.
+type LogStreamType string
+
+const (
+	// LogStreamTypeStdout is the stream type for stdout.
+	LogStreamTypeStdout LogStreamType = "stdout"
+	// LogStreamTypeStderr is the stream type for stderr.
+	LogStreamTypeStderr LogStreamType = "stderr"
+	// LogStreamTypeAll represents the combined stdout and stderr.
+	LogStreamTypeAll LogStreamType = "All"
+)
+
 // +k8s:conversion-gen:explicit-from=net/url.Values
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -5779,6 +5791,15 @@ type PodLogOptions struct {
 	// the actual log data coming from the real kubelet).
 	// +optional
 	InsecureSkipTLSVerifyBackend bool `json:"insecureSkipTLSVerifyBackend,omitempty" protobuf:"varint,9,opt,name=insecureSkipTLSVerifyBackend"`
+
+	// Specify which container log stream to return to the client. By default, both stdout and stderr are returned interleaved.
+	// Acceptable values are:
+	// - "All": the default value, combined stdout and stderr would be returned.
+	// - "stdout": only the stdout stream would be returned.
+	// - "stderr": only the stderr stream would be returned.
+	// This is an alpha field and requires enabling SplitStdoutAndStderr feature gate.
+	// +optional
+	Stream *LogStreamType `json:"stream,omitempty" protobuf:"varint,10,opt,name=stream"`
 }
 
 // +k8s:conversion-gen:explicit-from=net/url.Values

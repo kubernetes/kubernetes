@@ -4886,6 +4886,18 @@ type Preconditions struct {
 	UID *types.UID
 }
 
+// LogStreamType represents the desired log stream type.
+type LogStreamType string
+
+const (
+	// LogStreamTypeStdout is the stream type for stdout.
+	LogStreamTypeStdout LogStreamType = "stdout"
+	// LogStreamTypeStderr is the stream type for stderr.
+	LogStreamTypeStderr LogStreamType = "stderr"
+	// LogStreamTypeAll represents the combined stdout and stderr.
+	LogStreamTypeAll LogStreamType = "All"
+)
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PodLogOptions is the query options for a Pod's logs REST call
@@ -4927,6 +4939,15 @@ type PodLogOptions struct {
 	// the actual log data coming from the real kubelet).
 	// +optional
 	InsecureSkipTLSVerifyBackend bool
+
+	// Return the specific log stream. Defaults to "All".
+	// Acceptable values are:
+	// - "All": the combined stdout and stderr
+	// - "stdout": only the stdout
+	// - "stderr": only the stderr
+	// This is an alpha field and requires enabling SplitStdoutAndStderr feature gate.
+	// +optional
+	Stream *LogStreamType
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

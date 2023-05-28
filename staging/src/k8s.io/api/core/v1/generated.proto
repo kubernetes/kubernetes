@@ -3420,6 +3420,15 @@ message PodLogOptions {
   // the actual log data coming from the real kubelet).
   // +optional
   optional bool insecureSkipTLSVerifyBackend = 9;
+
+  // Specify which container log stream to return to the client. By default, both stdout and stderr are returned interleaved.
+  // Acceptable values are:
+  // - "All": the default value, combined stdout and stderr would be returned.
+  // - "stdout": only the stdout stream would be returned.
+  // - "stderr": only the stderr stream would be returned.
+  // This is an alpha field and requires enabling SplitStdoutAndStderr feature gate.
+  // +optional
+  optional string stream = 10;
 }
 
 // PodOS defines the OS parameters of a pod.

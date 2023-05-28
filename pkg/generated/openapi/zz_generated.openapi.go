@@ -23576,6 +23576,13 @@ func schema_k8sio_api_core_v1_PodLogOptions(ref common.ReferenceCallback) common
 							Format:      "",
 						},
 					},
+					"stream": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Specify which container log stream to return to the client. By default, both stdout and stderr are returned interleaved. Acceptable values are: - \"All\": the default value, combined stdout and stderr would be returned. - \"stdout\": only the stdout stream would be returned. - \"stderr\": only the stderr stream would be returned. This is an alpha field and requires enabling SplitStdoutAndStderr feature gate.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
