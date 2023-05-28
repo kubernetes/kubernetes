@@ -720,6 +720,12 @@ const (
 	// Enables kubelet support to size memory backed volumes
 	SizeMemoryBackedVolumes featuregate.Feature = "SizeMemoryBackedVolumes"
 
+	// owner: @knight42
+	// alpha: v1.28
+	//
+	// Enables only stdout or stderr of the container to be retrievd
+	SplitStdoutAndStderr featuregate.Feature = "SplitStdoutAndStderr"
+
 	// owner: @alexanderConstantinescu
 	// kep: http://kep.k8s.io/3458
 	// beta: v1.27
@@ -918,7 +924,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: featuregate.Deprecated, LockToDefault: true}, // remove in 1.30
 
-	GRPCContainerProbe: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, //remove in 1.29
+	GRPCContainerProbe: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 
 	GracefulNodeShutdown: {Default: true, PreRelease: featuregate.Beta},
 
@@ -1037,6 +1043,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ServiceNodePortStaticSubrange: {Default: false, PreRelease: featuregate.Alpha},
 
 	SizeMemoryBackedVolumes: {Default: true, PreRelease: featuregate.Beta},
+
+	SplitStdoutAndStderr: {Default: false, PreRelease: featuregate.Alpha},
 
 	StableLoadBalancerNodeSet: {Default: true, PreRelease: featuregate.Beta},
 
