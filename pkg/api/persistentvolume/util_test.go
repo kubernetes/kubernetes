@@ -275,6 +275,27 @@ func TestWarnings(t *testing.T) {
 				`spec.persistentVolumeSource.glusterfs: deprecated in v1.25, non-functional in v1.26+`,
 			},
 		},
+		{
+			name: "PV RBD deprecation warning",
+			template: &api.PersistentVolume{
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						RBD: &api.RBDPersistentVolumeSource{
+							CephMonitors: nil,
+							RBDImage:     "",
+							FSType:       "",
+							RBDPool:      "",
+							RadosUser:    "",
+							Keyring:      "",
+							SecretRef:    nil,
+							ReadOnly:     false,
+						},
+					},
+				},
+			},
+			expected: []string{
+				`spec.persistentVolumeSource.rbd: deprecated in v1.28, non-functional in v1.31+`},
+		},
 	}
 
 	for _, tc := range testcases {

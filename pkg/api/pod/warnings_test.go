@@ -225,6 +225,15 @@ func TestWarnings(t *testing.T) {
 		},
 
 		{
+			name: "rbd",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Volumes: []api.Volume{
+					{Name: "s", VolumeSource: api.VolumeSource{RBD: &api.RBDVolumeSource{}}},
+				}},
+			},
+			expected: []string{`spec.volumes[0].rbd: deprecated in v1.28, non-functional in v1.31+`},
+		},
+		{
 			name: "duplicate hostAlias",
 			template: &api.PodTemplateSpec{Spec: api.PodSpec{
 				HostAliases: []api.HostAlias{

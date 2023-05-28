@@ -157,6 +157,9 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 		if v.Glusterfs != nil {
 			warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.25, non-functional in v1.26+", fieldPath.Child("spec", "volumes").Index(i).Child("glusterfs")))
 		}
+		if v.RBD != nil {
+			warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.28, non-functional in v1.31+", fieldPath.Child("spec", "volumes").Index(i).Child("rbd")))
+		}
 		if v.Ephemeral != nil && v.Ephemeral.VolumeClaimTemplate != nil {
 			warnings = append(warnings, pvcutil.GetWarningsForPersistentVolumeClaimSpec(fieldPath.Child("spec", "volumes").Index(i).Child("ephemeral").Child("volumeClaimTemplate").Child("spec"), v.Ephemeral.VolumeClaimTemplate.Spec)...)
 		}
