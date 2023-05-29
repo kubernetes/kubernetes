@@ -43,9 +43,10 @@ import (
 )
 
 func (sched *Scheduler) onStorageClassAdd(obj interface{}) {
+	logger := sched.logger
 	sc, ok := obj.(*storagev1.StorageClass)
 	if !ok {
-		klog.ErrorS(nil, "Cannot convert to *storagev1.StorageClass", "obj", obj)
+		logger.Error(nil, "Cannot convert to *storagev1.StorageClass", "obj", obj)
 		return
 	}
 
@@ -56,42 +57,45 @@ func (sched *Scheduler) onStorageClassAdd(obj interface{}) {
 	// We don't need to invalidate cached results because results will not be
 	// cached for pod that has unbound immediate PVCs.
 	if sc.VolumeBindingMode != nil && *sc.VolumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer {
-		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(queue.StorageClassAdd, nil)
+		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, queue.StorageClassAdd, nil)
 	}
 }
 
 func (sched *Scheduler) addNodeToCache(obj interface{}) {
+	logger := sched.logger
 	node, ok := obj.(*v1.Node)
 	if !ok {
-		klog.ErrorS(nil, "Cannot convert to *v1.Node", "obj", obj)
+		logger.Error(nil, "Cannot convert to *v1.Node", "obj", obj)
 		return
 	}
 
-	nodeInfo := sched.Cache.AddNode(node)
-	klog.V(3).InfoS("Add event for node", "node", klog.KObj(node))
-	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(queue.NodeAdd, preCheckForNode(nodeInfo))
+	nodeInfo := sched.Cache.AddNode(logger, node)
+	logger.V(3).Info("Add event for node", "node", klog.KObj(node))
+	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, queue.NodeAdd, preCheckForNode(nodeInfo))
 }
 
 func (sched *Scheduler) updateNodeInCache(oldObj, newObj interface{}) {
+	logger := sched.logger
 	oldNode, ok := oldObj.(*v1.Node)
 	if !ok {
-		klog.ErrorS(nil, "Cannot convert oldObj to *v1.Node", "oldObj", oldObj)
+		logger.Error(nil, "Cannot convert oldObj to *v1.Node", "oldObj", oldObj)
 		return
 	}
 	newNode, ok := newObj.(*v1.Node)
 	if !ok {
-		klog.ErrorS(nil, "Cannot convert newObj to *v1.Node", "newObj", newObj)
+		logger.Error(nil, "Cannot convert newObj to *v1.Node", "newObj", newObj)
 		return
 	}
 
-	nodeInfo := sched.Cache.UpdateNode(oldNode, newNode)
+	nodeInfo := sched.Cache.UpdateNode(logger, oldNode, newNode)
 	// Only requeue unschedulable pods if the node became more schedulable.
 	if event := nodeSchedulingPropertiesChange(newNode, oldNode); event != nil {
-		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(*event, preCheckForNode(nodeInfo))
+		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, *event, preCheckForNode(nodeInfo))
 	}
 }
 
 func (sched *Scheduler) deleteNodeFromCache(obj interface{}) {
+	logger := sched.logger
 	var node *v1.Node
 	switch t := obj.(type) {
 	case *v1.Node:
@@ -100,28 +104,30 @@ func (sched *Scheduler) deleteNodeFromCache(obj interface{}) {
 		var ok bool
 		node, ok = t.Obj.(*v1.Node)
 		if !ok {
-			klog.ErrorS(nil, "Cannot convert to *v1.Node", "obj", t.Obj)
+			logger.Error(nil, "Cannot convert to *v1.Node", "obj", t.Obj)
 			return
 		}
 	default:
-		klog.ErrorS(nil, "Cannot convert to *v1.Node", "obj", t)
+		logger.Error(nil, "Cannot convert to *v1.Node", "obj", t)
 		return
 	}
-	klog.V(3).InfoS("Delete event for node", "node", klog.KObj(node))
-	if err := sched.Cache.RemoveNode(node); err != nil {
-		klog.ErrorS(err, "Scheduler cache RemoveNode failed")
+	logger.V(3).Info("Delete event for node", "node", klog.KObj(node))
+	if err := sched.Cache.RemoveNode(logger, node); err != nil {
+		logger.Error(err, "Scheduler cache RemoveNode failed")
 	}
 }
 
 func (sched *Scheduler) addPodToSchedulingQueue(obj interface{}) {
+	logger := sched.logger
 	pod := obj.(*v1.Pod)
-	klog.V(3).InfoS("Add event for unscheduled pod", "pod", klog.KObj(pod))
-	if err := sched.SchedulingQueue.Add(pod); err != nil {
+	logger.V(3).Info("Add event for unscheduled pod", "pod", klog.KObj(pod))
+	if err := sched.SchedulingQueue.Add(logger, pod); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to queue %T: %v", obj, err))
 	}
 }
 
 func (sched *Scheduler) updatePodInSchedulingQueue(oldObj, newObj interface{}) {
+	logger := sched.logger
 	oldPod, newPod := oldObj.(*v1.Pod), newObj.(*v1.Pod)
 	// Bypass update event that carries identical objects; otherwise, a duplicated
 	// Pod may go through scheduling and cause unexpected behavior (see #96071).
@@ -137,12 +143,13 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldObj, newObj interface{}) {
 		return
 	}
 
-	if err := sched.SchedulingQueue.Update(oldPod, newPod); err != nil {
+	if err := sched.SchedulingQueue.Update(logger, oldPod, newPod); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to update %T: %v", newObj, err))
 	}
 }
 
 func (sched *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
+	logger := sched.logger
 	var pod *v1.Pod
 	switch t := obj.(type) {
 	case *v1.Pod:
@@ -158,7 +165,7 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("unable to handle object in %T: %T", sched, obj))
 		return
 	}
-	klog.V(3).InfoS("Delete event for unscheduled pod", "pod", klog.KObj(pod))
+	logger.V(3).Info("Delete event for unscheduled pod", "pod", klog.KObj(pod))
 	if err := sched.SchedulingQueue.Delete(pod); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to dequeue %T: %v", obj, err))
 	}
@@ -166,53 +173,56 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
 	if err != nil {
 		// This shouldn't happen, because we only accept for scheduling the pods
 		// which specify a scheduler name that matches one of the profiles.
-		klog.ErrorS(err, "Unable to get profile", "pod", klog.KObj(pod))
+		logger.Error(err, "Unable to get profile", "pod", klog.KObj(pod))
 		return
 	}
 	// If a waiting pod is rejected, it indicates it's previously assumed and we're
 	// removing it from the scheduler cache. In this case, signal a AssignedPodDelete
 	// event to immediately retry some unscheduled Pods.
 	if fwk.RejectWaitingPod(pod.UID) {
-		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(queue.AssignedPodDelete, nil)
+		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, queue.AssignedPodDelete, nil)
 	}
 }
 
 func (sched *Scheduler) addPodToCache(obj interface{}) {
+	logger := sched.logger
 	pod, ok := obj.(*v1.Pod)
 	if !ok {
-		klog.ErrorS(nil, "Cannot convert to *v1.Pod", "obj", obj)
+		logger.Error(nil, "Cannot convert to *v1.Pod", "obj", obj)
 		return
 	}
-	klog.V(3).InfoS("Add event for scheduled pod", "pod", klog.KObj(pod))
+	logger.V(3).Info("Add event for scheduled pod", "pod", klog.KObj(pod))
 
-	if err := sched.Cache.AddPod(pod); err != nil {
-		klog.ErrorS(err, "Scheduler cache AddPod failed", "pod", klog.KObj(pod))
+	if err := sched.Cache.AddPod(logger, pod); err != nil {
+		logger.Error(err, "Scheduler cache AddPod failed", "pod", klog.KObj(pod))
 	}
 
-	sched.SchedulingQueue.AssignedPodAdded(pod)
+	sched.SchedulingQueue.AssignedPodAdded(logger, pod)
 }
 
 func (sched *Scheduler) updatePodInCache(oldObj, newObj interface{}) {
+	logger := sched.logger
 	oldPod, ok := oldObj.(*v1.Pod)
 	if !ok {
-		klog.ErrorS(nil, "Cannot convert oldObj to *v1.Pod", "oldObj", oldObj)
+		logger.Error(nil, "Cannot convert oldObj to *v1.Pod", "oldObj", oldObj)
 		return
 	}
 	newPod, ok := newObj.(*v1.Pod)
 	if !ok {
-		klog.ErrorS(nil, "Cannot convert newObj to *v1.Pod", "newObj", newObj)
+		logger.Error(nil, "Cannot convert newObj to *v1.Pod", "newObj", newObj)
 		return
 	}
-	klog.V(4).InfoS("Update event for scheduled pod", "pod", klog.KObj(oldPod))
+	logger.V(4).Info("Update event for scheduled pod", "pod", klog.KObj(oldPod))
 
-	if err := sched.Cache.UpdatePod(oldPod, newPod); err != nil {
-		klog.ErrorS(err, "Scheduler cache UpdatePod failed", "pod", klog.KObj(oldPod))
+	if err := sched.Cache.UpdatePod(logger, oldPod, newPod); err != nil {
+		logger.Error(err, "Scheduler cache UpdatePod failed", "pod", klog.KObj(oldPod))
 	}
 
-	sched.SchedulingQueue.AssignedPodUpdated(newPod)
+	sched.SchedulingQueue.AssignedPodUpdated(logger, newPod)
 }
 
 func (sched *Scheduler) deletePodFromCache(obj interface{}) {
+	logger := sched.logger
 	var pod *v1.Pod
 	switch t := obj.(type) {
 	case *v1.Pod:
@@ -221,19 +231,19 @@ func (sched *Scheduler) deletePodFromCache(obj interface{}) {
 		var ok bool
 		pod, ok = t.Obj.(*v1.Pod)
 		if !ok {
-			klog.ErrorS(nil, "Cannot convert to *v1.Pod", "obj", t.Obj)
+			logger.Error(nil, "Cannot convert to *v1.Pod", "obj", t.Obj)
 			return
 		}
 	default:
-		klog.ErrorS(nil, "Cannot convert to *v1.Pod", "obj", t)
+		logger.Error(nil, "Cannot convert to *v1.Pod", "obj", t)
 		return
 	}
-	klog.V(3).InfoS("Delete event for scheduled pod", "pod", klog.KObj(pod))
-	if err := sched.Cache.RemovePod(pod); err != nil {
-		klog.ErrorS(err, "Scheduler cache RemovePod failed", "pod", klog.KObj(pod))
+	logger.V(3).Info("Delete event for scheduled pod", "pod", klog.KObj(pod))
+	if err := sched.Cache.RemovePod(logger, pod); err != nil {
+		logger.Error(err, "Scheduler cache RemovePod failed", "pod", klog.KObj(pod))
 	}
 
-	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(queue.AssignedPodDelete, nil)
+	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, queue.AssignedPodDelete, nil)
 }
 
 // assignedPod selects pods that are assigned (scheduled and running).
@@ -317,24 +327,25 @@ func addAllEventHandlers(
 		},
 	)
 
+	logger := sched.logger
 	buildEvtResHandler := func(at framework.ActionType, gvk framework.GVK, shortGVK string) cache.ResourceEventHandlerFuncs {
 		funcs := cache.ResourceEventHandlerFuncs{}
 		if at&framework.Add != 0 {
 			evt := framework.ClusterEvent{Resource: gvk, ActionType: framework.Add, Label: fmt.Sprintf("%vAdd", shortGVK)}
 			funcs.AddFunc = func(_ interface{}) {
-				sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(evt, nil)
+				sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, nil)
 			}
 		}
 		if at&framework.Update != 0 {
 			evt := framework.ClusterEvent{Resource: gvk, ActionType: framework.Update, Label: fmt.Sprintf("%vUpdate", shortGVK)}
 			funcs.UpdateFunc = func(_, _ interface{}) {
-				sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(evt, nil)
+				sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, nil)
 			}
 		}
 		if at&framework.Delete != 0 {
 			evt := framework.ClusterEvent{Resource: gvk, ActionType: framework.Delete, Label: fmt.Sprintf("%vDelete", shortGVK)}
 			funcs.DeleteFunc = func(_ interface{}) {
-				sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(evt, nil)
+				sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, nil)
 			}
 		}
 		return funcs
@@ -402,7 +413,7 @@ func addAllEventHandlers(
 				informerFactory.Storage().V1().StorageClasses().Informer().AddEventHandler(
 					cache.ResourceEventHandlerFuncs{
 						UpdateFunc: func(_, _ interface{}) {
-							sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(queue.StorageClassUpdate, nil)
+							sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, queue.StorageClassUpdate, nil)
 						},
 					},
 				)
@@ -421,7 +432,7 @@ func addAllEventHandlers(
 			// - foos.v1 (2 sections)
 			// - foo.v1.example.com (the first section should be plural)
 			if strings.Count(string(gvk), ".") < 2 {
-				klog.ErrorS(nil, "incorrect event registration", "gvk", gvk)
+				logger.Error(nil, "incorrect event registration", "gvk", gvk)
 				continue
 			}
 			// Fall back to try dynamic informers.

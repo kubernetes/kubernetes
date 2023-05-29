@@ -46,6 +46,8 @@ import (
 	clientcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/component-helpers/storage/volume"
+	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -811,13 +813,14 @@ func TestSchedulerScheduleOne(t *testing.T) {
 }
 
 func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
-	scache := internalcache.New(100*time.Millisecond, ctx.Done())
+	scache := internalcache.New(ctx, 100*time.Millisecond)
 	pod := podWithPort("pod.Name", "", 8080)
 	node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1", UID: types.UID("node1")}}
-	scache.AddNode(&node)
+	scache.AddNode(logger, &node)
 
 	fns := []st.RegisterPluginFunc{
 		st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
@@ -876,13 +879,14 @@ func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
 }
 
 func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
-	scache := internalcache.New(10*time.Minute, ctx.Done())
+	scache := internalcache.New(ctx, 10*time.Minute)
 	firstPod := podWithPort("pod.Name", "", 8080)
 	node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1", UID: types.UID("node1")}}
-	scache.AddNode(&node)
+	scache.AddNode(logger, &node)
 	fns := []st.RegisterPluginFunc{
 		st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 		st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
@@ -921,10 +925,10 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 	// and would be removed itself (without any explicit actions on schedulernodeinfo). Even in that case,
 	// explicitly AddPod will as well correct the behavior.
 	firstPod.Spec.NodeName = node.Name
-	if err := scache.AddPod(firstPod); err != nil {
+	if err := scache.AddPod(logger, firstPod); err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	if err := scache.RemovePod(firstPod); err != nil {
+	if err := scache.RemovePod(logger, firstPod); err != nil {
 		t.Fatalf("err: %v", err)
 	}
 
@@ -945,10 +949,11 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 }
 
 func TestSchedulerFailedSchedulingReasons(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
-	scache := internalcache.New(10*time.Minute, ctx.Done())
+	scache := internalcache.New(ctx, 10*time.Minute)
 
 	// Design the baseline for the pods, and we will make nodes that don't fit it later.
 	var cpu = int64(4)
@@ -980,7 +985,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 					v1.ResourcePods:   *(resource.NewQuantity(10, resource.DecimalSI)),
 				}},
 		}
-		scache.AddNode(&node)
+		scache.AddNode(logger, &node)
 		nodes = append(nodes, &node)
 		objects = append(objects, &node)
 	}
@@ -1221,7 +1226,8 @@ func TestSchedulerBinding(t *testing.T) {
 				}
 				return false, nil, nil
 			})
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			fwk, err := st.NewFramework(ctx,
 				[]st.RegisterPluginFunc{
@@ -1233,7 +1239,7 @@ func TestSchedulerBinding(t *testing.T) {
 			}
 			sched := &Scheduler{
 				Extenders:                test.extenders,
-				Cache:                    internalcache.New(100*time.Millisecond, ctx.Done()),
+				Cache:                    internalcache.New(ctx, 100*time.Millisecond),
 				nodeInfoSnapshot:         nil,
 				percentageOfNodesToScore: 0,
 			}
@@ -1660,13 +1666,14 @@ func TestFindNodesThatPassExtenders(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			var extenders []framework.Extender
 			for ii := range tt.extenders {
 				extenders = append(extenders, &tt.extenders[ii])
 			}
 
 			pod := st.MakePod().Name("1").UID("1").Obj()
-			got, err := findNodesThatPassExtenders(extenders, pod, tt.nodes, tt.filteredNodesStatuses)
+			got, err := findNodesThatPassExtenders(ctx, extenders, pod, tt.nodes, tt.filteredNodesStatuses)
 			if tt.expectsErr {
 				if err == nil {
 					t.Error("Unexpected non-error")
@@ -2204,18 +2211,19 @@ func TestSchedulerSchedulePod(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			cache := internalcache.New(time.Duration(0), ctx.Done())
+			cache := internalcache.New(ctx, time.Duration(0))
 			for _, pod := range test.pods {
-				cache.AddPod(pod)
+				cache.AddPod(logger, pod)
 			}
 			var nodes []*v1.Node
 			for _, name := range test.nodes {
 				node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: map[string]string{"hostname": name}}}
 				nodes = append(nodes, node)
-				cache.AddNode(node)
+				cache.AddNode(logger, node)
 			}
 
 			cs := clientsetfake.NewSimpleClientset()
@@ -2403,7 +2411,8 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 				registerFakeFilterFunc,
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			}
-			ctx, cancel := context.WithCancel(context.Background())
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			fwk, err := st.NewFramework(
 				ctx,
@@ -2415,11 +2424,14 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 			}
 
 			scheduler := makeScheduler(ctx, nodes)
-			if err := scheduler.Cache.UpdateSnapshot(scheduler.nodeInfoSnapshot); err != nil {
+			if err := scheduler.Cache.UpdateSnapshot(logger, scheduler.nodeInfoSnapshot); err != nil {
 				t.Fatal(err)
 			}
-			fwk.AddNominatedPod(mustNewPodInfo(t, st.MakePod().UID("nominated").Priority(midPriority).Obj()),
-				&framework.NominatingInfo{NominatingMode: framework.ModeOverride, NominatedNodeName: "1"})
+			podinfo, err := framework.NewPodInfo(st.MakePod().UID("nominated").Priority(midPriority).Obj())
+			if err != nil {
+				t.Fatal(err)
+			}
+			fwk.AddNominatedPod(logger, podinfo, &framework.NominatingInfo{NominatingMode: framework.ModeOverride, NominatedNodeName: "1"})
 
 			_, _, err = scheduler.findNodesThatFitPod(ctx, fwk, framework.NewCycleState(), test.pod)
 			if err != nil {
@@ -2952,16 +2964,17 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
 			// create three nodes in the cluster.
 			nodes := makeNodeList([]string{"node1", "node2", "node3"})
 			client := clientsetfake.NewSimpleClientset(test.pod)
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			cache := internalcache.New(time.Duration(0), ctx.Done())
+			cache := internalcache.New(ctx, time.Duration(0))
 			for _, n := range nodes {
-				cache.AddNode(n)
+				cache.AddNode(logger, n)
 			}
 			plugin := st.FakeFilterPlugin{FailedNodeReturnCodeMap: test.nodeReturnCodeMap}
 			registerFakeFilterFunc := st.RegisterFilterPlugin(
@@ -3038,9 +3051,10 @@ func makeNodeList(nodeNames []string) []*v1.Node {
 
 // makeScheduler makes a simple Scheduler for testing.
 func makeScheduler(ctx context.Context, nodes []*v1.Node) *Scheduler {
-	cache := internalcache.New(time.Duration(0), ctx.Done())
+	logger := klog.FromContext(ctx)
+	cache := internalcache.New(ctx, time.Duration(0))
 	for _, n := range nodes {
-		cache.AddNode(n)
+		cache.AddNode(logger, n)
 	}
 
 	sched := &Scheduler{
@@ -3049,7 +3063,7 @@ func makeScheduler(ctx context.Context, nodes []*v1.Node) *Scheduler {
 		percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
 	}
 	sched.applyDefaultHandlers()
-	cache.UpdateSnapshot(sched.nodeInfoSnapshot)
+	cache.UpdateSnapshot(logger, sched.nodeInfoSnapshot)
 	return sched
 }
 
@@ -3162,6 +3176,7 @@ func setupTestScheduler(ctx context.Context, t *testing.T, queuedPodStore *clien
 }
 
 func setupTestSchedulerWithVolumeBinding(ctx context.Context, t *testing.T, volumeBinder volumebinding.SchedulerVolumeBinder, broadcaster events.EventBroadcaster) (*Scheduler, chan *v1.Binding, chan error) {
+	logger := klog.FromContext(ctx)
 	testNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1", UID: types.UID("node1")}}
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
 	pod := podWithID("foo", "")
@@ -3169,8 +3184,8 @@ func setupTestSchedulerWithVolumeBinding(ctx context.Context, t *testing.T, volu
 	pod.Spec.Volumes = append(pod.Spec.Volumes, v1.Volume{Name: "testVol",
 		VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: "testPVC"}}})
 	queuedPodStore.Add(pod)
-	scache := internalcache.New(10*time.Minute, ctx.Done())
-	scache.AddNode(&testNode)
+	scache := internalcache.New(ctx, 10*time.Minute)
+	scache.AddNode(logger, &testNode)
 	testPVC := v1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "testPVC", Namespace: pod.Namespace, UID: types.UID("testPVC")}}
 	client := clientsetfake.NewSimpleClientset(&testNode, &testPVC)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)

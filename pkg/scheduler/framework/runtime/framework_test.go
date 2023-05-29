@@ -2342,6 +2342,7 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
 			registry := Registry{}
 			cfgPls := &config.Plugins{}
 
@@ -2373,6 +2374,7 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 			podNominator := internalqueue.NewPodNominator(nil)
 			if tt.nominatedPod != nil {
 				podNominator.AddNominatedPod(
+					logger,
 					mustNewPodInfo(t, tt.nominatedPod),
 					&framework.NominatingInfo{NominatingMode: framework.ModeOverride, NominatedNodeName: nodeName})
 			}

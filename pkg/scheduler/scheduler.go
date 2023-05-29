@@ -96,6 +96,11 @@ type Scheduler struct {
 	percentageOfNodesToScore int32
 
 	nextStartNodeIndex int
+
+	// logger *must* be initialized when creating a Scheduler,
+	// otherwise logging functions will access a nil sink and
+	// panic.
+	logger klog.Logger
 }
 
 func (s *Scheduler) applyDefaultHandlers() {
@@ -246,6 +251,7 @@ func New(ctx context.Context,
 	recorderFactory profile.RecorderFactory,
 	opts ...Option) (*Scheduler, error) {
 
+	logger := klog.FromContext(ctx)
 	stopEverything := ctx.Done()
 
 	options := defaultSchedulerOptions
@@ -270,7 +276,7 @@ func New(ctx context.Context,
 
 	metrics.Register()
 
-	extenders, err := buildExtenders(options.extenders, options.profiles)
+	extenders, err := buildExtenders(logger, options.extenders, options.profiles)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't build extenders: %w", err)
 	}
@@ -323,11 +329,11 @@ func New(ctx context.Context,
 		fwk.SetPodNominator(podQueue)
 	}
 
-	schedulerCache := internalcache.New(durationToExpireAssumedPod, stopEverything)
+	schedulerCache := internalcache.New(ctx, durationToExpireAssumedPod)
 
 	// Setup cache debugger.
 	debugger := cachedebugger.New(nodeLister, podLister, schedulerCache, podQueue)
-	debugger.ListenForSignal(stopEverything)
+	debugger.ListenForSignal(ctx)
 
 	sched := &Scheduler{
 		Cache:                    schedulerCache,
@@ -335,10 +341,11 @@ func New(ctx context.Context,
 		nodeInfoSnapshot:         snapshot,
 		percentageOfNodesToScore: options.percentageOfNodesToScore,
 		Extenders:                extenders,
-		NextPod:                  internalqueue.MakeNextPodFunc(podQueue),
+		NextPod:                  internalqueue.MakeNextPodFunc(logger, podQueue),
 		StopEverything:           stopEverything,
 		SchedulingQueue:          podQueue,
 		Profiles:                 profiles,
+		logger:                   logger,
 	}
 	sched.applyDefaultHandlers()
 
@@ -349,7 +356,8 @@ func New(ctx context.Context,
 
 // Run begins watching and scheduling. It starts scheduling and blocked until the context is done.
 func (sched *Scheduler) Run(ctx context.Context) {
-	sched.SchedulingQueue.Run()
+	logger := klog.FromContext(ctx)
+	sched.SchedulingQueue.Run(logger)
 
 	// We need to start scheduleOne loop in a dedicated goroutine,
 	// because scheduleOne function hangs on getting the next item
@@ -371,7 +379,7 @@ func NewInformerFactory(cs clientset.Interface, resyncPeriod time.Duration) info
 	return informerFactory
 }
 
-func buildExtenders(extenders []schedulerapi.Extender, profiles []schedulerapi.KubeSchedulerProfile) ([]framework.Extender, error) {
+func buildExtenders(logger klog.Logger, extenders []schedulerapi.Extender, profiles []schedulerapi.KubeSchedulerProfile) ([]framework.Extender, error) {
 	var fExtenders []framework.Extender
 	if len(extenders) == 0 {
 		return nil, nil
@@ -380,7 +388,7 @@ func buildExtenders(extenders []schedulerapi.Extender, profiles []schedulerapi.K
 	var ignoredExtendedResources []string
 	var ignorableExtenders []framework.Extender
 	for i := range extenders {
-		klog.V(2).InfoS("Creating extender", "extender", extenders[i])
+		logger.V(2).Info("Creating extender", "extender", extenders[i])
 		extender, err := NewHTTPExtender(&extenders[i])
 		if err != nil {
 			return nil, err

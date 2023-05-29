@@ -37,6 +37,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/features"
@@ -378,6 +379,7 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	defer testutils.CleanupTest(t, testCtx)
 
 	cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
+	logger := klog.FromContext(ctx)
 	// Create one Node.
 	node := st.MakeNode().Name("fake-node").Obj()
 	if _, err := cs.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
@@ -415,7 +417,7 @@ func TestCustomResourceEnqueue(t *testing.T) {
 
 	// Scheduling cycle is incremented from 0 to 1 after NextPod() is called, so
 	// pass a number larger than 1 to move Pod to unschedulablePods.
-	testCtx.Scheduler.SchedulingQueue.AddUnschedulableIfNotPresent(podInfo, 10)
+	testCtx.Scheduler.SchedulingQueue.AddUnschedulableIfNotPresent(logger, podInfo, 10)
 
 	// Trigger a Custom Resource event.
 	// We expect this event to trigger moving the test Pod from unschedulablePods to activeQ.
