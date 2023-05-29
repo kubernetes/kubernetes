@@ -302,7 +302,7 @@ func performEtcdStaticPodUpgrade(certsRenewMgr *renewal.Manager, client clientse
 			return true, errors.Wrap(err, "failed to retrieve an etcd version for the target Kubernetes version")
 		}
 		if warning != nil {
-			klog.Warningf("[upgrade/etcd] %v", warning)
+			klog.V(1).Infof("[upgrade/etcd] WARNING: %v", warning)
 		}
 	}
 

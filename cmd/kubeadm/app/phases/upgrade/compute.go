@@ -304,7 +304,7 @@ func getSuggestedEtcdVersion(externalEtcd bool, kubernetesVersion string) string
 		return "N/A"
 	}
 	if warning != nil {
-		klog.Warningf("[upgrade/versions] %v", warning)
+		klog.V(1).Infof("[upgrade/versions] WARNING: %v", warning)
 	}
 	return etcdVersion.String()
 }
