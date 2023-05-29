@@ -20,7 +20,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	runtimeutil "k8s.io/kubernetes/pkg/kubelet/kuberuntime/util"
-	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
@@ -41,9 +40,6 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Po
 		return nil, err
 	}
 
-	// set ApparmorProfile.
-	synthesized.ApparmorProfile = apparmor.GetProfileNameFromPodAnnotations(pod.Annotations, container.Name)
-
 	// set RunAsUser.
 	if synthesized.RunAsUser == nil {
 		if uid != nil {
@@ -61,12 +57,12 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Po
 	podSc := pod.Spec.SecurityContext
 	if podSc != nil {
 		if podSc.FSGroup != nil {
-			synthesized.SupplementalGroups = append(synthesized.SupplementalGroups, int64(*podSc.FSGroup))
+			synthesized.SupplementalGroups = append(synthesized.SupplementalGroups, *podSc.FSGroup)
 		}
 
 		if podSc.SupplementalGroups != nil {
 			for _, sg := range podSc.SupplementalGroups {
-				synthesized.SupplementalGroups = append(synthesized.SupplementalGroups, int64(sg))
+				synthesized.SupplementalGroups = append(synthesized.SupplementalGroups, sg)
 			}
 		}
 	}
@@ -93,10 +89,10 @@ func convertToRuntimeSecurityContext(securityContext *v1.SecurityContext) *runti
 		SelinuxOptions: convertToRuntimeSELinuxOption(securityContext.SELinuxOptions),
 	}
 	if securityContext.RunAsUser != nil {
-		sc.RunAsUser = &runtimeapi.Int64Value{Value: int64(*securityContext.RunAsUser)}
+		sc.RunAsUser = &runtimeapi.Int64Value{Value: *securityContext.RunAsUser}
 	}
 	if securityContext.RunAsGroup != nil {
-		sc.RunAsGroup = &runtimeapi.Int64Value{Value: int64(*securityContext.RunAsGroup)}
+		sc.RunAsGroup = &runtimeapi.Int64Value{Value: *securityContext.RunAsGroup}
 	}
 	if securityContext.Privileged != nil {
 		sc.Privileged = *securityContext.Privileged
