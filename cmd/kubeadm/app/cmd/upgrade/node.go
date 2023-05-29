@@ -33,6 +33,7 @@ import (
 	phases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/upgrade/node"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 )
 
@@ -47,6 +48,7 @@ type nodeOptions struct {
 	dryRun                bool
 	patchesDir            string
 	ignorePreflightErrors []string
+	featureGatesString    string
 }
 
 // compile-time assert that the local data object satisfies the phases data interface.
@@ -85,6 +87,7 @@ func newCmdNode(out io.Writer) *cobra.Command {
 	// flags could be eventually inherited by the sub-commands automatically generated for phases
 	addUpgradeNodeFlags(cmd.Flags(), nodeOptions)
 	options.AddPatchesFlag(cmd.Flags(), &nodeOptions.patchesDir)
+	options.AddFeatureGatesStringFlag(cmd.Flags(), &nodeOptions.featureGatesString)
 
 	// initialize the workflow runner with the list of phases
 	nodeRunner.AppendPhase(phases.NewPreflightPhase())
@@ -159,6 +162,15 @@ func newNodeData(cmd *cobra.Command, args []string, options *nodeOptions, out io
 	}
 	// Also set the union of pre-flight errors to JoinConfiguration, to provide a consistent view of the runtime configuration:
 	cfg.NodeRegistration.IgnorePreflightErrors = sets.List(ignorePreflightErrorsSet)
+
+	// If features gates are passed to the command line, use it (otherwise use featureGates from configuration)
+	if options.featureGatesString != "" {
+		cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, options.featureGatesString)
+		if err != nil {
+			return nil, errors.Wrap(err, "[upgrade/config] FATAL")
+		}
+	}
+
 	return &nodeData{
 		etcdUpgrade:           options.etcdUpgrade,
 		renewCerts:            options.renewCerts,
