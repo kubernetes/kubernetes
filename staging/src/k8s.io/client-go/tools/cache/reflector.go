@@ -510,7 +510,7 @@ func (r *Reflector) list(stopCh <-chan struct{}) error {
 			pager.PageSize = 0
 		}
 
-		list, paginatedResult, err = pager.List(context.Background(), options)
+		list, paginatedResult, err = pager.ListWithAlloc(context.Background(), options)
 		if isExpiredError(err) || isTooLargeResourceVersionError(err) {
 			r.setIsLastSyncResourceVersionUnavailable(true)
 			// Retry immediately if the resource version used to list is unavailable.
@@ -519,7 +519,7 @@ func (r *Reflector) list(stopCh <-chan struct{}) error {
 			// resource version it is listing at is expired or the cache may not yet be synced to the provided
 			// resource version. So we need to fallback to resourceVersion="" in all to recover and ensure
 			// the reflector makes forward progress.
-			list, paginatedResult, err = pager.List(context.Background(), metav1.ListOptions{ResourceVersion: r.relistResourceVersion()})
+			list, paginatedResult, err = pager.ListWithAlloc(context.Background(), metav1.ListOptions{ResourceVersion: r.relistResourceVersion()})
 		}
 		close(listCh)
 	}()
@@ -557,7 +557,7 @@ func (r *Reflector) list(stopCh <-chan struct{}) error {
 	}
 	resourceVersion = listMetaInterface.GetResourceVersion()
 	initTrace.Step("Resource version extracted")
-	items, err := meta.ExtractList(list)
+	items, err := meta.ExtractListWithAlloc(list)
 	if err != nil {
 		return fmt.Errorf("unable to understand list result %#v (%v)", list, err)
 	}
