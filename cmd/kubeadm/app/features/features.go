@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-base/featuregate"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -90,9 +91,9 @@ func Enabled(featureList map[string]bool, featureName string) bool {
 // Supports indicates whether a feature name is supported on the given
 // feature set
 func Supports(featureList FeatureList, featureName string) bool {
-	for k, v := range featureList {
+	for k := range featureList {
 		if featureName == k {
-			return v.PreRelease != featuregate.Deprecated
+			return true
 		}
 	}
 	return false
@@ -148,7 +149,7 @@ func NewFeatureGate(f *FeatureList, value string) (map[string]bool, error) {
 		}
 
 		if featureSpec.PreRelease == featuregate.Deprecated {
-			return nil, errors.Errorf("feature-gate key is deprecated: %s", k)
+			klog.Warningf("Setting deprecated feature gate %s=%t. It will be removed in a future release.", k, v)
 		}
 
 		boolValue, err := strconv.ParseBool(v)
