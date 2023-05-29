@@ -18,9 +18,7 @@ package cache
 
 import (
 	"fmt"
-	"os"
 	"reflect"
-	"strconv"
 	"sync"
 	"time"
 
@@ -33,7 +31,7 @@ import (
 var mutationDetectionEnabled = false
 
 func init() {
-	mutationDetectionEnabled, _ = strconv.ParseBool(os.Getenv("KUBE_CACHE_MUTATION_DETECTOR"))
+	mutationDetectionEnabled = true
 }
 
 // IsCacheMutationDetectorEnabled returns true when KUBE_CACHE_MUTATION_DETECTOR was set.
