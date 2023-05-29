@@ -46,7 +46,7 @@ type FooList struct {
 	Items []Foo
 }
 
-func (s *FooList) DeepCopyObject() runtime.Object { panic("unimplemented"); return nil }
+func (s *FooList) DeepCopyObject() runtime.Object { panic("unimplemented") }
 
 type SampleList struct {
 	metav1.TypeMeta
@@ -54,7 +54,7 @@ type SampleList struct {
 	Items []Sample
 }
 
-func (s *SampleList) DeepCopyObject() runtime.Object { panic("unimplemented"); return nil }
+func (s *SampleList) DeepCopyObject() runtime.Object { panic("unimplemented") }
 
 type RawExtensionList struct {
 	metav1.TypeMeta
@@ -63,7 +63,7 @@ type RawExtensionList struct {
 	Items []runtime.RawExtension
 }
 
-func (l RawExtensionList) DeepCopyObject() runtime.Object { panic("unimplemented"); return nil }
+func (l RawExtensionList) DeepCopyObject() runtime.Object { panic("unimplemented") }
 
 // NOTE: Foo struct itself is the implementer of runtime.Object.
 type Foo struct {
@@ -77,7 +77,7 @@ func (f Foo) GetObjectKind() schema.ObjectKind {
 	return &tm
 }
 
-func (f Foo) DeepCopyObject() runtime.Object { panic("unimplemented"); return nil }
+func (f Foo) DeepCopyObject() runtime.Object { panic("unimplemented") }
 
 // NOTE: the pointer of Sample that is the implementer of runtime.Object.
 // the behavior is similar to our corev1.Pod. corev1.Node
@@ -92,7 +92,7 @@ func (s *Sample) GetObjectKind() schema.ObjectKind {
 	return &tm
 }
 
-func (s *Sample) DeepCopyObject() runtime.Object { panic("unimplemented"); return nil }
+func (s *Sample) DeepCopyObject() runtime.Object { panic("unimplemented") }
 
 func fakeSampleList(numItems int) *SampleList {
 	out := &SampleList{
@@ -102,7 +102,7 @@ func fakeSampleList(numItems int) *SampleList {
 	for i := range out.Items {
 		out.Items[i] = Sample{
 			TypeMeta: metav1.TypeMeta{
-				APIVersion: "foo.org/v1",
+				APIVersion: "sample.org/v1",
 				Kind:       "Sample",
 			},
 			ObjectMeta: metav1.ObjectMeta{
@@ -132,8 +132,8 @@ func fakeExtensionList(numItems int) *RawExtensionList {
 		out.Items[i] = runtime.RawExtension{
 			Object: &Foo{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "sample.org/v1",
-					Kind:       "Foo",
+					APIVersion: "sample.org/v2",
+					Kind:       "Sample",
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      strconv.Itoa(i),
@@ -186,7 +186,7 @@ func fakeFooList(numItems int) *FooList {
 	for i := range out.Items {
 		out.Items[i] = Foo{
 			TypeMeta: metav1.TypeMeta{
-				APIVersion: "sample.org/v1",
+				APIVersion: "foo.org/v1",
 				Kind:       "Foo",
 			},
 			ObjectMeta: metav1.ObjectMeta{
