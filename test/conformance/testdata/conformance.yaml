@@ -1950,6 +1950,15 @@
     visible at runtime in the container.
   release: v1.9
   file: test/e2e/common/node/downwardapi.go
+- testname: Ephemeral Container, update ephemeral containers
+  codename: '[sig-node] Ephemeral Containers [NodeConformance] should update the ephemeral
+    containers in an existing pod [Conformance]'
+  description: Adding an ephemeral container to pod.spec MUST result in the container
+    running. There MUST now be only one ephermal container found. Updating the pod
+    with another ephemeral container MUST succeed. There MUST now be two ephermal
+    containers found.
+  release: v1.28
+  file: test/e2e/common/node/ephemeral_containers.go
 - testname: Ephemeral Container Creation
   codename: '[sig-node] Ephemeral Containers [NodeConformance] will start an ephemeral
     container in an existing pod [Conformance]'

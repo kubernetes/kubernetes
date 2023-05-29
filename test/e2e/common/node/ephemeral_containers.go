@@ -87,7 +87,15 @@ var _ = SIGDescribe("Ephemeral Containers [NodeConformance]", func() {
 		gomega.Expect(log).To(gomega.ContainSubstring("polo"))
 	})
 
-	ginkgo.It("should update the ephemeral containers in an existing pod", func(ctx context.Context) {
+	/*
+		Release: v1.28
+		Testname: Ephemeral Container, update ephemeral containers
+		Description: Adding an ephemeral container to pod.spec MUST result in the container
+		running. There MUST now be only one ephermal container found. Updating the pod with
+		another ephemeral container MUST succeed. There MUST now be two ephermal containers
+		found.
+	*/
+	framework.ConformanceIt("should update the ephemeral containers in an existing pod", func(ctx context.Context) {
 		ginkgo.By("creating a target pod")
 		pod := podClient.CreateSync(ctx, &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "ephemeral-containers-target-pod"},
