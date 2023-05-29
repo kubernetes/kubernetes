@@ -22,6 +22,7 @@ import (
 	"math"
 	"reflect"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -19867,12 +19868,13 @@ func TestValidPodLogOptions(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		resetFeature := featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SplitStdoutAndStderr, test.enableSplitStdoutAndStderr)
-		errs := ValidatePodLogOptions(&test.opt)
-		if test.errs != len(errs) {
-			t.Errorf("%d: Unexpected errors: %v", i, errs)
-		}
-		resetFeature()
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SplitStdoutAndStderr, test.enableSplitStdoutAndStderr)()
+			errs := ValidatePodLogOptions(&test.opt)
+			if test.errs != len(errs) {
+				t.Errorf("%d: Unexpected errors: %v", i, errs)
+			}
+		})
 	}
 }
 
