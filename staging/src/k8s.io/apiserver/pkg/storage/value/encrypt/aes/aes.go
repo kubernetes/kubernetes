@@ -43,7 +43,7 @@ const commonSize = 32
 type gcm struct {
 	aead      cipher.AEAD
 	nonceFunc func([]byte) error
-	infoLen   int
+	info      []byte
 }
 
 // NewGCMTransformer takes the given block cipher and performs encryption and decryption on the given data.
@@ -248,7 +248,6 @@ func (e *extendedNonceGCM) TransformFromStorage(ctx context.Context, data []byte
 
 func (e *extendedNonceGCM) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, error) {
 	info := make([]byte, commonSize)
-
 	if err := randomNonce(info); err != nil {
 		return nil, err // TODO fmt.Err
 	}
@@ -262,8 +261,6 @@ func (e *extendedNonceGCM) TransformToStorage(ctx context.Context, data []byte, 
 	if err != nil {
 		return nil, err // TODO fmt.Err
 	}
-
-	copy(transformedData, info)
 
 	return transformedData, nil
 }
@@ -289,7 +286,7 @@ func (e *extendedNonceGCM) derivedKeyTransformer(info []byte, dataCtx value.Cont
 	if err != nil {
 		return nil, err // TODO fmt.Err
 	}
-	transformer.(*gcm).infoLen = commonSize // TODO probably better to set as part of the constructor
+	transformer.(*gcm).info = info // TODO probably better to set as part of the constructor
 
 	if e.cache != nil {
 		e.cache.set(info, dataCtx, transformer)
@@ -312,23 +309,27 @@ func (e *extendedNonceGCM) sha256KDFExpandOnly(info []byte) ([]byte, error) {
 
 func (t *gcm) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
 	nonceSize := t.aead.NonceSize()
-	if len(data) < t.infoLen+nonceSize {
+	infoLen := len(t.info)
+	if len(data) < infoLen+nonceSize {
 		return nil, false, errors.New("the stored data was shorter than the required size")
 	}
-	result, err := t.aead.Open(nil, data[t.infoLen:t.infoLen+nonceSize], data[t.infoLen+nonceSize:], dataCtx.AuthenticatedData())
+	result, err := t.aead.Open(nil, data[infoLen:infoLen+nonceSize], data[infoLen+nonceSize:], dataCtx.AuthenticatedData())
 	return result, false, err
 }
 
 func (t *gcm) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, error) {
 	nonceSize := t.aead.NonceSize()
-	result := make([]byte, t.infoLen+nonceSize+t.aead.Overhead()+len(data))
+	infoLen := len(t.info)
+	result := make([]byte, infoLen+nonceSize+t.aead.Overhead()+len(data))
 
-	if err := t.nonceFunc(result[t.infoLen : t.infoLen+nonceSize]); err != nil {
+	copy(result, t.info)
+
+	if err := t.nonceFunc(result[infoLen : infoLen+nonceSize]); err != nil {
 		return nil, fmt.Errorf("failed to write nonce for AES-GCM: %w", err)
 	}
 
-	cipherText := t.aead.Seal(result[t.infoLen+nonceSize:t.infoLen+nonceSize], result[t.infoLen:t.infoLen+nonceSize], data, dataCtx.AuthenticatedData())
-	return result[:t.infoLen+nonceSize+len(cipherText)], nil
+	cipherText := t.aead.Seal(result[infoLen+nonceSize:infoLen+nonceSize], result[infoLen:infoLen+nonceSize], data, dataCtx.AuthenticatedData())
+	return result[:infoLen+nonceSize+len(cipherText)], nil
 }
 
 // cbc implements encryption at rest of the provided values given a cipher.Block algorithm.
