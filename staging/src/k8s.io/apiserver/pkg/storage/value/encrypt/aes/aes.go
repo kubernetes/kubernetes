@@ -28,7 +28,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -222,16 +221,14 @@ func NewKDFExtendedNonceGCMTransformerWithUniqueKeyUnsafe() (value.Transformer, 
 
 func newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(key []byte, cache *simpleCache) value.Transformer {
 	return &extendedNonceGCM{
-		key:      key,
-		infoPool: &sync.Pool{New: func() any { b := make([]byte, commonSize); return &b }},
-		cache:    cache,
+		key:   key,
+		cache: cache,
 	}
 }
 
 type extendedNonceGCM struct {
-	key      []byte
-	infoPool *sync.Pool
-	cache    *simpleCache
+	key   []byte
+	cache *simpleCache
 }
 
 func (e *extendedNonceGCM) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
@@ -250,14 +247,13 @@ func (e *extendedNonceGCM) TransformFromStorage(ctx context.Context, data []byte
 }
 
 func (e *extendedNonceGCM) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, error) {
-	info := e.infoPool.Get().(*[]byte)
-	defer e.infoPool.Put(info)
+	info := make([]byte, commonSize)
 
-	if err := randomNonce(*info); err != nil {
+	if err := randomNonce(info); err != nil {
 		return nil, err // TODO fmt.Err
 	}
 
-	transformer, err := e.derivedKeyTransformer(*info, dataCtx)
+	transformer, err := e.derivedKeyTransformer(info, dataCtx)
 	if err != nil {
 		return nil, err // TODO fmt.Err
 	}
@@ -267,7 +263,7 @@ func (e *extendedNonceGCM) TransformToStorage(ctx context.Context, data []byte, 
 		return nil, err // TODO fmt.Err
 	}
 
-	copy(transformedData, *info)
+	copy(transformedData, info)
 
 	return transformedData, nil
 }
