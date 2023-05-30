@@ -78,10 +78,7 @@ func Exec(execer exec.Interface, parameters ...string) error {
 // The solution is clearing the conntrack. Known issues:
 // https://github.com/docker/docker/issues/8795
 // https://github.com/kubernetes/kubernetes/issues/31983
-func ClearEntriesForPort(execer exec.Interface, port int, isIPv6 bool, protocol v1.Protocol) error {
-	if port <= 0 || port >= 65536 {
-		return fmt.Errorf("wrong port number. The port number must be greater than zero and smaller than 65536")
-	}
+func ClearEntriesForPort(execer exec.Interface, port uint16, isIPv6 bool, protocol v1.Protocol) error {
 	parameters := parametersWithFamily(isIPv6, "-D", "-p", protoStr(protocol), "--dport", strconv.Itoa(port))
 	err := Exec(execer, parameters...)
 	if err != nil && !strings.Contains(err.Error(), NoConnectionToDelete) {
@@ -109,10 +106,7 @@ func ClearEntriesForNAT(execer exec.Interface, origin, dest string, protocol v1.
 // for connections specified by the {dest IP, port} pair.
 // Known issue:
 // https://github.com/kubernetes/kubernetes/issues/59368
-func ClearEntriesForPortNAT(execer exec.Interface, dest string, port int, protocol v1.Protocol) error {
-	if port <= 0 || port >= 65536 {
-		return fmt.Errorf("wrong port number. The port number must be greater than zero and smaller than 65536")
-	}
+func ClearEntriesForPortNAT(execer exec.Interface, dest string, port uint16, protocol v1.Protocol) error {
 	parameters := parametersWithFamily(utilnet.IsIPv6String(dest), "-D", "-p", protoStr(protocol), "--dport", strconv.Itoa(port), "--dst-nat", dest)
 	err := Exec(execer, parameters...)
 	if err != nil && !strings.Contains(err.Error(), NoConnectionToDelete) {
