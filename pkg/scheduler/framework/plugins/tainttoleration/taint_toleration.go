@@ -98,7 +98,7 @@ func getAllTolerationPreferNoSchedule(tolerations []v1.Toleration) (tolerationLi
 // PreScore builds and writes cycle state used by Score and NormalizeScore.
 func (pl *TaintToleration) PreScore(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) *framework.Status {
 	if len(nodes) == 0 {
-		return nil
+		return framework.NewStatus(framework.Skip)
 	}
 	tolerationsPreferNoSchedule := getAllTolerationPreferNoSchedule(pod.Spec.Tolerations)
 	state := &preScoreState{

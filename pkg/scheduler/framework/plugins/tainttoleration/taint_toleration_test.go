@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2/ktesting"
@@ -53,10 +54,11 @@ func podWithTolerations(podName string, tolerations []v1.Toleration) *v1.Pod {
 
 func TestTaintTolerationScore(t *testing.T) {
 	tests := []struct {
-		name         string
-		pod          *v1.Pod
-		nodes        []*v1.Node
-		expectedList framework.NodeScoreList
+		name               string
+		pod                *v1.Pod
+		nodes              []*v1.Node
+		expectedList       framework.NodeScoreList
+		wantPreScoreStatus *framework.Status
 	}{
 		// basic test case
 		{
@@ -226,6 +228,20 @@ func TestTaintTolerationScore(t *testing.T) {
 				{Name: "nodeB", Score: 0},
 			},
 		},
+		{
+			name: "Skip score if nodes is empty",
+			pod: podWithTolerations("pod1", []v1.Toleration{
+				{
+					Key:      "cpu-type",
+					Operator: v1.TolerationOpEqual,
+					Value:    "arm64",
+					Effect:   v1.TaintEffectNoSchedule,
+				},
+			}),
+			nodes:              []*v1.Node{},
+			expectedList:       []framework.NodeScore{},
+			wantPreScoreStatus: framework.NewStatus(framework.Skip),
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -239,6 +255,12 @@ func TestTaintTolerationScore(t *testing.T) {
 
 			p, _ := New(nil, fh)
 			status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, test.nodes)
+			if diff := cmp.Diff(test.wantPreScoreStatus, status); diff != "" {
+				t.Errorf("preScore status does not match (-want,+got): %s", diff)
+			}
+			if status.IsSkip() {
+				return
+			}
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)
 			}
