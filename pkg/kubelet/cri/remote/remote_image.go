@@ -159,20 +159,6 @@ func (r *remoteImageService) PullImage(ctx context.Context, image *runtimeapi.Im
 	return r.pullImageV1(ctx, image, auth, podSandboxConfig)
 }
 
-// PullImageWithProgress pulls an image with authentication config.
-func (r *remoteImageService) PullImageWithProgress(ctx context.Context, image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (runtimeapi.ImageService_PullImageWithProgressClient, context.CancelFunc, error) {
-
-	ctxWithCancel, cancel := context.WithCancel(ctx)
-	svc, err := r.pullImageWithProgressV1(ctxWithCancel, image, auth, podSandboxConfig)
-	if err != nil {
-		cancel()
-		klog.ErrorS(err, "PullImageWithProgress from image service failed", "image", image.Image)
-		return nil, nil, err
-	}
-
-	return svc, cancel, err
-}
-
 func (r *remoteImageService) pullImageV1(ctx context.Context, image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
 	resp, err := r.imageClient.PullImage(ctx, &runtimeapi.PullImageRequest{
 		Image:         image,
@@ -204,6 +190,20 @@ func (r *remoteImageService) pullImageV1(ctx context.Context, image *runtimeapi.
 	return resp.ImageRef, nil
 }
 
+// PullImageWithProgress pulls an image with authentication config.
+func (r *remoteImageService) PullImageWithProgress(ctx context.Context, image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (runtimeapi.ImageService_PullImageWithProgressClient, context.CancelFunc, error) {
+
+	ctxWithCancel, cancel := context.WithCancel(ctx)
+	svc, err := r.pullImageWithProgressV1(ctxWithCancel, image, auth, podSandboxConfig)
+	if err != nil {
+		cancel()
+		klog.ErrorS(err, "PullImageWithProgress from image service failed", "image", image.Image)
+		return nil, nil, err
+	}
+
+	return svc, cancel, err
+}
+
 func (r *remoteImageService) pullImageWithProgressV1(ctx context.Context, image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (runtimeapi.ImageService_PullImageWithProgressClient, error) {
 	stream, err := r.imageClient.PullImageWithProgress(ctx, &runtimeapi.PullImageWithProgressRequest{
 		Image:         image,
@@ -211,7 +211,7 @@ func (r *remoteImageService) pullImageWithProgressV1(ctx context.Context, image 
 		SandboxConfig: podSandboxConfig,
 	})
 	if err != nil {
-		klog.ErrorS(err, "PullImageWithStatus from image service failed", "image", image.Image)
+		klog.ErrorS(err, "PullImageWithProgress from image service failed", "image", image.Image)
 		return nil, err
 	}
 

@@ -364,6 +364,35 @@ func (f *FakeRuntime) PullImage(ctx context.Context, image kubecontainer.ImageSp
 	return image.Image, retErr
 }
 
+func (f *FakeRuntime) PullImageWithProgress(ctx context.Context, image kubecontainer.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig, objRef *v1.ObjectReference) (string, error) {
+	f.Lock()
+	f.CalledFunctions = append(f.CalledFunctions, "PullImage")
+	if f.Err == nil {
+		i := kubecontainer.Image{
+			ID:   image.Image,
+			Spec: image,
+		}
+		f.ImageList = append(f.ImageList, i)
+	}
+
+	if !f.BlockImagePulls {
+		f.Unlock()
+		return image.Image, f.Err
+	}
+
+	retErr := f.Err
+	if f.imagePullTokenBucket == nil {
+		f.imagePullTokenBucket = make(chan bool, 1)
+	}
+	// Unlock before waiting for UnblockImagePulls calls, to avoid deadlock.
+	f.Unlock()
+	select {
+	case <-ctx.Done():
+	case <-f.imagePullTokenBucket:
+	}
+	return image.Image, retErr
+}
+
 // UnblockImagePulls unblocks a certain number of image pulls, if BlockImagePulls is true.
 func (f *FakeRuntime) UnblockImagePulls(count int) {
 	if f.imagePullTokenBucket != nil {

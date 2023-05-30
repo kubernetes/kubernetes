@@ -18,6 +18,8 @@ package kuberuntime
 
 import (
 	"context"
+	"fmt"
+	"io"
 
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -25,6 +27,7 @@ import (
 	"k8s.io/klog/v2"
 	credentialprovidersecrets "k8s.io/kubernetes/pkg/credentialprovider/secrets"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/util/parsers"
 )
 
@@ -46,11 +49,11 @@ func (m *kubeGenericRuntimeManager) PullImage(ctx context.Context, image kubecon
 
 	creds, withCredentials := keyring.Lookup(repoToPull)
 	if !withCredentials {
-		klog.V(3).InfoS("Pulling image without credentials", "image", img)
+		klog.V(3).InfoS("Pulling image without progress without credentials", "image", img)
 
 		imageRef, err := m.imageService.PullImage(ctx, imgSpec, nil, podSandboxConfig)
 		if err != nil {
-			klog.ErrorS(err, "Failed to pull image", "image", img)
+			klog.ErrorS(err, "Failed to pull image without progress", "image", img)
 			return "", err
 		}
 
@@ -78,6 +81,103 @@ func (m *kubeGenericRuntimeManager) PullImage(ctx context.Context, image kubecon
 	}
 
 	return "", utilerrors.NewAggregate(pullErrs)
+}
+
+// PullImage pulls an image from the network to local storage using the supplied
+// secrets if necessary.
+func (m *kubeGenericRuntimeManager) PullImageWithProgress(ctx context.Context, image kubecontainer.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig, ref *v1.ObjectReference) (string, error) {
+	imageSpec := toRuntimeAPIImageSpec(image)
+	img := image.Image
+	repoToPull, _, _, err := parsers.ParseImageName(img)
+	if err != nil {
+		return "", err
+	}
+
+	keyring, err := credentialprovidersecrets.MakeDockerKeyring(pullSecrets, m.keyring)
+	if err != nil {
+		return "", err
+	}
+
+	creds, withCredentials := keyring.Lookup(repoToPull)
+	if !withCredentials {
+		klog.V(3).InfoS("Pulling image with progress without credentials", "image", img)
+
+		imageRef, err := m.pullImageWithProgressV1(ctx, imageSpec, nil, podSandboxConfig, ref)
+		if err != nil {
+			klog.ErrorS(err, "Failed to pull image with progress without credentials", "image", img)
+			return "", err
+		}
+
+		return imageRef, nil
+	}
+
+	var pullErrs []error
+	for _, currentCreds := range creds {
+		klog.V(3).InfoS("Pulling image with progress with credentials", "image", img)
+		auth := &runtimeapi.AuthConfig{
+			Username:      currentCreds.Username,
+			Password:      currentCreds.Password,
+			Auth:          currentCreds.Auth,
+			ServerAddress: currentCreds.ServerAddress,
+			IdentityToken: currentCreds.IdentityToken,
+			RegistryToken: currentCreds.RegistryToken,
+		}
+
+		imageRef, err := m.pullImageWithProgressV1(ctx, imageSpec, auth, podSandboxConfig, ref)
+		// If there was no error, return success
+		if err == nil {
+			return imageRef, nil
+		}
+
+		pullErrs = append(pullErrs, err)
+	}
+
+	return "", utilerrors.NewAggregate(pullErrs)
+}
+
+func (m *kubeGenericRuntimeManager) pullImageWithProgressV1(ctx context.Context, imageSpec *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig, ref *v1.ObjectReference) (string, error) {
+	klog.V(3).Infof("Sending test progress event to container, ref: %+v", ref)
+	m.recorder.Eventf(ref, v1.EventTypeNormal, events.PullingImage, fmt.Sprintf("Pulling image with progress, img: %q", imageSpec.Image))
+
+	client, cancel, err := m.imageService.PullImageWithProgress(ctx, imageSpec, auth, podSandboxConfig)
+
+	if err != nil {
+		klog.ErrorS(err, "Failed to pull image", "image", imageSpec.Image)
+		return "", err
+	}
+
+	var imgRef string
+	for {
+		var resp *runtimeapi.PullImageWithProgressResponse
+
+		resp, err = client.Recv()
+		if err != nil {
+			if err != io.EOF {
+				klog.ErrorS(err, "Failed receiving image pull progress from runtime", "image", imageSpec.Image)
+			} else {
+				if imgRef == "" {
+					imgRef = imageSpec.Image
+				}
+				klog.V(3).InfoS("Reached end of image transfer stream", "image", imageSpec.Image)
+				err = nil
+			}
+
+			break
+		}
+
+		if imgRef == "" {
+			imgRef = resp.ImageRef
+		}
+		//pullInProgress.prevOffset = resp.GetOffset().Value
+
+		m.recorder.Eventf(ref, v1.EventTypeNormal, events.PullingImage, fmt.Sprintf("Pulling image progress %+v", resp))
+		klog.V(3).Infof("PullImageWithProgress response %+v", resp)
+	}
+
+	cancel()
+
+	return imgRef, nil
+
 }
 
 // GetImageRef gets the ID of the image which has already been in

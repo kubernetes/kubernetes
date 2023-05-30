@@ -58,6 +58,11 @@ func (f *RemoteRuntime) PullImage(ctx context.Context, req *kubeapi.PullImageReq
 	}, nil
 }
 
+// PullImageWithProgress pulls an image with authentication config.
+func (f *RemoteRuntime) PullImageWithProgress(req *kubeapi.PullImageWithProgressRequest, srv kubeapi.ImageService_PullImageWithProgressServer) error {
+	return nil
+}
+
 // RemoveImage removes the image.
 // This call is idempotent, and must not return an error if the image has
 // already been removed.

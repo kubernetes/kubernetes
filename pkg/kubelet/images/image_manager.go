@@ -24,12 +24,14 @@ import (
 	dockerref "github.com/docker/distribution/reference"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/klog/v2"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	crierrors "k8s.io/cri-api/pkg/errors"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 )
@@ -150,10 +152,16 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, pod *v1.Pod, conta
 		return "", msg, ErrImagePullBackOff
 	}
 	m.podPullingTimeRecorder.RecordImageStartedPulling(pod.UID)
-	m.logIt(ref, v1.EventTypeNormal, events.PullingImage, logPrefix, fmt.Sprintf("Pulling image %q", container.Image), klog.Info)
 	startTime := time.Now()
 	pullChan := make(chan pullResult)
-	m.puller.pullImage(ctx, spec, pullSecrets, pullChan, podSandboxConfig)
+	if utilfeature.DefaultFeatureGate.Enabled(features.ImagePullProgress) {
+		m.logIt(ref, v1.EventTypeNormal, events.PullingImage, logPrefix, fmt.Sprintf("Pulling image %q with progress", container.Image), klog.Info)
+		m.puller.pullImageWithProgress(ctx, spec, pullSecrets, pullChan, podSandboxConfig, ref)
+	} else {
+		m.logIt(ref, v1.EventTypeNormal, events.PullingImage, logPrefix, fmt.Sprintf("Pulling image %q without progress", container.Image), klog.Info)
+		//m.puller.pullImage(ctx, spec, pullSecrets, pullChan, podSandboxConfig)
+		m.puller.pullImageWithProgress(ctx, spec, pullSecrets, pullChan, podSandboxConfig, ref)
+	}
 	imagePullResult := <-pullChan
 	if imagePullResult.err != nil {
 		m.logIt(ref, v1.EventTypeWarning, events.FailedToPullImage, logPrefix, fmt.Sprintf("Failed to pull image %q: %v", container.Image, imagePullResult.err), klog.Warning)

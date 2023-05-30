@@ -167,7 +167,7 @@ func (r *FakeImageService) ImageStatus(_ context.Context, image *runtimeapi.Imag
 	return &runtimeapi.ImageStatusResponse{Image: r.Images[image.Image]}, nil
 }
 
-// PullImage emulate pulling the image from the FakeImageService.
+// PullImage emulates pulling the image from the FakeImageService.
 func (r *FakeImageService) PullImage(_ context.Context, image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
 	r.Lock()
 	defer r.Unlock()
@@ -186,6 +186,27 @@ func (r *FakeImageService) PullImage(_ context.Context, image *runtimeapi.ImageS
 	}
 
 	return imageID, nil
+}
+
+// PullImageWithProgress emulates pulling the image from the FakeImageService.
+func (r *FakeImageService) PullImageWithProgress(_ context.Context, image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (runtimeapi.ImageService_PullImageWithProgressClient, context.CancelFunc, error) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "PullImageWithProgress")
+	if err := r.popError("PullImageWithProgress"); err != nil {
+		return nil, nil, err
+	}
+
+	r.pulledImages = append(r.pulledImages, &pulledImage{imageSpec: image, authConfig: auth})
+	// ImageID should be randomized for real container runtime, but here just use
+	// image's name for easily making fake images.
+	imageID := image.Image
+	if _, ok := r.Images[imageID]; !ok {
+		r.Images[imageID] = r.makeFakeImage(image)
+	}
+
+	return nil, nil, nil
 }
 
 // RemoveImage removes image from the FakeImageService.

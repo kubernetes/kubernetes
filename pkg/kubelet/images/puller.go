@@ -34,6 +34,7 @@ type pullResult struct {
 
 type imagePuller interface {
 	pullImage(context.Context, kubecontainer.ImageSpec, []v1.Secret, chan<- pullResult, *runtimeapi.PodSandboxConfig)
+	pullImageWithProgress(context.Context, kubecontainer.ImageSpec, []v1.Secret, chan<- pullResult, *runtimeapi.PodSandboxConfig, *v1.ObjectReference)
 }
 
 var _, _ imagePuller = &parallelImagePuller{}, &serialImagePuller{}
@@ -66,6 +67,22 @@ func (pip *parallelImagePuller) pullImage(ctx context.Context, spec kubecontaine
 	}()
 }
 
+func (pip *parallelImagePuller) pullImageWithProgress(ctx context.Context, spec kubecontainer.ImageSpec, pullSecrets []v1.Secret, pullChan chan<- pullResult, podSandboxConfig *runtimeapi.PodSandboxConfig, ref *v1.ObjectReference) {
+	go func() {
+		if pip.tokens != nil {
+			pip.tokens <- struct{}{}
+			defer func() { <-pip.tokens }()
+		}
+		startTime := time.Now()
+		imageRef, err := pip.imageService.PullImageWithProgress(ctx, spec, pullSecrets, podSandboxConfig, ref)
+		pullChan <- pullResult{
+			imageRef:     imageRef,
+			err:          err,
+			pullDuration: time.Since(startTime),
+		}
+	}()
+}
+
 // Maximum number of image pull requests than can be queued.
 const maxImagePullRequests = 10
 
@@ -86,6 +103,7 @@ type imagePullRequest struct {
 	pullSecrets      []v1.Secret
 	pullChan         chan<- pullResult
 	podSandboxConfig *runtimeapi.PodSandboxConfig
+	objRef           *v1.ObjectReference
 }
 
 func (sip *serialImagePuller) pullImage(ctx context.Context, spec kubecontainer.ImageSpec, pullSecrets []v1.Secret, pullChan chan<- pullResult, podSandboxConfig *runtimeapi.PodSandboxConfig) {
@@ -95,13 +113,33 @@ func (sip *serialImagePuller) pullImage(ctx context.Context, spec kubecontainer.
 		pullSecrets:      pullSecrets,
 		pullChan:         pullChan,
 		podSandboxConfig: podSandboxConfig,
+		objRef:           nil,
+	}
+}
+
+func (sip *serialImagePuller) pullImageWithProgress(ctx context.Context, spec kubecontainer.ImageSpec, pullSecrets []v1.Secret, pullChan chan<- pullResult, podSandboxConfig *runtimeapi.PodSandboxConfig, ref *v1.ObjectReference) {
+	sip.pullRequests <- &imagePullRequest{
+		ctx:              ctx,
+		spec:             spec,
+		pullSecrets:      pullSecrets,
+		pullChan:         pullChan,
+		podSandboxConfig: podSandboxConfig,
+		objRef:           ref,
 	}
 }
 
 func (sip *serialImagePuller) processImagePullRequests() {
 	for pullRequest := range sip.pullRequests {
 		startTime := time.Now()
-		imageRef, err := sip.imageService.PullImage(pullRequest.ctx, pullRequest.spec, pullRequest.pullSecrets, pullRequest.podSandboxConfig)
+		var (
+			imageRef string
+			err      error
+		)
+		if pullRequest.objRef == nil {
+			imageRef, err = sip.imageService.PullImage(pullRequest.ctx, pullRequest.spec, pullRequest.pullSecrets, pullRequest.podSandboxConfig)
+		} else {
+			imageRef, err = sip.imageService.PullImageWithProgress(pullRequest.ctx, pullRequest.spec, pullRequest.pullSecrets, pullRequest.podSandboxConfig, pullRequest.objRef)
+		}
 		pullRequest.pullChan <- pullResult{
 			imageRef:     imageRef,
 			err:          err,

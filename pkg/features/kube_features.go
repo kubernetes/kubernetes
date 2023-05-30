@@ -324,6 +324,13 @@ const (
 	// deletion ordering.
 	HonorPVReclaimPolicy featuregate.Feature = "HonorPVReclaimPolicy"
 
+	// owner: @byako
+	// kep: http://kep.k8s.io/3542
+	// alpha: v1.28
+	//
+	// When pulling images for containers, let kubelet publish progress as events to Pod
+	ImagePullProgress featuregate.Feature = "ImagePullProgress"
+
 	// owner: @leakingtapan
 	// alpha: v1.21
 	//
@@ -936,6 +943,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	HPAContainerMetrics: {Default: true, PreRelease: featuregate.Beta},
 
 	HonorPVReclaimPolicy: {Default: false, PreRelease: featuregate.Alpha},
+
+	ImagePullProgress: {Default: false, PreRelease: featuregate.Alpha},
 
 	InTreePluginAWSUnregister: {Default: false, PreRelease: featuregate.Alpha},
 
