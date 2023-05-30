@@ -618,6 +618,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/extensions/v1beta1.Scale":                                                             schema_k8sio_api_extensions_v1beta1_Scale(ref),
 		"k8s.io/api/extensions/v1beta1.ScaleSpec":                                                         schema_k8sio_api_extensions_v1beta1_ScaleSpec(ref),
 		"k8s.io/api/extensions/v1beta1.ScaleStatus":                                                       schema_k8sio_api_extensions_v1beta1_ScaleStatus(ref),
+		"k8s.io/api/flowcontrol/v1alpha1.ExemptPriorityLevelConfiguration":                                schema_k8sio_api_flowcontrol_v1alpha1_ExemptPriorityLevelConfiguration(ref),
 		"k8s.io/api/flowcontrol/v1alpha1.FlowDistinguisherMethod":                                         schema_k8sio_api_flowcontrol_v1alpha1_FlowDistinguisherMethod(ref),
 		"k8s.io/api/flowcontrol/v1alpha1.FlowSchema":                                                      schema_k8sio_api_flowcontrol_v1alpha1_FlowSchema(ref),
 		"k8s.io/api/flowcontrol/v1alpha1.FlowSchemaCondition":                                             schema_k8sio_api_flowcontrol_v1alpha1_FlowSchemaCondition(ref),
@@ -640,6 +641,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/flowcontrol/v1alpha1.ServiceAccountSubject":                                           schema_k8sio_api_flowcontrol_v1alpha1_ServiceAccountSubject(ref),
 		"k8s.io/api/flowcontrol/v1alpha1.Subject":                                                         schema_k8sio_api_flowcontrol_v1alpha1_Subject(ref),
 		"k8s.io/api/flowcontrol/v1alpha1.UserSubject":                                                     schema_k8sio_api_flowcontrol_v1alpha1_UserSubject(ref),
+		"k8s.io/api/flowcontrol/v1beta1.ExemptPriorityLevelConfiguration":                                 schema_k8sio_api_flowcontrol_v1beta1_ExemptPriorityLevelConfiguration(ref),
 		"k8s.io/api/flowcontrol/v1beta1.FlowDistinguisherMethod":                                          schema_k8sio_api_flowcontrol_v1beta1_FlowDistinguisherMethod(ref),
 		"k8s.io/api/flowcontrol/v1beta1.FlowSchema":                                                       schema_k8sio_api_flowcontrol_v1beta1_FlowSchema(ref),
 		"k8s.io/api/flowcontrol/v1beta1.FlowSchemaCondition":                                              schema_k8sio_api_flowcontrol_v1beta1_FlowSchemaCondition(ref),
@@ -662,6 +664,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/flowcontrol/v1beta1.ServiceAccountSubject":                                            schema_k8sio_api_flowcontrol_v1beta1_ServiceAccountSubject(ref),
 		"k8s.io/api/flowcontrol/v1beta1.Subject":                                                          schema_k8sio_api_flowcontrol_v1beta1_Subject(ref),
 		"k8s.io/api/flowcontrol/v1beta1.UserSubject":                                                      schema_k8sio_api_flowcontrol_v1beta1_UserSubject(ref),
+		"k8s.io/api/flowcontrol/v1beta2.ExemptPriorityLevelConfiguration":                                 schema_k8sio_api_flowcontrol_v1beta2_ExemptPriorityLevelConfiguration(ref),
 		"k8s.io/api/flowcontrol/v1beta2.FlowDistinguisherMethod":                                          schema_k8sio_api_flowcontrol_v1beta2_FlowDistinguisherMethod(ref),
 		"k8s.io/api/flowcontrol/v1beta2.FlowSchema":                                                       schema_k8sio_api_flowcontrol_v1beta2_FlowSchema(ref),
 		"k8s.io/api/flowcontrol/v1beta2.FlowSchemaCondition":                                              schema_k8sio_api_flowcontrol_v1beta2_FlowSchemaCondition(ref),
@@ -684,6 +687,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/flowcontrol/v1beta2.ServiceAccountSubject":                                            schema_k8sio_api_flowcontrol_v1beta2_ServiceAccountSubject(ref),
 		"k8s.io/api/flowcontrol/v1beta2.Subject":                                                          schema_k8sio_api_flowcontrol_v1beta2_Subject(ref),
 		"k8s.io/api/flowcontrol/v1beta2.UserSubject":                                                      schema_k8sio_api_flowcontrol_v1beta2_UserSubject(ref),
+		"k8s.io/api/flowcontrol/v1beta3.ExemptPriorityLevelConfiguration":                                 schema_k8sio_api_flowcontrol_v1beta3_ExemptPriorityLevelConfiguration(ref),
 		"k8s.io/api/flowcontrol/v1beta3.FlowDistinguisherMethod":                                          schema_k8sio_api_flowcontrol_v1beta3_FlowDistinguisherMethod(ref),
 		"k8s.io/api/flowcontrol/v1beta3.FlowSchema":                                                       schema_k8sio_api_flowcontrol_v1beta3_FlowSchema(ref),
 		"k8s.io/api/flowcontrol/v1beta3.FlowSchemaCondition":                                              schema_k8sio_api_flowcontrol_v1beta3_FlowSchemaCondition(ref),
@@ -31631,6 +31635,34 @@ func schema_k8sio_api_extensions_v1beta1_ScaleStatus(ref common.ReferenceCallbac
 	}
 }
 
+func schema_k8sio_api_flowcontrol_v1alpha1_ExemptPriorityLevelConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ExemptPriorityLevelConfiguration describes the configurable aspects of the handling of exempt requests. In the mandatory exempt configuration object the values in the fields here can be modified by authorized users, unlike the rest of the `spec`.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"nominalConcurrencyShares": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`nominalConcurrencyShares` (NCS) contributes to the computation of the NominalConcurrencyLimit (NominalCL) of this level. This is the number of execution seats nominally reserved for this priority level. This DOES NOT limit the dispatching from this priority level but affects the other priority levels through the borrowing mechanism. The server's concurrency limit (ServerCL) is divided among all the priority levels in proportion to their NCS values:\n\nNominalCL(i)  = ceil( ServerCL * NCS(i) / sum_ncs ) sum_ncs = sum[priority level k] NCS(k)\n\nBigger numbers mean a larger nominal concurrency limit, at the expense of every other priority level. This field has a default value of zero.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"lendablePercent": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`lendablePercent` prescribes the fraction of the level's NominalCL that can be borrowed by other priority levels.  This value of this field must be between 0 and 100, inclusive, and it defaults to 0. The number of seats that other levels can borrow from this level, known as this level's LendableConcurrencyLimit (LendableCL), is defined as follows.\n\nLendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_flowcontrol_v1alpha1_FlowDistinguisherMethod(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -32326,6 +32358,12 @@ func schema_k8sio_api_flowcontrol_v1alpha1_PriorityLevelConfigurationSpec(ref co
 							Ref:         ref("k8s.io/api/flowcontrol/v1alpha1.LimitedPriorityLevelConfiguration"),
 						},
 					},
+					"exempt": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`exempt` specifies how requests are handled for an exempt priority level. This field MUST be empty if `type` is `\"Limited\"`. This field MAY be non-empty if `type` is `\"Exempt\"`. If empty and `type` is `\"Exempt\"` then the default values for `ExemptPriorityLevelConfiguration` apply.",
+							Ref:         ref("k8s.io/api/flowcontrol/v1alpha1.ExemptPriorityLevelConfiguration"),
+						},
+					},
 				},
 				Required: []string{"type"},
 			},
@@ -32335,6 +32373,7 @@ func schema_k8sio_api_flowcontrol_v1alpha1_PriorityLevelConfigurationSpec(ref co
 						map[string]interface{}{
 							"discriminator": "type",
 							"fields-to-discriminateBy": map[string]interface{}{
+								"exempt":  "Exempt",
 								"limited": "Limited",
 							},
 						},
@@ -32343,7 +32382,7 @@ func schema_k8sio_api_flowcontrol_v1alpha1_PriorityLevelConfigurationSpec(ref co
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/flowcontrol/v1alpha1.LimitedPriorityLevelConfiguration"},
+			"k8s.io/api/flowcontrol/v1alpha1.ExemptPriorityLevelConfiguration", "k8s.io/api/flowcontrol/v1alpha1.LimitedPriorityLevelConfiguration"},
 	}
 }
 
@@ -32625,6 +32664,34 @@ func schema_k8sio_api_flowcontrol_v1alpha1_UserSubject(ref common.ReferenceCallb
 					},
 				},
 				Required: []string{"name"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_flowcontrol_v1beta1_ExemptPriorityLevelConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ExemptPriorityLevelConfiguration describes the configurable aspects of the handling of exempt requests. In the mandatory exempt configuration object the values in the fields here can be modified by authorized users, unlike the rest of the `spec`.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"nominalConcurrencyShares": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`nominalConcurrencyShares` (NCS) contributes to the computation of the NominalConcurrencyLimit (NominalCL) of this level. This is the number of execution seats nominally reserved for this priority level. This DOES NOT limit the dispatching from this priority level but affects the other priority levels through the borrowing mechanism. The server's concurrency limit (ServerCL) is divided among all the priority levels in proportion to their NCS values:\n\nNominalCL(i)  = ceil( ServerCL * NCS(i) / sum_ncs ) sum_ncs = sum[priority level k] NCS(k)\n\nBigger numbers mean a larger nominal concurrency limit, at the expense of every other priority level. This field has a default value of zero.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"lendablePercent": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`lendablePercent` prescribes the fraction of the level's NominalCL that can be borrowed by other priority levels.  This value of this field must be between 0 and 100, inclusive, and it defaults to 0. The number of seats that other levels can borrow from this level, known as this level's LendableConcurrencyLimit (LendableCL), is defined as follows.\n\nLendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
 			},
 		},
 	}
@@ -33325,6 +33392,12 @@ func schema_k8sio_api_flowcontrol_v1beta1_PriorityLevelConfigurationSpec(ref com
 							Ref:         ref("k8s.io/api/flowcontrol/v1beta1.LimitedPriorityLevelConfiguration"),
 						},
 					},
+					"exempt": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`exempt` specifies how requests are handled for an exempt priority level. This field MUST be empty if `type` is `\"Limited\"`. This field MAY be non-empty if `type` is `\"Exempt\"`. If empty and `type` is `\"Exempt\"` then the default values for `ExemptPriorityLevelConfiguration` apply.",
+							Ref:         ref("k8s.io/api/flowcontrol/v1beta1.ExemptPriorityLevelConfiguration"),
+						},
+					},
 				},
 				Required: []string{"type"},
 			},
@@ -33334,6 +33407,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_PriorityLevelConfigurationSpec(ref com
 						map[string]interface{}{
 							"discriminator": "type",
 							"fields-to-discriminateBy": map[string]interface{}{
+								"exempt":  "Exempt",
 								"limited": "Limited",
 							},
 						},
@@ -33342,7 +33416,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_PriorityLevelConfigurationSpec(ref com
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/flowcontrol/v1beta1.LimitedPriorityLevelConfiguration"},
+			"k8s.io/api/flowcontrol/v1beta1.ExemptPriorityLevelConfiguration", "k8s.io/api/flowcontrol/v1beta1.LimitedPriorityLevelConfiguration"},
 	}
 }
 
@@ -33624,6 +33698,34 @@ func schema_k8sio_api_flowcontrol_v1beta1_UserSubject(ref common.ReferenceCallba
 					},
 				},
 				Required: []string{"name"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_flowcontrol_v1beta2_ExemptPriorityLevelConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ExemptPriorityLevelConfiguration describes the configurable aspects of the handling of exempt requests. In the mandatory exempt configuration object the values in the fields here can be modified by authorized users, unlike the rest of the `spec`.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"nominalConcurrencyShares": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`nominalConcurrencyShares` (NCS) contributes to the computation of the NominalConcurrencyLimit (NominalCL) of this level. This is the number of execution seats nominally reserved for this priority level. This DOES NOT limit the dispatching from this priority level but affects the other priority levels through the borrowing mechanism. The server's concurrency limit (ServerCL) is divided among all the priority levels in proportion to their NCS values:\n\nNominalCL(i)  = ceil( ServerCL * NCS(i) / sum_ncs ) sum_ncs = sum[priority level k] NCS(k)\n\nBigger numbers mean a larger nominal concurrency limit, at the expense of every other priority level. This field has a default value of zero.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"lendablePercent": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`lendablePercent` prescribes the fraction of the level's NominalCL that can be borrowed by other priority levels.  This value of this field must be between 0 and 100, inclusive, and it defaults to 0. The number of seats that other levels can borrow from this level, known as this level's LendableConcurrencyLimit (LendableCL), is defined as follows.\n\nLendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
 			},
 		},
 	}
@@ -34324,6 +34426,12 @@ func schema_k8sio_api_flowcontrol_v1beta2_PriorityLevelConfigurationSpec(ref com
 							Ref:         ref("k8s.io/api/flowcontrol/v1beta2.LimitedPriorityLevelConfiguration"),
 						},
 					},
+					"exempt": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`exempt` specifies how requests are handled for an exempt priority level. This field MUST be empty if `type` is `\"Limited\"`. This field MAY be non-empty if `type` is `\"Exempt\"`. If empty and `type` is `\"Exempt\"` then the default values for `ExemptPriorityLevelConfiguration` apply.",
+							Ref:         ref("k8s.io/api/flowcontrol/v1beta2.ExemptPriorityLevelConfiguration"),
+						},
+					},
 				},
 				Required: []string{"type"},
 			},
@@ -34333,6 +34441,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_PriorityLevelConfigurationSpec(ref com
 						map[string]interface{}{
 							"discriminator": "type",
 							"fields-to-discriminateBy": map[string]interface{}{
+								"exempt":  "Exempt",
 								"limited": "Limited",
 							},
 						},
@@ -34341,7 +34450,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_PriorityLevelConfigurationSpec(ref com
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/flowcontrol/v1beta2.LimitedPriorityLevelConfiguration"},
+			"k8s.io/api/flowcontrol/v1beta2.ExemptPriorityLevelConfiguration", "k8s.io/api/flowcontrol/v1beta2.LimitedPriorityLevelConfiguration"},
 	}
 }
 
@@ -34623,6 +34732,34 @@ func schema_k8sio_api_flowcontrol_v1beta2_UserSubject(ref common.ReferenceCallba
 					},
 				},
 				Required: []string{"name"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_flowcontrol_v1beta3_ExemptPriorityLevelConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ExemptPriorityLevelConfiguration describes the configurable aspects of the handling of exempt requests. In the mandatory exempt configuration object the values in the fields here can be modified by authorized users, unlike the rest of the `spec`.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"nominalConcurrencyShares": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`nominalConcurrencyShares` (NCS) contributes to the computation of the NominalConcurrencyLimit (NominalCL) of this level. This is the number of execution seats nominally reserved for this priority level. This DOES NOT limit the dispatching from this priority level but affects the other priority levels through the borrowing mechanism. The server's concurrency limit (ServerCL) is divided among all the priority levels in proportion to their NCS values:\n\nNominalCL(i)  = ceil( ServerCL * NCS(i) / sum_ncs ) sum_ncs = sum[priority level k] NCS(k)\n\nBigger numbers mean a larger nominal concurrency limit, at the expense of every other priority level. This field has a default value of zero.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"lendablePercent": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`lendablePercent` prescribes the fraction of the level's NominalCL that can be borrowed by other priority levels.  This value of this field must be between 0 and 100, inclusive, and it defaults to 0. The number of seats that other levels can borrow from this level, known as this level's LendableConcurrencyLimit (LendableCL), is defined as follows.\n\nLendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
 			},
 		},
 	}
@@ -34969,7 +35106,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_LimitedPriorityLevelConfiguration(ref 
 				Properties: map[string]spec.Schema{
 					"nominalConcurrencyShares": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`nominalConcurrencyShares` (NCS) contributes to the computation of the NominalConcurrencyLimit (NominalCL) of this level. This is the number of execution seats available at this priority level. This is used both for requests dispatched from this priority level as well as requests dispatched from other priority levels borrowing seats from this level. The server's concurrency limit (ServerCL) is divided among the Limited priority levels in proportion to their NCS values:\n\nNominalCL(i)  = ceil( ServerCL * NCS(i) / sum_ncs ) sum_ncs = sum[limited priority level k] NCS(k)\n\nBigger numbers mean a larger nominal concurrency limit, at the expense of every other Limited priority level. This field has a default value of 30.",
+							Description: "`nominalConcurrencyShares` (NCS) contributes to the computation of the NominalConcurrencyLimit (NominalCL) of this level. This is the number of execution seats available at this priority level. This is used both for requests dispatched from this priority level as well as requests dispatched from other priority levels borrowing seats from this level. The server's concurrency limit (ServerCL) is divided among the Limited priority levels in proportion to their NCS values:\n\nNominalCL(i)  = ceil( ServerCL * NCS(i) / sum_ncs ) sum_ncs = sum[priority level k] NCS(k)\n\nBigger numbers mean a larger nominal concurrency limit, at the expense of every other priority level. This field has a default value of 30.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -35325,6 +35462,12 @@ func schema_k8sio_api_flowcontrol_v1beta3_PriorityLevelConfigurationSpec(ref com
 							Ref:         ref("k8s.io/api/flowcontrol/v1beta3.LimitedPriorityLevelConfiguration"),
 						},
 					},
+					"exempt": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`exempt` specifies how requests are handled for an exempt priority level. This field MUST be empty if `type` is `\"Limited\"`. This field MAY be non-empty if `type` is `\"Exempt\"`. If empty and `type` is `\"Exempt\"` then the default values for `ExemptPriorityLevelConfiguration` apply.",
+							Ref:         ref("k8s.io/api/flowcontrol/v1beta3.ExemptPriorityLevelConfiguration"),
+						},
+					},
 				},
 				Required: []string{"type"},
 			},
@@ -35334,6 +35477,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_PriorityLevelConfigurationSpec(ref com
 						map[string]interface{}{
 							"discriminator": "type",
 							"fields-to-discriminateBy": map[string]interface{}{
+								"exempt":  "Exempt",
 								"limited": "Limited",
 							},
 						},
@@ -35342,7 +35486,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_PriorityLevelConfigurationSpec(ref com
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/flowcontrol/v1beta3.LimitedPriorityLevelConfiguration"},
+			"k8s.io/api/flowcontrol/v1beta3.ExemptPriorityLevelConfiguration", "k8s.io/api/flowcontrol/v1beta3.LimitedPriorityLevelConfiguration"},
 	}
 }
 

@@ -1037,6 +1037,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsextensionsv1beta1.ScaleApplyConfiguration{}
 
 		// Group=flowcontrol.apiserver.k8s.io, Version=v1alpha1
+	case flowcontrolv1alpha1.SchemeGroupVersion.WithKind("ExemptPriorityLevelConfiguration"):
+		return &applyconfigurationsflowcontrolv1alpha1.ExemptPriorityLevelConfigurationApplyConfiguration{}
 	case flowcontrolv1alpha1.SchemeGroupVersion.WithKind("FlowDistinguisherMethod"):
 		return &applyconfigurationsflowcontrolv1alpha1.FlowDistinguisherMethodApplyConfiguration{}
 	case flowcontrolv1alpha1.SchemeGroupVersion.WithKind("FlowSchema"):
@@ -1079,6 +1081,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsflowcontrolv1alpha1.UserSubjectApplyConfiguration{}
 
 		// Group=flowcontrol.apiserver.k8s.io, Version=v1beta1
+	case flowcontrolv1beta1.SchemeGroupVersion.WithKind("ExemptPriorityLevelConfiguration"):
+		return &applyconfigurationsflowcontrolv1beta1.ExemptPriorityLevelConfigurationApplyConfiguration{}
 	case flowcontrolv1beta1.SchemeGroupVersion.WithKind("FlowDistinguisherMethod"):
 		return &applyconfigurationsflowcontrolv1beta1.FlowDistinguisherMethodApplyConfiguration{}
 	case flowcontrolv1beta1.SchemeGroupVersion.WithKind("FlowSchema"):
@@ -1121,6 +1125,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsflowcontrolv1beta1.UserSubjectApplyConfiguration{}
 
 		// Group=flowcontrol.apiserver.k8s.io, Version=v1beta2
+	case flowcontrolv1beta2.SchemeGroupVersion.WithKind("ExemptPriorityLevelConfiguration"):
+		return &applyconfigurationsflowcontrolv1beta2.ExemptPriorityLevelConfigurationApplyConfiguration{}
 	case flowcontrolv1beta2.SchemeGroupVersion.WithKind("FlowDistinguisherMethod"):
 		return &applyconfigurationsflowcontrolv1beta2.FlowDistinguisherMethodApplyConfiguration{}
 	case flowcontrolv1beta2.SchemeGroupVersion.WithKind("FlowSchema"):
@@ -1163,6 +1169,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsflowcontrolv1beta2.UserSubjectApplyConfiguration{}
 
 		// Group=flowcontrol.apiserver.k8s.io, Version=v1beta3
+	case v1beta3.SchemeGroupVersion.WithKind("ExemptPriorityLevelConfiguration"):
+		return &flowcontrolv1beta3.ExemptPriorityLevelConfigurationApplyConfiguration{}
 	case v1beta3.SchemeGroupVersion.WithKind("FlowDistinguisherMethod"):
 		return &flowcontrolv1beta3.FlowDistinguisherMethodApplyConfiguration{}
 	case v1beta3.SchemeGroupVersion.WithKind("FlowSchema"):
