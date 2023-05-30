@@ -17,6 +17,7 @@ limitations under the License.
 package aes
 
 import (
+	"bytes"
 	"time"
 	"unsafe"
 
@@ -30,31 +31,52 @@ type simpleCache struct {
 	ttl   time.Duration
 }
 
+type cacheRecord struct {
+	info        []byte
+	transformer value.Transformer
+}
+
 func newSimpleCache(clock clock.Clock, ttl time.Duration) *simpleCache {
+	cache := utilcache.NewExpiringWithClock(clock)
+	cache.AllowExpiredGet = true // TODO comment
 	return &simpleCache{
-		cache: utilcache.NewExpiringWithClock(clock),
+		cache: cache,
 		ttl:   ttl,
 	}
 }
 
 // given a key, return the transformer, or nil if it does not exist in the cache
-func (c *simpleCache) get(key []byte) value.Transformer {
-	record, ok := c.cache.Get(toString(key))
+func (c *simpleCache) get(info []byte, dataCtx value.Context) value.Transformer {
+	val, ok := c.cache.Get(keyFunc(dataCtx))
 	if !ok {
 		return nil
 	}
-	return record.(value.Transformer)
+
+	record := val.(cacheRecord)
+
+	if !bytes.Equal(record.info, info) {
+		return nil
+	}
+
+	return record.transformer
 }
 
 // set caches the record for the key
-func (c *simpleCache) set(key []byte, transformer value.Transformer) {
-	if len(key) == 0 {
-		panic("key must not be empty")
+func (c *simpleCache) set(info []byte, dataCtx value.Context, transformer value.Transformer) {
+	if len(info) == 0 {
+		panic("info must not be empty")
+	}
+	if dataCtx == nil || len(dataCtx.AuthenticatedData()) == 0 {
+		panic("authenticated data must not be empty")
 	}
 	if transformer == nil {
 		panic("transformer must not be nil")
 	}
-	c.cache.Set(toString(key), transformer, c.ttl)
+	c.cache.Set(keyFunc(dataCtx), cacheRecord{info: info, transformer: transformer}, c.ttl)
+}
+
+func keyFunc(dataCtx value.Context) string {
+	return toString(dataCtx.AuthenticatedData())
 }
 
 // toString performs unholy acts to avoid allocations

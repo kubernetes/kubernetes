@@ -22,7 +22,6 @@ import (
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
-	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
@@ -33,7 +32,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"golang.org/x/crypto/chacha20"
 	"golang.org/x/crypto/hkdf"
 
 	"k8s.io/apiserver/pkg/storage/value"
@@ -46,7 +44,7 @@ const commonSize = 32
 type gcm struct {
 	aead      cipher.AEAD
 	nonceFunc func([]byte) error
-	saltLen   int
+	infoLen   int
 }
 
 // NewGCMTransformer takes the given block cipher and performs encryption and decryption on the given data.
@@ -190,17 +188,16 @@ func generateKey(length int) (key []byte, err error) {
 	return key, nil
 }
 
+// TODO comment
 func NewReadOnlyKDFExtendedNonceGCMTransformerFromUniqueKeyUnsafe(key []byte) value.Read {
-	return newReadOnlyExtendedNonceGCMTransformerFromUniqueKeyUnsafe(key, sha256KDF, commonSize, nil)
+	return newReadOnlyExtendedNonceGCMTransformerFromUniqueKeyUnsafe(key, nil) // TODO set cache
 }
 
-func newReadOnlyExtendedNonceGCMTransformerFromUniqueKeyUnsafe(key []byte, prf pseudoRandomFunction, saltLen int, cache *simpleCache) value.Read {
+func newReadOnlyExtendedNonceGCMTransformerFromUniqueKeyUnsafe(key []byte, cache *simpleCache) value.Read {
 	return &readOnlyExtendedNonceGCM{
 		e: &extendedNonceGCM{
-			key:     key,
-			prf:     prf,
-			saltLen: saltLen,
-			cache:   cache,
+			key:   key,
+			cache: cache,
 		},
 	}
 }
@@ -214,47 +211,37 @@ func (r *readOnlyExtendedNonceGCM) TransformFromStorage(ctx context.Context, dat
 	return r.e.TransformFromStorage(ctx, data, dataCtx)
 }
 
-type pseudoRandomFunction func(secret, salt, info []byte) ([]byte, error)
-
 // TODO comment
 func NewKDFExtendedNonceGCMTransformerWithUniqueKeyUnsafe() (value.Transformer, []byte, error) {
 	key, err := generateKey(commonSize)
 	if err != nil {
 		return nil, nil, err
 	}
-	return newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(key, sha256KDF, randomNonce, commonSize, nil), key, nil
+	return newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(key, nil), key, nil // TODO set cache
 }
 
-func newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(key []byte, prf pseudoRandomFunction, salt func([]byte) error, saltLen int, cache *simpleCache) value.Transformer {
+func newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(key []byte, cache *simpleCache) value.Transformer {
 	return &extendedNonceGCM{
 		key:      key,
-		nonceGen: newNonceGenerator(),
-		prf:      prf,
-		salt:     salt,
-		saltLen:  saltLen,
-		saltPool: &sync.Pool{New: func() any { b := make([]byte, saltLen); return &b }},
+		infoPool: &sync.Pool{New: func() any { b := make([]byte, commonSize); return &b }},
 		cache:    cache,
 	}
 }
 
 type extendedNonceGCM struct {
 	key      []byte
-	nonceGen *nonceGenerator
-	prf      pseudoRandomFunction
-	salt     func([]byte) error
-	saltLen  int
-	saltPool *sync.Pool
+	infoPool *sync.Pool
 	cache    *simpleCache
 }
 
 func (e *extendedNonceGCM) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
-	if len(data) < e.saltLen {
+	if len(data) < commonSize {
 		return nil, false, errors.New("the stored data was shorter than the required size")
 	}
 
-	salt := data[:e.saltLen]
+	info := data[:commonSize]
 
-	transformer, err := e.derivedKeyTransformer(salt, dataCtx)
+	transformer, err := e.derivedKeyTransformer(info, dataCtx)
 	if err != nil {
 		return nil, false, err // TODO fmt.Err
 	}
@@ -263,14 +250,14 @@ func (e *extendedNonceGCM) TransformFromStorage(ctx context.Context, data []byte
 }
 
 func (e *extendedNonceGCM) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, error) {
-	salt := e.saltPool.Get().(*[]byte)
-	defer e.saltPool.Put(salt)
+	info := e.infoPool.Get().(*[]byte)
+	defer e.infoPool.Put(info)
 
-	if err := e.salt(*salt); err != nil {
+	if err := randomNonce(*info); err != nil {
 		return nil, err // TODO fmt.Err
 	}
 
-	transformer, err := e.derivedKeyTransformer(*salt, dataCtx)
+	transformer, err := e.derivedKeyTransformer(*info, dataCtx)
 	if err != nil {
 		return nil, err // TODO fmt.Err
 	}
@@ -280,41 +267,19 @@ func (e *extendedNonceGCM) TransformToStorage(ctx context.Context, data []byte, 
 		return nil, err // TODO fmt.Err
 	}
 
-	if e.saltLen == 0 {
-		return transformedData, nil
-	}
-
-	copy(transformedData, *salt)
+	copy(transformedData, *info)
 
 	return transformedData, nil
 }
 
-func noSalt(_ []byte) error {
-	return nil
-}
-
-func timeSalt(salt []byte) error {
-	binary.LittleEndian.PutUint64(salt, uint64(time.Now().UTC().Round(time.Hour).Unix()))
-	return nil
-}
-
-func (e *extendedNonceGCM) derivedKeyTransformer(salt []byte, dataCtx value.Context) (value.Transformer, error) {
-	var cacheKey []byte
+func (e *extendedNonceGCM) derivedKeyTransformer(info []byte, dataCtx value.Context) (value.Transformer, error) {
 	if e.cache != nil {
-		if saltLen := len(salt); saltLen == 0 {
-			cacheKey = dataCtx.AuthenticatedData()
-		} else {
-			// normally we would use the cryptobyte package but this is okay since we control the salt
-			cacheKey = make([]byte, 0, saltLen+len(dataCtx.AuthenticatedData()))
-			cacheKey = append(cacheKey, salt...)
-			cacheKey = append(cacheKey, dataCtx.AuthenticatedData()...)
-		}
-		if transformer := e.cache.get(cacheKey); transformer != nil {
+		if transformer := e.cache.get(info, dataCtx); transformer != nil {
 			return transformer, nil
 		}
 	}
 
-	key, err := e.prf(e.key, salt, dataCtx.AuthenticatedData())
+	key, err := e.sha256KDFExpandOnly(info)
 	if err != nil {
 		return nil, err // TODO fmt.Err
 	}
@@ -324,22 +289,22 @@ func (e *extendedNonceGCM) derivedKeyTransformer(salt []byte, dataCtx value.Cont
 		return nil, err // TODO fmt.Err
 	}
 
-	transformer, err := newGCMTransformerWithUniqueKeyUnsafe(block, e.nonceGen)
+	transformer, err := NewGCMTransformer(block)
 	if err != nil {
 		return nil, err // TODO fmt.Err
 	}
-	transformer.saltLen = e.saltLen // TODO probably better to set as part of the constructor
+	transformer.(*gcm).infoLen = commonSize // TODO probably better to set as part of the constructor
 
 	if e.cache != nil {
-		e.cache.set(cacheKey, transformer)
+		e.cache.set(info, dataCtx, transformer)
 	}
 
 	return transformer, nil
 }
 
-func sha256KDF(secret, salt, info []byte) ([]byte, error) {
+func (e *extendedNonceGCM) sha256KDFExpandOnly(info []byte) ([]byte, error) {
 	// TODO come up with a way to pre-compute this
-	kdf := hkdf.New(sha256.New, secret, salt, info)
+	kdf := hkdf.Expand(sha256.New, e.key, info)
 
 	derivedKey := make([]byte, commonSize)
 	if _, err := io.ReadFull(kdf, derivedKey); err != nil {
@@ -347,56 +312,27 @@ func sha256KDF(secret, salt, info []byte) ([]byte, error) {
 	}
 
 	return derivedKey, nil
-}
-
-func sha256KDFExpandOnly(secret, _, info []byte) ([]byte, error) {
-	// TODO come up with a way to pre-compute this
-	kdf := hkdf.Expand(sha256.New, secret, info)
-
-	derivedKey := make([]byte, commonSize)
-	if _, err := io.ReadFull(kdf, derivedKey); err != nil {
-		return nil, err // TODO fmt.Err
-	}
-
-	return derivedKey, nil
-}
-
-func sha256HMACNoInfo(secret, salt, _ []byte) ([]byte, error) {
-	mac := hmac.New(sha256.New, secret)
-	mac.Write(salt)
-	return mac.Sum(nil), nil
-}
-
-func sha256HMAC(secret, salt, info []byte) ([]byte, error) {
-	mac := hmac.New(sha256.New, secret)
-	mac.Write(salt)
-	mac.Write(info) // note that this is only okay because we control salt generation
-	return mac.Sum(nil), nil
-}
-
-func hchacha20NoInfo(secret, salt, _ []byte) ([]byte, error) { // I am not really sure how to adapt this to use info
-	return chacha20.HChaCha20(secret, salt[:16]) // hchacha requires 16 byte salt
 }
 
 func (t *gcm) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
 	nonceSize := t.aead.NonceSize()
-	if len(data) < t.saltLen+nonceSize {
+	if len(data) < t.infoLen+nonceSize {
 		return nil, false, errors.New("the stored data was shorter than the required size")
 	}
-	result, err := t.aead.Open(nil, data[t.saltLen:t.saltLen+nonceSize], data[t.saltLen+nonceSize:], dataCtx.AuthenticatedData())
+	result, err := t.aead.Open(nil, data[t.infoLen:t.infoLen+nonceSize], data[t.infoLen+nonceSize:], dataCtx.AuthenticatedData())
 	return result, false, err
 }
 
 func (t *gcm) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, error) {
 	nonceSize := t.aead.NonceSize()
-	result := make([]byte, t.saltLen+nonceSize+t.aead.Overhead()+len(data))
+	result := make([]byte, t.infoLen+nonceSize+t.aead.Overhead()+len(data))
 
-	if err := t.nonceFunc(result[t.saltLen : t.saltLen+nonceSize]); err != nil {
+	if err := t.nonceFunc(result[t.infoLen : t.infoLen+nonceSize]); err != nil {
 		return nil, fmt.Errorf("failed to write nonce for AES-GCM: %w", err)
 	}
 
-	cipherText := t.aead.Seal(result[t.saltLen+nonceSize:t.saltLen+nonceSize], result[t.saltLen:t.saltLen+nonceSize], data, dataCtx.AuthenticatedData())
-	return result[:t.saltLen+nonceSize+len(cipherText)], nil
+	cipherText := t.aead.Seal(result[t.infoLen+nonceSize:t.infoLen+nonceSize], result[t.infoLen:t.infoLen+nonceSize], data, dataCtx.AuthenticatedData())
+	return result[:t.infoLen+nonceSize+len(cipherText)], nil
 }
 
 // cbc implements encryption at rest of the provided values given a cipher.Block algorithm.
