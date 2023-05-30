@@ -64,6 +64,9 @@ func (c *simpleCache) set(dataCtx value.Context, transformer *gcm) {
 	if transformer == nil {
 		panic("transformer must not be nil")
 	}
+	if len(transformer.info) == 0 {
+		panic("info must not be empty")
+	}
 	c.cache.Set(keyFunc(dataCtx), transformer, c.ttl)
 }
 
