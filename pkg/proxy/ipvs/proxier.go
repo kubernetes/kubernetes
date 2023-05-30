@@ -48,7 +48,7 @@ import (
 	utilipvs "k8s.io/kubernetes/pkg/proxy/ipvs/util"
 	"k8s.io/kubernetes/pkg/proxy/metaproxier"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
-	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	"k8s.io/kubernetes/pkg/util/async"
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
@@ -268,19 +268,19 @@ type Proxier struct {
 	// that are significantly impacting performance.
 	iptablesData     *bytes.Buffer
 	filterChainsData *bytes.Buffer
-	natChains        utilproxy.LineBuffer
-	filterChains     utilproxy.LineBuffer
-	natRules         utilproxy.LineBuffer
-	filterRules      utilproxy.LineBuffer
+	natChains        proxyutil.LineBuffer
+	filterChains     proxyutil.LineBuffer
+	natRules         proxyutil.LineBuffer
+	filterRules      proxyutil.LineBuffer
 	// Added as a member to the struct to allow injection for testing.
 	netlinkHandle NetLinkHandle
 	// ipsetList is the list of ipsets that ipvs proxier used.
 	ipsetList map[string]*IPSet
 	// nodePortAddresses selects the interfaces where nodePort works.
-	nodePortAddresses *utilproxy.NodePortAddresses
+	nodePortAddresses *proxyutil.NodePortAddresses
 	// networkInterfacer defines an interface for several net library functions.
 	// Inject for test purpose.
-	networkInterfacer     utilproxy.NetworkInterfacer
+	networkInterfacer     proxyutil.NetworkInterfacer
 	gracefuldeleteManager *GracefulTerminationManager
 	// serviceNoLocalEndpointsInternal represents the set of services that couldn't be applied
 	// due to the absence of local endpoints when the internal traffic policy is "Local".
@@ -338,7 +338,7 @@ func NewProxier(ipFamily v1.IPFamily,
 	}
 
 	// Set the conntrack sysctl we need for
-	if err := utilproxy.EnsureSysctl(sysctl, sysctlVSConnTrack, 1); err != nil {
+	if err := proxyutil.EnsureSysctl(sysctl, sysctlVSConnTrack, 1); err != nil {
 		return nil, err
 	}
 
@@ -357,34 +357,34 @@ func NewProxier(ipFamily v1.IPFamily,
 		klog.V(2).InfoS("Left as-is", "sysctl", sysctlConnReuse)
 	} else {
 		// Set the connection reuse mode
-		if err := utilproxy.EnsureSysctl(sysctl, sysctlConnReuse, 0); err != nil {
+		if err := proxyutil.EnsureSysctl(sysctl, sysctlConnReuse, 0); err != nil {
 			return nil, err
 		}
 	}
 
 	// Set the expire_nodest_conn sysctl we need for
-	if err := utilproxy.EnsureSysctl(sysctl, sysctlExpireNoDestConn, 1); err != nil {
+	if err := proxyutil.EnsureSysctl(sysctl, sysctlExpireNoDestConn, 1); err != nil {
 		return nil, err
 	}
 
 	// Set the expire_quiescent_template sysctl we need for
-	if err := utilproxy.EnsureSysctl(sysctl, sysctlExpireQuiescentTemplate, 1); err != nil {
+	if err := proxyutil.EnsureSysctl(sysctl, sysctlExpireQuiescentTemplate, 1); err != nil {
 		return nil, err
 	}
 
 	// Set the ip_forward sysctl we need for
-	if err := utilproxy.EnsureSysctl(sysctl, sysctlForward, 1); err != nil {
+	if err := proxyutil.EnsureSysctl(sysctl, sysctlForward, 1); err != nil {
 		return nil, err
 	}
 
 	if strictARP {
 		// Set the arp_ignore sysctl we need for
-		if err := utilproxy.EnsureSysctl(sysctl, sysctlArpIgnore, 1); err != nil {
+		if err := proxyutil.EnsureSysctl(sysctl, sysctlArpIgnore, 1); err != nil {
 			return nil, err
 		}
 
 		// Set the arp_announce sysctl we need for
-		if err := utilproxy.EnsureSysctl(sysctl, sysctlArpAnnounce, 2); err != nil {
+		if err := proxyutil.EnsureSysctl(sysctl, sysctlArpAnnounce, 2); err != nil {
 			return nil, err
 		}
 	}
@@ -409,7 +409,7 @@ func NewProxier(ipFamily v1.IPFamily,
 		scheduler = defaultScheduler
 	}
 
-	nodePortAddresses := utilproxy.NewNodePortAddresses(ipFamily, nodePortAddressStrings)
+	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nodePortAddressStrings)
 
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses, healthzServer)
 
@@ -440,14 +440,14 @@ func NewProxier(ipFamily v1.IPFamily,
 		ipvsScheduler:         scheduler,
 		iptablesData:          bytes.NewBuffer(nil),
 		filterChainsData:      bytes.NewBuffer(nil),
-		natChains:             utilproxy.LineBuffer{},
-		natRules:              utilproxy.LineBuffer{},
-		filterChains:          utilproxy.LineBuffer{},
-		filterRules:           utilproxy.LineBuffer{},
+		natChains:             proxyutil.LineBuffer{},
+		natRules:              proxyutil.LineBuffer{},
+		filterChains:          proxyutil.LineBuffer{},
+		filterRules:           proxyutil.LineBuffer{},
 		netlinkHandle:         NewNetLinkHandle(ipFamily == v1.IPv6Protocol),
 		ipset:                 ipset,
 		nodePortAddresses:     nodePortAddresses,
-		networkInterfacer:     utilproxy.RealNetwork{},
+		networkInterfacer:     proxyutil.RealNetwork{},
 		gracefuldeleteManager: NewGracefulTerminationManager(ipvs),
 	}
 	// initialize ipsetList with all sets we needed

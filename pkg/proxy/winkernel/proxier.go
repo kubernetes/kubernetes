@@ -47,7 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/metaproxier"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
-	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/util/async"
 	netutils "k8s.io/utils/net"
 )
@@ -692,7 +692,7 @@ func NewProxier(
 	}
 
 	// windows listens to all node addresses
-	nodePortAddresses := utilproxy.NewNodePortAddresses(ipFamily, nil)
+	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nil)
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses, healthzServer)
 
 	hns, supportedFeatures := newHostNetworkService()
