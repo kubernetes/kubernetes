@@ -46,7 +46,7 @@ type Protocol uint16
 func New() Interface {
 	handle, err := libipvs.New("")
 	if err != nil {
-		klog.Errorf("IPVS interface can't be initialized, error: %v", err)
+		klog.ErrorS(err, "IPVS interface can't be initialized")
 		return nil
 	}
 	return &runner{
