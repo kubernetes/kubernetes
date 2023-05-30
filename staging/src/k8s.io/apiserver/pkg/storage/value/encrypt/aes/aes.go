@@ -257,12 +257,7 @@ func (e *extendedNonceGCM) TransformToStorage(ctx context.Context, data []byte, 
 		return nil, err // TODO fmt.Err
 	}
 
-	transformedData, err := transformer.TransformToStorage(ctx, data, dataCtx)
-	if err != nil {
-		return nil, err // TODO fmt.Err
-	}
-
-	return transformedData, nil
+	return transformer.TransformToStorage(ctx, data, dataCtx)
 }
 
 func (e *extendedNonceGCM) derivedKeyTransformer(info []byte, dataCtx value.Context) (value.Transformer, error) {
