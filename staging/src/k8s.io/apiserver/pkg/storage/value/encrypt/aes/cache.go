@@ -31,11 +31,6 @@ type simpleCache struct {
 	ttl   time.Duration
 }
 
-type cacheRecord struct {
-	info        []byte
-	transformer value.Transformer
-}
-
 func newSimpleCache(clock clock.Clock, ttl time.Duration) *simpleCache {
 	cache := utilcache.NewExpiringWithClock(clock)
 	cache.AllowExpiredGet = true // TODO comment
@@ -46,33 +41,30 @@ func newSimpleCache(clock clock.Clock, ttl time.Duration) *simpleCache {
 }
 
 // given a key, return the transformer, or nil if it does not exist in the cache
-func (c *simpleCache) get(info []byte, dataCtx value.Context) value.Transformer {
+func (c *simpleCache) get(info []byte, dataCtx value.Context) *gcm {
 	val, ok := c.cache.Get(keyFunc(dataCtx))
 	if !ok {
 		return nil
 	}
 
-	record := val.(cacheRecord)
+	transformer := val.(*gcm)
 
-	if !bytes.Equal(record.info, info) {
+	if !bytes.Equal(transformer.info, info) {
 		return nil
 	}
 
-	return record.transformer
+	return transformer
 }
 
 // set caches the record for the key
-func (c *simpleCache) set(info []byte, dataCtx value.Context, transformer value.Transformer) {
-	if len(info) == 0 {
-		panic("info must not be empty")
-	}
+func (c *simpleCache) set(dataCtx value.Context, transformer *gcm) {
 	if dataCtx == nil || len(dataCtx.AuthenticatedData()) == 0 {
 		panic("authenticated data must not be empty")
 	}
 	if transformer == nil {
 		panic("transformer must not be nil")
 	}
-	c.cache.Set(keyFunc(dataCtx), cacheRecord{info: info, transformer: transformer}, c.ttl)
+	c.cache.Set(keyFunc(dataCtx), transformer, c.ttl)
 }
 
 func keyFunc(dataCtx value.Context) string {

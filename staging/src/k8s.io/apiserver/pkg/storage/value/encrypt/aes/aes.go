@@ -61,12 +61,16 @@ type gcm struct {
 // rotation. Future work should include investigation of AES-GCM-SIV as an alternative to
 // random nonces.
 func NewGCMTransformer(block cipher.Block) (value.Transformer, error) {
+	return newGCMTransformerWithInfo(block, nil)
+}
+
+func newGCMTransformerWithInfo(block cipher.Block, info []byte) (*gcm, error) {
 	aead, err := newGCM(block)
 	if err != nil {
 		return nil, err
 	}
 
-	return &gcm{aead: aead, nonceFunc: randomNonce}, nil
+	return &gcm{aead: aead, nonceFunc: randomNonce, info: info}, nil
 }
 
 // NewGCMTransformerWithUniqueKeyUnsafe is the same as NewGCMTransformer but is unsafe for general
@@ -267,6 +271,9 @@ func (e *extendedNonceGCM) derivedKeyTransformer(info []byte, dataCtx value.Cont
 		}
 	}
 
+	// this could be a subslice of a much larger slice and we do not want to hold onto that larger slice
+	info = deepCopySlice(info)
+
 	key, err := e.sha256KDFExpandOnly(info)
 	if err != nil {
 		return nil, err // TODO fmt.Err
@@ -277,14 +284,13 @@ func (e *extendedNonceGCM) derivedKeyTransformer(info []byte, dataCtx value.Cont
 		return nil, err // TODO fmt.Err
 	}
 
-	transformer, err := NewGCMTransformer(block)
+	transformer, err := newGCMTransformerWithInfo(block, info)
 	if err != nil {
 		return nil, err // TODO fmt.Err
 	}
-	transformer.(*gcm).info = info // TODO probably better to set as part of the constructor
 
 	if e.cache != nil {
-		e.cache.set(info, dataCtx, transformer)
+		e.cache.set(dataCtx, transformer)
 	}
 
 	return transformer, nil
@@ -300,6 +306,12 @@ func (e *extendedNonceGCM) sha256KDFExpandOnly(info []byte) ([]byte, error) {
 	}
 
 	return derivedKey, nil
+}
+
+func deepCopySlice(in []byte) []byte {
+	out := make([]byte, len(in))
+	copy(out, in)
+	return out
 }
 
 func (t *gcm) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
