@@ -25,7 +25,9 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kube-openapi/pkg/validation/validate"
 	"sigs.k8s.io/yaml"
 )
 
@@ -190,17 +192,21 @@ func TestStatusStrategyValidateUpdate(t *testing.T) {
 	}
 	t.Logf("crd details: %v", crd)
 
-	strategy := statusStrategy{}
 	kind := schema.GroupVersionKind{
 		Version: crd.Spec.Versions[0].Name,
 		Kind:    crd.Spec.Names.Kind,
 		Group:   crd.Spec.Group,
 	}
-	strategy.customResourceStrategy.validator.kind = kind
-	ss, _ := structuralschema.NewStructural(crd.Spec.Versions[0].Schema.OpenAPIV3Schema)
-	strategy.structuralSchemas = map[string]*structuralschema.Structural{
-		crd.Spec.Versions[0].Name: ss,
+	ss, err := structuralschema.NewStructural(crd.Spec.Versions[0].Schema.OpenAPIV3Schema)
+	if err != nil {
+		t.Fatalf("unexpected schema error: %v", err)
 	}
+	strategy := NewStatusStrategy(NewStrategy(runtime.NewScheme(), false, kind,
+		func() (*validate.SchemaValidator, error) { return nil, nil },
+		func() (*validate.SchemaValidator, error) { return nil, nil },
+		map[string]*structuralschema.Structural{crd.Spec.Versions[0].Name: ss},
+		nil, nil,
+	))
 
 	ctx := context.TODO()
 

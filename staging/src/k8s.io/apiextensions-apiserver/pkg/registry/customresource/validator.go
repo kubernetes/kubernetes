@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"sync"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/validation"
@@ -34,12 +35,101 @@ import (
 	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 )
 
+type CustomResourceValidator interface {
+	Validate(ctx context.Context, obj runtime.Object, scale *apiextensions.CustomResourceSubresourceScale) field.ErrorList
+	ValidateUpdate(ctx context.Context, obj, old runtime.Object, scale *apiextensions.CustomResourceSubresourceScale) field.ErrorList
+	ValidateStatusUpdate(ctx context.Context, obj, old runtime.Object, scale *apiextensions.CustomResourceSubresourceScale) field.ErrorList
+}
+
+type lazyValidator struct {
+	newSchemaValidator, newStatusSchemaValidator func() (*validate.SchemaValidator, error)
+
+	lock      sync.RWMutex
+	validator *customResourceValidator
+}
+
+func NewLazyValidator(namespaceScoped bool, kind schema.GroupVersionKind, newSchemaValidator, newStatusSchemaValidator func() (*validate.SchemaValidator, error)) CustomResourceValidator {
+	return &lazyValidator{
+		newSchemaValidator:       newSchemaValidator,
+		newStatusSchemaValidator: newStatusSchemaValidator,
+		validator: &customResourceValidator{
+			namespaceScoped: namespaceScoped,
+			kind:            kind,
+		},
+	}
+}
+
+func (v *lazyValidator) Validate(ctx context.Context, obj runtime.Object, scale *apiextensions.CustomResourceSubresourceScale) field.ErrorList {
+	v.lock.RLock()
+	if v.validator.schemaValidator == nil {
+		v.lock.RUnlock()
+		v.lock.Lock()
+		if v.validator.schemaValidator == nil {
+			var err error
+			v.validator.schemaValidator, err = v.newSchemaValidator()
+			if err != nil {
+				v.lock.Unlock()
+				return field.ErrorList{field.InternalError(field.NewPath(""), err)} // TODO: maybe cache error
+			}
+		}
+		v.lock.Unlock()
+		v.lock.RLock()
+	}
+	defer v.lock.RUnlock()
+
+	return v.validator.Validate(ctx, obj, scale)
+}
+
+func (v *lazyValidator) ValidateUpdate(ctx context.Context, obj, old runtime.Object, scale *apiextensions.CustomResourceSubresourceScale) field.ErrorList {
+	v.lock.RLock()
+	if v.validator.schemaValidator == nil {
+		v.lock.RUnlock()
+		v.lock.Lock()
+		if v.validator.schemaValidator == nil {
+			var err error
+			v.validator.schemaValidator, err = v.newSchemaValidator()
+			if err != nil {
+				v.lock.Unlock()
+				return field.ErrorList{field.InternalError(field.NewPath(""), err)} // TODO: maybe cache error
+			}
+		}
+		v.lock.Unlock()
+		v.lock.RLock()
+	}
+	defer v.lock.RUnlock()
+
+	return v.validator.ValidateUpdate(ctx, obj, old, scale)
+}
+
+func (v *lazyValidator) ValidateStatusUpdate(ctx context.Context, obj, old runtime.Object, scale *apiextensions.CustomResourceSubresourceScale) field.ErrorList {
+	v.lock.RLock()
+	if v.validator.statusSchemaValidator == nil {
+		v.lock.RUnlock()
+		v.lock.Lock()
+		if v.validator.statusSchemaValidator == nil {
+			var err error
+			v.validator.statusSchemaValidator, err = v.newStatusSchemaValidator()
+			if err != nil {
+				v.lock.Unlock()
+				return field.ErrorList{field.InternalError(field.NewPath(""), err)} // TODO: maybe cache error
+			}
+		}
+		v.lock.Unlock()
+		v.lock.RLock()
+	}
+	defer v.lock.RUnlock()
+
+	return v.validator.ValidateStatusUpdate(ctx, obj, old, scale)
+}
+
 type customResourceValidator struct {
 	namespaceScoped       bool
 	kind                  schema.GroupVersionKind
 	schemaValidator       *validate.SchemaValidator
 	statusSchemaValidator *validate.SchemaValidator
 }
+
+var _ CustomResourceValidator = &customResourceValidator{}
 
 func (a customResourceValidator) Validate(ctx context.Context, obj runtime.Object, scale *apiextensions.CustomResourceSubresourceScale) field.ErrorList {
 	u, ok := obj.(*unstructured.Unstructured)
@@ -91,11 +181,6 @@ func (a customResourceValidator) ValidateUpdate(ctx context.Context, obj, old ru
 	allErrs = append(allErrs, a.ValidateScaleStatus(ctx, u, scale)...)
 
 	return allErrs
-}
-
-// WarningsOnUpdate returns warnings for the given update.
-func (customResourceValidator) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
 }
 
 func (a customResourceValidator) ValidateStatusUpdate(ctx context.Context, obj, old runtime.Object, scale *apiextensions.CustomResourceSubresourceScale) field.ErrorList {

@@ -50,7 +50,7 @@ type customResourceStrategy struct {
 	names.NameGenerator
 
 	namespaceScoped   bool
-	validator         customResourceValidator
+	validator         CustomResourceValidator
 	structuralSchemas map[string]*structuralschema.Structural
 	celValidators     map[string]*cel.Validator
 	status            *apiextensions.CustomResourceSubresourceStatus
@@ -58,7 +58,7 @@ type customResourceStrategy struct {
 	kind              schema.GroupVersionKind
 }
 
-func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.GroupVersionKind, schemaValidator, statusSchemaValidator *validate.SchemaValidator, structuralSchemas map[string]*structuralschema.Structural, status *apiextensions.CustomResourceSubresourceStatus, scale *apiextensions.CustomResourceSubresourceScale) customResourceStrategy {
+func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.GroupVersionKind, newSchemaValidator, newStatusSchemaValidator func() (*validate.SchemaValidator, error), structuralSchemas map[string]*structuralschema.Structural, status *apiextensions.CustomResourceSubresourceStatus, scale *apiextensions.CustomResourceSubresourceScale) customResourceStrategy {
 	celValidators := map[string]*cel.Validator{}
 	if utilfeature.DefaultFeatureGate.Enabled(features.CustomResourceValidationExpressions) {
 		for name, s := range structuralSchemas {
@@ -75,12 +75,12 @@ func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.Gr
 		namespaceScoped: namespaceScoped,
 		status:          status,
 		scale:           scale,
-		validator: customResourceValidator{
-			namespaceScoped:       namespaceScoped,
-			kind:                  kind,
-			schemaValidator:       schemaValidator,
-			statusSchemaValidator: statusSchemaValidator,
-		},
+		validator: NewLazyValidator(
+			namespaceScoped,
+			kind,
+			newSchemaValidator,
+			newStatusSchemaValidator,
+		),
 		structuralSchemas: structuralSchemas,
 		celValidators:     celValidators,
 		kind:              kind,

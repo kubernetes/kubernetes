@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"k8s.io/kube-openapi/pkg/validation/validate"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -101,8 +102,8 @@ func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcd3testi
 			typer,
 			true,
 			kind,
-			nil,
-			nil,
+			func() (*validate.SchemaValidator, error) { return nil, nil },
+			func() (*validate.SchemaValidator, error) { return nil, nil },
 			nil,
 			status,
 			scale,

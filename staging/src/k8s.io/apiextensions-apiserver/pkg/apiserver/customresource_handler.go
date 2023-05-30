@@ -734,25 +734,37 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		typer := newUnstructuredObjectTyper(parameterScheme)
 		creator := unstructuredCreator{}
 
-		validationSchema, err := apiextensionshelpers.GetSchemaForVersion(crd, v.Name)
-		if err != nil {
-			utilruntime.HandleError(err)
-			return nil, fmt.Errorf("the server could not properly serve the CR schema")
+		internalValidationSchema := cached[*apiextensionsinternal.CustomResourceValidation]{
+			Fn: func() (*apiextensionsinternal.CustomResourceValidation, error) {
+				validationSchema, err := apiextensionshelpers.GetSchemaForVersion(crd, v.Name)
+				if err != nil {
+					utilruntime.HandleError(err)
+					return nil, fmt.Errorf("the server could not properly serve the CR schema")
+				}
+				if validationSchema == nil {
+					return nil, nil
+				}
+				internalValidationSchema := &apiextensionsinternal.CustomResourceValidation{}
+				if err := apiextensionsv1.Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(validationSchema, internalValidationSchema, nil); err != nil {
+					return nil, fmt.Errorf("failed to convert CRD validation to internal version: %v", err)
+				}
+				return internalValidationSchema, nil
+			},
 		}
-		var internalValidationSchema *apiextensionsinternal.CustomResourceValidation
-		if validationSchema != nil {
-			internalValidationSchema = &apiextensionsinternal.CustomResourceValidation{}
-			if err := apiextensionsv1.Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(validationSchema, internalValidationSchema, nil); err != nil {
-				return nil, fmt.Errorf("failed to convert CRD validation to internal version: %v", err)
+		newValidator := func() (*validate.SchemaValidator, error) {
+			schema, err := internalValidationSchema.Get()
+			if err != nil {
+				return nil, err
 			}
-		}
-		validator, _, err := apiservervalidation.NewSchemaValidator(internalValidationSchema)
-		if err != nil {
-			return nil, err
+			validator, _, err := apiservervalidation.NewSchemaValidator(schema)
+			if err != nil {
+				return nil, err
+			}
+			return validator, nil
 		}
 
 		var statusSpec *apiextensionsinternal.CustomResourceSubresourceStatus
-		var statusValidator *validate.SchemaValidator
+		var newStatusValidator func() (*validate.SchemaValidator, error)
 		subresources, err := apiextensionshelpers.GetSubresourcesForVersion(crd, v.Name)
 		if err != nil {
 			utilruntime.HandleError(err)
@@ -764,15 +776,25 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 			if err := apiextensionsv1.Convert_v1_CustomResourceSubresourceStatus_To_apiextensions_CustomResourceSubresourceStatus(subresources.Status, statusSpec, nil); err != nil {
 				return nil, fmt.Errorf("failed converting CRD status subresource to internal version: %v", err)
 			}
-			// for the status subresource, validate only against the status schema
-			if internalValidationSchema != nil && internalValidationSchema.OpenAPIV3Schema != nil && internalValidationSchema.OpenAPIV3Schema.Properties != nil {
-				if statusSchema, ok := internalValidationSchema.OpenAPIV3Schema.Properties["status"]; ok {
-					openapiSchema := &spec.Schema{}
-					if err := apiservervalidation.ConvertJSONSchemaPropsWithPostProcess(&statusSchema, openapiSchema, apiservervalidation.StripUnsupportedFormatsPostProcess); err != nil {
-						return nil, err
-					}
-					statusValidator = validate.NewSchemaValidator(openapiSchema, nil, "", strfmt.Default)
+			newStatusValidator = func() (*validate.SchemaValidator, error) {
+				schema, err := internalValidationSchema.Get()
+				if err != nil {
+					return nil, err
 				}
+
+				// for the status subresource, validate only against the status schema
+				if schema == nil || schema.OpenAPIV3Schema == nil || schema.OpenAPIV3Schema.Properties == nil {
+					return nil, nil
+				}
+				statusSchema, found := schema.OpenAPIV3Schema.Properties["status"]
+				if !found {
+					return nil, nil
+				}
+				openapiSchema := &spec.Schema{}
+				if err := apiservervalidation.ConvertJSONSchemaPropsWithPostProcess(&statusSchema, openapiSchema, apiservervalidation.StripUnsupportedFormatsPostProcess); err != nil {
+					return nil, err
+				}
+				return validate.NewSchemaValidator(openapiSchema, nil, "", strfmt.Default), nil
 			}
 		}
 
@@ -804,8 +826,8 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 				typer,
 				crd.Spec.Scope == apiextensionsv1.NamespaceScoped,
 				kind,
-				validator,
-				statusValidator,
+				newValidator,
+				newStatusValidator,
 				structuralSchemas,
 				statusSpec,
 				scaleSpec,
@@ -1401,4 +1423,33 @@ func buildOpenAPIModelsForApply(staticOpenAPISpec map[string]*spec.Schema, crd *
 		return nil, err
 	}
 	return mergedOpenAPI.Components.Schemas, nil
+}
+
+// cached[T] calls Fn on the first Get() call and stores its result. Every
+// following Get() call is served from the cache.
+type cached[T any] struct {
+	Fn func() (T, error)
+
+	lock  sync.RWMutex
+	value T
+	err   error
+}
+
+func (c *cached[T]) Get() (T, error) {
+	c.lock.RLock()
+	if c.Fn == nil {
+		defer c.lock.RUnlock()
+		return c.value, c.err
+	}
+	c.lock.RUnlock()
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	if c.Fn != nil {
+		c.value, c.err = c.Fn()
+		c.Fn = nil
+	}
+
+	return c.value, c.err
 }
