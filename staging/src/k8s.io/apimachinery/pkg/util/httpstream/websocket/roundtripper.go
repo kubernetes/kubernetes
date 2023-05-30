@@ -86,6 +86,8 @@ func (rt *RoundTripper) RoundTrip(request *http.Request) (retResp *http.Response
 		Proxy:           rt.Proxier,
 		TLSClientConfig: rt.TLSConfig,
 		Subprotocols:    protocolVersions,
+		ReadBufferSize:  (32 * 1024) + 1,
+		WriteBufferSize: (32 * 1024) + 1,
 	}
 	switch request.URL.Scheme {
 	case "https":

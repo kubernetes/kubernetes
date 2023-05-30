@@ -74,7 +74,7 @@ func (h *StreamTranslatorHandler) ServeHTTP(w http.ResponseWriter, req *http.Req
 
 	// Create the SPDY client connection proxied through kubelet.
 	tlsConfig, err := utilnet.TLSClientConfig(h.Transport)
-	if err == nil {
+	if tlsConfig != nil && err == nil {
 		// Manually set NextProtos to "http/1.1", since http/2.0 will NOT upgrade a connection.
 		tlsConfig.NextProtos = []string{"http/1.1"}
 	} else {
