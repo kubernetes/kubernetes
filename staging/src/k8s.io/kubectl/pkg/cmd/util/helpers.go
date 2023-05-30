@@ -684,11 +684,15 @@ const (
 
 func GetDryRunStrategy(cmd *cobra.Command) (DryRunStrategy, error) {
 	var dryRunFlag = GetFlagString(cmd, "dry-run")
+	return GetDryRunStrategyFromFlag(dryRunFlag)
+}
+
+func GetDryRunStrategyFromFlag(dryRunFlag string) (DryRunStrategy, error) {
 	b, err := strconv.ParseBool(dryRunFlag)
 	// The flag is not a boolean
 	if err != nil {
 		switch dryRunFlag {
-		case cmd.Flag("dry-run").NoOptDefVal:
+		case "unchanged":
 			klog.Warning(`--dry-run is deprecated and can be replaced with --dry-run=client.`)
 			return DryRunClient, nil
 		case "client":

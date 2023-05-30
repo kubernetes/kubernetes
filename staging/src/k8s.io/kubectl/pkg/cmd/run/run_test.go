@@ -41,7 +41,6 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
-	"k8s.io/kubectl/pkg/util/i18n"
 )
 
 func TestGetRestartPolicy(t *testing.T) {
@@ -84,10 +83,7 @@ func TestGetRestartPolicy(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		cmd := &cobra.Command{}
-		cmd.Flags().String("restart", "", i18n.T("dummy restart flag)"))
-		cmd.Flags().Lookup("restart").Value.Set(test.input)
-		policy, err := getRestartPolicy(cmd, test.interactive)
+		policy, err := getRestartPolicy(test.input, test.interactive)
 		if test.expectErr && err == nil {
 			t.Error("unexpected non-error")
 		}
@@ -383,7 +379,7 @@ func TestGenerateService(t *testing.T) {
 				test.params["port"] = test.port
 			}
 
-			_, err = opts.generateService(tf, cmd, test.params)
+			_, err = opts.generateService(tf, test.params)
 			if test.expectErr {
 				if err == nil {
 					t.Error("unexpected non-error")
@@ -422,7 +418,7 @@ func TestRunValidations(t *testing.T) {
 			flags: map[string]string{
 				"image": "#",
 			},
-			expectedErr: "Invalid image name",
+			expectedErr: "invalid image name \"#\": invalid reference format",
 		},
 		{
 			name: "test rm errors when used on non-attached containers",
