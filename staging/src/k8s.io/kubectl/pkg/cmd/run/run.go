@@ -226,8 +226,8 @@ func NewCmdRun(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Com
 	flags.RecordFlags.AddFlags(cmd)
 
 	addRunFlags(cmd, flags)
-	//cmdutil.AddApplyAnnotationFlags(cmd)
-	//cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodAttachTimeout)
+	cmdutil.AddApplyAnnotationFlags(cmd)
+	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodAttachTimeout)
 
 	// Deprecate the cascade flag. If set, it has no practical effect since the created pod has no dependents.
 	// TODO: Remove the cascade flag from the run command in kubectl 1.29
@@ -281,8 +281,8 @@ func addRunFlags(cmd *cobra.Command, flags *RunFlags) {
 	cmd.Flags().BoolVarP(&flags.Quiet, "quiet", "q", flags.Quiet, "If true, suppress prompt messages.")
 	cmd.Flags().BoolVar(&flags.Privileged, "privileged", flags.Privileged, i18n.T("If true, run the container in privileged mode."))
 
-	cmd.Flags().BoolVar(&flags.SaveConfig, "save-config", flags.SaveConfig, i18n.T("TODO Save config description"))
-	cmd.Flags().DurationVar(&flags.PodRunningTimeout, "pod-running-timeout", flags.PodRunningTimeout, "TODO message about pod timeouts that makes sense")
+	//cmd.Flags().BoolVar(&flags.SaveConfig, "save-config", flags.SaveConfig, i18n.T("TODO Save config description"))
+	//cmd.Flags().DurationVar(&flags.PodRunningTimeout, "pod-running-timeout", flags.PodRunningTimeout, "TODO message about pod timeouts that makes sense")
 
 	cmdutil.AddFieldManagerFlagVar(cmd, &flags.fieldManager, "kubectl-run")
 	flags.AddOverrideFlags(cmd)
