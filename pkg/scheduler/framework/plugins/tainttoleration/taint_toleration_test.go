@@ -229,7 +229,7 @@ func TestTaintTolerationScore(t *testing.T) {
 			},
 		},
 		{
-			name: "Skip score if nodes is empty",
+			name: "Skip score if nodes are empty",
 			pod: podWithTolerations("pod1", []v1.Toleration{
 				{
 					Key:      "cpu-type",
@@ -279,8 +279,8 @@ func TestTaintTolerationScore(t *testing.T) {
 				t.Errorf("unexpected error: %v", status)
 			}
 
-			if !reflect.DeepEqual(test.expectedList, gotList) {
-				t.Errorf("expected:\n\t%+v,\ngot:\n\t%+v", test.expectedList, gotList)
+			if diff := cmp.Diff(test.expectedList, gotList); diff != "" {
+				t.Errorf("Unexpected node score list (-want, +got):\n%s", diff)
 			}
 		})
 	}
