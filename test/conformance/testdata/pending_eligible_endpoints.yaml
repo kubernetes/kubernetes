@@ -31,7 +31,6 @@
 - listStorageV1VolumeAttachment
 - patchCoreV1NamespacedPersistentVolumeClaim
 - patchCoreV1NamespacedPersistentVolumeClaimStatus
-- patchCoreV1NamespacedPodEphemeralcontainers
 - patchCoreV1PersistentVolume
 - patchCoreV1PersistentVolumeStatus
 - patchNetworkingV1NamespacedNetworkPolicyStatus
@@ -42,7 +41,6 @@
 - patchStorageV1VolumeAttachmentStatus
 - readCoreV1NamespacedPersistentVolumeClaim
 - readCoreV1NamespacedPersistentVolumeClaimStatus
-- readCoreV1NamespacedPodEphemeralcontainers
 - readCoreV1NodeStatus
 - readCoreV1PersistentVolume
 - readCoreV1PersistentVolumeStatus
