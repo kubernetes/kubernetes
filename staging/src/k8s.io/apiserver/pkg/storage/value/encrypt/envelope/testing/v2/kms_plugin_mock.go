@@ -26,7 +26,6 @@ import (
 	"net"
 	"os"
 	"sync"
-	"testing"
 	"time"
 
 	"google.golang.org/grpc"
@@ -59,8 +58,13 @@ type Base64Plugin struct {
 	keyID              string
 }
 
+type testingT interface {
+	Fatalf(format string, args ...any)
+	Cleanup(f func())
+}
+
 // NewBase64Plugin is a constructor for Base64Plugin.
-func NewBase64Plugin(t *testing.T, socketPath string) *Base64Plugin {
+func NewBase64Plugin(t testingT, socketPath string) *Base64Plugin {
 	server := grpc.NewServer()
 	result := &Base64Plugin{
 		grpcServer: server,

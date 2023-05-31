@@ -300,6 +300,8 @@ func (s *EtcdOptions) ApplyTo(c *server.Config) error {
 	return s.ApplyWithStorageFactoryTo(&SimpleStorageFactory{StorageConfig: s.StorageConfig}, c)
 }
 
+var LastHax []generic.RESTOptionsGetter
+
 // ApplyWithStorageFactoryTo mutates the provided server.Config.  It must never mutate the receiver (EtcdOptions).
 func (s *EtcdOptions) ApplyWithStorageFactoryTo(factory serverstorage.StorageFactory, c *server.Config) error {
 	if s == nil {
@@ -324,6 +326,9 @@ func (s *EtcdOptions) ApplyWithStorageFactoryTo(factory serverstorage.StorageFac
 	}
 
 	c.RESTOptionsGetter = &StorageFactoryRestOptionsFactory{Options: *s, StorageFactory: factory}
+
+	LastHax = append(LastHax, c.RESTOptionsGetter)
+
 	return nil
 }
 
