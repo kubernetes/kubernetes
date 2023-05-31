@@ -637,7 +637,7 @@ func makeNodesWithTopologyZone(num int) []*v1.Node {
 	nodeList := make([]*v1.Node, num, num)
 	for i := 0; i < len(nodeList); i++ {
 		nodeName := fmt.Sprintf("host_%d", i)
-		zone := fmt.Sprintf("us-west-0")
+		zone := "us-west-0"
 		nodeList[i] = &v1.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   nodeName,

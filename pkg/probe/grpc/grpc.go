@@ -113,5 +113,5 @@ func (p grpcProber) Probe(host, service string, port int, timeout time.Duration)
 		return probe.Failure, fmt.Sprintf("service unhealthy (responded with %q)", resp.GetStatus().String()), nil
 	}
 
-	return probe.Success, fmt.Sprintf("service healthy"), nil
+	return probe.Success, "service healthy", nil
 }

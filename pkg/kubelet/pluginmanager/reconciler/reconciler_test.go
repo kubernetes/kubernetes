@@ -195,7 +195,7 @@ func Test_Run_Positive_Register(t *testing.T) {
 	defer close(stopChan)
 	go reconciler.Run(stopChan)
 	socketPath := filepath.Join(socketDir, "plugin.sock")
-	pluginName := fmt.Sprintf("example-plugin")
+	pluginName := "example-plugin"
 	p := pluginwatcher.NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
 	require.NoError(t, p.Serve("v1beta1", "v1beta2"))
 	defer func() {
@@ -249,7 +249,7 @@ func Test_Run_Positive_RegisterThenUnregister(t *testing.T) {
 	go reconciler.Run(stopChan)
 
 	socketPath := filepath.Join(socketDir, "plugin.sock")
-	pluginName := fmt.Sprintf("example-plugin")
+	pluginName := "example-plugin"
 	p := pluginwatcher.NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
 	require.NoError(t, p.Serve("v1beta1", "v1beta2"))
 	timestampBeforeRegistration := time.Now()
@@ -310,7 +310,7 @@ func Test_Run_Positive_ReRegister(t *testing.T) {
 	go reconciler.Run(stopChan)
 
 	socketPath := filepath.Join(socketDir, "plugin2.sock")
-	pluginName := fmt.Sprintf("example-plugin2")
+	pluginName := "example-plugin2"
 	p := pluginwatcher.NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
 	require.NoError(t, p.Serve("v1beta1", "v1beta2"))
 	timestampBeforeRegistration := time.Now()

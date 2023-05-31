@@ -75,7 +75,7 @@ func isCycleStateEqual(a, b *CycleState) (bool, string) {
 		typed2, ok2 := v2.(*fakeData)
 		if !ok1 || !ok2 {
 			isEqual = false
-			msg = fmt.Sprintf("CycleState has the data which is not type *fakeData.")
+			msg = "CycleState has the data which is not type *fakeData."
 			return false
 		}
 

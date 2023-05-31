@@ -185,7 +185,7 @@ type updateOp struct {
 
 func (op *updateOp) String() string {
 	if op.node == nil {
-		return fmt.Sprintf("updateOp(nil)")
+		return "updateOp(nil)"
 	}
 	return fmt.Sprintf("updateOp(%q,%v)", op.node.Name, op.node.Spec.PodCIDR)
 }
@@ -353,7 +353,7 @@ type deleteOp struct {
 
 func (op *deleteOp) String() string {
 	if op.node == nil {
-		return fmt.Sprintf("deleteOp(nil)")
+		return "deleteOp(nil)"
 	}
 	return fmt.Sprintf("deleteOp(%q,%v)", op.node.Name, op.node.Spec.PodCIDR)
 }

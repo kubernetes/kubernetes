@@ -42,7 +42,7 @@ func (g *UndirectedGraph) NewNodeID() int {
 		return 0
 	}
 	if len(g.nodes) == maxInt {
-		panic(fmt.Sprintf("simple: cannot allocate node: no slot"))
+		panic("simple: cannot allocate node: no slot")
 	}
 
 	var id int
