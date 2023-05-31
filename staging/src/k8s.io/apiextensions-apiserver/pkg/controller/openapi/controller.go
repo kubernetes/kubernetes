@@ -18,12 +18,13 @@ package openapi
 
 import (
 	"fmt"
+	"k8s.io/apiextensions-apiserver/pkg/controller/openapi/helper"
+	"k8s.io/apimachinery/pkg/labels"
 	"reflect"
 	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
@@ -92,31 +93,55 @@ func (c *Controller) Run(staticSpec *spec.Swagger, openAPIService *handler.OpenA
 		return
 	}
 
-	// create initial spec to avoid merging once per CRD on startup
-	crds, err := c.crdLister.List(labels.Everything())
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("failed to initially list all CRDs: %v", err))
-		return
-	}
-	for _, crd := range crds {
-		if !apiextensionshelpers.IsCRDConditionTrue(crd, apiextensionsv1.Established) {
-			continue
-		}
-		newSpecs, changed, err := buildVersionSpecs(crd, nil)
-		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("failed to build OpenAPI spec of CRD %s: %v", crd.Name, err))
-		} else if !changed {
-			continue
-		}
-		c.crdSpecs[crd.Name] = newSpecs
-	}
-	if err := c.updateSpecLocked(); err != nil {
-		utilruntime.HandleError(fmt.Errorf("failed to initially create OpenAPI spec for CRDs: %v", err))
-		return
-	}
+	var stopWorkerCh chan struct{}
+	var stoppedWorker chan struct{}
+	sleepControl := &helper.SleepControl{
+		WakeupFn: func() {
+			// create initial spec to avoid merging once per CRD on startup
+			crds, err := c.crdLister.List(labels.Everything())
+			if err != nil {
+				utilruntime.HandleError(fmt.Errorf("failed to initially list all CRDs: %v", err))
+				return
+			}
+			for _, crd := range crds {
+				if !apiextensionshelpers.IsCRDConditionTrue(crd, apiextensionsv1.Established) {
+					continue
+				}
+				newSpecs, changed, err := buildVersionSpecs(crd, nil)
+				if err != nil {
+					utilruntime.HandleError(fmt.Errorf("failed to build OpenAPI spec of CRD %s: %v", crd.Name, err))
+				} else if !changed {
+					continue
+				}
+				c.crdSpecs[crd.Name] = newSpecs
+			}
+			if err := c.updateSpecLocked(); err != nil {
+				utilruntime.HandleError(fmt.Errorf("failed to initially create OpenAPI spec for CRDs: %v", err))
+				return
+			}
 
-	// only start one worker thread since its a slow moving API
-	go wait.Until(c.runWorker, time.Second, stopCh)
+			// only start one worker thread since its a slow moving API
+			klog.V(4).Infof("Starting OpenAPI v2 controller for CRDs")
+			stopWorkerCh = make(chan struct{})
+			stoppedWorker = make(chan struct{})
+			go func(stopWorkerCh <-chan struct{}, stoppedWorker chan<- struct{}) {
+				defer close(stoppedWorker)
+				wait.Until(c.runWorker, time.Second, stopWorkerCh)
+			}(stopWorkerCh, stoppedWorker)
+		},
+		SleepFn: func() {
+			if stopWorkerCh != nil {
+				klog.V(4).Infof("Stopping OpenAPI v2 controller for CRDs")
+				close(stopWorkerCh)
+				<-stoppedWorker
+				stopWorkerCh = nil
+				stoppedWorker = nil
+			}
+		},
+		FallAsleepAfter: time.Minute,
+	}
+	openAPIService.RegisterSynchronousHandlerCallback(sleepControl.Tick)
+	go sleepControl.Run(time.Second, stopCh)
 
 	<-stopCh
 }
