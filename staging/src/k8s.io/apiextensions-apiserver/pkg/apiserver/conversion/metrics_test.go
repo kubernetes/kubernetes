@@ -41,7 +41,6 @@ func TestWebhookConversionMetrics_ObserveWebhookConversionSuccess(t *testing.T) 
 		wantLabels           map[string]string
 		expectedRequestValue int
 	}{
-		// TODO: Add test cases.
 		{
 			name: "test_conversion_success",
 			fields: fields{
@@ -102,7 +101,6 @@ func TestWebhookConversionMetrics_ObserveWebhookConversionFailure(t *testing.T) 
 		expectedRequestValue int
 		expectedLatencyCount int
 	}{
-		// TODO: Add test cases.
 		{
 			name: "test_conversion_failure",
 			fields: fields{
