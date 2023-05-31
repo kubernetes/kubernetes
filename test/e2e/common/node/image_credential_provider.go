@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2enode
+package node
 
 import (
 	"context"
@@ -30,7 +30,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = SIGDescribe("ImageCredentialProvider", func() {
+var _ = SIGDescribe("ImageCredentialProvider [Feature:KubeletCredentialProviders]", func() {
 	f := framework.NewDefaultFramework("image-credential-provider")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var podClient *e2epod.PodClient
