@@ -56,7 +56,7 @@ func ContainsString(slice []string, s string, modifier func(s string) string) bo
 // RemoveString returns a newly created []string that contains all items from slice that
 // are not equal to s and modifier(s) in case modifier func is provided.
 func RemoveString(slice []string, s string, modifier func(s string) string) []string {
-	newSlice := make([]string, 0)
+	index := 0
 	for _, item := range slice {
 		if item == s {
 			continue
@@ -64,12 +64,11 @@ func RemoveString(slice []string, s string, modifier func(s string) string) []st
 		if modifier != nil && modifier(item) == s {
 			continue
 		}
-		newSlice = append(newSlice, item)
+		slice[index] = item
+		index++
 	}
-	if len(newSlice) == 0 {
-		// Sanitize for unit tests so we don't need to distinguish empty array
-		// and nil.
-		newSlice = nil
+	if index == 0 {
+		return nil
 	}
-	return newSlice
+	return slice[:index]
 }

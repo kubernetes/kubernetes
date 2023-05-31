@@ -141,6 +141,13 @@ func TestRemoveString(t *testing.T) {
 			modifier: modifier,
 			want:     []string{"a", "cd"},
 		},
+		{
+			testName: "Only remove strings that match the modifier func",
+			input:    []string{"a", "b", "ab"},
+			remove:   "ee",
+			modifier: modifier,
+			want:     []string{"a", "b"},
+		},
 	}
 	for _, tt := range tests {
 		if got := RemoveString(tt.input, tt.remove, tt.modifier); !reflect.DeepEqual(got, tt.want) {
