@@ -670,7 +670,7 @@ func doTestSecretDataInVolume(volumePath string, secret v1.Secret, t *testing.T)
 		if _, err := os.Stat(secretDataHostPath); err != nil {
 			t.Fatalf("SetUp() failed, couldn't find secret data on disk: %v", secretDataHostPath)
 		} else {
-			actualSecretBytes, err := ioutil.ReadFile(secretDataHostPath)
+			actualSecretBytes, err := os.ReadFile(secretDataHostPath)
 			if err != nil {
 				t.Fatalf("Couldn't read secret data from: %v", secretDataHostPath)
 			}

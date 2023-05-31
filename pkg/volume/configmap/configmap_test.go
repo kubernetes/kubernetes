@@ -703,7 +703,7 @@ func doTestConfigMapDataInVolume(volumePath string, configMap v1.ConfigMap, t *t
 		if _, err := os.Stat(configMapDataHostPath); err != nil {
 			t.Fatalf("SetUp() failed, couldn't find configMap data on disk: %v", configMapDataHostPath)
 		} else {
-			actualValue, err := ioutil.ReadFile(configMapDataHostPath)
+			actualValue, err := os.ReadFile(configMapDataHostPath)
 			if err != nil {
 				t.Fatalf("Couldn't read configMap data from: %v", configMapDataHostPath)
 			}
