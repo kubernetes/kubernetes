@@ -36,7 +36,11 @@ func TestGetContainerDevices(t *testing.T) {
 
 	podDevices.insert(podID, contID, resourceName1,
 		devices,
-		constructAllocResp(map[string]string{"/dev/r1dev1": "/dev/r1dev1", "/dev/r1dev2": "/dev/r1dev2"}, map[string]string{"/home/r1lib1": "/usr/r1lib1"}, map[string]string{}))
+		newContainerAllocateResponse(
+			withDevices(map[string]string{"/dev/r1dev1": "/dev/r1dev1", "/dev/r1dev2": "/dev/r1dev2"}),
+			withMounts(map[string]string{"/home/r1lib1": "/usr/r1lib1"}),
+		),
+	)
 
 	resContDevices := podDevices.getContainerDevices(podID, contID)
 	contDevices, ok := resContDevices[resourceName1]
