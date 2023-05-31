@@ -103,7 +103,6 @@ func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(admitPod *v1.Pod, 
 		// this is a blocking call and should only return when the pod and its containers are killed.
 		klog.V(3).InfoS("Preempting pod to free up resources", "pod", klog.KObj(pod), "podUID", pod.UID, "insufficientResources", insufficientResources)
 		err := c.killPodFunc(pod, true, nil, func(status *v1.PodStatus) {
-			status.Phase = v1.PodFailed
 			status.Reason = events.PreemptContainer
 			status.Message = message
 			if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {

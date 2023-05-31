@@ -165,7 +165,7 @@ func TestManager(t *testing.T) {
 			expectedPodToGracePeriodOverride: map[string]int64{"running-pod": 20, "failed-pod": 20, "succeeded-pod": 20},
 			expectedPodStatuses: map[string]v1.PodStatus{
 				"running-pod": {
-					Phase:   v1.PodFailed,
+					Phase:   v1.PodRunning,
 					Message: "Pod was terminated in response to imminent node shutdown.",
 					Reason:  "Terminated",
 					Conditions: []v1.PodCondition{
@@ -217,12 +217,10 @@ func TestManager(t *testing.T) {
 			expectedPodToGracePeriodOverride: map[string]int64{"normal-pod-nil-grace-period": 20, "critical-pod-nil-grace-period": 10},
 			expectedPodStatuses: map[string]v1.PodStatus{
 				"normal-pod-nil-grace-period": {
-					Phase:   v1.PodFailed,
 					Message: "Pod was terminated in response to imminent node shutdown.",
 					Reason:  "Terminated",
 				},
 				"critical-pod-nil-grace-period": {
-					Phase:   v1.PodFailed,
 					Message: "Pod was terminated in response to imminent node shutdown.",
 					Reason:  "Terminated",
 				},
