@@ -35,6 +35,7 @@ import (
 
 	"k8s.io/apiserver/pkg/storage/value"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 )
 
 // TODO comment
@@ -193,7 +194,7 @@ func generateKey(length int) (key []byte, err error) {
 
 // TODO comment
 func NewReadOnlyKDFExtendedNonceGCMTransformerFromUniqueKeyUnsafe(key []byte) value.Read {
-	return newReadOnlyExtendedNonceGCMTransformerFromUniqueKeyUnsafe(key, nil) // TODO set cache
+	return newReadOnlyExtendedNonceGCMTransformerFromUniqueKeyUnsafe(key, newSimpleCache(clock.RealClock{}, 10*time.Minute))
 }
 
 func newReadOnlyExtendedNonceGCMTransformerFromUniqueKeyUnsafe(key []byte, cache *simpleCache) value.Read {
@@ -220,7 +221,7 @@ func NewKDFExtendedNonceGCMTransformerWithUniqueKeyUnsafe() (value.Transformer, 
 	if err != nil {
 		return nil, nil, err
 	}
-	return newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(key, nil), key, nil // TODO set cache
+	return newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(key, newSimpleCache(clock.RealClock{}, 10*time.Minute)), key, nil
 }
 
 func newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(key []byte, cache *simpleCache) value.Transformer {
