@@ -59,9 +59,6 @@ const (
 	// backoffQ or activeQ. If this value is empty, the default value (5min)
 	// will be used.
 	DefaultPodMaxInUnschedulablePodsDuration time.Duration = 5 * time.Minute
-
-	queueClosed = "scheduling queue is closed"
-
 	// Scheduling queue names
 	activeQName       = "Active"
 	backoffQName      = "Backoff"
@@ -601,7 +598,8 @@ func (p *PriorityQueue) Pop() (*framework.QueuedPodInfo, error) {
 		// When Close() is called, the p.closed is set and the condition is broadcast,
 		// which causes this loop to continue and return from the Pop().
 		if p.closed {
-			return nil, fmt.Errorf(queueClosed)
+			klog.V(2).InfoS("Scheduling queue is closed")
+			return nil, nil
 		}
 		p.cond.Wait()
 	}
@@ -1130,14 +1128,15 @@ func newPodNominator(podLister listersv1.PodLister) *nominator {
 func MakeNextPodFunc(logger klog.Logger, queue SchedulingQueue) func() *framework.QueuedPodInfo {
 	return func() *framework.QueuedPodInfo {
 		podInfo, err := queue.Pop()
-		if err == nil {
+		if err == nil && podInfo != nil {
 			logger.V(4).Info("About to try and schedule pod", "pod", klog.KObj(podInfo.Pod))
 			for plugin := range podInfo.UnschedulablePlugins {
 				metrics.UnschedulableReason(plugin, podInfo.Pod.Spec.SchedulerName).Dec()
 			}
 			return podInfo
+		} else if err != nil {
+			logger.Error(err, "Error while retrieving next pod from scheduling queue")
 		}
-		logger.Error(err, "Error while retrieving next pod from scheduling queue")
 		return nil
 	}
 }
