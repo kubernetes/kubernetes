@@ -179,12 +179,7 @@ func (s *specAggregator) buildOpenAPISpec() (specToReturn *spec.Swagger, err err
 		if specInfo.spec == nil {
 			continue
 		}
-		// Copy the spec before removing the defaults.
-		localSpec := *specInfo.spec
-		localSpecInfo := *specInfo
-		localSpecInfo.spec = &localSpec
-		localSpecInfo.spec.Definitions = handler.PruneDefaults(specInfo.spec.Definitions)
-		specs = append(specs, localSpecInfo)
+		specs = append(specs, *specInfo)
 	}
 	if len(specs) == 0 {
 		return &spec.Swagger{}, nil
@@ -295,6 +290,10 @@ func (s *specAggregator) UpdateAPIServiceSpec(apiServiceName string, spec *spec.
 		spec = aggregator.FilterSpecByPathsWithoutSideEffects(spec, []string{"/apis/"})
 	}
 
+	// Prune defaults from the spec as we don't want to publish them.
+	spec = &*spec
+	spec.Definitions = handler.PruneDefaults(specInfo.spec.Definitions)
+
 	return s.tryUpdatingServiceSpecs(&openAPISpecInfo{
 		apiService: specInfo.apiService,
 		spec:       spec,
@@ -337,7 +336,7 @@ func (s *specAggregator) RemoveAPIServiceSpec(apiServiceName string) error {
 	return s.tryDeleteServiceSpecs(apiServiceName)
 }
 
-// GetAPIServiceSpec returns api service spec info
+// GetAPIServiceInfo returns api service spec info
 func (s *specAggregator) GetAPIServiceInfo(apiServiceName string) (handler http.Handler, etag string, exists bool) {
 	s.rwMutex.RLock()
 	defer s.rwMutex.RUnlock()
