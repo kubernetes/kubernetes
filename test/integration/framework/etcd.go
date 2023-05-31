@@ -24,6 +24,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -32,8 +33,8 @@ import (
 
 	"go.uber.org/goleak"
 	"google.golang.org/grpc/grpclog"
-	"k8s.io/klog/v2"
 
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/util/env"
 )
 
@@ -120,6 +121,8 @@ func RunCustomEtcd(dataDir string, customFlags []string, output io.Writer) (url 
 		"http://127.0.0.1:0",
 		"-log-level",
 		"warn", // set to info or debug for more logs
+		"--quota-backend-bytes",
+		strconv.FormatInt(8*1024*1024*1024, 10),
 	}
 	args = append(args, customFlags...)
 	cmd := exec.CommandContext(ctx, etcdPath, args...)
