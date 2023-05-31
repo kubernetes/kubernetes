@@ -125,3 +125,9 @@ func (cm *FakePodContainerManager) SetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceNa
 	cm.CalledFunctions = append(cm.CalledFunctions, "SetPodCgroupConfig")
 	return nil
 }
+
+func (m *FakePodContainerManager) DoNotEnforceCpuLimits() {
+}
+
+func (m *FakePodContainerManager) RemoveCpuLimits(*v1.Pod) {
+}

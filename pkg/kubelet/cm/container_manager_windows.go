@@ -272,3 +272,7 @@ func (cm *containerManagerImpl) UnprepareDynamicResources(*v1.Pod) error {
 func (cm *containerManagerImpl) PodMightNeedToUnprepareResources(UID types.UID) bool {
 	return false
 }
+
+func (cm *containerManagerImpl) PodContainsPinnedCpus(pod *v1.Pod) bool {
+	return false
+}
