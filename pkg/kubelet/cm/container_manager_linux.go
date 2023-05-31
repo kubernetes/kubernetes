@@ -1045,23 +1045,43 @@ func (cm *containerManagerImpl) PodMightNeedToUnprepareResources(UID types.UID) 
 
 func (cm *containerManagerImpl) ResyncComponents(machineInfo *cadvisorapi.MachineInfo) error {
 
+	var internalCapacity = v1.ResourceList{}
+	capacity := cadvisor.CapacityFromMachineInfo(machineInfo)
+	for k, v := range capacity {
+		internalCapacity[k] = v
+	}
+	pidLimits, err := pidlimit.Stats()
+	if err == nil && pidLimits != nil && pidLimits.MaxPID != nil {
+		internalCapacity[pidlimit.PIDs] = *resource.NewQuantity(int64(*pidLimits.MaxPID), resource.DecimalSI)
+	}
+
+	// Update capacity and internalCapacity from new machine info
+	cm.Lock()
+	cm.capacity = capacity
+	cm.internalCapacity = internalCapacity
+	cm.Unlock()
+
+	nodeAllocatableReservation := cm.GetNodeAllocatableReservation()
+	reservedMemory := cm.NodeConfig.ExperimentalMemoryManagerReservedMemory
+
+	// TODO(Doubt): Is it required to resyc topology manger, Will resizing node change topology?
 	// Resync Topology manager
-	if err := cm.topologyManager.Sync(machineInfo); err != nil {
+	if err := cm.topologyManager.Sync(machineInfo, cm.NodeConfig.TopologyManagerPolicy, cm.NodeConfig.TopologyManagerScope, cm.NodeConfig.ExperimentalTopologyManagerPolicyOptions); err != nil {
 		return err
 	}
 
 	// Resync Device manager
-	if err := cm.deviceManager.Sync(machineInfo); err != nil {
+	if err := cm.deviceManager.Sync(machineInfo, cm.topologyManager); err != nil {
 		return err
 	}
 
 	// Resync CPU manager
-	if err := cm.cpuManager.Sync(machineInfo); err != nil {
+	if err := cm.cpuManager.Sync(machineInfo, cm.NodeConfig.CPUManagerPolicy, cm.NodeConfig.CPUManagerPolicyOptions, cm.NodeConfig.NodeAllocatableConfig.ReservedSystemCPUs, cm.GetNodeAllocatableReservation(), cm.topologyManager); err != nil {
 		return err
 	}
 
 	// Resync Memory manager
-	if err := cm.memoryManager.Sync(machineInfo); err != nil {
+	if err := cm.memoryManager.Sync(cm.NodeConfig.ExperimentalMemoryManagerPolicy, machineInfo, nodeAllocatableReservation, reservedMemory, cm.topologyManager); err != nil {
 		return err
 	}
 

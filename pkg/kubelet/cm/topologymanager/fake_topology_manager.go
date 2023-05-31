@@ -78,7 +78,7 @@ func (m *fakeManager) RemoveContainer(containerID string) error {
 	return nil
 }
 
-func (m *fakeManager) Sync(machineInfo *cadvisorapi.MachineInfo) error {
+func (m *fakeManager) Sync(machineInfo *cadvisorapi.MachineInfo, topologyManagerPolicy string, topologyManagerScope string, topologyManagerPolicyOptions map[string]string) error {
 	klog.InfoS("SyncMachineInfo", "machineInfo", machineInfo)
 	return nil
 }

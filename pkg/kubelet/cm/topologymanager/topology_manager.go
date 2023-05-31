@@ -67,7 +67,7 @@ type Manager interface {
 	// Store is the interface for storing pod topology hints
 	Store
 	// Sync will sync the Topology Manager with the latest machine info
-	Sync(machineInfo *cadvisorapi.MachineInfo) error
+	Sync(machineInfo *cadvisorapi.MachineInfo, topologyManagerPolicy string, topologyManagerScope string, topologyManagerPolicyOptions map[string]string) error
 }
 
 type manager struct {
@@ -137,6 +137,58 @@ var _ Manager = &manager{}
 func NewManager(topology []cadvisorapi.Node, topologyPolicyName string, topologyScopeName string, topologyPolicyOptions map[string]string) (Manager, error) {
 	klog.InfoS("Creating topology manager with policy per scope", "topologyPolicyName", topologyPolicyName, "topologyScopeName", topologyScopeName)
 
+	scope, err := newTopologyScope(topology, topologyPolicyName, topologyScopeName, topologyPolicyOptions)
+	if err != nil {
+		return nil, err
+	}
+	manager := &manager{
+		scope: scope,
+	}
+
+	return manager, nil
+}
+
+func (m *manager) GetAffinity(podUID string, containerName string) TopologyHint {
+	return m.scope.GetAffinity(podUID, containerName)
+}
+
+func (m *manager) GetPolicy() Policy {
+	return m.scope.GetPolicy()
+}
+
+func (m *manager) AddHintProvider(h HintProvider) {
+	m.scope.AddHintProvider(h)
+}
+
+func (m *manager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) {
+	m.scope.AddContainer(pod, container, containerID)
+}
+
+func (m *manager) RemoveContainer(containerID string) error {
+	return m.scope.RemoveContainer(containerID)
+}
+
+func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+	klog.InfoS("Topology Admit Handler")
+	metrics.TopologyManagerAdmissionRequestsTotal.Inc()
+
+	startTime := time.Now()
+	podAdmitResult := m.scope.Admit(attrs.Pod)
+	metrics.TopologyManagerAdmissionDuration.Observe(float64(time.Since(startTime).Milliseconds()))
+
+	return podAdmitResult
+}
+
+func (m *manager) Sync(machineInfo *cadvisorapi.MachineInfo, topologyPolicyName string, topologyScopeName string, topologyPolicyOptions map[string]string) error {
+	scope, err := newTopologyScope(machineInfo.Topology, topologyPolicyName, topologyScopeName, topologyPolicyOptions)
+	if err != nil {
+		return err
+	}
+	m.scope = scope
+	return nil
+}
+
+func newTopologyScope(topology []cadvisorapi.Node, topologyPolicyName string, topologyScopeName string, topologyPolicyOptions map[string]string) (Scope, error) {
 	opts, err := NewPolicyOptions(topologyPolicyOptions)
 	if err != nil {
 		return nil, err
@@ -182,45 +234,5 @@ func NewManager(topology []cadvisorapi.Node, topologyPolicyName string, topology
 	default:
 		return nil, fmt.Errorf("unknown scope: \"%s\"", topologyScopeName)
 	}
-
-	manager := &manager{
-		scope: scope,
-	}
-
-	return manager, nil
-}
-
-func (m *manager) GetAffinity(podUID string, containerName string) TopologyHint {
-	return m.scope.GetAffinity(podUID, containerName)
-}
-
-func (m *manager) GetPolicy() Policy {
-	return m.scope.GetPolicy()
-}
-
-func (m *manager) AddHintProvider(h HintProvider) {
-	m.scope.AddHintProvider(h)
-}
-
-func (m *manager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) {
-	m.scope.AddContainer(pod, container, containerID)
-}
-
-func (m *manager) RemoveContainer(containerID string) error {
-	return m.scope.RemoveContainer(containerID)
-}
-
-func (m *manager) Sync(machineInfo *cadvisorapi.MachineInfo) error {
-	return nil
-}
-
-func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
-	klog.InfoS("Topology Admit Handler")
-	metrics.TopologyManagerAdmissionRequestsTotal.Inc()
-
-	startTime := time.Now()
-	podAdmitResult := m.scope.Admit(attrs.Pod)
-	metrics.TopologyManagerAdmissionDuration.Observe(float64(time.Since(startTime).Milliseconds()))
-
-	return podAdmitResult
+	return scope, nil
 }

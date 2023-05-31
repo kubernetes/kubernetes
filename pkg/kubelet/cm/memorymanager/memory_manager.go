@@ -92,7 +92,7 @@ type Manager interface {
 	GetMemory(podUID, containerName string) []state.Block
 
 	// Sync will sync the memory Manager with the latest machine info
-	Sync(machineInfo *cadvisorapi.MachineInfo) error
+	Sync(string, *cadvisorapi.MachineInfo, v1.ResourceList, []kubeletconfig.MemoryReservation, topologymanager.Store) error
 }
 
 type manager struct {
@@ -137,26 +137,9 @@ var _ Manager = &manager{}
 
 // NewManager returns new instance of the memory manager
 func NewManager(policyName string, machineInfo *cadvisorapi.MachineInfo, nodeAllocatableReservation v1.ResourceList, reservedMemory []kubeletconfig.MemoryReservation, stateFileDirectory string, affinity topologymanager.Store) (Manager, error) {
-	var policy Policy
-
-	switch policyType(policyName) {
-
-	case policyTypeNone:
-		policy = NewPolicyNone()
-
-	case policyTypeStatic:
-		systemReserved, err := getSystemReservedMemory(machineInfo, nodeAllocatableReservation, reservedMemory)
-		if err != nil {
-			return nil, err
-		}
-
-		policy, err = NewPolicyStatic(machineInfo, systemReserved, affinity)
-		if err != nil {
-			return nil, err
-		}
-
-	default:
-		return nil, fmt.Errorf("unknown policy: \"%s\"", policyName)
+	policy, err := createPolicy(policyName, machineInfo, nodeAllocatableReservation, reservedMemory, affinity)
+	if err != nil {
+		return nil, err
 	}
 
 	manager := &manager{
@@ -461,7 +444,14 @@ func (m *manager) GetMemory(podUID, containerName string) []state.Block {
 }
 
 // Sync will reinitialize the memory manager with latest machine info
-func (m *manager) Sync(machineInfo *cadvisorapi.MachineInfo) error {
+func (m *manager) Sync(policyName string, machineInfo *cadvisorapi.MachineInfo, nodeAllocatableReservation v1.ResourceList, reservedMemory []kubeletconfig.MemoryReservation, affinity topologymanager.Store) error {
+	m.Lock()
+	defer m.Unlock()
+	policy, err := createPolicy(policyName, machineInfo, nodeAllocatableReservation, reservedMemory, affinity)
+	if err != nil {
+		return err
+	}
+	m.policy = policy
 	return nil
 }
 
@@ -470,4 +460,25 @@ func (m *manager) setPodPendingAdmission(pod *v1.Pod) {
 	defer m.Unlock()
 
 	m.pendingAdmissionPod = pod
+}
+
+func createPolicy(policyName string, machineInfo *cadvisorapi.MachineInfo, nodeAllocatableReservation v1.ResourceList, reservedMemory []kubeletconfig.MemoryReservation, affinity topologymanager.Store) (Policy, error) {
+	var policy Policy
+
+	switch policyType(policyName) {
+	case policyTypeNone:
+		policy = NewPolicyNone()
+	case policyTypeStatic:
+		systemReserved, err := getSystemReservedMemory(machineInfo, nodeAllocatableReservation, reservedMemory)
+		if err != nil {
+			return nil, err
+		}
+		policy, err = NewPolicyStatic(machineInfo, systemReserved, affinity)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("unknown policy: \"%s\"", policyName)
+	}
+	return policy, nil
 }

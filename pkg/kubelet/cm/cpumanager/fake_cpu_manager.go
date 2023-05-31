@@ -86,7 +86,7 @@ func (m *fakeManager) GetCPUAffinity(podUID, containerName string) cpuset.CPUSet
 	return cpuset.CPUSet{}
 }
 
-func (m *fakeManager) Sync(machineInfo *cadvisorapi.MachineInfo) error {
+func (m *fakeManager) Sync(machineInfo *cadvisorapi.MachineInfo, cpuPolicyName string, cpuPolicyOptions map[string]string, specificCPUs cpuset.CPUSet, nodeAllocatableReservation v1.ResourceList, affinity topologymanager.Store) error {
 	return nil
 }
 

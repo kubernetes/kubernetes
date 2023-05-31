@@ -1020,8 +1020,13 @@ func (m *ManagerImpl) ShouldResetExtendedResourceCapacity() bool {
 	return len(checkpoints) == 0
 }
 
-func (m *ManagerImpl) Sync(machineInfo *cadvisorapi.MachineInfo) error {
-	// Handle CPU manager sync here
+func (m *ManagerImpl) Sync(machineInfo *cadvisorapi.MachineInfo, topologyAffinityStore topologymanager.Store) error {
+	var numaNodes []int
+	for _, node := range machineInfo.Topology {
+		numaNodes = append(numaNodes, node.Id)
+	}
+	m.numaNodes = numaNodes
+	m.topologyAffinityStore = topologyAffinityStore
 	return nil
 }
 

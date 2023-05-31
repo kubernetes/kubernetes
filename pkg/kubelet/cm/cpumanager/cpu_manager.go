@@ -95,7 +95,7 @@ type Manager interface {
 	GetCPUAffinity(podUID, containerName string) cpuset.CPUSet
 
 	// Sync will sync the CPU Manager with the latest machine info
-	Sync(machineInfo *cadvisorapi.MachineInfo) error
+	Sync(machineInfo *cadvisorapi.MachineInfo, cpuPolicyName string, cpuPolicyOptions map[string]string, specificCPUs cpuset.CPUSet, nodeAllocatableReservation v1.ResourceList, affinity topologymanager.Store) error
 }
 
 type manager struct {
@@ -155,6 +155,25 @@ func (s *sourcesReadyStub) AllReady() bool          { return true }
 
 // NewManager creates new cpu manager based on provided policy
 func NewManager(cpuPolicyName string, cpuPolicyOptions map[string]string, reconcilePeriod time.Duration, machineInfo *cadvisorapi.MachineInfo, specificCPUs cpuset.CPUSet, nodeAllocatableReservation v1.ResourceList, stateFileDirectory string, affinity topologymanager.Store) (Manager, error) {
+
+	policy, cpuTopology, err := newPolicy(cpuPolicyName, cpuPolicyOptions, machineInfo, specificCPUs, nodeAllocatableReservation, affinity)
+	if err != nil {
+		return nil, err
+	}
+
+	manager := &manager{
+		policy:                     policy,
+		reconcilePeriod:            reconcilePeriod,
+		lastUpdateState:            state.NewMemoryState(),
+		topology:                   cpuTopology,
+		nodeAllocatableReservation: nodeAllocatableReservation,
+		stateFileDirectory:         stateFileDirectory,
+	}
+	manager.sourcesReady = &sourcesReadyStub{}
+	return manager, nil
+}
+
+func newPolicy(cpuPolicyName string, cpuPolicyOptions map[string]string, machineInfo *cadvisorapi.MachineInfo, specificCPUs cpuset.CPUSet, nodeAllocatableReservation v1.ResourceList, affinity topologymanager.Store) (Policy, *topology.CPUTopology, error) {
 	var topo *topology.CPUTopology
 	var policy Policy
 	var err error
@@ -164,20 +183,20 @@ func NewManager(cpuPolicyName string, cpuPolicyOptions map[string]string, reconc
 	case PolicyNone:
 		policy, err = NewNonePolicy(cpuPolicyOptions)
 		if err != nil {
-			return nil, fmt.Errorf("new none policy error: %w", err)
+			return nil, nil, fmt.Errorf("new none policy error: %w", err)
 		}
 
 	case PolicyStatic:
 		topo, err = topology.Discover(machineInfo)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		klog.InfoS("Detected CPU topology", "topology", topo)
 
 		reservedCPUs, ok := nodeAllocatableReservation[v1.ResourceCPU]
 		if !ok {
 			// The static policy cannot initialize without this information.
-			return nil, fmt.Errorf("[cpumanager] unable to determine reserved CPU resources for static policy")
+			return nil, nil, fmt.Errorf("[cpumanager] unable to determine reserved CPU resources for static policy")
 		}
 		if reservedCPUs.IsZero() {
 			// The static policy requires this to be nonzero. Zero CPU reservation
@@ -185,7 +204,7 @@ func NewManager(cpuPolicyName string, cpuPolicyOptions map[string]string, reconc
 			// either we would violate our guarantee of exclusivity or need to evict
 			// any pod that has at least one container that requires zero CPUs.
 			// See the comments in policy_static.go for more details.
-			return nil, fmt.Errorf("[cpumanager] the static policy requires systemreserved.cpu + kubereserved.cpu to be greater than zero")
+			return nil, nil, fmt.Errorf("[cpumanager] the static policy requires systemreserved.cpu + kubereserved.cpu to be greater than zero")
 		}
 
 		// Take the ceiling of the reservation, since fractional CPUs cannot be
@@ -194,23 +213,13 @@ func NewManager(cpuPolicyName string, cpuPolicyOptions map[string]string, reconc
 		numReservedCPUs := int(math.Ceil(reservedCPUsFloat))
 		policy, err = NewStaticPolicy(topo, numReservedCPUs, specificCPUs, affinity, cpuPolicyOptions)
 		if err != nil {
-			return nil, fmt.Errorf("new static policy error: %w", err)
+			return nil, nil, fmt.Errorf("new static policy error: %w", err)
 		}
 
 	default:
-		return nil, fmt.Errorf("unknown policy: \"%s\"", cpuPolicyName)
+		return nil, nil, fmt.Errorf("unknown policy: \"%s\"", cpuPolicyName)
 	}
-
-	manager := &manager{
-		policy:                     policy,
-		reconcilePeriod:            reconcilePeriod,
-		lastUpdateState:            state.NewMemoryState(),
-		topology:                   topo,
-		nodeAllocatableReservation: nodeAllocatableReservation,
-		stateFileDirectory:         stateFileDirectory,
-	}
-	manager.sourcesReady = &sourcesReadyStub{}
-	return manager, nil
+	return policy, topo, nil
 }
 
 func (m *manager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
@@ -540,8 +549,13 @@ func (m *manager) GetCPUAffinity(podUID, containerName string) cpuset.CPUSet {
 	return m.state.GetCPUSetOrDefault(podUID, containerName)
 }
 
-func (m *manager) Sync(machineInfo *cadvisorapi.MachineInfo) error {
-	// Handle CPU manager sync here
+func (m *manager) Sync(machineInfo *cadvisorapi.MachineInfo, cpuPolicyName string, cpuPolicyOptions map[string]string, specificCPUs cpuset.CPUSet, nodeAllocatableReservation v1.ResourceList, affinity topologymanager.Store) error {
+	policy, cpuTopology, err := newPolicy(cpuPolicyName, cpuPolicyOptions, machineInfo, specificCPUs, nodeAllocatableReservation, affinity)
+	if err != nil {
+		return err
+	}
+	m.policy = policy
+	m.topology = cpuTopology
 	return nil
 }
 

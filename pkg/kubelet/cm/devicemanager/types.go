@@ -82,7 +82,7 @@ type Manager interface {
 	UpdateAllocatedDevices()
 
 	// Sync will sync the Device Manager with the latest machine info
-	Sync(machineInfo *cadvisorapi.MachineInfo) error
+	Sync(machineInfo *cadvisorapi.MachineInfo, topologyAffinityStore topologymanager.Store) error
 }
 
 // DeviceRunContainerOptions contains the combined container runtime settings to consume its allocated devices.
