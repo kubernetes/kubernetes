@@ -185,7 +185,7 @@ func NewRunFlags(streams genericiooptions.IOStreams) *RunFlags {
 		RecordFlags:       genericclioptions.NewRecordFlags(),
 		IOStreams:         streams,
 		PodRunningTimeout: defaultPodAttachTimeout,
-		DryRunStrategy:    "unchanged",
+		DryRunStrategy:    "none",
 	}
 }
 
@@ -206,7 +206,6 @@ func NewCmdRun(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Com
 			}
 			o, ao, err := flags.ToOptions(f, cmd, args)
 
-			
 			if err != nil {
 				cmdutil.CheckErr(err)
 				return
@@ -226,7 +225,7 @@ func NewCmdRun(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Com
 	flags.RecordFlags.AddFlags(cmd)
 
 	addRunFlags(cmd, flags)
-	cmdutil.AddApplyAnnotationFlags(cmd)
+	//cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodAttachTimeout)
 
 	// Deprecate the cascade flag. If set, it has no practical effect since the created pod has no dependents.
@@ -248,7 +247,7 @@ func NewCmdRun(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Com
 	return cmd
 }
 
-func getGeneratorAndParams(cmd *cobra.Command) (generate.Generator, map[string]interface{}, error){
+func getGeneratorAndParams(cmd *cobra.Command) (generate.Generator, map[string]interface{}, error) {
 	generators := generateversioned.GeneratorFn("run")
 	generator, found := generators[generateversioned.RunPodV1GeneratorName]
 	if !found {
@@ -280,8 +279,7 @@ func addRunFlags(cmd *cobra.Command, flags *RunFlags) {
 	cmd.Flags().BoolVar(&flags.Expose, "expose", flags.Expose, "If true, create a ClusterIP service associated with the pod.  Requires `--port`.")
 	cmd.Flags().BoolVarP(&flags.Quiet, "quiet", "q", flags.Quiet, "If true, suppress prompt messages.")
 	cmd.Flags().BoolVar(&flags.Privileged, "privileged", flags.Privileged, i18n.T("If true, run the container in privileged mode."))
-
-	//cmd.Flags().BoolVar(&flags.SaveConfig, "save-config", flags.SaveConfig, i18n.T("TODO Save config description"))
+	cmd.Flags().BoolVar(&flags.SaveConfig, "save-config", false, i18n.T("TODO Save config description"))
 	//cmd.Flags().DurationVar(&flags.PodRunningTimeout, "pod-running-timeout", flags.PodRunningTimeout, "TODO message about pod timeouts that makes sense")
 
 	cmdutil.AddFieldManagerFlagVar(cmd, &flags.fieldManager, "kubectl-run")
@@ -355,6 +353,7 @@ func (flags *RunFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, args []s
 		Quiet:          flags.Quiet,
 		TTY:            flags.TTY,
 		fieldManager:   flags.fieldManager,
+		SaveConfig:     flags.SaveConfig,
 
 		Namespace:         namespace,
 		EnforceNamespace:  enforceNamespace,
@@ -401,7 +400,7 @@ func (o *RunOptions) Validate(args []string) error {
 	}
 
 	if !reference.ReferenceRegexp.MatchString(o.Image) {
-		return fmt.Errorf("invalid image name %q: %v", o.Image, reference.ErrReferenceInvalidFormat)
+		return fmt.Errorf("Invalid image name %q: %v", o.Image, reference.ErrReferenceInvalidFormat)
 	}
 
 	if o.TTY && !o.Interactive {
@@ -431,8 +430,6 @@ func (o *RunOptions) Validate(args []string) error {
 	//add remaining needed options generated during validation
 	o.restartPolicy = restartPolicy
 	o.timeout = o.PodRunningTimeout
-	o.remove = o.remove
-
 	return nil
 }
 
