@@ -252,11 +252,9 @@ func (collector *pvAndPVCCountCollector) pvcCollect(ch chan<- metrics.Metric) {
 // if success is false.
 func RecordRetroactiveStorageClassMetric(success bool) {
 	if !success {
-		retroactiveStorageClassMetric.Inc()
 		retroactiveStorageClassErrorMetric.Inc()
-	} else {
-		retroactiveStorageClassMetric.Inc()
 	}
+	retroactiveStorageClassMetric.Inc()
 }
 
 // RecordVolumeOperationErrorMetric records error count into metric
