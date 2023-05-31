@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2023 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,11 +18,11 @@ package conversion
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
 	"k8s.io/component-base/metrics"
-	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 )
 
@@ -32,7 +32,6 @@ func TestWebhookConversionMetrics_ObserveWebhookConversionSuccess(t *testing.T) 
 		webhookConversionLatency *metrics.HistogramVec
 	}
 	type args struct {
-		ctx     context.Context
 		elapsed time.Duration
 	}
 	tests := []struct {
@@ -50,7 +49,6 @@ func TestWebhookConversionMetrics_ObserveWebhookConversionSuccess(t *testing.T) 
 				webhookConversionLatency: Metrics.webhookConversionLatency,
 			},
 			args: args{
-				ctx:     context.TODO(),
 				elapsed: 2 * time.Second,
 			},
 			wantLabels: map[string]string{
@@ -65,7 +63,6 @@ func TestWebhookConversionMetrics_ObserveWebhookConversionSuccess(t *testing.T) 
 				webhookConversionLatency: Metrics.webhookConversionLatency,
 			},
 			args: args{
-				ctx:     context.TODO(),
 				elapsed: 2 * time.Second,
 			},
 			wantLabels: map[string]string{
@@ -81,9 +78,9 @@ func TestWebhookConversionMetrics_ObserveWebhookConversionSuccess(t *testing.T) 
 				webhookConversionRequest: tt.fields.webhookConversionRequest,
 				webhookConversionLatency: tt.fields.webhookConversionLatency,
 			}
-			m.ObserveWebhookConversionSuccess(tt.args.ctx, tt.args.elapsed)
-			expectCounterValue(t, "webhook_conversion_requests", tt.wantLabels, tt.expectedRequestValue)
-			expectHistogramCountTotal(t, "webhook_conversion_duration_seconds", tt.wantLabels, tt.expectedRequestValue)
+			m.ObserveWebhookConversionSuccess(context.TODO(), tt.args.elapsed)
+			testutil.AssertVectorCount(t, fmt.Sprintf("%s_webhook_conversion_request_total", namespace), tt.wantLabels, tt.expectedRequestValue)
+			testutil.AssertHistogramTotalCount(t, fmt.Sprintf("%s_webhook_conversion_duration_seconds", namespace), tt.wantLabels, tt.expectedRequestValue)
 		})
 	}
 }
@@ -94,7 +91,6 @@ func TestWebhookConversionMetrics_ObserveWebhookConversionFailure(t *testing.T) 
 		webhookConversionLatency *metrics.HistogramVec
 	}
 	type args struct {
-		ctx       context.Context
 		elapsed   time.Duration
 		errorType WebhookConversionErrorType
 	}
@@ -114,7 +110,6 @@ func TestWebhookConversionMetrics_ObserveWebhookConversionFailure(t *testing.T) 
 				webhookConversionLatency: Metrics.webhookConversionLatency,
 			},
 			args: args{
-				ctx:       context.TODO(),
 				elapsed:   2 * time.Second,
 				errorType: WebhookConversionCallFailure,
 			},
@@ -131,7 +126,6 @@ func TestWebhookConversionMetrics_ObserveWebhookConversionFailure(t *testing.T) 
 				webhookConversionLatency: Metrics.webhookConversionLatency,
 			},
 			args: args{
-				ctx:       context.TODO(),
 				elapsed:   2 * time.Second,
 				errorType: WebhookConversionMalformedResponseFailure,
 			},
@@ -148,7 +142,6 @@ func TestWebhookConversionMetrics_ObserveWebhookConversionFailure(t *testing.T) 
 				webhookConversionLatency: Metrics.webhookConversionLatency,
 			},
 			args: args{
-				ctx:       context.TODO(),
 				elapsed:   2 * time.Second,
 				errorType: WebhookConversionPartialResponseFailure,
 			},
@@ -165,7 +158,6 @@ func TestWebhookConversionMetrics_ObserveWebhookConversionFailure(t *testing.T) 
 				webhookConversionLatency: Metrics.webhookConversionLatency,
 			},
 			args: args{
-				ctx:       context.TODO(),
 				elapsed:   2 * time.Second,
 				errorType: WebhookConversionInvalidConvertedObjectFailure,
 			},
@@ -182,7 +174,6 @@ func TestWebhookConversionMetrics_ObserveWebhookConversionFailure(t *testing.T) 
 				webhookConversionLatency: Metrics.webhookConversionLatency,
 			},
 			args: args{
-				ctx:       context.TODO(),
 				elapsed:   2 * time.Second,
 				errorType: WebhookConversionNoObjectsReturnedFailure,
 			},
@@ -200,69 +191,9 @@ func TestWebhookConversionMetrics_ObserveWebhookConversionFailure(t *testing.T) 
 				webhookConversionRequest: tt.fields.webhookConversionRequest,
 				webhookConversionLatency: tt.fields.webhookConversionLatency,
 			}
-			m.ObserveWebhookConversionFailure(tt.args.ctx, tt.args.elapsed, tt.args.errorType)
-			expectCounterValue(t, "webhook_conversion_requests", tt.wantLabels, tt.expectedRequestValue)
-			expectHistogramCountTotal(t, "webhook_conversion_duration_seconds", tt.wantLabels, tt.expectedRequestValue)
+			m.ObserveWebhookConversionFailure(context.TODO(), tt.args.elapsed, tt.args.errorType)
+			testutil.AssertVectorCount(t, fmt.Sprintf("%s_webhook_conversion_request_total", namespace), tt.wantLabels, tt.expectedRequestValue)
+			testutil.AssertHistogramTotalCount(t, fmt.Sprintf("%s_webhook_conversion_duration_seconds", namespace), tt.wantLabels, tt.expectedRequestValue)
 		})
-	}
-}
-
-func expectCounterValue(t *testing.T, name string, labelFilter map[string]string, wantCount int) {
-	metrics, err := legacyregistry.DefaultGatherer.Gather()
-	if err != nil {
-		t.Fatalf("Failed to gather metrics: %s", err)
-	}
-
-	counterSum := 0
-	for _, mf := range metrics {
-		if mf.GetName() != name {
-			continue // Ignore other metrics.
-		}
-		for _, metric := range mf.GetMetric() {
-			if !testutil.LabelsMatch(metric, labelFilter) {
-				continue
-			}
-			counterSum += int(metric.GetCounter().GetValue())
-		}
-	}
-	if wantCount != counterSum {
-		t.Errorf("Wanted count %d, got %d for metric %s with labels %#+v", wantCount, counterSum, name, labelFilter)
-		for _, mf := range metrics {
-			if mf.GetName() == name {
-				for _, metric := range mf.GetMetric() {
-					t.Logf("\tnear match: %s", metric.String())
-				}
-			}
-		}
-	}
-}
-
-func expectHistogramCountTotal(t *testing.T, name string, labelFilter map[string]string, wantCount int) {
-	metrics, err := legacyregistry.DefaultGatherer.Gather()
-	if err != nil {
-		t.Fatalf("Failed to gather metrics: %s", err)
-	}
-
-	counterSum := 0
-	for _, mf := range metrics {
-		if mf.GetName() != name {
-			continue // Ignore other metrics.
-		}
-		for _, metric := range mf.GetMetric() {
-			if !testutil.LabelsMatch(metric, labelFilter) {
-				continue
-			}
-			counterSum += int(metric.GetHistogram().GetSampleCount())
-		}
-	}
-	if wantCount != counterSum {
-		t.Errorf("Wanted count %d, got %d for metric %s with labels %#+v", wantCount, counterSum, name, labelFilter)
-		for _, mf := range metrics {
-			if mf.GetName() == name {
-				for _, metric := range mf.GetMetric() {
-					t.Logf("\tnear match: %s\n", metric.String())
-				}
-			}
-		}
 	}
 }

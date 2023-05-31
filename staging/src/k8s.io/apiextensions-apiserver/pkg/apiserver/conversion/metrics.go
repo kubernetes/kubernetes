@@ -99,7 +99,8 @@ const (
 )
 
 var (
-	Metrics = newWebhookConversionMetrics()
+	Metrics   = newWebhookConversionMetrics()
+	namespace = "apiserver"
 )
 
 // WebhookConversionMetrics instruments webhook conversion with prometheus metrics.
@@ -111,7 +112,8 @@ type WebhookConversionMetrics struct {
 func newWebhookConversionMetrics() *WebhookConversionMetrics {
 	webhookConversionRequest := metrics.NewCounterVec(
 		&metrics.CounterOpts{
-			Name:           "webhook_conversion_requests",
+			Name:           "webhook_conversion_request_total",
+			Namespace:      namespace,
 			Help:           "Counter for webhook conversion requests with success/failure and failure error type",
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -119,8 +121,10 @@ func newWebhookConversionMetrics() *WebhookConversionMetrics {
 
 	webhookConversionLatency := metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
-			Name:           "webhook_conversion_duration_seconds",
-			Help:           "Webhook conversion request latency",
+			Name:      "webhook_conversion_duration_seconds",
+			Namespace: namespace,
+			Help:      "Webhook conversion request latency",
+			// 0.001, 0.002, 0.004, .... 16.384 [1ms, 2ms, 4ms, ...., 16,384 ms]
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
