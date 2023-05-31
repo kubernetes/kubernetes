@@ -213,7 +213,7 @@ define TEST_E2E_NODE_HELP_INFO
 #    Defaults to "\[Flaky\]|\[Slow\]|\[Serial\]".
 #  TEST_ARGS: A space-separated list of arguments to pass to node e2e test.
 #    Defaults to "".
-#  RUN_UNTIL_FAILURE: If true, pass --untilItFails to ginkgo so tests are run
+#  RUN_UNTIL_FAILURE: If true, pass --until-it-fails=true to ginkgo so tests are run
 #    repeatedly until they fail.  Defaults to false.
 #  REMOTE: If true, run the tests on a remote host.  Defaults to false.
 #  REMOTE_MODE: For REMOTE=true only.  Mode for remote execution (eg. gce, ssh).
