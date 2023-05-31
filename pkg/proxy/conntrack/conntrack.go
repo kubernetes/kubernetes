@@ -79,6 +79,9 @@ func Exec(execer exec.Interface, parameters ...string) error {
 // https://github.com/docker/docker/issues/8795
 // https://github.com/kubernetes/kubernetes/issues/31983
 func ClearEntriesForPort(execer exec.Interface, port int, isIPv6 bool, protocol v1.Protocol) error {
+	// port uint16 will effectively handle the below check
+	// but for now, making it as compliant with the previous versions as possible seems safe
+	// https://github.com/kubernetes/kubernetes/pull/118247
 	if port <= 0 || port >= 65536 {
 		return fmt.Errorf("wrong port number. The port number must be greater than zero and smaller than 65536")
 	}
@@ -110,6 +113,9 @@ func ClearEntriesForNAT(execer exec.Interface, origin, dest string, protocol v1.
 // Known issue:
 // https://github.com/kubernetes/kubernetes/issues/59368
 func ClearEntriesForPortNAT(execer exec.Interface, dest string, port int, protocol v1.Protocol) error {
+	// port uint16 will effectively handle the below check
+	// but for now, making it as compliant with the previous versions as possible seems safe
+	// https://github.com/kubernetes/kubernetes/pull/118247
 	if port <= 0 || port >= 65536 {
 		return fmt.Errorf("wrong port number. The port number must be greater than zero and smaller than 65536")
 	}
