@@ -30,7 +30,10 @@ import (
 	"testing"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/credentialprovider"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/legacy-cloud-providers/gce/gcpcredential"
 )
 
@@ -47,6 +50,8 @@ func createProductNameFile() (string, error) {
 // referenced by gceProductNameFile being removed, which is the opposite of
 // the other tests
 func TestMetadata(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DisableCloudProviders, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DisableKubeletCloudCredentialProviders, false)()
 	// This test requires onGCEVM to return True. On Linux, this can be faked by creating a
 	// Product Name File. But on Windows, onGCEVM makes the following syscall instead:
 	// wmic computersystem get model

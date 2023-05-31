@@ -892,9 +892,9 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	DefaultHostNetworkHostPortsInPodTemplates: {Default: false, PreRelease: featuregate.Deprecated},
 
-	DisableCloudProviders: {Default: false, PreRelease: featuregate.Alpha},
+	DisableCloudProviders: {Default: true, PreRelease: featuregate.Beta}, // lock to default and remove after 1.29 based on KEP #2395 update
 
-	DisableKubeletCloudCredentialProviders: {Default: false, PreRelease: featuregate.Alpha},
+	DisableKubeletCloudCredentialProviders: {Default: true, PreRelease: featuregate.Beta}, // lock to default and remove after 1.29 based on KEP #2395 update
 
 	DownwardAPIHugePages: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in v1.29
 
