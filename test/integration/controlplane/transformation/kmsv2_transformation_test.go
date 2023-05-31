@@ -26,7 +26,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -717,17 +716,6 @@ resources:
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		if benchSecret != nil {
-			rev, err := strconv.ParseInt(benchSecret.ResourceVersion, 10, 64)
-			if err != nil {
-				b.Fatal(err)
-			}
-			_, err = test.kubeAPIServer.EtcdClient.Compact(ctx, rev)
-			if err != nil {
-				b.Fatal(err)
-			}
-		}
-
 		_, err := secretStorage.DeleteCollection(ctx, noValidation, &metav1.DeleteOptions{}, nil)
 		if err != nil {
 			b.Fatal(err)
