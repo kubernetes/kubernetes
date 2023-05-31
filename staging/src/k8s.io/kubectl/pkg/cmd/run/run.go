@@ -186,6 +186,7 @@ func NewRunFlags(streams genericiooptions.IOStreams) *RunFlags {
 		IOStreams:         streams,
 		PodRunningTimeout: defaultPodAttachTimeout,
 		DryRunStrategy:    "none",
+		LeaveStdinOpen:    true,
 	}
 }
 
@@ -400,7 +401,7 @@ func (o *RunOptions) Validate(args []string) error {
 	}
 
 	if !reference.ReferenceRegexp.MatchString(o.Image) {
-		return fmt.Errorf("Invalid image name %q: %v", o.Image, reference.ErrReferenceInvalidFormat)
+		return fmt.Errorf("invalid image name %q: %v", o.Image, reference.ErrReferenceInvalidFormat)
 	}
 
 	if o.TTY && !o.Interactive {
