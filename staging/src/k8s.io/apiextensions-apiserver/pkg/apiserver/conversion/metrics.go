@@ -124,8 +124,8 @@ func newWebhookConversionMetrics() *WebhookConversionMetrics {
 			Name:      "webhook_conversion_duration_seconds",
 			Namespace: namespace,
 			Help:      "Webhook conversion request latency",
-			// 0.001, 0.002, 0.004, .... 16.384 [1ms, 2ms, 4ms, ...., 16,384 ms]
-			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
+			// Various buckets from 5 ms to 60 seconds
+			Buckets:        []float64{0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 20, 25, 30, 45, 60},
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"result", "failure_type"},
