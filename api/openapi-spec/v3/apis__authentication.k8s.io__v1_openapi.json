@@ -136,6 +136,7 @@
             "type": "array"
           },
           "authenticated": {
+            "default": false,
             "description": "Authenticated indicates that the token was associated with a known user.",
             "type": "boolean"
           },

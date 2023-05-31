@@ -67,7 +67,7 @@ type TokenReviewSpec struct {
 type TokenReviewStatus struct {
 	// Authenticated indicates that the token was associated with a known user.
 	// +optional
-	Authenticated bool `json:"authenticated,omitempty" protobuf:"varint,1,opt,name=authenticated"`
+	Authenticated bool `json:"authenticated" protobuf:"varint,1,opt,name=authenticated"`
 	// User is the UserInfo associated with the provided token.
 	// +optional
 	User UserInfo `json:"user,omitempty" protobuf:"bytes,2,opt,name=user"`

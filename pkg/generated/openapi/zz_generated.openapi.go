@@ -8707,6 +8707,7 @@ func schema_k8sio_api_authentication_v1_TokenReviewStatus(ref common.ReferenceCa
 					"authenticated": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Authenticated indicates that the token was associated with a known user.",
+							Default:     false,
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -9039,6 +9040,7 @@ func schema_k8sio_api_authentication_v1beta1_TokenReviewStatus(ref common.Refere
 					"authenticated": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Authenticated indicates that the token was associated with a known user.",
+							Default:     false,
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
