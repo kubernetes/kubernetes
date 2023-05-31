@@ -18,6 +18,7 @@ package aws
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -187,7 +188,10 @@ func newAWSClient(zone string) *ec2.EC2 {
 		framework.Logf("Warning: No AWS zone configured!")
 		cfg = nil
 	} else {
-		region := zone[:len(zone)-1]
+		region, err := azToRegion(zone)
+		if err != nil {
+			framework.Logf("Warning: error converting zone %s to region", zone)
+		}
 		cfg = &aws.Config{Region: aws.String(region)}
 	}
 	session, err := session.NewSession()
@@ -195,4 +199,20 @@ func newAWSClient(zone string) *ec2.EC2 {
 		framework.Logf("Warning: failed to create aws session")
 	}
 	return ec2.New(session, cfg)
+}
+
+// Derives the region from a valid az name.
+// Returns an error if the az is known invalid (empty)
+func azToRegion(az string) (string, error) {
+	if len(az) < 1 {
+		return "", fmt.Errorf("invalid (empty) AZ")
+	}
+
+	r := regexp.MustCompile(`^([a-zA-Z]+-)+\d+`)
+	region := r.FindString(az)
+	if region == "" {
+		return "", fmt.Errorf("invalid AZ: %s", az)
+	}
+
+	return region, nil
 }
