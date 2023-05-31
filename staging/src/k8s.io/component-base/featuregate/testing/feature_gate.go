@@ -18,18 +18,23 @@ package testing
 
 import (
 	"fmt"
-	"testing"
 
 	"k8s.io/component-base/featuregate"
 )
 
+// Narrow interface used to report potential errors during featuregates manipulation.
+type statusReporter interface {
+	Errorf(format string, args ...any)
+}
+
 // SetFeatureGateDuringTest sets the specified gate to the specified value, and returns a function that restores the original value.
 // Failures to set or restore cause the test to fail.
+// `reporter` can be any type implementing Errorf(format string, args ...any) like testing.TB or ginkgo.GinkgoTInterface
 //
 // Example use:
 //
 // defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.<FeatureName>, true)()
-func SetFeatureGateDuringTest(tb testing.TB, gate featuregate.FeatureGate, f featuregate.Feature, value bool) func() {
+func SetFeatureGateDuringTest(reporter statusReporter, gate featuregate.FeatureGate, f featuregate.Feature, value bool) func() {
 	originalValue := gate.Enabled(f)
 
 	// Specially handle AllAlpha and AllBeta
@@ -41,18 +46,18 @@ func SetFeatureGateDuringTest(tb testing.TB, gate featuregate.FeatureGate, f fea
 				continue
 			}
 			if (f == "AllAlpha" && v.PreRelease == featuregate.Alpha) || (f == "AllBeta" && v.PreRelease == featuregate.Beta) {
-				cleanups = append(cleanups, SetFeatureGateDuringTest(tb, gate, k, value))
+				cleanups = append(cleanups, SetFeatureGateDuringTest(reporter, gate, k, value))
 			}
 		}
 	}
 
 	if err := gate.(featuregate.MutableFeatureGate).Set(fmt.Sprintf("%s=%v", f, value)); err != nil {
-		tb.Errorf("error setting %s=%v: %v", f, value, err)
+		reporter.Errorf("error setting %s=%v: %v", f, value, err)
 	}
 
 	return func() {
 		if err := gate.(featuregate.MutableFeatureGate).Set(fmt.Sprintf("%s=%v", f, originalValue)); err != nil {
-			tb.Errorf("error restoring %s=%v: %v", f, originalValue, err)
+			reporter.Errorf("error restoring %s=%v: %v", f, originalValue, err)
 		}
 		for _, cleanup := range cleanups {
 			cleanup()
