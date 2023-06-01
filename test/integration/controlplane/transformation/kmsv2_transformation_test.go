@@ -37,7 +37,6 @@ import (
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	unstructuredv1 "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -670,11 +669,8 @@ func BenchmarkKMSv2KDF(b *testing.B) {
 			return // this one does not handle secrets
 		}
 
-		if opts.StorageConfig.Codec.Identifier() == unstructuredv1.UnstructuredJSONScheme.Identifier() {
-			return // this one does not handle secrets
-		}
-
-		if err := runtime.CheckCodec(opts.StorageConfig.Codec, &api.Secret{}); err != nil {
+		if err := runtime.CheckCodec(opts.StorageConfig.Codec, &api.Secret{},
+			schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Secret"}); err != nil {
 			return // this one does not handle secrets
 		}
 
