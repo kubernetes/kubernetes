@@ -773,3 +773,92 @@ resources:
 }
 
 func noValidation(_ context.Context, _ runtime.Object) error { return nil }
+
+var benchRESTSecret *corev1.Secret
+
+func BenchmarkKMSv2REST(b *testing.B) {
+	b.StopTimer()
+
+	klog.SetOutput(io.Discard)
+	klog.LogToStderr(false)
+
+	defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.KMSv2, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.KMSv2KDF, false)()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	b.Cleanup(cancel)
+
+	encryptionConfig := `
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+resources:
+  - resources:
+    - secrets
+    providers:
+    - kms:
+       apiVersion: v2
+       name: kms-provider
+       endpoint: unix:///@kms-provider.sock
+`
+	_ = kmsv2mock.NewBase64Plugin(b, "@kms-provider.sock")
+
+	test, err := newTransformTest(b, encryptionConfig, false, "")
+	if err != nil {
+		b.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
+	}
+	b.Cleanup(test.cleanUp)
+
+	client := kubernetes.NewForConfigOrDie(test.kubeAPIServer.ClientConfig)
+
+	const dataLen = 1_000
+
+	secretStorage := client.CoreV1().Secrets(testNamespace)
+
+	secrets := make([]*corev1.Secret, dataLen)
+
+	for i := 0; i < dataLen; i++ {
+		secrets[i] = &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("test-secret-%d", i),
+				Namespace: testNamespace,
+			},
+			Data: map[string][]byte{
+				"lots_of_data": bytes.Repeat([]byte{1, 3, 3, 7}, i*dataLen/4),
+			},
+		}
+	}
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		err := secretStorage.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		for i := 0; i < dataLen; i++ {
+			out, err := secretStorage.Create(ctx, secrets[i], metav1.CreateOptions{})
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			benchRESTSecret = out
+
+			out, err = secretStorage.Get(ctx, benchRESTSecret.Name, metav1.GetOptions{})
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			benchRESTSecret = out
+		}
+	}
+	b.StopTimer()
+
+	secretList, err := client.CoreV1().Secrets(testNamespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	if secretLen := len(secretList.Items); secretLen != dataLen {
+		b.Errorf("unexpected secret len: want %d, got %d", dataLen, secretLen)
+	}
+}
