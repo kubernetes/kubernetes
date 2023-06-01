@@ -779,12 +779,6 @@ func (proxier *Proxier) syncProxyRules() {
 	// Accumulate NAT chains to keep.
 	activeNATChains := map[utiliptables.Chain]bool{} // use a map as a set
 
-	// To avoid growing this slice, we arbitrarily set its size to 64,
-	// there is never more than that many arguments for a single line.
-	// Note that even if we go over 64, it will still be correct - it
-	// is just for efficiency, not correctness.
-	args := make([]string, 64)
-
 	// Compute total number of endpoint chains across all services
 	// to get a sense of how big the cluster is.
 	totalEndpoints := 0
@@ -1037,16 +1031,13 @@ func (proxier *Proxier) syncProxyRules() {
 
 		// Set up internal traffic handling.
 		if hasInternalEndpoints {
-			args = append(args[:0],
-				"-m", "comment", "--comment", fmt.Sprintf(`"%s cluster IP"`, svcPortNameString),
-				"-m", protocol, "-p", protocol,
-				"-d", svcInfo.ClusterIP().String(),
-				"--dport", strconv.Itoa(svcInfo.Port()),
-			)
 			if proxier.masqueradeAll {
 				proxier.natRules.Write(
 					"-A", string(internalTrafficChain),
-					args,
+					"-m", "comment", "--comment", fmt.Sprintf(`"%s cluster IP"`, svcPortNameString),
+					"-m", protocol, "-p", protocol,
+					"-d", svcInfo.ClusterIP().String(),
+					"--dport", strconv.Itoa(svcInfo.Port()),
 					"-j", string(kubeMarkMasqChain))
 			} else if proxier.localDetector.IsImplemented() {
 				// This masquerades off-cluster traffic to a service VIP. The
@@ -1056,7 +1047,10 @@ func (proxier *Proxier) syncProxyRules() {
 				// off-node, we masquerade here.
 				proxier.natRules.Write(
 					"-A", string(internalTrafficChain),
-					args,
+					"-m", "comment", "--comment", fmt.Sprintf(`"%s cluster IP"`, svcPortNameString),
+					"-m", protocol, "-p", protocol,
+					"-d", svcInfo.ClusterIP().String(),
+					"--dport", strconv.Itoa(svcInfo.Port()),
 					proxier.localDetector.IfNotLocal(),
 					"-j", string(kubeMarkMasqChain))
 			}
@@ -1128,15 +1122,16 @@ func (proxier *Proxier) syncProxyRules() {
 			// loadbalancers that preserve source IPs. For loadbalancers which
 			// direct traffic to service NodePort, the firewall rules will not
 			// apply.
-			args = append(args[:0],
-				"-A", string(fwChain),
-				"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcPortNameString),
-			)
 
 			// firewall filter based on each source range
 			allowFromNode := false
 			for _, src := range svcInfo.LoadBalancerSourceRanges() {
-				proxier.natRules.Write(args, "-s", src, "-j", string(externalTrafficChain))
+				proxier.natRules.Write(
+					"-A", string(fwChain),
+					"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcPortNameString),
+					"-s", src,
+					"-j", string(externalTrafficChain),
+				)
 				_, cidr, err := netutils.ParseCIDRSloppy(src)
 				if err != nil {
 					klog.ErrorS(err, "Error parsing CIDR in LoadBalancerSourceRanges, dropping it", "cidr", cidr)
@@ -1152,9 +1147,11 @@ func (proxier *Proxier) syncProxyRules() {
 			if allowFromNode {
 				for _, lbip := range svcInfo.LoadBalancerVIPStrings() {
 					proxier.natRules.Write(
-						args,
+						"-A", string(fwChain),
+						"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcPortNameString),
 						"-s", lbip,
-						"-j", string(externalTrafficChain))
+						"-j", string(externalTrafficChain),
+					)
 				}
 			}
 			// If the packet was able to reach the end of firewall chain,
@@ -1170,14 +1167,14 @@ func (proxier *Proxier) syncProxyRules() {
 		// from clusterPolicyChain to the clusterEndpoints
 		if usesClusterPolicyChain {
 			proxier.natChains.Write(utiliptables.MakeChainLine(clusterPolicyChain))
-			proxier.writeServiceToEndpointRules(svcPortNameString, svcInfo, clusterPolicyChain, clusterEndpoints, args)
+			proxier.writeServiceToEndpointRules(svcPortNameString, svcInfo, clusterPolicyChain, clusterEndpoints)
 		}
 
 		// If Local policy is in use, create the chain and create rules jumping
 		// from localPolicyChain to the localEndpoints
 		if usesLocalPolicyChain {
 			proxier.natChains.Write(utiliptables.MakeChainLine(localPolicyChain))
-			proxier.writeServiceToEndpointRules(svcPortNameString, svcInfo, localPolicyChain, localEndpoints, args)
+			proxier.writeServiceToEndpointRules(svcPortNameString, svcInfo, localPolicyChain, localEndpoints)
 		}
 
 		// Generate the per-endpoint chains.
@@ -1194,20 +1191,24 @@ func (proxier *Proxier) syncProxyRules() {
 			proxier.natChains.Write(utiliptables.MakeChainLine(endpointChain))
 			activeNATChains[endpointChain] = true
 
-			args = append(args[:0], "-A", string(endpointChain))
-			args = append(args, "-m", "comment", "--comment", svcPortNameString)
 			// Handle traffic that loops back to the originator with SNAT.
 			proxier.natRules.Write(
-				args,
+				"-A", string(endpointChain),
+				"-m", "comment", "--comment", svcPortNameString,
 				"-s", epInfo.IP(),
-				"-j", string(kubeMarkMasqChain))
-			// Update client-affinity lists.
+				"-j", string(kubeMarkMasqChain),
+			)
+			commentAndAffinityArgs := []string{"-m", "comment", "--comment", svcPortNameString}
 			if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
-				args = append(args, "-m", "recent", "--name", string(endpointChain), "--set")
+				commentAndAffinityArgs = append(commentAndAffinityArgs, "-m", "recent", "--name", string(endpointChain), "--set")
 			}
 			// DNAT to final destination.
-			args = append(args, "-m", protocol, "-p", protocol, "-j", "DNAT", "--to-destination", epInfo.String())
-			proxier.natRules.Write(args)
+			proxier.natRules.Write(
+				"-A", string(endpointChain),
+				commentAndAffinityArgs,
+				"-m", protocol, "-p", protocol,
+				"-j", "DNAT", "--to-destination", epInfo.String(),
+			)
 		}
 	}
 
@@ -1356,7 +1357,7 @@ func (proxier *Proxier) syncProxyRules() {
 	conntrack.CleanStaleEntries(proxier.iptables.IsIPv6(), proxier.exec, proxier.svcPortMap, serviceUpdateResult, endpointUpdateResult)
 }
 
-func (proxier *Proxier) writeServiceToEndpointRules(svcPortNameString string, svcInfo proxy.ServicePort, svcChain utiliptables.Chain, endpoints []proxy.Endpoint, args []string) {
+func (proxier *Proxier) writeServiceToEndpointRules(svcPortNameString string, svcInfo proxy.ServicePort, svcChain utiliptables.Chain, endpoints []proxy.Endpoint) {
 	// First write session affinity rules, if applicable.
 	if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
 		for _, ep := range endpoints {
@@ -1365,17 +1366,13 @@ func (proxier *Proxier) writeServiceToEndpointRules(svcPortNameString string, sv
 				continue
 			}
 			comment := fmt.Sprintf(`"%s -> %s"`, svcPortNameString, epInfo.String())
-
-			args = append(args[:0],
+			proxier.natRules.Write(
 				"-A", string(svcChain),
-			)
-			args = append(args, "-m", "comment", "--comment", comment)
-			args = append(args,
+				"-m", "comment", "--comment", comment,
 				"-m", "recent", "--name", string(epInfo.ChainName),
 				"--rcheck", "--seconds", strconv.Itoa(svcInfo.StickyMaxAgeSeconds()), "--reap",
 				"-j", string(epInfo.ChainName),
 			)
-			proxier.natRules.Write(args)
 		}
 	}
 
@@ -1388,16 +1385,23 @@ func (proxier *Proxier) writeServiceToEndpointRules(svcPortNameString string, sv
 		}
 		comment := fmt.Sprintf(`"%s -> %s"`, svcPortNameString, epInfo.String())
 
-		args = append(args[:0], "-A", string(svcChain))
-		args = append(args, "-m", "comment", "--comment", comment)
 		if i < (numEndpoints - 1) {
 			// Each rule is a probabilistic match.
-			args = append(args,
+			proxier.natRules.Write(
+				"-A", string(svcChain),
+				"-m", "comment", "--comment", comment,
 				"-m", "statistic",
 				"--mode", "random",
-				"--probability", proxier.probability(numEndpoints-i))
+				"--probability", proxier.probability(numEndpoints-i),
+				"-j", string(epInfo.ChainName),
+			)
+		} else {
+			// The final (or only if n == 1) rule is a guaranteed match.
+			proxier.natRules.Write(
+				"-A", string(svcChain),
+				"-m", "comment", "--comment", comment,
+				"-j", string(epInfo.ChainName),
+			)
 		}
-		// The final (or only if n == 1) rule is a guaranteed match.
-		proxier.natRules.Write(args, "-j", string(epInfo.ChainName))
 	}
 }
