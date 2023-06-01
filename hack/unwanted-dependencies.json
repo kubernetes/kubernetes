@@ -169,7 +169,6 @@
         "github.com/container-storage-interface/spec",
         "github.com/containerd/ttrpc",
         "github.com/google/cadvisor",
-        "github.com/google/gnostic",
         "github.com/googleapis/gax-go/v2",
         "github.com/grpc-ecosystem/go-grpc-middleware",
         "github.com/grpc-ecosystem/grpc-gateway",
