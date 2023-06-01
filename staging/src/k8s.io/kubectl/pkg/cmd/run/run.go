@@ -186,7 +186,7 @@ func NewRunFlags(streams genericiooptions.IOStreams) *RunFlags {
 		IOStreams:         streams,
 		PodRunningTimeout: defaultPodAttachTimeout,
 		DryRunStrategy:    "none",
-		LeaveStdinOpen:    true,
+		LeaveStdinOpen:    false,
 	}
 }
 
