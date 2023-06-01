@@ -44,6 +44,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/server/options/encryptionconfig"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
@@ -658,7 +659,20 @@ func BenchmarkKMSv2KDF(b *testing.B) {
 	klog.SetOutput(io.Discard)
 	klog.LogToStderr(false)
 
-	options.LastHax = nil
+	origObserveRESTOptionsGetter := options.ObserveRESTOptionsGetter
+	b.Cleanup(func() { options.ObserveRESTOptionsGetter = origObserveRESTOptionsGetter })
+
+	var restOptionsGetter generic.RESTOptionsGetter
+	options.ObserveRESTOptionsGetter = func(opts generic.RESTOptionsGetter) {
+		_, err := opts.GetRESTOptions(schema.GroupResource{Group: "", Resource: "secrets"})
+		if err != nil {
+			return // this one does not handle secrets
+		}
+		if restOptionsGetter != nil {
+			b.Fatal("multiple REST options found for secrets")
+		}
+		restOptionsGetter = opts
+	}
 
 	defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.KMSv2, true)()
 	defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.KMSv2KDF, false)()
@@ -690,7 +704,9 @@ resources:
 
 	client := kubernetes.NewForConfigOrDie(test.kubeAPIServer.ClientConfig)
 
-	restOptionsGetter := options.LastHax[0]
+	if restOptionsGetter == nil {
+		b.Fatal("not REST options found for secrets")
+	}
 
 	secretStorage, err := secretstore.NewREST(restOptionsGetter)
 	if err != nil {
