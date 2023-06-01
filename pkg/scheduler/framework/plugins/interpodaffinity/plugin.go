@@ -122,12 +122,12 @@ func (pl *InterPodAffinity) mergeAffinityTermNamespacesIfNotEmpty(at *framework.
 
 // GetNamespaceLabelsSnapshot returns a snapshot of the labels associated with
 // the namespace.
-func GetNamespaceLabelsSnapshot(ns string, nsLister listersv1.NamespaceLister) (nsLabels labels.Set) {
+func GetNamespaceLabelsSnapshot(logger klog.Logger, ns string, nsLister listersv1.NamespaceLister) (nsLabels labels.Set) {
 	podNS, err := nsLister.Get(ns)
 	if err == nil {
 		// Create and return snapshot of the labels.
 		return labels.Merge(podNS.Labels, nil)
 	}
-	klog.V(3).InfoS("getting namespace, assuming empty set of namespace labels", "namespace", ns, "err", err)
+	logger.V(3).Info("getting namespace, assuming empty set of namespace labels", "namespace", ns, "err", err)
 	return
 }
