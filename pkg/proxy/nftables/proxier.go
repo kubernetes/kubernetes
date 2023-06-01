@@ -83,11 +83,6 @@ const (
 	// the anti-martian-packet rule. It should not be used for any other
 	// rules.
 	kubeletFirewallChain utiliptables.Chain = "KUBE-FIREWALL"
-
-	// largeClusterEndpointsThreshold is the number of endpoints at which
-	// we switch into "large cluster mode" and optimize for iptables
-	// performance over iptables debuggability
-	largeClusterEndpointsThreshold = 1000
 )
 
 const sysctlRouteLocalnet = "net/ipv4/conf/all/route_localnet"
@@ -162,7 +157,6 @@ type Proxier struct {
 	initialized          int32
 	syncRunner           *async.BoundedFrequencyRunner // governs calls to syncProxyRules
 	syncPeriod           time.Duration
-	lastIPTablesCleanup  time.Time
 
 	// These are effectively const and do not need the mutex to be held.
 	iptables       utiliptables.Interface
@@ -190,11 +184,6 @@ type Proxier struct {
 	filterRules              proxyutil.LineBuffer
 	natChains                proxyutil.LineBuffer
 	natRules                 proxyutil.LineBuffer
-
-	// largeClusterMode is set at the beginning of syncProxyRules if we are
-	// going to end up outputting "lots" of iptables rules and so we need to
-	// optimize for performance over debuggability.
-	largeClusterMode bool
 
 	// localhostNodePorts indicates whether we allow NodePort services to be accessed
 	// via localhost.
@@ -742,17 +731,6 @@ func isServiceChainName(chainString string) bool {
 	return false
 }
 
-// Assumes proxier.mu is held.
-func (proxier *Proxier) appendServiceCommentLocked(args []string, svcName string) []string {
-	// Not printing these comments, can reduce size of iptables (in case of large
-	// number of endpoints) even by 40%+. So if total number of endpoint chains
-	// is large enough, we simply drop those comments.
-	if proxier.largeClusterMode {
-		return args
-	}
-	return append(args, "-m", "comment", "--comment", svcName)
-}
-
 // Called by the iptables.Monitor, and in response to topology changes; this calls
 // syncProxyRules() and tells it to resync all services, regardless of whether the
 // Service or Endpoints/EndpointSlice objects themselves have changed
@@ -940,7 +918,6 @@ func (proxier *Proxier) syncProxyRules() {
 	for svcName := range proxier.svcPortMap {
 		totalEndpoints += len(proxier.endpointsMap[svcName])
 	}
-	proxier.largeClusterMode = (totalEndpoints > largeClusterEndpointsThreshold)
 
 	// These two variables are used to publish the sync_proxy_rules_no_endpoints_total
 	// metric.
@@ -1372,7 +1349,7 @@ func (proxier *Proxier) syncProxyRules() {
 			activeNATChains[endpointChain] = true
 
 			args = append(args[:0], "-A", string(endpointChain))
-			args = proxier.appendServiceCommentLocked(args, svcPortNameString)
+			args = append(args, "-m", "comment", "--comment", svcPortNameString)
 			// Handle traffic that loops back to the originator with SNAT.
 			natRules.Write(
 				args,
@@ -1388,37 +1365,31 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 	}
 
-	// Delete chains no longer in use. Since "iptables-save" can take several seconds
-	// to run on hosts with lots of iptables rules, we don't bother to do this on
-	// every sync in large clusters. (Stale chains will not be referenced by any
-	// active rules, so they're harmless other than taking up memory.)
+	// Delete chains no longer in use.
 	deletedChains := 0
-	if !proxier.largeClusterMode || time.Since(proxier.lastIPTablesCleanup) > proxier.syncPeriod {
-		var existingNATChains map[utiliptables.Chain]struct{}
+	var existingNATChains map[utiliptables.Chain]struct{}
 
-		proxier.iptablesData.Reset()
-		if err := proxier.iptables.SaveInto(utiliptables.TableNAT, proxier.iptablesData); err == nil {
-			existingNATChains = utiliptables.GetChainsFromTable(proxier.iptablesData.Bytes())
+	proxier.iptablesData.Reset()
+	if err := proxier.iptables.SaveInto(utiliptables.TableNAT, proxier.iptablesData); err == nil {
+		existingNATChains = utiliptables.GetChainsFromTable(proxier.iptablesData.Bytes())
 
-			for chain := range existingNATChains {
-				if !activeNATChains[chain] {
-					chainString := string(chain)
-					if !isServiceChainName(chainString) {
-						// Ignore chains that aren't ours.
-						continue
-					}
-					// We must (as per iptables) write a chain-line
-					// for it, which has the nice effect of flushing
-					// the chain. Then we can remove the chain.
-					proxier.natChains.Write(utiliptables.MakeChainLine(chain))
-					proxier.natRules.Write("-X", chainString)
-					deletedChains++
+		for chain := range existingNATChains {
+			if !activeNATChains[chain] {
+				chainString := string(chain)
+				if !isServiceChainName(chainString) {
+					// Ignore chains that aren't ours.
+					continue
 				}
+				// We must (as per iptables) write a chain-line
+				// for it, which has the nice effect of flushing
+				// the chain. Then we can remove the chain.
+				proxier.natChains.Write(utiliptables.MakeChainLine(chain))
+				proxier.natRules.Write("-X", chainString)
+				deletedChains++
 			}
-			proxier.lastIPTablesCleanup = time.Now()
-		} else {
-			klog.ErrorS(err, "Failed to execute iptables-save: stale chains will not be deleted")
 		}
+	} else {
+		klog.ErrorS(err, "Failed to execute iptables-save: stale chains will not be deleted")
 	}
 
 	// Finally, tail-call to the nodePorts chain.  This needs to be after all
@@ -1579,7 +1550,7 @@ func (proxier *Proxier) writeServiceToEndpointRules(natRules proxyutil.LineBuffe
 			args = append(args[:0],
 				"-A", string(svcChain),
 			)
-			args = proxier.appendServiceCommentLocked(args, comment)
+			args = append(args, "-m", "comment", "--comment", comment)
 			args = append(args,
 				"-m", "recent", "--name", string(epInfo.ChainName),
 				"--rcheck", "--seconds", strconv.Itoa(svcInfo.StickyMaxAgeSeconds()), "--reap",
@@ -1599,7 +1570,7 @@ func (proxier *Proxier) writeServiceToEndpointRules(natRules proxyutil.LineBuffe
 		comment := fmt.Sprintf(`"%s -> %s"`, svcPortNameString, epInfo.String())
 
 		args = append(args[:0], "-A", string(svcChain))
-		args = proxier.appendServiceCommentLocked(args, comment)
+		args = append(args, "-m", "comment", "--comment", comment)
 		if i < (numEndpoints - 1) {
 			// Each rule is a probabilistic match.
 			args = append(args,
