@@ -79,7 +79,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/controlplane"
-	"k8s.io/kubernetes/pkg/controlplane/apiserver"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
@@ -163,13 +162,21 @@ cluster's shared state through which all other components interact.`,
 }
 
 // Run runs the specified APIServer.  This should never exit.
-func Run(completeOptions completedServerRunOptions, stopCh <-chan struct{}) error {
+func Run(options completedServerRunOptions, stopCh <-chan struct{}) error {
 	// To help debugging, immediately log version
 	klog.Infof("Version: %+v", version.Get())
 
 	klog.InfoS("Golang settings", "GOGC", os.Getenv("GOGC"), "GOMAXPROCS", os.Getenv("GOMAXPROCS"), "GOTRACEBACK", os.Getenv("GOTRACEBACK"))
 
-	server, err := CreateServerChain(completeOptions)
+	config, err := NewConfig(options)
+	if err != nil {
+		return err
+	}
+	completed, err := config.Complete()
+	if err != nil {
+		return err
+	}
+	server, err := CreateServerChain(completed)
 	if err != nil {
 		return err
 	}
@@ -183,37 +190,21 @@ func Run(completeOptions completedServerRunOptions, stopCh <-chan struct{}) erro
 }
 
 // CreateServerChain creates the apiservers connected via delegation.
-func CreateServerChain(completedOptions completedServerRunOptions) (*aggregatorapiserver.APIAggregator, error) {
-	kubeAPIServerConfig, serviceResolver, pluginInitializer, err := CreateKubeAPIServerConfig(completedOptions)
+func CreateServerChain(config CompletedConfig) (*aggregatorapiserver.APIAggregator, error) {
+	notFoundHandler := notfoundhandler.New(config.ControlPlane.GenericConfig.Serializer, genericapifilters.NoMuxAndDiscoveryIncompleteKey)
+	apiExtensionsServer, err := config.ApiExtensions.New(genericapiserver.NewEmptyDelegateWithCustomHandler(notFoundHandler))
 	if err != nil {
 		return nil, err
 	}
+	crdAPIEnabled := config.ApiExtensions.GenericConfig.MergedResourceConfig.ResourceEnabled(apiextensionsv1.SchemeGroupVersion.WithResource("customresourcedefinitions"))
 
-	// If additional API servers are added, they should be gated.
-	apiExtensionsConfig, err := apiserver.CreateAPIExtensionsConfig(*kubeAPIServerConfig.GenericConfig, kubeAPIServerConfig.ExtraConfig.VersionedInformers, pluginInitializer, completedOptions.ServerRunOptions, completedOptions.MasterCount,
-		serviceResolver, webhook.NewDefaultAuthenticationInfoResolverWrapper(kubeAPIServerConfig.ExtraConfig.ProxyTransport, kubeAPIServerConfig.GenericConfig.EgressSelector, kubeAPIServerConfig.GenericConfig.LoopbackClientConfig, kubeAPIServerConfig.GenericConfig.TracerProvider))
-	if err != nil {
-		return nil, err
-	}
-	crdAPIEnabled := apiExtensionsConfig.GenericConfig.MergedResourceConfig.ResourceEnabled(apiextensionsv1.SchemeGroupVersion.WithResource("customresourcedefinitions"))
-
-	notFoundHandler := notfoundhandler.New(kubeAPIServerConfig.GenericConfig.Serializer, genericapifilters.NoMuxAndDiscoveryIncompleteKey)
-	apiExtensionsServer, err := apiExtensionsConfig.Complete().New(genericapiserver.NewEmptyDelegateWithCustomHandler(notFoundHandler))
-	if err != nil {
-		return nil, err
-	}
-
-	kubeAPIServer, err := kubeAPIServerConfig.Complete().New(apiExtensionsServer.GenericAPIServer)
+	kubeAPIServer, err := config.ControlPlane.New(apiExtensionsServer.GenericAPIServer)
 	if err != nil {
 		return nil, err
 	}
 
 	// aggregator comes last in the chain
-	aggregatorConfig, err := createAggregatorConfig(*kubeAPIServerConfig.GenericConfig, completedOptions.ServerRunOptions, kubeAPIServerConfig.ExtraConfig.VersionedInformers, serviceResolver, kubeAPIServerConfig.ExtraConfig.ProxyTransport, pluginInitializer)
-	if err != nil {
-		return nil, err
-	}
-	aggregatorServer, err := createAggregatorServer(aggregatorConfig, kubeAPIServer.GenericAPIServer, apiExtensionsServer.Informers, crdAPIEnabled)
+	aggregatorServer, err := createAggregatorServer(config.Aggregator, kubeAPIServer.GenericAPIServer, apiExtensionsServer.Informers, crdAPIEnabled)
 	if err != nil {
 		// we don't need special handling for innerStopCh because the aggregator server doesn't create any go routines
 		return nil, err
