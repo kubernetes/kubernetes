@@ -8,11 +8,11 @@ require (
 	github.com/coreos/go-oidc v2.2.1+incompatible
 	github.com/coreos/go-systemd/v22 v22.5.0
 	github.com/emicklei/go-restful/v3 v3.9.0
-	github.com/evanphx/json-patch v4.12.0+incompatible
+	github.com/evanphx/json-patch v5.6.0+incompatible
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/gogo/protobuf v1.3.2
 	github.com/google/cel-go v0.16.0
-	github.com/google/gnostic v0.5.7-v3refs
+	github.com/google/gnostic-models v0.6.8
 	github.com/google/go-cmp v0.5.9
 	github.com/google/gofuzz v1.2.0
 	github.com/google/uuid v1.3.0
@@ -34,7 +34,7 @@ require (
 	golang.org/x/crypto v0.6.0
 	golang.org/x/net v0.9.0
 	golang.org/x/sync v0.1.0
-	golang.org/x/sys v0.7.0
+	golang.org/x/sys v0.8.0
 	golang.org/x/time v0.3.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20230525234035-dd9d682886f9
 	google.golang.org/grpc v1.54.0
@@ -47,7 +47,7 @@ require (
 	k8s.io/component-base v0.0.0
 	k8s.io/klog/v2 v2.100.1
 	k8s.io/kms v0.0.0
-	k8s.io/kube-openapi v0.0.0-20230524182850-78281498afbb
+	k8s.io/kube-openapi v0.0.0-20230601164746-7562a1006961
 	k8s.io/utils v0.0.0-20230406110748-d93618cff8a2
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.1.2
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd
@@ -70,7 +70,7 @@ require (
 	github.com/go-logr/logr v1.2.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/jsonpointer v0.19.6 // indirect
-	github.com/go-openapi/jsonreference v0.20.1 // indirect
+	github.com/go-openapi/jsonreference v0.20.2 // indirect
 	github.com/go-openapi/swag v0.22.3 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect

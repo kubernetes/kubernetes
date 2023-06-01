@@ -28,7 +28,7 @@ import (
 	"github.com/NYTimes/gziphandler"
 	"github.com/emicklei/go-restful/v3"
 	"github.com/golang/protobuf/proto"
-	openapi_v2 "github.com/google/gnostic/openapiv2"
+	openapi_v2 "github.com/google/gnostic-models/openapiv2"
 	"github.com/google/uuid"
 	"github.com/munnerz/goautoneg"
 	klog "k8s.io/klog/v2"

@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package openapi_v3
+package openapi_v2
 
 import (
 	"gopkg.in/yaml.v3"
 
-	"github.com/google/gnostic/compiler"
+	"github.com/google/gnostic-models/compiler"
 )
 
-// ParseDocument reads an OpenAPI v3 description from a YAML/JSON representation.
+// ParseDocument reads an OpenAPI v2 description from a YAML/JSON representation.
 func ParseDocument(b []byte) (*Document, error) {
 	info, err := compiler.ReadInfoFromBytes("", b)
 	if err != nil {
