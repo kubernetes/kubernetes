@@ -39,7 +39,6 @@ import (
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/kubernetes/pkg/apis/core"
 	netutils "k8s.io/utils/net"
 )
 
@@ -47,7 +46,6 @@ func init() {
 	var scheme = runtime.NewScheme()
 
 	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
-	utilruntime.Must(core.AddToScheme(scheme))
 	utilruntime.Must(corev1.AddToScheme(scheme))
 	utilruntime.Must(scheme.SetVersionPriority(corev1.SchemeGroupVersion))
 
@@ -79,9 +77,9 @@ func newFakeLeases(t *testing.T, s storage.Interface) *fakeLeases {
 	}
 }
 
-func (f *fakeLeases) SetKeys(keys []string) error {
+func (f *fakeLeases) SetKeys(keys []string, endpointPorts []corev1.EndpointPort) error {
 	for _, ip := range keys {
-		if err := f.UpdateLease(ip); err != nil {
+		if err := f.UpdateLease(ip, "test", endpointPorts); err != nil {
 			return err
 		}
 	}
@@ -341,7 +339,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 	for _, test := range reconcileTests {
 		t.Run(test.testName, func(t *testing.T) {
 			fakeLeases := newFakeLeases(t, s)
-			err := fakeLeases.SetKeys(test.endpointKeys)
+			err := fakeLeases.SetKeys(test.endpointKeys, test.endpointPorts)
 			if err != nil {
 				t.Errorf("unexpected error creating keys: %v", err)
 			}
@@ -349,7 +347,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 
 			epAdapter := NewEndpointsAdapter(clientset.CoreV1(), clientset.DiscoveryV1())
 			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
-			err = r.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, true)
+			err = r.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, true, "test")
 			if err != nil {
 				t.Errorf("unexpected error reconciling: %v", err)
 			}
@@ -420,14 +418,14 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 	for _, test := range nonReconcileTests {
 		t.Run(test.testName, func(t *testing.T) {
 			fakeLeases := newFakeLeases(t, s)
-			err := fakeLeases.SetKeys(test.endpointKeys)
+			err := fakeLeases.SetKeys(test.endpointKeys, test.endpointPorts)
 			if err != nil {
 				t.Errorf("unexpected error creating keys: %v", err)
 			}
 			clientset := fake.NewSimpleClientset(test.initialState...)
 			epAdapter := NewEndpointsAdapter(clientset.CoreV1(), clientset.DiscoveryV1())
 			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
-			err = r.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, false)
+			err = r.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, false, "test")
 			if err != nil {
 				t.Errorf("unexpected error reconciling: %v", err)
 			}
@@ -529,7 +527,7 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 	for _, test := range stopTests {
 		t.Run(test.testName, func(t *testing.T) {
 			fakeLeases := newFakeLeases(t, s)
-			err := fakeLeases.SetKeys(test.endpointKeys)
+			err := fakeLeases.SetKeys(test.endpointKeys, test.endpointPorts)
 			if err != nil {
 				t.Errorf("unexpected error creating keys: %v", err)
 			}
@@ -649,7 +647,7 @@ func TestApiserverShutdown(t *testing.T) {
 	for _, test := range reconcileTests {
 		t.Run(test.testName, func(t *testing.T) {
 			fakeLeases := newFakeLeases(t, s)
-			err := fakeLeases.SetKeys(test.endpointKeys)
+			err := fakeLeases.SetKeys(test.endpointKeys, test.endpointPorts)
 			if err != nil {
 				t.Errorf("unexpected error creating keys: %v", err)
 			}
@@ -667,13 +665,13 @@ func TestApiserverShutdown(t *testing.T) {
 				}
 
 				// reconcile endpoints in another goroutine
-				err = r.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, false)
+				err = r.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, false, "test")
 				if err != nil {
 					t.Errorf("unexpected error reconciling: %v", err)
 				}
 			} else {
 				// reconcile endpoints first
-				err = r.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, false)
+				err = r.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, false, "test")
 				if err != nil {
 					t.Errorf("unexpected error reconciling: %v", err)
 				}

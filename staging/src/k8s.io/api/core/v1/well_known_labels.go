@@ -18,6 +18,7 @@ package v1
 
 const (
 	LabelHostname = "kubernetes.io/hostname"
+	LabelEndpoint = "kubernetes.io/endpoint"
 
 	LabelTopologyZone   = "topology.kubernetes.io/zone"
 	LabelTopologyRegion = "topology.kubernetes.io/region"

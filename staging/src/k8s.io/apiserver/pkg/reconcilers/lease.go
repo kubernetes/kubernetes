@@ -35,12 +35,16 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
+	endpointsv1 "k8s.io/apiserver/pkg/apis/endpoints"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	storagefactory "k8s.io/apiserver/pkg/storage/storagebackend/factory"
-	endpointsv1 "k8s.io/kubernetes/pkg/api/v1/endpoints"
+)
+
+const (
+	APIServerIdentityLabel = "apiserverIdentity"
 )
 
 // Leases is an interface which assists in managing the set of active masters
@@ -48,11 +52,14 @@ type Leases interface {
 	// ListLeases retrieves a list of the current master IPs
 	ListLeases() ([]string, error)
 
+	// GetLease retrieves the IP of a specific service
+	GetLease(serverId string) ([]string, error)
+
 	// UpdateLease adds or refreshes a master's lease
-	UpdateLease(ip string) error
+	UpdateLease(ip string, apiseverId string, endpointPorts []corev1.EndpointPort) error
 
 	// RemoveLease removes a master's lease
-	RemoveLease(ip string) error
+	RemoveLease(ip string, endpointPorts []corev1.EndpointPort) error
 
 	// Destroy cleans up everything on shutdown.
 	Destroy()
@@ -94,16 +101,27 @@ func (s *storageLeases) ListLeases() ([]string, error) {
 
 // UpdateLease resets the TTL on a master IP in storage
 // UpdateLease will create a new key if it doesn't exist.
-func (s *storageLeases) UpdateLease(ip string) error {
+func (s *storageLeases) UpdateLease(ip string, apiserverId string, endpointPorts []corev1.EndpointPort) error {
 	key := path.Join(s.baseKey, ip)
+	// TODO: how to use endpointPorts to save in the key
+	if len(endpointPorts) > 0 {
+		key = path.Join(key, fmt.Sprint(endpointPorts[0].Port))
+	}
 	return s.storage.GuaranteedUpdate(apirequest.NewDefaultContext(), key, &corev1.Endpoints{}, true, nil, func(input kruntime.Object, respMeta storage.ResponseMeta) (kruntime.Object, *uint64, error) {
 		// just make sure we've got the right IP set, and then refresh the TTL
 		existing := input.(*corev1.Endpoints)
 		existing.Subsets = []corev1.EndpointSubset{
 			{
 				Addresses: []corev1.EndpointAddress{{IP: ip}},
+				Ports:     endpointPorts,
 			},
 		}
+
+		// update apiserverId
+		if existing.Labels == nil {
+			existing.Labels = map[string]string{}
+		}
+		existing.Labels[APIServerIdentityLabel] = apiserverId
 
 		// leaseTime needs to be in seconds
 		leaseTime := uint64(s.leaseTime / time.Second)
@@ -120,9 +138,48 @@ func (s *storageLeases) UpdateLease(ip string) error {
 	}, nil)
 }
 
+// GetLease retrieves the master IP and port for a specific server id
+func (s *storageLeases) GetLease(serverId string) ([]string, error) {
+	ipInfoList := &corev1.EndpointsList{}
+	storageOpts := storage.ListOptions{
+		ResourceVersion:      "0",
+		ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+		Predicate:            storage.Everything,
+		Recursive:            true,
+	}
+	if err := s.storage.GetList(apirequest.NewDefaultContext(), s.baseKey, storageOpts, ipInfoList); err != nil {
+		return nil, err
+	}
+
+	ipPortList := make([]string, 0, len(ipInfoList.Items))
+	for _, ip := range ipInfoList.Items {
+		if ip.Labels != nil {
+			if ip.Labels[APIServerIdentityLabel] == serverId {
+				if len(ip.Subsets) > 0 && len(ip.Subsets[0].Addresses) > 0 {
+					var ipStr string
+					if len(ip.Subsets[0].Addresses[0].IP) > 0 {
+						ipStr = ip.Subsets[0].Addresses[0].IP
+						if len(ip.Subsets[0].Ports) > 0 {
+							ipStr = ipStr + ":" + fmt.Sprint(ip.Subsets[0].Ports[0].Port)
+						}
+						ipPortList = append(ipPortList, ipStr)
+					}
+				}
+			}
+		}
+	}
+
+	klog.V(6).Infof("Got this master IPs for the specified apiserverId %v, %v", serverId, ipPortList)
+	return ipPortList, nil
+}
+
 // RemoveLease removes the lease on a master IP in storage
-func (s *storageLeases) RemoveLease(ip string) error {
+func (s *storageLeases) RemoveLease(ip string, endpointPorts []corev1.EndpointPort) error {
 	key := path.Join(s.baseKey, ip)
+	// TODO: how to use endpointPorts to save in the key
+	if len(endpointPorts) > 0 {
+		key = path.Join(key, fmt.Sprint(endpointPorts[0].Port))
+	}
 	return s.storage.Delete(apirequest.NewDefaultContext(), key, &corev1.Endpoints{}, nil, rest.ValidateAllObjectFunc, nil)
 }
 
@@ -145,7 +202,7 @@ func NewLeases(config *storagebackend.ConfigForResource, baseKey string, leaseTi
 	}, nil
 }
 
-type leaseEndpointReconciler struct {
+type LeaseEndpointReconciler struct {
 	epAdapter             EndpointsAdapter
 	masterLeases          Leases
 	stopReconcilingCalled atomic.Bool
@@ -154,10 +211,14 @@ type leaseEndpointReconciler struct {
 
 // NewLeaseEndpointReconciler creates a new LeaseEndpoint reconciler
 func NewLeaseEndpointReconciler(epAdapter EndpointsAdapter, masterLeases Leases) EndpointReconciler {
-	return &leaseEndpointReconciler{
+	return &LeaseEndpointReconciler{
 		epAdapter:    epAdapter,
 		masterLeases: masterLeases,
 	}
+}
+
+func (r *LeaseEndpointReconciler) GetMasterLeases() Leases {
+	return r.masterLeases
 }
 
 // ReconcileEndpoints lists keys in a special etcd directory.
@@ -167,7 +228,7 @@ func NewLeaseEndpointReconciler(epAdapter EndpointsAdapter, masterLeases Leases)
 // expire. ReconcileEndpoints will notice that the endpoints object is
 // different from the directory listing, and update the endpoints object
 // accordingly.
-func (r *leaseEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
+func (r *LeaseEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort, reconcilePorts bool, apiserverId string) error {
 	// reconcile endpoints only if apiserver was not shutdown
 	if r.stopReconcilingCalled.Load() {
 		return nil
@@ -180,7 +241,7 @@ func (r *leaseEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.
 	// Refresh the TTL on our key, independently of whether any error or
 	// update conflict happens below. This makes sure that at least some of
 	// the masters will add our endpoint.
-	if err := r.masterLeases.UpdateLease(ip.String()); err != nil {
+	if err := r.masterLeases.UpdateLease(ip.String(), apiserverId, endpointPorts); err != nil {
 		return err
 	}
 
@@ -189,7 +250,7 @@ func (r *leaseEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.
 
 // doReconcile can be called from ReconcileEndpoints() or RemoveEndpoints().
 // it is NOT SAFE to call it from multiple goroutines.
-func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
+func (r *LeaseEndpointReconciler) doReconcile(serviceName string, endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
 	e, err := r.epAdapter.Get(corev1.NamespaceDefault, serviceName, metav1.GetOptions{})
 	shouldCreate := false
 	if err != nil {
@@ -324,22 +385,22 @@ func checkEndpointSubsetFormatWithLease(e *corev1.Endpoints, expectedIPs []strin
 	return true, ipsCorrect, portsCorrect
 }
 
-func (r *leaseEndpointReconciler) RemoveEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort) error {
+func (r *LeaseEndpointReconciler) RemoveEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort) error {
 	// Ensure that there will be no race condition with the ReconcileEndpoints.
 	r.reconcilingLock.Lock()
 	defer r.reconcilingLock.Unlock()
 
-	if err := r.masterLeases.RemoveLease(ip.String()); err != nil {
+	if err := r.masterLeases.RemoveLease(ip.String(), endpointPorts); err != nil {
 		return err
 	}
 
 	return r.doReconcile(serviceName, endpointPorts, true)
 }
 
-func (r *leaseEndpointReconciler) StopReconciling() {
+func (r *LeaseEndpointReconciler) StopReconciling() {
 	r.stopReconcilingCalled.Store(true)
 }
 
-func (r *leaseEndpointReconciler) Destroy() {
+func (r *LeaseEndpointReconciler) Destroy() {
 	r.masterLeases.Destroy()
 }

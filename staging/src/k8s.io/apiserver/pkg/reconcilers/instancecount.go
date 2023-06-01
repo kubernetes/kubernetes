@@ -24,9 +24,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	endpointsv1 "k8s.io/apiserver/pkg/apis/endpoints"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
-	endpointsv1 "k8s.io/kubernetes/pkg/api/v1/endpoints"
 )
 
 // masterCountEndpointReconciler reconciles endpoints based on a specified expected number of
@@ -59,7 +59,7 @@ func NewMasterCountEndpointReconciler(masterCount int, epAdapter EndpointsAdapte
 //   - All apiservers MUST know and agree on the number of apiservers expected
 //     to be running (c.masterCount).
 //   - ReconcileEndpoints is called periodically from all apiservers.
-func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
+func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort, reconcilePorts bool, apiserverId string) error {
 	r.reconcilingLock.Lock()
 	defer r.reconcilingLock.Unlock()
 
@@ -182,6 +182,10 @@ func (r *masterCountEndpointReconciler) StopReconciling() {
 }
 
 func (r *masterCountEndpointReconciler) Destroy() {
+}
+
+func (r *masterCountEndpointReconciler) GetMasterLeases() Leases {
+	return nil
 }
 
 // Determine if the endpoint is in the format ReconcileEndpoints expects.

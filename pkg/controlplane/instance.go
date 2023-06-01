@@ -23,6 +23,7 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
@@ -62,6 +63,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	apiserverfeatures "k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/reconcilers"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
@@ -81,7 +83,6 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
 	"k8s.io/kubernetes/pkg/controlplane/controller/legacytokentracking"
 	"k8s.io/kubernetes/pkg/controlplane/controller/systemnamespaces"
-	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/routes"
@@ -231,8 +232,9 @@ type CompletedConfig struct {
 // EndpointReconcilerConfig holds the endpoint reconciler and endpoint reconciliation interval to be
 // used by the master.
 type EndpointReconcilerConfig struct {
-	Reconciler reconcilers.EndpointReconciler
-	Interval   time.Duration
+	Reconciler   reconcilers.EndpointReconciler
+	Interval     time.Duration
+	MasterLeases reconcilers.Leases
 }
 
 // Instance contains state for a Kubernetes cluster api server instance.
@@ -329,7 +331,9 @@ func (c *Config) Complete() CompletedConfig {
 	}
 
 	if cfg.ExtraConfig.EndpointReconcilerConfig.Reconciler == nil {
-		cfg.ExtraConfig.EndpointReconcilerConfig.Reconciler = c.createEndpointReconciler()
+		reconciler := c.createEndpointReconciler()
+		cfg.ExtraConfig.EndpointReconcilerConfig.MasterLeases = reconciler.GetMasterLeases()
+		cfg.ExtraConfig.EndpointReconcilerConfig.Reconciler = reconciler
 	}
 
 	if cfg.ExtraConfig.RepairServicesInterval == 0 {
@@ -491,7 +495,6 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 
 			leaseName := m.GenericAPIServer.APIServerID
 			holderIdentity := m.GenericAPIServer.APIServerID + "_" + string(uuid.NewUUID())
-
 			controller := lease.NewController(
 				clock.RealClock{},
 				kubeClient,
@@ -502,7 +505,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 				leaseName,
 				metav1.NamespaceSystem,
 				// TODO: receive identity label value as a parameter when post start hook is moved to generic apiserver.
-				labelAPIServerHeartbeatFunc(KubeAPIServer))
+				labelAPIServerHeartbeatFunc(KubeAPIServer, m.GenericAPIServer.APIServerID, c.ExtraConfig.EndpointReconcilerConfig.MasterLeases))
 			go controller.Run(ctx)
 			return nil
 		})
@@ -550,7 +553,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	return m, nil
 }
 
-func labelAPIServerHeartbeatFunc(identity string) lease.ProcessLeaseFunc {
+func labelAPIServerHeartbeatFunc(identity string, apiserverId string, masterleases reconcilers.Leases) lease.ProcessLeaseFunc {
 	return func(lease *coordinationapiv1.Lease) error {
 		if lease.Labels == nil {
 			lease.Labels = map[string]string{}
@@ -566,6 +569,15 @@ func labelAPIServerHeartbeatFunc(identity string) lease.ProcessLeaseFunc {
 
 		// convenience label to easily map a lease object to a specific apiserver
 		lease.Labels[apiv1.LabelHostname] = hostname
+
+		// save apiserver network location for visibility
+		if masterleases != nil {
+			ipPorts, err := masterleases.GetLease(apiserverId)
+			if err != nil {
+				return err
+			}
+			lease.Labels[apiv1.LabelEndpoint] = strings.Join(ipPorts, ",")
+		}
 		return nil
 	}
 }

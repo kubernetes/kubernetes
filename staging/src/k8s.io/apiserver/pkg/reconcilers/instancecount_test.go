@@ -232,7 +232,7 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 			fakeClient := fake.NewSimpleClientset(test.initialState...)
 			epAdapter := NewEndpointsAdapter(fakeClient.CoreV1(), fakeClient.DiscoveryV1())
 			reconciler := NewMasterCountEndpointReconciler(test.additionalMasters+1, epAdapter)
-			err := reconciler.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, true)
+			err := reconciler.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, true, "")
 			if err != nil {
 				t.Errorf("unexpected error reconciling: %v", err)
 			}
@@ -290,7 +290,7 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 			fakeClient := fake.NewSimpleClientset(test.initialState...)
 			epAdapter := NewEndpointsAdapter(fakeClient.CoreV1(), fakeClient.DiscoveryV1())
 			reconciler := NewMasterCountEndpointReconciler(test.additionalMasters+1, epAdapter)
-			err := reconciler.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, false)
+			err := reconciler.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, false, "")
 			if err != nil {
 				t.Errorf("unexpected error reconciling: %v", err)
 			}

@@ -19,8 +19,8 @@ package checksum
 import (
 	"hash/fnv"
 
+	hashutil "k8s.io/apiserver/pkg/util/hash"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
-	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
 
 // Checksum is the data to be stored as checkpoint

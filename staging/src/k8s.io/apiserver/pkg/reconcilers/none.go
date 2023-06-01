@@ -33,7 +33,7 @@ func NewNoneEndpointReconciler() EndpointReconciler {
 }
 
 // ReconcileEndpoints noop reconcile
-func (r *noneEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
+func (r *noneEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort, reconcilePorts bool, serverId string) error {
 	return nil
 }
 
@@ -46,4 +46,8 @@ func (r *noneEndpointReconciler) StopReconciling() {
 }
 
 func (r *noneEndpointReconciler) Destroy() {
+}
+
+func (r *noneEndpointReconciler) GetMasterLeases() Leases {
+	return nil
 }

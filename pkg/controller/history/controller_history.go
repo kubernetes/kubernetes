@@ -26,11 +26,11 @@ import (
 	"strconv"
 
 	apps "k8s.io/api/apps/v1"
+	hashutil "k8s.io/apiserver/pkg/util/hash"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	"k8s.io/kubernetes/pkg/controller"
-	hashutil "k8s.io/kubernetes/pkg/util/hash"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"

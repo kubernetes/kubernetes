@@ -35,11 +35,11 @@ import (
 	// to "v1"?
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	// Ensure that core apis are installed
+	"k8s.io/apiserver/pkg/util/hash"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/util/hash"
 
 	"k8s.io/klog/v2"
 )

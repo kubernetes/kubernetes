@@ -28,6 +28,7 @@ import (
 	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/reconcilers"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
@@ -37,7 +38,6 @@ import (
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	netutils "k8s.io/utils/net"
