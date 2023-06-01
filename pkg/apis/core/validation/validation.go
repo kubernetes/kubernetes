@@ -2007,11 +2007,7 @@ func ValidatePersistentVolumeUpdate(newPv, oldPv *core.PersistentVolume, opts Pe
 
 // ValidatePersistentVolumeStatusUpdate tests to see if the status update is legal for an end user to make.
 func ValidatePersistentVolumeStatusUpdate(newPv, oldPv *core.PersistentVolume) field.ErrorList {
-	allErrs := ValidateObjectMetaUpdate(&newPv.ObjectMeta, &oldPv.ObjectMeta, field.NewPath("metadata"))
-	if len(newPv.ResourceVersion) == 0 {
-		allErrs = append(allErrs, field.Required(field.NewPath("resourceVersion"), ""))
-	}
-	return allErrs
+	return ValidateObjectMetaUpdate(&newPv.ObjectMeta, &oldPv.ObjectMeta, field.NewPath("metadata"))
 }
 
 type PersistentVolumeClaimSpecValidationOptions struct {
@@ -2308,9 +2304,6 @@ var resizeStatusSet = sets.NewString(string(core.PersistentVolumeClaimNoExpansio
 // ValidatePersistentVolumeClaimStatusUpdate validates an update to status of a PersistentVolumeClaim
 func ValidatePersistentVolumeClaimStatusUpdate(newPvc, oldPvc *core.PersistentVolumeClaim, validationOpts PersistentVolumeClaimSpecValidationOptions) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newPvc.ObjectMeta, &oldPvc.ObjectMeta, field.NewPath("metadata"))
-	if len(newPvc.ResourceVersion) == 0 {
-		allErrs = append(allErrs, field.Required(field.NewPath("resourceVersion"), ""))
-	}
 	if len(newPvc.Spec.AccessModes) == 0 {
 		allErrs = append(allErrs, field.Required(field.NewPath("Spec", "accessModes"), ""))
 	}
@@ -6397,9 +6390,6 @@ func ValidateResourceQuotaUpdate(newResourceQuota, oldResourceQuota *core.Resour
 // ValidateResourceQuotaStatusUpdate tests to see if the status update is legal for an end user to make.
 func ValidateResourceQuotaStatusUpdate(newResourceQuota, oldResourceQuota *core.ResourceQuota) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newResourceQuota.ObjectMeta, &oldResourceQuota.ObjectMeta, field.NewPath("metadata"))
-	if len(newResourceQuota.ResourceVersion) == 0 {
-		allErrs = append(allErrs, field.Required(field.NewPath("resourceVersion"), ""))
-	}
 	fldPath := field.NewPath("status", "hard")
 	for k, v := range newResourceQuota.Status.Hard {
 		resPath := fldPath.Key(string(k))
