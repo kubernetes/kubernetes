@@ -57,7 +57,7 @@ var baseOpts = []VersionedOptions{
 			cel.EagerlyValidateDeclarations(true),
 			cel.DefaultUTCTimeZone(true),
 
-			ext.Strings(),
+			ext.Strings(ext.StringsVersion(0)),
 			library.URLs(),
 			library.Regex(),
 			library.Lists(),
@@ -77,9 +77,10 @@ var baseOpts = []VersionedOptions{
 		IntroducedVersion: version.MajorMinor(1, 28),
 		EnvOptions: []cel.EnvOption{
 			cel.CrossTypeNumericComparisons(true),
-			// TODO: Add CEL Optionals once we bump cel-go
+			cel.OptionalTypes(),
 		},
 	},
+	// TODO: switch to ext.Strings version 2 once format() is fixed to work with HomogeneousAggregateLiterals.
 }
 
 // MustBaseEnvSet returns the common CEL base environments for Kubernetes for Version, or panics
