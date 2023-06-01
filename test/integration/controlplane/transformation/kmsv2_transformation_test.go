@@ -37,6 +37,7 @@ import (
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	unstructuredv1 "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -663,15 +664,25 @@ func BenchmarkKMSv2KDF(b *testing.B) {
 	b.Cleanup(func() { options.ObserveRESTOptionsGetter = origObserveRESTOptionsGetter })
 
 	var restOptionsGetter generic.RESTOptionsGetter
-	options.ObserveRESTOptionsGetter = func(opts generic.RESTOptionsGetter) {
-		_, err := opts.GetRESTOptions(schema.GroupResource{Group: "", Resource: "secrets"})
+	options.ObserveRESTOptionsGetter = func(optionsGetter generic.RESTOptionsGetter) {
+		opts, err := optionsGetter.GetRESTOptions(schema.GroupResource{Group: "", Resource: "secrets"})
 		if err != nil {
 			return // this one does not handle secrets
 		}
+
+		if opts.StorageConfig.Codec.Identifier() == unstructuredv1.UnstructuredJSONScheme.Identifier() {
+			return // this one does not handle secrets
+		}
+
+		if err := runtime.CheckCodec(opts.StorageConfig.Codec, &api.Secret{}); err != nil {
+			return // this one does not handle secrets
+		}
+
 		if restOptionsGetter != nil {
 			b.Fatal("multiple REST options found for secrets")
 		}
-		restOptionsGetter = opts
+
+		restOptionsGetter = optionsGetter
 	}
 
 	defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.KMSv2, true)()
