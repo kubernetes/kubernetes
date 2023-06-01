@@ -405,13 +405,3 @@ func managedByController(endpointSlice *discovery.EndpointSlice) bool {
 	managedBy, _ := endpointSlice.Labels[discovery.LabelManagedBy]
 	return managedBy == controllerName
 }
-
-// isNodeReady returns true if a node is ready; false otherwise.
-func isNodeReady(node *v1.Node) bool {
-	for _, c := range node.Status.Conditions {
-		if c.Type == v1.NodeReady {
-			return c.Status == v1.ConditionTrue
-		}
-	}
-	return false
-}

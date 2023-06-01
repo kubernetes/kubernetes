@@ -46,6 +46,7 @@ import (
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
 	endpointsliceutil "k8s.io/kubernetes/pkg/controller/util/endpointslice"
 	"k8s.io/kubernetes/pkg/features"
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
 const (
@@ -522,7 +523,7 @@ func (c *Controller) updateNode(old, cur interface{}) {
 
 	// LabelTopologyZone may be added by cloud provider asynchronously after the Node is created.
 	// The topology cache should be updated in this case.
-	if isNodeReady(oldNode) != isNodeReady(curNode) ||
+	if nodeutil.IsNodeReady(oldNode) != nodeutil.IsNodeReady(curNode) ||
 		oldNode.Labels[v1.LabelTopologyZone] != curNode.Labels[v1.LabelTopologyZone] {
 		c.checkNodeTopologyDistribution()
 	}

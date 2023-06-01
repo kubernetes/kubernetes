@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"math"
 
-	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/klog/v2"
 	endpointsliceutil "k8s.io/kubernetes/pkg/controller/util/endpointslice"
@@ -249,16 +248,6 @@ func serviceOverloaded(ezi EndpointZoneInfo, zoneRatios map[string]float64) bool
 		}
 	}
 
-	return false
-}
-
-// isNodeReady returns true if a node is ready; false otherwise.
-func isNodeReady(node *v1.Node) bool {
-	for _, c := range node.Status.Conditions {
-		if c.Type == v1.NodeReady {
-			return c.Status == v1.ConditionTrue
-		}
-	}
 	return false
 }
 

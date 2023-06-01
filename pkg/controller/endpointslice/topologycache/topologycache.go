@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	endpointsliceutil "k8s.io/kubernetes/pkg/controller/util/endpointslice"
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
 const (
@@ -212,7 +213,7 @@ func (t *TopologyCache) SetNodes(nodes []*v1.Node) {
 			klog.V(2).Infof("Ignoring node %s because it has an excluded label", node.Name)
 			continue
 		}
-		if !isNodeReady(node) {
+		if !nodeutil.IsNodeReady(node) {
 			klog.V(2).Infof("Ignoring node %s because it is not ready: %v", node.Name, node.Status.Conditions)
 			continue
 		}
