@@ -23,7 +23,7 @@ import (
 
 	oteltrace "go.opentelemetry.io/otel/trace"
 
-	extensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -44,12 +44,11 @@ import (
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/component-base/version"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
-	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
+	openapicommon "k8s.io/kube-openapi/pkg/common"
 
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controlplane"
-	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
@@ -59,7 +58,9 @@ import (
 // BuildGenericConfig takes the master server options and produces the genericapiserver.Config associated with it
 func BuildGenericConfig(
 	s *options.ServerRunOptions,
+	schemes []*runtime.Scheme,
 	proxyTransport *http.Transport,
+	getOpenAPIDefinitions func(ref openapicommon.ReferenceCallback) map[string]openapicommon.OpenAPIDefinition,
 ) (
 	genericConfig *genericapiserver.Config,
 	versionedInformers clientgoinformers.SharedInformerFactory,
@@ -95,8 +96,8 @@ func BuildGenericConfig(
 		}
 	}
 	// wrap the definitions to revert any changes from disabled features
-	getOpenAPIDefinitions := openapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(generatedopenapi.GetOpenAPIDefinitions)
-	namer := openapinamer.NewDefinitionNamer(legacyscheme.Scheme, extensionsapiserver.Scheme, aggregatorscheme.Scheme)
+	getOpenAPIDefinitions = openapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(getOpenAPIDefinitions)
+	namer := openapinamer.NewDefinitionNamer(schemes...)
 	genericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(getOpenAPIDefinitions, namer)
 	genericConfig.OpenAPIConfig.Info.Title = "Kubernetes"
 	genericConfig.OpenAPIV3Config = genericapiserver.DefaultOpenAPIV3Config(getOpenAPIDefinitions, namer)

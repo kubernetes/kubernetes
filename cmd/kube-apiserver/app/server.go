@@ -32,6 +32,8 @@ import (
 	"github.com/spf13/cobra"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	extensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
+	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -56,13 +58,16 @@ import (
 	"k8s.io/component-base/version/verflag"
 	"k8s.io/klog/v2"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
+	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 	netutils "k8s.io/utils/net"
 
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/controlplane"
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
+	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 	"k8s.io/kubernetes/pkg/serviceaccount"
@@ -213,7 +218,12 @@ func CreateKubeAPIServerConfig(s completedServerRunOptions) (
 ) {
 	proxyTransport := CreateProxyTransport()
 
-	genericConfig, versionedInformers, serviceResolver, pluginInitializers, admissionPostStartHook, storageFactory, err := controlplaneapiserver.BuildGenericConfig(s.ServerRunOptions, proxyTransport)
+	genericConfig, versionedInformers, serviceResolver, pluginInitializers, admissionPostStartHook, storageFactory, err := controlplaneapiserver.BuildGenericConfig(
+		s.ServerRunOptions,
+		[]*runtime.Scheme{legacyscheme.Scheme, extensionsapiserver.Scheme, aggregatorscheme.Scheme},
+		proxyTransport,
+		generatedopenapi.GetOpenAPIDefinitions,
+	)
 	if err != nil {
 		return nil, nil, nil, err
 	}
