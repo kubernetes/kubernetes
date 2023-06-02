@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	_ "k8s.io/component-base/metrics/prometheus/workqueue" // for workqueue metric registration
@@ -51,7 +52,7 @@ type Manager interface {
 	// AddResourceInfo records resources whose StorageVersions need updates
 	AddResourceInfo(resources ...*ResourceInfo)
 	// UpdateStorageVersions tries to update the StorageVersions of the recorded resources
-	UpdateStorageVersions(kubeAPIServerClientConfig *rest.Config, apiserverID string)
+	UpdateStorageVersions(kubeAPIServerClientConfig *rest.Config, apiserverID string, apiResourceConfigSource serverstorage.APIResourceConfigSource)
 	// PendingUpdate returns true if the StorageVersion of the given resource is still pending update.
 	PendingUpdate(gr schema.GroupResource) bool
 	// LastUpdateError returns the last error hit when updating the storage version of the given resource.
@@ -111,7 +112,7 @@ func (s *defaultManager) addPendingManagedStatusLocked(r *ResourceInfo) {
 }
 
 // UpdateStorageVersions tries to update the StorageVersions of the recorded resources
-func (s *defaultManager) UpdateStorageVersions(kubeAPIServerClientConfig *rest.Config, serverID string) {
+func (s *defaultManager) UpdateStorageVersions(kubeAPIServerClientConfig *rest.Config, serverID string, apiResourceConfigSource serverstorage.APIResourceConfigSource) {
 	clientset, err := kubernetes.NewForConfig(kubeAPIServerClientConfig)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("failed to get clientset: %v", err))
@@ -143,7 +144,14 @@ func (s *defaultManager) UpdateStorageVersions(kubeAPIServerClientConfig *rest.C
 		if len(gr.Group) == 0 {
 			gr.Group = "core"
 		}
-		if err := updateStorageVersionFor(sc, serverID, gr, r.EncodingVersion, decodableVersions); err != nil {
+
+		servedVersions := []string{}
+		for _, dv := range decodableVersions {
+			if apiResourceConfigSource.ResourceEnabled(gr.WithVersion(dv)) {
+				servedVersions = append(servedVersions, dv)
+			}
+		}
+		if err := updateStorageVersionFor(sc, serverID, gr, r.EncodingVersion, decodableVersions, servedVersions); err != nil {
 			utilruntime.HandleError(fmt.Errorf("failed to update storage version for %v: %v", r.GroupResource, err))
 			s.recordStatusFailure(&r, err)
 			hasFailure = true

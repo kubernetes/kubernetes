@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/features"
+	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storageversion"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
@@ -52,9 +53,9 @@ type wrappedStorageVersionManager struct {
 	completed      <-chan struct{}
 }
 
-func (w *wrappedStorageVersionManager) UpdateStorageVersions(loopbackClientConfig *rest.Config, serverID string) {
+func (w *wrappedStorageVersionManager) UpdateStorageVersions(loopbackClientConfig *rest.Config, serverID string, apiResourceConfigSource serverstorage.APIResourceConfigSource) {
 	<-w.startUpdateSV
-	w.Manager.UpdateStorageVersions(loopbackClientConfig, serverID)
+	w.Manager.UpdateStorageVersions(loopbackClientConfig, serverID, apiResourceConfigSource)
 	close(w.updateFinished)
 	<-w.finishUpdateSV
 }
