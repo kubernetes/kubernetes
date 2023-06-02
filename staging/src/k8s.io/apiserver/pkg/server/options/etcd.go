@@ -38,7 +38,6 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	storagefactory "k8s.io/apiserver/pkg/storage/storagebackend/factory"
-	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/klog/v2"
 )
 
@@ -216,7 +215,6 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 // up objects that must be created once and reused across multiple invocations such as storage transformers.
 // This method mutates the receiver (EtcdOptions).  It must never mutate the inputs.
 func (s *EtcdOptions) Complete(
-	storageObjectCountTracker flowcontrolrequest.StorageObjectCountTracker,
 	stopCh <-chan struct{},
 	addPostStartHook func(name string, hook server.PostStartHookFunc) error,
 ) error {
@@ -283,8 +281,6 @@ func (s *EtcdOptions) Complete(
 		}
 	}
 
-	s.StorageConfig.StorageObjectCountTracker = storageObjectCountTracker
-
 	s.complete = true
 
 	// nolint:govet // The only code path where closeTransformers does not get called is when it gets stored in dynamicTransformers.
@@ -297,7 +293,12 @@ func (s *EtcdOptions) ApplyTo(c *server.Config) error {
 		return nil
 	}
 
-	return s.ApplyWithStorageFactoryTo(&SimpleStorageFactory{StorageConfig: s.StorageConfig}, c)
+	storageConfig := s.StorageConfig
+	if storageConfig.StorageObjectCountTracker == nil {
+		storageConfig.StorageObjectCountTracker = c.StorageObjectCountTracker
+	}
+
+	return s.ApplyWithStorageFactoryTo(&SimpleStorageFactory{StorageConfig: storageConfig}, c)
 }
 
 // ApplyWithStorageFactoryTo mutates the provided server.Config.  It must never mutate the receiver (EtcdOptions).
