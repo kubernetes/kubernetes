@@ -43,7 +43,7 @@ import (
 	"k8s.io/apiserver/pkg/apis/config/validation"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server/healthz"
-	"k8s.io/apiserver/pkg/storage/value"
+	storagevalue "k8s.io/apiserver/pkg/storage/value"
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope"
 	envelopekmsv2 "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2"
@@ -159,7 +159,7 @@ func (h *kmsv2PluginProbe) toHealthzCheck(idx int) healthz.HealthChecker {
 // EncryptionConfiguration represents the parsed and normalized encryption configuration for the apiserver.
 type EncryptionConfiguration struct {
 	// Transformers is a list of value.Transformer that will be used to encrypt and decrypt data.
-	Transformers map[schema.GroupResource]value.Transformer
+	Transformers map[schema.GroupResource]storagevalue.Transformer
 
 	// HealthChecks is a list of healthz.HealthChecker that will be used to check the health of the encryption providers.
 	HealthChecks []healthz.HealthChecker
@@ -207,7 +207,7 @@ func LoadEncryptionConfig(ctx context.Context, filepath string, reload bool) (*E
 // getTransformerOverridesAndKMSPluginHealthzCheckers creates the set of transformers and KMS healthz checks based on the given config.
 // It may launch multiple go routines whose lifecycle is controlled by ctx.
 // In case of an error, the caller is responsible for canceling ctx to clean up any go routines that may have been launched.
-func getTransformerOverridesAndKMSPluginHealthzCheckers(ctx context.Context, config *apiserverconfig.EncryptionConfiguration) (map[schema.GroupResource]value.Transformer, []healthz.HealthChecker, *kmsState, error) {
+func getTransformerOverridesAndKMSPluginHealthzCheckers(ctx context.Context, config *apiserverconfig.EncryptionConfiguration) (map[schema.GroupResource]storagevalue.Transformer, []healthz.HealthChecker, *kmsState, error) {
 	var kmsHealthChecks []healthz.HealthChecker
 	transformers, probes, kmsUsed, err := getTransformerOverridesAndKMSPluginProbes(ctx, config)
 	if err != nil {
@@ -228,8 +228,8 @@ type healthChecker interface {
 // getTransformerOverridesAndKMSPluginProbes creates the set of transformers and KMS probes based on the given config.
 // It may launch multiple go routines whose lifecycle is controlled by ctx.
 // In case of an error, the caller is responsible for canceling ctx to clean up any go routines that may have been launched.
-func getTransformerOverridesAndKMSPluginProbes(ctx context.Context, config *apiserverconfig.EncryptionConfiguration) (map[schema.GroupResource]value.Transformer, []healthChecker, *kmsState, error) {
-	resourceToPrefixTransformer := map[schema.GroupResource][]value.PrefixTransformer{}
+func getTransformerOverridesAndKMSPluginProbes(ctx context.Context, config *apiserverconfig.EncryptionConfiguration) (map[schema.GroupResource]storagevalue.Transformer, []healthChecker, *kmsState, error) {
+	resourceToPrefixTransformer := map[schema.GroupResource][]storagevalue.PrefixTransformer{}
 	var probes []healthChecker
 	var kmsUsed kmsState
 
@@ -268,11 +268,11 @@ func getTransformerOverridesAndKMSPluginProbes(ctx context.Context, config *apis
 		probes = append(probes, p...)
 	}
 
-	transformers := make(map[schema.GroupResource]value.Transformer, len(resourceToPrefixTransformer))
+	transformers := make(map[schema.GroupResource]storagevalue.Transformer, len(resourceToPrefixTransformer))
 	for gr, transList := range resourceToPrefixTransformer {
 		gr := gr
 		transList := transList
-		transformers[gr] = value.NewPrefixTransformers(fmt.Errorf("no matching prefix found"), transList...)
+		transformers[gr] = storagevalue.NewPrefixTransformers(fmt.Errorf("no matching prefix found"), transList...)
 	}
 
 	return transformers, probes, &kmsUsed, nil
@@ -478,15 +478,15 @@ func loadConfig(filepath string, reload bool) (*apiserverconfig.EncryptionConfig
 // prefixTransformersAndProbes creates the set of transformers and KMS probes based on the given resource config.
 // It may launch multiple go routines whose lifecycle is controlled by ctx.
 // In case of an error, the caller is responsible for canceling ctx to clean up any go routines that may have been launched.
-func prefixTransformersAndProbes(ctx context.Context, config apiserverconfig.ResourceConfiguration) ([]value.PrefixTransformer, []healthChecker, *kmsState, error) {
-	var transformers []value.PrefixTransformer
+func prefixTransformersAndProbes(ctx context.Context, config apiserverconfig.ResourceConfiguration) ([]storagevalue.PrefixTransformer, []healthChecker, *kmsState, error) {
+	var transformers []storagevalue.PrefixTransformer
 	var probes []healthChecker
 	var kmsUsed kmsState
 
 	for _, provider := range config.Providers {
 		provider := provider
 		var (
-			transformer    value.PrefixTransformer
+			transformer    storagevalue.PrefixTransformer
 			transformerErr error
 			probe          healthChecker
 			used           *kmsState
@@ -497,7 +497,7 @@ func prefixTransformersAndProbes(ctx context.Context, config apiserverconfig.Res
 			transformer, transformerErr = aesPrefixTransformer(provider.AESGCM, aestransformer.NewGCMTransformer, aesGCMTransformerPrefixV1)
 
 		case provider.AESCBC != nil:
-			cbcTransformer := func(block cipher.Block) (value.Transformer, error) {
+			cbcTransformer := func(block cipher.Block) (storagevalue.Transformer, error) {
 				return aestransformer.NewCBCTransformer(block), nil
 			}
 			transformer, transformerErr = aesPrefixTransformer(provider.AESCBC, cbcTransformer, aesCBCTransformerPrefixV1)
@@ -513,7 +513,7 @@ func prefixTransformersAndProbes(ctx context.Context, config apiserverconfig.Res
 			}
 
 		case provider.Identity != nil:
-			transformer = value.PrefixTransformer{
+			transformer = storagevalue.PrefixTransformer{
 				Transformer: identity.NewEncryptCheckTransformer(),
 				Prefix:      []byte{},
 			}
@@ -532,10 +532,10 @@ func prefixTransformersAndProbes(ctx context.Context, config apiserverconfig.Res
 	return transformers, probes, &kmsUsed, nil
 }
 
-type blockTransformerFunc func(cipher.Block) (value.Transformer, error)
+type blockTransformerFunc func(cipher.Block) (storagevalue.Transformer, error)
 
-func aesPrefixTransformer(config *apiserverconfig.AESConfiguration, fn blockTransformerFunc, prefix string) (value.PrefixTransformer, error) {
-	var result value.PrefixTransformer
+func aesPrefixTransformer(config *apiserverconfig.AESConfiguration, fn blockTransformerFunc, prefix string) (storagevalue.PrefixTransformer, error) {
+	var result storagevalue.PrefixTransformer
 
 	if len(config.Keys) == 0 {
 		return result, fmt.Errorf("aes provider has no valid keys")
@@ -550,7 +550,7 @@ func aesPrefixTransformer(config *apiserverconfig.AESConfiguration, fn blockTran
 		}
 	}
 
-	keyTransformers := []value.PrefixTransformer{}
+	keyTransformers := []storagevalue.PrefixTransformer{}
 
 	for _, keyData := range config.Keys {
 		keyData := keyData
@@ -569,26 +569,26 @@ func aesPrefixTransformer(config *apiserverconfig.AESConfiguration, fn blockTran
 
 		// Create a new PrefixTransformer for this key
 		keyTransformers = append(keyTransformers,
-			value.PrefixTransformer{
+			storagevalue.PrefixTransformer{
 				Transformer: transformer,
 				Prefix:      []byte(keyData.Name + ":"),
 			})
 	}
 
 	// Create a prefixTransformer which can choose between these keys
-	keyTransformer := value.NewPrefixTransformers(
+	keyTransformer := storagevalue.NewPrefixTransformers(
 		fmt.Errorf("no matching key was found for the provided AES transformer"), keyTransformers...)
 
 	// Create a PrefixTransformer which shall later be put in a list with other providers
-	result = value.PrefixTransformer{
+	result = storagevalue.PrefixTransformer{
 		Transformer: keyTransformer,
 		Prefix:      []byte(prefix),
 	}
 	return result, nil
 }
 
-func secretboxPrefixTransformer(config *apiserverconfig.SecretboxConfiguration) (value.PrefixTransformer, error) {
-	var result value.PrefixTransformer
+func secretboxPrefixTransformer(config *apiserverconfig.SecretboxConfiguration) (storagevalue.PrefixTransformer, error) {
+	var result storagevalue.PrefixTransformer
 
 	if len(config.Keys) == 0 {
 		return result, fmt.Errorf("secretbox provider has no valid keys")
@@ -603,7 +603,7 @@ func secretboxPrefixTransformer(config *apiserverconfig.SecretboxConfiguration) 
 		}
 	}
 
-	keyTransformers := []value.PrefixTransformer{}
+	keyTransformers := []storagevalue.PrefixTransformer{}
 
 	for _, keyData := range config.Keys {
 		keyData := keyData
@@ -621,18 +621,18 @@ func secretboxPrefixTransformer(config *apiserverconfig.SecretboxConfiguration) 
 
 		// Create a new PrefixTransformer for this key
 		keyTransformers = append(keyTransformers,
-			value.PrefixTransformer{
+			storagevalue.PrefixTransformer{
 				Transformer: secretbox.NewSecretboxTransformer(keyArray),
 				Prefix:      []byte(keyData.Name + ":"),
 			})
 	}
 
 	// Create a prefixTransformer which can choose between these keys
-	keyTransformer := value.NewPrefixTransformers(
+	keyTransformer := storagevalue.NewPrefixTransformers(
 		fmt.Errorf("no matching key was found for the provided Secretbox transformer"), keyTransformers...)
 
 	// Create a PrefixTransformer which shall later be put in a list with other providers
-	result = value.PrefixTransformer{
+	result = storagevalue.PrefixTransformer{
 		Transformer: keyTransformer,
 		Prefix:      []byte(secretboxTransformerPrefixV1),
 	}
@@ -665,13 +665,13 @@ func (s *kmsState) accumulate(other *kmsState) {
 // kmsPrefixTransformer creates a KMS transformer and probe based on the given KMS config.
 // It may launch multiple go routines whose lifecycle is controlled by ctx.
 // In case of an error, the caller is responsible for canceling ctx to clean up any go routines that may have been launched.
-func kmsPrefixTransformer(ctx context.Context, config *apiserverconfig.KMSConfiguration) (value.PrefixTransformer, healthChecker, *kmsState, error) {
+func kmsPrefixTransformer(ctx context.Context, config *apiserverconfig.KMSConfiguration) (storagevalue.PrefixTransformer, healthChecker, *kmsState, error) {
 	kmsName := config.Name
 	switch config.APIVersion {
 	case kmsAPIVersionV1:
 		envelopeService, err := envelopeServiceFactory(ctx, config.Endpoint, config.Timeout.Duration)
 		if err != nil {
-			return value.PrefixTransformer{}, nil, nil, fmt.Errorf("could not configure KMSv1-Plugin's probe %q, error: %w", kmsName, err)
+			return storagevalue.PrefixTransformer{}, nil, nil, fmt.Errorf("could not configure KMSv1-Plugin's probe %q, error: %w", kmsName, err)
 		}
 
 		probe := &kmsPluginProbe{
@@ -692,12 +692,12 @@ func kmsPrefixTransformer(ctx context.Context, config *apiserverconfig.KMSConfig
 
 	case kmsAPIVersionV2:
 		if !utilfeature.DefaultFeatureGate.Enabled(features.KMSv2) {
-			return value.PrefixTransformer{}, nil, nil, fmt.Errorf("could not configure KMSv2 plugin %q, KMSv2 feature is not enabled", kmsName)
+			return storagevalue.PrefixTransformer{}, nil, nil, fmt.Errorf("could not configure KMSv2 plugin %q, KMSv2 feature is not enabled", kmsName)
 		}
 
 		envelopeService, err := EnvelopeKMSv2ServiceFactory(ctx, config.Endpoint, config.Name, config.Timeout.Duration)
 		if err != nil {
-			return value.PrefixTransformer{}, nil, nil, fmt.Errorf("could not configure KMSv2-Plugin's probe %q, error: %w", kmsName, err)
+			return storagevalue.PrefixTransformer{}, nil, nil, fmt.Errorf("could not configure KMSv2-Plugin's probe %q, error: %w", kmsName, err)
 		}
 
 		probe := &kmsv2PluginProbe{
@@ -748,7 +748,7 @@ func kmsPrefixTransformer(ctx context.Context, config *apiserverconfig.KMSConfig
 			})
 
 		// using AES-GCM by default for encrypting data with KMSv2
-		transformer := value.PrefixTransformer{
+		transformer := storagevalue.PrefixTransformer{
 			Transformer: envelopekmsv2.NewEnvelopeTransformer(envelopeService, kmsName, probe.getCurrentState),
 			Prefix:      []byte(kmsTransformerPrefixV2 + kmsName + ":"),
 		}
@@ -759,12 +759,12 @@ func kmsPrefixTransformer(ctx context.Context, config *apiserverconfig.KMSConfig
 		}, nil
 
 	default:
-		return value.PrefixTransformer{}, nil, nil, fmt.Errorf("could not configure KMS plugin %q, unsupported KMS API version %q", kmsName, config.APIVersion)
+		return storagevalue.PrefixTransformer{}, nil, nil, fmt.Errorf("could not configure KMS plugin %q, unsupported KMS API version %q", kmsName, config.APIVersion)
 	}
 }
 
-func envelopePrefixTransformer(config *apiserverconfig.KMSConfiguration, envelopeService envelope.Service, prefix string) value.PrefixTransformer {
-	baseTransformerFunc := func(block cipher.Block) (value.Transformer, error) {
+func envelopePrefixTransformer(config *apiserverconfig.KMSConfiguration, envelopeService envelope.Service, prefix string) storagevalue.PrefixTransformer {
+	baseTransformerFunc := func(block cipher.Block) (storagevalue.Transformer, error) {
 		gcm, err := aestransformer.NewGCMTransformer(block)
 		if err != nil {
 			return nil, err
@@ -777,15 +777,15 @@ func envelopePrefixTransformer(config *apiserverconfig.KMSConfiguration, envelop
 		return unionTransformers{gcm, aestransformer.NewCBCTransformer(block)}, nil
 	}
 
-	return value.PrefixTransformer{
+	return storagevalue.PrefixTransformer{
 		Transformer: envelope.NewEnvelopeTransformer(envelopeService, int(*config.CacheSize), baseTransformerFunc),
 		Prefix:      []byte(prefix + config.Name + ":"),
 	}
 }
 
-type unionTransformers []value.Transformer
+type unionTransformers []storagevalue.Transformer
 
-func (u unionTransformers) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) (out []byte, stale bool, err error) {
+func (u unionTransformers) TransformFromStorage(ctx context.Context, data []byte, dataCtx storagevalue.Context) (out []byte, stale bool, err error) {
 	var errs []error
 	for i := range u {
 		transformer := u[i]
@@ -804,7 +804,7 @@ func (u unionTransformers) TransformFromStorage(ctx context.Context, data []byte
 	return nil, false, fmt.Errorf("unionTransformers: unable to transform from storage")
 }
 
-func (u unionTransformers) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) (out []byte, err error) {
+func (u unionTransformers) TransformToStorage(ctx context.Context, data []byte, dataCtx storagevalue.Context) (out []byte, err error) {
 	return u[0].TransformToStorage(ctx, data, dataCtx)
 }
 
@@ -815,7 +815,7 @@ func computeEncryptionConfigHash(data []byte) string {
 	return fmt.Sprintf("%x", sha256.Sum256(data))
 }
 
-var _ ResourceTransformers = &DynamicTransformers{}
+var _ storagevalue.ResourceTransformers = &DynamicTransformers{}
 var _ healthz.HealthChecker = &DynamicTransformers{}
 
 // DynamicTransformers holds transformers that may be dynamically updated via a single external actor, likely a controller.
@@ -825,7 +825,7 @@ type DynamicTransformers struct {
 }
 
 type transformTracker struct {
-	transformerOverrides  map[schema.GroupResource]value.Transformer
+	transformerOverrides  map[schema.GroupResource]storagevalue.Transformer
 	kmsPluginHealthzCheck healthz.HealthChecker
 	closeTransformers     context.CancelFunc
 	kmsCloseGracePeriod   time.Duration
@@ -833,7 +833,7 @@ type transformTracker struct {
 
 // NewDynamicTransformers returns transformers, health checks for kms providers and an ability to close transformers.
 func NewDynamicTransformers(
-	transformerOverrides map[schema.GroupResource]value.Transformer,
+	transformerOverrides map[schema.GroupResource]storagevalue.Transformer,
 	kmsPluginHealthzCheck healthz.HealthChecker,
 	closeTransformers context.CancelFunc,
 	kmsCloseGracePeriod time.Duration,
@@ -864,7 +864,7 @@ func (d *DynamicTransformers) Name() string {
 }
 
 // TransformerForResource returns the transformer for the given resource.
-func (d *DynamicTransformers) TransformerForResource(resource schema.GroupResource) value.Transformer {
+func (d *DynamicTransformers) TransformerForResource(resource schema.GroupResource) storagevalue.Transformer {
 	return &resourceTransformer{
 		resource:         resource,
 		transformTracker: d.transformTracker,
@@ -873,7 +873,7 @@ func (d *DynamicTransformers) TransformerForResource(resource schema.GroupResour
 
 // Set sets the transformer overrides. This method is not go routine safe and must only be called by the same, single caller throughout the lifetime of this object.
 func (d *DynamicTransformers) Set(
-	transformerOverrides map[schema.GroupResource]value.Transformer,
+	transformerOverrides map[schema.GroupResource]storagevalue.Transformer,
 	closeTransformers context.CancelFunc,
 	kmsPluginHealthzCheck healthz.HealthChecker,
 	kmsCloseGracePeriod time.Duration,
@@ -898,34 +898,30 @@ func (d *DynamicTransformers) Set(
 	}()
 }
 
-var _ value.Transformer = &resourceTransformer{}
+var _ storagevalue.Transformer = &resourceTransformer{}
 
 type resourceTransformer struct {
 	resource         schema.GroupResource
 	transformTracker *atomic.Value
 }
 
-func (r *resourceTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
+func (r *resourceTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx storagevalue.Context) ([]byte, bool, error) {
 	return r.transformer().TransformFromStorage(ctx, data, dataCtx)
 }
 
-func (r *resourceTransformer) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, error) {
+func (r *resourceTransformer) TransformToStorage(ctx context.Context, data []byte, dataCtx storagevalue.Context) ([]byte, error) {
 	return r.transformer().TransformToStorage(ctx, data, dataCtx)
 }
 
-func (r *resourceTransformer) transformer() value.Transformer {
+func (r *resourceTransformer) transformer() storagevalue.Transformer {
 	return transformerFromOverrides(r.transformTracker.Load().(*transformTracker).transformerOverrides, r.resource)
 }
 
-type ResourceTransformers interface {
-	TransformerForResource(resource schema.GroupResource) value.Transformer
-}
+var _ storagevalue.ResourceTransformers = &StaticTransformers{}
 
-var _ ResourceTransformers = &StaticTransformers{}
+type StaticTransformers map[schema.GroupResource]storagevalue.Transformer
 
-type StaticTransformers map[schema.GroupResource]value.Transformer
-
-func (s StaticTransformers) TransformerForResource(resource schema.GroupResource) value.Transformer {
+func (s StaticTransformers) TransformerForResource(resource schema.GroupResource) storagevalue.Transformer {
 	return transformerFromOverrides(s, resource)
 }
 
@@ -934,7 +930,7 @@ var anyGroupAnyResource = schema.GroupResource{
 	Resource: "*",
 }
 
-func transformerFromOverrides(transformerOverrides map[schema.GroupResource]value.Transformer, resource schema.GroupResource) value.Transformer {
+func transformerFromOverrides(transformerOverrides map[schema.GroupResource]storagevalue.Transformer, resource schema.GroupResource) storagevalue.Transformer {
 	if transformer := transformerOverrides[resource]; transformer != nil {
 		return transformer
 	}

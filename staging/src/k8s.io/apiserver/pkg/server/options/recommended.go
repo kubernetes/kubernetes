@@ -101,9 +101,6 @@ func (o *RecommendedOptions) AddFlags(fs *pflag.FlagSet) {
 // ApplyTo adds RecommendedOptions to the server configuration.
 // pluginInitializers can be empty, it is only need for additional initializers.
 func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
-	if err := o.Etcd.Complete(config.Config.DrainedNotify(), config.Config.AddPostStartHook); err != nil {
-		return err
-	}
 	if err := o.Etcd.ApplyTo(&config.Config); err != nil {
 		return err
 	}
