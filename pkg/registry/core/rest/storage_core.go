@@ -417,6 +417,12 @@ type componentStatusStorage struct {
 }
 
 func (s componentStatusStorage) serversToValidate() map[string]*componentstatus.Server {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DisableComponentStatusProbes) {
+		// This API was deprecated in 1.19 for the reasons explained in
+		// https://github.com/kubernetes/kubernetes/pull/93570
+		return map[string]*componentstatus.Server{}
+	}
+
 	// this is fragile, which assumes that the default port is being used
 	// TODO: switch to secure port until these components remove the ability to serve insecurely.
 	serversToValidate := map[string]*componentstatus.Server{

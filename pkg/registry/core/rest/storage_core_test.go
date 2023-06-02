@@ -22,19 +22,43 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestGetServersToValidate(t *testing.T) {
-	servers := componentStatusStorage{fakeStorageFactory{}}.serversToValidate()
-
-	if e, a := 3, len(servers); e != a {
-		t.Errorf("expected %v, got %v", e, a)
+	tests := []struct {
+		name     string
+		gate     bool
+		expected []string
+	}{
+		{
+			name:     "DisableComponentStatusProbes enabled",
+			gate:     true,
+			expected: []string{},
+		},
+		{
+			name:     "DisableComponentStatusProbes disable",
+			gate:     false,
+			expected: []string{"scheduler", "controller-manager", "etcd-0"},
+		},
 	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DisableComponentStatusProbes, test.gate)()
+			servers := componentStatusStorage{fakeStorageFactory{}}.serversToValidate()
 
-	for _, server := range []string{"scheduler", "controller-manager", "etcd-0"} {
-		if _, ok := servers[server]; !ok {
-			t.Errorf("server list missing: %s", server)
-		}
+			if len(servers) != len(test.expected) {
+				t.Errorf("expected %v, got %v", len(servers), len(test.expected))
+			}
+
+			for _, server := range test.expected {
+				if _, ok := servers[server]; !ok {
+					t.Errorf("server list missing: %s", server)
+				}
+			}
+		})
 	}
 }
 

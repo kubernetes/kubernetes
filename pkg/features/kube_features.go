@@ -211,6 +211,15 @@ const (
 	// Disable any functionality in kube-apiserver, kube-controller-manager and kubelet related to the `--cloud-provider` component flag.
 	DisableCloudProviders featuregate.Feature = "DisableCloudProviders"
 
+	// owner: @aojea
+	// deprecated: v1.28
+	//
+	// Disable the componentstatus API probes, the API was deprecated in 1.19
+	// for different reasons explained in https://github.com/kubernetes/kubernetes/pull/93570
+	// Enabling the feature gate stops the apiserver to try to probe any of the components
+	// of the cluster.
+	DisableComponentStatusProbes featuregate.Feature = "DisableComponentStatusProbes"
+
 	// owner: @andrewsykim
 	// alpha: v1.23
 	//
@@ -895,6 +904,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	DefaultHostNetworkHostPortsInPodTemplates: {Default: false, PreRelease: featuregate.Deprecated},
 
 	DisableCloudProviders: {Default: false, PreRelease: featuregate.Alpha},
+
+	DisableComponentStatusProbes: {Default: false, PreRelease: featuregate.Deprecated},
 
 	DisableKubeletCloudCredentialProviders: {Default: false, PreRelease: featuregate.Alpha},
 
