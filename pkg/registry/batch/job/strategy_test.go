@@ -836,6 +836,37 @@ func TestJobStrategy_WarningsOnUpdate(t *testing.T) {
 			},
 			wantWarningsCount: 1,
 		},
+		"Invalid transition to high parallelism": {
+			wantWarningsCount: 1,
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob2",
+					Namespace:       metav1.NamespaceDefault,
+					Generation:      1,
+					ResourceVersion: "0",
+				},
+				Spec: batch.JobSpec{
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					Completions:    pointer.Int32(100_001),
+					Parallelism:    pointer.Int32(10_001),
+					Template:       validPodTemplateSpec,
+				},
+			},
+			oldJob: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob2",
+					Namespace:       metav1.NamespaceDefault,
+					Generation:      0,
+					ResourceVersion: "0",
+				},
+				Spec: batch.JobSpec{
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					Completions:    pointer.Int32(100_001),
+					Parallelism:    pointer.Int32(10_000),
+					Template:       validPodTemplateSpec,
+				},
+			},
+		},
 	}
 	for val, tc := range cases {
 		t.Run(val, func(t *testing.T) {
@@ -853,18 +884,20 @@ func TestJobStrategy_WarningsOnCreate(t *testing.T) {
 	validSelector := &metav1.LabelSelector{
 		MatchLabels: map[string]string{"a": "b"},
 	}
-	validSpec := batch.JobSpec{
-		Selector: nil,
-		Template: api.PodTemplateSpec{
-			ObjectMeta: metav1.ObjectMeta{
-				Labels: validSelector.MatchLabels,
-			},
-			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicyOnFailure,
-				DNSPolicy:     api.DNSClusterFirst,
-				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
-			},
+	validPodTemplate := api.PodTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: validSelector.MatchLabels,
 		},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicyOnFailure,
+			DNSPolicy:     api.DNSClusterFirst,
+			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+		},
+	}
+	validSpec := batch.JobSpec{
+		CompletionMode: completionModePtr(batch.NonIndexedCompletion),
+		Selector:       nil,
+		Template:       validPodTemplate,
 	}
 
 	testcases := map[string]struct {
@@ -890,6 +923,22 @@ func TestJobStrategy_WarningsOnCreate(t *testing.T) {
 					UID:       theUID,
 				},
 				Spec: validSpec,
+			},
+		},
+		"high completions and parallelism": {
+			wantWarningsCount: 1,
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "myjob2",
+					Namespace: metav1.NamespaceDefault,
+					UID:       theUID,
+				},
+				Spec: batch.JobSpec{
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					Parallelism:    pointer.Int32(100_001),
+					Completions:    pointer.Int32(100_001),
+					Template:       validPodTemplate,
+				},
 			},
 		},
 	}
