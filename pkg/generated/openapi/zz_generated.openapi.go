@@ -17626,13 +17626,7 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.Ope
 					"ports": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
-								"x-kubernetes-list-map-keys": []interface{}{
-									"containerPort",
-									"protocol",
-									"hostPort",
-									"hostIP",
-								},
-								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-list-type":       "atomic",
 								"x-kubernetes-patch-merge-key": "containerPort",
 								"x-kubernetes-patch-strategy":  "merge",
 							},
@@ -17891,7 +17885,6 @@ func schema_k8sio_api_core_v1_ContainerPort(ref common.ReferenceCallback) common
 					"hostPort": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Number of port to expose on the host. If specified, this must be a valid port number, 0 < x < 65536. If HostNetwork is specified, this must match ContainerPort. Most containers do not need this.",
-							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -17916,7 +17909,6 @@ func schema_k8sio_api_core_v1_ContainerPort(ref common.ReferenceCallback) common
 					"hostIP": {
 						SchemaProps: spec.SchemaProps{
 							Description: "What host IP to bind the external port to.",
-							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -18797,13 +18789,7 @@ func schema_k8sio_api_core_v1_EphemeralContainer(ref common.ReferenceCallback) c
 					"ports": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
-								"x-kubernetes-list-map-keys": []interface{}{
-									"containerPort",
-									"protocol",
-									"hostPort",
-									"hostIP",
-								},
-								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-list-type":       "atomic",
 								"x-kubernetes-patch-merge-key": "containerPort",
 								"x-kubernetes-patch-strategy":  "merge",
 							},
@@ -19079,13 +19065,7 @@ func schema_k8sio_api_core_v1_EphemeralContainerCommon(ref common.ReferenceCallb
 					"ports": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
-								"x-kubernetes-list-map-keys": []interface{}{
-									"containerPort",
-									"protocol",
-									"hostPort",
-									"hostIP",
-								},
-								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-list-type":       "atomic",
 								"x-kubernetes-patch-merge-key": "containerPort",
 								"x-kubernetes-patch-strategy":  "merge",
 							},

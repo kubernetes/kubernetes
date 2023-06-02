@@ -1143,13 +1143,7 @@
               "default": {}
             },
             "type": "array",
-            "x-kubernetes-list-map-keys": [
-              "containerPort",
-              "protocol",
-              "hostPort",
-              "hostIP"
-            ],
-            "x-kubernetes-list-type": "map",
+            "x-kubernetes-list-type": "atomic",
             "x-kubernetes-patch-merge-key": "containerPort",
             "x-kubernetes-patch-strategy": "merge"
           },
@@ -1286,12 +1280,10 @@
             "type": "integer"
           },
           "hostIP": {
-            "default": "",
             "description": "What host IP to bind the external port to.",
             "type": "string"
           },
           "hostPort": {
-            "default": 0,
             "description": "Number of port to expose on the host. If specified, this must be a valid port number, 0 < x < 65536. If HostNetwork is specified, this must match ContainerPort. Most containers do not need this.",
             "format": "int32",
             "type": "integer"
@@ -1999,13 +1991,7 @@
               "default": {}
             },
             "type": "array",
-            "x-kubernetes-list-map-keys": [
-              "containerPort",
-              "protocol",
-              "hostPort",
-              "hostIP"
-            ],
-            "x-kubernetes-list-type": "map",
+            "x-kubernetes-list-type": "atomic",
             "x-kubernetes-patch-merge-key": "containerPort",
             "x-kubernetes-patch-strategy": "merge"
           },

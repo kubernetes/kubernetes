@@ -696,11 +696,7 @@ message Container {
   // +optional
   // +patchMergeKey=containerPort
   // +patchStrategy=merge
-  // +listType=map
-  // +listMapKey=containerPort
-  // +listMapKey=protocol
-  // +listMapKey=hostPort
-  // +listMapKey=hostIP
+  // +listType=atomic
   repeated ContainerPort ports = 6;
 
   // List of sources to populate environment variables in the container.
@@ -856,7 +852,6 @@ message ContainerPort {
   // If HostNetwork is specified, this must match ContainerPort.
   // Most containers do not need this.
   // +optional
-  // +default=0
   optional int32 hostPort = 2;
 
   // Number of port to expose on the pod's IP address.
@@ -871,7 +866,6 @@ message ContainerPort {
 
   // What host IP to bind the external port to.
   // +optional
-  // +default=""
   optional string hostIP = 5;
 }
 
@@ -1360,11 +1354,7 @@ message EphemeralContainerCommon {
   // +optional
   // +patchMergeKey=containerPort
   // +patchStrategy=merge
-  // +listType=map
-  // +listMapKey=containerPort
-  // +listMapKey=protocol
-  // +listMapKey=hostPort
-  // +listMapKey=hostIP
+  // +listType=atomic
   repeated ContainerPort ports = 6;
 
   // List of sources to populate environment variables in the container.

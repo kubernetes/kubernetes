@@ -239,14 +239,8 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 		SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			if b.HostPort == 0 {
-				b.HostPort = 0
-			}
 			if b.Protocol == "" {
 				b.Protocol = "TCP"
-			}
-			if b.HostIP == "" {
-				b.HostIP = ""
 			}
 		}
 		for j := range a.Env {
@@ -313,14 +307,8 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 		SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			if b.HostPort == 0 {
-				b.HostPort = 0
-			}
 			if b.Protocol == "" {
 				b.Protocol = "TCP"
-			}
-			if b.HostIP == "" {
-				b.HostIP = ""
 			}
 		}
 		for j := range a.Env {
@@ -387,14 +375,8 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 		SetDefaults_EphemeralContainer(a)
 		for j := range a.EphemeralContainerCommon.Ports {
 			b := &a.EphemeralContainerCommon.Ports[j]
-			if b.HostPort == 0 {
-				b.HostPort = 0
-			}
 			if b.Protocol == "" {
 				b.Protocol = "TCP"
-			}
-			if b.HostIP == "" {
-				b.HostIP = ""
 			}
 		}
 		for j := range a.EphemeralContainerCommon.Env {
@@ -582,14 +564,8 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 		SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			if b.HostPort == 0 {
-				b.HostPort = 0
-			}
 			if b.Protocol == "" {
 				b.Protocol = "TCP"
-			}
-			if b.HostIP == "" {
-				b.HostIP = ""
 			}
 		}
 		for j := range a.Env {
@@ -656,14 +632,8 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 		SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			if b.HostPort == 0 {
-				b.HostPort = 0
-			}
 			if b.Protocol == "" {
 				b.Protocol = "TCP"
-			}
-			if b.HostIP == "" {
-				b.HostIP = ""
 			}
 		}
 		for j := range a.Env {
@@ -730,14 +700,8 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 		SetDefaults_EphemeralContainer(a)
 		for j := range a.EphemeralContainerCommon.Ports {
 			b := &a.EphemeralContainerCommon.Ports[j]
-			if b.HostPort == 0 {
-				b.HostPort = 0
-			}
 			if b.Protocol == "" {
 				b.Protocol = "TCP"
-			}
-			if b.HostIP == "" {
-				b.HostIP = ""
 			}
 		}
 		for j := range a.EphemeralContainerCommon.Env {
@@ -876,14 +840,8 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 			SetDefaults_Container(a)
 			for j := range a.Ports {
 				b := &a.Ports[j]
-				if b.HostPort == 0 {
-					b.HostPort = 0
-				}
 				if b.Protocol == "" {
 					b.Protocol = "TCP"
-				}
-				if b.HostIP == "" {
-					b.HostIP = ""
 				}
 			}
 			for j := range a.Env {
@@ -950,14 +908,8 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 			SetDefaults_Container(a)
 			for j := range a.Ports {
 				b := &a.Ports[j]
-				if b.HostPort == 0 {
-					b.HostPort = 0
-				}
 				if b.Protocol == "" {
 					b.Protocol = "TCP"
-				}
-				if b.HostIP == "" {
-					b.HostIP = ""
 				}
 			}
 			for j := range a.Env {
@@ -1024,14 +976,8 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 			SetDefaults_EphemeralContainer(a)
 			for j := range a.EphemeralContainerCommon.Ports {
 				b := &a.EphemeralContainerCommon.Ports[j]
-				if b.HostPort == 0 {
-					b.HostPort = 0
-				}
 				if b.Protocol == "" {
 					b.Protocol = "TCP"
-				}
-				if b.HostIP == "" {
-					b.HostIP = ""
 				}
 			}
 			for j := range a.EphemeralContainerCommon.Env {
