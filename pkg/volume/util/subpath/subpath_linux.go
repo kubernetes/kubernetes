@@ -21,8 +21,8 @@ package subpath
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
+	"io/fs"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -148,7 +148,7 @@ func prepareSubpathTarget(mounter mount.Interface, subpath Subpath) (bool, strin
 		// A file is enough for all possible targets (symlink, device, pipe,
 		// socket, ...), bind-mounting them into a file correctly changes type
 		// of the target file.
-		if err = ioutil.WriteFile(bindPathTarget, []byte{}, 0640); err != nil {
+		if err = os.WriteFile(bindPathTarget, []byte{}, 0640); err != nil {
 			return false, "", fmt.Errorf("error creating file %s: %s", bindPathTarget, err)
 		}
 	}
@@ -237,18 +237,30 @@ func doBindSubPath(mounter mount.Interface, subpath Subpath) (hostPath string, e
 	return bindPathTarget, nil
 }
 
+func readDir(dirname string) ([]os.FileInfo, error) {
+	entries, err := os.ReadDir(dirname)
+	if err != nil {
+		return nil, err
+	}
+	infos := make([]fs.FileInfo, 0, len(entries))
+	for _, entry := range entries {
+		info, err := entry.Info()
+		if err != nil {
+			return nil, err
+		}
+		infos = append(infos, info)
+	}
+	return infos, nil
+}
+
 // This implementation is shared between Linux and NsEnter
 func doCleanSubPaths(mounter mount.Interface, podDir string, volumeName string) error {
 	// scan /var/lib/kubelet/pods/<uid>/volume-subpaths/<volume>/*
 	subPathDir := filepath.Join(podDir, containerSubPathDirectoryName, volumeName)
 	klog.V(4).Infof("Cleaning up subpath mounts for %s", subPathDir)
-
-	containerDirs, err := ioutil.ReadDir(subPathDir)
+	containerDirs, err := readDir(subPathDir)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return fmt.Errorf("error reading %s: %s", subPathDir, err)
+		return err
 	}
 
 	for _, containerDir := range containerDirs {
