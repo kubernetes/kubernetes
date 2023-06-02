@@ -352,7 +352,11 @@ func (gcc *PodGCController) markFailedAndDeletePodWithCondition(ctx context.Cont
 				podApply.Status.WithConditions(condition)
 			}
 			if _, err := gcc.kubeClient.CoreV1().Pods(pod.Namespace).ApplyStatus(ctx, podApply, metav1.ApplyOptions{FieldManager: fieldManager, Force: true}); err != nil {
-				return err
+				if errors.IsSSAErrorFailedToCreateManagerFromExistingFields(err) {
+					klog.ErrorS(err, "Failed to update pod status with SSA", "pod", klog.KObj(pod))
+				} else {
+					return err
+				}
 			}
 		}
 	}

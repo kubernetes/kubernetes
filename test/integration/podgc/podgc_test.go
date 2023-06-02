@@ -37,6 +37,122 @@ import (
 	"k8s.io/utils/pointer"
 )
 
+// TestDeleteWhenSSAFails tests deletion by PodGC when adding the condition fails
+func TestDeleteWhenSSAFails(t *testing.T) {
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node",
+		},
+		Spec: v1.NodeSpec{},
+		Status: v1.NodeStatus{
+			Conditions: []v1.NodeCondition{
+				{
+					Type:   v1.NodeReady,
+					Status: v1.ConditionTrue,
+				},
+			},
+		},
+	}
+
+	tests := map[string]struct {
+		enablePodDisruptionConditions bool
+		pod                           v1.Pod
+	}{
+		"pod with duplicate port entries": {
+			enablePodDisruptionConditions: true,
+			pod: v1.Pod{
+				Spec: v1.PodSpec{
+					NodeName: node.Name,
+					Containers: []v1.Container{
+						{
+							Name:  "foo",
+							Image: "bar",
+							Ports: []v1.ContainerPort{
+								{
+									ContainerPort: 8080,
+									Name:          "http",
+									Protocol:      "TCP",
+								},
+								{
+									ContainerPort: 8080,
+									Name:          "metrics",
+									Protocol:      "TCP",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"pod with duplicate env keys": {
+			enablePodDisruptionConditions: true,
+			pod: v1.Pod{
+				Spec: v1.PodSpec{
+					NodeName: node.Name,
+					Containers: []v1.Container{
+						{
+							Name:  "foo",
+							Image: "bar",
+							Env: []v1.EnvVar{
+								{
+									Name:  "MY_VAR",
+									Value: "Value1",
+								},
+								{
+									Name:  "MY_VAR",
+									Value: "Value2",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
+
+			testCtx := setup(t, "duplicated-entries")
+			cs := testCtx.ClientSet
+
+			node, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Failed to create node '%v', err: %v", node.Name, err)
+			}
+			test.pod.Name = "pod"
+			test.pod.Namespace = testCtx.NS.Name
+
+			pod, err := cs.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, &test.pod, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Error %v, while creating pod: %v", err, klog.KObj(pod))
+			}
+
+			// we delete the node to orphan the pod
+			err = cs.CoreV1().Nodes().Delete(testCtx.Ctx, pod.Spec.NodeName, metav1.DeleteOptions{})
+			if err != nil {
+				t.Fatalf("Failed to delete node: %v, err: %v", pod.Spec.NodeName, err)
+			}
+			// wait until the pod is deleted
+			err = wait.PollImmediate(time.Second, time.Minute*15, func() (bool, error) {
+				var e error
+				pod, e = cs.CoreV1().Pods(pod.Namespace).Get(testCtx.Ctx, pod.Name, metav1.GetOptions{})
+				if e == nil {
+					return pod == nil, nil
+				}
+				if apierrors.IsNotFound(e) {
+					return true, nil
+				}
+				return false, e
+			})
+			if err != nil {
+				t.Errorf("Error %q while waiting for the pod %q to be deleted", err, klog.KObj(pod))
+			}
+		})
+	}
+}
+
 // TestPodGcOrphanedPodsWithFinalizer tests deletion of orphaned pods
 func TestPodGcOrphanedPodsWithFinalizer(t *testing.T) {
 	tests := map[string]struct {

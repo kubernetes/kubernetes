@@ -613,6 +613,12 @@ func IsUnsupportedMediaType(err error) bool {
 	return false
 }
 
+// IsSSAErrorFailedToCreate checks if this is SSA error to fail creating manager from existing fields
+func IsSSAErrorFailedToCreateManagerFromExistingFields(err error) bool {
+	message := err.Error()
+	return strings.HasPrefix(message, "failed to create manager for existing fields")
+}
+
 // IsMethodNotSupported determines if the err is an error which indicates the provided action could not
 // be performed because it is not supported by the server.
 // It supports wrapped errors and returns false when the error is nil.
