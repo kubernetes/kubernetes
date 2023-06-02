@@ -18,8 +18,8 @@ package fc
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
+	"io/fs"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -47,8 +47,26 @@ const (
 	byID   = "/dev/disk/by-id/"
 )
 
+// NewIOHandler Create a new IoHandler implementation
+func NewIOHandler() *osIOHandler {
+	return &osIOHandler{}
+}
+
+
 func (handler *osIOHandler) ReadDir(dirname string) ([]os.FileInfo, error) {
-	return ioutil.ReadDir(dirname)
+	entries, err := os.ReadDir(dirname)
+	if err != nil {
+		return nil, err
+	}
+	infos := make([]fs.FileInfo, 0, len(entries))
+	for _, entry := range entries {
+		info, err := entry.Info()
+		if err != nil {
+			return nil, err
+		}
+		infos = append(infos, info)
+	}
+	return infos, nil
 }
 func (handler *osIOHandler) Lstat(name string) (os.FileInfo, error) {
 	return os.Lstat(name)
@@ -57,7 +75,7 @@ func (handler *osIOHandler) EvalSymlinks(path string) (string, error) {
 	return filepath.EvalSymlinks(path)
 }
 func (handler *osIOHandler) WriteFile(filename string, data []byte, perm os.FileMode) error {
-	return ioutil.WriteFile(filename, data, perm)
+	return os.WriteFile(filename, data, perm)
 }
 
 // given a wwn and lun, find the device and associated devicemapper parent
@@ -65,7 +83,7 @@ func findDisk(wwn, lun string, io ioHandler, deviceUtil volumeutil.DeviceUtil) (
 	fcPathExp := "^(pci-.*-fc|fc)-0x" + wwn + "-lun-" + lun + "$"
 	r := regexp.MustCompile(fcPathExp)
 	devPath := byPath
-	if dirs, err := io.ReadDir(devPath); err == nil {
+	if dirs, err := NewIOHandler().ReadDir(devPath); err == nil {
 		for _, f := range dirs {
 			name := f.Name()
 			if r.MatchString(name) {
@@ -93,7 +111,7 @@ func findDiskWWIDs(wwid string, io ioHandler, deviceUtil volumeutil.DeviceUtil) 
 
 	fcPath := "scsi-" + wwid
 	devID := byID
-	if dirs, err := io.ReadDir(devID); err == nil {
+	if dirs, err := NewIOHandler().ReadDir(devID); err == nil {
 		for _, f := range dirs {
 			name := f.Name()
 			if name == fcPath {
@@ -133,7 +151,7 @@ func removeFromScsiSubsystem(deviceName string, io ioHandler) {
 // rescan scsi bus
 func scsiHostRescan(io ioHandler) {
 	scsiPath := "/sys/class/scsi_host/"
-	if dirs, err := io.ReadDir(scsiPath); err == nil {
+	if dirs, err := NewIOHandler().ReadDir(scsiPath); err == nil {
 		for _, f := range dirs {
 			name := scsiPath + f.Name() + "/scan"
 			data := []byte("- - -")
@@ -347,7 +365,7 @@ func (util *fcUtil) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath stri
 	if strings.Contains(volumeInfo, "-lun-") {
 		searchPath = byPath
 	}
-	fis, err := ioutil.ReadDir(searchPath)
+	fis, err := NewIOHandler().ReadDir(searchPath)
 	if err != nil {
 		return err
 	}
