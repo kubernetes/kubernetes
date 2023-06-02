@@ -348,8 +348,6 @@ github.com/google/btree v0.0.0-20180813153112-4030bb1f1f0c/go.mod h1:lNA+9X1NB3Z
 github.com/google/btree v1.0.0/go.mod h1:lNA+9X1NB3Zf8V7Ke586lFgjr2dZNuvo3lPJSGZ5JPQ=
 github.com/google/btree v1.0.1 h1:gK4Kx5IaGY9CD5sPJ36FHiBJ6ZXl0kilRiiCj+jdYp4=
 github.com/google/btree v1.0.1/go.mod h1:xXMiIv4Fb/0kKde4SpL7qlzvu5cMJDRkFDxJfI9uaxA=
-github.com/google/cadvisor v0.47.1 h1:YyKnRy/3myRNGOvF1bNF9FFnpjY7Gky5yKi/ZlN+BSo=
-github.com/google/cadvisor v0.47.1/go.mod h1:iJdTjcjyKHjLCf7OSTzwP5GxdfrkPusw2x5bwGvuLUw=
 github.com/google/cel-go v0.12.6 h1:kjeKudqV0OygrAqA9fX6J55S8gj+Jre2tckIm5RoG4M=
 github.com/google/cel-go v0.12.6/go.mod h1:Jk7ljRzLBhkmiAwBoUxB1sZSCVBAzkqPF25olK/iRDw=
 github.com/google/gnostic v0.5.7-v3refs h1:FhTMOKj2VhjpouxvWJAV1TL304uMlb9zcDqkl6cEI54=
@@ -566,6 +564,8 @@ github.com/openshift/apiserver-library-go v0.0.0-20230503174907-d9b2bf6185e9 h1:
 github.com/openshift/apiserver-library-go v0.0.0-20230503174907-d9b2bf6185e9/go.mod h1:pyUSwoDce710NhzXOmooyt5DBJjUEb2fifFSdKCcMyA=
 github.com/openshift/client-go v0.0.0-20230503144108-75015d2347cb h1:Nij5OnaECrkmcRQMAE9LMbQXPo95aqFnf+12B7SyFVI=
 github.com/openshift/client-go v0.0.0-20230503144108-75015d2347cb/go.mod h1:Rhb3moCqeiTuGHAbXBOlwPubUMlOZEkrEWTRjIF3jzs=
+github.com/openshift/google-cadvisor v0.47.1-openshift-4.15 h1:iMXdTAwyWOzWBjDDZHeNzCBasH25y+IP83B2r5AIxLw=
+github.com/openshift/google-cadvisor v0.47.1-openshift-4.15/go.mod h1:iJdTjcjyKHjLCf7OSTzwP5GxdfrkPusw2x5bwGvuLUw=
 github.com/openshift/library-go v0.0.0-20230503173034-95ca3c14e50a h1:GWDlGsHQUo2QaXG8r4nCAbAMAYNN85HOMt+vZSLBOdQ=
 github.com/openshift/library-go v0.0.0-20230503173034-95ca3c14e50a/go.mod h1:PJVatR/oS/EaFciwylyAr9hORSqQHrC+5bXf4L0wsBY=
 github.com/openshift/onsi-ginkgo/v2 v2.6.1-0.20230317131656-c62d9de5a460 h1:PftK9Q7BUD+wj8fNvxtJ+RhxYkcTtd8LcAo1Gk1H1HM=
