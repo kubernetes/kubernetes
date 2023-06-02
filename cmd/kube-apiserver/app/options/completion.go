@@ -19,141 +19,78 @@ package options
 import (
 	"fmt"
 	"net"
-	"os"
 	"strings"
-	"time"
 
-	serveroptions "k8s.io/apiserver/pkg/server/options"
-	"k8s.io/client-go/util/keyutil"
+	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	_ "k8s.io/component-base/metrics/prometheus/workqueue"
-	"k8s.io/klog/v2"
 	netutils "k8s.io/utils/net"
 
-	"k8s.io/kubernetes/pkg/controlplane"
+	controlplane "k8s.io/kubernetes/pkg/controlplane/apiserver/options"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
-	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
-	"k8s.io/kubernetes/pkg/serviceaccount"
+	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 )
 
 // completedOptions is a private wrapper that enforces a call of Complete() before Run can be invoked.
 type completedOptions struct {
-	*ServerRunOptions
+	controlplane.CompletedOptions
+	CloudProvider *kubeoptions.CloudProviderOptions
+
+	Extra
 }
 
 type CompletedOptions struct {
-	completedOptions
+	// Embed a private pointer that cannot be instantiated outside of this package.
+	*completedOptions
 }
 
 // Complete set default ServerRunOptions.
 // Should be called after kube-apiserver flags parsed.
 func Complete(opts *ServerRunOptions) (CompletedOptions, error) {
-	// set defaults
-	if err := opts.GenericServerRunOptions.DefaultAdvertiseAddress(opts.SecureServing.SecureServingOptions); err != nil {
-		return CompletedOptions{}, err
+	if opts == nil {
+		return CompletedOptions{completedOptions: &completedOptions{}}, nil
 	}
 
-	// process s.ServiceClusterIPRange from list to Primary and Secondary
+	// process opts.ServiceClusterIPRange from list to Primary and Secondary
 	// we process secondary only if provided by user
 	apiServerServiceIP, primaryServiceIPRange, secondaryServiceIPRange, err := getServiceIPAndRanges(opts.ServiceClusterIPRanges)
 	if err != nil {
 		return CompletedOptions{}, err
 	}
-	opts.PrimaryServiceClusterIPRange = primaryServiceIPRange
-	opts.SecondaryServiceClusterIPRange = secondaryServiceIPRange
-	opts.APIServerServiceIP = apiServerServiceIP
-
-	if err := opts.SecureServing.MaybeDefaultWithSelfSignedCerts(opts.GenericServerRunOptions.AdvertiseAddress.String(), []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes"}, []net.IP{apiServerServiceIP}); err != nil {
-		return CompletedOptions{}, fmt.Errorf("error creating self-signed certificates: %v", err)
+	controlplane, err := opts.Options.Complete([]string{"kubernetes.default.svc", "kubernetes.default", "kubernetes"}, []net.IP{apiServerServiceIP})
+	if err != nil {
+		return CompletedOptions{}, err
 	}
 
-	if len(opts.GenericServerRunOptions.ExternalHost) == 0 {
-		if len(opts.GenericServerRunOptions.AdvertiseAddress) > 0 {
-			opts.GenericServerRunOptions.ExternalHost = opts.GenericServerRunOptions.AdvertiseAddress.String()
-		} else {
-			hostname, err := os.Hostname()
-			if err != nil {
-				return CompletedOptions{}, fmt.Errorf("error finding host name: %v", err)
-			}
-			opts.GenericServerRunOptions.ExternalHost = hostname
-		}
-		klog.Infof("external host was not specified, using %v", opts.GenericServerRunOptions.ExternalHost)
+	completed := completedOptions{
+		CompletedOptions: controlplane,
+		CloudProvider:    opts.CloudProvider,
+
+		Extra: opts.Extra,
 	}
 
-	opts.Authentication.ApplyAuthorization(opts.Authorization)
+	completed.PrimaryServiceClusterIPRange = primaryServiceIPRange
+	completed.SecondaryServiceClusterIPRange = secondaryServiceIPRange
+	completed.APIServerServiceIP = apiServerServiceIP
 
-	// Use (ServiceAccountSigningKeyFile != "") as a proxy to the user enabling
-	// TokenRequest functionality. This defaulting was convenient, but messed up
-	// a lot of people when they rotated their serving cert with no idea it was
-	// connected to their service account keys. We are taking this opportunity to
-	// remove this problematic defaulting.
-	if opts.ServiceAccountSigningKeyFile == "" {
-		// Default to the private server key for service account token signing
-		if len(opts.Authentication.ServiceAccounts.KeyFiles) == 0 && opts.SecureServing.ServerCert.CertKey.KeyFile != "" {
-			if kubeauthenticator.IsValidServiceAccountKeyFile(opts.SecureServing.ServerCert.CertKey.KeyFile) {
-				opts.Authentication.ServiceAccounts.KeyFiles = []string{opts.SecureServing.ServerCert.CertKey.KeyFile}
-			} else {
-				klog.Warning("No TLS key provided, service account token authentication disabled")
-			}
-		}
-	}
-
-	if opts.ServiceAccountSigningKeyFile != "" && len(opts.Authentication.ServiceAccounts.Issuers) != 0 && opts.Authentication.ServiceAccounts.Issuers[0] != "" {
-		sk, err := keyutil.PrivateKeyFromFile(opts.ServiceAccountSigningKeyFile)
-		if err != nil {
-			return CompletedOptions{}, fmt.Errorf("failed to parse service-account-issuer-key-file: %v", err)
-		}
-		if opts.Authentication.ServiceAccounts.MaxExpiration != 0 {
-			lowBound := time.Hour
-			upBound := time.Duration(1<<32) * time.Second
-			if opts.Authentication.ServiceAccounts.MaxExpiration < lowBound ||
-				opts.Authentication.ServiceAccounts.MaxExpiration > upBound {
-				return CompletedOptions{}, fmt.Errorf("the service-account-max-token-expiration must be between 1 hour and 2^32 seconds")
-			}
-			if opts.Authentication.ServiceAccounts.ExtendExpiration {
-				if opts.Authentication.ServiceAccounts.MaxExpiration < serviceaccount.WarnOnlyBoundTokenExpirationSeconds*time.Second {
-					klog.Warningf("service-account-extend-token-expiration is true, in order to correctly trigger safe transition logic, service-account-max-token-expiration must be set longer than %d seconds (currently %s)", serviceaccount.WarnOnlyBoundTokenExpirationSeconds, opts.Authentication.ServiceAccounts.MaxExpiration)
-				}
-				if opts.Authentication.ServiceAccounts.MaxExpiration < serviceaccount.ExpirationExtensionSeconds*time.Second {
-					klog.Warningf("service-account-extend-token-expiration is true, enabling tokens valid up to %d seconds, which is longer than service-account-max-token-expiration set to %s seconds", serviceaccount.ExpirationExtensionSeconds, opts.Authentication.ServiceAccounts.MaxExpiration)
-				}
-			}
-		}
-
-		opts.ServiceAccountIssuer, err = serviceaccount.JWTTokenGenerator(opts.Authentication.ServiceAccounts.Issuers[0], sk)
-		if err != nil {
-			return CompletedOptions{}, fmt.Errorf("failed to build token generator: %v", err)
-		}
-		opts.ServiceAccountTokenMaxExpiration = opts.Authentication.ServiceAccounts.MaxExpiration
-	}
-
-	if opts.Etcd.EnableWatchCache {
+	if completed.Etcd != nil && completed.Etcd.EnableWatchCache {
 		sizes := kubeapiserver.DefaultWatchCacheSizes()
 		// Ensure that overrides parse correctly.
-		userSpecified, err := serveroptions.ParseWatchCacheSizes(opts.Etcd.WatchCacheSizes)
+		userSpecified, err := apiserveroptions.ParseWatchCacheSizes(completed.Etcd.WatchCacheSizes)
 		if err != nil {
 			return CompletedOptions{}, err
 		}
 		for resource, size := range userSpecified {
 			sizes[resource] = size
 		}
-		opts.Etcd.WatchCacheSizes, err = serveroptions.WriteWatchCacheSizes(sizes)
+		completed.Etcd.WatchCacheSizes, err = apiserveroptions.WriteWatchCacheSizes(sizes)
 		if err != nil {
 			return CompletedOptions{}, err
 		}
 	}
 
-	for key, value := range opts.APIEnablement.RuntimeConfig {
-		if key == "v1" || strings.HasPrefix(key, "v1/") ||
-			key == "api/v1" || strings.HasPrefix(key, "api/v1/") {
-			delete(opts.APIEnablement.RuntimeConfig, key)
-			opts.APIEnablement.RuntimeConfig["/v1"] = value
-		}
-		if key == "api/legacy" {
-			delete(opts.APIEnablement.RuntimeConfig, key)
-		}
-	}
-
-	return CompletedOptions{completedOptions: completedOptions{ServerRunOptions: opts}}, nil
+	return CompletedOptions{
+		completedOptions: &completed,
+	}, nil
 }
 
 func getServiceIPAndRanges(serviceClusterIPRanges string) (net.IP, net.IPNet, net.IPNet, error) {
