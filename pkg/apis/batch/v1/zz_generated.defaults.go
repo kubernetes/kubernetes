@@ -104,8 +104,14 @@ func SetObjectDefaults_CronJob(in *v1.CronJob) {
 		corev1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
+			if b.HostPort == 0 {
+				b.HostPort = 0
+			}
 			if b.Protocol == "" {
 				b.Protocol = "TCP"
+			}
+			if b.HostIP == "" {
+				b.HostIP = ""
 			}
 		}
 		for j := range a.Env {
@@ -172,8 +178,14 @@ func SetObjectDefaults_CronJob(in *v1.CronJob) {
 		corev1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
+			if b.HostPort == 0 {
+				b.HostPort = 0
+			}
 			if b.Protocol == "" {
 				b.Protocol = "TCP"
+			}
+			if b.HostIP == "" {
+				b.HostIP = ""
 			}
 		}
 		for j := range a.Env {
@@ -240,8 +252,14 @@ func SetObjectDefaults_CronJob(in *v1.CronJob) {
 		corev1.SetDefaults_EphemeralContainer(a)
 		for j := range a.EphemeralContainerCommon.Ports {
 			b := &a.EphemeralContainerCommon.Ports[j]
+			if b.HostPort == 0 {
+				b.HostPort = 0
+			}
 			if b.Protocol == "" {
 				b.Protocol = "TCP"
+			}
+			if b.HostIP == "" {
+				b.HostIP = ""
 			}
 		}
 		for j := range a.EphemeralContainerCommon.Env {
@@ -379,8 +397,14 @@ func SetObjectDefaults_Job(in *v1.Job) {
 		corev1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
+			if b.HostPort == 0 {
+				b.HostPort = 0
+			}
 			if b.Protocol == "" {
 				b.Protocol = "TCP"
+			}
+			if b.HostIP == "" {
+				b.HostIP = ""
 			}
 		}
 		for j := range a.Env {
@@ -447,8 +471,14 @@ func SetObjectDefaults_Job(in *v1.Job) {
 		corev1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
+			if b.HostPort == 0 {
+				b.HostPort = 0
+			}
 			if b.Protocol == "" {
 				b.Protocol = "TCP"
+			}
+			if b.HostIP == "" {
+				b.HostIP = ""
 			}
 		}
 		for j := range a.Env {
@@ -515,8 +545,14 @@ func SetObjectDefaults_Job(in *v1.Job) {
 		corev1.SetDefaults_EphemeralContainer(a)
 		for j := range a.EphemeralContainerCommon.Ports {
 			b := &a.EphemeralContainerCommon.Ports[j]
+			if b.HostPort == 0 {
+				b.HostPort = 0
+			}
 			if b.Protocol == "" {
 				b.Protocol = "TCP"
+			}
+			if b.HostIP == "" {
+				b.HostIP = ""
 			}
 		}
 		for j := range a.EphemeralContainerCommon.Env {

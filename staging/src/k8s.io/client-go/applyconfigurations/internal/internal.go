@@ -4259,9 +4259,7 @@ var schemaYAML = typed.YAMLObject(`types:
         list:
           elementType:
             namedType: io.k8s.api.core.v1.EnvVar
-          elementRelationship: associative
-          keys:
-          - name
+          elementRelationship: atomic
     - name: envFrom
       type:
         list:
@@ -4293,6 +4291,8 @@ var schemaYAML = typed.YAMLObject(`types:
           keys:
           - containerPort
           - protocol
+          - hostPort
+          - hostIP
     - name: readinessProbe
       type:
         namedType: io.k8s.api.core.v1.Probe
@@ -4368,9 +4368,11 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: hostIP
       type:
         scalar: string
+      default: ""
     - name: hostPort
       type:
         scalar: numeric
+      default: 0
     - name: name
       type:
         scalar: string
@@ -4676,9 +4678,7 @@ var schemaYAML = typed.YAMLObject(`types:
         list:
           elementType:
             namedType: io.k8s.api.core.v1.EnvVar
-          elementRelationship: associative
-          keys:
-          - name
+          elementRelationship: atomic
     - name: envFrom
       type:
         list:
@@ -4710,6 +4710,8 @@ var schemaYAML = typed.YAMLObject(`types:
           keys:
           - containerPort
           - protocol
+          - hostPort
+          - hostIP
     - name: readinessProbe
       type:
         namedType: io.k8s.api.core.v1.Probe

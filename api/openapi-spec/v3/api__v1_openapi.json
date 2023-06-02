@@ -1086,6 +1086,7 @@
               "default": {}
             },
             "type": "array",
+            "x-kubernetes-list-type": "atomic",
             "x-kubernetes-patch-merge-key": "name",
             "x-kubernetes-patch-strategy": "merge"
           },
@@ -1099,7 +1100,8 @@
               ],
               "default": {}
             },
-            "type": "array"
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
           },
           "image": {
             "description": "Container image name. More info: https://kubernetes.io/docs/concepts/containers/images This field is optional to allow higher level config management to default or override container images in workload controllers like Deployments and StatefulSets.",
@@ -1143,7 +1145,9 @@
             "type": "array",
             "x-kubernetes-list-map-keys": [
               "containerPort",
-              "protocol"
+              "protocol",
+              "hostPort",
+              "hostIP"
             ],
             "x-kubernetes-list-type": "map",
             "x-kubernetes-patch-merge-key": "containerPort",
@@ -1282,10 +1286,12 @@
             "type": "integer"
           },
           "hostIP": {
+            "default": "",
             "description": "What host IP to bind the external port to.",
             "type": "string"
           },
           "hostPort": {
+            "default": 0,
             "description": "Number of port to expose on the host. If specified, this must be a valid port number, 0 < x < 65536. If HostNetwork is specified, this must match ContainerPort. Most containers do not need this.",
             "format": "int32",
             "type": "integer"
@@ -1936,6 +1942,7 @@
               "default": {}
             },
             "type": "array",
+            "x-kubernetes-list-type": "atomic",
             "x-kubernetes-patch-merge-key": "name",
             "x-kubernetes-patch-strategy": "merge"
           },
@@ -1949,7 +1956,8 @@
               ],
               "default": {}
             },
-            "type": "array"
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
           },
           "image": {
             "description": "Container image name. More info: https://kubernetes.io/docs/concepts/containers/images",
@@ -1993,7 +2001,9 @@
             "type": "array",
             "x-kubernetes-list-map-keys": [
               "containerPort",
-              "protocol"
+              "protocol",
+              "hostPort",
+              "hostIP"
             ],
             "x-kubernetes-list-type": "map",
             "x-kubernetes-patch-merge-key": "containerPort",

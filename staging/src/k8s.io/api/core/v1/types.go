@@ -1931,6 +1931,7 @@ type ContainerPort struct {
 	// If HostNetwork is specified, this must match ContainerPort.
 	// Most containers do not need this.
 	// +optional
+	// +default=0
 	HostPort int32 `json:"hostPort,omitempty" protobuf:"varint,2,opt,name=hostPort"`
 	// Number of port to expose on the pod's IP address.
 	// This must be a valid port number, 0 < x < 65536.
@@ -1942,6 +1943,7 @@ type ContainerPort struct {
 	Protocol Protocol `json:"protocol,omitempty" protobuf:"bytes,4,opt,name=protocol,casttype=Protocol"`
 	// What host IP to bind the external port to.
 	// +optional
+	// +default=""
 	HostIP string `json:"hostIP,omitempty" protobuf:"bytes,5,opt,name=hostIP"`
 }
 
@@ -2421,6 +2423,8 @@ type Container struct {
 	// +listType=map
 	// +listMapKey=containerPort
 	// +listMapKey=protocol
+	// +listMapKey=hostPort
+	// +listMapKey=hostIP
 	Ports []ContainerPort `json:"ports,omitempty" patchStrategy:"merge" patchMergeKey:"containerPort" protobuf:"bytes,6,rep,name=ports"`
 	// List of sources to populate environment variables in the container.
 	// The keys defined within a source must be a C_IDENTIFIER. All invalid keys
@@ -2429,12 +2433,14 @@ type Container struct {
 	// Values defined by an Env with a duplicate key will take precedence.
 	// Cannot be updated.
 	// +optional
+	// +listType=atomic
 	EnvFrom []EnvFromSource `json:"envFrom,omitempty" protobuf:"bytes,19,rep,name=envFrom"`
 	// List of environment variables to set in the container.
 	// Cannot be updated.
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge
+	// +listType=atomic
 	Env []EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,7,rep,name=env"`
 	// Compute Resources required by this container.
 	// Cannot be updated.
@@ -3952,6 +3958,8 @@ type EphemeralContainerCommon struct {
 	// +listType=map
 	// +listMapKey=containerPort
 	// +listMapKey=protocol
+	// +listMapKey=hostPort
+	// +listMapKey=hostIP
 	Ports []ContainerPort `json:"ports,omitempty" patchStrategy:"merge" patchMergeKey:"containerPort" protobuf:"bytes,6,rep,name=ports"`
 	// List of sources to populate environment variables in the container.
 	// The keys defined within a source must be a C_IDENTIFIER. All invalid keys
@@ -3960,12 +3968,14 @@ type EphemeralContainerCommon struct {
 	// Values defined by an Env with a duplicate key will take precedence.
 	// Cannot be updated.
 	// +optional
+	// +listType=atomic
 	EnvFrom []EnvFromSource `json:"envFrom,omitempty" protobuf:"bytes,19,rep,name=envFrom"`
 	// List of environment variables to set in the container.
 	// Cannot be updated.
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge
+	// +listType=atomic
 	Env []EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,7,rep,name=env"`
 	// Resources are not allowed for ephemeral containers. Ephemeral containers use spare resources
 	// already allocated to the pod.
