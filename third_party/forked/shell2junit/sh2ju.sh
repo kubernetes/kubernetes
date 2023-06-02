@@ -153,7 +153,9 @@ function juLog() {
           failureMsg="${errMsg}"
       fi
       failure="
-      <failure type=\"ScriptError\" message=\"Script Error\"><![CDATA[${failureMsg}]]></failure>
+      <failure type=\"ScriptError\"><![CDATA[
+${failureMsg}
+]]></failure>
   "
   fi
   ## testcase tag
