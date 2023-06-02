@@ -227,7 +227,7 @@ func NewCmdRun(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Com
 
 	addRunFlags(cmd, flags)
 	//cmdutil.AddApplyAnnotationFlags(cmd)
-	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodAttachTimeout)
+	//cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodAttachTimeout)
 
 	// Deprecate the cascade flag. If set, it has no practical effect since the created pod has no dependents.
 	// TODO: Remove the cascade flag from the run command in kubectl 1.29
@@ -281,7 +281,7 @@ func addRunFlags(cmd *cobra.Command, flags *RunFlags) {
 	cmd.Flags().BoolVarP(&flags.Quiet, "quiet", "q", flags.Quiet, "If true, suppress prompt messages.")
 	cmd.Flags().BoolVar(&flags.Privileged, "privileged", flags.Privileged, i18n.T("If true, run the container in privileged mode."))
 	cmd.Flags().BoolVar(&flags.SaveConfig, "save-config", false, i18n.T("TODO Save config description"))
-	//cmd.Flags().DurationVar(&flags.PodRunningTimeout, "pod-running-timeout", flags.PodRunningTimeout, "TODO message about pod timeouts that makes sense")
+	cmd.Flags().DurationVar(&flags.PodRunningTimeout, "pod-running-timeout", flags.PodRunningTimeout, "TODO message about pod timeouts that makes sense")
 
 	cmdutil.AddFieldManagerFlagVar(cmd, &flags.fieldManager, "kubectl-run")
 	flags.AddOverrideFlags(cmd)
@@ -321,10 +321,10 @@ func (flags *RunFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, args []s
 	}
 
 	// TODO do we need this anymore
-	// attachFlag := cmd.Flags().Lookup("attach")
-	// if !attachFlag.Changed && flags.Interactive {
-	// 	flags.Attach = true
-	// }
+	attachFlag := cmd.Flags().Lookup("attach")
+	if !attachFlag.Changed && flags.Interactive {
+		flags.Attach = true
+	}
 
 	namespace, enforceNamespace, err := f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
@@ -355,6 +355,7 @@ func (flags *RunFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, args []s
 		TTY:            flags.TTY,
 		fieldManager:   flags.fieldManager,
 		SaveConfig:     flags.SaveConfig,
+		Restart:        flags.Restart,
 
 		Namespace:         namespace,
 		EnforceNamespace:  enforceNamespace,
@@ -370,7 +371,7 @@ func (flags *RunFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, args []s
 			TTY:       options.TTY,
 			Quiet:     options.Quiet,
 		},
-		GetPodTimeout: options.timeout,
+		GetPodTimeout: options.PodRunningTimeout,
 		CommandName:   cmd.CommandPath() + " attach",
 
 		Attach: &attach.DefaultRemoteAttach{},
