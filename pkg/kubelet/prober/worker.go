@@ -152,18 +152,8 @@ func (w *worker) run() {
 	ctx := context.Background()
 	probeTickerPeriod := time.Duration(w.spec.PeriodSeconds) * time.Second
 
-	// If kubelet restarted the probes could be started in rapid succession.
-	// Let the worker wait for a random portion of tickerPeriod before probing.
-	// Do it only if the kubelet has started recently.
-	if probeTickerPeriod > time.Since(w.probeManager.start) {
-		time.Sleep(time.Duration(rand.Float64() * float64(probeTickerPeriod)))
-	}
-
-	probeTicker := time.NewTicker(probeTickerPeriod)
-
 	defer func() {
 		// Clean up.
-		probeTicker.Stop()
 		if !w.containerID.IsEmpty() {
 			w.resultsManager.Remove(w.containerID)
 		}
@@ -176,15 +166,50 @@ func (w *worker) run() {
 		ProberDuration.Delete(w.proberDurationUnknownMetricLabels)
 	}()
 
-probeLoop:
-	for w.doProbe(ctx) {
-		// Wait for next probe tick.
+	waitUntilStopTriggerOrTimeout := func(timeout <-chan time.Time) (stopped bool) {
 		select {
 		case <-w.stopCh:
-			break probeLoop
-		case <-probeTicker.C:
+			return true
 		case <-w.manualTriggerCh:
-			// continue
+		case <-timeout:
+		}
+		return false
+	}
+
+	// If kubelet restarted the probes could be started in rapid succession.
+	// Let the worker wait for a random portion of tickerPeriod before probing,
+	// up to a maximum of 1 minute.
+	// Do it only if the kubelet has started recently.
+	if probeTickerPeriod > time.Since(w.probeManager.start) {
+		maxSleepDuration := time.Minute
+		if maxSleepDuration > probeTickerPeriod {
+			maxSleepDuration = probeTickerPeriod
+		}
+
+		kubeletRestartJitter := time.Duration(rand.Float64() * float64(maxSleepDuration))
+		if stopped := waitUntilStopTriggerOrTimeout(time.After(kubeletRestartJitter)); stopped {
+			return
+		}
+	}
+
+	// Execute the probe once, even before InitialDelaySeconds have passed. This is done in order
+	// to initialize the results manager with the initial value of the probe.
+	beforeProbeExecution := time.Now()
+	w.doProbe(ctx)
+
+	// Wait for the remaining time of InitialDelaySeconds.
+	initialDelay := time.Duration(w.spec.InitialDelaySeconds)*time.Second - time.Since(beforeProbeExecution)
+	if stopped := waitUntilStopTriggerOrTimeout(time.After(initialDelay)); stopped {
+		return
+	}
+
+	// Start the probe ticker only after we waited for the InitialDelaySeconds.
+	probeTicker := time.NewTicker(probeTickerPeriod)
+	defer probeTicker.Stop()
+
+	for w.doProbe(ctx) {
+		if stopped := waitUntilStopTriggerOrTimeout(probeTicker.C); stopped {
+			return
 		}
 	}
 }
