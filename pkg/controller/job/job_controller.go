@@ -762,7 +762,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 		job.Status.StartTime = &now
 	}
 
-	newBackoffInfo := jm.backoffRecordStore.newBackoffRecord(jm.clock, key, newSucceededPods, newFailedPods)
+	newBackoffInfo := jm.backoffRecordStore.newBackoffRecord(key, newSucceededPods, newFailedPods)
 
 	var manageJobErr error
 	var finishedCondition *batch.JobCondition
