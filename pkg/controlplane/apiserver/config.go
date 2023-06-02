@@ -18,16 +18,13 @@ package apiserver
 
 import (
 	"fmt"
-	"net/http"
 	"time"
 
 	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/apiserver/pkg/cel/openapi/resolver"
 	"k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	genericfeatures "k8s.io/apiserver/pkg/features"
@@ -38,19 +35,15 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/apiserver/pkg/util/openapi"
-	"k8s.io/client-go/dynamic"
 	clientgoinformers "k8s.io/client-go/informers"
 	clientgoclientset "k8s.io/client-go/kubernetes"
-	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/component-base/version"
-	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
-	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
 )
@@ -59,14 +52,10 @@ import (
 func BuildGenericConfig(
 	s *options.ServerRunOptions,
 	schemes []*runtime.Scheme,
-	proxyTransport *http.Transport,
 	getOpenAPIDefinitions func(ref openapicommon.ReferenceCallback) map[string]openapicommon.OpenAPIDefinition,
 ) (
 	genericConfig *genericapiserver.Config,
 	versionedInformers clientgoinformers.SharedInformerFactory,
-	serviceResolver aggregatorapiserver.ServiceResolver,
-	pluginInitializers []admission.PluginInitializer,
-	admissionPostStartHook genericapiserver.PostStartHookFunc,
 	storageFactory *serverstorage.DefaultStorageFactory,
 
 	lastErr error,
@@ -166,40 +155,10 @@ func BuildGenericConfig(
 		return
 	}
 
-	admissionConfig := &kubeapiserveradmission.Config{
-		ExternalInformers:    versionedInformers,
-		LoopbackClientConfig: genericConfig.LoopbackClientConfig,
-		CloudConfigFile:      s.CloudProvider.CloudConfigFile,
-	}
-	serviceResolver = buildServiceResolver(s.EnableAggregatorRouting, genericConfig.LoopbackClientConfig.Host, versionedInformers)
-	schemaResolver := resolver.NewDefinitionsSchemaResolver(k8sscheme.Scheme, genericConfig.OpenAPIConfig.GetDefinitions)
-	pluginInitializers, admissionPostStartHook, err = admissionConfig.New(proxyTransport, genericConfig.EgressSelector, serviceResolver, genericConfig.TracerProvider, schemaResolver)
-	if err != nil {
-		lastErr = fmt.Errorf("failed to create admission plugin initializer: %v", err)
-		return
-	}
-
-	dynamicExternalClient, err := dynamic.NewForConfig(kubeClientConfig)
-	if err != nil {
-		lastErr = fmt.Errorf("failed to create real dynamic external client: %w", err)
-		return
-	}
-
-	err = s.Admission.ApplyTo(
-		genericConfig,
-		versionedInformers,
-		clientgoExternalClient,
-		dynamicExternalClient,
-		utilfeature.DefaultFeatureGate,
-		pluginInitializers...)
-	if err != nil {
-		lastErr = fmt.Errorf("failed to initialize admission: %v", err)
-		return
-	}
-
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) && s.GenericServerRunOptions.EnablePriorityAndFairness {
 		genericConfig.FlowControl, lastErr = BuildPriorityAndFairness(s, clientgoExternalClient, versionedInformers)
 	}
+
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
 		genericConfig.AggregatedDiscoveryGroupManager = aggregated.NewResourceManager("apis")
 	}

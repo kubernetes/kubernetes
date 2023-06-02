@@ -38,6 +38,7 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/cel/openapi/resolver"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/egressselector"
@@ -45,7 +46,10 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/notfoundhandler"
 	"k8s.io/apiserver/pkg/util/webhook"
+	"k8s.io/client-go/dynamic"
 	clientgoinformers "k8s.io/client-go/informers"
+	clientset "k8s.io/client-go/kubernetes"
+	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/keyutil"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -69,6 +73,7 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
+	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
@@ -218,10 +223,9 @@ func CreateKubeAPIServerConfig(s completedServerRunOptions) (
 ) {
 	proxyTransport := CreateProxyTransport()
 
-	genericConfig, versionedInformers, serviceResolver, pluginInitializers, admissionPostStartHook, storageFactory, err := controlplaneapiserver.BuildGenericConfig(
+	genericConfig, versionedInformers, storageFactory, err := controlplaneapiserver.BuildGenericConfig(
 		s.ServerRunOptions,
 		[]*runtime.Scheme{legacyscheme.Scheme, extensionsapiserver.Scheme, aggregatorscheme.Scheme},
-		proxyTransport,
 		generatedopenapi.GetOpenAPIDefinitions,
 	)
 	if err != nil {
@@ -281,6 +285,36 @@ func CreateKubeAPIServerConfig(s completedServerRunOptions) (
 		config.ExtraConfig.ClusterAuthenticationInfo.RequestHeaderUsernameHeaders = requestHeaderConfig.UsernameHeaders
 	}
 
+	// setup admission
+	admissionConfig := &kubeapiserveradmission.Config{
+		ExternalInformers:    versionedInformers,
+		LoopbackClientConfig: genericConfig.LoopbackClientConfig,
+		CloudConfigFile:      s.CloudProvider.CloudConfigFile,
+	}
+	serviceResolver := buildServiceResolver(s.EnableAggregatorRouting, genericConfig.LoopbackClientConfig.Host, versionedInformers)
+	schemaResolver := resolver.NewDefinitionsSchemaResolver(k8sscheme.Scheme, genericConfig.OpenAPIConfig.GetDefinitions)
+	pluginInitializers, admissionPostStartHook, err := admissionConfig.New(proxyTransport, genericConfig.EgressSelector, serviceResolver, genericConfig.TracerProvider, schemaResolver)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to create admission plugin initializer: %v", err)
+	}
+	clientgoExternalClient, err := clientset.NewForConfig(genericConfig.LoopbackClientConfig)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to create real client-go external client: %w", err)
+	}
+	dynamicExternalClient, err := dynamic.NewForConfig(genericConfig.LoopbackClientConfig)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to create real dynamic external client: %w", err)
+	}
+	err = s.Admission.ApplyTo(
+		genericConfig,
+		versionedInformers,
+		clientgoExternalClient,
+		dynamicExternalClient,
+		utilfeature.DefaultFeatureGate,
+		pluginInitializers...)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to apply admission: %w", err)
+	}
 	if err := config.GenericConfig.AddPostStartHook("start-kube-apiserver-admission-initializer", admissionPostStartHook); err != nil {
 		return nil, nil, nil, err
 	}
@@ -300,7 +334,7 @@ func CreateKubeAPIServerConfig(s completedServerRunOptions) (
 		config.ExtraConfig.ProxyTransport = c
 	}
 
-	// Load the public keys.
+	// Load and set the public keys.
 	var pubKeys []interface{}
 	for _, f := range s.Authentication.ServiceAccounts.KeyFiles {
 		keys, err := keyutil.PublicKeysFromFile(f)
@@ -309,7 +343,6 @@ func CreateKubeAPIServerConfig(s completedServerRunOptions) (
 		}
 		pubKeys = append(pubKeys, keys...)
 	}
-	// Plumb the required metadata through ExtraConfig.
 	config.ExtraConfig.ServiceAccountIssuerURL = s.Authentication.ServiceAccounts.Issuers[0]
 	config.ExtraConfig.ServiceAccountJWKSURI = s.Authentication.ServiceAccounts.JWKSURI
 	config.ExtraConfig.ServiceAccountPublicKeys = pubKeys
