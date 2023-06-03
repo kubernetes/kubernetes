@@ -494,8 +494,6 @@ func parseRegistry(image string) string {
 // env vars
 func mergeEnvVars(sysEnvVars, credProviderVars []string) []string {
 	mergedEnvVars := sysEnvVars
-	for _, credProviderVar := range credProviderVars {
-		mergedEnvVars = append(mergedEnvVars, credProviderVar)
-	}
+	mergedEnvVars = append(mergedEnvVars, credProviderVars...)
 	return mergedEnvVars
 }
