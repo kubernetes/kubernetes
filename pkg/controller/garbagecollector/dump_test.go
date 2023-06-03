@@ -426,7 +426,7 @@ func TestMarshalDOT(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if e, a := string(goldenData), string(b.Bytes()); cmp.Diff(e, a) != "" {
+			if e, a := string(goldenData), b.String(); cmp.Diff(e, a) != "" {
 				t.Logf("got\n%s", string(a))
 				t.Fatalf("unexpected diff:\n%s", cmp.Diff(e, a))
 			}
