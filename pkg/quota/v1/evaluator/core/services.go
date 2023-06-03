@@ -133,7 +133,7 @@ func (p *serviceEvaluator) Usage(item runtime.Object) (corev1.ResourceList, erro
 		// nodeports won't be allocated yet, so we can't simply count the actual values.
 		// We need to look at the intent.
 		if svc.Spec.AllocateLoadBalancerNodePorts != nil &&
-			*svc.Spec.AllocateLoadBalancerNodePorts == false {
+			!*svc.Spec.AllocateLoadBalancerNodePorts {
 			result[corev1.ResourceServicesNodePorts] = *portsWithNodePorts(svc)
 		} else {
 			value := resource.NewQuantity(int64(ports), resource.DecimalSI)
