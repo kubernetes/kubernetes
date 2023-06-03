@@ -90,7 +90,7 @@ func newStorageWithPods(t *testing.T, ipFamilies []api.IPFamily, pods []api.Pod,
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
-	if pods != nil && len(pods) > 0 {
+	if len(pods) > 0 {
 		ctx := genericapirequest.NewDefaultContext()
 		for ix := range pods {
 			key, _ := podStorage.Pod.KeyFunc(ctx, pods[ix].Name)
@@ -108,7 +108,7 @@ func newStorageWithPods(t *testing.T, ipFamilies []api.IPFamily, pods []api.Pod,
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
-	if endpoints != nil && len(endpoints) > 0 {
+	if len(endpoints) > 0 {
 		ctx := genericapirequest.NewDefaultContext()
 		for ix := range endpoints {
 			key, _ := endpointsStorage.KeyFunc(ctx, endpoints[ix].Name)
