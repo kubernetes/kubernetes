@@ -894,9 +894,7 @@ func makeFakePodSandboxStatsStrictlyFromCRI(seed int, podSandbox *critest.FakePo
 		},
 		Linux: &runtimeapi.LinuxPodSandboxStats{},
 	}
-	for _, cs := range podContainerStats {
-		podSandboxStats.Linux.Containers = append(podSandboxStats.Linux.Containers, cs)
-	}
+	podSandboxStats.Linux.Containers = append(podSandboxStats.Linux.Containers, podContainerStats...)
 	if podSandbox.State == runtimeapi.PodSandboxState_SANDBOX_NOTREADY {
 		podSandboxStats.Linux.Cpu = nil
 		podSandboxStats.Linux.Memory = nil
