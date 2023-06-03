@@ -194,11 +194,20 @@ func getPodPVTopologies(ctx context.Context, pv *v1.PersistentVolume) []pvTopolo
 				logger.Info("Failed to parse label, ignoring the label", "label", fmt.Sprintf("%s:%s", key, value), "pv", klog.KObj(pv), "err", err)
 				continue
 			}
-			podPVTopologies = append(podPVTopologies, pvTopology{
-				pvName: pv.Name,
-				key:    key,
-				values: sets.Set[string](volumeVSet),
-			})
+			if key == v1.LabelFailureDomainBetaRegion || key == v1.LabelTopologyRegion {
+				podPVTopologies = append(podPVTopologies, pvTopology{
+					pvName: pv.Name,
+					key:    v1.LabelTopologyRegion,
+					values: sets.Set[string](volumeVSet),
+				})
+			}
+			if key == v1.LabelFailureDomainBetaZone || key == v1.LabelTopologyZone {
+				podPVTopologies = append(podPVTopologies, pvTopology{
+					pvName: pv.Name,
+					key:    v1.LabelTopologyZone,
+					values: sets.Set[string](volumeVSet),
+				})
+			}
 		}
 	}
 	return podPVTopologies
@@ -266,6 +275,13 @@ func (pl *VolumeZone) Filter(ctx context.Context, cs *framework.CycleState, pod 
 	logger := klog.FromContext(ctx)
 	for _, pvTopology := range podPVTopologies {
 		v, ok := node.Labels[pvTopology.key]
+		// if node doesn't have a ga label, we fall back to find the beta label
+		if !ok && pvTopology.key == v1.LabelTopologyRegion {
+			v, ok = node.Labels[v1.LabelFailureDomainBetaRegion]
+		}
+		if !ok && pvTopology.key == v1.LabelTopologyZone {
+			v, ok = node.Labels[v1.LabelFailureDomainBetaZone]
+		}
 		if !ok || !pvTopology.values.Has(v) {
 			logger.V(10).Info("Won't schedule pod onto node due to volume (mismatch on label key)", "pod", klog.KObj(pod), "node", klog.KObj(node), "PV", klog.KRef("", pvTopology.pvName), "PVLabelKey", pvTopology.key)
 			return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict)
@@ -288,6 +304,13 @@ func (pl *VolumeZone) Filter(ctx context.Context, cs *framework.CycleState, pod 
 		}
 		for _, pvTopology := range topologies {
 			v, ok := node.Labels[pvTopology.key]
+			// if node doesn't have a ga label, we fall back to find the beta label
+			if !ok && pvTopology.key == v1.LabelTopologyRegion {
+				v, ok = node.Labels[v1.LabelFailureDomainBetaRegion]
+			}
+			if !ok && pvTopology.key == v1.LabelTopologyZone {
+				v, ok = node.Labels[v1.LabelFailureDomainBetaZone]
+			}
 			if !ok || !pvTopology.values.Has(v) {
 				logger.V(10).Info("Won't schedule pod onto node due to volume (mismatch on label key)", "pod", klog.KObj(pod), "node", klog.KObj(node), "PV", klog.KRef("", pvTopology.pvName), "PVLabelKey", pvTopology.key)
 				return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict)

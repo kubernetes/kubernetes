@@ -233,7 +233,6 @@ func TestSingleZone(t *testing.T) {
 					},
 				},
 			},
-			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
 		},
 	}
 

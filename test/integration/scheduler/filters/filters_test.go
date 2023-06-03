@@ -2015,8 +2015,10 @@ func TestPvTopology(t *testing.T) {
 					},
 				},
 			},
-			incomingPod: st.MakePod().Name("pod1").Container(pause).PVC("pvc1").Obj(),
-			csiNode:     nil,
+			incomingPod:    st.MakePod().Name("pod1").Container(pause).PVC("pvc1").Obj(),
+			csiNode:        nil,
+			fits:           true,
+			candidateNodes: []string{"node1"},
 		},
 	}
 
