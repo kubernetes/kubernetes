@@ -220,7 +220,7 @@ func (e *Signer) signConfigMap(ctx context.Context) {
 		}
 
 		// Check to see if this signature is changed or new.
-		oldSig, _ := sigs[tokenID]
+		oldSig := sigs[tokenID]
 		if sig != oldSig {
 			needUpdate = true
 		}
