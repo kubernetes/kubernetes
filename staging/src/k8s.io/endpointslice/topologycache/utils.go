@@ -134,7 +134,7 @@ func getGivingAndReceivingZones(allocations map[string]allocation, allocatedHint
 	receivingZonesDesired := map[string]float64{}
 
 	for zone, allocation := range allocations {
-		allocatedHints, _ := allocatedHintsByZone[zone]
+		allocatedHints := allocatedHintsByZone[zone]
 		target := allocation.desired
 		if float64(allocatedHints) > target {
 			givingZonesDesired[zone] = float64(allocatedHints) - target
@@ -212,7 +212,7 @@ func getHintsByZone(slice *discovery.EndpointSlice, allocatedHintsByZone Endpoin
 	}
 
 	for zone, numHints := range hintsByZone {
-		alreadyAllocated, _ := allocatedHintsByZone[zone]
+		alreadyAllocated := allocatedHintsByZone[zone]
 		allocation, ok := allocations[zone]
 		if !ok || (numHints+alreadyAllocated) > allocation.maximum {
 			return nil

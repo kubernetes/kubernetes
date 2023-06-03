@@ -103,9 +103,7 @@ func (t *TopologyCache) AddHints(logger klog.Logger, si *SliceInfo) ([]*discover
 	allocatedHintsByZone := si.getAllocatedHintsByZone(allocations)
 
 	allocatableSlices := si.ToCreate
-	for _, slice := range si.ToUpdate {
-		allocatableSlices = append(allocatableSlices, slice)
-	}
+	allocatableSlices = append(allocatableSlices, si.ToUpdate...)
 
 	// step 1: assign same-zone hints for all endpoints as a starting point.
 	for _, slice := range allocatableSlices {
