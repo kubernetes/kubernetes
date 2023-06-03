@@ -90,10 +90,8 @@ type FakeLegacyHandler struct {
 func (m *FakeNodeHandler) GetUpdatedNodesCopy() []*v1.Node {
 	m.lock.Lock()
 	defer m.lock.Unlock()
-	updatedNodesCopy := make([]*v1.Node, len(m.UpdatedNodes), len(m.UpdatedNodes))
-	for i, ptr := range m.UpdatedNodes {
-		updatedNodesCopy[i] = ptr
-	}
+	updatedNodesCopy := make([]*v1.Node, len(m.UpdatedNodes))
+	copy(updatedNodesCopy, m.UpdatedNodes)
 	return updatedNodesCopy
 }
 
