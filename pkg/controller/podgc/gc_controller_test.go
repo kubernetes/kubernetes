@@ -348,13 +348,9 @@ func TestGCOrphaned(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
 			nodes := make([]*v1.Node, 0, len(test.initialClientNodes))
-			for _, node := range test.initialClientNodes {
-				nodes = append(nodes, node)
-			}
+			nodes = append(nodes, test.initialClientNodes...)
 			pods := make([]*v1.Pod, 0, len(test.pods))
-			for _, pod := range test.pods {
-				pods = append(pods, pod)
-			}
+			pods = append(pods, test.pods...)
 			client := setupNewSimpleClient(nodes, pods)
 			gcc, podInformer, nodeInformer := NewFromClient(client, -1)
 			for _, node := range test.initialInformerNodes {
