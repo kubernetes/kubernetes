@@ -510,7 +510,7 @@ func calculateStatus(allRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet, deployme
 
 	// Copy conditions one by one so we won't mutate the original object.
 	conditions := deployment.Status.Conditions
-	Conditions = append(status.Conditions, conditions...)
+	status.Conditions = append(status.Conditions, deployment.Status.Conditions...)
 
 	if availableReplicas >= *(deployment.Spec.Replicas)-deploymentutil.MaxUnavailable(*deployment) {
 		minAvailability := deploymentutil.NewDeploymentCondition(apps.DeploymentAvailable, v1.ConditionTrue, deploymentutil.MinimumReplicasAvailable, "Deployment has minimum availability.")
