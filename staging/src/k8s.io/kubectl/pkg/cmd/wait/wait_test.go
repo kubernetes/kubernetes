@@ -1533,3 +1533,41 @@ func TestWaitForJSONPathCondition(t *testing.T) {
 		})
 	}
 }
+
+// TestWaitForJSONPathBadConditionParsing will test errors in parsing JSONPath bad condition expressions
+// except for parsing JSONPath expression itself (i.e. call to cmdget.RelaxedJSONPathExpression())
+func TestWaitForJSONPathBadConditionParsing(t *testing.T) {
+	tests := []struct {
+		name           string
+		condition      string
+		expectedResult JSONPathWait
+		expectedErr    string
+	}{
+		{
+			name:        "missing JSONPath expression",
+			condition:   "jsonpath=",
+			expectedErr: "jsonpath expression cannot be empty",
+		},
+		{
+			name:        "value in JSONPath expression has equal sign",
+			condition:   "jsonpath={.metadata.name}='test=wrong'",
+			expectedErr: "jsonpath wait format must be --for=jsonpath='{.status.readyReplicas}'=3 or --for=jsonpath='{.status.readyReplicas}'",
+		},
+		{
+			name:        "undefined value",
+			condition:   "jsonpath={.metadata.name}=",
+			expectedErr: "jsonpath wait value cannot be empty",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := conditionFuncFor(test.condition, io.Discard)
+			if err == nil {
+				t.Fatalf("expected %q, got empty", test.expectedErr)
+			}
+			if !strings.Contains(err.Error(), test.expectedErr) {
+				t.Fatalf("expected %q, got %q", test.expectedErr, err.Error())
+			}
+		})
+	}
+}

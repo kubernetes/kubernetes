@@ -243,7 +243,7 @@ func newJSONPathParser(jsonPathExpression string) (*jsonpath.JSONPath, error) {
 
 // processJSONPathInput will parses the user's JSONPath input containing JSON expression and, optionally, JSON value for matching condition and process it
 func processJSONPathInput(jsonPathInput []string) (string, string, error) {
-	if numOfArgs := len(jsonPathInput); 1 < numOfArgs || numOfArgs > 2 {
+	if numOfArgs := len(jsonPathInput); numOfArgs < 1 || numOfArgs > 2 {
 		return "", "", fmt.Errorf("jsonpath wait format must be --for=jsonpath='{.status.readyReplicas}'=3 or --for=jsonpath='{.status.readyReplicas}'")
 	}
 	relaxedJSONPathExp, err := cmdget.RelaxedJSONPathExpression(jsonPathInput[0])
