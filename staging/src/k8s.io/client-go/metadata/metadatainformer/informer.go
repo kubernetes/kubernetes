@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -30,6 +31,17 @@ import (
 	"k8s.io/client-go/metadata/metadatalister"
 	"k8s.io/client-go/tools/cache"
 )
+
+// SharedInformerOption defines the functional option type for metadataSharedInformerFactory.
+type SharedInformerOption func(*metadataSharedInformerFactory) *metadataSharedInformerFactory
+
+// WithTransform sets a transform on all informers.
+func WithTransform(transform cache.TransformFunc) SharedInformerOption {
+	return func(factory *metadataSharedInformerFactory) *metadataSharedInformerFactory {
+		factory.transform = transform
+		return factory
+	}
+}
 
 // NewSharedInformerFactory constructs a new instance of metadataSharedInformerFactory for all namespaces.
 func NewSharedInformerFactory(client metadata.Interface, defaultResync time.Duration) SharedInformerFactory {
@@ -49,10 +61,29 @@ func NewFilteredSharedInformerFactory(client metadata.Interface, defaultResync t
 	}
 }
 
+// NewSharedInformerFactoryWithOptions constructs a new instance of metadataSharedInformerFactory with additional options.
+func NewSharedInformerFactoryWithOptions(client metadata.Interface, defaultResync time.Duration, options ...SharedInformerOption) SharedInformerFactory {
+	factory := &metadataSharedInformerFactory{
+		client:           client,
+		namespace:        v1.NamespaceAll,
+		defaultResync:    defaultResync,
+		informers:        map[schema.GroupVersionResource]informers.GenericInformer{},
+		startedInformers: make(map[schema.GroupVersionResource]bool),
+	}
+
+	// Apply all options
+	for _, opt := range options {
+		factory = opt(factory)
+	}
+
+	return factory
+}
+
 type metadataSharedInformerFactory struct {
 	client        metadata.Interface
 	defaultResync time.Duration
 	namespace     string
+	transform     cache.TransformFunc
 
 	lock      sync.Mutex
 	informers map[schema.GroupVersionResource]informers.GenericInformer
@@ -80,6 +111,7 @@ func (f *metadataSharedInformerFactory) ForResource(gvr schema.GroupVersionResou
 	}
 
 	informer = NewFilteredMetadataInformer(f.client, gvr, f.namespace, f.defaultResync, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	informer.Informer().SetTransform(f.transform)
 	f.informers[key] = informer
 
 	return informer
