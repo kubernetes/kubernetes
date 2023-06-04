@@ -37,7 +37,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
@@ -1281,7 +1280,7 @@ func FindEmptyDirectoryUsageOnTmpfs() (*resource.Quantity, error) {
 		used, err := resource.ParseQuantity("0")
 		return &used, err
 	}
-	tmpDir, err := utiltesting.MkTmpdir("metrics_du_test")
+	tmpDir, err := os.MkdirTemp("", "metrics_du_test")
 	if err != nil {
 		return nil, err
 	}

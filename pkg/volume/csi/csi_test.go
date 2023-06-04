@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
-	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -221,11 +220,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tmpDir, err := utiltesting.MkTmpdir("csi-test")
-			if err != nil {
-				t.Fatalf("can't create temp dir: %v", err)
-			}
-			defer os.RemoveAll(tmpDir)
+			tmpDir := t.TempDir()
 
 			var driverInfo *storage.CSIDriver
 			objs := []runtime.Object{}

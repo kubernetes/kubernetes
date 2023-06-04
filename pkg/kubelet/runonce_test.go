@@ -18,7 +18,6 @@ package kubelet
 
 import (
 	"context"
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -33,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
-	utiltesting "k8s.io/client-go/util/testing"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
@@ -75,11 +73,7 @@ func TestRunOnce(t *testing.T) {
 	podManager := kubepod.NewBasicPodManager()
 	fakeRuntime := &containertest.FakeRuntime{}
 	podStartupLatencyTracker := kubeletutil.NewPodStartupLatencyTracker()
-	basePath, err := utiltesting.MkTmpdir("kubelet")
-	if err != nil {
-		t.Fatalf("can't make a temp rootdir %v", err)
-	}
-	defer os.RemoveAll(basePath)
+	basePath := t.TempDir()
 	kb := &Kubelet{
 		rootDirectory:    filepath.Clean(basePath),
 		recorder:         &record.FakeRecorder{},
@@ -102,8 +96,8 @@ func TestRunOnce(t *testing.T) {
 	kb.containerManager = cm.NewStubContainerManager()
 
 	plug := &volumetest.FakeVolumePlugin{PluginName: "fake", Host: nil}
-	kb.volumePluginMgr, err =
-		NewInitializedVolumePluginMgr(kb, fakeSecretManager, fakeConfigMapManager, nil, []volume.VolumePlugin{plug}, nil /* prober */)
+	var err error
+	kb.volumePluginMgr, err = NewInitializedVolumePluginMgr(kb, fakeSecretManager, fakeConfigMapManager, nil, []volume.VolumePlugin{plug}, nil /* prober */)
 	if err != nil {
 		t.Fatalf("failed to initialize VolumePluginMgr: %v", err)
 	}

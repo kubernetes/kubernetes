@@ -24,7 +24,6 @@ import (
 	"strings"
 	"testing"
 
-	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/mount-utils"
 )
 
@@ -108,16 +107,12 @@ func TestRemoveAllOneFilesystem(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		tmpDir, err := utiltesting.MkTmpdir("removeall-" + test.name + "-")
-		if err != nil {
-			t.Fatalf("Can't make a tmp dir: %v", err)
-		}
-		defer os.RemoveAll(tmpDir)
+		tmpDir := t.TempDir()
 		// Create the directory structure
 		for _, item := range test.items {
 			if strings.HasSuffix(item, "/") {
 				item = strings.TrimRight(item, "/")
-				if err = os.Mkdir(path.Join(tmpDir, item), 0777); err != nil {
+				if err := os.Mkdir(path.Join(tmpDir, item), 0777); err != nil {
 					t.Fatalf("error creating %s: %v", item, err)
 				}
 			} else {
@@ -130,7 +125,7 @@ func TestRemoveAllOneFilesystem(t *testing.T) {
 		}
 
 		mounter := &fakeMounter{}
-		err = RemoveAllOneFilesystem(mounter, tmpDir)
+		err := RemoveAllOneFilesystem(mounter, tmpDir)
 		if err == nil && test.expectError {
 			t.Errorf("test %q failed: expected error and got none", test.name)
 		}
@@ -228,16 +223,12 @@ func TestRemoveDirsOneFilesystem(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		tmpDir, err := utiltesting.MkTmpdir("removeall-" + test.name + "-")
-		if err != nil {
-			t.Fatalf("Can't make a tmp dir: %v", err)
-		}
-		defer os.RemoveAll(tmpDir)
+		tmpDir := t.TempDir()
 		// Create the directory structure
 		for _, item := range test.items {
 			if strings.HasSuffix(item, "/") {
 				item = strings.TrimRight(item, "/")
-				if err = os.Mkdir(path.Join(tmpDir, item), 0777); err != nil {
+				if err := os.Mkdir(path.Join(tmpDir, item), 0777); err != nil {
 					t.Fatalf("error creating %s: %v", item, err)
 				}
 			} else {
@@ -250,7 +241,7 @@ func TestRemoveDirsOneFilesystem(t *testing.T) {
 		}
 
 		mounter := &fakeMounter{}
-		err = RemoveDirsOneFilesystem(mounter, tmpDir)
+		err := RemoveDirsOneFilesystem(mounter, tmpDir)
 		if err == nil && test.expectError {
 			t.Errorf("test %q failed: expected error and got none", test.name)
 		}

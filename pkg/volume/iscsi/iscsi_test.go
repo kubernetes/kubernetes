@@ -30,17 +30,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
-	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
 
 func TestCanSupport(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("iscsi_test")
-	if err != nil {
-		t.Fatalf("error creating temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
@@ -73,11 +68,7 @@ func TestCanSupport(t *testing.T) {
 }
 
 func TestGetAccessModes(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("iscsi_test")
-	if err != nil {
-		t.Fatalf("error creating temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
@@ -95,9 +86,9 @@ type fakeDiskManager struct {
 	tmpDir string
 }
 
-func NewFakeDiskManager() *fakeDiskManager {
+func NewFakeDiskManager(t *testing.T) *fakeDiskManager {
 	return &fakeDiskManager{
-		tmpDir: utiltesting.MkTmpdirOrDie("iscsi_test"),
+		tmpDir: t.TempDir(),
 	}
 }
 
@@ -145,11 +136,7 @@ func (fake *fakeDiskManager) DetachBlockISCSIDisk(c iscsiDiskUnmapper, mntPath s
 }
 
 func doTestPlugin(t *testing.T, spec *volume.Spec) {
-	tmpDir, err := utiltesting.MkTmpdir("iscsi_test")
-	if err != nil {
-		t.Fatalf("error creating temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
@@ -158,7 +145,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	fakeManager := NewFakeDiskManager()
+	fakeManager := NewFakeDiskManager(t)
 	defer fakeManager.Cleanup()
 	fakeMounter := mount.NewFakeMounter(nil)
 	fakeExec := &testingexec.FakeExec{}
@@ -187,7 +174,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 		}
 	}
 
-	fakeManager2 := NewFakeDiskManager()
+	fakeManager2 := NewFakeDiskManager(t)
 	defer fakeManager2.Cleanup()
 	unmounter, err := plug.(*iscsiPlugin).newUnmounterInternal("vol1", types.UID("poduid"), fakeManager2, fakeMounter, fakeExec)
 	if err != nil {
@@ -242,11 +229,7 @@ func TestPluginPersistentVolume(t *testing.T) {
 }
 
 func TestPersistentClaimReadOnlyFlag(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("iscsi_test")
-	if err != nil {
-		t.Fatalf("error creating temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{

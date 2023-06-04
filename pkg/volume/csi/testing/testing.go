@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
-	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -32,10 +31,7 @@ import (
 
 // NewTestPlugin creates a plugin mgr to load plugins and setup a fake client
 func NewTestPlugin(t *testing.T, client *fakeclient.Clientset) (*volume.VolumePluginMgr, *volume.VolumePlugin, string) {
-	tmpDir, err := utiltesting.MkTmpdir("csi-test")
-	if err != nil {
-		t.Fatalf("can't create temp dir: %v", err)
-	}
+	tmpDir := t.TempDir()
 
 	if client == nil {
 		client = fakeclient.NewSimpleClientset()

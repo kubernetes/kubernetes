@@ -30,7 +30,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
@@ -46,17 +45,13 @@ const (
 )
 
 func getPlugin(t *testing.T) (string, volume.VolumePlugin) {
-	tmpDir, err := utiltesting.MkTmpdir("localVolumeTest")
-	if err != nil {
-		t.Fatalf("can't make a temp dir: %v", err)
-	}
+	tmpDir := t.TempDir()
 
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeKubeletVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName(localVolumePluginName)
 	if err != nil {
-		os.RemoveAll(tmpDir)
 		t.Fatalf("Can't find the plugin by name")
 	}
 	if plug.GetPluginName() != localVolumePluginName {
@@ -66,16 +61,12 @@ func getPlugin(t *testing.T) (string, volume.VolumePlugin) {
 }
 
 func getBlockPlugin(t *testing.T) (string, volume.BlockVolumePlugin) {
-	tmpDir, err := utiltesting.MkTmpdir("localVolumeTest")
-	if err != nil {
-		t.Fatalf("can't make a temp dir: %v", err)
-	}
+	tmpDir := t.TempDir()
 
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeKubeletVolumeHost(t, tmpDir, nil, nil))
 	plug, err := plugMgr.FindMapperPluginByName(localVolumePluginName)
 	if err != nil {
-		os.RemoveAll(tmpDir)
 		t.Fatalf("Can't find the plugin by name: %q", localVolumePluginName)
 	}
 	if plug.GetPluginName() != localVolumePluginName {
@@ -85,10 +76,7 @@ func getBlockPlugin(t *testing.T) (string, volume.BlockVolumePlugin) {
 }
 
 func getNodeExpandablePlugin(t *testing.T, isBlockDevice bool) (string, volume.NodeExpandableVolumePlugin) {
-	tmpDir, err := utiltesting.MkTmpdir("localVolumeTest")
-	if err != nil {
-		t.Fatalf("can't make a temp dir: %v", err)
-	}
+	tmpDir := t.TempDir()
 
 	plugMgr := volume.VolumePluginMgr{}
 	var pathToFSType map[string]hostutil.FileType
@@ -106,7 +94,6 @@ func getNodeExpandablePlugin(t *testing.T, isBlockDevice bool) (string, volume.N
 
 	plug, err := plugMgr.FindNodeExpandablePluginByName(localVolumePluginName)
 	if err != nil {
-		os.RemoveAll(tmpDir)
 		t.Fatalf("Can't find the plugin by name")
 	}
 	if plug.GetPluginName() != localVolumePluginName {
@@ -116,17 +103,13 @@ func getNodeExpandablePlugin(t *testing.T, isBlockDevice bool) (string, volume.N
 }
 
 func getPersistentPlugin(t *testing.T) (string, volume.PersistentVolumePlugin) {
-	tmpDir, err := utiltesting.MkTmpdir("localVolumeTest")
-	if err != nil {
-		t.Fatalf("can't make a temp dir: %v", err)
-	}
+	tmpDir := t.TempDir()
 
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeKubeletVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPersistentPluginByName(localVolumePluginName)
 	if err != nil {
-		os.RemoveAll(tmpDir)
 		t.Fatalf("Can't find the plugin by name")
 	}
 	if plug.GetPluginName() != localVolumePluginName {
@@ -145,10 +128,7 @@ func getDeviceMountablePluginWithBlockPath(t *testing.T, isBlockDevice bool) (st
 		// On Windows, block devices are referenced by the disk number, which is validated by the mounter,
 		source = "0"
 	} else {
-		source, err = utiltesting.MkTmpdir("localVolumeTest")
-		if err != nil {
-			t.Fatalf("can't make a temp dir: %v", err)
-		}
+		source = t.TempDir()
 	}
 
 	plugMgr := volume.VolumePluginMgr{}
@@ -163,7 +143,6 @@ func getDeviceMountablePluginWithBlockPath(t *testing.T, isBlockDevice bool) (st
 
 	plug, err := plugMgr.FindDeviceMountablePluginByName(localVolumePluginName)
 	if err != nil {
-		os.RemoveAll(source)
 		t.Fatalf("Can't find the plugin by name")
 	}
 	if plug.GetPluginName() != localVolumePluginName {
@@ -536,11 +515,7 @@ func TestConstructVolumeSpec(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tmpDir, err := utiltesting.MkTmpdir("localVolumeTest")
-			if err != nil {
-				t.Fatalf("can't make a temp dir: %v", err)
-			}
-			defer os.RemoveAll(tmpDir)
+			tmpDir := t.TempDir()
 			plug := &localVolumePlugin{
 				host: volumetest.NewFakeKubeletVolumeHost(t, tmpDir, nil, nil),
 			}
@@ -695,11 +670,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 }
 
 func TestUnsupportedPlugins(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("localVolumeTest")
-	if err != nil {
-		t.Fatalf("can't make a temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeKubeletVolumeHost(t, tmpDir, nil, nil))

@@ -18,7 +18,6 @@ package volumemanager
 
 import (
 	"context"
-	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -35,7 +34,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
-	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
@@ -82,11 +80,8 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tmpDir, err := utiltesting.MkTmpdir("volumeManagerTest")
-			if err != nil {
-				t.Fatalf("can't make a temp dir: %v", err)
-			}
-			defer os.RemoveAll(tmpDir)
+
+			tmpDir := t.TempDir()
 			podManager := kubepod.NewBasicPodManager()
 
 			node, pod, pv, claim := createObjects(test.pvMode, test.podMode)
@@ -105,7 +100,7 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 				stopCh,
 				manager)
 
-			err = manager.WaitForAttachAndMount(context.Background(), pod)
+			err := manager.WaitForAttachAndMount(context.Background(), pod)
 			if err != nil && !test.expectError {
 				t.Errorf("Expected success: %v", err)
 			}
@@ -138,11 +133,7 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 }
 
 func TestWaitForAttachAndMountError(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("volumeManagerTest")
-	if err != nil {
-		t.Fatalf("can't make a temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 	podManager := kubepod.NewBasicPodManager()
 
 	pod := &v1.Pod{
@@ -223,7 +214,7 @@ func TestWaitForAttachAndMountError(t *testing.T) {
 
 	podManager.SetPods([]*v1.Pod{pod})
 
-	err = manager.WaitForAttachAndMount(context.Background(), pod)
+	err := manager.WaitForAttachAndMount(context.Background(), pod)
 	if err == nil {
 		t.Errorf("Expected error, got none")
 	}
@@ -234,11 +225,7 @@ func TestWaitForAttachAndMountError(t *testing.T) {
 }
 
 func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("volumeManagerTest")
-	if err != nil {
-		t.Fatalf("can't make a temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 	podManager := kubepod.NewBasicPodManager()
 
 	node, pod, pv, claim := createObjects(v1.PersistentVolumeFilesystem, v1.PersistentVolumeFilesystem)
@@ -264,13 +251,8 @@ func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
 	// delayed claim binding
 	go delayClaimBecomesBound(kubeClient, claim.GetNamespace(), claim.ObjectMeta.Name)
 
-	err = wait.Poll(100*time.Millisecond, 1*time.Second, func() (bool, error) {
-		err = manager.WaitForAttachAndMount(context.Background(), pod)
-		if err != nil {
-			// Few "PVC not bound" errors are expected
-			return false, nil
-		}
-		return true, nil
+	err := wait.Poll(100*time.Millisecond, 1*time.Second, func() (bool, error) {
+		return manager.WaitForAttachAndMount(context.Background(), pod) == nil, nil
 	})
 	if err != nil {
 		t.Errorf("Expected a volume to be mounted, got: %s", err)
@@ -279,11 +261,7 @@ func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
 }
 
 func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("volumeManagerTest")
-	if err != nil {
-		t.Fatalf("can't make a temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 	podManager := kubepod.NewBasicPodManager()
 
 	node, pod, _, claim := createObjects(v1.PersistentVolumeFilesystem, v1.PersistentVolumeFilesystem)
@@ -349,8 +327,7 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 			stopCh,
 			manager)
 
-		err = manager.WaitForAttachAndMount(context.Background(), pod)
-		if err != nil {
+		if err := manager.WaitForAttachAndMount(context.Background(), pod); err != nil {
 			t.Errorf("Expected success: %v", err)
 			continue
 		}

@@ -27,7 +27,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
-	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -37,11 +36,8 @@ const (
 )
 
 func TestCanSupport(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("portworxVolumeTest")
-	if err != nil {
-		t.Fatalf("can't make a temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
+
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 
@@ -61,11 +57,7 @@ func TestCanSupport(t *testing.T) {
 }
 
 func TestGetAccessModes(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("portworxVolumeTest")
-	if err != nil {
-		t.Fatalf("can't make a temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 
@@ -126,11 +118,7 @@ func (fake *fakePortworxManager) ResizeVolume(spec *volume.Spec, newSize resourc
 }
 
 func TestPlugin(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("portworxVolumeTest")
-	if err != nil {
-		t.Fatalf("can't make a temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 

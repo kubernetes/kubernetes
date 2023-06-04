@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
-	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/emptydir"
@@ -44,10 +43,7 @@ const (
 )
 
 func newTestHost(t *testing.T, clientset clientset.Interface) (string, volume.VolumeHost) {
-	tempDir, err := utiltesting.MkTmpdir("downwardApi_volume_test.")
-	if err != nil {
-		t.Fatalf("can't make a temp rootdir: %v", err)
-	}
+	tempDir := t.TempDir()
 	return tempDir, volumetest.NewFakeVolumeHost(t, tempDir, clientset, emptydir.ProbeVolumePlugins())
 }
 

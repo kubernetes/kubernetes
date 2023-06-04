@@ -27,17 +27,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
-	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
 
 func TestCanSupport(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("nfs_test")
-	if err != nil {
-		t.Fatalf("error creating temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
@@ -61,11 +56,7 @@ func TestCanSupport(t *testing.T) {
 }
 
 func TestGetAccessModes(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("nfs_test")
-	if err != nil {
-		t.Fatalf("error creating temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
@@ -80,11 +71,7 @@ func TestGetAccessModes(t *testing.T) {
 }
 
 func TestRecycler(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("nfs_test")
-	if err != nil {
-		t.Fatalf("error creating temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins([]volume.VolumePlugin{&nfsPlugin{nil, volume.VolumeConfig{}}}, nil, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
@@ -97,11 +84,7 @@ func TestRecycler(t *testing.T) {
 }
 
 func doTestPlugin(t *testing.T, spec *volume.Spec, expectedDevice string) {
-	tmpDir, err := utiltesting.MkTmpdir("nfs_test")
-	if err != nil {
-		t.Fatalf("error creating temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
@@ -227,11 +210,7 @@ func TestPluginPersistentVolume(t *testing.T) {
 }
 
 func TestPersistentClaimReadOnlyFlag(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("nfs_test")
-	if err != nil {
-		t.Fatalf("error creating temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{

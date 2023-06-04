@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"os"
 	"reflect"
 	"testing"
 
@@ -37,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
-	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -955,11 +953,7 @@ func TestInstallCSIDriverExistingAnnotation(t *testing.T) {
 		nodeName := tc.existingNode.Name
 		client := fake.NewSimpleClientset(tc.existingNode)
 
-		tmpDir, err := utiltesting.MkTmpdir("nodeinfomanager-test")
-		if err != nil {
-			t.Fatalf("can't create temp dir: %v", err)
-		}
-		defer os.RemoveAll(tmpDir)
+		tmpDir := t.TempDir()
 		host := volumetest.NewFakeVolumeHostWithCSINodeName(t,
 			tmpDir,
 			client,
@@ -972,7 +966,7 @@ func TestInstallCSIDriverExistingAnnotation(t *testing.T) {
 		nim := NewNodeInfoManager(types.NodeName(nodeName), host, nil)
 
 		// Act
-		_, err = nim.CreateCSINode()
+		_, err := nim.CreateCSINode()
 		if err != nil {
 			t.Errorf("expected no error from creating CSINodeinfo but got: %v", err)
 			continue
@@ -1016,11 +1010,8 @@ func test(t *testing.T, addNodeInfo bool, testcases []testcase) {
 		nodeName := tc.existingNode.Name
 		client := getClientSet(tc.existingNode, tc.existingCSINode)
 
-		tmpDir, err := utiltesting.MkTmpdir("nodeinfomanager-test")
-		if err != nil {
-			t.Fatalf("can't create temp dir: %v", err)
-		}
-		defer os.RemoveAll(tmpDir)
+		tmpDir := t.TempDir()
+		var err error
 		host := volumetest.NewFakeVolumeHostWithCSINodeName(t,
 			tmpDir,
 			client,

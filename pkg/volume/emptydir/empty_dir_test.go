@@ -30,7 +30,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utiltesting "k8s.io/client-go/util/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
@@ -52,11 +51,7 @@ func makePluginUnderTest(t *testing.T, plugName, basePath string) volume.VolumeP
 }
 
 func TestCanSupport(t *testing.T) {
-	tmpDir, err := utiltesting.MkTmpdir("emptydirTest")
-	if err != nil {
-		t.Fatalf("can't make a temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", tmpDir)
 
 	if plug.GetPluginName() != "kubernetes.io/empty-dir" {
@@ -142,11 +137,7 @@ type pluginTestConfig struct {
 
 // doTestPlugin sets up a volume and tears it back down.
 func doTestPlugin(t *testing.T, config pluginTestConfig) {
-	basePath, err := utiltesting.MkTmpdir("emptydir_volume_test")
-	if err != nil {
-		t.Fatalf("can't make a temp rootdir: %v", err)
-	}
-	defer os.RemoveAll(basePath)
+	basePath := t.TempDir()
 
 	var (
 		volumePath  = filepath.Join(basePath, "pods/poduid/volumes/kubernetes.io~empty-dir/test-volume")
@@ -299,11 +290,7 @@ func testTearDown(unmounter volume.Unmounter, metadataDir, volPath string) error
 }
 
 func TestPluginBackCompat(t *testing.T) {
-	basePath, err := utiltesting.MkTmpdir("emptydirTest")
-	if err != nil {
-		t.Fatalf("can't make a temp dir： %v", err)
-	}
-	defer os.RemoveAll(basePath)
+	basePath := t.TempDir()
 
 	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", basePath)
 
@@ -328,11 +315,7 @@ func TestPluginBackCompat(t *testing.T) {
 // TestMetrics tests that MetricProvider methods return sane values.
 func TestMetrics(t *testing.T) {
 	// Create an empty temp directory for the volume
-	tmpDir, err := utiltesting.MkTmpdir("empty_dir_test")
-	if err != nil {
-		t.Fatalf("Can't make a tmp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", tmpDir)
 
