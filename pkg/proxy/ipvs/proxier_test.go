@@ -1698,7 +1698,7 @@ func TestMasqueradeRule(t *testing.T) {
 
 		buf := bytes.NewBuffer(nil)
 		_ = ipt.SaveInto(utiliptables.TableNAT, buf)
-		natRules := strings.Split(string(buf.Bytes()), "\n")
+		natRules := strings.Split(buf.String(), "\n")
 		var hasMasqueradeJump, hasMasqRandomFully bool
 		for _, line := range natRules {
 			rule, _ := iptablestest.ParseRule(line, false)
@@ -3890,7 +3890,7 @@ func getRules(ipt *iptablestest.FakeIPTables, chain utiliptables.Chain) []*iptab
 	buf := bytes.NewBuffer(nil)
 	_ = ipt.SaveInto(utiliptables.TableNAT, buf)
 	_ = ipt.SaveInto(utiliptables.TableFilter, buf)
-	lines := strings.Split(string(buf.Bytes()), "\n")
+	lines := strings.Split(buf.String(), "\n")
 	for _, l := range lines {
 		if !strings.HasPrefix(l, "-A ") {
 			continue
