@@ -440,7 +440,14 @@ func (jm *Controller) updateJob(old, cur interface{}) {
 	if err != nil {
 		return
 	}
-	jm.enqueueController(curJob, true)
+	if curJob.Generation == oldJob.Generation {
+		// Delay the Job sync when no generation change to batch Job status updates,
+		// typically triggered by pod events.
+		jm.enqueueControllerPodUpdate(curJob, true)
+	} else {
+		// Trigger immediate sync when spec is changed.
+		jm.enqueueController(curJob, true)
+	}
 	// check if need to add a new rsync for ActiveDeadlineSeconds
 	if curJob.Status.StartTime != nil {
 		curADS := curJob.Spec.ActiveDeadlineSeconds
