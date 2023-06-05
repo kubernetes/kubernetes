@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clocktesting "k8s.io/utils/clock/testing"
+	"k8s.io/utils/pointer"
 )
 
 func TestNewBackoffRecord(t *testing.T) {
@@ -189,9 +190,7 @@ func TestNewBackoffRecord(t *testing.T) {
 				})
 			}
 
-			fakeClock := clocktesting.NewFakeClock(time.Now().Truncate(time.Second))
-
-			backoffRecord := backoffRecordStore.newBackoffRecord(fakeClock, "key", newSucceededPods, newFailedPods)
+			backoffRecord := backoffRecordStore.newBackoffRecord("key", newSucceededPods, newFailedPods)
 			if diff := cmp.Diff(tc.wantBackoffRecord, backoffRecord, cmp.AllowUnexported(backoffRecord)); diff != "" {
 				t.Errorf("backoffRecord not matching; (-want,+got): %v", diff)
 			}
@@ -201,6 +200,7 @@ func TestNewBackoffRecord(t *testing.T) {
 
 func TestGetFinishedTime(t *testing.T) {
 	defaultTestTime := time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)
+	defaultTestTimeMinus30s := defaultTestTime.Add(-30 * time.Second)
 	testCases := map[string]struct {
 		pod            v1.Pod
 		wantFinishTime time.Time
@@ -229,7 +229,7 @@ func TestGetFinishedTime(t *testing.T) {
 			},
 			wantFinishTime: defaultTestTime,
 		},
-		"Pod with multiple containers; two containers in terminated state and one in running state": {
+		"Pod with multiple containers; two containers in terminated state and one in running state; fallback to deletionTimestamp": {
 			pod: v1.Pod{
 				Status: v1.PodStatus{
 					ContainerStatuses: []v1.ContainerStatus{
@@ -250,10 +250,13 @@ func TestGetFinishedTime(t *testing.T) {
 						},
 					},
 				},
+				ObjectMeta: metav1.ObjectMeta{
+					DeletionTimestamp: &metav1.Time{Time: defaultTestTime},
+				},
 			},
 			wantFinishTime: defaultTestTime,
 		},
-		"Pod with single container in running state": {
+		"fallback to deletionTimestamp": {
 			pod: v1.Pod{
 				Status: v1.PodStatus{
 					ContainerStatuses: []v1.ContainerStatus{
@@ -264,10 +267,77 @@ func TestGetFinishedTime(t *testing.T) {
 						},
 					},
 				},
+				ObjectMeta: metav1.ObjectMeta{
+					DeletionTimestamp: &metav1.Time{Time: defaultTestTime},
+				},
 			},
 			wantFinishTime: defaultTestTime,
 		},
-		"Pod with single container with zero finish time": {
+		"fallback to deletionTimestamp, decremented by grace period": {
+			pod: v1.Pod{
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							State: v1.ContainerState{
+								Running: &v1.ContainerStateRunning{},
+							},
+						},
+					},
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					DeletionTimestamp:          &metav1.Time{Time: defaultTestTime},
+					DeletionGracePeriodSeconds: pointer.Int64(30),
+				},
+			},
+			wantFinishTime: defaultTestTimeMinus30s,
+		},
+		"fallback to PodReady.LastTransitionTime when status of the condition is False": {
+			pod: v1.Pod{
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							State: v1.ContainerState{
+								Terminated: &v1.ContainerStateTerminated{},
+							},
+						},
+					},
+					Conditions: []v1.PodCondition{
+						{
+							Type:               v1.PodReady,
+							Status:             v1.ConditionFalse,
+							Reason:             "PodFailed",
+							LastTransitionTime: metav1.Time{Time: defaultTestTime},
+						},
+					},
+				},
+			},
+			wantFinishTime: defaultTestTime,
+		},
+		"skip fallback to PodReady.LastTransitionTime when status of the condition is True": {
+			pod: v1.Pod{
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							State: v1.ContainerState{
+								Terminated: &v1.ContainerStateTerminated{},
+							},
+						},
+					},
+					Conditions: []v1.PodCondition{
+						{
+							Type:               v1.PodReady,
+							Status:             v1.ConditionTrue,
+							LastTransitionTime: metav1.Time{Time: defaultTestTimeMinus30s},
+						},
+					},
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					DeletionTimestamp: &metav1.Time{Time: defaultTestTime},
+				},
+			},
+			wantFinishTime: defaultTestTime,
+		},
+		"fallback to creationTimestamp": {
 			pod: v1.Pod{
 				Status: v1.PodStatus{
 					ContainerStatuses: []v1.ContainerStatus{
@@ -278,6 +348,9 @@ func TestGetFinishedTime(t *testing.T) {
 						},
 					},
 				},
+				ObjectMeta: metav1.ObjectMeta{
+					CreationTimestamp: metav1.Time{Time: defaultTestTime},
+				},
 			},
 			wantFinishTime: defaultTestTime,
 		},
@@ -285,7 +358,7 @@ func TestGetFinishedTime(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			f := getFinishedTime(&tc.pod, defaultTestTime)
+			f := getFinishedTime(&tc.pod)
 			if !f.Equal(tc.wantFinishTime) {
 				t.Errorf("Expected value of finishedTime %v; got %v", tc.wantFinishTime, f)
 			}
