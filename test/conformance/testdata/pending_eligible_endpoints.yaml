@@ -11,7 +11,6 @@
 - deleteCoreV1NamespacedPersistentVolumeClaim
 - deleteCoreV1Node
 - deleteCoreV1PersistentVolume
-- deleteStorageV1CollectionCSIDriver
 - deleteStorageV1CollectionCSINode
 - deleteStorageV1CollectionStorageClass
 - deleteStorageV1CollectionVolumeAttachment
@@ -34,7 +33,6 @@
 - patchCoreV1PersistentVolume
 - patchCoreV1PersistentVolumeStatus
 - patchNetworkingV1NamespacedNetworkPolicyStatus
-- patchStorageV1CSIDriver
 - patchStorageV1CSINode
 - patchStorageV1StorageClass
 - patchStorageV1VolumeAttachment
@@ -56,7 +54,6 @@
 - replaceCoreV1PersistentVolume
 - replaceCoreV1PersistentVolumeStatus
 - replaceNetworkingV1NamespacedNetworkPolicyStatus
-- replaceStorageV1CSIDriver
 - replaceStorageV1CSINode
 - replaceStorageV1StorageClass
 - replaceStorageV1VolumeAttachment
