@@ -573,9 +573,7 @@ func (tc *testContext) verify(t *testing.T, expected result, initialObjects []me
 	assert.Equal(t, expected.status, status)
 	objects := tc.listAll(t)
 	wantObjects := update(t, initialObjects, expected.changes)
-	for _, add := range expected.added {
-		wantObjects = append(wantObjects, add)
-	}
+	wantObjects = append(wantObjects, expected.added...)
 	for _, remove := range expected.removed {
 		for i, obj := range wantObjects {
 			// This is a bit relaxed (no GVR comparison, no UID
