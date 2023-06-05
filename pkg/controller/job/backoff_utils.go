@@ -23,10 +23,9 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/cache"
+	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/utils/clock"
 	"k8s.io/utils/pointer"
-
-	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
 type backoffRecord struct {
@@ -159,17 +158,26 @@ func sortByFinishedTime(pods []*v1.Pod) {
 	})
 }
 
+// Returns the pod finish time using the following lookups:
+// 1. if all containers finished, use the latest time
+// 2. if the pod has Ready=False condition, use the last transition time
+// 3. if the pod has been deleted, use the `deletionTimestamp - grace_period` to estimate the moment of deletion
+// 4. fallback to pod's creation time
+//
+// Pods owned by Kubelet are marked with Ready=False condition when
+// transitioning to terminal phase, thus being handled by (1.) or (2.).
+// Orphaned pods are deleted by PodGC, thus being handled by (3.).
 func getFinishedTime(p *v1.Pod) time.Time {
-	finishTime := getFinishTimeFromContainers(p)
-	if finishTime == nil {
-		finishTime = getFinishTimeFromPodReadyFalseCondition(p)
-	}
-	if finishTime == nil {
-		finishTime = getFinishTimeFromDeletionTimestamp(p)
-	}
-	if finishTime != nil {
+	if finishTime := getFinishTimeFromContainers(p); finishTime != nil {
 		return *finishTime
 	}
+	if finishTime := getFinishTimeFromPodReadyFalseCondition(p); finishTime != nil {
+		return *finishTime
+	}
+	if finishTime := getFinishTimeFromDeletionTimestamp(p); finishTime != nil {
+		return *finishTime
+	}
+	// This should not happen in clusters with Kubelet and PodGC running.
 	return p.CreationTimestamp.Time
 }
 
