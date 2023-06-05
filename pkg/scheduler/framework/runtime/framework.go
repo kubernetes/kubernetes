@@ -602,7 +602,7 @@ func updatePluginList(pluginList interface{}, pluginSet config.PluginSet, plugin
 	return nil
 }
 
-// EnqueuePlugins returns the registered enqueue plugins.
+// PreEnqueuePlugins returns the registered preEnqueue plugins.
 func (f *frameworkImpl) PreEnqueuePlugins() []framework.PreEnqueuePlugin {
 	return f.preEnqueuePlugins
 }
