@@ -107,6 +107,7 @@ type DiffOptions struct {
 	ForceConflicts    bool
 	ShowManagedFields bool
 
+	Concurrency      int
 	Selector         string
 	OpenAPISchema    openapi.Resources
 	DynamicClient    dynamic.Interface
@@ -166,6 +167,7 @@ func NewCmdDiff(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Co
 	cmd.Flags().StringArray("prune-allowlist", []string{}, "Overwrite the default whitelist with <group/version/kind> for --prune")
 	cmd.Flags().Bool("prune", false, "Include resources that would be deleted by pruning. Can be used with -l and default shows all resources would be pruned")
 	cmd.Flags().BoolVar(&options.ShowManagedFields, "show-managed-fields", options.ShowManagedFields, "If true, include managed fields in the diff.")
+	cmd.Flags().IntVar(&options.Concurrency, "concurrency", 1, "Number of objects to process in parallel when diffing against the live version. Larger number = faster, but more memory, I/O and CPU over that shorter period of time.")
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmdutil.AddServerSideApplyFlags(cmd)
 	cmdutil.AddFieldManagerFlagVar(cmd, &options.FieldManager, apply.FieldManagerClientSideApply)
@@ -683,6 +685,7 @@ func (o *DiffOptions) Run() error {
 
 	r := o.Builder.
 		Unstructured().
+		VisitorConcurrency(o.Concurrency).
 		NamespaceParam(o.CmdNamespace).DefaultNamespace().
 		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
 		LabelSelectorParam(o.Selector).
