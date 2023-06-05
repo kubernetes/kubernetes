@@ -140,12 +140,18 @@ func (c *FakeExamples) Apply(ctx context.Context, example *crv1.ExampleApplyConf
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := example.Name
 	if name == nil {
 		return nil, fmt.Errorf("example.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(examplesResource, c.ns, *name, types.ApplyPatchType, data), &v1.Example{})
+		Invokes(testing.NewApplySubresourceAction(examplesResource, c.ns, *name, data, manager, opts.Force), &v1.Example{})
 
 	if obj == nil {
 		return nil, err

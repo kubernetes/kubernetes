@@ -25,18 +25,20 @@ import (
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
 	fakeapiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/testing"
 )
 
-// NewSimpleClientset returns a clientset that will respond with the provided objects.
+// NewSimpleClientsetWithFieldmanager returns a clientset that will respond with the provided objects.
 // It's backed by a very simple object tracker that processes creates, updates and deletions as-is,
 // without applying any validations and/or defaults. It shouldn't be considered a replacement
 // for a real clientset and is mostly useful in simple unit tests.
-func NewSimpleClientset(objects ...runtime.Object) *Clientset {
-	o := testing.NewObjectTracker(scheme, codecs.UniversalDecoder())
+// It also takes the fieldmanager that can be used to track field ownership and use server-side apply.
+func NewSimpleClientsetWithFieldManager(fieldManager *managedfields.FieldManager, objects ...runtime.Object) *Clientset {
+	o := testing.NewObjectTrackerWithFieldManager(scheme, codecs.UniversalDecoder(), fieldManager)
 	for _, obj := range objects {
 		if err := o.Add(obj); err != nil {
 			panic(err)
@@ -59,13 +61,22 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 	return cs
 }
 
+// NewSimpleClientset returns a clientset that will respond with the provided objects.
+// It's backed by a very simple object tracker that processes creates, updates and deletions as-is,
+// without applying any validations and/or defaults. It shouldn't be considered a replacement
+// for a real clientset and is mostly useful in simple unit tests.
+func NewSimpleClientset(objects ...runtime.Object) *Clientset {
+	return NewSimpleClientsetWithFieldManager(nil, objects...)
+}
+
 // Clientset implements clientset.Interface. Meant to be embedded into a
 // struct to get a default implementation. This makes faking out just the method
 // you want to test easier.
 type Clientset struct {
 	testing.Fake
-	discovery *fakediscovery.FakeDiscovery
-	tracker   testing.ObjectTracker
+	discovery    *fakediscovery.FakeDiscovery
+	tracker      testing.ObjectTracker
+	fieldManager *managedfields.FieldManager
 }
 
 func (c *Clientset) Discovery() discovery.DiscoveryInterface {

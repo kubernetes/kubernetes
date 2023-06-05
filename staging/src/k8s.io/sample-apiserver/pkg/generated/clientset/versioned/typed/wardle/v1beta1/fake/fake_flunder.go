@@ -152,12 +152,18 @@ func (c *FakeFlunders) Apply(ctx context.Context, flunder *wardlev1beta1.Flunder
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := flunder.Name
 	if name == nil {
 		return nil, fmt.Errorf("flunder.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(flundersResource, c.ns, *name, types.ApplyPatchType, data), &v1beta1.Flunder{})
+		Invokes(testing.NewApplySubresourceAction(flundersResource, c.ns, *name, data, manager, opts.Force), &v1beta1.Flunder{})
 
 	if obj == nil {
 		return nil, err
@@ -175,12 +181,18 @@ func (c *FakeFlunders) ApplyStatus(ctx context.Context, flunder *wardlev1beta1.F
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := flunder.Name
 	if name == nil {
 		return nil, fmt.Errorf("flunder.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(flundersResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1beta1.Flunder{})
+		Invokes(testing.NewApplySubresourceAction(flundersResource, c.ns, *name, data, manager, opts.Force, "status"), &v1beta1.Flunder{})
 
 	if obj == nil {
 		return nil, err

@@ -132,12 +132,18 @@ func (c *FakeStorageClasses) Apply(ctx context.Context, storageClass *storagev1b
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := storageClass.Name
 	if name == nil {
 		return nil, fmt.Errorf("storageClass.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(storageclassesResource, *name, types.ApplyPatchType, data), &v1beta1.StorageClass{})
+		Invokes(testing.NewRootApplySubresourceAction(storageclassesResource, *name, data, manager, opts.Force), &v1beta1.StorageClass{})
 	if obj == nil {
 		return nil, err
 	}

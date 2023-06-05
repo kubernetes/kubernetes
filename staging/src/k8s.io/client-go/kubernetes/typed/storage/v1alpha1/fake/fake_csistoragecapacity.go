@@ -140,12 +140,18 @@ func (c *FakeCSIStorageCapacities) Apply(ctx context.Context, cSIStorageCapacity
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := cSIStorageCapacity.Name
 	if name == nil {
 		return nil, fmt.Errorf("cSIStorageCapacity.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(csistoragecapacitiesResource, c.ns, *name, types.ApplyPatchType, data), &v1alpha1.CSIStorageCapacity{})
+		Invokes(testing.NewApplySubresourceAction(csistoragecapacitiesResource, c.ns, *name, data, manager, opts.Force), &v1alpha1.CSIStorageCapacity{})
 
 	if obj == nil {
 		return nil, err

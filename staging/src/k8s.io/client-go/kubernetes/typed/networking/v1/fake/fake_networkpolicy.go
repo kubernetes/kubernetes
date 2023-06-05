@@ -140,12 +140,18 @@ func (c *FakeNetworkPolicies) Apply(ctx context.Context, networkPolicy *networki
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := networkPolicy.Name
 	if name == nil {
 		return nil, fmt.Errorf("networkPolicy.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(networkpoliciesResource, c.ns, *name, types.ApplyPatchType, data), &v1.NetworkPolicy{})
+		Invokes(testing.NewApplySubresourceAction(networkpoliciesResource, c.ns, *name, data, manager, opts.Force), &v1.NetworkPolicy{})
 
 	if obj == nil {
 		return nil, err

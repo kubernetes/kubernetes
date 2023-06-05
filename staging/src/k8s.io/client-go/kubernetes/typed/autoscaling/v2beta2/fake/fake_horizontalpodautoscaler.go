@@ -152,12 +152,18 @@ func (c *FakeHorizontalPodAutoscalers) Apply(ctx context.Context, horizontalPodA
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := horizontalPodAutoscaler.Name
 	if name == nil {
 		return nil, fmt.Errorf("horizontalPodAutoscaler.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(horizontalpodautoscalersResource, c.ns, *name, types.ApplyPatchType, data), &v2beta2.HorizontalPodAutoscaler{})
+		Invokes(testing.NewApplySubresourceAction(horizontalpodautoscalersResource, c.ns, *name, data, manager, opts.Force), &v2beta2.HorizontalPodAutoscaler{})
 
 	if obj == nil {
 		return nil, err
@@ -175,12 +181,18 @@ func (c *FakeHorizontalPodAutoscalers) ApplyStatus(ctx context.Context, horizont
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := horizontalPodAutoscaler.Name
 	if name == nil {
 		return nil, fmt.Errorf("horizontalPodAutoscaler.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(horizontalpodautoscalersResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v2beta2.HorizontalPodAutoscaler{})
+		Invokes(testing.NewApplySubresourceAction(horizontalpodautoscalersResource, c.ns, *name, data, manager, opts.Force, "status"), &v2beta2.HorizontalPodAutoscaler{})
 
 	if obj == nil {
 		return nil, err

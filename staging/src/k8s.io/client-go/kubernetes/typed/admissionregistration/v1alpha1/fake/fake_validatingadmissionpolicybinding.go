@@ -132,12 +132,18 @@ func (c *FakeValidatingAdmissionPolicyBindings) Apply(ctx context.Context, valid
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := validatingAdmissionPolicyBinding.Name
 	if name == nil {
 		return nil, fmt.Errorf("validatingAdmissionPolicyBinding.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(validatingadmissionpolicybindingsResource, *name, types.ApplyPatchType, data), &v1alpha1.ValidatingAdmissionPolicyBinding{})
+		Invokes(testing.NewRootApplySubresourceAction(validatingadmissionpolicybindingsResource, *name, data, manager, opts.Force), &v1alpha1.ValidatingAdmissionPolicyBinding{})
 	if obj == nil {
 		return nil, err
 	}

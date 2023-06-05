@@ -140,12 +140,18 @@ func (c *FakeEndpointSlices) Apply(ctx context.Context, endpointSlice *discovery
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := endpointSlice.Name
 	if name == nil {
 		return nil, fmt.Errorf("endpointSlice.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(endpointslicesResource, c.ns, *name, types.ApplyPatchType, data), &v1beta1.EndpointSlice{})
+		Invokes(testing.NewApplySubresourceAction(endpointslicesResource, c.ns, *name, data, manager, opts.Force), &v1beta1.EndpointSlice{})
 
 	if obj == nil {
 		return nil, err

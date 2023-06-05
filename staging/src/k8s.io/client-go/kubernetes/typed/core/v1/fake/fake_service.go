@@ -144,12 +144,18 @@ func (c *FakeServices) Apply(ctx context.Context, service *corev1.ServiceApplyCo
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := service.Name
 	if name == nil {
 		return nil, fmt.Errorf("service.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(servicesResource, c.ns, *name, types.ApplyPatchType, data), &v1.Service{})
+		Invokes(testing.NewApplySubresourceAction(servicesResource, c.ns, *name, data, manager, opts.Force), &v1.Service{})
 
 	if obj == nil {
 		return nil, err
@@ -167,12 +173,18 @@ func (c *FakeServices) ApplyStatus(ctx context.Context, service *corev1.ServiceA
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := service.Name
 	if name == nil {
 		return nil, fmt.Errorf("service.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(servicesResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1.Service{})
+		Invokes(testing.NewApplySubresourceAction(servicesResource, c.ns, *name, data, manager, opts.Force, "status"), &v1.Service{})
 
 	if obj == nil {
 		return nil, err

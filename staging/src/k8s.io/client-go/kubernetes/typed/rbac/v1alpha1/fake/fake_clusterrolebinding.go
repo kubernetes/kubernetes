@@ -132,12 +132,18 @@ func (c *FakeClusterRoleBindings) Apply(ctx context.Context, clusterRoleBinding 
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := clusterRoleBinding.Name
 	if name == nil {
 		return nil, fmt.Errorf("clusterRoleBinding.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(clusterrolebindingsResource, *name, types.ApplyPatchType, data), &v1alpha1.ClusterRoleBinding{})
+		Invokes(testing.NewRootApplySubresourceAction(clusterrolebindingsResource, *name, data, manager, opts.Force), &v1alpha1.ClusterRoleBinding{})
 	if obj == nil {
 		return nil, err
 	}

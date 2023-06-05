@@ -132,12 +132,18 @@ func (c *FakeValidatingWebhookConfigurations) Apply(ctx context.Context, validat
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := validatingWebhookConfiguration.Name
 	if name == nil {
 		return nil, fmt.Errorf("validatingWebhookConfiguration.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(validatingwebhookconfigurationsResource, *name, types.ApplyPatchType, data), &v1.ValidatingWebhookConfiguration{})
+		Invokes(testing.NewRootApplySubresourceAction(validatingwebhookconfigurationsResource, *name, data, manager, opts.Force), &v1.ValidatingWebhookConfiguration{})
 	if obj == nil {
 		return nil, err
 	}

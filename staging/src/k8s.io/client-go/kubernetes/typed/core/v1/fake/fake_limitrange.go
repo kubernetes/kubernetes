@@ -140,12 +140,18 @@ func (c *FakeLimitRanges) Apply(ctx context.Context, limitRange *corev1.LimitRan
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := limitRange.Name
 	if name == nil {
 		return nil, fmt.Errorf("limitRange.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(limitrangesResource, c.ns, *name, types.ApplyPatchType, data), &v1.LimitRange{})
+		Invokes(testing.NewApplySubresourceAction(limitrangesResource, c.ns, *name, data, manager, opts.Force), &v1.LimitRange{})
 
 	if obj == nil {
 		return nil, err

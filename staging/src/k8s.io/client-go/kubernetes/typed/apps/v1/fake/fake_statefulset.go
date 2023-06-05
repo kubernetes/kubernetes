@@ -154,12 +154,18 @@ func (c *FakeStatefulSets) Apply(ctx context.Context, statefulSet *appsv1.Statef
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := statefulSet.Name
 	if name == nil {
 		return nil, fmt.Errorf("statefulSet.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(statefulsetsResource, c.ns, *name, types.ApplyPatchType, data), &v1.StatefulSet{})
+		Invokes(testing.NewApplySubresourceAction(statefulsetsResource, c.ns, *name, data, manager, opts.Force), &v1.StatefulSet{})
 
 	if obj == nil {
 		return nil, err
@@ -177,12 +183,18 @@ func (c *FakeStatefulSets) ApplyStatus(ctx context.Context, statefulSet *appsv1.
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := statefulSet.Name
 	if name == nil {
 		return nil, fmt.Errorf("statefulSet.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(statefulsetsResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1.StatefulSet{})
+		Invokes(testing.NewApplySubresourceAction(statefulsetsResource, c.ns, *name, data, manager, opts.Force, "status"), &v1.StatefulSet{})
 
 	if obj == nil {
 		return nil, err
@@ -222,8 +234,14 @@ func (c *FakeStatefulSets) ApplyScale(ctx context.Context, statefulSetName strin
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(statefulsetsResource, c.ns, statefulSetName, types.ApplyPatchType, data, "status"), &autoscalingv1.Scale{})
+		Invokes(testing.NewApplySubresourceAction(statefulsetsResource, c.ns, statefulSetName, data, manager, opts.Force, "status"), &autoscalingv1.Scale{})
 
 	if obj == nil {
 		return nil, err

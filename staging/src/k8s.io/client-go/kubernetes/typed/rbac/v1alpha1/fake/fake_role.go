@@ -140,12 +140,18 @@ func (c *FakeRoles) Apply(ctx context.Context, role *rbacv1alpha1.RoleApplyConfi
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := role.Name
 	if name == nil {
 		return nil, fmt.Errorf("role.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(rolesResource, c.ns, *name, types.ApplyPatchType, data), &v1alpha1.Role{})
+		Invokes(testing.NewApplySubresourceAction(rolesResource, c.ns, *name, data, manager, opts.Force), &v1alpha1.Role{})
 
 	if obj == nil {
 		return nil, err

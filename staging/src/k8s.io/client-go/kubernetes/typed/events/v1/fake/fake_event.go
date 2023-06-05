@@ -140,12 +140,18 @@ func (c *FakeEvents) Apply(ctx context.Context, event *eventsv1.EventApplyConfig
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := event.Name
 	if name == nil {
 		return nil, fmt.Errorf("event.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(eventsResource, c.ns, *name, types.ApplyPatchType, data), &v1.Event{})
+		Invokes(testing.NewApplySubresourceAction(eventsResource, c.ns, *name, data, manager, opts.Force), &v1.Event{})
 
 	if obj == nil {
 		return nil, err

@@ -132,12 +132,18 @@ func (c *FakeFischers) Apply(ctx context.Context, fischer *wardlev1alpha1.Fische
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := fischer.Name
 	if name == nil {
 		return nil, fmt.Errorf("fischer.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(fischersResource, *name, types.ApplyPatchType, data), &v1alpha1.Fischer{})
+		Invokes(testing.NewRootApplySubresourceAction(fischersResource, *name, data, manager, opts.Force), &v1alpha1.Fischer{})
 	if obj == nil {
 		return nil, err
 	}
