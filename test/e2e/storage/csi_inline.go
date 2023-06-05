@@ -230,7 +230,16 @@ var _ = utils.SIGDescribe("CSIInlineVolumes", func() {
 		}
 	})
 
-	ginkgo.It("should run through the lifecycle of a CSIDriver", func(ctx context.Context) {
+	/*
+		Release: v1.28
+		Testname: CSIDriver, lifecycle
+		Description: Creating two CSIDrivers MUST succeed. Patching a CSIDriver MUST
+		succeed with its new label found. Updating a CSIDriver MUST succeed with its
+		new label found. Two CSIDrivers MUST be found when listed. Deleting the first
+		CSIDriver MUST succeed. Deleting the second CSIDriver via deleteCollection
+		MUST succeed.
+	*/
+	framework.ConformanceIt("should run through the lifecycle of a CSIDriver", func(ctx context.Context) {
 		// Create client
 		client := f.ClientSet.StorageV1().CSIDrivers()
 		defaultFSGroupPolicy := storagev1.ReadWriteOnceWithFSTypeFSGroupPolicy

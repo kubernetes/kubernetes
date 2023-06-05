@@ -2565,6 +2565,15 @@
     pod.
   release: v1.19
   file: test/e2e/scheduling/preemption.go
+- testname: CSIDriver, lifecycle
+  codename: '[sig-storage] CSIInlineVolumes should run through the lifecycle of a
+    CSIDriver [Conformance]'
+  description: Creating two CSIDrivers MUST succeed. Patching a CSIDriver MUST succeed
+    with its new label found. Updating a CSIDriver MUST succeed with its new label
+    found. Two CSIDrivers MUST be found when listed. Deleting the first CSIDriver
+    MUST succeed. Deleting the second CSIDriver via deleteCollection MUST succeed.
+  release: v1.28
+  file: test/e2e/storage/csi_inline.go
 - testname: CSIInlineVolumes should support Pods with inline volumes
   codename: '[sig-storage] CSIInlineVolumes should support CSIVolumeSource in Pod
     API [Conformance]'
