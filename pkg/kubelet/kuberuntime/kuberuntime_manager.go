@@ -1089,7 +1089,14 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 
 		// Prepare resources allocated by the Dynammic Resource Allocation feature for the pod
 		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-			if m.runtimeHelper.PrepareDynamicResources(pod) != nil {
+			if err := m.runtimeHelper.PrepareDynamicResources(pod); err != nil {
+				ref, referr := ref.GetReference(legacyscheme.Scheme, pod)
+				if referr != nil {
+					klog.ErrorS(referr, "Couldn't make a ref to pod", "pod", klog.KObj(pod))
+					return
+				}
+				m.recorder.Eventf(ref, v1.EventTypeWarning, events.FailedPrepareDynamicResources, "Failed to prepare dynamic resources: %v", err)
+				klog.ErrorS(err, "Failed to prepare dynamic resources", "pod", klog.KObj(pod))
 				return
 			}
 		}
