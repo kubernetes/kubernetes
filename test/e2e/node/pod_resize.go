@@ -1634,20 +1634,15 @@ func doPodResizeSchedulerTests() {
 }
 
 func revertResourceResizePatch(pod *v1.Pod, patch string) {
-	// Logic to revert the resource resize patch goes here
 	fmt.Println("Reverting resource resize with patch:", patch)
 
 	// Update the pod's spec with the original resource size
 	originalPod := makeTestPod(pod.Namespace, pod.Name, pod.ObjectMeta.Labels["time"], getOriginalContainerInfo(pod))
 	pod.Spec = originalPod.Spec
-
-	// Apply the updated pod spec to revert the resize
 	applyPodSpec(pod)
 }
 
 func getOriginalContainerInfo(pod *v1.Pod) []TestContainerInfo {
-	// Logic to retrieve the original container info goes here
-	// You need to implement this function based on your specific scenario
 	// Return the original container info as an array of TestContainerInfo
 	return []TestContainerInfo{}
 }
