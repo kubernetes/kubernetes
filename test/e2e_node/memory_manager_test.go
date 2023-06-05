@@ -216,9 +216,7 @@ func updateKubeletConfigWithMemoryManagerParams(initialCfg *kubeletconfig.Kubele
 	if initialCfg.ReservedMemory == nil {
 		initialCfg.ReservedMemory = []kubeletconfig.MemoryReservation{}
 	}
-	for _, memoryReservation := range params.systemReservedMemory {
-		initialCfg.ReservedMemory = append(initialCfg.ReservedMemory, memoryReservation)
-	}
+	initialCfg.ReservedMemory = append(initialCfg.ReservedMemory, params.systemReservedMemory...)
 }
 
 func getAllNUMANodes() []int {
