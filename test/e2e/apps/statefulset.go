@@ -1115,7 +1115,8 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Creating statefulset with correct image in namespace " + f.Namespace.Name)
-			ss := e2estatefulset.NewStatefulSet(ssName, f.Namespace.Name, headlessSvcName, 4, nil, nil, labels, intstr.FromInt32(2))
+			maxUnavailable := intstr.FromInt32(2)
+			ss := e2estatefulset.NewStatefulSet(ssName, f.Namespace.Name, headlessSvcName, 4, nil, nil, labels, &maxUnavailable)
 			ss.Spec.Template.Spec.NodeName = node.Name
 			_, err = f.ClientSet.AppsV1().StatefulSets(f.Namespace.Name).Create(ctx, ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
