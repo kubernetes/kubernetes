@@ -66,6 +66,12 @@ func (m *kubeGenericRuntimeManager) createPodSandbox(ctx context.Context, pod *v
 		}
 	}
 
+	// Set runtime handler annotation.
+	if podSandboxConfig.Annotations == nil {
+		podSandboxConfig.Annotations = make(map[string]string)
+	}
+	podSandboxConfig.Annotations["kubernetes.io/runtimehandler"] = runtimeHandler
+
 	podSandBoxID, err := m.runtimeService.RunPodSandbox(ctx, podSandboxConfig, runtimeHandler)
 	if err != nil {
 		message := fmt.Sprintf("Failed to create sandbox for pod %q: %v", format.Pod(pod), err)
