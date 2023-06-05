@@ -271,6 +271,8 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 		}
 	}
 
+	warnings = append(warnings, warningForContainerPorts(podSpec.Containers, fieldPath)...)
+
 	return warnings
 }
 
@@ -290,6 +292,81 @@ func warningsForWeightedPodAffinityTerms(terms []api.WeightedPodAffinityTerm, fi
 		// warn if labelSelector is empty which is no-match.
 		if t.PodAffinityTerm.LabelSelector == nil {
 			warnings = append(warnings, fmt.Sprintf("%s: a null labelSelector results in matching no pod", fieldPath.Index(i).Child("podAffinityTerm", "labelSelector")))
+		}
+	}
+	return warnings
+}
+
+func warningForContainerPorts(containers []api.Container, fieldPath *field.Path) []string {
+	var warnings []string
+
+	// genKey concatenates hostPort, containerPort and protocol into single string
+	genKey := func(hostPort, containerPort int32, protocol api.Protocol) string {
+		return fmt.Sprintf("%d-%d-%s", hostPort, containerPort, protocol)
+	}
+
+	// toString returns string representation for api.ContainerPort
+	toString := func(port api.ContainerPort) string {
+		value := "<"
+		if port.HostIP != "" {
+			value += fmt.Sprintf("hostIP=%s, ", port.HostIP)
+		}
+
+		if port.HostPort != 0 {
+			value += fmt.Sprintf("hostPort=%d, ", port.HostPort)
+		}
+
+		if port.Protocol != "" {
+			value += fmt.Sprintf("protocol=%s, ", port.Protocol)
+		}
+
+		value += fmt.Sprintf("containerPort=%d>", port.ContainerPort)
+		return value
+	}
+
+	wildCardHostIPv4 := "0.0.0.0"
+	wildCardHostIPv6 := "[::]"
+
+	// declaredPorts holds values declared for a container port in a custom structure for faster lookup.
+	//  { "<hostPort> + <protocol> + <containerPort>" : [<hostIP>, <hostIP>, ....  , <hostIP>] }
+	declaredPorts := make(map[string]sets.Set[string])
+
+	for i, container := range containers {
+		for j, port := range container.Ports {
+			// zero value will be considered for the fields which are not explicitly defined by end user.
+			key := genKey(port.HostPort, port.ContainerPort, port.Protocol)
+			hostIP := port.HostIP
+
+			// in golang 0.0.0.0 and [::] are equivalent, so we just need to deal with wildCardHostIPv4.
+			// https://github.com/golang/go/issues/48723
+			if hostIP == wildCardHostIPv6 {
+				hostIP = wildCardHostIPv4
+			}
+
+			if hostIPs, ok := declaredPorts[key]; ok {
+				// warn :: combination of hostIP, hostPort, protocol and containerPort already exists
+				if hostIPs.Has(hostIP) {
+					warnings = append(warnings, fmt.Sprintf("%s: container port already defined %s", fieldPath.Child("spec", "containers").Index(i).Child("ports").Index(j), toString(port)))
+				}
+
+				if port.HostIP == wildCardHostIPv4 {
+					// warn :: combination of hostPort, protocol and containerPort already exists for a non wildcard hostIP.
+					if hostIPs.Len() > 0 {
+						warnings = append(warnings, fmt.Sprintf("%s: container port already defined %s", fieldPath.Child("spec", "containers").Index(i).Child("ports").Index(j), toString(port)))
+					}
+				} else {
+					// warn :: combination of hostPort, protocol and containerPort already exists for wildcard hostIP.
+					if hostIPs.Has(wildCardHostIPv4) {
+						warnings = append(warnings, fmt.Sprintf("%s: container port already defined %s", fieldPath.Child("spec", "containers").Index(i).Child("ports").Index(j), toString(port)))
+					}
+				}
+
+				// add hostIP to set
+				declaredPorts[key].Insert(hostIP)
+			} else {
+				// create new set with hostIP
+				declaredPorts[key] = sets.New(hostIP)
+			}
 		}
 	}
 	return warnings

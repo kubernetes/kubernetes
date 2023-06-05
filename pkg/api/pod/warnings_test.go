@@ -599,6 +599,68 @@ func TestWarnings(t *testing.T) {
 				`spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[1].podAffinityTerm.labelSelector: a null labelSelector results in matching no pod`,
 			},
 		},
+		{
+			name: "duplicate container port",
+			template: &api.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{Ports: []api.ContainerPort{
+							{
+								ContainerPort: 80,
+							},
+							{
+								ContainerPort: 5000,
+								Protocol:      api.ProtocolTCP,
+							},
+							{
+								ContainerPort: 5000,
+								Protocol:      api.ProtocolTCP,
+								HostPort:      5001,
+							},
+							{
+								ContainerPort: 5000,
+								Protocol:      api.ProtocolUDP,
+								HostPort:      5005,
+								HostIP:        "192.168.1.2",
+							},
+						}},
+
+						{Ports: []api.ContainerPort{
+							{
+								ContainerPort: 80,
+							},
+							{
+								ContainerPort: 5000,
+								Protocol:      api.ProtocolTCP,
+							},
+							{
+								ContainerPort: 5000,
+								Protocol:      api.ProtocolTCP,
+								HostPort:      5002,
+							},
+							{
+								ContainerPort: 5000,
+								Protocol:      api.ProtocolUDP,
+								HostPort:      5005,
+								HostIP:        "127.0.0.1",
+							},
+							{
+								ContainerPort: 5000,
+								Protocol:      api.ProtocolUDP,
+								HostPort:      5005,
+								HostIP:        "0.0.0.0",
+							},
+						}},
+					},
+				},
+			},
+			expected: []string{
+				`spec.containers[1].ports[0]: container port already defined <containerPort=80>`,
+				`spec.containers[1].ports[1]: container port already defined <protocol=TCP, containerPort=5000>`,
+				`spec.containers[1].ports[4]: container port already defined <hostIP=0.0.0.0, hostPort=5005, protocol=UDP, containerPort=5000>`,
+			},
+		},
 	}
 
 	for _, tc := range testcases {
