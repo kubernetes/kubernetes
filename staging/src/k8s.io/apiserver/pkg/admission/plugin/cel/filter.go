@@ -315,6 +315,32 @@ func CreateAdmissionRequest(attr admission.Attributes) *admissionv1.AdmissionReq
 	}
 }
 
+func CreateNamespaceObject(namespace *v1.Namespace) *v1.Namespace {
+	if namespace == nil {
+		return nil
+	}
+	//md := namespace.GetObjectMeta()
+
+	return &v1.Namespace{
+		Status: namespace.Status,
+		Spec:   namespace.Spec,
+		ObjectMeta: metav1.ObjectMeta{
+			Name:                       namespace.Name,
+			GenerateName:               namespace.GenerateName,
+			Namespace:                  namespace.Namespace,
+			UID:                        namespace.UID,
+			ResourceVersion:            namespace.ResourceVersion,
+			Generation:                 namespace.Generation,
+			CreationTimestamp:          namespace.CreationTimestamp,
+			DeletionTimestamp:          namespace.DeletionTimestamp,
+			DeletionGracePeriodSeconds: namespace.DeletionGracePeriodSeconds,
+			Labels:                     namespace.Labels,
+			Annotations:                namespace.Annotations,
+			Finalizers:                 namespace.Finalizers,
+		},
+	}
+}
+
 // CompilationErrors returns a list of all the errors from the compilation of the evaluator
 func (e *filter) CompilationErrors() []error {
 	compilationErrors := []error{}

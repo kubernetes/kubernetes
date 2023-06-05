@@ -715,6 +715,15 @@ func TestFilter(t *testing.T) {
 				&condition{
 					Expression: "namespaceObject.status.phase == 'Active'",
 				},
+				&condition{
+					Expression: "size(namespaceObject.metadata.managedFields) == 1",
+				},
+				&condition{
+					Expression: "size(namespaceObject.metadata.ownerReferences) == 1",
+				},
+				&condition{
+					Expression: "'env' in namespaceObject.metadata.annotations",
+				},
 			},
 			attributes: newValidAttribute(&podObject, false),
 			results: []EvaluationResult{
@@ -732,6 +741,15 @@ func TestFilter(t *testing.T) {
 				},
 				{
 					EvalResult: celtypes.True,
+				},
+				{
+					Error: errors.New("undefined field 'managedFields'"),
+				},
+				{
+					Error: errors.New("undefined field 'ownerReferences'"),
+				},
+				{
+					EvalResult: celtypes.False,
 				},
 			},
 			hasParamKind:    false,
@@ -769,7 +787,7 @@ func TestFilter(t *testing.T) {
 
 			optionalVars := OptionalVariableBindings{VersionedParams: tc.params, Authorizer: tc.authorizer}
 			ctx := context.TODO()
-			evalResults, _, err := f.ForInput(ctx, versionedAttr, CreateAdmissionRequest(versionedAttr.Attributes), optionalVars, tc.namespaceObject, celconfig.RuntimeCELCostBudget)
+			evalResults, _, err := f.ForInput(ctx, versionedAttr, CreateAdmissionRequest(versionedAttr.Attributes), optionalVars, CreateNamespaceObject(tc.namespaceObject), celconfig.RuntimeCELCostBudget)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
