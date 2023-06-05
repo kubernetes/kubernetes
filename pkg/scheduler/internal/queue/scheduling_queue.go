@@ -60,8 +60,8 @@ const (
 	// will be used.
 	DefaultPodMaxInUnschedulablePodsDuration time.Duration = 5 * time.Minute
 	// Scheduling queue names
-	activeQName       = "Active"
-	backoffQName      = "Backoff"
+	activeQ           = "Active"
+	backoffQ          = "Backoff"
 	unschedulablePods = "Unschedulable"
 
 	preEnqueue = "PreEnqueue"
@@ -414,7 +414,7 @@ func (p *PriorityQueue) Add(logger klog.Logger, pod *v1.Pod) error {
 	if err := p.podBackoffQ.Delete(pInfo); err == nil {
 		logger.Error(nil, "Error: pod is already in the podBackoff queue", "pod", klog.KObj(pod))
 	}
-	logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pod), "event", PodAdd, "queue", activeQName)
+	logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pod), "event", PodAdd, "queue", activeQ)
 	metrics.SchedulerQueueIncomingPods.WithLabelValues("active", PodAdd).Inc()
 	p.addNominatedPodUnlocked(logger, pInfo.PodInfo, nil)
 	p.cond.Broadcast()
@@ -522,7 +522,7 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *
 		if err := p.podBackoffQ.Add(pInfo); err != nil {
 			return fmt.Errorf("error adding pod %v to the backoff queue: %v", klog.KObj(pod), err)
 		}
-		logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pod), "event", ScheduleAttemptFailure, "queue", backoffQName)
+		logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pod), "event", ScheduleAttemptFailure, "queue", backoffQ)
 		metrics.SchedulerQueueIncomingPods.WithLabelValues("backoff", ScheduleAttemptFailure).Inc()
 	} else {
 		p.unschedulablePods.addOrUpdate(pInfo)
@@ -556,7 +556,7 @@ func (p *PriorityQueue) flushBackoffQCompleted(logger klog.Logger) {
 			break
 		}
 		if added, _ := p.addToActiveQ(logger, pInfo); added {
-			logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pod), "event", BackoffComplete, "queue", activeQName)
+			logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pod), "event", BackoffComplete, "queue", activeQ)
 			metrics.SchedulerQueueIncomingPods.WithLabelValues("active", BackoffComplete).Inc()
 			activated = true
 		}
@@ -664,13 +664,13 @@ func (p *PriorityQueue) Update(logger klog.Logger, oldPod, newPod *v1.Pod) error
 					return err
 				}
 				p.unschedulablePods.delete(usPodInfo.Pod, gated)
-				logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", PodUpdate, "queue", backoffQName)
+				logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", PodUpdate, "queue", backoffQ)
 			} else {
 				if added, err := p.addToActiveQ(logger, pInfo); !added {
 					return err
 				}
 				p.unschedulablePods.delete(usPodInfo.Pod, gated)
-				logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", BackoffComplete, "queue", activeQName)
+				logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", BackoffComplete, "queue", activeQ)
 				p.cond.Broadcast()
 			}
 		} else {
@@ -686,7 +686,7 @@ func (p *PriorityQueue) Update(logger klog.Logger, oldPod, newPod *v1.Pod) error
 		return err
 	}
 	p.addNominatedPodUnlocked(logger, pInfo.PodInfo, nil)
-	logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", PodUpdate, "queue", activeQName)
+	logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", PodUpdate, "queue", activeQ)
 	p.cond.Broadcast()
 	return nil
 }
@@ -783,14 +783,14 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(logger klog.Logger, podIn
 			if err := p.podBackoffQ.Add(pInfo); err != nil {
 				logger.Error(err, "Error adding pod to the backoff queue", "pod", klog.KObj(pod))
 			} else {
-				logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", backoffQName)
+				logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", backoffQ)
 				metrics.SchedulerQueueIncomingPods.WithLabelValues("backoff", event.Label).Inc()
 				p.unschedulablePods.delete(pod, pInfo.Gated)
 			}
 		} else {
 			gated := pInfo.Gated
 			if added, _ := p.addToActiveQ(logger, pInfo); added {
-				logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", activeQName)
+				logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", activeQ)
 				activated = true
 				metrics.SchedulerQueueIncomingPods.WithLabelValues("active", event.Label).Inc()
 				p.unschedulablePods.delete(pod, gated)
