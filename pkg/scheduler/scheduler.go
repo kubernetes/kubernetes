@@ -103,9 +103,9 @@ type Scheduler struct {
 	logger klog.Logger
 }
 
-func (s *Scheduler) applyDefaultHandlers() {
-	s.SchedulePod = s.schedulePod
-	s.FailureHandler = s.handleSchedulingFailure
+func (sched *Scheduler) applyDefaultHandlers() {
+	sched.SchedulePod = sched.schedulePod
+	sched.FailureHandler = sched.handleSchedulingFailure
 }
 
 type schedulerOptions struct {

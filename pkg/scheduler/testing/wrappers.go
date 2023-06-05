@@ -930,12 +930,12 @@ type PodSchedulingWrapper struct {
 	resourcev1alpha2.PodSchedulingContext
 }
 
-// MakePodSchedulingContext creates a PodSchedulingContext wrapper.
+// MakePodSchedulingContexts creates a PodSchedulingContext wrapper.
 func MakePodSchedulingContexts() *PodSchedulingWrapper {
 	return &PodSchedulingWrapper{resourcev1alpha2.PodSchedulingContext{}}
 }
 
-// FromPodSchedulingContext creates a PodSchedulingContext wrapper from some existing object.
+// FromPodSchedulingContexts creates a PodSchedulingContext wrapper from an existing object.
 func FromPodSchedulingContexts(other *resourcev1alpha2.PodSchedulingContext) *PodSchedulingWrapper {
 	return &PodSchedulingWrapper{*other.DeepCopy()}
 }
