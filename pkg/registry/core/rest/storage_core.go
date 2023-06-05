@@ -21,11 +21,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"net/url"
-	"strings"
 	"time"
-
-	"k8s.io/klog/v2"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -35,7 +31,6 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	"k8s.io/apiserver/pkg/storage/etcd3"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	networkingv1alpha1client "k8s.io/client-go/kubernetes/typed/networking/v1alpha1"
@@ -69,7 +64,6 @@ import (
 	serviceaccountstore "k8s.io/kubernetes/pkg/registry/core/serviceaccount/storage"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-	utilsnet "k8s.io/utils/net"
 )
 
 // LegacyRESTStorageProvider provides information needed to build RESTStorage for core, but
@@ -416,43 +410,16 @@ type componentStatusStorage struct {
 	storageFactory serverstorage.StorageFactory
 }
 
-func (s componentStatusStorage) serversToValidate() map[string]*componentstatus.Server {
+func (s componentStatusStorage) serversToValidate() map[string]componentstatus.Server {
 	// this is fragile, which assumes that the default port is being used
 	// TODO: switch to secure port until these components remove the ability to serve insecurely.
-	serversToValidate := map[string]*componentstatus.Server{
-		"controller-manager": {EnableHTTPS: true, TLSConfig: &tls.Config{InsecureSkipVerify: true}, Addr: "127.0.0.1", Port: ports.KubeControllerManagerPort, Path: "/healthz"},
-		"scheduler":          {EnableHTTPS: true, TLSConfig: &tls.Config{InsecureSkipVerify: true}, Addr: "127.0.0.1", Port: kubeschedulerconfig.DefaultKubeSchedulerPort, Path: "/healthz"},
+	serversToValidate := map[string]componentstatus.Server{
+		"controller-manager": &componentstatus.HttpServer{EnableHTTPS: true, TLSConfig: &tls.Config{InsecureSkipVerify: true}, Addr: "127.0.0.1", Port: ports.KubeControllerManagerPort, Path: "/healthz"},
+		"scheduler":          &componentstatus.HttpServer{EnableHTTPS: true, TLSConfig: &tls.Config{InsecureSkipVerify: true}, Addr: "127.0.0.1", Port: kubeschedulerconfig.DefaultKubeSchedulerPort, Path: "/healthz"},
 	}
 
-	for ix, machine := range s.storageFactory.Backends() {
-		etcdUrl, err := url.Parse(machine.Server)
-		if err != nil {
-			klog.Errorf("Failed to parse etcd url for validation: %v", err)
-			continue
-		}
-		var port int
-		var addr string
-		if strings.Contains(etcdUrl.Host, ":") {
-			var portString string
-			addr, portString, err = net.SplitHostPort(etcdUrl.Host)
-			if err != nil {
-				klog.Errorf("Failed to split host/port: %s (%v)", etcdUrl.Host, err)
-				continue
-			}
-			port, _ = utilsnet.ParsePort(portString, true)
-		} else {
-			addr = etcdUrl.Host
-			port = 2379
-		}
-		// TODO: etcd health checking should be abstracted in the storage tier
-		serversToValidate[fmt.Sprintf("etcd-%d", ix)] = &componentstatus.Server{
-			Addr:        addr,
-			EnableHTTPS: etcdUrl.Scheme == "https",
-			TLSConfig:   machine.TLSConfig,
-			Port:        port,
-			Path:        "/health",
-			Validate:    etcd3.EtcdHealthCheck,
-		}
+	for ix, cfg := range s.storageFactory.Configs() {
+		serversToValidate[fmt.Sprintf("etcd-%d", ix)] = &componentstatus.EtcdServer{Config: cfg}
 	}
 	return serversToValidate
 }
