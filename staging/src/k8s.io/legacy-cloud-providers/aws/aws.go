@@ -280,6 +280,14 @@ const (
 	volumeCreateBackoffFactor = 1.2
 	volumeCreateBackoffSteps  = 10
 
+	// acquireNodeName* is configuration of exponential backoff for acquiring this instance's
+	// node name (currently the EC2 PrivateDnsName) during cloud provider initialization.
+	// This value is eventually-consistent.
+	// The current config will make its final attempt after ~130 seconds.
+	acquireNodeNameInitialDelay  = 5 * time.Second
+	acquireNodeNameBackoffFactor = 1.25
+	acquireNodeNameBackoffSteps  = 10
+
 	// Number of node names that can be added to a filter. The AWS limit is 200
 	// but we are using a lower limit on purpose
 	filterNodeLimit = 150
@@ -2379,11 +2387,29 @@ func (c *Cloud) buildSelfAWSInstance() (*awsInstance, error) {
 	// information from the instance returned by the EC2 API - it is a
 	// single API call to get all the information, and it means we don't
 	// have two code paths.
-	instance, err := c.getInstanceByID(instanceID)
-	if err != nil {
-		return nil, fmt.Errorf("error finding instance %s: %q", instanceID, err)
+	// The PrivateDnsName is eventually-consistent, and we can't complete
+	// initialization until we acquire it.
+	backoff := wait.Backoff{
+		Duration: acquireNodeNameInitialDelay,
+		Factor:   acquireNodeNameBackoffFactor,
+		Steps:    acquireNodeNameBackoffSteps,
 	}
-	return newAWSInstance(c.ec2, instance), nil
+	var awsInstance *awsInstance
+	err = wait.ExponentialBackoff(backoff, func() (done bool, err error) {
+		instance, err := c.getInstanceByID(instanceID)
+		if err != nil {
+			return true, fmt.Errorf("error finding instance %s: %q", instanceID, err)
+		}
+		awsInstance = newAWSInstance(c.ec2, instance)
+		if awsInstance.nodeName != "" {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to acquire node name for instance %s: %q", instanceID, err)
+	}
+	return awsInstance, nil
 }
 
 // wrapAttachError wraps the error returned by an AttachVolume request with
