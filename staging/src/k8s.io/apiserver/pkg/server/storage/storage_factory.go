@@ -22,8 +22,6 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"k8s.io/klog/v2"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -31,6 +29,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/storage/value"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2"
 )
 
 // Backend describes the storage servers, the information here should be enough
@@ -53,8 +52,12 @@ type StorageFactory interface {
 	// centralized control over the shape of etcd directories
 	ResourcePrefix(groupResource schema.GroupResource) string
 
+	// Configs gets configurations for all of registered storage destinations.
+	Configs() []storagebackend.Config
+
 	// Backends gets all backends for all registered storage destinations.
 	// Used for getting all instances for health validations.
+	// Deprecated: Use Configs instead
 	Backends() []Backend
 }
 
@@ -288,28 +291,76 @@ func (s *DefaultStorageFactory) NewConfig(groupResource schema.GroupResource) (*
 	return storageConfig.ForResource(groupResource), nil
 }
 
+// Configs implements StorageFactory.
+func (s *DefaultStorageFactory) Configs() []storagebackend.Config {
+	return configs(s.StorageConfig, s.Overrides)
+}
+
+// Configs gets configurations for all of registered storage destinations.
+func Configs(storageConfig storagebackend.Config) []storagebackend.Config {
+	return configs(storageConfig, nil)
+}
+
+// Returns all storage configurations including those for group resource overrides
+func configs(storageConfig storagebackend.Config, grOverrides map[schema.GroupResource]groupResourceOverrides) []storagebackend.Config {
+	locations := sets.NewString()
+	configs := []storagebackend.Config{}
+	for _, loc := range storageConfig.Transport.ServerList {
+		// copy
+		newConfig := storageConfig
+		newConfig.Transport.ServerList = []string{loc}
+		configs = append(configs, newConfig)
+		locations.Insert(loc)
+	}
+
+	for _, override := range grOverrides {
+		for _, loc := range override.etcdLocation {
+			if locations.Has(loc) {
+				continue
+			}
+			// copy
+			newConfig := storageConfig
+			override.Apply(&newConfig, &StorageCodecConfig{})
+			newConfig.Transport.ServerList = []string{loc}
+			configs = append(configs, newConfig)
+			locations.Insert(loc)
+		}
+	}
+	return configs
+}
+
+// Backends implements StorageFactory.
+func (s *DefaultStorageFactory) Backends() []Backend {
+	return backends(s.StorageConfig, s.Overrides)
+}
+
 // Backends returns all backends for all registered storage destinations.
 // Used for getting all instances for health validations.
-func (s *DefaultStorageFactory) Backends() []Backend {
-	servers := sets.NewString(s.StorageConfig.Transport.ServerList...)
+// Deprecated: Validate health by passing storagebackend.Config directly to storagefactory.CreateProber.
+func Backends(storageConfig storagebackend.Config) []Backend {
+	return backends(storageConfig, nil)
+}
 
-	for _, overrides := range s.Overrides {
+func backends(storageConfig storagebackend.Config, grOverrides map[schema.GroupResource]groupResourceOverrides) []Backend {
+	servers := sets.NewString(storageConfig.Transport.ServerList...)
+
+	for _, overrides := range grOverrides {
 		servers.Insert(overrides.etcdLocation...)
 	}
 
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: true,
 	}
-	if len(s.StorageConfig.Transport.CertFile) > 0 && len(s.StorageConfig.Transport.KeyFile) > 0 {
-		cert, err := tls.LoadX509KeyPair(s.StorageConfig.Transport.CertFile, s.StorageConfig.Transport.KeyFile)
+	if len(storageConfig.Transport.CertFile) > 0 && len(storageConfig.Transport.KeyFile) > 0 {
+		cert, err := tls.LoadX509KeyPair(storageConfig.Transport.CertFile, storageConfig.Transport.KeyFile)
 		if err != nil {
 			klog.Errorf("failed to load key pair while getting backends: %s", err)
 		} else {
 			tlsConfig.Certificates = []tls.Certificate{cert}
 		}
 	}
-	if len(s.StorageConfig.Transport.TrustedCAFile) > 0 {
-		if caCert, err := ioutil.ReadFile(s.StorageConfig.Transport.TrustedCAFile); err != nil {
+	if len(storageConfig.Transport.TrustedCAFile) > 0 {
+		if caCert, err := ioutil.ReadFile(storageConfig.Transport.TrustedCAFile); err != nil {
 			klog.Errorf("failed to read ca file while getting backends: %s", err)
 		} else {
 			caPool := x509.NewCertPool()
