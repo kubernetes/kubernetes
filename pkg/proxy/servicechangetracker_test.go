@@ -573,7 +573,7 @@ func TestServiceToServiceMap(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)()
-			svcTracker := NewServiceChangeTracker(nil, tc.ipFamily, nil, nil)
+			svcTracker := NewServiceChangeTracker(NewBaseServicePortInfo, tc.ipFamily, nil, nil)
 			// outputs
 			newServices := svcTracker.serviceToServiceMap(tc.service)
 
@@ -581,7 +581,7 @@ func TestServiceToServiceMap(t *testing.T) {
 				t.Fatalf("expected %d new, got %d: %v", len(tc.expected), len(newServices), dump.Pretty(newServices))
 			}
 			for svcKey, expectedInfo := range tc.expected {
-				svcInfo, exists := newServices[svcKey].(*BaseServicePortInfo)
+				svcInfo, exists := newServices[svcKey]
 				if !exists {
 					t.Fatalf("[%s] expected to find key %s", tc.desc, svcKey)
 				}
@@ -596,7 +596,7 @@ func TestServiceToServiceMap(t *testing.T) {
 					t.Errorf("[%s] expected new[%v]to be %v, got %v", tc.desc, svcKey, expectedInfo, *svcInfo)
 				}
 				for svcKey, expectedInfo := range tc.expected {
-					svcInfo, _ := newServices[svcKey].(*BaseServicePortInfo)
+					svcInfo := newServices[svcKey]
 					if !svcInfo.clusterIP.Equal(expectedInfo.clusterIP) ||
 						svcInfo.port != expectedInfo.port ||
 						svcInfo.protocol != expectedInfo.protocol ||
@@ -613,23 +613,23 @@ func TestServiceToServiceMap(t *testing.T) {
 }
 
 type FakeProxier struct {
-	endpointsChanges *EndpointsChangeTracker
-	serviceChanges   *ServiceChangeTracker
-	svcPortMap       ServicePortMap
-	endpointsMap     EndpointsMap
+	endpointsChanges *EndpointsChangeTracker[*BaseEndpointInfo]
+	serviceChanges   *ServiceChangeTracker[*BaseServicePortInfo]
+	svcPortMap       ServicePortMap[*BaseServicePortInfo]
+	endpointsMap     EndpointsMap[*BaseEndpointInfo]
 	hostname         string
 }
 
 func newFakeProxier(ipFamily v1.IPFamily, t time.Time) *FakeProxier {
 	return &FakeProxier{
-		svcPortMap:     make(ServicePortMap),
-		serviceChanges: NewServiceChangeTracker(nil, ipFamily, nil, nil),
-		endpointsMap:   make(EndpointsMap),
-		endpointsChanges: &EndpointsChangeTracker{
+		svcPortMap:     make(ServicePortMap[*BaseServicePortInfo]),
+		serviceChanges: NewServiceChangeTracker(NewBaseServicePortInfo, ipFamily, nil, nil),
+		endpointsMap:   make(EndpointsMap[*BaseEndpointInfo]),
+		endpointsChanges: &EndpointsChangeTracker[*BaseEndpointInfo]{
 			lastChangeTriggerTimes:    make(map[types.NamespacedName][]time.Time),
 			trackerStartTime:          t,
 			processEndpointsMapChange: nil,
-			endpointSliceCache:        NewEndpointSliceCache(testHostname, ipFamily, nil, nil),
+			endpointSliceCache:        NewEndpointSliceCache(testHostname, ipFamily, nil, NewBaseEndpointInfo),
 		},
 	}
 }

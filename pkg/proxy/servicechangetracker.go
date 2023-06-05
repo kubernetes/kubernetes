@@ -31,39 +31,39 @@ import (
 
 // ServiceChangeTracker carries state about uncommitted changes to an arbitrary number of
 // Services, keyed by their namespace and name.
-type ServiceChangeTracker struct {
+type ServiceChangeTracker[S ServicePort] struct {
 	// lock protects items.
 	lock sync.Mutex
 	// items maps a service to its serviceChange.
-	items map[types.NamespacedName]*serviceChange
+	items map[types.NamespacedName]*serviceChange[S]
 
 	// makeServiceInfo allows the proxier to inject customized information when
 	// processing services.
-	makeServiceInfo makeServicePortFunc
+	makeServiceInfo makeServicePortFunc[S]
 	// processServiceMapChange is invoked by the apply function on every change. This
 	// function should not modify the ServicePortMaps, but just use the changes for
 	// any Proxier-specific cleanup.
-	processServiceMapChange processServiceMapChangeFunc
+	processServiceMapChange processServiceMapChangeFunc[S]
 
 	ipFamily v1.IPFamily
 	recorder events.EventRecorder
 }
 
-type makeServicePortFunc func(*v1.ServicePort, *v1.Service, *BaseServicePortInfo) ServicePort
-type processServiceMapChangeFunc func(previous, current ServicePortMap)
+type makeServicePortFunc[S ServicePort] func(*v1.ServicePort, *v1.Service, *BaseServicePortInfo) S
+type processServiceMapChangeFunc[S ServicePort] func(previous, current ServicePortMap[S])
 
 // serviceChange contains all changes to services that happened since proxy rules were synced.  For a single object,
 // changes are accumulated, i.e. previous is state from before applying the changes,
 // current is state after applying all of the changes.
-type serviceChange struct {
-	previous ServicePortMap
-	current  ServicePortMap
+type serviceChange[S ServicePort] struct {
+	previous ServicePortMap[S]
+	current  ServicePortMap[S]
 }
 
 // NewServiceChangeTracker initializes a ServiceChangeTracker
-func NewServiceChangeTracker(makeServiceInfo makeServicePortFunc, ipFamily v1.IPFamily, recorder events.EventRecorder, processServiceMapChange processServiceMapChangeFunc) *ServiceChangeTracker {
-	return &ServiceChangeTracker{
-		items:                   make(map[types.NamespacedName]*serviceChange),
+func NewServiceChangeTracker[S ServicePort](makeServiceInfo makeServicePortFunc[S], ipFamily v1.IPFamily, recorder events.EventRecorder, processServiceMapChange processServiceMapChangeFunc[S]) *ServiceChangeTracker[S] {
+	return &ServiceChangeTracker[S]{
+		items:                   make(map[types.NamespacedName]*serviceChange[S]),
 		makeServiceInfo:         makeServiceInfo,
 		recorder:                recorder,
 		ipFamily:                ipFamily,
@@ -71,12 +71,18 @@ func NewServiceChangeTracker(makeServiceInfo makeServicePortFunc, ipFamily v1.IP
 	}
 }
 
+// NewBaseServicePortInfo can be used as a makeServicePortFunc for backends that do not
+// need to store backend-specific data
+func NewBaseServicePortInfo(_ *v1.ServicePort, _ *v1.Service, svcPort *BaseServicePortInfo) *BaseServicePortInfo {
+	return svcPort
+}
+
 // Update updates the ServiceChangeTracker based on the <previous, current> service pair
 // (where either previous or current, but not both, can be nil). It returns true if sct
 // contains changes that need to be synced (whether or not those changes were caused by
 // this update); note that this is different from the return value of
 // EndpointChangeTracker.EndpointSliceUpdate().
-func (sct *ServiceChangeTracker) Update(previous, current *v1.Service) bool {
+func (sct *ServiceChangeTracker[S]) Update(previous, current *v1.Service) bool {
 	// This is unexpected, we should return false directly.
 	if previous == nil && current == nil {
 		return false
@@ -94,7 +100,7 @@ func (sct *ServiceChangeTracker) Update(previous, current *v1.Service) bool {
 
 	change, exists := sct.items[namespacedName]
 	if !exists {
-		change = &serviceChange{}
+		change = &serviceChange[S]{}
 		change.previous = sct.serviceToServiceMap(previous)
 		sct.items[namespacedName] = change
 	}
@@ -110,7 +116,7 @@ func (sct *ServiceChangeTracker) Update(previous, current *v1.Service) bool {
 }
 
 // ServicePortMap maps a service to its ServicePort.
-type ServicePortMap map[ServicePortName]ServicePort
+type ServicePortMap[S ServicePort] map[ServicePortName]S
 
 // UpdateServiceMapResult is the updated results after applying service changes.
 type UpdateServiceMapResult struct {
@@ -126,7 +132,7 @@ type UpdateServiceMapResult struct {
 
 // HealthCheckNodePorts returns a map of Service names to HealthCheckNodePort values
 // for all Services in sm with non-zero HealthCheckNodePort.
-func (sm ServicePortMap) HealthCheckNodePorts() map[types.NamespacedName]uint16 {
+func (sm ServicePortMap[S]) HealthCheckNodePorts() map[types.NamespacedName]uint16 {
 	// TODO: If this will appear to be computationally expensive, consider
 	// computing this incrementally similarly to svcPortMap.
 	ports := make(map[types.NamespacedName]uint16)
@@ -141,7 +147,7 @@ func (sm ServicePortMap) HealthCheckNodePorts() map[types.NamespacedName]uint16 
 // serviceToServiceMap translates a single Service object to a ServicePortMap.
 //
 // NOTE: service object should NOT be modified.
-func (sct *ServiceChangeTracker) serviceToServiceMap(service *v1.Service) ServicePortMap {
+func (sct *ServiceChangeTracker[S]) serviceToServiceMap(service *v1.Service) ServicePortMap[S] {
 	if service == nil {
 		return nil
 	}
@@ -155,17 +161,13 @@ func (sct *ServiceChangeTracker) serviceToServiceMap(service *v1.Service) Servic
 		return nil
 	}
 
-	svcPortMap := make(ServicePortMap)
+	svcPortMap := make(ServicePortMap[S])
 	svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 	for i := range service.Spec.Ports {
 		servicePort := &service.Spec.Ports[i]
 		svcPortName := ServicePortName{NamespacedName: svcName, Port: servicePort.Name, Protocol: servicePort.Protocol}
 		baseSvcInfo := newBaseServiceInfo(service, sct.ipFamily, servicePort)
-		if sct.makeServiceInfo != nil {
-			svcPortMap[svcPortName] = sct.makeServiceInfo(servicePort, service, baseSvcInfo)
-		} else {
-			svcPortMap[svcPortName] = baseSvcInfo
-		}
+		svcPortMap[svcPortName] = sct.makeServiceInfo(servicePort, service, baseSvcInfo)
 	}
 	return svcPortMap
 }
@@ -173,7 +175,7 @@ func (sct *ServiceChangeTracker) serviceToServiceMap(service *v1.Service) Servic
 // Update updates ServicePortMap base on the given changes, returns information about the
 // diff since the last Update, triggers processServiceMapChange on every change, and
 // clears the changes map.
-func (sm ServicePortMap) Update(sct *ServiceChangeTracker) UpdateServiceMapResult {
+func (sm ServicePortMap[S]) Update(sct *ServiceChangeTracker[S]) UpdateServiceMapResult {
 	sct.lock.Lock()
 	defer sct.lock.Unlock()
 
@@ -195,7 +197,7 @@ func (sm ServicePortMap) Update(sct *ServiceChangeTracker) UpdateServiceMapResul
 		sm.unmerge(change.previous, result.DeletedUDPClusterIPs)
 	}
 	// clear changes after applying them to ServicePortMap.
-	sct.items = make(map[types.NamespacedName]*serviceChange)
+	sct.items = make(map[types.NamespacedName]*serviceChange[S])
 	metrics.ServiceChangesPending.Set(0)
 
 	return result
@@ -204,7 +206,7 @@ func (sm ServicePortMap) Update(sct *ServiceChangeTracker) UpdateServiceMapResul
 // merge adds other ServicePortMap's elements to current ServicePortMap.
 // If collision, other ALWAYS win. Otherwise add the other to current.
 // In other words, if some elements in current collisions with other, update the current by other.
-func (sm *ServicePortMap) merge(other ServicePortMap) {
+func (sm *ServicePortMap[S]) merge(other ServicePortMap[S]) {
 	for svcPortName, info := range other {
 		_, exists := (*sm)[svcPortName]
 		if !exists {
@@ -217,7 +219,7 @@ func (sm *ServicePortMap) merge(other ServicePortMap) {
 }
 
 // filter filters out elements from ServicePortMap base on given ports string sets.
-func (sm *ServicePortMap) filter(other ServicePortMap) {
+func (sm *ServicePortMap[S]) filter(other ServicePortMap[S]) {
 	for svcPortName := range *sm {
 		// skip the delete for Update event.
 		if _, ok := other[svcPortName]; ok {
@@ -228,7 +230,7 @@ func (sm *ServicePortMap) filter(other ServicePortMap) {
 
 // unmerge deletes all other ServicePortMap's elements from current ServicePortMap and
 // updates deletedUDPClusterIPs with all of the newly-deleted UDP cluster IPs.
-func (sm *ServicePortMap) unmerge(other ServicePortMap, deletedUDPClusterIPs sets.Set[string]) {
+func (sm *ServicePortMap[S]) unmerge(other ServicePortMap[S], deletedUDPClusterIPs sets.Set[string]) {
 	for svcPortName := range other {
 		info, exists := (*sm)[svcPortName]
 		if exists {

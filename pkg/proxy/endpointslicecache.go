@@ -36,7 +36,7 @@ import (
 )
 
 // EndpointSliceCache is used as a cache of EndpointSlice information.
-type EndpointSliceCache struct {
+type EndpointSliceCache[E Endpoint] struct {
 	// lock protects trackerByServiceMap.
 	lock sync.Mutex
 
@@ -48,7 +48,7 @@ type EndpointSliceCache struct {
 	// the cache when they may have just moved to a different slice.
 	trackerByServiceMap map[types.NamespacedName]*endpointSliceTracker
 
-	makeEndpointInfo makeEndpointFunc
+	makeEndpointInfo makeEndpointFunc[E]
 	hostname         string
 	ipFamily         v1.IPFamily
 	recorder         events.EventRecorder
@@ -89,11 +89,8 @@ type endpointData struct {
 }
 
 // NewEndpointSliceCache initializes an EndpointSliceCache.
-func NewEndpointSliceCache(hostname string, ipFamily v1.IPFamily, recorder events.EventRecorder, makeEndpointInfo makeEndpointFunc) *EndpointSliceCache {
-	if makeEndpointInfo == nil {
-		makeEndpointInfo = standardEndpointInfo
-	}
-	return &EndpointSliceCache{
+func NewEndpointSliceCache[E Endpoint](hostname string, ipFamily v1.IPFamily, recorder events.EventRecorder, makeEndpointInfo makeEndpointFunc[E]) *EndpointSliceCache[E] {
+	return &EndpointSliceCache[E]{
 		trackerByServiceMap: map[types.NamespacedName]*endpointSliceTracker{},
 		hostname:            hostname,
 		ipFamily:            ipFamily,
@@ -153,13 +150,8 @@ func newEndpointSliceData(endpointSlice *discovery.EndpointSlice, remove bool) *
 	return esData
 }
 
-// standardEndpointInfo is the default makeEndpointFunc.
-func standardEndpointInfo(ep *BaseEndpointInfo, _ *ServicePortName) Endpoint {
-	return ep
-}
-
 // updatePending updates a pending slice in the cache.
-func (cache *EndpointSliceCache) updatePending(endpointSlice *discovery.EndpointSlice, remove bool) bool {
+func (cache *EndpointSliceCache[E]) updatePending(endpointSlice *discovery.EndpointSlice, remove bool) bool {
 	serviceKey, sliceKey, err := endpointSliceCacheKeys(endpointSlice)
 	if err != nil {
 		klog.ErrorS(err, "Error getting endpoint slice cache keys")
@@ -186,8 +178,8 @@ func (cache *EndpointSliceCache) updatePending(endpointSlice *discovery.Endpoint
 
 // checkoutChanges returns a map of all endpointsChanges that are
 // pending and then marks them as applied.
-func (cache *EndpointSliceCache) checkoutChanges() map[types.NamespacedName]*endpointsChange {
-	changes := make(map[types.NamespacedName]*endpointsChange)
+func (cache *EndpointSliceCache[E]) checkoutChanges() map[types.NamespacedName]*endpointsChange[E] {
+	changes := make(map[types.NamespacedName]*endpointsChange[E])
 
 	cache.lock.Lock()
 	defer cache.lock.Unlock()
@@ -197,7 +189,7 @@ func (cache *EndpointSliceCache) checkoutChanges() map[types.NamespacedName]*end
 			continue
 		}
 
-		change := &endpointsChange{}
+		change := &endpointsChange[E]{}
 
 		change.previous = cache.getEndpointsMap(serviceNN, esTracker.applied)
 
@@ -220,17 +212,17 @@ func (cache *EndpointSliceCache) checkoutChanges() map[types.NamespacedName]*end
 
 // spToEndpointMap stores groups Endpoint objects by ServicePortName and
 // endpoint string (returned by Endpoint.String()).
-type spToEndpointMap map[ServicePortName]map[string]Endpoint
+type spToEndpointMap[E Endpoint] map[ServicePortName]map[string]E
 
 // getEndpointsMap computes an EndpointsMap for a given set of EndpointSlices.
-func (cache *EndpointSliceCache) getEndpointsMap(serviceNN types.NamespacedName, sliceDataByName endpointSliceDataByName) EndpointsMap {
+func (cache *EndpointSliceCache[E]) getEndpointsMap(serviceNN types.NamespacedName, sliceDataByName endpointSliceDataByName) EndpointsMap[E] {
 	endpointInfoBySP := cache.endpointInfoByServicePort(serviceNN, sliceDataByName)
 	return endpointsMapFromEndpointInfo(endpointInfoBySP)
 }
 
 // endpointInfoByServicePort groups endpoint info by service port name and address.
-func (cache *EndpointSliceCache) endpointInfoByServicePort(serviceNN types.NamespacedName, sliceDataByName endpointSliceDataByName) spToEndpointMap {
-	endpointInfoBySP := spToEndpointMap{}
+func (cache *EndpointSliceCache[E]) endpointInfoByServicePort(serviceNN types.NamespacedName, sliceDataByName endpointSliceDataByName) spToEndpointMap[E] {
+	endpointInfoBySP := spToEndpointMap[E]{}
 
 	for _, sliceData := range sliceDataByName {
 		for _, port := range sliceData.Ports {
@@ -258,9 +250,9 @@ func (cache *EndpointSliceCache) endpointInfoByServicePort(serviceNN types.Names
 }
 
 // addEndpoints adds endpointInfo for each unique endpoint.
-func (cache *EndpointSliceCache) addEndpoints(svcPortName *ServicePortName, portNum int, endpointSet map[string]Endpoint, endpoints []*endpointData) map[string]Endpoint {
+func (cache *EndpointSliceCache[E]) addEndpoints(svcPortName *ServicePortName, portNum int, endpointSet map[string]E, endpoints []*endpointData) map[string]E {
 	if endpointSet == nil {
-		endpointSet = map[string]Endpoint{}
+		endpointSet = map[string]E{}
 	}
 
 	// iterate through endpoints to add them to endpointSet.
@@ -295,13 +287,13 @@ func (cache *EndpointSliceCache) addEndpoints(svcPortName *ServicePortName, port
 	return endpointSet
 }
 
-func (cache *EndpointSliceCache) isLocal(hostname string) bool {
+func (cache *EndpointSliceCache[E]) isLocal(hostname string) bool {
 	return len(cache.hostname) > 0 && hostname == cache.hostname
 }
 
 // esDataChanged returns true if the esData parameter should be set as a new
 // pending value in the cache.
-func (cache *EndpointSliceCache) esDataChanged(serviceKey types.NamespacedName, sliceKey string, esData *endpointSliceData) bool {
+func (cache *EndpointSliceCache[E]) esDataChanged(serviceKey types.NamespacedName, sliceKey string, esData *endpointSliceData) bool {
 	if _, ok := cache.trackerByServiceMap[serviceKey]; ok {
 		appliedData, appliedOk := cache.trackerByServiceMap[serviceKey].applied[sliceKey]
 		pendingData, pendingOk := cache.trackerByServiceMap[serviceKey].pending[sliceKey]
@@ -331,19 +323,19 @@ func (cache *EndpointSliceCache) esDataChanged(serviceKey types.NamespacedName, 
 
 // endpointsMapFromEndpointInfo computes an endpointsMap from endpointInfo that
 // has been grouped by service port and IP.
-func endpointsMapFromEndpointInfo(endpointInfoBySP map[ServicePortName]map[string]Endpoint) EndpointsMap {
-	endpointsMap := EndpointsMap{}
+func endpointsMapFromEndpointInfo[E Endpoint](endpointInfoBySP map[ServicePortName]map[string]E) EndpointsMap[E] {
+	endpointsMap := EndpointsMap[E]{}
 
 	// transform endpointInfoByServicePort into an endpointsMap with sorted IPs.
 	for svcPortName, endpointSet := range endpointInfoBySP {
 		if len(endpointSet) > 0 {
-			endpointsMap[svcPortName] = []Endpoint{}
+			endpointsMap[svcPortName] = []E{}
 			for _, endpointInfo := range endpointSet {
 				endpointsMap[svcPortName] = append(endpointsMap[svcPortName], endpointInfo)
 
 			}
 			// Ensure endpoints are always returned in the same order to simplify diffing.
-			sort.Sort(byEndpoint(endpointsMap[svcPortName]))
+			sort.Sort(byEndpoint[E](endpointsMap[svcPortName]))
 
 			klog.V(3).InfoS("Setting endpoints for service port name", "portName", svcPortName, "endpoints", formatEndpointsList(endpointsMap[svcPortName]))
 		}
@@ -353,7 +345,7 @@ func endpointsMapFromEndpointInfo(endpointInfoBySP map[ServicePortName]map[strin
 }
 
 // formatEndpointsList returns a string list converted from an endpoints list.
-func formatEndpointsList(endpoints []Endpoint) []string {
+func formatEndpointsList[E Endpoint](endpoints []E) []string {
 	var formattedList []string
 	for _, ep := range endpoints {
 		formattedList = append(formattedList, ep.String())
@@ -387,15 +379,15 @@ func (e byAddress) Less(i, j int) bool {
 }
 
 // byEndpoint helps sort endpoints by endpoint string.
-type byEndpoint []Endpoint
+type byEndpoint[E Endpoint] []E
 
-func (e byEndpoint) Len() int {
+func (e byEndpoint[E]) Len() int {
 	return len(e)
 }
-func (e byEndpoint) Swap(i, j int) {
+func (e byEndpoint[E]) Swap(i, j int) {
 	e[i], e[j] = e[j], e[i]
 }
-func (e byEndpoint) Less(i, j int) bool {
+func (e byEndpoint[E]) Less(i, j int) bool {
 	return e[i].String() < e[j].String()
 }
 

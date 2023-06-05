@@ -204,7 +204,7 @@ func TestEndpointsMapFromESC(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			esCache := NewEndpointSliceCache(tc.hostname, v1.IPv4Protocol, nil, nil)
+			esCache := NewEndpointSliceCache(tc.hostname, v1.IPv4Protocol, nil, NewBaseEndpointInfo)
 
 			cmc := newCacheMutationCheck(tc.endpointSlices)
 			for _, endpointSlice := range tc.endpointSlices {
@@ -222,7 +222,7 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 		namespacedName types.NamespacedName
 		endpointSlices []*discovery.EndpointSlice
 		hostname       string
-		expectedMap    spToEndpointMap
+		expectedMap    spToEndpointMap[*BaseEndpointInfo]
 	}{
 		"simple use case with 3 endpoints": {
 			namespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"},
@@ -230,7 +230,7 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 			endpointSlices: []*discovery.EndpointSlice{
 				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](80)}),
 			},
-			expectedMap: spToEndpointMap{
+			expectedMap: spToEndpointMap[*BaseEndpointInfo]{
 				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
 					"10.0.1.1:80": &BaseEndpointInfo{
 						ip:          "10.0.1.1",
@@ -269,7 +269,7 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 				generateEndpointSliceWithOffset("svc1", "ns1", 1, 1, 2, 999, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](80)}),
 				generateEndpointSliceWithOffset("svc1", "ns1", 2, 1, 2, 999, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](8080)}),
 			},
-			expectedMap: spToEndpointMap{
+			expectedMap: spToEndpointMap[*BaseEndpointInfo]{
 				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
 					"10.0.1.1:80": &BaseEndpointInfo{
 						ip:          "10.0.1.1",
@@ -314,7 +314,7 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			esCache := NewEndpointSliceCache(tc.hostname, v1.IPv4Protocol, nil, nil)
+			esCache := NewEndpointSliceCache(tc.hostname, v1.IPv4Protocol, nil, NewBaseEndpointInfo)
 
 			for _, endpointSlice := range tc.endpointSlices {
 				esCache.updatePending(endpointSlice, false)
@@ -343,13 +343,13 @@ func TestEsDataChanged(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		cache         *EndpointSliceCache
+		cache         *EndpointSliceCache[*BaseEndpointInfo]
 		initialSlice  *discovery.EndpointSlice
 		updatedSlice  *discovery.EndpointSlice
 		expectChanged bool
 	}{
 		"identical slices, ports only": {
-			cache: NewEndpointSliceCache("", v1.IPv4Protocol, nil, nil),
+			cache: NewEndpointSliceCache("", v1.IPv4Protocol, nil, NewBaseEndpointInfo),
 			initialSlice: &discovery.EndpointSlice{
 				ObjectMeta: objMeta,
 				Ports:      []discovery.EndpointPort{port80},
@@ -361,7 +361,7 @@ func TestEsDataChanged(t *testing.T) {
 			expectChanged: false,
 		},
 		"identical slices, ports out of order": {
-			cache: NewEndpointSliceCache("", v1.IPv4Protocol, nil, nil),
+			cache: NewEndpointSliceCache("", v1.IPv4Protocol, nil, NewBaseEndpointInfo),
 			initialSlice: &discovery.EndpointSlice{
 				ObjectMeta: objMeta,
 				Ports:      []discovery.EndpointPort{port443, port80},
@@ -373,7 +373,7 @@ func TestEsDataChanged(t *testing.T) {
 			expectChanged: false,
 		},
 		"port removed": {
-			cache: NewEndpointSliceCache("", v1.IPv4Protocol, nil, nil),
+			cache: NewEndpointSliceCache("", v1.IPv4Protocol, nil, NewBaseEndpointInfo),
 			initialSlice: &discovery.EndpointSlice{
 				ObjectMeta: objMeta,
 				Ports:      []discovery.EndpointPort{port443, port80},
@@ -385,7 +385,7 @@ func TestEsDataChanged(t *testing.T) {
 			expectChanged: true,
 		},
 		"port added": {
-			cache: NewEndpointSliceCache("", v1.IPv4Protocol, nil, nil),
+			cache: NewEndpointSliceCache("", v1.IPv4Protocol, nil, NewBaseEndpointInfo),
 			initialSlice: &discovery.EndpointSlice{
 				ObjectMeta: objMeta,
 				Ports:      []discovery.EndpointPort{port443},
@@ -397,7 +397,7 @@ func TestEsDataChanged(t *testing.T) {
 			expectChanged: true,
 		},
 		"identical with endpoints": {
-			cache: NewEndpointSliceCache("", v1.IPv4Protocol, nil, nil),
+			cache: NewEndpointSliceCache("", v1.IPv4Protocol, nil, NewBaseEndpointInfo),
 			initialSlice: &discovery.EndpointSlice{
 				ObjectMeta: objMeta,
 				Ports:      []discovery.EndpointPort{port443},
@@ -411,7 +411,7 @@ func TestEsDataChanged(t *testing.T) {
 			expectChanged: false,
 		},
 		"identical with endpoints out of order": {
-			cache: NewEndpointSliceCache("", v1.IPv4Protocol, nil, nil),
+			cache: NewEndpointSliceCache("", v1.IPv4Protocol, nil, NewBaseEndpointInfo),
 			initialSlice: &discovery.EndpointSlice{
 				ObjectMeta: objMeta,
 				Ports:      []discovery.EndpointPort{port443},
@@ -425,7 +425,7 @@ func TestEsDataChanged(t *testing.T) {
 			expectChanged: false,
 		},
 		"identical with endpoint added": {
-			cache: NewEndpointSliceCache("", v1.IPv4Protocol, nil, nil),
+			cache: NewEndpointSliceCache("", v1.IPv4Protocol, nil, NewBaseEndpointInfo),
 			initialSlice: &discovery.EndpointSlice{
 				ObjectMeta: objMeta,
 				Ports:      []discovery.EndpointPort{port443},

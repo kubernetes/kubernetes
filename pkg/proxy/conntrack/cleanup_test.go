@@ -50,7 +50,7 @@ func TestCleanStaleEntries(t *testing.T) {
 	// provide our own implementation of that interface, or else use a
 	// proxy.ServiceChangeTracker to construct them and fill in the map for us.
 
-	sct := proxy.NewServiceChangeTracker(nil, v1.IPv4Protocol, nil, nil)
+	sct := proxy.NewServiceChangeTracker(proxy.NewBaseServicePortInfo, v1.IPv4Protocol, nil, nil)
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "cleanup-test",
@@ -83,7 +83,7 @@ func TestCleanStaleEntries(t *testing.T) {
 	}
 	sct.Update(nil, svc)
 
-	svcPortMap := make(proxy.ServicePortMap)
+	svcPortMap := make(proxy.ServicePortMap[*proxy.BaseServicePortInfo])
 	_ = svcPortMap.Update(sct)
 
 	// (At this point we are done with sct, and in particular, we don't use sct to

@@ -113,9 +113,9 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 	networkInterfacer.AddInterfaceAddr(&itf1, addrs1)
 
 	p := &Proxier{
-		svcPortMap:               make(proxy.ServicePortMap),
+		svcPortMap:               make(proxy.ServicePortMap[*servicePortInfo]),
 		serviceChanges:           proxy.NewServiceChangeTracker(newServiceInfo, ipfamily, nil, nil),
-		endpointsMap:             make(proxy.EndpointsMap),
+		endpointsMap:             make(proxy.EndpointsMap[*endpointInfo]),
 		endpointsChanges:         proxy.NewEndpointsChangeTracker(testHostname, newEndpointInfo, ipfamily, nil, nil),
 		needFullSync:             true,
 		iptables:                 ipt,
@@ -3179,7 +3179,7 @@ type endpointExpectation struct {
 	isLocal  bool
 }
 
-func checkEndpointExpectations(t *testing.T, tci int, newMap proxy.EndpointsMap, expected map[proxy.ServicePortName][]endpointExpectation) {
+func checkEndpointExpectations(t *testing.T, tci int, newMap proxy.EndpointsMap[*endpointInfo], expected map[proxy.ServicePortName][]endpointExpectation) {
 	if len(newMap) != len(expected) {
 		t.Errorf("[%d] expected %d results, got %d: %v", tci, len(expected), len(newMap), newMap)
 	}

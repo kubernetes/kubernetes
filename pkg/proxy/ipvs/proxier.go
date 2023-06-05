@@ -170,12 +170,12 @@ type Proxier struct {
 	// services that happened since last syncProxyRules call. For a single object,
 	// changes are accumulated, i.e. previous is state from before all of them,
 	// current is state after applying all of those.
-	endpointsChanges *proxy.EndpointsChangeTracker
-	serviceChanges   *proxy.ServiceChangeTracker
+	endpointsChanges *proxy.EndpointsChangeTracker[*proxy.BaseEndpointInfo]
+	serviceChanges   *proxy.ServiceChangeTracker[*servicePortInfo]
 
 	mu           sync.Mutex // protects the following fields
-	svcPortMap   proxy.ServicePortMap
-	endpointsMap proxy.EndpointsMap
+	svcPortMap   proxy.ServicePortMap[*servicePortInfo]
+	endpointsMap proxy.EndpointsMap[*proxy.BaseEndpointInfo]
 	nodeLabels   map[string]string
 	// initialSync is a bool indicating if the proxier is syncing for the first time.
 	// It is set to true when a new proxier is initialized and then set to false on all
@@ -368,10 +368,10 @@ func NewProxier(ipFamily v1.IPFamily,
 
 	proxier := &Proxier{
 		ipFamily:              ipFamily,
-		svcPortMap:            make(proxy.ServicePortMap),
+		svcPortMap:            make(proxy.ServicePortMap[*servicePortInfo]),
 		serviceChanges:        proxy.NewServiceChangeTracker(newServiceInfo, ipFamily, recorder, nil),
-		endpointsMap:          make(proxy.EndpointsMap),
-		endpointsChanges:      proxy.NewEndpointsChangeTracker(hostname, nil, ipFamily, recorder, nil),
+		endpointsMap:          make(proxy.EndpointsMap[*proxy.BaseEndpointInfo]),
+		endpointsChanges:      proxy.NewEndpointsChangeTracker(hostname, proxy.NewBaseEndpointInfo, ipFamily, recorder, nil),
 		initialSync:           true,
 		syncPeriod:            syncPeriod,
 		minSyncPeriod:         minSyncPeriod,
@@ -536,7 +536,7 @@ type servicePortInfo struct {
 }
 
 // returns a new proxy.ServicePort which abstracts a serviceInfo
-func newServiceInfo(port *v1.ServicePort, service *v1.Service, bsvcPortInfo *proxy.BaseServicePortInfo) proxy.ServicePort {
+func newServiceInfo(port *v1.ServicePort, service *v1.Service, bsvcPortInfo *proxy.BaseServicePortInfo) *servicePortInfo {
 	svcPort := &servicePortInfo{BaseServicePortInfo: bsvcPortInfo}
 
 	// Store the following for performance reasons.
@@ -978,9 +978,8 @@ func (proxier *Proxier) syncProxyRules() {
 	}
 
 	hasNodePort := false
-	for _, svc := range proxier.svcPortMap {
-		svcInfo, ok := svc.(*servicePortInfo)
-		if ok && svcInfo.NodePort() != 0 {
+	for _, svcInfo := range proxier.svcPortMap {
+		if svcInfo.NodePort() != 0 {
 			hasNodePort = true
 			break
 		}
@@ -1009,25 +1008,14 @@ func (proxier *Proxier) syncProxyRules() {
 	}
 
 	// Build IPVS rules for each service.
-	for svcPortName, svcPort := range proxier.svcPortMap {
-		svcInfo, ok := svcPort.(*servicePortInfo)
-		if !ok {
-			klog.ErrorS(nil, "Failed to cast serviceInfo", "servicePortName", svcPortName)
-			continue
-		}
-
+	for svcPortName, svcInfo := range proxier.svcPortMap {
 		protocol := strings.ToLower(string(svcInfo.Protocol()))
 		// Precompute svcNameString; with many services the many calls
 		// to ServicePortName.String() show up in CPU profiles.
 		svcPortNameString := svcPortName.String()
 
 		// Handle traffic that loops back to the originator with SNAT.
-		for _, e := range proxier.endpointsMap[svcPortName] {
-			ep, ok := e.(*proxy.BaseEndpointInfo)
-			if !ok {
-				klog.ErrorS(nil, "Failed to cast BaseEndpointInfo", "endpoint", e)
-				continue
-			}
+		for _, ep := range proxier.endpointsMap[svcPortName] {
 			if !ep.IsLocal() {
 				continue
 			}
