@@ -132,12 +132,18 @@ func (c *FakeComponentStatuses) Apply(ctx context.Context, componentStatus *core
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := componentStatus.Name
 	if name == nil {
 		return nil, fmt.Errorf("componentStatus.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(componentstatusesResource, *name, types.ApplyPatchType, data), &v1.ComponentStatus{})
+		Invokes(testing.NewRootApplySubresourceAction(componentstatusesResource, *name, data, manager, opts.Force), &v1.ComponentStatus{})
 	if obj == nil {
 		return nil, err
 	}

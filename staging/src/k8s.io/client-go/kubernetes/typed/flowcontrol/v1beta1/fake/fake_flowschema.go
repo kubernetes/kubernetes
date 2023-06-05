@@ -143,12 +143,18 @@ func (c *FakeFlowSchemas) Apply(ctx context.Context, flowSchema *flowcontrolv1be
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := flowSchema.Name
 	if name == nil {
 		return nil, fmt.Errorf("flowSchema.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(flowschemasResource, *name, types.ApplyPatchType, data), &v1beta1.FlowSchema{})
+		Invokes(testing.NewRootApplySubresourceAction(flowschemasResource, *name, data, manager, opts.Force), &v1beta1.FlowSchema{})
 	if obj == nil {
 		return nil, err
 	}
@@ -165,12 +171,18 @@ func (c *FakeFlowSchemas) ApplyStatus(ctx context.Context, flowSchema *flowcontr
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := flowSchema.Name
 	if name == nil {
 		return nil, fmt.Errorf("flowSchema.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(flowschemasResource, *name, types.ApplyPatchType, data, "status"), &v1beta1.FlowSchema{})
+		Invokes(testing.NewRootApplySubresourceAction(flowschemasResource, *name, data, manager, opts.Force, "status"), &v1beta1.FlowSchema{})
 	if obj == nil {
 		return nil, err
 	}

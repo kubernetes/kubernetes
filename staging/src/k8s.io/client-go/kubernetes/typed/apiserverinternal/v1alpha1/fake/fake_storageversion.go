@@ -143,12 +143,18 @@ func (c *FakeStorageVersions) Apply(ctx context.Context, storageVersion *apiserv
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := storageVersion.Name
 	if name == nil {
 		return nil, fmt.Errorf("storageVersion.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(storageversionsResource, *name, types.ApplyPatchType, data), &v1alpha1.StorageVersion{})
+		Invokes(testing.NewRootApplySubresourceAction(storageversionsResource, *name, data, manager, opts.Force), &v1alpha1.StorageVersion{})
 	if obj == nil {
 		return nil, err
 	}
@@ -165,12 +171,18 @@ func (c *FakeStorageVersions) ApplyStatus(ctx context.Context, storageVersion *a
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := storageVersion.Name
 	if name == nil {
 		return nil, fmt.Errorf("storageVersion.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(storageversionsResource, *name, types.ApplyPatchType, data, "status"), &v1alpha1.StorageVersion{})
+		Invokes(testing.NewRootApplySubresourceAction(storageversionsResource, *name, data, manager, opts.Force, "status"), &v1alpha1.StorageVersion{})
 	if obj == nil {
 		return nil, err
 	}

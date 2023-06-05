@@ -135,12 +135,18 @@ func (c *FakeNamespaces) Apply(ctx context.Context, namespace *corev1.NamespaceA
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := namespace.Name
 	if name == nil {
 		return nil, fmt.Errorf("namespace.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(namespacesResource, *name, types.ApplyPatchType, data), &v1.Namespace{})
+		Invokes(testing.NewRootApplySubresourceAction(namespacesResource, *name, data, manager, opts.Force), &v1.Namespace{})
 	if obj == nil {
 		return nil, err
 	}
@@ -157,12 +163,18 @@ func (c *FakeNamespaces) ApplyStatus(ctx context.Context, namespace *corev1.Name
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := namespace.Name
 	if name == nil {
 		return nil, fmt.Errorf("namespace.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(namespacesResource, *name, types.ApplyPatchType, data, "status"), &v1.Namespace{})
+		Invokes(testing.NewRootApplySubresourceAction(namespacesResource, *name, data, manager, opts.Force, "status"), &v1.Namespace{})
 	if obj == nil {
 		return nil, err
 	}

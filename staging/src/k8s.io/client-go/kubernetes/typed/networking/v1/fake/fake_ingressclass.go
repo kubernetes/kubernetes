@@ -132,12 +132,18 @@ func (c *FakeIngressClasses) Apply(ctx context.Context, ingressClass *networking
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := ingressClass.Name
 	if name == nil {
 		return nil, fmt.Errorf("ingressClass.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(ingressclassesResource, *name, types.ApplyPatchType, data), &v1.IngressClass{})
+		Invokes(testing.NewRootApplySubresourceAction(ingressclassesResource, *name, data, manager, opts.Force), &v1.IngressClass{})
 	if obj == nil {
 		return nil, err
 	}

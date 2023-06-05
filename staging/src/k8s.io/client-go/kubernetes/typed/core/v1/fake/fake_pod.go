@@ -152,12 +152,18 @@ func (c *FakePods) Apply(ctx context.Context, pod *corev1.PodApplyConfiguration,
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := pod.Name
 	if name == nil {
 		return nil, fmt.Errorf("pod.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(podsResource, c.ns, *name, types.ApplyPatchType, data), &v1.Pod{})
+		Invokes(testing.NewApplySubresourceAction(podsResource, c.ns, *name, data, manager, opts.Force), &v1.Pod{})
 
 	if obj == nil {
 		return nil, err
@@ -175,12 +181,18 @@ func (c *FakePods) ApplyStatus(ctx context.Context, pod *corev1.PodApplyConfigur
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := pod.Name
 	if name == nil {
 		return nil, fmt.Errorf("pod.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(podsResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1.Pod{})
+		Invokes(testing.NewApplySubresourceAction(podsResource, c.ns, *name, data, manager, opts.Force, "status"), &v1.Pod{})
 
 	if obj == nil {
 		return nil, err

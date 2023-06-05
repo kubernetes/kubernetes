@@ -152,12 +152,18 @@ func (c *FakeReplicaSets) Apply(ctx context.Context, replicaSet *appsv1beta2.Rep
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := replicaSet.Name
 	if name == nil {
 		return nil, fmt.Errorf("replicaSet.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(replicasetsResource, c.ns, *name, types.ApplyPatchType, data), &v1beta2.ReplicaSet{})
+		Invokes(testing.NewApplySubresourceAction(replicasetsResource, c.ns, *name, data, manager, opts.Force), &v1beta2.ReplicaSet{})
 
 	if obj == nil {
 		return nil, err
@@ -175,12 +181,18 @@ func (c *FakeReplicaSets) ApplyStatus(ctx context.Context, replicaSet *appsv1bet
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := replicaSet.Name
 	if name == nil {
 		return nil, fmt.Errorf("replicaSet.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(replicasetsResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1beta2.ReplicaSet{})
+		Invokes(testing.NewApplySubresourceAction(replicasetsResource, c.ns, *name, data, manager, opts.Force, "status"), &v1beta2.ReplicaSet{})
 
 	if obj == nil {
 		return nil, err

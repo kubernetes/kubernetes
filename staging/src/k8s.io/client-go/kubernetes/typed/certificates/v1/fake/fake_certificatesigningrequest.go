@@ -143,12 +143,18 @@ func (c *FakeCertificateSigningRequests) Apply(ctx context.Context, certificateS
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := certificateSigningRequest.Name
 	if name == nil {
 		return nil, fmt.Errorf("certificateSigningRequest.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(certificatesigningrequestsResource, *name, types.ApplyPatchType, data), &v1.CertificateSigningRequest{})
+		Invokes(testing.NewRootApplySubresourceAction(certificatesigningrequestsResource, *name, data, manager, opts.Force), &v1.CertificateSigningRequest{})
 	if obj == nil {
 		return nil, err
 	}
@@ -165,12 +171,18 @@ func (c *FakeCertificateSigningRequests) ApplyStatus(ctx context.Context, certif
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := certificateSigningRequest.Name
 	if name == nil {
 		return nil, fmt.Errorf("certificateSigningRequest.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(certificatesigningrequestsResource, *name, types.ApplyPatchType, data, "status"), &v1.CertificateSigningRequest{})
+		Invokes(testing.NewRootApplySubresourceAction(certificatesigningrequestsResource, *name, data, manager, opts.Force, "status"), &v1.CertificateSigningRequest{})
 	if obj == nil {
 		return nil, err
 	}

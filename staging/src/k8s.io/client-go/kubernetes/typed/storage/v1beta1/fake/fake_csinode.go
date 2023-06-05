@@ -132,12 +132,18 @@ func (c *FakeCSINodes) Apply(ctx context.Context, cSINode *storagev1beta1.CSINod
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := cSINode.Name
 	if name == nil {
 		return nil, fmt.Errorf("cSINode.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(csinodesResource, *name, types.ApplyPatchType, data), &v1beta1.CSINode{})
+		Invokes(testing.NewRootApplySubresourceAction(csinodesResource, *name, data, manager, opts.Force), &v1beta1.CSINode{})
 	if obj == nil {
 		return nil, err
 	}

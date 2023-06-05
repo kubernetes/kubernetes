@@ -132,12 +132,18 @@ func (c *FakeClusterRoles) Apply(ctx context.Context, clusterRole *rbacv1alpha1.
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := clusterRole.Name
 	if name == nil {
 		return nil, fmt.Errorf("clusterRole.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(clusterrolesResource, *name, types.ApplyPatchType, data), &v1alpha1.ClusterRole{})
+		Invokes(testing.NewRootApplySubresourceAction(clusterrolesResource, *name, data, manager, opts.Force), &v1alpha1.ClusterRole{})
 	if obj == nil {
 		return nil, err
 	}

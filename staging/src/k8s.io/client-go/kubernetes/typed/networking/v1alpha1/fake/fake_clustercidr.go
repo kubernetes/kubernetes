@@ -132,12 +132,18 @@ func (c *FakeClusterCIDRs) Apply(ctx context.Context, clusterCIDR *networkingv1a
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := clusterCIDR.Name
 	if name == nil {
 		return nil, fmt.Errorf("clusterCIDR.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(clustercidrsResource, *name, types.ApplyPatchType, data), &v1alpha1.ClusterCIDR{})
+		Invokes(testing.NewRootApplySubresourceAction(clustercidrsResource, *name, data, manager, opts.Force), &v1alpha1.ClusterCIDR{})
 	if obj == nil {
 		return nil, err
 	}

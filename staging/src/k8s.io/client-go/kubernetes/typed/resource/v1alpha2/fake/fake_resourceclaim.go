@@ -152,12 +152,18 @@ func (c *FakeResourceClaims) Apply(ctx context.Context, resourceClaim *resourcev
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := resourceClaim.Name
 	if name == nil {
 		return nil, fmt.Errorf("resourceClaim.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(resourceclaimsResource, c.ns, *name, types.ApplyPatchType, data), &v1alpha2.ResourceClaim{})
+		Invokes(testing.NewApplySubresourceAction(resourceclaimsResource, c.ns, *name, data, manager, opts.Force), &v1alpha2.ResourceClaim{})
 
 	if obj == nil {
 		return nil, err
@@ -175,12 +181,18 @@ func (c *FakeResourceClaims) ApplyStatus(ctx context.Context, resourceClaim *res
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := resourceClaim.Name
 	if name == nil {
 		return nil, fmt.Errorf("resourceClaim.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(resourceclaimsResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1alpha2.ResourceClaim{})
+		Invokes(testing.NewApplySubresourceAction(resourceclaimsResource, c.ns, *name, data, manager, opts.Force, "status"), &v1alpha2.ResourceClaim{})
 
 	if obj == nil {
 		return nil, err

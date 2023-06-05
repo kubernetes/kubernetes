@@ -143,12 +143,18 @@ func (c *FakePersistentVolumes) Apply(ctx context.Context, persistentVolume *cor
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := persistentVolume.Name
 	if name == nil {
 		return nil, fmt.Errorf("persistentVolume.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(persistentvolumesResource, *name, types.ApplyPatchType, data), &v1.PersistentVolume{})
+		Invokes(testing.NewRootApplySubresourceAction(persistentvolumesResource, *name, data, manager, opts.Force), &v1.PersistentVolume{})
 	if obj == nil {
 		return nil, err
 	}
@@ -165,12 +171,18 @@ func (c *FakePersistentVolumes) ApplyStatus(ctx context.Context, persistentVolum
 	if err != nil {
 		return nil, err
 	}
+
+	manager := "default-test-manager"
+	if m := opts.FieldManager; m != "" {
+		manager = m
+	}
+
 	name := persistentVolume.Name
 	if name == nil {
 		return nil, fmt.Errorf("persistentVolume.Name must be provided to Apply")
 	}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(persistentvolumesResource, *name, types.ApplyPatchType, data, "status"), &v1.PersistentVolume{})
+		Invokes(testing.NewRootApplySubresourceAction(persistentvolumesResource, *name, data, manager, opts.Force, "status"), &v1.PersistentVolume{})
 	if obj == nil {
 		return nil, err
 	}
