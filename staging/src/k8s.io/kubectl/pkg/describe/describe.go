@@ -5205,8 +5205,7 @@ func tabbedString(f func(io.Writer) error) (string, error) {
 	}
 
 	out.Flush()
-	str := string(buf.String())
-	return str, nil
+	return buf.String(), nil
 }
 
 type SortableResourceNames []corev1.ResourceName
