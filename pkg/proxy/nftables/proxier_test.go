@@ -1909,19 +1909,15 @@ func TestOverallIPTablesRules(t *testing.T) {
 
 	expected := dedent.Dedent(`
 		*filter
-		:KUBE-NODEPORTS - [0:0]
 		:KUBE-SERVICES - [0:0]
 		:KUBE-EXTERNAL-SERVICES - [0:0]
 		:KUBE-FORWARD - [0:0]
 		:KUBE-PROXY-FIREWALL - [0:0]
-		-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 		-A KUBE-SERVICES -m comment --comment "ns6/svc6:p80 has no endpoints" -m tcp -p tcp -d 172.30.0.46 --dport 80 -j REJECT
 		-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns2/svc2:p80 has no local endpoints" -m tcp -p tcp -d 192.168.99.22 --dport 80 -j DROP
 		-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns2/svc2:p80 has no local endpoints" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j DROP
 		-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns2/svc2:p80 has no local endpoints" -m addrtype --dst-type LOCAL -m tcp -p tcp --dport 3001 -j DROP
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
-		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
-		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		-A KUBE-PROXY-FIREWALL -m comment --comment "ns5/svc5:p80 traffic not accepted by KUBE-FW-NUKIZ6OKUXPJNT4C" -m tcp -p tcp -d 5.6.7.8 --dport 80 -j DROP
 		COMMIT
 		*nat
@@ -2604,61 +2600,6 @@ func TestNodePorts(t *testing.T) {
 	}
 }
 
-func TestHealthCheckNodePort(t *testing.T) {
-	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt)
-	fp.nodePortAddresses = proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{"127.0.0.0/8"})
-
-	svcIP := "172.30.0.42"
-	svcPort := 80
-	svcNodePort := 3001
-	svcHealthCheckNodePort := 30000
-	svcPortName := proxy.ServicePortName{
-		NamespacedName: makeNSN("ns1", "svc1"),
-		Port:           "p80",
-		Protocol:       v1.ProtocolTCP,
-	}
-
-	svc := makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
-		svc.Spec.Type = "LoadBalancer"
-		svc.Spec.ClusterIP = svcIP
-		svc.Spec.Ports = []v1.ServicePort{{
-			Name:     svcPortName.Port,
-			Port:     int32(svcPort),
-			Protocol: v1.ProtocolTCP,
-			NodePort: int32(svcNodePort),
-		}}
-		svc.Spec.HealthCheckNodePort = int32(svcHealthCheckNodePort)
-		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
-	})
-	makeServiceMap(fp, svc)
-	fp.syncProxyRules()
-
-	runPacketFlowTests(t, getLine(), ipt, testNodeIPs, []packetFlowTest{
-		{
-			name:     "firewall accepts HealthCheckNodePort",
-			sourceIP: "1.2.3.4",
-			destIP:   testNodeIP,
-			destPort: svcHealthCheckNodePort,
-			output:   "ACCEPT",
-			masq:     false,
-		},
-	})
-
-	fp.OnServiceDelete(svc)
-	fp.syncProxyRules()
-
-	runPacketFlowTests(t, getLine(), ipt, testNodeIPs, []packetFlowTest{
-		{
-			name:     "HealthCheckNodePort no longer has any rule",
-			sourceIP: "1.2.3.4",
-			destIP:   testNodeIP,
-			destPort: svcHealthCheckNodePort,
-			output:   "",
-		},
-	})
-}
-
 func TestDropInvalidRule(t *testing.T) {
 	for _, tcpLiberal := range []bool{false, true} {
 		t.Run(fmt.Sprintf("tcpLiberal %t", tcpLiberal), func(t *testing.T) {
@@ -2669,12 +2610,8 @@ func TestDropInvalidRule(t *testing.T) {
 
 			var expected string
 			if !tcpLiberal {
-				expected = "-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP"
+				expected = "-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP\n"
 			}
-			expected += dedent.Dedent(`
-				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
-				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-				`)
 
 			assertIPTablesChainEqual(t, getLine(), utiliptables.TableFilter, kubeForwardChain, expected, fp.iptablesData.String())
 		})
@@ -5898,14 +5835,11 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 
 	expected := dedent.Dedent(`
 		*filter
-		:KUBE-NODEPORTS - [0:0]
 		:KUBE-SERVICES - [0:0]
 		:KUBE-EXTERNAL-SERVICES - [0:0]
 		:KUBE-FORWARD - [0:0]
 		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
-		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
-		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
 		*nat
 		:KUBE-NODEPORTS - [0:0]
@@ -5972,14 +5906,11 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 
 	expected = dedent.Dedent(`
 		*filter
-		:KUBE-NODEPORTS - [0:0]
 		:KUBE-SERVICES - [0:0]
 		:KUBE-EXTERNAL-SERVICES - [0:0]
 		:KUBE-FORWARD - [0:0]
 		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
-		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
-		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
 		*nat
 		:KUBE-NODEPORTS - [0:0]
@@ -6030,14 +5961,11 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 
 	expected = dedent.Dedent(`
 		*filter
-		:KUBE-NODEPORTS - [0:0]
 		:KUBE-SERVICES - [0:0]
 		:KUBE-EXTERNAL-SERVICES - [0:0]
 		:KUBE-FORWARD - [0:0]
 		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
-		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
-		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
 		*nat
 		:KUBE-NODEPORTS - [0:0]
@@ -6094,15 +6022,12 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	fp.syncProxyRules()
 	expected = dedent.Dedent(`
 		*filter
-		:KUBE-NODEPORTS - [0:0]
 		:KUBE-SERVICES - [0:0]
 		:KUBE-EXTERNAL-SERVICES - [0:0]
 		:KUBE-FORWARD - [0:0]
 		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-SERVICES -m comment --comment "ns4/svc4:p80 has no endpoints" -m tcp -p tcp -d 172.30.0.44 --dport 80 -j REJECT
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
-		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
-		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
 		*nat
 		:KUBE-NODEPORTS - [0:0]
@@ -6155,14 +6080,11 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	fp.syncProxyRules()
 	expected = dedent.Dedent(`
 		*filter
-		:KUBE-NODEPORTS - [0:0]
 		:KUBE-SERVICES - [0:0]
 		:KUBE-EXTERNAL-SERVICES - [0:0]
 		:KUBE-FORWARD - [0:0]
 		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
-		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
-		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
 		*nat
 		:KUBE-NODEPORTS - [0:0]
@@ -6215,14 +6137,11 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 
 	expected = dedent.Dedent(`
 		*filter
-		:KUBE-NODEPORTS - [0:0]
 		:KUBE-SERVICES - [0:0]
 		:KUBE-EXTERNAL-SERVICES - [0:0]
 		:KUBE-FORWARD - [0:0]
 		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
-		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
-		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
 		*nat
 		:KUBE-NODEPORTS - [0:0]
@@ -6275,14 +6194,11 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 
 	expected = dedent.Dedent(`
 		*filter
-		:KUBE-NODEPORTS - [0:0]
 		:KUBE-SERVICES - [0:0]
 		:KUBE-EXTERNAL-SERVICES - [0:0]
 		:KUBE-FORWARD - [0:0]
 		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
-		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
-		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
 		*nat
 		:KUBE-NODEPORTS - [0:0]
@@ -6337,14 +6253,11 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 
 	expected = dedent.Dedent(`
 		*filter
-		:KUBE-NODEPORTS - [0:0]
 		:KUBE-SERVICES - [0:0]
 		:KUBE-EXTERNAL-SERVICES - [0:0]
 		:KUBE-FORWARD - [0:0]
 		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
-		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
-		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
 		*nat
 		:KUBE-NODEPORTS - [0:0]

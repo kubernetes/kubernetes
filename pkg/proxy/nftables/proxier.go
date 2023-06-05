@@ -330,7 +330,6 @@ type iptablesJumpChain struct {
 var iptablesJumpChains = []iptablesJumpChain{
 	{utiliptables.TableFilter, kubeExternalServicesChain, utiliptables.ChainInput, "kubernetes externally-visible service portals", []string{"-m", "conntrack", "--ctstate", "NEW"}},
 	{utiliptables.TableFilter, kubeExternalServicesChain, utiliptables.ChainForward, "kubernetes externally-visible service portals", []string{"-m", "conntrack", "--ctstate", "NEW"}},
-	{utiliptables.TableFilter, kubeNodePortsChain, utiliptables.ChainInput, "kubernetes health check service ports", nil},
 	{utiliptables.TableFilter, kubeServicesChain, utiliptables.ChainForward, "kubernetes service portals", []string{"-m", "conntrack", "--ctstate", "NEW"}},
 	{utiliptables.TableFilter, kubeServicesChain, utiliptables.ChainOutput, "kubernetes service portals", []string{"-m", "conntrack", "--ctstate", "NEW"}},
 	{utiliptables.TableFilter, kubeForwardChain, utiliptables.ChainForward, "kubernetes forwarding rules", nil},
@@ -410,7 +409,7 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 		filterChains := proxyutil.NewLineBuffer()
 		filterRules := proxyutil.NewLineBuffer()
 		filterChains.Write("*filter")
-		for _, chain := range []utiliptables.Chain{kubeServicesChain, kubeExternalServicesChain, kubeForwardChain, kubeNodePortsChain} {
+		for _, chain := range []utiliptables.Chain{kubeServicesChain, kubeExternalServicesChain, kubeForwardChain} {
 			if _, found := existingFilterChains[chain]; found {
 				chainString := string(chain)
 				filterChains.Write(utiliptables.MakeChainLine(chain))
@@ -757,7 +756,7 @@ func (proxier *Proxier) syncProxyRules() {
 	proxier.natRules.Reset()
 
 	// Write chain lines for all the "top-level" chains we'll be filling in
-	for _, chainName := range []utiliptables.Chain{kubeServicesChain, kubeExternalServicesChain, kubeForwardChain, kubeNodePortsChain, kubeProxyFirewallChain} {
+	for _, chainName := range []utiliptables.Chain{kubeServicesChain, kubeExternalServicesChain, kubeForwardChain, kubeProxyFirewallChain} {
 		proxier.filterChains.Write(utiliptables.MakeChainLine(chainName))
 	}
 	for _, chainName := range []utiliptables.Chain{kubeServicesChain, kubeNodePortsChain, kubePostroutingChain, kubeMarkMasqChain} {
@@ -1055,19 +1054,6 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 		}
 
-		// Capture healthCheckNodePorts.
-		if svcInfo.HealthCheckNodePort() != 0 {
-			// no matter if node has local endpoints, healthCheckNodePorts
-			// need to add a rule to accept the incoming connection
-			proxier.filterRules.Write(
-				"-A", string(kubeNodePortsChain),
-				"-m", "comment", "--comment", fmt.Sprintf(`"%s health check node port"`, svcPortNameString),
-				"-m", "tcp", "-p", "tcp",
-				"--dport", strconv.Itoa(svcInfo.HealthCheckNodePort()),
-				"-j", "ACCEPT",
-			)
-		}
-
 		// Set up internal traffic handling.
 		if hasInternalEndpoints {
 			args = append(args[:0],
@@ -1321,26 +1307,6 @@ func (proxier *Proxier) syncProxyRules() {
 			"-j", "DROP",
 		)
 	}
-
-	// If the masqueradeMark has been added then we want to forward that same
-	// traffic, this allows NodePort traffic to be forwarded even if the default
-	// FORWARD policy is not accept.
-	proxier.filterRules.Write(
-		"-A", string(kubeForwardChain),
-		"-m", "comment", "--comment", `"kubernetes forwarding rules"`,
-		"-m", "mark", "--mark", fmt.Sprintf("%s/%s", proxier.masqueradeMark, proxier.masqueradeMark),
-		"-j", "ACCEPT",
-	)
-
-	// The following rule ensures the traffic after the initial packet accepted
-	// by the "kubernetes forwarding rules" rule above will be accepted.
-	proxier.filterRules.Write(
-		"-A", string(kubeForwardChain),
-		"-m", "comment", "--comment", `"kubernetes forwarding conntrack rule"`,
-		"-m", "conntrack",
-		"--ctstate", "RELATED,ESTABLISHED",
-		"-j", "ACCEPT",
-	)
 
 	metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableFilter)).Set(float64(proxier.filterRules.Lines()))
 	metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableNAT)).Set(float64(proxier.natRules.Lines() - deletedChains))
