@@ -262,6 +262,8 @@ items:
     - endpoints
     - persistentvolumeclaims
     - persistentvolumeclaims/status
+    - persistentvolumes
+    - persistentvolumes/status
     - pods
     - replicationcontrollers
     - replicationcontrollers/scale
