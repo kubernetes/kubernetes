@@ -21,6 +21,7 @@ import (
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy/config"
 )
@@ -30,7 +31,14 @@ import (
 // https://issues.k8s.io/111321
 type NodePodCIDRHandler struct {
 	mu       sync.Mutex
+	nodeUID  types.UID
 	podCIDRs []string
+}
+
+func NewNodePodCIDRHandler(uid types.UID) *NodePodCIDRHandler {
+	return &NodePodCIDRHandler{
+		nodeUID: uid,
+	}
 }
 
 var _ config.NodeHandler = &NodePodCIDRHandler{}
@@ -40,6 +48,11 @@ func (n *NodePodCIDRHandler) OnNodeAdd(node *v1.Node) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
+	if n.nodeUID != node.GetUID() {
+		klog.ErrorS(nil, "Using NodeCIDR LocalDetector mode, current node UID is different that the one used to initialize the PodCIDRs, restarting",
+			"node", klog.KObj(node), "newUID", node.GetUID(), "oldUID", n.nodeUID)
+		panic("Current node UID is different that the one used to initialize the PodCIDRs, restarting")
+	}
 	podCIDRs := node.Spec.PodCIDRs
 	// initialize podCIDRs
 	if len(n.podCIDRs) == 0 && len(podCIDRs) > 0 {

@@ -21,11 +21,14 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 func TestNodePodCIDRHandlerAdd(t *testing.T) {
 	tests := []struct {
 		name            string
+		oldUID          types.UID
+		newUID          types.UID
 		oldNodePodCIDRs []string
 		newNodePodCIDRs []string
 		expectPanic     bool
@@ -38,6 +41,13 @@ func TestNodePodCIDRHandlerAdd(t *testing.T) {
 			newNodePodCIDRs: []string{"192.168.1.0/24", "fd00:1:2:3::/64"},
 		},
 		{
+			name:            "initialized with different UID",
+			oldUID:          "12345-6789",
+			newUID:          "98765-4321",
+			newNodePodCIDRs: []string{"192.168.1.0/24", "fd00:1:2:3::/64"},
+			expectPanic:     true,
+		},
+		{
 			name:            "already initialized and different node",
 			oldNodePodCIDRs: []string{"192.168.1.0/24", "fd00:1:2:3::/64"},
 			newNodePodCIDRs: []string{"10.0.0.0/24", "fd00:3:2:1::/64"},
@@ -47,12 +57,14 @@ func TestNodePodCIDRHandlerAdd(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			n := &NodePodCIDRHandler{
+				nodeUID:  tt.oldUID,
 				podCIDRs: tt.oldNodePodCIDRs,
 			}
 			node := &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:            "test-node",
 					ResourceVersion: "1",
+					UID:             tt.newUID,
 				},
 				Spec: v1.NodeSpec{
 					PodCIDRs: tt.newNodePodCIDRs,

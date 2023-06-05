@@ -88,7 +88,8 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 		if err != nil {
 			return nil, err
 		}
-		klog.InfoS("NodeInfo", "podCIDR", nodeInfo.Spec.PodCIDR, "podCIDRs", nodeInfo.Spec.PodCIDRs)
+		s.NodeRef.UID = nodeInfo.GetUID()
+		klog.InfoS("NodeInfo", "podCIDR", nodeInfo.Spec.PodCIDR, "podCIDRs", nodeInfo.Spec.PodCIDRs, "UID", nodeInfo.GetUID())
 	}
 
 	primaryFamily := v1.IPv4Protocol

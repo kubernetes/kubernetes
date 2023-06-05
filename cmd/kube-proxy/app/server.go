@@ -754,7 +754,7 @@ func (s *ProxyServer) Run() error {
 	nodeConfig := config.NewNodeConfig(currentNodeInformerFactory.Core().V1().Nodes(), s.Config.ConfigSyncPeriod.Duration)
 	// https://issues.k8s.io/111321
 	if s.Config.DetectLocalMode == kubeproxyconfig.LocalModeNodeCIDR {
-		nodeConfig.RegisterEventHandler(&proxy.NodePodCIDRHandler{})
+		nodeConfig.RegisterEventHandler(proxy.NewNodePodCIDRHandler(s.NodeRef.UID))
 	}
 	nodeConfig.RegisterEventHandler(s.Proxier)
 
