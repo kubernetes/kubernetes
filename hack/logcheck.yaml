@@ -1,0 +1,6 @@
+# Installed there by hack/verify-golangci-lint.sh.
+path: ../_output/local/bin/logcheck.so
+description: structured logging checker
+original-url: k8s.io/logtools/logcheck
+  settings:
+    config: /nvme/gopath/src/k8s.io/kubernetes/hack/logcheck.conf

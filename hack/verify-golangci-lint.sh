@@ -26,6 +26,8 @@ Usage: $0 [-r <revision>|-a] [-s] [-c none|<config>] [-- <golangci-lint run flag
    -a: automatically select the common base of origin/master and HEAD
        as revision
    -s: select a strict configuration for new code
+   -n: in addition to strict checking, also enable hints (aka nits) that may are may not
+       be useful
    -g <github action file>: also write results with --out-format=github-actions
        to a separate file
    -c <config|"none">: use the specified configuration or none instead of the default hack/golangci.yaml
@@ -65,8 +67,9 @@ golangci=(env LOGCHECK_CONFIG="${KUBE_ROOT}/hack/logcheck.conf" "${GOBIN}/golang
 golangci_config="${KUBE_ROOT}/hack/golangci.yaml"
 base=
 strict=
+hints=
 githubactions=
-while getopts "ar:sg:c:" o; do
+while getopts "ar:sng:c:" o; do
   case "${o}" in
     a)
       base="$(git merge-base origin/master HEAD)"
@@ -82,6 +85,10 @@ while getopts "ar:sg:c:" o; do
     s)
       golangci_config="${KUBE_ROOT}/hack/golangci-strict.yaml"
       strict=1
+      ;;
+    n)
+      golangci_config="${KUBE_ROOT}/hack/golangci-hints.yaml"
+      hints=1
       ;;
     g)
       githubactions="${OPTARG}"
@@ -192,9 +199,17 @@ else
     echo 'If the above warnings do not make sense, you can exempt this warning with a comment'
     echo ' (if your reviewer is okay with it).'
     if [ "$strict" ]; then
-        echo 'The more strict golangci-strict.yaml was used. If you feel that this warns about issues'
-        echo 'that should be ignored by default, then please discuss with your reviewer and propose'
-        echo 'a change for hack/golangci-strict.yaml as part of your PR.'
+        echo 'The more strict golangci-strict.yaml was used.'
+    elif [ "$hints" ]; then
+        echo 'The golangci-hints.yaml was used. Some of the reported issues may have to be fixed'
+        echo 'while others can be ignored, depending on the circumstances and/or personal'
+        echo 'preferences. To determine which issues have to be fixed, check the report that'
+        echo 'uses golangci-strict.yaml.'
+    fi
+    if [ "$strict" ] || [ "$hints" ]; then
+        echo 'If you feel that this warns about issues that should be ignored by default,'
+        echo 'then please discuss with your reviewer and propose'
+        echo 'a change for hack/golangci.yaml.in as part of your PR.'
     fi
     echo 'In general please prefer to fix the error, we have already disabled specific lints'
     echo ' that the project chooses to ignore.'
