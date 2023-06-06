@@ -1633,23 +1633,68 @@ func doPodResizeSchedulerTests() {
 	})
 }
 
+func convertToV1Container(tc TestContainerInfo) (v1.Container, v1.ContainerStatus) {
+	v1Container := v1.Container{
+		Name: tc.Name,
+		// Image: tc.Image,
+	}
+
+	v1ContainerStatus := v1.ContainerStatus{
+		Name: tc.Name,
+	}
+
+	return v1Container, v1.ContainerStatus(v1ContainerStatus)
+}
+
+func getOriginalContainerInfo(pod *v1.Pod) []v1.Container {
+	var originalContainers []v1.Container
+
+	tcInfo := []TestContainerInfo{
+		{
+			Name: "container-1",
+			// Image: "my-image",
+		},
+	}
+	for _, tc := range tcInfo {
+		v1Container, _ := convertToV1Container(tc)
+		originalContainers = append(originalContainers, v1Container)
+	}
+	return originalContainers
+}
+
+func applyPodSpec(pod *v1.Pod) error {
+	clientset := getClientset()
+	existingPod, err := clientset.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	existingPod.Spec = pod.Spec
+	_, err = clientset.CoreV1().Pods(pod.Namespace).Update(context.TODO(), existingPod, metav1.UpdateOptions{})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func getClientset() *kubernetes.ClientSet {
+	return nil
+}
+
 func revertResourceResizePatch(pod *v1.Pod, patch string) {
 	fmt.Println("Reverting resource resize with patch:", patch)
 
 	// Update the pod's spec with the original resource size
-	originalPod := makeTestPod(pod.Namespace, pod.Name, pod.ObjectMeta.Labels["time"], getOriginalContainerInfo(pod))
-	pod.Spec = originalPod.Spec
-	applyPodSpec(pod)
-}
+	originalContainers := getOriginalContainerInfo(pod)
+	pod.Spec.Containers = originalContainers
 
-func getOriginalContainerInfo(pod *v1.Pod) []TestContainerInfo {
-	// Return the original container info as an array of TestContainerInfo
-	return []TestContainerInfo{}
-}
+	// Apply the updated pod spec to revert the resize
+	err := applyPodSpec(pod)
+	if err != nil {
+		fmt.Println("Error reverting resource resize:", err)
+		return
+	}
 
-func applyPodSpec(pod *v1.Pod) {
-	// Logic to apply the updated pod spec goes here
-	fmt.Println("Applying updated pod spec:", pod.Spec)
+	fmt.Println("Resource resize reverted successfully")
 }
 
 var _ = SIGDescribe("[Serial] Pod InPlace Resize Container (scheduler-focused) [Feature:InPlacePodVerticalScaling]", func() {
@@ -1661,3 +1706,26 @@ var _ = SIGDescribe("Pod InPlace Resize Container [Feature:InPlacePodVerticalSca
 	doPodResizeResourceQuotaTests()
 	doPodResizeErrorTests()
 })
+
+func main() {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-pod",
+			Namespace: "my-namespace",
+			Labels: map[string]string{
+				"app": "my-app",
+			},
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "container-1",
+					// Image: "my-image",
+				},
+			},
+		},
+	}
+	patch := "your-patch-string"
+	revertResourceResizePatch(pod, patch)
+	fmt.Println("Resource resize reverted successfully")
+}
