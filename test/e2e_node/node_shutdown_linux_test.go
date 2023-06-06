@@ -340,14 +340,14 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 			err = restartDbus()
 			framework.ExpectNoError(err)
 
-			// Wait a few seconds to ensure dbus is restarted...
-			time.Sleep(5 * time.Second)
-
-			ginkgo.By("Emitting Shutdown signal")
-			err = emitSignalPrepareForShutdown(true)
-			framework.ExpectNoError(err)
-
 			gomega.Eventually(ctx, func(ctx context.Context) error {
+				// re-send the shutdown signal in case the dbus restart is not done
+				ginkgo.By("Emitting Shutdown signal")
+				err = emitSignalPrepareForShutdown(true)
+				if err != nil {
+					return err
+				}
+
 				isReady := getNodeReadyStatus(ctx, f)
 				if isReady {
 					return fmt.Errorf("node did not become shutdown as expected")
