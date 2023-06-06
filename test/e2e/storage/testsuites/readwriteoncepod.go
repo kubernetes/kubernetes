@@ -60,6 +60,7 @@ func InitCustomReadWriteOncePodTestSuite(patterns []storageframework.TestPattern
 		tsInfo: storageframework.TestSuiteInfo{
 			Name:         "read-write-once-pod",
 			TestPatterns: patterns,
+			FeatureTag:   "[MinimumKubeletVersion:1.27]",
 		},
 	}
 }

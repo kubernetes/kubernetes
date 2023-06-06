@@ -342,37 +342,6 @@ func usesIndivisibleHugePagesValues(podSpec *api.PodSpec) bool {
 	return false
 }
 
-// haveSameExpandedDNSConfig returns true if the oldPodSpec already had
-// ExpandedDNSConfig and podSpec has the same DNSConfig
-func haveSameExpandedDNSConfig(podSpec, oldPodSpec *api.PodSpec) bool {
-	if oldPodSpec == nil || oldPodSpec.DNSConfig == nil {
-		return false
-	}
-	if podSpec == nil || podSpec.DNSConfig == nil {
-		return false
-	}
-
-	if len(oldPodSpec.DNSConfig.Searches) <= apivalidation.MaxDNSSearchPathsLegacy &&
-		len(strings.Join(oldPodSpec.DNSConfig.Searches, " ")) <= apivalidation.MaxDNSSearchListCharsLegacy {
-		// didn't have ExpandedDNSConfig
-		return false
-	}
-
-	if len(oldPodSpec.DNSConfig.Searches) != len(podSpec.DNSConfig.Searches) {
-		// updates DNSConfig
-		return false
-	}
-
-	for i, oldSearch := range oldPodSpec.DNSConfig.Searches {
-		if podSpec.DNSConfig.Searches[i] != oldSearch {
-			// updates DNSConfig
-			return false
-		}
-	}
-
-	return true
-}
-
 // hasInvalidTopologySpreadConstraintLabelSelector return true if spec.TopologySpreadConstraints have any entry with invalid labelSelector
 func hasInvalidTopologySpreadConstraintLabelSelector(spec *api.PodSpec) bool {
 	for _, constraint := range spec.TopologySpreadConstraints {
@@ -390,9 +359,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 	opts := apivalidation.PodValidationOptions{
 		AllowInvalidPodDeletionCost: !utilfeature.DefaultFeatureGate.Enabled(features.PodDeletionCost),
 		// Do not allow pod spec to use non-integer multiple of huge page unit size default
-		AllowIndivisibleHugePagesValues: false,
-		// Allow pod spec with expanded DNS configuration
-		AllowExpandedDNSConfig:                            utilfeature.DefaultFeatureGate.Enabled(features.ExpandedDNSConfig) || haveSameExpandedDNSConfig(podSpec, oldPodSpec),
+		AllowIndivisibleHugePagesValues:                   false,
 		AllowInvalidLabelValueInSelector:                  false,
 		AllowInvalidTopologySpreadConstraintLabelSelector: false,
 		AllowMutableNodeSelectorAndNodeAffinity:           utilfeature.DefaultFeatureGate.Enabled(features.PodSchedulingReadiness),

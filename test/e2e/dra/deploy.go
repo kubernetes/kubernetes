@@ -240,14 +240,14 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 
 	// Wait for registration.
 	ginkgo.By("wait for plugin registration")
-	gomega.Eventually(func() []string {
-		var notRegistered []string
+	gomega.Eventually(func() map[string][]app.GRPCCall {
+		notRegistered := make(map[string][]app.GRPCCall)
 		for nodename, plugin := range d.Nodes {
-			if !plugin.IsRegistered() {
-				notRegistered = append(notRegistered, nodename)
+			calls := plugin.GetGRPCCalls()
+			if contains, err := app.BeRegistered.Match(calls); err != nil || !contains {
+				notRegistered[nodename] = calls
 			}
 		}
-		sort.Strings(notRegistered)
 		return notRegistered
 	}).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "hosts where the plugin has not been registered yet")
 }

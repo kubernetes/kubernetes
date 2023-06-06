@@ -59,7 +59,7 @@ func (i Uint) Add(other ref.Val) ref.Val {
 	}
 	val, err := addUint64Checked(uint64(i), uint64(otherUint))
 	if err != nil {
-		return wrapErr(err)
+		return WrapErr(err)
 	}
 	return Uint(val)
 }
@@ -82,7 +82,7 @@ func (i Uint) Compare(other ref.Val) ref.Val {
 }
 
 // ConvertToNative implements ref.Val.ConvertToNative.
-func (i Uint) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
+func (i Uint) ConvertToNative(typeDesc reflect.Type) (any, error) {
 	switch typeDesc.Kind() {
 	case reflect.Uint, reflect.Uint32:
 		v, err := uint64ToUint32Checked(uint64(i))
@@ -149,7 +149,7 @@ func (i Uint) ConvertToType(typeVal ref.Type) ref.Val {
 	case IntType:
 		v, err := uint64ToInt64Checked(uint64(i))
 		if err != nil {
-			return wrapErr(err)
+			return WrapErr(err)
 		}
 		return Int(v)
 	case UintType:
@@ -172,7 +172,7 @@ func (i Uint) Divide(other ref.Val) ref.Val {
 	}
 	div, err := divideUint64Checked(uint64(i), uint64(otherUint))
 	if err != nil {
-		return wrapErr(err)
+		return WrapErr(err)
 	}
 	return Uint(div)
 }
@@ -194,6 +194,11 @@ func (i Uint) Equal(other ref.Val) ref.Val {
 	}
 }
 
+// IsZeroValue returns true if the uint is zero.
+func (i Uint) IsZeroValue() bool {
+	return i == 0
+}
+
 // Modulo implements traits.Modder.Modulo.
 func (i Uint) Modulo(other ref.Val) ref.Val {
 	otherUint, ok := other.(Uint)
@@ -202,7 +207,7 @@ func (i Uint) Modulo(other ref.Val) ref.Val {
 	}
 	mod, err := moduloUint64Checked(uint64(i), uint64(otherUint))
 	if err != nil {
-		return wrapErr(err)
+		return WrapErr(err)
 	}
 	return Uint(mod)
 }
@@ -215,7 +220,7 @@ func (i Uint) Multiply(other ref.Val) ref.Val {
 	}
 	val, err := multiplyUint64Checked(uint64(i), uint64(otherUint))
 	if err != nil {
-		return wrapErr(err)
+		return WrapErr(err)
 	}
 	return Uint(val)
 }
@@ -228,7 +233,7 @@ func (i Uint) Subtract(subtrahend ref.Val) ref.Val {
 	}
 	val, err := subtractUint64Checked(uint64(i), uint64(subtraUint))
 	if err != nil {
-		return wrapErr(err)
+		return WrapErr(err)
 	}
 	return Uint(val)
 }
@@ -239,7 +244,7 @@ func (i Uint) Type() ref.Type {
 }
 
 // Value implements ref.Val.Value.
-func (i Uint) Value() interface{} {
+func (i Uint) Value() any {
 	return uint64(i)
 }
 

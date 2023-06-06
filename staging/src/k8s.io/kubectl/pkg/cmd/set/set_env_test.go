@@ -72,7 +72,7 @@ func TestSetEnvLocal(t *testing.T) {
 	err = opts.RunEnv()
 	assert.NoError(t, err)
 	if bufErr.Len() > 0 {
-		t.Errorf("unexpected error: %s", string(bufErr.String()))
+		t.Errorf("unexpected error: %s", bufErr.String())
 	}
 	if !strings.Contains(buf.String(), "replicationcontroller/cassandra") {
 		t.Errorf("did not set env: %s", buf.String())
@@ -109,7 +109,7 @@ func TestSetEnvLocalNamespace(t *testing.T) {
 	err = opts.RunEnv()
 	assert.NoError(t, err)
 	if bufErr.Len() > 0 {
-		t.Errorf("unexpected error: %s", string(bufErr.String()))
+		t.Errorf("unexpected error: %s", bufErr.String())
 	}
 	if !strings.Contains(buf.String(), "namespace: existing-ns") {
 		t.Errorf("did not set env: %s", buf.String())
@@ -146,7 +146,7 @@ func TestSetMultiResourcesEnvLocal(t *testing.T) {
 	err = opts.RunEnv()
 	assert.NoError(t, err)
 	if bufErr.Len() > 0 {
-		t.Errorf("unexpected error: %s", string(bufErr.String()))
+		t.Errorf("unexpected error: %s", bufErr.String())
 	}
 	expectedOut := "replicationcontroller/first-rc\nreplicationcontroller/second-rc\n"
 	if buf.String() != expectedOut {

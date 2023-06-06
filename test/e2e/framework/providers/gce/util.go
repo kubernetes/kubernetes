@@ -52,7 +52,7 @@ func RecreateNodes(c clientset.Interface, nodes []v1.Node) error {
 
 	// Find the sole managed instance group name
 	var instanceGroup string
-	if strings.Index(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") >= 0 {
+	if strings.Contains(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") {
 		return fmt.Errorf("Test does not support cluster setup with more than one managed instance group: %s", framework.TestContext.CloudConfig.NodeInstanceGroup)
 	}
 	instanceGroup = framework.TestContext.CloudConfig.NodeInstanceGroup

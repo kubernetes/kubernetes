@@ -45,9 +45,9 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
-	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
-	utilproxytest "k8s.io/kubernetes/pkg/proxy/util/testing"
+	proxyutiltest "k8s.io/kubernetes/pkg/proxy/util/testing"
 	"k8s.io/kubernetes/pkg/util/async"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
@@ -175,7 +175,7 @@ func TestDeleteEndpointConnections(t *testing.T) {
 				fexec.CommandScript = append(fexec.CommandScript, execFunc)
 			}
 
-			endpointIP := utilproxy.IPPart(tc.endpoint)
+			endpointIP := proxyutil.IPPart(tc.endpoint)
 			isIPv6 := netutils.IsIPv6String(endpointIP)
 
 			var ipt utiliptables.Interface
@@ -293,7 +293,7 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 	}
 	detectLocal, _ := proxyutiliptables.NewDetectLocalByCIDR(podCIDR, ipt)
 
-	networkInterfacer := utilproxytest.NewFakeNetwork()
+	networkInterfacer := proxyutiltest.NewFakeNetwork()
 	itf := net.Interface{Index: 0, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0}
 	addrs := []net.Addr{
 		&net.IPNet{IP: netutils.ParseIPSloppy("127.0.0.1"), Mask: net.CIDRMask(8, 32)},
@@ -324,13 +324,13 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		precomputedProbabilities: make([]string, 0, 1001),
 		iptablesData:             bytes.NewBuffer(nil),
 		existingFilterChainsData: bytes.NewBuffer(nil),
-		filterChains:             utilproxy.LineBuffer{},
-		filterRules:              utilproxy.LineBuffer{},
-		natChains:                utilproxy.LineBuffer{},
-		natRules:                 utilproxy.LineBuffer{},
+		filterChains:             proxyutil.LineBuffer{},
+		filterRules:              proxyutil.LineBuffer{},
+		natChains:                proxyutil.LineBuffer{},
+		natRules:                 proxyutil.LineBuffer{},
 		nodeIP:                   netutils.ParseIPSloppy(testNodeIP),
 		localhostNodePorts:       true,
-		nodePortAddresses:        utilproxy.NewNodePortAddresses(ipfamily, nil),
+		nodePortAddresses:        proxyutil.NewNodePortAddresses(ipfamily, nil),
 		networkInterfacer:        networkInterfacer,
 	}
 	p.setInitialized(true)
@@ -2464,7 +2464,7 @@ func TestNodePort(t *testing.T) {
 func TestHealthCheckNodePort(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
-	fp.nodePortAddresses = utilproxy.NewNodePortAddresses(v1.IPv4Protocol, []string{"127.0.0.0/8"})
+	fp.nodePortAddresses = proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{"127.0.0.0/8"})
 
 	svcIP := "172.30.0.42"
 	svcPort := 80
@@ -3393,7 +3393,7 @@ func TestDisableLocalhostNodePortsIPv4WithNodeAddress(t *testing.T) {
 	fp.localDetector = proxyutiliptables.NewNoOpLocalDetector()
 	fp.localhostNodePorts = false
 	fp.networkInterfacer.InterfaceAddrs()
-	fp.nodePortAddresses = utilproxy.NewNodePortAddresses(v1.IPv4Protocol, []string{"127.0.0.0/8"})
+	fp.nodePortAddresses = proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{"127.0.0.0/8"})
 
 	expected := dedent.Dedent(`
 		*filter
@@ -3674,7 +3674,7 @@ func TestOnlyLocalNodePortsNoClusterCIDR(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
 	fp.localDetector = proxyutiliptables.NewNoOpLocalDetector()
-	fp.nodePortAddresses = utilproxy.NewNodePortAddresses(v1.IPv4Protocol, []string{"192.168.0.0/24", "2001:db8::/64"})
+	fp.nodePortAddresses = proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{"192.168.0.0/24", "2001:db8::/64"})
 	fp.localhostNodePorts = false
 
 	expected := dedent.Dedent(`
@@ -3723,7 +3723,7 @@ func TestOnlyLocalNodePortsNoClusterCIDR(t *testing.T) {
 func TestOnlyLocalNodePorts(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
-	fp.nodePortAddresses = utilproxy.NewNodePortAddresses(v1.IPv4Protocol, []string{"192.168.0.0/24", "2001:db8::/64"})
+	fp.nodePortAddresses = proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{"192.168.0.0/24", "2001:db8::/64"})
 	fp.localhostNodePorts = false
 
 	expected := dedent.Dedent(`

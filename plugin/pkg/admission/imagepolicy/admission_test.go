@@ -39,7 +39,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"text/template"
@@ -94,7 +93,7 @@ func TestNewFromConfig(t *testing.T) {
 		{data.Key, clientKey},
 	}
 	for _, file := range files {
-		if err := ioutil.WriteFile(file.name, file.data, 0400); err != nil {
+		if err := os.WriteFile(file.name, file.data, 0400); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -198,10 +197,11 @@ current-context: default
 		// Use a closure so defer statements trigger between loop iterations.
 		t.Run(tt.msg, func(t *testing.T) {
 			err := func() error {
-				tempfile, err := ioutil.TempFile("", "")
+				tempfile, err := os.CreateTemp("", "")
 				if err != nil {
 					return err
 				}
+				p := tempfile.Name()
 				defer utiltesting.CloseAndRemove(t, tempfile)
 
 				tmpl, err := template.New("test").Parse(tt.kubeConfigTmpl)
@@ -212,11 +212,12 @@ current-context: default
 					return fmt.Errorf("failed to execute test template: %v", err)
 				}
 
-				tempconfigfile, err := ioutil.TempFile("", "")
+				tempconfigfile, err := os.CreateTemp("", "")
 				if err != nil {
 					return err
 				}
-				defer os.Remove(tempconfigfile.Name())
+				pc := tempconfigfile.Name()
+				defer utiltesting.CloseAndRemove(t, tempconfigfile)
 
 				configTmpl, err := template.New("testconfig").Parse(defaultConfigTmplJSON)
 				if err != nil {
@@ -229,7 +230,7 @@ current-context: default
 					RetryBackoff int
 					DefaultAllow bool
 				}{
-					KubeConfig:   tempfile.Name(),
+					KubeConfig:   p,
 					AllowTTL:     500,
 					DenyTTL:      500,
 					RetryBackoff: 500,
@@ -240,7 +241,7 @@ current-context: default
 				}
 
 				// Create a new admission controller
-				configFile, err := os.Open(tempconfigfile.Name())
+				configFile, err := os.Open(pc)
 				if err != nil {
 					return fmt.Errorf("failed to read test config: %v", err)
 				}
@@ -358,13 +359,13 @@ func (m *mockService) HTTPStatusCode() int { return m.statusCode }
 
 // newImagePolicyWebhook creates a temporary kubeconfig file from the provided arguments and attempts to load
 // a new newImagePolicyWebhook from it.
-func newImagePolicyWebhook(t *testing.T, callbackURL string, clientCert, clientKey, ca []byte, cacheTime time.Duration, defaultAllow bool) (*Plugin, error) {
-	tempfile, err := ioutil.TempFile("", "")
+func newImagePolicyWebhook(callbackURL string, clientCert, clientKey, ca []byte, cacheTime time.Duration, defaultAllow bool) (*Plugin, error) {
+	tempfile, err := os.CreateTemp("", "")
 	if err != nil {
 		return nil, err
 	}
 	p := tempfile.Name()
-	defer utiltesting.CloseAndRemove(t, tempfile)
+	defer os.Remove(p)
 	config := v1.Config{
 		Clusters: []v1.NamedCluster{
 			{
@@ -381,12 +382,12 @@ func newImagePolicyWebhook(t *testing.T, callbackURL string, clientCert, clientK
 		return nil, err
 	}
 
-	tempconfigfile, err := ioutil.TempFile("", "")
+	tempconfigfile, err := os.CreateTemp("", "")
 	if err != nil {
 		return nil, err
 	}
 	pc := tempconfigfile.Name()
-	defer utiltesting.CloseAndRemove(t, tempconfigfile)
+	defer os.Remove(pc)
 
 	configTmpl, err := template.New("testconfig").Parse(defaultConfigTmplYAML)
 	if err != nil {
@@ -478,7 +479,7 @@ func TestTLSConfig(t *testing.T) {
 			}
 			defer server.Close()
 
-			wh, err := newImagePolicyWebhook(t, server.URL, tt.clientCert, tt.clientKey, tt.clientCA, -1, false)
+			wh, err := newImagePolicyWebhook(server.URL, tt.clientCert, tt.clientKey, tt.clientCA, -1, false)
 			if err != nil {
 				t.Errorf("%s: failed to create client: %v", tt.test, err)
 				return
@@ -559,7 +560,7 @@ func TestWebhookCache(t *testing.T) {
 	defer s.Close()
 
 	// Create an admission controller that caches successful responses.
-	wh, err := newImagePolicyWebhook(t, s.URL, clientCert, clientKey, caCert, 200, false)
+	wh, err := newImagePolicyWebhook(s.URL, clientCert, clientKey, caCert, 200, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -595,17 +596,23 @@ func TestContainerCombinations(t *testing.T) {
 		test                 string
 		pod                  *api.Pod
 		wantAllowed, wantErr bool
+		subresource          string
+		operation            admission.Operation
 	}{
 		{
 			test:        "Single container allowed",
 			pod:         goodPod("good"),
 			wantAllowed: true,
+			subresource: "",
+			operation:   admission.Create,
 		},
 		{
 			test:        "Single container denied",
 			pod:         goodPod("bad"),
 			wantAllowed: false,
 			wantErr:     true,
+			subresource: "",
+			operation:   admission.Create,
 		},
 		{
 			test: "One good container, one bad",
@@ -627,6 +634,8 @@ func TestContainerCombinations(t *testing.T) {
 			},
 			wantAllowed: false,
 			wantErr:     true,
+			subresource: "",
+			operation:   admission.Create,
 		},
 		{
 			test: "Multiple good containers",
@@ -648,6 +657,8 @@ func TestContainerCombinations(t *testing.T) {
 			},
 			wantAllowed: true,
 			wantErr:     false,
+			subresource: "",
+			operation:   admission.Create,
 		},
 		{
 			test: "Multiple bad containers",
@@ -669,6 +680,8 @@ func TestContainerCombinations(t *testing.T) {
 			},
 			wantAllowed: false,
 			wantErr:     true,
+			subresource: "",
+			operation:   admission.Create,
 		},
 		{
 			test: "Good container, bad init container",
@@ -692,6 +705,8 @@ func TestContainerCombinations(t *testing.T) {
 			},
 			wantAllowed: false,
 			wantErr:     true,
+			subresource: "",
+			operation:   admission.Create,
 		},
 		{
 			test: "Bad container, good init container",
@@ -715,6 +730,8 @@ func TestContainerCombinations(t *testing.T) {
 			},
 			wantAllowed: false,
 			wantErr:     true,
+			subresource: "",
+			operation:   admission.Create,
 		},
 		{
 			test: "Good container, good init container",
@@ -738,6 +755,123 @@ func TestContainerCombinations(t *testing.T) {
 			},
 			wantAllowed: true,
 			wantErr:     false,
+			subresource: "",
+			operation:   admission.Create,
+		},
+		{
+			test: "Good container, good init container, bad ephemeral container when updating ephemeralcontainers subresource",
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					ServiceAccountName: "default",
+					SecurityContext:    &api.PodSecurityContext{},
+					Containers: []api.Container{
+						{
+							Image:           "good",
+							SecurityContext: &api.SecurityContext{},
+						},
+					},
+					InitContainers: []api.Container{
+						{
+							Image:           "good",
+							SecurityContext: &api.SecurityContext{},
+						},
+					},
+					EphemeralContainers: []api.EphemeralContainer{
+						{
+							EphemeralContainerCommon: api.EphemeralContainerCommon{
+								Image:           "bad",
+								SecurityContext: &api.SecurityContext{},
+							},
+						},
+					},
+				},
+			},
+			wantAllowed: false,
+			wantErr:     true,
+			subresource: "ephemeralcontainers",
+			operation:   admission.Update,
+		},
+		{
+			test: "Good container, good init container, bad ephemeral container when updating subresource=='' which sets initContainer and container only",
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					ServiceAccountName: "default",
+					SecurityContext:    &api.PodSecurityContext{},
+					Containers: []api.Container{
+						{
+							Image:           "good",
+							SecurityContext: &api.SecurityContext{},
+						},
+					},
+					InitContainers: []api.Container{
+						{
+							Image:           "good",
+							SecurityContext: &api.SecurityContext{},
+						},
+					},
+					EphemeralContainers: []api.EphemeralContainer{
+						{
+							EphemeralContainerCommon: api.EphemeralContainerCommon{
+								Image:           "bad",
+								SecurityContext: &api.SecurityContext{},
+							},
+						},
+					},
+				},
+			},
+			wantAllowed: true,
+			wantErr:     false,
+			subresource: "",
+			operation:   admission.Update,
+		},
+
+		{
+			test: "Bad container, good ephemeral container when updating subresource=='ephemeralcontainers' which sets ephemeralcontainers only",
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					ServiceAccountName: "default",
+					SecurityContext:    &api.PodSecurityContext{},
+					Containers: []api.Container{
+						{
+							Image:           "bad",
+							SecurityContext: &api.SecurityContext{},
+						},
+					},
+					EphemeralContainers: []api.EphemeralContainer{
+						{
+							EphemeralContainerCommon: api.EphemeralContainerCommon{
+								Image:           "good",
+								SecurityContext: &api.SecurityContext{},
+							},
+						},
+					},
+				},
+			},
+			wantAllowed: true,
+			wantErr:     false,
+			subresource: "ephemeralcontainers",
+			operation:   admission.Update,
+		},
+		{
+			test: "Good ephemeral container",
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					ServiceAccountName: "default",
+					SecurityContext:    &api.PodSecurityContext{},
+					EphemeralContainers: []api.EphemeralContainer{
+						{
+							EphemeralContainerCommon: api.EphemeralContainerCommon{
+								Image:           "good",
+								SecurityContext: &api.SecurityContext{},
+							},
+						},
+					},
+				},
+			},
+			wantAllowed: true,
+			wantErr:     false,
+			subresource: "ephemeralcontainers",
+			operation:   admission.Update,
 		},
 	}
 	for _, tt := range tests {
@@ -753,13 +887,13 @@ func TestContainerCombinations(t *testing.T) {
 			}
 			defer server.Close()
 
-			wh, err := newImagePolicyWebhook(t, server.URL, clientCert, clientKey, caCert, 0, false)
+			wh, err := newImagePolicyWebhook(server.URL, clientCert, clientKey, caCert, 0, false)
 			if err != nil {
 				t.Errorf("%s: failed to create client: %v", tt.test, err)
 				return
 			}
 
-			attr := admission.NewAttributesRecord(tt.pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, &user.DefaultInfo{})
+			attr := admission.NewAttributesRecord(tt.pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), tt.subresource, tt.operation, &metav1.CreateOptions{}, false, &user.DefaultInfo{})
 
 			err = wh.Validate(context.TODO(), attr, nil)
 			if tt.wantAllowed {
@@ -847,7 +981,7 @@ func TestDefaultAllow(t *testing.T) {
 			}
 			defer server.Close()
 
-			wh, err := newImagePolicyWebhook(t, server.URL, clientCert, clientKey, caCert, 0, tt.defaultAllow)
+			wh, err := newImagePolicyWebhook(server.URL, clientCert, clientKey, caCert, 0, tt.defaultAllow)
 			if err != nil {
 				t.Errorf("%s: failed to create client: %v", tt.test, err)
 				return
@@ -954,7 +1088,7 @@ func TestAnnotationFiltering(t *testing.T) {
 			}
 			defer server.Close()
 
-			wh, err := newImagePolicyWebhook(t, server.URL, clientCert, clientKey, caCert, 0, true)
+			wh, err := newImagePolicyWebhook(server.URL, clientCert, clientKey, caCert, 0, true)
 			if err != nil {
 				t.Errorf("%s: failed to create client: %v", tt.test, err)
 				return
@@ -1047,7 +1181,7 @@ func TestReturnedAnnotationAdd(t *testing.T) {
 			}
 			defer server.Close()
 
-			wh, err := newImagePolicyWebhook(t, server.URL, clientCert, clientKey, caCert, 0, true)
+			wh, err := newImagePolicyWebhook(server.URL, clientCert, clientKey, caCert, 0, true)
 			if err != nil {
 				t.Errorf("%s: failed to create client: %v", tt.test, err)
 				return

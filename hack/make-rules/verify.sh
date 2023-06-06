@@ -127,10 +127,10 @@ function run-cmd {
   local tr
 
   if ${SILENT}; then
-    juLog -output="${output}" -class="verify" -name="${testname}" "$@" &> /dev/null
+    juLog -output="${output}" -class="verify" -name="${testname}" -fail="^ERROR: " "$@" &> /dev/null
     tr=$?
   else
-    juLog -output="${output}" -class="verify" -name="${testname}" "$@"
+    juLog -output="${output}" -class="verify" -name="${testname}" -fail="^ERROR: " "$@"
     tr=$?
   fi
   return ${tr}

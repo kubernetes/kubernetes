@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-base/featuregate"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -41,10 +42,13 @@ const (
 
 // InitFeatureGates are the default feature gates for the init command
 var InitFeatureGates = FeatureList{
-	PublicKeysECDSA:                 {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
-	RootlessControlPlane:            {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
-	EtcdLearnerMode:                 {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
-	UpgradeAddonsBeforeControlPlane: {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Deprecated}},
+	PublicKeysECDSA:      {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
+	RootlessControlPlane: {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
+	EtcdLearnerMode:      {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
+	UpgradeAddonsBeforeControlPlane: {
+		FeatureSpec:        featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Deprecated},
+		DeprecationMessage: "The UpgradeAddonsBeforeControlPlane feature gate is deprecated and will be removed in a future release.",
+	},
 }
 
 // Feature represents a feature being gated
@@ -90,9 +94,9 @@ func Enabled(featureList map[string]bool, featureName string) bool {
 // Supports indicates whether a feature name is supported on the given
 // feature set
 func Supports(featureList FeatureList, featureName string) bool {
-	for k, v := range featureList {
+	for k := range featureList {
 		if featureName == k {
-			return v.PreRelease != featuregate.Deprecated
+			return true
 		}
 	}
 	return false
@@ -148,7 +152,7 @@ func NewFeatureGate(f *FeatureList, value string) (map[string]bool, error) {
 		}
 
 		if featureSpec.PreRelease == featuregate.Deprecated {
-			return nil, errors.Errorf("feature-gate key is deprecated: %s", k)
+			klog.Warningf("Setting deprecated feature gate %s=%t. It will be removed in a future release.", k, v)
 		}
 
 		boolValue, err := strconv.ParseBool(v)

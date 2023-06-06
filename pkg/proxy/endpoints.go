@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
-	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 )
 
 var supportedEndpointSliceAddressTypes = sets.New[string](
@@ -109,12 +109,12 @@ func (info *BaseEndpointInfo) GetZoneHints() sets.Set[string] {
 
 // IP returns just the IP part of the endpoint, it's a part of proxy.Endpoint interface.
 func (info *BaseEndpointInfo) IP() string {
-	return utilproxy.IPPart(info.Endpoint)
+	return proxyutil.IPPart(info.Endpoint)
 }
 
 // Port returns just the Port part of the endpoint.
 func (info *BaseEndpointInfo) Port() (int, error) {
-	return utilproxy.PortPart(info.Endpoint)
+	return proxyutil.PortPart(info.Endpoint)
 }
 
 // Equal is part of proxy.Endpoint interface.

@@ -19,6 +19,8 @@ limitations under the License.
 // operations are not repeated unnecessarily. The operations can be
 // created as a tree, and replaced dynamically as needed.
 //
+// All the operations in this module are thread-safe.
+//
 // # Dependencies and types of caches
 //
 // This package uses a source/transform/sink model of caches to build
@@ -34,15 +36,6 @@ limitations under the License.
 //     replaced with a new one, and saves the previous results in case an
 //     error pops-up.
 //
-// # Atomicity
-//
-// Most of the operations are not atomic/thread-safe, except for
-// [Replaceable.Replace] which can be performed while the objects are
-// being read. Specifically, `Get` methods are NOT thread-safe. Never
-// call `Get()` without a lock on a multi-threaded environment, since
-// it's usually performing updates to caches that will require write
-// operations.
-//
 // # Etags
 //
 // Etags in this library is a cache version identifier. It doesn't
@@ -57,6 +50,7 @@ package cached
 
 import (
 	"fmt"
+	"sync"
 	"sync/atomic"
 )
 
@@ -100,13 +94,6 @@ func (r Result[T]) Get() Result[T] {
 type Data[T any] interface {
 	// Returns the cached data, as well as an "etag" to identify the
 	// version of the cache, or an error if something happened.
-	//
-	// # Important note
-	//
-	// This method is NEVER thread-safe, never assume it is OK to
-	// call `Get()` without holding a proper mutex in a
-	// multi-threaded environment, especially since `Get()` will
-	// usually update the cache and perform write operations.
 	Get() Result[T]
 }
 
@@ -155,6 +142,7 @@ func NewMerger[K comparable, T, V any](mergeFn func(results map[K]Result[T]) Res
 }
 
 type listMerger[T, V any] struct {
+	lock         sync.Mutex
 	mergeFn      func([]Result[T]) Result[V]
 	caches       []Data[T]
 	cacheResults []Result[T]
@@ -183,15 +171,32 @@ func NewListMerger[T, V any](mergeFn func(results []Result[T]) Result[V], caches
 		caches:  caches,
 	}
 }
-func (c *listMerger[T, V]) prepareResults() []Result[T] {
-	cacheResults := make([]Result[T], 0, len(c.caches))
-	for _, cache := range c.caches {
-		cacheResults = append(cacheResults, cache.Get())
+
+func (c *listMerger[T, V]) prepareResultsLocked() []Result[T] {
+	cacheResults := make([]Result[T], len(c.caches))
+	ch := make(chan struct {
+		int
+		Result[T]
+	}, len(c.caches))
+	for i := range c.caches {
+		go func(index int) {
+			ch <- struct {
+				int
+				Result[T]
+			}{
+				index,
+				c.caches[index].Get(),
+			}
+		}(i)
+	}
+	for i := 0; i < len(c.caches); i++ {
+		res := <-ch
+		cacheResults[res.int] = res.Result
 	}
 	return cacheResults
 }
 
-func (c *listMerger[T, V]) needsRunning(results []Result[T]) bool {
+func (c *listMerger[T, V]) needsRunningLocked(results []Result[T]) bool {
 	if c.cacheResults == nil {
 		return true
 	}
@@ -211,8 +216,10 @@ func (c *listMerger[T, V]) needsRunning(results []Result[T]) bool {
 }
 
 func (c *listMerger[T, V]) Get() Result[V] {
-	cacheResults := c.prepareResults()
-	if c.needsRunning(cacheResults) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	cacheResults := c.prepareResultsLocked()
+	if c.needsRunningLocked(cacheResults) {
 		c.cacheResults = cacheResults
 		c.result = c.mergeFn(c.cacheResults)
 	}
@@ -238,7 +245,7 @@ func NewTransformer[T, V any](transformerFn func(Result[T]) Result[V], source Da
 
 // NewSource creates a new cache that generates some data. This
 // will always be called since we don't know the origin of the data and
-// if it needs to be updated or not.
+// if it needs to be updated or not. sourceFn MUST be thread-safe.
 func NewSource[T any](sourceFn func() Result[T]) Data[T] {
 	c := source[T](sourceFn)
 	return &c
@@ -259,25 +266,24 @@ func NewStaticSource[T any](staticFn func() Result[T]) Data[T] {
 }
 
 type static[T any] struct {
+	once   sync.Once
 	fn     func() Result[T]
-	result *Result[T]
+	result Result[T]
 }
 
 func (c *static[T]) Get() Result[T] {
-	if c.result == nil {
-		result := c.fn()
-		c.result = &result
-	}
-	return *c.result
+	c.once.Do(func() {
+		c.result = c.fn()
+	})
+	return c.result
 }
 
-// Replaceable is a cache that carries the result even when the
-// cache is replaced. The cache can be replaced atomically (without any
-// lock held). This is the type that should typically be stored in
+// Replaceable is a cache that carries the result even when the cache is
+// replaced. This is the type that should typically be stored in
 // structs.
 type Replaceable[T any] struct {
 	cache  atomic.Pointer[Data[T]]
-	result *Result[T]
+	result atomic.Pointer[Result[T]]
 }
 
 // Get retrieves the data from the underlying source. [Replaceable]
@@ -286,23 +292,21 @@ type Replaceable[T any] struct {
 // previously had returned a success, that success will be returned
 // instead. If the cache fails but we never returned a success, that
 // failure is returned.
-//
-// # Important note
-//
-// As all implementations of Get, this implementation is NOT
-// thread-safe. Please properly lock a mutex before calling this method
-// if you are in a multi-threaded environment, since this method will
-// update the cache and perform write operations.
 func (c *Replaceable[T]) Get() Result[T] {
 	result := (*c.cache.Load()).Get()
-	if result.Err != nil && c.result != nil && c.result.Err == nil {
-		return *c.result
+
+	for {
+		cResult := c.result.Load()
+		if result.Err != nil && cResult != nil && cResult.Err == nil {
+			return *cResult
+		}
+		if c.result.CompareAndSwap(cResult, &result) {
+			return result
+		}
 	}
-	c.result = &result
-	return *c.result
 }
 
-// Replace changes the cache in a thread-safe way.
+// Replace changes the cache.
 func (c *Replaceable[T]) Replace(cache Data[T]) {
 	c.cache.Swap(&cache)
 }
