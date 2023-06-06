@@ -43,11 +43,20 @@ const (
 // createNodeAllocatableCgroups creates Node Allocatable Cgroup when CgroupsPerQOS flag is specified as true
 func (cm *containerManagerImpl) createNodeAllocatableCgroups() error {
 	nodeAllocatable := cm.internalCapacity
+	klog.V(4).InfoS("Node Capacity: %v", nodeAllocatable)
 	// Use Node Allocatable limits instead of capacity if the user requested enforcing node allocatable.
 	nc := cm.NodeConfig.NodeAllocatableConfig
 	if cm.CgroupsPerQOS && nc.EnforceNodeAllocatable.Has(kubetypes.NodeAllocatableEnforcementKey) {
 		nodeAllocatable = cm.getNodeAllocatableInternalAbsolute()
+		klog.V(4).InfoS("Node Allocatable: %v", nodeAllocatable)
 	}
+
+	klog.V(4).InfoS("Node Allocatable: %v", nodeAllocatable)
+	klog.V(4).InfoS("Node Capacity Memory: %v", cm.internalCapacity.Memory())
+	klog.V(4).InfoS("Kube Reserved: %v", cm.NodeConfig.KubeReserved)
+	klog.V(4).InfoS("System Reserved: %v", cm.NodeConfig.SystemReserved)
+	klog.V(4).InfoS("Node Allocatable Memory: %v", nodeAllocatable.Memory())
+	klog.V(4).InfoS(cm.NodeConfig.KubeReservedCgroupName)
 
 	cgroupConfig := &CgroupConfig{
 		Name: cm.cgroupRoot,

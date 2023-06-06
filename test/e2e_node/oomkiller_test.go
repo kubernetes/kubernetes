@@ -19,7 +19,6 @@ package e2enode
 import (
 	"context"
 	"fmt"
-	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -36,7 +35,7 @@ type testCase struct {
 	oomTargetContainerName string
 }
 
-const PodOOMKilledTimeout = 2 * time.Minute
+// const PodOOMKilledTimeout = 2 * time.Minute
 
 var _ = SIGDescribe("OOMKiller [LinuxOnly] [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("oomkiller-test")
@@ -76,8 +75,13 @@ func runOomKillerTest(f *framework.Framework, testCase testCase) {
 
 func verifyReasonForOOMKilledContainer(pod *v1.Pod, oomTargetContainerName string) {
 	container := e2epod.FindContainerStatusInPod(pod, oomTargetContainerName)
+	fmt.Println("inside verifyReasonForOOMKilledContainer")
+	fmt.Println(oomTargetContainerName)
+	fmt.Println(pod.Name)
+	fmt.Println(container)
+	fmt.Println(pod.Spec.Containers)
 	if container == nil {
-		framework.Failf("OOM target pod %q, container %q does not have the expected state terminated", pod.Name, container.Name)
+		framework.Failf("OOM target pod %q, container %q does not have the expected state terminated", pod.Name, oomTargetContainerName)
 	}
 	if container.State.Terminated == nil {
 		framework.Failf("OOM target pod %q, container %q is not in the terminated state", pod.Name, container.Name)
