@@ -219,7 +219,7 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	var unknown runtime.Unknown
 	internalEvent := &metav1.InternalEvent{}
 	outEvent := &metav1.WatchEvent{}
-	buf := &bytes.Buffer{}
+	buf := runtime.NewSpliceBuffer()
 	ch := s.Watching.ResultChan()
 	done := req.Context().Done()
 
