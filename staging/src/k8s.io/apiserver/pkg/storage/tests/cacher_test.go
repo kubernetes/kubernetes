@@ -337,7 +337,9 @@ func TestWatch(t *testing.T) {
 }
 
 func TestWatchFromZero(t *testing.T) {
-	// TODO(#109831): Enable use of this test and run it.
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestWatchFromZero(ctx, t, cacher, nil)
 }
 
 func TestDeleteTriggerWatch(t *testing.T) {
