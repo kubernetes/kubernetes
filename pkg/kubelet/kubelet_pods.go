@@ -1173,6 +1173,16 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	metrics.RestartedPodTotal.WithLabelValues("true").Add(float64(restartCountStatic))
 	metrics.RestartedPodTotal.WithLabelValues("").Add(float64(restartCount))
 
+	// Complete termination of deleted pods that are not runtime pods (don't have
+	// running containers), are terminal, and are not known to pod workers.
+	// An example is pods rejected during kubelet admission that have never
+	// started before (i.e. does not have an orphaned pod).
+	// Triggering TerminatePod allows to proceed with force-deletion of such pods.
+	for _, pod := range kl.filterTerminalPodsToDelete(allPods, runningRuntimePods, workingPods) {
+		klog.V(3).InfoS("Completing termination of terminal pods scheduled for deletion", "pod", klog.KObj(pod), "podUID", pod.UID)
+		kl.statusManager.TerminatePod(pod)
+	}
+
 	// Finally, terminate any pods that are observed in the runtime but not present in the list of
 	// known running pods from config. If we do terminate running runtime pods that will happen
 	// asynchronously in the background and those will be processed in the next invocation of
@@ -1243,6 +1253,36 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	// Cleanup any backoff entries.
 	kl.backOff.GC()
 	return nil
+}
+
+// Filters terminal pods with deletion timestamp which are not runtime pods
+func (kl *Kubelet) filterTerminalPodsToDelete(allPods []*v1.Pod, runningRuntimePods []*kubecontainer.Pod, workingPods map[types.UID]PodWorkerSync) map[types.UID]*v1.Pod {
+	terminalPodsToDelete := make(map[types.UID]*v1.Pod)
+	for _, pod := range allPods {
+		if pod.DeletionTimestamp == nil {
+			// skip pods which don't have a deletion timestamp
+			continue
+		}
+		if !kl.isAdmittedPodTerminal(pod) {
+			// skip non-terminal pods
+			continue
+		}
+		if _, knownPod := workingPods[pod.UID]; knownPod {
+			// skip pods known to pod workers
+			continue
+		}
+		if _, knownPod := kl.statusManager.GetPodStatus(pod.UID); !knownPod {
+			// skip pods unknown to pod status manager
+			continue
+		}
+		terminalPodsToDelete[pod.UID] = pod
+	}
+	for _, runningRuntimePod := range runningRuntimePods {
+		// skip running runtime pods - they are handled by a dedicated routine
+		// which terminates the containers
+		delete(terminalPodsToDelete, runningRuntimePod.ID)
+	}
+	return terminalPodsToDelete
 }
 
 // splitPodsByStatic separates a list of desired pods from the pod manager into
