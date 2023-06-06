@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"sort"
@@ -77,6 +78,7 @@ import (
 	"k8s.io/client-go/scale/scheme/autoscalingv1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+	"k8s.io/kube-openapi/pkg/cached"
 	"k8s.io/kube-openapi/pkg/spec3"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
@@ -734,29 +736,29 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		typer := newUnstructuredObjectTyper(parameterScheme)
 		creator := unstructuredCreator{}
 
-		internalValidationSchema := cached[*apiextensionsinternal.CustomResourceValidation]{
-			Fn: func() (*apiextensionsinternal.CustomResourceValidation, error) {
+		internalValidationSchema := cached.NewStaticSource[*apiextensionsinternal.CustomResourceValidation](
+			func() cached.Result[*apiextensionsinternal.CustomResourceValidation] {
 				validationSchema, err := apiextensionshelpers.GetSchemaForVersion(crd, v.Name)
 				if err != nil {
 					utilruntime.HandleError(err)
-					return nil, fmt.Errorf("the server could not properly serve the CR schema")
+					return cached.NewResultErr[*apiextensionsinternal.CustomResourceValidation](errors.New("the server could not properly serve the CR schema"))
 				}
 				if validationSchema == nil {
-					return nil, nil
+					return cached.NewResultOK[*apiextensionsinternal.CustomResourceValidation](nil, "")
 				}
 				internalValidationSchema := &apiextensionsinternal.CustomResourceValidation{}
 				if err := apiextensionsv1.Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(validationSchema, internalValidationSchema, nil); err != nil {
-					return nil, fmt.Errorf("failed to convert CRD validation to internal version: %v", err)
+					return cached.NewResultErr[*apiextensionsinternal.CustomResourceValidation](fmt.Errorf("failed to convert CRD validation to internal version: %v", err))
 				}
-				return internalValidationSchema, nil
+				return cached.NewResultOK[*apiextensionsinternal.CustomResourceValidation](internalValidationSchema, "")
 			},
-		}
+		)
 		newValidator := func() (*validate.SchemaValidator, error) {
-			schema, err := internalValidationSchema.Get()
-			if err != nil {
+			result := internalValidationSchema.Get()
+			if result.Err != nil {
 				return nil, err
 			}
-			validator, _, err := apiservervalidation.NewSchemaValidator(schema)
+			validator, _, err := apiservervalidation.NewSchemaValidator(result.Data)
 			if err != nil {
 				return nil, err
 			}
@@ -777,10 +779,11 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 				return nil, fmt.Errorf("failed converting CRD status subresource to internal version: %v", err)
 			}
 			newStatusValidator = func() (*validate.SchemaValidator, error) {
-				schema, err := internalValidationSchema.Get()
-				if err != nil {
+				result := internalValidationSchema.Get()
+				if result.Err != nil {
 					return nil, err
 				}
+				schema := result.Data
 
 				// for the status subresource, validate only against the status schema
 				if schema == nil || schema.OpenAPIV3Schema == nil || schema.OpenAPIV3Schema.Properties == nil {
@@ -1423,33 +1426,4 @@ func buildOpenAPIModelsForApply(staticOpenAPISpec map[string]*spec.Schema, crd *
 		return nil, err
 	}
 	return mergedOpenAPI.Components.Schemas, nil
-}
-
-// cached[T] calls Fn on the first Get() call and stores its result. Every
-// following Get() call is served from the cache.
-type cached[T any] struct {
-	Fn func() (T, error)
-
-	lock  sync.RWMutex
-	value T
-	err   error
-}
-
-func (c *cached[T]) Get() (T, error) {
-	c.lock.RLock()
-	if c.Fn == nil {
-		defer c.lock.RUnlock()
-		return c.value, c.err
-	}
-	c.lock.RUnlock()
-
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	if c.Fn != nil {
-		c.value, c.err = c.Fn()
-		c.Fn = nil
-	}
-
-	return c.value, c.err
 }
