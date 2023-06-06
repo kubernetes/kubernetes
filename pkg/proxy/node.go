@@ -33,6 +33,12 @@ type NodePodCIDRHandler struct {
 	podCIDRs []string
 }
 
+func NewNodePodCIDRHandler(podCIDRs []string) *NodePodCIDRHandler {
+	return &NodePodCIDRHandler{
+		podCIDRs: podCIDRs,
+	}
+}
+
 var _ config.NodeHandler = &NodePodCIDRHandler{}
 
 // OnNodeAdd is a handler for Node creates.

@@ -163,12 +163,14 @@ func newProxyServer(
 	}
 
 	var nodeInfo *v1.Node
+	podCIDRs := []string{}
 	if detectLocalMode == proxyconfigapi.LocalModeNodeCIDR {
 		klog.InfoS("Watching for node, awaiting podCIDR allocation", "hostname", hostname)
 		nodeInfo, err = waitForPodCIDR(client, hostname)
 		if err != nil {
 			return nil, err
 		}
+		podCIDRs = nodeInfo.Spec.PodCIDRs
 		klog.InfoS("NodeInfo", "PodCIDR", nodeInfo.Spec.PodCIDR, "PodCIDRs", nodeInfo.Spec.PodCIDRs)
 	}
 
@@ -388,6 +390,7 @@ func newProxyServer(
 		HealthzServer:          healthzServer,
 		UseEndpointSlices:      useEndpointSlices,
 		localDetectorMode:      detectLocalMode,
+		podCIDRs:               podCIDRs,
 	}, nil
 }
 
