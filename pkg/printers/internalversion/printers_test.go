@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -1513,12 +1514,12 @@ func TestPrintPod(t *testing.T) {
 						{
 							Type:   api.PodScheduled,
 							Status: api.ConditionFalse,
-							Reason: api.PodReasonSchedulingGated,
+							Reason: apiv1.PodReasonSchedulingGated,
 						},
 					},
 				},
 			},
-			[]metav1.TableRow{{Cells: []interface{}{"test15", "0/2", api.PodReasonSchedulingGated, "0", "<unknown>"}}},
+			[]metav1.TableRow{{Cells: []interface{}{"test15", "0/2", apiv1.PodReasonSchedulingGated, "0", "<unknown>"}}},
 		},
 	}
 

@@ -2543,12 +2543,6 @@ const (
 	PodReady PodConditionType = "Ready"
 	// PodInitialized means that all init containers in the pod have started successfully.
 	PodInitialized PodConditionType = "Initialized"
-	// PodReasonUnschedulable reason in PodScheduled PodCondition means that the scheduler
-	// can't schedule the pod right now, for example due to insufficient resources in the cluster.
-	PodReasonUnschedulable = "Unschedulable"
-	// PodReasonSchedulingGated reason in PodScheduled PodCondition means that the scheduler
-	// skips scheduling the pod because one or more scheduling gates are still present.
-	PodReasonSchedulingGated = "SchedulingGated"
 	// ContainersReady indicates whether all containers in the pod are ready.
 	ContainersReady PodConditionType = "ContainersReady"
 	// DisruptionTarget indicates the pod is about to be terminated due to a

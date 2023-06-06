@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -686,7 +687,7 @@ func applyWaitingForSchedulingGatesCondition(pod *api.Pod) {
 	pod.Status.Conditions = append(pod.Status.Conditions, api.PodCondition{
 		Type:    api.PodScheduled,
 		Status:  api.ConditionFalse,
-		Reason:  api.PodReasonSchedulingGated,
+		Reason:  apiv1.PodReasonSchedulingGated,
 		Message: "Scheduling is blocked due to non-empty scheduling gates",
 	})
 }
