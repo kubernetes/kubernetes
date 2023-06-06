@@ -54,7 +54,7 @@ func certRotatingDialer(reload reloadFunc, dial utilnet.DialFunc) *dynamicClient
 	d := &dynamicClientCert{
 		reload:     reload,
 		connDialer: connrotation.NewDialer(connrotation.DialFunc(dial)),
-		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "DynamicClientCertificate"),
+		queue:      workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "DynamicClientCertificate"}),
 	}
 
 	return d

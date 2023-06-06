@@ -94,7 +94,7 @@ func NewDynamicCAFromConfigMapController(purpose, namespace, name, key string, k
 		configmapLister:    configmapLister,
 		configMapInformer:  uncastConfigmapInformer,
 
-		queue:        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), fmt.Sprintf("DynamicConfigMapCABundle-%s", purpose)),
+		queue:        workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: fmt.Sprintf("DynamicConfigMapCABundle-%s", purpose)}),
 		preRunCaches: []cache.InformerSynced{uncastConfigmapInformer.HasSynced},
 	}
 

@@ -55,7 +55,7 @@ func NewPublisher(cmInformer coreinformers.ConfigMapInformer, nsInformer coreinf
 	e := &Publisher{
 		client: cl,
 		rootCA: rootCA,
-		queue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "root_ca_cert_publisher"),
+		queue:  workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "root_ca_cert_publisher"}),
 	}
 
 	cmInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{

@@ -85,12 +85,12 @@ func NewController(endpointsInformer coreinformers.EndpointsInformer,
 		// processes events that can require significant EndpointSlice changes.
 		// A more significant rate limit back off here helps ensure that the
 		// Controller does not overwhelm the API Server.
-		queue: workqueue.NewNamedRateLimitingQueue(workqueue.NewMaxOfRateLimiter(
+		queue: workqueue.NewRateLimitingQueueWithConfig(workqueue.NewMaxOfRateLimiter(
 			workqueue.NewItemExponentialFailureRateLimiter(defaultSyncBackOff, maxSyncBackOff),
 			// 10 qps, 100 bucket size. This is only for retry speed and its
 			// only the overall factor (not per item).
 			&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
-		), "endpoint_slice_mirroring"),
+		), workqueue.RateLimitingQueueConfig{Name: "endpoint_slice_mirroring"}),
 		workerLoopPeriod: time.Second,
 	}
 

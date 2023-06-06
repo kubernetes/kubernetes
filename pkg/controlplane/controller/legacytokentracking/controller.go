@@ -81,7 +81,7 @@ func newController(cs kubernetes.Interface, cl clock.Clock, limiter *rate.Limite
 
 	c := &Controller{
 		configMapClient:     cs.CoreV1(),
-		queue:               workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "legacy_token_tracking_controller"),
+		queue:               workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "legacy_token_tracking_controller"}),
 		configMapInformer:   informer,
 		configMapCache:      informer.GetIndexer(),
 		configMapSynced:     informer.HasSynced,

@@ -69,7 +69,7 @@ func NewNamingConditionController(
 		crdClient: crdClient,
 		crdLister: crdInformer.Lister(),
 		crdSynced: crdInformer.Informer().HasSynced,
-		queue:     workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "crd_naming_condition_controller"),
+		queue:     workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "crd_naming_condition_controller"}),
 	}
 
 	informerIndexer := crdInformer.Informer().GetIndexer()

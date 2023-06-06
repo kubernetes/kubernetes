@@ -166,7 +166,7 @@ func NewDiscoveryManager(
 		mergedDiscoveryHandler: target,
 		apiServices:            make(map[string]groupVersionInfo),
 		cachedResults:          make(map[serviceKey]cachedResult),
-		dirtyAPIServiceQueue:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "discovery-manager"),
+		dirtyAPIServiceQueue:   workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "discovery-manager"}),
 	}
 }
 

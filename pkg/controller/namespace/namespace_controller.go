@@ -74,7 +74,7 @@ func NewNamespaceController(
 
 	// create the controller so we can inject the enqueue function
 	namespaceController := &NamespaceController{
-		queue:                      workqueue.NewNamedRateLimitingQueue(nsControllerRateLimiter(), "namespace"),
+		queue:                      workqueue.NewRateLimitingQueueWithConfig(nsControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "namespace"}),
 		namespacedResourcesDeleter: deletion.NewNamespacedResourcesDeleter(ctx, kubeClient.CoreV1().Namespaces(), metadataClient, kubeClient.CoreV1(), discoverResourcesFn, finalizerToken),
 	}
 

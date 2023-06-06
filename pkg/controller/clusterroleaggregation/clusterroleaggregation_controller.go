@@ -58,7 +58,7 @@ func NewClusterRoleAggregation(clusterRoleInformer rbacinformers.ClusterRoleInfo
 		clusterRoleLister:  clusterRoleInformer.Lister(),
 		clusterRolesSynced: clusterRoleInformer.Informer().HasSynced,
 
-		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ClusterRoleAggregator"),
+		queue: workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "ClusterRoleAggregator"}),
 	}
 	c.syncHandler = c.syncClusterRole
 

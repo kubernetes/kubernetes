@@ -76,7 +76,7 @@ func NewDynamicServingCertificateController(
 		servingCert:   servingCert,
 		sniCerts:      sniCerts,
 
-		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "DynamicServingCertificateController"),
+		queue:         workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "DynamicServingCertificateController"}),
 		eventRecorder: eventRecorder,
 	}
 

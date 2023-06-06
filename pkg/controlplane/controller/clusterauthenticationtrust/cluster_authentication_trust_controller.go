@@ -98,7 +98,7 @@ func NewClusterAuthenticationTrustController(requiredAuthenticationData ClusterA
 		configMapLister:             corev1listers.NewConfigMapLister(kubeSystemConfigMapInformer.GetIndexer()),
 		configMapClient:             kubeClient.CoreV1(),
 		namespaceClient:             kubeClient.CoreV1(),
-		queue:                       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "cluster_authentication_trust_controller"),
+		queue:                       workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "cluster_authentication_trust_controller"}),
 		preRunCaches:                []cache.InformerSynced{kubeSystemConfigMapInformer.HasSynced},
 		kubeSystemConfigMapInformer: kubeSystemConfigMapInformer,
 	}

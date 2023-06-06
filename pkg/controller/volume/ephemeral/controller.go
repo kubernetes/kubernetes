@@ -87,7 +87,7 @@ func NewController(
 		podSynced:  podInformer.Informer().HasSynced,
 		pvcLister:  pvcInformer.Lister(),
 		pvcsSynced: pvcInformer.Informer().HasSynced,
-		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ephemeral_volume"),
+		queue:      workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "ephemeral_volume"}),
 	}
 
 	ephemeralvolumemetrics.RegisterMetrics()

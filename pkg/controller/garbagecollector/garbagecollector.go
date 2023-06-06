@@ -96,8 +96,8 @@ func NewGarbageCollector(
 	eventBroadcaster := record.NewBroadcaster()
 	eventRecorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "garbage-collector-controller"})
 
-	attemptToDelete := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_delete")
-	attemptToOrphan := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_orphan")
+	attemptToDelete := workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "garbage_collector_attempt_to_delete"})
+	attemptToOrphan := workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "garbage_collector_attempt_to_orphan"})
 	absentOwnerCache := NewReferenceCache(500)
 	gc := &GarbageCollector{
 		metadataClient:   metadataClient,
@@ -113,7 +113,7 @@ func NewGarbageCollector(
 		metadataClient:   metadataClient,
 		informersStarted: informersStarted,
 		restMapper:       mapper,
-		graphChanges:     workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_graph_changes"),
+		graphChanges:     workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "garbage_collector_graph_changes"}),
 		uidToNode: &concurrentUIDToNode{
 			uidToNode: make(map[types.UID]*node),
 		},

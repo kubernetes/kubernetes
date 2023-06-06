@@ -76,7 +76,7 @@ func NewEndpointController(podInformer coreinformers.PodInformer, serviceInforme
 
 	e := &Controller{
 		client:           client,
-		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "endpoint"),
+		queue:            workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "endpoint"}),
 		workerLoopPeriod: time.Second,
 	}
 

@@ -63,7 +63,7 @@ func NewKubernetesAPIApprovalPolicyConformantConditionController(
 		crdClient:                   crdClient,
 		crdLister:                   crdInformer.Lister(),
 		crdSynced:                   crdInformer.Informer().HasSynced,
-		queue:                       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "kubernetes_api_approval_conformant_condition_controller"),
+		queue:                       workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "kubernetes_api_approval_conformant_condition_controller"}),
 		lastSeenProtectedAnnotation: map[string]string{},
 	}
 

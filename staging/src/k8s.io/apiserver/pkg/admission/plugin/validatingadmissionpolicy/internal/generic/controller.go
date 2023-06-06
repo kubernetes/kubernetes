@@ -99,7 +99,7 @@ func (c *controller[T]) Run(ctx context.Context) error {
 	klog.Infof("starting %s", c.options.Name)
 	defer klog.Infof("stopping %s", c.options.Name)
 
-	c.queue = workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), c.options.Name)
+	c.queue = workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: c.options.Name})
 
 	// Forcefully shutdown workqueue. Drop any enqueued items.
 	// Important to do this in a `defer` at the start of `Run`.

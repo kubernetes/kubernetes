@@ -97,7 +97,7 @@ func NewAutoRegisterController(apiServiceInformer informers.APIServiceInformer, 
 		syncedSuccessfullyLock: &sync.RWMutex{},
 		syncedSuccessfully:     map[string]bool{},
 
-		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "autoregister"),
+		queue: workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "autoregister"}),
 	}
 	c.syncHandler = c.checkAPIService
 

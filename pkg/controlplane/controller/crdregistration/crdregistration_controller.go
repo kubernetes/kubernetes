@@ -67,7 +67,7 @@ func NewCRDRegistrationController(crdinformer crdinformers.CustomResourceDefinit
 		crdSynced:              crdinformer.Informer().HasSynced,
 		apiServiceRegistration: apiServiceRegistration,
 		syncedInitialSet:       make(chan struct{}),
-		queue:                  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "crd_autoregistration_controller"),
+		queue:                  workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "crd_autoregistration_controller"}),
 	}
 	c.syncHandler = c.handleVersionUpdate
 

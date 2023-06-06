@@ -102,7 +102,7 @@ func NewStatefulSetController(
 		),
 		pvcListerSynced: pvcInformer.Informer().HasSynced,
 		revListerSynced: revInformer.Informer().HasSynced,
-		queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "statefulset"),
+		queue:           workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "statefulset"}),
 		podControl:      controller.RealPodControl{KubeClient: kubeClient, Recorder: recorder},
 
 		eventBroadcaster: eventBroadcaster,

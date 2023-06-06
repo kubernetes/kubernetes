@@ -55,7 +55,7 @@ func NewEstablishingController(crdInformer informers.CustomResourceDefinitionInf
 		crdClient: crdClient,
 		crdLister: crdInformer.Lister(),
 		crdSynced: crdInformer.Informer().HasSynced,
-		queue:     workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "crdEstablishing"),
+		queue:     workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "crdEstablishing"}),
 	}
 
 	ec.syncFn = ec.sync

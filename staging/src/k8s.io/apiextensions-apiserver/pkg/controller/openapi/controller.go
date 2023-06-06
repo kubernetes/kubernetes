@@ -62,7 +62,7 @@ func NewController(crdInformer informers.CustomResourceDefinitionInformer) *Cont
 	c := &Controller{
 		crdLister:  crdInformer.Lister(),
 		crdsSynced: crdInformer.Informer().HasSynced,
-		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "crd_openapi_controller"),
+		queue:      workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "crd_openapi_controller"}),
 		crdSpecs:   map[string]map[string]*spec.Swagger{},
 	}
 

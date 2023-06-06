@@ -335,7 +335,7 @@ func NewNodeLifecycleController(
 		largeClusterThreshold:       largeClusterThreshold,
 		unhealthyZoneThreshold:      unhealthyZoneThreshold,
 		nodeUpdateQueue:             workqueue.NewNamed("node_lifecycle_controller"),
-		podUpdateQueue:              workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "node_lifecycle_controller_pods"),
+		podUpdateQueue:              workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "node_lifecycle_controller_pods"}),
 	}
 
 	nc.enterPartialDisruptionFunc = nc.ReducedQPSFunc

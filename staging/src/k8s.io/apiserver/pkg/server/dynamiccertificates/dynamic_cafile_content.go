@@ -82,7 +82,7 @@ func NewDynamicCAContentFromFile(purpose, filename string) (*DynamicFileCAConten
 	ret := &DynamicFileCAContent{
 		name:     name,
 		filename: filename,
-		queue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), fmt.Sprintf("DynamicCABundle-%s", purpose)),
+		queue:    workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: fmt.Sprintf("DynamicCABundle-%s", purpose)}),
 	}
 	if err := ret.loadCABundle(); err != nil {
 		return nil, err

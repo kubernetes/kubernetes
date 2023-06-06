@@ -279,7 +279,7 @@ func newTestableController(config TestableConfig) *configController {
 	klog.V(2).Infof("NewTestableController %q with serverConcurrencyLimit=%d, requestWaitLimit=%s, name=%s, asFieldManager=%q", cfgCtlr.name, cfgCtlr.serverConcurrencyLimit, cfgCtlr.requestWaitLimit, cfgCtlr.name, cfgCtlr.asFieldManager)
 	// Start with longish delay because conflicts will be between
 	// different processes, so take some time to go away.
-	cfgCtlr.configQueue = workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(200*time.Millisecond, 8*time.Hour), "priority_and_fairness_config_queue")
+	cfgCtlr.configQueue = workqueue.NewRateLimitingQueueWithConfig(workqueue.NewItemExponentialFailureRateLimiter(200*time.Millisecond, 8*time.Hour), workqueue.RateLimitingQueueConfig{Name: "priority_and_fairness_config_queue"})
 	// ensure the data structure reflects the mandatory config
 	cfgCtlr.lockAndDigestConfigObjects(nil, nil)
 	fci := config.InformerFactory.Flowcontrol().V1beta3()

@@ -81,14 +81,6 @@ func NewRateLimitingQueueWithConfig(rateLimiter RateLimiter, config RateLimiting
 	}
 }
 
-// NewNamedRateLimitingQueue constructs a new named workqueue with rateLimited queuing ability.
-// Deprecated: Use NewRateLimitingQueueWithConfig instead.
-func NewNamedRateLimitingQueue(rateLimiter RateLimiter, name string) RateLimitingInterface {
-	return NewRateLimitingQueueWithConfig(rateLimiter, RateLimitingQueueConfig{
-		Name: name,
-	})
-}
-
 // NewRateLimitingQueueWithDelayingInterface constructs a new named workqueue with rateLimited queuing ability
 // with the option to inject a custom delaying queue instead of the default one.
 // Deprecated: Use NewRateLimitingQueueWithConfig instead.

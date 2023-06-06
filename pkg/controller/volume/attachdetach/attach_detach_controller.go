@@ -135,7 +135,7 @@ func NewAttachDetachController(
 		nodeLister:          nodeInformer.Lister(),
 		nodesSynced:         nodeInformer.Informer().HasSynced,
 		cloud:               cloud,
-		pvcQueue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcs"),
+		pvcQueue:            workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "pvcs"}),
 		filteredDialOptions: filteredDialOptions,
 	}
 

@@ -93,7 +93,7 @@ func NewCRDFinalizer(
 		crdLister:      crdInformer.Lister(),
 		crdSynced:      crdInformer.Informer().HasSynced,
 		crClientGetter: crClientGetter,
-		queue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "crd_finalizer"),
+		queue:          workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "crd_finalizer"}),
 	}
 
 	crdInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{

@@ -136,7 +136,7 @@ func NewCloudNodeController(
 		workerCount:               workerCount,
 		nodesLister:               nodeInformer.Lister(),
 		nodesSynced:               nodeInformer.Informer().HasSynced,
-		workqueue:                 workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Nodes"),
+		workqueue:                 workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "Nodes"}),
 	}
 
 	// Use shared informer to listen to add/update of nodes. Note that any nodes

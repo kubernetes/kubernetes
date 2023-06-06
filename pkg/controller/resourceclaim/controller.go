@@ -112,7 +112,7 @@ func NewController(
 		claimsSynced:    claimInformer.Informer().HasSynced,
 		templateLister:  templateInformer.Lister(),
 		templatesSynced: templateInformer.Informer().HasSynced,
-		queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "resource_claim"),
+		queue:           workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "resource_claim"}),
 		deletedObjects:  newUIDCache(maxUIDCacheEntries),
 	}
 

@@ -316,7 +316,7 @@ func TestSync(t *testing.T) {
 			apiServiceClient:  fakeClient.ApiregistrationV1(),
 			apiServiceLister:  listers.NewAPIServiceLister(apiServiceIndexer),
 			apiServicesToSync: map[string]*apiregistrationv1.APIService{},
-			queue:             workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "autoregister"),
+			queue:             workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "autoregister"}),
 
 			syncedSuccessfullyLock: &sync.RWMutex{},
 			syncedSuccessfully:     alreadySynced,

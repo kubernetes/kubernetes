@@ -56,9 +56,9 @@ type AggregationController struct {
 func NewAggregationController(openAPIAggregationManager aggregator.SpecProxier) *AggregationController {
 	c := &AggregationController{
 		openAPIAggregationManager: openAPIAggregationManager,
-		queue: workqueue.NewNamedRateLimitingQueue(
+		queue: workqueue.NewRateLimitingQueueWithConfig(
 			workqueue.NewItemExponentialFailureRateLimiter(successfulUpdateDelay, failedUpdateMaxExpDelay),
-			"open_api_v3_aggregation_controller",
+			workqueue.RateLimitingQueueConfig{Name: "open_api_v3_aggregation_controller"},
 		),
 	}
 

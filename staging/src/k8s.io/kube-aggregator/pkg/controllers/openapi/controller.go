@@ -58,9 +58,9 @@ type AggregationController struct {
 func NewAggregationController(downloader *aggregator.Downloader, openAPIAggregationManager aggregator.SpecAggregator) *AggregationController {
 	c := &AggregationController{
 		openAPIAggregationManager: openAPIAggregationManager,
-		queue: workqueue.NewNamedRateLimitingQueue(
+		queue: workqueue.NewRateLimitingQueueWithConfig(
 			workqueue.NewItemExponentialFailureRateLimiter(successfulUpdateDelay, failedUpdateMaxExpDelay),
-			"open_api_aggregation_controller",
+			workqueue.RateLimitingQueueConfig{Name: "open_api_aggregation_controller"},
 		),
 		downloader: downloader,
 	}

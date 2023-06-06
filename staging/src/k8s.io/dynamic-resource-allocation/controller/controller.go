@@ -178,8 +178,8 @@ func New(
 		v1.EventSource{Component: fmt.Sprintf("resource driver %s", name)})
 
 	// The work queue contains either keys for claims or PodSchedulingContext objects.
-	queue := workqueue.NewNamedRateLimitingQueue(
-		workqueue.DefaultControllerRateLimiter(), fmt.Sprintf("%s-queue", name))
+	queue := workqueue.NewRateLimitingQueueWithConfig(
+		workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: fmt.Sprintf("%s-queue", name)})
 
 	// The mutation cache acts as an additional layer for the informer
 	// cache and after an update made by the controller returns a more

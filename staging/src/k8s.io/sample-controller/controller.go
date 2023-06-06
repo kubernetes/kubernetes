@@ -111,7 +111,7 @@ func NewController(
 		deploymentsSynced: deploymentInformer.Informer().HasSynced,
 		foosLister:        fooInformer.Lister(),
 		foosSynced:        fooInformer.Informer().HasSynced,
-		workqueue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Foos"),
+		workqueue:         workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "Foos"}),
 		recorder:          recorder,
 	}
 

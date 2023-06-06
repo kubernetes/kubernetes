@@ -64,7 +64,7 @@ func NewDynamicServingContentFromFiles(purpose, certFile, keyFile string) (*Dyna
 		name:     name,
 		certFile: certFile,
 		keyFile:  keyFile,
-		queue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), fmt.Sprintf("DynamicCABundle-%s", purpose)),
+		queue:    workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: fmt.Sprintf("DynamicCABundle-%s", purpose)}),
 	}
 	if err := ret.loadCertKeyPair(); err != nil {
 		return nil, err

@@ -170,8 +170,8 @@ func newController() (*Controller, *fakecloud.Cloud, *fake.Clientset) {
 		eventRecorder:    recorder,
 		nodeLister:       newFakeNodeLister(nil),
 		nodeListerSynced: nodeInformer.Informer().HasSynced,
-		serviceQueue:     workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(minRetryDelay, maxRetryDelay), "service"),
-		nodeQueue:        workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(minRetryDelay, maxRetryDelay), "node"),
+		serviceQueue:     workqueue.NewRateLimitingQueueWithConfig(workqueue.NewItemExponentialFailureRateLimiter(minRetryDelay, maxRetryDelay), workqueue.RateLimitingQueueConfig{Name: "service"}),
+		nodeQueue:        workqueue.NewRateLimitingQueueWithConfig(workqueue.NewItemExponentialFailureRateLimiter(minRetryDelay, maxRetryDelay), workqueue.RateLimitingQueueConfig{Name: "node"}),
 		lastSyncedNodes:  []*v1.Node{},
 	}
 
@@ -2379,7 +2379,7 @@ func TestServiceQueueDelay(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			controller, cloud, client := newController()
-			queue := &spyWorkQueue{RateLimitingInterface: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-service-queue-delay")}
+			queue := &spyWorkQueue{RateLimitingInterface: workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "test-service-queue-delay"})}
 			controller.serviceQueue = queue
 			cloud.Err = tc.lbCloudErr
 

@@ -67,7 +67,7 @@ func NewConditionController(
 		crdClient:          crdClient,
 		crdLister:          crdInformer.Lister(),
 		crdSynced:          crdInformer.Informer().HasSynced,
-		queue:              workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "non_structural_schema_condition_controller"),
+		queue:              workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "non_structural_schema_condition_controller"}),
 		lastSeenGeneration: map[string]int64{},
 	}
 

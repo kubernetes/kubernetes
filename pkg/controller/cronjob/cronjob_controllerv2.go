@@ -85,7 +85,7 @@ func NewControllerV2(ctx context.Context, jobInformer batchv1informers.JobInform
 	eventBroadcaster := record.NewBroadcaster()
 
 	jm := &ControllerV2{
-		queue:       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "cronjob"),
+		queue:       workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "cronjob"}),
 		kubeClient:  kubeClient,
 		broadcaster: eventBroadcaster,
 		recorder:    eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "cronjob-controller"}),

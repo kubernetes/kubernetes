@@ -168,7 +168,7 @@ func TestRequeueStuckDeployment(t *testing.T) {
 	}
 
 	dc := &DeploymentController{
-		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "doesnt_matter"),
+		queue: workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "doesnt_matter"}),
 	}
 	dc.enqueueDeployment = dc.enqueue
 

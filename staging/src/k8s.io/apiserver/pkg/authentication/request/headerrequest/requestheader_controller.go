@@ -104,7 +104,7 @@ func NewRequestHeaderAuthRequestController(
 		extraHeaderPrefixesKey: extraHeaderPrefixesKey,
 		allowedClientNamesKey:  allowedClientNamesKey,
 
-		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "RequestHeaderAuthRequestController"),
+		queue: workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "RequestHeaderAuthRequestController"}),
 	}
 
 	// we construct our own informer because we need such a small subset of the information available.  Just one namespace.

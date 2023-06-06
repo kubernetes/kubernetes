@@ -62,7 +62,7 @@ func NewDynamicEncryptionConfiguration(
 		filePath:                       filePath,
 		lastLoadedEncryptionConfigHash: configContentHash,
 		dynamicTransformers:            dynamicTransformers,
-		queue:                          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), name),
+		queue:                          workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: name}),
 	}
 	encryptionConfig.queue.Add(workqueueKey) // to avoid missing any file changes that occur in between the initial load and Run
 

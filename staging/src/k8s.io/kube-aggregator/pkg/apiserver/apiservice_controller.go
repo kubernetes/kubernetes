@@ -62,7 +62,7 @@ func NewAPIServiceRegistrationController(apiServiceInformer informers.APIService
 		apiHandlerManager: apiHandlerManager,
 		apiServiceLister:  apiServiceInformer.Lister(),
 		apiServiceSynced:  apiServiceInformer.Informer().HasSynced,
-		queue:             workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "APIServiceRegistrationController"),
+		queue:             workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "APIServiceRegistrationController"}),
 	}
 
 	apiServiceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{

@@ -80,8 +80,8 @@ func NewTokensController(serviceAccounts informers.ServiceAccountInformer, secre
 		token:  options.TokenGenerator,
 		rootCA: options.RootCA,
 
-		syncServiceAccountQueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "serviceaccount_tokens_service"),
-		syncSecretQueue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "serviceaccount_tokens_secret"),
+		syncServiceAccountQueue: workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "serviceaccount_tokens_service"}),
+		syncSecretQueue:         workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "serviceaccount_tokens_secret"}),
 
 		maxRetries: maxRetries,
 	}
