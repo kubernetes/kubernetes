@@ -478,8 +478,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		}
 	})
 
-	// Marked as flaky until https://github.com/kubernetes/kubernetes/issues/65517 is solved.
-	ginkgo.It("[Flaky] kubectl explain works for CR with the same resource name as built-in object.", func(ctx context.Context) {
+	ginkgo.It("kubectl explain works for CR with the same resource name as built-in object.", func(ctx context.Context) {
 		customServiceShortName := fmt.Sprintf("ksvc-%d", time.Now().Unix()) // make short name unique
 		opt := func(crd *apiextensionsv1.CustomResourceDefinition) {
 			crd.ObjectMeta = metav1.ObjectMeta{Name: "services." + crd.Spec.Group}
@@ -493,6 +492,11 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		}
 		crdSvc, err := setupCRDAndVerifySchemaWithOptions(f, schemaCustomService, schemaCustomService, "service", []string{"v1"}, opt)
 		if err != nil {
+			framework.Failf("%v", err)
+		}
+
+		// Run kubectl api-resources to invalidate kubectl's discovery cache
+		if _, err := e2ekubectl.RunKubectl("", "api-resources", "--cached=false"); err != nil {
 			framework.Failf("%v", err)
 		}
 
