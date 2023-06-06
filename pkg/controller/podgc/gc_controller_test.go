@@ -37,6 +37,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	metricstestutil "k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/podgc/metrics"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
@@ -159,7 +160,7 @@ func TestGCTerminated(t *testing.T) {
 			for _, pod := range test.pods {
 				creationTime = creationTime.Add(1 * time.Hour)
 				pods = append(pods, &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{Name: pod.name, CreationTimestamp: metav1.Time{Time: creationTime}},
+					ObjectMeta: metav1.ObjectMeta{Name: pod.name, Namespace: metav1.NamespaceDefault, CreationTimestamp: metav1.Time{Time: creationTime}},
 					Status:     v1.PodStatus{Phase: pod.phase, Reason: pod.reason},
 					Spec:       v1.PodSpec{NodeName: "node"},
 				})
@@ -175,12 +176,16 @@ func TestGCTerminated(t *testing.T) {
 			verifyDeletedAndPatchedPods(t, client, test.deletedPodNames, test.patchedPodNames)
 		})
 	}
+
+	// testDeletingPodsMetrics is 9 in this test
+	testDeletingPodsMetrics(t, 9, metrics.PodGCReasonTerminated)
 }
 
 func makePod(name string, nodeName string, phase v1.PodPhase) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
+			Name:      name,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Spec:   v1.PodSpec{NodeName: nodeName},
 		Status: v1.PodStatus{Phase: phase},
@@ -406,6 +411,9 @@ func TestGCOrphaned(t *testing.T) {
 			verifyDeletedAndPatchedPods(t, client, test.deletedPodNames, test.patchedPodNames)
 		})
 	}
+
+	// testDeletingPodsMetrics is 10 in this test
+	testDeletingPodsMetrics(t, 10, metrics.PodGCReasonOrphaned)
 }
 
 func TestGCUnscheduledTerminating(t *testing.T) {
@@ -463,7 +471,7 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 			for _, pod := range test.pods {
 				creationTime = creationTime.Add(1 * time.Hour)
 				pods = append(pods, &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{Name: pod.name, CreationTimestamp: metav1.Time{Time: creationTime},
+					ObjectMeta: metav1.ObjectMeta{Name: pod.name, Namespace: metav1.NamespaceDefault, CreationTimestamp: metav1.Time{Time: creationTime},
 						DeletionTimestamp: pod.deletionTimeStamp},
 					Status: v1.PodStatus{Phase: pod.phase},
 					Spec:   v1.PodSpec{NodeName: pod.nodeName},
@@ -486,6 +494,9 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 			verifyDeletedAndPatchedPods(t, client, test.deletedPodNames, test.patchedPodNames)
 		})
 	}
+
+	// testDeletingPodsMetrics is 6 in this test
+	testDeletingPodsMetrics(t, 6, metrics.PodGCReasonTerminatingUnscheduled)
 }
 
 func TestGCTerminating(t *testing.T) {
@@ -633,7 +644,7 @@ func TestGCTerminating(t *testing.T) {
 			for _, pod := range test.pods {
 				creationTime = creationTime.Add(1 * time.Hour)
 				pods = append(pods, &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{Name: pod.name, CreationTimestamp: metav1.Time{Time: creationTime},
+					ObjectMeta: metav1.ObjectMeta{Name: pod.name, Namespace: metav1.NamespaceDefault, CreationTimestamp: metav1.Time{Time: creationTime},
 						DeletionTimestamp: pod.deletionTimeStamp},
 					Status: v1.PodStatus{Phase: pod.phase},
 					Spec:   v1.PodSpec{NodeName: pod.nodeName},
@@ -653,8 +664,8 @@ func TestGCTerminating(t *testing.T) {
 			verifyDeletedAndPatchedPods(t, client, test.deletedPodNames, test.patchedPodNames)
 		})
 	}
-	// deletingPodsTotal is 7 in this test
-	testDeletingPodsMetrics(t, 7)
+	// testDeletingPodsMetrics is 7 in this test
+	testDeletingPodsMetrics(t, 7, metrics.PodGCReasonTerminatingOutOfService)
 }
 
 func verifyDeletedAndPatchedPods(t *testing.T, client *fake.Clientset, wantDeletedPodNames, wantPatchedPodNames sets.String) {
@@ -669,18 +680,18 @@ func verifyDeletedAndPatchedPods(t *testing.T, client *fake.Clientset, wantDelet
 	}
 }
 
-func testDeletingPodsMetrics(t *testing.T, inputDeletingPodsTotal int) {
+func testDeletingPodsMetrics(t *testing.T, total int, reason string) {
 	t.Helper()
 
-	actualDeletingPodsTotal, err := metricstestutil.GetCounterMetricValue(deletingPodsTotal.WithLabelValues())
+	actualDeletingPodsTotal, err := metricstestutil.GetCounterMetricValue(metrics.DeletingPodsTotal.WithLabelValues(metav1.NamespaceDefault, reason))
 	if err != nil {
 		t.Errorf("Error getting actualDeletingPodsTotal")
 	}
-	if actualDeletingPodsTotal != float64(inputDeletingPodsTotal) {
-		t.Errorf("Expected desiredDeletingPodsTotal to be %d, got %v", inputDeletingPodsTotal, actualDeletingPodsTotal)
+	if actualDeletingPodsTotal != float64(total) {
+		t.Errorf("Expected desiredDeletingPodsTotal to be %d, got %v", total, actualDeletingPodsTotal)
 	}
 
-	actualDeletingPodsErrorTotal, err := metricstestutil.GetCounterMetricValue(deletingPodsErrorTotal.WithLabelValues())
+	actualDeletingPodsErrorTotal, err := metricstestutil.GetCounterMetricValue(metrics.DeletingPodsErrorTotal.WithLabelValues("", reason))
 	if err != nil {
 		t.Errorf("Error getting actualDeletingPodsErrorTotal")
 	}
