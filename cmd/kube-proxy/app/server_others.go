@@ -88,6 +88,7 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 		if err != nil {
 			return nil, err
 		}
+		s.podCIDRs = nodeInfo.Spec.PodCIDRs
 		klog.InfoS("NodeInfo", "podCIDR", nodeInfo.Spec.PodCIDR, "podCIDRs", nodeInfo.Spec.PodCIDRs)
 	}
 

@@ -522,6 +522,8 @@ type ProxyServer struct {
 	Hostname      string
 	NodeIP        net.IP
 
+	podCIDRs []string // only used for LocalModeNodeCIDR
+
 	Proxier proxy.Provider
 }
 
@@ -754,7 +756,7 @@ func (s *ProxyServer) Run() error {
 	nodeConfig := config.NewNodeConfig(currentNodeInformerFactory.Core().V1().Nodes(), s.Config.ConfigSyncPeriod.Duration)
 	// https://issues.k8s.io/111321
 	if s.Config.DetectLocalMode == kubeproxyconfig.LocalModeNodeCIDR {
-		nodeConfig.RegisterEventHandler(&proxy.NodePodCIDRHandler{})
+		nodeConfig.RegisterEventHandler(proxy.NewNodePodCIDRHandler(s.podCIDRs))
 	}
 	nodeConfig.RegisterEventHandler(s.Proxier)
 
