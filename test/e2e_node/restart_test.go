@@ -381,6 +381,69 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 				return checkMirrorPodDisappear(ctx, f.ClientSet, pod.Name, pod.Namespace)
 			}, f.Timeouts.PodDelete, f.Timeouts.Poll).Should(gomega.BeNil())
 		})
+		// Regression test for https://issues.k8s.io/118472
+		ginkgo.It("should force-delete non-admissible pods created and deleted during kubelet restart", func(ctx context.Context) {
+			podName := "rejected-deleted-pod" + string(uuid.NewUUID())
+			gracePeriod := int64(30)
+			nodeName := getNodeName(ctx, f)
+			podSpec := e2epod.MustMixinRestrictedPodSecurity(&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      podName,
+					Namespace: f.Namespace.Name,
+				},
+				Spec: v1.PodSpec{
+					NodeName: nodeName,
+					NodeSelector: map[string]string{
+						"this-label": "does-not-exist-on-any-nodes",
+					},
+					TerminationGracePeriodSeconds: &gracePeriod,
+					RestartPolicy:                 v1.RestartPolicyNever,
+					Containers: []v1.Container{
+						{
+							Name:  podName,
+							Image: imageutils.GetPauseImageName(),
+						},
+					},
+				},
+			})
+			ginkgo.By("Stopping the kubelet")
+			startKubelet := stopKubelet()
+
+			// wait until the kubelet health check will fail
+			gomega.Eventually(ctx, func() bool {
+				return kubeletHealthCheck(kubeletHealthCheckURL)
+			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalse())
+
+			// Create the pod bound to the node. It will remain in the Pending
+			// phase as Kubelet is down.
+			ginkgo.By(fmt.Sprintf("Creating a pod (%v/%v)", f.Namespace.Name, podName))
+			pod := e2epod.NewPodClient(f).Create(ctx, podSpec)
+
+			ginkgo.By(fmt.Sprintf("Deleting the pod (%v/%v) to set a deletion timestamp", pod.Namespace, pod.Name))
+			err := e2epod.NewPodClient(f).Delete(ctx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod})
+			framework.ExpectNoError(err, "Failed to delete the pod: %q", pod.Name)
+
+			// Restart Kubelet so that it proceeds with deletion
+			ginkgo.By("Starting the kubelet")
+			startKubelet()
+
+			// wait until the kubelet health check will succeed
+			gomega.Eventually(ctx, func() bool {
+				return kubeletHealthCheck(kubeletHealthCheckURL)
+			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrue())
+
+			// Wait for the Kubelet to be ready.
+			gomega.Eventually(ctx, func(ctx context.Context) bool {
+				nodes, err := e2enode.TotalReady(ctx, f.ClientSet)
+				framework.ExpectNoError(err)
+				return nodes == 1
+			}, time.Minute, f.Timeouts.Poll).Should(gomega.BeTrue())
+
+			ginkgo.By(fmt.Sprintf("After the kubelet is restarted, verify the pod (%v/%v) is deleted by kubelet", pod.Namespace, pod.Name))
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				return checkMirrorPodDisappear(ctx, f.ClientSet, pod.Name, pod.Namespace)
+			}, f.Timeouts.PodDelete, f.Timeouts.Poll).Should(gomega.BeNil())
+		})
 	})
 
 })
