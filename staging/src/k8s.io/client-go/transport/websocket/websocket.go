@@ -23,13 +23,18 @@ import (
 	gwebsocket "github.com/gorilla/websocket"
 
 	"k8s.io/apimachinery/pkg/util/httpstream"
-	ws "k8s.io/apimachinery/pkg/util/httpstream/websocket"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
 )
 
-func RoundTripperFor(config *restclient.Config) (http.RoundTripper, *ws.RoundTripper, error) {
+// Header to identify this WebSocket client can do stream translation.
+const (
+	HeaderWebSocketKey             = "K8s-Websocket-Protocol"
+	HeaderWebSocketStreamTranslate = "stream-translate"
+)
+
+func RoundTripperFor(config *restclient.Config) (http.RoundTripper, *RoundTripper, error) {
 	transportCfg, err := config.TransportConfig()
 	if err != nil {
 		return nil, nil, err
@@ -43,7 +48,7 @@ func RoundTripperFor(config *restclient.Config) (http.RoundTripper, *ws.RoundTri
 		proxy = utilnet.NewProxierWithNoProxyCIDR(http.ProxyFromEnvironment)
 	}
 
-	upgradeRoundTripper := &ws.RoundTripper{
+	upgradeRoundTripper := &RoundTripper{
 		TLSConfig: tlsConfig,
 		Proxier:   proxy,
 	}
@@ -57,7 +62,8 @@ func RoundTripperFor(config *restclient.Config) (http.RoundTripper, *ws.RoundTri
 // Negotiate opens a connection to a remote server and attempts to negotiate
 // a WebSocket connection. Upon success, it returns the negotiated connection.
 // The round tripper rt must use the WebSocket round tripper wsRt - see RoundTripperFor.
-func Negotiate(rt http.RoundTripper, wsRt *ws.RoundTripper, req *http.Request, protocols ...string) (*gwebsocket.Conn, error) {
+func Negotiate(rt http.RoundTripper, wsRt *RoundTripper, req *http.Request, protocols ...string) (*gwebsocket.Conn, error) {
+	req.Header[HeaderWebSocketKey] = []string{HeaderWebSocketStreamTranslate}
 	req.Header[httpstream.HeaderProtocolVersion] = protocols
 	resp, err := rt.RoundTrip(req)
 	if err != nil {

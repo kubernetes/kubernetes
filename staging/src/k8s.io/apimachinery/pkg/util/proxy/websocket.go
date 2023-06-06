@@ -27,7 +27,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy2"
-	"k8s.io/apimachinery/pkg/util/httpstream/websocket"
+	"k8s.io/apimachinery/pkg/util/httpstream/wsstream"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
 )
@@ -39,10 +39,10 @@ const (
 	errorChannel
 	resizeChannel
 
-	preV4BinaryWebsocketProtocol = websocket.ChannelWebSocketProtocol
-	preV4Base64WebsocketProtocol = websocket.Base64ChannelWebSocketProtocol
-	v4BinaryWebsocketProtocol    = "v4." + websocket.ChannelWebSocketProtocol
-	v4Base64WebsocketProtocol    = "v4." + websocket.Base64ChannelWebSocketProtocol
+	preV4BinaryWebsocketProtocol = wsstream.ChannelWebSocketProtocol
+	preV4Base64WebsocketProtocol = wsstream.Base64ChannelWebSocketProtocol
+	v4BinaryWebsocketProtocol    = "v4." + wsstream.ChannelWebSocketProtocol
+	v4Base64WebsocketProtocol    = "v4." + wsstream.Base64ChannelWebSocketProtocol
 )
 
 // Options contains details about which streams are required for
@@ -133,38 +133,38 @@ func handleResizeEvents(ctx context.Context, stream io.Reader, channel chan<- sp
 
 // createChannels returns the standard channel types for a shell connection (STDIN 0, STDOUT 1, STDERR 2)
 // along with the approximate duplex value. It also creates the error (3) and resize (4) channels.
-func createChannels(opts *Options) []websocket.ChannelType {
+func createChannels(opts *Options) []wsstream.ChannelType {
 	// open the requested channels, and always open the error channel
-	channels := make([]websocket.ChannelType, 5)
+	channels := make([]wsstream.ChannelType, 5)
 	channels[stdinChannel] = readChannel(opts.Stdin)
 	channels[stdoutChannel] = writeChannel(opts.Stdout)
 	channels[stderrChannel] = writeChannel(opts.Stderr)
-	channels[errorChannel] = websocket.WriteChannel
-	channels[resizeChannel] = websocket.ReadChannel
+	channels[errorChannel] = wsstream.WriteChannel
+	channels[resizeChannel] = wsstream.ReadChannel
 	return channels
 }
 
-// readChannel returns websocket.ReadChannel if real is true, or websocket.IgnoreChannel.
-func readChannel(real bool) websocket.ChannelType {
+// readChannel returns wsstream.ReadChannel if real is true, or wsstream.IgnoreChannel.
+func readChannel(real bool) wsstream.ChannelType {
 	if real {
-		return websocket.ReadChannel
+		return wsstream.ReadChannel
 	}
-	return websocket.IgnoreChannel
+	return wsstream.IgnoreChannel
 }
 
-// writeChannel returns websocket.WriteChannel if real is true, or websocket.IgnoreChannel.
-func writeChannel(real bool) websocket.ChannelType {
+// writeChannel returns wsstream.WriteChannel if real is true, or wsstream.IgnoreChannel.
+func writeChannel(real bool) wsstream.ChannelType {
 	if real {
-		return websocket.WriteChannel
+		return wsstream.WriteChannel
 	}
-	return websocket.IgnoreChannel
+	return wsstream.IgnoreChannel
 }
 
 // createWebSocketStreams returns a "conns" struct containing the websocket connection and
 // streams needed to perform an exec or an attach.
 func createWebSocketStreams(req *http.Request, w http.ResponseWriter, opts *Options, idleTimeout time.Duration) (*conns, bool) {
 	channels := createChannels(opts)
-	conn := websocket.NewConn(map[string]websocket.ChannelProtocolConfig{
+	conn := wsstream.NewConn(map[string]wsstream.ChannelProtocolConfig{
 		"": {
 			Binary:   true,
 			Channels: channels,
