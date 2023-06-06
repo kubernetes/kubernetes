@@ -59,8 +59,10 @@ require (
 replace (
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
+	k8s.io/apiserver => ../apiserver
 	k8s.io/client-go => ../client-go
 	k8s.io/component-base => ../component-base
+	k8s.io/cri-api => ../cri-api
 	k8s.io/dynamic-resource-allocation => ../dynamic-resource-allocation
 	k8s.io/kubelet => ../kubelet
 )
