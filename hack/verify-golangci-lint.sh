@@ -49,15 +49,7 @@ export GOBIN="${KUBE_OUTPUT_BINPATH}"
 PATH="${GOBIN}:${PATH}"
 
 invocation=(./hack/verify-golangci-lint.sh "$@")
-
-# The logcheck plugin currently has to be configured via env variables
-# (https://github.com/golangci/golangci-lint/issues/1512).
-#
-# Remember to clean the golangci-lint cache when changing
-# the configuration and running this script multiple times,
-# otherwise golangci-lint will report stale results:
-# _output/local/bin/golangci-lint cache clean
-golangci=(env LOGCHECK_CONFIG="${KUBE_ROOT}/hack/logcheck.conf" "${GOBIN}/golangci-lint" run)
+golangci=("${GOBIN}/golangci-lint" run)
 golangci_config="${KUBE_ROOT}/hack/golangci.yaml"
 base=
 strict=
