@@ -4660,8 +4660,8 @@ func TestCreateAndLinkKubeChain(t *testing.T) {
 :KUBE-SOURCE-RANGES-FIREWALL - [0:0]
 :KUBE-IPVS-FILTER - [0:0]
 `
-	assert.Equal(t, expectedNATChains, string(fp.natChains.Bytes()))
-	assert.Equal(t, expectedFilterChains, string(fp.filterChains.Bytes()))
+	assert.Equal(t, expectedNATChains, fp.natChains.String())
+	assert.Equal(t, expectedFilterChains, fp.filterChains.String())
 }
 
 // This test ensures that the iptables proxier supports translating Endpoints to

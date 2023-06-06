@@ -962,7 +962,7 @@ func TestLineBufferWrite(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			testBuffer.Reset()
 			testBuffer.Write(testCase.input...)
-			if want, got := testCase.expected, string(testBuffer.Bytes()); !strings.EqualFold(want, got) {
+			if want, got := testCase.expected, testBuffer.String(); !strings.EqualFold(want, got) {
 				t.Fatalf("write word is %v\n expected: %q, got: %q", testCase.input, want, got)
 			}
 			if testBuffer.Lines() != 1 {
@@ -1005,7 +1005,7 @@ func TestLineBufferWriteBytes(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			testBuffer.Reset()
 			testBuffer.WriteBytes(testCase.bytes)
-			if want, got := testCase.expected, string(testBuffer.Bytes()); !strings.EqualFold(want, got) {
+			if want, got := testCase.expected, testBuffer.String(); !strings.EqualFold(want, got) {
 				t.Fatalf("write bytes is %v\n expected: %s, got: %s", testCase.bytes, want, got)
 			}
 		})
