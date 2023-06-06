@@ -187,6 +187,20 @@ func (mr *MockPodDeletionSafetyProviderMockRecorder) PodCouldHaveRunningContaine
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PodCouldHaveRunningContainers", reflect.TypeOf((*MockPodDeletionSafetyProvider)(nil).PodCouldHaveRunningContainers), pod)
 }
 
+// PodIsFinished mocks base method.
+func (m *MockPodDeletionSafetyProvider) PodIsFinished(pod *v1.Pod) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PodIsFinished", pod)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// PodIsFinished indicates an expected call of PodIsFinished.
+func (mr *MockPodDeletionSafetyProviderMockRecorder) PodIsFinished(pod interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PodIsFinished", reflect.TypeOf((*MockPodDeletionSafetyProvider)(nil).PodIsFinished), pod)
+}
+
 // MockPodStartupLatencyStateHelper is a mock of PodStartupLatencyStateHelper interface.
 type MockPodStartupLatencyStateHelper struct {
 	ctrl     *gomock.Controller
