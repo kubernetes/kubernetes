@@ -278,6 +278,7 @@ func testPodDefaults(t *testing.T, featuresEnabled bool) {
 		".Spec.Containers[0].StartupProbe.TimeoutSeconds":                "1",
 		".Spec.Containers[0].TerminationMessagePath":                     `"/dev/termination-log"`,
 		".Spec.Containers[0].TerminationMessagePolicy":                   `"File"`,
+		".Spec.Containers[0].VolumeMounts[0].MountPropagation":           `"None"`,
 		".Spec.Containers[0].LivenessProbe.ProbeHandler.GRPC.Service":    `""`,
 		".Spec.Containers[0].ReadinessProbe.ProbeHandler.GRPC.Service":   `""`,
 		".Spec.Containers[0].StartupProbe.ProbeHandler.GRPC.Service":     `""`,
@@ -304,6 +305,7 @@ func testPodDefaults(t *testing.T, featuresEnabled bool) {
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.TimeoutSeconds":                "1",
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.TerminationMessagePath":                     `"/dev/termination-log"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.TerminationMessagePolicy":                   `"File"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.VolumeMounts[0].MountPropagation":           `"None"`,
 		".Spec.InitContainers[0].Env[0].ValueFrom.FieldRef.APIVersion":                                     `"v1"`,
 		".Spec.InitContainers[0].ImagePullPolicy":                                                          `"IfNotPresent"`,
 		".Spec.InitContainers[0].Lifecycle.PostStart.HTTPGet.Path":                                         `"/"`,
@@ -322,6 +324,7 @@ func testPodDefaults(t *testing.T, featuresEnabled bool) {
 		".Spec.InitContainers[0].Resources.Requests":                                                       `{"":"0"}`, // this gets defaulted from the limits field
 		".Spec.InitContainers[0].TerminationMessagePath":                                                   `"/dev/termination-log"`,
 		".Spec.InitContainers[0].TerminationMessagePolicy":                                                 `"File"`,
+		".Spec.InitContainers[0].VolumeMounts[0].MountPropagation":                                         `"None"`,
 		".Spec.InitContainers[0].StartupProbe.FailureThreshold":                                            "3",
 		".Spec.InitContainers[0].StartupProbe.PeriodSeconds":                                               "10",
 		".Spec.InitContainers[0].StartupProbe.SuccessThreshold":                                            "1",

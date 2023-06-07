@@ -287,9 +287,6 @@ func translateMountPropagation(mountMode *v1.MountPropagationMode) (runtimeapi.M
 	}
 
 	switch {
-	case mountMode == nil:
-		// PRIVATE is the default
-		return runtimeapi.MountPropagation_PROPAGATION_PRIVATE, nil
 	case *mountMode == v1.MountPropagationHostToContainer:
 		return runtimeapi.MountPropagation_PROPAGATION_HOST_TO_CONTAINER, nil
 	case *mountMode == v1.MountPropagationBidirectional:

@@ -191,25 +191,6 @@ func TestAssignsDefaultServiceAccountAndBoundTokenWithNoSecretTokens(t *testing.
 		t.Fatalf("Expected success, got: %v", err)
 	}
 
-	expectedVolumes := []api.Volume{{
-		Name: "cleared",
-		VolumeSource: api.VolumeSource{
-			Projected: &api.ProjectedVolumeSource{
-				Sources: []api.VolumeProjection{
-					{ServiceAccountToken: &api.ServiceAccountTokenProjection{ExpirationSeconds: 3607, Path: "token"}},
-					{ConfigMap: &api.ConfigMapProjection{LocalObjectReference: api.LocalObjectReference{Name: "kube-root-ca.crt"}, Items: []api.KeyToPath{{Key: "ca.crt", Path: "ca.crt"}}}},
-					{DownwardAPI: &api.DownwardAPIProjection{Items: []api.DownwardAPIVolumeFile{{Path: "namespace", FieldRef: &api.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.namespace"}}}}},
-				},
-				DefaultMode: utilpointer.Int32(0644),
-			},
-		},
-	}}
-	expectedVolumeMounts := []api.VolumeMount{{
-		Name:      "cleared",
-		ReadOnly:  true,
-		MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
-	}}
-
 	// clear generated volume names
 	for i := range pod.Spec.Volumes {
 		if len(pod.Spec.Volumes[i].Name) > 0 {
@@ -222,22 +203,38 @@ func TestAssignsDefaultServiceAccountAndBoundTokenWithNoSecretTokens(t *testing.
 		}
 	}
 
-	if !reflect.DeepEqual(expectedVolumes, pod.Spec.Volumes) {
-		t.Errorf("unexpected volumes: %s", cmp.Diff(expectedVolumes, pod.Spec.Volumes))
-	}
-	if !reflect.DeepEqual(expectedVolumeMounts, pod.Spec.Containers[0].VolumeMounts) {
-		t.Errorf("unexpected volumes: %s", cmp.Diff(expectedVolumeMounts, pod.Spec.Containers[0].VolumeMounts))
-	}
-
-	// ensure result converted to v1 matches defaulted object
 	v1PodOut := &corev1.Pod{}
 	if err := v1defaults.Convert_core_Pod_To_v1_Pod(pod, v1PodOut, nil); err != nil {
 		t.Fatal(err)
 	}
-	v1PodOutDefaulted := v1PodOut.DeepCopy()
-	v1defaults.SetObjectDefaults_Pod(v1PodOutDefaulted)
-	if !reflect.DeepEqual(v1PodOut, v1PodOutDefaulted) {
-		t.Error(cmp.Diff(v1PodOut, v1PodOutDefaulted))
+	v1defaults.SetObjectDefaults_Pod(v1PodOut)
+
+	expectedVolumes := []corev1.Volume{{
+		Name: "cleared",
+		VolumeSource: corev1.VolumeSource{
+			Projected: &corev1.ProjectedVolumeSource{
+				Sources: []corev1.VolumeProjection{
+					{ServiceAccountToken: &corev1.ServiceAccountTokenProjection{ExpirationSeconds: utilpointer.Int64(3607), Path: "token"}},
+					{ConfigMap: &corev1.ConfigMapProjection{LocalObjectReference: corev1.LocalObjectReference{Name: "kube-root-ca.crt"}, Items: []corev1.KeyToPath{{Key: "ca.crt", Path: "ca.crt"}}}},
+					{DownwardAPI: &corev1.DownwardAPIProjection{Items: []corev1.DownwardAPIVolumeFile{{Path: "namespace", FieldRef: &corev1.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.namespace"}}}}},
+				},
+				DefaultMode: utilpointer.Int32(0644),
+			},
+		},
+	}}
+	propagateNone := corev1.MountPropagationNone
+	expectedVolumeMounts := []corev1.VolumeMount{{
+		Name:             "cleared",
+		ReadOnly:         true,
+		MountPropagation: &propagateNone,
+		MountPath:        "/var/run/secrets/kubernetes.io/serviceaccount",
+	}}
+
+	if !reflect.DeepEqual(expectedVolumes, v1PodOut.Spec.Volumes) {
+		t.Errorf("unexpected volumes: %s", cmp.Diff(expectedVolumes, v1PodOut.Spec.Volumes))
+	}
+	if !reflect.DeepEqual(expectedVolumeMounts, v1PodOut.Spec.Containers[0].VolumeMounts) {
+		t.Errorf("unexpected volumes: %s", cmp.Diff(expectedVolumeMounts, v1PodOut.Spec.Containers[0].VolumeMounts))
 	}
 }
 
