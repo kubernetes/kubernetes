@@ -142,25 +142,9 @@ func (p *cadvisorStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 	// Add each PodStats to the result.
 	result := make([]statsapi.PodStats, 0, len(podToStats))
 	for _, podStats := range podToStats {
-		// Lookup the volume stats for each pod.
+		makePodStorageStats(podStats, &rootFsInfo, p.resourceAnalyzer, p.hostStatsProvider, false)
+
 		podUID := types.UID(podStats.PodRef.UID)
-		var ephemeralStats []statsapi.VolumeStats
-		if vstats, found := p.resourceAnalyzer.GetPodVolumeStats(podUID); found {
-			ephemeralStats = make([]statsapi.VolumeStats, len(vstats.EphemeralVolumes))
-			copy(ephemeralStats, vstats.EphemeralVolumes)
-			podStats.VolumeStats = append(append([]statsapi.VolumeStats{}, vstats.EphemeralVolumes...), vstats.PersistentVolumes...)
-		}
-
-		logStats, err := p.hostStatsProvider.getPodLogStats(podStats.PodRef.Namespace, podStats.PodRef.Name, podUID, &rootFsInfo)
-		if err != nil {
-			klog.ErrorS(err, "Unable to fetch pod log stats", "pod", klog.KRef(podStats.PodRef.Namespace, podStats.PodRef.Name))
-		}
-		etcHostsStats, err := p.hostStatsProvider.getPodEtcHostsStats(podUID, &rootFsInfo)
-		if err != nil {
-			klog.ErrorS(err, "Unable to fetch pod etc hosts stats", "pod", klog.KRef(podStats.PodRef.Namespace, podStats.PodRef.Name))
-		}
-
-		podStats.EphemeralStorage = calcEphemeralStorage(podStats.Containers, ephemeralStats, &rootFsInfo, logStats, etcHostsStats, false)
 		// Lookup the pod-level cgroup's CPU and memory stats
 		podInfo := getCadvisorPodInfoFromPodUID(podUID, allInfos)
 		if podInfo != nil {
