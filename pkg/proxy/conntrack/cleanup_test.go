@@ -62,7 +62,7 @@ func TestCleanStaleEntries(t *testing.T) {
 	// interface, or else use a proxy.ServiceChangeTracker and proxy.NewEndpointsChangeTracker
 	// to construct them and fill in the maps for us.
 
-	sct := proxy.NewServiceChangeTracker(nil, v1.IPv4Protocol, nil, nil)
+	sct := proxy.NewServiceChangeTracker(v1.IPv4Protocol, nil, nil)
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      testServiceName,
@@ -104,7 +104,7 @@ func TestCleanStaleEntries(t *testing.T) {
 	svcPortMap := make(proxy.ServicePortMap)
 	_ = svcPortMap.Update(sct)
 
-	ect := proxy.NewEndpointsChangeTracker("test-worker", nil, v1.IPv4Protocol, nil, nil)
+	ect := proxy.NewEndpointsChangeTracker(v1.IPv4Protocol, "test-worker", nil, nil)
 	eps := &discovery.EndpointSlice{
 		TypeMeta:    metav1.TypeMeta{},
 		AddressType: discovery.AddressTypeIPv4,

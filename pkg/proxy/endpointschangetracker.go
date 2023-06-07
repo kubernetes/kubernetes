@@ -24,7 +24,6 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 )
@@ -60,7 +59,7 @@ type makeEndpointFunc func(info *BaseEndpointInfo, svcPortName *ServicePortName)
 type processEndpointsMapChangeFunc func(oldEndpointsMap, newEndpointsMap EndpointsMap)
 
 // NewEndpointsChangeTracker initializes an EndpointsChangeTracker
-func NewEndpointsChangeTracker(hostname string, makeEndpointInfo makeEndpointFunc, ipFamily v1.IPFamily, _ events.EventRecorder, processEndpointsMapChange processEndpointsMapChangeFunc) *EndpointsChangeTracker {
+func NewEndpointsChangeTracker(ipFamily v1.IPFamily, hostname string, makeEndpointInfo makeEndpointFunc, processEndpointsMapChange processEndpointsMapChangeFunc) *EndpointsChangeTracker {
 	addressType := discovery.AddressTypeIPv4
 	if ipFamily == v1.IPv6Protocol {
 		addressType = discovery.AddressTypeIPv6
