@@ -20,25 +20,19 @@ limitations under the License.
 package mount
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
 )
 
-func writeFile(content string) (string, string, error) {
-	tempDir, err := ioutil.TempDir("", "mounter_shared_test")
+func writeFile(t *testing.T, content string) string {
+	filename := filepath.Join(t.TempDir(), "mountinfo")
+	err := os.WriteFile(filename, []byte(content), 0o600)
 	if err != nil {
-		return "", "", err
+		t.Fatal(err)
 	}
-	filename := filepath.Join(tempDir, "mountinfo")
-	err = ioutil.WriteFile(filename, []byte(content), 0o600)
-	if err != nil {
-		os.RemoveAll(tempDir)
-		return "", "", err
-	}
-	return tempDir, filename, nil
+	return filename
 }
 
 func TestParseMountInfo(t *testing.T) {
@@ -84,11 +78,7 @@ func TestParseMountInfo(t *testing.T) {
 40 28 0:36 / /sys/fs/cgroup/perf_event rw,nosuid,nodev,noexec,relatime shared:22 - cgroup cgroup rw,perf_event
 761 60 8:0 / /var/lib/kubelet/plugins/kubernetes.io/iscsi/iface-default/127.0.0.1:3260-iqn.2003-01.org.linux-iscsi.f21.x8664:sn.4b0aae584f7c-lun-0 rw,relatime shared:421 - ext4 /dev/sda rw,context="system_u:object_r:container_file_t:s0:c314,c894",data=ordered
 `
-	tempDir, filename, err := writeFile(info)
-	if err != nil {
-		t.Fatalf("cannot create temporary file: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
+	filename := writeFile(t, info)
 
 	tests := []struct {
 		name         string
@@ -303,11 +293,7 @@ func TestBadParseMountInfo(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		tempDir, filename, err := writeFile(test.info)
-		if err != nil {
-			t.Fatalf("cannot create temporary file: %v", err)
-		}
-		defer os.RemoveAll(tempDir)
+		filename := writeFile(t, test.info)
 
 		infos, err := ParseMountInfo(filename)
 		if err != nil {

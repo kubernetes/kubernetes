@@ -22,7 +22,6 @@ package mount
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"reflect"
@@ -430,7 +429,7 @@ func TestSearchMountPoints(t *testing.T) {
 			nil,
 		},
 	}
-	tmpFile, err := ioutil.TempFile("", "test-get-filetype")
+	tmpFile, err := os.CreateTemp("", "test-get-filetype")
 	if err != nil {
 		t.Fatal(err)
 	}
