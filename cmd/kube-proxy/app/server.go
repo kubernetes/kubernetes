@@ -545,6 +545,7 @@ type ProxyServer struct {
 	ConfigSyncPeriod       time.Duration
 	HealthzServer          healthcheck.ProxierHealthUpdater
 	localDetectorMode      kubeproxyconfig.LocalMode
+	podCIDRs               []string // only used for LocalModeNodeCIDR
 }
 
 // createClients creates a kube client and an event client from the given config and masterOverride.
@@ -767,7 +768,7 @@ func (s *ProxyServer) Run() error {
 	nodeConfig := config.NewNodeConfig(currentNodeInformerFactory.Core().V1().Nodes(), s.ConfigSyncPeriod)
 	// https://issues.k8s.io/111321
 	if s.localDetectorMode == kubeproxyconfig.LocalModeNodeCIDR {
-		nodeConfig.RegisterEventHandler(&proxy.NodePodCIDRHandler{})
+		nodeConfig.RegisterEventHandler(proxy.NewNodePodCIDRHandler(s.podCIDRs))
 	}
 	nodeConfig.RegisterEventHandler(s.Proxier)
 
