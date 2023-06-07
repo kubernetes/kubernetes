@@ -155,7 +155,7 @@ func BuildGenericConfig(
 		return
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) && s.GenericServerRunOptions.EnablePriorityAndFairness {
+	if s.GenericServerRunOptions.EnablePriorityAndFairness {
 		genericConfig.FlowControl, lastErr = BuildPriorityAndFairness(s, clientgoExternalClient, versionedInformers)
 	}
 

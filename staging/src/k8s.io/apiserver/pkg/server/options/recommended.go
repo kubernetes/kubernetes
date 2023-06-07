@@ -22,7 +22,6 @@ import (
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/util/feature"
@@ -144,21 +143,19 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 		initializers...); err != nil {
 		return err
 	}
-	if feature.DefaultFeatureGate.Enabled(features.APIPriorityAndFairness) {
-		if config.ClientConfig != nil {
-			if config.MaxRequestsInFlight+config.MaxMutatingRequestsInFlight <= 0 {
-				return fmt.Errorf("invalid configuration: MaxRequestsInFlight=%d and MaxMutatingRequestsInFlight=%d; they must add up to something positive", config.MaxRequestsInFlight, config.MaxMutatingRequestsInFlight)
+	if config.ClientConfig != nil {
+		if config.MaxRequestsInFlight+config.MaxMutatingRequestsInFlight <= 0 {
+			return fmt.Errorf("invalid configuration: MaxRequestsInFlight=%d and MaxMutatingRequestsInFlight=%d; they must add up to something positive", config.MaxRequestsInFlight, config.MaxMutatingRequestsInFlight)
 
-			}
-			config.FlowControl = utilflowcontrol.New(
-				config.SharedInformerFactory,
-				kubernetes.NewForConfigOrDie(config.ClientConfig).FlowcontrolV1beta3(),
-				config.MaxRequestsInFlight+config.MaxMutatingRequestsInFlight,
-				config.RequestTimeout/4,
-			)
-		} else {
-			klog.Warningf("Neither kubeconfig is provided nor service-account is mounted, so APIPriorityAndFairness will be disabled")
 		}
+		config.FlowControl = utilflowcontrol.New(
+			config.SharedInformerFactory,
+			kubernetes.NewForConfigOrDie(config.ClientConfig).FlowcontrolV1beta3(),
+			config.MaxRequestsInFlight+config.MaxMutatingRequestsInFlight,
+			config.RequestTimeout/4,
+		)
+	} else {
+		klog.Warningf("Neither kubeconfig is provided nor service-account is mounted, so APIPriorityAndFairness will be disabled")
 	}
 	return nil
 }

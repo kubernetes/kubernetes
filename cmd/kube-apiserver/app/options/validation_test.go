@@ -285,7 +285,7 @@ func TestValidateMaxCIDRRange(t *testing.T) {
 }
 
 func TestValidateAPIPriorityAndFairness(t *testing.T) {
-	const conflict = "conflicts with --enable-priority-and-fairness=true and --feature-gates=APIPriorityAndFairness=true"
+	const conflict = "conflicts with --enable-priority-and-fairness=true"
 	tests := []struct {
 		runtimeConfig    string
 		errShouldContain string

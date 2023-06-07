@@ -1006,7 +1006,7 @@ func installAPI(s *GenericAPIServer, c *Config) {
 			s.Handler.GoRestfulContainer.Add(s.DiscoveryGroupManager.WebService())
 		}
 	}
-	if c.FlowControl != nil && utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) {
+	if c.FlowControl != nil {
 		c.FlowControl.Install(s.Handler.NonGoRestfulMux)
 	}
 }

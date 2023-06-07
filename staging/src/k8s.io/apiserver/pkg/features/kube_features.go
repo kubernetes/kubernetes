@@ -61,6 +61,7 @@ const (
 	// owner: @MikeSpreitzer @yue9944882
 	// alpha: v1.18
 	// beta: v1.20
+	// GA: v1.28
 	//
 	// Enables managing request concurrency with prioritization and fairness at each server.
 	// The FeatureGate was introduced in release 1.15 but the feature
@@ -228,7 +229,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	APIListChunking: {Default: true, PreRelease: featuregate.Beta},
 
-	APIPriorityAndFairness: {Default: true, PreRelease: featuregate.Beta},
+	APIPriorityAndFairness: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.30
 
 	APIResponseCompression: {Default: true, PreRelease: featuregate.Beta},
 
