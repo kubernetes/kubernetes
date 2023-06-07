@@ -79,6 +79,10 @@ func warningsForPersistentVolumeSpecAndMeta(fieldPath *field.Path, pvSpec *api.P
 			warnings = append(warnings, nodeapi.GetWarningsForNodeSelectorTerm(term, termFldPath.Index(i))...)
 		}
 	}
+	// If we are on deprecated volume plugin
+	if pvSpec.CephFS != nil {
+		warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.28, non-functional in v1.31+", fieldPath.Child("spec", "persistentVolumeSource").Child("cephfs")))
+	}
 
 	return warnings
 }
