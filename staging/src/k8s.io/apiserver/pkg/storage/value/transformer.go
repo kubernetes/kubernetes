@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/errors"
 )
 
@@ -48,6 +49,11 @@ type Transformer interface {
 	TransformFromStorage(ctx context.Context, data []byte, dataCtx Context) (out []byte, stale bool, err error)
 	// TransformToStorage may transform the provided data into the appropriate form in storage or return an error.
 	TransformToStorage(ctx context.Context, data []byte, dataCtx Context) (out []byte, err error)
+}
+
+// ResourceTransformers returns a transformer for the provided resource.
+type ResourceTransformers interface {
+	TransformerForResource(resource schema.GroupResource) Transformer
 }
 
 // DefaultContext is a simple implementation of Context for a slice of bytes.

@@ -34,16 +34,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	netutils "k8s.io/utils/net"
-	"k8s.io/utils/pointer"
-
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clientgotesting "k8s.io/client-go/testing"
-
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utiliptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
+	netutils "k8s.io/utils/net"
+	"k8s.io/utils/pointer"
 )
 
 func Test_platformApplyDefaults(t *testing.T) {
@@ -779,5 +777,53 @@ func TestGetConntrackMax(t *testing.T) {
 		} else if x != tc.expected {
 			t.Errorf("[%d] expected %d, got %d", i, tc.expected, x)
 		}
+	}
+}
+
+func TestProxyServer_createProxier(t *testing.T) {
+	tests := []struct {
+		name         string
+		node         *v1.Node
+		config       *proxyconfigapi.KubeProxyConfiguration
+		wantPodCIDRs []string
+	}{
+		{
+			name:         "LocalModeNodeCIDR store the node PodCIDRs obtained",
+			node:         makeNodeWithPodCIDRs("10.0.0.0/24"),
+			config:       &proxyconfigapi.KubeProxyConfiguration{DetectLocalMode: proxyconfigapi.LocalModeNodeCIDR},
+			wantPodCIDRs: []string{"10.0.0.0/24"},
+		},
+		{
+			name:         "LocalModeNodeCIDR store the node PodCIDRs obtained dual stack",
+			node:         makeNodeWithPodCIDRs("10.0.0.0/24", "2001:db2:1/64"),
+			config:       &proxyconfigapi.KubeProxyConfiguration{DetectLocalMode: proxyconfigapi.LocalModeNodeCIDR},
+			wantPodCIDRs: []string{"10.0.0.0/24", "2001:db2:1/64"},
+		},
+		{
+			name:   "LocalModeClusterCIDR does not get the node PodCIDRs",
+			node:   makeNodeWithPodCIDRs("10.0.0.0/24", "2001:db2:1/64"),
+			config: &proxyconfigapi.KubeProxyConfiguration{DetectLocalMode: proxyconfigapi.LocalModeClusterCIDR},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := clientsetfake.NewSimpleClientset(tt.node)
+			s := &ProxyServer{
+				Config:   tt.config,
+				Client:   client,
+				Hostname: "nodename",
+				NodeIP:   netutils.ParseIPSloppy("127.0.0.1"),
+			}
+			_, err := s.createProxier(tt.config)
+			// TODO: mock the exec.Interface to not fail probing iptables
+			if (err != nil) && !strings.Contains(err.Error(), "iptables is not supported for primary IP family") {
+				t.Errorf("ProxyServer.createProxier() error = %v", err)
+				return
+			}
+			if !reflect.DeepEqual(s.podCIDRs, tt.wantPodCIDRs) {
+				t.Errorf("Expected PodCIDRs %v got %v", tt.wantPodCIDRs, s.podCIDRs)
+			}
+
+		})
 	}
 }

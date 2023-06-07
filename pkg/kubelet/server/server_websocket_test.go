@@ -29,7 +29,7 @@ import (
 	"golang.org/x/net/websocket"
 
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/portforward"
+	"k8s.io/kubelet/pkg/cri/streaming/portforward"
 )
 
 const (

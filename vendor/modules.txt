@@ -191,8 +191,8 @@ github.com/docker/distribution/reference
 # github.com/docker/go-units v0.5.0
 ## explicit
 github.com/docker/go-units
-# github.com/dustin/go-humanize v1.0.0
-## explicit
+# github.com/dustin/go-humanize v1.0.1
+## explicit; go 1.16
 github.com/dustin/go-humanize
 # github.com/emicklei/go-restful/v3 v3.9.0
 ## explicit; go 1.13
@@ -2264,6 +2264,9 @@ k8s.io/kubelet/pkg/apis/pluginregistration/v1
 k8s.io/kubelet/pkg/apis/podresources/v1
 k8s.io/kubelet/pkg/apis/podresources/v1alpha1
 k8s.io/kubelet/pkg/apis/stats/v1alpha1
+k8s.io/kubelet/pkg/cri/streaming
+k8s.io/kubelet/pkg/cri/streaming/portforward
+k8s.io/kubelet/pkg/cri/streaming/remotecommand
 # k8s.io/legacy-cloud-providers v0.0.0 => ./staging/src/k8s.io/legacy-cloud-providers
 ## explicit; go 1.20
 k8s.io/legacy-cloud-providers/azure

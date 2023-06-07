@@ -1098,17 +1098,50 @@ rules:
       branch: release-1.27
       dir: staging/src/k8s.io/kube-proxy
   library: true
+- destination: cri-api
+  branches:
+  - name: master
+    source:
+      branch: master
+      dir: staging/src/k8s.io/cri-api
+  - name: release-1.24
+    go: 1.19.9
+    source:
+      branch: release-1.24
+      dir: staging/src/k8s.io/cri-api
+  - name: release-1.25
+    go: 1.19.9
+    source:
+      branch: release-1.25
+      dir: staging/src/k8s.io/cri-api
+  - name: release-1.26
+    go: 1.19.9
+    source:
+      branch: release-1.26
+      dir: staging/src/k8s.io/cri-api
+  - name: release-1.27
+    go: 1.20.4
+    source:
+      branch: release-1.27
+      dir: staging/src/k8s.io/cri-api
+  library: true
 - destination: kubelet
   branches:
   - name: master
     dependencies:
     - repository: apimachinery
       branch: master
+    - repository: apiserver
+      branch: master
     - repository: api
       branch: master
     - repository: client-go
       branch: master
+    - repository: cri-api
+      branch: master
     - repository: component-base
+      branch: master
+    - repository: kms
       branch: master
     source:
       branch: master
@@ -1817,33 +1850,6 @@ rules:
       branch: release-1.27
       dir: staging/src/k8s.io/legacy-cloud-providers
   library: true
-- destination: cri-api
-  branches:
-  - name: master
-    source:
-      branch: master
-      dir: staging/src/k8s.io/cri-api
-  - name: release-1.24
-    go: 1.19.9
-    source:
-      branch: release-1.24
-      dir: staging/src/k8s.io/cri-api
-  - name: release-1.25
-    go: 1.19.9
-    source:
-      branch: release-1.25
-      dir: staging/src/k8s.io/cri-api
-  - name: release-1.26
-    go: 1.19.9
-    source:
-      branch: release-1.26
-      dir: staging/src/k8s.io/cri-api
-  - name: release-1.27
-    go: 1.20.4
-    source:
-      branch: release-1.27
-      dir: staging/src/k8s.io/cri-api
-  library: true
 - destination: kubectl
   branches:
   - name: master
@@ -2050,9 +2056,13 @@ rules:
     dependencies:
     - repository: apimachinery
       branch: master
+    - repository: apiserver
+      branch: master
     - repository: api
       branch: master
     - repository: client-go
+      branch: master
+    - repository: cri-api
       branch: master
     - repository: component-base
       branch: master

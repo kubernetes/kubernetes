@@ -17,6 +17,7 @@ limitations under the License.
 package conversion
 
 import (
+	"context"
 	"strconv"
 	"sync"
 	"time"
@@ -85,4 +86,73 @@ func (m *converterMetric) Convert(in runtime.Object, targetGV schema.GroupVersio
 			m.crdName, fromVersion, toVersion, strconv.FormatBool(err == nil)).Observe(time.Since(start).Seconds())
 	}
 	return obj, err
+}
+
+type WebhookConversionErrorType string
+
+const (
+	WebhookConversionCallFailure                   WebhookConversionErrorType = "webhook_conversion_call_failure"
+	WebhookConversionMalformedResponseFailure      WebhookConversionErrorType = "webhook_conversion_malformed_response_failure"
+	WebhookConversionPartialResponseFailure        WebhookConversionErrorType = "webhook_conversion_partial_response_failure"
+	WebhookConversionInvalidConvertedObjectFailure WebhookConversionErrorType = "webhook_conversion_invalid_converted_object_failure"
+	WebhookConversionNoObjectsReturnedFailure      WebhookConversionErrorType = "webhook_conversion_no_objects_returned_failure"
+)
+
+var (
+	Metrics   = newWebhookConversionMetrics()
+	namespace = "apiserver"
+)
+
+// WebhookConversionMetrics instruments webhook conversion with prometheus metrics.
+type WebhookConversionMetrics struct {
+	webhookConversionRequest *metrics.CounterVec
+	webhookConversionLatency *metrics.HistogramVec
+}
+
+func newWebhookConversionMetrics() *WebhookConversionMetrics {
+	webhookConversionRequest := metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Name:           "webhook_conversion_request_total",
+			Namespace:      namespace,
+			Help:           "Counter for webhook conversion requests with success/failure and failure error type",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"result", "failure_type"})
+
+	webhookConversionLatency := metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Name:      "webhook_conversion_duration_seconds",
+			Namespace: namespace,
+			Help:      "Webhook conversion request latency",
+			// Various buckets from 5 ms to 60 seconds
+			Buckets:        []float64{0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 30, 45, 60},
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"result", "failure_type"},
+	)
+
+	legacyregistry.MustRegister(webhookConversionRequest)
+	legacyregistry.MustRegister(webhookConversionLatency)
+
+	return &WebhookConversionMetrics{webhookConversionRequest: webhookConversionRequest, webhookConversionLatency: webhookConversionLatency}
+}
+
+// Observe successful request
+func (m *WebhookConversionMetrics) ObserveWebhookConversionSuccess(ctx context.Context, elapsed time.Duration) {
+	result := "success"
+	m.webhookConversionRequest.WithContext(ctx).WithLabelValues(result, "").Inc()
+	m.observe(ctx, elapsed, result, "")
+}
+
+// Observe failure with failure type
+func (m *WebhookConversionMetrics) ObserveWebhookConversionFailure(ctx context.Context, elapsed time.Duration, errorType WebhookConversionErrorType) {
+	result := "failure"
+	m.webhookConversionRequest.WithContext(ctx).WithLabelValues(result, string(errorType)).Inc()
+	m.observe(ctx, elapsed, result, errorType)
+}
+
+// Observe latency
+func (m *WebhookConversionMetrics) observe(ctx context.Context, elapsed time.Duration, result string, errorType WebhookConversionErrorType) {
+	elapsedSeconds := elapsed.Seconds()
+	m.webhookConversionLatency.WithContext(ctx).WithLabelValues(result, string(errorType)).Observe(elapsedSeconds)
 }

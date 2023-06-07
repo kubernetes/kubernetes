@@ -216,9 +216,13 @@
   allowedImports:
   - k8s.io/api
   - k8s.io/apimachinery
+  - k8s.io/apiserver
+  - k8s.io/client-go
+  - k8s.io/cri-api
   - k8s.io/klog
   - k8s.io/component-base
   - k8s.io/kubelet
+  - k8s.io/utils
 
 - baseImportPath: "./vendor/k8s.io/cluster-bootstrap/"
   allowedImports:
@@ -302,4 +306,3 @@
   - k8s.io/klog
   - k8s.io/kms
   - k8s.io/utils
-

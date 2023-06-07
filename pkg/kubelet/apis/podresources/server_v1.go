@@ -79,9 +79,10 @@ func (p *v1PodResourcesServer) List(ctx context.Context, req *v1.ListPodResource
 		podResources[i] = &pRes
 	}
 
-	return &v1.ListPodResourcesResponse{
+	response := &v1.ListPodResourcesResponse{
 		PodResources: podResources,
-	}, nil
+	}
+	return response, nil
 }
 
 // GetAllocatableResources returns information about all the resources known by the server - this more like the capacity, not like the current amount of free resources.
@@ -94,11 +95,13 @@ func (p *v1PodResourcesServer) GetAllocatableResources(ctx context.Context, req 
 		return nil, fmt.Errorf("PodResources API GetAllocatableResources disabled")
 	}
 
-	return &v1.AllocatableResourcesResponse{
+	response := &v1.AllocatableResourcesResponse{
 		Devices: p.devicesProvider.GetAllocatableDevices(),
 		CpuIds:  p.cpusProvider.GetAllocatableCPUs(),
 		Memory:  p.memoryProvider.GetAllocatableMemory(),
-	}, nil
+	}
+
+	return response, nil
 }
 
 // Get returns information about the resources assigned to a specific pod
