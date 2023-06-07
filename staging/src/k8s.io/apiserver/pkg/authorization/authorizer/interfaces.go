@@ -157,3 +157,10 @@ const (
 	// to allow or deny an action.
 	DecisionNoOpinion
 )
+
+type Mechanism string
+
+const (
+	WebhookMechanism Mechanism = "webhook"
+	RbacMechanism    Mechanism = "rbac"
+)

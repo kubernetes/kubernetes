@@ -36,6 +36,9 @@ const (
 	decisionAnnotationKey = "authorization.k8s.io/decision"
 	reasonAnnotationKey   = "authorization.k8s.io/reason"
 
+	// Annotation key names set in authentication mechanism
+	webhookAuthAnnotationKey = "authorization.k8s.io/webhook"
+
 	// Annotation values set in advanced audit
 	decisionAllow  = "allow"
 	decisionForbid = "forbid"
