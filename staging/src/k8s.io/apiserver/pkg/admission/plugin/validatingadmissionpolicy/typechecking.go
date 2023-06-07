@@ -35,6 +35,7 @@ import (
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/common"
 	"k8s.io/apiserver/pkg/cel/environment"
+	"k8s.io/apiserver/pkg/cel/library"
 	"k8s.io/apiserver/pkg/cel/openapi"
 	"k8s.io/apiserver/pkg/cel/openapi/resolver"
 	"k8s.io/klog/v2"
@@ -72,7 +73,8 @@ func (c *TypeChecker) Check(policy *v1alpha1.ValidatingAdmissionPolicy) []v1alph
 	for _, v := range policy.Spec.Validations {
 		exps = append(exps, v.Expression)
 	}
-	msgs := c.CheckExpressions(exps, policy.Spec.ParamKind != nil, policy)
+	// TODO(jiahuif) hasAuthorizer always true for now, will change after expending type checking to all fields.
+	msgs := c.CheckExpressions(exps, policy.Spec.ParamKind != nil, true, policy)
 	var results []v1alpha1.ExpressionWarning // intentionally not setting capacity
 	for i, msg := range msgs {
 		if msg != "" {
@@ -93,7 +95,7 @@ func (c *TypeChecker) Check(policy *v1alpha1.ValidatingAdmissionPolicy) []v1alph
 // TODO: It is much more useful to have machine-readable output and let the
 // client format it. That requires an update to the KEP, probably in coming
 // releases.
-func (c *TypeChecker) CheckExpressions(expressions []string, hasParams bool, policy *v1alpha1.ValidatingAdmissionPolicy) []string {
+func (c *TypeChecker) CheckExpressions(expressions []string, hasParams, hasAuthorizer bool, policy *v1alpha1.ValidatingAdmissionPolicy) []string {
 	var allWarnings []string
 	allGvks := c.typesToCheck(policy)
 	gvks := make([]schema.GroupVersionKind, 0, len(allGvks))
@@ -127,7 +129,7 @@ func (c *TypeChecker) CheckExpressions(expressions []string, hasParams bool, pol
 		var results []typeCheckingResult
 		for i, gvk := range gvks {
 			s := schemas[i]
-			issues, err := c.checkExpression(exp, hasParams, typeOverwrite{
+			issues, err := c.checkExpression(exp, hasParams, hasAuthorizer, typeOverwrite{
 				object: common.SchemaDeclType(s, true).MaybeAssignTypeName(generateUniqueTypeName(gvk.Kind)),
 				params: paramsDeclType,
 			})
@@ -187,8 +189,8 @@ func (c *TypeChecker) paramsType(policy *v1alpha1.ValidatingAdmissionPolicy) sch
 	return gv.WithKind(policy.Spec.ParamKind.Kind)
 }
 
-func (c *TypeChecker) checkExpression(expression string, hasParams bool, types typeOverwrite) (*cel.Issues, error) {
-	env, err := buildEnv(hasParams, types)
+func (c *TypeChecker) checkExpression(expression string, hasParams, hasAuthorizer bool, types typeOverwrite) (*cel.Issues, error) {
+	env, err := buildEnv(hasParams, hasAuthorizer, types)
 	if err != nil {
 		return nil, err
 	}
@@ -317,7 +319,7 @@ func sortGVKList(list []schema.GroupVersionKind) []schema.GroupVersionKind {
 	return list
 }
 
-func buildEnv(hasParams bool, types typeOverwrite) (*cel.Env, error) {
+func buildEnv(hasParams bool, hasAuthorizer bool, types typeOverwrite) (*cel.Env, error) {
 	baseEnv := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())
 	requestType := plugincel.BuildRequestType()
 
@@ -337,6 +339,13 @@ func buildEnv(hasParams bool, types typeOverwrite) (*cel.Env, error) {
 		declTypes = append(declTypes, types.params)
 		varOpts = append(varOpts, createVariableOpts(types.params, plugincel.ParamsVarName)...)
 	}
+
+	// authorizer, implicitly available to all expressions of a policy
+	if hasAuthorizer {
+		// we only need its structure but not the variable itself
+		varOpts = append(varOpts, cel.Variable("authorizer", library.AuthorizerType))
+	}
+
 	env, err := baseEnv.Extend(
 		environment.VersionedOptions{
 			// Feature epoch was actually 1.26, but we artificially set it to 1.0 because these
