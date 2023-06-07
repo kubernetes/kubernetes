@@ -217,6 +217,7 @@ func removeLabelsAndProbes(p *corev1.Pod) {
 	for i := range p.Spec.Containers {
 		p.Spec.Containers[i].LivenessProbe = nil
 		p.Spec.Containers[i].ReadinessProbe = nil
+		p.Spec.Containers[i].StartupProbe = nil
 	}
 }
 
