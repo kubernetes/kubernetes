@@ -148,14 +148,30 @@ func NewPodsToActivate() *PodsToActivate {
 type Status struct {
 	code    Code
 	reasons []string
-	err     error
+	err     StatusError
 	// failedPlugin is an optional field that records the plugin name a Pod failed by.
 	// It's set by the framework when code is Error, Unschedulable or UnschedulableAndUnresolvable.
 	failedPlugin string
 }
 
+// StatusError containers the error of the Error Status.
+//
+// Note: We need a wrapped error instead of a vanilla error mainly
+// because we want to compare the errors.
+type StatusError struct {
+	err error
+}
+
+func (e StatusError) Error() string {
+	return e.err.Error()
+}
+
+func (e StatusError) Is(target error) bool {
+	return e.err == target || e.err.Error() == target.Error()
+}
+
 func (s *Status) WithError(err error) *Status {
-	s.err = err
+	s.err = StatusError{err: err}
 	return s
 }
 
@@ -194,7 +210,7 @@ func (s *Status) FailedPlugin() string {
 
 // Reasons returns reasons of the Status.
 func (s *Status) Reasons() []string {
-	if s.err != nil {
+	if s.err.err != nil {
 		return append([]string{s.err.Error()}, s.reasons...)
 	}
 	return s.reasons
@@ -232,7 +248,7 @@ func (s *Status) AsError() error {
 	if s.IsSuccess() || s.IsWait() || s.IsSkip() {
 		return nil
 	}
-	if s.err != nil {
+	if s.err.err != nil {
 		return s.err
 	}
 	return errors.New(s.Message())
@@ -272,7 +288,7 @@ func AsStatus(err error) *Status {
 	}
 	return &Status{
 		code: Error,
-		err:  err,
+		err:  StatusError{err: err},
 	}
 }
 
