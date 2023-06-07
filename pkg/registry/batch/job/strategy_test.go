@@ -813,7 +813,7 @@ func TestJobStrategy_WarningsOnUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector: validSelector,
 					Template: api.PodTemplateSpec{
-						Spec: api.PodSpec{Volumes: []api.Volume{{Name: "volume-name"}, {Name: "volume-name"}}},
+						Spec: api.PodSpec{ImagePullSecrets: []api.LocalObjectReference{{Name: ""}}},
 					},
 					ManualSelector: pointer.BoolPtr(true),
 					Parallelism:    pointer.Int32Ptr(1),

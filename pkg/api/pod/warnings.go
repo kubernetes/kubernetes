@@ -192,18 +192,6 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 		}
 	}
 
-	// duplicate volume names (#78266, #58477)
-	if len(podSpec.Volumes) > 1 {
-		items := sets.NewString()
-		for i, item := range podSpec.Volumes {
-			if items.Has(item.Name) {
-				warnings = append(warnings, fmt.Sprintf("%s: duplicate name %q", fieldPath.Child("spec", "volumes").Index(i).Child("name"), item.Name))
-			} else {
-				items.Insert(item.Name)
-			}
-		}
-	}
-
 	// fractional memory/ephemeral-storage requests/limits (#79950, #49442, #18538)
 	if value, ok := podSpec.Overhead[api.ResourceMemory]; ok && value.MilliValue()%int64(1000) != int64(0) {
 		warnings = append(warnings, fmt.Sprintf("%s: fractional byte value %q is invalid, must be an integer", fieldPath.Child("spec", "overhead").Key(string(api.ResourceMemory)), value.String()))
