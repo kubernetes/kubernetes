@@ -17,9 +17,7 @@ limitations under the License.
 package prober
 
 import (
-	"fmt"
 	"math/rand"
-	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -27,7 +25,6 @@ import (
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/apis/apps"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 )
@@ -114,12 +111,10 @@ func newWorker(
 		w.initialValue = results.Unknown
 	}
 
-	podName := getPodLabelName(w.pod)
-
 	basicMetricLabels := metrics.Labels{
 		"probe_type": w.probeType.String(),
 		"container":  w.container.Name,
-		"pod":        podName,
+		"pod":        w.pod.Name,
 		"namespace":  w.pod.Namespace,
 		"pod_uid":    string(w.pod.UID),
 	}
@@ -127,7 +122,7 @@ func newWorker(
 	proberDurationLabels := metrics.Labels{
 		"probe_type": w.probeType.String(),
 		"container":  w.container.Name,
-		"pod":        podName,
+		"pod":        w.pod.Name,
 		"namespace":  w.pod.Namespace,
 	}
 
@@ -334,16 +329,4 @@ func deepCopyPrometheusLabels(m metrics.Labels) metrics.Labels {
 		ret[k] = v
 	}
 	return ret
-}
-
-func getPodLabelName(pod *v1.Pod) string {
-	podName := pod.Name
-	if pod.GenerateName != "" {
-		podNameSlice := strings.Split(pod.Name, "-")
-		podName = strings.Join(podNameSlice[:len(podNameSlice)-1], "-")
-		if label, ok := pod.GetLabels()[apps.DefaultDeploymentUniqueLabelKey]; ok {
-			podName = strings.ReplaceAll(podName, fmt.Sprintf("-%s", label), "")
-		}
-	}
-	return podName
 }
