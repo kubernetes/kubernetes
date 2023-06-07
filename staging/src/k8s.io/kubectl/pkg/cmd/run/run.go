@@ -153,6 +153,7 @@ type RunOptions struct {
 	ArgsLenAtDash     int
 	Attach            bool
 	Annotations       []string
+	args              []string
 	Env               []string
 	Expose            bool
 	Image             string
@@ -166,6 +167,11 @@ type RunOptions struct {
 	Quiet             bool
 	TTY               bool
 	fieldManager      string
+
+	factory       cmdutil.Factory
+	generator     generate.Generator
+	attachOptions attach.AttachOptions
+	params        map[string]interface{}
 
 	restartPolicy corev1.RestartPolicy
 	timeout       time.Duration
@@ -205,19 +211,19 @@ func NewCmdRun(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Com
 				cmdutil.CheckErr(err)
 				return
 			}
-			o, ao, err := flags.ToOptions(f, cmd, args)
+			o, err := flags.ToOptions(f, cmd, args, params, generator)
 
 			if err != nil {
 				cmdutil.CheckErr(err)
 				return
 			}
-			cmdutil.CheckErr(o.Complete())
+			
 			err = o.Validate(args)
 			if err != nil {
 				cmdutil.CheckErr(err)
 				return
 			}
-			cmdutil.CheckErr(o.Run(f, args, ao, params, generator))
+			cmdutil.CheckErr(o.Run())
 		},
 	}
 
@@ -287,23 +293,23 @@ func addRunFlags(cmd *cobra.Command, flags *RunFlags) {
 	flags.AddOverrideFlags(cmd)
 }
 
-func (flags *RunFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, args []string) (runOptions *RunOptions, attachOptions *attach.AttachOptions, error1 error) {
+func (flags *RunFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, args []string, params map[string]interface{}, generator generate.Generator) (runOptions *RunOptions, error1 error) {
 	dryRunStrategy, err := cmdutil.GetDryRunStrategyFromFlag(flags.DryRunStrategy)
 
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	flags.RecordFlags.Complete(cmd)
 	recorder, err := flags.RecordFlags.ToRecorder()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	cmdutil.PrintFlagsWithDryRunStrategy(flags.PrintFlags, dryRunStrategy)
 	printer, err := flags.PrintFlags.ToPrinter()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	printObj := func(obj runtime.Object) error {
@@ -312,12 +318,12 @@ func (flags *RunFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, args []s
 
 	dynamicClient, err := f.DynamicClient()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	deleteOptions, err := flags.DeleteFlags.ToOptions(dynamicClient, flags.IOStreams)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	// TODO do we need this anymore
@@ -328,7 +334,7 @@ func (flags *RunFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, args []s
 
 	namespace, enforceNamespace, err := f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	options := &RunOptions{
@@ -345,6 +351,9 @@ func (flags *RunFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, args []s
 
 		ArgsLenAtDash:  cmd.ArgsLenAtDash(),
 		Attach:         flags.Attach,
+		args:           args,
+		factory:        f,
+		generator:      generator,
 		Expose:         flags.Expose,
 		Image:          flags.Image,
 		Interactive:    flags.Interactive,
@@ -356,6 +365,7 @@ func (flags *RunFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, args []s
 		fieldManager:   flags.fieldManager,
 		SaveConfig:     flags.SaveConfig,
 		Restart:        flags.Restart,
+		params: params,
 
 		Namespace:         namespace,
 		EnforceNamespace:  enforceNamespace,
@@ -377,17 +387,13 @@ func (flags *RunFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, args []s
 		Attach: &attach.DefaultRemoteAttach{},
 	}
 
-	return options, ao, nil
-}
+	options.attachOptions = *ao
+	options.DeleteOptions.IgnoreNotFound = true
+	options.DeleteOptions.WaitForDeletion = false
+	options.DeleteOptions.GracePeriod = -1
+	options.DeleteOptions.Quiet = options.Quiet
 
-func (o *RunOptions) Complete() error {
-
-	o.DeleteOptions.IgnoreNotFound = true
-	o.DeleteOptions.WaitForDeletion = false
-	o.DeleteOptions.GracePeriod = -1
-	o.DeleteOptions.Quiet = o.Quiet
-
-	return nil
+	return options, nil
 }
 
 func (o *RunOptions) Validate(args []string) error {
@@ -435,18 +441,18 @@ func (o *RunOptions) Validate(args []string) error {
 	return nil
 }
 
-func (o *RunOptions) Run(f cmdutil.Factory, args []string, ao *attach.AttachOptions, params map[string]interface{}, generator generate.Generator) error {
+func (o *RunOptions) Run() error {
 
-	params["name"] = args[0]
-	if len(args) > 1 {
-		params["args"] = args[1:]
+	o.params["name"] = o.args[0]
+	if len(o.args) > 1 {
+		o.params["args"] = o.args[1:]
 	}
 
-	params["annotations"] = o.Annotations // cmdutil.GetFlagStringArray(cmd, "annotations")
-	params["env"] = o.Env                 //cmdutil.GetFlagStringArray(cmd, "env")
+	o.params["annotations"] = o.Annotations // cmdutil.GetFlagStringArray(cmd, "annotations")
+	o.params["env"] = o.Env                 //cmdutil.GetFlagStringArray(cmd, "env")
 
 	var createdObjects = []*RunObject{}
-	runObject, err := o.createGeneratedObject(f, generator, params, o.NewOverrider(&corev1.Pod{}))
+	runObject, err := o.createGeneratedObject(o.factory, o.generator, o.params, o.NewOverrider(&corev1.Pod{}))
 	if err != nil {
 		return err
 	}
@@ -454,7 +460,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, args []string, ao *attach.AttachOpti
 
 	allErrs := []error{}
 	if o.Expose {
-		serviceRunObject, err := o.generateService(f, params)
+		serviceRunObject, err := o.generateService(o.factory, o.params)
 		if err != nil {
 			allErrs = append(allErrs, err)
 		} else {
@@ -464,26 +470,26 @@ func (o *RunOptions) Run(f cmdutil.Factory, args []string, ao *attach.AttachOpti
 
 	if o.Attach {
 		if o.remove {
-			defer o.removeCreatedObjects(f, createdObjects)
+			defer o.removeCreatedObjects(o.factory, createdObjects)
 		}
 
-		config, err := f.ToRESTConfig()
+		config, err := o.factory.ToRESTConfig()
 		if err != nil {
 			return err
 		}
-		ao.Config = config
-		ao.AttachFunc = attach.DefaultAttachFunc
+		o.attachOptions.Config = config
+		o.attachOptions.AttachFunc = attach.DefaultAttachFunc
 
 		clientset, err := kubernetes.NewForConfig(config)
 		if err != nil {
 			return err
 		}
 
-		attachablePod, err := polymorphichelpers.AttachablePodForObjectFn(f, runObject.Object, ao.GetPodTimeout)
+		attachablePod, err := polymorphichelpers.AttachablePodForObjectFn(o.factory, runObject.Object, o.attachOptions.GetPodTimeout)
 		if err != nil {
 			return err
 		}
-		err = handleAttachPod(f, clientset.CoreV1(), attachablePod.Namespace, attachablePod.Name, ao)
+		err = handleAttachPod(o.factory, clientset.CoreV1(), attachablePod.Namespace, attachablePod.Name, &o.attachOptions)
 		if err != nil {
 			return err
 		}
@@ -498,7 +504,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, args []string, ao *attach.AttachOpti
 			if o.restartPolicy == corev1.RestartPolicyOnFailure {
 				exitCondition = podSucceeded
 			}
-			pod, err = waitForPod(clientset.CoreV1(), attachablePod.Namespace, attachablePod.Name, ao.GetPodTimeout, exitCondition)
+			pod, err = waitForPod(clientset.CoreV1(), attachablePod.Namespace, attachablePod.Name, o.attachOptions.GetPodTimeout, exitCondition)
 			if err != nil {
 				return err
 			}
