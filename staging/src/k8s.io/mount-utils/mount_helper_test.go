@@ -41,8 +41,7 @@ func TestDoCleanupMountPoint(t *testing.T) {
 		// and error if the prepare function encountered a fatal error.
 		prepareMnt func(base string) (MountPoint, error, error)
 		// Function that prepares the FakeMounter for the test.
-		// Returns error if prepareMntr function encountered a fatal error.
-		prepareMntr func(mntr *FakeMounter) error
+		prepareMntr func(mntr *FakeMounter)
 		expectErr   bool
 	}{
 		"mount-ok": {
@@ -94,9 +93,8 @@ func TestDoCleanupMountPoint(t *testing.T) {
 				}
 				return MountPoint{Device: "/dev/sdb", Path: path}, nil, nil
 			},
-			prepareMntr: func(mntr *FakeMounter) error {
+			prepareMntr: func(mntr *FakeMounter) {
 				mntr.WithSkipMountPointCheck()
-				return nil
 			},
 			expectErr: false,
 		},

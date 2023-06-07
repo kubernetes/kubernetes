@@ -30,6 +30,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	utilexec "k8s.io/utils/exec"
 	testexec "k8s.io/utils/exec/testing"
 )
@@ -436,15 +437,17 @@ func TestSearchMountPoints(t *testing.T) {
 	defer os.Remove(tmpFile.Name())
 	defer tmpFile.Close()
 	for _, v := range testcases {
-		tmpFile.Truncate(0)
-		tmpFile.Seek(0, 0)
-		tmpFile.WriteString(v.mountInfos)
-		tmpFile.Sync()
+		assert.NoError(t, tmpFile.Truncate(0))
+		_, err := tmpFile.Seek(0, 0)
+		assert.NoError(t, err)
+		_, err = tmpFile.WriteString(v.mountInfos)
+		assert.NoError(t, err)
+		assert.NoError(t, tmpFile.Sync())
 		refs, err := SearchMountPoints(v.source, tmpFile.Name())
 		if !reflect.DeepEqual(refs, v.expectedRefs) {
 			t.Errorf("test %q: expected Refs: %#v, got %#v", v.name, v.expectedRefs, refs)
 		}
-		if !reflect.DeepEqual(err, v.expectedErr) {
+		if err != v.expectedErr {
 			t.Errorf("test %q: expected err: %v, got %v", v.name, v.expectedErr, err)
 		}
 	}
@@ -703,7 +706,10 @@ func TestFormatConcurrency(t *testing.T) {
 			// for one to be released
 			for i := 0; i < tc.max+1; i++ {
 				go func() {
-					mounter.format(fstype, nil)
+					_, err := mounter.format(fstype, nil)
+					if err != nil {
+						t.Errorf("format(%q): %v", fstype, err)
+					}
 				}()
 			}
 
@@ -778,7 +784,10 @@ func TestFormatTimeout(t *testing.T) {
 
 	for i := 0; i < maxConcurrency+1; i++ {
 		go func() {
-			mounter.format(fstype, nil)
+			_, err := mounter.format(fstype, nil)
+			if err != nil {
+				t.Errorf("format(%q): %v", fstype, err)
+			}
 		}()
 	}
 
