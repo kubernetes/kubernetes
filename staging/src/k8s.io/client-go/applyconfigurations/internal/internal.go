@@ -6180,9 +6180,7 @@ var schemaYAML = typed.YAMLObject(`types:
         list:
           elementType:
             namedType: io.k8s.api.core.v1.HostAlias
-          elementRelationship: associative
-          keys:
-          - ip
+          elementRelationship: atomic
     - name: hostIPC
       type:
         scalar: boolean
@@ -6203,9 +6201,7 @@ var schemaYAML = typed.YAMLObject(`types:
         list:
           elementType:
             namedType: io.k8s.api.core.v1.LocalObjectReference
-          elementRelationship: associative
-          keys:
-          - name
+          elementRelationship: atomic
     - name: initContainers
       type:
         list:
@@ -7062,9 +7058,7 @@ var schemaYAML = typed.YAMLObject(`types:
         list:
           elementType:
             namedType: io.k8s.api.core.v1.ObjectReference
-          elementRelationship: associative
-          keys:
-          - name
+          elementRelationship: atomic
 - name: io.k8s.api.core.v1.ServiceAccountTokenProjection
   map:
     fields:

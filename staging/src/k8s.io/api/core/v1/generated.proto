@@ -3719,6 +3719,7 @@ message PodSpec {
   // +optional
   // +patchMergeKey=name
   // +patchStrategy=merge
+  // +listType=atomic
   repeated LocalObjectReference imagePullSecrets = 15;
 
   // Specifies the hostname of the Pod
@@ -3749,6 +3750,7 @@ message PodSpec {
   // +optional
   // +patchMergeKey=ip
   // +patchStrategy=merge
+  // +listType=atomic
   repeated HostAlias hostAliases = 23;
 
   // If specified, indicates the pod's priority. "system-node-critical" and
@@ -5043,6 +5045,7 @@ message ServiceAccount {
   // +optional
   // +patchMergeKey=name
   // +patchStrategy=merge
+  // +listType=atomic
   repeated ObjectReference secrets = 2;
 
   // ImagePullSecrets is a list of references to secrets in the same namespace to use for pulling any images

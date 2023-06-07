@@ -5131,6 +5131,7 @@
               "default": {}
             },
             "type": "array",
+            "x-kubernetes-list-type": "atomic",
             "x-kubernetes-patch-merge-key": "ip",
             "x-kubernetes-patch-strategy": "merge"
           },
@@ -5165,6 +5166,7 @@
               "default": {}
             },
             "type": "array",
+            "x-kubernetes-list-type": "atomic",
             "x-kubernetes-patch-merge-key": "name",
             "x-kubernetes-patch-strategy": "merge"
           },
@@ -6927,6 +6929,7 @@
               "default": {}
             },
             "type": "array",
+            "x-kubernetes-list-type": "atomic",
             "x-kubernetes-patch-merge-key": "name",
             "x-kubernetes-patch-strategy": "merge"
           }
