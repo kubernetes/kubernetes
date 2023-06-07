@@ -35,6 +35,14 @@ import (
 )
 
 func TestEnsurePriorityLevel(t *testing.T) {
+	validExemptPL := func() *flowcontrolv1beta3.PriorityLevelConfiguration {
+		copy := bootstrap.MandatoryPriorityLevelConfigurationExempt.DeepCopy()
+		copy.Annotations[flowcontrolv1beta3.AutoUpdateAnnotationKey] = "false"
+		copy.Spec.Exempt.NominalConcurrencyShares = pointer.Int32(10)
+		copy.Spec.Exempt.LendablePercent = pointer.Int32(50)
+		return copy
+	}()
+
 	tests := []struct {
 		name      string
 		strategy  func() EnsureStrategy[*flowcontrolv1beta3.PriorityLevelConfiguration]
@@ -86,6 +94,15 @@ func TestEnsurePriorityLevel(t *testing.T) {
 			bootstrap: newPLConfiguration("pl1").WithLimited(20).Object(),
 			current:   newPLConfiguration("pl1").WithAutoUpdateAnnotation("false").WithLimited(10).Object(),
 			expected:  newPLConfiguration("pl1").WithAutoUpdateAnnotation("true").WithLimited(20).Object(),
+		},
+		{
+			name:     "admin changes the Exempt field of the exempt priority level configuration",
+			strategy: NewMandatoryEnsureStrategy[*flowcontrolv1beta3.PriorityLevelConfiguration],
+			bootstrap: func() *flowcontrolv1beta3.PriorityLevelConfiguration {
+				return bootstrap.MandatoryPriorityLevelConfigurationExempt
+			}(),
+			current:  validExemptPL,
+			expected: validExemptPL,
 		},
 	}
 

@@ -150,6 +150,11 @@ func NewSuggestedEnsureStrategy[ObjectType configurationObjectType]() EnsureStra
 func NewMandatoryEnsureStrategy[ObjectType configurationObjectType]() EnsureStrategy[ObjectType] {
 	return &strategy[ObjectType]{
 		alwaysAutoUpdateSpecFn: func(want, have ObjectType) bool {
+			if want.GetName() == flowcontrolv1beta3.PriorityLevelConfigurationNameExempt {
+				// we allow the cluster operator to update the spec of the
+				// singleton 'exempt' prioritylevelconfiguration object.
+				return false
+			}
 			return true
 		},
 		name: "mandatory",
