@@ -127,6 +127,10 @@ type ContainerManager interface {
 	// might need to unprepare resources.
 	PodMightNeedToUnprepareResources(UID types.UID) bool
 
+	// AreAllDeviceResourcesReady returns bool when the container manager have up to date information about
+	// the device plugins. Note this doesn't mean devices are healthy, but just that they reported their status.
+	AreAllDeviceResourcesReady() bool
+
 	// Implements the PodResources Provider API
 	podresources.CPUsProvider
 	podresources.DevicesProvider

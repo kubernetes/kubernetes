@@ -79,6 +79,10 @@ type Manager interface {
 
 	// UpdateAllocatedDevices frees any Devices that are bound to terminated pods.
 	UpdateAllocatedDevices()
+
+	// GetResourcRegistrationStatus() returns a map resourceName->ready reporting the resource readiness status
+	// and a boolean reporting if the server is running yet or not
+	GetResourceRegistrationStatus() (map[string]bool, bool)
 }
 
 // DeviceRunContainerOptions contains the combined container runtime settings to consume its allocated devices.

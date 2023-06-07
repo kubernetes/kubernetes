@@ -41,6 +41,7 @@ type FakeContainerManager struct {
 	CalledFunctions                     []string
 	PodContainerManager                 *FakePodContainerManager
 	shouldResetExtendedResourceCapacity bool
+	areAllDeviceResourcesReady          bool
 }
 
 var _ ContainerManager = &FakeContainerManager{}
@@ -252,4 +253,11 @@ func (cm *FakeContainerManager) UnprepareDynamicResources(*v1.Pod) error {
 
 func (cm *FakeContainerManager) PodMightNeedToUnprepareResources(UID types.UID) bool {
 	return false
+}
+
+func (cm *FakeContainerManager) AreAllDeviceResourcesReady() bool {
+	cm.Lock()
+	defer cm.Unlock()
+	cm.CalledFunctions = append(cm.CalledFunctions, "AreAllDeviceResourcesReady")
+	return cm.areAllDeviceResourcesReady
 }

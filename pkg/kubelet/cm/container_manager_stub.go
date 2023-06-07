@@ -181,6 +181,10 @@ func (cm *containerManagerStub) PodMightNeedToUnprepareResources(UID types.UID) 
 	return false
 }
 
+func (cm *containerManagerStub) AreAllDeviceResourcesReady() bool {
+	return true
+}
+
 func NewStubContainerManager() ContainerManager {
 	return &containerManagerStub{shouldResetExtendedResourceCapacity: false}
 }

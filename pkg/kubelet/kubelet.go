@@ -201,6 +201,12 @@ const (
 
 	// instrumentationScope is the name of OpenTelemetry instrumentation scope
 	instrumentationScope = "k8s.io/kubernetes/pkg/kubelet"
+
+	// Max amount of time to wait for the device plugins to register themselves again.
+	// a quick survey of device plugin implementation reveals they can take up to 5s to
+	// detect a kubelet restart. Hence we want to give them at least 2-3 cycles, plus some
+	// extra buffer
+	maxWaitForDevicePlugins = 20 * time.Second
 )
 
 var (
@@ -1652,7 +1658,27 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 		kl.eventedPleg.Start()
 	}
 
+	// TODO: what about node reboots?
+	kl.waitForDevicesReady(ctx, maxWaitForDevicePlugins)
+
 	kl.syncLoop(ctx, updates, kl)
+}
+
+func (kl *Kubelet) waitForDevicesReady(ctx context.Context, timeout time.Duration) {
+	klog.V(2).InfoS("Waiting for device readiness", "timeout", timeout)
+	var devsReady bool
+	wait.PollImmediateWithContext(ctx, 500*time.Millisecond, timeout, func(_ context.Context) (bool, error) {
+		// containerManager is initialized asynchronously.
+		// TODO: find a better way
+		cm := kl.containerManager
+		if cm == nil {
+			klog.V(2).InfoS("Container manager not initialized, skipping check")
+			return false, nil
+		}
+		devsReady = cm.AreAllDeviceResourcesReady()
+		return devsReady, nil
+	})
+	klog.V(2).InfoS("Done waiting for device readiness", "timeout", timeout, "ready", devsReady)
 }
 
 // SyncPod is the transaction script for the sync of a single pod (setting up)

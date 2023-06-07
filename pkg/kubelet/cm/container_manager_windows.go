@@ -268,3 +268,19 @@ func (cm *containerManagerImpl) UnprepareDynamicResources(*v1.Pod) error {
 func (cm *containerManagerImpl) PodMightNeedToUnprepareResources(UID types.UID) bool {
 	return false
 }
+
+func (cm *containerManagerImpl) AreAllDeviceResourcesReady() bool {
+	rs, running := cm.deviceManager.GetResourceRegistrationStatus()
+	klog.V(2).InfoS("Checking registration status", "deviceCount", len(rs), "running", running)
+	if !running {
+		return false
+	}
+	for resourceName, registered := range rs {
+		if !registered {
+			klog.V(4).InfoS("Device has not registered yet", "resourceName", resourceName)
+			return false
+		}
+		klog.V(4).InfoS("Device has registered", "resourceName", resourceName)
+	}
+	return true
+}

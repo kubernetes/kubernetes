@@ -97,6 +97,9 @@ type ManagerImpl struct {
 
 	// pendingAdmissionPod contain the pod during the admission phase
 	pendingAdmissionPod *v1.Pod
+
+	// is the plugin server running?
+	running bool
 }
 
 type endpointInfo struct {
@@ -245,6 +248,42 @@ func (m *ManagerImpl) PluginListAndWatchReceiver(resourceName string, resp *plug
 	m.genericDeviceUpdateCallback(resourceName, devices)
 }
 
+func (m *ManagerImpl) GetResourceRegistrationStatus() (map[string]bool, bool) {
+	running := m.running
+	resourceNames := []string{}
+	// recovered by checkpoint file, if any.
+	for resourceName, _ := range m.endpoints {
+		resourceNames = append(resourceNames, resourceName)
+	}
+
+	klog.V(4).InfoS("device resource registration status", "resourceNames", resourceNames)
+
+	rs := make(map[string]bool)
+	if len(resourceNames) == 0 {
+		return rs, running // nothing to do!
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	for _, resourceName := range resourceNames {
+		rs[resourceName] = m.isResourceRegistered(resourceName)
+	}
+	return rs, running
+}
+
+// isResourceRegistered needs to be called with the mutex held
+func (m *ManagerImpl) isResourceRegistered(resourceName string) bool {
+	healthyDevs, healthyOk := m.healthyDevices[resourceName]
+	unhealthyDevs, unhealthyOk := m.unhealthyDevices[resourceName]
+	if !healthyOk || !unhealthyOk {
+		// if either counter is unknown, the device is unknown to the kubelet
+		return false
+	}
+	// if BOTH counters are zero, the device was registered in the past, but not registered yet.
+	// note the device plugin may have been removed, so this count may stay zero forever.
+	return healthyDevs.Len() > 0 || unhealthyDevs.Len() > 0
+}
+
 func (m *ManagerImpl) genericDeviceUpdateCallback(resourceName string, devices []pluginapi.Device) {
 	m.mutex.Lock()
 	m.healthyDevices[resourceName] = sets.NewString()
@@ -289,14 +328,24 @@ func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.Sourc
 		klog.InfoS("Continue after failing to read checkpoint file. Device allocation info may NOT be up-to-date", "err", err)
 	}
 
-	return m.server.Start()
+	err = m.server.Start()
+	if err != nil {
+		return err
+	}
+	m.running = true
+	return nil
 }
 
 // Stop is the function that can stop the plugin server.
 // Can be called concurrently, more than once, and is safe to call
 // without a prior Start.
 func (m *ManagerImpl) Stop() error {
-	return m.server.Stop()
+	err := m.server.Stop()
+	if err != nil {
+		return err
+	}
+	m.running = false
+	return nil
 }
 
 // Allocate is the call that you can use to allocate a set of devices
