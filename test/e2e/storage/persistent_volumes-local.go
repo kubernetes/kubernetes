@@ -463,6 +463,8 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			setupStorageClass(ctx, config, &waitMode)
+			ginkgo.DeferCleanup(cleanupStorageClass, config)
+
 			for i, node := range config.nodes {
 				ginkgo.By(fmt.Sprintf("Setting up %d local volumes on node %q", volsPerNode, node.Name))
 				allLocalVolumes[node.Name] = setupLocalVolumes(ctx, config, volType, &config.nodes[i], volsPerNode)
@@ -476,6 +478,13 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 					framework.ExpectNoError(err)
 				}
 			}
+			ginkgo.DeferCleanup(func(ctx context.Context) {
+				ginkgo.By("Clean all PVs")
+				for nodeName, localVolumes := range allLocalVolumes {
+					ginkgo.By(fmt.Sprintf("Cleaning up %d local volumes on node %q", len(localVolumes), nodeName))
+					cleanupLocalVolumes(ctx, config, localVolumes)
+				}
+			})
 			ginkgo.By("Start a goroutine to recycle unbound PVs")
 			backgroundCtx, cancel := context.WithCancel(context.Background())
 			var wg sync.WaitGroup
@@ -530,15 +539,6 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 					}
 				}
 			}()
-		})
-
-		ginkgo.AfterEach(func(ctx context.Context) {
-			ginkgo.By("Clean all PVs")
-			for nodeName, localVolumes := range allLocalVolumes {
-				ginkgo.By(fmt.Sprintf("Cleaning up %d local volumes on node %q", len(localVolumes), nodeName))
-				cleanupLocalVolumes(ctx, config, localVolumes)
-			}
-			cleanupStorageClass(ctx, config)
 		})
 
 		ginkgo.It("should be able to process many pods and reuse local volumes", func(ctx context.Context) {
