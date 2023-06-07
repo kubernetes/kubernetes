@@ -24,7 +24,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -270,7 +269,7 @@ func detectSafeNotMountedBehavior() bool {
 // detectSafeNotMountedBehaviorWithExec is for testing with FakeExec.
 func detectSafeNotMountedBehaviorWithExec(exec utilexec.Interface) bool {
 	// create a temp dir and try to umount it
-	path, err := ioutil.TempDir("", "kubelet-detect-safe-umount")
+	path, err := os.MkdirTemp("", "kubelet-detect-safe-umount")
 	if err != nil {
 		klog.V(4).Infof("Cannot create temp dir to detect safe 'not mounted' behavior: %v", err)
 		return false
