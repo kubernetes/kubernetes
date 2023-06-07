@@ -309,7 +309,6 @@ func (c *webhookConverter) Convert(in runtime.Object, toGV schema.GroupVersion) 
 				Metrics.ObserveConversionWebhookFailure(ctx, time.Since(t), ConversionWebhookInvalidConvertedObjectFailure)
 				return nil, fmt.Errorf("conversion webhook for %v returned invalid converted object at index %v: %v", in.GetObjectKind().GroupVersionKind(), convertedIndex, err)
 			}
-			convertedIndex++
 			if expected, got := toGV, converted.GetObjectKind().GroupVersionKind().GroupVersion(); expected != got {
 				Metrics.ObserveConversionWebhookFailure(ctx, time.Since(t), ConversionWebhookInvalidConvertedObjectFailure)
 				return nil, fmt.Errorf("conversion webhook for %v returned invalid converted object at index %v: invalid groupVersion (expected %v, received %v)", in.GetObjectKind().GroupVersionKind(), convertedIndex, expected, got)
@@ -332,6 +331,7 @@ func (c *webhookConverter) Convert(in runtime.Object, toGV schema.GroupVersion) 
 				Metrics.ObserveConversionWebhookFailure(ctx, time.Since(t), ConversionWebhookInvalidConvertedObjectFailure)
 				return nil, fmt.Errorf("conversion webhook for %v returned invalid metadata in object at index %v: %v", in.GetObjectKind().GroupVersionKind(), convertedIndex, err)
 			}
+			convertedIndex++
 			convertedList.Items[i] = *unstructConverted
 		}
 		convertedList.SetAPIVersion(toGV.String())
