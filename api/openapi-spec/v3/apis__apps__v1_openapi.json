@@ -1766,7 +1766,8 @@
             "type": "array",
             "x-kubernetes-list-map-keys": [
               "containerPort",
-              "protocol"
+              "protocol",
+              "hostIP"
             ],
             "x-kubernetes-list-type": "map",
             "x-kubernetes-patch-merge-key": "containerPort",
@@ -2200,7 +2201,8 @@
             "type": "array",
             "x-kubernetes-list-map-keys": [
               "containerPort",
-              "protocol"
+              "protocol",
+              "hostIP"
             ],
             "x-kubernetes-list-type": "map",
             "x-kubernetes-patch-merge-key": "containerPort",

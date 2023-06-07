@@ -699,6 +699,7 @@ message Container {
   // +listType=map
   // +listMapKey=containerPort
   // +listMapKey=protocol
+  // +listMapKey=hostIP
   repeated ContainerPort ports = 6;
 
   // List of sources to populate environment variables in the container.
@@ -1357,6 +1358,7 @@ message EphemeralContainerCommon {
   // +listType=map
   // +listMapKey=containerPort
   // +listMapKey=protocol
+  // +listMapKey=hostIP
   repeated ContainerPort ports = 6;
 
   // List of sources to populate environment variables in the container.

@@ -17629,6 +17629,7 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.Ope
 								"x-kubernetes-list-map-keys": []interface{}{
 									"containerPort",
 									"protocol",
+									"hostIP",
 								},
 								"x-kubernetes-list-type":       "map",
 								"x-kubernetes-patch-merge-key": "containerPort",
@@ -18790,6 +18791,7 @@ func schema_k8sio_api_core_v1_EphemeralContainer(ref common.ReferenceCallback) c
 								"x-kubernetes-list-map-keys": []interface{}{
 									"containerPort",
 									"protocol",
+									"hostIP",
 								},
 								"x-kubernetes-list-type":       "map",
 								"x-kubernetes-patch-merge-key": "containerPort",
@@ -19064,6 +19066,7 @@ func schema_k8sio_api_core_v1_EphemeralContainerCommon(ref common.ReferenceCallb
 								"x-kubernetes-list-map-keys": []interface{}{
 									"containerPort",
 									"protocol",
+									"hostIP",
 								},
 								"x-kubernetes-list-type":       "map",
 								"x-kubernetes-patch-merge-key": "containerPort",

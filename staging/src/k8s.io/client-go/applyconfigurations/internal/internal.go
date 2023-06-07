@@ -4293,6 +4293,7 @@ var schemaYAML = typed.YAMLObject(`types:
           keys:
           - containerPort
           - protocol
+          - hostIP
     - name: readinessProbe
       type:
         namedType: io.k8s.api.core.v1.Probe
@@ -4710,6 +4711,7 @@ var schemaYAML = typed.YAMLObject(`types:
           keys:
           - containerPort
           - protocol
+          - hostIP
     - name: readinessProbe
       type:
         namedType: io.k8s.api.core.v1.Probe
