@@ -1,8 +1,17 @@
 # Kubernetes (K8s)
 
-[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/569/badge)](https://bestpractices.coreinfrastructure.org/projects/569) [![Go Report Card](https://goreportcard.com/badge/github.com/kubernetes/kubernetes)](https://goreportcard.com/report/github.com/kubernetes/kubernetes) ![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/kubernetes/kubernetes)
+<div align="center">
 
-<img src="https://github.com/kubernetes/kubernetes/raw/master/logo/logo.png" width="100">
+<img src="https://github.com/kubernetes/kubernetes/raw/master/logo/logo.png" width="150">
+
+<br/>
+<br/>
+
+[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/569/badge)](https://bestpractices.coreinfrastructure.org/projects/569) [![Go Report Card](https://goreportcard.com/badge/github.com/kubernetes/kubernetes)](https://goreportcard.com/report/github.com/kubernetes/kubernetes) ![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/kubernetes/kubernetes)
+[![License](https://img.shields.io/github/license/kubernetes/kubernetes)](/LICENSE)
+
+</div>
+
 
 ----
 
