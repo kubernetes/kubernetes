@@ -19,7 +19,9 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -74,6 +76,10 @@ func stubAllocFunc(r *pluginapi.AllocateRequest, devs map[string]pluginapi.Devic
 }
 
 func main() {
+	// respond to syscalls for termination
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+
 	devs := []*pluginapi.Device{
 		{ID: "Dev-1", Health: pluginapi.Healthy},
 		{ID: "Dev-2", Health: pluginapi.Healthy},
@@ -94,17 +100,36 @@ func main() {
 
 	}
 	dp1.SetAllocFunc(stubAllocFunc)
+	var registerControlFile string
+	autoregister := true
 
-	if registerControlFile := os.Getenv("REGISTER_CONTROL_FILE"); registerControlFile != "" {
+	if registerControlFile = os.Getenv("REGISTER_CONTROL_FILE"); registerControlFile != "" {
+		autoregister = false
+	}
+	if !autoregister {
+
 		if err := handleRegistrationProcess(registerControlFile); err != nil {
 			panic(err)
 		}
-	}
+		if err := dp1.Register(pluginapi.KubeletSocket, resourceName, pluginapi.DevicePluginPath); err != nil {
+			panic(err)
+		}
+		select {}
+	} else {
+		if err := dp1.Register(pluginapi.KubeletSocket, resourceName, pluginapi.DevicePluginPath); err != nil {
+			panic(err)
+		}
 
-	if err := dp1.Register(pluginapi.KubeletSocket, resourceName, pluginapi.DevicePluginPath); err != nil {
-		panic(err)
+		go dp1.Watch(pluginapi.KubeletSocket, resourceName, pluginapi.DevicePluginPath)
+
+		// Catch termination signals
+		sig := <-sigCh
+		klog.InfoS("Shutting down, received signal", "signal", sig)
+		if err := dp1.Stop(); err != nil {
+			panic(err)
+		}
+		return
 	}
-	select {}
 }
 
 func handleRegistrationProcess(registerControlFile string) error {
@@ -123,7 +148,7 @@ func handleRegistrationProcess(registerControlFile string) error {
 	defer close(updateCh)
 
 	go func() {
-		klog.Infof("Starting watching routine")
+		klog.InfoS("Starting watching routine")
 		for {
 			select {
 			case event, ok := <-watcher.Events:
@@ -131,8 +156,7 @@ func handleRegistrationProcess(registerControlFile string) error {
 					return
 				}
 				klog.InfoS("Received event", "name", event.Name, "operation", event.Op)
-				switch {
-				case event.Op&fsnotify.Remove == fsnotify.Remove:
+				if event.Op&fsnotify.Remove == fsnotify.Remove {
 					if event.Name == registerControlFile {
 						klog.InfoS("Expected delete", "name", event.Name, "operation", event.Op)
 						updateCh <- true
