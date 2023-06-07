@@ -345,16 +345,38 @@ func ValidatePriorityLevelConfiguration(pl *flowcontrol.PriorityLevelConfigurati
 	allErrs := apivalidation.ValidateObjectMeta(&pl.ObjectMeta, false, ValidatePriorityLevelConfigurationName, field.NewPath("metadata"))
 	specPath := field.NewPath("spec")
 	allErrs = append(allErrs, ValidatePriorityLevelConfigurationSpec(&pl.Spec, requestGV, pl.Name, specPath)...)
-	if mand, ok := internalbootstrap.MandatoryPriorityLevelConfigurations[pl.Name]; ok {
-		// Check for almost exact equality.  This is a pretty
-		// strict test, and it is OK in this context because both
-		// sides of this comparison are intended to ultimately
-		// come from the same code.
-		if !apiequality.Semantic.DeepEqual(pl.Spec, mand.Spec) {
-			allErrs = append(allErrs, field.Invalid(specPath, pl.Spec, fmt.Sprintf("spec of '%s' must equal the fixed value", pl.Name)))
-		}
-	}
+	allErrs = append(allErrs, ValidateIfMandatoryPriorityLevelConfigurationObject(pl, specPath)...)
 	allErrs = append(allErrs, ValidatePriorityLevelConfigurationStatus(&pl.Status, field.NewPath("status"))...)
+	return allErrs
+}
+
+func ValidateIfMandatoryPriorityLevelConfigurationObject(pl *flowcontrol.PriorityLevelConfiguration, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	mand, ok := internalbootstrap.MandatoryPriorityLevelConfigurations[pl.Name]
+	if !ok {
+		return allErrs
+	}
+
+	if pl.Name == flowcontrol.PriorityLevelConfigurationNameExempt {
+		// we allow the admin to change the contents of the 'Exempt' field of
+		// the singleton 'exempt' priority level object, every other fields of
+		// the Spec should not be allowed to change.
+		want := &mand.Spec
+		have := pl.Spec.DeepCopy()
+		have.Exempt = want.Exempt
+		if !apiequality.Semantic.DeepEqual(want, have) {
+			allErrs = append(allErrs, field.Invalid(fldPath, pl.Spec, fmt.Sprintf("spec of '%s' except the 'spec.exempt' field must equal the fixed value", pl.Name)))
+		}
+		return allErrs
+	}
+
+	// Check for almost exact equality.  This is a pretty
+	// strict test, and it is OK in this context because both
+	// sides of this comparison are intended to ultimately
+	// come from the same code.
+	if !apiequality.Semantic.DeepEqual(pl.Spec, mand.Spec) {
+		allErrs = append(allErrs, field.Invalid(fldPath, pl.Spec, fmt.Sprintf("spec of '%s' must equal the fixed value", pl.Name)))
+	}
 	return allErrs
 }
 

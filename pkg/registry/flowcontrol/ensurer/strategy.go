@@ -126,7 +126,12 @@ func NewSuggestedEnsureStrategy() EnsureStrategy {
 // NewMandatoryEnsureStrategy returns an EnsureStrategy for mandatory config objects
 func NewMandatoryEnsureStrategy() EnsureStrategy {
 	return &strategy{
-		alwaysAutoUpdateSpecFn: func(_ wantAndHave) bool {
+		alwaysAutoUpdateSpecFn: func(wh wantAndHave) bool {
+			if want, ok := wh.getWant().(*flowcontrolv1beta3.PriorityLevelConfiguration); ok && want.Name == flowcontrolv1beta3.PriorityLevelConfigurationNameExempt {
+				// we allow the cluster operator to update the spec of the
+				// singleton 'exempt' prioritylevelconfiguration object.
+				return false
+			}
 			return true
 		},
 		name: "mandatory",
