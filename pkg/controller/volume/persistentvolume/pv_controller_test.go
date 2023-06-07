@@ -754,8 +754,6 @@ func TestModifyDeletionFinalizers(t *testing.T) {
 }
 
 func TestRetroactiveStorageClassAssignment(t *testing.T) {
-	// Enable RetroactiveDefaultStorageClass feature gate.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RetroactiveDefaultStorageClass, true)()
 	tests := []struct {
 		storageClasses []*storagev1.StorageClass
 		tests          []controllerTest

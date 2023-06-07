@@ -2420,11 +2420,10 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 	})
 
 	scenarios := map[string]struct {
-		isExpectedFailure                    bool
-		oldClaim                             *core.PersistentVolumeClaim
-		newClaim                             *core.PersistentVolumeClaim
-		enableRecoverFromExpansion           bool
-		enableRetroactiveDefaultStorageClass bool
+		isExpectedFailure          bool
+		oldClaim                   *core.PersistentVolumeClaim
+		newClaim                   *core.PersistentVolumeClaim
+		enableRecoverFromExpansion bool
 	}{
 		"valid-update-volumeName-only": {
 			isExpectedFailure: false,
@@ -2536,67 +2535,34 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			newClaim:          validClaimStorageClassInSpec,
 		},
 		"valid-upgrade-nil-storage-class-spec-to-spec": {
-			isExpectedFailure:                    false,
-			oldClaim:                             validClaimStorageClassNil,
-			newClaim:                             validClaimStorageClassInSpec,
-			enableRetroactiveDefaultStorageClass: true,
-			// Feature enabled - change from nil sc name is valid if there is no beta annotation.
-		},
-		"invalid-upgrade-nil-storage-class-spec-to-spec": {
-			isExpectedFailure:                    true,
-			oldClaim:                             validClaimStorageClassNil,
-			newClaim:                             validClaimStorageClassInSpec,
-			enableRetroactiveDefaultStorageClass: false,
-			// Feature disabled - change from nil sc name is invalid if there is no beta annotation.
+			isExpectedFailure: false,
+			oldClaim:          validClaimStorageClassNil,
+			newClaim:          validClaimStorageClassInSpec,
 		},
 		"invalid-upgrade-not-nil-storage-class-spec-to-spec": {
-			isExpectedFailure:                    true,
-			oldClaim:                             validClaimStorageClassInSpec,
-			newClaim:                             validClaimStorageClassInSpecChanged,
-			enableRetroactiveDefaultStorageClass: true,
-			// Feature enablement must not allow non nil value change.
+			isExpectedFailure: true,
+			oldClaim:          validClaimStorageClassInSpec,
+			newClaim:          validClaimStorageClassInSpecChanged,
 		},
 		"invalid-upgrade-to-nil-storage-class-spec-to-spec": {
-			isExpectedFailure:                    true,
-			oldClaim:                             validClaimStorageClassInSpec,
-			newClaim:                             validClaimStorageClassNil,
-			enableRetroactiveDefaultStorageClass: true,
-			// Feature enablement must not allow change to nil value change.
-		},
-		"valid-upgrade-storage-class-annotation-and-nil-spec-to-spec": {
-			isExpectedFailure:                    false,
-			oldClaim:                             validClaimStorageClassInAnnotationAndNilInSpec,
-			newClaim:                             validClaimStorageClassInAnnotationAndSpec,
-			enableRetroactiveDefaultStorageClass: false,
-			// Change from nil sc name is valid if annotations match.
+			isExpectedFailure: true,
+			oldClaim:          validClaimStorageClassInSpec,
+			newClaim:          validClaimStorageClassNil,
 		},
 		"valid-upgrade-storage-class-annotation-and-nil-spec-to-spec-retro": {
-			isExpectedFailure:                    false,
-			oldClaim:                             validClaimStorageClassInAnnotationAndNilInSpec,
-			newClaim:                             validClaimStorageClassInAnnotationAndSpec,
-			enableRetroactiveDefaultStorageClass: true,
-			// Change from nil sc name is valid if annotations match, feature enablement must not break this old behavior.
-		},
-		"invalid-upgrade-storage-class-annotation-and-spec-to-spec": {
-			isExpectedFailure:                    true,
-			oldClaim:                             validClaimStorageClassInAnnotationAndSpec,
-			newClaim:                             validClaimStorageClassInSpecChanged,
-			enableRetroactiveDefaultStorageClass: false,
-			// Change from non nil sc name is invalid if annotations don't match.
+			isExpectedFailure: false,
+			oldClaim:          validClaimStorageClassInAnnotationAndNilInSpec,
+			newClaim:          validClaimStorageClassInAnnotationAndSpec,
 		},
 		"invalid-upgrade-storage-class-annotation-and-spec-to-spec-retro": {
-			isExpectedFailure:                    true,
-			oldClaim:                             validClaimStorageClassInAnnotationAndSpec,
-			newClaim:                             validClaimStorageClassInSpecChanged,
-			enableRetroactiveDefaultStorageClass: true,
-			// Change from non nil sc name is invalid if annotations don't match, feature enablement must not break this old behavior.
+			isExpectedFailure: true,
+			oldClaim:          validClaimStorageClassInAnnotationAndSpec,
+			newClaim:          validClaimStorageClassInSpecChanged,
 		},
 		"invalid-upgrade-storage-class-annotation-and-no-spec": {
-			isExpectedFailure:                    true,
-			oldClaim:                             validClaimStorageClassInAnnotationAndNilInSpec,
-			newClaim:                             validClaimStorageClassInSpecChanged,
-			enableRetroactiveDefaultStorageClass: true,
-			// Change from nil sc name is invalid if annotations don't match, feature enablement must not break this old behavior.
+			isExpectedFailure: true,
+			oldClaim:          validClaimStorageClassInAnnotationAndNilInSpec,
+			newClaim:          validClaimStorageClassInSpecChanged,
 		},
 		"invalid-upgrade-storage-class-annotation-to-spec": {
 			isExpectedFailure: true,
@@ -2662,7 +2628,6 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, scenario.enableRecoverFromExpansion)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RetroactiveDefaultStorageClass, scenario.enableRetroactiveDefaultStorageClass)()
 			scenario.oldClaim.ResourceVersion = "1"
 			scenario.newClaim.ResourceVersion = "1"
 			opts := ValidationOptionsForPersistentVolumeClaim(scenario.newClaim, scenario.oldClaim)
@@ -2687,45 +2652,40 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 			oldPvc:                 nil,
 			enableReadWriteOncePod: true,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				AllowReadWriteOncePod:                true,
-				EnableRecoverFromExpansionFailure:    false,
-				EnableRetroactiveDefaultStorageClass: true,
+				AllowReadWriteOncePod:             true,
+				EnableRecoverFromExpansionFailure: false,
 			},
 		},
 		"rwop allowed because feature enabled": {
 			oldPvc:                 pvcWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOnce}),
 			enableReadWriteOncePod: true,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				AllowReadWriteOncePod:                true,
-				EnableRecoverFromExpansionFailure:    false,
-				EnableRetroactiveDefaultStorageClass: true,
+				AllowReadWriteOncePod:             true,
+				EnableRecoverFromExpansionFailure: false,
 			},
 		},
 		"rwop not allowed because not used and feature disabled": {
 			oldPvc:                 pvcWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOnce}),
 			enableReadWriteOncePod: false,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				AllowReadWriteOncePod:                false,
-				EnableRecoverFromExpansionFailure:    false,
-				EnableRetroactiveDefaultStorageClass: true,
+				AllowReadWriteOncePod:             false,
+				EnableRecoverFromExpansionFailure: false,
 			},
 		},
 		"rwop allowed because used and feature enabled": {
 			oldPvc:                 pvcWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOncePod}),
 			enableReadWriteOncePod: true,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				AllowReadWriteOncePod:                true,
-				EnableRecoverFromExpansionFailure:    false,
-				EnableRetroactiveDefaultStorageClass: true,
+				AllowReadWriteOncePod:             true,
+				EnableRecoverFromExpansionFailure: false,
 			},
 		},
 		"rwop allowed because used and feature disabled": {
 			oldPvc:                 pvcWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOncePod}),
 			enableReadWriteOncePod: false,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				AllowReadWriteOncePod:                true,
-				EnableRecoverFromExpansionFailure:    false,
-				EnableRetroactiveDefaultStorageClass: true,
+				AllowReadWriteOncePod:             true,
+				EnableRecoverFromExpansionFailure: false,
 			},
 		},
 	}
