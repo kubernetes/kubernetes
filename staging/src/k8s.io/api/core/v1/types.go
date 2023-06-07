@@ -2421,6 +2421,7 @@ type Container struct {
 	// +listType=map
 	// +listMapKey=containerPort
 	// +listMapKey=protocol
+	// +listMapKey=hostIP
 	Ports []ContainerPort `json:"ports,omitempty" patchStrategy:"merge" patchMergeKey:"containerPort" protobuf:"bytes,6,rep,name=ports"`
 	// List of sources to populate environment variables in the container.
 	// The keys defined within a source must be a C_IDENTIFIER. All invalid keys
@@ -3952,6 +3953,7 @@ type EphemeralContainerCommon struct {
 	// +listType=map
 	// +listMapKey=containerPort
 	// +listMapKey=protocol
+	// +listMapKey=hostIP
 	Ports []ContainerPort `json:"ports,omitempty" patchStrategy:"merge" patchMergeKey:"containerPort" protobuf:"bytes,6,rep,name=ports"`
 	// List of sources to populate environment variables in the container.
 	// The keys defined within a source must be a C_IDENTIFIER. All invalid keys
