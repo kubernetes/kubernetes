@@ -455,7 +455,7 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 			}
 
 			// Once we make it here we know we have a running container.
-			// Idempotently add it to the containerMap incase it is missing.
+			// Idempotently add it to the containerMap in case it is missing.
 			// This can happen after a kubelet restart, for example.
 			m.containerMap.Add(string(pod.UID), container.Name, containerID)
 			m.Unlock()

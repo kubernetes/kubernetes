@@ -514,7 +514,7 @@ func TestKeyFunc(t *testing.T) {
 				tr: &authenticationv1.TokenRequest{
 					Spec: authenticationv1.TokenRequestSpec{
 						Audiences: []string{"foo1", "foo2"},
-						//everthing is same besides ExpirationSeconds
+						//everything is same besides ExpirationSeconds
 						ExpirationSeconds: getInt64Point(2001),
 						BoundObjectRef: &authenticationv1.BoundObjectReference{
 							Kind: "pod",
@@ -554,7 +554,7 @@ func TestKeyFunc(t *testing.T) {
 						ExpirationSeconds: getInt64Point(2000),
 						BoundObjectRef: &authenticationv1.BoundObjectReference{
 							Kind: "pod",
-							//everthing is same besides BoundObjectRef.Name
+							//everything is same besides BoundObjectRef.Name
 							Name: "diff-pod",
 							UID:  "foo-uid",
 						},

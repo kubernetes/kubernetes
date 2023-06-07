@@ -204,7 +204,7 @@ const (
 )
 
 var (
-	// ContainerLogsDir can be overwrited for testing usage
+	// ContainerLogsDir can be overwritten for testing usage
 	ContainerLogsDir = DefaultContainerLogsDir
 	etcHostsPath     = getContainerEtcHostsPath()
 )

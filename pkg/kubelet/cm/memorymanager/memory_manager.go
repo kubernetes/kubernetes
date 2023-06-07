@@ -425,7 +425,7 @@ func convertReserved(machineInfo *cadvisorapi.MachineInfo, reservedMemory []kube
 		for resourceName, q := range reservation.Limits {
 			val, success := q.AsInt64()
 			if !success {
-				return nil, fmt.Errorf("could not covert a variable of type Quantity to int64")
+				return nil, fmt.Errorf("could not convert a variable of type Quantity to int64")
 			}
 			reservedMemoryConverted[int(reservation.NumaNode)][resourceName] = uint64(val)
 		}

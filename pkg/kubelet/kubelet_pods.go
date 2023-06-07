@@ -1798,7 +1798,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		// oldStatus should always exist if container is running
 		oldStatus, oldStatusFound := oldStatuses[cName]
 		// Initialize limits/requests from container's spec upon transition to Running state
-		// For cpu & memory, values queried from runtime via CRI always supercedes spec values
+		// For cpu & memory, values queried from runtime via CRI always supersedes spec values
 		// For ephemeral-storage, a running container's status.limit/request equals spec.limit/request
 		determineResource := func(rName v1.ResourceName, v1ContainerResource, oldStatusResource, resource v1.ResourceList) {
 			if oldStatusFound {

@@ -30,6 +30,6 @@ const (
 
 // GenerateEndpoint generates a new unix socket server of grpc server.
 func GenerateEndpoint() (string, error) {
-	// use random int be a part fo file name
+	// use random int be a part of file name
 	return fmt.Sprintf(defaultUnixEndpoint, rand.Int()), nil
 }

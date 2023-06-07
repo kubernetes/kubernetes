@@ -797,7 +797,7 @@ func TestHasWindowsHostProcessContainer(t *testing.T) {
 			expectedResult: true,
 		},
 		{
-			name: "pod with hostprocess=true, container with hostprocess=flase",
+			name: "pod with hostprocess=true, container with hostprocess=false",
 			podSpec: &v1.PodSpec{
 				HostNetwork: true,
 				SecurityContext: &v1.PodSecurityContext{

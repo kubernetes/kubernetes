@@ -1097,7 +1097,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 	// induce hard threshold
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker(".9Gi", "200Gi", podStats)
-	// make GC return disk usage bellow the threshold, but not satisfying minReclaim
+	// make GC return disk usage below the threshold, but not satisfying minReclaim
 	diskGC.summaryAfterGC = summaryStatsMaker("1.1Gi", "200Gi", podStats)
 	manager.synchronize(diskInfoProvider, activePodsFunc)
 

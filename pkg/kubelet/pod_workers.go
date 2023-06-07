@@ -240,7 +240,7 @@ type PodWorkers interface {
 	IsPodForMirrorPodTerminatingByFullName(podFullname string) bool
 }
 
-// podSyncer describes the core lifecyle operations of the pod state machine. A pod is first
+// podSyncer describes the core lifecycle operations of the pod state machine. A pod is first
 // synced until it naturally reaches termination (true is returned) or an external agent decides
 // the pod should be terminated. Once a pod should be terminating, SyncTerminatingPod is invoked
 // until it returns no error. Then the SyncTerminatedPod method is invoked until it exits without
