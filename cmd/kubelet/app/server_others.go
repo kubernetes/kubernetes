@@ -28,7 +28,25 @@ func checkPermissions() error {
 	if uid := os.Getuid(); uid != 0 {
 		return fmt.Errorf("kubelet needs to run as uid `0`. It is being run as %d", uid)
 	}
-	// TODO: Check if kubelet is running in the `initial` user namespace.
-	// http://man7.org/linux/man-pages/man7/user_namespaces.7.html
+
+	if err := checkInitialUserNamespace(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// checkInitialUserNamespace checks if kubelet is running in the initial user namespace.
+// http://man7.org/linux/man-pages/man7/user_namespaces.7.html
+func checkInitialUserNamespace() error {
+	uidMap, err := ioutil.ReadFile("/proc/self/uid_map")
+	if err != nil {
+		return err
+	}
+
+	if strings.TrimSpace(string(uidMap)) != "0\t0\t4294967295" {
+		return fmt.Errorf("kubelet is not running in the initial user namespace")
+	}
+
 	return nil
 }
