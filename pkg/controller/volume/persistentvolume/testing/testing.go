@@ -397,12 +397,12 @@ func (r *VolumeReactor) PopChange(ctx context.Context) interface{} {
 	// For debugging purposes, print the queue
 	logger := klog.FromContext(ctx)
 	for _, obj := range r.changedObjects {
-		switch obj.(type) {
+		switch obj := obj.(type) {
 		case *v1.PersistentVolume:
-			vol, _ := obj.(*v1.PersistentVolume)
+			vol := obj
 			logger.V(4).Info("Reactor queue", "volumeName", vol.Name)
 		case *v1.PersistentVolumeClaim:
-			claim, _ := obj.(*v1.PersistentVolumeClaim)
+			claim := obj
 			logger.V(4).Info("Reactor queue", "PVC", klog.KObj(claim))
 		}
 	}
