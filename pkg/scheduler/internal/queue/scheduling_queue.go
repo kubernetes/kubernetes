@@ -104,7 +104,7 @@ type SchedulingQueue interface {
 	// Pop removes the head of the queue and returns it. It blocks if the
 	// queue is empty and waits until a new item is added to the queue.
 	Pop() (*framework.QueuedPodInfo, error)
-	// Done must be called pod returned by Pop. This allows the queue to
+	// Done must be called for pod returned by Pop. This allows the queue to
 	// keep track of which pods are currently being processed.
 	Done(types.UID)
 	Update(logger klog.Logger, oldPod, newPod *v1.Pod) error
@@ -662,7 +662,7 @@ func (p *PriorityQueue) Pop() (*framework.QueuedPodInfo, error) {
 	return pInfo, nil
 }
 
-// Done must be called pod returned by Pop. This allows the queue to
+// Done must be called for pod returned by Pop. This allows the queue to
 // keep track of which pods are currently being processed.
 func (p *PriorityQueue) Done(pod types.UID) {
 	p.lock.Lock()
@@ -858,8 +858,8 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(logger klog.Logger, podIn
 	// Besides setting MoveRequestCycle above for all pods which got moved,
 	// we also need to set it for pods that are being processed because
 	// AddUnschedulableIfNotPresent might get called for them, and in
-	// AddUnschedulableIfNotPresent we need to know whether events where
-	// observed while processing them.
+	// AddUnschedulableIfNotPresent we need to know whether events were
+	// observed while scheduling them.
 	for uid, inFlight := range p.inFlightPods {
 		logger.V(5).Info("In-flight pod with concurrent event", "pod", klog.KObj(inFlight.pod), "event", event.Label, "schedulingCycle", p.schedulingCycle)
 
