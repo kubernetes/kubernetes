@@ -217,7 +217,7 @@ func NewCmdRun(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Com
 				cmdutil.CheckErr(err)
 				return
 			}
-			
+
 			err = o.Validate(args)
 			if err != nil {
 				cmdutil.CheckErr(err)
@@ -365,7 +365,7 @@ func (flags *RunFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, args []s
 		fieldManager:   flags.fieldManager,
 		SaveConfig:     flags.SaveConfig,
 		Restart:        flags.Restart,
-		params: params,
+		params:         params,
 
 		Namespace:         namespace,
 		EnforceNamespace:  enforceNamespace,
