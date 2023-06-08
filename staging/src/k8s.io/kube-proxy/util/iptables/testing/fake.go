@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/iptables"
+	"k8s.io/kube-proxy/util/iptables"
 )
 
 // FakeIPTables is no-op implementation of iptables Interface.

@@ -200,7 +200,8 @@
   allowedImports:
   - k8s.io/apimachinery
   - k8s.io/component-base
-  - k8s.io/klog
+  - k8s.io/klog/v2
+  - k8s.io/kube-proxy/util/iptables
   - k8s.io/utils
 
 - baseImportPath: "./vendor/k8s.io/kube-scheduler/"

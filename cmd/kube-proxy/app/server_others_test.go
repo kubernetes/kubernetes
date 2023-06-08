@@ -36,10 +36,10 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clientgotesting "k8s.io/client-go/testing"
+	utiliptables "k8s.io/kube-proxy/util/iptables"
+	utiliptablestest "k8s.io/kube-proxy/util/iptables/testing"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
-	utiliptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/pointer"
 )
