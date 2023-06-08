@@ -83,6 +83,18 @@ func warningsForPersistentVolumeSpecAndMeta(fieldPath *field.Path, pvSpec *api.P
 	if pvSpec.CephFS != nil {
 		warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.28, non-functional in v1.31+", fieldPath.Child("spec", "persistentVolumeSource").Child("cephfs")))
 	}
+	if pvSpec.PhotonPersistentDisk != nil {
+		warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.11, non-functional in v1.16+", fieldPath.Child("spec", "persistentVolumeSource").Child("photonPersistentDisk")))
+	}
+	if pvSpec.ScaleIO != nil {
+		warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.16, non-functional in v1.22+", fieldPath.Child("spec", "persistentVolumeSource").Child("scaleIO")))
+	}
+	if pvSpec.StorageOS != nil {
+		warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.22, non-functional in v1.25+", fieldPath.Child("spec", "persistentVolumeSource").Child("storageOS")))
+	}
+	if pvSpec.Glusterfs != nil {
+		warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.25, non-functional in v1.26+", fieldPath.Child("spec", "persistentVolumeSource").Child("glusterfs")))
+	}
 
 	return warnings
 }

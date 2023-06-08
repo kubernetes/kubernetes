@@ -196,6 +196,85 @@ func TestWarnings(t *testing.T) {
 				`spec.persistentVolumeSource.cephfs: deprecated in v1.28, non-functional in v1.31+`,
 			},
 		},
+		{
+			name: "PV PhotonPersistentDisk deprecation warning",
+			template: &api.PersistentVolume{
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						PhotonPersistentDisk: &api.PhotonPersistentDiskVolumeSource{
+							PdID:   "",
+							FSType: "",
+						},
+					},
+				},
+			},
+			expected: []string{
+				`spec.persistentVolumeSource.photonPersistentDisk: deprecated in v1.11, non-functional in v1.16+`,
+			},
+		},
+		{
+			name: "PV ScaleIO deprecation warning",
+			template: &api.PersistentVolume{
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						ScaleIO: &api.ScaleIOPersistentVolumeSource{
+							Gateway:          "",
+							System:           "",
+							SecretRef:        nil,
+							SSLEnabled:       false,
+							ProtectionDomain: "",
+							StoragePool:      "",
+							StorageMode:      "",
+							VolumeName:       "",
+							FSType:           "",
+							ReadOnly:         false,
+						},
+					},
+				},
+			},
+			expected: []string{
+				`spec.persistentVolumeSource.scaleIO: deprecated in v1.16, non-functional in v1.22+`,
+			},
+		},
+
+		{
+			name: "PV StorageOS deprecation warning",
+			template: &api.PersistentVolume{
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						StorageOS: &api.StorageOSPersistentVolumeSource{
+							VolumeName:      "",
+							VolumeNamespace: "",
+							FSType:          "",
+							ReadOnly:        false,
+							SecretRef:       nil,
+						},
+					},
+				},
+			},
+			expected: []string{
+				`spec.persistentVolumeSource.storageOS: deprecated in v1.22, non-functional in v1.25+`,
+			},
+		},
+
+		{
+			name: "PV GlusterFS deprecation warning",
+			template: &api.PersistentVolume{
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						Glusterfs: &api.GlusterfsPersistentVolumeSource{
+							EndpointsName:      "",
+							Path:               "",
+							ReadOnly:           false,
+							EndpointsNamespace: nil,
+						},
+					},
+				},
+			},
+			expected: []string{
+				`spec.persistentVolumeSource.glusterfs: deprecated in v1.25, non-functional in v1.26+`,
+			},
+		},
 	}
 
 	for _, tc := range testcases {
