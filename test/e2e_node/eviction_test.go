@@ -584,7 +584,11 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 				}
 				logKubeletLatencyMetrics(ctx, kubeletmetrics.EvictionStatsAgeKey)
 				logFunc(ctx)
-				return verifyEvictionOrdering(ctx, f, testSpecs)
+				err := verifyEvictionOrdering(ctx, f, testSpecs)
+				if err != nil {
+					framework.Logf("Verify eviction ordering failed: %s", err)
+				}
+				return err
 			}, pressureTimeout, evictionPollInterval).Should(gomega.Succeed())
 
 			ginkgo.By("checking for the expected pod conditions for evicted pods")
@@ -613,7 +617,11 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 				}
 				logFunc(ctx)
 				logKubeletLatencyMetrics(ctx, kubeletmetrics.EvictionStatsAgeKey)
-				return verifyEvictionOrdering(ctx, f, testSpecs)
+				err := verifyEvictionOrdering(ctx, f, testSpecs)
+				if err != nil {
+					framework.Logf("Verify eviction ordering failed: %s", err)
+				}
+				return err
 			}, postTestConditionMonitoringPeriod, evictionPollInterval).Should(gomega.Succeed())
 
 			ginkgo.By("checking for correctly formatted eviction events")
