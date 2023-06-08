@@ -20,50 +20,94 @@ import (
 	"net"
 	"strconv"
 
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	netutils "k8s.io/utils/net"
 )
 
-// IsValidIP tests that the argument is a valid IP address.
-func IsValidIP(value string) []string {
-	if netutils.ParseIPSloppy(value) == nil {
-		return []string{"must be a valid IP address, (e.g. 10.9.8.7 or 2001:db8::ffff)"}
+// "Good" validation functions, for new API objects and fields
+
+// ValidateIP tests that value is a valid IP address (either IPv4 or IPv6). Note that
+// this rejects some values that were considered valid in older Kubernetes APIs; those
+// fields must use ValidateIPForLegacyAPI instead.
+func ValidateIP(fldPath *field.Path, value string) field.ErrorList {
+	var allErrors field.ErrorList
+	if _, err := utilip.ParseIP(value); err != nil {
+		allErrors = append(allErrors, field.Invalid(fldPath, value, err.Error()))
 	}
-	return nil
+	return allErrors
 }
 
-// IsValidIPv4Address tests that the argument is a valid IPv4 address.
-func IsValidIPv4Address(fldPath *field.Path, value string) field.ErrorList {
+// ValidateIPv4Address tests that the argument is a valid IPv4 address. Note that
+// this rejects some values that were considered valid in older Kubernetes APIs; those
+// fields must use ValidateIP4AddressForLegacyAPI instead.
+func ValidateIPv4Address(fldPath *field.Path, value string) field.ErrorList {
 	var allErrors field.ErrorList
-	ip := netutils.ParseIPSloppy(value)
-	if ip == nil || ip.To4() == nil {
+	ip, err := utilip.ParseIP(value)
+	if err != nil {
+		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid IPv4 address: %v", err))
+	} else if !utilip.IsIPv4(ip) {
 		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid IPv4 address"))
 	}
 	return allErrors
 }
 
-// IsValidIPv6Address tests that the argument is a valid IPv6 address.
-func IsValidIPv6Address(fldPath *field.Path, value string) field.ErrorList {
+// ValidateIPv6Address tests that the argument is a valid IPv6 address. Note that
+// this rejects some values that were considered valid in older Kubernetes APIs; those
+// fields must use ValidateIP6AddressForLegacyAPI instead.
+func ValidateIPv6Address(fldPath *field.Path, value string) field.ErrorList {
 	var allErrors field.ErrorList
-	ip := netutils.ParseIPSloppy(value)
-	if ip == nil || ip.To4() != nil {
+	ip, err := utilip.ParseIP(value)
+	if err != nil {
+		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid IPv6 address: %v", err))
+	} else if !utilip.IsIPv6(ip) {
 		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid IPv6 address"))
 	}
 	return allErrors
 }
 
+// Legacy validation functions.
 
-// IsValidSocketAddr checks that string represents a valid socket address
-// as defined in RFC 789. (e.g 0.0.0.0:10254 or [::]:10254))
-func IsValidSocketAddr(value string) []string {
-	var errs []string
-	ip, port, err := net.SplitHostPort(value)
-	if err != nil {
-		errs = append(errs, "must be a valid socket address format, (e.g. 0.0.0.0:10254 or [::]:10254)")
-		return errs
+// ValidateIPForLegacyAPI tests that value was considered an IP according to legacy
+// Kubernetes IP validation rules. This must be used for validating API fields that
+// historically used these rules, but MUST NOT be used for new APIs.
+func ValidateIPForLegacyAPI(fldPath *field.Path, value string, context utilip.LegacyIPStringContext) field.ErrorList {
+	var allErrors field.ErrorList
+	if _, _, err := utilip.ParseLegacyIP(value, context); err != nil {
+		allErrors = append(allErrors, field.Invalid(fldPath, value, err.Error()))
 	}
-	portInt, _ := strconv.Atoi(port)
-	errs = append(errs, IsValidPortNum(portInt)...)
-	errs = append(errs, IsValidIP(ip)...)
-	return errs
+	return allErrors
+}
+
+// ValidateIPv4AddressForLegacyAPI tests that the argument was considered a valid IPv4
+// address according to legacy Kubernetes IP validation rules. This must be used for
+// validating API fields that historically used these rules, but MUST NOT be used for new
+// APIs.
+//
+// In addition to accepting IPv4 addresses with leading "0"s, this also considers
+// IPv6-wrapped IPv4 addresses (e.g., "::ffff:1.2.3.4") to be valid IPv4 addresses.
+func ValidateIPv4AddressForLegacyAPI(fldPath *field.Path, value string, context utilip.LegacyIPStringContext) field.ErrorList {
+	var allErrors field.ErrorList
+	_, ip, err := utilip.ParseLegacyIP(value, context)
+	if err != nil {
+		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid IPv4 address: %v", err))
+	} else if !utilip.IsIPv4(ip) {
+		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid IPv4 address"))
+	}
+	return allErrors
+}
+
+// ValidateIPv6AddressForLegacyAPI tests that the argument was considered a valid IPv6
+// address according to legacy Kubernetes IP validation rules. This must be used for
+// validating API fields that historically used these rules, but MUST NOT be used for new
+// APIs.
+func ValidateIPv6AddressForLegacyAPI(fldPath *field.Path, value string, context utilip.LegacyIPStringContext) field.ErrorList {
+	var allErrors field.ErrorList
+	_, ip, err := utilip.ParseLegacyIP(value, context)
+	if err != nil {
+		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid IPv6 address: %v", err))
+	} else if !utilip.IsIPv6(ip) {
+		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid IPv6 address"))
+	}
+	return allErrors
 }
