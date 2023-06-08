@@ -1444,50 +1444,109 @@ func TestUpdatePod(t *testing.T) {
 	}
 }
 
-func TestSelectHost(t *testing.T) {
+func Test_SelectHost(t *testing.T) {
 	tests := []struct {
-		name          string
-		list          []framework.NodePluginScores
-		possibleHosts sets.Set[string]
-		expectsErr    bool
+		name              string
+		list              []framework.NodePluginScores
+		topNodesCnt       int
+		possibleNodes     sets.Set[string]
+		possibleNodeLists [][]framework.NodePluginScores
+		wantError         error
 	}{
 		{
 			name: "unique properly ordered scores",
 			list: []framework.NodePluginScores{
-				{Name: "node1.1", TotalScore: 1},
-				{Name: "node2.1", TotalScore: 2},
+				{Name: "node1", TotalScore: 1},
+				{Name: "node2", TotalScore: 2},
 			},
-			possibleHosts: sets.New("node2.1"),
-			expectsErr:    false,
+			topNodesCnt:   2,
+			possibleNodes: sets.New("node2"),
+			possibleNodeLists: [][]framework.NodePluginScores{
+				{
+					{Name: "node2", TotalScore: 2},
+					{Name: "node1", TotalScore: 1},
+				},
+			},
+		},
+		{
+			name: "numberOfNodeScoresToReturn > len(list)",
+			list: []framework.NodePluginScores{
+				{Name: "node1", TotalScore: 1},
+				{Name: "node2", TotalScore: 2},
+			},
+			topNodesCnt:   100,
+			possibleNodes: sets.New("node2"),
+			possibleNodeLists: [][]framework.NodePluginScores{
+				{
+					{Name: "node2", TotalScore: 2},
+					{Name: "node1", TotalScore: 1},
+				},
+			},
 		},
 		{
 			name: "equal scores",
 			list: []framework.NodePluginScores{
-				{Name: "node1.1", TotalScore: 1},
-				{Name: "node1.2", TotalScore: 2},
-				{Name: "node1.3", TotalScore: 2},
 				{Name: "node2.1", TotalScore: 2},
+				{Name: "node2.2", TotalScore: 2},
+				{Name: "node2.3", TotalScore: 2},
 			},
-			possibleHosts: sets.New("node1.2", "node1.3", "node2.1"),
-			expectsErr:    false,
+			topNodesCnt:   2,
+			possibleNodes: sets.New("node2.1", "node2.2", "node2.3"),
+			possibleNodeLists: [][]framework.NodePluginScores{
+				{
+					{Name: "node2.1", TotalScore: 2},
+					{Name: "node2.2", TotalScore: 2},
+				},
+				{
+					{Name: "node2.1", TotalScore: 2},
+					{Name: "node2.3", TotalScore: 2},
+				},
+				{
+					{Name: "node2.2", TotalScore: 2},
+					{Name: "node2.1", TotalScore: 2},
+				},
+				{
+					{Name: "node2.2", TotalScore: 2},
+					{Name: "node2.3", TotalScore: 2},
+				},
+				{
+					{Name: "node2.3", TotalScore: 2},
+					{Name: "node2.1", TotalScore: 2},
+				},
+				{
+					{Name: "node2.3", TotalScore: 2},
+					{Name: "node2.2", TotalScore: 2},
+				},
+			},
 		},
 		{
 			name: "out of order scores",
 			list: []framework.NodePluginScores{
-				{Name: "node1.1", TotalScore: 3},
-				{Name: "node1.2", TotalScore: 3},
+				{Name: "node3.1", TotalScore: 3},
 				{Name: "node2.1", TotalScore: 2},
-				{Name: "node3.1", TotalScore: 1},
-				{Name: "node1.3", TotalScore: 3},
+				{Name: "node1.1", TotalScore: 1},
+				{Name: "node3.2", TotalScore: 3},
 			},
-			possibleHosts: sets.New("node1.1", "node1.2", "node1.3"),
-			expectsErr:    false,
+			topNodesCnt:   3,
+			possibleNodes: sets.New("node3.1", "node3.2"),
+			possibleNodeLists: [][]framework.NodePluginScores{
+				{
+					{Name: "node3.1", TotalScore: 3},
+					{Name: "node3.2", TotalScore: 3},
+					{Name: "node2.1", TotalScore: 2},
+				},
+				{
+					{Name: "node3.2", TotalScore: 3},
+					{Name: "node3.1", TotalScore: 3},
+					{Name: "node2.1", TotalScore: 2},
+				},
+			},
 		},
 		{
 			name:          "empty priority list",
 			list:          []framework.NodePluginScores{},
-			possibleHosts: sets.New[string](),
-			expectsErr:    true,
+			possibleNodes: sets.Set[string]{},
+			wantError:     errEmptyPriorityList,
 		},
 	}
 
@@ -1495,19 +1554,28 @@ func TestSelectHost(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// increase the randomness
 			for i := 0; i < 10; i++ {
-				got, err := selectHost(test.list)
-				if test.expectsErr {
-					if err == nil {
-						t.Error("Unexpected non-error")
+				got, scoreList, err := selectHost(test.list, test.topNodesCnt)
+				if err != test.wantError {
+					t.Fatalf("unexpected error is returned from selectHost: got: %v want: %v", err, test.wantError)
+				}
+				if test.possibleNodes.Len() == 0 {
+					if got != "" {
+						t.Fatalf("expected nothing returned as selected Node, but actually %s is returned from selectHost", got)
 					}
-				} else {
-					if err != nil {
-						t.Errorf("Unexpected error: %v", err)
-					}
-					if !test.possibleHosts.Has(got) {
-						t.Errorf("got %s is not in the possible map %v", got, test.possibleHosts)
+					return
+				}
+				if !test.possibleNodes.Has(got) {
+					t.Errorf("got %s is not in the possible map %v", got, test.possibleNodes)
+				}
+				if got != scoreList[0].Name {
+					t.Errorf("The head of list should be the selected Node's score: got: %v, expected: %v", scoreList[0], got)
+				}
+				for _, list := range test.possibleNodeLists {
+					if cmp.Equal(list, scoreList) {
+						return
 					}
 				}
+				t.Errorf("Unexpected scoreList: %v", scoreList)
 			}
 		})
 	}
