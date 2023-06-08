@@ -19,12 +19,14 @@ package log
 import (
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/audit"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -44,18 +46,20 @@ var AllowedFormats = []string{
 }
 
 type backend struct {
-	out     io.Writer
-	format  string
-	encoder runtime.Encoder
+	filePath string
+	out      io.Writer
+	format   string
+	encoder  runtime.Encoder
 }
 
 var _ audit.Backend = &backend{}
 
-func NewBackend(out io.Writer, format string, groupVersion schema.GroupVersion) audit.Backend {
+func NewBackend(filePath string, out io.Writer, format string, groupVersion schema.GroupVersion) audit.Backend {
 	return &backend{
-		out:     out,
-		format:  format,
-		encoder: audit.Codecs.LegacyCodec(groupVersion),
+		filePath: filePath,
+		out:      out,
+		format:   format,
+		encoder:  audit.Codecs.LegacyCodec(groupVersion),
 	}
 }
 
@@ -83,6 +87,10 @@ func (b *backend) logEvent(ev *auditinternal.Event) bool {
 		audit.HandlePluginError(PluginName, fmt.Errorf("log format %q is not in list of known formats (%s)",
 			b.format, strings.Join(AllowedFormats, ",")), ev)
 		return false
+	}
+	_, err := os.Stat(b.filePath)
+	if os.IsNotExist(err) {
+		klog.Warning("log file does not exist, it may be deleted")
 	}
 	if _, err := fmt.Fprint(b.out, line); err != nil {
 		audit.HandlePluginError(PluginName, err, ev)

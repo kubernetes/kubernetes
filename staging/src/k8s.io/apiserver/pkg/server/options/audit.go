@@ -302,7 +302,7 @@ func (o *AuditOptions) ApplyTo(
 		if evaluator == nil {
 			klog.V(2).Info("No audit policy file provided, no events will be recorded for log backend")
 		} else {
-			logBackend = o.LogOptions.newBackend(w)
+			logBackend = o.LogOptions.newBackend(o.LogOptions.Path, w)
 		}
 	}
 
@@ -537,9 +537,9 @@ func (o *AuditLogOptions) ensureLogFile() error {
 	return f.Close()
 }
 
-func (o *AuditLogOptions) newBackend(w io.Writer) audit.Backend {
+func (o *AuditLogOptions) newBackend(filePath string, w io.Writer) audit.Backend {
 	groupVersion, _ := schema.ParseGroupVersion(o.GroupVersionString)
-	log := pluginlog.NewBackend(w, o.Format, groupVersion)
+	log := pluginlog.NewBackend(filePath, w, o.Format, groupVersion)
 	log = o.BatchOptions.wrapBackend(log)
 	log = o.TruncateOptions.wrapBackend(log, groupVersion)
 	return log
