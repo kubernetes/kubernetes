@@ -19,6 +19,7 @@ package node
 import (
 	"context"
 	"fmt"
+	"k8s.io/apiserver/pkg/audit"
 
 	"k8s.io/klog/v2"
 
@@ -101,6 +102,8 @@ func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attribu
 		klog.V(2).Infof("NODE DENY: unknown node for user %q", attrs.GetUser().GetName())
 		return authorizer.DecisionNoOpinion, fmt.Sprintf("unknown node for user %q", attrs.GetUser().GetName()), nil
 	}
+
+	audit.AddAuditAnnotations(ctx, authorizer.MechanismAnnotationKey, authorizer.NodeMechanism)
 
 	// subdivide access to specific resources
 	if attrs.IsResourceRequest() {

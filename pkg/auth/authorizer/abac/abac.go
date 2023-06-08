@@ -21,6 +21,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"k8s.io/apiserver/pkg/audit"
 	"os"
 	"strings"
 
@@ -232,6 +233,7 @@ func (pl PolicyList) Authorize(ctx context.Context, a authorizer.Attributes) (au
 			return authorizer.DecisionAllow, "", nil
 		}
 	}
+	audit.AddAuditAnnotations(ctx, authorizer.MechanismAnnotationKey, authorizer.RbacMechanism)
 	return authorizer.DecisionNoOpinion, "No policy matched.", nil
 	// TODO: Benchmark how much time policy matching takes with a medium size
 	// policy file, compared to other steps such as encoding/decoding.

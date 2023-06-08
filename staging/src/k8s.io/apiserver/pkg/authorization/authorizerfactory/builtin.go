@@ -19,6 +19,7 @@ package authorizerfactory
 import (
 	"context"
 	"errors"
+	"k8s.io/apiserver/pkg/audit"
 
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -77,6 +78,9 @@ func (r *privilegedGroupAuthorizer) Authorize(ctx context.Context, attr authoriz
 	if attr.GetUser() == nil {
 		return authorizer.DecisionNoOpinion, "Error", errors.New("no user on request.")
 	}
+
+	audit.AddAuditAnnotations(ctx, authorizer.MechanismAnnotationKey, authorizer.PrivilegedGroupMechanism)
+
 	for _, attr_group := range attr.GetUser().GetGroups() {
 		for _, priv_group := range r.groups {
 			if priv_group == attr_group {

@@ -158,9 +158,12 @@ const (
 	DecisionNoOpinion
 )
 
-type Mechanism string
-
 const (
-	WebhookMechanism Mechanism = "webhook"
-	RbacMechanism    Mechanism = "rbac"
+	MechanismAnnotationKey = "authorization.k8s.io/mechanism"
+
+	WebhookMechanism         = "webhook"
+	RbacMechanism            = "rbac"
+	AbacMechanism            = "abac"
+	NodeMechanism            = "node"
+	PrivilegedGroupMechanism = "privilegedGroup"
 )

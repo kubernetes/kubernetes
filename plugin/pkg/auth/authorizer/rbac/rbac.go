@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"k8s.io/apiserver/pkg/audit"
 
 	"k8s.io/klog/v2"
 
@@ -123,6 +124,9 @@ func (r *RBACAuthorizer) Authorize(ctx context.Context, requestAttributes author
 	if len(ruleCheckingVisitor.errors) > 0 {
 		reason = fmt.Sprintf("RBAC: %v", utilerrors.NewAggregate(ruleCheckingVisitor.errors))
 	}
+
+	audit.AddAuditAnnotations(ctx, authorizer.MechanismAnnotationKey, authorizer.RbacMechanism)
+
 	return authorizer.DecisionNoOpinion, reason, nil
 }
 
