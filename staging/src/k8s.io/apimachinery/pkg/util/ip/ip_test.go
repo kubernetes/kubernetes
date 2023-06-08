@@ -92,8 +92,8 @@ func TestParseIP(t *testing.T) {
 			input: "[2001:db8::5]:80",
 		},
 		{
-			name:   "ipv6 with zone (invalid)",
-			input:  "1234::abcd%eth0",
+			name:  "ipv6 with zone (invalid)",
+			input: "1234::abcd%eth0",
 		},
 		{
 			name:  "leading whitespace (invalid)",

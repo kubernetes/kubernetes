@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -3751,9 +3752,7 @@ func validatePodIPs(pod *core.Pod) field.ErrorList {
 
 	// all PodIPs must be valid IPs
 	for i, podIP := range pod.Status.PodIPs {
-		for _, msg := range validation.IsValidIP(podIP.IP) {
-			allErrs = append(allErrs, field.Invalid(podIPsField.Index(i), podIP.IP, msg))
-		}
+		allErrs = append(allErrs, validation.ValidateIPForLegacyAPI(podIPsField.Index(i), podIP.IP, utilip.PodStatusPodIPsContext)...)
 	}
 
 	// if we have more than one Pod.PodIP then
@@ -5005,10 +5004,8 @@ func ValidateService(service *core.Service) field.ErrorList {
 	ipPath := specPath.Child("externalIPs")
 	for i, ip := range service.Spec.ExternalIPs {
 		idxPath := ipPath.Index(i)
-		if msgs := validation.IsValidIP(ip); len(msgs) != 0 {
-			for i := range msgs {
-				allErrs = append(allErrs, field.Invalid(idxPath, ip, msgs[i]))
-			}
+		if errs := validation.ValidateIPForLegacyAPI(idxPath, ip, utilip.ServiceSpecExternalIPsContext); len(errs) != 0 {
+			allErrs = append(allErrs, errs...)
 		} else {
 			allErrs = append(allErrs, ValidateNonSpecialIP(ip, idxPath)...)
 		}
@@ -6525,10 +6522,8 @@ func validateEndpointSubsets(subsets []core.EndpointSubset, fldPath *field.Path)
 }
 
 func validateEndpointAddress(address *core.EndpointAddress, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	for _, msg := range validation.IsValidIP(address.IP) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("ip"), address.IP, msg))
-	}
+	allErrs := validation.ValidateIPForLegacyAPI(fldPath.Child("ip"), address.IP, utilip.EndpointAddressIPContext)
+	allErrs = append(allErrs, ValidateNonSpecialIP(address.IP, fldPath.Child("ip"))...)
 	if len(address.Hostname) > 0 {
 		allErrs = append(allErrs, ValidateDNS1123Label(address.Hostname, fldPath.Child("hostname"))...)
 	}
@@ -6538,7 +6533,6 @@ func validateEndpointAddress(address *core.EndpointAddress, fldPath *field.Path)
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("nodeName"), *address.NodeName, msg))
 		}
 	}
-	allErrs = append(allErrs, ValidateNonSpecialIP(address.IP, fldPath.Child("ip"))...)
 	return allErrs
 }
 
@@ -7140,11 +7134,9 @@ func ValidateServiceClusterIPsRelatedFields(service *core.Service) field.ErrorLi
 		}
 
 		// is it valid ip?
-		errorMessages := validation.IsValidIP(clusterIP)
-		hasInvalidIPs = (len(errorMessages) != 0) || hasInvalidIPs
-		for _, msg := range errorMessages {
-			allErrs = append(allErrs, field.Invalid(clusterIPsField.Index(i), clusterIP, msg))
-		}
+		errs := validation.ValidateIPForLegacyAPI(clusterIPsField.Index(i), clusterIP, utilip.ServiceSpecClusterIPsContext)
+		hasInvalidIPs = (len(errs) != 0) || hasInvalidIPs
+		allErrs = append(allErrs, errs...)
 	}
 
 	// max two

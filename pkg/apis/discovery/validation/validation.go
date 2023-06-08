@@ -22,6 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metavalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
+	utilip "k8s.io/apimachinery/pkg/util/ip"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -99,10 +100,10 @@ func validateEndpoints(endpoints []discovery.Endpoint, addrType discovery.Addres
 			// and do not get validated.
 			switch addrType {
 			case discovery.AddressTypeIPv4:
-				allErrs = append(allErrs, validation.IsValidIPv4Address(addressPath.Index(i), address)...)
+				allErrs = append(allErrs, validation.ValidateIPv4AddressForLegacyAPI(addressPath.Index(i), address, utilip.EndpointSliceAddressesContext)...)
 				allErrs = append(allErrs, apivalidation.ValidateNonSpecialIP(address, addressPath.Index(i))...)
 			case discovery.AddressTypeIPv6:
-				allErrs = append(allErrs, validation.IsValidIPv6Address(addressPath.Index(i), address)...)
+				allErrs = append(allErrs, validation.ValidateIPv6AddressForLegacyAPI(addressPath.Index(i), address, utilip.EndpointSliceAddressesContext)...)
 				allErrs = append(allErrs, apivalidation.ValidateNonSpecialIP(address, addressPath.Index(i))...)
 			case discovery.AddressTypeFQDN:
 				allErrs = append(allErrs, validation.IsFullyQualifiedDomainName(addressPath.Index(i), address)...)

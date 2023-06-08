@@ -26,7 +26,11 @@ type LegacyIPStringContext string
 
 const (
 	// Legacy API fields
-	ServiceSpecClusterIP LegacyIPStringContext = "v1.ServiceSpec.ClusterIP"
+	EndpointAddressIPContext      LegacyIPStringContext = "v1.EndpointAddress.IP"
+	EndpointSliceAddressesContext LegacyIPStringContext = "discoveryv1.Endpoint.Addresses"
+	PodStatusPodIPsContext        LegacyIPStringContext = "v1.PodStatus.PodIPs"
+	ServiceSpecClusterIPsContext  LegacyIPStringContext = "v1.ServiceSpec.ClusterIPs"
+	ServiceSpecExternalIPsContext LegacyIPStringContext = "v1.ServiceSpec.ExternalIPs"
 	// ...
 
 	// Legacy command-line arguments
