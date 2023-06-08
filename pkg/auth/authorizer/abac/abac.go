@@ -21,13 +21,13 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"k8s.io/apiserver/pkg/audit"
 	"os"
 	"strings"
 
 	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/pkg/apis/abac"
