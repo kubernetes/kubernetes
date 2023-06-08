@@ -260,18 +260,18 @@ func getErrorAsStatus(err error) *framework.Status {
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *VolumeZone) EventsToRegister() []framework.ClusterEvent {
-	return []framework.ClusterEvent{
+func (pl *VolumeZone) EventsToRegister() []framework.ClusterEventWithHint {
+	return []framework.ClusterEventWithHint{
 		// New storageClass with bind mode `VolumeBindingWaitForFirstConsumer` will make a pod schedulable.
 		// Due to immutable field `storageClass.volumeBindingMode`, storageClass update events are ignored.
-		{Resource: framework.StorageClass, ActionType: framework.Add},
+		{Event: framework.ClusterEvent{Resource: framework.StorageClass, ActionType: framework.Add}},
 		// A new node or updating a node's volume zone labels may make a pod schedulable.
-		{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel},
+		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel}},
 		// A new pvc may make a pod schedulable.
 		// Due to fields are immutable except `spec.resources`, pvc update events are ignored.
-		{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add},
+		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add}},
 		// A new pv or updating a pv's volume zone labels may make a pod schedulable.
-		{Resource: framework.PersistentVolume, ActionType: framework.Add | framework.Update},
+		{Event: framework.ClusterEvent{Resource: framework.PersistentVolume, ActionType: framework.Add | framework.Update}},
 	}
 }
 

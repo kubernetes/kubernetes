@@ -276,9 +276,9 @@ func (f *fakeCRPlugin) Filter(_ context.Context, _ *framework.CycleState, _ *v1.
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (f *fakeCRPlugin) EventsToRegister() []framework.ClusterEvent {
-	return []framework.ClusterEvent{
-		{Resource: "foos.v1.example.com", ActionType: framework.All},
+func (f *fakeCRPlugin) EventsToRegister() []framework.ClusterEventWithHint {
+	return []framework.ClusterEventWithHint{
+		{Event: framework.ClusterEvent{Resource: "foos.v1.example.com", ActionType: framework.All}},
 	}
 }
 

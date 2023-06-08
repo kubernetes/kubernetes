@@ -101,11 +101,11 @@ func getPreFilterState(cycleState *framework.CycleState) (preFilterState, error)
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *NodePorts) EventsToRegister() []framework.ClusterEvent {
-	return []framework.ClusterEvent{
+func (pl *NodePorts) EventsToRegister() []framework.ClusterEventWithHint {
+	return []framework.ClusterEventWithHint{
 		// Due to immutable fields `spec.containers[*].ports`, pod update events are ignored.
-		{Resource: framework.Pod, ActionType: framework.Delete},
-		{Resource: framework.Node, ActionType: framework.Add | framework.Update},
+		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Delete}},
+		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.Update}},
 	}
 }
 

@@ -234,16 +234,16 @@ func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (f *Fit) EventsToRegister() []framework.ClusterEvent {
+func (f *Fit) EventsToRegister() []framework.ClusterEventWithHint {
 	podActionType := framework.Delete
 	if f.enableInPlacePodVerticalScaling {
 		// If InPlacePodVerticalScaling (KEP 1287) is enabled, then PodUpdate event should be registered
 		// for this plugin since a Pod update may free up resources that make other Pods schedulable.
 		podActionType |= framework.Update
 	}
-	return []framework.ClusterEvent{
-		{Resource: framework.Pod, ActionType: podActionType},
-		{Resource: framework.Node, ActionType: framework.Add | framework.Update},
+	return []framework.ClusterEventWithHint{
+		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: podActionType}},
+		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.Update}},
 	}
 }
 

@@ -24,7 +24,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
@@ -285,7 +284,6 @@ func New(ctx context.Context,
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 
 	snapshot := internalcache.NewEmptySnapshot()
-	clusterEventMap := make(map[framework.ClusterEvent]sets.Set[string])
 	metricsRecorder := metrics.NewMetricsAsyncRecorder(1000, time.Second, stopEverything)
 
 	profiles, err := profile.NewMap(ctx, options.profiles, registry, recorderFactory,
@@ -295,7 +293,6 @@ func New(ctx context.Context,
 		frameworkruntime.WithInformerFactory(informerFactory),
 		frameworkruntime.WithSnapshotSharedLister(snapshot),
 		frameworkruntime.WithCaptureProfile(frameworkruntime.CaptureProfile(options.frameworkCapturer)),
-		frameworkruntime.WithClusterEventMap(clusterEventMap),
 		frameworkruntime.WithParallelism(int(options.parallelism)),
 		frameworkruntime.WithExtenders(extenders),
 		frameworkruntime.WithMetricsRecorder(metricsRecorder),
@@ -309,18 +306,21 @@ func New(ctx context.Context,
 	}
 
 	preEnqueuePluginMap := make(map[string][]framework.PreEnqueuePlugin)
+	queueingHintsPerProfile := make(internalqueue.QueueingHintMapPerProfile)
 	for profileName, profile := range profiles {
 		preEnqueuePluginMap[profileName] = profile.PreEnqueuePlugins()
+		queueingHintsPerProfile[profileName] = buildQueueingHintMap(profile.EnqueueExtensions())
 	}
+
 	podQueue := internalqueue.NewSchedulingQueue(
 		profiles[options.profiles[0].SchedulerName].QueueSortFunc(),
 		informerFactory,
 		internalqueue.WithPodInitialBackoffDuration(time.Duration(options.podInitialBackoffSeconds)*time.Second),
 		internalqueue.WithPodMaxBackoffDuration(time.Duration(options.podMaxBackoffSeconds)*time.Second),
 		internalqueue.WithPodLister(podLister),
-		internalqueue.WithClusterEventMap(clusterEventMap),
 		internalqueue.WithPodMaxInUnschedulablePodsDuration(options.podMaxInUnschedulablePodsDuration),
 		internalqueue.WithPreEnqueuePluginMap(preEnqueuePluginMap),
+		internalqueue.WithQueueingHintMapPerProfile(queueingHintsPerProfile),
 		internalqueue.WithPluginMetricsSamplePercent(pluginMetricsSamplePercent),
 		internalqueue.WithMetricsRecorder(*metricsRecorder),
 	)
@@ -349,9 +349,34 @@ func New(ctx context.Context,
 	}
 	sched.applyDefaultHandlers()
 
-	addAllEventHandlers(sched, informerFactory, dynInformerFactory, unionedGVKs(clusterEventMap))
+	addAllEventHandlers(sched, informerFactory, dynInformerFactory, unionedGVKs(queueingHintsPerProfile))
 
 	return sched, nil
+}
+
+// defaultQueueingHintFn is the default queueing hint function.
+// It always returns QueueAfterBackoff as the queueing hint.
+var defaultQueueingHintFn = func(_ *v1.Pod, _, _ interface{}) framework.QueueingHint {
+	return framework.QueueAfterBackoff
+}
+
+func buildQueueingHintMap(es []framework.EnqueueExtensions) internalqueue.QueueingHintMap {
+	queueingHintMap := make(map[framework.ClusterEvent][]*internalqueue.QueueingHintFunction)
+	for _, e := range es {
+		events := e.EventsToRegister()
+		for _, event := range events {
+			fn := event.QueueingHintFn
+			if fn == nil {
+				fn = defaultQueueingHintFn
+			}
+
+			queueingHintMap[event.Event] = append(queueingHintMap[event.Event], &internalqueue.QueueingHintFunction{
+				PluginName:     e.Name(),
+				QueueingHintFn: fn,
+			})
+		}
+	}
+	return queueingHintMap
 }
 
 // Run begins watching and scheduling. It starts scheduling and blocked until the context is done.
@@ -439,13 +464,15 @@ func buildExtenders(logger klog.Logger, extenders []schedulerapi.Extender, profi
 
 type FailureHandlerFn func(ctx context.Context, fwk framework.Framework, podInfo *framework.QueuedPodInfo, status *framework.Status, nominatingInfo *framework.NominatingInfo, start time.Time)
 
-func unionedGVKs(m map[framework.ClusterEvent]sets.Set[string]) map[framework.GVK]framework.ActionType {
+func unionedGVKs(queueingHintsPerProfile internalqueue.QueueingHintMapPerProfile) map[framework.GVK]framework.ActionType {
 	gvkMap := make(map[framework.GVK]framework.ActionType)
-	for evt := range m {
-		if _, ok := gvkMap[evt.Resource]; ok {
-			gvkMap[evt.Resource] |= evt.ActionType
-		} else {
-			gvkMap[evt.Resource] = evt.ActionType
+	for _, queueingHints := range queueingHintsPerProfile {
+		for evt := range queueingHints {
+			if _, ok := gvkMap[evt.Resource]; ok {
+				gvkMap[evt.Resource] |= evt.ActionType
+			} else {
+				gvkMap[evt.Resource] = evt.ActionType
+			}
 		}
 	}
 	return gvkMap
