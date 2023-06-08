@@ -64,3 +64,5 @@ replace (
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go
 )
+
+replace k8s.io/kube-openapi v0.0.0-20230601164746-7562a1006961 => k8s.io/kube-openapi v0.0.0-20230606174411-725288a7abf1
