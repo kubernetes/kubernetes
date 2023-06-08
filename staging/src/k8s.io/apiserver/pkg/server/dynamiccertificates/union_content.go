@@ -37,7 +37,7 @@ func NewUnionCAContentProvider(caContentProviders ...CAContentProvider) CAConten
 
 // Name is just an identifier
 func (c unionCAContent) Name() string {
-	names := []string{}
+	names := make([]string, 0, len(c))
 	for _, curr := range c {
 		names = append(names, curr.Name())
 	}

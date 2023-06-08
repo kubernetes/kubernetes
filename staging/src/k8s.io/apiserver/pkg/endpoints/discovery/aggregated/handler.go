@@ -514,18 +514,19 @@ func (rdm *resourceDiscoveryManager) serveHTTP(resp http.ResponseWriter, req *ht
 			resp,
 			req,
 		)
-	} else {
-		// Default to normal response in rare case etag is
-		// not cached with the object for some reason.
-		responsewriters.WriteObjectNegotiated(
-			rdm.serializer,
-			DiscoveryEndpointRestrictions,
-			AggregatedDiscoveryGV,
-			resp,
-			req,
-			http.StatusOK,
-			&response,
-			true,
-		)
+		return
 	}
+
+	// Default to normal response in rare case etag is
+	// not cached with the object for some reason.
+	responsewriters.WriteObjectNegotiated(
+		rdm.serializer,
+		DiscoveryEndpointRestrictions,
+		AggregatedDiscoveryGV,
+		resp,
+		req,
+		http.StatusOK,
+		&response,
+		true,
+	)
 }

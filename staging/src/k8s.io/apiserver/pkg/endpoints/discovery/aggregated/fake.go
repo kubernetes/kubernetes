@@ -97,7 +97,7 @@ func (f *fakeResourceManager) Validate() error {
 }
 
 func (f *fakeResourceManager) WaitForActions(ctx context.Context, timeout time.Duration) error {
-	err := wait.PollImmediateWithContext(
+	return wait.PollImmediateWithContext(
 		ctx,
 		100*time.Millisecond, // try every 100ms
 		timeout,              // timeout after timeout
@@ -107,7 +107,6 @@ func (f *fakeResourceManager) WaitForActions(ctx context.Context, timeout time.D
 			}
 			return false, nil
 		})
-	return err
 }
 
 func (f *recorderResourceManager) SetGroupVersionPriority(gv metav1.GroupVersion, grouppriority, versionpriority int) {

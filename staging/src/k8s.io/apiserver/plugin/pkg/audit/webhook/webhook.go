@@ -58,10 +58,7 @@ func init() {
 // sending audit events if there is even a slight chance that the
 // receiving service gets back to normal at some point.
 func retryOnError(err error) bool {
-	if err != nil {
-		return true
-	}
-	return false
+	return err != nil
 }
 
 func loadWebhook(configFile string, groupVersion schema.GroupVersion, retryBackoff wait.Backoff, customDial utilnet.DialFunc) (*webhook.GenericWebhook, error) {

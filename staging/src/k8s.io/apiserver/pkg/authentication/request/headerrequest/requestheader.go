@@ -94,7 +94,7 @@ func NewDynamic(nameHeaders, groupHeaders, extraHeaderPrefixes StringSliceProvid
 }
 
 func trimHeaders(headerNames ...string) ([]string, error) {
-	ret := []string{}
+	ret := make([]string, 0, len(headerNames))
 	for _, headerName := range headerNames {
 		trimmedHeader := strings.TrimSpace(headerName)
 		if len(trimmedHeader) == 0 {

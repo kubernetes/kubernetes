@@ -66,7 +66,7 @@ func newDynamicRequestHeaderController(client kubernetes.Interface) (*DynamicReq
 }
 
 func (c *DynamicRequestHeaderController) RunOnce(ctx context.Context) error {
-	errs := []error{}
+	errs := make([]error, 0, 2)
 	errs = append(errs, c.ConfigMapCAController.RunOnce(ctx))
 	errs = append(errs, c.RequestHeaderAuthRequestController.RunOnce(ctx))
 	return errors.NewAggregate(errs)

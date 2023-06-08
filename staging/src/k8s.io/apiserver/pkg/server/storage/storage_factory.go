@@ -317,7 +317,7 @@ func backends(storageConfig storagebackend.Config, grOverrides map[schema.GroupR
 		}
 	}
 
-	backends := []Backend{}
+	backends := make([]Backend, 0, len(servers))
 	for server := range servers {
 		backends = append(backends, Backend{
 			Server: server,

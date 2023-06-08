@@ -68,7 +68,5 @@ func (o *FeatureOptions) Validate() []error {
 	if o == nil {
 		return nil
 	}
-
-	errs := []error{}
-	return errs
+	return []error{}
 }

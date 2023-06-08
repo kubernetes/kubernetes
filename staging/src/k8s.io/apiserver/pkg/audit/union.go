@@ -46,7 +46,7 @@ func (u union) ProcessEvents(events ...*auditinternal.Event) bool {
 }
 
 func (u union) Run(stopCh <-chan struct{}) error {
-	var funcs []func() error
+	funcs := make([]func() error, 0, len(u.backends))
 	for _, backend := range u.backends {
 		backend := backend
 		funcs = append(funcs, func() error {
@@ -63,7 +63,7 @@ func (u union) Shutdown() {
 }
 
 func (u union) String() string {
-	var backendStrings []string
+	backendStrings := make([]string, 0, len(u.backends))
 	for _, backend := range u.backends {
 		backendStrings = append(backendStrings, fmt.Sprintf("%s", backend))
 	}

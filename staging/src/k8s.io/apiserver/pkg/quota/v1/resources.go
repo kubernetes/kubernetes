@@ -159,7 +159,7 @@ func Mask(resources corev1.ResourceList, names []corev1.ResourceName) corev1.Res
 
 // ResourceNames returns a list of all resource names in the ResourceList
 func ResourceNames(resources corev1.ResourceList) []corev1.ResourceName {
-	result := []corev1.ResourceName{}
+	result := make([]corev1.ResourceName, 0, len(resources))
 	for resourceName := range resources {
 		result = append(result, resourceName)
 	}

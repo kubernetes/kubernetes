@@ -120,7 +120,7 @@ func (s *defaultManager) UpdateStorageVersions(kubeAPIServerClientConfig *rest.C
 	sc := clientset.InternalV1alpha1().StorageVersions()
 
 	s.mu.RLock()
-	resources := []ResourceInfo{}
+	resources := make([]ResourceInfo, 0, len(s.managedResourceInfos))
 	for resource := range s.managedResourceInfos {
 		resources = append(resources, *resource)
 	}

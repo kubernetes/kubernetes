@@ -73,7 +73,7 @@ func evaluatorsByGroupResource(items []quota.Evaluator) map[schema.GroupResource
 
 // evaluatorsList converts a map of evaluators to list
 func evaluatorsList(input map[schema.GroupResource]quota.Evaluator) []quota.Evaluator {
-	var result []quota.Evaluator
+	result := make([]quota.Evaluator, 0, len(input))
 	for _, item := range input {
 		result = append(result, item)
 	}

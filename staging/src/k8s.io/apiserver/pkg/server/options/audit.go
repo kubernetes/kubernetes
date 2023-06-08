@@ -276,9 +276,7 @@ func (o *AuditOptions) AddFlags(fs *pflag.FlagSet) {
 	o.WebhookOptions.TruncateOptions.AddFlags(pluginwebhook.PluginName, fs)
 }
 
-func (o *AuditOptions) ApplyTo(
-	c *server.Config,
-) error {
+func (o *AuditOptions) ApplyTo(c *server.Config) error {
 	if o == nil {
 		return nil
 	}

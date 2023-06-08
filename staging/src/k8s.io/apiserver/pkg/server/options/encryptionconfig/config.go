@@ -208,11 +208,11 @@ func LoadEncryptionConfig(ctx context.Context, filepath string, reload bool) (*E
 // It may launch multiple go routines whose lifecycle is controlled by ctx.
 // In case of an error, the caller is responsible for canceling ctx to clean up any go routines that may have been launched.
 func getTransformerOverridesAndKMSPluginHealthzCheckers(ctx context.Context, config *apiserverconfig.EncryptionConfiguration) (map[schema.GroupResource]storagevalue.Transformer, []healthz.HealthChecker, *kmsState, error) {
-	var kmsHealthChecks []healthz.HealthChecker
 	transformers, probes, kmsUsed, err := getTransformerOverridesAndKMSPluginProbes(ctx, config)
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	kmsHealthChecks := make([]healthz.HealthChecker, 0, len(probes))
 	for i := range probes {
 		probe := probes[i]
 		kmsHealthChecks = append(kmsHealthChecks, probe.toHealthzCheck(i))
