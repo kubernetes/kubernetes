@@ -165,8 +165,16 @@ func TestWaitForAttachAndMountError(t *testing.T) {
 							MountPath: "/vol2",
 						},
 						{
+							Name:      "vol02",
+							MountPath: "/vol02",
+						},
+						{
 							Name:      "vol3",
 							MountPath: "/vol3",
+						},
+						{
+							Name:      "vol03",
+							MountPath: "/vol03",
 						},
 					},
 				},
@@ -185,7 +193,19 @@ func TestWaitForAttachAndMountError(t *testing.T) {
 					},
 				},
 				{
+					Name: "vol02",
+					VolumeSource: v1.VolumeSource{
+						RBD: &v1.RBDVolumeSource{},
+					},
+				},
+				{
 					Name: "vol3",
+					VolumeSource: v1.VolumeSource{
+						AzureDisk: &v1.AzureDiskVolumeSource{},
+					},
+				},
+				{
+					Name: "vol03",
 					VolumeSource: v1.VolumeSource{
 						AzureDisk: &v1.AzureDiskVolumeSource{},
 					},
@@ -208,7 +228,7 @@ func TestWaitForAttachAndMountError(t *testing.T) {
 		t.Errorf("Expected error, got none")
 	}
 	if !strings.Contains(err.Error(),
-		"unattached volumes=[vol2], failed to process volumes=[vol3]") {
+		"unattached volumes=[vol02 vol2], failed to process volumes=[vol03 vol3]") {
 		t.Errorf("Unexpected error info: %v", err)
 	}
 }
