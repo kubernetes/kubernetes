@@ -20,8 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -32,6 +30,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/dynamic-resource-allocation/controller"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/e2e/dra/test-driver/app"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -344,69 +343,102 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 		})
 
 		ginkgo.Context("reallocation", func() {
-			var allocateWrapper app.AllocateWrapperType
+			var allocateWrapper2 app.AllocateWrapperType
 			driver := NewDriver(f, nodes, func() app.Resources {
 				return app.Resources{
 					NodeLocal:      true,
 					MaxAllocations: 2,
 					Nodes:          nodes.NodeNames,
+				}
+			})
+			driver2 := NewDriver(f, nodes, func() app.Resources {
+				return app.Resources{
+					NodeLocal:      true,
+					MaxAllocations: 2,
+					Nodes:          nodes.NodeNames,
 
-					AllocateWrapper: func(ctx context.Context, claim *resourcev1alpha2.ResourceClaim, claimParameters interface{}, class *resourcev1alpha2.ResourceClass, classParameters interface{}, selectedNode string,
-						handler func(ctx context.Context, claim *resourcev1alpha2.ResourceClaim, claimParameters interface{}, class *resourcev1alpha2.ResourceClass, classParameters interface{}, selectedNode string) (result *resourcev1alpha2.AllocationResult, err error)) (result *resourcev1alpha2.AllocationResult, err error) {
-						return allocateWrapper(ctx, claim, claimParameters, class, classParameters, selectedNode, handler)
+					AllocateWrapper: func(
+						ctx context.Context,
+						claimAllocations []*controller.ClaimAllocation,
+						selectedNode string,
+						handler func(
+							ctx context.Context,
+							claimAllocations []*controller.ClaimAllocation,
+							selectedNode string),
+					) {
+						allocateWrapper2(ctx, claimAllocations, selectedNode, handler)
+						return
 					},
 				}
 			})
+			driver2.NameSuffix = "-other"
+
 			b := newBuilder(f, driver)
+			b2 := newBuilder(f, driver2)
 
 			ginkgo.It("works", func(ctx context.Context) {
-				// A pod with two claims can run on a node, but
-				// only if allocation of both succeeds. This
-				// tests simulates the scenario where one claim
-				// gets allocated but the second doesn't
-				// because of a race with some other pod.
+				// A pod with multiple claims can run on a node, but
+				// only if allocation of all succeeds. This
+				// test simulates the scenario where one claim
+				// gets allocated from one driver, but the claims
+				// from second driver fail allocation because of a
+				// race with some other pod.
 				//
-				// To ensure the right timing, allocation of the second
-				// claim gets delayed while creating another pod
-				// that gets the remaining resource on the node.
+				// To ensure the right timing, allocation of the
+				// claims from second driver are delayed while
+				// creating another pod that gets the remaining
+				// resource on the node from second driver.
 				ctx, cancel := context.WithCancel(ctx)
 				defer cancel()
 
-				parameters := b.parameters()
-				claim1 := b.externalClaim(resourcev1alpha2.AllocationModeWaitForFirstConsumer)
-				claim2 := b.externalClaim(resourcev1alpha2.AllocationModeWaitForFirstConsumer)
+				parameters1 := b.parameters()
+				parameters2 := b2.parameters()
 				pod1 := b.podExternal()
+				pod2 := b2.podExternal()
+				pod1claim1 := b.externalClaim(resourcev1alpha2.AllocationModeWaitForFirstConsumer)
+				pod2claim1 := b2.externalClaim(resourcev1alpha2.AllocationModeWaitForFirstConsumer)
+				pod1claim2 := b2.externalClaim(resourcev1alpha2.AllocationModeWaitForFirstConsumer)
+				pod1claim3 := b2.externalClaim(resourcev1alpha2.AllocationModeWaitForFirstConsumer)
+
 				pod1.Spec.ResourceClaims = append(pod1.Spec.ResourceClaims,
 					v1.PodResourceClaim{
-						Name: "claim2",
+						Name: "claim-other1",
 						Source: v1.ClaimSource{
-							ResourceClaimName: &claim2.Name,
+							ResourceClaimName: &pod1claim2.Name,
+						},
+					},
+					v1.PodResourceClaim{
+						Name: "claim-other2",
+						Source: v1.ClaimSource{
+							ResourceClaimName: &pod1claim3.Name,
 						},
 					},
 				)
 
-				// Block on the second external claim that is to be allocated.
+				// Block on the second, third external claim from driver2 that is to be allocated.
 				blockClaim, cancelBlockClaim := context.WithCancel(ctx)
 				defer cancelBlockClaim()
-				var allocated int32
-				allocateWrapper = func(ctx context.Context, claim *resourcev1alpha2.ResourceClaim, claimParameters interface{},
-					class *resourcev1alpha2.ResourceClass, classParameters interface{}, selectedNode string,
-					handler func(ctx context.Context, claim *resourcev1alpha2.ResourceClaim, claimParameters interface{},
-						class *resourcev1alpha2.ResourceClass, classParameters interface{}, selectedNode string) (result *resourcev1alpha2.AllocationResult, err error),
-				) (result *resourcev1alpha2.AllocationResult, err error) {
-					oldAllocated := atomic.AddInt32(&allocated, 0)
-					if oldAllocated == 1 && strings.HasPrefix(claim.Name, "external-claim") {
+
+				b2.create(ctx, parameters2, pod1claim2, pod1claim3)
+				b.create(ctx, parameters1, pod1claim1, pod1)
+
+				allocateWrapper2 = func(ctx context.Context,
+					claimAllocations []*controller.ClaimAllocation,
+					selectedNode string,
+					handler func(ctx context.Context,
+						claimAllocations []*controller.ClaimAllocation,
+						selectedNode string),
+				) {
+					// pod1 will have only external-claim[2-3], it has to wait
+					// for pod2 to consume resources from driver2
+					if claimAllocations[0].Claim.Name != "external-claim-other" {
 						<-blockClaim.Done()
 					}
-					result, err = handler(ctx, claim, claimParameters, class, classParameters, selectedNode)
-					if err == nil {
-						atomic.AddInt32(&allocated, 1)
-					}
+					handler(ctx, claimAllocations, selectedNode)
 					return
 				}
-				b.create(ctx, parameters, claim1, claim2, pod1)
 
-				ginkgo.By("waiting for one claim to be allocated")
+				ginkgo.By("waiting for one claim from driver1 to be allocated")
 				var nodeSelector *v1.NodeSelector
 				gomega.Eventually(ctx, func(ctx context.Context) (int, error) {
 					claims, err := f.ClientSet.ResourceV1alpha2().ResourceClaims(f.Namespace.Name).List(ctx, metav1.ListOptions{})
@@ -429,18 +461,20 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 				// the node selector looks like and can
 				// directly access the key and value from it.
 				ginkgo.By(fmt.Sprintf("create second pod on the same node %s", nodeSelector))
-				pod2, template2 := b.podInline(resourcev1alpha2.AllocationModeWaitForFirstConsumer)
+
 				req := nodeSelector.NodeSelectorTerms[0].MatchExpressions[0]
 				node := req.Values[0]
 				pod2.Spec.NodeSelector = map[string]string{req.Key: node}
-				b.create(ctx, pod2, template2)
+
+				b2.create(ctx, pod2claim1, pod2)
 				framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod2), "start pod 2")
 
-				// Allow allocation of claim2 to proceed. It should fail now
+				// Allow allocation of pod1 claim2, claim3 to proceed. It should fail now
 				// and the other node must be used instead, after deallocating
 				// the first claim.
 				ginkgo.By("move first pod to other node")
 				cancelBlockClaim()
+
 				framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod1), "start pod 1")
 				pod1, err := f.ClientSet.CoreV1().Pods(pod1.Namespace).Get(ctx, pod1.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err, "get first pod")
@@ -463,6 +497,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 			}
 		})
 		b1 := newBuilder(f, driver1)
+
 		driver2 := NewDriver(f, nodes, func() app.Resources {
 			return app.Resources{
 				NodeLocal:      true,
