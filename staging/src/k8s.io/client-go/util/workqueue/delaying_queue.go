@@ -45,6 +45,11 @@ type ExpandedDelayingInterface interface {
 	// DoneWaiting will remove an item from the 'waiting' queue.
 	// If you want to cancel 'active' queued items you need to call Done().
 	DoneWaiting(item interface{})
+	// IsWaiting returns a bool indicating whether the given item is queued in the 'waiting' queue
+	// and if it is how long it has left to wait.
+	IsWaiting(item interface{}) (bool, time.Duration)
+	// LenWaiting returns the length of the 'waiting' queue.
+	LenWaiting() int
 }
 
 // ExpandedDelayingOptions toggle implementation specific options for use with ExpandedDelayingInterface
@@ -318,14 +323,14 @@ func (q *delayingType) AddWithOptions(item interface{}, opts ExpandedDelayingOpt
 	q.sendItemToWaitingLoop(item, opts, waitForActionQueue)
 }
 
-// ForgetWaiting removes an item from the delayed queue, effectively cancelling its future processing.
+// DoneWaiting removes an item from the delayed queue, effectively cancelling its future processing.
 func (q *delayingType) DoneWaiting(item interface{}) {
 	q.sendItemToWaitingLoop(item, ExpandedDelayingOptions{}, waitForActionDoneWaiting)
 }
 
-// isWaiting returns a bool indicating whether the given item is queued in the 'waiting' queue.
+// IsWaiting returns a bool indicating whether the given item is queued in the 'waiting' queue.
 // The client can call IsQueued() in order to determine whether an item is queued in the 'active' queue.
-func (q *delayingType) isWaiting(item interface{}) (bool, time.Duration) {
+func (q *delayingType) IsWaiting(item interface{}) (bool, time.Duration) {
 	result := q.sendItemToWaitingLoop(item, ExpandedDelayingOptions{Synchronous: true}, waitForActionIsWaiting)
 	if result.exists != nil && result.nextReady != nil {
 		return *result.exists, *result.nextReady
@@ -333,9 +338,9 @@ func (q *delayingType) isWaiting(item interface{}) (bool, time.Duration) {
 	return false, 0
 }
 
-// lenWaiting returns an int representing the number of items queued in the 'waiting' queue.
+// LenWaiting returns an int representing the number of items queued in the 'waiting' queue.
 // The client can call Len() in order to determine the number of items in the 'active' queue.
-func (q *delayingType) lenWaiting() int {
+func (q *delayingType) LenWaiting() int {
 	result := q.sendItemToWaitingLoop(nil, ExpandedDelayingOptions{Synchronous: true}, waitForActionLenWaiting)
 	if result.length != nil {
 		return *result.length

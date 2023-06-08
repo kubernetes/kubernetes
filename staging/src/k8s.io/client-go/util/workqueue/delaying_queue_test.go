@@ -627,13 +627,13 @@ func assertDelayedQueueState(t *testing.T, q *delayingType, qs QueueState) {
 	var errored bool
 
 	// check the 'waiting' queue
-	wlen := q.lenWaiting()
+	wlen := q.LenWaiting()
 	if wlen != len(qs.waiting) {
 		t.Errorf("the waiting queue has %d queued items but we expected %d", wlen, len(qs.waiting))
 		errored = true
 	}
 	for _, w := range qs.waiting {
-		waiting, _ := q.isWaiting(w)
+		waiting, _ := q.IsWaiting(w)
 		if !waiting {
 			t.Errorf("item %v was expected to be waiting but isn't", w)
 			errored = true
