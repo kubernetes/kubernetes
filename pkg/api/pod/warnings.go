@@ -249,7 +249,25 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 			items := sets.NewString()
 			for i, item := range c.Env {
 				if items.Has(item.Name) {
-					warnings = append(warnings, fmt.Sprintf("%s: duplicate name %q", p.Child("env").Index(i).Child("name"), item.Name))
+					// a previous value exists, but it might be OK
+					bad := false
+					ref := fmt.Sprintf("$(%s)", item.Name) // what does a ref to this name look like
+					// if we are replacing it with a valueFrom, warn
+					if item.ValueFrom != nil {
+						bad = true
+					}
+					// if this is X="$(X)", warn
+					if item.Value == ref {
+						bad = true
+					}
+					// if the new value does not contain a reference to the old
+					// value (e.g. X="abc"; X="$(X)123"), warn
+					if !strings.Contains(item.Value, ref) {
+						bad = true
+					}
+					if bad {
+						warnings = append(warnings, fmt.Sprintf("%s: hides previous definition of %q", p.Child("env").Index(i), item.Name))
+					}
 				} else {
 					items.Insert(item.Name)
 				}
