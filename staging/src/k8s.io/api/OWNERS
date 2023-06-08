@@ -13,3 +13,7 @@ filters:
   "\\.go$":
     labels:
       - kind/api-change
+  # allow dependency approver(s) for just go.mod/go.sum files.
+  "go.(mod|sum)$":
+    approvers:
+      - dep-approvers
