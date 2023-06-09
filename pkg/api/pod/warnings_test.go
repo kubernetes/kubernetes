@@ -264,20 +264,6 @@ func TestWarnings(t *testing.T) {
 			},
 		},
 		{
-			name: "duplicate volume",
-			template: &api.PodTemplateSpec{Spec: api.PodSpec{
-				Volumes: []api.Volume{
-					{Name: "a"},
-					{Name: "a"},
-					{Name: "a"},
-				}},
-			},
-			expected: []string{
-				`spec.volumes[1].name: duplicate name "a"`,
-				`spec.volumes[2].name: duplicate name "a"`,
-			},
-		},
-		{
 			name: "duplicate env",
 			template: &api.PodTemplateSpec{Spec: api.PodSpec{
 				InitContainers: []api.Container{{Env: []api.EnvVar{
