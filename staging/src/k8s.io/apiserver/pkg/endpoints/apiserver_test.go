@@ -38,6 +38,7 @@ import (
 	"time"
 
 	"github.com/emicklei/go-restful/v3"
+	"github.com/google/go-cmp/cmp"
 
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -55,7 +56,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -231,6 +232,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 
 		Creater:         scheme,
 		Convertor:       scheme,
+		TypeConverter:   managedfields.NewDeducedTypeConverter(),
 		UnsafeConvertor: runtime.UnsafeObjectConvertor(scheme),
 		Defaulter:       scheme,
 		Typer:           scheme,
@@ -1832,7 +1834,7 @@ func TestGetTable(t *testing.T) {
 			}
 			if !reflect.DeepEqual(test.expected, &itemOut) {
 				t.Log(body)
-				t.Errorf("%d: did not match: %s", i, diff.ObjectReflectDiff(test.expected, &itemOut))
+				t.Errorf("%d: did not match: %s", i, cmp.Diff(test.expected, &itemOut))
 			}
 		})
 	}
@@ -2061,13 +2063,7 @@ func TestWatchTable(t *testing.T) {
 				actual = append(actual, &event)
 			}
 			if !reflect.DeepEqual(test.expected, actual) {
-				for i := range test.expected {
-					if i >= len(actual) {
-						break
-					}
-					t.Logf("%s", diff.StringDiff(string(test.expected[i].Object.Raw), string(actual[i].Object.Raw)))
-				}
-				t.Fatalf("unexpected: %s", diff.ObjectReflectDiff(test.expected, actual))
+				t.Fatalf("unexpected: %s", cmp.Diff(test.expected, actual))
 			}
 		})
 	}
@@ -2245,7 +2241,7 @@ func TestGetPartialObjectMetadata(t *testing.T) {
 				t.Fatal(err)
 			}
 			if !reflect.DeepEqual(test.expected, itemOut) {
-				t.Errorf("%d: did not match: %s", i, diff.ObjectReflectDiff(test.expected, itemOut))
+				t.Errorf("%d: did not match: %s", i, cmp.Diff(test.expected, itemOut))
 			}
 			body = d
 		} else {
@@ -2829,7 +2825,7 @@ func TestDeleteWithOptions(t *testing.T) {
 	}
 	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	if !apiequality.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
-		t.Errorf("unexpected delete options: %s", diff.ObjectDiff(simpleStorage.deleteOptions, item))
+		t.Errorf("unexpected delete options: %s", cmp.Diff(simpleStorage.deleteOptions, item))
 	}
 }
 
@@ -2869,7 +2865,7 @@ func TestDeleteWithOptionsQuery(t *testing.T) {
 	}
 	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	if !apiequality.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
-		t.Errorf("unexpected delete options: %s", diff.ObjectDiff(simpleStorage.deleteOptions, item))
+		t.Errorf("unexpected delete options: %s", cmp.Diff(simpleStorage.deleteOptions, item))
 	}
 }
 
@@ -2912,7 +2908,7 @@ func TestDeleteWithOptionsQueryAndBody(t *testing.T) {
 	}
 	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	if !apiequality.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
-		t.Errorf("unexpected delete options: %s", diff.ObjectDiff(simpleStorage.deleteOptions, item))
+		t.Errorf("unexpected delete options: %s", cmp.Diff(simpleStorage.deleteOptions, item))
 	}
 }
 
@@ -3345,6 +3341,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Creater:         scheme,
 		Convertor:       scheme,
 		UnsafeConvertor: runtime.UnsafeObjectConvertor(scheme),
+		TypeConverter:   managedfields.NewDeducedTypeConverter(),
 		Defaulter:       scheme,
 		Typer:           scheme,
 		Namer:           namer,
@@ -3538,6 +3535,8 @@ func TestNamedCreaterWithGenerateName(t *testing.T) {
 		t.Errorf("unexpected error: %v %#v", err, response)
 	}
 
+	// Avoid comparing managed fields in expected result
+	itemOut.ManagedFields = nil
 	itemOut.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	simple.Name = populateName
 	simple.Namespace = "default" // populated by create handler to match request URL
@@ -3618,6 +3617,8 @@ func TestCreate(t *testing.T) {
 		t.Errorf("unexpected error: %v %#v", err, response)
 	}
 
+	// Avoid comparing managed fields in expected result
+	itemOut.ManagedFields = nil
 	itemOut.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	simple.Namespace = "default" // populated by create handler to match request URL
 	if !reflect.DeepEqual(&itemOut, simple) {
@@ -3680,6 +3681,8 @@ func TestCreateYAML(t *testing.T) {
 		t.Fatalf("unexpected error: %v %#v", err, response)
 	}
 
+	// Avoid comparing managed fields in expected result
+	itemOut.ManagedFields = nil
 	itemOut.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	simple.Namespace = "default" // populated by create handler to match request URL
 	if !reflect.DeepEqual(&itemOut, simple) {
@@ -3732,6 +3735,8 @@ func TestCreateInNamespace(t *testing.T) {
 		t.Fatalf("unexpected error: %v\n%s", err, data)
 	}
 
+	// Avoid comparing managed fields in expected result
+	itemOut.ManagedFields = nil
 	itemOut.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	simple.Namespace = "other" // populated by create handler to match request URL
 	if !reflect.DeepEqual(&itemOut, simple) {
@@ -4330,6 +4335,7 @@ func TestXGSubresource(t *testing.T) {
 
 		Creater:         scheme,
 		Convertor:       scheme,
+		TypeConverter:   managedfields.NewDeducedTypeConverter(),
 		UnsafeConvertor: runtime.UnsafeObjectConvertor(scheme),
 		Defaulter:       scheme,
 		Typer:           scheme,

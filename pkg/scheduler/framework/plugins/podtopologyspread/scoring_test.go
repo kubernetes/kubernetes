@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -84,7 +85,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
 					},
 				},
-				IgnoredNodes: sets.NewString(),
+				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{key: "zone", value: "zone1"}: pointer.Int64(0),
 					{key: "zone", value: "zone2"}: pointer.Int64(0),
@@ -116,7 +117,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
 					},
 				},
-				IgnoredNodes: sets.NewString(),
+				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{key: "zone", value: "zone1"}: pointer.Int64(0),
 					{key: "zone", value: "zone2"}: pointer.Int64(0),
@@ -157,7 +158,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
 					},
 				},
-				IgnoredNodes: sets.NewString("node-x"),
+				IgnoredNodes: sets.New("node-x"),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{key: "zone", value: "zone1"}: pointer.Int64(0),
 				},
@@ -199,7 +200,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
 					},
 				},
-				IgnoredNodes: sets.NewString(),
+				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{key: v1.LabelTopologyZone, value: "mars"}: pointer.Int64(0),
 					{key: v1.LabelTopologyZone, value: ""}:     pointer.Int64(0),
@@ -250,7 +251,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
 					},
 				},
-				IgnoredNodes: sets.NewString(),
+				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{key: "planet", value: "mars"}: pointer.Int64(0),
 				},
@@ -314,7 +315,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
 					},
 				},
-				IgnoredNodes: sets.NewString(),
+				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{"planet", "mars"}: pointer.Int64(0),
 				},
@@ -346,7 +347,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
 					},
 				},
-				IgnoredNodes: sets.NewString(),
+				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{key: "zone", value: "zone1"}: pointer.Int64(0),
 					{key: "zone", value: "zone2"}: pointer.Int64(0),
@@ -380,7 +381,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
 					},
 				},
-				IgnoredNodes: sets.NewString(),
+				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{key: "zone", value: "zone1"}: pointer.Int64(0),
 					{key: "zone", value: "zone2"}: pointer.Int64(0),
@@ -414,7 +415,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
 					},
 				},
-				IgnoredNodes: sets.NewString(),
+				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{key: "zone", value: "zone1"}: pointer.Int64(0),
 					{key: "zone", value: "zone2"}: pointer.Int64(0),
@@ -448,7 +449,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
 					},
 				},
-				IgnoredNodes: sets.NewString(),
+				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{key: "zone", value: "zone1"}: pointer.Int64(0),
 					{key: "zone", value: "zone2"}: pointer.Int64(0),
@@ -481,7 +482,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyHonor,
 					},
 				},
-				IgnoredNodes: sets.NewString(),
+				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{key: "zone", value: "zone1"}: pointer.Int64(0),
 					{key: "zone", value: "zone2"}: pointer.Int64(0),
@@ -514,7 +515,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
 					},
 				},
-				IgnoredNodes: sets.NewString(),
+				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{key: "zone", value: "zone1"}: pointer.Int64(0),
 					{key: "zone", value: "zone2"}: pointer.Int64(0),
@@ -526,10 +527,11 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(tt.objs...), 0)
-			f, err := frameworkruntime.NewFramework(nil, nil, ctx.Done(),
+			f, err := frameworkruntime.NewFramework(ctx, nil, nil,
 				frameworkruntime.WithSnapshotSharedLister(cache.NewSnapshot(nil, tt.nodes)),
 				frameworkruntime.WithInformerFactory(informerFactory))
 			if err != nil {
@@ -1364,12 +1366,13 @@ func BenchmarkTestPodTopologySpreadScore(b *testing.B) {
 	}
 	for _, tt := range tests {
 		b.Run(tt.name, func(b *testing.B) {
+			_, ctx := ktesting.NewTestContext(b)
 			existingPods, allNodes, filteredNodes := st.MakeNodesAndPodsForEvenPodsSpread(tt.pod.Labels, tt.existingPodsNum, tt.allNodesNum, tt.filteredNodesNum)
 			state := framework.NewCycleState()
-			pl := plugintesting.SetupPlugin(b, podTopologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, cache.NewSnapshot(existingPods, allNodes))
+			pl := plugintesting.SetupPlugin(ctx, b, podTopologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, cache.NewSnapshot(existingPods, allNodes))
 			p := pl.(*PodTopologySpread)
 
-			status := p.PreScore(context.Background(), state, tt.pod, filteredNodes)
+			status := p.PreScore(ctx, state, tt.pod, filteredNodes)
 			if !status.IsSuccess() {
 				b.Fatalf("unexpected error: %v", status)
 			}
@@ -1434,10 +1437,11 @@ func BenchmarkTestDefaultEvenPodsSpreadPriority(b *testing.B) {
 			client := fake.NewSimpleClientset(
 				&v1.Service{Spec: v1.ServiceSpec{Selector: map[string]string{"foo": ""}}},
 			)
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(b)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			f, err := frameworkruntime.NewFramework(nil, nil, ctx.Done(),
+			f, err := frameworkruntime.NewFramework(ctx, nil, nil,
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithInformerFactory(informerFactory))
 			if err != nil {

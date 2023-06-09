@@ -36,8 +36,8 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy/internal/generic"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/matchconditions"
-	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
@@ -512,13 +512,13 @@ func (c *policyController) latestPolicyData() []policyData {
 					for i := range matchConditions {
 						matchExpressionAccessors[i] = (*matchconditions.MatchCondition)(&matchConditions[i])
 					}
-					matcher = matchconditions.NewMatcher(c.filterCompiler.Compile(matchExpressionAccessors, optionalVars, celconfig.PerCallLimit), c.authz, failurePolicy, "validatingadmissionpolicy", definitionInfo.lastReconciledValue.Name)
+					matcher = matchconditions.NewMatcher(c.filterCompiler.Compile(matchExpressionAccessors, optionalVars, environment.StoredExpressions), c.authz, failurePolicy, "validatingadmissionpolicy", definitionInfo.lastReconciledValue.Name)
 				}
 				bindingInfo.validator = c.newValidator(
-					c.filterCompiler.Compile(convertv1alpha1Validations(definitionInfo.lastReconciledValue.Spec.Validations), optionalVars, celconfig.PerCallLimit),
+					c.filterCompiler.Compile(convertv1alpha1Validations(definitionInfo.lastReconciledValue.Spec.Validations), optionalVars, environment.StoredExpressions),
 					matcher,
-					c.filterCompiler.Compile(convertv1alpha1AuditAnnotations(definitionInfo.lastReconciledValue.Spec.AuditAnnotations), optionalVars, celconfig.PerCallLimit),
-					c.filterCompiler.Compile(convertV1Alpha1MessageExpressions(definitionInfo.lastReconciledValue.Spec.Validations), expressionOptionalVars, celconfig.PerCallLimit),
+					c.filterCompiler.Compile(convertv1alpha1AuditAnnotations(definitionInfo.lastReconciledValue.Spec.AuditAnnotations), optionalVars, environment.StoredExpressions),
+					c.filterCompiler.Compile(convertV1Alpha1MessageExpressions(definitionInfo.lastReconciledValue.Spec.Validations), expressionOptionalVars, environment.StoredExpressions),
 					failurePolicy,
 					c.authz,
 				)

@@ -515,7 +515,7 @@ func testRSLifeCycle(ctx context.Context, f *framework.Framework) {
 			"replicas": rsPatchReplicas,
 			"template": map[string]interface{}{
 				"spec": map[string]interface{}{
-					"TerminationGracePeriodSeconds": &zero,
+					"terminationGracePeriodSeconds": &zero,
 					"containers": [1]map[string]interface{}{{
 						"name":  rsName,
 						"image": rsPatchImage,
@@ -536,7 +536,8 @@ func testRSLifeCycle(ctx context.Context, f *framework.Framework) {
 				rset.ObjectMeta.Labels["test-rs"] == "patched" &&
 				rset.Status.ReadyReplicas == rsPatchReplicas &&
 				rset.Status.AvailableReplicas == rsPatchReplicas &&
-				rset.Spec.Template.Spec.Containers[0].Image == rsPatchImage
+				rset.Spec.Template.Spec.Containers[0].Image == rsPatchImage &&
+				*rset.Spec.Template.Spec.TerminationGracePeriodSeconds == zero
 			if !found {
 				framework.Logf("observed ReplicaSet %v in namespace %v with ReadyReplicas %v, AvailableReplicas %v", rset.ObjectMeta.Name, rset.ObjectMeta.Namespace, rset.Status.ReadyReplicas,
 					rset.Status.AvailableReplicas)

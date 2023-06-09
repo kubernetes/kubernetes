@@ -59,12 +59,11 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 
 	// networkpolicies
 	if resource := "networkpolicies"; apiResourceConfigSource.ResourceEnabled(networkingapiv1.SchemeGroupVersion.WithResource(resource)) {
-		networkPolicyStorage, networkPolicyStatusStorage, err := networkpolicystore.NewREST(restOptionsGetter)
+		networkPolicyStorage, err := networkpolicystore.NewREST(restOptionsGetter)
 		if err != nil {
 			return storage, err
 		}
 		storage[resource] = networkPolicyStorage
-		storage[resource+"/status"] = networkPolicyStatusStorage
 	}
 
 	// ingresses

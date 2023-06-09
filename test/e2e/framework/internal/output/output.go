@@ -18,7 +18,7 @@ package output
 
 import (
 	"encoding/xml"
-	"io/ioutil"
+	"os"
 	"path"
 	"regexp"
 	"testing"
@@ -52,7 +52,7 @@ func TestGinkgoOutput(t *testing.T, expected TestResult, runSpecsArgs ...interfa
 	ginkgo.RunSpecs(fakeT, "Logging Suite", runSpecsArgs...)
 
 	var actual reporters.JUnitTestSuites
-	data, err := ioutil.ReadFile(junitFile)
+	data, err := os.ReadFile(junitFile)
 	require.NoError(t, err)
 	err = xml.Unmarshal(data, &actual)
 	require.NoError(t, err)

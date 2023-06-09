@@ -306,10 +306,10 @@ const (
 	KubeletHealthzPort = 10248
 
 	// MinExternalEtcdVersion indicates minimum external etcd version which kubeadm supports
-	MinExternalEtcdVersion = "3.2.18"
+	MinExternalEtcdVersion = "3.4.3-0"
 
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
-	DefaultEtcdVersion = "3.5.7-0"
+	DefaultEtcdVersion = "3.5.9-0"
 
 	// Etcd defines variable used internally when referring to etcd component
 	Etcd = "etcd"
@@ -422,15 +422,15 @@ const (
 	// CgroupDriverSystemd holds the systemd driver type
 	CgroupDriverSystemd = "systemd"
 
-	// The username of the user that kube-controller-manager runs as.
+	// KubeControllerManagerUserName is the username of the user that kube-controller-manager runs as.
 	KubeControllerManagerUserName string = "kubeadm-kcm"
-	// The username of the user that kube-apiserver runs as.
+	// KubeAPIServerUserName is the username of the user that kube-apiserver runs as.
 	KubeAPIServerUserName string = "kubeadm-kas"
-	// The username of the user that kube-scheduler runs as.
+	// KubeSchedulerUserName is the username of the user that kube-scheduler runs as.
 	KubeSchedulerUserName string = "kubeadm-ks"
-	// The username of the user that etcd runs as.
+	// EtcdUserName is the username of the user that etcd runs as.
 	EtcdUserName string = "kubeadm-etcd"
-	// The group of users that are allowed to read the service account private key.
+	// ServiceAccountKeyReadersGroupName is the group of users that are allowed to read the service account private key.
 	ServiceAccountKeyReadersGroupName string = "kubeadm-sa-key-readers"
 )
 
@@ -467,20 +467,18 @@ var (
 
 	// SupportedEtcdVersion lists officially supported etcd versions with corresponding Kubernetes releases
 	SupportedEtcdVersion = map[uint8]string{
-		13: "3.2.24",
-		14: "3.3.10",
-		15: "3.3.10",
-		16: "3.3.17-0",
 		17: "3.4.3-0",
 		18: "3.4.3-0",
-		19: "3.4.13-0",
-		20: "3.4.13-0",
-		21: "3.4.13-0",
-		22: "3.5.7-0",
-		23: "3.5.7-0",
-		24: "3.5.7-0",
-		25: "3.5.7-0",
-		26: "3.5.7-0",
+		19: "3.4.18-0",
+		20: "3.4.18-0",
+		21: "3.4.18-0",
+		22: "3.5.8-0",
+		23: "3.5.8-0",
+		24: "3.5.8-0",
+		25: "3.5.8-0",
+		26: "3.5.8-0",
+		27: "3.5.8-0",
+		28: "3.5.9-0",
 	}
 
 	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows

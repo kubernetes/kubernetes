@@ -59,7 +59,7 @@ func CreateJob(ctx context.Context, c clientset.Interface, ns string, job *batch
 	return c.BatchV1().Jobs(ns).Create(ctx, job, metav1.CreateOptions{})
 }
 
-// CreateJob uses c to update a job in namespace ns. If the returned error is
+// UpdateJob uses c to update a job in namespace ns. If the returned error is
 // nil, the returned Job is valid and has been updated.
 func UpdateJob(ctx context.Context, c clientset.Interface, ns string, job *batchv1.Job) (*batchv1.Job, error) {
 	return c.BatchV1().Jobs(ns).Update(ctx, job, metav1.UpdateOptions{})

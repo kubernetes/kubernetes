@@ -124,7 +124,7 @@ func newDaemonSet(name string) *apps.DaemonSet {
 }
 
 func newRollingUpdateStrategy() *apps.DaemonSetUpdateStrategy {
-	one := intstr.FromInt(1)
+	one := intstr.FromInt32(1)
 	return &apps.DaemonSetUpdateStrategy{
 		Type:          apps.RollingUpdateDaemonSetStrategyType,
 		RollingUpdate: &apps.RollingUpdateDaemonSet{MaxUnavailable: &one},
@@ -480,11 +480,12 @@ func TestDeleteFinalStateUnknown(t *testing.T) {
 }
 
 func TestExpectationsOnRecreate(t *testing.T) {
-	client := fake.NewSimpleClientset()
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-
 	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	client := fake.NewSimpleClientset()
+
 	f := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 	dsc, err := NewDaemonSetsController(
 		ctx,
@@ -550,8 +551,8 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	f.Start(stopCh)
-	for ty, ok := range f.WaitForCacheSync(stopCh) {
+	f.Start(ctx.Done())
+	for ty, ok := range f.WaitForCacheSync(ctx.Done()) {
 		if !ok {
 			t.Fatalf("caches failed to sync: %v", ty)
 		}
@@ -3217,7 +3218,7 @@ func getQueuedKeys(queue workqueue.RateLimitingInterface) []string {
 func TestSurgeDealsWithExistingPods(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	ds := newDaemonSet("foo")
-	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt(1))
+	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt32(1))
 	manager, podControl, _, err := newTestController(ctx, ds)
 	if err != nil {
 		t.Fatalf("error creating DaemonSets controller: %v", err)
@@ -3234,7 +3235,7 @@ func TestSurgeDealsWithExistingPods(t *testing.T) {
 func TestSurgePreservesReadyOldPods(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	ds := newDaemonSet("foo")
-	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt(1))
+	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt32(1))
 	manager, podControl, _, err := newTestController(ctx, ds)
 	if err != nil {
 		t.Fatalf("error creating DaemonSets controller: %v", err)
@@ -3274,7 +3275,7 @@ func TestSurgePreservesReadyOldPods(t *testing.T) {
 func TestSurgeCreatesNewPodWhenAtMaxSurgeAndOldPodDeleted(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	ds := newDaemonSet("foo")
-	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt(1))
+	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt32(1))
 	manager, podControl, _, err := newTestController(ctx, ds)
 	if err != nil {
 		t.Fatalf("error creating DaemonSets controller: %v", err)
@@ -3321,7 +3322,7 @@ func TestSurgeCreatesNewPodWhenAtMaxSurgeAndOldPodDeleted(t *testing.T) {
 func TestSurgeDeletesUnreadyOldPods(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	ds := newDaemonSet("foo")
-	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt(1))
+	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt32(1))
 	manager, podControl, _, err := newTestController(ctx, ds)
 	if err != nil {
 		t.Fatalf("error creating DaemonSets controller: %v", err)
@@ -3362,7 +3363,7 @@ func TestSurgePreservesOldReadyWithUnsatisfiedMinReady(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	ds := newDaemonSet("foo")
 	ds.Spec.MinReadySeconds = 15
-	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt(1))
+	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt32(1))
 	manager, podControl, _, err := newTestController(ctx, ds)
 	if err != nil {
 		t.Fatalf("error creating DaemonSets controller: %v", err)
@@ -3407,7 +3408,7 @@ func TestSurgeDeletesOldReadyWithUnsatisfiedMinReady(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	ds := newDaemonSet("foo")
 	ds.Spec.MinReadySeconds = 15
-	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt(1))
+	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt32(1))
 	manager, podControl, _, err := newTestController(ctx, ds)
 	if err != nil {
 		t.Fatalf("error creating DaemonSets controller: %v", err)

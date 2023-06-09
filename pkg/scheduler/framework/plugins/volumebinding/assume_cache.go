@@ -43,7 +43,7 @@ type AssumeCache interface {
 	// Get the object by name
 	Get(objName string) (interface{}, error)
 
-	// Get the API object by name
+	// GetAPIObj gets the API object by name
 	GetAPIObj(objName string) (interface{}, error)
 
 	// List all the objects in the cache

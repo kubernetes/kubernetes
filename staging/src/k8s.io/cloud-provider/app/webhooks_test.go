@@ -19,8 +19,8 @@ package app
 import (
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
 	admissionv1 "k8s.io/api/admission/v1"
+	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/cloud-provider/app/config"
 	cpconfig "k8s.io/cloud-provider/config"
 	"k8s.io/cloud-provider/fake"
@@ -38,7 +38,7 @@ func TestWebhookEnableDisable(t *testing.T) {
 		desc            string
 		webhookConfigs  map[string]WebhookConfig
 		completedConfig *config.CompletedConfig
-		expected        map[string]webhookHandler
+		expected        map[string]WebhookHandler
 	}{
 		{
 			"Webhooks Enabled",
@@ -47,9 +47,9 @@ func TestWebhookEnableDisable(t *testing.T) {
 				"webhook-b": {Path: "/path/b", AdmissionHandler: noOpAdmissionHandler},
 			},
 			newConfig(cpconfig.WebhookConfiguration{Webhooks: []string{"webhook-a", "webhook-b"}}),
-			map[string]webhookHandler{
-				"webhook-a": {path: "/path/a", admissionHandler: noOpAdmissionHandler},
-				"webhook-b": {path: "/path/b", admissionHandler: noOpAdmissionHandler},
+			map[string]WebhookHandler{
+				"webhook-a": {Path: "/path/a", AdmissionHandler: noOpAdmissionHandler},
+				"webhook-b": {Path: "/path/b", AdmissionHandler: noOpAdmissionHandler},
 			},
 		},
 		{
@@ -59,8 +59,8 @@ func TestWebhookEnableDisable(t *testing.T) {
 				"webhook-b": {Path: "/path/b", AdmissionHandler: noOpAdmissionHandler},
 			},
 			newConfig(cpconfig.WebhookConfiguration{Webhooks: []string{"webhook-a"}}),
-			map[string]webhookHandler{
-				"webhook-a": {path: "/path/a", admissionHandler: noOpAdmissionHandler},
+			map[string]WebhookHandler{
+				"webhook-a": {Path: "/path/a", AdmissionHandler: noOpAdmissionHandler},
 			},
 		},
 		{
@@ -70,8 +70,8 @@ func TestWebhookEnableDisable(t *testing.T) {
 				"webhook-b": {Path: "/path/b", AdmissionHandler: noOpAdmissionHandler},
 			},
 			newConfig(cpconfig.WebhookConfiguration{Webhooks: []string{"webhook-a", "-webhook-b"}}),
-			map[string]webhookHandler{
-				"webhook-a": {path: "/path/a", admissionHandler: noOpAdmissionHandler},
+			map[string]WebhookHandler{
+				"webhook-a": {Path: "/path/a", AdmissionHandler: noOpAdmissionHandler},
 			},
 		},
 		{
@@ -81,7 +81,7 @@ func TestWebhookEnableDisable(t *testing.T) {
 				"webhook-b": {Path: "/path/b", AdmissionHandler: noOpAdmissionHandler},
 			},
 			newConfig(cpconfig.WebhookConfiguration{Webhooks: []string{"-webhook-b"}}),
-			map[string]webhookHandler{},
+			map[string]WebhookHandler{},
 		},
 		{
 			"Webhooks Enabled Glob",
@@ -90,23 +90,23 @@ func TestWebhookEnableDisable(t *testing.T) {
 				"webhook-b": {Path: "/path/b", AdmissionHandler: noOpAdmissionHandler},
 			},
 			newConfig(cpconfig.WebhookConfiguration{Webhooks: []string{"*"}}),
-			map[string]webhookHandler{
-				"webhook-a": {path: "/path/a", admissionHandler: noOpAdmissionHandler},
-				"webhook-b": {path: "/path/b", admissionHandler: noOpAdmissionHandler},
+			map[string]WebhookHandler{
+				"webhook-a": {Path: "/path/a", AdmissionHandler: noOpAdmissionHandler},
+				"webhook-b": {Path: "/path/b", AdmissionHandler: noOpAdmissionHandler},
 			},
 		},
 	}
 	for _, tc := range cases {
 		t.Logf("Running %q", tc.desc)
-		actual := newWebhookHandlers(tc.webhookConfigs, tc.completedConfig, cloud)
+		actual := NewWebhookHandlers(tc.webhookConfigs, tc.completedConfig, cloud)
 		if !webhookHandlersEqual(actual, tc.expected) {
 			t.Fatalf(
 				"FAILED: %q\n---\nActual:\n%s\nExpected:\n%s\ntc.webhookConfigs:\n%s\ntc.completedConfig:\n%s\n",
 				tc.desc,
-				spew.Sdump(actual),
-				spew.Sdump(tc.expected),
-				spew.Sdump(tc.webhookConfigs),
-				spew.Sdump(tc.completedConfig),
+				dump.Pretty(actual),
+				dump.Pretty(tc.expected),
+				dump.Pretty(tc.webhookConfigs),
+				dump.Pretty(tc.completedConfig),
 			)
 		}
 	}
@@ -121,7 +121,7 @@ func newConfig(webhookConfig cpconfig.WebhookConfiguration) *config.CompletedCon
 	return cfg.Complete()
 }
 
-func webhookHandlersEqual(actual, expected map[string]webhookHandler) bool {
+func webhookHandlersEqual(actual, expected map[string]WebhookHandler) bool {
 	if len(actual) != len(expected) {
 		return false
 	}

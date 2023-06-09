@@ -381,14 +381,35 @@ var DefaultObjectDescriber ObjectDescriber
 func init() {
 	d := &Describers{}
 	err := d.Add(
-		describeLimitRange,
-		describeQuota,
-		describePod,
-		describeService,
-		describeReplicationController,
+		describeCertificateSigningRequest,
+		describeCronJob,
+		describeCSINode,
 		describeDaemonSet,
-		describeNode,
+		describeDeployment,
+		describeEndpoints,
+		describeEndpointSliceV1,
+		describeEndpointSliceV1beta1,
+		describeHorizontalPodAutoscalerV1,
+		describeHorizontalPodAutoscalerV2,
+		describeJob,
+		describeLimitRange,
 		describeNamespace,
+		describeNetworkPolicy,
+		describeNode,
+		describePersistentVolume,
+		describePersistentVolumeClaim,
+		describePod,
+		describePodDisruptionBudgetV1,
+		describePodDisruptionBudgetV1beta1,
+		describePriorityClass,
+		describeQuota,
+		describeReplicaSet,
+		describeReplicationController,
+		describeSecret,
+		describeService,
+		describeServiceAccount,
+		describeStatefulSet,
+		describeStorageClass,
 	)
 	if err != nil {
 		klog.Fatalf("Cannot register describers: %v", err)
@@ -5184,8 +5205,7 @@ func tabbedString(f func(io.Writer) error) (string, error) {
 	}
 
 	out.Flush()
-	str := string(buf.String())
-	return str, nil
+	return buf.String(), nil
 }
 
 type SortableResourceNames []corev1.ResourceName

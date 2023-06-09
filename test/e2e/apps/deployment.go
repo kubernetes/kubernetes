@@ -24,7 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/fields"
@@ -40,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -184,6 +184,7 @@ var _ = SIGDescribe("Deployment", func() {
 	*/
 	framework.ConformanceIt("should run the lifecycle of a Deployment", func(ctx context.Context) {
 		one := int64(1)
+		two := int64(2)
 		deploymentResource := schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
 		testNamespaceName := f.Namespace.Name
 		testDeploymentName := "test-deployment"
@@ -259,7 +260,7 @@ var _ = SIGDescribe("Deployment", func() {
 				"replicas": testDeploymentMinimumReplicas,
 				"template": map[string]interface{}{
 					"spec": map[string]interface{}{
-						"TerminationGracePeriodSeconds": &one,
+						"terminationGracePeriodSeconds": &two,
 						"containers": [1]map[string]interface{}{{
 							"name":  testDeploymentName,
 							"image": testDeploymentPatchImage,
@@ -301,7 +302,8 @@ var _ = SIGDescribe("Deployment", func() {
 					deployment.Status.ReadyReplicas == testDeploymentMinimumReplicas &&
 					deployment.Status.UpdatedReplicas == testDeploymentMinimumReplicas &&
 					deployment.Status.UnavailableReplicas == 0 &&
-					deployment.Spec.Template.Spec.Containers[0].Image == testDeploymentPatchImage
+					deployment.Spec.Template.Spec.Containers[0].Image == testDeploymentPatchImage &&
+					*deployment.Spec.Template.Spec.TerminationGracePeriodSeconds == two
 				if !found {
 					framework.Logf("observed Deployment %v in namespace %v with ReadyReplicas %v", deployment.ObjectMeta.Name, deployment.ObjectMeta.Namespace, deployment.Status.ReadyReplicas)
 				}
@@ -626,7 +628,7 @@ func failureTrap(ctx context.Context, c clientset.Interface, ns string) {
 	for i := range deployments.Items {
 		d := deployments.Items[i]
 
-		framework.Logf(spew.Sprintf("Deployment %q:\n%+v\n", d.Name, d))
+		framework.Logf("Deployment %q:\n%s\n", d.Name, dump.Pretty(d))
 		_, allOldRSs, newRS, err := testutil.GetAllReplicaSets(&d, c)
 		if err != nil {
 			framework.Logf("Could not list ReplicaSets for Deployment %q: %v", d.Name, err)
@@ -650,7 +652,7 @@ func failureTrap(ctx context.Context, c clientset.Interface, ns string) {
 		return
 	}
 	for _, rs := range rss.Items {
-		framework.Logf(spew.Sprintf("ReplicaSet %q:\n%+v\n", rs.Name, rs))
+		framework.Logf("ReplicaSet %q:\n%s\n", rs.Name, dump.Pretty(rs))
 		selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
 		if err != nil {
 			framework.Logf("failed to get selector of ReplicaSet %s: %v", rs.Name, err)
@@ -662,7 +664,7 @@ func failureTrap(ctx context.Context, c clientset.Interface, ns string) {
 			continue
 		}
 		for _, pod := range podList.Items {
-			framework.Logf(spew.Sprintf("pod: %q:\n%+v\n", pod.Name, pod))
+			framework.Logf("pod: %q:\n%s\n", pod.Name, dump.Pretty(pod))
 		}
 	}
 }

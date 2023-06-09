@@ -39,8 +39,8 @@ import (
 
 func TestSetDefaultDaemonSetSpec(t *testing.T) {
 	defaultLabels := map[string]string{"foo": "bar"}
-	maxUnavailable := intstr.FromInt(1)
-	maxSurge := intstr.FromInt(0)
+	maxUnavailable := intstr.FromInt32(1)
+	maxSurge := intstr.FromInt32(0)
 	period := int64(v1.DefaultTerminationGracePeriodSeconds)
 	defaultTemplate := v1.PodTemplateSpec{
 		Spec: v1.PodSpec{
@@ -494,7 +494,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 
 func TestSetDefaultDeployment(t *testing.T) {
 	defaultIntOrString := intstr.FromString("25%")
-	differentIntOrString := intstr.FromInt(5)
+	differentIntOrString := intstr.FromInt32(5)
 	period := int64(v1.DefaultTerminationGracePeriodSeconds)
 	defaultTemplate := v1.PodTemplateSpec{
 		Spec: v1.PodSpec{

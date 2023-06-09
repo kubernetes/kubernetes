@@ -24,7 +24,8 @@ import (
 	"net"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
+	"k8s.io/klog/v2"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	netutils "k8s.io/utils/net"
 
 	"github.com/vishvananda/netlink"
@@ -134,7 +135,7 @@ func (h *netlinkHandle) GetAllLocalAddresses() (sets.Set[string], error) {
 	if err != nil {
 		return nil, fmt.Errorf("Could not get addresses: %v", err)
 	}
-	return utilproxy.AddressSet(h.isValidForSet, addr), nil
+	return proxyutil.AddressSet(h.isValidForSet, addr), nil
 }
 
 // GetLocalAddresses return all local addresses for an interface.
@@ -149,7 +150,7 @@ func (h *netlinkHandle) GetLocalAddresses(dev string) (sets.Set[string], error) 
 	if err != nil {
 		return nil, fmt.Errorf("Can't get addresses from %s: %v", ifi.Name, err)
 	}
-	return utilproxy.AddressSet(h.isValidForSet, addr), nil
+	return proxyutil.AddressSet(h.isValidForSet, addr), nil
 }
 
 func (h *netlinkHandle) isValidForSet(ip net.IP) bool {
@@ -163,4 +164,31 @@ func (h *netlinkHandle) isValidForSet(ip net.IP) bool {
 		return false
 	}
 	return true
+}
+
+// GetAllLocalAddressesExcept return all local addresses on the node,
+// except from the passed dev.  This is not the same as to take the
+// diff between GetAllLocalAddresses and GetLocalAddresses since an
+// address can be assigned to many interfaces. This problem raised
+// https://github.com/kubernetes/kubernetes/issues/114815
+func (h *netlinkHandle) GetAllLocalAddressesExcept(dev string) (sets.Set[string], error) {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return nil, err
+	}
+	var addr []net.Addr
+	for _, iface := range ifaces {
+		if iface.Name == dev {
+			continue
+		}
+		ifadr, err := iface.Addrs()
+		if err != nil {
+			// This may happen if the interface was deleted. Ignore
+			// but log the error.
+			klog.ErrorS(err, "Reading addresses", "interface", iface.Name)
+			continue
+		}
+		addr = append(addr, ifadr...)
+	}
+	return proxyutil.AddressSet(h.isValidForSet, addr), nil
 }

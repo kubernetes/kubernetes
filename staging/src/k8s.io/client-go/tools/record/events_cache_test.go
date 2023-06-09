@@ -23,9 +23,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
 	testclocks "k8s.io/utils/clock/testing"
 )
 
@@ -115,13 +115,16 @@ func validateEvent(messagePrefix string, actualEvent *v1.Event, expectedEvent *v
 	// Temp clear time stamps for comparison because actual values don't matter for comparison
 	recvEvent.FirstTimestamp = expectedEvent.FirstTimestamp
 	recvEvent.LastTimestamp = expectedEvent.LastTimestamp
+
+	recvEvent.ReportingController = expectedEvent.ReportingController
+
 	// Check that name has the right prefix.
 	if n, en := recvEvent.Name, expectedEvent.Name; !strings.HasPrefix(n, en) {
 		t.Errorf("%v - Name '%v' does not contain prefix '%v'", messagePrefix, n, en)
 	}
 	recvEvent.Name = expectedEvent.Name
 	if e, a := expectedEvent, &recvEvent; !reflect.DeepEqual(e, a) {
-		t.Errorf("%v - diff: %s", messagePrefix, diff.ObjectGoPrintDiff(e, a))
+		t.Errorf("%v - diff: %s", messagePrefix, cmp.Diff(e, a))
 	}
 	recvEvent.FirstTimestamp = actualFirstTimestamp
 	recvEvent.LastTimestamp = actualLastTimestamp

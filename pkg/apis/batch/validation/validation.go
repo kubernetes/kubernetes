@@ -24,7 +24,6 @@ import (
 
 	"github.com/robfig/cron/v3"
 
-	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
@@ -55,19 +54,19 @@ const (
 )
 
 var (
-	supportedPodFailurePolicyActions sets.String = sets.NewString(
+	supportedPodFailurePolicyActions = sets.New(
 		string(batch.PodFailurePolicyActionCount),
 		string(batch.PodFailurePolicyActionFailJob),
 		string(batch.PodFailurePolicyActionIgnore))
 
-	supportedPodFailurePolicyOnExitCodesOperator sets.String = sets.NewString(
+	supportedPodFailurePolicyOnExitCodesOperator = sets.New(
 		string(batch.PodFailurePolicyOnExitCodesOpIn),
 		string(batch.PodFailurePolicyOnExitCodesOpNotIn))
 
-	supportedPodFailurePolicyOnPodConditionsStatus sets.String = sets.NewString(
-		string(v1.ConditionFalse),
-		string(v1.ConditionTrue),
-		string(v1.ConditionUnknown))
+	supportedPodFailurePolicyOnPodConditionsStatus = sets.New(
+		string(api.ConditionFalse),
+		string(api.ConditionTrue),
+		string(api.ConditionUnknown))
 )
 
 // validateGeneratedSelector validates that the generated selector on a controller object match the controller object
@@ -98,7 +97,7 @@ func validateGeneratedSelector(obj *batch.Job, validateBatchLabels bool) field.E
 	// backward-compatibility, and experimentation with new
 	// labeling/selection schemes.  Automatic selector generation should
 	// have placed certain labels on the pod, but this could have failed if
-	// the user added coflicting labels.  Validate that the expected
+	// the user added conflicting labels.  Validate that the expected
 	// generated ones are there.
 	allErrs = append(allErrs, apivalidation.ValidateHasLabel(obj.Spec.Template.ObjectMeta, field.NewPath("spec").Child("template").Child("metadata"), batch.LegacyControllerUidLabel, string(obj.UID))...)
 	allErrs = append(allErrs, apivalidation.ValidateHasLabel(obj.Spec.Template.ObjectMeta, field.NewPath("spec").Child("template").Child("metadata"), batch.LegacyJobNameLabel, string(obj.Name))...)
@@ -130,9 +129,6 @@ func ValidateJob(job *batch.Job, opts JobValidationOptions) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&job.ObjectMeta, true, apivalidation.ValidateReplicationControllerName, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateGeneratedSelector(job, opts.RequirePrefixedLabels)...)
 	allErrs = append(allErrs, ValidateJobSpec(&job.Spec, field.NewPath("spec"), opts.PodValidationOptions)...)
-	if !opts.AllowTrackingAnnotation && hasJobTrackingAnnotation(job) {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("metadata").Child("annotations").Key(batch.JobTrackingFinalizer), "cannot add this annotation"))
-	}
 	if job.Spec.CompletionMode != nil && *job.Spec.CompletionMode == batch.IndexedCompletion && job.Spec.Completions != nil && *job.Spec.Completions > 0 {
 		// For indexed job, the job controller appends a suffix (`-$INDEX`)
 		// to the pod hostname when indexed job create pods.
@@ -144,14 +140,6 @@ func ValidateJob(job *batch.Job, opts JobValidationOptions) field.ErrorList {
 		}
 	}
 	return allErrs
-}
-
-func hasJobTrackingAnnotation(job *batch.Job) bool {
-	if job.Annotations == nil {
-		return false
-	}
-	_, ok := job.Annotations[batch.JobTrackingFinalizer]
-	return ok
 }
 
 // ValidateJobSpec validates a JobSpec and returns an ErrorList with any errors.
@@ -253,9 +241,9 @@ func validatePodFailurePolicyRule(rule *batch.PodFailurePolicyRule, rulePath *fi
 	var allErrs field.ErrorList
 	actionPath := rulePath.Child("action")
 	if rule.Action == "" {
-		allErrs = append(allErrs, field.Required(actionPath, fmt.Sprintf("valid values: %q", supportedPodFailurePolicyActions.List())))
+		allErrs = append(allErrs, field.Required(actionPath, fmt.Sprintf("valid values: %q", sets.List(supportedPodFailurePolicyActions))))
 	} else if !supportedPodFailurePolicyActions.Has(string(rule.Action)) {
-		allErrs = append(allErrs, field.NotSupported(actionPath, rule.Action, supportedPodFailurePolicyActions.List()))
+		allErrs = append(allErrs, field.NotSupported(actionPath, rule.Action, sets.List(supportedPodFailurePolicyActions)))
 	}
 	if rule.OnExitCodes != nil {
 		allErrs = append(allErrs, validatePodFailurePolicyRuleOnExitCodes(rule.OnExitCodes, rulePath.Child("onExitCodes"), containerNames)...)
@@ -282,9 +270,9 @@ func validatePodFailurePolicyRuleOnPodConditions(onPodConditions []batch.PodFail
 		statusPath := patternPath.Child("status")
 		allErrs = append(allErrs, apivalidation.ValidateQualifiedName(string(pattern.Type), patternPath.Child("type"))...)
 		if pattern.Status == "" {
-			allErrs = append(allErrs, field.Required(statusPath, fmt.Sprintf("valid values: %q", supportedPodFailurePolicyOnPodConditionsStatus.List())))
+			allErrs = append(allErrs, field.Required(statusPath, fmt.Sprintf("valid values: %q", sets.List(supportedPodFailurePolicyOnPodConditionsStatus))))
 		} else if !supportedPodFailurePolicyOnPodConditionsStatus.Has(string(pattern.Status)) {
-			allErrs = append(allErrs, field.NotSupported(statusPath, pattern.Status, supportedPodFailurePolicyOnPodConditionsStatus.List()))
+			allErrs = append(allErrs, field.NotSupported(statusPath, pattern.Status, sets.List(supportedPodFailurePolicyOnPodConditionsStatus)))
 		}
 	}
 	return allErrs
@@ -294,9 +282,9 @@ func validatePodFailurePolicyRuleOnExitCodes(onExitCode *batch.PodFailurePolicyO
 	var allErrs field.ErrorList
 	operatorPath := onExitCodesPath.Child("operator")
 	if onExitCode.Operator == "" {
-		allErrs = append(allErrs, field.Required(operatorPath, fmt.Sprintf("valid values: %q", supportedPodFailurePolicyOnExitCodesOperator.List())))
+		allErrs = append(allErrs, field.Required(operatorPath, fmt.Sprintf("valid values: %q", sets.List(supportedPodFailurePolicyOnExitCodesOperator))))
 	} else if !supportedPodFailurePolicyOnExitCodesOperator.Has(string(onExitCode.Operator)) {
-		allErrs = append(allErrs, field.NotSupported(operatorPath, onExitCode.Operator, supportedPodFailurePolicyOnExitCodesOperator.List()))
+		allErrs = append(allErrs, field.NotSupported(operatorPath, onExitCode.Operator, sets.List(supportedPodFailurePolicyOnExitCodesOperator)))
 	}
 	if onExitCode.ContainerName != nil && !containerNames.Has(*onExitCode.ContainerName) {
 		allErrs = append(allErrs, field.Invalid(onExitCodesPath.Child("containerName"), *onExitCode.ContainerName, "must be one of the container or initContainer names in the pod template"))
@@ -598,8 +586,6 @@ func validateCompletions(spec, oldSpec batch.JobSpec, fldPath *field.Path, opts 
 
 type JobValidationOptions struct {
 	apivalidation.PodValidationOptions
-	// Allow Job to have the annotation batch.kubernetes.io/job-tracking
-	AllowTrackingAnnotation bool
 	// Allow mutable node affinity, selector and tolerations of the template
 	AllowMutableSchedulingDirectives bool
 	// Allow elastic indexed jobs

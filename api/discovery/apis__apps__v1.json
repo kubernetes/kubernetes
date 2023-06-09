@@ -1,0 +1,199 @@
+{
+  "apiVersion": "v1",
+  "groupVersion": "apps/v1",
+  "kind": "APIResourceList",
+  "resources": [
+    {
+      "kind": "ControllerRevision",
+      "name": "controllerrevisions",
+      "namespaced": true,
+      "singularName": "controllerrevision",
+      "storageVersionHash": "85nkx63pcBU=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "categories": [
+        "all"
+      ],
+      "kind": "DaemonSet",
+      "name": "daemonsets",
+      "namespaced": true,
+      "shortNames": [
+        "ds"
+      ],
+      "singularName": "daemonset",
+      "storageVersionHash": "dd7pWHUlMKQ=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "DaemonSet",
+      "name": "daemonsets/status",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    },
+    {
+      "categories": [
+        "all"
+      ],
+      "kind": "Deployment",
+      "name": "deployments",
+      "namespaced": true,
+      "shortNames": [
+        "deploy"
+      ],
+      "singularName": "deployment",
+      "storageVersionHash": "8aSe+NMegvE=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "group": "autoscaling",
+      "kind": "Scale",
+      "name": "deployments/scale",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ],
+      "version": "v1"
+    },
+    {
+      "kind": "Deployment",
+      "name": "deployments/status",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    },
+    {
+      "categories": [
+        "all"
+      ],
+      "kind": "ReplicaSet",
+      "name": "replicasets",
+      "namespaced": true,
+      "shortNames": [
+        "rs"
+      ],
+      "singularName": "replicaset",
+      "storageVersionHash": "P1RzHs8/mWQ=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "group": "autoscaling",
+      "kind": "Scale",
+      "name": "replicasets/scale",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ],
+      "version": "v1"
+    },
+    {
+      "kind": "ReplicaSet",
+      "name": "replicasets/status",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    },
+    {
+      "categories": [
+        "all"
+      ],
+      "kind": "StatefulSet",
+      "name": "statefulsets",
+      "namespaced": true,
+      "shortNames": [
+        "sts"
+      ],
+      "singularName": "statefulset",
+      "storageVersionHash": "H+vl74LkKdo=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "group": "autoscaling",
+      "kind": "Scale",
+      "name": "statefulsets/scale",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ],
+      "version": "v1"
+    },
+    {
+      "kind": "StatefulSet",
+      "name": "statefulsets/status",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    }
+  ]
+}

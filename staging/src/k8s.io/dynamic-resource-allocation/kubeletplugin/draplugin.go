@@ -135,10 +135,11 @@ func KubeletPluginSocketPath(path string) Option {
 	}
 }
 
-// GRPCInterceptor is called for each incoming gRPC method call.
+// GRPCInterceptor is called for each incoming gRPC method call. This option
+// may be used more than once and each interceptor will get called.
 func GRPCInterceptor(interceptor grpc.UnaryServerInterceptor) Option {
 	return func(o *options) error {
-		o.interceptor = interceptor
+		o.interceptors = append(o.interceptors, interceptor)
 		return nil
 	}
 }
@@ -150,7 +151,7 @@ type options struct {
 	draEndpoint                endpoint
 	draAddress                 string
 	pluginRegistrationEndpoint endpoint
-	interceptor                grpc.UnaryServerInterceptor
+	interceptors               []grpc.UnaryServerInterceptor
 }
 
 // draPlugin combines the kubelet registration service and the DRA node plugin
@@ -190,7 +191,7 @@ func Start(nodeServer drapbv1.NodeServer, opts ...Option) (result DRAPlugin, fin
 	}
 
 	// Run the node plugin gRPC server first to ensure that it is ready.
-	plugin, err := startGRPCServer(klog.LoggerWithName(o.logger, "dra"), o.grpcVerbosity, o.interceptor, o.draEndpoint, func(grpcServer *grpc.Server) {
+	plugin, err := startGRPCServer(klog.LoggerWithName(o.logger, "dra"), o.grpcVerbosity, o.interceptors, o.draEndpoint, func(grpcServer *grpc.Server) {
 		drapbv1.RegisterNodeServer(grpcServer, nodeServer)
 	})
 	if err != nil {
@@ -209,7 +210,7 @@ func Start(nodeServer drapbv1.NodeServer, opts ...Option) (result DRAPlugin, fin
 	}()
 
 	// Now make it available to kubelet.
-	registrar, err := startRegistrar(klog.LoggerWithName(o.logger, "registrar"), o.grpcVerbosity, o.interceptor, o.driverName, o.draAddress, o.pluginRegistrationEndpoint)
+	registrar, err := startRegistrar(klog.LoggerWithName(o.logger, "registrar"), o.grpcVerbosity, o.interceptors, o.driverName, o.draAddress, o.pluginRegistrationEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("start registrar: %v", err)
 	}

@@ -49,15 +49,15 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 		// Make sure all options are set so system specific defaults are not used.
 		seLinuxOpts1 := v1.SELinuxOptions{
 			User:  "system_u",
-			Role:  "object_r",
-			Type:  "container_file_t",
+			Role:  "system_r",
+			Type:  "container_t",
 			Level: "s0:c0,c1",
 		}
 		seLinuxMountOption1 := "context=\"system_u:object_r:container_file_t:s0:c0,c1\""
 		seLinuxOpts2 := v1.SELinuxOptions{
 			User:  "system_u",
-			Role:  "object_r",
-			Type:  "container_file_t",
+			Role:  "system_r",
+			Type:  "container_t",
 			Level: "s0:c98,c99",
 		}
 		seLinuxMountOption2 := "context=\"system_u:object_r:container_file_t:s0:c98,c99\""
@@ -267,14 +267,14 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics", func() {
 		// Make sure all options are set so system specific defaults are not used.
 		seLinuxOpts1 := v1.SELinuxOptions{
 			User:  "system_u",
-			Role:  "object_r",
-			Type:  "container_file_t",
+			Role:  "system_r",
+			Type:  "container_t",
 			Level: "s0:c0,c1",
 		}
 		seLinuxOpts2 := v1.SELinuxOptions{
 			User:  "system_u",
-			Role:  "object_r",
-			Type:  "container_file_t",
+			Role:  "system_r",
+			Type:  "container_t",
 			Level: "s0:c98,c99",
 		}
 

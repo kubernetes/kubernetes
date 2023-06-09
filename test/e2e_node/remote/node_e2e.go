@@ -48,7 +48,7 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
 	}
 
 	// Make sure we can find the newly built binaries
-	buildOutputDir, err := utils.GetK8sBuildOutputDir()
+	buildOutputDir, err := utils.GetK8sBuildOutputDir(builder.IsDockerizedBuild(), builder.GetTargetBuildArch())
 	if err != nil {
 		return fmt.Errorf("failed to locate kubernetes build output directory: %w", err)
 	}
@@ -62,6 +62,7 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
 	requiredBins := []string{"kubelet", "e2e_node.test", "ginkgo", "mounter", "gcp-credential-provider"}
 	for _, bin := range requiredBins {
 		source := filepath.Join(buildOutputDir, bin)
+		klog.V(2).Infof("Copying binaries from %s", source)
 		if _, err := os.Stat(source); err != nil {
 			return fmt.Errorf("failed to locate test binary %s: %w", bin, err)
 		}
@@ -96,7 +97,7 @@ func prependMemcgNotificationFlag(args string) string {
 // a credential provider plugin.
 func prependGCPCredentialProviderFlag(args, workspace string) string {
 	credentialProviderConfig := filepath.Join(workspace, "credential-provider.yaml")
-	featureGateFlag := "--kubelet-flags=--feature-gates=DisableKubeletCloudCredentialProviders=true,KubeletCredentialProviders=true"
+	featureGateFlag := "--kubelet-flags=--feature-gates=DisableKubeletCloudCredentialProviders=true"
 	configFlag := fmt.Sprintf("--kubelet-flags=--image-credential-provider-config=%s", credentialProviderConfig)
 	binFlag := fmt.Sprintf("--kubelet-flags=--image-credential-provider-bin-dir=%s", workspace)
 	return fmt.Sprintf("%s %s %s %s", featureGateFlag, configFlag, binFlag, args)

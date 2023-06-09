@@ -23,7 +23,6 @@ import (
 	"net/http/httptest"
 	"net/http/httputil"
 	"net/url"
-	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -340,8 +339,8 @@ func TestCreateBackoffManager(t *testing.T) {
 	theUrl, _ := url.Parse("http://localhost")
 
 	// 1 second base backoff + duration of 2 seconds -> exponential backoff for requests.
-	os.Setenv(envBackoffBase, "1")
-	os.Setenv(envBackoffDuration, "2")
+	t.Setenv(envBackoffBase, "1")
+	t.Setenv(envBackoffDuration, "2")
 	backoff := readExpBackoffConfig()
 	backoff.UpdateBackoff(theUrl, nil, 500)
 	backoff.UpdateBackoff(theUrl, nil, 500)
@@ -350,8 +349,8 @@ func TestCreateBackoffManager(t *testing.T) {
 	}
 
 	// 0 duration -> no backoff.
-	os.Setenv(envBackoffBase, "1")
-	os.Setenv(envBackoffDuration, "0")
+	t.Setenv(envBackoffBase, "1")
+	t.Setenv(envBackoffDuration, "0")
 	backoff.UpdateBackoff(theUrl, nil, 500)
 	backoff.UpdateBackoff(theUrl, nil, 500)
 	backoff = readExpBackoffConfig()
@@ -360,8 +359,8 @@ func TestCreateBackoffManager(t *testing.T) {
 	}
 
 	// No env -> No backoff.
-	os.Setenv(envBackoffBase, "")
-	os.Setenv(envBackoffDuration, "")
+	t.Setenv(envBackoffBase, "")
+	t.Setenv(envBackoffDuration, "")
 	backoff = readExpBackoffConfig()
 	backoff.UpdateBackoff(theUrl, nil, 500)
 	backoff.UpdateBackoff(theUrl, nil, 500)

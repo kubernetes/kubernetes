@@ -36,6 +36,8 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
+	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
@@ -173,14 +175,15 @@ func TestSchedulerCreation(t *testing.T) {
 
 			eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
 
-			stopCh := make(chan struct{})
-			defer close(stopCh)
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
 			s, err := New(
+				ctx,
 				client,
 				informerFactory,
 				nil,
 				profile.NewRecorderFactory(eventBroadcaster),
-				stopCh,
 				tc.opts...,
 			)
 
@@ -260,7 +263,8 @@ func TestFailureHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
 			client := fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testPod}})
@@ -270,21 +274,21 @@ func TestFailureHandler(t *testing.T) {
 			podInformer.Informer().GetStore().Add(testPod)
 
 			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())))
-			schedulerCache := internalcache.New(30*time.Second, ctx.Done())
+			schedulerCache := internalcache.New(ctx, 30*time.Second)
 
-			queue.Add(testPod)
+			queue.Add(logger, testPod)
 			queue.Pop()
 
 			if tt.podUpdatedDuringScheduling {
 				podInformer.Informer().GetStore().Update(testPodUpdated)
-				queue.Update(testPod, testPodUpdated)
+				queue.Update(logger, testPod, testPodUpdated)
 			}
 			if tt.podDeletedDuringScheduling {
 				podInformer.Informer().GetStore().Delete(testPod)
 				queue.Delete(testPod)
 			}
 
-			s, fwk, err := initScheduler(ctx.Done(), schedulerCache, queue, client, informerFactory)
+			s, fwk, err := initScheduler(ctx, schedulerCache, queue, client, informerFactory)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -319,26 +323,27 @@ func TestFailureHandler_NodeNotFound(t *testing.T) {
 		nodes            []v1.Node
 		nodeNameToDelete string
 		injectErr        error
-		expectNodeNames  sets.String
+		expectNodeNames  sets.Set[string]
 	}{
 		{
 			name:             "node is deleted during a scheduling cycle",
 			nodes:            []v1.Node{*nodeFoo, *nodeBar},
 			nodeNameToDelete: "foo",
 			injectErr:        apierrors.NewNotFound(v1.Resource("node"), nodeFoo.Name),
-			expectNodeNames:  sets.NewString("bar"),
+			expectNodeNames:  sets.New("bar"),
 		},
 		{
 			name:            "node is not deleted but NodeNotFound is received incorrectly",
 			nodes:           []v1.Node{*nodeFoo, *nodeBar},
 			injectErr:       apierrors.NewNotFound(v1.Resource("node"), nodeFoo.Name),
-			expectNodeNames: sets.NewString("foo", "bar"),
+			expectNodeNames: sets.New("foo", "bar"),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
 			client := fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testPod}}, &v1.NodeList{Items: tt.nodes})
@@ -348,18 +353,18 @@ func TestFailureHandler_NodeNotFound(t *testing.T) {
 			podInformer.Informer().GetStore().Add(testPod)
 
 			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())))
-			schedulerCache := internalcache.New(30*time.Second, ctx.Done())
+			schedulerCache := internalcache.New(ctx, 30*time.Second)
 
 			for i := range tt.nodes {
 				node := tt.nodes[i]
 				// Add node to schedulerCache no matter it's deleted in API server or not.
-				schedulerCache.AddNode(&node)
+				schedulerCache.AddNode(logger, &node)
 				if node.Name == tt.nodeNameToDelete {
 					client.CoreV1().Nodes().Delete(ctx, node.Name, metav1.DeleteOptions{})
 				}
 			}
 
-			s, fwk, err := initScheduler(ctx.Done(), schedulerCache, queue, client, informerFactory)
+			s, fwk, err := initScheduler(ctx, schedulerCache, queue, client, informerFactory)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -368,7 +373,7 @@ func TestFailureHandler_NodeNotFound(t *testing.T) {
 			s.FailureHandler(ctx, fwk, testPodInfo, framework.NewStatus(framework.Unschedulable).WithError(tt.injectErr), nil, time.Now())
 
 			gotNodes := schedulerCache.Dump().Nodes
-			gotNodeNames := sets.NewString()
+			gotNodeNames := sets.New[string]()
 			for _, nodeInfo := range gotNodes {
 				gotNodeNames.Insert(nodeInfo.Node().Name)
 			}
@@ -380,7 +385,8 @@ func TestFailureHandler_NodeNotFound(t *testing.T) {
 }
 
 func TestFailureHandler_PodAlreadyBound(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	nodeFoo := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
@@ -393,12 +399,12 @@ func TestFailureHandler_PodAlreadyBound(t *testing.T) {
 	podInformer.Informer().GetStore().Add(testPod)
 
 	queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())))
-	schedulerCache := internalcache.New(30*time.Second, ctx.Done())
+	schedulerCache := internalcache.New(ctx, 30*time.Second)
 
 	// Add node to schedulerCache no matter it's deleted in API server or not.
-	schedulerCache.AddNode(&nodeFoo)
+	schedulerCache.AddNode(logger, &nodeFoo)
 
-	s, fwk, err := initScheduler(ctx.Done(), schedulerCache, queue, client, informerFactory)
+	s, fwk, err := initScheduler(ctx, schedulerCache, queue, client, informerFactory)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -436,14 +442,15 @@ func TestWithPercentageOfNodesToScore(t *testing.T) {
 			client := fake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
-			stopCh := make(chan struct{})
-			defer close(stopCh)
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
 			sched, err := New(
+				ctx,
 				client,
 				informerFactory,
 				nil,
 				profile.NewRecorderFactory(eventBroadcaster),
-				stopCh,
 				WithPercentageOfNodesToScore(tt.percentageOfNodesToScoreConfig),
 			)
 			if err != nil {
@@ -483,16 +490,17 @@ func getPodFromPriorityQueue(queue *internalqueue.PriorityQueue, pod *v1.Pod) *v
 	return nil
 }
 
-func initScheduler(stop <-chan struct{}, cache internalcache.Cache, queue internalqueue.SchedulingQueue,
+func initScheduler(ctx context.Context, cache internalcache.Cache, queue internalqueue.SchedulingQueue,
 	client kubernetes.Interface, informerFactory informers.SharedInformerFactory) (*Scheduler, framework.Framework, error) {
+	logger := klog.FromContext(ctx)
 	registerPluginFuncs := []st.RegisterPluginFunc{
 		st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 		st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 	}
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
-	fwk, err := st.NewFramework(registerPluginFuncs,
+	fwk, err := st.NewFramework(ctx,
+		registerPluginFuncs,
 		testSchedulerName,
-		stop,
 		frameworkruntime.WithClientSet(client),
 		frameworkruntime.WithInformerFactory(informerFactory),
 		frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, testSchedulerName)),
@@ -504,9 +512,10 @@ func initScheduler(stop <-chan struct{}, cache internalcache.Cache, queue intern
 	s := &Scheduler{
 		Cache:           cache,
 		client:          client,
-		StopEverything:  stop,
+		StopEverything:  ctx.Done(),
 		SchedulingQueue: queue,
 		Profiles:        profile.Map{testSchedulerName: fwk},
+		logger:          logger,
 	}
 	s.applyDefaultHandlers()
 
@@ -591,9 +600,10 @@ func TestInitPluginsWithIndexers(t *testing.T) {
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			)
-			stopCh := make(chan struct{})
-			defer close(stopCh)
-			_, err := st.NewFramework(registerPluginFuncs, "test", stopCh, frameworkruntime.WithInformerFactory(fakeInformerFactory))
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			_, err := st.NewFramework(ctx, registerPluginFuncs, "test", frameworkruntime.WithInformerFactory(fakeInformerFactory))
 
 			if len(tt.wantErr) > 0 {
 				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {

@@ -36,6 +36,7 @@ import (
 
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
+	"k8s.io/client-go/transport"
 
 	"golang.org/x/net/websocket"
 
@@ -325,7 +326,6 @@ func TestProxyHandler(t *testing.T) {
 			handler := &proxyHandler{
 				localDelegate:              http.NewServeMux(),
 				serviceResolver:            serviceResolver,
-				proxyTransport:             &http.Transport{},
 				proxyCurrentCertKeyContent: func() ([]byte, []byte) { return emptyCert(), emptyCert() },
 			}
 			server := httptest.NewServer(contextHandler(handler, tc.user))
@@ -551,7 +551,6 @@ func TestProxyUpgrade(t *testing.T) {
 			serverURL, _ := url.Parse(backendServer.URL)
 			proxyHandler := &proxyHandler{
 				serviceResolver:            &mockedRouter{destinationHost: serverURL.Host},
-				proxyTransport:             &http.Transport{},
 				proxyCurrentCertKeyContent: func() ([]byte, []byte) { return emptyCert(), emptyCert() },
 			}
 
@@ -559,7 +558,14 @@ func TestProxyUpgrade(t *testing.T) {
 			var selector *egressselector.EgressSelector
 			if tc.NewEgressSelector != nil {
 				dialer, selector = tc.NewEgressSelector()
-				proxyHandler.egressSelector = selector
+
+				egressDialer, err := selector.Lookup(egressselector.Cluster.AsNetworkContext())
+				if err != nil {
+					t.Fatal(err)
+				}
+				if egressDialer != nil {
+					proxyHandler.proxyTransportDial = &transport.DialHolder{Dial: egressDialer}
+				}
 			}
 
 			proxyHandler.updateAPIService(tc.APIService)

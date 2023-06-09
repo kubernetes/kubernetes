@@ -85,12 +85,12 @@ func LoadJoinConfigurationFromFile(cfgPath string) (*kubeadmapi.JoinConfiguratio
 		return nil, err
 	}
 
-	return documentMapToJoinConfiguration(gvkmap, false)
+	return documentMapToJoinConfiguration(gvkmap, false, false)
 }
 
 // documentMapToJoinConfiguration takes a map between GVKs and YAML documents (as returned by SplitYAMLDocuments),
 // finds a JoinConfiguration, decodes it, dynamically defaults it and then validates it prior to return.
-func documentMapToJoinConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecated bool) (*kubeadmapi.JoinConfiguration, error) {
+func documentMapToJoinConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecated, strictErrors bool) (*kubeadmapi.JoinConfiguration, error) {
 	joinBytes := []byte{}
 	for gvk, bytes := range gvkmap {
 		// not interested in anything other than JoinConfiguration
@@ -105,7 +105,11 @@ func documentMapToJoinConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecat
 
 		// verify the validity of the YAML
 		if err := strict.VerifyUnmarshalStrict([]*runtime.Scheme{kubeadmscheme.Scheme}, gvk, bytes); err != nil {
-			klog.Warning(err.Error())
+			if !strictErrors {
+				klog.Warning(err.Error())
+			} else {
+				return nil, err
+			}
 		}
 
 		joinBytes = bytes

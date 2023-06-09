@@ -31,11 +31,7 @@ import (
 
 func TestNoUpdateBeforeFirstApply(t *testing.T) {
 	f := internaltesting.NewTestFieldManagerImpl(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"), "", func(m internal.Manager) internal.Manager {
-		return internal.NewSkipNonAppliedManager(
-			m,
-			internaltesting.NewFakeObjectCreater(),
-			schema.FromAPIVersionAndKind("v1", "Pod"),
-		)
+		return internal.NewSkipNonAppliedManager(m, &internaltesting.FakeObjectCreater{})
 	})
 
 	appliedObj := &unstructured.Unstructured{Object: map[string]interface{}{}}
@@ -71,11 +67,7 @@ func TestNoUpdateBeforeFirstApply(t *testing.T) {
 
 func TestUpdateBeforeFirstApply(t *testing.T) {
 	f := internaltesting.NewTestFieldManagerImpl(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"), "", func(m internal.Manager) internal.Manager {
-		return internal.NewSkipNonAppliedManager(
-			m,
-			internaltesting.NewFakeObjectCreater(),
-			schema.FromAPIVersionAndKind("v1", "Pod"),
-		)
+		return internal.NewSkipNonAppliedManager(m, &internaltesting.FakeObjectCreater{})
 	})
 
 	updatedObj := &unstructured.Unstructured{}

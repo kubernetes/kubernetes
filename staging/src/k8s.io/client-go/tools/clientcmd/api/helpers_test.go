@@ -23,6 +23,8 @@ import (
 	"reflect"
 	"testing"
 
+	utiltesting "k8s.io/client-go/util/testing"
+
 	"sigs.k8s.io/yaml"
 )
 
@@ -53,11 +55,9 @@ func newMergedConfig(certFile, certContent, keyFile, keyContent, caFile, caConte
 
 func TestMinifySuccess(t *testing.T) {
 	certFile, _ := os.CreateTemp("", "")
-	defer os.Remove(certFile.Name())
 	keyFile, _ := os.CreateTemp("", "")
-	defer os.Remove(keyFile.Name())
 	caFile, _ := os.CreateTemp("", "")
-	defer os.Remove(caFile.Name())
+	defer utiltesting.CloseAndRemove(t, certFile, keyFile, caFile)
 
 	mutatingConfig := newMergedConfig(certFile.Name(), "cert", keyFile.Name(), "key", caFile.Name(), "ca", t)
 
@@ -89,11 +89,9 @@ func TestMinifySuccess(t *testing.T) {
 
 func TestMinifyMissingContext(t *testing.T) {
 	certFile, _ := os.CreateTemp("", "")
-	defer os.Remove(certFile.Name())
 	keyFile, _ := os.CreateTemp("", "")
-	defer os.Remove(keyFile.Name())
 	caFile, _ := os.CreateTemp("", "")
-	defer os.Remove(caFile.Name())
+	defer utiltesting.CloseAndRemove(t, certFile, keyFile, caFile)
 
 	mutatingConfig := newMergedConfig(certFile.Name(), "cert", keyFile.Name(), "key", caFile.Name(), "ca", t)
 	mutatingConfig.CurrentContext = "missing"
@@ -107,11 +105,9 @@ func TestMinifyMissingContext(t *testing.T) {
 
 func TestMinifyMissingCluster(t *testing.T) {
 	certFile, _ := os.CreateTemp("", "")
-	defer os.Remove(certFile.Name())
 	keyFile, _ := os.CreateTemp("", "")
-	defer os.Remove(keyFile.Name())
 	caFile, _ := os.CreateTemp("", "")
-	defer os.Remove(caFile.Name())
+	defer utiltesting.CloseAndRemove(t, certFile, keyFile, caFile)
 
 	mutatingConfig := newMergedConfig(certFile.Name(), "cert", keyFile.Name(), "key", caFile.Name(), "ca", t)
 	delete(mutatingConfig.Clusters, mutatingConfig.Contexts[mutatingConfig.CurrentContext].Cluster)
@@ -125,11 +121,9 @@ func TestMinifyMissingCluster(t *testing.T) {
 
 func TestMinifyMissingAuthInfo(t *testing.T) {
 	certFile, _ := os.CreateTemp("", "")
-	defer os.Remove(certFile.Name())
 	keyFile, _ := os.CreateTemp("", "")
-	defer os.Remove(keyFile.Name())
 	caFile, _ := os.CreateTemp("", "")
-	defer os.Remove(caFile.Name())
+	defer utiltesting.CloseAndRemove(t, certFile, keyFile, caFile)
 
 	mutatingConfig := newMergedConfig(certFile.Name(), "cert", keyFile.Name(), "key", caFile.Name(), "ca", t)
 	delete(mutatingConfig.AuthInfos, mutatingConfig.Contexts[mutatingConfig.CurrentContext].AuthInfo)
@@ -143,11 +137,9 @@ func TestMinifyMissingAuthInfo(t *testing.T) {
 
 func TestFlattenSuccess(t *testing.T) {
 	certFile, _ := os.CreateTemp("", "")
-	defer os.Remove(certFile.Name())
 	keyFile, _ := os.CreateTemp("", "")
-	defer os.Remove(keyFile.Name())
 	caFile, _ := os.CreateTemp("", "")
-	defer os.Remove(caFile.Name())
+	defer utiltesting.CloseAndRemove(t, certFile, keyFile, caFile)
 
 	certData := "cert"
 	keyData := "key"
@@ -208,11 +200,9 @@ func TestFlattenSuccess(t *testing.T) {
 
 func Example_minifyAndShorten() {
 	certFile, _ := os.CreateTemp("", "")
-	defer os.Remove(certFile.Name())
 	keyFile, _ := os.CreateTemp("", "")
-	defer os.Remove(keyFile.Name())
 	caFile, _ := os.CreateTemp("", "")
-	defer os.Remove(caFile.Name())
+	defer utiltesting.CloseAndRemove(&testing.T{}, certFile, keyFile, caFile)
 
 	certData := "cert"
 	keyData := "key"
@@ -228,19 +218,16 @@ func Example_minifyAndShorten() {
 	// Output:
 	// clusters:
 	//   cow-cluster:
-	//     LocationOfOrigin: ""
 	//     certificate-authority-data: DATA+OMITTED
 	//     server: http://cow.org:8080
 	// contexts:
 	//   federal-context:
-	//     LocationOfOrigin: ""
 	//     cluster: cow-cluster
 	//     user: red-user
 	// current-context: federal-context
 	// preferences: {}
 	// users:
 	//   red-user:
-	//     LocationOfOrigin: ""
 	//     client-certificate-data: DATA+OMITTED
 	//     client-key-data: DATA+OMITTED
 	//     token: REDACTED
@@ -248,11 +235,9 @@ func Example_minifyAndShorten() {
 
 func TestShortenSuccess(t *testing.T) {
 	certFile, _ := os.CreateTemp("", "")
-	defer os.Remove(certFile.Name())
 	keyFile, _ := os.CreateTemp("", "")
-	defer os.Remove(keyFile.Name())
 	caFile, _ := os.CreateTemp("", "")
-	defer os.Remove(caFile.Name())
+	defer utiltesting.CloseAndRemove(t, certFile, keyFile, caFile)
 
 	certData := "cert"
 	keyData := "key"

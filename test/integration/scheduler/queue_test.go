@@ -37,6 +37,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/features"
@@ -124,8 +125,7 @@ func TestSchedulingGates(t *testing.T) {
 				scheduler.WithPodInitialBackoffSeconds(0),
 				scheduler.WithPodMaxBackoffSeconds(0),
 			)
-			testutils.SyncInformerFactory(testCtx)
-			defer testutils.CleanupTest(t, testCtx)
+			testutils.SyncSchedulerInformerFactory(testCtx)
 
 			cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
 			for _, p := range tt.pods {
@@ -186,9 +186,8 @@ func TestCoreResourceEnqueue(t *testing.T) {
 		scheduler.WithPodInitialBackoffSeconds(0),
 		scheduler.WithPodMaxBackoffSeconds(0),
 	)
-	testutils.SyncInformerFactory(testCtx)
+	testutils.SyncSchedulerInformerFactory(testCtx)
 
-	defer testutils.CleanupTest(t, testCtx)
 	defer testCtx.Scheduler.SchedulingQueue.Close()
 
 	cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
@@ -293,8 +292,12 @@ func TestCustomResourceEnqueue(t *testing.T) {
 		testfwk.SharedEtcd(),
 	)
 	testCtx := &testutils.TestContext{}
-	testCtx.Ctx, testCtx.CancelFn = context.WithCancel(context.Background())
-	testCtx.CloseFn = func() { server.TearDownFn() }
+	ctx, cancel := context.WithCancel(context.Background())
+	testCtx.Ctx = ctx
+	testCtx.CloseFn = func() {
+		cancel()
+		server.TearDownFn()
+	}
 
 	apiExtensionClient := apiextensionsclient.NewForConfigOrDie(server.ClientConfig)
 	dynamicClient := dynamic.NewForConfigOrDie(server.ClientConfig)
@@ -371,11 +374,12 @@ func TestCustomResourceEnqueue(t *testing.T) {
 		scheduler.WithPodInitialBackoffSeconds(0),
 		scheduler.WithPodMaxBackoffSeconds(0),
 	)
-	testutils.SyncInformerFactory(testCtx)
+	testutils.SyncSchedulerInformerFactory(testCtx)
 
 	defer testutils.CleanupTest(t, testCtx)
 
 	cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
+	logger := klog.FromContext(ctx)
 	// Create one Node.
 	node := st.MakeNode().Name("fake-node").Obj()
 	if _, err := cs.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
@@ -413,7 +417,7 @@ func TestCustomResourceEnqueue(t *testing.T) {
 
 	// Scheduling cycle is incremented from 0 to 1 after NextPod() is called, so
 	// pass a number larger than 1 to move Pod to unschedulablePods.
-	testCtx.Scheduler.SchedulingQueue.AddUnschedulableIfNotPresent(podInfo, 10)
+	testCtx.Scheduler.SchedulingQueue.AddUnschedulableIfNotPresent(logger, podInfo, 10)
 
 	// Trigger a Custom Resource event.
 	// We expect this event to trigger moving the test Pod from unschedulablePods to activeQ.

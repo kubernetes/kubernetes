@@ -58,6 +58,9 @@ var (
 	// gRPC server. An xDS-enabled server needs to know what type of credentials
 	// is configured on the underlying gRPC server. This is set by server.go.
 	GetServerCredentials interface{} // func (*grpc.Server) credentials.TransportCredentials
+	// CanonicalString returns the canonical string of the code defined here:
+	// https://github.com/grpc/grpc/blob/master/doc/statuscodes.md.
+	CanonicalString interface{} // func (codes.Code) string
 	// DrainServerTransports initiates a graceful close of existing connections
 	// on a gRPC server accepted on the provided listener address. An
 	// xDS-enabled server invokes this method on a grpc.Server when a particular
@@ -74,9 +77,16 @@ var (
 	// globally for newly created client channels. The priority will be: 1.
 	// user-provided; 2. this method; 3. default values.
 	AddGlobalDialOptions interface{} // func(opt ...DialOption)
+	// DisableGlobalDialOptions returns a DialOption that prevents the
+	// ClientConn from applying the global DialOptions (set via
+	// AddGlobalDialOptions).
+	DisableGlobalDialOptions interface{} // func() grpc.DialOption
 	// ClearGlobalDialOptions clears the array of extra DialOption. This
 	// method is useful in testing and benchmarking.
 	ClearGlobalDialOptions func()
+	// JoinDialOptions combines the dial options passed as arguments into a
+	// single dial option.
+	JoinDialOptions interface{} // func(...grpc.DialOption) grpc.DialOption
 	// JoinServerOptions combines the server options passed as arguments into a
 	// single server option.
 	JoinServerOptions interface{} // func(...grpc.ServerOption) grpc.ServerOption
@@ -127,6 +137,9 @@ var (
 	//
 	// TODO: Remove this function once the RBAC env var is removed.
 	UnregisterRBACHTTPFilterForTesting func()
+
+	// ORCAAllowAnyMinReportingInterval is for examples/orca use ONLY.
+	ORCAAllowAnyMinReportingInterval interface{} // func(so *orca.ServiceOptions)
 )
 
 // HealthChecker defines the signature of the client-side LB channel health checking function.

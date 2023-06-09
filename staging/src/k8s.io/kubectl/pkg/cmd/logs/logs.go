@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/rest"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
@@ -125,14 +126,14 @@ type LogsOptions struct {
 	RESTClientGetter genericclioptions.RESTClientGetter
 	LogsForObject    polymorphichelpers.LogsForObjectFunc
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 
 	TailSpecified bool
 
 	containerNameFromRefSpecRegexp *regexp.Regexp
 }
 
-func NewLogsOptions(streams genericclioptions.IOStreams, allContainers bool) *LogsOptions {
+func NewLogsOptions(streams genericiooptions.IOStreams, allContainers bool) *LogsOptions {
 	return &LogsOptions{
 		IOStreams:            streams,
 		AllContainers:        allContainers,
@@ -144,7 +145,7 @@ func NewLogsOptions(streams genericclioptions.IOStreams, allContainers bool) *Lo
 }
 
 // NewCmdLogs creates a new pod logs command
-func NewCmdLogs(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdLogs(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewLogsOptions(streams, false)
 
 	cmd := &cobra.Command{

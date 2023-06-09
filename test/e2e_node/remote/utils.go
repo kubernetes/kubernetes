@@ -21,16 +21,16 @@ import (
 	"path/filepath"
 
 	"k8s.io/klog/v2"
+
+	"k8s.io/kubernetes/test/e2e_node/builder"
 )
 
 // utils.go contains functions used across test suites.
 
 const (
 	cniVersion       = "v1.2.0"
-	cniArch          = "amd64"
 	cniDirectory     = "cni/bin" // The CNI tarball places binaries under directory under "cni/bin".
 	cniConfDirectory = "cni/net.d"
-	cniURL           = "https://storage.googleapis.com/k8s-artifacts-cni/release/" + cniVersion + "/" + "cni-plugins-linux-" + cniArch + "-" + cniVersion + ".tgz"
 )
 
 const cniConfig = `{
@@ -60,14 +60,25 @@ providers:
     - "*.pkg.dev"
     defaultCacheDuration: 1m`
 
+func getCNIURL() string {
+	cniArch := "amd64"
+	if builder.IsTargetArchArm64() {
+		cniArch = "arm64"
+	}
+	cniURL := fmt.Sprintf("https://storage.googleapis.com/k8s-artifacts-cni/release/%s/cni-plugins-linux-%s-%s.tgz", cniVersion, cniArch, cniVersion)
+	return cniURL
+
+}
+
 // Install the cni plugin and add basic bridge configuration to the
 // configuration directory.
 func setupCNI(host, workspace string) error {
 	klog.V(2).Infof("Install CNI on %q", host)
 	cniPath := filepath.Join(workspace, cniDirectory)
+	klog.V(2).Infof("Install CNI on path %q", cniPath)
 	cmd := getSSHCommand(" ; ",
 		fmt.Sprintf("mkdir -p %s", cniPath),
-		fmt.Sprintf("curl -s -L %s | tar -xz -C %s", cniURL, cniPath),
+		fmt.Sprintf("curl -s -L %s | tar -xz -C %s", getCNIURL(), cniPath),
 	)
 	if output, err := SSH(host, "sh", "-c", cmd); err != nil {
 		return fmt.Errorf("failed to install cni plugin on %q: %v output: %q", host, err, output)

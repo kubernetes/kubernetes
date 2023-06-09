@@ -22,6 +22,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/rest/fake"
 	cgtesting "k8s.io/client-go/testing"
 	"k8s.io/kubectl/pkg/scheme"
@@ -30,7 +31,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
@@ -80,7 +80,7 @@ func TestRolloutStatus(t *testing.T) {
 		return true, fw, nil
 	})
 
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdRolloutStatus(tf, streams)
 	cmd.Run(cmd, []string{deploymentName})
 
@@ -138,7 +138,7 @@ func TestRolloutStatusWithSelector(t *testing.T) {
 		return true, fw, nil
 	})
 
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdRolloutStatus(tf, streams)
 	cmd.Flags().Set("selector", "app=api")
 	cmd.Run(cmd, []string{deploymentName})
@@ -193,7 +193,7 @@ func TestRolloutStatusWatchDisabled(t *testing.T) {
 		return true, fw, nil
 	})
 
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdRolloutStatus(tf, streams)
 	cmd.Flags().Set("watch", "false")
 	cmd.Run(cmd, []string{deploymentName})
@@ -248,7 +248,7 @@ func TestRolloutStatusWatchDisabledUnavailable(t *testing.T) {
 		return true, fw, nil
 	})
 
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdRolloutStatus(tf, streams)
 	cmd.Flags().Set("watch", "false")
 	cmd.Run(cmd, []string{deploymentName})
@@ -256,5 +256,31 @@ func TestRolloutStatusWatchDisabledUnavailable(t *testing.T) {
 	expectedMsg := "Waiting for deployment \"deployment/nginx-deployment\" rollout to finish: 0 of 1 updated replicas are available...\n"
 	if buf.String() != expectedMsg {
 		t.Errorf("expected output: %s, but got: %s", expectedMsg, buf.String())
+	}
+}
+
+func TestRolloutStatusEmptyList(t *testing.T) {
+	ns := scheme.Codecs.WithoutConversion()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+
+	info, _ := runtime.SerializerInfoForMediaType(ns.SupportedMediaTypes(), runtime.ContentTypeJSON)
+	encoder := ns.EncoderForVersion(info.Serializer, rolloutStatusGroupVersionEncoder)
+	tf.Client = &fake.RESTClient{
+		GroupVersion:         rolloutStatusGroupVersionEncoder,
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			dep := &appsv1.DeploymentList{}
+			body := io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, dep))))
+			return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
+		}),
+	}
+	streams, _, _, err := genericiooptions.NewTestIOStreams()
+	cmd := NewCmdRolloutStatus(tf, streams)
+	cmd.Run(cmd, []string{"deployment"})
+
+	expectedMsg := "No resources found in test namespace.\n"
+	if err.String() != expectedMsg {
+		t.Errorf("expected output: %s, but got: %s", expectedMsg, err.String())
 	}
 }

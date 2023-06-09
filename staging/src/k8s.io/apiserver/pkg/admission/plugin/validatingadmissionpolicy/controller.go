@@ -43,6 +43,7 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy/matching"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/apiserver/pkg/cel/openapi/resolver"
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/dynamic"
@@ -140,7 +141,7 @@ func NewAdmissionController(
 			client,
 			dynamicClient,
 			typeChecker,
-			cel.NewFilterCompiler(),
+			cel.NewFilterCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())),
 			NewMatcher(matching.NewMatcher(informerFactory.Core().V1().Namespaces().Lister(), client)),
 			generic.NewInformer[*v1alpha1.ValidatingAdmissionPolicy](
 				informerFactory.Admissionregistration().V1alpha1().ValidatingAdmissionPolicies().Informer()),
@@ -336,12 +337,6 @@ func (c *celAdmissionController) Validate(
 			}
 
 			validationResult := bindingInfo.validator.Validate(ctx, versionedAttr, param, celconfig.RuntimeCELCostBudget)
-			if err != nil {
-				// runtime error. Apply failure policy
-				wrappedError := fmt.Errorf("failed to evaluate CEL expression: %w", err)
-				addConfigError(wrappedError, definition, binding)
-				continue
-			}
 
 			for i, decision := range validationResult.Decisions {
 				switch decision.Action {

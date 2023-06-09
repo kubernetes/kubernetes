@@ -27,11 +27,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 
@@ -103,10 +101,7 @@ func omitDuplicates(strs []string) []string {
 func (c *Configurer) formDNSSearchFitsLimits(composedSearch []string, pod *v1.Pod) []string {
 	limitsExceeded := false
 
-	maxDNSSearchPaths, maxDNSSearchListChars := validation.MaxDNSSearchPathsLegacy, validation.MaxDNSSearchListCharsLegacy
-	if utilfeature.DefaultFeatureGate.Enabled(features.ExpandedDNSConfig) {
-		maxDNSSearchPaths, maxDNSSearchListChars = validation.MaxDNSSearchPathsExpanded, validation.MaxDNSSearchListCharsExpanded
-	}
+	maxDNSSearchPaths, maxDNSSearchListChars := validation.MaxDNSSearchPaths, validation.MaxDNSSearchListChars
 
 	if len(composedSearch) > maxDNSSearchPaths {
 		composedSearch = composedSearch[:maxDNSSearchPaths]
@@ -195,10 +190,7 @@ func (c *Configurer) CheckLimitsForResolvConf() {
 		return
 	}
 
-	domainCountLimit, maxDNSSearchListChars := validation.MaxDNSSearchPathsLegacy, validation.MaxDNSSearchListCharsLegacy
-	if utilfeature.DefaultFeatureGate.Enabled(features.ExpandedDNSConfig) {
-		domainCountLimit, maxDNSSearchListChars = validation.MaxDNSSearchPathsExpanded, validation.MaxDNSSearchListCharsExpanded
-	}
+	domainCountLimit, maxDNSSearchListChars := validation.MaxDNSSearchPaths, validation.MaxDNSSearchListChars
 
 	if c.ClusterDomain != "" {
 		domainCountLimit -= 3
@@ -279,6 +271,33 @@ func parseResolvConf(reader io.Reader) (nameservers []string, searches []string,
 	}
 
 	return nameservers, searches, options, utilerrors.NewAggregate(allErrors)
+}
+
+// Reads a resolv.conf-like file and returns the DNS config options from it.
+// Returns an empty DNSConfig if the given resolverConfigFile is an empty string.
+func getDNSConfig(resolverConfigFile string) (*runtimeapi.DNSConfig, error) {
+	var hostDNS, hostSearch, hostOptions []string
+	// Get host DNS settings
+	if resolverConfigFile != "" {
+		f, err := os.Open(resolverConfigFile)
+		if err != nil {
+			klog.ErrorS(err, "Could not open resolv conf file.")
+			return nil, err
+		}
+		defer f.Close()
+
+		hostDNS, hostSearch, hostOptions, err = parseResolvConf(f)
+		if err != nil {
+			err := fmt.Errorf("Encountered error while parsing resolv conf file. Error: %w", err)
+			klog.ErrorS(err, "Could not parse resolv conf file.")
+			return nil, err
+		}
+	}
+	return &runtimeapi.DNSConfig{
+		Servers:  hostDNS,
+		Searches: hostSearch,
+		Options:  hostOptions,
+	}, nil
 }
 
 func getPodDNSType(pod *v1.Pod) (podDNSType, error) {

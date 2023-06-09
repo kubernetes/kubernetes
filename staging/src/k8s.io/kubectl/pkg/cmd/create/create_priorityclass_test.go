@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
@@ -51,7 +52,7 @@ func TestCreatePriorityClass(t *testing.T) {
 
 	outputFormat := "name"
 
-	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdCreatePriorityClass(tf, ioStreams)
 	cmd.Flags().Set("value", "1000")
 	cmd.Flags().Set("global-default", "true")

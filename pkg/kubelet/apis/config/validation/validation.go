@@ -30,9 +30,9 @@ import (
 	tracingapi "k8s.io/component-base/tracing/api/v1"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utiltaints "k8s.io/kubernetes/pkg/util/taints"
+	"k8s.io/utils/cpuset"
 )
 
 var (

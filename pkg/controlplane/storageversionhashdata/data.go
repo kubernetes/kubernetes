@@ -26,6 +26,7 @@ import (
 var NoStorageVersionHash = sets.NewString(
 	"v1/bindings",
 	"v1/componentstatuses",
+	"authentication.k8s.io/v1/selfsubjectreviews",
 	"authentication.k8s.io/v1/tokenreviews",
 	"authorization.k8s.io/v1/localsubjectaccessreviews",
 	"authorization.k8s.io/v1/selfsubjectaccessreviews",

@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
@@ -491,7 +492,7 @@ func TestNodeAffinity(t *testing.T) {
 				},
 			},
 			nodeName:            "node1",
-			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.NewString("node1")},
+			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.New("node1")},
 			runPreFilter:        true,
 		},
 		{
@@ -519,7 +520,7 @@ func TestNodeAffinity(t *testing.T) {
 			},
 			nodeName:            "node2",
 			wantStatus:          framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
-			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.NewString("node1")},
+			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.New("node1")},
 			runPreFilter:        true,
 		},
 		{
@@ -595,7 +596,7 @@ func TestNodeAffinity(t *testing.T) {
 			},
 			nodeName:            "node2",
 			labels:              map[string]string{"foo": "bar"},
-			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.NewString("node1")},
+			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.New("node1")},
 			wantStatus:          framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
 			runPreFilter:        true,
 		},
@@ -631,7 +632,7 @@ func TestNodeAffinity(t *testing.T) {
 			},
 			nodeName:            "node1",
 			labels:              map[string]string{"foo": "bar"},
-			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.NewString("node1")},
+			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.New("node1")},
 			runPreFilter:        true,
 		},
 		{
@@ -704,7 +705,7 @@ func TestNodeAffinity(t *testing.T) {
 				},
 			},
 			nodeName:            "node2",
-			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.NewString("node1", "node2")},
+			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.New("node1", "node2")},
 			runPreFilter:        true,
 		},
 		{
@@ -1134,11 +1135,12 @@ func TestNodeAffinityPriority(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
 			state := framework.NewCycleState()
-			fh, _ := runtime.NewFramework(nil, nil, ctx.Done(), runtime.WithSnapshotSharedLister(cache.NewSnapshot(nil, test.nodes)))
+			fh, _ := runtime.NewFramework(ctx, nil, nil, runtime.WithSnapshotSharedLister(cache.NewSnapshot(nil, test.nodes)))
 			p, err := New(&test.args, fh)
 			if err != nil {
 				t.Fatalf("Creating plugin: %v", err)

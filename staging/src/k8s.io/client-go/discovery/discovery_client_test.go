@@ -26,8 +26,8 @@ import (
 	"time"
 
 	"github.com/gogo/protobuf/proto"
-	openapi_v2 "github.com/google/gnostic/openapiv2"
-	openapi_v3 "github.com/google/gnostic/openapiv3"
+	openapi_v2 "github.com/google/gnostic-models/openapiv2"
+	openapi_v3 "github.com/google/gnostic-models/openapiv3"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,7 +36,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/openapi"
@@ -437,7 +436,7 @@ func TestGetServerResourcesForGroupVersion(t *testing.T) {
 		"extensions/v1beta10",
 	}
 	if !reflect.DeepEqual(expectedGroupVersions, serverGroupVersions) {
-		t.Errorf("unexpected group versions: %v", diff.ObjectReflectDiff(expectedGroupVersions, serverGroupVersions))
+		t.Errorf("unexpected group versions: %v", cmp.Diff(expectedGroupVersions, serverGroupVersions))
 	}
 }
 
@@ -1395,8 +1394,9 @@ func TestAggregatedServerGroups(t *testing.T) {
 			}
 			output, err := json.Marshal(agg)
 			require.NoError(t, err)
-			// Content-type is "aggregated" discovery format.
-			w.Header().Set("Content-Type", AcceptV2Beta1)
+			// Content-Type is "aggregated" discovery format. Add extra parameter
+			// to ensure we are resilient to these extra parameters.
+			w.Header().Set("Content-Type", AcceptV2Beta1+"; charset=utf-8")
 			w.WriteHeader(http.StatusOK)
 			w.Write(output)
 		}))
@@ -1985,8 +1985,9 @@ func TestAggregatedServerGroupsAndResources(t *testing.T) {
 			}
 			output, err := json.Marshal(agg)
 			require.NoError(t, err)
-			// Content-type is "aggregated" discovery format.
-			w.Header().Set("Content-Type", AcceptV2Beta1)
+			// Content-type is "aggregated" discovery format. Add extra parameter
+			// to ensure we are resilient to these extra parameters.
+			w.Header().Set("Content-Type", AcceptV2Beta1+"; charset=utf-8")
 			w.WriteHeader(http.StatusOK)
 			w.Write(output)
 		}))
@@ -2125,8 +2126,9 @@ func TestAggregatedServerGroupsAndResourcesWithErrors(t *testing.T) {
 			}
 			output, err := json.Marshal(agg)
 			require.NoError(t, err)
-			// Content-type is "aggregated" discovery format.
-			w.Header().Set("Content-Type", AcceptV2Beta1)
+			// Content-type is "aggregated" discovery format. Add extra parameter
+			// to ensure we are resilient to these extra parameters.
+			w.Header().Set("Content-Type", AcceptV2Beta1+"; charset=utf-8")
 			w.WriteHeader(status)
 			w.Write(output)
 		}))
@@ -2733,8 +2735,9 @@ func TestAggregatedServerPreferredResources(t *testing.T) {
 			}
 			output, err := json.Marshal(agg)
 			require.NoError(t, err)
-			// Content-type is "aggregated" discovery format.
-			w.Header().Set("Content-Type", AcceptV2Beta1)
+			// Content-type is "aggregated" discovery format. Add extra parameter
+			// to ensure we are resilient to these extra parameters.
+			w.Header().Set("Content-Type", AcceptV2Beta1+"; charset=utf-8")
 			w.WriteHeader(http.StatusOK)
 			w.Write(output)
 		}))
@@ -2755,6 +2758,58 @@ func TestAggregatedServerPreferredResources(t *testing.T) {
 		actualGVKs := sets.NewString(groupVersionKinds(resources)...)
 		assert.True(t, expectedGVKs.Equal(actualGVKs),
 			"%s: Expected GVKs (%s), got (%s)", test.name, expectedGVKs.List(), actualGVKs.List())
+	}
+}
+
+func TestDiscoveryContentTypeVersion(t *testing.T) {
+	tests := []struct {
+		contentType string
+		isV2Beta1   bool
+	}{
+		{
+			contentType: "application/json; g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList",
+			isV2Beta1:   true,
+		},
+		{
+			// content-type parameters are not in correct order, but comparison ignores order.
+			contentType: "application/json; v=v2beta1;as=APIGroupDiscoveryList;g=apidiscovery.k8s.io",
+			isV2Beta1:   true,
+		},
+		{
+			// content-type parameters are not in correct order, but comparison ignores order.
+			contentType: "application/json; as=APIGroupDiscoveryList;g=apidiscovery.k8s.io;v=v2beta1",
+			isV2Beta1:   true,
+		},
+		{
+			// Ignores extra parameter "charset=utf-8"
+			contentType: "application/json; g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList;charset=utf-8",
+			isV2Beta1:   true,
+		},
+		{
+			contentType: "application/json",
+			isV2Beta1:   false,
+		},
+		{
+			contentType: "application/json; charset=UTF-8",
+			isV2Beta1:   false,
+		},
+		{
+			contentType: "text/json",
+			isV2Beta1:   false,
+		},
+		{
+			contentType: "text/html",
+			isV2Beta1:   false,
+		},
+		{
+			contentType: "",
+			isV2Beta1:   false,
+		},
+	}
+
+	for _, test := range tests {
+		isV2Beta1 := isV2Beta1ContentType(test.contentType)
+		assert.Equal(t, test.isV2Beta1, isV2Beta1)
 	}
 }
 

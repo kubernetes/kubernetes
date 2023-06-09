@@ -146,6 +146,9 @@ func TestWarnings(t *testing.T) {
 			template: &api.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
+					Annotations: map[string]string{
+						api.BetaStorageClassAnnotation: "",
+					},
 				},
 				Spec: api.PersistentVolumeSpec{
 					NodeAffinity: &api.VolumeNodeAffinity{
@@ -169,7 +172,107 @@ func TestWarnings(t *testing.T) {
 				},
 			},
 			expected: []string{
+				`metadata.annotations[volume.beta.kubernetes.io/storage-class]: deprecated since v1.8; use "storageClassName" attribute instead`,
 				`spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[0].key: beta.kubernetes.io/os is deprecated since v1.14; use "kubernetes.io/os" instead`,
+			},
+		},
+		{
+			name: "PV CephFS deprecation warning",
+			template: &api.PersistentVolume{
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						CephFS: &api.CephFSPersistentVolumeSource{
+							Monitors:   nil,
+							Path:       "",
+							User:       "",
+							SecretFile: "",
+							SecretRef:  nil,
+							ReadOnly:   false,
+						},
+					},
+				},
+			},
+			expected: []string{
+				`spec.persistentVolumeSource.cephfs: deprecated in v1.28, non-functional in v1.31+`,
+			},
+		},
+		{
+			name: "PV PhotonPersistentDisk deprecation warning",
+			template: &api.PersistentVolume{
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						PhotonPersistentDisk: &api.PhotonPersistentDiskVolumeSource{
+							PdID:   "",
+							FSType: "",
+						},
+					},
+				},
+			},
+			expected: []string{
+				`spec.persistentVolumeSource.photonPersistentDisk: deprecated in v1.11, non-functional in v1.16+`,
+			},
+		},
+		{
+			name: "PV ScaleIO deprecation warning",
+			template: &api.PersistentVolume{
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						ScaleIO: &api.ScaleIOPersistentVolumeSource{
+							Gateway:          "",
+							System:           "",
+							SecretRef:        nil,
+							SSLEnabled:       false,
+							ProtectionDomain: "",
+							StoragePool:      "",
+							StorageMode:      "",
+							VolumeName:       "",
+							FSType:           "",
+							ReadOnly:         false,
+						},
+					},
+				},
+			},
+			expected: []string{
+				`spec.persistentVolumeSource.scaleIO: deprecated in v1.16, non-functional in v1.22+`,
+			},
+		},
+
+		{
+			name: "PV StorageOS deprecation warning",
+			template: &api.PersistentVolume{
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						StorageOS: &api.StorageOSPersistentVolumeSource{
+							VolumeName:      "",
+							VolumeNamespace: "",
+							FSType:          "",
+							ReadOnly:        false,
+							SecretRef:       nil,
+						},
+					},
+				},
+			},
+			expected: []string{
+				`spec.persistentVolumeSource.storageOS: deprecated in v1.22, non-functional in v1.25+`,
+			},
+		},
+
+		{
+			name: "PV GlusterFS deprecation warning",
+			template: &api.PersistentVolume{
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						Glusterfs: &api.GlusterfsPersistentVolumeSource{
+							EndpointsName:      "",
+							Path:               "",
+							ReadOnly:           false,
+							EndpointsNamespace: nil,
+						},
+					},
+				},
+			},
+			expected: []string{
+				`spec.persistentVolumeSource.glusterfs: deprecated in v1.25, non-functional in v1.26+`,
 			},
 		},
 	}

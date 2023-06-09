@@ -231,10 +231,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 
 	basicUserRules := []rbacv1.PolicyRule{
 		rbacv1helpers.NewRule("create").Groups(authorizationGroup).Resources("selfsubjectaccessreviews", "selfsubjectrulesreviews").RuleOrDie(),
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.APISelfSubjectReview) {
-		basicUserRules = append(basicUserRules, rbacv1helpers.NewRule("create").Groups(authenticationGroup).Resources("selfsubjectreviews").RuleOrDie())
+		rbacv1helpers.NewRule("create").Groups(authenticationGroup).Resources("selfsubjectreviews").RuleOrDie(),
 	}
 
 	roles = append(roles, []rbacv1.ClusterRole{
@@ -432,9 +429,6 @@ func ClusterRoles() []rbacv1.ClusterRole {
 				// Needed for leader election.
 				rbacv1helpers.NewRule("create").Groups(coordinationGroup).Resources("leases").RuleOrDie(),
 				rbacv1helpers.NewRule("get", "update").Groups(coordinationGroup).Resources("leases").Names("kube-controller-manager").RuleOrDie(),
-				// TODO: Remove once we fully migrate to lease in leader-election.
-				rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("endpoints").RuleOrDie(),
-				rbacv1helpers.NewRule("get", "update").Groups(legacyGroup).Resources("endpoints").Names("kube-controller-manager").RuleOrDie(),
 				// Fundamental resources.
 				rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("secrets", "serviceaccounts").RuleOrDie(),
 				rbacv1helpers.NewRule("delete").Groups(legacyGroup).Resources("secrets").RuleOrDie(),
@@ -548,9 +542,6 @@ func ClusterRoles() []rbacv1.ClusterRole {
 		// TODO: scope this to the kube-system namespace
 		rbacv1helpers.NewRule("create").Groups(coordinationGroup).Resources("leases").RuleOrDie(),
 		rbacv1helpers.NewRule("get", "update").Groups(coordinationGroup).Resources("leases").Names("kube-scheduler").RuleOrDie(),
-		// TODO: Remove once we fully migrate to lease in leader-election.
-		rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("endpoints").RuleOrDie(),
-		rbacv1helpers.NewRule("get", "update").Groups(legacyGroup).Resources("endpoints").Names("kube-scheduler").RuleOrDie(),
 
 		// Fundamental resources
 		rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("nodes").RuleOrDie(),

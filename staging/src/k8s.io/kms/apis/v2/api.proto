@@ -73,7 +73,6 @@ message EncryptResponse {
     // This can be used to inform staleness of data updated via value.Transformer.TransformFromStorage.
     string key_id = 2;
     // Additional metadata to be stored with the encrypted data.
-    // This metadata can contain the encrypted local KEK that was used to encrypt the DEK.
     // This data is stored in plaintext in etcd. KMS plugin implementations are responsible for pre-encrypting any sensitive data.
     map<string, bytes> annotations = 3;
 }

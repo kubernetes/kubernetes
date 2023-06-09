@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/diff"
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/handler"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -52,7 +52,7 @@ func TestOpenAPIRoundtrip(t *testing.T) {
 			delete(value.Schema.Extensions, common.ExtensionV2Schema)
 
 			if !reflect.DeepEqual(value.Schema, roundTripped) {
-				t.Errorf("unexpected diff (a=expected,b=roundtripped):\n%s", diff.ObjectReflectDiff(value.Schema, roundTripped))
+				t.Errorf("unexpected diff (a=expected,b=roundtripped):\n%s", cmp.Diff(value.Schema, roundTripped))
 				return
 			}
 		})

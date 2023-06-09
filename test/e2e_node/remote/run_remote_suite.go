@@ -107,12 +107,16 @@ func RunRemoteTestSuite(testSuite TestSuite) {
 	}
 
 	var sshRunner Runner
-	switch *mode {
-	case "gce":
-		runner = NewGCERunner(cfg)
-		sshRunner = NewSSHRunner(cfg)
-	case "ssh":
+
+	if *mode == "ssh" {
 		runner = NewSSHRunner(cfg)
+	} else {
+		getRunner, err := GetRunner(*mode)
+		if err != nil {
+			klog.Fatalf("getting runner mode %q : %v", *mode, err)
+		}
+		runner = getRunner(cfg)
+		sshRunner = NewSSHRunner(cfg)
 	}
 
 	if err := runner.Validate(); err != nil {

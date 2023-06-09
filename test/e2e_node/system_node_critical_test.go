@@ -67,7 +67,7 @@ var _ = SIGDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptive] [NodeFea
 				ginkgo.By("create a static system-node-critical pod")
 				staticPodName = "static-disk-hog-" + string(uuid.NewUUID())
 				mirrorPodName = staticPodName + "-" + framework.TestContext.NodeName
-				podPath = framework.TestContext.KubeletConfig.StaticPodPath
+				podPath = kubeletCfg.StaticPodPath
 				// define a static pod consuming disk gradually
 				// the upper limit is 1024 (iterations) * 10485760 bytes (10MB) = 10GB
 				err := createStaticSystemNodeCriticalPod(

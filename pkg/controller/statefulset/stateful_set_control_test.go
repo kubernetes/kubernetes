@@ -1042,7 +1042,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 		// Setup the statefulSet controller
 		totalPods := 6
 		var partition int32 = 3
-		var maxUnavailable = intstr.FromInt(2)
+		var maxUnavailable = intstr.FromInt32(2)
 		set := setupPodManagementPolicy(tc.policyType, newStatefulSet(totalPods))
 		set.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{
 			Type: apps.RollingUpdateStatefulSetStrategyType,
@@ -1130,7 +1130,7 @@ func setupForInvariant(t *testing.T) (*apps.StatefulSet, *fakeObjectManager, Sta
 	set := newStatefulSet(totalPods)
 	// update all pods >=3(3,4,5)
 	var partition int32 = 3
-	var maxUnavailable = intstr.FromInt(2)
+	var maxUnavailable = intstr.FromInt32(2)
 	set.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{
 		Type: apps.RollingUpdateStatefulSetStrategyType,
 		RollingUpdate: func() *apps.RollingUpdateStatefulSetStrategy {

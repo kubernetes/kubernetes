@@ -44,6 +44,7 @@ const (
 
 	// owner: @jefftree @alexzielenski
 	// alpha: v1.26
+	// beta: v1.27
 	//
 	// Enables an single HTTP endpoint /discovery/<version> which supports native HTTP
 	// caching with ETags containing all APIResources known to the apiserver.
@@ -111,17 +112,6 @@ const (
 	// Enables expression validation for Custom Resource
 	CustomResourceValidationExpressions featuregate.Feature = "CustomResourceValidationExpressions"
 
-	// owner: @apelisse
-	// alpha: v1.12
-	// beta: v1.13
-	// stable: v1.18
-	//
-	// Allow requests to be processed but not stored, so that
-	// validation, merging, mutation can be tested without
-	// committing.
-	DryRun featuregate.Feature = "DryRun"
-
-	// owner: @wojtek-t
 	// alpha: v1.20
 	// beta: v1.21
 	// GA: v1.24
@@ -150,6 +140,7 @@ const (
 	// kep: https://kep.k8s.io/2896
 	// alpha: v1.23
 	// beta: v1.24
+	// stable: v1.27
 	//
 	// Enables kubernetes to publish OpenAPI v3
 	OpenAPIV3 featuregate.Feature = "OpenAPIV3"
@@ -250,8 +241,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ValidatingAdmissionPolicy: {Default: false, PreRelease: featuregate.Alpha},
 
 	CustomResourceValidationExpressions: {Default: true, PreRelease: featuregate.Beta},
-
-	DryRun: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 
 	EfficientWatchResumption: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 

@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -555,6 +556,20 @@ func TestWarnings(t *testing.T) {
 				},
 			},
 			expected: nil,
+		},
+		{
+			name: "storageclass annotations warning",
+			template: &core.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+					Annotations: map[string]string{
+						core.BetaStorageClassAnnotation: "",
+					},
+				},
+			},
+			expected: []string{
+				`metadata.annotations[volume.beta.kubernetes.io/storage-class]: deprecated since v1.8; use "storageClassName" attribute instead`,
+			},
 		},
 	}
 

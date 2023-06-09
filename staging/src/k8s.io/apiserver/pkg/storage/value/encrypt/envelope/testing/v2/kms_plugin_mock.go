@@ -25,9 +25,8 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"runtime"
-	"strings"
 	"sync"
+	"testing"
 	"time"
 
 	"google.golang.org/grpc"
@@ -61,7 +60,7 @@ type Base64Plugin struct {
 }
 
 // NewBase64Plugin is a constructor for Base64Plugin.
-func NewBase64Plugin(socketPath string) (*Base64Plugin, error) {
+func NewBase64Plugin(t *testing.T, socketPath string) *Base64Plugin {
 	server := grpc.NewServer()
 	result := &Base64Plugin{
 		grpcServer: server,
@@ -72,11 +71,19 @@ func NewBase64Plugin(socketPath string) (*Base64Plugin, error) {
 	}
 
 	kmsapi.RegisterKeyManagementServiceServer(server, result)
-	return result, nil
+
+	if err := result.start(); err != nil {
+		t.Fatalf("failed to start KMS plugin, err: %v", err)
+	}
+	t.Cleanup(result.CleanUp)
+	if err := waitForBase64PluginToBeUp(result); err != nil {
+		t.Fatalf("failed to start KMS plugin: err: %v", err)
+	}
+	return result
 }
 
-// WaitForBase64PluginToBeUp waits until the plugin is ready to serve requests.
-func WaitForBase64PluginToBeUp(plugin *Base64Plugin) error {
+// waitForBase64PluginToBeUp waits until the plugin is ready to serve requests.
+func waitForBase64PluginToBeUp(plugin *Base64Plugin) error {
 	var gRPCErr error
 	var resp *kmsapi.StatusResponse
 	pollErr := wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
@@ -84,14 +91,14 @@ func WaitForBase64PluginToBeUp(plugin *Base64Plugin) error {
 		return gRPCErr == nil && resp.Healthz == "ok", nil
 	})
 
-	if pollErr == wait.ErrWaitTimeout {
-		return fmt.Errorf("failed to start kms-plugin, error: %v", gRPCErr)
+	if pollErr != nil {
+		return fmt.Errorf("failed to start kms-plugin, gRPC error: %v, poll error: %v", gRPCErr, pollErr)
 	}
 
 	return nil
 }
 
-// WaitForBase64PluginToBeUpdated waits until the plugin updates keyID.
+// waitForBase64PluginToBeUpdated waits until the plugin updates keyID.
 func WaitForBase64PluginToBeUpdated(plugin *Base64Plugin) error {
 	var gRPCErr error
 	var resp *kmsapi.StatusResponse
@@ -103,7 +110,7 @@ func WaitForBase64PluginToBeUpdated(plugin *Base64Plugin) error {
 	})
 
 	if updatePollErr != nil {
-		return fmt.Errorf("failed to update keyID for kmsv2-plugin, error: %w", gRPCErr)
+		return fmt.Errorf("failed to update keyID for kmsv2-plugin, gRPC error: %w, updatePoll error: %w", gRPCErr, updatePollErr)
 	}
 
 	return nil
@@ -119,8 +126,8 @@ func (s *Base64Plugin) SetVersion(ver string) {
 	s.ver = ver
 }
 
-// Start starts plugin's gRPC service.
-func (s *Base64Plugin) Start() error {
+// start starts plugin's gRPC service.
+func (s *Base64Plugin) start() error {
 	var err error
 	s.listener, err = net.Listen(unixProtocol, s.socketPath)
 	if err != nil {
@@ -135,10 +142,8 @@ func (s *Base64Plugin) Start() error {
 // CleanUp stops gRPC server and the underlying listener.
 func (s *Base64Plugin) CleanUp() {
 	s.grpcServer.Stop()
-	s.listener.Close()
-	if !strings.HasPrefix(s.socketPath, "@") || runtime.GOOS != "linux" {
-		os.Remove(s.socketPath)
-	}
+	_ = s.listener.Close()
+	_ = os.Remove(s.socketPath)
 }
 
 // EnterFailedState places the plugin into failed state.

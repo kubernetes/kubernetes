@@ -19,7 +19,7 @@ package apply
 import (
 	"github.com/spf13/cobra"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/util/editor"
 	"k8s.io/kubectl/pkg/util/completion"
@@ -58,7 +58,7 @@ var (
 )
 
 // NewCmdApplyEditLastApplied created the cobra CLI command for the `apply edit-last-applied` command.
-func NewCmdApplyEditLastApplied(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdApplyEditLastApplied(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := editor.NewEditOptions(editor.ApplyEditMode, ioStreams)
 
 	cmd := &cobra.Command{

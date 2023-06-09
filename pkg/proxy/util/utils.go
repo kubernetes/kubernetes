@@ -483,6 +483,11 @@ func (buf *LineBuffer) Bytes() []byte {
 	return buf.b.Bytes()
 }
 
+// String returns the contents of buf as a string
+func (buf *LineBuffer) String() string {
+	return buf.b.String()
+}
+
 // Lines returns the number of lines in buf. Note that more precisely, this returns the
 // number of times Write() or WriteBytes() was called; it assumes that you never wrote
 // any newlines to the buffer yourself.

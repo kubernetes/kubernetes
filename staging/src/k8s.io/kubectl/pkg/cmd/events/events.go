@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	runtimeresource "k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes"
@@ -84,11 +85,11 @@ type EventsFlags struct {
 	ForObject     string
 	FilterTypes   []string
 	ChunkSize     int64
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewEventsFlags returns a default EventsFlags
-func NewEventsFlags(restClientGetter genericclioptions.RESTClientGetter, streams genericclioptions.IOStreams) *EventsFlags {
+func NewEventsFlags(restClientGetter genericclioptions.RESTClientGetter, streams genericiooptions.IOStreams) *EventsFlags {
 	return &EventsFlags{
 		RESTClientGetter: restClientGetter,
 		PrintFlags:       genericclioptions.NewPrintFlags("events").WithTypeSetter(scheme.Scheme),
@@ -112,11 +113,11 @@ type EventsOptions struct {
 
 	PrintObj printers.ResourcePrinterFunc
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewCmdEvents creates a new events command
-func NewCmdEvents(restClientGetter genericclioptions.RESTClientGetter, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdEvents(restClientGetter genericclioptions.RESTClientGetter, streams genericiooptions.IOStreams) *cobra.Command {
 	flags := NewEventsFlags(restClientGetter, streams)
 
 	cmd := &cobra.Command{
@@ -386,11 +387,18 @@ func decodeResourceTypeName(mapper meta.RESTMapper, s string) (gvk schema.GroupV
 	}
 	resource, name := seg[0], seg[1]
 
-	var gvr schema.GroupVersionResource
-	gvr, err = mapper.ResourceFor(schema.GroupVersionResource{Resource: resource})
-	if err != nil {
-		return
+	fullySpecifiedGVR, groupResource := schema.ParseResourceArg(strings.ToLower(resource))
+	gvr := schema.GroupVersionResource{}
+	if fullySpecifiedGVR != nil {
+		gvr, _ = mapper.ResourceFor(*fullySpecifiedGVR)
 	}
+	if gvr.Empty() {
+		gvr, err = mapper.ResourceFor(groupResource.WithVersion(""))
+		if err != nil {
+			return
+		}
+	}
+
 	gvk, err = mapper.KindFor(gvr)
 	if err != nil {
 		return

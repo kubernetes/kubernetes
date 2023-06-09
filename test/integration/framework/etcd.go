@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -82,6 +83,8 @@ func startEtcd(output io.Writer) (func(), error) {
 
 	return stop, nil
 }
+
+var initGRPCOnce sync.Once
 
 // RunCustomEtcd starts a custom etcd instance for test purposes.
 func RunCustomEtcd(dataDir string, customFlags []string, output io.Writer) (url string, stopFn func(), err error) {
@@ -150,7 +153,9 @@ func RunCustomEtcd(dataDir string, customFlags []string, output io.Writer) (url 
 
 	// Quiet etcd logs for integration tests
 	// Comment out to get verbose logs if desired
-	grpclog.SetLoggerV2(grpclog.NewLoggerV2(io.Discard, io.Discard, os.Stderr))
+	initGRPCOnce.Do(func() {
+		grpclog.SetLoggerV2(grpclog.NewLoggerV2(io.Discard, io.Discard, os.Stderr))
+	})
 
 	if err := cmd.Start(); err != nil {
 		return "", nil, fmt.Errorf("failed to run etcd: %v", err)

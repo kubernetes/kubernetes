@@ -40,19 +40,18 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/kubelet/pkg/cri/streaming/portforward"
+	"k8s.io/kubelet/pkg/cri/streaming/remotecommand"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
-	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/portforward"
-	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/status"
@@ -3273,7 +3272,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					expected.Conditions = append([]v1.PodCondition{test.expectedPodDisruptionCondition}, expected.Conditions...)
 				}
 				if !apiequality.Semantic.DeepEqual(*expected, actual) {
-					t.Fatalf("Unexpected status: %s", diff.ObjectReflectDiff(*expected, actual))
+					t.Fatalf("Unexpected status: %s", cmp.Diff(*expected, actual))
 				}
 			})
 		}
@@ -3433,222 +3432,6 @@ func TestGetPortForward(t *testing.T) {
 		} else {
 			assert.NoError(t, err, description)
 			assert.Equal(t, containertest.FakeHost, redirect.Host, description+": redirect")
-		}
-	}
-}
-
-func TestHasHostMountPVC(t *testing.T) {
-	type testcase struct {
-		pvError         error
-		pvcError        error
-		expected        bool
-		podHasPVC       bool
-		pvcIsHostPath   bool
-		podHasEphemeral bool
-	}
-	tests := map[string]testcase{
-		"no pvc": {podHasPVC: false, expected: false},
-		"error fetching pvc": {
-			podHasPVC: true,
-			pvcError:  fmt.Errorf("foo"),
-			expected:  false,
-		},
-		"error fetching pv": {
-			podHasPVC: true,
-			pvError:   fmt.Errorf("foo"),
-			expected:  false,
-		},
-		"host path pvc": {
-			podHasPVC:     true,
-			pvcIsHostPath: true,
-			expected:      true,
-		},
-		"enabled ephemeral host path": {
-			podHasEphemeral: true,
-			pvcIsHostPath:   true,
-			expected:        true,
-		},
-		"non host path pvc": {
-			podHasPVC:     true,
-			pvcIsHostPath: false,
-			expected:      false,
-		},
-	}
-
-	run := func(t *testing.T, v testcase) {
-		ctx := context.Background()
-		testKubelet := newTestKubelet(t, false)
-		defer testKubelet.Cleanup()
-		pod := &v1.Pod{
-			Spec: v1.PodSpec{},
-		}
-
-		volumeToReturn := &v1.PersistentVolume{
-			Spec: v1.PersistentVolumeSpec{},
-		}
-
-		if v.podHasPVC {
-			pod.Spec.Volumes = []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{},
-					},
-				},
-			}
-		}
-
-		if v.podHasEphemeral {
-			pod.Spec.Volumes = []v1.Volume{
-				{
-					Name: "xyz",
-					VolumeSource: v1.VolumeSource{
-						Ephemeral: &v1.EphemeralVolumeSource{},
-					},
-				},
-			}
-		}
-
-		if (v.podHasPVC || v.podHasEphemeral) && v.pvcIsHostPath {
-			volumeToReturn.Spec.PersistentVolumeSource = v1.PersistentVolumeSource{
-				HostPath: &v1.HostPathVolumeSource{},
-			}
-		}
-
-		testKubelet.fakeKubeClient.AddReactor("get", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
-			return true, &v1.PersistentVolumeClaim{
-				Spec: v1.PersistentVolumeClaimSpec{
-					VolumeName: "foo",
-				},
-			}, v.pvcError
-		})
-		testKubelet.fakeKubeClient.AddReactor("get", "persistentvolumes", func(action core.Action) (bool, runtime.Object, error) {
-			return true, volumeToReturn, v.pvError
-		})
-
-		actual := testKubelet.kubelet.hasHostMountPVC(ctx, pod)
-		if actual != v.expected {
-			t.Errorf("expected %t but got %t", v.expected, actual)
-		}
-	}
-
-	for k, v := range tests {
-		t.Run(k, func(t *testing.T) {
-			run(t, v)
-		})
-	}
-}
-
-func TestHasNonNamespacedCapability(t *testing.T) {
-	createPodWithCap := func(caps []v1.Capability) *v1.Pod {
-		pod := &v1.Pod{
-			Spec: v1.PodSpec{
-				Containers: []v1.Container{{}},
-			},
-		}
-
-		if len(caps) > 0 {
-			pod.Spec.Containers[0].SecurityContext = &v1.SecurityContext{
-				Capabilities: &v1.Capabilities{
-					Add: caps,
-				},
-			}
-		}
-		return pod
-	}
-
-	nilCaps := createPodWithCap([]v1.Capability{v1.Capability("foo")})
-	nilCaps.Spec.Containers[0].SecurityContext = nil
-
-	tests := map[string]struct {
-		pod      *v1.Pod
-		expected bool
-	}{
-		"nil security contxt":           {createPodWithCap(nil), false},
-		"nil caps":                      {nilCaps, false},
-		"namespaced cap":                {createPodWithCap([]v1.Capability{v1.Capability("foo")}), false},
-		"non-namespaced cap MKNOD":      {createPodWithCap([]v1.Capability{v1.Capability("MKNOD")}), true},
-		"non-namespaced cap SYS_TIME":   {createPodWithCap([]v1.Capability{v1.Capability("SYS_TIME")}), true},
-		"non-namespaced cap SYS_MODULE": {createPodWithCap([]v1.Capability{v1.Capability("SYS_MODULE")}), true},
-	}
-
-	for k, v := range tests {
-		actual := hasNonNamespacedCapability(v.pod)
-		if actual != v.expected {
-			t.Errorf("%s failed, expected %t but got %t", k, v.expected, actual)
-		}
-	}
-}
-
-func TestHasHostVolume(t *testing.T) {
-	pod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						HostPath: &v1.HostPathVolumeSource{},
-					},
-				},
-			},
-		},
-	}
-
-	result := hasHostVolume(pod)
-	if !result {
-		t.Errorf("expected host volume to enable host user namespace")
-	}
-
-	pod.Spec.Volumes[0].VolumeSource.HostPath = nil
-	result = hasHostVolume(pod)
-	if result {
-		t.Errorf("expected nil host volume to not enable host user namespace")
-	}
-}
-
-func TestHasHostNamespace(t *testing.T) {
-	tests := map[string]struct {
-		ps       v1.PodSpec
-		expected bool
-	}{
-		"nil psc": {
-			ps:       v1.PodSpec{},
-			expected: false},
-
-		"host pid true": {
-			ps: v1.PodSpec{
-				HostPID:         true,
-				SecurityContext: &v1.PodSecurityContext{},
-			},
-			expected: true,
-		},
-		"host ipc true": {
-			ps: v1.PodSpec{
-				HostIPC:         true,
-				SecurityContext: &v1.PodSecurityContext{},
-			},
-			expected: true,
-		},
-		"host net true": {
-			ps: v1.PodSpec{
-				HostNetwork:     true,
-				SecurityContext: &v1.PodSecurityContext{},
-			},
-			expected: true,
-		},
-		"no host ns": {
-			ps: v1.PodSpec{
-				SecurityContext: &v1.PodSecurityContext{},
-			},
-			expected: false,
-		},
-	}
-
-	for k, v := range tests {
-		pod := &v1.Pod{
-			Spec: v.ps,
-		}
-		actual := hasHostNamespace(pod)
-		if actual != v.expected {
-			t.Errorf("%s failed, expected %t but got %t", k, v.expected, actual)
 		}
 	}
 }
@@ -5083,6 +4866,71 @@ func TestKubelet_HandlePodCleanups(t *testing.T) {
 			},
 		},
 		{
+			name:    "pod that could not start still has a pending update and is tracked in metrics",
+			wantErr: false,
+			pods: []*v1.Pod{
+				staticPod(),
+			},
+			prepareWorker: func(t *testing.T, w *podWorkers, records map[types.UID][]syncPodRecord) {
+				// send a create of a static pod
+				pod := staticPod()
+				// block startup of the static pod due to full name collision
+				w.startedStaticPodsByFullname[kubecontainer.GetPodFullName(pod)] = types.UID("2")
+
+				w.UpdatePod(UpdatePodOptions{
+					UpdateType: kubetypes.SyncPodCreate,
+					StartTime:  time.Unix(1, 0).UTC(),
+					Pod:        pod,
+				})
+				drainAllWorkers(w)
+
+				if _, ok := records[pod.UID]; ok {
+					t.Fatalf("unexpected records: %#v", records)
+				}
+				// pod worker is unaware of pod1 yet
+			},
+			wantWorker: func(t *testing.T, w *podWorkers, records map[types.UID][]syncPodRecord) {
+				uid := types.UID("1")
+				if len(w.podSyncStatuses) != 1 {
+					t.Fatalf("unexpected sync statuses: %#v", w.podSyncStatuses)
+				}
+				s, ok := w.podSyncStatuses[uid]
+				if !ok || s.IsTerminationRequested() || s.IsTerminationStarted() || s.IsFinished() || s.IsWorking() || s.IsDeleted() || s.restartRequested || s.activeUpdate != nil || s.pendingUpdate == nil {
+					t.Errorf("unexpected requested pod termination: %#v", s)
+				}
+
+				// expect that no sync calls are made, since the pod doesn't ever start
+				if actual, expected := records[uid], []syncPodRecord(nil); !reflect.DeepEqual(expected, actual) {
+					t.Fatalf("unexpected pod sync records: %s", cmp.Diff(expected, actual, cmp.AllowUnexported(syncPodRecord{})))
+				}
+			},
+			expectMetrics: map[string]string{
+				metrics.DesiredPodCount.FQName(): `# HELP kubelet_desired_pods [ALPHA] The number of pods the kubelet is being instructed to run. static is true if the pod is not from the apiserver.
+				# TYPE kubelet_desired_pods gauge
+				kubelet_desired_pods{static=""} 0
+				kubelet_desired_pods{static="true"} 1
+				`,
+				metrics.WorkingPodCount.FQName(): `# HELP kubelet_working_pods [ALPHA] Number of pods the kubelet is actually running, broken down by lifecycle phase, whether the pod is desired, orphaned, or runtime only (also orphaned), and whether the pod is static. An orphaned pod has been removed from local configuration or force deleted in the API and consumes resources that are not otherwise visible.
+				# TYPE kubelet_working_pods gauge
+				kubelet_working_pods{config="desired",lifecycle="sync",static=""} 0
+				kubelet_working_pods{config="desired",lifecycle="sync",static="true"} 1
+				kubelet_working_pods{config="desired",lifecycle="terminated",static=""} 0
+				kubelet_working_pods{config="desired",lifecycle="terminated",static="true"} 0
+				kubelet_working_pods{config="desired",lifecycle="terminating",static=""} 0
+				kubelet_working_pods{config="desired",lifecycle="terminating",static="true"} 0
+				kubelet_working_pods{config="orphan",lifecycle="sync",static=""} 0
+				kubelet_working_pods{config="orphan",lifecycle="sync",static="true"} 0
+				kubelet_working_pods{config="orphan",lifecycle="terminated",static=""} 0
+				kubelet_working_pods{config="orphan",lifecycle="terminated",static="true"} 0
+				kubelet_working_pods{config="orphan",lifecycle="terminating",static=""} 0
+				kubelet_working_pods{config="orphan",lifecycle="terminating",static="true"} 0
+				kubelet_working_pods{config="runtime_only",lifecycle="sync",static="unknown"} 0
+				kubelet_working_pods{config="runtime_only",lifecycle="terminated",static="unknown"} 0
+				kubelet_working_pods{config="runtime_only",lifecycle="terminating",static="unknown"} 0
+				`,
+			},
+		},
+		{
 			name:           "pod that could not start and is not in config is force terminated without runtime during pod cleanup",
 			wantErr:        false,
 			terminatingErr: errors.New("unable to terminate"),
@@ -5361,6 +5209,100 @@ func TestKubelet_HandlePodCleanups(t *testing.T) {
 				}; !reflect.DeepEqual(expected, actual) {
 					t.Fatalf("unexpected pod sync records: %s", cmp.Diff(expected, actual, cmp.AllowUnexported(syncPodRecord{})))
 				}
+			},
+		},
+		{
+			name:    "terminated pod is restarted in the same invocation that it is detected",
+			wantErr: false,
+			pods: []*v1.Pod{
+				func() *v1.Pod {
+					pod := staticPod()
+					pod.Annotations = map[string]string{"version": "2"}
+					return pod
+				}(),
+			},
+			prepareWorker: func(t *testing.T, w *podWorkers, records map[types.UID][]syncPodRecord) {
+				// simulate a delete and recreate of the static pod
+				pod := simplePod()
+				w.UpdatePod(UpdatePodOptions{
+					UpdateType: kubetypes.SyncPodCreate,
+					StartTime:  time.Unix(1, 0).UTC(),
+					Pod:        pod,
+				})
+				drainAllWorkers(w)
+				w.UpdatePod(UpdatePodOptions{
+					UpdateType: kubetypes.SyncPodKill,
+					Pod:        pod,
+				})
+				pod2 := simplePod()
+				pod2.Annotations = map[string]string{"version": "2"}
+				w.UpdatePod(UpdatePodOptions{
+					UpdateType: kubetypes.SyncPodCreate,
+					Pod:        pod2,
+				})
+				drainAllWorkers(w)
+			},
+			wantWorker: func(t *testing.T, w *podWorkers, records map[types.UID][]syncPodRecord) {
+				uid := types.UID("1")
+				if len(w.podSyncStatuses) != 1 {
+					t.Fatalf("unexpected sync statuses: %#v", w.podSyncStatuses)
+				}
+				s, ok := w.podSyncStatuses[uid]
+				if !ok || s.IsTerminationRequested() || s.IsTerminationStarted() || s.IsFinished() || s.IsWorking() || s.IsDeleted() {
+					t.Fatalf("unexpected requested pod termination: %#v", s)
+				}
+				if s.pendingUpdate != nil || s.activeUpdate == nil || s.activeUpdate.Pod == nil || s.activeUpdate.Pod.Annotations["version"] != "2" {
+					t.Fatalf("unexpected restarted pod: %#v", s.activeUpdate.Pod)
+				}
+				// expect we get a pod sync record for kill that should have the same grace period as before (2), but no
+				// running pod because the SyncKnownPods method killed it
+				if actual, expected := records[uid], []syncPodRecord{
+					{name: "pod1", updateType: kubetypes.SyncPodCreate},
+					{name: "pod1", updateType: kubetypes.SyncPodKill, gracePeriod: &one},
+					{name: "pod1", terminated: true},
+					{name: "pod1", updateType: kubetypes.SyncPodCreate},
+				}; !reflect.DeepEqual(expected, actual) {
+					t.Fatalf("unexpected pod sync records: %s", cmp.Diff(expected, actual, cmp.AllowUnexported(syncPodRecord{})))
+				}
+			},
+			expectMetrics: map[string]string{
+				metrics.DesiredPodCount.FQName(): `# HELP kubelet_desired_pods [ALPHA] The number of pods the kubelet is being instructed to run. static is true if the pod is not from the apiserver.
+				# TYPE kubelet_desired_pods gauge
+				kubelet_desired_pods{static=""} 1
+				kubelet_desired_pods{static="true"} 0
+				`,
+				metrics.ActivePodCount.FQName(): `# HELP kubelet_active_pods [ALPHA] The number of pods the kubelet considers active and which are being considered when admitting new pods. static is true if the pod is not from the apiserver.
+				# TYPE kubelet_active_pods gauge
+				kubelet_active_pods{static=""} 1
+				kubelet_active_pods{static="true"} 0
+				`,
+				metrics.OrphanedRuntimePodTotal.FQName(): `# HELP kubelet_orphaned_runtime_pods_total [ALPHA] Number of pods that have been detected in the container runtime without being already known to the pod worker. This typically indicates the kubelet was restarted while a pod was force deleted in the API or in the local configuration, which is unusual.
+				# TYPE kubelet_orphaned_runtime_pods_total counter
+				kubelet_orphaned_runtime_pods_total 0
+				`,
+				metrics.RestartedPodTotal.FQName(): `# HELP kubelet_restarted_pods_total [ALPHA] Number of pods that have been restarted because they were deleted and recreated with the same UID while the kubelet was watching them (common for static pods, extremely uncommon for API pods)
+				# TYPE kubelet_restarted_pods_total counter
+				kubelet_restarted_pods_total{static=""} 1
+				kubelet_restarted_pods_total{static="true"} 0
+				`,
+				metrics.WorkingPodCount.FQName(): `# HELP kubelet_working_pods [ALPHA] Number of pods the kubelet is actually running, broken down by lifecycle phase, whether the pod is desired, orphaned, or runtime only (also orphaned), and whether the pod is static. An orphaned pod has been removed from local configuration or force deleted in the API and consumes resources that are not otherwise visible.
+				# TYPE kubelet_working_pods gauge
+				kubelet_working_pods{config="desired",lifecycle="sync",static=""} 1
+				kubelet_working_pods{config="desired",lifecycle="sync",static="true"} 0
+				kubelet_working_pods{config="desired",lifecycle="terminated",static=""} 0
+				kubelet_working_pods{config="desired",lifecycle="terminated",static="true"} 0
+				kubelet_working_pods{config="desired",lifecycle="terminating",static=""} 0
+				kubelet_working_pods{config="desired",lifecycle="terminating",static="true"} 0
+				kubelet_working_pods{config="orphan",lifecycle="sync",static=""} 0
+				kubelet_working_pods{config="orphan",lifecycle="sync",static="true"} 0
+				kubelet_working_pods{config="orphan",lifecycle="terminated",static=""} 0
+				kubelet_working_pods{config="orphan",lifecycle="terminated",static="true"} 0
+				kubelet_working_pods{config="orphan",lifecycle="terminating",static=""} 0
+				kubelet_working_pods{config="orphan",lifecycle="terminating",static="true"} 0
+				kubelet_working_pods{config="runtime_only",lifecycle="sync",static="unknown"} 0
+				kubelet_working_pods{config="runtime_only",lifecycle="terminated",static="unknown"} 0
+				kubelet_working_pods{config="runtime_only",lifecycle="terminating",static="unknown"} 0
+				`,
 			},
 		},
 	}

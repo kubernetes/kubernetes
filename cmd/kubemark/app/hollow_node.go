@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cri/remote"
 	fakeremote "k8s.io/kubernetes/pkg/kubelet/cri/remote/fake"
 	"k8s.io/kubernetes/pkg/kubemark"
+	kubemarkproxy "k8s.io/kubernetes/pkg/proxy/kubemark"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	fakeiptables "k8s.io/kubernetes/pkg/util/iptables/testing"
 	fakeexec "k8s.io/utils/exec/testing"
@@ -279,7 +280,7 @@ func run(config *hollowNodeConfig) error {
 		eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
 		recorder := eventBroadcaster.NewRecorder(legacyscheme.Scheme, "kube-proxy")
 
-		hollowProxy, err := kubemark.NewHollowProxyOrDie(
+		hollowProxy, err := kubemarkproxy.NewHollowProxyOrDie(
 			config.NodeName,
 			client,
 			client.CoreV1(),

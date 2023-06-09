@@ -18,7 +18,8 @@ package kustomize
 
 import (
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 	"sigs.k8s.io/kustomize/kustomize/v5/commands/build"
@@ -26,7 +27,7 @@ import (
 )
 
 // NewCmdKustomize returns an adapted kustomize build command.
-func NewCmdKustomize(streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdKustomize(streams genericiooptions.IOStreams) *cobra.Command {
 	h := build.MakeHelp("kubectl", "kustomize")
 	return build.NewCmdBuild(
 		filesys.MakeFsOnDisk(),

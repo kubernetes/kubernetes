@@ -205,7 +205,6 @@ func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgr
 		for _, m := range msg {
 			printer.Printf("[upgrade/config] %s\n", m)
 		}
-		return nil, nil, nil, errors.New("[upgrade/config] FATAL. Unable to upgrade a cluster using deprecated feature-gate flags. Please see the release notes")
 	}
 
 	// If the user told us to print this information out; do it!

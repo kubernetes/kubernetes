@@ -28,6 +28,8 @@ import (
 	celtypes "github.com/google/cel-go/common/types"
 	"github.com/stretchr/testify/require"
 
+	"k8s.io/utils/pointer"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -38,7 +40,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	apiservercel "k8s.io/apiserver/pkg/cel"
-	"k8s.io/utils/pointer"
+	"k8s.io/apiserver/pkg/cel/environment"
 )
 
 type condition struct {
@@ -91,8 +93,8 @@ func TestCompile(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			var c filterCompiler
-			e := c.Compile(tc.validation, OptionalVariableDeclarations{HasParams: false, HasAuthorizer: false}, celconfig.PerCallLimit)
+			c := filterCompiler{compiler: NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))}
+			e := c.Compile(tc.validation, OptionalVariableDeclarations{HasParams: false, HasAuthorizer: false}, environment.NewExpressions)
 			if e == nil {
 				t.Fatalf("unexpected nil validator")
 			}
@@ -643,11 +645,20 @@ func TestFilter(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			c := filterCompiler{}
 			if tc.testPerCallLimit == 0 {
 				tc.testPerCallLimit = celconfig.PerCallLimit
 			}
-			f := c.Compile(tc.validations, OptionalVariableDeclarations{HasParams: tc.hasParamKind, HasAuthorizer: tc.authorizer != nil}, tc.testPerCallLimit)
+			env, err := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()).Extend(
+				environment.VersionedOptions{
+					IntroducedVersion: environment.DefaultCompatibilityVersion(),
+					ProgramOptions:    []celgo.ProgramOption{celgo.CostLimit(tc.testPerCallLimit)},
+				},
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			c := NewFilterCompiler(env)
+			f := c.Compile(tc.validations, OptionalVariableDeclarations{HasParams: tc.hasParamKind, HasAuthorizer: tc.authorizer != nil}, environment.NewExpressions)
 			if f == nil {
 				t.Fatalf("unexpected nil validator")
 			}
@@ -789,8 +800,8 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			c := filterCompiler{}
-			f := c.Compile(tc.validations, OptionalVariableDeclarations{HasParams: tc.hasParamKind, HasAuthorizer: false}, celconfig.PerCallLimit)
+			c := filterCompiler{compiler: NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))}
+			f := c.Compile(tc.validations, OptionalVariableDeclarations{HasParams: tc.hasParamKind, HasAuthorizer: false}, environment.NewExpressions)
 			if f == nil {
 				t.Fatalf("unexpected nil validator")
 			}

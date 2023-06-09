@@ -783,3 +783,60 @@ func TestGetBranchFromVersion(t *testing.T) {
 		})
 	}
 }
+
+func TestGetSuggestedEtcdVersion(t *testing.T) {
+	constants.SupportedEtcdVersion = map[uint8]string{
+		16: "3.3.17-0",
+		17: "3.4.3-0",
+		18: "3.4.3-0",
+		19: "3.4.13-0",
+		20: "3.4.13-0",
+		21: "3.4.13-0",
+		22: "3.5.5-0",
+	}
+
+	tests := []struct {
+		name              string
+		externalEtcd      bool
+		kubernetesVersion string
+		expectedVersion   string
+	}{
+		{
+			name:              "external etcd: no version",
+			externalEtcd:      true,
+			kubernetesVersion: "1.1.0",
+			expectedVersion:   "",
+		},
+		{
+			name:              "local etcd: illegal kubernetes version",
+			externalEtcd:      false,
+			kubernetesVersion: "1.x.5",
+			expectedVersion:   "N/A",
+		},
+		{
+			name:              "local etcd: no supported version for 1.10.5, return the nearest version",
+			externalEtcd:      false,
+			kubernetesVersion: "1.10.5",
+			expectedVersion:   "3.3.17-0",
+		},
+		{
+			name:              "local etcd: has supported version for 1.17.0",
+			externalEtcd:      false,
+			kubernetesVersion: "1.17.0",
+			expectedVersion:   "3.4.3-0",
+		},
+		{
+			name:              "local etcd: no supported version for v1.99.0, return the nearest version",
+			externalEtcd:      false,
+			kubernetesVersion: "v1.99.0",
+			expectedVersion:   "3.5.5-0",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := getSuggestedEtcdVersion(tt.externalEtcd, tt.kubernetesVersion); got != tt.expectedVersion {
+				t.Errorf("getSuggestedEtcdVersion() want %v, got %v", tt.expectedVersion, got)
+			}
+		})
+	}
+}

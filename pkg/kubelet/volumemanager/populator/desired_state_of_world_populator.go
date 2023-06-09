@@ -40,7 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
@@ -70,10 +69,17 @@ type DesiredStateOfWorldPopulator interface {
 	HasAddedPods() bool
 }
 
-// podStateProvider can determine if a pod is going to be terminated.
-type podStateProvider interface {
+// PodStateProvider can determine if a pod is going to be terminated.
+type PodStateProvider interface {
 	ShouldPodContainersBeTerminating(types.UID) bool
 	ShouldPodRuntimeBeRemoved(types.UID) bool
+}
+
+// PodManager is the subset of methods the manager needs to observe the actual state of the kubelet.
+// See pkg/k8s.io/kubernetes/pkg/kubelet/pod.Manager for method godoc.
+type PodManager interface {
+	GetPodByUID(types.UID) (*v1.Pod, bool)
+	GetPods() []*v1.Pod
 }
 
 // NewDesiredStateOfWorldPopulator returns a new instance of
@@ -90,8 +96,8 @@ type podStateProvider interface {
 func NewDesiredStateOfWorldPopulator(
 	kubeClient clientset.Interface,
 	loopSleepDuration time.Duration,
-	podManager pod.Manager,
-	podStateProvider podStateProvider,
+	podManager PodManager,
+	podStateProvider PodStateProvider,
 	desiredStateOfWorld cache.DesiredStateOfWorld,
 	actualStateOfWorld cache.ActualStateOfWorld,
 	kubeContainerRuntime kubecontainer.Runtime,
@@ -121,8 +127,8 @@ func NewDesiredStateOfWorldPopulator(
 type desiredStateOfWorldPopulator struct {
 	kubeClient               clientset.Interface
 	loopSleepDuration        time.Duration
-	podManager               pod.Manager
-	podStateProvider         podStateProvider
+	podManager               PodManager
+	podStateProvider         PodStateProvider
 	desiredStateOfWorld      cache.DesiredStateOfWorld
 	actualStateOfWorld       cache.ActualStateOfWorld
 	pods                     processedPods
@@ -207,7 +213,9 @@ func (dswp *desiredStateOfWorldPopulator) findAndAddNewPods() {
 // Iterate through all pods in desired state of world, and remove if they no
 // longer exist
 func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
+	podsFromCache := make(map[volumetypes.UniquePodName]struct{})
 	for _, volumeToMount := range dswp.desiredStateOfWorld.GetVolumesToMount() {
+		podsFromCache[volumetypes.UniquePodName(volumeToMount.Pod.UID)] = struct{}{}
 		pod, podExists := dswp.podManager.GetPodByUID(volumeToMount.Pod.UID)
 		if podExists {
 
@@ -254,6 +262,23 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 		dswp.desiredStateOfWorld.DeletePodFromVolume(
 			volumeToMount.PodName, volumeToMount.VolumeName)
 		dswp.deleteProcessedPod(volumeToMount.PodName)
+	}
+
+	// Cleanup orphanded entries from processedPods
+	dswp.pods.Lock()
+	orphanedPods := make([]volumetypes.UniquePodName, 0, len(dswp.pods.processedPods))
+	for k := range dswp.pods.processedPods {
+		if _, ok := podsFromCache[k]; !ok {
+			orphanedPods = append(orphanedPods, k)
+		}
+	}
+	dswp.pods.Unlock()
+	for _, orphanedPod := range orphanedPods {
+		uid := types.UID(orphanedPod)
+		_, podExists := dswp.podManager.GetPodByUID(uid)
+		if !podExists && dswp.podStateProvider.ShouldPodRuntimeBeRemoved(uid) {
+			dswp.deleteProcessedPod(orphanedPod)
+		}
 	}
 
 	podsWithError := dswp.desiredStateOfWorld.GetPodsWithErrors()

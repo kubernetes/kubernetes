@@ -265,6 +265,8 @@ func (t *envelopeTransformer) doDecode(originalData []byte) (*kmstypes.Encrypted
 	return o, nil
 }
 
+// GenerateTransformer generates a new transformer and encrypts the DEK using the envelope service.
+// It returns the transformer, the encrypted DEK, cache key and error.
 func GenerateTransformer(ctx context.Context, uid string, envelopeService kmsservice.Service) (value.Transformer, *kmsservice.EncryptResponse, []byte, error) {
 	transformer, newKey, err := aestransformer.NewGCMTransformerWithUniqueKeyUnsafe()
 	if err != nil {
@@ -276,6 +278,15 @@ func GenerateTransformer(ctx context.Context, uid string, envelopeService kmsser
 	resp, err := envelopeService.Encrypt(ctx, uid, newKey)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to encrypt DEK, error: %w", err)
+	}
+
+	if err := validateEncryptedObject(&kmstypes.EncryptedObject{
+		KeyID:         resp.KeyID,
+		EncryptedDEK:  resp.Ciphertext,
+		EncryptedData: []byte{0}, // any non-empty value to pass validation
+		Annotations:   resp.Annotations,
+	}); err != nil {
+		return nil, nil, nil, err
 	}
 
 	cacheKey, err := generateCacheKey(resp.Ciphertext, resp.KeyID, resp.Annotations)

@@ -50,8 +50,10 @@ type simpleCache struct {
 }
 
 func newSimpleCache(clock clock.Clock, ttl time.Duration) *simpleCache {
+	cache := utilcache.NewExpiringWithClock(clock)
+	cache.AllowExpiredGet = true // for a given key, the value (the decryptTransformer) is always the same
 	return &simpleCache{
-		cache: utilcache.NewExpiringWithClock(clock),
+		cache: cache,
 		ttl:   ttl,
 		hashPool: &sync.Pool{
 			New: func() interface{} {

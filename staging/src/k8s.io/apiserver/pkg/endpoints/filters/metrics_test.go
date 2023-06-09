@@ -23,8 +23,12 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 )
@@ -146,10 +150,118 @@ func TestMetrics(t *testing.T) {
 					close(done)
 				}),
 				tt.apiAudience,
+				nil,
 			)
 
 			auth.ServeHTTP(httptest.NewRecorder(), &http.Request{})
 			<-done
+
+			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tt.want), metrics...); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestRecordAuthorizationMetricsMetrics(t *testing.T) {
+	// Excluding authorization_duration_seconds since it is difficult to predict its values.
+	metrics := []string{
+		"authorization_attempts_total",
+		"authorization_decision_annotations_total",
+	}
+
+	testCases := []struct {
+		desc       string
+		authorizer fakeAuthorizer
+		want       string
+	}{
+		{
+			desc: "auth ok",
+			authorizer: fakeAuthorizer{
+				authorizer.DecisionAllow,
+				"RBAC: allowed to patch pod",
+				nil,
+			},
+			want: `
+			# HELP authorization_attempts_total [ALPHA] Counter of authorization attempts broken down by result. It can be either 'allowed', 'denied', 'no-opinion' or 'error'.
+			# TYPE authorization_attempts_total counter
+			authorization_attempts_total{result="allowed"} 1
+				`,
+		},
+		{
+			desc: "decision forbid",
+			authorizer: fakeAuthorizer{
+				authorizer.DecisionDeny,
+				"RBAC: not allowed to patch pod",
+				nil,
+			},
+			want: `
+			# HELP authorization_attempts_total [ALPHA] Counter of authorization attempts broken down by result. It can be either 'allowed', 'denied', 'no-opinion' or 'error'.
+			# TYPE authorization_attempts_total counter
+			authorization_attempts_total{result="denied"} 1
+				`,
+		},
+		{
+			desc: "authorizer failed with error",
+			authorizer: fakeAuthorizer{
+				authorizer.DecisionNoOpinion,
+				"",
+				errors.New("can't parse user info"),
+			},
+			want: `
+			# HELP authorization_attempts_total [ALPHA] Counter of authorization attempts broken down by result. It can be either 'allowed', 'denied', 'no-opinion' or 'error'.
+			# TYPE authorization_attempts_total counter
+			authorization_attempts_total{result="error"} 1
+				`,
+		},
+		{
+			desc: "authorizer decided allow with error",
+			authorizer: fakeAuthorizer{
+				authorizer.DecisionAllow,
+				"",
+				errors.New("can't parse user info"),
+			},
+			want: `
+			# HELP authorization_attempts_total [ALPHA] Counter of authorization attempts broken down by result. It can be either 'allowed', 'denied', 'no-opinion' or 'error'.
+			# TYPE authorization_attempts_total counter
+			authorization_attempts_total{result="allowed"} 1
+				`,
+		},
+		{
+			desc: "authorizer failed with error",
+			authorizer: fakeAuthorizer{
+				authorizer.DecisionNoOpinion,
+				"",
+				nil,
+			},
+			want: `
+			# HELP authorization_attempts_total [ALPHA] Counter of authorization attempts broken down by result. It can be either 'allowed', 'denied', 'no-opinion' or 'error'.
+			# TYPE authorization_attempts_total counter
+			authorization_attempts_total{result="no-opinion"} 1
+				`,
+		},
+	}
+
+	// Since prometheus' gatherer is global, other tests may have updated metrics already, so
+	// we need to reset them prior running this test.
+	// This also implies that we can't run this test in parallel with other auth tests.
+	authorizationAttemptsCounter.Reset()
+
+	scheme := runtime.NewScheme()
+	negotiatedSerializer := serializer.NewCodecFactory(scheme).WithoutConversion()
+
+	for _, tt := range testCases {
+		t.Run(tt.desc, func(t *testing.T) {
+			defer authorizationAttemptsCounter.Reset()
+
+			audit := &auditinternal.Event{Level: auditinternal.LevelMetadata}
+			handler := WithAuthorization(&fakeHTTPHandler{}, tt.authorizer, negotiatedSerializer)
+			// TODO: fake audit injector
+
+			req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
+			req = withTestContext(req, nil, audit)
+			req.RemoteAddr = "127.0.0.1"
+			handler.ServeHTTP(httptest.NewRecorder(), req)
 
 			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tt.want), metrics...); err != nil {
 				t.Fatal(err)

@@ -131,7 +131,7 @@ func (pl *InterPodAffinity) PreScore(
 ) *framework.Status {
 	if len(nodes) == 0 {
 		// No nodes to score.
-		return nil
+		return framework.NewStatus(framework.Skip)
 	}
 
 	if pl.sharedLister == nil {
@@ -141,21 +141,19 @@ func (pl *InterPodAffinity) PreScore(
 	affinity := pod.Spec.Affinity
 	hasPreferredAffinityConstraints := affinity != nil && affinity.PodAffinity != nil && len(affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution) > 0
 	hasPreferredAntiAffinityConstraints := affinity != nil && affinity.PodAntiAffinity != nil && len(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution) > 0
+	hasConstraints := hasPreferredAffinityConstraints || hasPreferredAntiAffinityConstraints
 
 	// Optionally ignore calculating preferences of existing pods' affinity rules
 	// if the incoming pod has no inter-pod affinities.
-	if pl.args.IgnorePreferredTermsOfExistingPods && !hasPreferredAffinityConstraints && !hasPreferredAntiAffinityConstraints {
-		cycleState.Write(preScoreStateKey, &preScoreState{
-			topologyScore: make(map[string]map[string]int64),
-		})
-		return nil
+	if pl.args.IgnorePreferredTermsOfExistingPods && !hasConstraints {
+		return framework.NewStatus(framework.Skip)
 	}
 
 	// Unless the pod being scheduled has preferred affinity terms, we only
 	// need to process nodes hosting pods with affinity.
 	var allNodes []*framework.NodeInfo
 	var err error
-	if hasPreferredAffinityConstraints || hasPreferredAntiAffinityConstraints {
+	if hasConstraints {
 		allNodes, err = pl.sharedLister.NodeInfos().List()
 		if err != nil {
 			return framework.AsStatus(fmt.Errorf("failed to get all nodes from shared lister: %w", err))
@@ -192,13 +190,11 @@ func (pl *InterPodAffinity) PreScore(
 	index := int32(-1)
 	processNode := func(i int) {
 		nodeInfo := allNodes[i]
-		if nodeInfo.Node() == nil {
-			return
-		}
+
 		// Unless the pod being scheduled has preferred affinity terms, we only
 		// need to process pods with affinity in the node.
 		podsToProcess := nodeInfo.PodsWithAffinity
-		if hasPreferredAffinityConstraints || hasPreferredAntiAffinityConstraints {
+		if hasConstraints {
 			// We need to process all the pods.
 			podsToProcess = nodeInfo.Pods
 		}
@@ -212,6 +208,10 @@ func (pl *InterPodAffinity) PreScore(
 		}
 	}
 	pl.parallelizer.Until(pCtx, len(allNodes), processNode, pl.Name())
+
+	if index == -1 {
+		return framework.NewStatus(framework.Skip)
+	}
 
 	for i := 0; i <= int(index); i++ {
 		state.topologyScore.append(topoScores[i])

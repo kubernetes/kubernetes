@@ -27,11 +27,14 @@ import (
 
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/mo"
-	"k8s.io/klog/v2"
-
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
+	coreclients "k8s.io/client-go/kubernetes/typed/core/v1"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/klog/v2"
 	"k8s.io/legacy-cloud-providers/vsphere/vclib"
 )
 
@@ -60,6 +63,9 @@ type NodeManager struct {
 	registeredNodes map[string]*v1.Node
 	//CredentialsManager
 	credentialManager *SecretCredentialManager
+
+	nodeLister corelisters.NodeLister
+	nodeGetter coreclients.NodesGetter
 
 	// Mutexes
 	registeredNodesLock   sync.RWMutex
@@ -271,10 +277,43 @@ func (nm *NodeManager) GetNode(nodeName k8stypes.NodeName) (v1.Node, error) {
 	nm.registeredNodesLock.RLock()
 	node := nm.registeredNodes[convertToString(nodeName)]
 	nm.registeredNodesLock.RUnlock()
-	if node == nil {
-		return v1.Node{}, vclib.ErrNoVMFound
+	if node != nil {
+		klog.V(4).Infof("Node %s found in vSphere cloud provider cache", nodeName)
+		return *node, nil
 	}
-	return *node, nil
+
+	if nm.nodeLister != nil {
+		klog.V(4).Infof("Node %s missing in vSphere cloud provider cache, trying node informer")
+		node, err := nm.nodeLister.Get(convertToString(nodeName))
+		if err != nil {
+			if !errors.IsNotFound(err) {
+				return v1.Node{}, err
+			}
+			// Fall through with IsNotFound error and try to get the node from the API server
+		} else {
+			node := node.DeepCopy()
+			nm.addNode(node)
+			klog.V(4).Infof("Node %s found in vSphere cloud provider node informer", nodeName)
+			return *node, nil
+		}
+	}
+
+	if nm.nodeGetter != nil {
+		klog.V(4).Infof("Node %s missing in vSphere cloud provider caches, trying the API server")
+		node, err := nm.nodeGetter.Nodes().Get(context.TODO(), convertToString(nodeName), metav1.GetOptions{})
+		if err != nil {
+			if !errors.IsNotFound(err) {
+				return v1.Node{}, err
+			}
+			// Fall through with IsNotFound error to keep the code consistent with the above
+		} else {
+			nm.addNode(node)
+			klog.V(4).Infof("Node %s found in the API server", nodeName)
+			return *node, nil
+		}
+	}
+	klog.V(4).Infof("Node %s not found in vSphere cloud provider", nodeName)
+	return v1.Node{}, vclib.ErrNoVMFound
 }
 
 func (nm *NodeManager) getNodes() map[string]*v1.Node {
@@ -514,4 +553,12 @@ func (nm *NodeManager) GetHostsInZone(ctx context.Context, zoneFailureDomain str
 	}
 	klog.V(4).Infof("GetHostsInZone %v returning: %v", zoneFailureDomain, hosts)
 	return hosts, nil
+}
+
+func (nm *NodeManager) SetNodeLister(nodeLister corelisters.NodeLister) {
+	nm.nodeLister = nodeLister
+}
+
+func (nm *NodeManager) SetNodeGetter(nodeGetter coreclients.NodesGetter) {
+	nm.nodeGetter = nodeGetter
 }

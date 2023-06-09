@@ -214,7 +214,16 @@ func TestWarnings(t *testing.T) {
 				}},
 			},
 			expected: []string{`spec.volumes[0].glusterfs: deprecated in v1.25, non-functional in v1.26+`},
+		}, {
+			name: "CephFS",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Volumes: []api.Volume{
+					{Name: "s", VolumeSource: api.VolumeSource{CephFS: &api.CephFSVolumeSource{}}},
+				}},
+			},
+			expected: []string{`spec.volumes[0].cephfs: deprecated in v1.28, non-functional in v1.31+`},
 		},
+
 		{
 			name: "duplicate hostAlias",
 			template: &api.PodTemplateSpec{Spec: api.PodSpec{
@@ -255,38 +264,38 @@ func TestWarnings(t *testing.T) {
 			},
 		},
 		{
-			name: "duplicate volume",
-			template: &api.PodTemplateSpec{Spec: api.PodSpec{
-				Volumes: []api.Volume{
-					{Name: "a"},
-					{Name: "a"},
-					{Name: "a"},
-				}},
-			},
-			expected: []string{
-				`spec.volumes[1].name: duplicate name "a"`,
-				`spec.volumes[2].name: duplicate name "a"`,
-			},
-		},
-		{
 			name: "duplicate env",
 			template: &api.PodTemplateSpec{Spec: api.PodSpec{
 				InitContainers: []api.Container{{Env: []api.EnvVar{
-					{Name: "a"},
-					{Name: "a"},
-					{Name: "a"},
+					{Name: "a", Value: "a"},
+					{Name: "a", Value: "a"},
+					{Name: "a", Value: "other"},
+					{Name: "a", Value: ""},
+					{Name: "a", Value: "$(a)"},
+					{Name: "a", ValueFrom: &api.EnvVarSource{}},
+					{Name: "a", Value: "$(a) $(a)"}, // no warning
 				}}},
 				Containers: []api.Container{{Env: []api.EnvVar{
-					{Name: "b"},
-					{Name: "b"},
-					{Name: "b"},
+					{Name: "b", Value: "b"},
+					{Name: "b", Value: "b"},
+					{Name: "b", Value: "other"},
+					{Name: "b", Value: ""},
+					{Name: "b", Value: "$(b)"},
+					{Name: "b", ValueFrom: &api.EnvVarSource{}},
+					{Name: "b", Value: "$(b) $(b)"}, // no warning
 				}}},
 			}},
 			expected: []string{
-				`spec.initContainers[0].env[1].name: duplicate name "a"`,
-				`spec.initContainers[0].env[2].name: duplicate name "a"`,
-				`spec.containers[0].env[1].name: duplicate name "b"`,
-				`spec.containers[0].env[2].name: duplicate name "b"`,
+				`spec.initContainers[0].env[1]: hides previous definition of "a"`,
+				`spec.initContainers[0].env[2]: hides previous definition of "a"`,
+				`spec.initContainers[0].env[3]: hides previous definition of "a"`,
+				`spec.initContainers[0].env[4]: hides previous definition of "a"`,
+				`spec.initContainers[0].env[5]: hides previous definition of "a"`,
+				`spec.containers[0].env[1]: hides previous definition of "b"`,
+				`spec.containers[0].env[2]: hides previous definition of "b"`,
+				`spec.containers[0].env[3]: hides previous definition of "b"`,
+				`spec.containers[0].env[4]: hides previous definition of "b"`,
+				`spec.containers[0].env[5]: hides previous definition of "b"`,
 			},
 		},
 		{
@@ -401,12 +410,30 @@ func TestWarnings(t *testing.T) {
 			template: &api.PodTemplateSpec{
 				Spec: api.PodSpec{
 					TopologySpreadConstraints: []api.TopologySpreadConstraint{
-						{TopologyKey: `foo`},
-						{TopologyKey: `beta.kubernetes.io/arch`},
-						{TopologyKey: `beta.kubernetes.io/os`},
-						{TopologyKey: `failure-domain.beta.kubernetes.io/region`},
-						{TopologyKey: `failure-domain.beta.kubernetes.io/zone`},
-						{TopologyKey: `beta.kubernetes.io/instance-type`},
+						{
+							TopologyKey:   `foo`,
+							LabelSelector: &metav1.LabelSelector{},
+						},
+						{
+							TopologyKey:   `beta.kubernetes.io/arch`,
+							LabelSelector: &metav1.LabelSelector{},
+						},
+						{
+							TopologyKey:   `beta.kubernetes.io/os`,
+							LabelSelector: &metav1.LabelSelector{},
+						},
+						{
+							TopologyKey:   `failure-domain.beta.kubernetes.io/region`,
+							LabelSelector: &metav1.LabelSelector{},
+						},
+						{
+							TopologyKey:   `failure-domain.beta.kubernetes.io/zone`,
+							LabelSelector: &metav1.LabelSelector{},
+						},
+						{
+							TopologyKey:   `beta.kubernetes.io/instance-type`,
+							LabelSelector: &metav1.LabelSelector{},
+						},
 					},
 				},
 			},
@@ -500,6 +527,85 @@ func TestWarnings(t *testing.T) {
 			},
 			expected: []string{
 				`spec.terminationGracePeriodSeconds: must be >= 0; negative values are invalid and will be treated as 1`,
+			},
+		},
+		{
+			name: "null LabelSelector in topologySpreadConstraints",
+			template: &api.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{},
+				Spec: api.PodSpec{
+					TopologySpreadConstraints: []api.TopologySpreadConstraint{
+						{
+							LabelSelector: &metav1.LabelSelector{},
+						},
+						{
+							LabelSelector: nil,
+						},
+					},
+				},
+			},
+			expected: []string{
+				`spec.topologySpreadConstraints[1].labelSelector: a null labelSelector results in matching no pod`,
+			},
+		},
+		{
+			name: "null LabelSelector in PodAffinity",
+			template: &api.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{},
+				Spec: api.PodSpec{
+					Affinity: &api.Affinity{
+						PodAffinity: &api.PodAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{},
+								},
+								{
+									LabelSelector: nil,
+								},
+							},
+							PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
+								{
+									PodAffinityTerm: api.PodAffinityTerm{
+										LabelSelector: &metav1.LabelSelector{},
+									},
+								},
+								{
+									PodAffinityTerm: api.PodAffinityTerm{
+										LabelSelector: nil,
+									},
+								},
+							},
+						},
+						PodAntiAffinity: &api.PodAntiAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{},
+								},
+								{
+									LabelSelector: nil,
+								},
+							},
+							PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
+								{
+									PodAffinityTerm: api.PodAffinityTerm{
+										LabelSelector: &metav1.LabelSelector{},
+									},
+								},
+								{
+									PodAffinityTerm: api.PodAffinityTerm{
+										LabelSelector: nil,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: []string{
+				`spec.affinity.podAffinity.requiredDuringSchedulingIgnoredDuringExecution[1].labelSelector: a null labelSelector results in matching no pod`,
+				`spec.affinity.podAffinity.preferredDuringSchedulingIgnoredDuringExecution[1].podAffinityTerm.labelSelector: a null labelSelector results in matching no pod`,
+				`spec.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution[1].labelSelector: a null labelSelector results in matching no pod`,
+				`spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[1].podAffinityTerm.labelSelector: a null labelSelector results in matching no pod`,
 			},
 		},
 	}

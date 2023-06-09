@@ -49,7 +49,9 @@ var cfgFiles = map[string][]byte{
 	"InitConfiguration_v1beta3": []byte(fmt.Sprintf(`
 apiVersion: %s
 kind: InitConfiguration
-`, kubeadmapiv1.SchemeGroupVersion.String())),
+nodeRegistration:
+  criSocket: %s
+`, kubeadmapiv1.SchemeGroupVersion.String(), kubeadmconstants.UnknownCRISocket)),
 	"ClusterConfiguration_v1beta3": []byte(fmt.Sprintf(`
 apiVersion: %s
 kind: ClusterConfiguration

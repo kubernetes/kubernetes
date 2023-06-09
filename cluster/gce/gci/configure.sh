@@ -32,9 +32,9 @@ DEFAULT_AUTH_PROVIDER_GCP_HASH_AMD64='88d9fa581002973170ca58427763f00355b24fbabd
 DEFAULT_AUTH_PROVIDER_GCP_VERSION='v0.24.0'
 # TODO (SergeyKanzhelev): fill up for npd 0.8.9+
 DEFAULT_NPD_HASH_ARM64='8ccb42a862efdfc1f25ca9a22f3fd36f9fdff1ac618dd7d39e3b5991505dd610d432364420896ad71f42197a116f28a85dde58b129baa075ebb7312caa57f852'
-DEFAULT_CRICTL_VERSION='v1.26.0'
-DEFAULT_CRICTL_AMD64_SHA512='a3a2c02a90b008686c20babaf272e703924db2a3e2a0d4e2a7c81d994cbc68c47458a4a354ecc243af095b390815c7f203348b9749351ae817bd52a522300449'
-DEFAULT_CRICTL_ARM64_SHA512='4c7e4541123cbd6f1d6fec1f827395cd58d65716c0998de790f965485738b6d6257c0dc46fd7f66403166c299f6d5bf9ff30b6e1ff9afbb071f17005e834518c'
+DEFAULT_CRICTL_VERSION='v1.27.0'
+DEFAULT_CRICTL_AMD64_SHA512='aa622325bf05520939f9e020d7a28ab48ac23e2fae6f47d5a4e52174c88c1ebc31b464853e4fd65bd8f5331f330a6ca96fd370d247d3eeaed042da4ee2d1219a'
+DEFAULT_CRICTL_ARM64_SHA512='db062e43351a63347871e7094115be2ae3853afcd346d47f7b51141da8c3202c2df58d2e17359322f632abcb37474fd7fdb3b7aadbc5cfd5cf6d3bad040b6251'
 DEFAULT_MOUNTER_TAR_SHA='7956fd42523de6b3107ddc3ce0e75233d2fcb78436ff07a1389b6eaac91fb2b1b72a08f7a219eaf96ba1ca4da8d45271002e0d60e0644e796c665f99bb356516'
 ###
 
@@ -254,7 +254,7 @@ function install-gci-mounter-tools {
   mkdir -p "${CONTAINERIZED_MOUNTER_HOME}"
   chmod a+x "${CONTAINERIZED_MOUNTER_HOME}"
   mkdir -p "${CONTAINERIZED_MOUNTER_HOME}/rootfs"
-  download-or-bust "${mounter_tar_sha}" "https://storage.googleapis.com/kubernetes-release/gci-mounter/mounter.tar"
+  download-or-bust "${mounter_tar_sha}" "https://dl.k8s.io/gci-mounter/mounter.tar"
   cp "${KUBE_HOME}/kubernetes/server/bin/mounter" "${CONTAINERIZED_MOUNTER_HOME}/mounter"
   chmod a+x "${CONTAINERIZED_MOUNTER_HOME}/mounter"
   mv "${KUBE_HOME}/mounter.tar" /tmp/mounter.tar
@@ -297,7 +297,7 @@ function install-node-problem-detector {
   fi
 
   echo "Downloading ${npd_tar}."
-  local -r npd_release_path="${NODE_PROBLEM_DETECTOR_RELEASE_PATH:-https://storage.googleapis.com/kubernetes-release}"
+  local -r npd_release_path="${NODE_PROBLEM_DETECTOR_RELEASE_PATH:-https://dl.k8s.io}"
   download-or-bust "${npd_hash}" "${npd_release_path}/node-problem-detector/${npd_tar}"
   local -r npd_dir="${KUBE_HOME}/node-problem-detector"
   mkdir -p "${npd_dir}"
@@ -717,8 +717,8 @@ function install-kube-binary-config {
   # are presented to kubelet:
   # --image-credential-provider-config=${path-to-config}
   # --image-credential-provider-bin-dir=${path-to-auth-provider-binary}
-  # Also, it is required that DisableKubeletCloudCredentialProviders and KubeletCredentialProviders
-  # feature gates are set to true for kubelet to use external credential provider. 
+  # Also, it is required that DisableKubeletCloudCredentialProviders
+  # feature gate is set to true for kubelet to use external credential provider.
   if [[ "${ENABLE_AUTH_PROVIDER_GCP:-}" == "true" ]]; then
     # Install out-of-tree auth-provider-gcp binary to enable kubelet to dynamically
     # retrieve credentials for a container image registry.

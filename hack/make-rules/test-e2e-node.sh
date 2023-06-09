@@ -66,8 +66,8 @@ if [[ ${skip} != "" ]]; then
   ginkgoflags="${ginkgoflags} -skip=\"${skip}\" "
 fi
 
-if [[ ${run_until_failure} != "" ]]; then
-  ginkgoflags="${ginkgoflags} -untilItFails=${run_until_failure} "
+if [[ ${run_until_failure} == "true" ]]; then
+  ginkgoflags="${ginkgoflags} --until-it-fails=true "
 fi
 
 # Setup the directory to copy test artifacts (logs, junit.xml, etc) from remote host to local host

@@ -134,8 +134,8 @@ fi
 # Some arguments (like --nodes) are only supported when using the CLI.
 # Those get set below when choosing the program.
 ginkgo_args=(
-  "--poll-progress-after=${GINKGO_POLL_PROGRESS_AFTER:-300s}"
-  "--poll-progress-interval=${GINKGO_POLL_PROGRESS_INTERVAL:-20s}"
+  "--poll-progress-after=${GINKGO_POLL_PROGRESS_AFTER:-60m}"
+  "--poll-progress-interval=${GINKGO_POLL_PROGRESS_INTERVAL:-5m}"
   "--source-root=${KUBE_ROOT}"
 )
 
@@ -149,7 +149,7 @@ if [[ -n "${CONFORMANCE_TEST_SKIP_REGEX:-}" ]]; then
 fi
 
 if [[ "${GINKGO_UNTIL_IT_FAILS:-}" == true ]]; then
-  ginkgo_args+=("--untilItFails=true")
+  ginkgo_args+=("--until-it-fails=true")
 fi
 
 FLAKE_ATTEMPTS=1

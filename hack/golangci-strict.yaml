@@ -15,6 +15,12 @@ issues:
     - path: conversion\.go
       linters:
         - ineffassign
+    # The Kubernetes naming convention for conversion functions uses underscores
+    # and intentionally deviates from normal Go conventions to make those function
+    # names more readable. Same for SetDefaults_*.
+    - linters:
+        - stylecheck
+      text: "ST1003: should not use underscores in Go names; func (Convert_.*_To_.*|SetDefaults_)"
 
 linters:
   disable-all: false # in contrast to golangci.yaml, the default set of linters remains enabled

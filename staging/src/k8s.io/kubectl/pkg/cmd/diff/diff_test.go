@@ -29,7 +29,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/utils/exec"
 )
 
@@ -64,14 +64,11 @@ func (f *FakeObject) Live() runtime.Object {
 func TestDiffProgram(t *testing.T) {
 	externalDiffCommands := [3]string{"diff", "diff -ruN", "diff --report-identical-files"}
 
-	if oriLang := os.Getenv("LANG"); oriLang != "C" {
-		os.Setenv("LANG", "C")
-		defer os.Setenv("LANG", oriLang)
-	}
+	t.Setenv("LANG", "C")
 
 	for i, c := range externalDiffCommands {
-		os.Setenv("KUBECTL_EXTERNAL_DIFF", c)
-		streams, _, stdout, _ := genericclioptions.NewTestIOStreams()
+		t.Setenv("KUBECTL_EXTERNAL_DIFF", c)
+		streams, _, stdout, _ := genericiooptions.NewTestIOStreams()
 		diff := DiffProgram{
 			IOStreams: streams,
 			Exec:      exec.New(),

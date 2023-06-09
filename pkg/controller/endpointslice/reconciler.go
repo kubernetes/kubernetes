@@ -58,8 +58,8 @@ type reconciler struct {
 // endpointMeta includes the attributes we group slices on, this type helps with
 // that logic in reconciler
 type endpointMeta struct {
-	Ports       []discovery.EndpointPort `json:"ports" protobuf:"bytes,2,rep,name=ports"`
-	AddressType discovery.AddressType    `json:"addressType" protobuf:"bytes,3,rep,name=addressType"`
+	ports       []discovery.EndpointPort
+	addressType discovery.AddressType
 }
 
 // reconcile takes a set of pods currently matching a service selector and
@@ -80,7 +80,7 @@ func (r *reconciler) reconcile(service *corev1.Service, pods []*corev1.Pod, exis
 	// for further adjustment
 	for _, existingSlice := range existingSlices {
 		// service no longer supports that address type, add it to deleted slices
-		if _, ok := serviceSupportedAddressesTypes[existingSlice.AddressType]; !ok {
+		if !serviceSupportedAddressesTypes.Has(existingSlice.AddressType) {
 			if r.topologyCache != nil {
 				svcKey, err := serviceControllerKey(existingSlice)
 				if err != nil {
@@ -166,8 +166,8 @@ func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*cor
 
 		if _, ok := desiredMetaByPortMap[epHash]; !ok {
 			desiredMetaByPortMap[epHash] = &endpointMeta{
-				AddressType: addressType,
-				Ports:       endpointPorts,
+				addressType: addressType,
+				ports:       endpointPorts,
 			}
 		}
 
@@ -231,7 +231,7 @@ func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*cor
 	// When no endpoint slices would usually exist, we need to add a placeholder.
 	if len(existingSlices) == len(slicesToDelete) && len(slicesToCreate) < 1 {
 		// Check for existing placeholder slice outside of the core control flow
-		placeholderSlice := newEndpointSlice(service, &endpointMeta{Ports: []discovery.EndpointPort{}, AddressType: addressType})
+		placeholderSlice := newEndpointSlice(service, &endpointMeta{ports: []discovery.EndpointPort{}, addressType: addressType})
 		if len(slicesToDelete) == 1 && placeholderSliceCompare.DeepEqual(slicesToDelete[0], placeholderSlice) {
 			// We are about to unnecessarily delete/recreate the placeholder, remove it now.
 			slicesToDelete = slicesToDelete[:0]
@@ -413,9 +413,9 @@ func (r *reconciler) reconcileByPortMapping(
 	endpointMeta *endpointMeta,
 ) ([]*discovery.EndpointSlice, []*discovery.EndpointSlice, []*discovery.EndpointSlice, int, int) {
 	slicesByName := map[string]*discovery.EndpointSlice{}
-	sliceNamesUnchanged := sets.String{}
-	sliceNamesToUpdate := sets.String{}
-	sliceNamesToDelete := sets.String{}
+	sliceNamesUnchanged := sets.New[string]()
+	sliceNamesToUpdate := sets.New[string]()
+	sliceNamesToDelete := sets.New[string]()
 	numRemoved := 0
 
 	// 1. Iterate through existing slices to delete endpoints no longer desired

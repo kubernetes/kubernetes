@@ -340,8 +340,8 @@ func TestCreateSecretGeneric(t *testing.T) {
 		"create_secret_get_env_from_env_file": {
 			secretName: "get_env",
 			setup: func() func(t *testing.T, secretGenericOptions *CreateSecretOptions) func() {
-				os.Setenv("g_key1", "1")
-				os.Setenv("g_key2", "2")
+				t.Setenv("g_key1", "1")
+				t.Setenv("g_key2", "2")
 				return setupSecretEnvFile([][]string{{"g_key1", "g_key2="}})
 			}(),
 			fromEnvFile: []string{"file.env"},
@@ -362,8 +362,8 @@ func TestCreateSecretGeneric(t *testing.T) {
 		"create_secret_get_env_from_env_file_hash": {
 			secretName: "get_env",
 			setup: func() func(t *testing.T, secretGenericOptions *CreateSecretOptions) func() {
-				os.Setenv("g_key1", "1")
-				os.Setenv("g_key2", "2")
+				t.Setenv("g_key1", "1")
+				t.Setenv("g_key2", "2")
 				return setupSecretEnvFile([][]string{{"g_key1", "g_key2="}})
 			}(),
 			fromEnvFile: []string{"file.env"},

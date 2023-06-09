@@ -4,11 +4,13 @@ approvers:
   - luxas
   - fabriziopandini
   - neolit123
+  - pacoxu
 reviewers:
   - luxas
   - fabriziopandini
   - neolit123
   - SataQiu
+  - pacoxu
 labels:
   - sig/cluster-lifecycle
 emeritus_approvers:

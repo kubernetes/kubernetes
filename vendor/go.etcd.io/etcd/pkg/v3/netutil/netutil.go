@@ -103,7 +103,7 @@ func resolveURL(ctx context.Context, lg *zap.Logger, u url.URL) (string, error) 
 		)
 		return "", err
 	}
-	if host == "localhost" || net.ParseIP(host) != nil {
+	if host == "localhost" {
 		return "", nil
 	}
 	for ctx.Err() == nil {

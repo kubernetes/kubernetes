@@ -1835,11 +1835,15 @@ func (ctrl *PersistentVolumeController) provisionClaimOperationExternal(
 	newClaim, err := ctrl.setClaimProvisioner(ctx, claim, provisionerName)
 	if err != nil {
 		// Save failed, the controller will retry in the next sync
+		strerr := fmt.Sprintf("Error saving claim: %v", err)
 		logger.V(2).Info("Error saving claim", "PVC", klog.KObj(claim), "err", err)
+		ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.ProvisioningFailed, strerr)
 		return provisionerName, err
 	}
 	claim = newClaim
-	msg := fmt.Sprintf("waiting for a volume to be created, either by external provisioner %q or manually created by system administrator", provisionerName)
+	msg := fmt.Sprintf("Waiting for a volume to be created either by the external provisioner '%s' "+
+		"or manually by the system administrator. If volume creation is delayed, please verify that "+
+		"the provisioner is running and correctly registered.", provisionerName)
 	// External provisioner has been requested for provisioning the volume
 	// Report an event and wait for external provisioner to finish
 	ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, events.ExternalProvisioning, msg)

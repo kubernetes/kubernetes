@@ -131,8 +131,8 @@ type KubeControllerManagerConfiguration struct {
 	JobController JobControllerConfiguration
 	// CronJobControllerConfiguration holds configuration for CronJobController related features.
 	CronJobController CronJobControllerConfiguration
-	// NamespaceControllerConfiguration holds configuration for NamespaceController
-	// related features.
+	// LegacySATokenCleanerConfiguration holds configuration for LegacySATokenCleaner related features.
+	LegacySATokenCleaner LegacySATokenCleanerConfiguration
 	// NamespaceControllerConfiguration holds configuration for NamespaceController
 	// related features.
 	NamespaceController NamespaceControllerConfiguration
@@ -355,6 +355,13 @@ type CronJobControllerConfiguration struct {
 	// allowed to sync concurrently. Larger number = more responsive jobs,
 	// but more CPU (and network) load.
 	ConcurrentCronJobSyncs int32
+}
+
+// LegacySATokenCleanerConfiguration contains elements describing LegacySATokenCleaner
+type LegacySATokenCleanerConfiguration struct {
+	// CleanUpPeriod is the period of time since the last usage of an
+	// auto-generated service account token before it can be deleted.
+	CleanUpPeriod metav1.Duration
 }
 
 // NamespaceControllerConfiguration contains elements describing NamespaceController.

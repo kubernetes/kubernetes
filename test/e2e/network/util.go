@@ -158,7 +158,7 @@ func execHostnameTest(sourcePod v1.Pod, targetAddr, targetHostname string) {
 	)
 
 	framework.Logf("Waiting up to %v to get response from %s", timeout, targetAddr)
-	cmd := fmt.Sprintf(`curl -q -s --connect-timeout 30 %s/hostname`, targetAddr)
+	cmd := fmt.Sprintf(`curl -q -s --max-time 30 %s/hostname`, targetAddr)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2 * time.Second) {
 		stdout, err = e2eoutput.RunHostCmd(sourcePod.Namespace, sourcePod.Name, cmd)
 		if err != nil {

@@ -35,6 +35,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
@@ -75,7 +76,7 @@ type ApplyFlags struct {
 	PruneWhitelist []string // TODO: Remove this in kubectl 1.28 or later
 	PruneAllowlist []string
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // ApplyOptions defines flags and other configuration parameters for the `apply` command
@@ -109,7 +110,7 @@ type ApplyOptions struct {
 	Namespace        string
 	EnforceNamespace bool
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 
 	// Objects (and some denormalized data) which are to be
 	// applied. The standard way to fill in this structure
@@ -179,7 +180,7 @@ var (
 var ApplySetToolVersion = version.Get().GitVersion
 
 // NewApplyFlags returns a default ApplyFlags
-func NewApplyFlags(streams genericclioptions.IOStreams) *ApplyFlags {
+func NewApplyFlags(streams genericiooptions.IOStreams) *ApplyFlags {
 	return &ApplyFlags{
 		RecordFlags: genericclioptions.NewRecordFlags(),
 		DeleteFlags: delete.NewDeleteFlags("The files that contain the configurations to apply."),
@@ -193,7 +194,7 @@ func NewApplyFlags(streams genericclioptions.IOStreams) *ApplyFlags {
 }
 
 // NewCmdApply creates the `apply` command
-func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	flags := NewApplyFlags(ioStreams)
 
 	cmd := &cobra.Command{

@@ -55,7 +55,7 @@ func (client ExpressRoutePortsClient) CreateOrUpdate(ctx context.Context, resour
 
 	result, err = client.CreateOrUpdateSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.ExpressRoutePortsClient", "CreateOrUpdate", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.ExpressRoutePortsClient", "CreateOrUpdate", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -90,6 +90,7 @@ func (client ExpressRoutePortsClient) CreateOrUpdatePreparer(ctx context.Context
 // http.Response Body if it receives an error.
 func (client ExpressRoutePortsClient) CreateOrUpdateSender(req *http.Request) (future ExpressRoutePortsCreateOrUpdateFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -136,7 +137,7 @@ func (client ExpressRoutePortsClient) Delete(ctx context.Context, resourceGroupN
 
 	result, err = client.DeleteSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.ExpressRoutePortsClient", "Delete", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.ExpressRoutePortsClient", "Delete", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -168,6 +169,7 @@ func (client ExpressRoutePortsClient) DeletePreparer(ctx context.Context, resour
 // http.Response Body if it receives an error.
 func (client ExpressRoutePortsClient) DeleteSender(req *http.Request) (future ExpressRoutePortsDeleteFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -519,7 +521,7 @@ func (client ExpressRoutePortsClient) UpdateTags(ctx context.Context, resourceGr
 
 	result, err = client.UpdateTagsSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.ExpressRoutePortsClient", "UpdateTags", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.ExpressRoutePortsClient", "UpdateTags", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -553,6 +555,7 @@ func (client ExpressRoutePortsClient) UpdateTagsPreparer(ctx context.Context, re
 // http.Response Body if it receives an error.
 func (client ExpressRoutePortsClient) UpdateTagsSender(req *http.Request) (future ExpressRoutePortsUpdateTagsFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return

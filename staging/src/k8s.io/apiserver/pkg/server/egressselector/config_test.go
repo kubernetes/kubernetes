@@ -23,6 +23,8 @@ import (
 	"reflect"
 	"testing"
 
+	utiltesting "k8s.io/client-go/util/testing"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/apis/apiserver"
 )
@@ -281,7 +283,7 @@ spec:
 				if err != nil {
 					t.Fatal(err)
 				}
-				defer os.Remove(f.Name())
+				defer utiltesting.CloseAndRemove(t, f)
 				if err := ioutil.WriteFile(f.Name(), []byte(tc.contents), os.FileMode(0755)); err != nil {
 					t.Fatal(err)
 				}

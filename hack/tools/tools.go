@@ -31,9 +31,9 @@ import (
 	_ "github.com/cespare/prettybench"
 	_ "gotest.tools/gotestsum"
 
-	// dependencies
-	_ "sigs.k8s.io/zeitgeist"
-
 	// mockgen
 	_ "github.com/golang/mock/mockgen"
+
+	// tools like cpu
+	_ "go.uber.org/automaxprocs"
 )

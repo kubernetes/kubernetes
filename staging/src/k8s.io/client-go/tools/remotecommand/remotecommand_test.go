@@ -17,10 +17,13 @@ limitations under the License.
 package remotecommand
 
 import (
+	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -364,4 +367,62 @@ func TestStreamExitsAfterConnectionIsClosed(t *testing.T) {
 	case <-errorChan:
 		return
 	}
+}
+
+func TestStreamRandomData(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		var stdin, stdout bytes.Buffer
+		ctx, err := createHTTPStreams(w, req, &StreamOptions{
+			Stdin:  &stdin,
+			Stdout: &stdout,
+		})
+		if err != nil {
+			t.Errorf("error on createHTTPStreams: %v", err)
+			return
+		}
+		defer ctx.conn.Close()
+
+		io.Copy(ctx.stdoutStream, ctx.stdinStream)
+	}))
+
+	defer server.Close()
+
+	uri, _ := url.Parse(server.URL)
+	exec, err := NewSPDYExecutor(&rest.Config{Host: uri.Host}, "POST", uri)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	randomData := make([]byte, 1024*1024)
+	if _, err := rand.Read(randomData); err != nil {
+		t.Errorf("unexpected error reading random data: %v", err)
+	}
+	var stdout bytes.Buffer
+	options := &StreamOptions{
+		Stdin:  bytes.NewReader(randomData),
+		Stdout: &stdout,
+	}
+	errorChan := make(chan error)
+	go func() {
+		errorChan <- exec.StreamWithContext(context.Background(), *options)
+	}()
+
+	select {
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatalf("expect stream to be closed after connection is closed.")
+	case err := <-errorChan:
+		if err != nil {
+			t.Errorf("unexpected error")
+		}
+	}
+
+	data, err := ioutil.ReadAll(bytes.NewReader(stdout.Bytes()))
+	if err != nil {
+		t.Errorf("error reading the stream: %v", err)
+		return
+	}
+	if !bytes.Equal(randomData, data) {
+		t.Errorf("unexpected data received: %d sent: %d", len(data), len(randomData))
+	}
+
 }

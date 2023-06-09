@@ -37,6 +37,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
@@ -190,8 +191,44 @@ func ChooseAPIServerBindAddress(bindAddress net.IP) (net.IP, error) {
 	return ip, nil
 }
 
+// validateKnownGVKs takes a list of GVKs and verifies if they are known in kubeadm or component config schemes
+func validateKnownGVKs(gvks []schema.GroupVersionKind) error {
+	var unknown []schema.GroupVersionKind
+
+	schemes := []*runtime.Scheme{
+		kubeadmscheme.Scheme,
+		componentconfigs.Scheme,
+	}
+
+	for _, gvk := range gvks {
+		var scheme *runtime.Scheme
+
+		// Skip legacy known GVs so that they don't return errors.
+		// This makes the function return errors only for GVs that where never known.
+		if err := validateSupportedVersion(gvk.GroupVersion(), true); err != nil {
+			continue
+		}
+
+		for _, s := range schemes {
+			if _, err := s.New(gvk); err == nil {
+				scheme = s
+				break
+			}
+		}
+		if scheme == nil {
+			unknown = append(unknown, gvk)
+		}
+	}
+
+	if len(unknown) > 0 {
+		return errors.Errorf("unknown configuration APIs: %#v", unknown)
+	}
+
+	return nil
+}
+
 // MigrateOldConfig migrates an old configuration from a byte slice into a new one (returned again as a byte slice).
-// Only kubeadm kinds are migrated. Others are silently ignored.
+// Only kubeadm kinds are migrated.
 func MigrateOldConfig(oldConfig []byte) ([]byte, error) {
 	newConfig := [][]byte{}
 
@@ -205,9 +242,13 @@ func MigrateOldConfig(oldConfig []byte) ([]byte, error) {
 		gvks = append(gvks, gvk)
 	}
 
+	if err := validateKnownGVKs(gvks); err != nil {
+		return []byte{}, err
+	}
+
 	// Migrate InitConfiguration and ClusterConfiguration if there are any in the config
 	if kubeadmutil.GroupVersionKindsHasInitConfiguration(gvks...) || kubeadmutil.GroupVersionKindsHasClusterConfiguration(gvks...) {
-		o, err := documentMapToInitConfiguration(gvkmap, true)
+		o, err := documentMapToInitConfiguration(gvkmap, true, true)
 		if err != nil {
 			return []byte{}, err
 		}
@@ -220,7 +261,7 @@ func MigrateOldConfig(oldConfig []byte) ([]byte, error) {
 
 	// Migrate JoinConfiguration if there is any
 	if kubeadmutil.GroupVersionKindsHasJoinConfiguration(gvks...) {
-		o, err := documentMapToJoinConfiguration(gvkmap, true)
+		o, err := documentMapToJoinConfiguration(gvkmap, true, true)
 		if err != nil {
 			return []byte{}, err
 		}
@@ -232,6 +273,40 @@ func MigrateOldConfig(oldConfig []byte) ([]byte, error) {
 	}
 
 	return bytes.Join(newConfig, []byte(constants.YAMLDocumentSeparator)), nil
+}
+
+// ValidateConfig takes a byte slice containing a kubeadm configuration and performs conversion
+// to internal types and validation.
+func ValidateConfig(oldConfig []byte) error {
+	gvkmap, err := kubeadmutil.SplitYAMLDocuments(oldConfig)
+	if err != nil {
+		return err
+	}
+
+	gvks := []schema.GroupVersionKind{}
+	for gvk := range gvkmap {
+		gvks = append(gvks, gvk)
+	}
+
+	if err := validateKnownGVKs(gvks); err != nil {
+		return err
+	}
+
+	// Validate InitConfiguration and ClusterConfiguration if there are any in the config
+	if kubeadmutil.GroupVersionKindsHasInitConfiguration(gvks...) || kubeadmutil.GroupVersionKindsHasClusterConfiguration(gvks...) {
+		if _, err := documentMapToInitConfiguration(gvkmap, true, true); err != nil {
+			return err
+		}
+	}
+
+	// Validate JoinConfiguration if there is any
+	if kubeadmutil.GroupVersionKindsHasJoinConfiguration(gvks...) {
+		if _, err := documentMapToJoinConfiguration(gvkmap, true, true); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // isKubeadmPrereleaseVersion returns true if the kubeadm version is a pre-release version and

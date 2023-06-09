@@ -38,6 +38,11 @@ func TestNodePodCIDRHandlerAdd(t *testing.T) {
 			newNodePodCIDRs: []string{"192.168.1.0/24", "fd00:1:2:3::/64"},
 		},
 		{
+			name:            "already initialized and same node",
+			oldNodePodCIDRs: []string{"10.0.0.0/24", "fd00:3:2:1::/64"},
+			newNodePodCIDRs: []string{"10.0.0.0/24", "fd00:3:2:1::/64"},
+		},
+		{
 			name:            "already initialized and different node",
 			oldNodePodCIDRs: []string{"192.168.1.0/24", "fd00:1:2:3::/64"},
 			newNodePodCIDRs: []string{"10.0.0.0/24", "fd00:3:2:1::/64"},

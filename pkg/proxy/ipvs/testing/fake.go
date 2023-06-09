@@ -140,6 +140,21 @@ func (h *FakeNetlinkHandle) GetAllLocalAddresses() (sets.Set[string], error) {
 	return res, nil
 }
 
+func (h *FakeNetlinkHandle) GetAllLocalAddressesExcept(dev string) (sets.Set[string], error) {
+	res := sets.New[string]()
+	for linkName := range h.localAddresses {
+		if linkName == dev {
+			continue
+		}
+		for _, addr := range h.localAddresses[linkName] {
+			if h.isValidForSet(addr) {
+				res.Insert(addr)
+			}
+		}
+	}
+	return res, nil
+}
+
 // SetLocalAddresses set IP addresses to the given interface device.  It's not part of interface.
 func (h *FakeNetlinkHandle) SetLocalAddresses(dev string, ips ...string) error {
 	if h.localAddresses == nil {

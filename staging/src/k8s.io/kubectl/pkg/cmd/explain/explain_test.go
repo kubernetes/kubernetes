@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	sptest "k8s.io/apimachinery/pkg/util/strategicpatch/testing"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/discovery"
 	openapiclient "k8s.io/client-go/openapi"
 	"k8s.io/client-go/rest"
@@ -57,8 +57,8 @@ func TestExplainInvalidArgs(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
-	opts := explain.NewExplainOptions("kubectl", genericclioptions.NewTestIOStreamsDiscard())
-	cmd := explain.NewCmdExplain("kubectl", tf, genericclioptions.NewTestIOStreamsDiscard())
+	opts := explain.NewExplainOptions("kubectl", genericiooptions.NewTestIOStreamsDiscard())
+	cmd := explain.NewCmdExplain("kubectl", tf, genericiooptions.NewTestIOStreamsDiscard())
 	err := opts.Complete(tf, cmd, []string{})
 	if err != nil {
 		t.Fatalf("unexpected error %v", err)
@@ -84,8 +84,8 @@ func TestExplainNotExistResource(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
-	opts := explain.NewExplainOptions("kubectl", genericclioptions.NewTestIOStreamsDiscard())
-	cmd := explain.NewCmdExplain("kubectl", tf, genericclioptions.NewTestIOStreamsDiscard())
+	opts := explain.NewExplainOptions("kubectl", genericiooptions.NewTestIOStreamsDiscard())
+	cmd := explain.NewCmdExplain("kubectl", tf, genericiooptions.NewTestIOStreamsDiscard())
 	err := opts.Complete(tf, cmd, []string{"foo"})
 	if err != nil {
 		t.Fatalf("unexpected error %v", err)
@@ -208,7 +208,7 @@ func runExplainTestCases(t *testing.T, cases []explainTestCase) {
 	tf.OpenAPISchemaFunc = FakeOpenAPISchema.OpenAPISchemaFn
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
 
 	type catchFatal error
 

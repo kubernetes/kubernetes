@@ -21,7 +21,7 @@ import (
 	"io"
 	"os"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/kubectl/pkg/cmd"
 	cmdsanity "k8s.io/kubectl/pkg/cmd/util/sanity"
 )
@@ -29,7 +29,7 @@ import (
 func main() {
 	var errorCount int
 
-	kubectl := cmd.NewKubectlCommand(cmd.KubectlOptions{IOStreams: genericclioptions.IOStreams{In: os.Stdin, Out: io.Discard, ErrOut: io.Discard}})
+	kubectl := cmd.NewKubectlCommand(cmd.KubectlOptions{IOStreams: genericiooptions.IOStreams{In: os.Stdin, Out: io.Discard, ErrOut: io.Discard}})
 	errors := cmdsanity.RunCmdChecks(kubectl, cmdsanity.AllCmdChecks, []string{})
 	for _, err := range errors {
 		errorCount++

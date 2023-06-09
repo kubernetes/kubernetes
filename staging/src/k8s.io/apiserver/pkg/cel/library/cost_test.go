@@ -362,7 +362,13 @@ func TestAuthzLibrary(t *testing.T) {
 
 func testCost(t *testing.T, expr string, expectEsimatedCost checker.CostEstimate, expectRuntimeCost uint64) {
 	est := &CostEstimator{SizeEstimator: &testCostEstimator{}}
-	env, err := cel.NewEnv(append(k8sExtensionLibs, ext.Strings())...)
+	env, err := cel.NewEnv(
+		ext.Strings(),
+		URLs(),
+		Regex(),
+		Lists(),
+		Authz(),
+	)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}

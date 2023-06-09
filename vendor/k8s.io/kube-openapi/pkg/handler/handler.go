@@ -22,12 +22,13 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/NYTimes/gziphandler"
 	"github.com/emicklei/go-restful/v3"
 	"github.com/golang/protobuf/proto"
-	openapi_v2 "github.com/google/gnostic/openapiv2"
+	openapi_v2 "github.com/google/gnostic-models/openapiv2"
 	"github.com/google/uuid"
 	"github.com/munnerz/goautoneg"
 	klog "k8s.io/klog/v2"
@@ -98,16 +99,6 @@ func NewOpenAPIServiceLazy(swagger cached.Data[*spec.Swagger]) *OpenAPIService {
 	return o
 }
 
-func (o *OpenAPIService) getSwaggerBytes() (timedSpec, string, error) {
-	result := o.jsonCache.Get()
-	return result.Data, result.Etag, result.Err
-}
-
-func (o *OpenAPIService) getSwaggerPbBytes() (timedSpec, string, error) {
-	result := o.protoCache.Get()
-	return result.Data, result.Etag, result.Err
-}
-
 func (o *OpenAPIService) UpdateSpec(swagger *spec.Swagger) error {
 	o.UpdateSpecLazy(cached.NewResultOK(swagger, uuid.New().String()))
 	return nil
@@ -128,13 +119,17 @@ func ToProtoBinary(json []byte) ([]byte, error) {
 // RegisterOpenAPIVersionedService registers a handler to provide access to provided swagger spec.
 //
 // Deprecated: use OpenAPIService.RegisterOpenAPIVersionedService instead.
-func RegisterOpenAPIVersionedService(spec *spec.Swagger, servePath string, handler common.PathHandler) (*OpenAPIService, error) {
+func RegisterOpenAPIVersionedService(spec *spec.Swagger, servePath string, handler common.PathHandler) *OpenAPIService {
 	o := NewOpenAPIService(spec)
-	return o, o.RegisterOpenAPIVersionedService(servePath, handler)
+	o.RegisterOpenAPIVersionedService(servePath, handler)
+	return o
 }
 
 // RegisterOpenAPIVersionedService registers a handler to provide access to provided swagger spec.
-func (o *OpenAPIService) RegisterOpenAPIVersionedService(servePath string, handler common.PathHandler) error {
+func (o *OpenAPIService) RegisterOpenAPIVersionedService(servePath string, handler common.PathHandler) {
+	// Mutex protects the cache chain
+	var mutex sync.Mutex
+
 	accepted := []struct {
 		Type                string
 		SubType             string
@@ -163,7 +158,9 @@ func (o *OpenAPIService) RegisterOpenAPIVersionedService(servePath string, handl
 						continue
 					}
 					// serve the first matching media type in the sorted clause list
+					mutex.Lock()
 					result := accepts.GetDataAndEtag.Get()
+					mutex.Unlock()
 					if result.Err != nil {
 						klog.Errorf("Error in OpenAPI handler: %s", result.Err)
 						// only return a 503 if we have no older cache data to serve
@@ -187,8 +184,6 @@ func (o *OpenAPIService) RegisterOpenAPIVersionedService(servePath string, handl
 			return
 		}),
 	))
-
-	return nil
 }
 
 // BuildAndRegisterOpenAPIVersionedService builds the spec and registers a handler to provide access to it.
@@ -207,5 +202,6 @@ func BuildAndRegisterOpenAPIVersionedServiceFromRoutes(servePath string, routeCo
 		return nil, err
 	}
 	o := NewOpenAPIService(spec)
-	return o, o.RegisterOpenAPIVersionedService(servePath, handler)
+	o.RegisterOpenAPIVersionedService(servePath, handler)
+	return o, nil
 }

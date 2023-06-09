@@ -92,8 +92,9 @@ func TestNewFeatureGate(t *testing.T) {
 			expectedError: true,
 		},
 		{ //deprecated feature-gate key
-			value:         "deprecated=true",
-			expectedError: true,
+			value:                "deprecated=true",
+			expectedError:        false,
+			expectedFeaturesGate: map[string]bool{"deprecated": true},
 		},
 		{ //one feature
 			value:                "feature1=true",

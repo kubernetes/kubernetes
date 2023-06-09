@@ -59,6 +59,7 @@ func TestNewResetData(t *testing.T) {
 			name: "fails if preflight ignores all but has individual check",
 			flags: map[string]string{
 				options.IgnorePreflightErrors: "all,something-else",
+				options.NodeCRISocket:         "unix:///var/run/crio/crio.sock",
 			},
 			expectError: "don't specify individual checks if 'all' is used",
 		},
@@ -66,6 +67,7 @@ func TestNewResetData(t *testing.T) {
 			name: "pre-flights errors from CLI args",
 			flags: map[string]string{
 				options.IgnorePreflightErrors: "a,b",
+				options.NodeCRISocket:         "unix:///var/run/crio/crio.sock",
 			},
 			validate: expectedResetIgnorePreflightErrors(sets.New("a", "b")),
 		},

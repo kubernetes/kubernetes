@@ -280,3 +280,174 @@ run_kubectl_debug_baseline_node_tests() {
   set +o nounset
   set +o errexit
 }
+
+run_kubectl_debug_restricted_tests() {
+  set -o nounset
+  set -o errexit
+
+  create_and_use_new_namespace  
+  kube::log::status "Testing kubectl debug profile restricted"
+
+  ### Pod Troubleshooting by ephemeral containers with restricted profile
+  
+  # Pre-Condition: Pod "nginx" is created
+  kubectl run target "--image=${IMAGE_NGINX:?}" "${kube_flags[@]:?}"
+  kube::test::get_object_assert pod "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:'
+  # Restricted profile just works in not restricted namespace
+  # Command: add a new debug container with restricted profile
+  output_message=$(kubectl debug target -it --image=busybox --attach=false -c debug-container --profile=restricted "${kube_flags[@]:?}")
+  kube::test::if_has_not_string "${output_message}" 'forbidden: violates PodSecurity'
+  # Post-Conditions
+  kube::test::get_object_assert pod/target '{{range.spec.ephemeralContainers}}{{.name}}:{{end}}' 'debug-container:'
+  # Clean up
+  kubectl delete pod target "${kube_flags[@]:?}"
+
+  # Pre-Condition: Pod "nginx" is created
+  kubectl run target "--image=${IMAGE_NGINX:?}" "${kube_flags[@]:?}"
+  kube::test::get_object_assert pod "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:'
+  # Restricted profile just works in not restricted namespace
+  # Command: create a copy of target with a new debug container
+  kubectl debug target -it --copy-to=target-copy --image=busybox --container=debug-container --attach=false --profile=restricted "${kube_flags[@]:?}"
+  # Post-Conditions
+  kube::test::get_object_assert pod "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:target-copy:'
+  kube::test::get_object_assert pod/target-copy '{{range.spec.containers}}{{.name}}:{{end}}' 'target:debug-container:'
+  kube::test::get_object_assert pod/target-copy '{{range.spec.containers}}{{.image}}:{{end}}' "${IMAGE_NGINX:?}:busybox:"
+  # Clean up
+  kubectl delete pod target target-copy "${kube_flags[@]:?}"
+
+  ns_name="namespace-restricted"
+  # Command: create namespace and add a label
+  kubectl create namespace "${ns_name}"
+  kubectl label namespace "${ns_name}" pod-security.kubernetes.io/enforce=restricted
+  output_message=$(kubectl get namespaces "${ns_name}" --show-labels)
+  kube::test::if_has_string "${output_message}" 'pod-security.kubernetes.io/enforce=restricted'
+ 
+  # Pre-Condition: Pod "busybox" is created that complies with the restricted policy
+  kubectl create -f hack/testdata/pod-restricted-runtime-default.yaml -n "${ns_name}"
+  kube::test::get_object_assert "pod -n ${ns_name}" "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:'
+  # Restricted profile works when pod's seccompProfile is RuntimeDefault
+  # Command: add a new debug container with restricted profile
+  output_message=$(kubectl debug target -it --image=busybox --attach=false -c debug-container --profile=restricted -n "${ns_name}" "${kube_flags[@]:?}")
+  kube::test::if_has_not_string "${output_message}" 'forbidden: violates PodSecurity'
+  # Post-Conditions
+  kube::test::get_object_assert "pod/target -n ${ns_name}" '{{range.spec.ephemeralContainers}}{{.name}}:{{end}}' 'debug-container:'
+  # Clean up
+  kubectl delete pod target -n "${ns_name}" "${kube_flags[@]:?}"
+
+  # Pre-Condition: Pod "nginx" is created
+  kubectl create -f hack/testdata/pod-restricted-runtime-default.yaml -n "${ns_name}"
+  kube::test::get_object_assert "pod -n ${ns_name}" "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:'
+  # Restricted profile works when pod's seccompProfile is RuntimeDefault
+  # Command: create a copy of target with a new debug container
+  kubectl debug target -it --copy-to=target-copy --image=busybox --container=debug-container --attach=false --profile=restricted -n ${ns_name} "${kube_flags[@]:?}"
+  # Post-Conditions
+  kube::test::get_object_assert "pod -n ${ns_name}" "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:target-copy:'
+  kube::test::get_object_assert "pod/target-copy -n ${ns_name}" '{{range.spec.containers}}{{.name}}:{{end}}' 'target:debug-container:'
+  kube::test::get_object_assert "pod/target-copy -n ${ns_name}" '{{range.spec.containers}}{{.image}}:{{end}}' "busybox:busybox:"
+  # Clean up
+  kubectl delete pod target target-copy -n "${ns_name}" "${kube_flags[@]:?}"
+
+  # Pre-Condition: Pod "busybox" is created that complies with the restricted policy
+  kubectl create -f hack/testdata/pod-restricted-localhost.yaml -n "${ns_name}"
+  kube::test::get_object_assert "pod -n ${ns_name}" "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:'
+  # Restricted profile works when pod's seccompProfile is Localhost
+  # Command: add a new debug container with restricted profile
+  output_message=$(kubectl debug target -it --image=busybox --attach=false -c debug-container --profile=restricted -n ${ns_name} "${kube_flags[@]:?}")
+  kube::test::if_has_not_string "${output_message}" 'forbidden: violates PodSecurity'
+  # Post-Conditions
+  kube::test::get_object_assert "pod/target -n ${ns_name}" '{{range.spec.ephemeralContainers}}{{.name}}:{{end}}' 'debug-container:'
+  # Clean up
+  kubectl delete pod target -n ${ns_name} "${kube_flags[@]:?}"
+
+  # Pre-Condition: Pod "nginx" is created
+  kubectl create -f hack/testdata/pod-restricted-localhost.yaml -n "${ns_name}"
+  kube::test::get_object_assert "pod -n ${ns_name}" "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:'
+  # Restricted profile works when pod's seccompProfile is Localhost
+  # Command: create a copy of target with a new debug container
+  kubectl debug target -it --copy-to=target-copy --image=busybox --container=debug-container --attach=false --profile=restricted -n ${ns_name} "${kube_flags[@]:?}"
+  # Post-Conditions
+  kube::test::get_object_assert "pod -n ${ns_name}" "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:target-copy:'
+  kube::test::get_object_assert "pod/target-copy -n ${ns_name}" '{{range.spec.containers}}{{.name}}:{{end}}' 'target:debug-container:'
+  kube::test::get_object_assert "pod/target-copy -n ${ns_name}" '{{range.spec.containers}}{{.image}}:{{end}}' "busybox:busybox:"
+  # Clean up
+  kubectl delete pod target target-copy -n "${ns_name}" "${kube_flags[@]:?}"
+
+  # Clean up restricted namespace
+  kubectl delete namespace "${ns_name}"
+
+  set +o nounset
+  set +o errexit
+}
+
+run_kubectl_debug_restricted_node_tests() {
+  set -o nounset
+  set -o errexit
+
+  create_and_use_new_namespace  
+  kube::log::status "Testing kubectl debug profile restricted (node)"
+
+  ### Debug node with restrected profile
+  
+  # Pre-Condition: node exists
+  kube::test::get_object_assert nodes "{{range.items}}{{${id_field:?}}}:{{end}}" '127.0.0.1:'
+  # Restricted profile just works in not restricted namespace
+  # Command: create a new node debugger pod
+  output_message=$(kubectl debug --profile restricted node/127.0.0.1 --image=busybox --attach=false "${kube_flags[@]:?}" -- true)
+  kube::test::if_has_not_string "${output_message}" 'forbidden: violates PodSecurity'
+  # Post-Conditions
+  kube::test::get_object_assert pod "{{(len .items)}}" '1'
+  debugger=$(kubectl get pod -o go-template="{{(index .items 0)${id_field:?}}}")
+  kube::test::if_has_string "${output_message:?}" "${debugger:?}"
+  kube::test::get_object_assert "pod/${debugger:?}" "{{${image_field:?}}}" 'busybox'
+  kube::test::get_object_assert "pod/${debugger:?}" '{{.spec.nodeName}}' '127.0.0.1'
+  kube::test::get_object_assert "pod/${debugger:?}" '{{.spec.hostIPC}}' '<no value>'
+  kube::test::get_object_assert "pod/${debugger:?}" '{{.spec.hostNetwork}}' '<no value>'
+  kube::test::get_object_assert "pod/${debugger:?}" '{{.spec.hostPID}}' '<no value>'
+  kube::test::get_object_assert "pod/${debugger:?}" '{{index .spec.containers 0 "securityContext" "allowPrivilegeEscalation"}}' 'false'
+  kube::test::get_object_assert "pod/${debugger:?}" '{{index .spec.containers 0 "securityContext" "capabilities" "drop"}}' '\[ALL\]'
+  kube::test::get_object_assert "pod/${debugger:?}" '{{if (index (index .spec.containers 0) "securityContext" "capabilities" "add") }}:{{end}}' ''
+  kube::test::get_object_assert "pod/${debugger:?}" '{{index .spec.containers 0 "securityContext" "runAsNonRoot"}}' 'true'
+  kube::test::get_object_assert "pod/${debugger:?}" '{{index .spec.containers 0 "securityContext" "seccompProfile" "type"}}' 'RuntimeDefault'
+  # Clean up
+  # pod.spec.nodeName is set by kubectl debug node which causes the delete to hang,
+  # presumably waiting for a kubelet that's not present. Force the delete.
+  kubectl delete --force pod "${debugger:?}" "${kube_flags[@]:?}"
+
+  ns_name="namespace-restricted"
+  # Command: create namespace and add a label
+  kubectl create namespace "${ns_name}"
+  kubectl label namespace "${ns_name}" pod-security.kubernetes.io/enforce=restricted
+  output_message=$(kubectl get namespaces "${ns_name}" --show-labels)
+  kube::test::if_has_string "${output_message}" 'pod-security.kubernetes.io/enforce=restricted'
+
+  # Pre-Condition: node exists
+  kube::test::get_object_assert nodes "{{range.items}}{{${id_field:?}}}:{{end}}" '127.0.0.1:'
+  # Restricted profile works in restricted namespace
+  # Command: create a new node debugger pod
+  output_message=$(kubectl debug --profile restricted node/127.0.0.1 --image=busybox --attach=false -n ${ns_name} "${kube_flags[@]:?}" -- true)
+  kube::test::if_has_not_string "${output_message}" 'forbidden: violates PodSecurity'
+  # Post-Conditions
+  kube::test::get_object_assert "pod -n ${ns_name}" "{{(len .items)}}" '1'
+  debugger=$(kubectl get pod -n ${ns_name} -o go-template="{{(index .items 0)${id_field:?}}}")
+  kube::test::if_has_string "${output_message:?}" "${debugger:?}"
+  kube::test::get_object_assert "pod/${debugger:?} -n ${ns_name}" "{{${image_field:?}}}" 'busybox'
+  kube::test::get_object_assert "pod/${debugger:?} -n ${ns_name}" '{{.spec.nodeName}}' '127.0.0.1'
+  kube::test::get_object_assert "pod/${debugger:?} -n ${ns_name}" '{{.spec.hostIPC}}' '<no value>'
+  kube::test::get_object_assert "pod/${debugger:?} -n ${ns_name}" '{{.spec.hostNetwork}}' '<no value>'
+  kube::test::get_object_assert "pod/${debugger:?} -n ${ns_name}" '{{.spec.hostPID}}' '<no value>'
+  kube::test::get_object_assert "pod/${debugger:?} -n ${ns_name}" '{{index .spec.containers 0 "securityContext" "allowPrivilegeEscalation"}}' 'false'
+  kube::test::get_object_assert "pod/${debugger:?} -n ${ns_name}" '{{index .spec.containers 0 "securityContext" "capabilities" "drop"}}' '\[ALL\]'
+  kube::test::get_object_assert "pod/${debugger:?} -n ${ns_name}" '{{if (index (index .spec.containers 0) "securityContext" "capabilities" "add") }}:{{end}}' ''
+  kube::test::get_object_assert "pod/${debugger:?} -n ${ns_name}" '{{index .spec.containers 0 "securityContext" "runAsNonRoot"}}' 'true'
+  kube::test::get_object_assert "pod/${debugger:?} -n ${ns_name}" '{{index .spec.containers 0 "securityContext" "seccompProfile" "type"}}' 'RuntimeDefault'
+  # Clean up
+  # pod.spec.nodeName is set by kubectl debug node which causes the delete to hang,
+  # presumably waiting for a kubelet that's not present. Force the delete.
+  kubectl delete --force pod "${debugger:?}" -n ${ns_name} "${kube_flags[@]:?}"
+
+  # Clean up restricted namespace
+  kubectl delete namespace "${ns_name}"
+
+  set +o nounset
+  set +o errexit
+}

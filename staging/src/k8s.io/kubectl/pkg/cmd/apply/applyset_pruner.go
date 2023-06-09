@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/klog/v2"
@@ -40,7 +40,7 @@ type ApplySetDeleteOptions struct {
 
 	Printer printers.ResourcePrinter
 
-	IOStreams genericclioptions.IOStreams
+	IOStreams genericiooptions.IOStreams
 }
 
 // PruneObject is an apiserver object that should be deleted as part of prune.

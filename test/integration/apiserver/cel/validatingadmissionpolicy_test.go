@@ -210,7 +210,7 @@ func Test_ValidateNamespace_NoParams(t *testing.T) {
 					Name: "test-k8s",
 				},
 			},
-			err:           "namespaces \"test-k8s\" is forbidden: ValidatingAdmissionPolicy 'validate-namespace-suffix' with binding 'validate-namespace-suffix-binding' denied request: expression 'has(params.metadata) && has(params.metadata.name) && object.metadata.name.endsWith(params.metadata.name)' resulted in error: invalid type for field selection.",
+			err:           "namespaces \"test-k8s\" is forbidden: ValidatingAdmissionPolicy 'validate-namespace-suffix' with binding 'validate-namespace-suffix-binding' denied request: failed expression: has(params.metadata) && has(params.metadata.name) && object.metadata.name.endsWith(params.metadata.name)",
 			failureReason: metav1.StatusReasonInvalid,
 		},
 		{

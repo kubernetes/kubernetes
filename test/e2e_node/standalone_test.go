@@ -53,7 +53,7 @@ var _ = SIGDescribe("[Feature:StandaloneMode] ", func() {
 		ginkgo.It("the pod should be running", func(ctx context.Context) {
 			ns = f.Namespace.Name
 			staticPodName = "static-pod-" + string(uuid.NewUUID())
-			podPath = framework.TestContext.KubeletConfig.StaticPodPath
+			podPath = kubeletCfg.StaticPodPath
 
 			err := createBasicStaticPod(podPath, staticPodName, ns)
 			framework.ExpectNoError(err)

@@ -25,73 +25,27 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	goruntime "runtime"
 	"strconv"
 
 	// Enable pprof HTTP handlers.
 	_ "net/http/pprof"
 
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/events"
-	"k8s.io/component-base/configz"
-	"k8s.io/component-base/metrics"
-	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
-	proxyconfigscheme "k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
-	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/winkernel"
 )
 
-// NewProxyServer returns a new ProxyServer.
-func NewProxyServer(o *Options) (*ProxyServer, error) {
-	return newProxyServer(o.config, o.master)
+func (o *Options) platformApplyDefaults(config *proxyconfigapi.KubeProxyConfiguration) {
+	if config.Mode == "" {
+		config.Mode = proxyconfigapi.ProxyModeKernelspace
+	}
 }
 
-func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, master string) (*ProxyServer, error) {
-	if config == nil {
-		return nil, errors.New("config is required")
-	}
-
-	if c, err := configz.New(proxyconfigapi.GroupName); err == nil {
-		c.Set(config)
-	} else {
-		return nil, fmt.Errorf("unable to register configz: %s", err)
-	}
-
-	if len(config.ShowHiddenMetricsForVersion) > 0 {
-		metrics.SetShowHidden()
-	}
-
-	client, eventClient, err := createClients(config.ClientConnection, master)
-	if err != nil {
-		return nil, err
-	}
-
-	// Create event recorder
-	hostname, err := nodeutil.GetHostname(config.HostnameOverride)
-	if err != nil {
-		return nil, err
-	}
-	nodeIP := detectNodeIP(client, hostname, config.BindAddress)
-	klog.InfoS("Detected node IP", "IP", nodeIP.String())
-
-	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
-	recorder := eventBroadcaster.NewRecorder(proxyconfigscheme.Scheme, "kube-proxy")
-
-	nodeRef := &v1.ObjectReference{
-		Kind:      "Node",
-		Name:      hostname,
-		UID:       types.UID(hostname),
-		Namespace: "",
-	}
-
-	var healthzServer healthcheck.ProxierHealthUpdater
+// createProxier creates the proxy.Provider
+func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguration) (proxy.Provider, error) {
 	var healthzPort int
 	if len(config.HealthzBindAddress) > 0 {
-		healthzServer = healthcheck.NewProxierHealthServer(config.HealthzBindAddress, 2*config.IPTables.SyncPeriod.Duration, recorder, nodeRef)
 		_, port, _ := net.SplitHostPort(config.HealthzBindAddress)
 		healthzPort, _ = strconv.Atoi(port)
 	}
@@ -103,7 +57,7 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, master string
 	}
 
 	var proxier proxy.Provider
-	proxyMode := proxyconfigapi.ProxyModeKernelspace
+
 	dualStackMode := getDualStackMode(config.Winkernel.NetworkName, winkernel.DualStackCompatTester{})
 	if dualStackMode {
 		klog.InfoS("Creating dualStackProxier for Windows kernel.")
@@ -111,13 +65,11 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, master string
 		proxier, err = winkernel.NewDualStackProxier(
 			config.IPTables.SyncPeriod.Duration,
 			config.IPTables.MinSyncPeriod.Duration,
-			config.IPTables.MasqueradeAll,
-			int(*config.IPTables.MasqueradeBit),
 			config.ClusterCIDR,
-			hostname,
-			nodeIPTuple(config.BindAddress),
-			recorder,
-			healthzServer,
+			s.Hostname,
+			s.NodeIPs,
+			s.Recorder,
+			s.HealthzServer,
 			config.Winkernel,
 			healthzPort,
 		)
@@ -125,13 +77,11 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, master string
 		proxier, err = winkernel.NewProxier(
 			config.IPTables.SyncPeriod.Duration,
 			config.IPTables.MinSyncPeriod.Duration,
-			config.IPTables.MasqueradeAll,
-			int(*config.IPTables.MasqueradeBit),
 			config.ClusterCIDR,
-			hostname,
-			nodeIP,
-			recorder,
-			healthzServer,
+			s.Hostname,
+			s.NodeIPs[s.PrimaryIPFamily],
+			s.Recorder,
+			s.HealthzServer,
 			config.Winkernel,
 			healthzPort,
 		)
@@ -139,31 +89,17 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, master string
 	if err != nil {
 		return nil, fmt.Errorf("unable to create proxier: %v", err)
 	}
-	winkernel.RegisterMetrics()
 
-	return &ProxyServer{
-		Client:              client,
-		EventClient:         eventClient,
-		Proxier:             proxier,
-		Broadcaster:         eventBroadcaster,
-		Recorder:            recorder,
-		ProxyMode:           proxyMode,
-		NodeRef:             nodeRef,
-		MetricsBindAddress:  config.MetricsBindAddress,
-		BindAddressHardFail: config.BindAddressHardFail,
-		EnableProfiling:     config.EnableProfiling,
-		OOMScoreAdj:         config.OOMScoreAdj,
-		ConfigSyncPeriod:    config.ConfigSyncPeriod.Duration,
-		HealthzServer:       healthzServer,
-	}, nil
+	return proxier, nil
+}
+
+func (s *ProxyServer) platformSetup() error {
+	winkernel.RegisterMetrics()
+	return nil
 }
 
 func getDualStackMode(networkname string, compatTester winkernel.StackCompatTester) bool {
 	return compatTester.DualStackCompatible(networkname)
-}
-
-func detectNumCPU() int {
-	return goruntime.NumCPU()
 }
 
 // cleanupAndExit cleans up after a previous proxy run

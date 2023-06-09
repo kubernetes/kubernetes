@@ -23,9 +23,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
 	apiserver "k8s.io/apiserver/pkg/server"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	appconfig "k8s.io/cloud-provider/app/config"
@@ -150,7 +150,7 @@ func TestDefaultFlags(t *testing.T) {
 		NodeStatusUpdateFrequency: metav1.Duration{Duration: 5 * time.Minute},
 	}
 	if !reflect.DeepEqual(expected, s) {
-		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", diff.ObjectReflectDiff(expected, s))
+		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", cmp.Diff(expected, s))
 	}
 }
 
@@ -309,7 +309,7 @@ func TestAddFlags(t *testing.T) {
 		NodeStatusUpdateFrequency: metav1.Duration{Duration: 10 * time.Minute},
 	}
 	if !reflect.DeepEqual(expected, s) {
-		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", diff.ObjectReflectDiff(expected, s))
+		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", cmp.Diff(expected, s))
 	}
 }
 
@@ -444,6 +444,6 @@ func TestCreateConfig(t *testing.T) {
 	c.LoopbackClientConfig = nil
 
 	if !reflect.DeepEqual(expected, c) {
-		t.Errorf("Got different config than expected.\nDifference detected on:\n%s", diff.ObjectReflectDiff(expected, c))
+		t.Errorf("Got different config than expected.\nDifference detected on:\n%s", cmp.Diff(expected, c))
 	}
 }

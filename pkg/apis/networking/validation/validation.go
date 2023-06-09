@@ -214,11 +214,6 @@ func ValidateNetworkPolicyUpdate(update, old *networking.NetworkPolicy, opts Net
 	return allErrs
 }
 
-// ValidateNetworkPolicyStatusUpdate tests if an update to a NetworkPolicy status is valid
-func ValidateNetworkPolicyStatusUpdate(status, oldstatus networking.NetworkPolicyStatus, fldPath *field.Path) field.ErrorList {
-	return unversionedvalidation.ValidateConditions(status.Conditions, fldPath.Child("conditions"))
-}
-
 // ValidateIPBlock validates a cidr and the except fields of an IpBlock NetworkPolicyPeer
 func ValidateIPBlock(ipb *networking.IPBlock, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -599,27 +594,24 @@ func validateIngressClassParametersReference(params *networking.IngressClassPara
 		return allErrs
 	}
 
-	if params.Scope != nil || params.Namespace != nil {
-		scope := utilpointer.StringDeref(params.Scope, "")
+	scope := utilpointer.StringDeref(params.Scope, "")
 
-		if !supportedIngressClassParametersReferenceScopes.Has(scope) {
-			allErrs = append(allErrs, field.NotSupported(fldPath.Child("scope"), scope,
-				supportedIngressClassParametersReferenceScopes.List()))
-		} else {
-
-			if scope == networking.IngressClassParametersReferenceScopeNamespace {
-				if params.Namespace == nil {
-					allErrs = append(allErrs, field.Required(fldPath.Child("namespace"), "`parameters.scope` is set to 'Namespace'"))
-				} else {
-					for _, msg := range apivalidation.ValidateNamespaceName(*params.Namespace, false) {
-						allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), *params.Namespace, msg))
-					}
+	if !supportedIngressClassParametersReferenceScopes.Has(scope) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("scope"), scope,
+			supportedIngressClassParametersReferenceScopes.List()))
+	} else {
+		if scope == networking.IngressClassParametersReferenceScopeNamespace {
+			if params.Namespace == nil {
+				allErrs = append(allErrs, field.Required(fldPath.Child("namespace"), "`parameters.scope` is set to 'Namespace'"))
+			} else {
+				for _, msg := range apivalidation.ValidateNamespaceName(*params.Namespace, false) {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), *params.Namespace, msg))
 				}
 			}
+		}
 
-			if scope == networking.IngressClassParametersReferenceScopeCluster && params.Namespace != nil {
-				allErrs = append(allErrs, field.Forbidden(fldPath.Child("namespace"), "`parameters.scope` is set to 'Cluster'"))
-			}
+		if scope == networking.IngressClassParametersReferenceScopeCluster && params.Namespace != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("namespace"), "`parameters.scope` is set to 'Cluster'"))
 		}
 	}
 

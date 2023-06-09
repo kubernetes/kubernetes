@@ -63,4 +63,32 @@ func NewTestFieldManager(typeConverter managedfields.TypeConverter, gvk schema.G
 // for the given gvk, on the given sub-resource.
 func NewTestFieldManagerSubresource(typeConverter managedfields.TypeConverter, gvk schema.GroupVersionKind, subresource string) TestFieldManager {
 	return testing.NewTestFieldManagerImpl(typeConverter, gvk, subresource, nil)
+
+}
+
+// NewFakeFieldManager creates an actual FieldManager but that doesn't
+// perform any conversion. This is just a convenience for tests to
+// create an actual manager that they can use but in very restricted
+// ways.
+//
+// This is different from the TestFieldManager because it's not meant to
+// assert values, or hold the state, this acts like a normal
+// FieldManager.
+//
+// Also, this only operates on the main-resource, and sub-resource can't
+// be configured.
+func NewFakeFieldManager(typeConverter managedfields.TypeConverter, gvk schema.GroupVersionKind) *managedfields.FieldManager {
+	ffm, err := managedfields.NewDefaultFieldManager(
+		typeConverter,
+		&testing.FakeObjectConvertor{},
+		&testing.FakeObjectDefaulter{},
+		&testing.FakeObjectCreater{},
+		gvk,
+		gvk.GroupVersion(),
+		"",
+		nil)
+	if err != nil {
+		panic(err)
+	}
+	return ffm
 }

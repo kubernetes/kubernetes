@@ -29,7 +29,7 @@ type InterpretableDecorator func(Interpretable) (Interpretable, error)
 func decObserveEval(observer EvalObserver) InterpretableDecorator {
 	return func(i Interpretable) (Interpretable, error) {
 		switch inst := i.(type) {
-		case *evalWatch, *evalWatchAttr, *evalWatchConst:
+		case *evalWatch, *evalWatchAttr, *evalWatchConst, *evalWatchConstructor:
 			// these instruction are already watching, return straight-away.
 			return i, nil
 		case InterpretableAttribute:
@@ -41,6 +41,11 @@ func decObserveEval(observer EvalObserver) InterpretableDecorator {
 			return &evalWatchConst{
 				InterpretableConst: inst,
 				observer:           observer,
+			}, nil
+		case InterpretableConstructor:
+			return &evalWatchConstructor{
+				constructor: inst,
+				observer:    observer,
 			}, nil
 		default:
 			return &evalWatch{
@@ -224,8 +229,8 @@ func maybeOptimizeSetMembership(i Interpretable, inlist InterpretableCall) (Inte
 	valueSet := make(map[ref.Val]ref.Val)
 	for it.HasNext() == types.True {
 		elem := it.Next()
-		if !types.IsPrimitiveType(elem) {
-			// Note, non-primitive type are not yet supported.
+		if !types.IsPrimitiveType(elem) || elem.Type() == types.BytesType {
+			// Note, non-primitive type are not yet supported, and []byte isn't hashable.
 			return i, nil
 		}
 		valueSet[elem] = types.True

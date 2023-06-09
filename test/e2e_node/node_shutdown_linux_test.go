@@ -340,14 +340,14 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 			err = restartDbus()
 			framework.ExpectNoError(err)
 
-			// Wait a few seconds to ensure dbus is restarted...
-			time.Sleep(5 * time.Second)
-
-			ginkgo.By("Emitting Shutdown signal")
-			err = emitSignalPrepareForShutdown(true)
-			framework.ExpectNoError(err)
-
 			gomega.Eventually(ctx, func(ctx context.Context) error {
+				// re-send the shutdown signal in case the dbus restart is not done
+				ginkgo.By("Emitting Shutdown signal")
+				err = emitSignalPrepareForShutdown(true)
+				if err != nil {
+					return err
+				}
+
 				isReady := getNodeReadyStatus(ctx, f)
 				if isReady {
 					return fmt.Errorf("node did not become shutdown as expected")
@@ -560,6 +560,11 @@ func getPriorityClass(name string, value int32) *schedulingv1.PriorityClass {
 	}
 	return priority
 }
+
+// getGracePeriodOverrideTestPod returns a new Pod object containing a container
+// runs a shell script, hangs the process until a SIGTERM signal is received.
+// The script waits for $PID to ensure that the process does not exist.
+// If priorityClassName is scheduling.SystemNodeCritical, the Pod is marked as critical and a comment is added.
 func getGracePeriodOverrideTestPod(name string, node string, gracePeriod int64, priorityClassName string) *v1.Pod {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
@@ -576,13 +581,16 @@ func getGracePeriodOverrideTestPod(name string, node string, gracePeriod int64, 
 					Image:   busyboxImage,
 					Command: []string{"sh", "-c"},
 					Args: []string{`
-_term() {
-	echo "Caught SIGTERM signal!"
-	while true; do sleep 5; done
-}
-trap _term SIGTERM
-while true; do sleep 5; done
-`},
+					sleep 9999999 &
+					PID=$!
+					_term() {
+						echo "Caught SIGTERM signal!"
+						wait $PID
+					}
+					
+					trap _term SIGTERM
+					wait $PID
+					`},
 				},
 			},
 			TerminationGracePeriodSeconds: &gracePeriod,

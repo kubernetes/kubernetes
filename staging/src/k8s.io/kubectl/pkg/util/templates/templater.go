@@ -126,6 +126,7 @@ func (templater *templater) templateFuncs(exposedFlags ...string) template.FuncM
 		"isRootCmd":           templater.isRootCmd,
 		"optionsCmdFor":       templater.optionsCmdFor,
 		"usageLine":           templater.usageLine,
+		"reverseParentsNames": templater.reverseParentsNames,
 		"exposed": func(c *cobra.Command) *flag.FlagSet {
 			exposed := flag.NewFlagSet("exposed", flag.ContinueOnError)
 			if len(exposedFlags) > 0 {
@@ -170,6 +171,15 @@ func (t *templater) cmdGroupsString(c *cobra.Command) string {
 
 func (t *templater) rootCmdName(c *cobra.Command) string {
 	return t.rootCmd(c).CommandPath()
+}
+
+func (t *templater) reverseParentsNames(c *cobra.Command) []string {
+	reverseParentsNames := []string{}
+	parents := t.parents(c)
+	for i := len(parents) - 1; i >= 0; i-- {
+		reverseParentsNames = append(reverseParentsNames, parents[i].Name())
+	}
+	return reverseParentsNames
 }
 
 func (t *templater) isRootCmd(c *cobra.Command) bool {

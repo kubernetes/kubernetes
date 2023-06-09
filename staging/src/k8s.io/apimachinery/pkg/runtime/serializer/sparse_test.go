@@ -19,11 +19,11 @@ package serializer
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 )
 
 type FakeV1Obj struct {
@@ -83,9 +83,9 @@ func TestSparse(t *testing.T) {
 	uncastDstObj2.(*FakeV2DifferentObj).TypeMeta = metav1.TypeMeta{}
 
 	if !equality.Semantic.DeepEqual(srcObj1, uncastDstObj1) {
-		t.Fatal(diff.ObjectDiff(srcObj1, uncastDstObj1))
+		t.Fatal(cmp.Diff(srcObj1, uncastDstObj1))
 	}
 	if !equality.Semantic.DeepEqual(srcObj2, uncastDstObj2) {
-		t.Fatal(diff.ObjectDiff(srcObj2, uncastDstObj2))
+		t.Fatal(cmp.Diff(srcObj2, uncastDstObj2))
 	}
 }

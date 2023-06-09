@@ -24,6 +24,8 @@ import (
 	"path/filepath"
 	"sync"
 
+	"google.golang.org/grpc"
+
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/klog/v2"
 	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1alpha2"
@@ -38,8 +40,23 @@ type ExamplePlugin struct {
 	driverName string
 	nodeName   string
 
-	mutex    sync.Mutex
-	prepared map[ClaimID]bool
+	mutex     sync.Mutex
+	prepared  map[ClaimID]bool
+	gRPCCalls []GRPCCall
+}
+
+type GRPCCall struct {
+	// FullMethod is the fully qualified, e.g. /package.service/method.
+	FullMethod string
+
+	// Request contains the parameters of the call.
+	Request interface{}
+
+	// Response contains the reply of the plugin. It is nil for calls that are in progress.
+	Response interface{}
+
+	// Err contains the error return value of the plugin. It is nil for calls that are in progress or succeeded.
+	Err error
 }
 
 // ClaimID contains both claim name and UID to simplify debugging. The
@@ -94,6 +111,7 @@ func StartPlugin(logger klog.Logger, cdiDir, driverName string, nodeName string,
 	opts = append(opts,
 		kubeletplugin.Logger(logger),
 		kubeletplugin.DriverName(driverName),
+		kubeletplugin.GRPCInterceptor(ex.recordGRPCCall),
 	)
 	d, err := kubeletplugin.Start(ex, opts...)
 	if err != nil {
@@ -205,4 +223,36 @@ func (ex *ExamplePlugin) GetPreparedResources() []ClaimID {
 		prepared = append(prepared, claimID)
 	}
 	return prepared
+}
+
+func (ex *ExamplePlugin) recordGRPCCall(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+	call := GRPCCall{
+		FullMethod: info.FullMethod,
+		Request:    req,
+	}
+	ex.mutex.Lock()
+	ex.gRPCCalls = append(ex.gRPCCalls, call)
+	index := len(ex.gRPCCalls) - 1
+	ex.mutex.Unlock()
+
+	// We don't hold the mutex here to allow concurrent calls.
+	call.Response, call.Err = handler(ctx, req)
+
+	ex.mutex.Lock()
+	ex.gRPCCalls[index] = call
+	ex.mutex.Unlock()
+
+	return call.Response, call.Err
+}
+
+func (ex *ExamplePlugin) GetGRPCCalls() []GRPCCall {
+	ex.mutex.Lock()
+	defer ex.mutex.Unlock()
+
+	// We must return a new slice, otherwise adding new calls would become
+	// visible to the caller. We also need to copy the entries because
+	// they get mutated by recordGRPCCall.
+	calls := make([]GRPCCall, 0, len(ex.gRPCCalls))
+	calls = append(calls, ex.gRPCCalls...)
+	return calls
 }

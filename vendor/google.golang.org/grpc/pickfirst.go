@@ -51,7 +51,7 @@ type pickfirstBalancer struct {
 
 func (b *pickfirstBalancer) ResolverError(err error) {
 	if logger.V(2) {
-		logger.Infof("pickfirstBalancer: ResolverError called with error %v", err)
+		logger.Infof("pickfirstBalancer: ResolverError called with error: %v", err)
 	}
 	if b.subConn == nil {
 		b.state = connectivity.TransientFailure
@@ -102,8 +102,8 @@ func (b *pickfirstBalancer) UpdateClientConnState(state balancer.ClientConnState
 	b.subConn = subConn
 	b.state = connectivity.Idle
 	b.cc.UpdateState(balancer.State{
-		ConnectivityState: connectivity.Idle,
-		Picker:            &picker{result: balancer.PickResult{SubConn: b.subConn}},
+		ConnectivityState: connectivity.Connecting,
+		Picker:            &picker{err: balancer.ErrNoSubConnAvailable},
 	})
 	b.subConn.Connect()
 	return nil

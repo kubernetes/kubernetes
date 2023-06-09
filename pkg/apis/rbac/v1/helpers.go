@@ -186,22 +186,6 @@ func NewRoleBinding(roleName, namespace string) *RoleBindingBuilder {
 	}
 }
 
-func NewRoleBindingForClusterRole(roleName, namespace string) *RoleBindingBuilder {
-	return &RoleBindingBuilder{
-		RoleBinding: rbacv1.RoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      roleName,
-				Namespace: namespace,
-			},
-			RoleRef: rbacv1.RoleRef{
-				APIGroup: GroupName,
-				Kind:     "ClusterRole",
-				Name:     roleName,
-			},
-		},
-	}
-}
-
 // Groups adds the specified groups as the subjects of the RoleBinding.
 func (r *RoleBindingBuilder) Groups(groups ...string) *RoleBindingBuilder {
 	for _, group := range groups {

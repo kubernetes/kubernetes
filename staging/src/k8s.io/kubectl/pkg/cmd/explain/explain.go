@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	openapiclient "k8s.io/client-go/openapi"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/explain"
@@ -57,7 +57,7 @@ var (
 )
 
 type ExplainOptions struct {
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 
 	CmdParent  string
 	APIVersion string
@@ -76,7 +76,7 @@ type ExplainOptions struct {
 	OpenAPIV3Client openapiclient.Client
 }
 
-func NewExplainOptions(parent string, streams genericclioptions.IOStreams) *ExplainOptions {
+func NewExplainOptions(parent string, streams genericiooptions.IOStreams) *ExplainOptions {
 	return &ExplainOptions{
 		IOStreams:    streams,
 		CmdParent:    parent,
@@ -85,7 +85,7 @@ func NewExplainOptions(parent string, streams genericclioptions.IOStreams) *Expl
 }
 
 // NewCmdExplain returns a cobra command for swagger docs
-func NewCmdExplain(parent string, f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdExplain(parent string, f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewExplainOptions(parent, streams)
 
 	cmd := &cobra.Command{

@@ -724,7 +724,7 @@ func TestDifferentFlowsExpectEqual(t *testing.T) {
 	}.exercise(t)
 }
 
-// TestSeatSecondsRollover checks that there is not a problem with SeatSecons overflow.
+// TestSeatSecondsRollover checks that there is not a problem with SeatSeconds overflow.
 func TestSeatSecondsRollover(t *testing.T) {
 	metrics.Register()
 	now := time.Now()

@@ -40,6 +40,7 @@ func TestValidationExpressions(t *testing.T) {
 	tests := []struct {
 		name          string
 		schema        *schema.Structural
+		oldSchema     *schema.Structural
 		obj           interface{}
 		oldObj        interface{}
 		valid         []string
@@ -173,6 +174,60 @@ func TestValidationExpressions(t *testing.T) {
 				"double(self.val1) < 10.0",
 				"double(self.val2) == 10.0",
 				"double(self.val3) > 10.0",
+
+				// Cross Type Numeric Comparisons: integers with all float types
+				"self.val1 < self.val4",
+				"self.val1 <= self.val4",
+				"self.val2 <= self.val4",
+				"self.val2 >= self.val4",
+				"self.val3 > self.val4",
+				"self.val3 >= self.val4",
+
+				"self.val1 < self.val4",
+				"self.val3 > self.val4",
+
+				"self.val1 < self.val5",
+				"self.val3 > self.val5",
+
+				"self.val1 < self.val5",
+				"self.val3 > self.val5",
+
+				"self.val1 < self.val6",
+				"self.val3 > self.val6",
+
+				"self.val1 < self.val6",
+				"self.val3 > self.val6",
+
+				// Cross Type Numeric Comparisons: float types backed by integer values,
+				// which is how integer literals are parsed from JSON for custom resources.
+				"self.val1 < self.val7",
+				"self.val3 > self.val7",
+
+				"self.val1 < int(self.val7)",
+				"self.val3 > int(self.val7)",
+
+				"self.val1 < self.val8",
+				"self.val3 > self.val8",
+
+				"self.val1 < self.val8",
+				"self.val3 > self.val8",
+
+				"self.val1 < self.val9",
+				"self.val3 > self.val9",
+
+				"self.val1 < self.val9",
+				"self.val3 > self.val9",
+
+				// Cross Type Numeric Comparisons: literal integers and floats
+				"5 < 10.0",
+				"15 > 10.0",
+
+				"5 < 10.0",
+				"15 > 10.0",
+
+				// Cross Type Numeric Comparisons: integers with literal floats
+				"self.val1 < 10.0",
+				"self.val3 > 10.0",
 			},
 		},
 		{name: "unicode strings",
@@ -208,6 +263,9 @@ func TestValidationExpressions(t *testing.T) {
 			errors: map[string]string{
 				// Invalid regex with a string constant regex pattern is compile time error
 				"self.val1.matches(')')": "compile error: program instantiation failed: error parsing regexp: unexpected ): `)`",
+				// strings version 0 does not have format or join
+				// TODO: Replace this error test with valid tests when the string version is bumped.
+				"'%s %i'.format('a', 1) == 'a 1'": "undeclared reference to 'format'",
 			},
 		},
 		{name: "escaped strings",
@@ -338,6 +396,21 @@ func TestValidationExpressions(t *testing.T) {
 				"self.val1 + self.val2 == [1, 2, 3, 1, 2, 3]",
 				"self.val1 + [4, 5] == [1, 2, 3, 4, 5]",
 			},
+			errors: map[string]string{
+				// Mixed type lists are not allowed since we have HomogeneousAggregateLiterals enabled
+				"[1, 'a', false].filter(x, string(x) == 'a')": "expected type 'int' but found 'string'",
+			},
+		},
+		{name: "string lists",
+			obj:    objs([]interface{}{"a", "b", "c"}),
+			schema: schemas(listType(&stringType)),
+			valid: []string{
+				// Join function
+				"self.val1.join('-') == 'a-b-c'",
+				"['a', 'b', 'c'].join('-') == 'a-b-c'",
+				"self.val1.join() == 'abc'",
+				"['a', 'b', 'c'].join() == 'abc'",
+			},
 		},
 		{name: "listSets",
 			obj:    objs([]interface{}{"a", "b", "c"}, []interface{}{"a", "c", "b"}),
@@ -351,6 +424,12 @@ func TestValidationExpressions(t *testing.T) {
 				"!('x' in self.val1)",
 				"self.val1 + self.val2 == ['a', 'b', 'c']",
 				"self.val1 + ['c', 'd'] == ['a', 'b', 'c', 'd']",
+
+				// Join function
+				"self.val1.join('-') == 'a-b-c'",
+				"['a', 'b', 'c'].join('-') == 'a-b-c'",
+				"self.val1.join() == 'abc'",
+				"['a', 'b', 'c'].join() == 'abc'",
 			},
 		},
 		{name: "listMaps",
@@ -402,6 +481,10 @@ func TestValidationExpressions(t *testing.T) {
 				"'k1' in self.val1",
 				"!('k3' in self.val1)",
 				"self.val1 == {'k1': 'a', 'k2': 'b'}",
+			},
+			errors: map[string]string{
+				// Mixed type maps are not allowed since we have HomogeneousAggregateLiterals enabled
+				"{'k1': 'a', 'k2': 1, 'k2': false}": "expected type 'string' but found 'int'",
 			},
 		},
 		{name: "objects",
@@ -1759,7 +1842,89 @@ func TestValidationExpressions(t *testing.T) {
 			oldObj: []interface{}{},
 			schema: objectTypePtr(map[string]schema.Structural{}),
 			errors: map[string]string{
-				"authorizer.path('/healthz').check('get').isAllowed()": "undeclared reference to 'authorizer'",
+				"authorizer.path('/healthz').check('get').allowed()": "undeclared reference to 'authorizer'",
+			},
+		},
+		{name: "optionals", // https://github.com/google/cel-spec/wiki/proposal-246
+			obj: map[string]interface{}{
+				"presentObj": map[string]interface{}{
+					"presentStr": "value",
+				},
+				"m": map[string]interface{}{"k": "v"},
+				"l": []interface{}{"a"},
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"presentObj": objectType(map[string]schema.Structural{
+					"presentStr": stringType,
+				}),
+				"absentObj": objectType(map[string]schema.Structural{
+					"absentStr": stringType,
+				}),
+				"m": mapType(&stringType),
+				"l": listType(&stringType),
+			}),
+			valid: []string{
+				"self.?presentObj.?presentStr == optional.of('value')",
+				"self.presentObj.?presentStr == optional.of('value')",
+				"self.presentObj.?presentStr.or(optional.of('nope')) == optional.of('value')",
+				"self.presentObj.?presentStr.orValue('') == 'value'",
+				"self.presentObj.?presentStr.hasValue() == true",
+				"self.presentObj.?presentStr.optMap(v, v == 'value').hasValue()",
+				"self.?absentObj.?absentStr == optional.none()",
+				"self.?absentObj.?absentStr.or(optional.of('nope')) == optional.of('nope')",
+				"self.?absentObj.?absentStr.orValue('nope') == 'nope'",
+				"self.?absentObj.?absentStr.hasValue() == false",
+				"self.?absentObj.?absentStr.optMap(v, v == 'value').hasValue() == false",
+
+				"self.m[?'k'] == optional.of('v')",
+				"self.m[?'k'].or(optional.of('nope')) == optional.of('v')",
+				"self.m[?'k'].orValue('') == 'v'",
+				"self.m[?'k'].hasValue() == true",
+				"self.m[?'k'].optMap(v, v == 'v').hasValue()",
+				"self.m[?'x'] == optional.none()",
+				"self.m[?'x'].or(optional.of('nope')) == optional.of('nope')",
+				"self.m[?'x'].orValue('nope') == 'nope'",
+				"self.m[?'x'].hasValue() == false",
+				"self.m[?'x'].hasValue() == false",
+
+				"self.l[?0] == optional.of('a')",
+				"self.l[?1] == optional.none()",
+				"self.l[?0].orValue('') == 'a'",
+				"self.l[?0].hasValue() == true",
+				"self.l[?0].optMap(v, v == 'a').hasValue()",
+				"self.l[?1] == optional.none()",
+				"self.l[?1].or(optional.of('nope')) == optional.of('nope')",
+				"self.l[?1].orValue('nope') == 'nope'",
+				"self.l[?1].hasValue() == false",
+				"self.l[?1].hasValue() == false",
+
+				"optional.ofNonZeroValue(1).hasValue()",
+				"optional.ofNonZeroValue(uint(1)).hasValue()",
+				"optional.ofNonZeroValue(1.1).hasValue()",
+				"optional.ofNonZeroValue('a').hasValue()",
+				"optional.ofNonZeroValue(true).hasValue()",
+				"optional.ofNonZeroValue(['a']).hasValue()",
+				"optional.ofNonZeroValue({'k': 'v'}).hasValue()",
+				"optional.ofNonZeroValue(timestamp('2011-08-18T00:00:00.000+01:00')).hasValue()",
+				"optional.ofNonZeroValue(duration('19h3m37s10ms')).hasValue()",
+				"optional.ofNonZeroValue(null) == optional.none()",
+				"optional.ofNonZeroValue(0) == optional.none()",
+				"optional.ofNonZeroValue(uint(0)) == optional.none()",
+				"optional.ofNonZeroValue(0.0) == optional.none()",
+				"optional.ofNonZeroValue('') == optional.none()",
+				"optional.ofNonZeroValue(false) == optional.none()",
+				"optional.ofNonZeroValue([]) == optional.none()",
+				"optional.ofNonZeroValue({}) == optional.none()",
+				"optional.ofNonZeroValue(timestamp('0001-01-01T00:00:00.000+00:00')) == optional.none()",
+				"optional.ofNonZeroValue(duration('0s')) == optional.none()",
+
+				"{?'k': optional.none(), 'k2': 'v2'} == {'k2': 'v2'}",
+				"{?'k': optional.of('v'), 'k2': 'v2'} == {'k': 'v', 'k2': 'v2'}",
+				"['a', ?optional.none(), 'c'] == ['a', 'c']",
+				"['a', ?optional.of('v'), 'c'] == ['a', 'v', 'c']",
+			},
+			errors: map[string]string{
+				"self.absentObj.?absentStr == optional.none()": "no such key: absentObj", // missing ?. operator on first deref is an error
 			},
 		},
 	}
@@ -2182,7 +2347,7 @@ func TestCELValidationContextCancellation(t *testing.T) {
 
 // This is the most recursive operations we expect to be able to include in an expression.
 // This number could get larger with more improvements in the grammar or ANTLR stack, but should *never* decrease or previously valid expressions could be treated as invalid.
-const maxValidDepth = 243
+const maxValidDepth = 250
 
 // TestCELMaxRecursionDepth tests CEL setting for maxRecursionDepth.
 func TestCELMaxRecursionDepth(t *testing.T) {
@@ -2317,7 +2482,7 @@ func TestMessageExpression(t *testing.T) {
 			message:                 "message not messageExpression",
 			messageExpression:       `"str1 " + ["a", "b", "c", "d"][4]`,
 			costBudget:              50,
-			expectedLogErr:          "messageExpression evaluation failed due to: index '4' out of range in list size '4'",
+			expectedLogErr:          "messageExpression evaluation failed due to: index out of bounds: 4",
 			expectedValidationErr:   "message not messageExpression",
 			expectedRemainingBudget: 47,
 		},
@@ -2325,7 +2490,7 @@ func TestMessageExpression(t *testing.T) {
 			name:                    "runtime cost preserved if messageExpression fails during evaluation (no message set)",
 			messageExpression:       `"str1 " + ["a", "b", "c", "d"][4]`,
 			costBudget:              50,
-			expectedLogErr:          "messageExpression evaluation failed due to: index '4' out of range in list size '4'",
+			expectedLogErr:          "messageExpression evaluation failed due to: index out of bounds: 4",
 			expectedValidationErr:   "failed rule",
 			expectedRemainingBudget: 47,
 		},

@@ -25,6 +25,7 @@ import (
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/controller/job/metrics"
 )
@@ -76,7 +77,7 @@ func TestUIDTrackingExpectations(t *testing.T) {
 		uids := expectations.getSet(track.job)
 		if uids == nil {
 			t.Errorf("Set of UIDs is empty for job %s", track.job)
-		} else if diff := cmp.Diff(track.firstRound, uids.set.List()); diff != "" {
+		} else if diff := cmp.Diff(track.firstRound, sets.List(uids.set)); diff != "" {
 			t.Errorf("Unexpected keys for job %s (-want,+got):\n%s", track.job, diff)
 		}
 	}
@@ -110,7 +111,7 @@ func TestUIDTrackingExpectations(t *testing.T) {
 		uids := expectations.getSet(track.job)
 		if uids == nil {
 			t.Errorf("Set of UIDs is empty for job %s", track.job)
-		} else if diff := cmp.Diff(track.secondRound, uids.set.List()); diff != "" {
+		} else if diff := cmp.Diff(track.secondRound, sets.List(uids.set)); diff != "" {
 			t.Errorf("Unexpected keys for job %s (-want,+got):\n%s", track.job, diff)
 		}
 	}

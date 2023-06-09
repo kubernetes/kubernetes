@@ -44,6 +44,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	sptest "k8s.io/apimachinery/pkg/util/strategicpatch/testing"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	dynamicfakeclient "k8s.io/client-go/dynamic/fake"
 	restclient "k8s.io/client-go/rest"
@@ -90,7 +91,7 @@ func TestApplyExtraArgsFail(t *testing.T) {
 	defer f.Cleanup()
 
 	cmd := &cobra.Command{}
-	flags := NewApplyFlags(genericclioptions.NewTestIOStreamsDiscard())
+	flags := NewApplyFlags(genericiooptions.NewTestIOStreamsDiscard())
 	flags.AddFlags(cmd)
 	_, err := flags.ToOptions(f, cmd, "kubectl", []string{"rc"})
 	require.EqualError(t, err, "Unexpected args: [rc]\nSee ' -h' for help and examples")
@@ -105,13 +106,13 @@ func TestAlphaEnablement(t *testing.T) {
 		defer f.Cleanup()
 
 		cmd := &cobra.Command{}
-		flags := NewApplyFlags(genericclioptions.NewTestIOStreamsDiscard())
+		flags := NewApplyFlags(genericiooptions.NewTestIOStreamsDiscard())
 		flags.AddFlags(cmd)
 		require.Nil(t, cmd.Flags().Lookup(flag), "flag %q should not be registered without the %q feature enabled", flag, feature)
 
 		cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{feature}, t, func(t *testing.T) {
 			cmd := &cobra.Command{}
-			flags := NewApplyFlags(genericclioptions.NewTestIOStreamsDiscard())
+			flags := NewApplyFlags(genericiooptions.NewTestIOStreamsDiscard())
 			flags.AddFlags(cmd)
 			require.NotNil(t, cmd.Flags().Lookup(flag), "flag %q should be registered with the %q feature enabled", flag, feature)
 		})
@@ -239,7 +240,7 @@ func TestApplyFlagValidation(t *testing.T) {
 			f.UnstructuredClient = f.Client
 			cmdtesting.WithAlphaEnvs(test.enableAlphas, t, func(t *testing.T) {
 				cmd := &cobra.Command{}
-				flags := NewApplyFlags(genericclioptions.NewTestIOStreamsDiscard())
+				flags := NewApplyFlags(genericiooptions.NewTestIOStreamsDiscard())
 				flags.AddFlags(cmd)
 				cmd.Flags().Set("filename", "unused")
 				for _, arg := range test.args {
@@ -498,7 +499,7 @@ func TestRunApplyPrintsValidObjectList(t *testing.T) {
 	}
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdApply("kubectl", tf, ioStreams)
 	cmd.Flags().Set("filename", filenameCM)
 	cmd.Flags().Set("output", "json")
@@ -638,7 +639,7 @@ func TestRunApplyViewLastApplied(t *testing.T) {
 				}
 			})
 
-			ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+			ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
 			cmd := NewCmdApplyViewLastApplied(tf, ioStreams)
 			if test.filePath != "" {
 				cmd.Flags().Set("filename", test.filePath)
@@ -684,7 +685,7 @@ func TestApplyObjectWithoutAnnotation(t *testing.T) {
 	}
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-	ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
+	ioStreams, _, buf, errBuf := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdApply("kubectl", tf, ioStreams)
 	cmd.Flags().Set("filename", filenameRC)
 	cmd.Flags().Set("output", "name")
@@ -731,7 +732,7 @@ func TestApplyObject(t *testing.T) {
 			tf.OpenAPISchemaFunc = testingOpenAPISchema.OpenAPISchemaFn
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
+			ioStreams, _, buf, errBuf := genericiooptions.NewTestIOStreams()
 			cmd := NewCmdApply("kubectl", tf, ioStreams)
 			cmd.Flags().Set("filename", filenameRC)
 			cmd.Flags().Set("output", "name")
@@ -779,7 +780,7 @@ func TestApplyPruneObjects(t *testing.T) {
 			tf.OpenAPISchemaFunc = testingOpenAPISchema.OpenAPISchemaFn
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
+			ioStreams, _, buf, errBuf := genericiooptions.NewTestIOStreams()
 			cmd := NewCmdApply("kubectl", tf, ioStreams)
 			cmd.Flags().Set("filename", filenameRC)
 			cmd.Flags().Set("prune", "true")
@@ -1021,7 +1022,7 @@ func TestApplyPruneObjectsWithAllowlist(t *testing.T) {
 					}
 				}
 
-				ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
+				ioStreams, _, buf, errBuf := genericiooptions.NewTestIOStreams()
 				cmd := NewCmdApply("kubectl", tf, ioStreams)
 				cmd.Flags().Set("filename", filenameRC)
 				cmd.Flags().Set("prune", "true")
@@ -1193,7 +1194,7 @@ func TestApplyCSAMigration(t *testing.T) {
 	tf.OpenAPISchemaFunc = FakeOpenAPISchema.OpenAPISchemaFn
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-	ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
+	ioStreams, _, buf, errBuf := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdApply("kubectl", tf, ioStreams)
 	cmd.Flags().Set("filename", filenameRC)
 	cmd.Flags().Set("output", "yaml")
@@ -1222,7 +1223,7 @@ func TestApplyCSAMigration(t *testing.T) {
 
 	// Apply the upgraded object.
 	// Expect only a single PATCH call to apiserver
-	ioStreams, _, _, errBuf = genericclioptions.NewTestIOStreams()
+	ioStreams, _, _, errBuf = genericiooptions.NewTestIOStreams()
 	cmd = NewCmdApply("kubectl", tf, ioStreams)
 	cmd.Flags().Set("filename", filenameRC)
 	cmd.Flags().Set("output", "yaml")
@@ -1281,7 +1282,7 @@ func TestApplyObjectOutput(t *testing.T) {
 			tf.OpenAPISchemaFunc = testingOpenAPISchema.OpenAPISchemaFn
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
+			ioStreams, _, buf, errBuf := genericiooptions.NewTestIOStreams()
 			cmd := NewCmdApply("kubectl", tf, ioStreams)
 			cmd.Flags().Set("filename", filenameRC)
 			cmd.Flags().Set("output", "yaml")
@@ -1342,7 +1343,7 @@ func TestApplyRetry(t *testing.T) {
 			tf.OpenAPISchemaFunc = testingOpenAPISchema.OpenAPISchemaFn
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
+			ioStreams, _, buf, errBuf := genericiooptions.NewTestIOStreams()
 			cmd := NewCmdApply("kubectl", tf, ioStreams)
 			cmd.Flags().Set("filename", filenameRC)
 			cmd.Flags().Set("output", "name")
@@ -1391,7 +1392,7 @@ func TestApplyNonExistObject(t *testing.T) {
 	}
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdApply("kubectl", tf, ioStreams)
 	cmd.Flags().Set("filename", filenameRC)
 	cmd.Flags().Set("output", "name")
@@ -1444,7 +1445,7 @@ func TestApplyEmptyPatch(t *testing.T) {
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 	// 1. apply non exist object
-	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdApply("kubectl", tf, ioStreams)
 	cmd.Flags().Set("filename", filenameRC)
 	cmd.Flags().Set("output", "name")
@@ -1459,7 +1460,7 @@ func TestApplyEmptyPatch(t *testing.T) {
 	}
 
 	// 2. test apply already exist object, will not send empty patch request
-	ioStreams, _, buf, _ = genericclioptions.NewTestIOStreams()
+	ioStreams, _, buf, _ = genericiooptions.NewTestIOStreams()
 	cmd = NewCmdApply("kubectl", tf, ioStreams)
 	cmd.Flags().Set("filename", filenameRC)
 	cmd.Flags().Set("output", "name")
@@ -1517,7 +1518,7 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 			tf.OpenAPISchemaFunc = testingOpenAPISchema.OpenAPISchemaFn
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
+			ioStreams, _, buf, errBuf := genericiooptions.NewTestIOStreams()
 			cmd := NewCmdApply("kubectl", tf, ioStreams)
 			if asList {
 				cmd.Flags().Set("filename", filenameRCSVC)
@@ -1612,7 +1613,7 @@ func TestApplyNULLPreservation(t *testing.T) {
 			tf.OpenAPISchemaFunc = testingOpenAPISchema.OpenAPISchemaFn
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
+			ioStreams, _, buf, errBuf := genericiooptions.NewTestIOStreams()
 			cmd := NewCmdApply("kubectl", tf, ioStreams)
 			cmd.Flags().Set("filename", filenameDeployObjClientside)
 			cmd.Flags().Set("output", "name")
@@ -1674,7 +1675,7 @@ func TestUnstructuredApply(t *testing.T) {
 			tf.OpenAPISchemaFunc = testingOpenAPISchema.OpenAPISchemaFn
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
+			ioStreams, _, buf, errBuf := genericiooptions.NewTestIOStreams()
 			cmd := NewCmdApply("kubectl", tf, ioStreams)
 			cmd.Flags().Set("filename", filenameWidgetClientside)
 			cmd.Flags().Set("output", "name")
@@ -1738,7 +1739,7 @@ func TestUnstructuredIdempotentApply(t *testing.T) {
 			tf.OpenAPISchemaFunc = testingOpenAPISchema.OpenAPISchemaFn
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
+			ioStreams, _, buf, errBuf := genericiooptions.NewTestIOStreams()
 			cmd := NewCmdApply("kubectl", tf, ioStreams)
 			cmd.Flags().Set("filename", filenameWidgetClientside)
 			cmd.Flags().Set("output", "name")
@@ -1843,7 +1844,7 @@ func TestRunApplySetLastApplied(t *testing.T) {
 				}
 			})
 
-			ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+			ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
 			cmd := NewCmdApplySetLastApplied(tf, ioStreams)
 			cmd.Flags().Set("filename", test.filePath)
 			cmd.Flags().Set("output", test.output)
@@ -1981,7 +1982,7 @@ func TestForceApply(t *testing.T) {
 			tf.Client = tf.UnstructuredClient
 			tf.ClientConfigVal = &restclient.Config{}
 
-			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
+			ioStreams, _, buf, errBuf := genericiooptions.NewTestIOStreams()
 			cmd := NewCmdApply("kubectl", tf, ioStreams)
 			cmd.Flags().Set("filename", filenameRC)
 			cmd.Flags().Set("output", "name")
@@ -2022,7 +2023,7 @@ func TestDontAllowForceApplyWithServerDryRun(t *testing.T) {
 
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-	ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
+	ioStreams, _, _, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdApply("kubectl", tf, ioStreams)
 	cmd.Flags().Set("filename", filenameRC)
 	cmd.Flags().Set("dry-run", "server")
@@ -2050,7 +2051,7 @@ func TestDontAllowForceApplyWithServerSide(t *testing.T) {
 
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-	ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
+	ioStreams, _, _, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdApply("kubectl", tf, ioStreams)
 	cmd.Flags().Set("filename", filenameRC)
 	cmd.Flags().Set("server-side", "true")
@@ -2072,7 +2073,7 @@ func TestDontAllowApplyWithPodGeneratedName(t *testing.T) {
 	defer tf.Cleanup()
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-	ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
+	ioStreams, _, _, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdApply("kubectl", tf, ioStreams)
 	cmd.Flags().Set("filename", filenamePodGeneratedName)
 	cmd.Flags().Set("dry-run", "client")
@@ -2165,7 +2166,7 @@ func TestApplySetParentValidation(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
 				cmd := &cobra.Command{}
-				flags := NewApplyFlags(genericclioptions.NewTestIOStreamsDiscard())
+				flags := NewApplyFlags(genericiooptions.NewTestIOStreamsDiscard())
 				flags.AddFlags(cmd)
 				cmd.Flags().Set("filename", filenameRC)
 				cmd.Flags().Set("applyset", test.applysetFlag)
@@ -2311,7 +2312,7 @@ func TestLoadObjects(t *testing.T) {
 			cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
 
 				cmd := &cobra.Command{}
-				flags := NewApplyFlags(genericclioptions.NewTestIOStreamsDiscard())
+				flags := NewApplyFlags(genericiooptions.NewTestIOStreamsDiscard())
 				flags.AddFlags(cmd)
 				cmd.Flags().Set("filename", testFile+".yaml")
 				cmd.Flags().Set("applyset", filepath.Base(filepath.Dir(testFile)))
@@ -2381,7 +2382,7 @@ func TestApplySetParentManagement(t *testing.T) {
 
 	// Initially, the rc 'exists' server side but the svc and applyset secret do not
 	// This should 'update' the rc and create the secret
-	ioStreams, _, outbuff, errbuff := genericclioptions.NewTestIOStreams()
+	ioStreams, _, outbuff, errbuff := genericiooptions.NewTestIOStreams()
 	cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
 		cmd := NewCmdApply("kubectl", tf, ioStreams)
 		cmd.Flags().Set("filename", filenameRC)
@@ -2401,12 +2402,12 @@ func TestApplySetParentManagement(t *testing.T) {
 kind: Secret
 metadata:
   annotations:
-    applyset.k8s.io/additional-namespaces: ""
-    applyset.k8s.io/contains-group-resources: replicationcontrollers
-    applyset.k8s.io/tooling: kubectl/v0.0.0-master+$Format:%H$
+    applyset.kubernetes.io/additional-namespaces: ""
+    applyset.kubernetes.io/contains-group-resources: replicationcontrollers
+    applyset.kubernetes.io/tooling: kubectl/v0.0.0-master+$Format:%H$
   creationTimestamp: null
   labels:
-    applyset.k8s.io/id: applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1
+    applyset.kubernetes.io/id: applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1
   name: my-set
   namespace: test
   uid: a-static-fake-uid
@@ -2435,12 +2436,12 @@ metadata:
 kind: Secret
 metadata:
   annotations:
-    applyset.k8s.io/additional-namespaces: ""
-    applyset.k8s.io/contains-group-resources: replicationcontrollers,services
-    applyset.k8s.io/tooling: kubectl/v0.0.0-master+$Format:%H$
+    applyset.kubernetes.io/additional-namespaces: ""
+    applyset.kubernetes.io/contains-group-resources: replicationcontrollers,services
+    applyset.kubernetes.io/tooling: kubectl/v0.0.0-master+$Format:%H$
   creationTimestamp: null
   labels:
-    applyset.k8s.io/id: applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1
+    applyset.kubernetes.io/id: applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1
   name: my-set
   namespace: test
   uid: a-static-fake-uid
@@ -2470,12 +2471,12 @@ metadata:
 kind: Secret
 metadata:
   annotations:
-    applyset.k8s.io/additional-namespaces: ""
-    applyset.k8s.io/contains-group-resources: replicationcontrollers,services
-    applyset.k8s.io/tooling: kubectl/v0.0.0-master+$Format:%H$
+    applyset.kubernetes.io/additional-namespaces: ""
+    applyset.kubernetes.io/contains-group-resources: replicationcontrollers,services
+    applyset.kubernetes.io/tooling: kubectl/v0.0.0-master+$Format:%H$
   creationTimestamp: null
   labels:
-    applyset.k8s.io/id: applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1
+    applyset.kubernetes.io/id: applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1
   name: my-set
   namespace: test
   uid: a-static-fake-uid
@@ -2505,12 +2506,12 @@ metadata:
 kind: Secret
 metadata:
   annotations:
-    applyset.k8s.io/additional-namespaces: ""
-    applyset.k8s.io/contains-group-resources: services
-    applyset.k8s.io/tooling: kubectl/v0.0.0-master+$Format:%H$
+    applyset.kubernetes.io/additional-namespaces: ""
+    applyset.kubernetes.io/contains-group-resources: services
+    applyset.kubernetes.io/tooling: kubectl/v0.0.0-master+$Format:%H$
   creationTimestamp: null
   labels:
-    applyset.k8s.io/id: applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1
+    applyset.kubernetes.io/id: applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1
   name: my-set
   namespace: test
   uid: a-static-fake-uid
@@ -2537,19 +2538,19 @@ func TestApplySetInvalidLiveParent(t *testing.T) {
 			grsAnnotation:     "",
 			toolingAnnotation: validToolingAnnotation,
 			idLabel:           validIDLabel,
-			expectErr:         "error: parsing ApplySet annotation on \"secrets./my-set\": kubectl requires the \"applyset.k8s.io/contains-group-resources\" annotation to be set on all ApplySet parent objects",
+			expectErr:         "error: parsing ApplySet annotation on \"secrets./my-set\": kubectl requires the \"applyset.kubernetes.io/contains-group-resources\" annotation to be set on all ApplySet parent objects",
 		},
 		"group-resources annotation should not contain invalid resources": {
 			grsAnnotation:     "does-not-exist",
 			toolingAnnotation: validToolingAnnotation,
 			idLabel:           validIDLabel,
-			expectErr:         "error: parsing ApplySet annotation on \"secrets./my-set\": invalid group resource in \"applyset.k8s.io/contains-group-resources\" annotation: no matches for /, Resource=does-not-exist",
+			expectErr:         "error: parsing ApplySet annotation on \"secrets./my-set\": invalid group resource in \"applyset.kubernetes.io/contains-group-resources\" annotation: no matches for /, Resource=does-not-exist",
 		},
 		"tooling annotation is required": {
 			grsAnnotation:     validGrsAnnotation,
 			toolingAnnotation: "",
 			idLabel:           validIDLabel,
-			expectErr:         "error: ApplySet parent object \"secrets./my-set\" already exists and is missing required annotation \"applyset.k8s.io/tooling\"",
+			expectErr:         "error: ApplySet parent object \"secrets./my-set\" already exists and is missing required annotation \"applyset.kubernetes.io/tooling\"",
 		},
 		"tooling annotation must have kubectl prefix": {
 			grsAnnotation:     validGrsAnnotation,
@@ -2573,13 +2574,13 @@ func TestApplySetInvalidLiveParent(t *testing.T) {
 			grsAnnotation:     validGrsAnnotation,
 			toolingAnnotation: validToolingAnnotation,
 			idLabel:           "",
-			expectErr:         "error: ApplySet parent object \"secrets./my-set\" exists and does not have required label applyset.k8s.io/id",
+			expectErr:         "error: ApplySet parent object \"secrets./my-set\" exists and does not have required label applyset.kubernetes.io/id",
 		},
 		"ID label must match the ApplySet's real ID": {
 			grsAnnotation:     validGrsAnnotation,
 			toolingAnnotation: validToolingAnnotation,
 			idLabel:           "somethingelse",
-			expectErr:         fmt.Sprintf("error: ApplySet parent object \"secrets./my-set\" exists and has incorrect value for label \"applyset.k8s.io/id\" (got: somethingelse, want: %s)", validIDLabel),
+			expectErr:         fmt.Sprintf("error: ApplySet parent object \"secrets./my-set\" exists and has incorrect value for label \"applyset.kubernetes.io/id\" (got: somethingelse, want: %s)", validIDLabel),
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -2609,7 +2610,7 @@ func TestApplySetInvalidLiveParent(t *testing.T) {
 			setUpClientsForApplySetWithSSA(t, tf, secret)
 
 			cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
-				ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
+				ioStreams, _, _, _ := genericiooptions.NewTestIOStreams()
 				cmd := NewCmdApply("kubectl", tf, ioStreams)
 				cmd.Flags().Set("filename", filenameSVC)
 				cmd.Flags().Set("server-side", "true")
@@ -2630,7 +2631,7 @@ func TestApplySet_ClusterScopedCustomResourceParent(t *testing.T) {
 	cr := readUnstructuredFromFile(t, filenameApplySetCR)
 	setUpClientsForApplySetWithSSA(t, tf, replicationController, crd)
 
-	ioStreams, _, outbuff, errbuff := genericclioptions.NewTestIOStreams()
+	ioStreams, _, outbuff, errbuff := genericiooptions.NewTestIOStreams()
 	cmdutil.BehaviorOnFatal(func(s string, i int) {
 		require.Equal(t, "error: custom resource ApplySet parents cannot be created automatically", s)
 	})
@@ -2668,12 +2669,12 @@ func TestApplySet_ClusterScopedCustomResourceParent(t *testing.T) {
 kind: ApplySet
 metadata:
   annotations:
-    applyset.k8s.io/additional-namespaces: test
-    applyset.k8s.io/contains-group-resources: replicationcontrollers
-    applyset.k8s.io/tooling: kubectl/v0.0.0-master+$Format:%H$
+    applyset.kubernetes.io/additional-namespaces: test
+    applyset.kubernetes.io/contains-group-resources: replicationcontrollers
+    applyset.kubernetes.io/tooling: kubectl/v0.0.0-master+$Format:%H$
   creationTimestamp: null
   labels:
-    applyset.k8s.io/id: applyset-rhp1a-HVAVT_dFgyEygyA1BEB82HPp2o10UiFTpqtAs-v1
+    applyset.kubernetes.io/id: applyset-rhp1a-HVAVT_dFgyEygyA1BEB82HPp2o10UiFTpqtAs-v1
   name: my-set
 `, string(updatedCRYaml))
 }
@@ -2836,7 +2837,7 @@ func TestApplyWithPruneV2(t *testing.T) {
 					t.Logf("applying manifest %v", manifest)
 
 					cmd := &cobra.Command{}
-					flags := NewApplyFlags(genericclioptions.NewTestIOStreamsDiscard())
+					flags := NewApplyFlags(genericiooptions.NewTestIOStreamsDiscard())
 					flags.AddFlags(cmd)
 					cmd.Flags().Set("filename", filepath.Join(testdir, manifest+".yaml"))
 					cmd.Flags().Set("applyset", filepath.Base(testdir))
@@ -2885,12 +2886,12 @@ func TestApplySetUpdateConflictsAreRetried(t *testing.T) {
 kind: Secret
 metadata:
   annotations:
-    applyset.k8s.io/additional-namespaces: ""
-    applyset.k8s.io/contains-group-resources: replicationcontrollers
-    applyset.k8s.io/tooling: kubectl/v0.0.0-master+$Format:%H$
+    applyset.kubernetes.io/additional-namespaces: ""
+    applyset.kubernetes.io/contains-group-resources: replicationcontrollers
+    applyset.kubernetes.io/tooling: kubectl/v0.0.0-master+$Format:%H$
   creationTimestamp: null
   labels:
-    applyset.k8s.io/id: applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1
+    applyset.kubernetes.io/id: applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1
   name: my-set
   namespace: test
 `
@@ -2915,7 +2916,7 @@ metadata:
 				if req.URL.Path == pathSecret {
 					if !forceConflicts {
 						applyReturnedConflict = true
-						return &http.Response{StatusCode: http.StatusConflict, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(strings.NewReader("Apply failed with 1 conflict: conflict with \"other\": .metadata.annotations.applyset.k8s.io/contains-group-resources"))}, nil
+						return &http.Response{StatusCode: http.StatusConflict, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(strings.NewReader("Apply failed with 1 conflict: conflict with \"other\": .metadata.annotations.applyset.kubernetes.io/contains-group-resources"))}, nil
 					}
 					appliedWithConflictsForced = true
 				}
@@ -2929,7 +2930,7 @@ metadata:
 	}
 	tf.UnstructuredClient = tf.Client
 
-	ioStreams, _, outbuff, errbuff := genericclioptions.NewTestIOStreams()
+	ioStreams, _, outbuff, errbuff := genericiooptions.NewTestIOStreams()
 	cmdutil.BehaviorOnFatal(fatalNoExit(t, ioStreams))
 	defer cmdutil.DefaultBehaviorOnFatal()
 
@@ -3117,7 +3118,7 @@ func TestApplyWithPruneV2Fail(t *testing.T) {
 					t.Logf("applying manifest %v", manifest)
 
 					var unifiedOutput bytes.Buffer
-					ioStreams := genericclioptions.IOStreams{
+					ioStreams := genericiooptions.IOStreams{
 						ErrOut: &unifiedOutput,
 						Out:    &unifiedOutput,
 						In:     bytes.NewBufferString(""),
@@ -3165,7 +3166,7 @@ func TestApplyWithPruneV2Fail(t *testing.T) {
 
 // fatalNoExit is a handler that replaces the default cmdutil.BehaviorOnFatal,
 // that still prints as expected, but does not call os.Exit (which terminates our tests)
-func fatalNoExit(t *testing.T, ioStreams genericclioptions.IOStreams) func(msg string, code int) {
+func fatalNoExit(t *testing.T, ioStreams genericiooptions.IOStreams) func(msg string, code int) {
 	return func(msg string, code int) {
 		if len(msg) > 0 {
 			// add newline if needed
@@ -3216,7 +3217,7 @@ func TestApplySetDryRun(t *testing.T) {
 	}
 
 	t.Run("server side dry run", func(t *testing.T) {
-		ioStreams, _, outbuff, _ := genericclioptions.NewTestIOStreams()
+		ioStreams, _, outbuff, _ := genericiooptions.NewTestIOStreams()
 		tf.Client = fakeDryRunClient(t, true)
 		tf.UnstructuredClient = tf.Client
 		cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
@@ -3234,7 +3235,7 @@ func TestApplySetDryRun(t *testing.T) {
 	})
 
 	t.Run("client side dry run", func(t *testing.T) {
-		ioStreams, _, outbuff, _ := genericclioptions.NewTestIOStreams()
+		ioStreams, _, outbuff, _ := genericiooptions.NewTestIOStreams()
 		tf.Client = fakeDryRunClient(t, false)
 		tf.UnstructuredClient = tf.Client
 		cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
