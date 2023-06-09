@@ -146,6 +146,7 @@ run_kubectl_debug_general_tests() {
   kube::test::get_object_assert pod/target-copy '{{range.spec.containers}}{{.image}}:{{end}}' "${IMAGE_NGINX:?}:busybox:"
   kube::test::get_object_assert pod/target-copy '{{range.spec.containers}}{{if (index . "livenessProbe")}}:{{end}}{{end}}' ''
   kube::test::get_object_assert pod/target-copy '{{range.spec.containers}}{{if (index . "readinessProbe")}}:{{end}}{{end}}' ''
+  kube::test::get_object_assert pod/target-copy '{{range.spec.containers}}{{if (index . "startupProbe")}}:{{end}}{{end}}' ''
   kube::test::get_object_assert pod/target-copy '{{(index (index .spec.containers 1).securityContext.capabilities.add 0)}}' 'SYS_PTRACE'
   kube::test::get_object_assert pod/target-copy '{{.spec.shareProcessNamespace}}' 'true'
   # Clean up
@@ -225,6 +226,7 @@ run_kubectl_debug_baseline_tests() {
   kube::test::get_object_assert pod/target-copy '{{range.spec.containers}}{{.image}}:{{end}}' "${IMAGE_NGINX:?}:busybox:"
   kube::test::get_object_assert pod/target-copy '{{range.spec.containers}}{{if (index . "livenessProbe")}}:{{end}}{{end}}' ''
   kube::test::get_object_assert pod/target-copy '{{range.spec.containers}}{{if (index . "readinessProbe")}}:{{end}}{{end}}' ''
+  kube::test::get_object_assert pod/target-copy '{{range.spec.containers}}{{if (index . "startupProbe")}}:{{end}}{{end}}' ''
   kube::test::get_object_assert pod/target-copy '{{if (index (index .spec.containers 0) "securityContext")}}:{{end}}' ''
   kube::test::get_object_assert pod/target-copy '{{.spec.shareProcessNamespace}}' 'true'
   # Clean up
