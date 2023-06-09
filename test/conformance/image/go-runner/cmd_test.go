@@ -39,7 +39,7 @@ func TestGetCmd(t *testing.T) {
 			expectArgs: []string{
 				"ginkgobin",
 				"--focus=", "--skip=",
-				"--noColor=true", "--timeout=24h", "testbin", "--",
+				"--no-color=true", "--timeout=24h", "testbin", "--",
 				"--disable-log-dump", "--repo-root=/kubernetes",
 				"--provider=", "--report-dir=", "--kubeconfig=",
 			},
@@ -59,7 +59,7 @@ func TestGetCmd(t *testing.T) {
 			expectArgs: []string{
 				"ginkgobin",
 				"--focus=focus", "--skip=skip",
-				"--noColor=true", "--timeout=24h", "testbin", "--",
+				"--no-color=true", "--timeout=24h", "testbin", "--",
 				"--disable-log-dump", "--repo-root=/kubernetes",
 				"--provider=provider", "--report-dir=results", "--kubeconfig=kubeconfig",
 			},
@@ -75,7 +75,7 @@ func TestGetCmd(t *testing.T) {
 			expectArgs: []string{
 				"ginkgobin", "--p",
 				"--focus=", "--skip=\\[Serial\\]",
-				"--noColor=true", "--timeout=24h", "testbin", "--",
+				"--no-color=true", "--timeout=24h", "testbin", "--",
 				"--disable-log-dump", "--repo-root=/kubernetes",
 				"--provider=", "--report-dir=", "--kubeconfig=",
 			},
@@ -91,7 +91,7 @@ func TestGetCmd(t *testing.T) {
 			},
 			expectArgs: []string{
 				"ginkgobin", "--focus=", "--skip=",
-				"--noColor=true", "--ginkgo1", "--ginkgo2", "--timeout=24h",
+				"--no-color=true", "--ginkgo1", "--ginkgo2", "--timeout=24h",
 				"testbin", "--",
 				"--disable-log-dump", "--repo-root=/kubernetes",
 				"--provider=", "--report-dir=", "--kubeconfig=",
@@ -110,7 +110,7 @@ func TestGetCmd(t *testing.T) {
 			},
 			expectArgs: []string{
 				"ginkgobin", "--focus=", "--skip=",
-				"--noColor=true", `--ginkgo='with "quotes" and '`, "--ginkgo2=true$(foo)", "--timeout=24h",
+				"--no-color=true", `--ginkgo='with "quotes" and '`, "--ginkgo2=true$(foo)", "--timeout=24h",
 				"testbin", "--",
 				"--disable-log-dump", "--repo-root=/kubernetes",
 				"--provider=", "--report-dir=", "--kubeconfig=",
@@ -127,7 +127,7 @@ func TestGetCmd(t *testing.T) {
 			},
 			expectArgs: []string{
 				"ginkgobin", "--focus=", "--skip=",
-				"--noColor=true", "--timeout=10h", "testbin", "--",
+				"--no-color=true", "--timeout=10h", "testbin", "--",
 				"--disable-log-dump", "--repo-root=/kubernetes",
 				"--provider=", "--report-dir=", "--kubeconfig=",
 			},
