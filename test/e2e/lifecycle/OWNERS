@@ -1,13 +1,11 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-  - luxas
   - fabriziopandini
   - neolit123
   - SataQiu
   - pacoxu
 reviewers:
-  - luxas
   - fabriziopandini
   - neolit123
   - SataQiu
@@ -18,3 +16,4 @@ emeritus_approvers:
   - rosti
   - ereslibre
   - timothysc
+  - luxas
