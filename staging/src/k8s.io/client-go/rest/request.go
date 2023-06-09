@@ -938,17 +938,21 @@ func (r *Request) newHTTPRequest(ctx context.Context) (*http.Request, error) {
 // newDNSMetricsTrace returns an HTTP trace that tracks time spend on DNS lookups per network/host.
 // This metric is available in client as "rest_client_dns_resolution_duration_seconds".
 func newDNSMetricsTrace(ctx context.Context) *httptrace.ClientTrace {
-	var (
-		dnsStart time.Time
-		dnsHost  string
-	)
+	type dnsMetric struct {
+		start time.Time
+		host  string
+		sync.Mutex
+	}
+	dns := &dnsMetric{}
 	return &httptrace.ClientTrace{
 		DNSStart: func(info httptrace.DNSStartInfo) {
-			dnsStart = time.Now()
-			dnsHost = info.Host
+			dns.Lock()
+			dns.start = time.Now()
+			dns.host = info.Host
 		},
 		DNSDone: func(info httptrace.DNSDoneInfo) {
-			metrics.ResolverLatency.Observe(ctx, dnsHost, time.Since(dnsStart))
+			defer dns.Unlock()
+			metrics.ResolverLatency.Observe(ctx, dns.host, time.Since(dns.start))
 		},
 	}
 }
