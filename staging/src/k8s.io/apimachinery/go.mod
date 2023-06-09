@@ -7,7 +7,6 @@ go 1.20
 require (
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
 	github.com/davecgh/go-spew v1.1.1
-	github.com/evanphx/json-patch v5.6.0+incompatible
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/protobuf v1.5.3
 	github.com/google/gnostic-models v0.6.8
@@ -21,6 +20,7 @@ require (
 	github.com/stretchr/testify v1.8.2
 	golang.org/x/net v0.13.0
 	golang.org/x/time v0.3.0
+	gopkg.in/evanphx/json-patch.v5 v5.6.0
 	gopkg.in/inf.v0 v0.9.1
 	k8s.io/klog/v2 v2.100.1
 	k8s.io/kube-openapi v0.0.0-20230717233707-2695361300d9

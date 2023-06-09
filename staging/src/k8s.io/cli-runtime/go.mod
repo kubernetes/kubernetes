@@ -5,7 +5,6 @@ module k8s.io/cli-runtime
 go 1.20
 
 require (
-	github.com/evanphx/json-patch v5.6.0+incompatible
 	github.com/google/gnostic-models v0.6.8
 	github.com/google/go-cmp v0.5.9
 	github.com/google/uuid v1.3.0
@@ -15,6 +14,7 @@ require (
 	github.com/stretchr/testify v1.8.2
 	golang.org/x/sync v0.2.0
 	golang.org/x/text v0.11.0
+	gopkg.in/evanphx/json-patch.v5 v5.6.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
@@ -30,6 +30,7 @@ require (
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.9.0 // indirect
+	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/go-errors/errors v1.4.2 // indirect
 	github.com/go-logr/logr v1.2.4 // indirect
 	github.com/go-openapi/jsonpointer v0.19.6 // indirect

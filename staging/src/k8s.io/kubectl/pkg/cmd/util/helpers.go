@@ -27,7 +27,7 @@ import (
 	"strings"
 	"time"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	jsonpatch "gopkg.in/evanphx/json-patch.v5"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 

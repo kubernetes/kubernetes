@@ -27,7 +27,7 @@ import (
 	"testing"
 	"time"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	jsonpatch "gopkg.in/evanphx/json-patch.v5"
 	"github.com/google/go-cmp/cmp"
 	fuzz "github.com/google/gofuzz"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"

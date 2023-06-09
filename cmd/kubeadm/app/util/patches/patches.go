@@ -27,7 +27,7 @@ import (
 	"strings"
 	"sync"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	jsonpatch "gopkg.in/evanphx/json-patch.v5"
 	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/types"

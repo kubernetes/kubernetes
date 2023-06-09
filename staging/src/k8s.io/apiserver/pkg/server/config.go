@@ -32,7 +32,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	jsonpatch "gopkg.in/evanphx/json-patch.v5"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/cryptobyte"
 

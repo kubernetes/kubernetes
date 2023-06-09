@@ -24,7 +24,7 @@ import (
 
 	"github.com/onsi/gomega"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	jsonpatch "gopkg.in/evanphx/json-patch.v5"
 	"github.com/onsi/ginkgo/v2"
 
 	appsv1 "k8s.io/api/apps/v1"
