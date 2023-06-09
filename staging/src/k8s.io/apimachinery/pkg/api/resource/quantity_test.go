@@ -1151,7 +1151,16 @@ func TestMul(t *testing.T) {
 		{decQuantity(50, 0, DecimalSI), 0, decQuantity(0, 0, DecimalSI), true},
 		{Quantity{Format: DecimalSI}, 0, decQuantity(0, 0, DecimalSI), true},
 
+		{decQuantity(10, 0, DecimalSI), -10, decQuantity(-100, 0, DecimalSI), true},
+		{decQuantity(-10, 0, DecimalSI), 1, decQuantity(-10, 0, DecimalSI), true},
+		{decQuantity(10, 0, BinarySI), -1, decQuantity(-10, 0, BinarySI), true},
+		{decQuantity(-50, 0, DecimalSI), 0, decQuantity(0, 0, DecimalSI), true},
+		{decQuantity(-50, 0, DecimalSI), -50, decQuantity(2500, 0, DecimalSI), true},
+		{Quantity{Format: DecimalSI}, -50, decQuantity(0, 0, DecimalSI), true},
+
 		{decQuantity(mostPositive, 0, DecimalSI), 10, decQuantity(mostPositive, 1, DecimalSI), false},
+		{decQuantity(mostNegative, 0, DecimalSI), 10, decQuantity(mostNegative, 1, DecimalSI), false},
+		{decQuantity(mostPositive, 0, DecimalSI), -10, decQuantity(-mostPositive, 1, DecimalSI), false},
 	}
 
 	for i, test := range tests {
