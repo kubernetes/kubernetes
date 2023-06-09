@@ -106,6 +106,9 @@ func TestInt64AmountMul(t *testing.T) {
 		{int64Amount{value: mostPositive, scale: -1}, 10, int64Amount{value: mostPositive, scale: -1}, false},
 		{int64Amount{value: mostPositive, scale: -1}, 0, int64Amount{value: 0, scale: 0}, true},
 		{int64Amount{value: mostPositive / 10, scale: 1}, 10, int64Amount{value: mostPositive / 10, scale: 1}, false},
+		{int64Amount{value: mostPositive, scale: 0}, -1, int64Amount{value: -mostPositive, scale: 0}, true},
+		{int64Amount{value: mostNegative, scale: 1}, 0, int64Amount{value: 0, scale: 0}, true},
+		{int64Amount{value: mostNegative, scale: 1}, 1, int64Amount{value: mostNegative, scale: 1}, false},
 	} {
 		c := test.a
 		ok := c.Mul(test.b)
