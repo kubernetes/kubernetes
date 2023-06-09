@@ -36,6 +36,7 @@ import (
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
+	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
 	plugin "k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/plugin/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
@@ -97,6 +98,10 @@ type ManagerImpl struct {
 
 	// pendingAdmissionPod contain the pod during the admission phase
 	pendingAdmissionPod *v1.Pod
+
+	// containerMap provides a mapping from (pod, container) -> containerID
+	// for all containers in a pod. Used to detect pods running across a restart
+	containerMap containermap.ContainerMap
 }
 
 type endpointInfo struct {
@@ -277,11 +282,12 @@ func (m *ManagerImpl) checkpointFile() string {
 // Start starts the Device Plugin Manager and start initialization of
 // podDevices and allocatedDevices information from checkpointed state and
 // starts device plugin registration service.
-func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady) error {
+func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, initialContainers containermap.ContainerMap) error {
 	klog.V(2).InfoS("Starting Device Plugin manager")
 
 	m.activePods = activePods
 	m.sourcesReady = sourcesReady
+	m.containerMap = initialContainers
 
 	// Loads in allocatedDevices information from disk.
 	err := m.readCheckpoint()
@@ -545,6 +551,15 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 		}
 	}
 
+	// kubelet restart flow.
+	if !m.sourcesReady.AllReady() {
+		// if the container is reported running and it had a device assigned, things are already fine and we can just bail out
+		if needed == 0 && m.checkContainerAlreadyRunning(podUID, contName) {
+			klog.V(3).InfoS("container detected running, nothing to do", "deviceNumber", needed, "resourceName", resource, "podUID", string(podUID), "containerName", contName)
+			return nil, nil
+		}
+	}
+
 	klog.V(3).InfoS("Need devices to allocate for pod", "deviceNumber", needed, "resourceName", resource, "podUID", string(podUID), "containerName", contName)
 	healthyDevices, hasRegistered := m.healthyDevices[resource]
 
@@ -564,6 +579,7 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 	}
 
 	if needed == 0 {
+		klog.V(3).InfoS("no devices needed, nothing to do", "deviceNumber", needed, "resourceName", resource, "podUID", string(podUID), "containerName", contName)
 		// No change, no work.
 		return nil, nil
 	}
@@ -1039,4 +1055,14 @@ func (m *ManagerImpl) setPodPendingAdmission(pod *v1.Pod) {
 	defer m.mutex.Unlock()
 
 	m.pendingAdmissionPod = pod
+}
+
+func (m *ManagerImpl) checkContainerAlreadyRunning(podUID, cntName string) bool {
+	isRunning, err := m.containerMap.IsContainerRunning(podUID, cntName)
+	if err != nil {
+		klog.V(4).InfoS("container not found in the initial map, assumed NOT running", "podUID", podUID, "containerName", cntName, "err", err)
+		return false
+	}
+	klog.V(4).InfoS("container found in the initial map", "podUID", podUID, "containerName", cntName, "running", isRunning)
+	return isRunning
 }

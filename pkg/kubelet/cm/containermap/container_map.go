@@ -20,11 +20,14 @@ import (
 	"fmt"
 )
 
-// ContainerMap maps (containerID)->(*v1.Pod, *v1.Container)
-type ContainerMap map[string]struct {
+type containerMapElem struct {
 	podUID        string
 	containerName string
+	running       bool
 }
+
+// ContainerMap maps (containerID)->(*v1.Pod, *v1.Container)
+type ContainerMap map[string]containerMapElem
 
 // NewContainerMap creates a new ContainerMap struct
 func NewContainerMap() ContainerMap {
@@ -33,10 +36,20 @@ func NewContainerMap() ContainerMap {
 
 // Add adds a mapping of (containerID)->(podUID, containerName) to the ContainerMap
 func (cm ContainerMap) Add(podUID, containerName, containerID string) {
-	cm[containerID] = struct {
-		podUID        string
-		containerName string
-	}{podUID, containerName}
+	cm[containerID] = containerMapElem{
+		podUID:        podUID,
+		containerName: containerName,
+		running:       false,
+	}
+}
+
+// AddWithRunningState adds a mapping of (containerID)->(podUID, containerName) to the ContainerMap
+func (cm ContainerMap) AddWithRunningState(containerID, podUID, containerName string, isRunning bool) {
+	cm[containerID] = containerMapElem{
+		podUID:        podUID,
+		containerName: containerName,
+		running:       isRunning,
+	}
 }
 
 // RemoveByContainerID removes a mapping of (containerID)->(podUID, containerName) from the ContainerMap
@@ -50,6 +63,17 @@ func (cm ContainerMap) RemoveByContainerRef(podUID, containerName string) {
 	if err == nil {
 		cm.RemoveByContainerID(containerID)
 	}
+
+}
+
+// IsContainerRunning returns true if the container was detected running when inserted in the ContainerMap
+func (cm ContainerMap) IsContainerRunning(podUID, containerName string) (bool, error) {
+	for _, val := range cm {
+		if val.podUID == podUID && val.containerName == containerName {
+			return val.running, nil
+		}
+	}
+	return false, fmt.Errorf("container %s not in ContainerMap for pod %s", containerName, podUID)
 }
 
 // GetContainerID retrieves a ContainerID from the ContainerMap

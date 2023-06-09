@@ -17,7 +17,13 @@ limitations under the License.
 package cm
 
 import (
-	"k8s.io/api/core/v1"
+	"context"
+
+	v1 "k8s.io/api/core/v1"
+	internalapi "k8s.io/cri-api/pkg/apis"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 )
 
@@ -43,4 +49,29 @@ func hardEvictionReservation(thresholds []evictionapi.Threshold, capacity v1.Res
 		}
 	}
 	return ret
+}
+
+func buildContainerMapFromRuntime(ctx context.Context, runtimeService internalapi.RuntimeService) containermap.ContainerMap {
+	podSandboxMap := make(map[string]string)
+	podSandboxList, _ := runtimeService.ListPodSandbox(ctx, nil)
+	for _, p := range podSandboxList {
+		podSandboxMap[p.Id] = p.Metadata.Uid
+	}
+
+	containerMap := containermap.NewContainerMap()
+	containerList, _ := runtimeService.ListContainers(ctx, nil)
+	for _, c := range containerList {
+		if _, exists := podSandboxMap[c.PodSandboxId]; !exists {
+			klog.InfoS("No PodSandBox found for the container", "podSandboxId", c.PodSandboxId, "containerName", c.Metadata.Name, "containerId", c.Id)
+			continue
+		}
+		podUID := podSandboxMap[c.PodSandboxId]
+		containerMap.AddWithRunningState(c.Id, podUID, c.Metadata.Name, isContainerStateRunning(c.State))
+	}
+
+	return containerMap
+}
+
+func isContainerStateRunning(state runtimeapi.ContainerState) bool {
+	return state == runtimeapi.ContainerState_CONTAINER_RUNNING
 }
