@@ -2262,6 +2262,7 @@ func (kl *Kubelet) rejectPod(pod *v1.Pod, reason, message string) {
 		Phase:   v1.PodFailed,
 		Reason:  reason,
 		Message: "Pod was rejected: " + message})
+	kl.statusManager.TerminatePod(pod)
 }
 
 // canAdmitPod determines if a pod can be admitted, and gives a reason if it
