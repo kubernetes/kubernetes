@@ -198,4 +198,76 @@ func TestCreateJobFromCronJob(t *testing.T) {
 			}
 		})
 	}
+
+}
+
+func TestCreateJobFromJob(t *testing.T) {
+	jobName := "test-job"
+	suspended := true
+	labels := make(map[string]string)
+	labels["controller-uid"] = "test"
+	labels["job-name"] = "test"
+
+	refJob := &batchv1.Job{
+		Spec: batchv1.JobSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Image: "test-image"},
+					},
+					RestartPolicy: corev1.RestartPolicyNever,
+				},
+			},
+			Selector: &metav1.LabelSelector{
+				MatchLabels: labels,
+			},
+			Suspend: &suspended,
+		},
+	}
+	tests := map[string]struct {
+		from     *batchv1.Job
+		expected *batchv1.Job
+	}{
+		"from Job": {
+			from: refJob,
+			expected: &batchv1.Job{
+				TypeMeta: metav1.TypeMeta{APIVersion: batchv1.SchemeGroupVersion.String(), Kind: "Job"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: jobName,
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							APIVersion: batchv1.SchemeGroupVersion.String(),
+							Kind:       "Job",
+							Name:       refJob.GetName(),
+							UID:        refJob.GetUID(),
+						},
+					},
+				},
+				Spec: batchv1.JobSpec{
+					Suspend: &suspended,
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{Image: "test-image"},
+							},
+							RestartPolicy: corev1.RestartPolicyNever,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			o := &CreateJobOptions{
+				Name: jobName,
+			}
+			job := o.createJobFromJob(tc.from)
+
+			if !apiequality.Semantic.DeepEqual(job, tc.expected) {
+				t.Errorf("expected:\n%#v\ngot:\n%#v", tc.expected, job)
+			}
+		})
+	}
 }

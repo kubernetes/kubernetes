@@ -105,7 +105,7 @@ func NewCmdCreateJob(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *c
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddDryRunFlag(cmd)
 	cmd.Flags().StringVar(&o.Image, "image", o.Image, "Image name to run.")
-	cmd.Flags().StringVar(&o.From, "from", o.From, "The name of the resource to create a Job from (only cronjob is supported).")
+	cmd.Flags().StringVar(&o.From, "from", o.From, "The name of the resource to create a Job from (only cronjob and job is supported).")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
 	return cmd
 }
@@ -194,6 +194,8 @@ func (o *CreateJobOptions) Run() error {
 		switch obj := infos[0].Object.(type) {
 		case *batchv1.CronJob:
 			job = o.createJobFromCronJob(obj)
+		case *batchv1.Job:
+			job = o.createJobFromJob(obj)
 		default:
 			return fmt.Errorf("unknown object type %T", obj)
 		}
@@ -274,6 +276,35 @@ func (o *CreateJobOptions) createJobFromCronJob(cronJob *batchv1.CronJob) *batch
 			},
 		},
 		Spec: cronJob.Spec.JobTemplate.Spec,
+	}
+	if o.EnforceNamespace {
+		job.Namespace = o.Namespace
+	}
+	return job
+}
+
+func (o *CreateJobOptions) createJobFromJob(refJob *batchv1.Job) *batchv1.Job {
+
+	// removing the pod selector and label. not selectly removing the controller-uid and job-name .
+	refJob.Spec.Selector = nil
+	refJob.Spec.Template.Labels = nil
+
+	job := &batchv1.Job{
+		// this is ok because we know exactly how we want to be serialized
+		TypeMeta: metav1.TypeMeta{APIVersion: batchv1.SchemeGroupVersion.String(), Kind: "Job"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        o.Name,
+			Annotations: refJob.ObjectMeta.Annotations,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: batchv1.SchemeGroupVersion.String(),
+					Kind:       "Job",
+					Name:       refJob.GetName(),
+					UID:        refJob.GetUID(),
+				},
+			},
+		},
+		Spec: refJob.Spec,
 	}
 	if o.EnforceNamespace {
 		job.Namespace = o.Namespace
