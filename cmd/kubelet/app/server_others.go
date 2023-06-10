@@ -39,7 +39,7 @@ func checkPermissions() error {
 // checkInitialUserNamespace checks if kubelet is running in the initial user namespace.
 // http://man7.org/linux/man-pages/man7/user_namespaces.7.html
 func checkInitialUserNamespace() error {
-	uidMap, err := ioutil.ReadFile("/proc/self/uid_map")
+	uidMap, err := os.ReadFile("/proc/self/uid_map")
 	if err != nil {
 		return err
 	}
