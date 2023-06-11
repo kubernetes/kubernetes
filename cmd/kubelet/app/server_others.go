@@ -22,6 +22,7 @@ package app
 import (
 	"fmt"
 	"os"
+	"strings"
 )
 
 func checkPermissions() error {
@@ -38,7 +39,7 @@ func checkPermissions() error {
 
 // checkInitialUserNamespace checks if kubelet is running in the initial user namespace.
 // http://man7.org/linux/man-pages/man7/user_namespaces.7.html
-// 
+//
 // The initial user namespace is the namespace from which all other namespaces are derived.
 // Running in the initial user namespace ensures that
 // the process has the same view of users and groups as the host system.
@@ -47,11 +48,11 @@ func checkPermissions() error {
 func checkInitialUserNamespace() error {
 	uidMap, err := os.ReadFile("/proc/self/uid_map")
 	if err != nil {
-    return fmt.Errorf("error reading /proc/self/uid_map: %w", err)
+		return fmt.Errorf("failed to read /proc/self/uid_map: %w", err)
 	}
 
-  // When running in the initial user namespace, the `/proc/self/uid_map` file content looks like:
-  // 0          0 4294967295
+	// When running in the initial user namespace, the `/proc/self/uid_map` file content looks like:
+	// 0          0 4294967295
 	if strings.TrimSpace(string(uidMap)) != "0\t0\t4294967295" {
 		return fmt.Errorf("kubelet is not running in the initial user namespace")
 	}
