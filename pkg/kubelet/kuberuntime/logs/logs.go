@@ -344,7 +344,8 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 						return fmt.Errorf("failed to create fsnotify watcher: %v", err)
 					}
 					defer watcher.Close()
-					if err := watcher.Add(f.Name()); err != nil {
+					// Watch the directory of the log file.
+					if err := watcher.Add(filepath.Dir(path)); err != nil {
 						return fmt.Errorf("failed to watch file %q: %v", f.Name(), err)
 					}
 					// If we just created the watcher, try again to read as we might have missed
@@ -353,7 +354,7 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 				}
 				var recreated bool
 				// Wait until the next log change.
-				found, recreated, err = waitLogs(ctx, containerID, watcher, runtimeService)
+				found, recreated, err = waitLogs(ctx, containerID, watcher, path, runtimeService)
 				if err != nil {
 					return err
 				}
@@ -367,13 +368,7 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 					}
 					defer newF.Close()
 					f.Close()
-					if err := watcher.Remove(f.Name()); err != nil && !os.IsNotExist(err) {
-						klog.ErrorS(err, "Failed to remove file watch", "path", f.Name())
-					}
 					f = newF
-					if err := watcher.Add(f.Name()); err != nil {
-						return fmt.Errorf("failed to watch file %q: %v", f.Name(), err)
-					}
 					r = bufio.NewReader(f)
 				}
 				// If the container exited consume data until the next EOF
@@ -441,7 +436,7 @@ func isContainerRunning(ctx context.Context, id string, r internalapi.RuntimeSer
 // waitLogs wait for the next log write. It returns two booleans and an error. The first boolean
 // indicates whether a new log is found; the second boolean if the log file was recreated;
 // the error is error happens during waiting new logs.
-func waitLogs(ctx context.Context, id string, w *fsnotify.Watcher, runtimeService internalapi.RuntimeService) (bool, bool, error) {
+func waitLogs(ctx context.Context, id string, w *fsnotify.Watcher, path string, runtimeService internalapi.RuntimeService) (bool, bool, error) {
 	// no need to wait if the pod is not running
 	if running, err := isContainerRunning(ctx, id, runtimeService); !running {
 		return false, false, err
@@ -452,15 +447,20 @@ func waitLogs(ctx context.Context, id string, w *fsnotify.Watcher, runtimeServic
 		case <-ctx.Done():
 			return false, false, fmt.Errorf("context cancelled")
 		case e := <-w.Events:
+			// Only care about the log file we are watching.
+			if e.Name != path {
+				continue
+			}
 			switch e.Op {
 			case fsnotify.Write:
 				return true, false, nil
 			case fsnotify.Create:
-				fallthrough
+				return true, true, nil
 			case fsnotify.Rename:
-				fallthrough
+				// Log rotation is running, so we'll wait for the create event in the next loop.
+				continue
 			case fsnotify.Remove:
-				fallthrough
+				return false, false, nil
 			case fsnotify.Chmod:
 				return true, true, nil
 			default:

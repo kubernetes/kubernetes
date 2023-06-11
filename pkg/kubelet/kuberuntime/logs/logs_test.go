@@ -26,9 +26,8 @@ import (
 	"testing"
 	"time"
 
-	utiltesting "k8s.io/client-go/util/testing"
-
 	v1 "k8s.io/api/core/v1"
+	utiltesting "k8s.io/client-go/util/testing"
 	apitesting "k8s.io/cri-api/pkg/apis/testing"
 	"k8s.io/utils/pointer"
 
@@ -453,4 +452,66 @@ func TestReadLogsLimitsWithTimestamps(t *testing.T) {
 	}
 
 	assert.Equal(t, 2, lineCount, "should have two lines")
+}
+
+func TestReadLogsWithLogRotation(t *testing.T) {
+	logLineFmt := "2023-06-09T05:28:57.806368292Z stdout F %v\n"
+
+	tmpfile, err := os.CreateTemp(t.TempDir(), "log.*.txt")
+	assert.NoError(t, err)
+
+	writeLogs := func(f *os.File) {
+		for i := 0; i < 5; i++ {
+			f.WriteString(fmt.Sprintf(logLineFmt, i))
+		}
+	}
+	writeLogs(tmpfile)
+	tmpfile.Close()
+
+	ctx := context.Background()
+	// use fake runtime service
+	containerID := "83a21271e2a84a48ac89-6411e55fb8c1"
+	fakeRuntimeService := apitesting.NewFakeRuntimeService()
+	fakeRuntimeService.Containers[containerID] = &apitesting.FakeContainer{
+		ContainerStatus: runtimeapi.ContainerStatus{
+			Id:    containerID,
+			State: runtimeapi.ContainerState_CONTAINER_RUNNING,
+		},
+	}
+
+	// mock log rotation
+	go func() {
+		time.Sleep(1 * time.Second)
+
+		os.Rename(tmpfile.Name(), tmpfile.Name()+".1")
+		defer os.Remove(tmpfile.Name() + ".1")
+
+		// call CRI.ReopenContainerLog took some time
+		time.Sleep(500 * time.Millisecond)
+		newTmpfile, err := os.OpenFile(tmpfile.Name(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+		assert.NoError(t, err)
+
+		writeLogs(newTmpfile)
+		newTmpfile.Close()
+
+		// wait 1 second and stop container
+		time.Sleep(1 * time.Second)
+		fakeRuntimeService.StopContainer(ctx, containerID, 0)
+	}()
+
+	var buf bytes.Buffer
+	w := io.MultiWriter(&buf)
+
+	err = ReadLogs(ctx, tmpfile.Name(), containerID,
+		&LogOptions{tail: -1, bytes: -1, timestamp: true, follow: true},
+		fakeRuntimeService, w, w)
+	assert.NoError(t, err)
+
+	lineCount := 0
+	scanner := bufio.NewScanner(bytes.NewReader(buf.Bytes()))
+	for scanner.Scan() {
+		lineCount++
+	}
+
+	assert.Equal(t, 10, lineCount, "should have 10 lines")
 }
