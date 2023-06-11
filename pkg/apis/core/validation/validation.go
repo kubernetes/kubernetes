@@ -57,6 +57,7 @@ import (
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/fieldpath"
+	"k8s.io/kubernetes/pkg/util/ipfamily"
 	netutils "k8s.io/utils/net"
 )
 
@@ -3447,9 +3448,7 @@ func validatePodDNSConfig(dnsConfig *core.PodDNSConfig, dnsPolicy *core.DNSPolic
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("nameservers"), dnsConfig.Nameservers, fmt.Sprintf("must not have more than %v nameservers", MaxDNSNameservers)))
 		}
 		for i, ns := range dnsConfig.Nameservers {
-			if ip := netutils.ParseIPSloppy(ns); ip == nil {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("nameservers").Index(i), ns, "must be valid IP address"))
-			}
+			allErrs = append(allErrs, validation.ValidateIPForLegacyAPI(fldPath.Child("nameservers").Index(i), ns, utilip.PodDNSConfigNameserversContext)...)
 		}
 		// Validate searches.
 		if len(dnsConfig.Searches) > MaxDNSSearchPaths {
@@ -3617,9 +3616,7 @@ func validateOnlyDeletedSchedulingGates(newGates, oldGates []core.PodSchedulingG
 func ValidateHostAliases(hostAliases []core.HostAlias, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, hostAlias := range hostAliases {
-		if ip := netutils.ParseIPSloppy(hostAlias.IP); ip == nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("ip"), hostAlias.IP, "must be valid IP address"))
-		}
+		allErrs = append(allErrs, validation.ValidateIPForLegacyAPI(fldPath.Child("ip"), hostAlias.IP, utilip.HostAliasIPContext)...)
 		for _, hostname := range hostAlias.Hostnames {
 			allErrs = append(allErrs, ValidateDNS1123Subdomain(hostname, fldPath.Child("hostnames"))...)
 		}
@@ -3755,32 +3752,15 @@ func validatePodIPs(pod *core.Pod) field.ErrorList {
 		allErrs = append(allErrs, validation.ValidateIPForLegacyAPI(podIPsField.Index(i), podIP.IP, utilip.PodStatusPodIPsContext)...)
 	}
 
-	// if we have more than one Pod.PodIP then
-	// - validate for dual stack
-	// - validate for duplication
+	// if we have more than one Pod.PodIP then they must be a dual-stack pair
 	if len(pod.Status.PodIPs) > 1 {
 		podIPs := make([]string, 0, len(pod.Status.PodIPs))
 		for _, podIP := range pod.Status.PodIPs {
 			podIPs = append(podIPs, podIP.IP)
 		}
 
-		dualStack, err := netutils.IsDualStackIPStrings(podIPs)
-		if err != nil {
-			allErrs = append(allErrs, field.InternalError(podIPsField, fmt.Errorf("failed to check for dual stack with error:%v", err)))
-		}
-
-		// We only support one from each IP family (i.e. max two IPs in this list).
-		if !dualStack || len(podIPs) > 2 {
-			allErrs = append(allErrs, field.Invalid(podIPsField, pod.Status.PodIPs, "may specify no more than one IP for each IP family"))
-		}
-
-		// There should be no duplicates in list of Pod.PodIPs
-		seen := sets.String{} // := make(map[string]int)
-		for i, podIP := range pod.Status.PodIPs {
-			if seen.Has(podIP.IP) {
-				allErrs = append(allErrs, field.Duplicate(podIPsField.Index(i), podIP))
-			}
-			seen.Insert(podIP.IP)
+		if !ipfamily.IsDualStackIPStringPair(podIPs) {
+			allErrs = append(allErrs, field.InternalError(podIPsField, fmt.Errorf("must contain no more than 1 IPv4 IP and 1 IPv6 IP")))
 		}
 	}
 
@@ -5485,30 +5465,13 @@ func ValidateNode(node *core.Node) field.ErrorList {
 
 		// all PodCIDRs should be valid ones
 		for idx, value := range node.Spec.PodCIDRs {
-			if _, err := ValidateCIDR(value); err != nil {
-				allErrs = append(allErrs, field.Invalid(podCIDRsField.Index(idx), node.Spec.PodCIDRs, "must be valid CIDR"))
-			}
+			allErrs = append(allErrs, validation.ValidateCIDRForLegacyAPI(podCIDRsField.Index(idx), value, utilip.NodeSpecPodCIDRsContext)...)
 		}
 
-		// if more than PodCIDR then
-		// - validate for dual stack
-		// - validate for duplication
+		// if more than one PodCIDR then it must be a dual-stack pair
 		if len(node.Spec.PodCIDRs) > 1 {
-			dualStack, err := netutils.IsDualStackCIDRStrings(node.Spec.PodCIDRs)
-			if err != nil {
-				allErrs = append(allErrs, field.InternalError(podCIDRsField, fmt.Errorf("invalid PodCIDRs. failed to check with dual stack with error:%v", err)))
-			}
-			if !dualStack || len(node.Spec.PodCIDRs) > 2 {
-				allErrs = append(allErrs, field.Invalid(podCIDRsField, node.Spec.PodCIDRs, "may specify no more than one CIDR for each IP family"))
-			}
-
-			// PodCIDRs must not contain duplicates
-			seen := sets.String{}
-			for i, value := range node.Spec.PodCIDRs {
-				if seen.Has(value) {
-					allErrs = append(allErrs, field.Duplicate(podCIDRsField.Index(i), value))
-				}
-				seen.Insert(value)
+			if !ipfamily.IsDualStackCIDRStringPair(node.Spec.PodCIDRs) {
+				allErrs = append(allErrs, field.InternalError(podCIDRsField, fmt.Errorf("invalid PodCIDRs. must contain no more than 1 IPv4 CIDR and 1 IPv6 CIDR")))
 			}
 		}
 	}
@@ -6861,17 +6824,13 @@ func ValidateLoadBalancerStatus(status *core.LoadBalancerStatus, fldPath *field.
 	for i, ingress := range status.Ingress {
 		idxPath := fldPath.Child("ingress").Index(i)
 		if len(ingress.IP) > 0 {
-			if isIP := (netutils.ParseIPSloppy(ingress.IP) != nil); !isIP {
-				allErrs = append(allErrs, field.Invalid(idxPath.Child("ip"), ingress.IP, "must be a valid IP address"))
-			}
+			allErrs = append(allErrs, validation.ValidateIPForLegacyAPI(idxPath.Child("ip"), ingress.IP, utilip.ServiceLoadBalancerIngressIPContext)...)
 		}
 		if len(ingress.Hostname) > 0 {
 			for _, msg := range validation.IsDNS1123Subdomain(ingress.Hostname) {
 				allErrs = append(allErrs, field.Invalid(idxPath.Child("hostname"), ingress.Hostname, msg))
 			}
-			if isIP := (netutils.ParseIPSloppy(ingress.Hostname) != nil); isIP {
-				allErrs = append(allErrs, field.Invalid(idxPath.Child("hostname"), ingress.Hostname, "must be a DNS name, not an IP address"))
-			}
+			allErrs = append(allErrs, validation.ValidateNonIP(idxPath.Child("hostname"), ingress.Hostname)...)
 		}
 	}
 	return allErrs
@@ -6895,15 +6854,6 @@ func validateVolumeNodeAffinity(nodeAffinity *core.VolumeNodeAffinity, fldPath *
 	}
 
 	return true, allErrs
-}
-
-// ValidateCIDR validates whether a CIDR matches the conventions expected by net.ParseCIDR
-func ValidateCIDR(cidr string) (*net.IPNet, error) {
-	_, net, err := netutils.ParseCIDRSloppy(cidr)
-	if err != nil {
-		return nil, err
-	}
-	return net, nil
 }
 
 func IsDecremented(update, old *int32) bool {
@@ -7139,11 +7089,6 @@ func ValidateServiceClusterIPsRelatedFields(service *core.Service) field.ErrorLi
 		allErrs = append(allErrs, errs...)
 	}
 
-	// max two
-	if len(service.Spec.ClusterIPs) > 2 {
-		allErrs = append(allErrs, field.Invalid(clusterIPsField, service.Spec.ClusterIPs, "may only hold up to 2 values"))
-	}
-
 	// at this stage if there is an invalid ip or misplaced none/empty string
 	// it will skew the error messages (bad index || dualstackness of already bad ips). so we
 	// stop here if there are errors in clusterIPs validation
@@ -7151,15 +7096,9 @@ func ValidateServiceClusterIPsRelatedFields(service *core.Service) field.ErrorLi
 		return allErrs
 	}
 
-	// must be dual stacked ips if they are more than one ip
+	// must be dual-stack ips if they are more than one ip
 	if len(service.Spec.ClusterIPs) > 1 /* meaning: it does not have a None or empty string */ {
-		dualStack, err := netutils.IsDualStackIPStrings(service.Spec.ClusterIPs)
-		if err != nil { // though we check for that earlier. safe > sorry
-			allErrs = append(allErrs, field.InternalError(clusterIPsField, fmt.Errorf("failed to check for dual stack with error:%v", err)))
-		}
-
-		// We only support one from each IP family (i.e. max two IPs in this list).
-		if !dualStack {
+		if !ipfamily.IsDualStackIPStringPair(service.Spec.ClusterIPs) {
 			allErrs = append(allErrs, field.Invalid(clusterIPsField, service.Spec.ClusterIPs, "may specify no more than one IP for each IP family"))
 		}
 	}
@@ -7171,13 +7110,8 @@ func ValidateServiceClusterIPsRelatedFields(service *core.Service) field.ErrorLi
 				break // no more families to check
 			}
 
-			// 4=>6
-			if service.Spec.IPFamilies[i] == core.IPv4Protocol && netutils.IsIPv6String(ip) {
-				allErrs = append(allErrs, field.Invalid(clusterIPsField.Index(i), ip, fmt.Sprintf("expected an IPv4 value as indicated by `ipFamilies[%v]`", i)))
-			}
-			// 6=>4
-			if service.Spec.IPFamilies[i] == core.IPv6Protocol && !netutils.IsIPv6String(ip) {
-				allErrs = append(allErrs, field.Invalid(clusterIPsField.Index(i), ip, fmt.Sprintf("expected an IPv6 value as indicated by `ipFamilies[%v]`", i)))
+			if ipfamily.IPFamilyOfString(ip) != v1.IPFamily(service.Spec.IPFamilies[i]) {
+				allErrs = append(allErrs, field.Invalid(clusterIPsField.Index(i), ip, fmt.Sprintf("expected an %s value as indicated by `ipFamilies[%v]`", service.Spec.IPFamilies[i], i)))
 			}
 		}
 	}

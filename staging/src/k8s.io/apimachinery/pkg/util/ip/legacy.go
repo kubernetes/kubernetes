@@ -26,12 +26,20 @@ type LegacyIPStringContext string
 
 const (
 	// Legacy API fields
-	EndpointAddressIPContext      LegacyIPStringContext = "v1.EndpointAddress.IP"
+	EndpointAddressIPContext            LegacyIPStringContext = "v1.EndpointAddress.IP"
+	HostAliasIPContext                  LegacyIPStringContext = "v1.HostAlias.IP"
+	NodeSpecPodCIDRsContext             LegacyIPStringContext = "v1.NodeSpec.PodCIDRs"
+	PodDNSConfigNameserversContext      LegacyIPStringContext = "v1.PodDNSConfig.Nameservers"
+	PodStatusPodIPsContext              LegacyIPStringContext = "v1.PodStatus.PodIPs"
+	ServiceSpecClusterIPsContext        LegacyIPStringContext = "v1.ServiceSpec.ClusterIPs"
+	ServiceSpecExternalIPsContext       LegacyIPStringContext = "v1.ServiceSpec.ExternalIPs"
+	ServiceLoadBalancerIngressIPContext LegacyIPStringContext = "v1.LoadBalancerIngress.IP"
+
 	EndpointSliceAddressesContext LegacyIPStringContext = "discoveryv1.Endpoint.Addresses"
-	PodStatusPodIPsContext        LegacyIPStringContext = "v1.PodStatus.PodIPs"
-	ServiceSpecClusterIPsContext  LegacyIPStringContext = "v1.ServiceSpec.ClusterIPs"
-	ServiceSpecExternalIPsContext LegacyIPStringContext = "v1.ServiceSpec.ExternalIPs"
-	// ...
+
+	ClusterCIDRSpecContext            LegacyIPStringContext = "networkingv1.ClusterCIDRSpec"
+	IngressLoadBalancerIngressContext LegacyIPStringContext = "networkingv1.IngressLoadBalancer.Ingress"
+	NetworkPolicyIPBlockContext       LegacyIPStringContext = "networkingv1.IPBlock"
 
 	// Legacy command-line arguments
 	KubeProxyBindAddress LegacyIPStringContext = "kube-proxy --bind-address"

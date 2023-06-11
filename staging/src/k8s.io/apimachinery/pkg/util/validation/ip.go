@@ -21,6 +21,7 @@ import (
 
 	utilip "k8s.io/apimachinery/pkg/util/ip"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	netutils "k8s.io/utils/net"
 )
 
 // "Good" validation functions, for new API objects and fields
@@ -60,6 +61,29 @@ func ValidateIPv6Address(fldPath *field.Path, value string) field.ErrorList {
 		allErrors = append(allErrors, field.Invalid(fldPath, value, fmt.Sprintf("must be a valid IPv6 address: %v", err)))
 	} else if !(ip.Is6() && !ip.Is4In6()) /* FIXME !utilip.IsIPv6(ip) */ {
 		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid IPv6 address"))
+	}
+	return allErrors
+}
+
+// ValidateNonIP tests that the argument is NOT an IP address (valid or legacy). This is
+// intended for contexts where a hostname is expected and an IP address is not allowed,
+// but it does not validate that value is a hostname since different fields have different
+// requirements there (e.g., allowing or not allowing wildcards).
+func ValidateNonIP(fldPath *field.Path, value string) field.ErrorList {
+	var allErrors field.ErrorList
+	if netutils.ParseIPSloppy(value) != nil {
+		allErrors = append(allErrors, field.Invalid(fldPath, value, fmt.Sprintf("must be a DNS name, not an IP address")))
+	}
+	return allErrors
+}
+
+// ValidateCIDR tests that value is a valid CIDR address (either IPv4 or IPv6). Note that
+// this rejects some values that were considered valid in older Kubernetes APIs; those
+// fields must use ValidateCIDRForLegacyAPI instead.
+func ValidateCIDR(fldPath *field.Path, value string) field.ErrorList {
+	var allErrors field.ErrorList
+	if _, err := utilip.ParseCIDR(value); err != nil {
+		allErrors = append(allErrors, field.Invalid(fldPath, value, fmt.Sprintf("must be a valid CIDR address: %v", err)))
 	}
 	return allErrors
 }
@@ -106,6 +130,17 @@ func ValidateIPv6AddressForLegacyAPI(fldPath *field.Path, value string, context 
 		allErrors = append(allErrors, field.Invalid(fldPath, value, fmt.Sprintf("must be a valid IPv6 address: %v", err)))
 	} else if !(ip.Is6() && !ip.Is4In6()) /* FIXME !utilip.IsIPv6(ip) */ {
 		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid IPv6 address"))
+	}
+	return allErrors
+}
+
+// ValidateCIDRForLegacyAPI tests that value was considered a CIDR address according to
+// legacy Kubernetes IP validation rules. This must be used for validating API fields that
+// historically used these rules, but MUST NOT be used for new APIs.
+func ValidateCIDRForLegacyAPI(fldPath *field.Path, value string, context utilip.LegacyIPStringContext) field.ErrorList {
+	var allErrors field.ErrorList
+	if _, _, err := utilip.ParseLegacyCIDR(value, context); err != nil {
+		allErrors = append(allErrors, field.Invalid(fldPath, value, fmt.Sprintf("must be a valid CIDR address: %v", err)))
 	}
 	return allErrors
 }
