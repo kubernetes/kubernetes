@@ -85,8 +85,9 @@ type Builder struct {
 	limitChunks       int64
 	requestTransforms []RequestTransform
 
-	resources   []string
-	subresource string
+	resources       []string
+	subresource     string
+	resourceVersion string
 
 	namespace    string
 	allNamespace bool
@@ -570,6 +571,13 @@ func (b *Builder) Subresource(subresource string) *Builder {
 	return b
 }
 
+// ResourceVersion instructs the builder to retrieve the object at a
+// specific version instead of the latest version.
+func (b *Builder) ResourceVersion(resourceVersion string) *Builder {
+	b.resourceVersion = resourceVersion
+	return b
+}
+
 // SelectEverythingParam
 func (b *Builder) SelectAllParam(selectAll bool) *Builder {
 	if selectAll && (b.labelSelector != nil || b.fieldSelector != nil) {
@@ -930,7 +938,7 @@ func (b *Builder) visitBySelector() *Result {
 		if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
 			selectorNamespace = ""
 		}
-		visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, labelSelector, fieldSelector, b.limitChunks))
+		visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, labelSelector, fieldSelector, b.limitChunks, b.resourceVersion))
 	}
 	if b.continueOnError {
 		result.visitor = EagerVisitorList(visitors)
@@ -1091,11 +1099,12 @@ func (b *Builder) visitByName() *Result {
 	visitors := []Visitor{}
 	for _, name := range b.names {
 		info := &Info{
-			Client:      client,
-			Mapping:     mapping,
-			Namespace:   selectorNamespace,
-			Name:        name,
-			Subresource: b.subresource,
+			Client:          client,
+			Mapping:         mapping,
+			Namespace:       selectorNamespace,
+			Name:            name,
+			Subresource:     b.subresource,
+			ResourceVersion: b.resourceVersion,
 		}
 		visitors = append(visitors, info)
 	}

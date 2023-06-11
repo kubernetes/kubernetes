@@ -315,6 +315,18 @@ func (r *Request) NamespaceIfScoped(namespace string, scoped bool) *Request {
 	return r
 }
 
+// ResourceVersion sets the requested version of the resource
+func (r *Request) ResourceVersion(resourceVersion string) *Request {
+	if r.err != nil {
+		return r
+	}
+	if r.params == nil {
+		r.params = make(url.Values)
+	}
+	r.params.Set("resourceVersion", resourceVersion)
+	return r
+}
+
 // AbsPath overwrites an existing path with the segments provided. Trailing slashes are preserved
 // when a single segment is passed.
 func (r *Request) AbsPath(segments ...string) *Request {

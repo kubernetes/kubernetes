@@ -39,6 +39,8 @@ type Helper struct {
 	Resource string
 	// The name of the subresource as the server would recognize it
 	Subresource string
+	// The resource version to look for
+	ResourceVersion string
 	// A RESTClient capable of mutating this resource.
 	RESTClient RESTClient
 	// True if the resource type is scoped to namespaces
@@ -96,10 +98,17 @@ func (m *Helper) WithSubresource(subresource string) *Helper {
 	return m
 }
 
+// WithResourceVersion sets the helper to request a resource with a specific version
+func (m *Helper) WithResourceVersion(resourceVersion string) *Helper {
+	m.ResourceVersion = resourceVersion
+	return m
+}
+
 func (m *Helper) Get(namespace, name string) (runtime.Object, error) {
 	req := m.RESTClient.Get().
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
+		ResourceVersion(m.ResourceVersion).
 		Name(name).
 		SubResource(m.Subresource)
 	return req.Do(context.TODO()).Get()

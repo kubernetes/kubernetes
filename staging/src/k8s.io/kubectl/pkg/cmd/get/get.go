@@ -62,10 +62,11 @@ type GetOptions struct {
 
 	resource.FilenameOptions
 
-	Raw       string
-	Watch     bool
-	WatchOnly bool
-	ChunkSize int64
+	Raw             string
+	Watch           bool
+	WatchOnly       bool
+	ChunkSize       int64
+	ResourceVersion string
 
 	OutputWatchEvents bool
 
@@ -182,6 +183,7 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericiooptions.IOStre
 	cmd.Flags().BoolVar(&o.IgnoreNotFound, "ignore-not-found", o.IgnoreNotFound, "If the requested object does not exist the command will return exit code 0.")
 	cmd.Flags().StringVar(&o.FieldSelector, "field-selector", o.FieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
+	cmd.Flags().StringVar(&o.ResourceVersion, "resource-version", o.ResourceVersion, "If present, get the exact resourceVersion of the specified resource")
 	addServerPrintColumnFlags(cmd, o)
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "identifying the resource to get from a server.")
 	cmdutil.AddChunkSizeFlag(cmd, &o.ChunkSize)
@@ -462,6 +464,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, args []string) error {
 		LabelSelectorParam(o.LabelSelector).
 		FieldSelectorParam(o.FieldSelector).
 		Subresource(o.Subresource).
+		ResourceVersion(o.ResourceVersion).
 		RequestChunksOf(chunkSize).
 		ResourceTypeOrNameArgs(true, args...).
 		ContinueOnError().

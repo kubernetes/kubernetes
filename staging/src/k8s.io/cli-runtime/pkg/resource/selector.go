@@ -25,23 +25,25 @@ import (
 
 // Selector is a Visitor for resources that match a label selector.
 type Selector struct {
-	Client        RESTClient
-	Mapping       *meta.RESTMapping
-	Namespace     string
-	LabelSelector string
-	FieldSelector string
-	LimitChunks   int64
+	Client          RESTClient
+	Mapping         *meta.RESTMapping
+	Namespace       string
+	LabelSelector   string
+	FieldSelector   string
+	LimitChunks     int64
+	ResourceVersion string
 }
 
 // NewSelector creates a resource selector which hides details of getting items by their label selector.
-func NewSelector(client RESTClient, mapping *meta.RESTMapping, namespace, labelSelector, fieldSelector string, limitChunks int64) *Selector {
+func NewSelector(client RESTClient, mapping *meta.RESTMapping, namespace, labelSelector, fieldSelector string, limitChunks int64, resourceVersion string) *Selector {
 	return &Selector{
-		Client:        client,
-		Mapping:       mapping,
-		Namespace:     namespace,
-		LabelSelector: labelSelector,
-		FieldSelector: fieldSelector,
-		LimitChunks:   limitChunks,
+		Client:          client,
+		Mapping:         mapping,
+		Namespace:       namespace,
+		LabelSelector:   labelSelector,
+		FieldSelector:   fieldSelector,
+		LimitChunks:     limitChunks,
+		ResourceVersion: resourceVersion,
 	}
 }
 
@@ -49,9 +51,10 @@ func NewSelector(client RESTClient, mapping *meta.RESTMapping, namespace, labelS
 func (r *Selector) Visit(fn VisitorFunc) error {
 	helper := NewHelper(r.Client, r.Mapping)
 	initialOpts := metav1.ListOptions{
-		LabelSelector: r.LabelSelector,
-		FieldSelector: r.FieldSelector,
-		Limit:         r.LimitChunks,
+		LabelSelector:   r.LabelSelector,
+		FieldSelector:   r.FieldSelector,
+		Limit:           r.LimitChunks,
+		ResourceVersion: r.ResourceVersion,
 	}
 	return FollowContinue(&initialOpts, func(options metav1.ListOptions) (runtime.Object, error) {
 		list, err := helper.List(
