@@ -186,6 +186,13 @@ func TestProbe(t *testing.T) {
 			execResult:     probe.Unknown,
 			expectedResult: results.Failure,
 		},
+		{ // Probe returns unknown result without an error
+			probe:          execProbe,
+			execError:      false,
+			expectError:    false,
+			execResult:     probe.Unknown,
+			expectedResult: results.Failure,
+		},
 		{ // Probe arguments are passed through
 			probe: &v1.Probe{
 				ProbeHandler: v1.ProbeHandler{
