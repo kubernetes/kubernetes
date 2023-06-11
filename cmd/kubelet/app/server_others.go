@@ -47,7 +47,7 @@ func checkPermissions() error {
 func checkInitialUserNamespace() error {
 	uidMap, err := os.ReadFile("/proc/self/uid_map")
 	if err != nil {
-		return err
+    return fmt.Errorf("error reading /proc/self/uid_map: %w", err)
 	}
 
   // When running in the initial user namespace, the `/proc/self/uid_map` file content looks like:
