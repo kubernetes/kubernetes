@@ -207,10 +207,29 @@ func TestCreateJobFromJob(t *testing.T) {
 	labels := make(map[string]string)
 	labels["controller-uid"] = "test"
 	labels["job-name"] = "test"
+	labels["custom"] = "shouldBePassed"
+	labels[batchv1.ControllerUidLabel] = "test"
+	labels[batchv1.JobNameLabel] = "test"
+
+	selectorLabels := make(map[string]string)
+	selectorLabels["controller-uid"] = "test"
+	selectorLabels[batchv1.ControllerUidLabel] = "test"
+
+	resLabels := make(map[string]string)
+	resLabels["custom"] = "shouldBePassed"
+
+	resSelectorLabels := make(map[string]string)
 
 	refJob := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   jobName,
+			Labels: labels,
+		},
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labels,
+				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{Image: "test-image"},
@@ -219,7 +238,7 @@ func TestCreateJobFromJob(t *testing.T) {
 				},
 			},
 			Selector: &metav1.LabelSelector{
-				MatchLabels: labels,
+				MatchLabels: selectorLabels,
 			},
 			Suspend: &suspended,
 		},
@@ -233,7 +252,8 @@ func TestCreateJobFromJob(t *testing.T) {
 			expected: &batchv1.Job{
 				TypeMeta: metav1.TypeMeta{APIVersion: batchv1.SchemeGroupVersion.String(), Kind: "Job"},
 				ObjectMeta: metav1.ObjectMeta{
-					Name: jobName,
+					Name:   jobName,
+					Labels: labels,
 					OwnerReferences: []metav1.OwnerReference{
 						{
 							APIVersion: batchv1.SchemeGroupVersion.String(),
@@ -246,12 +266,18 @@ func TestCreateJobFromJob(t *testing.T) {
 				Spec: batchv1.JobSpec{
 					Suspend: &suspended,
 					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: resLabels,
+						},
 						Spec: corev1.PodSpec{
 							Containers: []corev1.Container{
 								{Image: "test-image"},
 							},
 							RestartPolicy: corev1.RestartPolicyNever,
 						},
+					},
+					Selector: &metav1.LabelSelector{
+						MatchLabels: resSelectorLabels,
 					},
 				},
 			},

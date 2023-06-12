@@ -19,6 +19,7 @@ package create
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -285,15 +286,17 @@ func (o *CreateJobOptions) createJobFromCronJob(cronJob *batchv1.CronJob) *batch
 
 func (o *CreateJobOptions) createJobFromJob(refJob *batchv1.Job) *batchv1.Job {
 
-	// removing the pod selector and label. not selectly removing the controller-uid and job-name .
-	refJob.Spec.Selector = nil
-	refJob.Spec.Template.Labels = nil
+	// selectly remove Kube labels.
+	o.removeKubeLabel(refJob.Labels)
+	o.removeKubeLabel(refJob.Spec.Template.Labels)
+	o.removeKubeLabel(refJob.Spec.Selector.MatchLabels)
 
 	job := &batchv1.Job{
 		// this is ok because we know exactly how we want to be serialized
 		TypeMeta: metav1.TypeMeta{APIVersion: batchv1.SchemeGroupVersion.String(), Kind: "Job"},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        o.Name,
+			Labels:      refJob.Labels,
 			Annotations: refJob.ObjectMeta.Annotations,
 			OwnerReferences: []metav1.OwnerReference{
 				{
@@ -310,4 +313,17 @@ func (o *CreateJobOptions) createJobFromJob(refJob *batchv1.Job) *batchv1.Job {
 		job.Namespace = o.Namespace
 	}
 	return job
+}
+
+func (o *CreateJobOptions) removeKubeLabel(labels map[string]string) {
+	for key := range labels {
+		if strings.HasPrefix(key, batchv1.LabelPrefix) {
+			delete(labels, key)
+		}
+	}
+
+	// remove kube label without prefix for backward compatibility
+	delete(labels, "controller-uid")
+	delete(labels, "job-name")
+
 }
