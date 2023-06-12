@@ -95,6 +95,7 @@ var args = []string{
 	"--concurrent-gc-syncs=30",
 	"--concurrent-namespace-syncs=20",
 	"--concurrent-job-syncs=10",
+	"--concurrent-cron-job-syncs=10",
 	"--concurrent-replicaset-syncs=10",
 	"--concurrent-resource-quota-syncs=10",
 	"--concurrent-service-syncs=2",
@@ -326,7 +327,7 @@ func TestAddFlags(t *testing.T) {
 		},
 		CronJobController: &CronJobControllerOptions{
 			&cronjobconfig.CronJobControllerConfiguration{
-				ConcurrentCronJobSyncs: 5,
+				ConcurrentCronJobSyncs: 10,
 			},
 		},
 		NamespaceController: &NamespaceControllerOptions{
@@ -580,7 +581,7 @@ func TestApplyTo(t *testing.T) {
 				ConcurrentJobSyncs: 10,
 			},
 			CronJobController: cronjobconfig.CronJobControllerConfiguration{
-				ConcurrentCronJobSyncs: 5,
+				ConcurrentCronJobSyncs: 10,
 			},
 			NamespaceController: namespaceconfig.NamespaceControllerConfiguration{
 				NamespaceSyncPeriod:      metav1.Duration{Duration: 10 * time.Minute},
@@ -1096,13 +1097,23 @@ func TestValidateControllersOptions(t *testing.T) {
 				},
 			}).Validate,
 		},
+		{
+			name:                   "CronJobControllerOptions ConcurrentCronJobSyncs equal 0",
+			expectErrors:           true,
+			expectedErrorSubString: "concurrent-cron-job-syncs must be greater than 0",
+			validate: (&CronJobControllerOptions{
+				&cronjobconfig.CronJobControllerConfiguration{
+					ConcurrentCronJobSyncs: 0,
+				},
+			}).Validate,
+		},
 		/* empty errs */
 		{
 			name:         "CronJobControllerOptions",
 			expectErrors: false,
 			validate: (&CronJobControllerOptions{
 				&cronjobconfig.CronJobControllerConfiguration{
-					ConcurrentCronJobSyncs: 5,
+					ConcurrentCronJobSyncs: 10,
 				},
 			}).Validate,
 		},
