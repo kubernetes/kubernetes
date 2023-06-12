@@ -375,9 +375,9 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 	ginkgo.It("should increase cluster size if pending pods are small and there is another node pool that is not autoscaled [Feature:ClusterSizeAutoscalingScaleUp]", func(ctx context.Context) {
 		e2eskipper.SkipUnlessProviderIs("gke")
 
-		ginkgo.By("Creating new node-pool with n1-standard-4 machines")
+		ginkgo.By("Creating new node-pool with e2-standard-4 machines")
 		const extraPoolName = "extra-pool"
-		addNodePool(extraPoolName, "n1-standard-4", 1)
+		addNodePool(extraPoolName, "e2-standard-4", 1)
 		defer deleteNodePool(extraPoolName)
 		extraNodes := getPoolInitialSize(extraPoolName)
 		framework.ExpectNoError(e2enode.WaitForReadyNodes(ctx, c, nodeCount+extraNodes, resizeTimeout))
@@ -409,9 +409,9 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 	ginkgo.It("should disable node pool autoscaling [Feature:ClusterSizeAutoscalingScaleUp]", func(ctx context.Context) {
 		e2eskipper.SkipUnlessProviderIs("gke")
 
-		ginkgo.By("Creating new node-pool with n1-standard-4 machines")
+		ginkgo.By("Creating new node-pool with e2-standard-4 machines")
 		const extraPoolName = "extra-pool"
-		addNodePool(extraPoolName, "n1-standard-4", 1)
+		addNodePool(extraPoolName, "e2-standard-4", 1)
 		defer deleteNodePool(extraPoolName)
 		extraNodes := getPoolInitialSize(extraPoolName)
 		framework.ExpectNoError(e2enode.WaitForReadyNodes(ctx, c, nodeCount+extraNodes, resizeTimeout))
@@ -641,9 +641,9 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 	ginkgo.It("should scale up correct target pool [Feature:ClusterSizeAutoscalingScaleUp]", func(ctx context.Context) {
 		e2eskipper.SkipUnlessProviderIs("gke")
 
-		ginkgo.By("Creating new node-pool with n1-standard-4 machines")
+		ginkgo.By("Creating new node-pool with e2-standard-4 machines")
 		const extraPoolName = "extra-pool"
-		addNodePool(extraPoolName, "n1-standard-4", 1)
+		addNodePool(extraPoolName, "e2-standard-4", 1)
 		defer deleteNodePool(extraPoolName)
 		extraNodes := getPoolInitialSize(extraPoolName)
 		framework.ExpectNoError(e2enode.WaitForReadyNodes(ctx, c, nodeCount+extraNodes, resizeTimeout))
@@ -697,7 +697,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		increasedSize := manuallyIncreaseClusterSize(ctx, f, originalSizes)
 
 		const extraPoolName = "extra-pool"
-		addNodePool(extraPoolName, "n1-standard-1", 3)
+		addNodePool(extraPoolName, "e2-standard-2", 3)
 		defer deleteNodePool(extraPoolName)
 		extraNodes := getPoolInitialSize(extraPoolName)
 
@@ -753,7 +753,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 			// GKE-specific setup
 			ginkgo.By("Add a new node pool with 0 nodes and min size 0")
 			const extraPoolName = "extra-pool"
-			addNodePool(extraPoolName, "n1-standard-4", 0)
+			addNodePool(extraPoolName, "e2-standard-4", 0)
 			defer deleteNodePool(extraPoolName)
 			framework.ExpectNoError(enableAutoscaler(extraPoolName, 0, 1))
 			defer disableAutoscaler(extraPoolName, 0, 1)
@@ -813,7 +813,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		// GKE-specific setup
 		ginkgo.By("Add a new node pool with size 1 and min size 0")
 		const extraPoolName = "extra-pool"
-		addNodePool(extraPoolName, "n1-standard-4", 1)
+		addNodePool(extraPoolName, "e2-standard-4", 1)
 		defer deleteNodePool(extraPoolName)
 		extraNodes := getPoolInitialSize(extraPoolName)
 		framework.ExpectNoError(e2enode.WaitForReadyNodes(ctx, c, nodeCount+extraNodes, resizeTimeout))
