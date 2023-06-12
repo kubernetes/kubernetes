@@ -75,7 +75,7 @@ func (s *backoffStore) removeBackoffRecord(jobId string) error {
 
 }
 
-func newBackoffRecordStore() *backoffStore {
+func newBackoffStore() *backoffStore {
 	return &backoffStore{
 		store: cache.NewStore(backoffRecordKeyFunc),
 	}
