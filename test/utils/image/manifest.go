@@ -131,7 +131,7 @@ func readFromURL(url string, writer io.Writer) error {
 var (
 	initRegistry = RegistryList{
 		GcAuthenticatedRegistry:  "gcr.io/authenticated-image-pulling",
-		PromoterE2eRegistry:      "registry.k8s.io/e2e-test-images",
+		PromoterE2eRegistry:      "gcr.io/k8s-staging-e2e-test-images",
 		BuildImageRegistry:       "registry.k8s.io/build-image",
 		InvalidRegistry:          "invalid.registry.k8s.io/invalid",
 		GcEtcdRegistry:           "registry.k8s.io",
