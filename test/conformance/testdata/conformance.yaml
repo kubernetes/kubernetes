@@ -495,8 +495,7 @@
     be found. Patching the hard status values MUST succeed. The reported hard status
     values MUST equal the new spec hard values. Getting the /status MUST succeed and
     the reported hard status values MUST equal the spec hard values. Repatching the
-    hard status values MUST succeed. The spec spec MUST NOT be changed when patching
-    /status.
+    hard status values MUST succeed. The spec MUST NOT be changed when patching /status.
   release: v1.26
   file: test/e2e/apimachinery/resource_quota.go
 - testname: ResourceQuota, update and delete
