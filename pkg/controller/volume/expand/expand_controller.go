@@ -81,9 +81,6 @@ type expandController struct {
 	pvcLister  corelisters.PersistentVolumeClaimLister
 	pvcsSynced cache.InformerSynced
 
-	pvLister corelisters.PersistentVolumeLister
-	pvSynced cache.InformerSynced
-
 	// cloud provider used by volume host
 	cloud cloudprovider.Interface
 
@@ -108,7 +105,6 @@ type expandController struct {
 func NewExpandController(
 	kubeClient clientset.Interface,
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
-	pvInformer coreinformers.PersistentVolumeInformer,
 	cloud cloudprovider.Interface,
 	plugins []volume.VolumePlugin,
 	translator CSINameTranslator,
@@ -120,8 +116,6 @@ func NewExpandController(
 		cloud:                    cloud,
 		pvcLister:                pvcInformer.Lister(),
 		pvcsSynced:               pvcInformer.Informer().HasSynced,
-		pvLister:                 pvInformer.Lister(),
-		pvSynced:                 pvInformer.Informer().HasSynced,
 		queue:                    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "volume_expand"),
 		translator:               translator,
 		csiMigratedPluginManager: csiMigratedPluginManager,
@@ -339,7 +333,7 @@ func (expc *expandController) Run(ctx context.Context) {
 	logger.Info("Starting expand controller")
 	defer logger.Info("Shutting down expand controller")
 
-	if !cache.WaitForNamedCacheSync("expand", ctx.Done(), expc.pvcsSynced, expc.pvSynced) {
+	if !cache.WaitForNamedCacheSync("expand", ctx.Done(), expc.pvcsSynced) {
 		return
 	}
 
