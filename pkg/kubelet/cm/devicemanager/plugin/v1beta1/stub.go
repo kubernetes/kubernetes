@@ -178,7 +178,7 @@ func (m *Stub) Stop() error {
 	return m.cleanup()
 }
 
-func (m *Stub) Watch(kubeletEndpoint, resourceName string, pluginSockDir string) {
+func (m *Stub) Watch(kubeletEndpoint, resourceName string, pluginSockDir string, autoregister bool) {
 	for {
 		select {
 		case stop := <-m.stopWatcher:
@@ -196,9 +196,11 @@ func (m *Stub) Watch(kubeletEndpoint, resourceName string, pluginSockDir string)
 					panic(err)
 
 				}
-				if err := m.Register(pluginapi.KubeletSocket, resourceName, pluginapi.DevicePluginPath); err != nil {
-					klog.ErrorS(err, "Unable to register to kubelet")
-					panic(err)
+				if autoregister {
+					if err := m.Register(pluginapi.KubeletSocket, resourceName, pluginapi.DevicePluginPath); err != nil {
+						klog.ErrorS(err, "Unable to register to kubelet")
+						panic(err)
+					}
 				}
 
 			}
