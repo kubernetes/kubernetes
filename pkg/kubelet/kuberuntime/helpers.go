@@ -212,53 +212,6 @@ func toKubeRuntimeStatus(status *runtimeapi.RuntimeStatus) *kubecontainer.Runtim
 	return &kubecontainer.RuntimeStatus{Conditions: conditions}
 }
 
-func fieldProfile(scmp *v1.SeccompProfile, profileRootPath string, fallbackToRuntimeDefault bool) (string, error) {
-	if scmp == nil {
-		if fallbackToRuntimeDefault {
-			return v1.SeccompProfileRuntimeDefault, nil
-		}
-		return "", nil
-	}
-	if scmp.Type == v1.SeccompProfileTypeRuntimeDefault {
-		return v1.SeccompProfileRuntimeDefault, nil
-	}
-	if scmp.Type == v1.SeccompProfileTypeLocalhost {
-		if scmp.LocalhostProfile != nil && len(*scmp.LocalhostProfile) > 0 {
-			fname := filepath.Join(profileRootPath, *scmp.LocalhostProfile)
-			return v1.SeccompLocalhostProfileNamePrefix + fname, nil
-		} else {
-			return "", fmt.Errorf("localhostProfile must be set if seccompProfile type is Localhost.")
-		}
-	}
-	if scmp.Type == v1.SeccompProfileTypeUnconfined {
-		return v1.SeccompProfileNameUnconfined, nil
-	}
-
-	if fallbackToRuntimeDefault {
-		return v1.SeccompProfileRuntimeDefault, nil
-	}
-	return "", nil
-}
-
-func (m *kubeGenericRuntimeManager) getSeccompProfilePath(annotations map[string]string, containerName string,
-	podSecContext *v1.PodSecurityContext, containerSecContext *v1.SecurityContext, fallbackToRuntimeDefault bool) (string, error) {
-	// container fields are applied first
-	if containerSecContext != nil && containerSecContext.SeccompProfile != nil {
-		return fieldProfile(containerSecContext.SeccompProfile, m.seccompProfileRoot, fallbackToRuntimeDefault)
-	}
-
-	// when container seccomp is not defined, try to apply from pod field
-	if podSecContext != nil && podSecContext.SeccompProfile != nil {
-		return fieldProfile(podSecContext.SeccompProfile, m.seccompProfileRoot, fallbackToRuntimeDefault)
-	}
-
-	if fallbackToRuntimeDefault {
-		return v1.SeccompProfileRuntimeDefault, nil
-	}
-
-	return "", nil
-}
-
 func fieldSeccompProfile(scmp *v1.SeccompProfile, profileRootPath string, fallbackToRuntimeDefault bool) (*runtimeapi.SecurityProfile, error) {
 	if scmp == nil {
 		if fallbackToRuntimeDefault {
