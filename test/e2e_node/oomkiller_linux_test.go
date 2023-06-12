@@ -19,7 +19,6 @@ package e2enode
 import (
 	"context"
 	"fmt"
-	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -29,35 +28,52 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 )
 
 type testCase struct {
+	name                   string
 	podSpec                *v1.Pod
 	oomTargetContainerName string
 }
-
-const PodOOMKilledTimeout = 2 * time.Minute
 
 var _ = SIGDescribe("OOMKiller [LinuxOnly] [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("oomkiller-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
-	containerName := "oomkill-target-container"
-	oomPodSpec := getOOMTargetPod("oomkill-target-pod", containerName)
-	runOomKillerTest(f, testCase{podSpec: oomPodSpec, oomTargetContainerName: containerName})
+	testCases := []testCase{{
+		name:                   "single process container",
+		oomTargetContainerName: "oomkill-single-target-container",
+		podSpec: getOOMTargetPod("oomkill-target-pod", "oomkill-single-target-container",
+			getOOMTargetContainer),
+	}}
+
+	// If using cgroup v2, we set memory.oom.group=1 for the container cgroup so that any process which gets OOM killed
+	// in the process, causes all processes in the container to get OOM killed
+	if libcontainercgroups.IsCgroup2UnifiedMode() {
+		testCases = append(testCases, testCase{
+			name:                   "multi process container",
+			oomTargetContainerName: "oomkill-multi-target-container",
+			podSpec: getOOMTargetPod("oomkill-target-pod", "oomkill-multi-target-container",
+				getOOMTargetContainerMultiProcess),
+		})
+	}
+	for _, tc := range testCases {
+		runOomKillerTest(f, tc)
+	}
 })
 
 func runOomKillerTest(f *framework.Framework, testCase testCase) {
-	ginkgo.Context("", func() {
+	ginkgo.Context(testCase.name, func() {
 		ginkgo.BeforeEach(func() {
 			ginkgo.By("setting up the pod to be used in the test")
 			e2epod.NewPodClient(f).Create(context.TODO(), testCase.podSpec)
 		})
 
 		ginkgo.It("The containers terminated by OOM killer should have the reason set to OOMKilled", func() {
-
 			ginkgo.By("Waiting for the pod to be failed")
-			e2epod.WaitForPodTerminatedInNamespace(context.TODO(), f.ClientSet, testCase.podSpec.Name, "", f.Namespace.Name)
+			err := e2epod.WaitForPodTerminatedInNamespace(context.TODO(), f.ClientSet, testCase.podSpec.Name, "", f.Namespace.Name)
+			framework.ExpectNoError(err, "Failed waiting for pod to terminate, %s/%s", f.Namespace.Name, testCase.podSpec.Name)
 
 			ginkgo.By("Fetching the latest pod status")
 			pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), testCase.podSpec.Name, metav1.GetOptions{})
@@ -88,7 +104,7 @@ func verifyReasonForOOMKilledContainer(pod *v1.Pod, oomTargetContainerName strin
 		fmt.Sprintf("pod: %q, container: %q has unexpected reason: %q", pod.Name, container.Name, container.State.Terminated.Reason))
 }
 
-func getOOMTargetPod(podName string, ctnName string) *v1.Pod {
+func getOOMTargetPod(podName string, ctnName string, createContainer func(name string) v1.Container) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,
@@ -96,12 +112,14 @@ func getOOMTargetPod(podName string, ctnName string) *v1.Pod {
 		Spec: v1.PodSpec{
 			RestartPolicy: v1.RestartPolicyNever,
 			Containers: []v1.Container{
-				getOOMTargetContainer(ctnName),
+				createContainer(ctnName),
 			},
 		},
 	}
 }
 
+// getOOMTargetContainer returns a container with a single process, which attempts to allocate more memory than is
+// allowed by the container memory limit.
 func getOOMTargetContainer(name string) v1.Container {
 	return v1.Container{
 		Name:  name,
@@ -111,6 +129,29 @@ func getOOMTargetContainer(name string) v1.Container {
 			"-c",
 			// use the dd tool to attempt to allocate 20M in a block which exceeds the limit
 			"sleep 5 && dd if=/dev/zero of=/dev/null bs=20M",
+		},
+		Resources: v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("15Mi"),
+			},
+			Limits: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("15Mi"),
+			},
+		},
+	}
+}
+
+// getOOMTargetContainerMultiProcess returns a container with two processes, one of which attempts to allocate more
+// memory than is allowed by the container memory limit, and a second process which just sleeps.
+func getOOMTargetContainerMultiProcess(name string) v1.Container {
+	return v1.Container{
+		Name:  name,
+		Image: busyboxImage,
+		Command: []string{
+			"sh",
+			"-c",
+			// use the dd tool to attempt to allocate 20M in a block which exceeds the limit
+			"dd if=/dev/zero of=/dev/null bs=20M & sleep 86400",
 		},
 		Resources: v1.ResourceRequirements{
 			Requests: v1.ResourceList{
