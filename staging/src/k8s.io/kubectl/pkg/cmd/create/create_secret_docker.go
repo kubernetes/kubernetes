@@ -54,7 +54,7 @@ var (
 		by creating a dockercfg secret and attaching it to your service account.`))
 
 	secretForDockerRegistryExample = templates.Examples(i18n.T(`
-		  # If you don't already have a .dockercfg file, you can create a dockercfg secret directly by using:
+		  # If you do not already have a .dockercfg file, create a dockercfg secret directly
 		  kubectl create secret docker-registry my-secret --docker-server=DOCKER_REGISTRY_SERVER --docker-username=DOCKER_USER --docker-password=DOCKER_PASSWORD --docker-email=DOCKER_EMAIL
 
 		  # Create a new secret named my-secret from ~/.docker/config.json

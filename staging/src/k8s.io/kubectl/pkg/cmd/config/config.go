@@ -41,7 +41,7 @@ func NewCmdConfig(pathOptions *clientcmd.PathOptions, streams genericiooptions.I
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Modify kubeconfig files"),
 		Long: templates.LongDesc(i18n.T(`
-			Modify kubeconfig files using subcommands like "kubectl config set current-context my-context"
+			Modify kubeconfig files using subcommands like "kubectl config set current-context my-context".
 
 			The loading order follows these rules:
 

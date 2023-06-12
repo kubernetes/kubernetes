@@ -61,7 +61,7 @@ var (
 		# Show merged kubeconfig settings
 		kubectl config view
 
-		# Show merged kubeconfig settings and raw certificate data and exposed secrets
+		# Show merged kubeconfig settings, raw certificate data, and exposed secrets
 		kubectl config view --raw
 
 		# Get the password for the e2e user
