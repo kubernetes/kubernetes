@@ -27,7 +27,10 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/client-go/transport/ws"
+
 	"github.com/spf13/cobra"
+	"golang.org/x/net/websocket"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,7 +40,6 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/portforward"
-	"k8s.io/client-go/transport/spdy"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/util"
@@ -132,12 +134,24 @@ type defaultPortForwarder struct {
 }
 
 func (f *defaultPortForwarder) ForwardPorts(method string, url *url.URL, opts PortForwardOptions) error {
-	transport, upgrader, err := spdy.RoundTripperFor(opts.Config)
+	dialer, err := ws.NewDialer(opts.Config)
 	if err != nil {
 		return err
 	}
-	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, method, url)
-	fw, err := portforward.NewOnAddresses(dialer, opts.Address, opts.Ports, opts.StopChannel, opts.ReadyChannel, f.Out, f.ErrOut)
+	dialFn := func(id int, port uint16, subProtocols ...string) (*websocket.Conn, error) {
+		// websocket uses query parameter instead headers
+		query := url.Query()
+		query.Set("ports", strconv.Itoa(int(port)))
+		headers := http.Header{}
+		// TODO: Although headers below will not be used for websockets in container runtime,
+		// they will be used by httpstream and that's why SPDY stream translator should
+		// obtain these headers and pass them to SPDY connection.
+		headers.Set(corev1.PortHeader, fmt.Sprintf("%d", port))
+		headers.Set(corev1.PortForwardRequestIDHeader, strconv.Itoa(id))
+		return dialer.Dial(url.Path, headers, query, subProtocols...)
+	}
+
+	fw, err := portforward.NewOnAddresses(dialFn, opts.Address, opts.Ports, opts.StopChannel, opts.ReadyChannel, f.Out, f.ErrOut)
 	if err != nil {
 		return err
 	}
