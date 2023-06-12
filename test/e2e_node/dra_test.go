@@ -39,6 +39,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+	dra "k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -55,6 +56,7 @@ const (
 	pluginRegistrationPath    = "/var/lib/kubelet/plugins_registry"
 	draAddress                = "/var/lib/kubelet/plugins/test-driver/dra.sock"
 	pluginRegistrationTimeout = time.Second * 60 // how long to wait for a node plugin to be registered
+	podInPendingStateTimeout  = time.Second * 60 // how long to wait for a pod to stay in pending state
 )
 
 var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation][NodeFeature:DynamicResourceAllocation]", func() {
@@ -105,6 +107,27 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation][Node
 			// Pod should succeed
 			err = e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartShortTimeout)
 			framework.ExpectNoError(err)
+		})
+
+		ginkgo.It("must keep pod in pending state if NodePrepareResource times out", func(ctx context.Context) {
+			ginkgo.By("set delay for the NodePrepareResource call")
+			kubeletPlugin.Block()
+			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod")
+
+			ginkgo.By("wait for pod to be in Pending state")
+			err := e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "Pending", framework.PodStartShortTimeout, func(pod *v1.Pod) (bool, error) {
+				return pod.Status.Phase == v1.PodPending, nil
+			})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("wait for NodePrepareResource call")
+			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(dra.PluginClientTimeout * 2).Should(testdriver.NodePrepareResourceCalled)
+
+			// TODO: Check condition or event when implemented
+			// see https://github.com/kubernetes/kubernetes/issues/118468 for details
+			ginkgo.By("check that pod is consistently in Pending state")
+			gomega.Consistently(ctx, e2epod.Get(f.ClientSet, pod)).WithTimeout(podInPendingStateTimeout).Should(e2epod.BeInPhase(v1.PodPending),
+				"Pod should be in Pending state as resource preparation time outed")
 		})
 	})
 })
@@ -177,7 +200,8 @@ func createTestObjects(ctx context.Context, clientSet kubernetes.Interface, node
 	containerName := "testcontainer"
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: podName,
+			Name:      podName,
+			Namespace: namespace,
 		},
 		Spec: v1.PodSpec{
 			NodeName: nodename, // Assign the node as the scheduler is not running
