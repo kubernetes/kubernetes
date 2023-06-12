@@ -18,6 +18,7 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"path/filepath"
@@ -517,7 +518,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 							continue
 						}
 						pv, err = config.client.CoreV1().PersistentVolumes().Get(backgroundCtx, pv.Name, metav1.GetOptions{})
-						if apierrors.IsNotFound(err) {
+						if apierrors.IsNotFound(err) || errors.Is(err, context.Canceled) {
 							continue
 						}
 						// Delete and create a new PV for same local volume storage
@@ -528,9 +529,15 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 									continue
 								}
 								err = config.client.CoreV1().PersistentVolumes().Delete(backgroundCtx, pv.Name, metav1.DeleteOptions{})
+								if errors.Is(err, context.Canceled) {
+									continue
+								}
 								framework.ExpectNoError(err)
 								pvConfig := makeLocalPVConfig(config, localVolume)
 								localVolume.pv, err = e2epv.CreatePV(backgroundCtx, config.client, f.Timeouts, e2epv.MakePersistentVolume(pvConfig))
+								if errors.Is(err, context.Canceled) {
+									continue
+								}
 								framework.ExpectNoError(err)
 							}
 						}
