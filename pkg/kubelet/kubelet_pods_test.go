@@ -2819,16 +2819,16 @@ func Test_generateAPIPodStatus(t *testing.T) {
 	normalized_now := now.Rfc3339Copy()
 
 	tests := []struct {
-		name                           string
-		pod                            *v1.Pod
-		currentStatus                  *kubecontainer.PodStatus
-		unreadyContainer               []string
-		previousStatus                 v1.PodStatus
-		isPodTerminal                  bool
-		enablePodDisruptionConditions  bool
-		expected                       v1.PodStatus
-		expectedPodDisruptionCondition v1.PodCondition
-		expectedPodHasNetworkCondition v1.PodCondition
+		name                                       string
+		pod                                        *v1.Pod
+		currentStatus                              *kubecontainer.PodStatus
+		unreadyContainer                           []string
+		previousStatus                             v1.PodStatus
+		isPodTerminal                              bool
+		enablePodDisruptionConditions              bool
+		expected                                   v1.PodStatus
+		expectedPodDisruptionCondition             v1.PodCondition
+		expectedPodReadyToStartContainersCondition v1.PodCondition
 	}{
 		{
 			name: "pod disruption condition is copied over and the phase is set to failed when deleted; PodDisruptionConditions enabled",
@@ -2881,8 +2881,8 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				Status:             v1.ConditionTrue,
 				LastTransitionTime: normalized_now,
 			},
-			expectedPodHasNetworkCondition: v1.PodCondition{
-				Type:   kubetypes.PodHasNetwork,
+			expectedPodReadyToStartContainersCondition: v1.PodCondition{
+				Type:   kubetypes.PodReadyToStartContainers,
 				Status: v1.ConditionTrue,
 			},
 		},
@@ -2920,8 +2920,8 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					ready(waitingWithLastTerminationUnknown("containerB", 0)),
 				},
 			},
-			expectedPodHasNetworkCondition: v1.PodCondition{
-				Type:   kubetypes.PodHasNetwork,
+			expectedPodReadyToStartContainersCondition: v1.PodCondition{
+				Type:   kubetypes.PodReadyToStartContainers,
 				Status: v1.ConditionTrue,
 			},
 		},
@@ -2958,8 +2958,8 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					ready(waitingWithLastTerminationUnknown("containerB", 1)),
 				},
 			},
-			expectedPodHasNetworkCondition: v1.PodCondition{
-				Type:   kubetypes.PodHasNetwork,
+			expectedPodReadyToStartContainersCondition: v1.PodCondition{
+				Type:   kubetypes.PodReadyToStartContainers,
 				Status: v1.ConditionTrue,
 			},
 		},
@@ -2997,8 +2997,8 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					ready(waitingWithLastTerminationUnknown("containerB", 1)),
 				},
 			},
-			expectedPodHasNetworkCondition: v1.PodCondition{
-				Type:   kubetypes.PodHasNetwork,
+			expectedPodReadyToStartContainersCondition: v1.PodCondition{
+				Type:   kubetypes.PodReadyToStartContainers,
 				Status: v1.ConditionFalse,
 			},
 		},
@@ -3042,8 +3042,8 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				Reason:  "Test",
 				Message: "test",
 			},
-			expectedPodHasNetworkCondition: v1.PodCondition{
-				Type:   kubetypes.PodHasNetwork,
+			expectedPodReadyToStartContainersCondition: v1.PodCondition{
+				Type:   kubetypes.PodReadyToStartContainers,
 				Status: v1.ConditionFalse,
 			},
 		},
@@ -3094,8 +3094,8 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				Reason:  "Test",
 				Message: "test",
 			},
-			expectedPodHasNetworkCondition: v1.PodCondition{
-				Type:   kubetypes.PodHasNetwork,
+			expectedPodReadyToStartContainersCondition: v1.PodCondition{
+				Type:   kubetypes.PodReadyToStartContainers,
 				Status: v1.ConditionFalse,
 			},
 		},
@@ -3133,8 +3133,8 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					ready(waitingStateWithReason("containerB", "ContainerCreating")),
 				},
 			},
-			expectedPodHasNetworkCondition: v1.PodCondition{
-				Type:   kubetypes.PodHasNetwork,
+			expectedPodReadyToStartContainersCondition: v1.PodCondition{
+				Type:   kubetypes.PodReadyToStartContainers,
 				Status: v1.ConditionTrue,
 			},
 		},
@@ -3187,8 +3187,8 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					ready(withID(runningStateWithStartedAt("containerB", time.Unix(1, 0).UTC()), "://foo")),
 				},
 			},
-			expectedPodHasNetworkCondition: v1.PodCondition{
-				Type:   kubetypes.PodHasNetwork,
+			expectedPodReadyToStartContainersCondition: v1.PodCondition{
+				Type:   kubetypes.PodReadyToStartContainers,
 				Status: v1.ConditionTrue,
 			},
 		},
@@ -3245,17 +3245,17 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					ready(withID(runningStateWithStartedAt("containerB", time.Unix(2, 0).UTC()), "://c2")),
 				},
 			},
-			expectedPodHasNetworkCondition: v1.PodCondition{
-				Type:   kubetypes.PodHasNetwork,
+			expectedPodReadyToStartContainersCondition: v1.PodCondition{
+				Type:   kubetypes.PodReadyToStartContainers,
 				Status: v1.ConditionTrue,
 			},
 		},
 	}
 	for _, test := range tests {
-		for _, enablePodHasNetworkCondition := range []bool{false, true} {
+		for _, enablePodReadyToStartContainersCondition := range []bool{false, true} {
 			t.Run(test.name, func(t *testing.T) {
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodHasNetworkCondition, enablePodHasNetworkCondition)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodReadyToStartContainersCondition, enablePodReadyToStartContainersCondition)()
 				testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 				defer testKubelet.Cleanup()
 				kl := testKubelet.kubelet
@@ -3265,8 +3265,8 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				}
 				expected := test.expected.DeepCopy()
 				actual := kl.generateAPIPodStatus(test.pod, test.currentStatus, test.isPodTerminal)
-				if enablePodHasNetworkCondition {
-					expected.Conditions = append([]v1.PodCondition{test.expectedPodHasNetworkCondition}, expected.Conditions...)
+				if enablePodReadyToStartContainersCondition {
+					expected.Conditions = append([]v1.PodCondition{test.expectedPodReadyToStartContainersCondition}, expected.Conditions...)
 				}
 				if test.enablePodDisruptionConditions {
 					expected.Conditions = append([]v1.PodCondition{test.expectedPodDisruptionCondition}, expected.Conditions...)

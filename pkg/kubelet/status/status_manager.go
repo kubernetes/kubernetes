@@ -598,8 +598,8 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 	// Set InitializedCondition.LastTransitionTime.
 	updateLastTransitionTime(&status, &oldStatus, v1.PodInitialized)
 
-	// Set PodHasNetwork.LastTransitionTime.
-	updateLastTransitionTime(&status, &oldStatus, kubetypes.PodHasNetwork)
+	// Set PodReadyToStartContainersCondition.LastTransitionTime.
+	updateLastTransitionTime(&status, &oldStatus, kubetypes.PodReadyToStartContainers)
 
 	// Set PodScheduledCondition.LastTransitionTime.
 	updateLastTransitionTime(&status, &oldStatus, v1.PodScheduled)
