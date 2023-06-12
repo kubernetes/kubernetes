@@ -345,6 +345,7 @@ func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfig
 			"v":                   true,
 			"vmodule":             true,
 			"log-flush-frequency": true,
+			"provider-id":         true,
 		}
 		fs.VisitAll(func(f *pflag.Flag) {
 			if notDeprecated[f.Name] {
