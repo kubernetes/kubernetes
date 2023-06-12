@@ -4642,11 +4642,14 @@ func TestKubelet_HandlePodCleanups(t *testing.T) {
 			},
 			wantWorker: func(t *testing.T, w *podWorkers, records map[types.UID][]syncPodRecord) {
 				uid := types.UID("1")
-				if len(w.podSyncStatuses) != 0 {
+				if len(w.podSyncStatuses) != 1 {
 					t.Fatalf("unexpected sync statuses: %#v", w.podSyncStatuses)
 				}
 				// no pod sync record was delivered
-				if actual, expected := records[uid], []syncPodRecord(nil); !reflect.DeepEqual(expected, actual) {
+				if actual, expected := records[uid], []syncPodRecord{
+					{name: "pod1", updateType: kubetypes.SyncPodKill, gracePeriod: &one},
+					{name: "pod1", terminated: true},
+				}; !reflect.DeepEqual(expected, actual) {
 					t.Fatalf("unexpected pod sync records: %s", cmp.Diff(expected, actual, cmp.AllowUnexported(syncPodRecord{})))
 				}
 			},
@@ -4658,7 +4661,7 @@ func TestKubelet_HandlePodCleanups(t *testing.T) {
 				`,
 				metrics.ActivePodCount.FQName(): `# HELP kubelet_active_pods [ALPHA] The number of pods the kubelet considers active and which are being considered when admitting new pods. static is true if the pod is not from the apiserver.
 				# TYPE kubelet_active_pods gauge
-				kubelet_active_pods{static=""} 0
+				kubelet_active_pods{static=""} 1
 				kubelet_active_pods{static="true"} 0
 				`,
 				metrics.OrphanedRuntimePodTotal.FQName(): `# HELP kubelet_orphaned_runtime_pods_total [ALPHA] Number of pods that have been detected in the container runtime without being already known to the pod worker. This typically indicates the kubelet was restarted while a pod was force deleted in the API or in the local configuration, which is unusual.
@@ -4682,7 +4685,7 @@ func TestKubelet_HandlePodCleanups(t *testing.T) {
 				kubelet_working_pods{config="desired",lifecycle="sync",static="true"} 0
 				kubelet_working_pods{config="desired",lifecycle="terminated",static=""} 0
 				kubelet_working_pods{config="desired",lifecycle="terminated",static="true"} 0
-				kubelet_working_pods{config="desired",lifecycle="terminating",static=""} 0
+				kubelet_working_pods{config="desired",lifecycle="terminating",static=""} 1
 				kubelet_working_pods{config="desired",lifecycle="terminating",static="true"} 0
 				kubelet_working_pods{config="orphan",lifecycle="sync",static=""} 0
 				kubelet_working_pods{config="orphan",lifecycle="sync",static="true"} 0

@@ -108,8 +108,6 @@ type PodStatusProvider interface {
 type PodDeletionSafetyProvider interface {
 	// PodCouldHaveRunningContainers returns true if the pod could have running containers.
 	PodCouldHaveRunningContainers(pod *v1.Pod) bool
-	// PodIsFinished returns true if the pod is finished based on the pod workers status.
-	PodIsFinished(pod *v1.Pod) bool
 }
 
 type PodStartupLatencyStateHelper interface {
@@ -900,13 +898,13 @@ func (m *manager) canBeDeleted(pod *v1.Pod, status v1.PodStatus, podIsFinished b
 		return false
 	}
 	// Delay deletion of pods until the phase is terminal.
-	if !podutil.IsPodPhaseTerminal(status.Phase) {
-		klog.V(3).InfoS("Delaying pod deletion as the phase is non-terminal", "phase", status.Phase, "pod", klog.KObj(pod), "podUID", pod.UID)
+	if !podutil.IsPodPhaseTerminal(pod.Status.Phase) {
+		klog.V(3).InfoS("Delaying pod deletion as the phase is non-terminal", "podPhase", pod.Status.Phase, "statusPhase", status.Phase, "pod", klog.KObj(pod), "podUID", pod.UID)
 		return false
 	}
 	// If this is an update completing pod termination then we know the pod termination is finished.
-	if podIsFinished || m.podDeletionSafety.PodIsFinished(pod) {
-		klog.V(3).InfoS("The pod termination is finished as SyncTerminatedPod completes its execution", "phase", status.Phase, "pod", klog.KObj(pod), "podUID", pod.UID)
+	if podIsFinished {
+		klog.V(3).InfoS("The pod termination is finished as SyncTerminatedPod completes its execution", "podPhase", pod.Status.Phase, "statusPhase", status.Phase, "pod", klog.KObj(pod), "podUID", pod.UID)
 		return true
 	}
 	return false
