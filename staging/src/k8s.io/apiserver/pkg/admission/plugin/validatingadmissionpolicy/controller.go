@@ -134,6 +134,7 @@ func NewAdmissionController(
 			restMapper,
 			client,
 			dynamicClient,
+			informerFactory,
 			nil,
 			NewMatcher(matching.NewMatcher(informerFactory.Core().V1().Namespaces().Lister(), client)),
 			generic.NewInformer[*v1alpha1.ValidatingAdmissionPolicy](
