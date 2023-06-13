@@ -511,7 +511,7 @@ func InitDisruptionController(t *testing.T, testCtx *TestContext) *disruption.Di
 
 	config := restclient.CopyConfig(testCtx.KubeConfig)
 	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(testCtx.ClientSet.Discovery())
-	scaleClient, err := scale.NewForConfig(config, mapper, dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
+	scaleClient, err := scale.NewForConfig(config, mapper, scale.LegacyAPIPathResolverFunc, scaleKindResolver)
 	if err != nil {
 		t.Fatalf("Error in create scaleClient: %v", err)
 	}

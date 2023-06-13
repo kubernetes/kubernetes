@@ -72,7 +72,7 @@ func setup(t *testing.T) (*kubeapiservertesting.TestServer, *disruption.Disrupti
 	mapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
 
 	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(client.Discovery())
-	scaleClient, err := scale.NewForConfig(server.ClientConfig, mapper, dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
+	scaleClient, err := scale.NewForConfig(server.ClientConfig, mapper, scale.LegacyAPIPathResolverFunc, scaleKindResolver)
 	if err != nil {
 		t.Fatalf("Error creating scaleClient: %v", err)
 	}

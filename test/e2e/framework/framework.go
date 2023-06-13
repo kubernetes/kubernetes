@@ -47,6 +47,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
+	"k8s.io/client-go/scale"
 	scaleclient "k8s.io/client-go/scale"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -242,7 +243,7 @@ func (f *Framework) BeforeEach(ctx context.Context) {
 	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cachedDiscoClient)
 	restMapper.Reset()
 	resolver := scaleclient.NewDiscoveryScaleKindResolver(cachedDiscoClient)
-	f.ScalesGetter = scaleclient.New(restClient, restMapper, dynamic.LegacyAPIPathResolverFunc, resolver)
+	f.ScalesGetter = scaleclient.New(restClient, restMapper, scale.LegacyAPIPathResolverFunc, resolver)
 
 	TestContext.CloudConfig.Provider.FrameworkBeforeEach(f)
 

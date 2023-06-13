@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	fakedisco "k8s.io/client-go/discovery/fake"
-	"k8s.io/client-go/dynamic"
 	fakerest "k8s.io/client-go/rest/fake"
 
 	"github.com/stretchr/testify/assert"
@@ -243,7 +242,7 @@ func fakeScaleClient(t *testing.T) (ScalesGetter, []schema.GroupResource) {
 	}
 
 	resolver := NewDiscoveryScaleKindResolver(fakeDiscoveryClient)
-	client := New(fakeClient, restMapper, dynamic.LegacyAPIPathResolverFunc, resolver)
+	client := New(fakeClient, restMapper, LegacyAPIPathResolverFunc, resolver)
 
 	groupResources := []schema.GroupResource{
 		{Group: corev1.GroupName, Resource: "replicationcontrollers"},

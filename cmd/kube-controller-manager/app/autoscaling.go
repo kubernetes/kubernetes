@@ -24,7 +24,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/scale"
 	"k8s.io/controller-manager/controller"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler"
@@ -73,7 +72,7 @@ func startHPAControllerWithMetricsClient(ctx context.Context, controllerContext 
 	// we don't use cached discovery because DiscoveryScaleKindResolver does its own caching,
 	// so we want to re-fetch every time when we actually ask for it
 	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(hpaClient.Discovery())
-	scaleClient, err := scale.NewForConfig(hpaClientConfig, controllerContext.RESTMapper, dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
+	scaleClient, err := scale.NewForConfig(hpaClientConfig, controllerContext.RESTMapper, scale.LegacyAPIPathResolverFunc, scaleKindResolver)
 	if err != nil {
 		return nil, false, err
 	}

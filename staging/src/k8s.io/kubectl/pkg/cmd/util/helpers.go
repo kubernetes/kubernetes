@@ -41,7 +41,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/clientcmd"
@@ -875,7 +874,7 @@ func scaleClient(restClientGetter genericclioptions.RESTClientGetter) (scale.Sca
 		return nil, err
 	}
 
-	return scale.New(restClient, mapper, dynamic.LegacyAPIPathResolverFunc, resolver), nil
+	return scale.New(restClient, mapper, scale.LegacyAPIPathResolverFunc, resolver), nil
 }
 
 func Warning(cmdErr io.Writer, newGeneratorName, oldGeneratorName string) {

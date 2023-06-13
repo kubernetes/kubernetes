@@ -32,11 +32,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/metadata"
 	metadatafake "k8s.io/client-go/metadata/fake"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/scale"
 	core "k8s.io/client-go/testing"
 	"k8s.io/klog/v2/ktesting"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -123,7 +123,7 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersio
 	groupVersionResources, _ := discovery.GroupVersionResources(resources)
 	for groupVersionResource := range groupVersionResources {
 		urlPath := path.Join([]string{
-			dynamic.LegacyAPIPathResolverFunc(schema.GroupVersionKind{Group: groupVersionResource.Group, Version: groupVersionResource.Version}),
+			scale.LegacyAPIPathResolverFunc(schema.GroupVersionKind{Group: groupVersionResource.Group, Version: groupVersionResource.Version}),
 			groupVersionResource.Group,
 			groupVersionResource.Version,
 			"namespaces",
