@@ -140,6 +140,7 @@ func NewAdmissionController(
 			restMapper,
 			client,
 			dynamicClient,
+			informerFactory,
 			typeChecker,
 			cel.NewFilterCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())),
 			NewMatcher(matching.NewMatcher(informerFactory.Core().V1().Namespaces().Lister(), client)),
