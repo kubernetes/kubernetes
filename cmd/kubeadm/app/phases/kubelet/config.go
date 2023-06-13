@@ -39,7 +39,7 @@ import (
 )
 
 // WriteConfigToDisk writes the kubelet config object down to a file
-// Used at "kubeadm init" and "kubeadm upgrade" time
+// Used at "kubeadm init", "kubeadm join" and "kubeadm upgrade" time
 func WriteConfigToDisk(cfg *kubeadmapi.ClusterConfiguration, kubeletDir, patchesDir string, output io.Writer) error {
 	kubeletCfg, ok := cfg.ComponentConfigs[componentconfigs.KubeletGroup]
 	if !ok {

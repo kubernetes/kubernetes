@@ -38,6 +38,10 @@ const (
 	EtcdLearnerMode = "EtcdLearnerMode"
 	// UpgradeAddonsBeforeControlPlane is expected to be in deprecated in v1.28 and will be removed in future release
 	UpgradeAddonsBeforeControlPlane = "UpgradeAddonsBeforeControlPlane"
+	// NodeLocalCRISocket is alpha in v1.29, and it helps to remove cri annotation of node
+	// 1. init/join: save it to `kubelet/config.yaml` instead of `kubeadm-flags.env`.
+	// 2. upgrade: respect local `containerRuntimeEndpoint` in `kubelet/config.yaml`.
+	NodeLocalCRISocket = "NodeLocalCRISocket"
 )
 
 // InitFeatureGates are the default feature gates for the init command
@@ -49,6 +53,7 @@ var InitFeatureGates = FeatureList{
 		FeatureSpec:        featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Deprecated},
 		DeprecationMessage: "The UpgradeAddonsBeforeControlPlane feature gate is deprecated and will be removed in a future release.",
 	},
+	NodeLocalCRISocket: {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
 }
 
 // Feature represents a feature being gated

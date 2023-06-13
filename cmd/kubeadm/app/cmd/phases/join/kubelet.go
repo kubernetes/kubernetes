@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
@@ -217,9 +218,11 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 		return err
 	}
 
-	klog.V(1).Infoln("[kubelet-start] preserving the crisocket information for the node")
-	if err := patchnodephase.AnnotateCRISocket(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.CRISocket); err != nil {
-		return errors.Wrap(err, "error uploading crisocket")
+	if !features.Enabled(initCfg.FeatureGates, features.NodeLocalCRISocket) {
+		klog.V(1).Infoln("[kubelet-start] preserving the crisocket information for the node")
+		if err := patchnodephase.AnnotateCRISocket(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.CRISocket); err != nil {
+			return errors.Wrap(err, "error uploading crisocket")
+		}
 	}
 
 	return nil

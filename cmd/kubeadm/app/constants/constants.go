@@ -259,6 +259,7 @@ const (
 
 	// AnnotationKubeadmCRISocket specifies the annotation kubeadm uses to preserve the crisocket information given to kubeadm at
 	// init/join time for use later. kubeadm annotates the node object with this information
+	// Deprecated in v1.28
 	AnnotationKubeadmCRISocket = "kubeadm.alpha.kubernetes.io/cri-socket"
 
 	// UnknownCRISocket defines the undetected or unknown CRI socket
@@ -294,6 +295,8 @@ const (
 	// might be passed through this file. "kubeadm init" writes one variable, with the name ${KubeletEnvFileVariableName}.
 	// This file should exist under KubeletRunDirectory
 	KubeletEnvFileName = "kubeadm-flags.env"
+
+	KubeletConfigInstanceFileName = "kubeadm-config-instance.yaml"
 
 	// KubeletEnvFileVariableName specifies the shell script variable name "kubeadm init" should write a value to in KubeletEnvFile
 	KubeletEnvFileVariableName = "KUBELET_KUBEADM_ARGS"

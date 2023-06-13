@@ -72,6 +72,7 @@ func TestAnnotateCRISocket(t *testing.T) {
 				},
 			}
 
+			// removed once 
 			if tc.currentCRISocketAnnotation != "" {
 				node.ObjectMeta.Annotations[kubeadmconstants.AnnotationKubeadmCRISocket] = tc.currentCRISocketAnnotation
 			}
