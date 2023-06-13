@@ -116,23 +116,27 @@ type configurationObject interface {
 // NewSuggestedEnsureStrategy returns an EnsureStrategy for suggested config objects
 func NewSuggestedEnsureStrategy() EnsureStrategy {
 	return &strategy{
-		alwaysAutoUpdateSpec: false,
-		name:                 "suggested",
+		alwaysAutoUpdateSpecFn: func(_ wantAndHave) bool {
+			return false
+		},
+		name: "suggested",
 	}
 }
 
 // NewMandatoryEnsureStrategy returns an EnsureStrategy for mandatory config objects
 func NewMandatoryEnsureStrategy() EnsureStrategy {
 	return &strategy{
-		alwaysAutoUpdateSpec: true,
-		name:                 "mandatory",
+		alwaysAutoUpdateSpecFn: func(_ wantAndHave) bool {
+			return true
+		},
+		name: "mandatory",
 	}
 }
 
 // auto-update strategy for the configuration objects
 type strategy struct {
-	alwaysAutoUpdateSpec bool
-	name                 string
+	alwaysAutoUpdateSpecFn func(wantAndHave) bool
+	name                   string
 }
 
 func (s *strategy) Name() string {
@@ -146,7 +150,7 @@ func (s *strategy) ShouldUpdate(wah wantAndHave) (updatable, bool, error) {
 		return nil, false, nil
 	}
 
-	autoUpdateSpec := s.alwaysAutoUpdateSpec
+	autoUpdateSpec := s.alwaysAutoUpdateSpecFn(wah)
 	if !autoUpdateSpec {
 		autoUpdateSpec = shouldUpdateSpec(current)
 	}
