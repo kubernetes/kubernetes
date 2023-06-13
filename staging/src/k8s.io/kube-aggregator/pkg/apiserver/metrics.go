@@ -17,6 +17,10 @@ limitations under the License.
 package apiserver
 
 import (
+	"context"
+	"net/http"
+	"time"
+
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 )
@@ -46,7 +50,36 @@ var x509InsecureSHA1Counter = metrics.NewCounter(
 	},
 )
 
+var (
+	extensionApiserverRequestCounter = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Name:           "extension_apiserver_requests_total",
+			Help:           "Counter of extension apiserver request broken down by result. It can be either 'OK', 'Not Found', 'Service Unavailable' or 'Internal Server Error'.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"result"},
+	)
+
+	extensionApiserverLatency = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Name:           "extension_apiserver_request_duration_seconds",
+			Help:           "extension apiserver request duration in seconds broken out by result.",
+			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"result"},
+	)
+)
+
 func init() {
 	legacyregistry.MustRegister(x509MissingSANCounter)
 	legacyregistry.MustRegister(x509InsecureSHA1Counter)
+	legacyregistry.MustRegister(extensionApiserverRequestCounter)
+	legacyregistry.MustRegister(extensionApiserverLatency)
+}
+
+func recordExtensionApiserverMetrics(ctx context.Context, httpStatus int, extensionApiserverStart time.Time) {
+	extensionApiserverFinish := time.Now()
+	extensionApiserverRequestCounter.WithContext(ctx).WithLabelValues(http.StatusText(httpStatus)).Inc()
+	extensionApiserverLatency.WithContext(ctx).WithLabelValues(http.StatusText(httpStatus)).Observe(extensionApiserverFinish.Sub(extensionApiserverStart).Seconds())
 }

@@ -40,6 +40,9 @@ import (
 
 	"golang.org/x/net/websocket"
 
+	"math/rand"
+	"time"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -52,6 +55,7 @@ import (
 	apiserverproxyutil "k8s.io/apiserver/pkg/util/proxy"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 	apiregistration "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/utils/pointer"
 )
@@ -1107,3 +1111,69 @@ func backendKey() []byte { return readTestFile("server-key.pem") }
 func backendCaCertificate() []byte { return readTestFile("server-ca.pem") }
 
 func clientCaCrt() []byte { return readTestFile("client-ca.pem") }
+
+func TestRecordExtApiserverMetricsMetrics(t *testing.T) {
+	metrics := []string{
+		"extension_apiserver_requests_total",
+	}
+
+	testCases := []struct {
+		desc string
+		err  int
+		want string
+	}{
+		{
+			desc: "OK",
+			err:  200,
+			want: `
+			# HELP extension_apiserver_requests_total [ALPHA] Counter of extension apiserver request broken down by result. It can be either 'OK', 'Not Found', 'Service Unavailable' or 'Internal Server Error'.
+			# TYPE extension_apiserver_requests_total counter
+			extension_apiserver_requests_total{result="OK"} 1
+				`,
+		},
+		{
+			desc: "Not Found",
+			err:  404,
+			want: `
+			# HELP extension_apiserver_requests_total [ALPHA] Counter of extension apiserver request broken down by result. It can be either 'OK', 'Not Found', 'Service Unavailable' or 'Internal Server Error'.
+			# TYPE extension_apiserver_requests_total counter
+			extension_apiserver_requests_total{result="Not Found"} 1
+				`,
+		},
+		{
+			desc: "Service Unavailable",
+			err:  503,
+			want: `
+			# HELP extension_apiserver_requests_total [ALPHA] Counter of extension apiserver request broken down by result. It can be either 'OK', 'Not Found', 'Service Unavailable' or 'Internal Server Error'.
+			# TYPE extension_apiserver_requests_total counter
+			extension_apiserver_requests_total{result="Service Unavailable"} 1
+				`,
+		},
+		{
+			desc: "Internal Server Error",
+			err:  500,
+			want: `
+			# HELP extension_apiserver_requests_total [ALPHA] Counter of extension apiserver request broken down by result. It can be either 'OK', 'Not Found', 'Service Unavailable' or 'Internal Server Error'.
+			# TYPE extension_apiserver_requests_total counter
+            extension_apiserver_requests_total{result="Internal Server Error"} 1
+				`,
+		},
+	}
+
+	random := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	extensionApiserverRequestCounter.Reset()
+
+	for _, tt := range testCases {
+		t.Run(tt.desc, func(t *testing.T) {
+			defer extensionApiserverRequestCounter.Reset()
+			aggregationStart := time.Now()
+			ctx := context.TODO()
+			time.Sleep(time.Duration(random.Intn(100)) * time.Millisecond)
+			recordExtensionApiserverMetrics(ctx, tt.err, aggregationStart)
+			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tt.want), metrics...); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
