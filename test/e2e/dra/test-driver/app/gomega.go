@@ -17,6 +17,8 @@ limitations under the License.
 package app
 
 import (
+	"strings"
+
 	"github.com/onsi/gomega/gcustom"
 )
 
@@ -30,3 +32,13 @@ var BeRegistered = gcustom.MakeMatcher(func(actualCalls []GRPCCall) (bool, error
 	}
 	return false, nil
 }).WithMessage("contain successful NotifyRegistrationStatus call")
+
+// NodePrepareResouceCalled checks that NodePrepareResource API has been called
+var NodePrepareResourceCalled = gcustom.MakeMatcher(func(actualCalls []GRPCCall) (bool, error) {
+	for _, call := range actualCalls {
+		if strings.HasSuffix(call.FullMethod, "/NodePrepareResource") && call.Err == nil {
+			return true, nil
+		}
+	}
+	return false, nil
+}).WithMessage("contain NodePrepareResource call")
