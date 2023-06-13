@@ -210,6 +210,11 @@ func TestPlugin(t *testing.T) {
 	}{
 		"empty": {
 			pod: st.MakePod().Name("foo").Namespace("default").Obj(),
+			want: want{
+				prefilter: result{
+					status: framework.NewStatus(framework.Skip),
+				},
+			},
 		},
 		"claim-reference": {
 			pod:    podWithClaimName,
@@ -482,14 +487,19 @@ func TestPlugin(t *testing.T) {
 				assert.Equal(t, tc.want.preFilterResult, result)
 				testCtx.verify(t, tc.want.prefilter, initialObjects, result, status)
 			})
-			unschedulable := status.Code() != framework.Success
+			unschedulable := status.Code() != framework.Success && status.Code() != framework.Skip
 
 			var potentialNodes []*v1.Node
 
 			initialObjects = testCtx.listAll(t)
 			testCtx.updateAPIServer(t, initialObjects, tc.prepare.filter)
 			if !unschedulable {
+				shouldSkipFilter := status.Code() == framework.Skip
 				for _, nodeInfo := range testCtx.nodeInfos {
+					if shouldSkipFilter {
+						potentialNodes = append(potentialNodes, nodeInfo.Node())
+						continue
+					}
 					initialObjects = testCtx.listAll(t)
 					status := testCtx.p.Filter(testCtx.ctx, testCtx.state, tc.pod, nodeInfo)
 					nodeName := nodeInfo.Node().Name
@@ -501,6 +511,10 @@ func TestPlugin(t *testing.T) {
 					} else {
 						potentialNodes = append(potentialNodes, nodeInfo.Node())
 					}
+				}
+				if shouldSkipFilter {
+					// A nil status is also considered as "Success".
+					status = nil
 				}
 			}
 
