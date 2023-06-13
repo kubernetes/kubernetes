@@ -28,11 +28,11 @@ import (
 
 const (
 	// Parameters for retrying updates/waits with linear backoff.
-	// TODO: Try to move this to exponential backoff by modifying scale.Scale().
 	updateRetryInterval = 5 * time.Second
 	updateRetryTimeout  = 1 * time.Minute
 	waitRetryInterval   = 5 * time.Second
 	waitRetryTimeout    = 5 * time.Minute
+	retryAmount         = 12 // arbitrary no of retires SCOPE of improvement
 )
 
 func RetryErrorCondition(condition wait.ConditionFunc) wait.ConditionFunc {
@@ -48,9 +48,16 @@ func ScaleResourceWithRetries(scalesGetter scaleclient.ScalesGetter, namespace, 
 		Size:            -1,
 		ResourceVersion: "",
 	}
+	// timeouts per iterations: 5s, 10s, 20s, 40s...
+	exponentialBackoff := wait.Backoff{
+		Steps:    retryAmount,
+		Duration: updateRetryTimeout,
+		Factor:   2.0,
+		Jitter:   0.1,
+	}
 	waitForReplicas := scale.NewRetryParams(waitRetryInterval, waitRetryTimeout)
 	cond := RetryErrorCondition(scale.ScaleCondition(scaler, preconditions, namespace, name, size, nil, gvr, false))
-	err := wait.PollImmediate(updateRetryInterval, updateRetryTimeout, cond)
+	err := wait.ExponentialBackoff(exponentialBackoff, cond)
 	if err == nil {
 		err = scale.WaitForScaleHasDesiredReplicas(scalesGetter, gvr.GroupResource(), name, namespace, size, waitForReplicas)
 	}
