@@ -808,6 +808,11 @@ func TestPostFilterPlugin(t *testing.T) {
 								{Name: filterPluginName},
 							},
 						},
+						PreScore: configv1.PluginSet{
+							Disabled: []configv1.Plugin{
+								{Name: "*"},
+							},
+						},
 						Score: configv1.PluginSet{
 							Enabled: []configv1.Plugin{
 								{Name: scorePluginName},
