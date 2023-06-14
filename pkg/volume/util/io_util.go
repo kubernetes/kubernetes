@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 )
@@ -40,7 +41,19 @@ func (handler *osIOHandler) ReadFile(filename string) ([]byte, error) {
 	return os.ReadFile(filename)
 }
 func (handler *osIOHandler) ReadDir(dirname string) ([]os.FileInfo, error) {
-	return os.ReadDir(dirname)
+	files, err := os.ReadDir(dirname)
+	if err != nil {
+		return nil, err
+	}
+	infos := make([]fs.FileInfo, 0, len(files))
+	for _, file := range files {
+		info, err := file.Info()
+		if err != nil {
+			return nil, err
+		}
+		infos = append(infos, info)
+	}
+	return infos, nil
 }
 func (handler *osIOHandler) Lstat(name string) (os.FileInfo, error) {
 	return os.Lstat(name)
