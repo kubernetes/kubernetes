@@ -1054,30 +1054,6 @@ func TestValidateControllersOptions(t *testing.T) {
 			}).Validate,
 		},
 		{
-			name:                   "PersistentVolumeBinderControllerOptions bad cidr deny list",
-			expectErrors:           true,
-			expectedErrorSubString: "bad --volume-host-ip-denylist/--volume-host-allow-local-loopback invalid CIDR",
-			validate: (&PersistentVolumeBinderControllerOptions{
-				&persistentvolumeconfig.PersistentVolumeBinderControllerConfiguration{
-					PVClaimBinderSyncPeriod: metav1.Duration{Duration: 30 * time.Second},
-					VolumeConfiguration: persistentvolumeconfig.VolumeConfiguration{
-						EnableDynamicProvisioning:  false,
-						EnableHostPathProvisioning: true,
-						FlexVolumePluginDir:        "/flex-volume-plugin",
-						PersistentVolumeRecyclerConfiguration: persistentvolumeconfig.PersistentVolumeRecyclerConfiguration{
-							MaximumRetry:             3,
-							MinimumTimeoutNFS:        200,
-							IncrementTimeoutNFS:      45,
-							MinimumTimeoutHostPath:   45,
-							IncrementTimeoutHostPath: 45,
-						},
-					},
-					VolumeHostCIDRDenylist:       []string{"127.0.0.1"},
-					VolumeHostAllowLocalLoopback: false,
-				},
-			}).Validate,
-		},
-		{
 			name:                   "StatefulSetControllerOptions ConcurrentStatefulSetSyncs equal 0",
 			expectErrors:           true,
 			expectedErrorSubString: "concurrent-statefulset-syncs must be greater than 0",

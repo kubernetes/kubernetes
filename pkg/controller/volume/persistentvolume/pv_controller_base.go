@@ -47,7 +47,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/common"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume/metrics"
 	"k8s.io/kubernetes/pkg/features"
-	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	"k8s.io/kubernetes/pkg/util/slice"
 	vol "k8s.io/kubernetes/pkg/volume"
@@ -75,7 +74,6 @@ type ControllerParameters struct {
 	NodeInformer              coreinformers.NodeInformer
 	EventRecorder             record.EventRecorder
 	EnableDynamicProvisioning bool
-	FilteredDialOptions       *proxyutil.FilteredDialOptions
 }
 
 // NewController creates a new PersistentVolume controller
@@ -147,8 +145,6 @@ func NewController(ctx context.Context, p ControllerParameters) (*PersistentVolu
 	csiTranslator := csitrans.New()
 	controller.translator = csiTranslator
 	controller.csiMigratedPluginManager = csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate)
-
-	controller.filteredDialOptions = p.FilteredDialOptions
 
 	return controller, nil
 }

@@ -53332,7 +53332,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_PersistentVolumeBinder
 					},
 					"VolumeHostCIDRDenylist": {
 						SchemaProps: spec.SchemaProps{
-							Description: "VolumeHostCIDRDenylist is a list of CIDRs that should not be reachable by the controller from plugins.",
+							Description: "DEPRECATED: VolumeHostCIDRDenylist is a list of CIDRs that should not be reachable by the controller from plugins.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -53347,7 +53347,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_PersistentVolumeBinder
 					},
 					"VolumeHostAllowLocalLoopback": {
 						SchemaProps: spec.SchemaProps{
-							Description: "VolumeHostAllowLocalLoopback indicates if local loopback hosts (127.0.0.1, etc) should be allowed from plugins.",
+							Description: "DEPRECATED: VolumeHostAllowLocalLoopback indicates if local loopback hosts (127.0.0.1, etc) should be allowed from plugins.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},

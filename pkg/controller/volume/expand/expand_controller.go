@@ -45,7 +45,6 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/controller/volume/events"
 	"k8s.io/kubernetes/pkg/features"
-	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -97,8 +96,6 @@ type expandController struct {
 	translator CSINameTranslator
 
 	csiMigratedPluginManager csimigration.PluginManager
-
-	filteredDialOptions *proxyutil.FilteredDialOptions
 }
 
 // NewExpandController expands the pvs
@@ -108,8 +105,7 @@ func NewExpandController(
 	cloud cloudprovider.Interface,
 	plugins []volume.VolumePlugin,
 	translator CSINameTranslator,
-	csiMigratedPluginManager csimigration.PluginManager,
-	filteredDialOptions *proxyutil.FilteredDialOptions) (ExpandController, error) {
+	csiMigratedPluginManager csimigration.PluginManager) (ExpandController, error) {
 
 	expc := &expandController{
 		kubeClient:               kubeClient,
@@ -119,7 +115,6 @@ func NewExpandController(
 		queue:                    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "volume_expand"),
 		translator:               translator,
 		csiMigratedPluginManager: csiMigratedPluginManager,
-		filteredDialOptions:      filteredDialOptions,
 	}
 
 	if err := expc.volumePluginMgr.InitPlugins(plugins, nil, expc); err != nil {
@@ -478,8 +473,4 @@ func (expc *expandController) GetEventRecorder() record.EventRecorder {
 func (expc *expandController) GetSubpather() subpath.Interface {
 	// not needed for expand controller
 	return nil
-}
-
-func (expc *expandController) GetFilteredDialOptions() *proxyutil.FilteredDialOptions {
-	return expc.filteredDialOptions
 }
