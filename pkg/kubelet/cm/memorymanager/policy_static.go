@@ -681,17 +681,7 @@ func areMachineStatesEqual(ms1, ms2 state.NUMANodeMap) bool {
 				return false
 			}
 
-			if memoryState1.TotalMemSize != memoryState2.TotalMemSize {
-				klog.ErrorS(nil, "Memory states for the NUMA node and resource are different", "node", nodeID, "resource", resourceName, "memoryState1", *memoryState1, "memoryState2", *memoryState2)
-				return false
-			}
-
-			if memoryState1.SystemReserved != memoryState2.SystemReserved {
-				klog.ErrorS(nil, "Memory states for the NUMA node and resource are different", "node", nodeID, "resource", resourceName, "memoryState1", *memoryState1, "memoryState2", *memoryState2)
-				return false
-			}
-
-			if memoryState1.Allocatable != memoryState2.Allocatable {
+			if memoryState1.TotalMemSize != memoryState2.TotalMemSize || memoryState1.SystemReserved != memoryState2.SystemReserved || memoryState1.Allocatable != memoryState2.Allocatable {
 				klog.ErrorS(nil, "Memory states for the NUMA node and resource are different", "node", nodeID, "resource", resourceName, "memoryState1", *memoryState1, "memoryState2", *memoryState2)
 				return false
 			}
