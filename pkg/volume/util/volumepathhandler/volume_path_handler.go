@@ -18,6 +18,7 @@ package volumepathhandler
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -282,11 +283,19 @@ func (v VolumePathHandler) GetDeviceBindMountRefs(devPath string, mapPath string
 	if err != nil {
 		return nil, err
 	}
+	fileInfos := make([]fs.FileInfo, 0, len(files))
 	for _, file := range files {
-		if file.Mode()&os.ModeDevice != os.ModeDevice {
+		info, err := file.Info()
+		if err != nil {
+			return nil, err
+		}
+		fileInfos = append(fileInfos, info)
+	}
+	for _, info := range fileInfos {
+		if info.Mode()&os.ModeDevice != os.ModeDevice {
 			continue
 		}
-		filename := file.Name()
+		filename := info.Name()
 		// TODO: Might need to check if the file is actually linked to devPath
 		refs = append(refs, filepath.Join(mapPath, filename))
 	}
