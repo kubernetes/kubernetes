@@ -35,7 +35,7 @@ import (
 
 var (
 	explainLong = templates.LongDesc(i18n.T(`
-		Get structure of various resources with their list of fields. For instance pods, nodes, services, etc.
+		Describe fields and structure of various resources.
 
 		This command describes the fields associated with each supported API resource.
 		Fields are identified via a simple JSONPath identifier:
@@ -51,8 +51,14 @@ var (
 		# Get all the fields in the resource
 		kubectl explain pods --recursive
 
+		# Get the explanation for deployment in supported api versions
+		kubectl explain deployments --api-version=v1beta2
+
 		# Get the documentation of a specific field of a resource
-		kubectl explain pods.spec.containers`))
+		kubectl explain pods.spec.containers
+		
+		# Get the documentation of resources in different format
+		kubectl explain deployment --output=plaintext-openapiv2`))
 
 	plaintextTemplateName          = "plaintext"
 	plaintextOpenAPIV2TemplateName = "plaintext-openapiv2"
@@ -102,11 +108,11 @@ func NewCmdExplain(parent string, f cmdutil.Factory, streams genericiooptions.IO
 			cmdutil.CheckErr(o.Run())
 		},
 	}
-	cmd.Flags().BoolVar(&o.Recursive, "recursive", o.Recursive, "If present, displays all of the fields at once without descriptions. It print the fields of fields (Currently only 1 level deep)")
-	cmd.Flags().StringVar(&o.APIVersion, "api-version", o.APIVersion, "The resource explanation for particular selected API version/group will be displayed. (For eg. 'kubectl explain pods --api-version=v1'). Defaults to latest API version/group.")
+	cmd.Flags().BoolVar(&o.Recursive, "recursive", o.Recursive, "When true, print the name of all the fields recursively. Otherwise, print the available fields with their description.")
+	cmd.Flags().StringVar(&o.APIVersion, "api-version", o.APIVersion, "The resource explanation for a particular API version/group will be displayed.")
 
 	// Only enable --output as a valid flag if the feature is enabled
-	cmd.Flags().StringVar(&o.OutputFormat, "output", plaintextTemplateName, "This flag selects which format to render the schema from. Valid values are: (plaintext, plaintext-openapiv2, plaintext-openapiv3). Defaults to openapiv3.")
+	cmd.Flags().StringVar(&o.OutputFormat, "output", plaintextTemplateName, "Format in which to render the schema. Valid values are: (plaintext, plaintext-openapiv2).")
 
 	return cmd
 }
