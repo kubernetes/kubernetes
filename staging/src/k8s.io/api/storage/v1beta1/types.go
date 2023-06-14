@@ -606,7 +606,8 @@ type CSINodeList struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.21
-// +k8s:prerelease-lifecycle-gen:deprecated=1.24
+// +k8s:prerelease-lifecycle-gen:deprecated=1.27
+// +k8s:prerelease-lifecycle-gen:removed=1.29
 // +k8s:prerelease-lifecycle-gen:replacement=storage.k8s.io,v1,CSIStorageCapacity
 
 // CSIStorageCapacity stores the result of one CSI GetCapacity call.
@@ -694,7 +695,8 @@ type CSIStorageCapacity struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.21
-// +k8s:prerelease-lifecycle-gen:deprecated=1.24
+// +k8s:prerelease-lifecycle-gen:deprecated=1.27
+// +k8s:prerelease-lifecycle-gen:removed=1.29
 // +k8s:prerelease-lifecycle-gen:replacement=storage.k8s.io,v1,CSIStorageCapacityList
 
 // CSIStorageCapacityList is a collection of CSIStorageCapacity objects.

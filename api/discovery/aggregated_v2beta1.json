@@ -1179,6 +1179,32 @@
             }
           ],
           "version": "v1"
+        },
+        {
+          "freshness": "Current",
+          "resources": [
+            {
+              "resource": "csistoragecapacities",
+              "responseKind": {
+                "group": "",
+                "kind": "CSIStorageCapacity",
+                "version": ""
+              },
+              "scope": "Namespaced",
+              "singularResource": "csistoragecapacity",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            }
+          ],
+          "version": "v1beta1"
         }
       ]
     },
