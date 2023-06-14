@@ -56,7 +56,7 @@ var (
 		# and sends stdout/stderr from 'bash' back to the client
 		kubectl attach mypod -c ruby-container -i -t
 
-		# Get output from the first pod of a replica set named nginx
+		# Get output from the active pod of a replica set named nginx
 		kubectl attach rs/nginx
 		`))
 )

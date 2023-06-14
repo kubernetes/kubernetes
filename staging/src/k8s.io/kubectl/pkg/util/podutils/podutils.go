@@ -142,18 +142,25 @@ func (s ActivePods) Less(i, j int) bool {
 	if IsPodReady(s[i]) != IsPodReady(s[j]) {
 		return !IsPodReady(s[i])
 	}
+
+	// 4. Terminating < Non terminating
+	// If only one of the pods is terminating, the terminating one is smaller
+	if (s[i].DeletionTimestamp != nil) != (s[j].DeletionTimestamp != nil) {
+		return s[i].DeletionTimestamp != nil
+	}
+
 	// TODO: take availability into account when we push minReadySeconds information from deployment into pods,
 	//       see https://github.com/kubernetes/kubernetes/issues/22065
-	// 4. Been ready for empty time < less time < more time
+	// 5. Been ready for empty time < less time < more time
 	// If both pods are ready, the latest ready one is smaller
 	if IsPodReady(s[i]) && IsPodReady(s[j]) && !podReadyTime(s[i]).Equal(podReadyTime(s[j])) {
 		return afterOrZero(podReadyTime(s[i]), podReadyTime(s[j]))
 	}
-	// 5. Pods with containers with higher restart counts < lower restart counts
+	// 6. Pods with containers with higher restart counts < lower restart counts
 	if maxContainerRestarts(s[i]) != maxContainerRestarts(s[j]) {
 		return maxContainerRestarts(s[i]) > maxContainerRestarts(s[j])
 	}
-	// 6. Empty creation time pods < newer pods < older pods
+	// 7. Empty creation time pods < newer pods < older pods
 	if !s[i].CreationTimestamp.Equal(&s[j].CreationTimestamp) {
 		return afterOrZero(&s[i].CreationTimestamp, &s[j].CreationTimestamp)
 	}

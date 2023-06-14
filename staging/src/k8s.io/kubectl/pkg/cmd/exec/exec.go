@@ -65,10 +65,10 @@ var (
 		# unless that is how you would execute it normally (i.e., do ls -t /usr, not "ls -t /usr")
 		kubectl exec mypod -i -t -- ls -t /usr
 
-		# Get output from running 'date' command from the first pod of the deployment mydeployment, using the first container by default
+		# Get output from running 'date' command from the active pod of the deployment mydeployment, using the first container by default
 		kubectl exec deploy/mydeployment -- date
 
-		# Get output from running 'date' command from the first pod of the service myservice, using the first container by default
+		# Get output from running 'date' command from the active pod of the service myservice, using the first container by default
 		kubectl exec svc/myservice -- date
 		`))
 )
