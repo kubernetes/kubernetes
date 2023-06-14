@@ -51,8 +51,8 @@ type orderedIntervals []interval
 // The old list is solely based off .status.completedIndexes, but returns an
 // empty list if this Job is not tracked with finalizers. The new list includes
 // the indexes that succeeded since the last sync.
-func calculateSucceededIndexes(job *batch.Job, pods []*v1.Pod) (orderedIntervals, orderedIntervals) {
-	prevIntervals := succeededIndexesFromString(job.Status.CompletedIndexes, int(*job.Spec.Completions))
+func calculateSucceededIndexes(logger klog.Logger, job *batch.Job, pods []*v1.Pod) (orderedIntervals, orderedIntervals) {
+	prevIntervals := succeededIndexesFromString(logger, job.Status.CompletedIndexes, int(*job.Spec.Completions))
 	newSucceeded := sets.New[int]()
 	for _, p := range pods {
 		ix := getCompletionIndex(p.Annotations)
@@ -148,7 +148,7 @@ func (oi orderedIntervals) has(ix int) bool {
 	return oi[hi].First <= ix
 }
 
-func succeededIndexesFromString(completedIndexes string, completions int) orderedIntervals {
+func succeededIndexesFromString(logger klog.Logger, completedIndexes string, completions int) orderedIntervals {
 	if completedIndexes == "" {
 		return nil
 	}
@@ -160,7 +160,7 @@ func succeededIndexesFromString(completedIndexes string, completions int) ordere
 		var err error
 		inter.First, err = strconv.Atoi(limitsStr[0])
 		if err != nil {
-			klog.InfoS("Corrupted completed indexes interval, ignoring", "interval", intervalStr, "err", err)
+			logger.Info("Corrupted completed indexes interval, ignoring", "interval", intervalStr, "err", err)
 			continue
 		}
 		if inter.First >= completions {
@@ -169,7 +169,7 @@ func succeededIndexesFromString(completedIndexes string, completions int) ordere
 		if len(limitsStr) > 1 {
 			inter.Last, err = strconv.Atoi(limitsStr[1])
 			if err != nil {
-				klog.InfoS("Corrupted completed indexes interval, ignoring", "interval", intervalStr, "err", err)
+				logger.Info("Corrupted completed indexes interval, ignoring", "interval", intervalStr, "err", err)
 				continue
 			}
 			if inter.Last >= completions {
