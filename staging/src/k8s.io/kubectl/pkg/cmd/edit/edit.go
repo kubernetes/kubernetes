@@ -70,7 +70,7 @@ var (
 		# Edit the deployment 'mydeployment' in YAML and save the modified config in its annotation
 		kubectl edit deployment/mydeployment -o yaml --save-config
 
-		# Edit the deployment/mydeployment's status subresource
+		# Edit the 'status' subresource for the 'mydeployment' deployment
 		kubectl edit deployment mydeployment --subresource='status'`))
 )
 
