@@ -770,6 +770,9 @@ message ImageSpec {
     // ImageSpec Annotations can be used to help the runtime target specific
     // images in multi-arch images.
     map<string, string> annotations = 2;
+    // The container image reference specified by the user (e.g. image[:tag] or digest).
+    // Only set if available within the RPC context.
+    string user_specified_image = 18;
 }
 
 message KeyValue {

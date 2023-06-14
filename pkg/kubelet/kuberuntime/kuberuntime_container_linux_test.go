@@ -58,7 +58,7 @@ func makeExpectedConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, containerInde
 			Name:    container.Name,
 			Attempt: restartCountUint32,
 		},
-		Image:       &runtimeapi.ImageSpec{Image: container.Image},
+		Image:       &runtimeapi.ImageSpec{Image: container.Image, UserSpecifiedImage: container.Image},
 		Command:     container.Command,
 		Args:        []string(nil),
 		WorkingDir:  container.WorkingDir,
