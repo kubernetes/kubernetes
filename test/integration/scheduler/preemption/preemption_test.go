@@ -1677,7 +1677,7 @@ func TestReadWriteOncePodPreemption(t *testing.T) {
 
 	cs := testCtx.ClientSet
 
-	storage := v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}
+	storage := v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}
 	volType := v1.HostPathDirectoryOrCreate
 	pv1 := st.MakePersistentVolume().
 		Name("pv-with-read-write-once-pod-1").

@@ -801,7 +801,7 @@ func (p *PersistentVolumeClaimWrapper) AccessModes(accessModes []v1.PersistentVo
 
 // Resources sets `resources` as the resource requirements of the inner
 // PersistentVolumeClaim.
-func (p *PersistentVolumeClaimWrapper) Resources(resources v1.ResourceRequirements) *PersistentVolumeClaimWrapper {
+func (p *PersistentVolumeClaimWrapper) Resources(resources v1.VolumeResourceRequirements) *PersistentVolumeClaimWrapper {
 	p.PersistentVolumeClaim.Spec.Resources = resources
 	return p
 }

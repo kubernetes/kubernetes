@@ -1710,7 +1710,7 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 					return fmt.Errorf("cannot create node: %v", err)
 				}
 
-				storage := v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}
+				storage := v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}
 				volType := v1.HostPathDirectoryOrCreate
 				pv, err := testutils.CreatePV(cs, st.MakePersistentVolume().
 					Name("pv-with-read-write-once-pod").

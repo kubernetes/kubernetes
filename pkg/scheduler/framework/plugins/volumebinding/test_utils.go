@@ -127,7 +127,7 @@ func (pvcb pvcBuilder) withBoundPV(pvName string) pvcBuilder {
 }
 
 func (pvcb pvcBuilder) withRequestStorage(request resource.Quantity) pvcBuilder {
-	pvcb.PersistentVolumeClaim.Spec.Resources = v1.ResourceRequirements{
+	pvcb.PersistentVolumeClaim.Spec.Resources = v1.VolumeResourceRequirements{
 		Requests: v1.ResourceList{
 			v1.ResourceName(v1.ResourceStorage): request,
 		},
