@@ -65,7 +65,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 
 	var kubeletPlugin *testdriver.ExamplePlugin
 
-	ginkgo.Context("Resource Kubelet Plugin [Serial]", func() {
+	ginkgo.Context("Resource Kubelet Plugin", func() {
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			kubeletPlugin = newKubeletPlugin(getNodeName(ctx, f))
 		})
