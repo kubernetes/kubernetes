@@ -21780,8 +21780,8 @@ func TestValidateHostUsers(t *testing.T) {
 			}},
 		},
 	}, {
-		name:    "hostUsers=false - unsupported volume",
-		success: false,
+		name:    "hostUsers=false - stateful volume",
+		success: true,
 		spec: &core.PodSpec{
 			SecurityContext: &core.PodSecurityContext{
 				HostUsers: &falseVar,
@@ -21794,7 +21794,6 @@ func TestValidateHostUsers(t *testing.T) {
 			}},
 		},
 	}, {
-		// It should ignore unsupported volumes with hostUsers=true.
 		name:    "hostUsers=true - unsupported volume",
 		success: true,
 		spec: &core.PodSpec{

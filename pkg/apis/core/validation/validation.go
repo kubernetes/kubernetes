@@ -3256,25 +3256,6 @@ func validateHostUsers(spec *core.PodSpec, fldPath *field.Path) field.ErrorList 
 		return allErrs
 	}
 
-	// For now only these volumes are supported:
-	// - configmap
-	// - secret
-	// - downwardAPI
-	// - emptyDir
-	// - projected
-	// So reject anything else.
-	for i, vol := range spec.Volumes {
-		switch {
-		case vol.EmptyDir != nil:
-		case vol.Secret != nil:
-		case vol.DownwardAPI != nil:
-		case vol.ConfigMap != nil:
-		case vol.Projected != nil:
-		default:
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("volumes").Index(i), "volume type not supported when `pod.Spec.HostUsers` is false"))
-		}
-	}
-
 	// We decided to restrict the usage of userns with other host namespaces:
 	// 	https://github.com/kubernetes/kubernetes/pull/111090#discussion_r935994282
 	// The tl;dr is: you can easily run into permission issues that seem unexpected, we don't
