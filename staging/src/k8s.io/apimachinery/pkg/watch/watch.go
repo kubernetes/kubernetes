@@ -49,7 +49,7 @@ const (
 )
 
 var (
-	DefaultChanSize int32 = 100
+	DefaultChanSize int32 = 200
 )
 
 // Event represents a single event to a watched resource.
