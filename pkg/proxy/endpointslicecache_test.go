@@ -454,7 +454,7 @@ func TestEsDataChanged(t *testing.T) {
 				t.Fatalf("Expected no error calling endpointSliceCacheKeys(): %v", err)
 			}
 
-			esData := newEndpointSliceData(tc.updatedSlice, false)
+			esData := &endpointSliceData{tc.updatedSlice, false}
 			changed := tc.cache.esDataChanged(serviceKey, sliceKey, esData)
 
 			if tc.expectChanged != changed {
