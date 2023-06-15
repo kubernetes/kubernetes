@@ -41,7 +41,10 @@ var (
 		TimeZone:          pointer.String("Asia/Shanghai"),
 		JobTemplate: batch.JobTemplateSpec{
 			Spec: batch.JobSpec{
-				Template: validPodTemplateSpec,
+				Template:       validPodTemplateSpec,
+				CompletionMode: completionModePtr(batch.IndexedCompletion),
+				Completions:    pointer.Int32(10),
+				Parallelism:    pointer.Int32(10),
 			},
 		},
 	}
@@ -56,6 +59,10 @@ var (
 		},
 	}
 )
+
+func completionModePtr(m batch.CompletionMode) *batch.CompletionMode {
+	return &m
+}
 
 func TestCronJobStrategy(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
