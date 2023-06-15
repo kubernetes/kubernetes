@@ -227,7 +227,7 @@ func MapIPsByIPFamily(ipStrings []string) map[v1.IPFamily][]string {
 	ipFamilyMap := map[v1.IPFamily][]string{}
 	for _, ip := range ipStrings {
 		// Handle only the valid IPs
-		if ipFamily, err := getIPFamilyFromIP(ip); err == nil {
+		if ipFamily := getIPFamilyFromIP(ip); ipFamily != "" {
 			ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], ip)
 		} else {
 			// this function is called in multiple places. All of which
@@ -249,7 +249,7 @@ func MapCIDRsByIPFamily(cidrStrings []string) map[v1.IPFamily][]string {
 	ipFamilyMap := map[v1.IPFamily][]string{}
 	for _, cidr := range cidrStrings {
 		// Handle only the valid CIDRs
-		if ipFamily, err := getIPFamilyFromCIDR(cidr); err == nil {
+		if ipFamily := getIPFamilyFromCIDR(cidr); ipFamily != "" {
 			ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], cidr)
 		} else {
 			klog.ErrorS(nil, "Skipping invalid CIDR", "cidr", cidr)
@@ -258,27 +258,29 @@ func MapCIDRsByIPFamily(cidrStrings []string) map[v1.IPFamily][]string {
 	return ipFamilyMap
 }
 
-func getIPFamilyFromIP(ipStr string) (v1.IPFamily, error) {
+// Returns the IP family of ipStr, or "" if ipStr can't be parsed as an IP
+func getIPFamilyFromIP(ipStr string) v1.IPFamily {
 	netIP := netutils.ParseIPSloppy(ipStr)
 	if netIP == nil {
-		return "", ErrAddressNotAllowed
+		return ""
 	}
 
 	if netutils.IsIPv6(netIP) {
-		return v1.IPv6Protocol, nil
+		return v1.IPv6Protocol
 	}
-	return v1.IPv4Protocol, nil
+	return v1.IPv4Protocol
 }
 
-func getIPFamilyFromCIDR(cidrStr string) (v1.IPFamily, error) {
+// Returns the IP family of cidrStr, or "" if cidrStr can't be parsed as a CIDR
+func getIPFamilyFromCIDR(cidrStr string) v1.IPFamily {
 	_, netCIDR, err := netutils.ParseCIDRSloppy(cidrStr)
 	if err != nil {
-		return "", ErrAddressNotAllowed
+		return ""
 	}
 	if netutils.IsIPv6CIDR(netCIDR) {
-		return v1.IPv6Protocol, nil
+		return v1.IPv6Protocol
 	}
-	return v1.IPv4Protocol, nil
+	return v1.IPv4Protocol
 }
 
 // OtherIPFamily returns the other ip family
