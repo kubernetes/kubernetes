@@ -840,6 +840,11 @@ func (p *podWorkers) UpdatePod(options UpdatePodOptions) {
 	// once a pod is terminated by UID, it cannot reenter the pod worker (until the UID is purged by housekeeping)
 	if status.IsFinished() {
 		klog.V(4).InfoS("Pod is finished processing, no further updates", "pod", klog.KRef(ns, name), "podUID", uid, "updateType", options.UpdateType)
+		if options.KillPodOptions != nil {
+			if ch := options.KillPodOptions.CompletedCh; ch != nil {
+				close(ch)
+			}
+		}
 		return
 	}
 
