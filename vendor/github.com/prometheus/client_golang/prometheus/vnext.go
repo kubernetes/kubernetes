@@ -1,4 +1,4 @@
-// Copyright 2020 The Prometheus Authors
+// Copyright 2022 The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -11,9 +11,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build linux && !386 && !amd64 && !arm && !arm64 && !loong64 && !mips && !mips64 && !mips64le && !mipsle && !ppc64 && !ppc64le && !riscv64 && !s390x
-// +build linux,!386,!amd64,!arm,!arm64,!loong64,!mips,!mips64,!mips64le,!mipsle,!ppc64,!ppc64le,!riscv64,!s390x
+package prometheus
 
-package procfs
+type v2 struct{}
 
-var parseCPUInfo = parseCPUInfoDummy
+// V2 is a struct that can be referenced to access experimental API that might
+// be present in v2 of client golang someday. It offers extended functionality
+// of v1 with slightly changed API. It is acceptable to use some pieces from v1
+// and e.g `prometheus.NewGauge` and some from v2 e.g. `prometheus.V2.NewDesc`
+// in the same codebase.
+var V2 = v2{}

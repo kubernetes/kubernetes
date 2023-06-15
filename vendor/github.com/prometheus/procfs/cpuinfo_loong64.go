@@ -1,4 +1,4 @@
-// Copyright 2020 The Prometheus Authors
+// Copyright 2022 The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -11,9 +11,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build linux && !386 && !amd64 && !arm && !arm64 && !loong64 && !mips && !mips64 && !mips64le && !mipsle && !ppc64 && !ppc64le && !riscv64 && !s390x
-// +build linux,!386,!amd64,!arm,!arm64,!loong64,!mips,!mips64,!mips64le,!mipsle,!ppc64,!ppc64le,!riscv64,!s390x
+//go:build linux
+// +build linux
 
 package procfs
 
-var parseCPUInfo = parseCPUInfoDummy
+var parseCPUInfo = parseCPUInfoLoong

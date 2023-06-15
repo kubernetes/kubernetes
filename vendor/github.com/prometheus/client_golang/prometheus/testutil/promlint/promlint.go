@@ -287,17 +287,15 @@ func lintUnitAbbreviations(mf *dto.MetricFamily) []Problem {
 func metricUnits(m string) (unit, base string, ok bool) {
 	ss := strings.Split(m, "_")
 
-	for unit, base := range units {
-		// Also check for "no prefix".
-		for _, p := range append(unitPrefixes, "") {
-			for _, s := range ss {
-				// Attempt to explicitly match a known unit with a known prefix,
-				// as some words may look like "units" when matching suffix.
-				//
-				// As an example, "thermometers" should not match "meters", but
-				// "kilometers" should.
-				if s == p+unit {
-					return p + unit, base, true
+	for _, s := range ss {
+		if base, found := units[s]; found {
+			return s, base, true
+		}
+
+		for _, p := range unitPrefixes {
+			if strings.HasPrefix(s, p) {
+				if base, found := units[s[len(p):]]; found {
+					return s, base, true
 				}
 			}
 		}

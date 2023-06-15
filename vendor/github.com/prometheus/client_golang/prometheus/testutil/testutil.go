@@ -238,6 +238,7 @@ func convertReaderToMetricFamily(reader io.Reader) ([]*dto.MetricFamily, error) 
 func compareMetricFamilies(got, expected []*dto.MetricFamily, metricNames ...string) error {
 	if metricNames != nil {
 		got = filterMetrics(got, metricNames)
+		expected = filterMetrics(expected, metricNames)
 	}
 
 	return compare(got, expected)
