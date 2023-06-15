@@ -18,6 +18,7 @@ import (
 	"github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/sysctl"
 	"github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/user"
 	sccutil "github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/util"
+	podhelpers "k8s.io/kubernetes/pkg/apis/core/pods"
 )
 
 // used to pass in the field being validated for reusable group strategies so they
@@ -347,17 +348,10 @@ func (s *simpleProvider) ValidateContainerSecurityContext(pod *api.Pod, containe
 	}
 
 	if !s.scc.AllowHostPorts {
-		containersPath := fldPath.Child("containers")
-		for idx, c := range pod.Spec.Containers {
-			idxPath := containersPath.Index(idx)
-			allErrs = append(allErrs, s.hasHostPort(&c, idxPath)...)
-		}
-
-		containersPath = fldPath.Child("initContainers")
-		for idx, c := range pod.Spec.InitContainers {
-			idxPath := containersPath.Index(idx)
-			allErrs = append(allErrs, s.hasHostPort(&c, idxPath)...)
-		}
+		podhelpers.VisitContainersWithPath(&pod.Spec, fldPath, func(container *api.Container, path *field.Path) bool {
+			allErrs = append(allErrs, s.hasHostPort(container, path)...)
+			return true
+		})
 	}
 
 	if !s.scc.AllowHostPID && podSC.HostPID() {
