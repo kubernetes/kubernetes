@@ -32,6 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
 
+	"k8s.io/client-go/tools/clientcmd"
+
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
@@ -227,7 +229,7 @@ func (flags *AnnotateFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, arg
 	}
 
 	options.namespace, options.enforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
-	if err != nil {
+	if err != nil && !(options.local && clientcmd.IsEmptyConfig(err)) {
 		return nil, err
 	}
 	options.builder = f.NewBuilder()
