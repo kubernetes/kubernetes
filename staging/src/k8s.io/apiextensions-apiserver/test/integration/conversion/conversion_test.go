@@ -1127,7 +1127,7 @@ var multiVersionFixture = &apiextensionsv1.CustomResourceDefinition{
 								Type: "object",
 								Properties: map[string]apiextensionsv1.JSONSchemaProps{
 									"v1alpha1": {Type: "boolean"},
-									"v1beta1":  {Type: "boolean", Default: jsonPtr(true)},
+									"v1beta1":  {Type: "boolean", Default: &apiextensionsv1.JSON{Object: true}},
 									"v1beta2":  {Type: "boolean"},
 								},
 							},
@@ -1167,7 +1167,7 @@ var multiVersionFixture = &apiextensionsv1.CustomResourceDefinition{
 							"defaults": {
 								Type: "object",
 								Properties: map[string]apiextensionsv1.JSONSchemaProps{
-									"v1alpha1": {Type: "boolean", Default: jsonPtr(true)},
+									"v1alpha1": {Type: "boolean", Default: &apiextensionsv1.JSON{Object: true}},
 									"v1beta1":  {Type: "boolean"},
 									"v1beta2":  {Type: "boolean"},
 								},
@@ -1210,7 +1210,7 @@ var multiVersionFixture = &apiextensionsv1.CustomResourceDefinition{
 								Properties: map[string]apiextensionsv1.JSONSchemaProps{
 									"v1alpha1": {Type: "boolean"},
 									"v1beta1":  {Type: "boolean"},
-									"v1beta2":  {Type: "boolean", Default: jsonPtr(true)},
+									"v1beta2":  {Type: "boolean", Default: &apiextensionsv1.JSON{Object: true}},
 								},
 							},
 						},
@@ -1324,8 +1324,4 @@ func closeOnCall(h http.Handler) (chan struct{}, http.Handler) {
 		})
 		h.ServeHTTP(w, r)
 	})
-}
-
-func jsonPtr(x interface{}) *apiextensionsv1.JSON {
-	return &apiextensionsv1.JSON{Object: x}
 }

@@ -262,7 +262,7 @@ func testDefaulting(t *testing.T, watchCache bool) {
 					}
 					obj.Spec.Versions[i].Schema.OpenAPIV3Schema.Properties[root].Properties[key] = apiextensionsv1.JSONSchemaProps{
 						Type:    "string",
-						Default: jsonPtr(value),
+						Default: &apiextensionsv1.JSON{Object: value},
 					}
 				}
 			}
@@ -700,8 +700,4 @@ func TestCustomResourceDefaultingOfMetaFields(t *testing.T) {
 			})
 		}
 	}
-}
-
-func jsonPtr(x interface{}) *apiextensionsv1.JSON {
-	return apiextensionsv1.JSON{Object: x}
 }

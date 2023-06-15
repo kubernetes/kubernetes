@@ -27,11 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-func jsonPtr(x interface{}) *apiextensions.JSON {
-	ret := apiextensions.JSON{Object: x}
-	return &ret
-}
-
 func TestDefaultValidationWithCostBudget(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -57,7 +52,7 @@ func TestDefaultValidationWithCostBudget(t *testing.T) {
 													Rule: "self == 'singleton'",
 												},
 											},
-											Default: jsonPtr("singleton"),
+											Default: &apiextensions.JSON{Object: "singleton"},
 										},
 									},
 								},
@@ -70,7 +65,7 @@ func TestDefaultValidationWithCostBudget(t *testing.T) {
 									Rule: "self.startsWith('kube')",
 								},
 							},
-							Default: jsonPtr("kube-everything"),
+							Default: &apiextensions.JSON{Object: "kube-everything"},
 						},
 						"object": {
 							Type: "object",
@@ -87,7 +82,7 @@ func TestDefaultValidationWithCostBudget(t *testing.T) {
 									Rule: "self.field1 < self.field2",
 								},
 							},
-							Default: jsonPtr(map[string]interface{}{"field1": 1, "field2": 2}),
+							Default: &apiextensions.JSON{Object: map[string]interface{}{"field1": 1, "field2": 2}},
 						},
 					},
 				},
