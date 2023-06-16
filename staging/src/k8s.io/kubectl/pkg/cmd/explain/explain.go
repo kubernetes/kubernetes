@@ -52,7 +52,7 @@ var (
 		kubectl explain pods --recursive
 
 		# Get the explanation for deployment in supported api versions
-		kubectl explain deployments --api-version=v1beta2
+		kubectl explain deployments --api-version=apps/v1
 
 		# Get the documentation of a specific field of a resource
 		kubectl explain pods.spec.containers
@@ -97,7 +97,7 @@ func NewCmdExplain(parent string, f cmdutil.Factory, streams genericiooptions.IO
 	o := NewExplainOptions(parent, streams)
 
 	cmd := &cobra.Command{
-		Use:                   "explain TYPE [--recursive=FALSE|TRUE] [--api-version=api-version-group] [--output=plaintext|plaintext-openapiv2|plaintext-openapiv3]",
+		Use:                   "explain TYPE [--recursive=FALSE|TRUE] [--api-version=api-version-group] [--output=plaintext|plaintext-openapiv2]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Get documentation for a resource"),
 		Long:                  explainLong + "\n\n" + cmdutil.SuggestAPIResources(parent),
@@ -109,7 +109,7 @@ func NewCmdExplain(parent string, f cmdutil.Factory, streams genericiooptions.IO
 		},
 	}
 	cmd.Flags().BoolVar(&o.Recursive, "recursive", o.Recursive, "When true, print the name of all the fields recursively. Otherwise, print the available fields with their description.")
-	cmd.Flags().StringVar(&o.APIVersion, "api-version", o.APIVersion, "The resource explanation for a particular API version/group will be displayed.")
+	cmd.Flags().StringVar(&o.APIVersion, "api-version", o.APIVersion, "Use given api-version (group/version) of the resource.")
 
 	// Only enable --output as a valid flag if the feature is enabled
 	cmd.Flags().StringVar(&o.OutputFormat, "output", plaintextTemplateName, "Format in which to render the schema. Valid values are: (plaintext, plaintext-openapiv2).")
