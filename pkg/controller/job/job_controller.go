@@ -69,10 +69,14 @@ const (
 var controllerKind = batch.SchemeGroupVersion.WithKind("Job")
 
 var (
-	// DefaultJobBackOff is the default backoff period. Exported for tests.
-	DefaultJobBackOff = 10 * time.Second
-	// MaxJobBackOff is the max backoff period. Exported for tests.
-	MaxJobBackOff = 360 * time.Second
+	// DefaultJobApiBackOff is the default backoff period. Exported for tests.
+	DefaultJobApiBackOff = 1 * time.Second
+	// MaxJobApiBackOff is the max backoff period. Exported for tests.
+	MaxJobApiBackOff = 60 * time.Second
+	// DefaultJobPodFailureBackOff is the default backoff period. Exported for tests.
+	DefaultJobPodFailureBackOff = 10 * time.Second
+	// MaxJobPodFailureBackOff is the max backoff period. Exported for tests.
+	MaxJobPodFailureBackOff = 360 * time.Second
 	// MaxUncountedPods is the maximum size the slices in
 	// .status.uncountedTerminatedPods should have to keep their representation
 	// roughly below 20 KB. Exported for tests
@@ -148,8 +152,8 @@ func newControllerWithClock(ctx context.Context, podInformer coreinformers.PodIn
 		},
 		expectations:          controller.NewControllerExpectations(),
 		finalizerExpectations: newUIDTrackingExpectations(),
-		queue:                 workqueue.NewRateLimitingQueueWithDelayingInterface(workqueue.NewDelayingQueueWithCustomClock(clock, "job"), workqueue.NewItemExponentialFailureRateLimiter(DefaultJobBackOff, MaxJobBackOff)),
-		orphanQueue:           workqueue.NewRateLimitingQueueWithDelayingInterface(workqueue.NewDelayingQueueWithCustomClock(clock, "job_orphan_pod"), workqueue.NewItemExponentialFailureRateLimiter(DefaultJobBackOff, MaxJobBackOff)),
+		queue:                 workqueue.NewRateLimitingQueueWithDelayingInterface(workqueue.NewDelayingQueueWithCustomClock(clock, "job"), workqueue.NewItemExponentialFailureRateLimiter(DefaultJobApiBackOff, MaxJobApiBackOff)),
+		orphanQueue:           workqueue.NewRateLimitingQueueWithDelayingInterface(workqueue.NewDelayingQueueWithCustomClock(clock, "job_orphan_pod"), workqueue.NewItemExponentialFailureRateLimiter(DefaultJobApiBackOff, MaxJobApiBackOff)),
 		broadcaster:           eventBroadcaster,
 		recorder:              eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "job-controller"}),
 		clock:                 clock,
@@ -1436,7 +1440,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, activePods 
 	}
 
 	if active < wantActive {
-		remainingTime := newBackoffRecord.getRemainingTime(jm.clock, DefaultJobBackOff, MaxJobBackOff)
+		remainingTime := newBackoffRecord.getRemainingTime(jm.clock, DefaultJobPodFailureBackOff, MaxJobPodFailureBackOff)
 		if remainingTime > 0 {
 			jm.enqueueSyncJobWithDelay(logger, job, remainingTime)
 			return 0, metrics.JobSyncActionPodsCreated, nil

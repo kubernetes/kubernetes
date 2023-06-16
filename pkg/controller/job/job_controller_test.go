@@ -3106,8 +3106,8 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 func TestSyncJobUpdateRequeue(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-	defer func() { DefaultJobBackOff = 10 * time.Second }()
-	DefaultJobBackOff = time.Duration(0) // overwrite the default value for testing
+	defer func() { DefaultJobApiBackOff = 1 * time.Second }()
+	DefaultJobApiBackOff = time.Duration(0) // overwrite the default value for testing
 	cases := map[string]struct {
 		updateErr               error
 		wantRequeuedImmediately bool
@@ -3136,7 +3136,7 @@ func TestSyncJobUpdateRequeue(t *testing.T) {
 			sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 			manager.queue.Add(testutil.GetKey(job, t))
 			manager.processNextWorkItem(context.TODO())
-			// With DefaultJobBackOff=0, the queueing is synchronous.
+			// With DefaultJobApiBackOff=0, the queueing is synchronous.
 			requeued := manager.queue.Len() > 0
 			if requeued != tc.wantRequeuedImmediately {
 				t.Errorf("Unexpected requeue, got %t, want %t", requeued, tc.wantRequeuedImmediately)
@@ -3934,8 +3934,8 @@ func TestJobBackoffReset(t *testing.T) {
 
 	for name, tc := range testCases {
 		clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-		defer func() { DefaultJobBackOff = 10 * time.Second }()
-		DefaultJobBackOff = time.Duration(0) // overwrite the default value for testing
+		defer func() { DefaultJobApiBackOff = 1 * time.Second }()
+		DefaultJobApiBackOff = time.Duration(0) // overwrite the default value for testing
 		manager, sharedInformerFactory := newControllerFromClient(ctx, clientset, controller.NoResyncPeriodFunc)
 		fakePodControl := controller.FakePodControl{}
 		manager.podControl = &fakePodControl

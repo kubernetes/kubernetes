@@ -1379,9 +1379,9 @@ func TestFinalizersClearedWhenBackoffLimitExceeded(t *testing.T) {
 
 func TestJobPodsCreatedWithExponentialBackoff(t *testing.T) {
 	// overwrite the default value for faster testing
-	oldBackoff := jobcontroller.DefaultJobBackOff
-	defer func() { jobcontroller.DefaultJobBackOff = oldBackoff }()
-	jobcontroller.DefaultJobBackOff = 2 * time.Second
+	oldBackoff := jobcontroller.DefaultJobPodFailureBackOff
+	defer func() { jobcontroller.DefaultJobPodFailureBackOff = oldBackoff }()
+	jobcontroller.DefaultJobPodFailureBackOff = 2 * time.Second
 
 	closeFn, restConfig, clientSet, ns := setup(t, "simple")
 	defer closeFn()
@@ -1441,25 +1441,25 @@ func TestJobPodsCreatedWithExponentialBackoff(t *testing.T) {
 		return finishTime[i].Before(finishTime[j])
 	})
 
-	if creationTime[1].Sub(finishTime[0]).Seconds() < jobcontroller.DefaultJobBackOff.Seconds() {
-		t.Fatalf("Second pod should be created at least %v seconds after the first pod", jobcontroller.DefaultJobBackOff)
+	if creationTime[1].Sub(finishTime[0]).Seconds() < jobcontroller.DefaultJobPodFailureBackOff.Seconds() {
+		t.Fatalf("Second pod should be created at least %v seconds after the first pod", jobcontroller.DefaultJobPodFailureBackOff)
 	}
 
-	if creationTime[1].Sub(finishTime[0]).Seconds() >= 2*jobcontroller.DefaultJobBackOff.Seconds() {
-		t.Fatalf("Second pod should be created before %v seconds after the first pod", 2*jobcontroller.DefaultJobBackOff)
+	if creationTime[1].Sub(finishTime[0]).Seconds() >= 2*jobcontroller.DefaultJobPodFailureBackOff.Seconds() {
+		t.Fatalf("Second pod should be created before %v seconds after the first pod", 2*jobcontroller.DefaultJobPodFailureBackOff)
 	}
 
 	diff := creationTime[2].Sub(finishTime[1]).Seconds()
 
 	// The third pod should not be created before 4 seconds
-	if diff < 2*jobcontroller.DefaultJobBackOff.Seconds() {
-		t.Fatalf("Third pod should be created at least %v seconds after the second pod", 2*jobcontroller.DefaultJobBackOff)
+	if diff < 2*jobcontroller.DefaultJobPodFailureBackOff.Seconds() {
+		t.Fatalf("Third pod should be created at least %v seconds after the second pod", 2*jobcontroller.DefaultJobPodFailureBackOff)
 	}
 
 	// The third pod should be created within 8 seconds
 	// This check rules out double counting
-	if diff >= 4*jobcontroller.DefaultJobBackOff.Seconds() {
-		t.Fatalf("Third pod should be created before %v seconds after the second pod", 4*jobcontroller.DefaultJobBackOff)
+	if diff >= 4*jobcontroller.DefaultJobPodFailureBackOff.Seconds() {
+		t.Fatalf("Third pod should be created before %v seconds after the second pod", 4*jobcontroller.DefaultJobPodFailureBackOff)
 	}
 }
 
