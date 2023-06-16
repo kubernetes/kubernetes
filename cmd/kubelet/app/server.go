@@ -35,6 +35,8 @@ import (
 	"github.com/coreos/go-systemd/v22/daemon"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 
@@ -76,6 +78,7 @@ import (
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
 	nodeutil "k8s.io/component-helpers/node/util"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -627,6 +630,13 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 
 	if err := kubelet.PreInitRuntimeService(&s.KubeletConfiguration, kubeDeps); err != nil {
 		return err
+	}
+
+	// Get cgroup driver setting from CRI
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletCgroupDriverFromCRI) {
+		if err := getCgroupDriverFromCRI(ctx, s, kubeDeps); err != nil {
+			return err
+		}
 	}
 
 	var cgroupRoots []string
@@ -1280,4 +1290,29 @@ func newTracerProvider(s *options.KubeletServer) (oteltrace.TracerProvider, erro
 		return nil, fmt.Errorf("could not configure tracer provider: %w", err)
 	}
 	return tp, nil
+}
+
+func getCgroupDriverFromCRI(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Dependencies) error {
+	klog.V(4).InfoS("Getting CRI runtime configuration information")
+	runtimeConfig, err := kubeDeps.RemoteRuntimeService.RuntimeConfig(ctx)
+	if err != nil {
+		s, ok := status.FromError(err)
+		if !ok || s.Code() != codes.Unimplemented {
+			return err
+		}
+		// CRI implementation doesn't support RuntimeConfig, fallback
+		klog.InfoS("CRI implementation should be updated to support RuntimeConfig when KubeletCgroupDriverFromCRI feature gate has been enabled. Falling back to using cgroupDriver from kubelet config.")
+		return nil
+	}
+
+	switch d := runtimeConfig.GetLinux().GetCgroupDriver(); d {
+	case runtimeapi.CgroupDriver_SYSTEMD:
+		s.CgroupDriver = "systemd"
+	case runtimeapi.CgroupDriver_CGROUPFS:
+		s.CgroupDriver = "cgroupfs"
+	default:
+		return fmt.Errorf("runtime returned an unknown cgroup driver %d", d)
+	}
+	klog.InfoS("Using cgroup driver setting received from the CRI runtime", "cgroupDriver", s.CgroupDriver)
+	return nil
 }
