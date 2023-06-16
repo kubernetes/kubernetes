@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	enjson "encoding/json"
 	"fmt"
 	"math"
 	"reflect"
@@ -168,7 +169,7 @@ func TestCompatibility(t *testing.T) {
 			expectAllFields: true,
 			expectConfig: LoggingConfiguration{
 				Format:         JSONLogFormat,
-				FlushFrequency: time.Nanosecond,
+				FlushFrequency: TimeOrMetaDuration{Duration: time.Nanosecond},
 				Verbosity:      VerbosityLevel(5),
 				VModule: VModuleConfiguration{
 					{
@@ -263,4 +264,49 @@ func notZeroRecursive(t *testing.T, i interface{}, path string) bool {
 	}
 
 	return valid
+}
+
+func TestTimeOrMetaDuration_UnmarshalJSON(t *testing.T) {
+	tests := []struct {
+		name   string
+		tomd   *TimeOrMetaDuration
+		arg    any
+		wanted string
+	}{
+		{
+			name:   "string values unmarshal as metav1.Duration",
+			tomd:   &TimeOrMetaDuration{},
+			arg:    "1s",
+			wanted: "1s",
+		}, {
+			name:   "int values unmarshal as metav1.Duration",
+			tomd:   &TimeOrMetaDuration{},
+			arg:    1000000000,
+			wanted: "1s",
+		}, {
+			name:   "invalid value return error",
+			tomd:   &TimeOrMetaDuration{},
+			arg:    "invalid",
+			wanted: "time: invalid duration \"invalid\"",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b, err := enjson.Marshal(tt.arg)
+			if err != nil {
+				t.Errorf("unexpect error: %v", err)
+			}
+
+			if err := tt.tomd.UnmarshalJSON(b); err == nil {
+				if tt.wanted != tt.tomd.String() {
+					t.Errorf("unexpected wanted for %s, wanted: %v, got: %v", tt.name, tt.wanted, tt.tomd.String())
+				}
+			} else {
+				if err.Error() != tt.wanted {
+					t.Errorf("UnmarshalJSON() error = %v", err)
+				}
+			}
+		})
+	}
+
 }

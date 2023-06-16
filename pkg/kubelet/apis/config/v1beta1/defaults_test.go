@@ -115,7 +115,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				VolumePluginDir:                           DefaultVolumePluginDir,
 				Logging: logsapi.LoggingConfiguration{
 					Format:         "text",
-					FlushFrequency: 5 * time.Second,
+					FlushFrequency: logsapi.TimeOrMetaDuration{Duration: 5 * time.Second},
 				},
 				EnableSystemLogHandler:        utilpointer.Bool(true),
 				EnableProfilingHandler:        utilpointer.Bool(true),
@@ -239,7 +239,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				KernelMemcgNotification:     false,
 				Logging: logsapi.LoggingConfiguration{
 					Format:         "",
-					FlushFrequency: 5 * time.Second,
+					FlushFrequency: logsapi.TimeOrMetaDuration{Duration: 5 * time.Second},
 				},
 				EnableSystemLogHandler:          utilpointer.Bool(false),
 				ShutdownGracePeriod:             zeroDuration,
@@ -339,7 +339,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				VolumePluginDir:        DefaultVolumePluginDir,
 				Logging: logsapi.LoggingConfiguration{
 					Format:         "text",
-					FlushFrequency: 5 * time.Second,
+					FlushFrequency: logsapi.TimeOrMetaDuration{Duration: 5 * time.Second},
 				},
 				EnableSystemLogHandler:        utilpointer.Bool(false),
 				ReservedMemory:                []v1beta1.MemoryReservation{},
@@ -481,7 +481,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				KernelMemcgNotification:     true,
 				Logging: logsapi.LoggingConfiguration{
 					Format:         "json",
-					FlushFrequency: 5 * time.Second,
+					FlushFrequency: logsapi.TimeOrMetaDuration{Duration: 5 * time.Second},
 				},
 				EnableSystemLogHandler:          utilpointer.Bool(true),
 				ShutdownGracePeriod:             metav1.Duration{Duration: 60 * time.Second},
@@ -627,7 +627,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				KernelMemcgNotification:     true,
 				Logging: logsapi.LoggingConfiguration{
 					Format:         "json",
-					FlushFrequency: 5 * time.Second,
+					FlushFrequency: logsapi.TimeOrMetaDuration{Duration: 5 * time.Second},
 				},
 				EnableSystemLogHandler:          utilpointer.Bool(true),
 				ShutdownGracePeriod:             metav1.Duration{Duration: 60 * time.Second},
@@ -724,7 +724,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				VolumePluginDir:                           DefaultVolumePluginDir,
 				Logging: logsapi.LoggingConfiguration{
 					Format:         "text",
-					FlushFrequency: 5 * time.Second,
+					FlushFrequency: logsapi.TimeOrMetaDuration{Duration: 5 * time.Second},
 				},
 				EnableSystemLogHandler:        utilpointer.Bool(true),
 				EnableProfilingHandler:        utilpointer.Bool(true),
@@ -813,7 +813,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				VolumePluginDir:                           DefaultVolumePluginDir,
 				Logging: logsapi.LoggingConfiguration{
 					Format:         "text",
-					FlushFrequency: 5 * time.Second,
+					FlushFrequency: logsapi.TimeOrMetaDuration{Duration: 5 * time.Second},
 				},
 				EnableSystemLogHandler:        utilpointer.Bool(true),
 				EnableProfilingHandler:        utilpointer.Bool(true),
@@ -902,7 +902,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				VolumePluginDir:                           DefaultVolumePluginDir,
 				Logging: logsapi.LoggingConfiguration{
 					Format:         "text",
-					FlushFrequency: 5 * time.Second,
+					FlushFrequency: logsapi.TimeOrMetaDuration{Duration: 5 * time.Second},
 				},
 				EnableSystemLogHandler:        utilpointer.Bool(true),
 				EnableProfilingHandler:        utilpointer.Bool(true),

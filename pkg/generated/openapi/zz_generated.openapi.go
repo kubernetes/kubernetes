@@ -53901,12 +53901,19 @@ func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyConfiguration(ref common.R
 							Ref:         ref("k8s.io/kube-proxy/config/v1alpha1.DetectLocalConfiguration"),
 						},
 					},
+					"logging": {
+						SchemaProps: spec.SchemaProps{
+							Description: "logging specifies the options of logging. Refer to [Logs Options](https://github.com/kubernetes/component-base/blob/master/logs/options.go) for more information.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/component-base/logs/api/v1.LoggingConfiguration"),
+						},
+					},
 				},
 				Required: []string{"bindAddress", "healthzBindAddress", "metricsBindAddress", "bindAddressHardFail", "enableProfiling", "clusterCIDR", "hostnameOverride", "clientConnection", "iptables", "ipvs", "oomScoreAdj", "mode", "portRange", "conntrack", "configSyncPeriod", "nodePortAddresses", "winkernel", "showHiddenMetricsForVersion", "detectLocalMode", "detectLocal"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.Duration", "k8s.io/component-base/config/v1alpha1.ClientConnectionConfiguration", "k8s.io/kube-proxy/config/v1alpha1.DetectLocalConfiguration", "k8s.io/kube-proxy/config/v1alpha1.KubeProxyConntrackConfiguration", "k8s.io/kube-proxy/config/v1alpha1.KubeProxyIPTablesConfiguration", "k8s.io/kube-proxy/config/v1alpha1.KubeProxyIPVSConfiguration", "k8s.io/kube-proxy/config/v1alpha1.KubeProxyWinkernelConfiguration"},
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Duration", "k8s.io/component-base/config/v1alpha1.ClientConnectionConfiguration", "k8s.io/component-base/logs/api/v1.LoggingConfiguration", "k8s.io/kube-proxy/config/v1alpha1.DetectLocalConfiguration", "k8s.io/kube-proxy/config/v1alpha1.KubeProxyConntrackConfiguration", "k8s.io/kube-proxy/config/v1alpha1.KubeProxyIPTablesConfiguration", "k8s.io/kube-proxy/config/v1alpha1.KubeProxyIPVSConfiguration", "k8s.io/kube-proxy/config/v1alpha1.KubeProxyWinkernelConfiguration"},
 	}
 }
 
