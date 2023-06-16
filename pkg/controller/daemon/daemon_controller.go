@@ -761,6 +761,12 @@ func (dsc *DaemonSetsController) getNodesToDaemonPods(ctx context.Context, ds *a
 	nodeToDaemonPods := make(map[string][]*v1.Pod)
 	logger := klog.FromContext(ctx)
 	for _, pod := range claimedPods {
+		if podutil.IsPodTerminal(pod) && pod.DeletionTimestamp != nil {
+			// This Pod has a finalizer or is already scheduled for deletion by the
+			// kubelet or the Pod GC. The DS controller doesn't have anything else to
+			// do with it.
+			continue
+		}
 		nodeName, err := util.GetTargetNodeName(pod)
 		if err != nil {
 			logger.Info("Failed to get target node name of Pod in DaemonSet",
