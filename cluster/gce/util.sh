@@ -774,8 +774,8 @@ function construct-linux-kubelet-flags {
     # Keep the values of --image-credential-provider-config and --image-credential-provider-bin-dir
     # in sync with value of auth_config_file and auth_provider_dir set in install-auth-provider-gcp function
     # in gci/configure.sh.
-    flags+="  --image-credential-provider-config=/home/kubernetes/cri_auth_config.yaml"
-    flags+="  --image-credential-provider-bin-dir=/home/kubernetes/bin"
+    flags+="  --image-credential-provider-config=${AUTH_PROVIDER_GCP_LINUX_CONF_FILE}"
+    flags+="  --image-credential-provider-bin-dir=${AUTH_PROVIDER_GCP_LINUX_BIN_DIR}"
   fi
 
   if [[ "${node_type}" == "master" ]]; then
@@ -879,6 +879,13 @@ function construct-windows-kubelet-flags {
 
   WINDOWS_CONTAINER_RUNTIME_ENDPOINT=${KUBE_WINDOWS_CONTAINER_RUNTIME_ENDPOINT:-npipe:////./pipe/containerd-containerd}
   flags+=" --container-runtime-endpoint=${WINDOWS_CONTAINER_RUNTIME_ENDPOINT}"
+
+  # If ENABLE_AUTH_PROVIDER_GCP is set to true, kubelet is enabled to use out-of-tree auth
+  # credential provider. https://kubernetes.io/docs/tasks/kubelet-credential-provider/kubelet-credential-provider
+  if [[ "${ENABLE_AUTH_PROVIDER_GCP:-false}" == "true" ]]; then
+    flags+="  --image-credential-provider-config=${AUTH_PROVIDER_GCP_WINDOWS_CONF_FILE}"
+    flags+="  --image-credential-provider-bin-dir=${AUTH_PROVIDER_GCP_WINDOWS_BIN_DIR}"
+  fi
 
   KUBELET_ARGS="${flags}"
 }
@@ -1215,6 +1222,10 @@ ${CUSTOM_CALICO_NODE_DAEMONSET_YAML//\'/\'\'}
 CUSTOM_TYPHA_DEPLOYMENT_YAML: |
 ${CUSTOM_TYPHA_DEPLOYMENT_YAML//\'/\'\'}
 CONCURRENT_SERVICE_SYNCS: $(yaml-quote "${CONCURRENT_SERVICE_SYNCS:-}")
+AUTH_PROVIDER_GCP_STORAGE_PATH: $(yaml-quote "${AUTH_PROVIDER_GCP_STORAGE_PATH}")
+AUTH_PROVIDER_GCP_VERSION: $(yaml-quote "${AUTH_PROVIDER_GCP_VERSION}")
+AUTH_PROVIDER_GCP_LINUX_BIN_DIR: $(yaml-quote "${AUTH_PROVIDER_GCP_LINUX_BIN_DIR}")
+AUTH_PROVIDER_GCP_LINUX_CONF_FILE: $(yaml-quote "${AUTH_PROVIDER_GCP_LINUX_CONF_FILE}")
 EOF
   if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "gci" ]] || \
      [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "gci" ]]  || \
@@ -1597,6 +1608,11 @@ NODE_PROBLEM_DETECTOR_RELEASE_PATH: $(yaml-quote "${NODE_PROBLEM_DETECTOR_RELEAS
 NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS: $(yaml-quote "${WINDOWS_NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS}")
 NODE_PROBLEM_DETECTOR_TOKEN: $(yaml-quote "${NODE_PROBLEM_DETECTOR_TOKEN:-}")
 WINDOWS_NODEPROBLEMDETECTOR_KUBECONFIG_FILE: $(yaml-quote "${WINDOWS_NODEPROBLEMDETECTOR_KUBECONFIG_FILE}")
+AUTH_PROVIDER_GCP_STORAGE_PATH: $(yaml-quote "${AUTH_PROVIDER_GCP_STORAGE_PATH}")
+AUTH_PROVIDER_GCP_VERSION: $(yaml-quote "${AUTH_PROVIDER_GCP_VERSION}")
+AUTH_PROVIDER_GCP_HASH_WINDOWS_AMD64: $(yaml-quote "${AUTH_PROVIDER_GCP_HASH_WINDOWS_AMD64}")
+AUTH_PROVIDER_GCP_WINDOWS_BIN_DIR: $(yaml-quote "${AUTH_PROVIDER_GCP_WINDOWS_BIN_DIR}")
+AUTH_PROVIDER_GCP_WINDOWS_CONF_FILE: $(yaml-quote "${AUTH_PROVIDER_GCP_WINDOWS_CONF_FILE}")
 EOF
 }
 
