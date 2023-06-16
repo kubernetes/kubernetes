@@ -213,6 +213,27 @@ func TestWarnings(t *testing.T) {
 			},
 		},
 		{
+			name: "PV RBD deprecation warning",
+			template: &api.PersistentVolume{
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						RBD: &api.RBDPersistentVolumeSource{
+							CephMonitors: nil,
+							RBDImage:     "",
+							FSType:       "",
+							RBDPool:      "",
+							RadosUser:    "",
+							Keyring:      "",
+							SecretRef:    nil,
+							ReadOnly:     false,
+						},
+					},
+				},
+			},
+			expected: []string{
+				`spec.rbd: deprecated in v1.28, non-functional in v1.31+`},
+		},
+		{
 			name: "PV ScaleIO deprecation warning",
 			template: &api.PersistentVolume{
 				Spec: api.PersistentVolumeSpec{

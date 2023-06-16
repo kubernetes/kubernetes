@@ -93,8 +93,10 @@ func warningsForPersistentVolumeSpecAndMeta(fieldPath *field.Path, pvSpec *api.P
 		warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.22, non-functional in v1.25+", fieldPath.Child("spec", "persistentVolumeSource").Child("storageOS")))
 	}
 	if pvSpec.Glusterfs != nil {
-		warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.25, non-functional in v1.26+", fieldPath.Child("spec", "persistentVolumeSource").Child("glusterfs")))
+		warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.25, non-functional in v1.26+", fieldPath.Child("spec", "glusterfs")))
 	}
-
+	if pvSpec.RBD != nil {
+		warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.28, non-functional in v1.31+", fieldPath.Child("spec", "rbd")))
+	}
 	return warnings
 }
