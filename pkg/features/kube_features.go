@@ -512,6 +512,7 @@ const (
 	// owner: @xiaoxubeii
 	// kep: https://kep.k8s.io/2570
 	// alpha: v1.22
+	// beta: v1.28
 	//
 	// Enables kubelet to support memory QoS with cgroups v2.
 	MemoryQoS featuregate.Feature = "MemoryQoS"
@@ -984,7 +985,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	MemoryManager: {Default: true, PreRelease: featuregate.Beta},
 
-	MemoryQoS: {Default: false, PreRelease: featuregate.Alpha},
+	MemoryQoS: {Default: true, PreRelease: featuregate.Beta},
 
 	MinDomainsInPodTopologySpread: {Default: true, PreRelease: featuregate.Beta},
 
