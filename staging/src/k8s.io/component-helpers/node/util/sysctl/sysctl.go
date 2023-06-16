@@ -98,3 +98,31 @@ func (*procSysctl) GetSysctl(sysctl string) (int, error) {
 func (*procSysctl) SetSysctl(sysctl string, newVal int) error {
 	return os.WriteFile(path.Join(sysctlBase, sysctl), []byte(strconv.Itoa(newVal)), 0640)
 }
+
+// ConvertSysctlVariableToDotsSeparator can return sysctl variables in dots separator format.
+// The '/' separator is also accepted in place of a '.'.
+// Convert the sysctl variables to dots separator format for validation.
+// More info:
+//
+//	https://man7.org/linux/man-pages/man8/sysctl.8.html
+//	https://man7.org/linux/man-pages/man5/sysctl.d.5.html
+func ConvertSysctlVariableToDotsSeparator(val string) string {
+	if val == "" {
+		return val
+	}
+	firstSepIndex := strings.IndexAny(val, "./")
+	if firstSepIndex == -1 || val[firstSepIndex] == '.' {
+		return val
+	}
+
+	f := func(r rune) rune {
+		switch r {
+		case '.':
+			return '/'
+		case '/':
+			return '.'
+		}
+		return r
+	}
+	return strings.Map(f, val)
+}

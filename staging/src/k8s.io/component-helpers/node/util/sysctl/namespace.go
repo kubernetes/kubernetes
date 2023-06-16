@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2023 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,24 +25,24 @@ type Namespace string
 
 const (
 	// the Linux IPC namespace
-	ipcNamespace = Namespace("ipc")
+	IpcNamespace = Namespace("ipc")
 
 	// the network namespace
-	netNamespace = Namespace("net")
+	NetNamespace = Namespace("net")
 
 	// the zero value if no namespace is known
-	unknownNamespace = Namespace("")
+	UnknownNamespace = Namespace("")
 )
 
 var namespaces = map[string]Namespace{
-	"kernel.sem": ipcNamespace,
+	"kernel.sem": IpcNamespace,
 }
 
 var prefixNamespaces = map[string]Namespace{
-	"kernel.shm": ipcNamespace,
-	"kernel.msg": ipcNamespace,
-	"fs.mqueue.": ipcNamespace,
-	"net.":       netNamespace,
+	"kernel.shm": IpcNamespace,
+	"kernel.msg": IpcNamespace,
+	"fs.mqueue.": IpcNamespace,
+	"net.":       NetNamespace,
 }
 
 // NamespacedBy returns the namespace of the Linux kernel for a sysctl, or
@@ -56,5 +56,5 @@ func NamespacedBy(val string) Namespace {
 			return ns
 		}
 	}
-	return unknownNamespace
+	return UnknownNamespace
 }
