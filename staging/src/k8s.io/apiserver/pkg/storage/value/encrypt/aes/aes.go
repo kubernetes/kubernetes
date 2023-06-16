@@ -41,6 +41,9 @@ import (
 // TODO comment
 const commonSize = 32
 
+// TODO comment
+const cacheTTL = 10 * time.Minute
+
 type gcm struct {
 	aead      cipher.AEAD
 	nonceFunc func([]byte) error
@@ -191,25 +194,10 @@ func generateKey(length int) (key []byte, err error) {
 
 // TODO comment
 func NewReadOnlyKDFExtendedNonceGCMTransformerFromUniqueKeyUnsafe(key []byte) value.Read {
-	return newReadOnlyExtendedNonceGCMTransformerFromUniqueKeyUnsafe(key, newSimpleCache(clock.RealClock{}, 10*time.Minute))
-}
-
-func newReadOnlyExtendedNonceGCMTransformerFromUniqueKeyUnsafe(key []byte, cache *simpleCache) value.Read {
-	return &readOnlyExtendedNonceGCM{
-		e: &extendedNonceGCM{
-			key:   key,
-			cache: cache,
-		},
+	return &extendedNonceGCM{
+		key:   key,
+		cache: newSimpleCache(clock.RealClock{}, cacheTTL),
 	}
-}
-
-// readOnlyExtendedNonceGCM is just a wrapper that prevents callers from accessing extendedNonceGCM's write method
-type readOnlyExtendedNonceGCM struct {
-	e *extendedNonceGCM
-}
-
-func (r *readOnlyExtendedNonceGCM) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
-	return r.e.TransformFromStorage(ctx, data, dataCtx)
 }
 
 // TODO comment
@@ -218,14 +206,10 @@ func NewKDFExtendedNonceGCMTransformerWithUniqueKeyUnsafe() (value.Transformer, 
 	if err != nil {
 		return nil, nil, err
 	}
-	return newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(key, newSimpleCache(clock.RealClock{}, 10*time.Minute)), key, nil
-}
-
-func newExtendedNonceGCMTransformerWithUniqueKeyUnsafe(key []byte, cache *simpleCache) value.Transformer {
 	return &extendedNonceGCM{
 		key:   key,
-		cache: cache,
-	}
+		cache: newSimpleCache(clock.RealClock{}, cacheTTL),
+	}, key, nil
 }
 
 type extendedNonceGCM struct {
