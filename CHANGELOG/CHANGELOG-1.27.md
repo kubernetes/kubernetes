@@ -1609,6 +1609,7 @@ name | architectures
 - Update the Event series starting count when emitting isomorphic events from 1 to 2. ([#112334](https://github.com/kubernetes/kubernetes/pull/112334), [@dgrisonnet](https://github.com/dgrisonnet)) [SIG API Machinery and Testing]
 - When GCing pods, kube-controller-manager will delete Evicted pods first. ([#116167](https://github.com/kubernetes/kubernetes/pull/116167), [@borgerli](https://github.com/borgerli)) [SIG Apps]
 - Windows CPU usage node stats are now correctly calculated for nodes with multiple Processor Groups. ([#110864](https://github.com/kubernetes/kubernetes/pull/110864), [@claudiubelu](https://github.com/claudiubelu)) [SIG Node, Testing and Windows]
+- In-Place Update of Pod Resources (alpha feature) - resizing of pod may race with other pod updates. ([#116826](https://github.com/kubernetes/kubernetes/issues/116826) [SIG Node])
 
 ### Other (Cleanup or Flake)
 
