@@ -99,14 +99,6 @@ func NewGCMTransformerWithUniqueKeyUnsafe() (value.Transformer, []byte, error) {
 		return nil, nil, err
 	}
 
-	transformer, err := newGCMTransformerWithUniqueKeyUnsafe(block, newNonceGenerator())
-	if err != nil {
-		return nil, nil, err
-	}
-	return transformer, key, nil
-}
-
-func newNonceGenerator() *nonceGenerator {
 	nonceGen := &nonceGenerator{
 		// we start the nonce counter at one billion so that we are
 		// guaranteed to detect rollover across different go routines
@@ -114,7 +106,11 @@ func newNonceGenerator() *nonceGenerator {
 		fatal: die,
 	}
 	nonceGen.nonce.Add(nonceGen.zero)
-	return nonceGen
+	transformer, err := newGCMTransformerWithUniqueKeyUnsafe(block, nonceGen)
+	if err != nil {
+		return nil, nil, err
+	}
+	return transformer, key, nil
 }
 
 func newGCMTransformerWithUniqueKeyUnsafe(block cipher.Block, nonceGen *nonceGenerator) (*gcm, error) {
