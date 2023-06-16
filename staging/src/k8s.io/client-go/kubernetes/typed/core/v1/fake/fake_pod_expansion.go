@@ -68,7 +68,7 @@ func (c *FakePods) GetLogs(name string, opts *v1.PodLogOptions) *restclient.Requ
 		Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
 			resp := &http.Response{
 				StatusCode: http.StatusOK,
-				Body:       io.NopCloser(strings.NewReader("fake logs")),
+				Body:       io.NopCloser(strings.NewReader("2006-01-02T15:04:05.999999999Z07:00 fake logs")),
 			}
 			return resp, nil
 		}),
