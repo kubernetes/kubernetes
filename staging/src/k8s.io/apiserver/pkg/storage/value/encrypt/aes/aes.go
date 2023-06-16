@@ -106,6 +106,7 @@ func NewGCMTransformerWithUniqueKeyUnsafe() (value.Transformer, []byte, error) {
 		fatal: die,
 	}
 	nonceGen.nonce.Add(nonceGen.zero)
+
 	transformer, err := newGCMTransformerWithUniqueKeyUnsafe(block, nonceGen)
 	if err != nil {
 		return nil, nil, err
