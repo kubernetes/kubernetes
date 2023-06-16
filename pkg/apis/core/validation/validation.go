@@ -4562,7 +4562,7 @@ func IsValidSysctlName(name string) bool {
 	return sysctlContainSlashRegexp.MatchString(name)
 }
 
-func validateSysctls(sysctls []core.Sysctl, fldPath *field.Path) field.ErrorList {
+func validateSysctls(sysctls []core.Sysctl, fldPath *field.Path, hostNetwork, hostIPC bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 	names := make(map[string]struct{})
 	for i, s := range sysctls {
@@ -4573,6 +4573,15 @@ func validateSysctls(sysctls []core.Sysctl, fldPath *field.Path) field.ErrorList
 		} else if _, ok := names[s.Name]; ok {
 			allErrs = append(allErrs, field.Duplicate(fldPath.Index(i).Child("name"), s.Name))
 		}
+		// The parameters hostNet and hostIPC are used to forbid sysctls for pod sharing the
+		// respective namespaces with the host.
+		if hostNetwork && strings.HasPrefix(s.Name, "net") {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("name"), s.Name, "sysctl not allowed with host net enabled"))
+		}
+		if hostIPC && strings.HasPrefix(s.Name, "ipc") {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("name"), s.Name, "sysctl not allowed with host ipc enabled"))
+		}
+
 		names[s.Name] = struct{}{}
 	}
 	return allErrs
@@ -4610,7 +4619,13 @@ func validatePodSpecSecurityContext(securityContext *core.PodSecurityContext, sp
 		}
 
 		if len(securityContext.Sysctls) != 0 {
-			allErrs = append(allErrs, validateSysctls(securityContext.Sysctls, fldPath.Child("sysctls"))...)
+			var hostNetwork, hostIPC bool
+			if spec.SecurityContext != nil {
+				hostNetwork = spec.SecurityContext.HostNetwork
+				hostIPC = spec.SecurityContext.HostIPC
+			}
+
+			allErrs = append(allErrs, validateSysctls(securityContext.Sysctls, fldPath.Child("sysctls"), hostNetwork, hostIPC)...)
 		}
 
 		if securityContext.FSGroupChangePolicy != nil {
