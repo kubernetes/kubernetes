@@ -59,7 +59,7 @@ const (
 	podInPendingStateTimeout  = time.Second * 60 // how long to wait for a pod to stay in pending state
 )
 
-var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", func() {
+var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation][NodeAlphaFeature:DynamicResourceAllocation]", func() {
 	f := framework.NewDefaultFramework("dra-node")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
