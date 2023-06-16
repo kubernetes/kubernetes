@@ -131,6 +131,9 @@ service RuntimeService {
 
     // ListPodSandboxMetrics gets pod sandbox metrics from CRI Runtime
     rpc ListPodSandboxMetrics(ListPodSandboxMetricsRequest) returns (ListPodSandboxMetricsResponse) {}
+
+    // RuntimeConfig returns configuration information of the runtime.
+    rpc RuntimeConfig(RuntimeConfigRequest) returns (RuntimeConfigResponse) {}
 }
 
 // ImageService defines the public APIs for managing images.
@@ -1804,3 +1807,23 @@ enum MetricType {
     COUNTER = 0;
     GAUGE = 1;
 }
+
+message RuntimeConfigRequest {}
+
+message RuntimeConfigResponse {
+    // Configuration information for Linux-based runtimes. This field contains
+    // global runtime configuration options that are not specific to runtime
+    // handlers.
+    LinuxRuntimeConfiguration linux = 1;
+}
+
+message LinuxRuntimeConfiguration {
+    // Cgroup driver to use
+    CgroupDriver cgroup_driver = 1;
+}
+
+enum CgroupDriver {
+    SYSTEMD = 0;
+    CGROUPFS = 1;
+}
+
