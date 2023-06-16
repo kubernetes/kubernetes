@@ -21491,6 +21491,16 @@ func TestValidateSysctls(t *testing.T) {
 		"_invalid",
 	}
 
+	invalidWithHostNet := []string{
+		"net.ipv4.conf.enp3s0/200.forwarding",
+		"net/ipv4/conf/enp3s0.200/forwarding",
+	}
+
+	invalidWithHostIPC := []string{
+		"kernel.shmmax",
+		"kernel.msgmax",
+	}
+
 	duplicates := []string{
 		"kernel.shmmax",
 		"kernel.shmmax",
@@ -21500,7 +21510,7 @@ func TestValidateSysctls(t *testing.T) {
 	for i, sysctl := range valid {
 		sysctls[i].Name = sysctl
 	}
-	errs := validateSysctls(sysctls, field.NewPath("foo"))
+	errs := validateSysctls(sysctls, field.NewPath("foo"), false, false)
 	if len(errs) != 0 {
 		t.Errorf("unexpected validation errors: %v", errs)
 	}
@@ -21509,7 +21519,7 @@ func TestValidateSysctls(t *testing.T) {
 	for i, sysctl := range invalid {
 		sysctls[i].Name = sysctl
 	}
-	errs = validateSysctls(sysctls, field.NewPath("foo"))
+	errs = validateSysctls(sysctls, field.NewPath("foo"), false, false)
 	if len(errs) != 2 {
 		t.Errorf("expected 2 validation errors. Got: %v", errs)
 	} else {
@@ -21525,11 +21535,29 @@ func TestValidateSysctls(t *testing.T) {
 	for i, sysctl := range duplicates {
 		sysctls[i].Name = sysctl
 	}
-	errs = validateSysctls(sysctls, field.NewPath("foo"))
+	errs = validateSysctls(sysctls, field.NewPath("foo"), false, false)
 	if len(errs) != 1 {
 		t.Errorf("unexpected validation errors: %v", errs)
 	} else if errs[0].Type != field.ErrorTypeDuplicate {
 		t.Errorf("expected error type %v, got %v", field.ErrorTypeDuplicate, errs[0].Type)
+	}
+
+	sysctls = make([]core.Sysctl, len(invalidWithHostNet))
+	for i, sysctl := range invalidWithHostNet {
+		sysctls[i].Name = sysctl
+	}
+	errs = validateSysctls(sysctls, field.NewPath("foo"), true, false)
+	if len(errs) != 2 {
+		t.Errorf("unexpected validation errors: %v", errs)
+	}
+
+	sysctls = make([]core.Sysctl, len(invalidWithHostIPC))
+	for i, sysctl := range invalidWithHostIPC {
+		sysctls[i].Name = sysctl
+	}
+	errs = validateSysctls(sysctls, field.NewPath("foo"), false, true)
+	if len(errs) != 2 {
+		t.Errorf("unexpected validation errors: %v", errs)
 	}
 }
 

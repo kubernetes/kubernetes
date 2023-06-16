@@ -44,6 +44,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	schedulinghelper "k8s.io/component-helpers/scheduling/corev1"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
@@ -4575,16 +4576,39 @@ func validateSysctls(sysctls []core.Sysctl, fldPath *field.Path, hostNetwork, ho
 		}
 		// The parameters hostNet and hostIPC are used to forbid sysctls for pod sharing the
 		// respective namespaces with the host.
-		if hostNetwork && strings.HasPrefix(s.Name, "net") {
-			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("name"), s.Name, "sysctl not allowed with host net enabled"))
-		}
-		if hostIPC && strings.HasPrefix(s.Name, "ipc") {
-			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("name"), s.Name, "sysctl not allowed with host ipc enabled"))
+		if !isValidSysctlWithHostNetIPC(s.Name, hostNetwork, hostIPC) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("name"), s.Name, "sysctl not allowed with host net/ipc enabled"))
 		}
 
 		names[s.Name] = struct{}{}
 	}
 	return allErrs
+}
+
+func isValidSysctlWithHostNetIPC(sysctl string, hostNet, hostIPC bool) bool {
+	sysctl = utilsysctl.ConvertSysctlVariableToDotsSeparator(sysctl)
+	var ns utilsysctl.Namespace
+	if strings.HasSuffix(sysctl, "*") {
+		prefix := sysctl[:len(sysctl)-1]
+		ns = utilsysctl.NamespacedBy(prefix)
+		if ns == utilsysctl.UnknownNamespace {
+			// don't handle unknown namespace here
+			return true
+		}
+	} else {
+		ns = utilsysctl.NamespacedBy(sysctl)
+		if ns == utilsysctl.UnknownNamespace {
+			// don't handle unknown namespace here
+			return true
+		}
+	}
+	if ns == utilsysctl.IpcNamespace && hostIPC {
+		return false
+	}
+	if ns == utilsysctl.NetNamespace && hostNet {
+		return false
+	}
+	return true
 }
 
 // validatePodSpecSecurityContext verifies the SecurityContext of a PodSpec,
