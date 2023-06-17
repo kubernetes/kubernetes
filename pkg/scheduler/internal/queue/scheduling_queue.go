@@ -161,7 +161,7 @@ type PriorityQueue struct {
 	// hasn't been called yet - in other words, all pods that are currently being
 	// processed.
 	inFlightPods map[types.UID]inFlightPod
-	// receivedEvents holds the events received by the scheduling queue in this scheduling cycle.
+	// receivedEvents holds the events received by the scheduling queue.
 	receivedEvents []clusterEvent
 
 	// activeQ is heap structure that scheduler actively looks at to find pods to
@@ -692,7 +692,8 @@ func (p *PriorityQueue) Done(pod types.UID) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	// remove events which is only referred from this Pod.
+	// remove events which is only referred from this Pod
+	// so that the receivedEvents map doesn't grow infinitely.
 	var events []clusterEvent
 	for _, e := range p.receivedEvents {
 		e.inFlightPods.Delete(pod)
