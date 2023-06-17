@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -483,6 +484,64 @@ func Test_As_Node(t *testing.T) {
 			}
 			if diff := cmp.Diff(tc.wantNewObj, gotNew); diff != "" {
 				t.Errorf("unexpected new object (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestDeletePod(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	cs := &clientsetfake.Clientset{}
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "foo",
+			Name:      "bar",
+		},
+		Spec: v1.PodSpec{
+			ImagePullSecrets: []v1.LocalObjectReference{{Name: "foo"}},
+		},
+	}
+	err := DeletePod(ctx, cs, pod)
+	assert.NoError(t, err)
+}
+
+func TestIsScalarResourceName(t *testing.T) {
+	tests := []struct {
+		name         string
+		resourcename v1.ResourceName
+		want         bool
+	}{
+		{
+			name:         "hugepages ResourceName",
+			resourcename: "hugepages-foo",
+			want:         true,
+		},
+		{
+			name:         "Prefixed Native ResourceName",
+			resourcename: "kubernetes.io/foo",
+			want:         true,
+		},
+		{
+			name:         "Attachable Volume ResourceName",
+			resourcename: "attachable-volumes-foo",
+			want:         true,
+		},
+		{
+			name:         "Extended ResourceName",
+			resourcename: "foo/bar",
+			want:         true,
+		},
+		{
+			name:         "Names not in the specified range",
+			resourcename: "request.foo",
+			want:         false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsScalarResourceName(tt.resourcename); got != tt.want {
+				t.Errorf("IsScalarResourceName() = %v, want %v", got, tt.want)
 			}
 		})
 	}
