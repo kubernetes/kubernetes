@@ -108,8 +108,13 @@ type Endpoint interface {
 	// String returns endpoint string.  An example format can be: `IP:Port`.
 	// We take the returned value as ServiceEndpoint.Endpoint.
 	String() string
-	// GetIsLocal returns true if the endpoint is running in same host as kube-proxy, otherwise returns false.
-	GetIsLocal() bool
+	// IP returns IP part of the endpoint.
+	IP() string
+	// Port returns the Port part of the endpoint.
+	Port() (int, error)
+
+	// IsLocal returns true if the endpoint is running on the same host as kube-proxy.
+	IsLocal() bool
 	// IsReady returns true if an endpoint is ready and not terminating, or
 	// if PublishNotReadyAddresses is set on the service.
 	IsReady() bool
@@ -119,13 +124,10 @@ type Endpoint interface {
 	// IsTerminating returns true if an endpoint is terminating. For pods,
 	// that is any pod with a deletion timestamp.
 	IsTerminating() bool
-	// GetZoneHints returns the zone hint for the endpoint. This is based on
+
+	// ZoneHints returns the zone hint for the endpoint. This is based on
 	// endpoint.hints.forZones[0].name in the EndpointSlice API.
-	GetZoneHints() sets.Set[string]
-	// IP returns IP part of the endpoint.
-	IP() string
-	// Port returns the Port part of the endpoint.
-	Port() (int, error)
+	ZoneHints() sets.Set[string]
 }
 
 // ServiceEndpoint is used to identify a service and one of its endpoint pair.

@@ -3666,7 +3666,7 @@ func checkEndpointExpectations(t *testing.T, tci int, newMap proxy.EndpointsMap,
 			for i := range expected[x] {
 				newEp := newMap[x][i]
 				if newEp.String() != expected[x][i].endpoint ||
-					newEp.GetIsLocal() != expected[x][i].isLocal {
+					newEp.IsLocal() != expected[x][i].isLocal {
 					t.Errorf("[%d] expected new[%v][%d] to be %v, got %v", tci, x, i, expected[x][i], newEp)
 				}
 			}
