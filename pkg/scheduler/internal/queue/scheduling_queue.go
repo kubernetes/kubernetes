@@ -517,6 +517,9 @@ func (p *PriorityQueue) SchedulingCycle() int64 {
 func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *framework.QueuedPodInfo, podSchedulingCycle int64) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
+	// In any case, this Pod will be moved back to the queue and we should call Done.
+	defer p.Done(pInfo.Pod.UID)
+
 	pod := pInfo.Pod
 	if p.unschedulablePods.get(pod) != nil {
 		return fmt.Errorf("Pod %v is already present in unschedulable queue", klog.KObj(pod))

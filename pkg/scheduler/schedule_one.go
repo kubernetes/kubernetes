@@ -79,16 +79,6 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 	pod := podInfo.Pod
 	logger.V(4).Info("About to try and schedule pod", "pod", klog.KObj(pod))
 
-	schedulingFailed := true
-	defer func() {
-		// scheduleOne must call DonePod regardless how it returns,
-		// with one exception: when the pod is ready for PreBind, the
-		// goroutine below takes over.
-		if schedulingFailed {
-			sched.DonePod(pod.UID)
-		}
-	}()
-
 	fwk, err := sched.frameworkForPod(pod)
 	if err != nil {
 		// This shouldn't happen, because we only accept for scheduling the pods
@@ -121,13 +111,9 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 	}
 
 	// bind the pod to its host asynchronously (we can do this b/c of the assumption step above).
-	//
-	// This goroutine becomes responsible for calling DonePod.
-	schedulingFailed = false
 	go func() {
 		bindingCycleCtx, cancel := context.WithCancel(ctx)
 		defer cancel()
-		defer sched.DonePod(assumedPodInfo.Pod.UID)
 
 		metrics.Goroutines.WithLabelValues(metrics.Binding).Inc()
 		defer metrics.Goroutines.WithLabelValues(metrics.Binding).Dec()
@@ -136,6 +122,9 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 		if !status.IsSuccess() {
 			sched.handleBindingCycleError(bindingCycleCtx, state, fwk, assumedPodInfo, start, scheduleResult, status)
 		}
+		// Usually, DonePod is called inside the scheduling queue,
+		// but in this case, we need to call it here because this Pod won't go back to the scheduling queue.
+		sched.DonePod(assumedPodInfo.Pod.UID)
 	}()
 }
 
