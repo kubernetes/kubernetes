@@ -165,6 +165,8 @@ type PriorityQueue struct {
 	// hasn't been called yet - in other words, all pods that are currently being
 	// processed.
 	inFlightPods map[types.UID]inFlightPod
+	// receivedEvents holds the events received by the scheduling queue in this scheduling cycle.
+	receivedEvents []clusterEvent
 
 	// activeQ is heap structure that scheduler actively looks at to find pods to
 	// schedule. Head of heap is the highest priority pod.
@@ -200,14 +202,14 @@ type QueueingHintFunction struct {
 	QueueingHintFn framework.QueueingHintFn
 	}
 type inFlightPod struct {
-	pod *v1.Pod
-	// events happened during in-flight.
-	events []clusterEvent
+	startedCycle int64
 }
 
 // clusterEvent has the event and involved objects.
 type clusterEvent struct {
 	requestCycle int64
+	// inFlightPods is the pods that are in-flight when this event is received.
+	inFlightPods sets.Set[types.UID]
 	event        framework.ClusterEvent
 }
 
@@ -614,32 +616,46 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *
 
 	// Check if some events, which may make this in flight Pod schedulable, happen during in-flight.
 	var moveRequestCycle int64
-	// AddUnschedulableIfNotPresent is called with the Pod at the end of scheduling or binding.
-	// So, given pInfo should have been Pop()ed before,
-	// we can assume pInfo must be recorded in inFlightPods.
-	if inFlightPod, ok := p.inFlightPods[pInfo.Pod.UID]; ok {
-		for _, e := range inFlightPod.events {
-			if len(pInfo.UnschedulablePlugins) != 0 && !p.podMatchesEvent(pInfo, e.event) {
-				// This event won't make this Pod schedulable.
-				continue
-			}
-			moveRequestCycle = e.requestCycle
-			if len(pInfo.UnschedulablePlugins) == 0 {
-				// use the latest requestCycle when no unschedulable plugin is recorded.
-				break
-			}
+	if len(pInfo.UnschedulablePlugins) == 0 {
+		// When there is no unschedulable plugin, we cannot have a guess which event makes this Pod schedulable.
+		// Here, we uses the latest requestCycle so that this Pod won't stuck in the unschedulable pod pool for a long time.
+		if len(p.receivedEvents) != 0 {
+			moveRequestCycle = p.receivedEvents[len(p.receivedEvents)-1].requestCycle
 		}
 	} else {
-		// It shouldn't reach here unless there is a bug somewhere.
-		// But, set podSchedulingCycle to moveRequestCycle
-		// so that this Pod won't stuck in the unschedulable pod pool.
-		logger.Error(nil, "In flight Pod isn't found in the scheduling queue. If you see this error log, it's likely a bug in the scheduler.", "pod", klog.KObj(pod))
-		moveRequestCycle = podSchedulingCycle
+		// AddUnschedulableIfNotPresent is called with the Pod at the end of scheduling or binding.
+		// So, given pInfo should have been Pop()ed before,
+		// we can assume pInfo must be recorded in inFlightPods.
+		if inFlightPod, ok := p.inFlightPods[pInfo.Pod.UID]; ok {
+			// check if there is an event that makes this Pod schedulable based on pInfo.UnschedulablePlugins.
+			for _, e := range p.receivedEvents {
+				if e.requestCycle < inFlightPod.startedCycle {
+					// This event is recorded before the Pod is popped.
+					continue
+				}
+
+				if !p.podMatchesEvent(pInfo, e.event) {
+					// This event won't make this Pod schedulable.
+					continue
+				}
+
+				moveRequestCycle = e.requestCycle
+
+				// TODO(sanposhiho): filter out events with the callback function, which filters out useless events, is implemented in EventToRegister.
+			}
+		} else {
+			// It shouldn't reach here unless there is a bug somewhere.
+			// But, set podSchedulingCycle to moveRequestCycle
+			// so that this Pod won't stuck in the unschedulable pod pool.
+			logger.Error(nil, "In flight Pod isn't found in the scheduling queue. If you see this error log, it's likely a bug in the scheduler.", "pod", klog.KObj(pod))
+			moveRequestCycle = podSchedulingCycle
+		}
 	}
 
-	// TODO(sanposhiho): filter out events when the callback function, which filters out useless events, is implemented in EventToRegister.
-
 	if moveRequestCycle >= podSchedulingCycle {
+		// moveRequestCycle is not smaller than podSchedulingCycle,
+		// it means that we received the event recently that might make this Pod schedulable.
+		// So, put this Pod to backoffQ instead of unschedulable Pod pool.
 		if err := p.podBackoffQ.Add(pInfo); err != nil {
 			return fmt.Errorf("error adding pod %v to the backoff queue: %v", klog.KObj(pod), err)
 		}
@@ -732,7 +748,7 @@ func (p *PriorityQueue) Pop() (*framework.QueuedPodInfo, error) {
 	p.schedulingCycle++
 	// In flight, no move request yet.
 	p.inFlightPods[pInfo.Pod.UID] = inFlightPod{
-		pod: pInfo.Pod,
+		startedCycle: p.schedulingCycle,
 	}
 	return pInfo, nil
 }
@@ -742,7 +758,20 @@ func (p *PriorityQueue) Pop() (*framework.QueuedPodInfo, error) {
 func (p *PriorityQueue) Done(pod types.UID) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
+
+	// remove events which is only referred from this Pod.
+	var events []clusterEvent
+	for _, e := range p.receivedEvents {
+		e.inFlightPods.Delete(pod)
+		if e.inFlightPods.Len() != 0 {
+			// leave this event because it will be referred from other in-flight Pods later.
+			events = append(events, e)
+		}
+	}
+	p.receivedEvents = events
+
 	delete(p.inFlightPods, pod)
+
 }
 
 // isPodUpdated checks if the pod is updated in a way that it may have become
@@ -965,20 +994,19 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(logger klog.Logger, podIn
 		}
 	}
 
-	// Besides setting MoveRequestCycle above for all pods which got moved,
-	// we also need to set it for pods that are being processed because
-	// AddUnschedulableIfNotPresent might get called for them, and in
+	inflightPods := sets.New[types.UID]()
+	for uid := range p.inFlightPods {
+		inflightPods.Insert(uid)
+	}
+
+	// AddUnschedulableIfNotPresent might get called for them later, and in
 	// AddUnschedulableIfNotPresent we need to know whether events were
 	// observed while scheduling them.
-	for uid, inFlight := range p.inFlightPods {
-		logger.V(5).Info("In-flight pod with concurrent event", "pod", klog.KObj(inFlight.pod), "event", event.Label, "schedulingCycle", p.schedulingCycle)
-
-		inFlight.events = append(inFlight.events, clusterEvent{
-			event:        event,
-			requestCycle: p.schedulingCycle,
-		})
-		p.inFlightPods[uid] = inFlight
-	}
+	p.receivedEvents = append(p.receivedEvents, clusterEvent{
+		event:        event,
+		inFlightPods: inflightPods, // record which Pods are in-flight now.
+		requestCycle: p.schedulingCycle,
+	})
 
 	if activated {
 		p.cond.Broadcast()
