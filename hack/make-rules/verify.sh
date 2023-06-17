@@ -129,6 +129,7 @@ function is-explicitly-chosen {
   return 1
 }
 
+# Run a command, logging its output to a junit file by removing file path and suffix if any.
 function run-cmd {
   local filename="${2##*/verify-}"
   local testname="${filename%%.*}"
@@ -136,11 +137,21 @@ function run-cmd {
   local tr
 
   if ${SILENT}; then
-    juLog -output="${output}" -class="verify" -name="${testname}" -fail="^ERROR: " "$@" &> /dev/null
-    tr=$?
+    if [[ "$1" = "binary" ]]; then
+      juLog -output="${output}" -class="verify" -name="${testname}" -fail="^ERROR: " "./$2" &> /dev/null
+      tr=$?
+    else
+      juLog -output="${output}" -class="verify" -name="${testname}" -fail="^ERROR: " "$@" &> /dev/null
+      tr=$?
+    fi
   else
-    juLog -output="${output}" -class="verify" -name="${testname}" -fail="^ERROR: " "$@"
-    tr=$?
+      if [[ "$1" = "binary" ]]; then
+      juLog -output="${output}" -class="verify" -name="${testname}" -fail="^ERROR: " "./$2"
+      tr=$?
+    else
+      juLog -output="${output}" -class="verify" -name="${testname}" -fail="^ERROR: " "$@"
+      tr=$?  
+    fi
   fi
   return ${tr}
 }
@@ -220,10 +231,22 @@ if ${QUICK} ; then
   echo "Running in quick mode (QUICK=true). Only fast checks will run."
 fi
 
+# Function to delete the Go binary in case of interrupt or exit
+function cleanup {
+  if [[ -f "${KUBE_ROOT}/hack/tools/verify/verify-publishing-bot" ]]; then
+    rm "${KUBE_ROOT}/hack/tools/verify/verify-publishing-bot"
+  fi
+}
+
+go build -o "${KUBE_ROOT}/hack/tools/verify/verify-publishing-bot" "${KUBE_ROOT}/hack/tools/verify/verify-publishing-bot.go"
+
 ret=0
 run-checks "${KUBE_ROOT}/hack/verify-*.sh" bash
-run-checks "${KUBE_ROOT}/hack/verify-*.py" python3
+run-checks "${KUBE_ROOT}/hack/tools/verify/verify-publishing-bot" binary
 missing-target-checks
+
+# cleaning up the go binary once the execution is done
+rm "${KUBE_ROOT}/hack/tools/verify/verify-publishing-bot"
 
 if [[ ${ret} -eq 1 ]]; then
     print-failed-tests
