@@ -290,7 +290,9 @@ func TestByJobStartTime(t *testing.T) {
 func TestMostRecentScheduleTime(t *testing.T) {
 	metav1TopOfTheHour := metav1.NewTime(*topOfTheHour())
 	metav1HalfPastTheHour := metav1.NewTime(*deltaTimeAfterTopOfTheHour(30 * time.Minute))
+	metav1MinuteAfterTopOfTheHour := metav1.NewTime(*deltaTimeAfterTopOfTheHour(1 * time.Minute))
 	oneMinute := int64(60)
+	tenSeconds := int64(10)
 
 	tests := []struct {
 		name                   string
@@ -345,6 +347,94 @@ func TestMostRecentScheduleTime(t *testing.T) {
 			expectedRecentTime:     deltaTimeAfterTopOfTheHour(300 * time.Minute),
 			expectedEarliestTime:   *deltaTimeAfterTopOfTheHour(10 * time.Second),
 			expectedNumberOfMisses: 5,
+		},
+		{
+			name: "complex schedule",
+			cj: &batchv1.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					CreationTimestamp: metav1TopOfTheHour,
+				},
+				Spec: batchv1.CronJobSpec{
+					Schedule: "30 6-16/4 * * 1-5",
+				},
+				Status: batchv1.CronJobStatus{
+					LastScheduleTime: &metav1HalfPastTheHour,
+				},
+			},
+			now:                    *deltaTimeAfterTopOfTheHour(24*time.Hour + 31*time.Minute),
+			expectedRecentTime:     deltaTimeAfterTopOfTheHour(24*time.Hour + 30*time.Minute),
+			expectedEarliestTime:   *deltaTimeAfterTopOfTheHour(30 * time.Minute),
+			expectedNumberOfMisses: 2,
+		},
+		{
+			name: "another complex schedule",
+			cj: &batchv1.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					CreationTimestamp: metav1TopOfTheHour,
+				},
+				Spec: batchv1.CronJobSpec{
+					Schedule: "30 10,11,12 * * 1-5",
+				},
+				Status: batchv1.CronJobStatus{
+					LastScheduleTime: &metav1HalfPastTheHour,
+				},
+			},
+			now:                    *deltaTimeAfterTopOfTheHour(30*time.Hour + 30*time.Minute),
+			expectedRecentTime:     nil,
+			expectedEarliestTime:   *deltaTimeAfterTopOfTheHour(30 * time.Minute),
+			expectedNumberOfMisses: 30,
+		},
+		{
+			name: "complex schedule with longer diff between executions",
+			cj: &batchv1.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					CreationTimestamp: metav1TopOfTheHour,
+				},
+				Spec: batchv1.CronJobSpec{
+					Schedule: "30 6-16/4 * * 1-5",
+				},
+				Status: batchv1.CronJobStatus{
+					LastScheduleTime: &metav1HalfPastTheHour,
+				},
+			},
+			now:                    *deltaTimeAfterTopOfTheHour(96*time.Hour + 31*time.Minute),
+			expectedRecentTime:     deltaTimeAfterTopOfTheHour(96*time.Hour + 30*time.Minute),
+			expectedEarliestTime:   *deltaTimeAfterTopOfTheHour(30 * time.Minute),
+			expectedNumberOfMisses: 6,
+		},
+		{
+			name: "complex schedule with shorter diff between executions",
+			cj: &batchv1.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					CreationTimestamp: metav1TopOfTheHour,
+				},
+				Spec: batchv1.CronJobSpec{
+					Schedule: "30 6-16/4 * * 1-5",
+				},
+			},
+			now:                    *deltaTimeAfterTopOfTheHour(24*time.Hour + 31*time.Minute),
+			expectedRecentTime:     deltaTimeAfterTopOfTheHour(24*time.Hour + 30*time.Minute),
+			expectedEarliestTime:   *topOfTheHour(),
+			expectedNumberOfMisses: 7,
+		},
+		{
+			name: "@every schedule",
+			cj: &batchv1.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					CreationTimestamp: metav1.NewTime(*deltaTimeAfterTopOfTheHour(-59 * time.Minute)),
+				},
+				Spec: batchv1.CronJobSpec{
+					Schedule:                "@every 1h",
+					StartingDeadlineSeconds: &tenSeconds,
+				},
+				Status: batchv1.CronJobStatus{
+					LastScheduleTime: &metav1MinuteAfterTopOfTheHour,
+				},
+			},
+			now:                    *deltaTimeAfterTopOfTheHour(7 * 24 * time.Hour),
+			expectedRecentTime:     deltaTimeAfterTopOfTheHour((6 * 24 * time.Hour) + 23*time.Hour + 1*time.Minute),
+			expectedEarliestTime:   *deltaTimeAfterTopOfTheHour(1 * time.Minute),
+			expectedNumberOfMisses: 167,
 		},
 		{
 			name: "rogue cronjob",
