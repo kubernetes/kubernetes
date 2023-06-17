@@ -376,12 +376,11 @@ func TestPriorityQueue_Update(t *testing.T) {
 		t.Errorf("Expected: %v after Pop, but got: %v", medPriorityPodInfo.Pod.Name, podGotFromBackoffQ.Name)
 	}
 
-	// updating a pod which is in unschedulable queue, and it is still backing off,
-	// we will move it to backoff queue
-	// register medPriorityPodInfo in in-flight Pod.
-	// In real world, this Pod should have been Pop()ed, Pop() records Pods as in-flight Pod,
-	// and thus AddUnschedulableIfNotPresent assumes the Pod is recorded as in-flight Pod.
-	q.inFlightPods[medPriorityPodInfo.Pod.UID] = inFlightPod{}
+	// To simulate the pod is failed in scheduling in the real world, Pop() the pod from activeQ before testing AddUnschedulableIfNotPresent.
+	q.activeQ.Add(podInfo)
+	if p, err := q.Pop(); err != nil || p.Pod != medPriorityPodInfo.Pod {
+		t.Errorf("Expected: %v after Pop, but got: %v", medPriorityPodInfo.Pod.Name, p.Pod.Name)
+	}
 	q.AddUnschedulableIfNotPresent(logger, q.newQueuedPodInfo(medPriorityPodInfo.Pod), q.SchedulingCycle())
 	if len(q.unschedulablePods.podInfoMap) != 1 {
 		t.Error("Expected unschedulablePods to be 1.")
@@ -729,12 +728,16 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueue(t *testing.T) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	q := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(c), WithClusterEventMap(m))
+	// To simulate the pod is failed in scheduling in the real world, Pop() the pod from activeQ before AddUnschedulableIfNotPresent()s below.
+	q.activeQ.Add(q.newQueuedPodInfo(unschedulablePodInfo.Pod))
+	if p, err := q.Pop(); err != nil || p.Pod != unschedulablePodInfo.Pod {
+		t.Errorf("Expected: %v after Pop, but got: %v", unschedulablePodInfo.Pod.Name, p.Pod.Name)
+	}
+	q.activeQ.Add(q.newQueuedPodInfo(highPriorityPodInfo.Pod))
+	if p, err := q.Pop(); err != nil || p.Pod != highPriorityPodInfo.Pod {
+		t.Errorf("Expected: %v after Pop, but got: %v", highPriorityPodInfo.Pod.Name, p.Pod.Name)
+	}
 	q.Add(logger, medPriorityPodInfo.Pod)
-	// register Pods in in-flight Pod.
-	// In real world, these Pods should have been Pop()ed, Pop() records Pods as in-flight Pod,
-	// and thus AddUnschedulableIfNotPresent assumes Pods are recorded as in-flight Pod.
-	q.inFlightPods[unschedulablePodInfo.Pod.UID] = inFlightPod{}
-	q.inFlightPods[highPriorityPodInfo.Pod.UID] = inFlightPod{}
 	q.AddUnschedulableIfNotPresent(logger, q.newQueuedPodInfo(unschedulablePodInfo.Pod, "fooPlugin"), q.SchedulingCycle())
 	q.AddUnschedulableIfNotPresent(logger, q.newQueuedPodInfo(highPriorityPodInfo.Pod, "fooPlugin"), q.SchedulingCycle())
 	// Construct a Pod, but don't associate its scheduler failure to any plugin
@@ -796,13 +799,16 @@ func TestPriorityQueue_AssignedPodAdded(t *testing.T) {
 	c := testingclock.NewFakeClock(time.Now())
 	m := map[framework.ClusterEvent]sets.Set[string]{AssignedPodAdd: sets.New("fakePlugin")}
 	q := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(c), WithClusterEventMap(m))
+	// To simulate the pod is failed in scheduling in the real world, Pop() the pod from activeQ before AddUnschedulableIfNotPresent()s below.
+	q.activeQ.Add(q.newQueuedPodInfo(unschedulablePodInfo.Pod))
+	if p, err := q.Pop(); err != nil || p.Pod != unschedulablePodInfo.Pod {
+		t.Errorf("Expected: %v after Pop, but got: %v", unschedulablePodInfo.Pod.Name, p.Pod.Name)
+	}
+	q.activeQ.Add(q.newQueuedPodInfo(highPriorityPodInfo.Pod))
+	if p, err := q.Pop(); err != nil || p.Pod != highPriorityPodInfo.Pod {
+		t.Errorf("Expected: %v after Pop, but got: %v", highPriorityPodInfo.Pod.Name, p.Pod.Name)
+	}
 	q.Add(logger, medPriorityPodInfo.Pod)
-	// Add a couple of pods to the unschedulablePods.
-	// register Pods in in-flight Pod.
-	// In real world, these Pods should have been Pop()ed, Pop() records Pods as in-flight Pod,
-	// and thus AddUnschedulableIfNotPresent assumes Pods are recorded as in-flight Pod.
-	q.inFlightPods[unschedulablePodInfo.Pod.UID] = inFlightPod{}
-	q.inFlightPods[highPriorityPodInfo.Pod.UID] = inFlightPod{}
 	q.AddUnschedulableIfNotPresent(logger, q.newQueuedPodInfo(unschedulablePodInfo.Pod, "fakePlugin"), q.SchedulingCycle())
 	q.AddUnschedulableIfNotPresent(logger, q.newQueuedPodInfo(affinityPod, "fakePlugin"), q.SchedulingCycle())
 
@@ -915,12 +921,16 @@ func TestPriorityQueue_PendingPods(t *testing.T) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	q := NewTestQueue(ctx, newDefaultQueueSort())
+	// To simulate the pod is failed in scheduling in the real world, Pop() the pod from activeQ before AddUnschedulableIfNotPresent()s below.
+	q.activeQ.Add(q.newQueuedPodInfo(unschedulablePodInfo.Pod))
+	if p, err := q.Pop(); err != nil || p.Pod != unschedulablePodInfo.Pod {
+		t.Errorf("Expected: %v after Pop, but got: %v", unschedulablePodInfo.Pod.Name, p.Pod.Name)
+	}
+	q.activeQ.Add(q.newQueuedPodInfo(highPriorityPodInfo.Pod))
+	if p, err := q.Pop(); err != nil || p.Pod != highPriorityPodInfo.Pod {
+		t.Errorf("Expected: %v after Pop, but got: %v", highPriorityPodInfo.Pod.Name, p.Pod.Name)
+	}
 	q.Add(logger, medPriorityPodInfo.Pod)
-	// register Pods in in-flight Pod.
-	// In real world, these Pods should have been Pop()ed, Pop() records Pods as in-flight Pod,
-	// and thus AddUnschedulableIfNotPresent assumes Pods are recorded as in-flight Pod.
-	q.inFlightPods[unschedulablePodInfo.Pod.UID] = inFlightPod{}
-	q.inFlightPods[highPriorityPodInfo.Pod.UID] = inFlightPod{}
 	q.AddUnschedulableIfNotPresent(logger, q.newQueuedPodInfo(unschedulablePodInfo.Pod), q.SchedulingCycle())
 	q.AddUnschedulableIfNotPresent(logger, q.newQueuedPodInfo(highPriorityPodInfo.Pod), q.SchedulingCycle())
 
@@ -1255,10 +1265,11 @@ func TestPodFailedSchedulingMultipleTimesDoesNotBlockNewerPod(t *testing.T) {
 		Message: "fake scheduling failure",
 	})
 
-	// register Pods in in-flight Pod.
-	// In real world, these Pods should have been Pop()ed, Pop() records Pods as in-flight Pod,
-	// and thus AddUnschedulableIfNotPresent assumes Pods are recorded as in-flight Pod.
-	q.inFlightPods[unschedulablePod.UID] = inFlightPod{}
+	// To simulate the pod is failed in scheduling in the real world, Pop() the pod from activeQ before AddUnschedulableIfNotPresent() below.
+	q.activeQ.Add(q.newQueuedPodInfo(unschedulablePod))
+	if p, err := q.Pop(); err != nil || p.Pod != unschedulablePod {
+		t.Errorf("Expected: %v after Pop, but got: %v", unschedulablePod.Name, p.Pod.Name)
+	}
 	// Put in the unschedulable queue
 	q.AddUnschedulableIfNotPresent(logger, newQueuedPodInfoForLookup(unschedulablePod), q.SchedulingCycle())
 	// Move clock to make the unschedulable pods complete backoff.
@@ -1379,11 +1390,15 @@ func TestHighPriorityFlushUnschedulablePodsLeftover(t *testing.T) {
 		Message: "fake scheduling failure",
 	})
 
-	// register Pods in in-flight Pod.
-	// In real world, these Pods should have been Pop()ed, Pop() records Pods as in-flight Pod,
-	// and thus AddUnschedulableIfNotPresent assumes Pods are recorded as in-flight Pod.
-	q.inFlightPods[highPod.UID] = inFlightPod{}
-	q.inFlightPods[midPod.UID] = inFlightPod{}
+	// To simulate the pod is failed in scheduling in the real world, Pop() the pod from activeQ before AddUnschedulableIfNotPresent()s below.
+	q.activeQ.Add(q.newQueuedPodInfo(highPod))
+	if p, err := q.Pop(); err != nil || p.Pod != highPod {
+		t.Errorf("Expected: %v after Pop, but got: %v", highPod.Name, p.Pod.Name)
+	}
+	q.activeQ.Add(q.newQueuedPodInfo(midPod))
+	if p, err := q.Pop(); err != nil || p.Pod != midPod {
+		t.Errorf("Expected: %v after Pop, but got: %v", midPod.Name, p.Pod.Name)
+	}
 	q.AddUnschedulableIfNotPresent(logger, q.newQueuedPodInfo(highPod, "fakePlugin"), q.SchedulingCycle())
 	q.AddUnschedulableIfNotPresent(logger, q.newQueuedPodInfo(midPod, "fakePlugin"), q.SchedulingCycle())
 	c.Step(DefaultPodMaxInUnschedulablePodsDuration + time.Second)
@@ -1489,10 +1504,12 @@ var (
 		queue.Add(logger, pInfo.Pod)
 	}
 	addUnschedulablePodBackToUnschedulablePods = func(logger klog.Logger, queue *PriorityQueue, pInfo *framework.QueuedPodInfo) {
-		// register Pods in in-flight Pod.
-		// In real world, these Pods should have been Pop()ed, Pop() records Pods as in-flight Pod,
-		// and thus AddUnschedulableIfNotPresent assumes Pods are recorded as in-flight Pod.
-		queue.inFlightPods[pInfo.Pod.UID] = inFlightPod{}
+		// To simulate the pod is failed in scheduling in the real world, Pop() the pod from activeQ before AddUnschedulableIfNotPresent() below.
+		queue.activeQ.Add(queue.newQueuedPodInfo(pInfo.Pod))
+		if p, err := queue.Pop(); err != nil || p.Pod != pInfo.Pod {
+			panic(fmt.Sprintf("Expected: %v after Pop, but got: %v", pInfo.Pod.Name, p.Pod.Name))
+		}
+
 		queue.AddUnschedulableIfNotPresent(logger, pInfo, 1)
 	}
 	addUnschedulablePodBackToBackoffQ = func(logger klog.Logger, queue *PriorityQueue, pInfo *framework.QueuedPodInfo) {
@@ -2296,10 +2313,11 @@ func TestMoveAllToActiveOrBackoffQueue_PreEnqueueChecks(t *testing.T) {
 			defer cancel()
 			q := NewTestQueue(ctx, newDefaultQueueSort())
 			for i, podInfo := range tt.podInfos {
-				// register this Pod in in-flight Pod.
-				// In real world, this Pod should have been Pop()ed, Pop() records Pods as in-flight Pod,
-				// and thus AddUnschedulableIfNotPresent assumes Pods are recorded as in-flight Pod.
-				q.inFlightPods[podInfo.Pod.UID] = inFlightPod{}
+				// To simulate the pod is failed in scheduling in the real world, Pop() the pod from activeQ before AddUnschedulableIfNotPresent() below.
+				q.activeQ.Add(q.newQueuedPodInfo(podInfo.Pod))
+				if p, err := q.Pop(); err != nil || p.Pod != podInfo.Pod {
+					t.Errorf("Expected: %v after Pop, but got: %v", podInfo.Pod.Name, p.Pod.Name)
+				}
 				q.AddUnschedulableIfNotPresent(logger, podInfo, q.schedulingCycle)
 				// NOTE: On Windows, time.Now() is not as precise, 2 consecutive calls may return the same timestamp,
 				// resulting in 0 time delta / latency. This will cause the pods to be backed off in a random
