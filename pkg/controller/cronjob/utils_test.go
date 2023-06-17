@@ -25,7 +25,7 @@ import (
 
 	cron "github.com/robfig/cron/v3"
 	batchv1 "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -318,6 +318,56 @@ func TestGetMostRecentScheduleTime(t *testing.T) {
 			},
 			expectedTime:           deltaTimeAfterTopOfTheHour(time.Minute * 300),
 			expectedNumberOfMisses: 5,
+		},
+		{
+			name: "complex schedule",
+			args: args{
+				earliestTime: deltaTimeAfterTopOfTheHour(30 * time.Minute),
+				now:          *deltaTimeAfterTopOfTheHour(24*time.Hour + 31*time.Minute),
+				schedule:     "30 6-16/4 * * 1-5",
+			},
+			expectedTime:           deltaTimeAfterTopOfTheHour(24*time.Hour + 30*time.Minute),
+			expectedNumberOfMisses: 2,
+		},
+		{
+			name: "another complex schedule",
+			args: args{
+				earliestTime: deltaTimeAfterTopOfTheHour(30 * time.Minute),
+				now:          *deltaTimeAfterTopOfTheHour(30*time.Hour + 30*time.Minute),
+				schedule:     "30 10,11,12 * * 1-5",
+			},
+			expectedTime:           nil,
+			expectedNumberOfMisses: 30,
+		},
+		{
+			name: "complex schedule with longer diff between executions",
+			args: args{
+				earliestTime: deltaTimeAfterTopOfTheHour(30 * time.Minute),
+				now:          *deltaTimeAfterTopOfTheHour(96*time.Hour + 31*time.Minute),
+				schedule:     "30 6-16/4 * * 1-5",
+			},
+			expectedTime:           deltaTimeAfterTopOfTheHour(96*time.Hour + 30*time.Minute),
+			expectedNumberOfMisses: 6,
+		},
+		{
+			name: "complex schedule with shorter diff between executions",
+			args: args{
+				earliestTime: topOfTheHour(),
+				now:          *deltaTimeAfterTopOfTheHour(24*time.Hour + 31*time.Minute),
+				schedule:     "30 6-16/4 * * 1-5",
+			},
+			expectedTime:           deltaTimeAfterTopOfTheHour(24*time.Hour + 30*time.Minute),
+			expectedNumberOfMisses: 7,
+		},
+		{
+			name: "@every schedule",
+			args: args{
+				earliestTime: deltaTimeAfterTopOfTheHour(1 * time.Minute),
+				now:          *deltaTimeAfterTopOfTheHour(7 * 24 * time.Hour),
+				schedule:     "@every 1h",
+			},
+			expectedTime:           deltaTimeAfterTopOfTheHour((6 * 24 * time.Hour) + 23*time.Hour + 1*time.Minute),
+			expectedNumberOfMisses: 167,
 		},
 		{
 			name: "rogue cronjob",
