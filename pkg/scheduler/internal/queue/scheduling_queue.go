@@ -518,7 +518,7 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	// In any case, this Pod will be moved back to the queue and we should call Done.
-	defer p.Done(pInfo.Pod.UID)
+	defer p.done(pInfo.Pod.UID)
 
 	pod := pInfo.Pod
 	if p.unschedulablePods.get(pod) != nil {
@@ -692,6 +692,10 @@ func (p *PriorityQueue) Done(pod types.UID) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
+	p.done(pod)
+}
+
+func (p *PriorityQueue) done(pod types.UID) {
 	// remove events which is only referred from this Pod
 	// so that the receivedEvents map doesn't grow infinitely.
 	var events []clusterEvent
@@ -705,7 +709,6 @@ func (p *PriorityQueue) Done(pod types.UID) {
 	p.receivedEvents = events
 
 	delete(p.inFlightPods, pod)
-
 }
 
 // isPodUpdated checks if the pod is updated in a way that it may have become
