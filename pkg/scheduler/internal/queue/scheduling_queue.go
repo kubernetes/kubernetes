@@ -750,6 +750,11 @@ func (p *PriorityQueue) Pop() (*framework.QueuedPodInfo, error) {
 	p.inFlightPods[pInfo.Pod.UID] = inFlightPod{
 		startedCycle: p.schedulingCycle,
 	}
+
+	for plugin := range pInfo.UnschedulablePlugins {
+		metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Dec()
+	}
+
 	return pInfo, nil
 }
 
@@ -1331,29 +1336,6 @@ func newPodNominator(podLister listersv1.PodLister) *nominator {
 		nominatedPods:      make(map[string][]*framework.PodInfo),
 		nominatedPodToNode: make(map[types.UID]string),
 	}
-}
-
-// MakeNextPodFuncs returns two functions to retrieve the next pod from a given
-// scheduling queue. For each pod info retrieved via it, the done function
-// must be called when no longer processing the pod.
-func MakeNextPodFuncs(logger klog.Logger, queue SchedulingQueue) (next func() *framework.QueuedPodInfo, done func(types.UID)) {
-	next = func() *framework.QueuedPodInfo {
-		podInfo, err := queue.Pop()
-		if err == nil && podInfo != nil {
-			logger.V(4).Info("About to try and schedule pod", "pod", klog.KObj(podInfo.Pod))
-			for plugin := range podInfo.UnschedulablePlugins {
-				metrics.UnschedulableReason(plugin, podInfo.Pod.Spec.SchedulerName).Dec()
-			}
-			return podInfo
-		} else if err != nil {
-			logger.Error(err, "Error while retrieving next pod from scheduling queue")
-		}
-		return nil
-	}
-	done = func(pod types.UID) {
-		queue.Done(pod)
-	}
-	return
 }
 
 func podInfoKeyFunc(obj interface{}) (string, error) {
