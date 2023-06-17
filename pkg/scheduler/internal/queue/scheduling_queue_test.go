@@ -197,7 +197,6 @@ func TestInFlightPods(t *testing.T) {
 	if getUnschedulablePod(q, medPriorityPodInfo.Pod) != medPriorityPodInfo.Pod {
 		t.Fatalf("Pod %v was not found in the unschedulablePods.", medPriorityPodInfo.Pod.Name)
 	}
-	q.Done(medPriorityPodInfo.Pod.UID)
 
 	q.MoveAllToActiveOrBackoffQueue(logger, WildCardEvent, nil, nil, func(pod *v1.Pod) bool {
 		// pretend that medPriorityPodInfo is moved to activeQ from unschedulable pod pool.
