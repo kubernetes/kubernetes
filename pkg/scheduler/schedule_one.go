@@ -66,12 +66,18 @@ const (
 // scheduleOne does the entire scheduling workflow for a single pod. It is serialized on the scheduling algorithm's host fitting.
 func (sched *Scheduler) scheduleOne(ctx context.Context) {
 	logger := klog.FromContext(ctx)
-	podInfo := sched.NextPod()
+	podInfo, err := sched.NextPod()
+	if err != nil {
+		logger.Error(err, "Error while retrieving next pod from scheduling queue")
+		return
+	}
 	// pod could be nil when schedulerQueue is closed
 	if podInfo == nil || podInfo.Pod == nil {
 		return
 	}
+
 	pod := podInfo.Pod
+	logger.V(4).Info("About to try and schedule pod", "pod", klog.KObj(pod))
 
 	schedulingFailed := true
 	defer func() {

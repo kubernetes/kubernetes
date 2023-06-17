@@ -71,7 +71,7 @@ type Scheduler struct {
 	// is available. We don't use a channel for this, because scheduling
 	// a pod may take some amount of time and we don't want pods to get
 	// stale while they sit in a channel.
-	NextPod func() *framework.QueuedPodInfo
+	NextPod func() (*framework.QueuedPodInfo, error)
 
 	// DonePod must be called when the processing of the pod is completed.
 	DonePod func(pod types.UID)
@@ -350,7 +350,8 @@ func New(ctx context.Context,
 		Profiles:                 profiles,
 		logger:                   logger,
 	}
-	sched.NextPod, sched.DonePod = internalqueue.MakeNextPodFuncs(logger, podQueue)
+	sched.NextPod = podQueue.Pop
+	sched.DonePod = podQueue.Done
 	sched.applyDefaultHandlers()
 
 	addAllEventHandlers(sched, informerFactory, dynInformerFactory, unionedGVKs(clusterEventMap))
