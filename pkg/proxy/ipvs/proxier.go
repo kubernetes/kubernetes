@@ -1052,7 +1052,7 @@ func (proxier *Proxier) syncProxyRules() {
 				klog.ErrorS(nil, "Failed to cast BaseEndpointInfo", "endpoint", e)
 				continue
 			}
-			if !ep.IsLocal {
+			if !ep.IsLocal() {
 				continue
 			}
 			epIP := ep.IP()

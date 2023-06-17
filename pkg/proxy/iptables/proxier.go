@@ -132,7 +132,7 @@ type endpointInfo struct {
 func newEndpointInfo(baseInfo *proxy.BaseEndpointInfo, svcPortName *proxy.ServicePortName) proxy.Endpoint {
 	return &endpointInfo{
 		BaseEndpointInfo: baseInfo,
-		ChainName:        servicePortEndpointChainName(svcPortName.String(), strings.ToLower(string(svcPortName.Protocol)), baseInfo.Endpoint),
+		ChainName:        servicePortEndpointChainName(svcPortName.String(), strings.ToLower(string(svcPortName.Protocol)), baseInfo.String()),
 	}
 }
 
@@ -1373,7 +1373,7 @@ func (proxier *Proxier) syncProxyRules() {
 				args = append(args, "-m", "recent", "--name", string(endpointChain), "--set")
 			}
 			// DNAT to final destination.
-			args = append(args, "-m", protocol, "-p", protocol, "-j", "DNAT", "--to-destination", epInfo.Endpoint)
+			args = append(args, "-m", protocol, "-p", protocol, "-j", "DNAT", "--to-destination", epInfo.String())
 			natRules.Write(args)
 		}
 	}
@@ -1564,7 +1564,7 @@ func (proxier *Proxier) writeServiceToEndpointRules(natRules proxyutil.LineBuffe
 			if !ok {
 				continue
 			}
-			comment := fmt.Sprintf(`"%s -> %s"`, svcPortNameString, epInfo.Endpoint)
+			comment := fmt.Sprintf(`"%s -> %s"`, svcPortNameString, epInfo.String())
 
 			args = append(args[:0],
 				"-A", string(svcChain),
@@ -1586,7 +1586,7 @@ func (proxier *Proxier) writeServiceToEndpointRules(natRules proxyutil.LineBuffe
 		if !ok {
 			continue
 		}
-		comment := fmt.Sprintf(`"%s -> %s"`, svcPortNameString, epInfo.Endpoint)
+		comment := fmt.Sprintf(`"%s -> %s"`, svcPortNameString, epInfo.String())
 
 		args = append(args[:0], "-A", string(svcChain))
 		args = proxier.appendServiceCommentLocked(args, comment)
