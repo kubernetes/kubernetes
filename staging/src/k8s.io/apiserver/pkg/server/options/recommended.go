@@ -157,6 +157,7 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 				config.SharedInformerFactory,
 				kubernetes.NewForConfigOrDie(config.ClientConfig).FlowcontrolV1beta3(),
 				config.MaxRequestsInFlight+config.MaxMutatingRequestsInFlight,
+				config.MaxWatchesInFlight,
 				config.RequestTimeout/4,
 			)
 		} else {

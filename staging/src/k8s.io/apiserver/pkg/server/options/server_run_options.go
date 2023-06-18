@@ -50,6 +50,7 @@ type ServerRunOptions struct {
 	ExternalHost                string
 	MaxRequestsInFlight         int
 	MaxMutatingRequestsInFlight int
+	MaxWatchesInFlight          int
 	RequestTimeout              time.Duration
 	GoawayChance                float64
 	LivezGracePeriod            time.Duration
@@ -97,6 +98,7 @@ func NewServerRunOptions() *ServerRunOptions {
 	return &ServerRunOptions{
 		MaxRequestsInFlight:                 defaults.MaxRequestsInFlight,
 		MaxMutatingRequestsInFlight:         defaults.MaxMutatingRequestsInFlight,
+		MaxWatchesInFlight:                  defaults.MaxWatchesInFlight,
 		RequestTimeout:                      defaults.RequestTimeout,
 		LivezGracePeriod:                    defaults.LivezGracePeriod,
 		MinRequestTimeout:                   defaults.MinRequestTimeout,
@@ -116,6 +118,7 @@ func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.ExternalAddress = s.ExternalHost
 	c.MaxRequestsInFlight = s.MaxRequestsInFlight
 	c.MaxMutatingRequestsInFlight = s.MaxMutatingRequestsInFlight
+	c.MaxWatchesInFlight = s.MaxWatchesInFlight
 	c.LivezGracePeriod = s.LivezGracePeriod
 	c.RequestTimeout = s.RequestTimeout
 	c.GoawayChance = s.GoawayChance

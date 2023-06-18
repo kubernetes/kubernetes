@@ -64,7 +64,7 @@ type Interface interface {
 		noteFn func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string),
 		workEstimator func() fcrequest.WorkEstimate,
 		queueNoteFn fq.QueueNoteFn,
-		execFn func(),
+		execFn func(servingWatch bool),
 	)
 
 	// Run monitors config objects from the main apiservers and causes
@@ -86,21 +86,23 @@ func New(
 	informerFactory kubeinformers.SharedInformerFactory,
 	flowcontrolClient flowcontrolclient.FlowcontrolV1beta3Interface,
 	serverConcurrencyLimit int,
+	serverWatchConcurrencyLimit int,
 	requestWaitLimit time.Duration,
 ) Interface {
 	clk := eventclock.Real{}
 	return NewTestable(TestableConfig{
-		Name:                   "Controller",
-		Clock:                  clk,
-		AsFieldManager:         ConfigConsumerAsFieldManager,
-		FoundToDangling:        func(found bool) bool { return !found },
-		InformerFactory:        informerFactory,
-		FlowcontrolClient:      flowcontrolClient,
-		ServerConcurrencyLimit: serverConcurrencyLimit,
-		RequestWaitLimit:       requestWaitLimit,
-		ReqsGaugeVec:           metrics.PriorityLevelConcurrencyGaugeVec,
-		ExecSeatsGaugeVec:      metrics.PriorityLevelExecutionSeatsGaugeVec,
-		QueueSetFactory:        fqs.NewQueueSetFactory(clk),
+		Name:                        "Controller",
+		Clock:                       clk,
+		AsFieldManager:              ConfigConsumerAsFieldManager,
+		FoundToDangling:             func(found bool) bool { return !found },
+		InformerFactory:             informerFactory,
+		FlowcontrolClient:           flowcontrolClient,
+		ServerConcurrencyLimit:      serverConcurrencyLimit,
+		ServerWatchConcurrencyLimit: serverWatchConcurrencyLimit,
+		RequestWaitLimit:            requestWaitLimit,
+		ReqsGaugeVec:                metrics.PriorityLevelConcurrencyGaugeVec,
+		ExecSeatsGaugeVec:           metrics.PriorityLevelExecutionSeatsGaugeVec,
+		QueueSetFactory:             fqs.NewQueueSetFactory(clk),
 	})
 }
 
@@ -133,7 +135,8 @@ type TestableConfig struct {
 	FlowcontrolClient flowcontrolclient.FlowcontrolV1beta3Interface
 
 	// ServerConcurrencyLimit for the controller to enforce
-	ServerConcurrencyLimit int
+	ServerConcurrencyLimit      int
+	ServerWatchConcurrencyLimit int
 
 	// RequestWaitLimit configured on the server
 	RequestWaitLimit time.Duration
@@ -157,8 +160,8 @@ func (cfgCtlr *configController) Handle(ctx context.Context, requestDigest Reque
 	noteFn func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string),
 	workEstimator func() fcrequest.WorkEstimate,
 	queueNoteFn fq.QueueNoteFn,
-	execFn func()) {
-	fs, pl, isExempt, req, startWaitingTime := cfgCtlr.startRequest(ctx, requestDigest, noteFn, workEstimator, queueNoteFn)
+	execFn func(servingWatch bool)) {
+	fs, pl, isExempt, req, startWaitingTime, servingWatch := cfgCtlr.startRequest(ctx, requestDigest, noteFn, workEstimator, queueNoteFn)
 	queued := startWaitingTime != time.Time{}
 	if req == nil {
 		if queued {
@@ -190,7 +193,7 @@ func (cfgCtlr *configController) Handle(ctx context.Context, requestDigest Reque
 			httplog.AddKeyValue(ctx, "apf_execution_time", executionTime)
 			metrics.ObserveExecutionDuration(ctx, pl.Name, fs.Name, executionTime)
 		}()
-		execFn()
+		execFn(servingWatch)
 	})
 	if queued && !executed {
 		observeQueueWaitTime(ctx, pl.Name, fs.Name, strconv.FormatBool(req != nil), cfgCtlr.clock.Since(startWaitingTime))

@@ -220,6 +220,7 @@ type Config struct {
 	// MaxRequestsInFlight is the maximum number of parallel non-long-running requests. Every further
 	// request has to wait. Applies only to non-mutating requests.
 	MaxRequestsInFlight int
+	MaxWatchesInFlight  int
 	// MaxMutatingRequestsInFlight is the maximum number of parallel mutating requests. Every further
 	// request has to wait.
 	MaxMutatingRequestsInFlight int
@@ -407,11 +408,13 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		DebugSocketPath:                "",
 		EnableMetrics:                  true,
 		MaxRequestsInFlight:            400,
-		MaxMutatingRequestsInFlight:    200,
-		RequestTimeout:                 time.Duration(60) * time.Second,
-		MinRequestTimeout:              1800,
-		LivezGracePeriod:               time.Duration(0),
-		ShutdownDelayDuration:          time.Duration(0),
+		// TODO(test)
+		MaxWatchesInFlight:          400,
+		MaxMutatingRequestsInFlight: 200,
+		RequestTimeout:              time.Duration(60) * time.Second,
+		MinRequestTimeout:           1800,
+		LivezGracePeriod:            time.Duration(0),
+		ShutdownDelayDuration:       time.Duration(0),
 		// 1.5MB is the default client request size in bytes
 		// the etcd server should accept. See
 		// https://github.com/etcd-io/etcd/blob/release-3.4/embed/config.go#L56.

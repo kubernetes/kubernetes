@@ -109,6 +109,7 @@ func WithPriorityAndFairness(
 		}
 
 		var classification *PriorityAndFairnessClassification
+		// TODO: add apf_pl_watch
 		noteFn := func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string) {
 			classification = &PriorityAndFairnessClassification{
 				FlowSchemaName:    fs.Name,
@@ -199,7 +200,7 @@ func WithPriorityAndFairness(
 				}
 			}()
 
-			execute := func() {
+			execute := func(servingWatch bool) {
 				startedAt := time.Now()
 				defer func() {
 					httplog.AddKeyValue(ctx, "apf_init_latency", time.Since(startedAt))
@@ -210,6 +211,14 @@ func WithPriorityAndFairness(
 				setResponseHeaders(classification, w)
 
 				forgetWatch = fcIfc.RegisterWatch(r)
+
+				// Serving the watch in here instead of the main thread.
+				if servingWatch {
+					watchCtx := utilflowcontrol.WithInitializationSignal(ctx, watchInitializationSignal)
+					watchReq = r.WithContext(watchCtx)
+					handler.ServeHTTP(w, watchReq)
+					return
+				}
 
 				// Notify the main thread that we're ready to start the watch.
 				close(shouldStartWatchCh)
@@ -283,7 +292,7 @@ func WithPriorityAndFairness(
 				}
 			}
 		} else {
-			execute := func() {
+			execute := func(_ bool) {
 				noteExecutingDelta(1)
 				defer noteExecutingDelta(-1)
 				served = true
