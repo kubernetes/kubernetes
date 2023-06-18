@@ -92,7 +92,8 @@ type FlowSchemaSpec struct {
 	// `priorityLevelConfiguration` should reference a PriorityLevelConfiguration in the cluster. If the reference cannot
 	// be resolved, the FlowSchema will be ignored and marked as invalid in its status.
 	// Required.
-	PriorityLevelConfiguration PriorityLevelConfigurationReference
+	PriorityLevelConfiguration      PriorityLevelConfigurationReference
+	PriorityLevelConfigurationWatch PriorityLevelConfigurationReference
 	// `matchingPrecedence` is used to choose among the FlowSchemas that match a given request. The chosen
 	// FlowSchema is among those with the numerically lowest (which we take to be logically highest)
 	// MatchingPrecedence.  Each MatchingPrecedence value must be ranged in [1,10000].
@@ -445,7 +446,23 @@ type LimitedPriorityLevelConfiguration struct {
 	// When this field is left `nil`, the limit is effectively infinite.
 	// +optional
 	BorrowingLimitPercent *int32
+
+	// `seatType` indicates what seat type that this level limits.
+	// A value of "Reuqest" is the default if not present. It means this level
+	// limits the rate of requests, which is the most common type of requests.
+	// A value of "Watch" means that this level limits the number of inflight
+	// Watch connections.
+	SeatType LimitedPriorityLevelSeatType
 }
+
+type LimitedPriorityLevelSeatType string
+
+const (
+	// LimitedPriorityLevelSeatTypeRequest
+	LimitedPriorityLevelSeatTypeRequest LimitedPriorityLevelSeatType = "Request"
+	// LimitedPriorityLevelSeatTypeWatch
+	LimitedPriorityLevelSeatTypeWatch LimitedPriorityLevelSeatType = "Watch"
+)
 
 // LimitResponse defines how to handle requests that can not be executed right now.
 // +union

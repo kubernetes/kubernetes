@@ -31818,6 +31818,12 @@ func schema_k8sio_api_flowcontrol_v1alpha1_FlowSchemaSpec(ref common.ReferenceCa
 							Ref:         ref("k8s.io/api/flowcontrol/v1alpha1.PriorityLevelConfigurationReference"),
 						},
 					},
+					"priorityLevelConfigurationWatch": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref("k8s.io/api/flowcontrol/v1alpha1.PriorityLevelConfigurationReference"),
+						},
+					},
 					"matchingPrecedence": {
 						SchemaProps: spec.SchemaProps{
 							Description: "`matchingPrecedence` is used to choose among the FlowSchemas that match a given request. The chosen FlowSchema is among those with the numerically lowest (which we take to be logically highest) MatchingPrecedence.  Each MatchingPrecedence value must be ranged in [1,10000]. Note that if the precedence is not specified, it will be set to 1000 as default.",
@@ -31852,7 +31858,7 @@ func schema_k8sio_api_flowcontrol_v1alpha1_FlowSchemaSpec(ref common.ReferenceCa
 						},
 					},
 				},
-				Required: []string{"priorityLevelConfiguration"},
+				Required: []string{"priorityLevelConfiguration", "priorityLevelConfigurationWatch"},
 			},
 		},
 		Dependencies: []string{
@@ -31997,7 +32003,16 @@ func schema_k8sio_api_flowcontrol_v1alpha1_LimitedPriorityLevelConfiguration(ref
 							Format:      "int32",
 						},
 					},
+					"seatType": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`seatType` indicates what seat type that this level limits. A value of \"Reuqest\" is the default if not present. It means this level limits the rate of requests, which is the most common type of requests. A value of \"Watch\" means that this level limits the number of inflight Watch connections.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
+				Required: []string{"seatType"},
 			},
 		},
 		Dependencies: []string{
@@ -32817,6 +32832,12 @@ func schema_k8sio_api_flowcontrol_v1beta1_FlowSchemaSpec(ref common.ReferenceCal
 							Ref:         ref("k8s.io/api/flowcontrol/v1beta1.PriorityLevelConfigurationReference"),
 						},
 					},
+					"priorityLevelConfigurationWatch": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref("k8s.io/api/flowcontrol/v1beta1.PriorityLevelConfigurationReference"),
+						},
+					},
 					"matchingPrecedence": {
 						SchemaProps: spec.SchemaProps{
 							Description: "`matchingPrecedence` is used to choose among the FlowSchemas that match a given request. The chosen FlowSchema is among those with the numerically lowest (which we take to be logically highest) MatchingPrecedence.  Each MatchingPrecedence value must be ranged in [1,10000]. Note that if the precedence is not specified, it will be set to 1000 as default.",
@@ -32851,7 +32872,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_FlowSchemaSpec(ref common.ReferenceCal
 						},
 					},
 				},
-				Required: []string{"priorityLevelConfiguration"},
+				Required: []string{"priorityLevelConfiguration", "priorityLevelConfigurationWatch"},
 			},
 		},
 		Dependencies: []string{
@@ -32996,7 +33017,16 @@ func schema_k8sio_api_flowcontrol_v1beta1_LimitedPriorityLevelConfiguration(ref 
 							Format:      "int32",
 						},
 					},
+					"seatType": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`seatType` indicates what seat type that this level limits. A value of \"Reuqest\" is the default if not present. It means this level limits the rate of requests, which is the most common type of requests. A value of \"Watch\" means that this level limits the number of inflight Watch connections.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
+				Required: []string{"seatType"},
 			},
 		},
 		Dependencies: []string{
@@ -33816,6 +33846,12 @@ func schema_k8sio_api_flowcontrol_v1beta2_FlowSchemaSpec(ref common.ReferenceCal
 							Ref:         ref("k8s.io/api/flowcontrol/v1beta2.PriorityLevelConfigurationReference"),
 						},
 					},
+					"priorityLevelConfigurationWatch": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref("k8s.io/api/flowcontrol/v1beta2.PriorityLevelConfigurationReference"),
+						},
+					},
 					"matchingPrecedence": {
 						SchemaProps: spec.SchemaProps{
 							Description: "`matchingPrecedence` is used to choose among the FlowSchemas that match a given request. The chosen FlowSchema is among those with the numerically lowest (which we take to be logically highest) MatchingPrecedence.  Each MatchingPrecedence value must be ranged in [1,10000]. Note that if the precedence is not specified, it will be set to 1000 as default.",
@@ -33850,7 +33886,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_FlowSchemaSpec(ref common.ReferenceCal
 						},
 					},
 				},
-				Required: []string{"priorityLevelConfiguration"},
+				Required: []string{"priorityLevelConfiguration", "priorityLevelConfigurationWatch"},
 			},
 		},
 		Dependencies: []string{
@@ -33995,7 +34031,16 @@ func schema_k8sio_api_flowcontrol_v1beta2_LimitedPriorityLevelConfiguration(ref 
 							Format:      "int32",
 						},
 					},
+					"seatType": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`seatType` indicates what seat type that this level limits. A value of \"Reuqest\" is the default if not present. It means this level limits the rate of requests, which is the most common type of requests. A value of \"Watch\" means that this level limits the number of inflight Watch connections.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
+				Required: []string{"seatType"},
 			},
 		},
 		Dependencies: []string{
@@ -34815,6 +34860,12 @@ func schema_k8sio_api_flowcontrol_v1beta3_FlowSchemaSpec(ref common.ReferenceCal
 							Ref:         ref("k8s.io/api/flowcontrol/v1beta3.PriorityLevelConfigurationReference"),
 						},
 					},
+					"priorityLevelConfigurationWatch": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref("k8s.io/api/flowcontrol/v1beta3.PriorityLevelConfigurationReference"),
+						},
+					},
 					"matchingPrecedence": {
 						SchemaProps: spec.SchemaProps{
 							Description: "`matchingPrecedence` is used to choose among the FlowSchemas that match a given request. The chosen FlowSchema is among those with the numerically lowest (which we take to be logically highest) MatchingPrecedence.  Each MatchingPrecedence value must be ranged in [1,10000]. Note that if the precedence is not specified, it will be set to 1000 as default.",
@@ -34849,7 +34900,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_FlowSchemaSpec(ref common.ReferenceCal
 						},
 					},
 				},
-				Required: []string{"priorityLevelConfiguration"},
+				Required: []string{"priorityLevelConfiguration", "priorityLevelConfigurationWatch"},
 			},
 		},
 		Dependencies: []string{
@@ -34996,7 +35047,16 @@ func schema_k8sio_api_flowcontrol_v1beta3_LimitedPriorityLevelConfiguration(ref 
 							Format:      "int32",
 						},
 					},
+					"seatType": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`seatType` indicates what seat type that this level limits. A value of \"Reuqest\" is the default if not present. It means this level limits the rate of requests, which is the most common type of requests. A value of \"Watch\" means that this level limits the number of inflight Watch connections.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
+				Required: []string{"seatType"},
 			},
 		},
 		Dependencies: []string{

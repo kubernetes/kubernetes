@@ -94,6 +94,8 @@ message FlowSchemaSpec {
   // Required.
   optional PriorityLevelConfigurationReference priorityLevelConfiguration = 1;
 
+  optional PriorityLevelConfigurationReference priorityLevelConfigurationWatch = 5;
+
   // `matchingPrecedence` is used to choose among the FlowSchemas that match a given request. The chosen
   // FlowSchema is among those with the numerically lowest (which we take to be logically highest)
   // MatchingPrecedence.  Each MatchingPrecedence value must be ranged in [1,10000].
@@ -205,6 +207,13 @@ message LimitedPriorityLevelConfiguration {
   // When this field is left `nil`, the limit is effectively infinite.
   // +optional
   optional int32 borrowingLimitPercent = 4;
+
+  // `seatType` indicates what seat type that this level limits.
+  // A value of "Reuqest" is the default if not present. It means this level
+  // limits the rate of requests, which is the most common type of requests.
+  // A value of "Watch" means that this level limits the number of inflight
+  // Watch connections.
+  optional string seatType = 5;
 }
 
 // NonResourcePolicyRule is a predicate that matches non-resource requests according to their verb and the

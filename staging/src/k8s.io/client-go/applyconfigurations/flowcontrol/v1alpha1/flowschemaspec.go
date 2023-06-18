@@ -21,10 +21,11 @@ package v1alpha1
 // FlowSchemaSpecApplyConfiguration represents an declarative configuration of the FlowSchemaSpec type for use
 // with apply.
 type FlowSchemaSpecApplyConfiguration struct {
-	PriorityLevelConfiguration *PriorityLevelConfigurationReferenceApplyConfiguration `json:"priorityLevelConfiguration,omitempty"`
-	MatchingPrecedence         *int32                                                 `json:"matchingPrecedence,omitempty"`
-	DistinguisherMethod        *FlowDistinguisherMethodApplyConfiguration             `json:"distinguisherMethod,omitempty"`
-	Rules                      []PolicyRulesWithSubjectsApplyConfiguration            `json:"rules,omitempty"`
+	PriorityLevelConfiguration      *PriorityLevelConfigurationReferenceApplyConfiguration `json:"priorityLevelConfiguration,omitempty"`
+	PriorityLevelConfigurationWatch *PriorityLevelConfigurationReferenceApplyConfiguration `json:"priorityLevelConfigurationWatch,omitempty"`
+	MatchingPrecedence              *int32                                                 `json:"matchingPrecedence,omitempty"`
+	DistinguisherMethod             *FlowDistinguisherMethodApplyConfiguration             `json:"distinguisherMethod,omitempty"`
+	Rules                           []PolicyRulesWithSubjectsApplyConfiguration            `json:"rules,omitempty"`
 }
 
 // FlowSchemaSpecApplyConfiguration constructs an declarative configuration of the FlowSchemaSpec type for use with
@@ -38,6 +39,14 @@ func FlowSchemaSpec() *FlowSchemaSpecApplyConfiguration {
 // If called multiple times, the PriorityLevelConfiguration field is set to the value of the last call.
 func (b *FlowSchemaSpecApplyConfiguration) WithPriorityLevelConfiguration(value *PriorityLevelConfigurationReferenceApplyConfiguration) *FlowSchemaSpecApplyConfiguration {
 	b.PriorityLevelConfiguration = value
+	return b
+}
+
+// WithPriorityLevelConfigurationWatch sets the PriorityLevelConfigurationWatch field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PriorityLevelConfigurationWatch field is set to the value of the last call.
+func (b *FlowSchemaSpecApplyConfiguration) WithPriorityLevelConfigurationWatch(value *PriorityLevelConfigurationReferenceApplyConfiguration) *FlowSchemaSpecApplyConfiguration {
+	b.PriorityLevelConfigurationWatch = value
 	return b
 }
 

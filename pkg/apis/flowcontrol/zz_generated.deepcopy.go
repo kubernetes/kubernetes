@@ -123,6 +123,7 @@ func (in *FlowSchemaList) DeepCopyObject() runtime.Object {
 func (in *FlowSchemaSpec) DeepCopyInto(out *FlowSchemaSpec) {
 	*out = *in
 	out.PriorityLevelConfiguration = in.PriorityLevelConfiguration
+	out.PriorityLevelConfigurationWatch = in.PriorityLevelConfigurationWatch
 	if in.DistinguisherMethod != nil {
 		in, out := &in.DistinguisherMethod, &out.DistinguisherMethod
 		*out = new(FlowDistinguisherMethod)

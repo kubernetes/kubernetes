@@ -366,6 +366,9 @@ func autoConvert_v1alpha1_FlowSchemaSpec_To_flowcontrol_FlowSchemaSpec(in *v1alp
 	if err := Convert_v1alpha1_PriorityLevelConfigurationReference_To_flowcontrol_PriorityLevelConfigurationReference(&in.PriorityLevelConfiguration, &out.PriorityLevelConfiguration, s); err != nil {
 		return err
 	}
+	if err := Convert_v1alpha1_PriorityLevelConfigurationReference_To_flowcontrol_PriorityLevelConfigurationReference(&in.PriorityLevelConfigurationWatch, &out.PriorityLevelConfigurationWatch, s); err != nil {
+		return err
+	}
 	out.MatchingPrecedence = in.MatchingPrecedence
 	out.DistinguisherMethod = (*flowcontrol.FlowDistinguisherMethod)(unsafe.Pointer(in.DistinguisherMethod))
 	out.Rules = *(*[]flowcontrol.PolicyRulesWithSubjects)(unsafe.Pointer(&in.Rules))
@@ -379,6 +382,9 @@ func Convert_v1alpha1_FlowSchemaSpec_To_flowcontrol_FlowSchemaSpec(in *v1alpha1.
 
 func autoConvert_flowcontrol_FlowSchemaSpec_To_v1alpha1_FlowSchemaSpec(in *flowcontrol.FlowSchemaSpec, out *v1alpha1.FlowSchemaSpec, s conversion.Scope) error {
 	if err := Convert_flowcontrol_PriorityLevelConfigurationReference_To_v1alpha1_PriorityLevelConfigurationReference(&in.PriorityLevelConfiguration, &out.PriorityLevelConfiguration, s); err != nil {
+		return err
+	}
+	if err := Convert_flowcontrol_PriorityLevelConfigurationReference_To_v1alpha1_PriorityLevelConfigurationReference(&in.PriorityLevelConfigurationWatch, &out.PriorityLevelConfigurationWatch, s); err != nil {
 		return err
 	}
 	out.MatchingPrecedence = in.MatchingPrecedence
@@ -461,6 +467,7 @@ func autoConvert_v1alpha1_LimitedPriorityLevelConfiguration_To_flowcontrol_Limit
 	}
 	out.LendablePercent = (*int32)(unsafe.Pointer(in.LendablePercent))
 	out.BorrowingLimitPercent = (*int32)(unsafe.Pointer(in.BorrowingLimitPercent))
+	out.SeatType = flowcontrol.LimitedPriorityLevelSeatType(in.SeatType)
 	return nil
 }
 
@@ -471,6 +478,7 @@ func autoConvert_flowcontrol_LimitedPriorityLevelConfiguration_To_v1alpha1_Limit
 	}
 	out.LendablePercent = (*int32)(unsafe.Pointer(in.LendablePercent))
 	out.BorrowingLimitPercent = (*int32)(unsafe.Pointer(in.BorrowingLimitPercent))
+	out.SeatType = v1alpha1.LimitedPriorityLevelSeatType(in.SeatType)
 	return nil
 }
 

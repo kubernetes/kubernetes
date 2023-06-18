@@ -8607,6 +8607,10 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.flowcontrol.v1alpha1.PriorityLevelConfigurationReference
       default: {}
+    - name: priorityLevelConfigurationWatch
+      type:
+        namedType: io.k8s.api.flowcontrol.v1alpha1.PriorityLevelConfigurationReference
+      default: {}
     - name: rules
       type:
         list:
@@ -8663,6 +8667,10 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.flowcontrol.v1alpha1.LimitResponse
       default: {}
+    - name: seatType
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.flowcontrol.v1alpha1.NonResourcePolicyRule
   map:
     fields:
@@ -8921,6 +8929,10 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfigurationReference
       default: {}
+    - name: priorityLevelConfigurationWatch
+      type:
+        namedType: io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfigurationReference
+      default: {}
     - name: rules
       type:
         list:
@@ -8977,6 +8989,10 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.flowcontrol.v1beta1.LimitResponse
       default: {}
+    - name: seatType
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.flowcontrol.v1beta1.NonResourcePolicyRule
   map:
     fields:
@@ -9235,6 +9251,10 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.flowcontrol.v1beta2.PriorityLevelConfigurationReference
       default: {}
+    - name: priorityLevelConfigurationWatch
+      type:
+        namedType: io.k8s.api.flowcontrol.v1beta2.PriorityLevelConfigurationReference
+      default: {}
     - name: rules
       type:
         list:
@@ -9291,6 +9311,10 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.flowcontrol.v1beta2.LimitResponse
       default: {}
+    - name: seatType
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.flowcontrol.v1beta2.NonResourcePolicyRule
   map:
     fields:
@@ -9549,6 +9573,10 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfigurationReference
       default: {}
+    - name: priorityLevelConfigurationWatch
+      type:
+        namedType: io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfigurationReference
+      default: {}
     - name: rules
       type:
         list:
@@ -9605,6 +9633,10 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: numeric
       default: 0
+    - name: seatType
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.flowcontrol.v1beta3.NonResourcePolicyRule
   map:
     fields:

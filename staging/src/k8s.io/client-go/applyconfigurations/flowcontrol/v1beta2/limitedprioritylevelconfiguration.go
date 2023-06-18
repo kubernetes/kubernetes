@@ -18,13 +18,18 @@ limitations under the License.
 
 package v1beta2
 
+import (
+	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
+)
+
 // LimitedPriorityLevelConfigurationApplyConfiguration represents an declarative configuration of the LimitedPriorityLevelConfiguration type for use
 // with apply.
 type LimitedPriorityLevelConfigurationApplyConfiguration struct {
-	AssuredConcurrencyShares *int32                           `json:"assuredConcurrencyShares,omitempty"`
-	LimitResponse            *LimitResponseApplyConfiguration `json:"limitResponse,omitempty"`
-	LendablePercent          *int32                           `json:"lendablePercent,omitempty"`
-	BorrowingLimitPercent    *int32                           `json:"borrowingLimitPercent,omitempty"`
+	AssuredConcurrencyShares *int32                                           `json:"assuredConcurrencyShares,omitempty"`
+	LimitResponse            *LimitResponseApplyConfiguration                 `json:"limitResponse,omitempty"`
+	LendablePercent          *int32                                           `json:"lendablePercent,omitempty"`
+	BorrowingLimitPercent    *int32                                           `json:"borrowingLimitPercent,omitempty"`
+	SeatType                 *flowcontrolv1beta2.LimitedPriorityLevelSeatType `json:"seatType,omitempty"`
 }
 
 // LimitedPriorityLevelConfigurationApplyConfiguration constructs an declarative configuration of the LimitedPriorityLevelConfiguration type for use with
@@ -62,5 +67,13 @@ func (b *LimitedPriorityLevelConfigurationApplyConfiguration) WithLendablePercen
 // If called multiple times, the BorrowingLimitPercent field is set to the value of the last call.
 func (b *LimitedPriorityLevelConfigurationApplyConfiguration) WithBorrowingLimitPercent(value int32) *LimitedPriorityLevelConfigurationApplyConfiguration {
 	b.BorrowingLimitPercent = &value
+	return b
+}
+
+// WithSeatType sets the SeatType field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the SeatType field is set to the value of the last call.
+func (b *LimitedPriorityLevelConfigurationApplyConfiguration) WithSeatType(value flowcontrolv1beta2.LimitedPriorityLevelSeatType) *LimitedPriorityLevelConfigurationApplyConfiguration {
+	b.SeatType = &value
 	return b
 }
