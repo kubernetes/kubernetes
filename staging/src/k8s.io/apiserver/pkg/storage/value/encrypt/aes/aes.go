@@ -232,7 +232,7 @@ func (e *extendedNonceGCM) TransformFromStorage(ctx context.Context, data []byte
 
 	transformer, err := e.derivedKeyTransformer(info, dataCtx)
 	if err != nil {
-		return nil, false, err // TODO fmt.Err
+		return nil, false, fmt.Errorf("failed to derive read key from KDF: %w", err)
 	}
 
 	return transformer.TransformFromStorage(ctx, data, dataCtx)
@@ -241,12 +241,12 @@ func (e *extendedNonceGCM) TransformFromStorage(ctx context.Context, data []byte
 func (e *extendedNonceGCM) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, error) {
 	info := make([]byte, commonSize)
 	if err := randomNonce(info); err != nil {
-		return nil, err // TODO fmt.Err
+		return nil, fmt.Errorf("failed to generate info for KDF: %w", err)
 	}
 
 	transformer, err := e.derivedKeyTransformer(info, dataCtx)
 	if err != nil {
-		return nil, err // TODO fmt.Err
+		return nil, fmt.Errorf("failed to derive write key from KDF: %w", err)
 	}
 
 	return transformer.TransformToStorage(ctx, data, dataCtx)
@@ -262,17 +262,17 @@ func (e *extendedNonceGCM) derivedKeyTransformer(info []byte, dataCtx value.Cont
 
 	key, err := e.sha256KDFExpandOnly(info)
 	if err != nil {
-		return nil, err // TODO fmt.Err
+		return nil, fmt.Errorf("failed to KDF expand seed with info: %w", err)
 	}
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return nil, err // TODO fmt.Err
+		return nil, fmt.Errorf("failed to build cipher with KDF derived key: %w", err)
 	}
 
 	transformer, err := newGCMTransformerWithInfo(block, info)
 	if err != nil {
-		return nil, err // TODO fmt.Err
+		return nil, fmt.Errorf("failed to build transformer with KDF derived key: %w", err)
 	}
 
 	e.cache.set(dataCtx, transformer)
@@ -281,12 +281,11 @@ func (e *extendedNonceGCM) derivedKeyTransformer(info []byte, dataCtx value.Cont
 }
 
 func (e *extendedNonceGCM) sha256KDFExpandOnly(info []byte) ([]byte, error) {
-	// TODO come up with a way to pre-compute this
 	kdf := hkdf.Expand(sha256.New, e.key, info)
 
 	derivedKey := make([]byte, commonSize)
 	if _, err := io.ReadFull(kdf, derivedKey); err != nil {
-		return nil, err // TODO fmt.Err
+		return nil, fmt.Errorf("failed to read a derived key from KDF: %w", err)
 	}
 
 	return derivedKey, nil
