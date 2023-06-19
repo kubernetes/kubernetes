@@ -38,10 +38,16 @@ import (
 	"k8s.io/utils/clock"
 )
 
-// TODO comment
+// commonSize is the length of various security sensitive byte slices such as encryption keys.
 const commonSize = 32
 
-// TODO comment
+// cacheTTL is the TTL of KDF cache entries.  We assume that the value.Context.AuthenticatedData
+// for every call is the etcd storage path of the associated resource, and use that as the primary
+// cache key (with a secondary check that confirms that the gcm.info matches).  Thus if a client
+// is constantly creating resources with new names (and thus new paths), they will keep adding new
+// entries to the cache for up to this TTL before the GC logic starts deleting old entries.  Each
+// entry is ~300 bytes in size, so even a malicious client will be bounded in the overall memory
+// it can consume.
 const cacheTTL = 10 * time.Minute
 
 type gcm struct {
