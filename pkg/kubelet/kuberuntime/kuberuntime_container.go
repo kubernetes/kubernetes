@@ -48,6 +48,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	kubelettypes "k8s.io/kubelet/pkg/types"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/cri/remote"
@@ -549,7 +550,7 @@ func (m *kubeGenericRuntimeManager) convertToKubeContainerStatus(status *runtime
 func (m *kubeGenericRuntimeManager) getPodContainerStatuses(ctx context.Context, uid kubetypes.UID, name, namespace string) ([]*kubecontainer.Status, error) {
 	// Select all containers of the given pod.
 	containers, err := m.runtimeService.ListContainers(ctx, &runtimeapi.ContainerFilter{
-		LabelSelector: map[string]string{types.KubernetesPodUIDLabel: string(uid)},
+		LabelSelector: map[string]string{kubelettypes.KubernetesPodUIDLabel: string(uid)},
 	})
 	if err != nil {
 		klog.ErrorS(err, "ListContainers error")
