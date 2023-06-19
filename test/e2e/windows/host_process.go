@@ -85,7 +85,7 @@ var (
 	User_NTAuthoritySystem       = "NT AUTHORITY\\SYSTEM"
 )
 
-var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersion:1.22] HostProcess containers", func() {
+var _ = sigDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersion:1.22] HostProcess containers", skipUnlessWindows(func() {
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
 	})
@@ -799,7 +799,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 		gomega.Expect(strings.ToLower(logs)).ShouldNot(gomega.ContainSubstring("nt authority"), "Container runs 'whoami' and logs should not contain 'nt authority'")
 	})
 
-})
+}))
 
 func makeTestPodWithVolumeMounts(name string) *v1.Pod {
 	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate

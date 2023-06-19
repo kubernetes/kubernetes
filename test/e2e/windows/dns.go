@@ -31,7 +31,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("[Feature:Windows] DNS", func() {
+var _ = sigDescribe("[Feature:Windows] DNS", skipUnlessWindows(func() {
 
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
@@ -136,4 +136,4 @@ var _ = SIGDescribe("[Feature:Windows] DNS", func() {
 
 		// TODO: Add more test cases for other DNSPolicies.
 	})
-})
+}))

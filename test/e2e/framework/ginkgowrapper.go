@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"path"
 	"reflect"
+	"regexp"
 	"strings"
 
 	"github.com/onsi/ginkgo/v2"
@@ -122,6 +123,26 @@ func AnnotatedLocationWithOffset(annotation string, offset int) types.CodeLocati
 	codeLocation = types.NewCustomCodeLocation(annotation + " | " + codeLocation.String())
 	return codeLocation
 }
+
+// SIGDescribe returns a wrapper function for ginkgo.Describe which injects
+// the SIG name as annotation. The parameter should be lowercase with
+// no spaces and no sig- or SIG- prefix.
+func SIGDescribe(sig string) func(string, ...interface{}) bool {
+	if !sigRE.MatchString(sig) || strings.HasPrefix(sig, "sig-") {
+		panic(fmt.Sprintf("SIG label must be lowercase, no spaces and no sig- prefix, got instead: %q", sig))
+	}
+	return func(text string, args ...interface{}) bool {
+		args = append(args, ginkgo.Label("sig-"+sig))
+		if text == "" {
+			text = fmt.Sprintf("[sig-%s]", sig)
+		} else {
+			text = fmt.Sprintf("[sig-%s] %s", sig, text)
+		}
+		return registerInSuite(ginkgo.Describe, text, args)
+	}
+}
+
+var sigRE = regexp.MustCompile(`^[a-z]+(-[a-z]+)*$`)
 
 // ConformanceIt is wrapper function for ginkgo It.  Adds "[Conformance]" tag and makes static analysis easier.
 func ConformanceIt(text string, args ...interface{}) bool {
