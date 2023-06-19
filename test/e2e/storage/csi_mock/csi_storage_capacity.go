@@ -320,7 +320,7 @@ var _ = utils.SIGDescribe("CSI Mock volume storage capacity", func() {
 		}
 		for _, t := range tests {
 			test := t
-			ginkgo.It(t.name, ginkgo.SpecTimeout(f.Timeouts.PodStart), func(ctx context.Context) {
+			ginkgo.It(t.name, ginkgo.NodeTimeout(f.Timeouts.PodStart), func(ctx context.Context) {
 				scName := "mock-csi-storage-capacity-" + f.UniqueName
 				m.init(ctx, testParameters{
 					registerDriver:  true,

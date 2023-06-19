@@ -118,6 +118,10 @@ func RemoveStackedEtcdMemberFromCluster(client clientset.Interface, cfg *kubeadm
 	klog.V(2).Infof("[etcd] get the member id from peer: %s", etcdPeerAddress)
 	id, err := etcdClient.GetMemberID(etcdPeerAddress)
 	if err != nil {
+		if errors.Is(etcdutil.ErrNoMemberIDForPeerURL, err) {
+			klog.V(5).Infof("[etcd] member was already removed, because no member id exists for peer %s", etcdPeerAddress)
+			return nil
+		}
 		return err
 	}
 
