@@ -905,12 +905,6 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 		return fmt.Errorf("tracking status: %w", err)
 	}
 
-	jobFinished := IsJobFinished(&job)
-	if jobHasNewFailure && !jobFinished {
-		// returning an error will re-enqueue Job after the backoff period
-		return fmt.Errorf("failed pod(s) detected for job key %q", key)
-	}
-
 	return manageJobErr
 }
 
