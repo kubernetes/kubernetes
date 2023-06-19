@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -177,25 +178,40 @@ func makeTestContainer(tcInfo TestContainerInfo) (v1.Container, v1.ContainerStat
 	bTrue := true
 	bFalse := false
 	userID := int64(1001)
-	tc := v1.Container{
-		Name:         tcInfo.Name,
-		Image:        imageutils.GetE2EImage(imageutils.BusyBox),
-		Command:      []string{"/bin/sh"},
-		Args:         []string{"-c", cmd},
-		Resources:    res,
-		ResizePolicy: resizePol,
-		SecurityContext: &v1.SecurityContext{
+	userName := "ContainerUser"
+
+	var securityContext *v1.SecurityContext
+
+	if framework.NodeOSDistroIs("windows") {
+		securityContext = &v1.SecurityContext{
+			RunAsNonRoot: &bTrue,
+			WindowsOptions: &v1.WindowsSecurityContextOptions{
+				RunAsUserName: &userName,
+			},
+		}
+	} else {
+		securityContext = &v1.SecurityContext{
 			Privileged:               &bFalse,
 			AllowPrivilegeEscalation: &bFalse,
-			RunAsNonRoot:             &bTrue,
 			RunAsUser:                &userID,
+			RunAsNonRoot:             &bTrue,
 			Capabilities: &v1.Capabilities{
 				Drop: []v1.Capability{"ALL"},
 			},
 			SeccompProfile: &v1.SeccompProfile{
 				Type: v1.SeccompProfileTypeRuntimeDefault,
 			},
-		},
+		}
+	}
+
+	tc := v1.Container{
+		Name:            tcInfo.Name,
+		Image:           imageutils.GetE2EImage(imageutils.BusyBox),
+		Command:         []string{"/bin/sh"},
+		Args:            []string{"-c", cmd},
+		Resources:       res,
+		ResizePolicy:    resizePol,
+		SecurityContext: securityContext,
 	}
 
 	tcStatus := v1.ContainerStatus{
@@ -207,10 +223,19 @@ func makeTestContainer(tcInfo TestContainerInfo) (v1.Container, v1.ContainerStat
 
 func makeTestPod(ns, name, timeStamp string, tcInfo []TestContainerInfo) *v1.Pod {
 	var testContainers []v1.Container
+	var podOS *v1.PodOS
+
 	for _, ci := range tcInfo {
 		tc, _ := makeTestContainer(ci)
 		testContainers = append(testContainers, tc)
 	}
+
+	if framework.NodeOSDistroIs("windows") {
+		podOS = &v1.PodOS{Name: v1.OSName("windows")}
+	} else {
+		podOS = &v1.PodOS{Name: v1.OSName(runtime.GOOS)}
+	}
+
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -225,6 +250,7 @@ func makeTestPod(ns, name, timeStamp string, tcInfo []TestContainerInfo) *v1.Pod
 			},
 		},
 		Spec: v1.PodSpec{
+			OS:            podOS,
 			Containers:    testContainers,
 			RestartPolicy: v1.RestartPolicyOnFailure,
 		},
@@ -470,18 +496,20 @@ func waitForPodResizeActuation(c clientset.Interface, podClient *e2epod.PodClien
 	// Wait for pod resource allocations to equal expected values after resize
 	resizedPod, aErr := waitPodAllocationsEqualsExpected()
 	framework.ExpectNoError(aErr, "failed to verify pod resource allocation values equals expected values")
-	// Wait for container cgroup values to equal expected cgroup values after resize
-	cErr := waitContainerCgroupValuesEqualsExpected()
-	framework.ExpectNoError(cErr, "failed to verify container cgroup values equals expected values")
 	//TODO(vinaykul,InPlacePodVerticalScaling): Remove this check once base-OS updates to containerd>=1.6.9
 	//                containerd needs to add CRI support before Beta (See Node KEP #2273)
-	if isInPlaceResizeSupportedByRuntime(c, pod.Spec.NodeName) {
+	if !isInPlaceResizeSupportedByRuntime(c, pod.Spec.NodeName) {
 		// Wait for PodSpec container resources to equal PodStatus container resources indicating resize is complete
 		rPod, rErr := waitPodStatusResourcesEqualSpecResources()
 		framework.ExpectNoError(rErr, "failed to verify pod spec resources equals pod status resources")
 
 		ginkgo.By("verifying pod status after resize")
 		verifyPodStatusResources(rPod, expectedContainers)
+	} else if !framework.NodeOSDistroIs("windows") {
+		// Wait for container cgroup values to equal expected cgroup values after resize
+		// only for containerd versions before 1.6.9
+		cErr := waitContainerCgroupValuesEqualsExpected()
+		framework.ExpectNoError(cErr, "failed to verify container cgroup values equals expected values")
 	}
 	return resizedPod
 }
@@ -1228,7 +1256,12 @@ func doPodResizeTests() {
 
 			ginkgo.By("verifying initial pod status resources and cgroup config are as expected")
 			verifyPodStatusResources(newPod, tc.containers)
-			verifyPodContainersCgroupValues(newPod, tc.containers, true)
+			// Check cgroup values only for containerd versions before 1.6.9
+			if !isInPlaceResizeSupportedByRuntime(f.ClientSet, newPod.Spec.NodeName) {
+				if !framework.NodeOSDistroIs("windows") {
+					verifyPodContainersCgroupValues(newPod, tc.containers, true)
+				}
+			}
 
 			ginkgo.By("patching pod for resize")
 			patchedPod, pErr = f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(context.TODO(), newPod.Name,
@@ -1242,8 +1275,13 @@ func doPodResizeTests() {
 			ginkgo.By("waiting for resize to be actuated")
 			resizedPod := waitForPodResizeActuation(f.ClientSet, podClient, newPod, patchedPod, tc.expected)
 
-			ginkgo.By("verifying pod container's cgroup values after resize")
-			verifyPodContainersCgroupValues(resizedPod, tc.expected, true)
+			// Check cgroup values only for containerd versions before 1.6.9
+			if !isInPlaceResizeSupportedByRuntime(f.ClientSet, newPod.Spec.NodeName) {
+				ginkgo.By("verifying pod container's cgroup values after resize")
+				if !framework.NodeOSDistroIs("windows") {
+					verifyPodContainersCgroupValues(resizedPod, tc.expected, true)
+				}
+			}
 
 			ginkgo.By("verifying pod resources after resize")
 			verifyPodResources(resizedPod, tc.expected)
@@ -1335,9 +1373,12 @@ func doPodResizeResourceQuotaTests() {
 
 		ginkgo.By("waiting for resize to be actuated")
 		resizedPod := waitForPodResizeActuation(f.ClientSet, podClient, newPod1, patchedPod, expected)
-
-		ginkgo.By("verifying pod container's cgroup values after resize")
-		verifyPodContainersCgroupValues(resizedPod, expected, true)
+		if !isInPlaceResizeSupportedByRuntime(f.ClientSet, newPod1.Spec.NodeName) {
+			ginkgo.By("verifying pod container's cgroup values after resize")
+			if !framework.NodeOSDistroIs("windows") {
+				verifyPodContainersCgroupValues(resizedPod, expected, true)
+			}
+		}
 
 		ginkgo.By("verifying pod resources after resize")
 		verifyPodResources(resizedPod, expected)
@@ -1439,7 +1480,11 @@ func doPodResizeErrorTests() {
 
 			ginkgo.By("verifying initial pod status resources and cgroup config are as expected")
 			verifyPodStatusResources(newPod, tc.containers)
-			verifyPodContainersCgroupValues(newPod, tc.containers, true)
+			if !isInPlaceResizeSupportedByRuntime(f.ClientSet, newPod.Spec.NodeName) {
+				if !framework.NodeOSDistroIs("windows") {
+					verifyPodContainersCgroupValues(newPod, tc.containers, true)
+				}
+			}
 
 			ginkgo.By("patching pod for resize")
 			patchedPod, pErr = f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(context.TODO(), newPod.Name,
@@ -1451,8 +1496,12 @@ func doPodResizeErrorTests() {
 				patchedPod = newPod
 			}
 
-			ginkgo.By("verifying pod container's cgroup values after patch")
-			verifyPodContainersCgroupValues(patchedPod, tc.expected, true)
+			if !isInPlaceResizeSupportedByRuntime(f.ClientSet, patchedPod.Spec.NodeName) {
+				ginkgo.By("verifying pod container's cgroup values after patch")
+				if !framework.NodeOSDistroIs("windows") {
+					verifyPodContainersCgroupValues(patchedPod, tc.expected, true)
+				}
+			}
 
 			ginkgo.By("verifying pod resources after patch")
 			verifyPodResources(patchedPod, tc.expected)
