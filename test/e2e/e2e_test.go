@@ -92,6 +92,11 @@ func TestMain(m *testing.M) {
 		os.Exit(0)
 	}
 
+	if flag.CommandLine.NArg() > 0 {
+		fmt.Fprintf(os.Stderr, "unknown additional command line arguments: %s", flag.CommandLine.Args())
+		os.Exit(1)
+	}
+
 	// Enable embedded FS file lookup as fallback
 	testfiles.AddFileSource(e2etestingmanifests.GetE2ETestingManifestsFS())
 	testfiles.AddFileSource(testfixtures.GetTestFixturesFS())
