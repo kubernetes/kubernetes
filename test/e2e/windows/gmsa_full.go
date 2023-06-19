@@ -90,7 +90,7 @@ const (
 	gmsaSharedFolder = "write_test"
 )
 
-var _ = SIGDescribe("[Feature:Windows] GMSA Full [Serial] [Slow]", func() {
+var _ = sigDescribe("[Feature:Windows] GMSA Full [Serial] [Slow]", skipUnlessWindows(func() {
 	f := framework.NewDefaultFramework("gmsa-full-test-windows")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -220,7 +220,7 @@ var _ = SIGDescribe("[Feature:Windows] GMSA Full [Serial] [Slow]", func() {
 
 		})
 	})
-})
+}))
 
 func isValidOutput(output string) bool {
 	return strings.Contains(output, expectedQueryOutput) &&

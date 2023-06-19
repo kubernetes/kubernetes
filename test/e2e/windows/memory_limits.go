@@ -39,7 +39,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("[Feature:Windows] Memory Limits [Serial] [Slow]", func() {
+var _ = sigDescribe("[Feature:Windows] Memory Limits [Serial] [Slow]", skipUnlessWindows(func() {
 
 	f := framework.NewDefaultFramework("memory-limit-test-windows")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
@@ -60,8 +60,7 @@ var _ = SIGDescribe("[Feature:Windows] Memory Limits [Serial] [Slow]", func() {
 			overrideAllocatableMemoryTest(ctx, f, framework.TestContext.CloudConfig.NumNodes)
 		})
 	})
-
-})
+}))
 
 type nodeMemory struct {
 	// capacity

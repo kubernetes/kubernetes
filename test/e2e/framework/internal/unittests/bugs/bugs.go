@@ -69,7 +69,7 @@ var (
 func Describe() {
 	// Normally a single line would be better, but this is an extreme example and
 	// thus uses multiple.
-	framework.Describe("abc",
+	framework.SIGDescribe("testing")("abc",
 		// Bugs in parameters will be attributed to the Describe call, not the line of the parameter.
 		"",        // buggy: not needed
 		" space1", // buggy: leading white space
@@ -123,8 +123,8 @@ ERROR: some/relative/path/buggy.go:200: with spaces
 `
 	// Used by unittests/list-tests. It's sorted by test name, not source code location.
 	ListTestsOutput = `The following spec names can be used with 'ginkgo run --focus/skip':
-    ../bugs/bugs.go:103: abc   space1 space2  [Feature: no-such-feature] [Feature: feature-foo] [Environment: no-such-env] [Environment: Linux] [no-such-node-env] [node-feature-foo] [FeatureGate: no-such-feature-gate] [FeatureGate: TestAlphaFeature] [Alpha] [FeatureGate: TestBetaFeature] [Beta] [FeatureGate: TestGAFeature] [Conformance] [NodeConformance] [Slow] [Serial] [Disruptive] [custom-label] xyz x [foo] should [bar]
-    ../bugs/bugs.go:98: abc   space1 space2  [Feature: no-such-feature] [Feature: feature-foo] [Environment: no-such-env] [Environment: Linux] [no-such-node-env] [node-feature-foo] [FeatureGate: no-such-feature-gate] [FeatureGate: TestAlphaFeature] [Alpha] [FeatureGate: TestBetaFeature] [Beta] [FeatureGate: TestGAFeature] [Conformance] [NodeConformance] [Slow] [Serial] [Disruptive] [custom-label] xyz y [foo] should [bar]
+    ../bugs/bugs.go:103: [sig-testing] abc   space1 space2  [Feature: no-such-feature] [Feature: feature-foo] [Environment: no-such-env] [Environment: Linux] [no-such-node-env] [node-feature-foo] [FeatureGate: no-such-feature-gate] [FeatureGate: TestAlphaFeature] [Alpha] [FeatureGate: TestBetaFeature] [Beta] [FeatureGate: TestGAFeature] [Conformance] [NodeConformance] [Slow] [Serial] [Disruptive] [custom-label] xyz x [foo] should [bar]
+    ../bugs/bugs.go:98: [sig-testing] abc   space1 space2  [Feature: no-such-feature] [Feature: feature-foo] [Environment: no-such-env] [Environment: Linux] [no-such-node-env] [node-feature-foo] [FeatureGate: no-such-feature-gate] [FeatureGate: TestAlphaFeature] [Alpha] [FeatureGate: TestBetaFeature] [Beta] [FeatureGate: TestGAFeature] [Conformance] [NodeConformance] [Slow] [Serial] [Disruptive] [custom-label] xyz y [foo] should [bar]
 
 `
 
@@ -150,6 +150,7 @@ ERROR: some/relative/path/buggy.go:200: with spaces
     foo
     no-such-node-env
     node-feature-foo
+    sig-testing
 
 `
 )

@@ -40,7 +40,7 @@ import (
 
 const runAsUserNameContainerName = "run-as-username-container"
 
-var _ = SIGDescribe("[Feature:Windows] SecurityContext", func() {
+var _ = sigDescribe("[Feature:Windows] SecurityContext", skipUnlessWindows(func() {
 	f := framework.NewDefaultFramework("windows-run-as-username")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -190,7 +190,7 @@ var _ = SIGDescribe("[Feature:Windows] SecurityContext", func() {
 		expectedEventError := "container's runAsUserName (CONTAINERADMINISTRATOR) which will be regarded as root identity and will break non-root policy"
 		gomega.Expect(event.Message).Should(gomega.ContainSubstring(expectedEventError), "Event error should indicate non-root policy caused container to not start")
 	})
-})
+}))
 
 func runAsUserNamePod(username *string) *v1.Pod {
 	podName := "run-as-username-" + string(uuid.NewUUID())
