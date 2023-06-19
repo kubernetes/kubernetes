@@ -466,8 +466,9 @@ func updateDS(t *testing.T, dsClient appstyped.DaemonSetInterface, dsName string
 
 func forEachStrategy(t *testing.T, tf func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy)) {
 	for _, strategy := range updateStrategies() {
-		t.Run(fmt.Sprintf("%s_%s", t.Name(), strategy.Type),
-			func(tt *testing.T) { tf(tt, strategy) })
+		t.Run(string(strategy.Type), func(t *testing.T) {
+			tf(t, strategy)
+		})
 	}
 }
 
@@ -536,8 +537,8 @@ func TestSimpleDaemonSetLaunchesPods(t *testing.T) {
 
 func TestSimpleDaemonSetRestartsPodsOnTerminalPhase(t *testing.T) {
 	for _, podPhase := range []v1.PodPhase{v1.PodSucceeded, v1.PodFailed} {
-		t.Run(string(podPhase), func(tt *testing.T) {
-			forEachStrategy(tt, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
+		t.Run(string(podPhase), func(t *testing.T) {
+			forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
 				ctx, closeFn, dc, informers, clientset := setup(t)
 				defer closeFn()
 				ns := framework.CreateNamespaceOrDie(clientset, "daemonset-restart-terminal-pod-test", t)
