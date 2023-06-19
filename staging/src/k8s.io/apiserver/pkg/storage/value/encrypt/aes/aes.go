@@ -253,10 +253,8 @@ func (e *extendedNonceGCM) TransformToStorage(ctx context.Context, data []byte, 
 }
 
 func (e *extendedNonceGCM) derivedKeyTransformer(info []byte, dataCtx value.Context) (value.Transformer, error) {
-	if e.cache != nil {
-		if transformer := e.cache.get(info, dataCtx); transformer != nil {
-			return transformer, nil
-		}
+	if transformer := e.cache.get(info, dataCtx); transformer != nil {
+		return transformer, nil
 	}
 
 	// this could be a subslice of a much larger slice and we do not want to hold onto that larger slice
@@ -277,9 +275,7 @@ func (e *extendedNonceGCM) derivedKeyTransformer(info []byte, dataCtx value.Cont
 		return nil, err // TODO fmt.Err
 	}
 
-	if e.cache != nil {
-		e.cache.set(dataCtx, transformer)
-	}
+	e.cache.set(dataCtx, transformer)
 
 	return transformer, nil
 }
