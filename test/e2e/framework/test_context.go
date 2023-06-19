@@ -23,9 +23,11 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -36,6 +38,7 @@ import (
 	"github.com/onsi/gomega"
 	gomegaformat "github.com/onsi/gomega/format"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -51,6 +54,12 @@ const (
 
 	// DefaultNumNodes is the number of nodes. If not specified, then number of nodes is auto-detected
 	DefaultNumNodes = -1
+)
+
+var (
+	// Output is used for output when not running tests, for example in -list-tests.
+	// Test output should go to ginkgo.GinkgoWriter.
+	Output io.Writer = os.Stdout
 )
 
 // TestContextType contains test settings and global state. Due to
@@ -93,6 +102,8 @@ type TestContextType struct {
 	RepoRoot string
 	// ListImages will list off all images that are used then quit
 	ListImages bool
+
+	listTests, listLabels bool
 
 	// ListConformanceTests will list off all conformance tests that are available then quit
 	ListConformanceTests bool
@@ -356,6 +367,8 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 	flags.StringVar(&TestContext.NonblockingTaints, "non-blocking-taints", `node-role.kubernetes.io/control-plane`, "Nodes with taints in this comma-delimited list will not block the test framework from starting tests.")
 
 	flags.BoolVar(&TestContext.ListImages, "list-images", false, "If true, will show list of images used for running tests.")
+	flags.BoolVar(&TestContext.listLabels, "list-labels", false, "If true, will show the list of labels that can be used to select tests via -ginkgo.label-filter.")
+	flags.BoolVar(&TestContext.listTests, "list-tests", false, "If true, will show the full names of all tests (aka specs) that can be used to select test via -ginkgo.focus/skip.")
 	flags.StringVar(&TestContext.KubectlPath, "kubectl-path", "kubectl", "The kubectl binary to use. For development, you might use 'cluster/kubectl.sh' here.")
 
 	flags.StringVar(&TestContext.ProgressReportURL, "progress-report-url", "", "The URL to POST progress updates to as the suite runs to assist in aiding integrations. If empty, no messages sent.")
@@ -494,6 +507,11 @@ func AfterReadingAllFlags(t *TestContextType) {
 	gomega.SetDefaultEventuallyTimeout(t.timeouts.PodStart)
 	gomega.SetDefaultConsistentlyDuration(t.timeouts.PodStartShort)
 
+	if t.listLabels || t.listTests {
+		listTestInformation(ginkgo.PreviewSpecs("Kubernetes e2e test statistics"))
+		os.Exit(0)
+	}
+
 	// Only set a default host if one won't be supplied via kubeconfig
 	if len(t.Host) == 0 && len(t.KubeConfig) == 0 {
 		// Check if we can use the in-cluster config
@@ -599,4 +617,48 @@ func AfterReadingAllFlags(t *TestContextType) {
 			ExpectNoError(junit.WriteJUnitReport(report, junitReport))
 		})
 	}
+}
+
+func listTestInformation(report ginkgo.Report) {
+	indent := strings.Repeat(" ", 4)
+
+	if TestContext.listLabels {
+		labels := sets.New[string]()
+		for _, spec := range report.SpecReports {
+			if spec.LeafNodeType == types.NodeTypeIt {
+				labels.Insert(spec.Labels()...)
+			}
+		}
+		fmt.Fprintf(Output, "The following labels can be used with 'gingko run --label-filter':\n%s%s\n\n", indent, strings.Join(sets.List(labels), "\n"+indent))
+	}
+	if TestContext.listTests {
+		leafs := make([][]string, 0, len(report.SpecReports))
+		wd, _ := os.Getwd()
+		for _, spec := range report.SpecReports {
+			if spec.LeafNodeType == types.NodeTypeIt {
+				leafs = append(leafs, []string{fmt.Sprintf("%s:%d: ", relativePath(wd, spec.LeafNodeLocation.FileName), spec.LeafNodeLocation.LineNumber), spec.FullText()})
+			}
+		}
+		// Sort by test name, not the source code location, because the test
+		// name is more stable across code refactoring.
+		sort.Slice(leafs, func(i, j int) bool {
+			return leafs[i][1] < leafs[j][1]
+		})
+		fmt.Fprint(Output, "The following spec names can be used with 'ginkgo run --focus/skip':\n")
+		for _, leaf := range leafs {
+			fmt.Fprintf(Output, "%s%s%s\n", indent, leaf[0], leaf[1])
+		}
+		fmt.Fprint(Output, "\n")
+	}
+}
+
+func relativePath(wd, path string) string {
+	if wd == "" {
+		return path
+	}
+	relpath, err := filepath.Rel(wd, path)
+	if err != nil {
+		return path
+	}
+	return relpath
 }
