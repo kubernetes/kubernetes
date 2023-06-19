@@ -33,7 +33,12 @@ type simpleCache struct {
 
 func newSimpleCache(clock clock.Clock, ttl time.Duration) *simpleCache {
 	cache := utilcache.NewExpiringWithClock(clock)
-	cache.AllowExpiredGet = true // TODO comment
+	// "Stale" entries are always valid for us because the TTL is just used to prevent
+	// unbounded growth on the cache - for a given info the transformer is always the same.
+	// The key always corresponds to the exact same value, with the caveat that
+	// since we use the value.Context.AuthenticatedData to overwrite old keys,
+	// we always have to check that the info matches (to validate the transformer is correct).
+	cache.AllowExpiredGet = true
 	return &simpleCache{
 		cache: cache,
 		ttl:   ttl,

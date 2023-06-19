@@ -230,7 +230,7 @@ func (e *extendedNonceGCM) TransformFromStorage(ctx context.Context, data []byte
 
 	info := data[:commonSize]
 
-	transformer, err := e.derivedKeyTransformer(info, dataCtx)
+	transformer, err := e.derivedKeyTransformer(info, dataCtx, false)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to derive read key from KDF: %w", err)
 	}
@@ -244,7 +244,7 @@ func (e *extendedNonceGCM) TransformToStorage(ctx context.Context, data []byte, 
 		return nil, fmt.Errorf("failed to generate info for KDF: %w", err)
 	}
 
-	transformer, err := e.derivedKeyTransformer(info, dataCtx)
+	transformer, err := e.derivedKeyTransformer(info, dataCtx, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to derive write key from KDF: %w", err)
 	}
@@ -252,13 +252,15 @@ func (e *extendedNonceGCM) TransformToStorage(ctx context.Context, data []byte, 
 	return transformer.TransformToStorage(ctx, data, dataCtx)
 }
 
-func (e *extendedNonceGCM) derivedKeyTransformer(info []byte, dataCtx value.Context) (value.Transformer, error) {
-	if transformer := e.cache.get(info, dataCtx); transformer != nil {
-		return transformer, nil
-	}
+func (e *extendedNonceGCM) derivedKeyTransformer(info []byte, dataCtx value.Context, write bool) (value.Transformer, error) {
+	if !write { // no need to check cache on write since we always generate a new transformer
+		if transformer := e.cache.get(info, dataCtx); transformer != nil {
+			return transformer, nil
+		}
 
-	// this could be a subslice of a much larger slice and we do not want to hold onto that larger slice
-	info = deepCopySlice(info)
+		// on read, this is a subslice of a much larger slice and we do not want to hold onto that larger slice
+		info = deepCopySlice(info)
+	}
 
 	key, err := e.sha256KDFExpandOnly(info)
 	if err != nil {
