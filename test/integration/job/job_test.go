@@ -66,6 +66,7 @@ import (
 )
 
 const waitInterval = time.Second
+const fastPodFailureBackoff = 100 * time.Millisecond
 
 type metricLabelsWithValue struct {
 	Labels []string
@@ -467,6 +468,7 @@ func TestJobPodFailurePolicyWithFailedPodDeletedDuringControllerRestart(t *testi
 // TestJobPodFailurePolicy tests handling of pod failures with respect to the
 // configured pod failure policy rules
 func TestJobPodFailurePolicy(t *testing.T) {
+	t.Cleanup(setDurationDuringTest(&jobcontroller.DefaultJobPodFailureBackOff, fastPodFailureBackoff))
 	job := batchv1.Job{
 		Spec: batchv1.JobSpec{
 			Template: v1.PodTemplateSpec{
@@ -689,6 +691,7 @@ func TestJobPodFailurePolicy(t *testing.T) {
 // recreates the Job controller at some points to make sure a new controller
 // is able to pickup.
 func TestNonParallelJob(t *testing.T) {
+	t.Cleanup(setDurationDuringTest(&jobcontroller.DefaultJobPodFailureBackOff, fastPodFailureBackoff))
 	closeFn, restConfig, clientSet, ns := setup(t, "simple")
 	defer closeFn()
 	ctx, cancel := startJobControllerAndWaitForCaches(restConfig)
@@ -737,6 +740,7 @@ func TestNonParallelJob(t *testing.T) {
 }
 
 func TestParallelJob(t *testing.T) {
+	t.Cleanup(setDurationDuringTest(&jobcontroller.DefaultJobPodFailureBackOff, fastPodFailureBackoff))
 	cases := map[string]struct {
 		enableReadyPods bool
 	}{
@@ -893,6 +897,7 @@ func TestParallelJobWithCompletions(t *testing.T) {
 	// number of pods.
 	t.Cleanup(setDuringTest(&jobcontroller.MaxUncountedPods, 10))
 	t.Cleanup(setDuringTest(&jobcontroller.MaxPodCreateDeletePerSync, 10))
+	t.Cleanup(setDurationDuringTest(&jobcontroller.DefaultJobPodFailureBackOff, fastPodFailureBackoff))
 	cases := map[string]struct {
 		enableReadyPods bool
 	}{
@@ -977,6 +982,7 @@ func TestParallelJobWithCompletions(t *testing.T) {
 }
 
 func TestIndexedJob(t *testing.T) {
+	t.Cleanup(setDurationDuringTest(&jobcontroller.DefaultJobPodFailureBackOff, fastPodFailureBackoff))
 	closeFn, restConfig, clientSet, ns := setup(t, "indexed")
 	defer closeFn()
 	ctx, cancel := startJobControllerAndWaitForCaches(restConfig)
@@ -1378,11 +1384,7 @@ func TestFinalizersClearedWhenBackoffLimitExceeded(t *testing.T) {
 }
 
 func TestJobPodsCreatedWithExponentialBackoff(t *testing.T) {
-	// overwrite the default value for faster testing
-	oldBackoff := jobcontroller.DefaultJobPodFailureBackOff
-	defer func() { jobcontroller.DefaultJobPodFailureBackOff = oldBackoff }()
-	jobcontroller.DefaultJobPodFailureBackOff = 2 * time.Second
-
+	t.Cleanup(setDurationDuringTest(&jobcontroller.DefaultJobPodFailureBackOff, 2*time.Second))
 	closeFn, restConfig, clientSet, ns := setup(t, "simple")
 	defer closeFn()
 	ctx, cancel := startJobControllerAndWaitForCaches(restConfig)
@@ -2134,6 +2136,14 @@ func hasJobTrackingFinalizer(obj metav1.Object) bool {
 }
 
 func setDuringTest(val *int, newVal int) func() {
+	origVal := *val
+	*val = newVal
+	return func() {
+		*val = origVal
+	}
+}
+
+func setDurationDuringTest(val *time.Duration, newVal time.Duration) func() {
 	origVal := *val
 	*val = newVal
 	return func() {
