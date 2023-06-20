@@ -32,7 +32,7 @@ const (
 	updateRetryTimeout  = 1 * time.Minute
 	waitRetryInterval   = 5 * time.Second
 	waitRetryTimeout    = 5 * time.Minute
-	retryAmount         = 12 // arbitrary no of retires SCOPE of improvement
+	retryAmount         = 12 // arbitrary no of retries SCOPE of improvement
 )
 
 func RetryErrorCondition(condition wait.ConditionFunc) wait.ConditionFunc {
