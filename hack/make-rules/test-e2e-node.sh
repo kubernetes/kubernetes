@@ -84,6 +84,9 @@ if [[ -n ${image_service_endpoint} ]] ; then
   test_args="--image-service-endpoint=${image_service_endpoint} ${test_args}"
 fi
 
+if [[ "${test_args}" != *"prepull-images"* ]]; then
+  test_args="--prepull-images=${PREPULL_IMAGES:-false}  ${test_args}"
+fi
 
 if [ "${remote}" = true ] && [ "${remote_mode}" = gce ] ; then
   # The following options are only valid in remote GCE run.
