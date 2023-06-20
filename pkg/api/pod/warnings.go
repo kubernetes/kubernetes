@@ -163,6 +163,9 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 		if v.CephFS != nil {
 			warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.28, non-functional in v1.31+", fieldPath.Child("spec", "volumes").Index(i).Child("cephfs")))
 		}
+		if v.RBD != nil {
+			warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.28, non-functional in v1.31+", fieldPath.Child("spec", "volumes").Index(i).Child("rbd")))
+		}
 	}
 
 	// duplicate hostAliases (#91670, #58477)

@@ -193,7 +193,7 @@ func TestWarnings(t *testing.T) {
 				},
 			},
 			expected: []string{
-				`spec.persistentVolumeSource.cephfs: deprecated in v1.28, non-functional in v1.31+`,
+				`spec.cephfs: deprecated in v1.28, non-functional in v1.31+`,
 			},
 		},
 		{
@@ -209,8 +209,29 @@ func TestWarnings(t *testing.T) {
 				},
 			},
 			expected: []string{
-				`spec.persistentVolumeSource.photonPersistentDisk: deprecated in v1.11, non-functional in v1.16+`,
+				`spec.photonPersistentDisk: deprecated in v1.11, non-functional in v1.16+`,
 			},
+		},
+		{
+			name: "PV RBD deprecation warning",
+			template: &api.PersistentVolume{
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						RBD: &api.RBDPersistentVolumeSource{
+							CephMonitors: nil,
+							RBDImage:     "",
+							FSType:       "",
+							RBDPool:      "",
+							RadosUser:    "",
+							Keyring:      "",
+							SecretRef:    nil,
+							ReadOnly:     false,
+						},
+					},
+				},
+			},
+			expected: []string{
+				`spec.rbd: deprecated in v1.28, non-functional in v1.31+`},
 		},
 		{
 			name: "PV ScaleIO deprecation warning",
@@ -233,10 +254,9 @@ func TestWarnings(t *testing.T) {
 				},
 			},
 			expected: []string{
-				`spec.persistentVolumeSource.scaleIO: deprecated in v1.16, non-functional in v1.22+`,
+				`spec.scaleIO: deprecated in v1.16, non-functional in v1.22+`,
 			},
 		},
-
 		{
 			name: "PV StorageOS deprecation warning",
 			template: &api.PersistentVolume{
@@ -253,10 +273,9 @@ func TestWarnings(t *testing.T) {
 				},
 			},
 			expected: []string{
-				`spec.persistentVolumeSource.storageOS: deprecated in v1.22, non-functional in v1.25+`,
+				`spec.storageOS: deprecated in v1.22, non-functional in v1.25+`,
 			},
 		},
-
 		{
 			name: "PV GlusterFS deprecation warning",
 			template: &api.PersistentVolume{
@@ -272,7 +291,7 @@ func TestWarnings(t *testing.T) {
 				},
 			},
 			expected: []string{
-				`spec.persistentVolumeSource.glusterfs: deprecated in v1.25, non-functional in v1.26+`,
+				`spec.glusterfs: deprecated in v1.25, non-functional in v1.26+`,
 			},
 		},
 	}
