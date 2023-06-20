@@ -6828,10 +6828,13 @@ func TestValidateResizePolicy(t *testing.T) {
 	tSupportedResizeResources := sets.NewString(string(core.ResourceCPU), string(core.ResourceMemory))
 	tSupportedResizePolicies := sets.NewString(string(core.NotRequired), string(core.RestartContainer))
 	type T struct {
-		PolicyList  []core.ContainerResizePolicy
-		ExpectError bool
-		Errors      field.ErrorList
+		PolicyList       []core.ContainerResizePolicy
+		ExpectError      bool
+		Errors           field.ErrorList
+		PodRestartPolicy core.RestartPolicy
 	}
+	// var PodRestartPolicy core.RestartPolicy
+	// PodRestartPolicy = "Never"
 	testCases := map[string]T{
 		"ValidCPUandMemoryPolicies": {
 			[]core.ContainerResizePolicy{
@@ -6840,6 +6843,7 @@ func TestValidateResizePolicy(t *testing.T) {
 			},
 			false,
 			nil,
+			"Always",
 		},
 		"ValidCPUPolicy": {
 			[]core.ContainerResizePolicy{
@@ -6847,6 +6851,7 @@ func TestValidateResizePolicy(t *testing.T) {
 			},
 			false,
 			nil,
+			"Always",
 		},
 		"ValidMemoryPolicy": {
 			[]core.ContainerResizePolicy{
@@ -6854,11 +6859,13 @@ func TestValidateResizePolicy(t *testing.T) {
 			},
 			false,
 			nil,
+			"Always",
 		},
 		"NoPolicy": {
 			[]core.ContainerResizePolicy{},
 			false,
 			nil,
+			"Always",
 		},
 		"ValidCPUandInvalidMemoryPolicy": {
 			[]core.ContainerResizePolicy{
@@ -6867,6 +6874,7 @@ func TestValidateResizePolicy(t *testing.T) {
 			},
 			true,
 			field.ErrorList{field.NotSupported(field.NewPath("field"), core.ResourceResizeRestartPolicy("Restarrrt"), tSupportedResizePolicies.List())},
+			"Always",
 		},
 		"ValidMemoryandInvalidCPUPolicy": {
 			[]core.ContainerResizePolicy{
@@ -6875,6 +6883,7 @@ func TestValidateResizePolicy(t *testing.T) {
 			},
 			true,
 			field.ErrorList{field.NotSupported(field.NewPath("field"), core.ResourceResizeRestartPolicy("RestartNotRequirrred"), tSupportedResizePolicies.List())},
+			"Always",
 		},
 		"InvalidResourceNameValidPolicy": {
 			[]core.ContainerResizePolicy{
@@ -6882,6 +6891,7 @@ func TestValidateResizePolicy(t *testing.T) {
 			},
 			true,
 			field.ErrorList{field.NotSupported(field.NewPath("field"), core.ResourceName("cpuuu"), tSupportedResizeResources.List())},
+			"Always",
 		},
 		"ValidResourceNameMissingPolicy": {
 			[]core.ContainerResizePolicy{
@@ -6889,6 +6899,7 @@ func TestValidateResizePolicy(t *testing.T) {
 			},
 			true,
 			field.ErrorList{field.Required(field.NewPath("field"), "")},
+			"Always",
 		},
 		"RepeatedPolicies": {
 			[]core.ContainerResizePolicy{
@@ -6898,12 +6909,20 @@ func TestValidateResizePolicy(t *testing.T) {
 			},
 			true,
 			field.ErrorList{field.Duplicate(field.NewPath("field").Index(2), core.ResourceCPU)},
+			"Always",
+		},
+		"InvalidPolicyWithPodRestartPolicy": {
+			[]core.ContainerResizePolicy{
+				{ResourceName: "cpu", RestartPolicy: "NotRequired"},
+				{ResourceName: "memory", RestartPolicy: "RestartContainer"},
+			},
+			true,
+			field.ErrorList{field.NotSupported(field.NewPath("field"), core.ResourceResizeRestartPolicy("RestartContainer"), []string{string(core.NotRequired)})},
+			"Never",
 		},
 	}
-	var PodRestartPolicy core.RestartPolicy
-	PodRestartPolicy = "Never"
 	for k, v := range testCases {
-		errs := validateResizePolicy(v.PolicyList, field.NewPath("field"), &PodRestartPolicy)
+		errs := validateResizePolicy(v.PolicyList, field.NewPath("field"), &v.PodRestartPolicy)
 		if !v.ExpectError && len(errs) > 0 {
 			t.Errorf("Testcase %s - expected success, got error: %+v", k, errs)
 		}
@@ -7624,7 +7643,7 @@ func TestValidateContainers(t *testing.T) {
 	}
 
 	var PodRestartPolicy core.RestartPolicy
-	PodRestartPolicy = "Never"
+	PodRestartPolicy = "Always"
 	if errs := validateContainers(successCase, volumeDevices, nil, field.NewPath("field"), PodValidationOptions{}, &PodRestartPolicy); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
