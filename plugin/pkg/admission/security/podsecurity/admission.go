@@ -27,6 +27,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	"k8s.io/kubernetes/pkg/features"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -151,6 +152,7 @@ func (p *Plugin) updateDelegate() {
 
 func (c *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
 	c.inspectedFeatureGates = true
+	policy.RelaxPolicyForUserNamespacePods(featureGates.Enabled(features.UserNamespacesPodSecurityStandards))
 }
 
 // ValidateInitialization ensures all required options are set
