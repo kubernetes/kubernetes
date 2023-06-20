@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-helpers/storage/ephemeral"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
@@ -66,7 +67,7 @@ func InitCustomSnapshottableTestSuite(patterns []storageframework.TestPattern) s
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Mi",
 			},
-			FeatureTag: "[Feature:VolumeSnapshotDataSource]",
+			TestTags: []interface{}{feature.VolumeSnapshotDataSource},
 		},
 	}
 }

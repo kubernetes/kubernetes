@@ -19,7 +19,6 @@ package storage
 import (
 	"os"
 
-	"github.com/onsi/ginkgo/v2"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
@@ -80,8 +79,8 @@ var _ = utils.SIGDescribe("In-tree Volumes", func() {
 	for _, initDriver := range testDrivers {
 		curDriver := initDriver()
 
-		ginkgo.Context(storageframework.GetDriverNameWithFeatureTags(curDriver), func() {
+		framework.Context(append(storageframework.GetDriverNameWithFeatureTags(curDriver), func() {
 			storageframework.DefineTestSuites(curDriver, testsuites.BaseSuites)
-		})
+		})...)
 	}
 })
