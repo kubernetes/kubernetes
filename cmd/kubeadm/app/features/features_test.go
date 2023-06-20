@@ -207,13 +207,44 @@ func TestCheckDeprecatedFlags(t *testing.T) {
 			features:    map[string]bool{"feature1": true},
 			expectedMsg: map[string]string{},
 		},
+		{
+			name:        "invalid feature",
+			features:    map[string]bool{"feature2": true},
+			expectedMsg: map[string]string{"feature2": "Unknown feature gate flag: feature2"},
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			msg := CheckDeprecatedFlags(&someFeatures, test.features)
 			if !reflect.DeepEqual(test.expectedMsg, msg) {
-				t.Error("CheckDeprecatedFlags didn't returned expected message")
+				t.Errorf("CheckDeprecatedFlags() = %v, want %v", msg, test.expectedMsg)
+			}
+		})
+	}
+}
+
+func TestSupports(t *testing.T) {
+	tests := []struct {
+		name        string
+		featureName string
+		want        bool
+	}{
+		{
+			name:        "the feature is not supported",
+			featureName: "foo",
+			want:        false,
+		},
+		{
+			name:        "the feature is supported",
+			featureName: PublicKeysECDSA,
+			want:        true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := Supports(InitFeatureGates, test.featureName); got != test.want {
+				t.Errorf("Supports() = %v, want %v", got, test.want)
 			}
 		})
 	}

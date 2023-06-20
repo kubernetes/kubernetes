@@ -102,15 +102,6 @@ func Supports(featureList FeatureList, featureName string) bool {
 	return false
 }
 
-// Keys returns a slice of feature names for a given feature set
-func Keys(featureList FeatureList) []string {
-	var list []string
-	for k := range featureList {
-		list = append(list, k)
-	}
-	return list
-}
-
 // KnownFeatures returns a slice of strings describing the FeatureList features.
 func KnownFeatures(f *FeatureList) []string {
 	var known []string
