@@ -91,10 +91,10 @@ type LocalSubjectAccessReview struct {
 
 // ResourceAttributes includes the authorization attributes available for resource requests to the Authorizer interface
 type ResourceAttributes struct {
-	// Namespace is the namespace of the action being requested.  Currently, there is no distinction between no namespace and all namespaces
-	// "" (empty) is defaulted for LocalSubjectAccessReviews
-	// "" (empty) is empty for cluster-scoped resources
-	// "" (empty) means "all" for namespace scoped resources from a SubjectAccessReview or SelfSubjectAccessReview
+	// Namespace is the namespace of the action being requested.  Currently, there is no distinction between no namespace and all namespaces. 
+	// "" (empty) is defaulted for LocalSubjectAccessReviews. 
+	// "" (empty) is empty for cluster-scoped resources. 
+	// "" (empty) means "all" for namespace scoped resources from a SubjectAccessReview or SelfSubjectAccessReview. 
 	// +optional
 	Namespace string `json:"namespace,omitempty" protobuf:"bytes,1,opt,name=namespace"`
 	// Verb is a kubernetes resource API verb, like: get, list, watch, create, update, delete, proxy.  "*" means all.
