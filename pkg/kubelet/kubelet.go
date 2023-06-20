@@ -1695,6 +1695,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 //   - Create the data directories for the pod if they do not exist
 //   - Wait for volumes to attach/mount
 //   - Fetch the pull secrets for the pod
+//   - If the FG InPlacePodVerticalScaling is enabled do the scaling
 //   - Call the container runtime's SyncPod callback
 //   - Update the traffic shaping for the pod's ingress and egress limits
 //
