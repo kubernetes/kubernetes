@@ -278,7 +278,7 @@ func validateDaemonSetPodsAndMarkReady(
 ) {
 	if err := wait.Poll(time.Second, 60*time.Second, func() (bool, error) {
 		objects := podInformer.GetIndexer().List()
-		readyPods := 0
+		nonTerminatedPods := 0
 
 		for _, object := range objects {
 			pod := object.(*v1.Pod)
@@ -295,11 +295,11 @@ func validateDaemonSetPodsAndMarkReady(
 				t.Errorf("controllerRef.Controller is not set to true")
 			}
 
-			if podutil.IsPodPhaseTerminal(pod.Status.Phase) || len(pod.Spec.NodeName) == 0 {
+			if podutil.IsPodPhaseTerminal(pod.Status.Phase) {
 				continue
 			}
-			readyPods++
-			if !podutil.IsPodReady(pod) {
+			nonTerminatedPods++
+			if !podutil.IsPodReady(pod) && len(pod.Spec.NodeName) != 0 {
 				podCopy := pod.DeepCopy()
 				podCopy.Status = v1.PodStatus{
 					Phase:      v1.PodRunning,
@@ -312,7 +312,7 @@ func validateDaemonSetPodsAndMarkReady(
 			}
 		}
 
-		return readyPods == numberPods, nil
+		return nonTerminatedPods == numberPods, nil
 	}); err != nil {
 		t.Fatal(err)
 	}

@@ -224,6 +224,8 @@ func RemovePodFinalizers(ctx context.Context, cs clientset.Interface, t *testing
 		if err != nil && !apierrors.IsNotFound(err) {
 			t.Errorf("error while removing pod finalizers for %v: %v", klog.KObj(&p), err)
 		} else if pod != nil && len(pod.Finalizers) > 0 {
+			// Use Patch to remove finalizer, instead of Update, to avoid transient
+			// conflicts.
 			patchBytes, _ := json.Marshal(map[string]interface{}{
 				"metadata": map[string]interface{}{
 					"$deleteFromPrimitiveList/finalizers": pod.Finalizers,
