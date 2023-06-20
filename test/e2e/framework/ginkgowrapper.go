@@ -21,6 +21,7 @@ import (
 	"path"
 	"reflect"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/onsi/ginkgo/v2"
@@ -456,4 +457,23 @@ type label struct {
 
 func newLabel(parts ...string) label {
 	return label{parts: parts}
+}
+
+// TagsEqual can be used to check whether two tags are the same.
+// It's safe to compare e.g. the result of WithSlow() against the result
+// of WithSerial(), the result will be false. False is also returned
+// when a parameter is some completely different value.
+func TagsEqual(a, b interface{}) bool {
+	al, ok := a.(label)
+	if !ok {
+		return false
+	}
+	bl, ok := b.(label)
+	if !ok {
+		return false
+	}
+	if al.extra != bl.extra {
+		return false
+	}
+	return slices.Equal(al.parts, bl.parts)
 }
