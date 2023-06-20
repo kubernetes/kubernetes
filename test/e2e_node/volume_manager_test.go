@@ -37,7 +37,7 @@ var _ = SIGDescribe("Kubelet Volume Manager", func() {
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.Describe("Volume Manager", func() {
 		ginkgo.Context("On termination of pod with memory backed volume", func() {
-			ginkgo.It("should remove the volume from the node [NodeConformance]", func(ctx context.Context) {
+			f.It("should remove the volume from the node", f.WithNodeConformance(), func(ctx context.Context) {
 				var (
 					memoryBackedPod *v1.Pod
 					volumeName      string

@@ -103,6 +103,7 @@ var (
 	SeccompDefault                          = framework.WithFeature(framework.ValidFeatures.Add("SeccompDefault"))
 	SELinux                                 = framework.WithFeature(framework.ValidFeatures.Add("SELinux"))
 	SELinuxMountReadWriteOncePod            = framework.WithFeature(framework.ValidFeatures.Add("SELinuxMountReadWriteOncePod"))
+	ServiceCIDRs                            = framework.WithFeature(framework.ValidFeatures.Add("ServiceCIDRs"))
 	SidecarContainers                       = framework.WithFeature(framework.ValidFeatures.Add("SidecarContainers"))
 	StackdriverAcceleratorMonitoring        = framework.WithFeature(framework.ValidFeatures.Add("StackdriverAcceleratorMonitoring"))
 	StackdriverCustomMetrics                = framework.WithFeature(framework.ValidFeatures.Add("StackdriverCustomMetrics"))

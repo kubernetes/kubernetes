@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -42,7 +43,7 @@ const (
 	recreateNodeReadyAgainTimeout = 10 * time.Minute
 )
 
-var _ = SIGDescribe("Recreate [Feature:Recreate]", func() {
+var _ = SIGDescribe("Recreate", feature.Recreate, func() {
 	f := framework.NewDefaultFramework("recreate")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var originalNodes []v1.Node

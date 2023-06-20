@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edaemonset "k8s.io/kubernetes/test/e2e/framework/daemonset"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -39,7 +40,7 @@ const (
 	testSlowMultiplier = 60
 )
 
-var _ = sigDescribe("[Feature:GPUDevicePlugin] Device Plugin", skipUnlessWindows(func() {
+var _ = sigDescribe(feature.GPUDevicePlugin, "Device Plugin", skipUnlessWindows(func() {
 	f := framework.NewDefaultFramework("device-plugin")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 

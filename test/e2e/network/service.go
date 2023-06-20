@@ -1195,7 +1195,7 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(verifyServeHostnameServiceUp(ctx, cs, ns, podNames, svc.Spec.ClusterIP, servicePort))
 	})
 
-	ginkgo.It("should work after restarting kube-proxy [Disruptive]", func(ctx context.Context) {
+	f.It("should work after restarting kube-proxy", f.WithDisruptive(), func(ctx context.Context) {
 		kubeProxyLabelSet := map[string]string{clusterAddonLabelKey: kubeProxyLabelName}
 		e2eskipper.SkipUnlessComponentRunsAsPodsAndClientCanDeleteThem(ctx, kubeProxyLabelName, cs, metav1.NamespaceSystem, kubeProxyLabelSet)
 
@@ -1228,7 +1228,7 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(verifyServeHostnameServiceUp(ctx, cs, ns, podNames2, svc2IP, servicePort))
 	})
 
-	ginkgo.It("should work after restarting apiserver [Disruptive]", func(ctx context.Context) {
+	f.It("should work after restarting apiserver", f.WithDisruptive(), func(ctx context.Context) {
 
 		if !framework.ProviderIs("gke") {
 			e2eskipper.SkipUnlessComponentRunsAsPodsAndClientCanDeleteThem(ctx, kubeAPIServerLabelName, cs, metav1.NamespaceSystem, map[string]string{clusterComponentKey: kubeAPIServerLabelName})
@@ -3827,7 +3827,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 	// These is [Serial] because it can't run at the same time as the
 	// [Feature:SCTPConnectivity] tests, since they may cause sctp.ko to be loaded.
-	ginkgo.It("should allow creating a basic SCTP service with pod and endpoints [LinuxOnly] [Serial]", func(ctx context.Context) {
+	f.It("should allow creating a basic SCTP service with pod and endpoints [LinuxOnly]", f.WithSerial(), func(ctx context.Context) {
 		serviceName := "sctp-endpoint-test"
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)

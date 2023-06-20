@@ -186,14 +186,13 @@ var _ = utils.SIGDescribe("PersistentVolumes-local", func() {
 
 		// New variable required for gingko test closures
 		testVolType := tempTestVolType
-		serialStr := ""
+		args := []interface{}{fmt.Sprintf("[Volume type: %s]", testVolType)}
 		if testVolType == GCELocalSSDVolumeType {
-			serialStr = " [Serial]"
+			args = append(args, framework.WithSerial())
 		}
-		ctxString := fmt.Sprintf("[Volume type: %s]%v", testVolType, serialStr)
 		testMode := immediateMode
 
-		ginkgo.Context(ctxString, func() {
+		args = append(args, func() {
 			var testVol *localTestVolume
 
 			ginkgo.BeforeEach(func(ctx context.Context) {
@@ -276,14 +275,14 @@ var _ = utils.SIGDescribe("PersistentVolumes-local", func() {
 					}
 				})
 
-				ginkgo.It("should set fsGroup for one pod [Slow]", func(ctx context.Context) {
+				f.It("should set fsGroup for one pod", f.WithSlow(), func(ctx context.Context) {
 					ginkgo.By("Checking fsGroup is set")
 					pod := createPodWithFsGroupTest(ctx, config, testVol, 1234, 1234)
 					ginkgo.By("Deleting pod")
 					e2epod.DeletePodOrFail(ctx, config.client, config.ns, pod.Name)
 				})
 
-				ginkgo.It("should set same fsGroup for two pods simultaneously [Slow]", func(ctx context.Context) {
+				f.It("should set same fsGroup for two pods simultaneously", f.WithSlow(), func(ctx context.Context) {
 					fsGroup := int64(1234)
 					ginkgo.By("Create first pod and check fsGroup is set")
 					pod1 := createPodWithFsGroupTest(ctx, config, testVol, fsGroup, fsGroup)
@@ -309,11 +308,11 @@ var _ = utils.SIGDescribe("PersistentVolumes-local", func() {
 					e2epod.DeletePodOrFail(ctx, config.client, config.ns, pod2.Name)
 				})
 			})
-
 		})
+		f.Context(args...)
 	}
 
-	ginkgo.Context("Local volume that cannot be mounted [Slow]", func() {
+	f.Context("Local volume that cannot be mounted", f.WithSlow(), func() {
 		// TODO:
 		// - check for these errors in unit tests instead
 		ginkgo.It("should fail due to non-existent path", func(ctx context.Context) {
@@ -393,7 +392,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local", func() {
 		})
 	})
 
-	ginkgo.Context("StatefulSet with pod affinity [Slow]", func() {
+	f.Context("StatefulSet with pod affinity", f.WithSlow(), func() {
 		var testVols map[string][]*localTestVolume
 		const (
 			ssReplicas  = 3
@@ -450,7 +449,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local", func() {
 		})
 	})
 
-	ginkgo.Context("Stress with local volumes [Serial]", func() {
+	f.Context("Stress with local volumes", f.WithSerial(), func() {
 		var (
 			allLocalVolumes = make(map[string][]*localTestVolume)
 			volType         = TmpfsLocalVolumeType

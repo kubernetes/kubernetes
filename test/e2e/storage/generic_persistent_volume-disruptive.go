@@ -34,7 +34,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = utils.SIGDescribe("GenericPersistentVolume[Disruptive]", func() {
+var _ = utils.SIGDescribe("GenericPersistentVolume", framework.WithDisruptive(), func() {
 	f := framework.NewDefaultFramework("generic-disruptive-pv")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var (

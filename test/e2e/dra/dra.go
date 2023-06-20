@@ -35,6 +35,7 @@ import (
 	"k8s.io/dynamic-resource-allocation/controller"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/e2e/dra/test-driver/app"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -53,7 +54,7 @@ func networkResources() app.Resources {
 	}
 }
 
-var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", func() {
+var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, func() {
 	f := framework.NewDefaultFramework("dra")
 
 	// The driver containers have to run with sufficient privileges to
@@ -523,7 +524,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 			// https://github.com/kubernetes/enhancements/tree/master/keps/sig-storage/2268-non-graceful-shutdown
 			// NOTE: this test depends on kind. It will only work with kind cluster as it shuts down one of the
 			// nodes by running `docker stop <node name>`, which is very kind-specific.
-			ginkgo.It("[Serial] [Disruptive] [Slow] must deallocate on non graceful node shutdown", func(ctx context.Context) {
+			f.It(f.WithSerial(), f.WithDisruptive(), f.WithSlow(), "must deallocate on non graceful node shutdown", func(ctx context.Context) {
 				ginkgo.By("create test pod")
 				parameters := b.parameters()
 				label := "app.kubernetes.io/instance"

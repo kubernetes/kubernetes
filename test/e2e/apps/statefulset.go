@@ -47,6 +47,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -637,7 +638,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		   Testname: StatefulSet, Scaling
 		   Description: StatefulSet MUST create Pods in ascending order by ordinal index when scaling up, and delete Pods in descending order when scaling down. Scaling up or down MUST pause if any Pods belonging to the StatefulSet are unhealthy. This test does not depend on a preexisting default StorageClass or a dynamic provisioner.
 		*/
-		framework.ConformanceIt("Scaling should happen in predictable order and halt if any stateful pod is unhealthy [Slow]", func(ctx context.Context) {
+		framework.ConformanceIt("Scaling should happen in predictable order and halt if any stateful pod is unhealthy", f.WithSlow(), func(ctx context.Context) {
 			psLabels := klabels.Set(labels)
 			w := &cache.ListWatch{
 				WatchFunc: func(options metav1.ListOptions) (i watch.Interface, e error) {
@@ -747,7 +748,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		   Testname: StatefulSet, Burst Scaling
 		   Description: StatefulSet MUST support the Parallel PodManagementPolicy for burst scaling. This test does not depend on a preexisting default StorageClass or a dynamic provisioner.
 		*/
-		framework.ConformanceIt("Burst scaling should run to completion even with unhealthy pods [Slow]", func(ctx context.Context) {
+		framework.ConformanceIt("Burst scaling should run to completion even with unhealthy pods", f.WithSlow(), func(ctx context.Context) {
 			psLabels := klabels.Set(labels)
 
 			ginkgo.By("Creating stateful set " + ssName + " in namespace " + ns)
@@ -1154,7 +1155,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		})
 	})
 
-	ginkgo.Describe("Deploy clustered applications [Feature:StatefulSet] [Slow]", func() {
+	f.Describe("Deploy clustered applications", feature.StatefulSet, framework.WithSlow(), func() {
 		var appTester *clusterAppTester
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
@@ -1424,7 +1425,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			e2estatefulset.DeleteAllStatefulSets(ctx, c, ns)
 		})
 
-		ginkgo.It("PVC should be recreated when pod is pending due to missing PVC [Disruptive][Serial]", func(ctx context.Context) {
+		f.It("PVC should be recreated when pod is pending due to missing PVC", f.WithDisruptive(), f.WithSerial(), func(ctx context.Context) {
 			e2epv.SkipIfNoDefaultStorageClass(ctx, c)
 
 			readyNode, err := e2enode.GetRandomReadySchedulableNode(ctx, c)

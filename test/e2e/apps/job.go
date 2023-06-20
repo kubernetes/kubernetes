@@ -652,7 +652,7 @@ done`}
 		}
 	})
 
-	ginkgo.It("should run a job to completion with CPU requests [Serial]", func(ctx context.Context) {
+	f.It("should run a job to completion with CPU requests", f.WithSerial(), func(ctx context.Context) {
 		ginkgo.By("Creating a job that with CPU requests")
 
 		testNodeName := scheduling.GetNodeThatCanRunPod(ctx, f)

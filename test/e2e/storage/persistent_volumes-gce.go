@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
@@ -59,7 +60,7 @@ func initializeGCETestSpec(ctx context.Context, c clientset.Interface, t *framew
 }
 
 // Testing configurations of single a PV/PVC pair attached to a GCE PD
-var _ = utils.SIGDescribe("PersistentVolumes GCEPD [Feature:StorageProvider]", func() {
+var _ = utils.SIGDescribe("PersistentVolumes GCEPD", feature.StorageProvider, func() {
 	var (
 		c         clientset.Interface
 		diskName  string

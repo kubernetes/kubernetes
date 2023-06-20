@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edebug "k8s.io/kubernetes/test/e2e/framework/debug"
 	e2egpu "k8s.io/kubernetes/test/e2e/framework/gpu"
@@ -221,7 +222,7 @@ func logContainers(ctx context.Context, f *framework.Framework, pod *v1.Pod) {
 	}
 }
 
-var _ = SIGDescribe("[Feature:GPUDevicePlugin]", func() {
+var _ = SIGDescribe(feature.GPUDevicePlugin, func() {
 	f := framework.NewDefaultFramework("device-plugin-gpus")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.It("run Nvidia GPU Device Plugin tests", func(ctx context.Context) {
@@ -320,7 +321,7 @@ func podNames(pods []v1.Pod) []string {
 	return originalPodNames
 }
 
-var _ = SIGDescribe("GPUDevicePluginAcrossRecreate [Feature:Recreate]", func() {
+var _ = SIGDescribe("GPUDevicePluginAcrossRecreate", feature.Recreate, func() {
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 	})

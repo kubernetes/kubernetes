@@ -60,7 +60,7 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 		})
 
-		ginkgo.It("mirror pod termination should satisfy grace period when static pod is deleted [NodeConformance]", func(ctx context.Context) {
+		f.It("mirror pod termination should satisfy grace period when static pod is deleted", f.WithNodeConformance(), func(ctx context.Context) {
 			ginkgo.By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
@@ -78,7 +78,7 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 			}, 19*time.Second, 200*time.Millisecond).Should(gomega.BeNil())
 		})
 
-		ginkgo.It("mirror pod termination should satisfy grace period when static pod is updated [NodeConformance]", func(ctx context.Context) {
+		f.It("mirror pod termination should satisfy grace period when static pod is updated", f.WithNodeConformance(), func(ctx context.Context) {
 			ginkgo.By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
@@ -106,7 +106,7 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 			gomega.Expect(pod.Spec.Containers[0].Image).To(gomega.Equal(image))
 		})
 
-		ginkgo.It("should update a static pod when the static pod is updated multiple times during the graceful termination period [NodeConformance]", func(ctx context.Context) {
+		f.It("should update a static pod when the static pod is updated multiple times during the graceful termination period", f.WithNodeConformance(), func(ctx context.Context) {
 			ginkgo.By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
@@ -135,7 +135,7 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 			gomega.Expect(pod.Spec.Containers[0].Image).To(gomega.Equal(image))
 		})
 
-		ginkgo.Context("and the container runtime is temporarily down during pod termination [NodeConformance] [Serial] [Disruptive]", func() {
+		f.Context("and the container runtime is temporarily down during pod termination", f.WithNodeConformance(), f.WithSerial(), f.WithDisruptive(), func() {
 			ginkgo.BeforeEach(func(ctx context.Context) {
 				// Ensure that prior to the test starting, no other pods are running or in the process of being terminated other than the mirror pod.
 				// This is necessary as the test verifies metrics that assume that there is only one pod (the static pod) being run, and all other pods have been terminated.

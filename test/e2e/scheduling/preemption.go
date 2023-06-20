@@ -64,7 +64,7 @@ const (
 	testFinalizer = "example.com/test-finalizer"
 )
 
-var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
+var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 	var cs clientset.Interface
 	var nodeList *v1.NodeList
 	var ns string

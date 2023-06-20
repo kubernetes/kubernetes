@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -53,7 +54,7 @@ type externalMetricTarget struct {
 	isAverage bool
 }
 
-var _ = SIGDescribe("[HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod autoscaling (scale resource: Custom Metrics from Stackdriver)", func() {
+var _ = SIGDescribe("[HPA]", feature.CustomMetricsAutoscaling, "Horizontal pod autoscaling (scale resource: Custom Metrics from Stackdriver)", func() {
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 	})

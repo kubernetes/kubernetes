@@ -76,25 +76,25 @@ var _ = utils.SIGDescribe("Regional PD", func() {
 	})
 
 	ginkgo.Describe("RegionalPD", func() {
-		ginkgo.It("should provision storage [Slow]", func(ctx context.Context) {
+		f.It("should provision storage", f.WithSlow(), func(ctx context.Context) {
 			testVolumeProvisioning(ctx, c, f.Timeouts, ns)
 		})
 
-		ginkgo.It("should provision storage with delayed binding [Slow]", func(ctx context.Context) {
+		f.It("should provision storage with delayed binding", f.WithSlow(), func(ctx context.Context) {
 			testRegionalDelayedBinding(ctx, c, ns, 1 /* pvcCount */)
 			testRegionalDelayedBinding(ctx, c, ns, 3 /* pvcCount */)
 		})
 
-		ginkgo.It("should provision storage in the allowedTopologies [Slow]", func(ctx context.Context) {
+		f.It("should provision storage in the allowedTopologies", f.WithSlow(), func(ctx context.Context) {
 			testRegionalAllowedTopologies(ctx, c, ns)
 		})
 
-		ginkgo.It("should provision storage in the allowedTopologies with delayed binding [Slow]", func(ctx context.Context) {
+		f.It("should provision storage in the allowedTopologies with delayed binding", f.WithSlow(), func(ctx context.Context) {
 			testRegionalAllowedTopologiesWithDelayedBinding(ctx, c, ns, 1 /* pvcCount */)
 			testRegionalAllowedTopologiesWithDelayedBinding(ctx, c, ns, 3 /* pvcCount */)
 		})
 
-		ginkgo.It("should failover to a different zone when all nodes in one zone become unreachable [Slow] [Disruptive]", func(ctx context.Context) {
+		f.It("should failover to a different zone when all nodes in one zone become unreachable", f.WithSlow(), f.WithDisruptive(), func(ctx context.Context) {
 			testZonalFailover(ctx, c, ns)
 		})
 	})

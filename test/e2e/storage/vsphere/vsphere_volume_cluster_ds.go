@@ -23,6 +23,7 @@ import (
 	"github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -40,7 +41,7 @@ This test reads env
 1. CLUSTER_DATASTORE which should be set to clustered datastore
 2. VSPHERE_SPBM_POLICY_DS_CLUSTER which should be set to a tag based spbm policy tagged to a clustered datastore
 */
-var _ = utils.SIGDescribe("Volume Provisioning On Clustered Datastore [Feature:vsphere]", func() {
+var _ = utils.SIGDescribe("Volume Provisioning On Clustered Datastore", feature.Vsphere, func() {
 	f := framework.NewDefaultFramework("volume-provision")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 

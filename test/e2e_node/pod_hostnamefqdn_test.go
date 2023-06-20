@@ -73,7 +73,7 @@ func testPod(podnamebase string) *v1.Pod {
 	return pod
 }
 
-var _ = SIGDescribe("Hostname of Pod [NodeConformance]", func() {
+var _ = SIGDescribe("Hostname of Pod", framework.WithNodeConformance(), func() {
 	f := framework.NewDefaultFramework("hostfqdn")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	/*

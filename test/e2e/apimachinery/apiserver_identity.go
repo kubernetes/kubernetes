@@ -26,13 +26,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"golang.org/x/crypto/cryptobyte"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -80,11 +80,11 @@ func restartAPIServer(ctx context.Context, node *v1.Node) error {
 }
 
 // This test requires that --feature-gates=APIServerIdentity=true be set on the apiserver
-var _ = SIGDescribe("kube-apiserver identity [Feature:APIServerIdentity]", func() {
+var _ = SIGDescribe("kube-apiserver identity", feature.APIServerIdentity, func() {
 	f := framework.NewDefaultFramework("kube-apiserver-identity")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
-	ginkgo.It("kube-apiserver identity should persist after restart [Disruptive]", func(ctx context.Context) {
+	f.It("kube-apiserver identity should persist after restart", f.WithDisruptive(), func(ctx context.Context) {
 		e2eskipper.SkipUnlessProviderIs("gce")
 
 		client := f.ClientSet

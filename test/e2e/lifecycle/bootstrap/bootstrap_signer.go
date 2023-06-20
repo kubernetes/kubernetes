@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/lifecycle"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -37,7 +38,7 @@ const (
 	TokenSecretBytes = 8
 )
 
-var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
+var _ = lifecycle.SIGDescribe(feature.BootstrapTokens, func() {
 
 	var c clientset.Interface
 
@@ -70,7 +71,7 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should resign the bootstrap tokens when the clusterInfo ConfigMap updated [Serial][Disruptive]", func(ctx context.Context) {
+	f.It("should resign the bootstrap tokens when the clusterInfo ConfigMap updated", f.WithSerial(), f.WithDisruptive(), func(ctx context.Context) {
 		ginkgo.By("create a new bootstrap token secret")
 		tokenID, err := GenerateTokenID()
 		framework.ExpectNoError(err)

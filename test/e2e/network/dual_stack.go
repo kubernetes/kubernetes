@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
@@ -44,7 +45,7 @@ import (
 )
 
 // Tests for ipv4-ipv6 dual-stack feature
-var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
+var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 	f := framework.NewDefaultFramework("dualstack")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -111,7 +112,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 		framework.ExpectNoError(err, "failed to delete pod")
 	})
 
-	ginkgo.It("should create pod, add ipv6 and ipv4 ip to host ips [Feature:PodHostIPs]", func(ctx context.Context) {
+	f.It("should create pod, add ipv6 and ipv4 ip to host ips", feature.PodHostIPs, func(ctx context.Context) {
 		podName := "pod-dualstack-ips"
 
 		pod := &v1.Pod{
@@ -498,7 +499,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 			}
 		})
 
-		ginkgo.It("should function for pod-Service: sctp [Feature:SCTPConnectivity]", func(ctx context.Context) {
+		f.It("should function for pod-Service: sctp", feature.SCTPConnectivity, func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(ctx, f, e2enetwork.EnableDualStack, e2enetwork.EnableSCTP)
 			ginkgo.By(fmt.Sprintf("dialing(sctp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterSCTPPort))
 			err := config.DialFromTestContainer(ctx, "sctp", config.SecondaryClusterIP, e2enetwork.ClusterSCTPPort, config.MaxTries, 0, config.EndpointHostnames())

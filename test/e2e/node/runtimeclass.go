@@ -67,7 +67,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		}
 	})
 
-	ginkgo.It("should run a Pod requesting a RuntimeClass with scheduling with taints [Serial] ", func(ctx context.Context) {
+	f.It("should run a Pod requesting a RuntimeClass with scheduling with taints", f.WithSerial(), func(ctx context.Context) {
 		labelFooName := "foo-" + string(uuid.NewUUID())
 		labelFizzName := "fizz-" + string(uuid.NewUUID())
 

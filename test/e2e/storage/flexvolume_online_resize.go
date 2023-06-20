@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -40,7 +41,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume volume expand [Slow]", func() {
+var _ = utils.SIGDescribe(feature.Flexvolumes, "Mounted flexvolume volume expand", framework.WithSlow(), func() {
 	var (
 		c                 clientset.Interface
 		ns                string

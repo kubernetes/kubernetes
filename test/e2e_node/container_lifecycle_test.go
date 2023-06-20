@@ -44,7 +44,7 @@ func prefixedName(namePrefix string, name string) string {
 	return fmt.Sprintf("%s-%s", namePrefix, name)
 }
 
-var _ = SIGDescribe("[NodeConformance] Containers Lifecycle", func() {
+var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", func() {
 	f := framework.NewDefaultFramework("containers-lifecycle-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -559,7 +559,7 @@ var _ = SIGDescribe("[NodeConformance] Containers Lifecycle", func() {
 		// reduce test flakes.
 		bufferSeconds := int64(30)
 
-		ginkgo.It("should respect termination grace period seconds [NodeConformance]", func() {
+		f.It("should respect termination grace period seconds", f.WithNodeConformance(), func() {
 			client := e2epod.NewPodClient(f)
 			gracePeriod := int64(30)
 
@@ -580,7 +580,7 @@ var _ = SIGDescribe("[NodeConformance] Containers Lifecycle", func() {
 			framework.ExpectNoError(err)
 		})
 
-		ginkgo.It("should respect termination grace period seconds with long-running preStop hook [NodeConformance]", func() {
+		f.It("should respect termination grace period seconds with long-running preStop hook", f.WithNodeConformance(), func() {
 			client := e2epod.NewPodClient(f)
 			gracePeriod := int64(30)
 
@@ -747,7 +747,7 @@ var _ = SIGDescribe("[NodeConformance] Containers Lifecycle", func() {
 	})
 })
 
-var _ = SIGDescribe("[Serial] Containers Lifecycle", func() {
+var _ = SIGDescribe(framework.WithSerial(), "Containers Lifecycle", func() {
 	f := framework.NewDefaultFramework("containers-lifecycle-test-serial")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
@@ -2961,7 +2961,7 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle",
 	})
 })
 
-var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers][Serial] Containers Lifecycle", func() {
+var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers]", framework.WithSerial(), "Containers Lifecycle", func() {
 	f := framework.NewDefaultFramework("containers-lifecycle-test-serial")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
