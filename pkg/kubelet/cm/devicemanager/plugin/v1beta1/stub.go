@@ -53,6 +53,9 @@ type Stub struct {
 	// getPreferredAllocFunc is used for handling getPreferredAllocation request
 	getPreferredAllocFunc stubGetPreferredAllocFunc
 
+	// registerControlFunc is used for controlling auto-registration of requests
+	registerControlFunc stubRegisterControlFunc
+
 	registrationStatus chan watcherapi.RegistrationStatus // for testing
 	endpoint           string                             // for testing
 
@@ -77,6 +80,13 @@ func defaultAllocFunc(r *pluginapi.AllocateRequest, devs map[string]pluginapi.De
 	return &response, nil
 }
 
+// stubRegisterControlFunc is the function called when a registration request is received from Kubelet
+type stubRegisterControlFunc func() bool
+
+func defaultRegisterControlFunc() bool {
+	return true
+}
+
 // NewDevicePluginStub returns an initialized DevicePlugin Stub.
 func NewDevicePluginStub(devs []*pluginapi.Device, socket string, name string, preStartContainerFlag bool, getPreferredAllocationFlag bool) *Stub {
 	return &Stub{
@@ -85,6 +95,7 @@ func NewDevicePluginStub(devs []*pluginapi.Device, socket string, name string, p
 		resourceName:               name,
 		preStartContainerFlag:      preStartContainerFlag,
 		getPreferredAllocationFlag: getPreferredAllocationFlag,
+		registerControlFunc:        defaultRegisterControlFunc,
 
 		stop:   make(chan interface{}),
 		update: make(chan []*pluginapi.Device),
@@ -103,6 +114,11 @@ func (m *Stub) SetGetPreferredAllocFunc(f stubGetPreferredAllocFunc) {
 // SetAllocFunc sets allocFunc of the device plugin
 func (m *Stub) SetAllocFunc(f stubAllocFunc) {
 	m.allocFunc = f
+}
+
+// SetRegisterControlFunc sets RegisterControlFunc of the device plugin
+func (m *Stub) SetRegisterControlFunc(f stubRegisterControlFunc) {
+	m.registerControlFunc = f
 }
 
 // Start starts the gRPC server of the device plugin. Can only
@@ -178,7 +194,7 @@ func (m *Stub) Stop() error {
 	return m.cleanup()
 }
 
-func (m *Stub) Watch(kubeletEndpoint, resourceName string, pluginSockDir string, autoregister bool) {
+func (m *Stub) Watch(kubeletEndpoint, resourceName, pluginSockDir string) {
 	for {
 		select {
 		case stop := <-m.stopWatcher:
@@ -196,7 +212,7 @@ func (m *Stub) Watch(kubeletEndpoint, resourceName string, pluginSockDir string,
 					panic(err)
 
 				}
-				if autoregister {
+				if ok := m.registerControlFunc(); ok {
 					if err := m.Register(pluginapi.KubeletSocket, resourceName, pluginapi.DevicePluginPath); err != nil {
 						klog.ErrorS(err, "Unable to register to kubelet")
 						panic(err)
