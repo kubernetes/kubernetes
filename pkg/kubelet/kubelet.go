@@ -1944,6 +1944,8 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		if kl.podWorkers.CouldHaveRunningContainers(pod.UID) && !kubetypes.IsStaticPod(pod) {
 			pod = kl.handlePodResourcesResize(pod)
 		}
+	} else {
+		pod = kl.podResizeInfeasible(pod)
 	}
 
 	// TODO(#113606): connect this with the incoming context parameter, which comes from the pod worker.
@@ -2737,6 +2739,21 @@ func isPodResizeInProgress(pod *v1.Pod, podStatus *v1.PodStatus) bool {
 		}
 	}
 	return false
+}
+
+func (kl *Kubelet) podResizeInfeasible(pod *v1.Pod) *v1.Pod {
+	updatedPod := pod.DeepCopy()
+	resizeStatus := v1.PodResizeStatusInfeasible
+
+	// Save resize decision to checkpoint
+	if err := kl.statusManager.SetPodResizeStatus(updatedPod.UID, resizeStatus); err != nil {
+		klog.ErrorS(err, "SetPodResizeStatus failed", "pod", klog.KObj(updatedPod))
+		return pod
+	}
+	updatedPod.Status.Resize = resizeStatus
+	kl.podManager.UpdatePod(updatedPod)
+	kl.statusManager.SetPodStatus(updatedPod, updatedPod.Status)
+	return updatedPod
 }
 
 func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, *v1.Pod, v1.PodResizeStatus) {
