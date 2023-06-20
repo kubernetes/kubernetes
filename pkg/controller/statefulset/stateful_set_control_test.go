@@ -26,6 +26,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -2357,22 +2358,37 @@ func TestStatefulSetStatusUpdate(t *testing.T) {
 }
 
 type requestTracker struct {
+	sync.Mutex
 	requests int
 	err      error
 	after    int
 }
 
 func (rt *requestTracker) errorReady() bool {
+	rt.Lock()
+	defer rt.Unlock()
 	return rt.err != nil && rt.requests >= rt.after
 }
 
 func (rt *requestTracker) inc() {
+	rt.Lock()
+	defer rt.Unlock()
 	rt.requests++
 }
 
 func (rt *requestTracker) reset() {
+	rt.Lock()
+	defer rt.Unlock()
 	rt.err = nil
 	rt.after = 0
+}
+
+func newRequestTracker(requests int, err error, after int) requestTracker {
+	return requestTracker{
+		requests: requests,
+		err:      err,
+		after:    after,
+	}
 }
 
 type fakeObjectManager struct {
@@ -2402,9 +2418,10 @@ func newFakeObjectManager(informerFactory informers.SharedInformerFactory) *fake
 		claimInformer.Informer().GetIndexer(),
 		setInformer.Informer().GetIndexer(),
 		revisionInformer.Informer().GetIndexer(),
-		requestTracker{0, nil, 0},
-		requestTracker{0, nil, 0},
-		requestTracker{0, nil, 0}}
+		newRequestTracker(0, nil, 0),
+		newRequestTracker(0, nil, 0),
+		newRequestTracker(0, nil, 0),
+	}
 }
 
 func (om *fakeObjectManager) CreatePod(ctx context.Context, pod *v1.Pod) error {
@@ -2619,7 +2636,7 @@ func newFakeStatefulSetStatusUpdater(setInformer appsinformers.StatefulSetInform
 	return &fakeStatefulSetStatusUpdater{
 		setInformer.Lister(),
 		setInformer.Informer().GetIndexer(),
-		requestTracker{0, nil, 0},
+		newRequestTracker(0, nil, 0),
 	}
 }
 
