@@ -380,10 +380,10 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		UIDMap:         uidMap,
 		DynamicClient:  o.DynamicClient,
 		Timeout:        effectiveTimeout,
+		ForConditions:  map[string]cmdwait.ConditionFunc{"delete": cmdwait.IsDeleted},
 
-		Printer:     printers.NewDiscardingPrinter(),
-		ConditionFn: cmdwait.IsDeleted,
-		IOStreams:   o.IOStreams,
+		Printer:   printers.NewDiscardingPrinter(),
+		IOStreams: o.IOStreams,
 	}
 	err = waitOptions.RunWait()
 	if errors.IsForbidden(err) || errors.IsMethodNotSupported(err) {

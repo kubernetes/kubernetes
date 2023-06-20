@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -77,6 +78,9 @@ var (
 		# Wait for pod "busybox1" to be Ready
 		kubectl wait --for='jsonpath={.status.conditions[?(@.type=="Ready")].status}=True' pod/busybox1
 
+		# Wait for pod "busybox1" to be either "Failed" or "Complete"
+		kubectl wait --for='jsonpath={.status.conditions[?(@.type=="Failed")].status}=True' --for='jsonpath={.status.conditions[?(@.type=="Complete")].status}=True' job/busybox1
+
 		# Wait for the service "loadbalancer" to have ingress.
 		kubectl wait --for=jsonpath='{.status.loadBalancer.ingress}' service/loadbalancer
 
@@ -97,7 +101,8 @@ type WaitFlags struct {
 	ResourceBuilderFlags *genericclioptions.ResourceBuilderFlags
 
 	Timeout      time.Duration
-	ForCondition string
+	ForCondition []string
+	ForAll       bool
 
 	genericiooptions.IOStreams
 }
@@ -126,7 +131,7 @@ func NewCmdWait(restClientGetter genericclioptions.RESTClientGetter, streams gen
 	flags := NewWaitFlags(restClientGetter, streams)
 
 	cmd := &cobra.Command{
-		Use:     "wait ([-f FILENAME] | resource.group/resource.name | resource.group [(-l label | --all)]) [--for=delete|--for condition=available|--for=jsonpath='{}'[=value]]",
+		Use:     "wait ([-f FILENAME] | resource.group/resource.name | resource.group [(-l label | --all)]) [--for-all] {--for=delete|--for condition=available|--for=jsonpath='{}'[=value]}",
 		Short:   i18n.T("Experimental: Wait for a specific condition on one or many resources"),
 		Long:    waitLong,
 		Example: waitExample,
@@ -151,7 +156,9 @@ func (flags *WaitFlags) AddFlags(cmd *cobra.Command) {
 	flags.ResourceBuilderFlags.AddFlags(cmd.Flags())
 
 	cmd.Flags().DurationVar(&flags.Timeout, "timeout", flags.Timeout, "The length of time to wait before giving up.  Zero means check once and don't wait, negative means wait for a week.")
-	cmd.Flags().StringVar(&flags.ForCondition, "for", flags.ForCondition, "The condition to wait on: [delete|condition=condition-name[=condition-value]|jsonpath='{JSONPath expression}'=[JSONPath value]]. The default condition-value is true.  Condition values are compared after Unicode simple case folding, which is a more general form of case-insensitivity.")
+	cmd.Flags().StringArrayVar(&flags.ForCondition, "for", flags.ForCondition, "The condition to wait on: [delete|condition=condition-name[=condition-value]|jsonpath='{JSONPath expression}'[=JSONPath Condition]]. The default condition-value is true.  Condition values are compared after Unicode simple case folding, which is a more general form of case-insensitivity. This option may be repeated to wait for one or all of several conditions. See parameter --for-all.")
+	cmd.Flags().BoolVar(&flags.ForAll, "for-all", flags.ForAll, "Wait for all conditions to be true when multiple "+
+		"--for flags are provided.")
 }
 
 // ToOptions converts from CLI inputs to runtime inputs
@@ -169,9 +176,14 @@ func (flags *WaitFlags) ToOptions(args []string) (*WaitOptions, error) {
 	if err != nil {
 		return nil, err
 	}
-	conditionFn, err := conditionFuncFor(flags.ForCondition, flags.ErrOut)
-	if err != nil {
-		return nil, err
+
+	forConditions := make(map[string]ConditionFunc)
+	for _, condition := range flags.ForCondition {
+		conditionFn, err := conditionFuncFor(condition, flags.ErrOut)
+		if err != nil {
+			return nil, err
+		}
+		forConditions[condition] = conditionFn
 	}
 
 	effectiveTimeout := flags.Timeout
@@ -183,11 +195,11 @@ func (flags *WaitFlags) ToOptions(args []string) (*WaitOptions, error) {
 		ResourceFinder: builder,
 		DynamicClient:  dynamicClient,
 		Timeout:        effectiveTimeout,
-		ForCondition:   flags.ForCondition,
+		ForConditions:  forConditions,
+		ForAll:         flags.ForAll,
 
-		Printer:     printer,
-		ConditionFn: conditionFn,
-		IOStreams:   flags.IOStreams,
+		Printer:   printer,
+		IOStreams: flags.IOStreams,
 	}
 
 	return o, nil
@@ -305,29 +317,55 @@ type WaitOptions struct {
 	UIDMap        UIDMap
 	DynamicClient dynamic.Interface
 	Timeout       time.Duration
-	ForCondition  string
+	ForConditions map[string]ConditionFunc
+	ForAll        bool
 
-	Printer     printers.ResourcePrinter
-	ConditionFn ConditionFunc
+	Printer printers.ResourcePrinter
 	genericiooptions.IOStreams
 }
 
 // ConditionFunc is the interface for providing condition checks
 type ConditionFunc func(ctx context.Context, info *resource.Info, o *WaitOptions) (finalObject runtime.Object, done bool, err error)
 
-// RunWait runs the waiting logic
+// RunWait runs the waiting logic.
 func (o *WaitOptions) RunWait() error {
 	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), o.Timeout)
 	defer cancel()
 
+	if len(o.ForConditions) == 0 {
+		return errors.New("provide at least one for condition to wait on")
+	}
+
+	errChan := make(chan error, len(o.ForConditions))
+	for condition := range o.ForConditions {
+		condition := condition
+		go func(errChan chan<- error) {
+			errChan <- o.runWaitCondition(ctx, condition)
+		}(errChan)
+	}
+	var errors []error
+	for range o.ForConditions {
+		if err := <-errChan; err != nil {
+			if o.ForAll {
+				return err
+			}
+			errors = append(errors, err)
+		} else if !o.ForAll {
+			return nil
+		}
+	}
+	return utilerrors.NewAggregate(errors)
+}
+
+// runWaitCondition runs the waiting logic for a single provided condition.
+func (o *WaitOptions) runWaitCondition(ctx context.Context, condition string) error {
 	visitCount := 0
 	visitFunc := func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
 		}
-
 		visitCount++
-		finalObject, success, err := o.ConditionFn(ctx, info, o)
+		finalObject, success, err := o.ForConditions[condition](ctx, info, o)
 		if success {
 			o.Printer.PrintObj(finalObject, o.Out)
 			return nil
@@ -338,7 +376,7 @@ func (o *WaitOptions) RunWait() error {
 		return err
 	}
 	visitor := o.ResourceFinder.Do()
-	isForDelete := strings.ToLower(o.ForCondition) == "delete"
+	isForDelete := strings.ToLower(condition) == "delete"
 	if visitor, ok := visitor.(*resource.Result); ok && isForDelete {
 		visitor.IgnoreErrors(apierrors.IsNotFound)
 	}

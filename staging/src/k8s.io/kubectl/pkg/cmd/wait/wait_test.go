@@ -278,7 +278,7 @@ func TestWaitForDeletion(t *testing.T) {
 				return dynamicfakeclient.NewSimpleDynamicClient(scheme)
 			},
 			timeout:     10 * time.Second,
-			expectedErr: errNoMatchingResources.Error(),
+			expectedErr: None, // upon deletion, expect no errors when no resources found
 		},
 		{
 			name: "uid conflict on get",
@@ -553,9 +553,9 @@ func TestWaitForDeletion(t *testing.T) {
 				DynamicClient:  fakeClient,
 				Timeout:        test.timeout,
 
-				Printer:     printers.NewDiscardingPrinter(),
-				ConditionFn: IsDeleted,
-				IOStreams:   genericiooptions.NewTestIOStreamsDiscard(),
+				Printer:       printers.NewDiscardingPrinter(),
+				ForConditions: map[string]ConditionFunc{"delete": IsDeleted},
+				IOStreams:     genericiooptions.NewTestIOStreamsDiscard(),
 			}
 			err := o.RunWait()
 			switch {
@@ -963,9 +963,9 @@ func TestWaitForCondition(t *testing.T) {
 				DynamicClient:  fakeClient,
 				Timeout:        test.timeout,
 
-				Printer:     printers.NewDiscardingPrinter(),
-				ConditionFn: ConditionalWait{conditionName: "the-condition", conditionStatus: "status-value", errOut: io.Discard}.IsConditionMet,
-				IOStreams:   genericiooptions.NewTestIOStreamsDiscard(),
+				Printer:       printers.NewDiscardingPrinter(),
+				ForConditions: map[string]ConditionFunc{"condition": ConditionalWait{conditionName: "the-condition", conditionStatus: "status-value", errOut: io.Discard}.IsConditionMet},
+				IOStreams:     genericiooptions.NewTestIOStreamsDiscard(),
 			}
 			err := o.RunWait()
 			switch {
@@ -995,9 +995,8 @@ func TestWaitForDeletionIgnoreNotFound(t *testing.T) {
 		ResourceFinder: genericclioptions.NewSimpleFakeResourceFinder(infos...),
 		DynamicClient:  fakeClient,
 		Printer:        printers.NewDiscardingPrinter(),
-		ConditionFn:    IsDeleted,
 		IOStreams:      genericiooptions.NewTestIOStreamsDiscard(),
-		ForCondition:   "delete",
+		ForConditions:  map[string]ConditionFunc{"delete": IsDeleted},
 	}
 	err := o.RunWait()
 	if err != nil {
@@ -1246,11 +1245,11 @@ func TestWaitForDifferentJSONPathExpression(t *testing.T) {
 				Timeout:        1 * time.Second,
 
 				Printer: printers.NewDiscardingPrinter(),
-				ConditionFn: JSONPathWait{
+				ForConditions: map[string]ConditionFunc{"jsonpath": JSONPathWait{
 					matchAnyValue:  test.matchAnyValue,
 					jsonPathValue:  test.jsonPathValue,
 					jsonPathParser: j,
-					errOut:         io.Discard}.IsJSONPathConditionMet,
+					errOut:         io.Discard}.IsJSONPathConditionMet},
 				IOStreams: genericiooptions.NewTestIOStreamsDiscard(),
 			}
 
@@ -1511,9 +1510,9 @@ func TestWaitForJSONPathCondition(t *testing.T) {
 				Timeout:        test.timeout,
 
 				Printer: printers.NewDiscardingPrinter(),
-				ConditionFn: JSONPathWait{
+				ForConditions: map[string]ConditionFunc{"jsonpath": JSONPathWait{
 					jsonPathValue:  test.jsonPathValue,
-					jsonPathParser: j, errOut: io.Discard}.IsJSONPathConditionMet,
+					jsonPathParser: j, errOut: io.Discard}.IsJSONPathConditionMet},
 				IOStreams: genericiooptions.NewTestIOStreamsDiscard(),
 			}
 
@@ -1624,6 +1623,175 @@ func TestConditionFuncFor(t *testing.T) {
 			case err != nil && test.expectedErr != None:
 				if !strings.Contains(err.Error(), test.expectedErr) {
 					t.Fatalf("expected error %q, got %q", test.expectedErr, err.Error())
+				}
+			}
+		})
+	}
+}
+
+func TestWaitForMultipleConditions(t *testing.T) {
+	scheme := runtime.NewScheme()
+	listMapping := map[schema.GroupVersionResource]string{
+		{Group: "group", Version: "version", Resource: "theresource"}: "TheKindList",
+	}
+
+	tests := []struct {
+		name          string
+		infos         []*resource.Info
+		fakeClient    func() *dynamicfakeclient.FakeDynamicClient
+		timeout       time.Duration
+		forConditions map[string]ConditionFunc
+		forAll        bool
+		expectedErr   string
+	}{
+		{
+			name: "pass when one condition matches",
+			infos: []*resource.Info{
+				{
+					Mapping: &meta.RESTMapping{
+						Resource: schema.GroupVersionResource{Group: "group", Version: "version", Resource: "theresource"},
+					},
+					Name:      "name-foo",
+					Namespace: "ns-foo",
+				},
+			},
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
+				fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, newUnstructuredList(addCondition(
+						newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"),
+						"the-condition", "status-value",
+					)), nil
+				})
+				return fakeClient
+			},
+			forConditions: map[string]ConditionFunc{
+				"condition1": ConditionalWait{conditionName: "the-condition", conditionStatus: "status-value", errOut: io.Discard}.IsConditionMet,
+				"condition2": ConditionalWait{conditionName: "the-condition", conditionStatus: "status-valu", errOut: io.Discard}.IsConditionMet,
+			},
+			timeout: 10 * time.Second,
+		},
+		{
+			name: "pass with for-all when all conditions match",
+			infos: []*resource.Info{
+				{
+					Mapping: &meta.RESTMapping{
+						Resource: schema.GroupVersionResource{Group: "group", Version: "version", Resource: "theresource"},
+					},
+					Name:      "name-foo",
+					Namespace: "ns-foo",
+				},
+			},
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
+				fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, newUnstructuredList(addCondition(
+						newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"),
+						"the-condition", "status-value",
+					)), nil
+				})
+				return fakeClient
+			},
+			forConditions: map[string]ConditionFunc{
+				"condition1": ConditionalWait{conditionName: "the-condition", conditionStatus: "status-value", errOut: io.Discard}.IsConditionMet,
+				"condition2": ConditionalWait{conditionName: "the-condition", conditionStatus: "status-value", errOut: io.Discard}.IsConditionMet,
+			},
+			forAll:  true,
+			timeout: 10 * time.Second,
+		},
+		{
+			name: "fail when no condition matches",
+			infos: []*resource.Info{
+				{
+					Mapping: &meta.RESTMapping{
+						Resource: schema.GroupVersionResource{Group: "group", Version: "version", Resource: "theresource"},
+					},
+					Name:      "name-foo",
+					Namespace: "ns-foo",
+				},
+			},
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
+				fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, newUnstructuredList(addCondition(
+						newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"),
+						"the-condition", "status-value",
+					)), nil
+				})
+				return fakeClient
+			},
+			forConditions: map[string]ConditionFunc{
+				"condition1": ConditionalWait{conditionName: "the-condition", conditionStatus: "status-val", errOut: io.Discard}.IsConditionMet,
+				"condition2": ConditionalWait{conditionName: "the-condition", conditionStatus: "status-valu", errOut: io.Discard}.IsConditionMet,
+			},
+			timeout:     2 * time.Second,
+			expectedErr: "timed out waiting for the condition on theresource/name-foo",
+		},
+		{
+			name: "fail with for-all when only one condition matches",
+			infos: []*resource.Info{
+				{
+					Mapping: &meta.RESTMapping{
+						Resource: schema.GroupVersionResource{Group: "group", Version: "version", Resource: "theresource"},
+					},
+					Name:      "name-foo",
+					Namespace: "ns-foo",
+				},
+			},
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
+				fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, newUnstructuredList(addCondition(
+						newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"),
+						"the-condition", "status-value",
+					)), nil
+				})
+				return fakeClient
+			},
+			forConditions: map[string]ConditionFunc{
+				"condition1": ConditionalWait{conditionName: "the-condition", conditionStatus: "status-value", errOut: io.Discard}.IsConditionMet,
+				"condition2": ConditionalWait{conditionName: "the-condition", conditionStatus: "status-valu", errOut: io.Discard}.IsConditionMet,
+			},
+			forAll:      true,
+			timeout:     2 * time.Second,
+			expectedErr: "timed out waiting for the condition on theresource/name-foo",
+		},
+		{
+			name:  "fail when no condition provided",
+			infos: []*resource.Info{},
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				return nil
+			},
+			forConditions: map[string]ConditionFunc{},
+			forAll:        true,
+			timeout:       2 * time.Second,
+			expectedErr:   "provide at least one for condition to wait on",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeClient := test.fakeClient()
+			o := &WaitOptions{
+				ResourceFinder: genericclioptions.NewSimpleFakeResourceFinder(test.infos...),
+				DynamicClient:  fakeClient,
+				Timeout:        test.timeout,
+
+				Printer:       printers.NewDiscardingPrinter(),
+				ForConditions: test.forConditions,
+				ForAll:        test.forAll,
+				IOStreams:     genericiooptions.NewTestIOStreamsDiscard(),
+			}
+			err := o.RunWait()
+			switch {
+			case err == nil && len(test.expectedErr) == 0:
+			case err != nil && len(test.expectedErr) == 0:
+				t.Fatal(err)
+			case err == nil && len(test.expectedErr) != 0:
+				t.Fatalf("missing: %q", test.expectedErr)
+			case err != nil && len(test.expectedErr) != 0:
+				if !strings.Contains(err.Error(), test.expectedErr) {
+					t.Fatalf("expected %q, got %q", test.expectedErr, err.Error())
 				}
 			}
 		})

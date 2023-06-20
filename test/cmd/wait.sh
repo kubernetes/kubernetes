@@ -105,11 +105,18 @@ EOF
     output_message_1=$(kubectl wait \
         --for='jsonpath=spec.template.spec.containers[?(@.name=="busybox")].image=busybox' \
         deploy/test-3)
+    # Command: Wait for all --for conditions
+    output_message_2=$(kubectl wait \
+        --for='jsonpath={.spec.template.spec.containers[?(@.name=="busybox")].image}=busybox' \
+        --for=jsonpath='{.status.replicas}' \
+        --for-all \
+        deploy/test-3)
     set -o errexit
 
     # Post-Condition: Wait succeed
     kube::test::if_has_string "${output_message_0}" 'deployment.apps/test-3 condition met'
     kube::test::if_has_string "${output_message_1}" 'deployment.apps/test-3 condition met'
+    kube::test::if_has_string "${output_message_2//$'\n'/ }" "deployment.apps/test-3 condition met deployment.apps/test-3 condition met"
 
     # Clean deployment
     kubectl delete deployment test-3
