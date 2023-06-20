@@ -33,6 +33,7 @@ import (
 func TestApplySandboxResources(t *testing.T) {
 	_, _, m, err := createTestRuntimeManager()
 	m.cpuCFSQuota = true
+	setCgroupVersionDuringTest(cgroupV1)
 
 	config := &runtimeapi.PodSandboxConfig{
 		Linux: &runtimeapi.LinuxPodSandboxConfig{},
