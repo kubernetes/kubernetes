@@ -21,7 +21,6 @@ import (
 // kernel data structures.
 type FS struct {
 	proc fs.FS
-	real bool
 }
 
 // DefaultMountPoint is the common mount point of the proc filesystem.
@@ -40,11 +39,5 @@ func NewFS(mountPoint string) (FS, error) {
 	if err != nil {
 		return FS{}, err
 	}
-
-	real, err := isRealProc(mountPoint)
-	if err != nil {
-		return FS{}, err
-	}
-
-	return FS{fs, real}, nil
+	return FS{fs}, nil
 }
