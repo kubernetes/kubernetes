@@ -6821,8 +6821,10 @@ func TestValidateResizePolicy(t *testing.T) {
 			field.ErrorList{field.Duplicate(field.NewPath("field").Index(2), core.ResourceCPU)},
 		},
 	}
+	var PodRestartPolicy core.RestartPolicy
+	PodRestartPolicy = "Never"
 	for k, v := range testCases {
-		errs := validateResizePolicy(v.PolicyList, field.NewPath("field"))
+		errs := validateResizePolicy(v.PolicyList, field.NewPath("field"), &PodRestartPolicy)
 		if !v.ExpectError && len(errs) > 0 {
 			t.Errorf("Testcase %s - expected success, got error: %+v", k, errs)
 		}
@@ -6918,7 +6920,9 @@ func TestValidateEphemeralContainers(t *testing.T) {
 			},
 		}},
 	} {
-		if errs := validateEphemeralContainers(ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}); len(errs) != 0 {
+		var PodRestartPolicy core.RestartPolicy
+		PodRestartPolicy = "Never"
+		if errs := validateEphemeralContainers(ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy); len(errs) != 0 {
 			t.Errorf("expected success for '%s' but got errors: %v", title, errs)
 		}
 	}
@@ -7172,9 +7176,11 @@ func TestValidateEphemeralContainers(t *testing.T) {
 	},
 	}
 
+	var PodRestartPolicy core.RestartPolicy
+	PodRestartPolicy = "Never"
 	for _, tc := range tcs {
 		t.Run(tc.title+"__@L"+tc.line, func(t *testing.T) {
-			errs := validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{})
+			errs := validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy)
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
@@ -7472,7 +7478,10 @@ func TestValidateContainers(t *testing.T) {
 			},
 		},
 	}
-	if errs := validateContainers(successCase, volumeDevices, nil, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
+
+	var PodRestartPolicy core.RestartPolicy
+	PodRestartPolicy = "Never"
+	if errs := validateContainers(successCase, volumeDevices, nil, field.NewPath("field"), PodValidationOptions{}, &PodRestartPolicy); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -8028,9 +8037,10 @@ func TestValidateContainers(t *testing.T) {
 		field.ErrorList{{Type: field.ErrorTypeNotSupported, Field: "containers[0].resizePolicy"}},
 	},
 	}
+
 	for _, tc := range errorCases {
 		t.Run(tc.title+"__@L"+tc.line, func(t *testing.T) {
-			errs := validateContainers(tc.containers, volumeDevices, nil, field.NewPath("containers"), PodValidationOptions{})
+			errs := validateContainers(tc.containers, volumeDevices, nil, field.NewPath("containers"), PodValidationOptions{}, &PodRestartPolicy)
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
@@ -8077,7 +8087,9 @@ func TestValidateInitContainers(t *testing.T) {
 		TerminationMessagePolicy: "File",
 	},
 	}
-	if errs := validateInitContainers(successCase, containers, volumeDevices, nil, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
+	var PodRestartPolicy core.RestartPolicy
+	PodRestartPolicy = "Never"
+	if errs := validateInitContainers(successCase, containers, volumeDevices, nil, field.NewPath("field"), PodValidationOptions{}, &PodRestartPolicy); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -8233,9 +8245,10 @@ func TestValidateInitContainers(t *testing.T) {
 		field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "initContainers[0].startupProbe", BadValue: ""}},
 	},
 	}
+
 	for _, tc := range errorCases {
 		t.Run(tc.title+"__@L"+tc.line, func(t *testing.T) {
-			errs := validateInitContainers(tc.initContainers, containers, volumeDevices, nil, field.NewPath("initContainers"), PodValidationOptions{})
+			errs := validateInitContainers(tc.initContainers, containers, volumeDevices, nil, field.NewPath("initContainers"), PodValidationOptions{}, &PodRestartPolicy)
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
