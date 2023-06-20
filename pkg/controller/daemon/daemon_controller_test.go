@@ -2757,7 +2757,7 @@ func TestGetNodesToDaemonPods(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		addNodes(manager.nodeStore, 0, 4, nil)
+		addNodes(manager.nodeStore, 0, 2, nil)
 
 		// These pods should be returned.
 		wantedPods := []*v1.Pod{
@@ -2785,6 +2785,13 @@ func TestGetNodesToDaemonPods(t *testing.T) {
 			newPod("non-matching-owned-0-", "node-0", simpleDaemonSetLabel2, ds),
 			newPod("non-matching-orphan-1-", "node-1", simpleDaemonSetLabel2, nil),
 			newPod("matching-owned-by-other-0-", "node-0", simpleDaemonSetLabel, ds2),
+			func() *v1.Pod {
+				pod := newPod("matching-owned-succeeded-deleted-pod-0-", "node-0", simpleDaemonSetLabel, ds)
+				now := metav1.Now()
+				pod.DeletionTimestamp = &now
+				pod.Status = v1.PodStatus{Phase: v1.PodSucceeded}
+				return pod
+			}(),
 			func() *v1.Pod {
 				pod := newPod("matching-owned-failed-deleted-pod-1-", "node-1", simpleDaemonSetLabel, ds)
 				now := metav1.Now()
