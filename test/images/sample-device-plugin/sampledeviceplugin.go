@@ -93,8 +93,7 @@ func main() {
 	pluginSocksDir := os.Getenv("PLUGIN_SOCK_DIR")
 	klog.Infof("pluginSocksDir: %s", pluginSocksDir)
 	if pluginSocksDir == "" {
-		klog.Errorf("Empty pluginSocksDir")
-		return
+		pluginSocksDir = pluginapi.DevicePluginPath
 	}
 
 	socketPath := pluginSocksDir + "/dp." + fmt.Sprintf("%d", time.Now().Unix())
