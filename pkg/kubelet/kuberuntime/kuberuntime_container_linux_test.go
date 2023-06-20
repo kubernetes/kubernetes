@@ -244,11 +244,12 @@ func TestCalculateLinuxResources(t *testing.T) {
 	}
 
 	tests := []struct {
-		name     string
-		cpuReq   *resource.Quantity
-		cpuLim   *resource.Quantity
-		memLim   *resource.Quantity
-		expected *runtimeapi.LinuxContainerResources
+		name          string
+		cpuReq        *resource.Quantity
+		cpuLim        *resource.Quantity
+		memLim        *resource.Quantity
+		expected      *runtimeapi.LinuxContainerResources
+		cgroupVersion CgroupVersion
 	}{
 		{
 			name:   "Request128MBLimit256MB",
@@ -261,6 +262,7 @@ func TestCalculateLinuxResources(t *testing.T) {
 				CpuShares:          1024,
 				MemoryLimitInBytes: 134217728,
 			},
+			cgroupVersion: cgroupV1,
 		},
 		{
 			name:   "RequestNoMemory",
@@ -273,6 +275,7 @@ func TestCalculateLinuxResources(t *testing.T) {
 				CpuShares:          2048,
 				MemoryLimitInBytes: 0,
 			},
+			cgroupVersion: cgroupV1,
 		},
 		{
 			name:   "RequestNilCPU",
@@ -284,6 +287,7 @@ func TestCalculateLinuxResources(t *testing.T) {
 				CpuShares:          2048,
 				MemoryLimitInBytes: 0,
 			},
+			cgroupVersion: cgroupV1,
 		},
 		{
 			name:   "RequestZeroCPU",
@@ -296,9 +300,66 @@ func TestCalculateLinuxResources(t *testing.T) {
 				CpuShares:          2,
 				MemoryLimitInBytes: 0,
 			},
+			cgroupVersion: cgroupV1,
+		},
+		{
+			name:   "Request128MBLimit256MB",
+			cpuReq: generateResourceQuantity("1"),
+			cpuLim: generateResourceQuantity("2"),
+			memLim: generateResourceQuantity("128Mi"),
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod:          100000,
+				CpuQuota:           200000,
+				CpuShares:          1024,
+				MemoryLimitInBytes: 134217728,
+				Unified:            map[string]string{"memory.oom.group": "1"},
+			},
+			cgroupVersion: cgroupV2,
+		},
+		{
+			name:   "RequestNoMemory",
+			cpuReq: generateResourceQuantity("2"),
+			cpuLim: generateResourceQuantity("8"),
+			memLim: generateResourceQuantity("0"),
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod:          100000,
+				CpuQuota:           800000,
+				CpuShares:          2048,
+				MemoryLimitInBytes: 0,
+				Unified:            map[string]string{"memory.oom.group": "1"},
+			},
+			cgroupVersion: cgroupV2,
+		},
+		{
+			name:   "RequestNilCPU",
+			cpuLim: generateResourceQuantity("2"),
+			memLim: generateResourceQuantity("0"),
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod:          100000,
+				CpuQuota:           200000,
+				CpuShares:          2048,
+				MemoryLimitInBytes: 0,
+				Unified:            map[string]string{"memory.oom.group": "1"},
+			},
+			cgroupVersion: cgroupV2,
+		},
+		{
+			name:   "RequestZeroCPU",
+			cpuReq: generateResourceQuantity("0"),
+			cpuLim: generateResourceQuantity("2"),
+			memLim: generateResourceQuantity("0"),
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod:          100000,
+				CpuQuota:           200000,
+				CpuShares:          2,
+				MemoryLimitInBytes: 0,
+				Unified:            map[string]string{"memory.oom.group": "1"},
+			},
+			cgroupVersion: cgroupV2,
 		},
 	}
 	for _, test := range tests {
+		setCgroupVersionDuringTest(test.cgroupVersion)
 		linuxContainerResources := m.calculateLinuxResources(test.cpuReq, test.cpuLim, test.memLim)
 		assert.Equal(t, test.expected, linuxContainerResources)
 	}
@@ -887,4 +948,17 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 		})
 	}
 	//TODO(vinaykul,InPlacePodVerticalScaling): Add unit tests for cgroup v1 & v2
+}
+
+type CgroupVersion string
+
+const (
+	cgroupV1 CgroupVersion = "v1"
+	cgroupV2 CgroupVersion = "v2"
+)
+
+func setCgroupVersionDuringTest(version CgroupVersion) {
+	isCgroup2UnifiedMode = func() bool {
+		return version == cgroupV2
+	}
 }
