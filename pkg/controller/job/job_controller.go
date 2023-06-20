@@ -56,9 +56,6 @@ import (
 	"k8s.io/utils/pointer"
 )
 
-// syncJobBatchPeriod is the batch period for controller sync invocations for a Job.
-const syncJobBatchPeriod = time.Second
-
 const (
 	// PodFailurePolicy reason indicates a job failure condition is added due to
 	// a failed pod matching a pod failure policy rule
@@ -69,14 +66,16 @@ const (
 var controllerKind = batch.SchemeGroupVersion.WithKind("Job")
 
 var (
-	// DefaultJobApiBackOff is the default backoff period. Exported for tests.
-	DefaultJobApiBackOff = 1 * time.Second
-	// MaxJobApiBackOff is the max backoff period. Exported for tests.
-	MaxJobApiBackOff = 60 * time.Second
-	// DefaultJobPodFailureBackOff is the default backoff period. Exported for tests.
+	// syncJobBatchPeriod is the batch period for controller sync invocations for a Job.
+	syncJobBatchPeriod = time.Second
+	// DefaultJobApiBackOff is the default API backoff period. Exported for tests.
+	DefaultJobApiBackOff = time.Second
+	// MaxJobApiBackOff is the max API backoff period. Exported for tests.
+	MaxJobApiBackOff = time.Minute
+	// DefaultJobPodFailureBackOff is the default pod failure backoff period. Exported for tests.
 	DefaultJobPodFailureBackOff = 10 * time.Second
-	// MaxJobPodFailureBackOff is the max backoff period. Exported for tests.
-	MaxJobPodFailureBackOff = 360 * time.Second
+	// MaxJobPodFailureBackOff is the max  pod failure backoff period. Exported for tests.
+	MaxJobPodFailureBackOff = 10 * time.Minute
 	// MaxUncountedPods is the maximum size the slices in
 	// .status.uncountedTerminatedPods should have to keep their representation
 	// roughly below 20 KB. Exported for tests
@@ -125,8 +124,6 @@ type Controller struct {
 	broadcaster record.EventBroadcaster
 	recorder    record.EventRecorder
 
-	syncJobBatchPeriod time.Duration
-
 	clock clock.WithTicker
 
 	// Store with information to compute the expotential backoff delay for pod
@@ -159,7 +156,6 @@ func newControllerWithClock(ctx context.Context, podInformer coreinformers.PodIn
 		clock:                 clock,
 		podBackoffStore:       newBackoffStore(),
 	}
-	jm.syncJobBatchPeriod = syncJobBatchPeriod
 
 	jobInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -521,7 +517,7 @@ func (jm *Controller) enqueueSyncJobImmediately(logger klog.Logger, obj interfac
 // - Job status update
 // obj could be an *batch.Job, or a DeletionFinalStateUnknown marker item.
 func (jm *Controller) enqueueSyncJobBatched(logger klog.Logger, obj interface{}) {
-	jm.enqueueSyncJobInternal(logger, obj, jm.syncJobBatchPeriod)
+	jm.enqueueSyncJobInternal(logger, obj, syncJobBatchPeriod)
 }
 
 // enqueueSyncJobWithDelay tells the controller to invoke syncJob with a
@@ -529,8 +525,8 @@ func (jm *Controller) enqueueSyncJobBatched(logger klog.Logger, obj interface{})
 // It is used when pod recreations are delayed due to pod failures.
 // obj could be an *batch.Job, or a DeletionFinalStateUnknown marker item.
 func (jm *Controller) enqueueSyncJobWithDelay(logger klog.Logger, obj interface{}, delay time.Duration) {
-	if delay < jm.syncJobBatchPeriod {
-		delay = jm.syncJobBatchPeriod
+	if delay < syncJobBatchPeriod {
+		delay = syncJobBatchPeriod
 	}
 	jm.enqueueSyncJobInternal(logger, obj, delay)
 }
