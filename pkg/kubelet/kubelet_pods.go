@@ -1505,27 +1505,37 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal bool) v1.Pod
 	}
 }
 
-func (kl *Kubelet) determinePodResizeStatus(pod *v1.Pod, podStatus *v1.PodStatus) v1.PodResizeStatus {
-	var podResizeStatus v1.PodResizeStatus
-	specStatusDiffer := false
+func (kl *Kubelet) specStatusDiffers(pod *v1.Pod, podStatus *v1.PodStatus) bool {
 	for _, c := range pod.Spec.Containers {
 		if cs, ok := podutil.GetContainerStatus(podStatus.ContainerStatuses, c.Name); ok {
 			if cs.Resources != nil && !cmp.Equal(c.Resources, *cs.Resources) {
-				specStatusDiffer = true
-				break
+				return true
 			}
 		}
 	}
-	if !specStatusDiffer {
-		// Clear last resize state from checkpoint
-		if err := kl.statusManager.SetPodResizeStatus(pod.UID, ""); err != nil {
-			klog.ErrorS(err, "SetPodResizeStatus failed", "pod", pod.Name)
+	return false
+}
+
+func (kl *Kubelet) determinePodResizeStatus(pod *v1.Pod, podStatus *v1.PodStatus) v1.PodResizeStatus {
+	var podResizeStatus v1.PodResizeStatus
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		if !kl.specStatusDiffers(pod, podStatus) {
+			// Clear last resize state from checkpoint
+			if err := kl.statusManager.SetPodResizeStatus(pod.UID, ""); err != nil {
+				klog.ErrorS(err, "SetPodResizeStatus failed", "pod", pod.Name)
+			}
+		} else {
+			if resizeStatus, found := kl.statusManager.GetPodResizeStatus(string(pod.UID)); found {
+				podResizeStatus = resizeStatus
+			}
 		}
 	} else {
-		if resizeStatus, found := kl.statusManager.GetPodResizeStatus(string(pod.UID)); found {
-			podResizeStatus = resizeStatus
+		if kl.specStatusDiffers(pod, podStatus) {
+			podResizeStatus = v1.PodResizeStatusInfeasible
 		}
 	}
+
 	return podResizeStatus
 }
 
@@ -1539,9 +1549,8 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 		oldPodStatus = pod.Status
 	}
 	s := kl.convertStatusToAPIStatus(pod, podStatus, oldPodStatus)
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		s.Resize = kl.determinePodResizeStatus(pod, s)
-	}
+	s.Resize = kl.determinePodResizeStatus(pod, s)
+
 	// calculate the next phase and preserve reason
 	allStatus := append(append([]v1.ContainerStatus{}, s.ContainerStatuses...), s.InitContainerStatuses...)
 	s.Phase = getPhase(pod, allStatus, podIsTerminal)
