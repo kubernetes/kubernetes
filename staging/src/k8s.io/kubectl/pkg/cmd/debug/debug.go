@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/docker/distribution/reference"
@@ -128,6 +129,7 @@ type DebugOptions struct {
 	TTY             bool
 	Profile         string
 	Applier         ProfileApplier
+	VolumeMounts    []string
 
 	explicitNamespace     bool
 	attachChanged         bool
@@ -192,6 +194,7 @@ func (o *DebugOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&o.TargetContainer, "target", "", i18n.T("When using an ephemeral container, target processes in this container name."))
 	cmd.Flags().BoolVarP(&o.TTY, "tty", "t", o.TTY, i18n.T("Allocate a TTY for the debugging container."))
 	cmd.Flags().StringVar(&o.Profile, "profile", ProfileLegacy, i18n.T(`Debugging profile. Options are "legacy", "general", "baseline", "netadmin", or "restricted".`))
+	cmd.Flags().StringArrayVar(&o.VolumeMounts, "volume", nil, i18n.T("When using an ephemeral container, mount volumes into the ephemeral container. Volume mounts must be provided in the format '[volume name]:[mount path]'"))
 }
 
 // Complete finishes run-time initialization of debug.DebugOptions.
@@ -336,6 +339,13 @@ func (o *DebugOptions) Validate() error {
 	// WarningPrinter
 	if o.WarningPrinter == nil {
 		return fmt.Errorf("WarningPrinter can not be used without initialization")
+	}
+
+	// Volume Mounts
+	for _, vol := range o.VolumeMounts {
+		if len(strings.Split(vol, ":")) != 2 {
+			return fmt.Errorf("volume mount must be in the format '[volume name]:[mount path]'")
+		}
 	}
 
 	return nil
@@ -556,6 +566,17 @@ func (o *DebugOptions) generateDebugContainer(pod *corev1.Pod) (*corev1.Pod, *co
 		ec.Args = o.Args
 	} else {
 		ec.Command = o.Args
+	}
+
+	if len(o.VolumeMounts) > 0 {
+		ec.VolumeMounts = []corev1.VolumeMount{}
+		for _, vol := range o.VolumeMounts {
+			parts := strings.Split(vol, ":")
+			ec.VolumeMounts = append(ec.VolumeMounts, corev1.VolumeMount{
+				Name:      parts[0],
+				MountPath: parts[1],
+			})
+		}
 	}
 
 	copied := pod.DeepCopy()

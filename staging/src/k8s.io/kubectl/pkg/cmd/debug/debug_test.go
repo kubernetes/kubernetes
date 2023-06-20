@@ -316,6 +316,29 @@ func TestGenerateDebugContainer(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "volume mounts",
+			opts: &DebugOptions{
+				Image:        "busybox",
+				PullPolicy:   corev1.PullIfNotPresent,
+				Profile:      ProfileLegacy,
+				VolumeMounts: []string{"data:/tmp"},
+			},
+			expected: &corev1.EphemeralContainer{
+				EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+					Name:                     "debugger-1",
+					Image:                    "busybox",
+					ImagePullPolicy:          corev1.PullIfNotPresent,
+					TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+					VolumeMounts: []corev1.VolumeMount{
+						{
+							Name:      "data",
+							MountPath: "/tmp",
+						},
+					},
+				},
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.opts.IOStreams = genericiooptions.NewTestIOStreamsDiscard()
@@ -2070,6 +2093,24 @@ func TestCompleteAndValidate(t *testing.T) {
 		{
 			name:      "Node: --target not allowed",
 			args:      "node/mynode --target --image=busybox",
+			wantError: true,
+		},
+		{
+			name: "Volume mount - valid",
+			args: "mypod --image=busybox --volume data:/tmp",
+			wantOpts: &DebugOptions{
+				Args:           []string{},
+				Image:          "busybox",
+				Namespace:      "test",
+				ShareProcesses: true,
+				Profile:        ProfileLegacy,
+				TargetNames:    []string{"mypod"},
+				VolumeMounts:   []string{"data:/tmp"},
+			},
+		},
+		{
+			name:      "Volume mount - invalid",
+			args:      "mypod --image=busybox --volume /tmp",
 			wantError: true,
 		},
 	}
