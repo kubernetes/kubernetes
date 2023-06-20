@@ -17,6 +17,7 @@ limitations under the License.
 package deletion
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -72,7 +73,7 @@ func TestFinalizeNamespaceFunc(t *testing.T) {
 		nsClient:       mockClient.CoreV1().Namespaces(),
 		finalizerToken: v1.FinalizerKubernetes,
 	}
-	d.finalizeNamespace(testNamespace)
+	d.finalizeNamespace(context.Background(), testNamespace)
 	actions := mockClient.Actions()
 	if len(actions) != 1 {
 		t.Errorf("Expected 1 mock client action, but got %v", len(actions))
@@ -254,7 +255,7 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersio
 func TestRetryOnConflictError(t *testing.T) {
 	mockClient := &fake.Clientset{}
 	numTries := 0
-	retryOnce := func(namespace *v1.Namespace) (*v1.Namespace, error) {
+	retryOnce := func(ctx context.Context, namespace *v1.Namespace) (*v1.Namespace, error) {
 		numTries++
 		if numTries <= 1 {
 			return namespace, errors.NewConflict(api.Resource("namespaces"), namespace.Name, fmt.Errorf("ERROR"))
@@ -265,7 +266,7 @@ func TestRetryOnConflictError(t *testing.T) {
 	d := namespacedResourcesDeleter{
 		nsClient: mockClient.CoreV1().Namespaces(),
 	}
-	_, err := d.retryOnConflictError(namespace, retryOnce)
+	_, err := d.retryOnConflictError(context.Background(), namespace, retryOnce)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
