@@ -235,6 +235,7 @@ func TestGenerateLinuxContainerConfigResources(t *testing.T) {
 func TestCalculateLinuxResources(t *testing.T) {
 	_, _, m, err := createTestRuntimeManager()
 	m.cpuCFSQuota = true
+	setCgroupVersionDuringTest(cgroupV1)
 
 	assert.NoError(t, err)
 
@@ -887,4 +888,17 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 		})
 	}
 	//TODO(vinaykul,InPlacePodVerticalScaling): Add unit tests for cgroup v1 & v2
+}
+
+type CgroupVersion string
+
+const (
+	cgroupV1 CgroupVersion = "v1"
+	cgroupV2 CgroupVersion = "v2"
+)
+
+func setCgroupVersionDuringTest(version CgroupVersion) {
+	isCgroup2UnifiedMode = func() bool {
+		return version == cgroupV2
+	}
 }
