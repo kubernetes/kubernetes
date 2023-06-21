@@ -25,6 +25,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
@@ -55,7 +56,11 @@ func NewRemoteImageService(endpoint string, connectionTimeout time.Duration, tp 
 	ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
 	defer cancel()
 
-	dialOpts := []grpc.DialOption{}
+	dialOpts := []grpc.DialOption{
+		grpc.WithConnectParams(grpc.ConnectParams{
+			Backoff: backoff.DefaultConfig,
+		}),
+	}
 	dialOpts = append(dialOpts,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(dialer),
