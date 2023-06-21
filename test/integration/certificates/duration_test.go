@@ -43,6 +43,7 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/certificate/csr"
 	"k8s.io/client-go/util/keyutil"
+	"k8s.io/klog/v2/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/certificates/signer"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -55,7 +56,8 @@ func TestCSRDuration(t *testing.T) {
 	s := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
 	t.Cleanup(s.TearDownFn)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	t.Cleanup(cancel)
 
 	// assert that the metrics we collect during the test run match expectations
@@ -111,7 +113,7 @@ func TestCSRDuration(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c, err := signer.NewKubeAPIServerClientCSRSigningController(client, informerFactory.Certificates().V1().CertificateSigningRequests(), caPublicKeyFile, caPrivateKeyFile, 24*time.Hour)
+	c, err := signer.NewKubeAPIServerClientCSRSigningController(ctx, client, informerFactory.Certificates().V1().CertificateSigningRequests(), caPublicKeyFile, caPrivateKeyFile, 24*time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}
