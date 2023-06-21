@@ -246,7 +246,7 @@ func TestTerminatingOnOutOfServiceNode(t *testing.T) {
 			}
 			if test.withFinalizer {
 				// wait until the pod phase is set as expected
-				err = wait.PollImmediate(time.Second, time.Second*15, func() (bool, error) {
+				err = wait.Poll(time.Second, time.Second*15, func() (bool, error) {
 					var e error
 					pod, e = cs.CoreV1().Pods(pod.Namespace).Get(testCtx.Ctx, pod.Name, metav1.GetOptions{})
 					if e != nil {
