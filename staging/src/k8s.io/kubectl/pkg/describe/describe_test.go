@@ -1254,7 +1254,7 @@ func TestDefaultDescribers(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(out, "foo") {
-		t.Errorf("unexpected output: %s", out)
+		t.Errorf("missing Pod `foo` in output: %s", out)
 	}
 
 	out, err = DefaultObjectDescriber.DescribeObject(&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
@@ -1262,18 +1262,18 @@ func TestDefaultDescribers(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(out, "foo") {
-		t.Errorf("unexpected output: %s", out)
+		t.Errorf("missing Service `foo` in output: %s", out)
 	}
 
 	out, err = DefaultObjectDescriber.DescribeObject(&corev1.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-		Spec:       corev1.ReplicationControllerSpec{Replicas: utilpointer.Int32Ptr(1)},
+		Spec:       corev1.ReplicationControllerSpec{Replicas: utilpointer.Int32(1)},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(out, "foo") {
-		t.Errorf("unexpected output: %s", out)
+		t.Errorf("missing Replication Controller `foo` in output: %s", out)
 	}
 
 	out, err = DefaultObjectDescriber.DescribeObject(&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
@@ -1281,7 +1281,18 @@ func TestDefaultDescribers(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(out, "foo") {
-		t.Errorf("unexpected output: %s", out)
+		t.Errorf("missing Node `foo` output: %s", out)
+	}
+
+	out, err = DefaultObjectDescriber.DescribeObject(&appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+		Spec:       appsv1.StatefulSetSpec{Replicas: utilpointer.Int32(1)},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "foo") {
+		t.Errorf("missing StatefulSet `foo` in output: %s", out)
 	}
 }
 
