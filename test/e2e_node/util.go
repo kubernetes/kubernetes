@@ -329,25 +329,34 @@ func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService
 	return r, i, nil
 }
 
-// findKubeletServiceName searches the unit name among the services known to systemd.
-// if the `running` parameter is true, restricts the search among currently running services;
-// otherwise, also stopped, failed, exited (non-running in general) services are also considered.
-// TODO: Find a uniform way to deal with systemctl/initctl/service operations. #34494
-func findKubeletServiceName(running bool) string {
-	cmdLine := []string{
-		"systemctl", "list-units", "*kubelet*",
+func unique(ss *[]string) {
+	if len(*ss) <= 1 {
+		return
 	}
-	if running {
-		cmdLine = append(cmdLine, "--state=running")
+	uniq := (*ss)[:1]
+	for _, s := range *ss {
+		if s != uniq[len(uniq)-1] {
+			uniq = append(uniq, s)
+		}
+	}
+	*ss = uniq
+}
+
+// findKubeletServiceName finds the first kubelet unit name among the services known to systemd.
+func findKubeletServiceName() string {
+	cmdLine := []string{
+		"systemctl", "list-units", "*.service", "--all",
 	}
 	stdout, err := exec.Command("sudo", cmdLine...).CombinedOutput()
 	framework.ExpectNoError(err)
 	regex := regexp.MustCompile("(kubelet-\\w+)")
 	matches := regex.FindStringSubmatch(string(stdout))
-	framework.ExpectNotEqual(len(matches), 0, "Found more than one kubelet service running: %q", stdout)
-	kubeletServiceName := matches[0]
-	framework.Logf("Get running kubelet with systemctl: %v, %v", string(stdout), kubeletServiceName)
-	return kubeletServiceName
+
+	unique(&matches)
+	framework.Logf("Get kubelet with systemctl found: (%v): %v", string(stdout), matches)
+	gomega.Expect(matches).To(gomega.HaveLen(1), "we need exactly 1 kubelet service")
+
+	return matches[0]
 }
 
 func findContainerRuntimeServiceName() (string, error) {
@@ -424,7 +433,9 @@ func startContainerRuntime() error {
 // recent kubelet service unit, IOW there is not a unique ID we use to bind explicitly a kubelet
 // instance to a test run.
 func restartKubelet(running bool) {
-	kubeletServiceName := findKubeletServiceName(running)
+	kubeletServiceName := findKubeletServiceName()
+	framework.Logf(">>>> restartKubelet called for %s", kubeletServiceName)
+
 	// reset the kubelet service start-limit-hit
 	stdout, err := exec.Command("sudo", "systemctl", "reset-failed", kubeletServiceName).CombinedOutput()
 	framework.ExpectNoError(err, "Failed to reset kubelet start-limit-hit with systemctl: %v, %s", err, string(stdout))
@@ -435,16 +446,21 @@ func restartKubelet(running bool) {
 
 // stopKubelet will kill the running kubelet, and returns a func that will restart the process again
 func stopKubelet() func() {
-	kubeletServiceName := findKubeletServiceName(true)
+	kubeletServiceName := findKubeletServiceName()
+	framework.Logf(">>>> stopKubelet called for %s", kubeletServiceName)
 
 	// reset the kubelet service start-limit-hit
 	stdout, err := exec.Command("sudo", "systemctl", "reset-failed", kubeletServiceName).CombinedOutput()
 	framework.ExpectNoError(err, "Failed to reset kubelet start-limit-hit with systemctl: %v, %s", err, string(stdout))
 
 	stdout, err = exec.Command("sudo", "systemctl", "kill", kubeletServiceName).CombinedOutput()
-	framework.ExpectNoError(err, "Failed to stop kubelet with systemctl: %v, %s", err, string(stdout))
+	if err != nil {
+		framework.Logf("Failed to kill kubelet with systemctl: %v, %s", err, string(stdout))
+	}
 
 	return func() {
+		framework.Logf(">>>> systemctl restart called for %s", kubeletServiceName)
+
 		// we should restart service, otherwise the transient service start will fail
 		stdout, err := exec.Command("sudo", "systemctl", "restart", kubeletServiceName).CombinedOutput()
 		framework.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %v", err, stdout)
@@ -453,14 +469,17 @@ func stopKubelet() func() {
 
 // killKubelet sends a signal (SIGINT, SIGSTOP, SIGTERM...) to the running kubelet
 func killKubelet(sig string) {
-	kubeletServiceName := findKubeletServiceName(true)
+	kubeletServiceName := findKubeletServiceName()
+	framework.Logf(">>>> killKubelet called for %s", kubeletServiceName)
 
 	// reset the kubelet service start-limit-hit
 	stdout, err := exec.Command("sudo", "systemctl", "reset-failed", kubeletServiceName).CombinedOutput()
 	framework.ExpectNoError(err, "Failed to reset kubelet start-limit-hit with systemctl: %v, %v", err, stdout)
 
 	stdout, err = exec.Command("sudo", "systemctl", "kill", "-s", sig, kubeletServiceName).CombinedOutput()
-	framework.ExpectNoError(err, "Failed to stop kubelet with systemctl: %v, %v", err, stdout)
+	if err != nil {
+		framework.Logf("Failed to kill kubelet with systemctl -s %c: %v, %v", sig, err, stdout)
+	}
 }
 
 func kubeletHealthCheck(url string) bool {

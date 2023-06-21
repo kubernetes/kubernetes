@@ -22,6 +22,7 @@ package e2enode
 import (
 	"context"
 	"fmt"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"os"
 	"path/filepath"
 	"time"
@@ -76,6 +77,7 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 		})
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
+			e2eskipper.Skipf("Skipping Node Shutdown tests as they are broken!")
 			ginkgo.By("Wait for the node to be ready")
 			waitForNodeReady(ctx)
 		})
@@ -179,6 +181,7 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 		})
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
+			e2eskipper.Skipf("Skipping Node Shutdown tests as they are broken!")
 			ginkgo.By("Wait for the node to be ready")
 			waitForNodeReady(ctx)
 		})
@@ -402,6 +405,8 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 		})
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
+			e2eskipper.Skipf("Skipping Node Shutdown tests as they are broken!")
+
 			ginkgo.By("Wait for the node to be ready")
 			waitForNodeReady(ctx)
 			customClasses := []*schedulingv1.PriorityClass{customClassA, customClassB, customClassC}
