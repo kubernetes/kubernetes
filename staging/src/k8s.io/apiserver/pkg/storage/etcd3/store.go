@@ -885,7 +885,18 @@ func (s *store) Watch(ctx context.Context, key string, opts storage.ListOptions)
 	if err != nil {
 		return nil, err
 	}
-	return s.watcher.Watch(ctx, preparedKey, int64(rev), opts.Recursive, opts.ProgressNotify, s.transformer, opts.Predicate)
+	return s.watcher.Watch(s.watchContext(ctx), preparedKey, int64(rev), opts.Recursive, opts.ProgressNotify, s.transformer, opts.Predicate)
+}
+
+func (s *store) watchContext(ctx context.Context) context.Context {
+	// The etcd server waits until it cannot find a leader for 3 election
+	// timeouts to cancel existing streams. 3 is currently a hard coded
+	// constant. The election timeout defaults to 1000ms. If the cluster is
+	// healthy, when the leader is stopped, the leadership transfer should be
+	// smooth. (leader transfers its leadership before stopping). If leader is
+	// hard killed, other servers will take an election timeout to realize
+	// leader lost and start campaign.
+	return clientv3.WithRequireLeader(ctx)
 }
 
 func (s *store) getState(ctx context.Context, getResp *clientv3.GetResponse, key string, v reflect.Value, ignoreNotFound bool) (*objState, error) {
