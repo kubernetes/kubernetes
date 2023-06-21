@@ -149,9 +149,15 @@ func shouldListFromStorage(query url.Values, opts *metav1.ListOptions) bool {
 	resourceVersion := opts.ResourceVersion
 	match := opts.ResourceVersionMatch
 	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
+
+	// Serve consistent reads from storage
+	consistentReadFromStorage := resourceVersion == ""
+	// Watch cache doesn't support continuations, so serve them from etcd.
 	hasContinuation := pagingEnabled && len(opts.Continue) > 0
+	// Serve paginated requests about revision "0" from watch cache to avoid overwhelming etcd.
 	hasLimit := pagingEnabled && opts.Limit > 0 && resourceVersion != "0"
+	// Watch cache only supports ResourceVersionMatchNotOlderThan (default).
 	unsupportedMatch := match != "" && match != metav1.ResourceVersionMatchNotOlderThan
 
-	return resourceVersion == "" || hasContinuation || hasLimit || unsupportedMatch
+	return consistentReadFromStorage || hasContinuation || hasLimit || unsupportedMatch
 }
