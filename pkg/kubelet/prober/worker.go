@@ -192,12 +192,15 @@ func (w *worker) run() {
 		}
 	}
 
-	// Execute the probe once, even before InitialDelaySeconds have passed. This is done in order
-	// to initialize the results manager with the initial value of the probe.
+	// Let the worker enter doProbe once, even before InitialDelaySeconds have passed.
+	// This is done in order to initialize the results manager with the initial value of the probe.
 	beforeProbeExecution := time.Now()
 	w.doProbe(ctx)
 
-	// Wait for the remaining time of InitialDelaySeconds.
+	// Wait for the remaining time of InitialDelaySeconds. The wait is performed here, even though
+	// doProbe checks InitialDelaySeconds, in order to make sure the first probe will start
+	// at the right time (after InitialDelaySeconds passed). From there, doProbe will execute
+	// every PeriodDurationSeconds.
 	initialDelay := time.Duration(w.spec.InitialDelaySeconds)*time.Second - time.Since(beforeProbeExecution)
 	if stopped := waitUntilStopTriggerOrTimeout(time.After(initialDelay)); stopped {
 		return
