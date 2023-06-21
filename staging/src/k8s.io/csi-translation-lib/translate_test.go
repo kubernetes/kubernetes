@@ -231,7 +231,7 @@ func TestTopologyTranslation(t *testing.T) {
 			}
 			// verify that either beta or GA kubernetes topology key should exist
 			if !(plugins.TopologyKeyExist(v1.LabelFailureDomainBetaZone, nodeAffinity) || plugins.TopologyKeyExist(v1.LabelTopologyZone, nodeAffinity)) {
-				t.Errorf("Expected node affinity kuberenetes topology label exist, got %v", *nodeAffinity)
+				t.Errorf("Expected node affinity kubernetes topology label exist, got %v", *nodeAffinity)
 			}
 		} else {
 			nodeAffinity := newCSIPV.Spec.NodeAffinity
