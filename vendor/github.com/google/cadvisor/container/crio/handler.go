@@ -305,14 +305,20 @@ func (h *crioContainerHandler) GetStats() (*info.ContainerStats, error) {
 	if err != nil {
 		return stats, err
 	}
-	// Clean up stats for containers that don't have their own network - this
-	// includes containers running in Kubernetes pods that use the network of the
-	// infrastructure container. This stops metrics being reported multiple times
-	// for each container in a pod.
-	if !h.needNet() {
-		stats.Network = info.NetworkStats{}
-	}
 
+	if !h.needNet() {
+		// Clean up stats for containers that don't have their own network - this
+		// includes containers running in Kubernetes pods that use the network of the
+		// infrastructure container. This stops metrics being reported multiple times
+		// for each container in a pod.
+		stats.Network = info.NetworkStats{}
+	} else if len(stats.Network.Interfaces) == 0 {
+		// No network related information indicates that the pid of the
+		// container is not longer valid and we need to ask crio to
+		// provide the pid of another container from that pod
+		h.pidKnown = false
+		return stats, nil
+	}
 	// Get filesystem stats.
 	err = h.getFsStats(stats)
 	if err != nil {
