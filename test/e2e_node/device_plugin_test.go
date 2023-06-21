@@ -38,7 +38,6 @@ import (
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"k8s.io/klog/v2"
 	kubeletdevicepluginv1beta1 "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -569,30 +568,40 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 				return nil
 			}, f.Timeouts.SystemDaemonsetStartup, f.Timeouts.Poll).Should(gomega.Succeed())
 
-			ginkgo.By("Setting up the directory and file for controlling registration")
+			ginkgo.By("Setting up the directory for controlling registration")
 			triggerPathDir = filepath.Join(devicePluginDir, "sample")
-			if _, err := os.Stat(triggerPathDir); errors.Is(err, os.ErrNotExist) {
-				err := os.Mkdir(triggerPathDir, os.ModePerm)
-				if err != nil {
-					klog.Errorf("Directory creation %s failed: %v ", triggerPathDir, err)
-					panic(err)
-				}
-				klog.InfoS("Directory created successfully")
-
-				triggerPathFile = filepath.Join(triggerPathDir, "registration")
-				if _, err := os.Stat(triggerPathFile); errors.Is(err, os.ErrNotExist) {
-					_, err = os.Create(triggerPathFile)
-					if err != nil {
-						klog.Errorf("File creation %s failed: %v ", triggerPathFile, err)
-						panic(err)
+			if _, err := os.Stat(triggerPathDir); err != nil {
+				if errors.Is(err, os.ErrNotExist) {
+					if err := os.Mkdir(triggerPathDir, os.ModePerm); err != nil {
+						framework.Fail(fmt.Sprintf("registration control directory %q creation failed: %v ", triggerPathDir, err))
 					}
+					framework.Logf("registration control directory created successfully")
+				} else {
+					framework.Fail(fmt.Sprintf("unexpected error checking %q: %v", triggerPathDir, err))
 				}
+			} else {
+				framework.Logf("registration control directory %q already present", triggerPathDir)
+			}
+
+			ginkgo.By("Setting up the file trigger for controlling registration")
+			triggerPathFile = filepath.Join(triggerPathDir, "registration")
+			if _, err := os.Stat(triggerPathFile); err != nil {
+				if errors.Is(err, os.ErrNotExist) {
+					if _, err = os.Create(triggerPathFile); err != nil {
+						framework.Fail(fmt.Sprintf("registration control file %q creation failed: %v", triggerPathFile, err))
+					}
+					framework.Logf("registration control file created successfully")
+				} else {
+					framework.Fail(fmt.Sprintf("unexpected error creating %q: %v", triggerPathFile, err))
+				}
+			} else {
+				framework.Logf("registration control file %q already present", triggerPathFile)
 			}
 
 			ginkgo.By("Scheduling a sample device plugin pod")
 			data, err := e2etestfiles.Read(SampleDevicePluginControlRegistrationDSYAML)
 			if err != nil {
-				framework.Fail(err.Error())
+				framework.Fail(fmt.Sprintf("error reading test data %q: %v", SampleDevicePluginControlRegistrationDSYAML, err))
 			}
 			ds := readDaemonSetV1OrDie(data)
 
