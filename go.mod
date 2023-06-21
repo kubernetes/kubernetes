@@ -40,7 +40,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
 	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.2
-	github.com/google/cadvisor v0.45.0
+	github.com/google/cadvisor v0.45.1
 	github.com/google/gnostic v0.5.7-v3refs
 	github.com/google/go-cmp v0.5.8
 	github.com/google/gofuzz v1.1.0
@@ -388,7 +388,7 @@ replace (
 	github.com/golangplus/fmt => github.com/golangplus/fmt v1.0.0
 	github.com/golangplus/testing => github.com/golangplus/testing v1.0.0
 	github.com/google/btree => github.com/google/btree v1.0.1
-	github.com/google/cadvisor => github.com/google/cadvisor v0.45.0
+	github.com/google/cadvisor => github.com/google/cadvisor v0.45.1
 	github.com/google/cel-go => github.com/google/cel-go v0.12.6
 	github.com/google/gnostic => github.com/google/gnostic v0.5.7-v3refs
 	github.com/google/go-cmp => github.com/google/go-cmp v0.5.8
