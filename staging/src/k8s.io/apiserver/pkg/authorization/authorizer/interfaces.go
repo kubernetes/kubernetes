@@ -64,10 +64,12 @@ type Attributes interface {
 	GetPath() string
 }
 
-// Authorizer makes an authorization decision based on information gained by making
-// zero or more calls to methods of the Attributes interface.  It returns nil when an action is
-// authorized, otherwise it returns an error.
+// Authorizer makes authorization decisions based on request attributes.
 type Authorizer interface {
+	// Authorize makes an authorization decision based on the provided Attributes. The returned
+	// reason may be empty. If nonempty, it is a human-readable explanation for the
+	// decision. The returned decision and reason are always valid, even if a non-nil error is
+	// also returned.
 	Authorize(ctx context.Context, a Attributes) (authorized Decision, reason string, err error)
 }
 
