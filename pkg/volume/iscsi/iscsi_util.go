@@ -369,6 +369,15 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 					continue
 				}
 
+				// rescan iscsi target (required because we set node.session.scan=manual)
+				out, err = execWithLog(b, "iscsiadm", "-m", "node", "-p", tp, "-T", b.Iqn, "-I", b.Iface, "--rescan")
+				if err != nil {
+					// delete the node record from database
+					execWithLog(b, "iscsiadm", "-m", "node", "-p", tp, "-I", b.Iface, "-T", b.Iqn, "-o", "delete")
+					lastErr = fmt.Errorf("iscsi: failed to attach disk: Error: %s (%v)", out, err)
+					continue
+				}
+
 				// in case of node failure/restart, explicitly set to manual login so it doesn't hang on boot
 				_, err = execWithLog(b, "iscsiadm", "-m", "node", "-p", tp, "-T", b.Iqn, "-o", "update", "-n", "node.startup", "-v", "manual")
 				if err != nil {
