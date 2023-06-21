@@ -78,6 +78,7 @@ var baseOpts = []VersionedOptions{
 		EnvOptions: []cel.EnvOption{
 			cel.CrossTypeNumericComparisons(true),
 			cel.OptionalTypes(),
+			library.Quantity(),
 		},
 	},
 	// TODO: switch to ext.Strings version 2 once format() is fixed to work with HomogeneousAggregateLiterals.
