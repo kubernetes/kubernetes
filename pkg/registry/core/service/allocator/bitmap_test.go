@@ -346,11 +346,11 @@ func TestForEach(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			subTests := []sets.Int{
-				sets.NewInt(),
-				sets.NewInt(0),
-				sets.NewInt(0, 2, 5),
-				sets.NewInt(0, 1, 2, 3, 4, 5, 6, 7),
+			subTests := []sets.Set[int]{
+				sets.New[int](),
+				sets.New[int](0),
+				sets.New[int](0, 2, 5),
+				sets.New[int](0, 1, 2, 3, 4, 5, 6, 7),
 			}
 
 			for i, ts := range subTests {
@@ -363,15 +363,15 @@ func TestForEach(t *testing.T) {
 						t.Errorf("[%d] expect offset %v allocated", i, offset)
 					}
 				}
-				calls := sets.NewInt()
+				calls := sets.New[int]()
 				m.ForEach(func(i int) {
 					calls.Insert(i)
 				})
-				if len(calls) != len(ts) {
-					t.Errorf("[%d] expected %d calls, got %d", i, len(ts), len(calls))
+				if calls.Len() != ts.Len() {
+					t.Errorf("[%d] expected %d calls, got %d", i, ts.Len(), calls.Len())
 				}
 				if !calls.Equal(ts) {
-					t.Errorf("[%d] expected calls to equal testcase: %v vs %v", i, calls.List(), ts.List())
+					t.Errorf("[%d] expected calls to equal testcase: %v vs %v", i, sets.List(calls), sets.List(ts))
 				}
 			}
 		})

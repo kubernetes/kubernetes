@@ -66,7 +66,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter, issuer token.TokenGenerator, 
 			secrets:              secretStorage,
 			issuer:               issuer,
 			auds:                 auds,
-			audsSet:              sets.NewString(auds...),
+			audsSet:              sets.New[string](auds...),
 			maxExpirationSeconds: int64(max.Seconds()),
 			extendExpiration:     extendExpiration,
 		}

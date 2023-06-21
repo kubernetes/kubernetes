@@ -475,7 +475,7 @@ func TestDeploymentController_cleanupDeploymentOrder(t *testing.T) {
 	tests := []struct {
 		oldRSs               []*apps.ReplicaSet
 		revisionHistoryLimit int32
-		expectedDeletedRSs   sets.String
+		expectedDeletedRSs   sets.Set[string]
 	}{
 		{
 			// revision order: rs1 < rs2, delete rs1
@@ -484,7 +484,7 @@ func TestDeploymentController_cleanupDeploymentOrder(t *testing.T) {
 				newRSWithRevisionAndCreationTimestamp("foo-2", 0, selector, now.Time, "2"),
 			},
 			revisionHistoryLimit: 1,
-			expectedDeletedRSs:   sets.NewString("foo-1"),
+			expectedDeletedRSs:   sets.New[string]("foo-1"),
 		},
 		{
 			// revision order: rs2 < rs1, delete rs2
@@ -493,7 +493,7 @@ func TestDeploymentController_cleanupDeploymentOrder(t *testing.T) {
 				newRSWithRevisionAndCreationTimestamp("foo-2", 0, selector, now.Time, "1"),
 			},
 			revisionHistoryLimit: 1,
-			expectedDeletedRSs:   sets.NewString("foo-2"),
+			expectedDeletedRSs:   sets.New[string]("foo-2"),
 		},
 		{
 			// rs1 has revision but rs2 doesn't have revision, delete rs2
@@ -502,7 +502,7 @@ func TestDeploymentController_cleanupDeploymentOrder(t *testing.T) {
 				newRSWithRevisionAndCreationTimestamp("foo-2", 0, selector, now.Time, ""),
 			},
 			revisionHistoryLimit: 1,
-			expectedDeletedRSs:   sets.NewString("foo-2"),
+			expectedDeletedRSs:   sets.New[string]("foo-2"),
 		},
 		{
 			// rs1 doesn't have revision while rs2 has revision, delete rs1
@@ -511,7 +511,7 @@ func TestDeploymentController_cleanupDeploymentOrder(t *testing.T) {
 				newRSWithRevisionAndCreationTimestamp("foo-2", 0, selector, now.Time, "2"),
 			},
 			revisionHistoryLimit: 1,
-			expectedDeletedRSs:   sets.NewString("foo-1"),
+			expectedDeletedRSs:   sets.New[string]("foo-1"),
 		},
 		{
 			// revision order: rs1 < rs2 < r3, but rs1 has replicas, delete rs2
@@ -521,7 +521,7 @@ func TestDeploymentController_cleanupDeploymentOrder(t *testing.T) {
 				newRSWithRevisionAndCreationTimestamp("foo-3", 0, selector, now.Add(duration), "3"),
 			},
 			revisionHistoryLimit: 1,
-			expectedDeletedRSs:   sets.NewString("foo-2"),
+			expectedDeletedRSs:   sets.New[string]("foo-2"),
 		},
 		{
 			// revision order: rs1 < rs2 < r3, both rs1 && rs2 have replicas, don't delete
@@ -531,7 +531,7 @@ func TestDeploymentController_cleanupDeploymentOrder(t *testing.T) {
 				newRSWithRevisionAndCreationTimestamp("foo-3", 0, selector, now.Add(duration), "3"),
 			},
 			revisionHistoryLimit: 1,
-			expectedDeletedRSs:   sets.NewString(),
+			expectedDeletedRSs:   sets.New[string](),
 		},
 		{
 			// revision order: rs2 < rs4 < rs1 < rs3, delete rs2 && rs4
@@ -542,7 +542,7 @@ func TestDeploymentController_cleanupDeploymentOrder(t *testing.T) {
 				newRSWithRevisionAndCreationTimestamp("foo-4", 0, selector, now.Add(2*duration), "2"),
 			},
 			revisionHistoryLimit: 2,
-			expectedDeletedRSs:   sets.NewString("foo-2", "foo-4"),
+			expectedDeletedRSs:   sets.New[string]("foo-2", "foo-4"),
 		},
 	}
 
