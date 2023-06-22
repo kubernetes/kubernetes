@@ -2646,6 +2646,46 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 		},
 		expectedError: `spec.validations[0].messageExpression: Invalid value: "object.x in [1, 2, ": compilation failed: ERROR: <input>:1:20: Syntax error: missing ']' at '<EOF>`,
 	}, {
+		name: "messageExpression may reference authorizer",
+		config: &admissionregistration.ValidatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.ValidatingAdmissionPolicySpec{
+				FailurePolicy: func() *admissionregistration.FailurePolicyType {
+					r := admissionregistration.FailurePolicyType("Fail")
+					return &r
+				}(),
+				Validations: []admissionregistration.Validation{{
+					Expression:        "object.x < 100",
+					MessageExpression: "authorizer.path('/healthz').check('get').reason()",
+				}},
+				MatchConstraints: &admissionregistration.MatchResources{
+					MatchPolicy: func() *admissionregistration.MatchPolicyType {
+						r := admissionregistration.MatchPolicyType("Exact")
+						return &r
+					}(),
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					ObjectSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
+						RuleWithOperations: admissionregistration.RuleWithOperations{
+							Operations: []admissionregistration.OperationType{"CREATE"},
+							Rule: admissionregistration.Rule{
+								APIGroups:   []string{"a"},
+								APIVersions: []string{"a"},
+								Resources:   []string{"a/*", "a"},
+							},
+						},
+					}},
+				},
+			},
+		},
+		expectedError: ``,
+	}, {
 		name: "messageExpression of wrong type",
 		config: &admissionregistration.ValidatingAdmissionPolicy{
 			ObjectMeta: metav1.ObjectMeta{

@@ -101,7 +101,6 @@ func (v *validator) Validate(ctx context.Context, versionedAttr *admission.Versi
 	}
 
 	optionalVars := cel.OptionalVariableBindings{VersionedParams: versionedParams, Authorizer: authz}
-	expressionOptionalVars := cel.OptionalVariableBindings{VersionedParams: versionedParams}
 	admissionRequest := cel.CreateAdmissionRequest(versionedAttr.Attributes)
 	// Decide which fields are exposed
 	ns := cel.CreateNamespaceObject(namespace)
@@ -118,7 +117,7 @@ func (v *validator) Validate(ctx context.Context, versionedAttr *admission.Versi
 		}
 	}
 	decisions := make([]PolicyDecision, len(evalResults))
-	messageResults, _, err := v.messageFilter.ForInput(ctx, versionedAttr, admissionRequest, expressionOptionalVars, ns, remainingBudget)
+	messageResults, _, err := v.messageFilter.ForInput(ctx, versionedAttr, admissionRequest, optionalVars, ns, remainingBudget)
 	for i, evalResult := range evalResults {
 		var decision = &decisions[i]
 		// TODO: move this to generics

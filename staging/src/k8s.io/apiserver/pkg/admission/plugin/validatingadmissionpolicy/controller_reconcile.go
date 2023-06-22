@@ -461,7 +461,6 @@ func (c *policyController) latestPolicyData() []policyData {
 					hasParam = true
 				}
 				optionalVars := cel.OptionalVariableDeclarations{HasParams: hasParam, HasAuthorizer: true}
-				expressionOptionalVars := cel.OptionalVariableDeclarations{HasParams: hasParam, HasAuthorizer: false}
 				failurePolicy := convertv1alpha1FailurePolicyTypeTov1FailurePolicyType(definitionInfo.lastReconciledValue.Spec.FailurePolicy)
 				var matcher matchconditions.Matcher = nil
 				matchConditions := definitionInfo.lastReconciledValue.Spec.MatchConditions
@@ -487,7 +486,7 @@ func (c *policyController) latestPolicyData() []policyData {
 					filterCompiler.Compile(convertv1alpha1Validations(definitionInfo.lastReconciledValue.Spec.Validations), optionalVars, environment.StoredExpressions),
 					matcher,
 					filterCompiler.Compile(convertv1alpha1AuditAnnotations(definitionInfo.lastReconciledValue.Spec.AuditAnnotations), optionalVars, environment.StoredExpressions),
-					filterCompiler.Compile(convertV1Alpha1MessageExpressions(definitionInfo.lastReconciledValue.Spec.Validations), expressionOptionalVars, environment.StoredExpressions),
+					filterCompiler.Compile(convertV1Alpha1MessageExpressions(definitionInfo.lastReconciledValue.Spec.Validations), optionalVars, environment.StoredExpressions),
 					failurePolicy,
 				)
 			}

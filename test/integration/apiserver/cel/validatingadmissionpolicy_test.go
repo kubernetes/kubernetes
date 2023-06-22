@@ -2276,12 +2276,14 @@ func TestBindingRemoval(t *testing.T) {
 // for both users and service accounts.
 func Test_ValidateSecondaryAuthorization(t *testing.T) {
 	testcases := []struct {
-		name             string
-		rbac             *rbacv1.PolicyRule
-		expression       string
-		allowed          bool
-		extraAccountFn   func(t *testing.T, adminClient *clientset.Clientset, clientConfig *rest.Config, rules []rbacv1.PolicyRule) *clientset.Clientset
-		extraAccountRbac *rbacv1.PolicyRule
+		name              string
+		rbac              *rbacv1.PolicyRule
+		expression        string
+		messageExpression string
+		allowed           bool
+		expectedMessage   func(string) error
+		extraAccountFn    func(t *testing.T, adminClient *clientset.Clientset, clientConfig *rest.Config, rules []rbacv1.PolicyRule) *clientset.Clientset
+		extraAccountRbac  *rbacv1.PolicyRule
 	}{
 		{
 			name: "principal is allowed to create a specific deployment",
@@ -2324,6 +2326,24 @@ func Test_ValidateSecondaryAuthorization(t *testing.T) {
 			},
 			expression: "authorizer.serviceAccount('default', 'extra-acct').group('').resource('pods').check('anthropomorphize').allowed()",
 			allowed:    true,
+		},
+		{
+			name: "messageExpression uses authorizer",
+			rbac: &rbacv1.PolicyRule{
+				Verbs:     []string{"anthropomorphize"},
+				APIGroups: []string{""},
+				Resources: []string{"namespaces"},
+			},
+			expression:        "false",
+			messageExpression: "authorizer.requestResource.check('anthropomorphize').reason()",
+			expectedMessage: func(msg string) error {
+				const substring = "RBAC: allowed by"
+				if strings.Contains(msg, substring) {
+					return nil
+				}
+				return fmt.Errorf(`does not contain %q`, substring)
+			},
+			allowed: false,
 		},
 	}
 
@@ -2373,7 +2393,8 @@ func Test_ValidateSecondaryAuthorization(t *testing.T) {
 
 					policy := withWaitReadyConstraintAndExpression(withValidations([]admissionregistrationv1alpha1.Validation{
 						{
-							Expression: testcase.expression,
+							Expression:        testcase.expression,
+							MessageExpression: testcase.messageExpression,
 						},
 					}, withFailurePolicy(admissionregistrationv1alpha1.Fail, withNamespaceMatch(makePolicy("validate-authz")))))
 					if _, err := adminClient.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Create(context.TODO(), policy, metav1.CreateOptions{}); err != nil {
@@ -2395,6 +2416,17 @@ func Test_ValidateSecondaryAuthorization(t *testing.T) {
 						expected = metav1.StatusReasonInvalid
 					}
 					checkFailureReason(t, err, expected)
+
+					if testcase.expectedMessage != nil {
+						if err != nil {
+							msgErr := testcase.expectedMessage(err.Error())
+							if msgErr != nil {
+								t.Errorf("unexpected message: %v: %v", msgErr, err)
+							}
+						} else {
+							t.Errorf("expected non-nil error")
+						}
+					}
 				})
 			}
 		})
@@ -2922,6 +2954,18 @@ func TestAuthorizationDecisionCaching(t *testing.T) {
 			validations: []admissionregistrationv1alpha1.Validation{
 				{
 					Expression: "authorizer.requestResource.check('test').reason() == authorizer.requestResource.check('test').reason()",
+				},
+			},
+		},
+		{
+			name: "hit across expression and message expression",
+			validations: []admissionregistrationv1alpha1.Validation{
+				{
+					Expression:        "true",
+					MessageExpression: "authorizer.requestResource.check('test').reason()",
+				},
+				{
+					Expression: "authorizer.requestResource.check('test').reason() == '1'",
 				},
 			},
 		},

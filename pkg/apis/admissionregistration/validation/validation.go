@@ -1072,7 +1072,7 @@ func validateMessageExpression(compiler plugincel.Compiler, expression string, o
 		MessageExpression: expression,
 	}, plugincel.OptionalVariableDeclarations{
 		HasParams:     opts.allowParamsInMatchConditions,
-		HasAuthorizer: false,
+		HasAuthorizer: true,
 	}, envType, fldPath)
 }
 
