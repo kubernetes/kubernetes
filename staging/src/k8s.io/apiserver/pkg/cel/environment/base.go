@@ -78,6 +78,11 @@ var baseOpts = []VersionedOptions{
 		EnvOptions: []cel.EnvOption{
 			cel.CrossTypeNumericComparisons(true),
 			cel.OptionalTypes(),
+		},
+	},
+	{
+		IntroducedVersion: version.MajorMinor(1, 29),
+		EnvOptions: []cel.EnvOption{
 			library.Quantity(),
 		},
 	},
