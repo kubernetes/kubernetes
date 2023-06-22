@@ -161,5 +161,7 @@ func boundedSample(lower, upper interface{}) types.GomegaMatcher {
 				gomega.BeTemporally(">=", time.Now().Add(-maxStatsAge)),
 				// Now() is the test start time, not the match time, so permit a few extra minutes.
 				gomega.BeTemporally("<", time.Now().Add(2*time.Minute))),
-		)}))
+		),
+		"Histogram": gstruct.Ignore(),
+	}))
 }
