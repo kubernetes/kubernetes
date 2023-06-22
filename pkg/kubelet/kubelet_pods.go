@@ -1177,10 +1177,15 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	// running containers), are terminal, and are not known to pod workers.
 	// An example is pods rejected during kubelet admission that have never
 	// started before (i.e. does not have an orphaned pod).
-	// Triggering TerminatePod allows to proceed with force-deletion of such pods.
+	// Adding the pods with SyncPodKill to pod workers allows to proceed with
+	// force-deletion of such pods, yet preventing re-entry of the routine in the
+	// next invocation of HandlePodCleanups.
 	for _, pod := range kl.filterTerminalPodsToDelete(allPods, runningRuntimePods, workingPods) {
-		klog.V(3).InfoS("Completing termination of terminal pods scheduled for deletion", "pod", klog.KObj(pod), "podUID", pod.UID)
-		kl.statusManager.TerminatePod(pod)
+		klog.V(3).InfoS("Handling termination and deletion of the pod to pod workers", "pod", klog.KObj(pod), "podUID", pod.UID)
+		kl.podWorkers.UpdatePod(UpdatePodOptions{
+			UpdateType: kubetypes.SyncPodKill,
+			Pod:        pod,
+		})
 	}
 
 	// Finally, terminate any pods that are observed in the runtime but not present in the list of
@@ -1255,7 +1260,16 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	return nil
 }
 
-// Filters terminal pods with deletion timestamp which are not runtime pods
+// filterTerminalPodsToDelete returns terminal pods which are ready to be
+// deleted by the status manager, but are not in pod workers.
+// First, the check for deletionTimestamp is a performance optimization as we
+// don't need to do anything with terminal pods without deletionTimestamp.
+// Second, the check for terminal pods is to avoid race conditions of triggering
+// deletion on Pending pods which are not yet added to pod workers.
+// Third, the check to skip pods known to pod workers is that the lifecycle of
+// such pods is already handled by pod workers.
+// Finally, we skip runtime pods as their termination is handled separately in
+// the HandlePodCleanups routine.
 func (kl *Kubelet) filterTerminalPodsToDelete(allPods []*v1.Pod, runningRuntimePods []*kubecontainer.Pod, workingPods map[types.UID]PodWorkerSync) map[types.UID]*v1.Pod {
 	terminalPodsToDelete := make(map[types.UID]*v1.Pod)
 	for _, pod := range allPods {
@@ -1263,16 +1277,12 @@ func (kl *Kubelet) filterTerminalPodsToDelete(allPods []*v1.Pod, runningRuntimeP
 			// skip pods which don't have a deletion timestamp
 			continue
 		}
-		if !kl.isAdmittedPodTerminal(pod) {
-			// skip non-terminal pods
+		if !podutil.IsPodPhaseTerminal(pod.Status.Phase) {
+			// skip the non-terminal pods
 			continue
 		}
 		if _, knownPod := workingPods[pod.UID]; knownPod {
 			// skip pods known to pod workers
-			continue
-		}
-		if _, knownPod := kl.statusManager.GetPodStatus(pod.UID); !knownPod {
-			// skip pods unknown to pod status manager
 			continue
 		}
 		terminalPodsToDelete[pod.UID] = pod
