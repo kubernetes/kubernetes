@@ -167,10 +167,7 @@ func (ec *Controller) enqueuePod(obj interface{}, deleted bool) {
 	}
 
 	// Release reservations of a deleted or completed pod?
-	if deleted ||
-		podutil.IsPodTerminal(pod) ||
-		// Deleted and not scheduled:
-		pod.DeletionTimestamp != nil && pod.Spec.NodeName == "" {
+	if deleted || isPodDone(pod) {
 		for _, podClaim := range pod.Spec.ResourceClaims {
 			claimName := resourceclaim.Name(pod, &podClaim)
 			ec.queue.Add(claimKeyPrefix + pod.Namespace + "/" + claimName)
@@ -480,4 +477,11 @@ func podResourceClaimIndexFunc(obj interface{}) ([]string, error) {
 		}
 	}
 	return keys, nil
+}
+
+// isPodDone returns true if it is certain that none of the containers are running and never will run.
+func isPodDone(pod *v1.Pod) bool {
+	return podutil.IsPodPhaseTerminal(pod.Status.Phase) ||
+		// Deleted and not scheduled:
+		pod.DeletionTimestamp != nil && pod.Spec.NodeName == ""
 }
