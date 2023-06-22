@@ -160,7 +160,7 @@ func TestTerminatingOnOutOfServiceNode(t *testing.T) {
 			withFinalizer:                 true,
 			wantPhase:                     v1.PodFailed,
 		},
-		"pod has phase when PodDisruptionConditions disabled": {
+		"pod has phase unchanged when PodDisruptionConditions disabled": {
 			enablePodDisruptionConditions: false,
 			withFinalizer:                 true,
 			wantPhase:                     v1.PodPending,
