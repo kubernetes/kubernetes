@@ -319,31 +319,27 @@ func daemonSetMatch(ds *appsv1.DaemonSet, history *appsv1.ControllerRevision) (b
 	return bytes.Equal(patch, history.Data.Raw), nil
 }
 
+// templatePatch used to encapsulate the Patch data for PodTemplateSpec
+type templatePatch struct {
+	corev1.PodTemplateSpec `json:",inline"`
+	PatchType string `json:"$patch"`	
+}
+
+
 // getPatch returns a strategic merge patch that can be applied to restore a Daemonset to a
 // previous version. If the returned error is nil the patch is valid. The current state that we save is just the
 // PodSpecTemplate. We can modify this later to encompass more state (or less) and remain compatible with previously
 // recorded patches.
 func getDaemonSetPatch(ds *appsv1.DaemonSet) ([]byte, error) {
-	dsBytes, err := json.Marshal(ds)
-	if err != nil {
-		return nil, err
+	objCopy := map[string]any {
+		"spec": map[string]any {
+			"template": templatePatch{
+				PodTemplateSpec: ds.Spec.Template,
+				PatchType: "replace",
+			},
+		},
 	}
-	var raw map[string]interface{}
-	err = json.Unmarshal(dsBytes, &raw)
-	if err != nil {
-		return nil, err
-	}
-	objCopy := make(map[string]interface{})
-	specCopy := make(map[string]interface{})
-
-	// Create a patch of the DaemonSet that replaces spec.template
-	spec := raw["spec"].(map[string]interface{})
-	template := spec["template"].(map[string]interface{})
-	specCopy["template"] = template
-	template["$patch"] = "replace"
-	objCopy["spec"] = specCopy
-	patch, err := json.Marshal(objCopy)
-	return patch, err
+	return json.Marshal(objCopy)
 }
 
 type StatefulSetRollbacker struct {
@@ -432,23 +428,15 @@ func statefulsetMatch(ss *appsv1.StatefulSet, history *appsv1.ControllerRevision
 // PodSpecTemplate. We can modify this later to encompass more state (or less) and remain compatible with previously
 // recorded patches.
 func getStatefulSetPatch(set *appsv1.StatefulSet) ([]byte, error) {
-	str, err := runtime.Encode(appsCodec, set)
-	if err != nil {
-		return nil, err
+	objCopy := map[string]any {
+		"spec": map[string]any {
+			"template": templatePatch{
+				PodTemplateSpec: set.Spec.Template,
+				PatchType: "replace",
+			},
+		},
 	}
-	var raw map[string]interface{}
-	if err := json.Unmarshal([]byte(str), &raw); err != nil {
-		return nil, err
-	}
-	objCopy := make(map[string]interface{})
-	specCopy := make(map[string]interface{})
-	spec := raw["spec"].(map[string]interface{})
-	template := spec["template"].(map[string]interface{})
-	specCopy["template"] = template
-	template["$patch"] = "replace"
-	objCopy["spec"] = specCopy
-	patch, err := json.Marshal(objCopy)
-	return patch, err
+	return json.Marshal(objCopy)
 }
 
 // findHistory returns a controllerrevision of a specific revision from the given controllerrevisions.

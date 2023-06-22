@@ -480,29 +480,27 @@ func newVersionedStatefulSetPod(currentSet, updateSet *apps.StatefulSet, current
 	return pod
 }
 
+// podTemplatePatch used to encapsulate the Patch data for PodTemplateSpec
+type podTemplatePatch struct {
+	v1.PodTemplateSpec `json:",inline"`
+	PatchType string `json:"$patch"`	
+}
+
+
 // getPatch returns a strategic merge patch that can be applied to restore a StatefulSet to a
 // previous version. If the returned error is nil the patch is valid. The current state that we save is just the
 // PodSpecTemplate. We can modify this later to encompass more state (or less) and remain compatible with previously
 // recorded patches.
 func getPatch(set *apps.StatefulSet) ([]byte, error) {
-	data, err := runtime.Encode(patchCodec, set)
-	if err != nil {
-		return nil, err
+	objCopy := map[string]any {
+		"spec": map[string]any {
+			"template": podTemplatePatch{
+				PodTemplateSpec: set.Spec.Template,
+				PatchType: "replace",
+			},
+		},
 	}
-	var raw map[string]interface{}
-	err = json.Unmarshal(data, &raw)
-	if err != nil {
-		return nil, err
-	}
-	objCopy := make(map[string]interface{})
-	specCopy := make(map[string]interface{})
-	spec := raw["spec"].(map[string]interface{})
-	template := spec["template"].(map[string]interface{})
-	specCopy["template"] = template
-	template["$patch"] = "replace"
-	objCopy["spec"] = specCopy
-	patch, err := json.Marshal(objCopy)
-	return patch, err
+	return json.Marshal(objCopy)
 }
 
 // newRevision creates a new ControllerRevision containing a patch that reapplies the target state of set.
