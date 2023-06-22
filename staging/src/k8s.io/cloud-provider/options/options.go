@@ -38,6 +38,7 @@ import (
 	ccmconfig "k8s.io/cloud-provider/config"
 	ccmconfigscheme "k8s.io/cloud-provider/config/install"
 	ccmconfigv1alpha1 "k8s.io/cloud-provider/config/v1alpha1"
+	"k8s.io/cloud-provider/names"
 	cliflag "k8s.io/component-base/cli/flag"
 	cmoptions "k8s.io/controller-manager/options"
 	"k8s.io/controller-manager/pkg/clientbuilder"
@@ -141,12 +142,12 @@ func NewDefaultComponentConfig() (*ccmconfig.CloudControllerManagerConfiguration
 }
 
 // Flags returns flags for a specific CloudController by section name
-func (o *CloudControllerManagerOptions) Flags(allControllers, disabledByDefaultControllers, allWebhooks, disabledByDefaultWebhooks []string) cliflag.NamedFlagSets {
+func (o *CloudControllerManagerOptions) Flags(allControllers []string, disabledByDefaultControllers []string, controllerAliases map[string]string, allWebhooks, disabledByDefaultWebhooks []string) cliflag.NamedFlagSets {
 	fss := cliflag.NamedFlagSets{}
-	o.Generic.AddFlags(&fss, allControllers, disabledByDefaultControllers)
+	o.Generic.AddFlags(&fss, allControllers, disabledByDefaultControllers, controllerAliases)
 	o.KubeCloudShared.AddFlags(fss.FlagSet("generic"))
-	o.NodeController.AddFlags(fss.FlagSet("node controller"))
-	o.ServiceController.AddFlags(fss.FlagSet("service controller"))
+	o.NodeController.AddFlags(fss.FlagSet(names.CloudNodeController))
+	o.ServiceController.AddFlags(fss.FlagSet(names.ServiceLBController))
 	if o.Webhook != nil {
 		o.Webhook.AddFlags(fss.FlagSet("webhook"), allWebhooks, disabledByDefaultWebhooks)
 	}
@@ -168,7 +169,7 @@ func (o *CloudControllerManagerOptions) Flags(allControllers, disabledByDefaultC
 }
 
 // ApplyTo fills up cloud controller manager config with options.
-func (o *CloudControllerManagerOptions) ApplyTo(c *config.Config, userAgent string) error {
+func (o *CloudControllerManagerOptions) ApplyTo(c *config.Config, allControllers []string, disabledByDefaultControllers []string, controllerAliases map[string]string, userAgent string) error {
 	var err error
 
 	// Build kubeconfig first to so that if it fails, it doesn't cause leaking
@@ -184,7 +185,7 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *config.Config, userAgent stri
 	c.Kubeconfig.QPS = o.Generic.ClientConnection.QPS
 	c.Kubeconfig.Burst = int(o.Generic.ClientConnection.Burst)
 
-	if err = o.Generic.ApplyTo(&c.ComponentConfig.Generic); err != nil {
+	if err = o.Generic.ApplyTo(&c.ComponentConfig.Generic, allControllers, disabledByDefaultControllers, controllerAliases); err != nil {
 		return err
 	}
 	if err = o.KubeCloudShared.ApplyTo(&c.ComponentConfig.KubeCloudShared); err != nil {
@@ -246,10 +247,10 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *config.Config, userAgent stri
 }
 
 // Validate is used to validate config before launching the cloud controller manager
-func (o *CloudControllerManagerOptions) Validate(allControllers, disabledByDefaultControllers, allWebhooks, disabledByDefaultWebhooks []string) error {
+func (o *CloudControllerManagerOptions) Validate(allControllers []string, disabledByDefaultControllers []string, controllerAliases map[string]string, allWebhooks, disabledByDefaultWebhooks []string) error {
 	errors := []error{}
 
-	errors = append(errors, o.Generic.Validate(allControllers, disabledByDefaultControllers)...)
+	errors = append(errors, o.Generic.Validate(allControllers, disabledByDefaultControllers, controllerAliases)...)
 	errors = append(errors, o.KubeCloudShared.Validate()...)
 	errors = append(errors, o.ServiceController.Validate()...)
 	errors = append(errors, o.SecureServing.Validate()...)
@@ -282,8 +283,8 @@ func resyncPeriod(c *config.Config) func() time.Duration {
 }
 
 // Config return a cloud controller manager config objective
-func (o *CloudControllerManagerOptions) Config(allControllers, disabledByDefaultControllers, allWebhooks, disabledByDefaultWebhooks []string) (*config.Config, error) {
-	if err := o.Validate(allControllers, disabledByDefaultControllers, allWebhooks, disabledByDefaultWebhooks); err != nil {
+func (o *CloudControllerManagerOptions) Config(allControllers []string, disabledByDefaultControllers []string, controllerAliases map[string]string, allWebhooks, disabledByDefaultWebhooks []string) (*config.Config, error) {
+	if err := o.Validate(allControllers, disabledByDefaultControllers, controllerAliases, allWebhooks, disabledByDefaultWebhooks); err != nil {
 		return nil, err
 	}
 
@@ -298,7 +299,7 @@ func (o *CloudControllerManagerOptions) Config(allControllers, disabledByDefault
 	}
 
 	c := &config.Config{}
-	if err := o.ApplyTo(c, CloudControllerManagerUserAgent); err != nil {
+	if err := o.ApplyTo(c, allControllers, disabledByDefaultControllers, controllerAliases, CloudControllerManagerUserAgent); err != nil {
 		return nil, err
 	}
 
