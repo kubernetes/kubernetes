@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -228,11 +229,15 @@ func TestCoreResourceEnqueue(t *testing.T) {
 			t.Fatalf("Cannot find the profile for Pod %v", podInfo.Pod.Name)
 		}
 		// Schedule the Pod manually.
-		_, fitError := testCtx.Scheduler.SchedulePod(ctx, fwk, framework.NewCycleState(), podInfo.Pod)
-		if fitError == nil {
+		_, err := testCtx.Scheduler.SchedulePod(ctx, fwk, framework.NewCycleState(), podInfo.Pod)
+		if err == nil {
 			t.Fatalf("Expect Pod %v to fail at scheduling.", podInfo.Pod.Name)
 		}
-		testCtx.Scheduler.FailureHandler(ctx, fwk, podInfo, framework.NewStatus(framework.Unschedulable).WithError(fitError), nil, time.Now())
+		var unschedPlugins sets.Set[string]
+		if fitError, ok := err.(*framework.FitError); ok {
+			unschedPlugins = fitError.Diagnosis.UnschedulablePlugins
+		}
+		testCtx.Scheduler.FailureHandler(ctx, fwk, podInfo, framework.NewStatus(framework.Unschedulable).WithError(err), nil, unschedPlugins, time.Now())
 	}
 
 	// Trigger a NodeTaintChange event.
@@ -413,7 +418,11 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	if fitError == nil {
 		t.Fatalf("Expect Pod %v to fail at scheduling.", podInfo.Pod.Name)
 	}
-	testCtx.Scheduler.FailureHandler(ctx, fwk, podInfo, framework.NewStatus(framework.Unschedulable).WithError(fitError), nil, time.Now())
+	var unschedPlugins sets.Set[string]
+	if fitError, ok := err.(*framework.FitError); ok {
+		unschedPlugins = fitError.Diagnosis.UnschedulablePlugins
+	}
+	testCtx.Scheduler.FailureHandler(ctx, fwk, podInfo, framework.NewStatus(framework.Unschedulable).WithError(fitError), nil, unschedPlugins, time.Now())
 
 	// Scheduling cycle is incremented from 0 to 1 after NextPod() is called, so
 	// pass a number larger than 1 to move Pod to unschedulablePods.
