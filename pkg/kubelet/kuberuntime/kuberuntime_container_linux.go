@@ -55,7 +55,7 @@ func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(config 
 	}
 	config.Linux = cl
 
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.UserNamespacesStatelessPodsSupport) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.UserNamespacesSupport) {
 		if cl.SecurityContext.NamespaceOptions.UsernsOptions != nil {
 			for _, mount := range config.Mounts {
 				mount.UidMappings = cl.SecurityContext.NamespaceOptions.UsernsOptions.Uids

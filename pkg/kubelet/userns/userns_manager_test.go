@@ -40,7 +40,7 @@ func (m *testUserNsPodsManager) ListPodsFromDisk() ([]types.UID, error) {
 }
 
 func TestUserNsManagerAllocate(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesStatelessPodsSupport, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)()
 
 	testUserNsPodsManager := &testUserNsPodsManager{}
 	m, err := MakeUserNsManager(testUserNsPodsManager)
@@ -90,7 +90,7 @@ func TestUserNsManagerAllocate(t *testing.T) {
 }
 
 func TestUserNsManagerParseUserNsFile(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesStatelessPodsSupport, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)()
 
 	cases := []struct {
 		name    string
