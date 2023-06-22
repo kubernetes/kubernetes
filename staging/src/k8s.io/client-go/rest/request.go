@@ -930,7 +930,7 @@ func (r *Request) newHTTPRequest(ctx context.Context) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
-	req = req.WithContext(httptrace.WithClientTrace(req.Context(), newDNSMetricsTrace(ctx)))
+	req = req.WithContext(httptrace.WithClientTrace(ctx, newDNSMetricsTrace(ctx)))
 	req.Header = r.headers
 	return req, nil
 }
