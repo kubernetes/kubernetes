@@ -947,10 +947,12 @@ func newDNSMetricsTrace(ctx context.Context) *httptrace.ClientTrace {
 	return &httptrace.ClientTrace{
 		DNSStart: func(info httptrace.DNSStartInfo) {
 			dns.Lock()
+			defer dns.Unlock()
 			dns.start = time.Now()
 			dns.host = info.Host
 		},
 		DNSDone: func(info httptrace.DNSDoneInfo) {
+			dns.Lock()
 			defer dns.Unlock()
 			metrics.ResolverLatency.Observe(ctx, dns.host, time.Since(dns.start))
 		},
