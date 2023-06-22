@@ -25,6 +25,7 @@ import (
 	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
@@ -44,13 +45,13 @@ const (
 //
 //   - suggested: additional configurationWrapper objects for initial behavior.
 //     the cluster operators have an option to edit or delete these configurationWrapper objects.
-type EnsureStrategy interface {
+type EnsureStrategy[ObjectType configurationObjectType] interface {
 	// Name of the strategy, for now we have two: 'mandatory' and 'suggested'.
 	// This comes handy in logging.
 	Name() string
 
-	// ShouldUpdate accepts a pair of the current and the bootstrap configuration and determines
-	// whether an update is necessary.
+	// ReviseIfNeeded accepts a pair of the current and the bootstrap configuration, determines
+	// whether an update is necessary, and returns a (revised if appropriate) copy of the object.
 	// current is the existing in-cluster configuration object.
 	// bootstrap is the configuration the kube-apiserver maintains in-memory.
 	//
@@ -58,65 +59,87 @@ type EnsureStrategy interface {
 	// ok: true if auto update is required, otherwise false
 	// err: err is set when the function runs into an error and can not
 	//      determine if auto update is needed.
-	ShouldUpdate(wantAndHave) (revised updatable, ok bool, err error)
+	ReviseIfNeeded(objectOps objectLocalOps[ObjectType], current, bootstrap ObjectType) (revised ObjectType, ok bool, err error)
 }
 
-// BootstrapObjects is a generic interface to a list of bootstrap objects bound up with the relevant operations on them.
-// The binding makes it unnecessary to have any type casts.
-// A bootstrap object is a mandatory or suggested config object,
-// with the spec that the code is built to provide.
-type BootstrapObjects interface {
-	typeName() string                         // the Kind of the objects
-	len() int                                 // number of objects
-	get(int) bootstrapObject                  // extract one object, origin 0
-	getExistingObjects() ([]deletable, error) // returns all the APF config objects that exist at the moment
+// objectLocalOps is the needed operations on an individual configurationObject
+type objectLocalOps[ObjectType configurationObject] interface {
+	DeepCopy(ObjectType) ObjectType
+
+	// replaceSpec returns a deep copy of `into` except that the spec is a deep copy of `from`
+	ReplaceSpec(into, from ObjectType) ObjectType
+
+	// specEqual says whether applying defaulting to `expected` makes its spec equal that of `actual`
+	SpecEqual(expected, actual ObjectType) bool
 }
 
-// deletable is an existing config object and it supports the delete operation
-type deletable interface {
-	configurationObject
-	delete(context.Context) error // delete the object.  TODO: make conditional on ResouceVersion
+// ObjectOps is the needed operations, both as a receiver from a server and server-independent, on configurationObjects
+type ObjectOps[ObjectType configurationObject] interface {
+	client[ObjectType]
+	cache[ObjectType]
+	objectLocalOps[ObjectType]
 }
 
-// bootstrapObject is a single bootstrap object.
-// Its spec is what the code provides.
-type bootstrapObject interface {
-	typeName() string                 // the Kind of the object
-	getName() string                  // the object's name
-	create(context.Context) error     // request the server to create the object
-	getCurrent() (wantAndHave, error) // pair up with the object as it currently exists
+// Client is the needed fragment of the typed generated client stubs for the given object type
+type client[ObjectType configurationObject] interface {
+	Create(ctx context.Context, obj ObjectType, opts metav1.CreateOptions) (ObjectType, error)
+	Update(ctx context.Context, obj ObjectType, opts metav1.UpdateOptions) (ObjectType, error)
+	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 }
 
-// wantAndHave is a pair of versions of an APF config object.
-// The "want" has the spec that the code provides.
-// The "have" is what came from the server.
-type wantAndHave interface {
-	getWant() configurationObject
-	getHave() configurationObject
-
-	specsDiffer() bool
-
-	// copyHave returns a copy of the "have" version,
-	// optionally with spec replaced by the spec from "want".
-	copyHave(specFromWant bool) updatable
+// cache is the needed fragment of the typed generated access ("lister") to an informer's local cache
+type cache[ObjectType configurationObject] interface {
+	List(labels.Selector) ([]ObjectType, error)
+	Get(name string) (ObjectType, error)
 }
 
-// updatable is an APF config object that can be written back to the apiserver
-type updatable interface {
-	configurationObject
-	update(context.Context) error
-}
-
-// A convenient wrapper interface that is used by the ensure logic.
+// configurationObject is the relevant interfaces that each API object type implements
 type configurationObject interface {
 	metav1.Object
 	runtime.Object
 }
 
+// configurationObjectType adds the type constraint `comparable` and is thus
+// only usable as a type constraint.
+type configurationObjectType interface {
+	comparable
+	configurationObject
+}
+
+type objectOps[ObjectType configurationObjectType] struct {
+	client[ObjectType]
+	cache[ObjectType]
+	deepCopy    func(ObjectType) ObjectType
+	replaceSpec func(ObjectType, ObjectType) ObjectType
+	specEqual   func(expected, actual ObjectType) bool
+}
+
+func NewObjectOps[ObjectType configurationObjectType](client client[ObjectType], cache cache[ObjectType],
+	deepCopy func(ObjectType) ObjectType,
+	replaceSpec func(ObjectType, ObjectType) ObjectType,
+	specEqual func(expected, actual ObjectType) bool,
+) ObjectOps[ObjectType] {
+	return objectOps[ObjectType]{client: client,
+		cache:       cache,
+		deepCopy:    deepCopy,
+		replaceSpec: replaceSpec,
+		specEqual:   specEqual}
+}
+
+func (oo objectOps[ObjectType]) DeepCopy(obj ObjectType) ObjectType { return oo.deepCopy(obj) }
+
+func (oo objectOps[ObjectType]) ReplaceSpec(into, from ObjectType) ObjectType {
+	return oo.replaceSpec(into, from)
+}
+
+func (oo objectOps[ObjectType]) SpecEqual(expected, actual ObjectType) bool {
+	return oo.specEqual(expected, actual)
+}
+
 // NewSuggestedEnsureStrategy returns an EnsureStrategy for suggested config objects
-func NewSuggestedEnsureStrategy() EnsureStrategy {
-	return &strategy{
-		alwaysAutoUpdateSpecFn: func(_ wantAndHave) bool {
+func NewSuggestedEnsureStrategy[ObjectType configurationObjectType]() EnsureStrategy[ObjectType] {
+	return &strategy[ObjectType]{
+		alwaysAutoUpdateSpecFn: func(want, have ObjectType) bool {
 			return false
 		},
 		name: "suggested",
@@ -124,9 +147,9 @@ func NewSuggestedEnsureStrategy() EnsureStrategy {
 }
 
 // NewMandatoryEnsureStrategy returns an EnsureStrategy for mandatory config objects
-func NewMandatoryEnsureStrategy() EnsureStrategy {
-	return &strategy{
-		alwaysAutoUpdateSpecFn: func(_ wantAndHave) bool {
+func NewMandatoryEnsureStrategy[ObjectType configurationObjectType]() EnsureStrategy[ObjectType] {
+	return &strategy[ObjectType]{
+		alwaysAutoUpdateSpecFn: func(want, have ObjectType) bool {
 			return true
 		},
 		name: "mandatory",
@@ -134,36 +157,41 @@ func NewMandatoryEnsureStrategy() EnsureStrategy {
 }
 
 // auto-update strategy for the configuration objects
-type strategy struct {
-	alwaysAutoUpdateSpecFn func(wantAndHave) bool
+type strategy[ObjectType configurationObjectType] struct {
+	alwaysAutoUpdateSpecFn func(want, have ObjectType) bool
 	name                   string
 }
 
-func (s *strategy) Name() string {
+func (s *strategy[ObjectType]) Name() string {
 	return s.name
 }
 
-func (s *strategy) ShouldUpdate(wah wantAndHave) (updatable, bool, error) {
-	current := wah.getHave()
-
-	if current == nil {
-		return nil, false, nil
+func (s *strategy[ObjectType]) ReviseIfNeeded(objectOps objectLocalOps[ObjectType], current, bootstrap ObjectType) (ObjectType, bool, error) {
+	var zero ObjectType
+	if current == zero {
+		return zero, false, nil
 	}
 
-	autoUpdateSpec := s.alwaysAutoUpdateSpecFn(wah)
+	autoUpdateSpec := s.alwaysAutoUpdateSpecFn(bootstrap, current)
 	if !autoUpdateSpec {
 		autoUpdateSpec = shouldUpdateSpec(current)
 	}
 	updateAnnotation := shouldUpdateAnnotation(current, autoUpdateSpec)
 
-	specChanged := autoUpdateSpec && wah.specsDiffer()
+	// specChanged := autoUpdateSpec && wah.specsDiffer()
+	specChanged := autoUpdateSpec && !objectOps.SpecEqual(bootstrap, current)
 
 	if !(updateAnnotation || specChanged) {
 		// the annotation key is up to date and the spec has not changed, no update is necessary
-		return nil, false, nil
+		return zero, false, nil
 	}
 
-	revised := wah.copyHave(specChanged)
+	var revised ObjectType
+	if specChanged {
+		revised = objectOps.ReplaceSpec(current, bootstrap)
+	} else {
+		revised = objectOps.DeepCopy(current)
+	}
 	if updateAnnotation {
 		setAutoUpdateAnnotation(revised, autoUpdateSpec)
 	}
@@ -214,11 +242,9 @@ func setAutoUpdateAnnotation(accessor metav1.Object, autoUpdate bool) {
 
 // EnsureConfigurations applies the given maintenance strategy to the given objects.
 // At the first error, if any, it stops and returns that error.
-func EnsureConfigurations(ctx context.Context, boots BootstrapObjects, strategy EnsureStrategy) error {
-	len := boots.len()
-	for i := 0; i < len; i++ {
-		bo := boots.get(i)
-		err := EnsureConfiguration(ctx, bo, strategy)
+func EnsureConfigurations[ObjectType configurationObjectType](ctx context.Context, ops ObjectOps[ObjectType], boots []ObjectType, strategy EnsureStrategy[ObjectType]) error {
+	for _, bo := range boots {
+		err := EnsureConfiguration(ctx, ops, bo, strategy)
 		if err != nil {
 			return err
 		}
@@ -227,65 +253,65 @@ func EnsureConfigurations(ctx context.Context, boots BootstrapObjects, strategy 
 }
 
 // EnsureConfiguration applies the given maintenance strategy to the given object.
-func EnsureConfiguration(ctx context.Context, bootstrap bootstrapObject, strategy EnsureStrategy) error {
-	name := bootstrap.getName()
+func EnsureConfiguration[ObjectType configurationObjectType](ctx context.Context, ops ObjectOps[ObjectType], bootstrap ObjectType, strategy EnsureStrategy[ObjectType]) error {
+	name := bootstrap.GetName()
 	configurationType := strategy.Name()
 
-	var wah wantAndHave
+	var current ObjectType
 	var err error
 	for {
-		wah, err = bootstrap.getCurrent()
+		current, err = ops.Get(name)
 		if err == nil {
 			break
 		}
 		if !apierrors.IsNotFound(err) {
-			return fmt.Errorf("failed to retrieve %s type=%s name=%q error=%w", bootstrap.typeName(), configurationType, name, err)
+			return fmt.Errorf("failed to retrieve %s type=%s name=%q error=%w", bootstrap.GetObjectKind().GroupVersionKind().Kind, configurationType, name, err)
 		}
 
 		// we always re-create a missing configuration object
-		if err = bootstrap.create(ctx); err == nil {
-			klog.V(2).InfoS(fmt.Sprintf("Successfully created %s", bootstrap.typeName()), "type", configurationType, "name", name)
+		if _, err = ops.Create(ctx, bootstrap, metav1.CreateOptions{FieldManager: fieldManager}); err == nil {
+			klog.V(2).InfoS(fmt.Sprintf("Successfully created %s", bootstrap.GetObjectKind().GroupVersionKind().Kind), "type", configurationType, "name", name)
 			return nil
 		}
 
 		if !apierrors.IsAlreadyExists(err) {
-			return fmt.Errorf("cannot create %s type=%s name=%q error=%w", bootstrap.typeName(), configurationType, name, err)
+			return fmt.Errorf("cannot create %s type=%s name=%q error=%w", bootstrap.GetObjectKind().GroupVersionKind().Kind, configurationType, name, err)
 		}
-		klog.V(5).InfoS(fmt.Sprintf("Something created the %s concurrently", bootstrap.typeName()), "type", configurationType, "name", name)
+		klog.V(5).InfoS(fmt.Sprintf("Something created the %s concurrently", bootstrap.GetObjectKind().GroupVersionKind().Kind), "type", configurationType, "name", name)
 	}
 
-	klog.V(5).InfoS(fmt.Sprintf("The %s already exists, checking whether it is up to date", bootstrap.typeName()), "type", configurationType, "name", name)
-	newObject, update, err := strategy.ShouldUpdate(wah)
+	klog.V(5).InfoS(fmt.Sprintf("The %s already exists, checking whether it is up to date", bootstrap.GetObjectKind().GroupVersionKind().Kind), "type", configurationType, "name", name)
+	newObject, update, err := strategy.ReviseIfNeeded(ops, current, bootstrap)
 	if err != nil {
-		return fmt.Errorf("failed to determine whether auto-update is required for %s type=%s name=%q error=%w", bootstrap.typeName(), configurationType, name, err)
+		return fmt.Errorf("failed to determine whether auto-update is required for %s type=%s name=%q error=%w", bootstrap.GetObjectKind().GroupVersionKind().Kind, configurationType, name, err)
 	}
 	if !update {
 		if klogV := klog.V(5); klogV.Enabled() {
-			klogV.InfoS("No update required", "wrapper", bootstrap.typeName(), "type", configurationType, "name", name,
-				"diff", cmp.Diff(wah.getHave(), wah.getWant()))
+			klogV.InfoS("No update required", "wrapper", bootstrap.GetObjectKind().GroupVersionKind().Kind, "type", configurationType, "name", name,
+				"diff", cmp.Diff(current, bootstrap))
 		}
 		return nil
 	}
 
-	if err = newObject.update(ctx); err == nil {
-		klog.V(2).Infof("Updated the %s type=%s name=%q diff: %s", bootstrap.typeName(), configurationType, name, cmp.Diff(wah.getHave(), wah.getWant()))
+	if _, err = ops.Update(ctx, newObject, metav1.UpdateOptions{FieldManager: fieldManager}); err == nil {
+		klog.V(2).Infof("Updated the %s type=%s name=%q diff: %s", bootstrap.GetObjectKind().GroupVersionKind().Kind, configurationType, name, cmp.Diff(current, bootstrap))
 		return nil
 	}
 
 	if apierrors.IsConflict(err) {
-		klog.V(2).InfoS(fmt.Sprintf("Something updated the %s concurrently, I will check its spec later", bootstrap.typeName()), "type", configurationType, "name", name)
+		klog.V(2).InfoS(fmt.Sprintf("Something updated the %s concurrently, I will check its spec later", bootstrap.GetObjectKind().GroupVersionKind().Kind), "type", configurationType, "name", name)
 		return nil
 	}
 
-	return fmt.Errorf("failed to update the %s, will retry later type=%s name=%q error=%w", bootstrap.typeName(), configurationType, name, err)
+	return fmt.Errorf("failed to update the %s, will retry later type=%s name=%q error=%w", bootstrap.GetObjectKind().GroupVersionKind().Kind, configurationType, name, err)
 }
 
 // RemoveUnwantedObjects attempts to delete the configuration objects
 // that exist, are annotated `apf.kubernetes.io/autoupdate-spec=true`, and do not
 // have a name in the given set.  A refusal due to concurrent update is logged
 // and not considered an error; the object will be reconsidered later.
-func RemoveUnwantedObjects(ctx context.Context, boots BootstrapObjects) error {
-	current, err := boots.getExistingObjects()
+func RemoveUnwantedObjects[ObjectType configurationObjectType](ctx context.Context, objectOps ObjectOps[ObjectType], boots []ObjectType) error {
+	current, err := objectOps.List(labels.Everything())
 	if err != nil {
 		return err
 	}
@@ -316,9 +342,9 @@ func RemoveUnwantedObjects(ctx context.Context, boots BootstrapObjects) error {
 			continue
 		}
 		// TODO: expectedResourceVersion := object.GetResourceVersion()
-		err = object.delete(ctx /* TODO: expectedResourceVersion */)
+		err = objectOps.Delete(ctx, object.GetName(), metav1.DeleteOptions{ /* TODO: expectedResourceVersion */ })
 		if err == nil {
-			klog.V(2).InfoS(fmt.Sprintf("Successfully deleted the unwanted %s", boots.typeName()), "name", name)
+			klog.V(2).InfoS(fmt.Sprintf("Successfully deleted the unwanted %s", object.GetObjectKind().GroupVersionKind().Kind), "name", name)
 			continue
 		}
 		if apierrors.IsNotFound(err) {
@@ -330,12 +356,10 @@ func RemoveUnwantedObjects(ctx context.Context, boots BootstrapObjects) error {
 	return nil
 }
 
-func namesOfBootstrapObjects(bos BootstrapObjects) sets.String {
+func namesOfBootstrapObjects[ObjectType configurationObjectType](bos []ObjectType) sets.String {
 	names := sets.NewString()
-	len := bos.len()
-	for i := 0; i < len; i++ {
-		bo := bos.get(i)
-		names.Insert(bo.getName())
+	for _, bo := range bos {
+		names.Insert(bo.GetName())
 	}
 	return names
 }

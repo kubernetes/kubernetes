@@ -27,7 +27,7 @@ import (
 	"k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
 	"k8s.io/client-go/kubernetes/fake"
 	flowcontrollisters "k8s.io/client-go/listers/flowcontrol/v1beta3"
-	"k8s.io/client-go/tools/cache"
+	toolscache "k8s.io/client-go/tools/cache"
 	flowcontrolapisv1beta3 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta3"
 	"k8s.io/utils/pointer"
 
@@ -37,7 +37,7 @@ import (
 func TestEnsurePriorityLevel(t *testing.T) {
 	tests := []struct {
 		name      string
-		strategy  func() EnsureStrategy
+		strategy  func() EnsureStrategy[*flowcontrolv1beta3.PriorityLevelConfiguration]
 		current   *flowcontrolv1beta3.PriorityLevelConfiguration
 		bootstrap *flowcontrolv1beta3.PriorityLevelConfiguration
 		expected  *flowcontrolv1beta3.PriorityLevelConfiguration
@@ -45,21 +45,21 @@ func TestEnsurePriorityLevel(t *testing.T) {
 		// for suggested configurations
 		{
 			name:      "suggested priority level configuration does not exist - the object should always be re-created",
-			strategy:  NewSuggestedEnsureStrategy,
+			strategy:  NewSuggestedEnsureStrategy[*flowcontrolv1beta3.PriorityLevelConfiguration],
 			bootstrap: newPLConfiguration("pl1").WithLimited(10).Object(),
 			current:   nil,
 			expected:  newPLConfiguration("pl1").WithLimited(10).Object(),
 		},
 		{
 			name:      "suggested priority level configuration exists, auto update is enabled, spec does not match - current object should be updated",
-			strategy:  NewSuggestedEnsureStrategy,
+			strategy:  NewSuggestedEnsureStrategy[*flowcontrolv1beta3.PriorityLevelConfiguration],
 			bootstrap: newPLConfiguration("pl1").WithLimited(20).Object(),
 			current:   newPLConfiguration("pl1").WithAutoUpdateAnnotation("true").WithLimited(10).Object(),
 			expected:  newPLConfiguration("pl1").WithAutoUpdateAnnotation("true").WithLimited(20).Object(),
 		},
 		{
 			name:      "suggested priority level configuration exists, auto update is disabled, spec does not match - current object should not be updated",
-			strategy:  NewSuggestedEnsureStrategy,
+			strategy:  NewSuggestedEnsureStrategy[*flowcontrolv1beta3.PriorityLevelConfiguration],
 			bootstrap: newPLConfiguration("pl1").WithLimited(20).Object(),
 			current:   newPLConfiguration("pl1").WithAutoUpdateAnnotation("false").WithLimited(10).Object(),
 			expected:  newPLConfiguration("pl1").WithAutoUpdateAnnotation("false").WithLimited(10).Object(),
@@ -68,21 +68,21 @@ func TestEnsurePriorityLevel(t *testing.T) {
 		// for mandatory configurations
 		{
 			name:      "mandatory priority level configuration does not exist - new object should be created",
-			strategy:  NewMandatoryEnsureStrategy,
+			strategy:  NewMandatoryEnsureStrategy[*flowcontrolv1beta3.PriorityLevelConfiguration],
 			bootstrap: newPLConfiguration("pl1").WithLimited(10).WithAutoUpdateAnnotation("true").Object(),
 			current:   nil,
 			expected:  newPLConfiguration("pl1").WithLimited(10).WithAutoUpdateAnnotation("true").Object(),
 		},
 		{
 			name:      "mandatory priority level configuration exists, annotation is missing - annotation is added",
-			strategy:  NewMandatoryEnsureStrategy,
+			strategy:  NewMandatoryEnsureStrategy[*flowcontrolv1beta3.PriorityLevelConfiguration],
 			bootstrap: newPLConfiguration("pl1").WithLimited(20).Object(),
 			current:   newPLConfiguration("pl1").WithLimited(20).Object(),
 			expected:  newPLConfiguration("pl1").WithAutoUpdateAnnotation("true").WithLimited(20).Object(),
 		},
 		{
 			name:      "mandatory priority level configuration exists, auto update is disabled, spec does not match - current object should be updated",
-			strategy:  NewMandatoryEnsureStrategy,
+			strategy:  NewMandatoryEnsureStrategy[*flowcontrolv1beta3.PriorityLevelConfiguration],
 			bootstrap: newPLConfiguration("pl1").WithLimited(20).Object(),
 			current:   newPLConfiguration("pl1").WithAutoUpdateAnnotation("false").WithLimited(10).Object(),
 			expected:  newPLConfiguration("pl1").WithAutoUpdateAnnotation("true").WithLimited(20).Object(),
@@ -92,16 +92,17 @@ func TestEnsurePriorityLevel(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			client := fake.NewSimpleClientset().FlowcontrolV1beta3().PriorityLevelConfigurations()
-			indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+			indexer := toolscache.NewIndexer(toolscache.MetaNamespaceKeyFunc, toolscache.Indexers{})
 			if test.current != nil {
 				client.Create(context.TODO(), test.current, metav1.CreateOptions{})
 				indexer.Add(test.current)
 			}
 
-			boots := WrapBootstrapPriorityLevelConfigurations(client, flowcontrollisters.NewPriorityLevelConfigurationLister(indexer), []*flowcontrolv1beta3.PriorityLevelConfiguration{test.bootstrap})
+			ops := NewPriorityLevelConfigurationOps(client, flowcontrollisters.NewPriorityLevelConfigurationLister(indexer))
+			boots := []*flowcontrolv1beta3.PriorityLevelConfiguration{test.bootstrap}
 			strategy := test.strategy()
 
-			err := EnsureConfigurations(context.Background(), boots, strategy)
+			err := EnsureConfigurations(context.Background(), ops, boots, strategy)
 			if err != nil {
 				t.Fatalf("Expected no error, but got: %v", err)
 			}
@@ -204,24 +205,17 @@ func TestSuggestedPLEnsureStrategy_ShouldUpdate(t *testing.T) {
 		},
 	}
 
+	ops := NewPriorityLevelConfigurationOps(nil, nil)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			strategy := NewSuggestedEnsureStrategy()
-			wah := &wantAndHavePriorityLevelConfiguration{
-				want: test.bootstrap,
-				have: test.current,
-			}
-			updatableGot, updateGot, err := strategy.ShouldUpdate(wah)
+			strategy := NewSuggestedEnsureStrategy[*flowcontrolv1beta3.PriorityLevelConfiguration]()
+			updatableGot, updateGot, err := strategy.ReviseIfNeeded(ops, test.current, test.bootstrap)
 			if err != nil {
 				t.Errorf("Expected no error, but got: %v", err)
 			}
-			var newObjectGot *flowcontrolv1beta3.PriorityLevelConfiguration
-			if updatableGot != nil {
-				newObjectGot = updatableGot.(*updatablePriorityLevelConfiguration).PriorityLevelConfiguration
-			}
 			if test.newObjectExpected == nil {
-				if newObjectGot != nil {
-					t.Errorf("Expected a nil object, but got: %#v", newObjectGot)
+				if updatableGot != nil {
+					t.Errorf("Expected a nil object, but got: %#v", updatableGot)
 				}
 				if updateGot {
 					t.Errorf("Expected update=%t but got: %t", false, updateGot)
@@ -232,8 +226,8 @@ func TestSuggestedPLEnsureStrategy_ShouldUpdate(t *testing.T) {
 			if !updateGot {
 				t.Errorf("Expected update=%t but got: %t", true, updateGot)
 			}
-			if !reflect.DeepEqual(test.newObjectExpected, newObjectGot) {
-				t.Errorf("Expected the object to be updated to match - diff: %s", cmp.Diff(test.newObjectExpected, newObjectGot))
+			if !reflect.DeepEqual(test.newObjectExpected, updatableGot) {
+				t.Errorf("Expected the object to be updated to match - diff: %s", cmp.Diff(test.newObjectExpected, updatableGot))
 			}
 		})
 	}
@@ -297,7 +291,7 @@ func TestPriorityLevelSpecChanged(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			w := priorityLevelSpecChanged(testCase.expected, testCase.actual)
+			w := !plcSpecEqual(testCase.expected, testCase.actual)
 			if testCase.specChanged != w {
 				t.Errorf("Expected priorityLevelSpecChanged to return %t, but got: %t - diff: %s", testCase.specChanged, w,
 					cmp.Diff(testCase.expected, testCase.actual))
@@ -359,15 +353,16 @@ func TestRemovePriorityLevelConfiguration(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			client := fake.NewSimpleClientset().FlowcontrolV1beta3().PriorityLevelConfigurations()
-			indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+			indexer := toolscache.NewIndexer(toolscache.MetaNamespaceKeyFunc, toolscache.Indexers{})
 			if test.current != nil {
 				client.Create(context.TODO(), test.current, metav1.CreateOptions{})
 				indexer.Add(test.current)
 			}
 
 			boot := newPLConfiguration(test.bootstrapName).Object()
-			boots := WrapBootstrapPriorityLevelConfigurations(client, flowcontrollisters.NewPriorityLevelConfigurationLister(indexer), []*flowcontrolv1beta3.PriorityLevelConfiguration{boot})
-			err := RemoveUnwantedObjects(context.Background(), boots)
+			boots := []*flowcontrolv1beta3.PriorityLevelConfiguration{boot}
+			ops := NewPriorityLevelConfigurationOps(client, flowcontrollisters.NewPriorityLevelConfigurationLister(indexer))
+			err := RemoveUnwantedObjects(context.Background(), ops, boots)
 			if err != nil {
 				t.Fatalf("Expected no error, but got: %v", err)
 			}
