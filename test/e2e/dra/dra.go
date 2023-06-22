@@ -230,6 +230,21 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 
 				b.testPod(ctx, f.ClientSet, pod)
 			})
+
+			ginkgo.It("removes reservation from claim when pod is done", func(ctx context.Context) {
+				parameters := b.parameters()
+				pod := b.podExternal()
+				claim := b.externalClaim(allocationMode)
+				pod.Spec.Containers[0].Command = []string{"true"}
+				b.create(ctx, parameters, claim, pod)
+
+				ginkgo.By("waiting for pod to finish")
+				framework.ExpectNoError(e2epod.WaitForPodNoLongerRunningInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace), "wait for pod to finish")
+				ginkgo.By("waiting for claim to be unreserved")
+				gomega.Eventually(ctx, func(ctx context.Context) (*resourcev1alpha2.ResourceClaim, error) {
+					return f.ClientSet.ResourceV1alpha2().ResourceClaims(pod.Namespace).Get(ctx, claim.Name, metav1.GetOptions{})
+				}).WithTimeout(f.Timeouts.PodDelete).Should(gomega.HaveField("Status.ReservedFor", gomega.BeEmpty()), "reservation should have been removed")
+			})
 		}
 
 		ginkgo.Context("with delayed allocation", func() {

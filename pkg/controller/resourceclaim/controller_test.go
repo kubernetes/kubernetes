@@ -188,6 +188,27 @@ func TestSyncHandler(t *testing.T) {
 			expectedMetrics: expectedMetrics{0, 0},
 		},
 		{
+			name: "clear-reserved-when-done",
+			pods: func() []*v1.Pod {
+				pods := []*v1.Pod{testPodWithResource.DeepCopy()}
+				pods[0].Status.Phase = v1.PodSucceeded
+				return pods
+			}(),
+			key: claimKey(testClaimReserved),
+			claims: func() []*resourcev1alpha2.ResourceClaim {
+				claims := []*resourcev1alpha2.ResourceClaim{testClaimReserved.DeepCopy()}
+				claims[0].OwnerReferences = nil
+				return claims
+			}(),
+			expectedClaims: func() []resourcev1alpha2.ResourceClaim {
+				claims := []resourcev1alpha2.ResourceClaim{*testClaimReserved.DeepCopy()}
+				claims[0].OwnerReferences = nil
+				claims[0].Status.ReservedFor = nil
+				return claims
+			}(),
+			expectedMetrics: expectedMetrics{0, 0},
+		},
+		{
 			name:            "remove-reserved",
 			pods:            []*v1.Pod{testPod},
 			key:             claimKey(testClaimReservedTwice),

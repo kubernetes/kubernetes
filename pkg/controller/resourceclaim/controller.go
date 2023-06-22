@@ -435,10 +435,10 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 				keepEntry = false
 			} else {
 				pod, err := ec.podLister.Pods(claim.Namespace).Get(reservedFor.Name)
-				if err != nil && !errors.IsNotFound(err) {
+				switch {
+				case err != nil && !errors.IsNotFound(err):
 					return err
-				}
-				if pod == nil {
+				case err != nil:
 					// We might not have it in our informer cache
 					// yet. Removing the pod while the scheduler is
 					// scheduling it would be bad. We have to be
@@ -449,10 +449,14 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 						return err
 					}
 					if pod == nil || pod.UID != reservedFor.UID {
+						logger.V(6).Info("remove reservation because pod is gone or got replaced", "pod", klog.KObj(pod), "claim", klog.KRef(namespace, name))
 						keepEntry = false
 					}
-				} else if pod.UID != reservedFor.UID {
-					// Pod exists, but is a different incarnation under the same name.
+				case pod.UID != reservedFor.UID:
+					logger.V(6).Info("remove reservation because pod got replaced with new instance", "pod", klog.KObj(pod), "claim", klog.KRef(namespace, name))
+					keepEntry = false
+				case isPodDone(pod):
+					logger.V(6).Info("remove reservation because pod will not run anymore", "pod", klog.KObj(pod), "claim", klog.KRef(namespace, name))
 					keepEntry = false
 				}
 			}
