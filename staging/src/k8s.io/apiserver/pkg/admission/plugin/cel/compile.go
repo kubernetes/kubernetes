@@ -35,6 +35,7 @@ const (
 	RequestVarName                   = "request"
 	AuthorizerVarName                = "authorizer"
 	RequestResourceAuthorizerVarName = "authorizer.requestResource"
+	VariableVarName                  = "variables"
 )
 
 // BuildRequestType generates a DeclType for AdmissionRequest. This may be replaced with a utility that
@@ -132,7 +133,7 @@ func (c compiler) CompileCELExpression(expressionAccessor ExpressionAccessor, op
 	found := false
 	returnTypes := expressionAccessor.ReturnTypes()
 	for _, returnType := range returnTypes {
-		if ast.OutputType() == returnType {
+		if ast.OutputType() == returnType || cel.AnyType == returnType {
 			found = true
 			break
 		}

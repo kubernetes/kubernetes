@@ -46,7 +46,7 @@ func NewFilterCompiler(env *environment.EnvSet) FilterCompiler {
 }
 
 type evaluationActivation struct {
-	object, oldObject, params, request, authorizer, requestResourceAuthorizer interface{}
+	object, oldObject, params, request, authorizer, requestResourceAuthorizer, variables interface{}
 }
 
 // ResolveName returns a value from the activation by qualified name, or false if the name
@@ -65,6 +65,8 @@ func (a *evaluationActivation) ResolveName(name string) (interface{}, bool) {
 		return a.authorizer, a.authorizer != nil
 	case RequestResourceAuthorizerVarName:
 		return a.requestResourceAuthorizer, a.requestResourceAuthorizer != nil
+	case VariableVarName: // variables always present
+		return a.variables, true
 	default:
 		return nil, false
 	}
@@ -161,6 +163,12 @@ func (f *filter) ForInput(ctx context.Context, versionedAttr *admission.Versione
 		request:                   requestVal.Object,
 		authorizer:                authorizerVal,
 		requestResourceAuthorizer: requestResourceAuthorizerVal,
+	}
+
+	// composition is an optional feature that only applies for ValidatingAdmissionPolicy.
+	// check if the context allows composition
+	if compositionCtx, ok := ctx.(CompositionContext); ok {
+		va.variables = compositionCtx.Variables(va)
 	}
 
 	remainingBudget := runtimeCELCostBudget

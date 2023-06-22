@@ -36,12 +36,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	celmetrics "k8s.io/apiserver/pkg/admission/cel"
-	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy/internal/generic"
 	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy/matching"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
@@ -135,7 +133,7 @@ func NewAdmissionController(
 			restMapper,
 			client,
 			dynamicClient,
-			cel.NewFilterCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())),
+			nil,
 			NewMatcher(matching.NewMatcher(informerFactory.Core().V1().Namespaces().Lister(), client)),
 			generic.NewInformer[*v1alpha1.ValidatingAdmissionPolicy](
 				informerFactory.Admissionregistration().V1alpha1().ValidatingAdmissionPolicies().Informer()),
