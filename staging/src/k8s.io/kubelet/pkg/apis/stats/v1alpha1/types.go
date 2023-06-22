@@ -221,6 +221,9 @@ type MemoryStats struct {
 	// Total memory in use. This includes all memory regardless of when it was accessed.
 	// +optional
 	UsageBytes *uint64 `json:"usageBytes,omitempty"`
+	// Total swap memory in use.
+	// +optional
+	SwapUsageBytes *uint64 `json:"swapUsageBytes,omitempty"`
 	// The amount of working set memory. This includes recently accessed memory,
 	// dirty memory, and kernel memory. WorkingSetBytes is <= UsageBytes
 	// +optional
