@@ -142,6 +142,34 @@ func TestQuantity(t *testing.T) {
 			expr:               `isQuantity([1, 2, 3])`,
 			expectedCompileErr: []string{"found no matching overload for 'isQuantity' applied to.*"},
 		},
+		{
+			name:        "equality_reflexivity",
+			expr:        `quantity("200M") == quantity("200M")`,
+			expectValue: true,
+		},
+		{
+			name:        "equality_symmetry",
+			expr:        `quantity("200M") == quantity("0.2G") && quantity("0.2G") == quantity("200M")`,
+			expectValue: true,
+		},
+		{
+			name:        "equality_transitivity",
+			expr:        `quantity("2M") == quantity("0.002G") && quantity("2000k") == quantity("2M") && quantity("0.002G") == quantity("2000k")`,
+			expectValue: true,
+		},
+		{
+			name:        "inequality",
+			expr:        `quantity("200M") == quantity("0.3G")`,
+			expectValue: false,
+		},
+		{
+			name: "quantity_less",
+			expr: `quantity("50M").isLessThan(quantity("50Mi"))`,
+		},
+		{
+			name: "quantity_greater",
+			expr: `quantity("50Mi").isGreaterThan(quantity("50M"))`,
+		},
 	}
 
 	for _, c := range cases {
