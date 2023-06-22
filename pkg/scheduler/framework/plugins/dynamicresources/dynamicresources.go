@@ -245,22 +245,21 @@ func (pl *dynamicResources) Name() string {
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *dynamicResources) EventsToRegister() []framework.ClusterEvent {
+func (pl *dynamicResources) EventsToRegister() []framework.ClusterEventWithHint {
 	if !pl.enabled {
 		return nil
 	}
-
-	events := []framework.ClusterEvent{
+	events := []framework.ClusterEventWithHint{
 		// Allocation is tracked in ResourceClaims, so any changes may make the pods schedulable.
-		{Resource: framework.ResourceClaim, ActionType: framework.Add | framework.Update},
+		{Event: framework.ClusterEvent{Resource: framework.ResourceClaim, ActionType: framework.Add | framework.Update}},
 		// When a driver has provided additional information, a pod waiting for that information
 		// may be schedulable.
 		// TODO (#113702): can we change this so that such an event does not trigger *all* pods?
 		// Yes: https://github.com/kubernetes/kubernetes/blob/abcbaed0784baf5ed2382aae9705a8918f2daa18/pkg/scheduler/eventhandlers.go#L70
-		{Resource: framework.PodSchedulingContext, ActionType: framework.Add | framework.Update},
+		{Event: framework.ClusterEvent{Resource: framework.PodSchedulingContext, ActionType: framework.Add | framework.Update}},
 		// A resource might depend on node labels for topology filtering.
 		// A new or updated node may make pods schedulable.
-		{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel},
+		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel}},
 	}
 	return events
 }

@@ -991,22 +991,22 @@ func TestEventsToRegister(t *testing.T) {
 	tests := []struct {
 		name                             string
 		inPlacePodVerticalScalingEnabled bool
-		expectedClusterEvents            []framework.ClusterEvent
+		expectedClusterEvents            []framework.ClusterEventWithHint
 	}{
 		{
 			"Register events with InPlacePodVerticalScaling feature enabled",
 			true,
-			[]framework.ClusterEvent{
-				{Resource: "Pod", ActionType: framework.Update | framework.Delete},
-				{Resource: "Node", ActionType: framework.Add | framework.Update},
+			[]framework.ClusterEventWithHint{
+				{Event: framework.ClusterEvent{Resource: "Pod", ActionType: framework.Update | framework.Delete}},
+				{Event: framework.ClusterEvent{Resource: "Node", ActionType: framework.Add | framework.Update}},
 			},
 		},
 		{
 			"Register events with InPlacePodVerticalScaling feature disabled",
 			false,
-			[]framework.ClusterEvent{
-				{Resource: "Pod", ActionType: framework.Delete},
-				{Resource: "Node", ActionType: framework.Add | framework.Update},
+			[]framework.ClusterEventWithHint{
+				{Event: framework.ClusterEvent{Resource: "Pod", ActionType: framework.Delete}},
+				{Event: framework.ClusterEvent{Resource: "Node", ActionType: framework.Add | framework.Update}},
 			},
 		},
 	}

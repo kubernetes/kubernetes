@@ -78,6 +78,62 @@ const (
 	WildCard              GVK = "*"
 )
 
+type ClusterEventWithHint struct {
+	Event ClusterEvent
+	// QueueingHintFn is executed for the plugin rejected by this plugin when the above Event happens,
+	// and filters out events to reduce useless retry of Pod's scheduling.
+	// It's an optional field. If not set,
+	// the scheduling of Pods will be always retried with backoff when this Event happens.
+	// (the same as QueueAfterBackoff)
+	QueueingHintFn QueueingHintFn
+}
+
+// QueueingHintFn returns a hint that signals whether the event can make a Pod,
+// which was rejected by this plugin in the past scheduling cycle, schedulable or not.
+// It's called before a Pod gets moved from unschedulableQ to backoffQ or activeQ.
+//
+// - `pod`: the Pod to be enqueued, which is rejected by this plugin in the past.
+// - `event`: By which event the pod will be moved back to schedQ/backoffQ.
+// - `oldObj` `newObj`: the object involved in that event.
+//   - For example, the given event is "Node deleted", the `oldObj` will be that deleted Node.
+//   - `oldObj` is nil if the event is add event.
+//   - `newObj` is nil if the event is delete event.
+type QueueingHintFn func(pod *v1.Pod, oldObj, newObj interface{}) QueueingHint
+
+type QueueingHint int
+
+const (
+	// QueueSkip implies that the cluster event has no impact on
+	// scheduling of the pod.
+	QueueSkip QueueingHint = iota
+
+	// QueueAfterBackoff implies that the Pod may be schedulable by the event,
+	// and worth retring the scheduling again after backoff.
+	QueueAfterBackoff
+
+	// QueueImmediately is returned only when it is highly possible that the Pod gets scheduled in the next scheduling.
+	// You should only return QueueImmediately when there is a high chance that the Pod gets scheduled in the next scheduling.
+	// Otherwise, it's detrimental to scheduling throughput.
+	// For example, when the Pod was rejected as waiting for an external resource to be provisioned, that is directly tied to the Pod,
+	// and the event is that the resource is provisioned, then you can return QueueImmediately.
+	// As a counterexample, when the Pod was rejected due to insufficient memory resource,
+	// and the event is that more memory on Node is available, then you should return QueueAfterBackoff instead of QueueImmediately
+	// because other Pods may be waiting for the same resources and only a few of them would schedule in the next scheduling cycle.
+	QueueImmediately
+)
+
+func (s QueueingHint) String() string {
+	switch s {
+	case QueueSkip:
+		return "QueueSkip"
+	case QueueAfterBackoff:
+		return "QueueAfterBackoff"
+	case QueueImmediately:
+		return "QueueImmediately"
+	}
+	return ""
+}
+
 // ClusterEvent abstracts how a system resource's state gets changed.
 // Resource represents the standard API resources such as Pod, Node, etc.
 // ActionType denotes the specific change such as Add, Update or Delete.
