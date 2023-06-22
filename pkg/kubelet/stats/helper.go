@@ -61,6 +61,7 @@ func cadvisorInfoToCPUandMemoryStats(info *cadvisorapiv2.ContainerInfo) (*statsa
 		memoryStats = &statsapi.MemoryStats{
 			Time:            metav1.NewTime(cstat.Timestamp),
 			UsageBytes:      &cstat.Memory.Usage,
+			SwapUsageBytes:  &cstat.Memory.Swap,
 			WorkingSetBytes: &cstat.Memory.WorkingSet,
 			RSSBytes:        &cstat.Memory.RSS,
 			PageFaults:      &pageFaults,
