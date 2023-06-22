@@ -216,6 +216,18 @@ func TestSyncHandler(t *testing.T) {
 			expectedClaims:  []resourcev1alpha2.ResourceClaim{*testClaimReserved},
 			expectedMetrics: expectedMetrics{0, 0},
 		},
+		{
+			name: "delete-claim-when-done",
+			pods: func() []*v1.Pod {
+				pods := []*v1.Pod{testPodWithResource.DeepCopy()}
+				pods[0].Status.Phase = v1.PodSucceeded
+				return pods
+			}(),
+			key:             claimKey(testClaimReserved),
+			claims:          []*resourcev1alpha2.ResourceClaim{testClaimReserved},
+			expectedClaims:  nil,
+			expectedMetrics: expectedMetrics{0, 0},
+		},
 	}
 
 	for _, tc := range tests {

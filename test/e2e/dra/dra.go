@@ -245,6 +245,38 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 					return f.ClientSet.ResourceV1alpha2().ResourceClaims(pod.Namespace).Get(ctx, claim.Name, metav1.GetOptions{})
 				}).WithTimeout(f.Timeouts.PodDelete).Should(gomega.HaveField("Status.ReservedFor", gomega.BeEmpty()), "reservation should have been removed")
 			})
+
+			ginkgo.It("deletes generated claims when pod is done", func(ctx context.Context) {
+				parameters := b.parameters()
+				pod, template := b.podInline(allocationMode)
+				pod.Spec.Containers[0].Command = []string{"true"}
+				b.create(ctx, parameters, template, pod)
+
+				ginkgo.By("waiting for pod to finish")
+				framework.ExpectNoError(e2epod.WaitForPodNoLongerRunningInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace), "wait for pod to finish")
+				ginkgo.By("waiting for claim to be deleted")
+				gomega.Eventually(ctx, func(ctx context.Context) ([]resourcev1alpha2.ResourceClaim, error) {
+					claims, err := f.ClientSet.ResourceV1alpha2().ResourceClaims(pod.Namespace).List(ctx, metav1.ListOptions{})
+					if err != nil {
+						return nil, err
+					}
+					return claims.Items, nil
+				}).WithTimeout(f.Timeouts.PodDelete).Should(gomega.BeEmpty(), "claim should have been deleted")
+			})
+
+			ginkgo.It("does not delete generated claims when pod is restarting", func(ctx context.Context) {
+				parameters := b.parameters()
+				pod, template := b.podInline(allocationMode)
+				pod.Spec.Containers[0].Command = []string{"sh", "-c", "sleep 1; exit 1"}
+				pod.Spec.RestartPolicy = v1.RestartPolicyAlways
+				b.create(ctx, parameters, template, pod)
+
+				ginkgo.By("waiting for pod to restart twice")
+				gomega.Eventually(ctx, func(ctx context.Context) (*v1.Pod, error) {
+					return f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+				}).WithTimeout(f.Timeouts.PodStartSlow).Should(gomega.HaveField("Status.ContainerStatuses", gomega.ContainElements(gomega.HaveField("RestartCount", gomega.BeNumerically(">=", 2)))))
+				gomega.Expect(driver.Controller.GetNumAllocations()).To(gomega.Equal(int64(1)), "number of allocations")
+			})
 		}
 
 		ginkgo.Context("with delayed allocation", func() {

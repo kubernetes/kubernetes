@@ -26,6 +26,7 @@ import (
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	v1informers "k8s.io/client-go/informers/core/v1"
@@ -42,6 +43,7 @@ import (
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
+	"k8s.io/utils/pointer"
 )
 
 const (
@@ -482,7 +484,52 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 		}
 	}
 
+	if len(valid) == 0 {
+		// Claim is not reserved. If it was generated for a pod and
+		// that pod is not going to run, the claim can be
+		// deleted. Normally the garbage collector does that, but the
+		// pod itself might not get deleted for a while.
+		podName, podUID := owningPod(claim)
+		if podName != "" {
+			pod, err := ec.podLister.Pods(claim.Namespace).Get(podName)
+			switch {
+			case err == nil:
+				// Pod already replaced or not going to run?
+				if pod.UID != podUID || isPodDone(pod) {
+					// We are certain that the owning pod is not going to need
+					// the claim and therefore remove the claim.
+					logger.V(5).Info("deleting unused generated claim", "claim", klog.KObj(claim), "pod", klog.KObj(pod))
+					err := ec.kubeClient.ResourceV1alpha2().ResourceClaims(claim.Namespace).Delete(ctx, claim.Name, metav1.DeleteOptions{})
+					if err != nil {
+						return fmt.Errorf("delete claim: %v", err)
+					}
+				} else {
+					logger.V(6).Info("wrong pod content, not deleting claim", "claim", klog.KObj(claim), "podUID", podUID, "podContent", pod)
+				}
+			case errors.IsNotFound(err):
+				// We might not know the pod *yet*. Instead of doing an expensive API call,
+				// let the garbage collector handle the case that the pod is truly gone.
+				logger.V(5).Info("pod for claim not found", "claim", klog.KObj(claim), "pod", klog.KRef(claim.Namespace, podName))
+			default:
+				return fmt.Errorf("lookup pod: %v", err)
+			}
+		} else {
+			logger.V(5).Info("claim not generated for a pod", "claim", klog.KObj(claim))
+		}
+	}
+
 	return nil
+}
+
+func owningPod(claim *resourcev1alpha2.ResourceClaim) (string, types.UID) {
+	for _, owner := range claim.OwnerReferences {
+		if pointer.BoolDeref(owner.Controller, false) &&
+			owner.APIVersion == "v1" &&
+			owner.Kind == "Pod" {
+			return owner.Name, owner.UID
+		}
+	}
+	return "", ""
 }
 
 // podResourceClaimIndexFunc is an index function that returns ResourceClaim keys (=
