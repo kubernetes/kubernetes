@@ -34,9 +34,10 @@ const KubeadmGroupName = "kubeadm.k8s.io"
 
 func TestValidateSupportedVersion(t *testing.T) {
 	tests := []struct {
-		gv              schema.GroupVersion
-		allowDeprecated bool
-		expectedErr     bool
+		gv                schema.GroupVersion
+		allowDeprecated   bool
+		allowExperimental bool
+		expectedErr       bool
 	}{
 		{
 			gv: schema.GroupVersion{
@@ -85,11 +86,25 @@ func TestValidateSupportedVersion(t *testing.T) {
 				Version: "v1",
 			},
 		},
+		{
+			gv: schema.GroupVersion{
+				Group:   KubeadmGroupName,
+				Version: "v1beta4",
+			},
+			allowExperimental: true,
+		},
+		{
+			gv: schema.GroupVersion{
+				Group:   KubeadmGroupName,
+				Version: "v1beta4",
+			},
+			expectedErr: true,
+		},
 	}
 
 	for _, rt := range tests {
 		t.Run(fmt.Sprintf("%s/allowDeprecated:%t", rt.gv, rt.allowDeprecated), func(t *testing.T) {
-			err := validateSupportedVersion(rt.gv, rt.allowDeprecated)
+			err := validateSupportedVersion(rt.gv, rt.allowDeprecated, rt.allowExperimental)
 			if rt.expectedErr && err == nil {
 				t.Error("unexpected success")
 			} else if !rt.expectedErr && err != nil {

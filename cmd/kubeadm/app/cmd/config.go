@@ -225,6 +225,8 @@ func getDefaultNodeConfigBytes() ([]byte, error) {
 // newCmdConfigMigrate returns cobra.Command for "kubeadm config migrate" command
 func newCmdConfigMigrate(out io.Writer) *cobra.Command {
 	var oldCfgPath, newCfgPath string
+	var allowExperimental bool
+
 	cmd := &cobra.Command{
 		Use:   "migrate",
 		Short: "Read an older version of the kubeadm configuration API types from a file, and output the similar config object for the newer version",
@@ -252,7 +254,7 @@ func newCmdConfigMigrate(out io.Writer) *cobra.Command {
 				return err
 			}
 
-			outputBytes, err := configutil.MigrateOldConfig(oldCfgBytes)
+			outputBytes, err := configutil.MigrateOldConfig(oldCfgBytes, allowExperimental)
 			if err != nil {
 				return err
 			}
@@ -270,12 +272,14 @@ func newCmdConfigMigrate(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&oldCfgPath, "old-config", "", "Path to the kubeadm config file that is using an old API version and should be converted. This flag is mandatory.")
 	cmd.Flags().StringVar(&newCfgPath, "new-config", "", "Path to the resulting equivalent kubeadm config file using the new API version. Optional, if not specified output will be sent to STDOUT.")
+	cmd.Flags().BoolVar(&allowExperimental, options.AllowExperimentalAPI, false, "Allow migration to experimental, unreleased APIs.")
 	return cmd
 }
 
 // newCmdConfigValidate returns cobra.Command for the "kubeadm config validate" command
 func newCmdConfigValidate(out io.Writer) *cobra.Command {
 	var cfgPath string
+	var allowExperimental bool
 
 	cmd := &cobra.Command{
 		Use:   "validate",
@@ -300,7 +304,7 @@ func newCmdConfigValidate(out io.Writer) *cobra.Command {
 				return err
 			}
 
-			if err := configutil.ValidateConfig(cfgBytes); err != nil {
+			if err := configutil.ValidateConfig(cfgBytes, allowExperimental); err != nil {
 				return err
 			}
 			fmt.Fprintln(out, "ok")
@@ -310,6 +314,7 @@ func newCmdConfigValidate(out io.Writer) *cobra.Command {
 		Args: cobra.NoArgs,
 	}
 	options.AddConfigFlag(cmd.Flags(), &cfgPath)
+	cmd.Flags().BoolVar(&allowExperimental, options.AllowExperimentalAPI, false, "Allow validation of experimental, unreleased APIs.")
 	return cmd
 }
 
