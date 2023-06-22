@@ -38,6 +38,7 @@ func TestCollectResourceMetrics(t *testing.T) {
 		"scrape_error",
 		"node_cpu_usage_seconds_total",
 		"node_memory_working_set_bytes",
+		"node_swap_bytes",
 		"container_cpu_usage_seconds_total",
 		"container_memory_working_set_bytes",
 		"container_start_time_seconds",
@@ -74,6 +75,7 @@ func TestCollectResourceMetrics(t *testing.T) {
 					Memory: &statsapi.MemoryStats{
 						Time:            testTime,
 						WorkingSetBytes: uint64Ptr(1000),
+						SwapUsageBytes:  uint64Ptr(500),
 					},
 				},
 			},
@@ -85,6 +87,9 @@ func TestCollectResourceMetrics(t *testing.T) {
 				# HELP node_memory_working_set_bytes [ALPHA] Current working set of the node in bytes
 				# TYPE node_memory_working_set_bytes gauge
 				node_memory_working_set_bytes 1000 1624396278302
+				# HELP node_swap_bytes [ALPHA] Current node swap usage in bytes
+				# TYPE node_swap_bytes gauge
+				node_swap_bytes 500 1624396278302
 				# HELP scrape_error [ALPHA] 1 if there was an error while getting container metrics, 0 otherwise
 				# TYPE scrape_error gauge
 				scrape_error 0
