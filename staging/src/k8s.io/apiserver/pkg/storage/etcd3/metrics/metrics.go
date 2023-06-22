@@ -17,11 +17,14 @@ limitations under the License.
 package metrics
 
 import (
+	"context"
+	"fmt"
 	"sync"
 	"time"
 
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/klog/v2"
 )
 
 /*
@@ -73,13 +76,16 @@ var (
 	)
 	dbTotalSize = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
-			Subsystem:      "apiserver",
-			Name:           "storage_db_total_size_in_bytes",
-			Help:           "Total size of the storage database file physically allocated in bytes.",
-			StabilityLevel: compbasemetrics.ALPHA,
+			Subsystem:         "apiserver",
+			Name:              "storage_db_total_size_in_bytes",
+			Help:              "Total size of the storage database file physically allocated in bytes.",
+			StabilityLevel:    compbasemetrics.ALPHA,
+			DeprecatedVersion: "1.28.0",
 		},
 		[]string{"endpoint"},
 	)
+	storageSizeDescription   = compbasemetrics.NewDesc("apiserver_storage_size_bytes", "Size of the storage database file physically allocated in bytes.", []string{"server"}, nil, compbasemetrics.ALPHA, "")
+	storageMonitor           = &monitorCollector{}
 	etcdEventsReceivedCounts = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
 			Subsystem:      "apiserver",
@@ -160,6 +166,7 @@ func Register() {
 		legacyregistry.MustRegister(etcdRequestErrorCounts)
 		legacyregistry.MustRegister(objectCounts)
 		legacyregistry.MustRegister(dbTotalSize)
+		legacyregistry.CustomMustRegister(storageMonitor)
 		legacyregistry.MustRegister(etcdBookmarkCounts)
 		legacyregistry.MustRegister(etcdLeaseObjectCounts)
 		legacyregistry.MustRegister(listStorageCount)
@@ -214,8 +221,14 @@ var sinceInSeconds = func(start time.Time) float64 {
 }
 
 // UpdateEtcdDbSize sets the etcd_db_total_size_in_bytes metric.
+// Deprecated: Metric etcd_db_total_size_in_bytes will be replaced with apiserver_storage_size_bytes
 func UpdateEtcdDbSize(ep string, size int64) {
 	dbTotalSize.WithLabelValues(ep).Set(float64(size))
+}
+
+// SetStorageMonitorGetter sets monitor getter to allow monitoring etcd stats.
+func SetStorageMonitorGetter(getter func() ([]Monitor, error)) {
+	storageMonitor.monitorGetter = getter
 }
 
 // UpdateLeaseObjectCount sets the etcd_lease_object_counts metric.
@@ -231,4 +244,52 @@ func RecordStorageListMetrics(resource string, numFetched, numEvald, numReturned
 	listStorageNumFetched.WithLabelValues(resource).Add(float64(numFetched))
 	listStorageNumSelectorEvals.WithLabelValues(resource).Add(float64(numEvald))
 	listStorageNumReturned.WithLabelValues(resource).Add(float64(numReturned))
+}
+
+type Monitor interface {
+	Monitor(ctx context.Context) (StorageMetrics, error)
+	Close() error
+}
+
+type StorageMetrics struct {
+	Size int64
+}
+
+type monitorCollector struct {
+	compbasemetrics.BaseStableCollector
+
+	monitorGetter func() ([]Monitor, error)
+}
+
+// DescribeWithStability implements compbasemetrics.StableColletor
+func (c *monitorCollector) DescribeWithStability(ch chan<- *compbasemetrics.Desc) {
+	ch <- storageSizeDescription
+}
+
+// CollectWithStability implements compbasemetrics.StableColletor
+func (c *monitorCollector) CollectWithStability(ch chan<- compbasemetrics.Metric) {
+	monitors, err := c.monitorGetter()
+	if err != nil {
+		return
+	}
+
+	for i, m := range monitors {
+		server := fmt.Sprintf("etcd-%d", i)
+
+		klog.V(4).InfoS("Start collecting storage metrics", "server", server)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		metrics, err := m.Monitor(ctx)
+		cancel()
+		m.Close()
+		if err != nil {
+			klog.InfoS("Failed to get storage metrics", "server", server, "err", err)
+			continue
+		}
+
+		metric, err := compbasemetrics.NewConstMetric(storageSizeDescription, compbasemetrics.GaugeValue, float64(metrics.Size), server)
+		if err != nil {
+			klog.ErrorS(err, "Failed to create metric", "server", server)
+		}
+		ch <- metric
+	}
 }
