@@ -98,6 +98,7 @@ const (
 
 // NewController creates a ResourceClaim controller.
 func NewController(
+	logger klog.Logger,
 	kubeClient clientset.Interface,
 	podInformer v1informers.PodInformer,
 	claimInformer resourcev1alpha2informers.ResourceClaimInformer,
@@ -120,23 +121,27 @@ func NewController(
 
 	if _, err := podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			ec.enqueuePod(obj, false)
+			ec.enqueuePod(logger, obj, false)
 		},
 		UpdateFunc: func(old, updated interface{}) {
-			ec.enqueuePod(updated, false)
+			ec.enqueuePod(logger, updated, false)
 		},
 		DeleteFunc: func(obj interface{}) {
-			ec.enqueuePod(obj, true)
+			ec.enqueuePod(logger, obj, true)
 		},
 	}); err != nil {
 		return nil, err
 	}
 	if _, err := claimInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: ec.onResourceClaimAddOrUpdate,
-		UpdateFunc: func(old, updated interface{}) {
-			ec.onResourceClaimAddOrUpdate(updated)
+		AddFunc: func(obj interface{}) {
+			ec.onResourceClaimAddOrUpdate(logger, obj)
 		},
-		DeleteFunc: ec.onResourceClaimDelete,
+		UpdateFunc: func(old, updated interface{}) {
+			ec.onResourceClaimAddOrUpdate(logger, updated)
+		},
+		DeleteFunc: func(obj interface{}) {
+			ec.onResourceClaimDelete(logger, obj)
+		},
 	}); err != nil {
 		return nil, err
 	}
@@ -147,7 +152,7 @@ func NewController(
 	return ec, nil
 }
 
-func (ec *Controller) enqueuePod(obj interface{}, deleted bool) {
+func (ec *Controller) enqueuePod(logger klog.Logger, obj interface{}, deleted bool) {
 	if d, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 		obj = d.Obj
 	}
@@ -166,11 +171,15 @@ func (ec *Controller) enqueuePod(obj interface{}, deleted bool) {
 		return
 	}
 
+	logger.V(6).Info("pod with resource claims changed", "pod", klog.KObj(pod), "deleted", deleted)
+
 	// Release reservations of a deleted or completed pod?
 	if deleted || isPodDone(pod) {
 		for _, podClaim := range pod.Spec.ResourceClaims {
 			claimName := resourceclaim.Name(pod, &podClaim)
-			ec.queue.Add(claimKeyPrefix + pod.Namespace + "/" + claimName)
+			key := claimKeyPrefix + pod.Namespace + "/" + claimName
+			logger.V(6).Info("pod is deleted or done, process claim", "pod", klog.KObj(pod), "key", key)
+			ec.queue.Add(key)
 		}
 	}
 
@@ -179,14 +188,16 @@ func (ec *Controller) enqueuePod(obj interface{}, deleted bool) {
 		for _, podClaim := range pod.Spec.ResourceClaims {
 			if podClaim.Source.ResourceClaimTemplateName != nil {
 				// It has at least one inline template, work on it.
-				ec.queue.Add(podKeyPrefix + pod.Namespace + "/" + pod.Name)
+				key := podKeyPrefix + pod.Namespace + "/" + pod.Name
+				logger.V(6).Info("pod is not deleted, process it", "pod", klog.KObj(pod), "key", key)
+				ec.queue.Add(key)
 				break
 			}
 		}
 	}
 }
 
-func (ec *Controller) onResourceClaimAddOrUpdate(obj interface{}) {
+func (ec *Controller) onResourceClaimAddOrUpdate(logger klog.Logger, obj interface{}) {
 	claim, ok := obj.(*resourcev1alpha2.ResourceClaim)
 	if !ok {
 		return
@@ -195,10 +206,12 @@ func (ec *Controller) onResourceClaimAddOrUpdate(obj interface{}) {
 	// When starting up, we have to check all claims to find those with
 	// stale pods in ReservedFor. During an update, a pod might get added
 	// that already no longer exists.
-	ec.queue.Add(claimKeyPrefix + claim.Namespace + "/" + claim.Name)
+	key := claimKeyPrefix + claim.Namespace + "/" + claim.Name
+	logger.V(6).Info("claim is new or updated, process it", "key", key)
+	ec.queue.Add(key)
 }
 
-func (ec *Controller) onResourceClaimDelete(obj interface{}) {
+func (ec *Controller) onResourceClaimDelete(logger klog.Logger, obj interface{}) {
 	claim, ok := obj.(*resourcev1alpha2.ResourceClaim)
 	if !ok {
 		return
@@ -215,8 +228,13 @@ func (ec *Controller) onResourceClaimDelete(obj interface{}) {
 		runtime.HandleError(fmt.Errorf("listing pods from cache: %v", err))
 		return
 	}
+	if len(objs) == 0 {
+		logger.V(6).Info("claim got deleted while not needed by any pod, nothing to do", "claim", klog.KObj(claim))
+		return
+	}
+	logger = klog.LoggerWithValues(logger, "claim", klog.KObj(claim))
 	for _, obj := range objs {
-		ec.enqueuePod(obj, false)
+		ec.enqueuePod(logger, obj, false)
 	}
 }
 
@@ -382,7 +400,7 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podClaim v1.
 }
 
 func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) error {
-	logger := klog.LoggerWithValues(klog.FromContext(ctx), "PVC", klog.KRef(namespace, name))
+	logger := klog.LoggerWithValues(klog.FromContext(ctx), "claim", klog.KRef(namespace, name))
 	ctx = klog.NewContext(ctx, logger)
 	claim, err := ec.claimLister.ResourceClaims(namespace).Get(name)
 	if err != nil {
@@ -449,6 +467,7 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 		return fmt.Errorf("unsupported ReservedFor entry: %v", reservedFor)
 	}
 
+	logger.V(5).Info("claim reserved for counts", "currentCount", len(claim.Status.ReservedFor), "claim", klog.KRef(namespace, name), "updatedCount", len(valid))
 	if len(valid) < len(claim.Status.ReservedFor) {
 		// TODO (#113700): patch
 		claim := claim.DeepCopy()

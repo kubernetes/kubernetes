@@ -226,7 +226,7 @@ func TestSyncHandler(t *testing.T) {
 			claimInformer := informerFactory.Resource().V1alpha2().ResourceClaims()
 			templateInformer := informerFactory.Resource().V1alpha2().ResourceClaimTemplates()
 
-			ec, err := NewController(fakeKubeClient, podInformer, claimInformer, templateInformer)
+			ec, err := NewController(klog.TODO(), fakeKubeClient, podInformer, claimInformer, templateInformer)
 			if err != nil {
 				t.Fatalf("error creating ephemeral controller : %v", err)
 			}
