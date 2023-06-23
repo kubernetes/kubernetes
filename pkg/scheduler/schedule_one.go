@@ -977,11 +977,15 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 	cachedPod, e := podLister.Pods(pod.Namespace).Get(pod.Name)
 	if e != nil {
 		logger.Info("Pod doesn't exist in informer cache", "pod", klog.KObj(pod), "err", e)
+		// We need to call DonePod here because we don't call AddUnschedulableIfNotPresent in this case.
+		sched.DonePod(pod.UID)
 	} else {
 		// In the case of extender, the pod may have been bound successfully, but timed out returning its response to the scheduler.
 		// It could result in the live version to carry .spec.nodeName, and that's inconsistent with the internal-queued version.
 		if len(cachedPod.Spec.NodeName) != 0 {
 			logger.Info("Pod has been assigned to node. Abort adding it back to queue.", "pod", klog.KObj(pod), "node", cachedPod.Spec.NodeName)
+			// We need to call DonePod here because we don't call AddUnschedulableIfNotPresent in this case.
+			sched.DonePod(pod.UID)
 		} else {
 			// As <cachedPod> is from SharedInformer, we need to do a DeepCopy() here.
 			// ignore this err since apiserver doesn't properly validate affinity terms

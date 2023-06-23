@@ -775,6 +775,12 @@ func (p *PriorityQueue) Done(pod types.UID) {
 }
 
 func (p *PriorityQueue) done(pod types.UID) {
+	if _, ok := p.inFlightPods[pod]; !ok {
+		// This Pod is already done()ed.
+		return
+	}
+	delete(p.inFlightPods, pod)
+
 	// remove events which is only referred from this Pod
 	// so that the receivedEvents map doesn't grow infinitely.
 	for event := p.receivedEvents.Front(); event != nil; event = event.Next() {
@@ -784,8 +790,6 @@ func (p *PriorityQueue) done(pod types.UID) {
 			p.receivedEvents.Remove(event)
 		}
 	}
-
-	delete(p.inFlightPods, pod)
 }
 
 // isPodUpdated checks if the pod is updated in a way that it may have become
