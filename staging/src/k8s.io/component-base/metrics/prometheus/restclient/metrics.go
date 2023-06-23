@@ -42,11 +42,11 @@ var (
 	)
 
 	// resolverLatency is a Prometheus Histogram metric type partitioned by
-	// "network", and "address" labels. It is used for the rest client DNS resolver latency metrics.
+	// "host" labels. It is used for the rest client DNS resolver latency metrics.
 	resolverLatency = k8smetrics.NewHistogramVec(
 		&k8smetrics.HistogramOpts{
 			Name:           "rest_client_dns_resolution_duration_seconds",
-			Help:           "DNS resolver latency in seconds. Broken down by network, and address.",
+			Help:           "DNS resolver latency in seconds. Broken down by host.",
 			StabilityLevel: k8smetrics.ALPHA,
 			Buckets:        []float64{0.005, 0.025, 0.1, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 15.0, 30.0},
 		},

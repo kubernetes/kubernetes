@@ -926,16 +926,15 @@ func (r *Request) newHTTPRequest(ctx context.Context) (*http.Request, error) {
 	}
 
 	url := r.URL().String()
-	req, err := http.NewRequest(r.verb, url, body)
+	req, err := http.NewRequestWithContext(httptrace.WithClientTrace(ctx, newDNSMetricsTrace(ctx)), r.verb, url, body)
 	if err != nil {
 		return nil, err
 	}
-	req = req.WithContext(httptrace.WithClientTrace(ctx, newDNSMetricsTrace(ctx)))
 	req.Header = r.headers
 	return req, nil
 }
 
-// newDNSMetricsTrace returns an HTTP trace that tracks time spend on DNS lookups per network/host.
+// newDNSMetricsTrace returns an HTTP trace that tracks time spent on DNS lookups per host.
 // This metric is available in client as "rest_client_dns_resolution_duration_seconds".
 func newDNSMetricsTrace(ctx context.Context) *httptrace.ClientTrace {
 	type dnsMetric struct {
