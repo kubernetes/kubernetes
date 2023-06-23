@@ -1870,6 +1870,38 @@ func TestPerPodSchedulingMetrics(t *testing.T) {
 		t.Fatalf("Failed to pop a pod %v", err)
 	}
 	checkPerPodSchedulingMetrics("Attempt twice with update", t, pInfo, 2, timestamp)
+
+	// Case 4: A gated pod is created and scheduled after lifting gate. The queue operations are
+	//  Add gated pod -> check unschedulablePods -> lift gate & update pod -> Pop.
+	c = testingclock.NewFakeClock(timestamp)
+	// Create a queue with PreEnqueuePlugin
+	m := map[string][]framework.PreEnqueuePlugin{"": {&preEnqueuePlugin{allowlists: []string{"foo"}}}}
+	queue = NewTestQueue(ctx, newDefaultQueueSort(), WithClock(c), WithPreEnqueuePluginMap(m), WithPluginMetricsSamplePercent(0))
+
+	// Create a pod without PreEnqueuePlugin label.
+	gatedPod := st.MakePod().Name("gated-test-pod").Namespace("test-ns").UID("test-uid").Obj()
+	err = queue.Add(gatedPod)
+	if err != nil {
+		t.Fatalf("Failed to add a pod %v", err)
+	}
+	// Check pod is added to the unschedulablePods queue.
+	if getUnschedulablePod(queue, gatedPod) != gatedPod {
+		t.Errorf("Pod %v was not found in the unschedulablePods.", gatedPod.Name)
+	}
+	// Override clock to get different InitialAttemptTimestamp
+	c.Step(1 * time.Minute)
+
+	// Update pod with the required label to get it out of unschedulablePods queue.
+	updateGatedPod := gatedPod.DeepCopy()
+	updateGatedPod.Labels = map[string]string{"foo": ""}
+	queue.Update(gatedPod, updateGatedPod)
+
+	pInfo, err = queue.Pop()
+	if err != nil {
+		t.Fatalf("Failed to pop a pod %v", err)
+	}
+
+	checkPerPodSchedulingMetrics("Attempt once/gated", t, pInfo, 1, timestamp.Add(1*time.Minute))
 }
 
 func TestIncomingPodsMetrics(t *testing.T) {
@@ -1965,8 +1997,8 @@ func checkPerPodSchedulingMetrics(name string, t *testing.T, pInfo *framework.Qu
 	if pInfo.Attempts != wantAttempts {
 		t.Errorf("[%s] Pod schedule attempt unexpected, got %v, want %v", name, pInfo.Attempts, wantAttempts)
 	}
-	if pInfo.InitialAttemptTimestamp != wantInitialAttemptTs {
-		t.Errorf("[%s] Pod initial schedule attempt timestamp unexpected, got %v, want %v", name, pInfo.InitialAttemptTimestamp, wantInitialAttemptTs)
+	if *pInfo.InitialAttemptTimestamp != wantInitialAttemptTs {
+		t.Errorf("[%s] Pod initial schedule attempt timestamp unexpected, got %v, want %v", name, *pInfo.InitialAttemptTimestamp, wantInitialAttemptTs)
 	}
 }
 
