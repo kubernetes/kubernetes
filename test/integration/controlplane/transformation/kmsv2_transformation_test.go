@@ -33,7 +33,6 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 
 	corev1 "k8s.io/api/core/v1"
-	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -50,7 +49,6 @@ import (
 	kmsv2mock "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/testing/v2"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kmsv2api "k8s.io/kms/apis/v2"
 	kmsv2svc "k8s.io/kms/pkg/service"
@@ -193,7 +191,6 @@ resources:
 	if err != nil {
 		t.Fatalf("failed to transform from storage via AESGCM, err: %v", err)
 	}
-
 	if !strings.Contains(string(plainSecret), secretVal) {
 		t.Fatalf("expected %q after decryption, but got %q", secretVal, string(plainSecret))
 	}
@@ -241,7 +238,7 @@ resources:
 	}
 	defer test.cleanUp()
 
-	dynamicClient := dynamic.NewForConfigOrDie(test.kubeAPIServer.ClientConfig)
+	dynamicClient := dynamic.NewForConfigOrDie(test.apiServer.Config)
 
 	testPod, err := test.createPod(testNamespace, dynamicClient)
 	if err != nil {
@@ -263,7 +260,7 @@ resources:
 	t.Cleanup(cancel)
 
 	var firstEncryptedDEK []byte
-	assertPodDEKs(ctx, t, test.kubeAPIServer.ServerOpts.Etcd.StorageConfig,
+	assertPodDEKs(ctx, t, *test.storageConfig,
 		1, 1,
 		"k8s:enc:kms:v2:kms-provider:",
 		func(_ int, counter uint64, etcdKey string, obj kmstypes.EncryptedObject) {
@@ -352,7 +349,7 @@ resources:
 	pluginMock.EnterFailedState()
 	mustBeUnHealthy(t, "/kms-providers",
 		"internal server error: kms-provider-0: rpc error: code = FailedPrecondition desc = failed precondition - key disabled",
-		test.kubeAPIServer.ClientConfig)
+		test.apiServer.Config)
 
 	newPod, err := test.createPod(testNamespace, dynamicClient)
 	if err != nil {
@@ -392,7 +389,7 @@ resources:
 		t.Fatalf("Resource version should not have changed again after the initial version updated as a result of the keyID update. old pod: %v, new pod: %v", newPod, updatedNewPod)
 	}
 
-	assertPodDEKs(ctx, t, test.kubeAPIServer.ServerOpts.Etcd.StorageConfig,
+	assertPodDEKs(ctx, t, *test.storageConfig,
 		1, 1, "k8s:enc:kms:v2:kms-provider:", checkDEK,
 	)
 }
@@ -423,12 +420,10 @@ resources:
 	}
 	t.Cleanup(test.cleanUp)
 
-	client := kubernetes.NewForConfigOrDie(test.kubeAPIServer.ClientConfig)
-
 	const podCount = 1_000
 
 	for i := 0; i < podCount; i++ {
-		if _, err := client.CoreV1().Pods(testNamespace).Create(ctx, &corev1.Pod{
+		if _, err := test.restClient.CoreV1().Pods(testNamespace).Create(ctx, &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("dek-reuse-%04d", i+1), // making creation order match returned list order / nonce counter
 			},
@@ -445,7 +440,7 @@ resources:
 		}
 	}
 
-	assertPodDEKs(ctx, t, test.kubeAPIServer.ServerOpts.Etcd.StorageConfig,
+	assertPodDEKs(ctx, t, *test.storageConfig,
 		podCount, 1, // key ID does not change during the test so we should only have a single DEK
 		"k8s:enc:kms:v2:kms-provider:",
 		func(i int, counter uint64, etcdKey string, obj kmstypes.EncryptedObject) {
@@ -543,14 +538,14 @@ resources:
 
 	// Stage 1 - Since all kms-plugins are guaranteed to be up,
 	// the healthz check should be OK.
-	mustBeHealthy(t, "/kms-providers", "ok", test.kubeAPIServer.ClientConfig)
+	mustBeHealthy(t, "/kms-providers", "ok", test.apiServer.Config)
 
 	// Stage 2 - kms-plugin for provider-1 is down. Therefore, expect the healthz check
 	// to fail and report that provider-1 is down
 	pluginMock1.EnterFailedState()
 	mustBeUnHealthy(t, "/kms-providers",
 		"internal server error: kms-provider-0: rpc error: code = FailedPrecondition desc = failed precondition - key disabled",
-		test.kubeAPIServer.ClientConfig)
+		test.apiServer.Config)
 	pluginMock1.ExitFailedState()
 
 	// Stage 3 - kms-plugin for provider-1 is now up. Therefore, expect the health check for provider-1
@@ -558,12 +553,12 @@ resources:
 	pluginMock2.EnterFailedState()
 	mustBeUnHealthy(t, "/kms-providers",
 		"internal server error: kms-provider-1: rpc error: code = FailedPrecondition desc = failed precondition - key disabled",
-		test.kubeAPIServer.ClientConfig)
+		test.apiServer.Config)
 	pluginMock2.ExitFailedState()
 
 	// Stage 4 - All kms-plugins are once again up,
 	// the healthz check should be OK.
-	mustBeHealthy(t, "/kms-providers", "ok", test.kubeAPIServer.ClientConfig)
+	mustBeHealthy(t, "/kms-providers", "ok", test.apiServer.Config)
 
 	// Stage 5 - All kms-plugins are unhealthy at the same time and we can observe both failures.
 	pluginMock1.EnterFailedState()
@@ -572,7 +567,7 @@ resources:
 		"internal server error: "+
 			"[kms-provider-0: failed to perform status section of the healthz check for KMS Provider provider-1, error: rpc error: code = FailedPrecondition desc = failed precondition - key disabled,"+
 			" kms-provider-1: failed to perform status section of the healthz check for KMS Provider provider-2, error: rpc error: code = FailedPrecondition desc = failed precondition - key disabled]",
-		test.kubeAPIServer.ClientConfig)
+		test.apiServer.Config)
 }
 
 func TestKMSv2SingleService(t *testing.T) {
@@ -617,8 +612,7 @@ resources:
 	}
 	t.Cleanup(test.cleanUp)
 
-	// the storage registry for CRs is dynamic so create one to exercise the wiring
-	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(test.kubeAPIServer.ClientConfig), false, etcd.GetCustomResourceDefinitionData()...)
+	// the CRDs have already been created as part of etcd.StartRealAPIServerOrDieForKMS()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	t.Cleanup(cancel)
@@ -629,7 +623,7 @@ resources:
 		Resource:         gvr,
 		GroupVersionKind: gvr.GroupVersion().WithKind("Panda"),
 		Scope:            meta.RESTScopeRoot,
-	}, dynamic.NewForConfigOrDie(test.kubeAPIServer.ClientConfig))
+	}, dynamic.NewForConfigOrDie(test.apiServer.Config))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -640,5 +634,189 @@ resources:
 
 	if kmsv2Calls != 1 {
 		t.Fatalf("expected a single call to KMS v2 service factory: %v", kmsv2Calls)
+	}
+}
+
+// TestKMSv2FeatureFlag is an integration test between KubeAPI and ETCD
+// Concretely, this test verifies the following:
+// 1. When feature flag is not enabled, loading a encryptionConfig with KMSv2 should fail
+// 2. When feature flag is enabled, loading a encryptionConfig with KMSv2 should work
+// 3. When feature flag is disabled, loading a encryptionConfig with a non-v2 provider should work.
+// without performing a storage migration, decryption of existing data encrypted with v2 should fail for Get and List operations.
+// New data stored in etcd will no longer be encrypted using the external kms provider with v2 API.
+// 4. when feature flag is re-enabled, loading a encryptionConfig with the same KMSv2 plugin from 2 should work,
+// decryption of data encrypted with v2 should work
+func TestKMSv2FeatureFlag(t *testing.T) {
+
+	encryptionConfig := `
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+resources:
+  - resources:
+    - secrets
+    providers:
+    - kms:
+       apiVersion: v2
+       name: kms-provider
+       endpoint: unix:///@kms-provider.sock
+`
+	// When feature flag is not enabled, loading a encryptionConfig with KMSv2 should fail
+	test, err := newTransformTest(t, encryptionConfig, false, "")
+	if err == nil || !strings.Contains(err.Error(), "timed out waiting for the condition") {
+		t.Fatalf("when feature flag is not enabled, loading a encryptionConfig with KMSv2 should have failed with: timed out waiting for the condition, encryptionConfig:\n%s\n actual error: %v", encryptionConfig, err)
+	}
+	test.cleanUp()
+
+	// When feature flag is enabled, loading a encryptionConfig with KMSv1 and v2 should work
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2, true)()
+
+	providerName := "kms-provider"
+	pluginMock := kmsv2mock.NewBase64Plugin(t, "@kms-provider.sock")
+
+	test, err = newTransformTest(t, encryptionConfig, false, "")
+	if err != nil {
+		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
+	}
+	restarted := 0
+	defer func() {
+		if restarted == 0 {
+			test.cleanUp()
+		}
+	}()
+
+	test.secret, err = test.createSecret(testSecret, testNamespace)
+	if err != nil {
+		t.Fatalf("Failed to create test secret, error: %v", err)
+	}
+
+	// Since Data Encryption Key (DEK) is randomly generated (per encryption operation), we need to ask KMS Mock for it.
+	plainTextDEK := pluginMock.LastEncryptRequest()
+
+	secretETCDPath := test.getETCDPathForResource(test.storageConfig.Prefix, "", "secrets", test.secret.Name, test.secret.Namespace)
+	rawEnvelope, err := test.getRawSecretFromETCD()
+	if err != nil {
+		t.Fatalf("failed to read %s from etcd: %v", secretETCDPath, err)
+	}
+
+	envelopeData := envelopekmsv2{
+		providerName: providerName,
+		rawEnvelope:  rawEnvelope,
+		plainTextDEK: plainTextDEK,
+	}
+
+	wantPrefix := envelopeData.prefix()
+	if !bytes.HasPrefix(rawEnvelope, []byte(wantPrefix)) {
+		t.Fatalf("expected secret to be prefixed with %s, but got %s", wantPrefix, rawEnvelope)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	ciphertext, err := envelopeData.cipherTextDEK()
+	if err != nil {
+		t.Fatalf("failed to get ciphertext DEK from KMSv2 Plugin: %v", err)
+	}
+	decryptResponse, err := pluginMock.Decrypt(ctx, &kmsv2api.DecryptRequest{Uid: string(uuid.NewUUID()), Ciphertext: ciphertext})
+	if err != nil {
+		t.Fatalf("failed to decrypt DEK, %v", err)
+	}
+	dekPlainAsWouldBeSeenByETCD := decryptResponse.Plaintext
+
+	if !bytes.Equal(plainTextDEK, dekPlainAsWouldBeSeenByETCD) {
+		t.Fatalf("expected plainTextDEK %v to be passed to KMS Plugin, but got %s",
+			plainTextDEK, dekPlainAsWouldBeSeenByETCD)
+	}
+
+	plainSecret, err := envelopeData.plainTextPayload(secretETCDPath)
+	if err != nil {
+		t.Fatalf("failed to transform from storage via AESGCM, err: %v", err)
+	}
+
+	if !strings.Contains(string(plainSecret), secretVal) {
+		t.Fatalf("expected %q after decryption, but got %q", secretVal, string(plainSecret))
+	}
+
+	secretClient := test.restClient.CoreV1().Secrets(testNamespace)
+	// Secrets should be un-enveloped on direct reads from Kube API Server.
+	s, err := secretClient.Get(ctx, testSecret, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("failed to get Secret from %s, err: %v", testNamespace, err)
+	}
+	if secretVal != string(s.Data[secretKey]) {
+		t.Fatalf("expected %s from KubeAPI, but got %s", secretVal, string(s.Data[secretKey]))
+	}
+	// When KMSv2 feature flag is disabled, loading a encryptionConfig with a non-v2 provider should work. without performing a storage migration, decryption of existing data encrypted with v2 should fail for Get and List operations.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2, false)()
+
+	encryptionConfig1 := `
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+resources:
+  - resources:
+    - secrets
+    providers:
+    - aescbc:
+        keys:
+        - name: key1
+          secret: c2VjcmV0IGlzIHNlY3VyZQ==
+`
+	if err = test.restartAPIServer(t, encryptionConfig1, false); err != nil {
+		t.Fatalf("Failed to restart api server, error: %v", err)
+	}
+	restarted = 1
+	defer func() {
+		if restarted == 1 {
+			test.cleanUp()
+		}
+	}()
+
+	_, err = test.createSecret("test2", testNamespace)
+	if err != nil {
+		t.Fatalf("Failed to create test secret, error: %v", err)
+	}
+	test.runResource(t, unSealWithCBCTransformer, aesCBCPrefix, "", "v1", "secrets", "test2", testNamespace)
+
+	secretClient = test.restClient.CoreV1().Secrets(testNamespace)
+
+	// Getting an old secret that was encrypted by another provider should fail
+	_, err = secretClient.Get(ctx, testSecret, metav1.GetOptions{})
+	if err == nil || !strings.Contains(err.Error(), "no matching prefix found") {
+		t.Fatalf("using a new provider, get Secret %s from %s should return err containing: no matching prefix found. Got err: %v", testSecret, testNamespace, err)
+	}
+	// List all cluster wide secrets should fail
+	_, err = test.restClient.CoreV1().Secrets("").List(context.TODO(), metav1.ListOptions{})
+	if err == nil || !strings.Contains(err.Error(), "no matching prefix found") {
+		t.Fatalf("using a new provider, LIST all Secrets should return err containing: no matching prefix found. Got err: %v", err)
+	}
+
+	// when feature flag is re-enabled, loading a encryptionConfig with the same KMSv2 plugin before the restart should work, decryption of data encrypted with v2 should work
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2, true)()
+
+	if err = test.restartAPIServer(t, encryptionConfig, false); err != nil {
+		t.Fatalf("Failed to restart api server, error: %v", err)
+	}
+	restarted = 2
+	defer func() {
+		if restarted == 2 {
+			test.cleanUp()
+		}
+	}()
+
+	// Getting an old secret that was encrypted by the same plugin should not fail.
+	s, err = test.restClient.CoreV1().Secrets(testNamespace).Get(
+		context.TODO(),
+		testSecret,
+		metav1.GetOptions{},
+	)
+	if err != nil {
+		t.Fatalf("failed to read secret, err: %v", err)
+	}
+	if secretVal != string(s.Data[secretKey]) {
+		t.Fatalf("expected %s from KubeAPI, but got %s", secretVal, string(s.Data[secretKey]))
+	}
+	secretClient = test.restClient.CoreV1().Secrets(testNamespace)
+	// Getting an old secret that was encrypted by another plugin should fail
+	_, err = secretClient.Get(ctx, "test2", metav1.GetOptions{})
+	if err == nil || !strings.Contains(err.Error(), "no matching prefix found") {
+		t.Fatalf("after re-enabling feature gate, get test2 Secret from %s should return err containing: no matching prefix found. actual err: %v", testNamespace, err)
 	}
 }

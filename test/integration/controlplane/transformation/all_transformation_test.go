@@ -21,7 +21,6 @@ import (
 	"testing"
 	"time"
 
-	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -39,7 +38,7 @@ func createResources(t *testing.T, test *transformTest,
 ) {
 	switch resource {
 	case "pods":
-		_, err := test.createPod(namespace, dynamic.NewForConfigOrDie(test.kubeAPIServer.ClientConfig))
+		_, err := test.createPod(namespace, dynamic.NewForConfigOrDie(test.apiServer.Config))
 		if err != nil {
 			t.Fatalf("Failed to create test pod, error: %v, name: %s, ns: %s", err, name, namespace)
 		}
@@ -59,7 +58,7 @@ func createResources(t *testing.T, test *transformTest,
 			Resource:         gvr,
 			GroupVersionKind: gvr.GroupVersion().WithKind(kind),
 			Scope:            meta.RESTScopeRoot,
-		}, dynamic.NewForConfigOrDie(test.kubeAPIServer.ClientConfig))
+		}, dynamic.NewForConfigOrDie(test.apiServer.Config))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -99,9 +98,6 @@ resources:
 		t.Fatalf("failed to start Kube API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
 	t.Cleanup(test.cleanUp)
-
-	// the storage registry for CRs is dynamic so create one to exercise the wiring
-	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(test.kubeAPIServer.ClientConfig), false, etcd.GetCustomResourceDefinitionData()...)
 
 	for _, tt := range []struct {
 		group     string

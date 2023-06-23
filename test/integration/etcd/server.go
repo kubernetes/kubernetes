@@ -245,13 +245,19 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 // APIServer represents a running API server that is ready for use
 // The Cleanup func must be deferred to prevent resource leaks
 type APIServer struct {
-	Client    clientset.Interface
-	Dynamic   dynamic.Interface
-	Config    *restclient.Config
-	KV        clientv3.KV
-	Mapper    meta.RESTMapper
-	Resources []Resource
-	Cleanup   func()
+	Client           clientset.Interface
+	Dynamic          dynamic.Interface
+	Config           *restclient.Config
+	KV               clientv3.KV
+	Mapper           meta.RESTMapper
+	Resources        []Resource
+	Cleanup          func()
+	ServerOpts       *options.ServerRunOptions
+	EtcdClient       *clientv3.Client
+	StopCh           chan struct{}
+	ErrCh            chan error
+	SaSigningKeyFile *os.File
+	CertDir          string
 }
 
 // Resource contains REST mapping information for a specific resource and extra metadata such as delete collection support

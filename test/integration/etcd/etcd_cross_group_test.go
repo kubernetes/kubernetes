@@ -117,6 +117,8 @@ func TestCrossGroupStorage(t *testing.T) {
 				if err != nil {
 					t.Fatalf("error opening watch via %s: %v", resource.Mapping.Resource.GroupVersion().String(), err)
 				}
+
+				defer watches[resource.Mapping.Resource].Stop()
 			}
 
 			versioner := storage.APIObjectVersioner{}
