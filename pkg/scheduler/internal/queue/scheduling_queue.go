@@ -27,6 +27,7 @@ limitations under the License.
 package queue
 
 import (
+	"container/list"
 	"context"
 	"fmt"
 	"math/rand"
@@ -166,7 +167,7 @@ type PriorityQueue struct {
 	// processed.
 	inFlightPods map[types.UID]inFlightPod
 	// receivedEvents holds the events received by the scheduling queue.
-	receivedEvents []clusterEvent
+	receivedEvents list.List
 
 	// activeQ is heap structure that scheduler actively looks at to find pods to
 	// schedule. Head of heap is the highest priority pod.
@@ -208,9 +209,11 @@ type inFlightPod struct {
 // clusterEvent has the event and involved objects.
 type clusterEvent struct {
 	requestCycle int64
-	// inFlightPods is the pods that are in-flight when this event is received.
-	inFlightPods sets.Set[types.UID]
 	event        framework.ClusterEvent
+	// inFlightPodsNum is the counter of pods referring to this cluster event.
+	// It is initialized with the number of Pods being scheduled when the event is received,
+	// and is decremented when the scheduling for those Pods are Done().
+	inFlightPodsNum int
 }
 
 type priorityQueueOptions struct {
@@ -622,8 +625,8 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *
 	if len(pInfo.UnschedulablePlugins) == 0 {
 		// When there is no unschedulable plugin, we cannot have a guess which event makes this Pod schedulable.
 		// Here, we uses the latest requestCycle so that this Pod won't stuck in the unschedulable pod pool for a long time.
-		if len(p.receivedEvents) != 0 {
-			moveRequestCycle = p.receivedEvents[len(p.receivedEvents)-1].requestCycle
+		if p.receivedEvents.Len() != 0 {
+			moveRequestCycle = p.receivedEvents.Back().Value.(clusterEvent).requestCycle
 		}
 	} else {
 		// AddUnschedulableIfNotPresent is called with the Pod at the end of scheduling or binding.
@@ -631,7 +634,8 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *
 		// we can assume pInfo must be recorded in inFlightPods.
 		if inFlightPod, ok := p.inFlightPods[pInfo.Pod.UID]; ok {
 			// check if there is an event that makes this Pod schedulable based on pInfo.UnschedulablePlugins.
-			for _, e := range p.receivedEvents {
+			for event := p.receivedEvents.Front(); event != nil; event = event.Next() {
+				e := event.Value.(clusterEvent)
 				if e.requestCycle < inFlightPod.startedCycle {
 					// This event is recorded before the Pod is popped.
 					continue
@@ -773,15 +777,13 @@ func (p *PriorityQueue) Done(pod types.UID) {
 func (p *PriorityQueue) done(pod types.UID) {
 	// remove events which is only referred from this Pod
 	// so that the receivedEvents map doesn't grow infinitely.
-	var events []clusterEvent
-	for _, e := range p.receivedEvents {
-		e.inFlightPods.Delete(pod)
-		if e.inFlightPods.Len() != 0 {
-			// leave this event because it will be referred from other in-flight Pods later.
-			events = append(events, e)
+	for event := p.receivedEvents.Front(); event != nil; event = event.Next() {
+		e := event.Value.(clusterEvent)
+		e.inFlightPodsNum--
+		if e.inFlightPodsNum == 0 {
+			p.receivedEvents.Remove(event)
 		}
 	}
-	p.receivedEvents = events
 
 	delete(p.inFlightPods, pod)
 }
@@ -1011,13 +1013,13 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(logger klog.Logger, podIn
 		inflightPods.Insert(uid)
 	}
 
-	// AddUnschedulableIfNotPresent might get called for them later, and in
+	// AddUnschedulableIfNotPresent might get called for in-flight Pods later, and in
 	// AddUnschedulableIfNotPresent we need to know whether events were
 	// observed while scheduling them.
-	p.receivedEvents = append(p.receivedEvents, clusterEvent{
-		event:        event,
-		inFlightPods: inflightPods, // record which Pods are in-flight now.
-		requestCycle: p.schedulingCycle,
+	p.receivedEvents.PushBack(clusterEvent{
+		event:           event,
+		requestCycle:    p.schedulingCycle,
+		inFlightPodsNum: inflightPods.Len(),
 	})
 
 	if activated {
