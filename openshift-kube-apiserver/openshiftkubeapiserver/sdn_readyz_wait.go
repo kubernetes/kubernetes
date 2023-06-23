@@ -18,28 +18,33 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func newOpenshiftAPIServiceReachabilityCheck() *aggregatedAPIServiceAvailabilityCheck {
-	return newAggregatedAPIServiceReachabilityCheck("openshift-apiserver", "api")
+func newOpenshiftAPIServiceReachabilityCheck(ipForKubernetesDefaultService net.IP) *aggregatedAPIServiceAvailabilityCheck {
+	return newAggregatedAPIServiceReachabilityCheck(ipForKubernetesDefaultService, "openshift-apiserver", "api")
 }
 
-func newOAuthPIServiceReachabilityCheck() *aggregatedAPIServiceAvailabilityCheck {
-	return newAggregatedAPIServiceReachabilityCheck("openshift-oauth-apiserver", "api")
+func newOAuthPIServiceReachabilityCheck(ipForKubernetesDefaultService net.IP) *aggregatedAPIServiceAvailabilityCheck {
+	return newAggregatedAPIServiceReachabilityCheck(ipForKubernetesDefaultService, "openshift-oauth-apiserver", "api")
 }
 
 // if the API service is not found, then this check returns quickly.
 // if the endpoint is not accessible within 60 seconds, we report ready no matter what
 // otherwise, wait for up to 60 seconds to be able to reach the apiserver
-func newAggregatedAPIServiceReachabilityCheck(namespace, service string) *aggregatedAPIServiceAvailabilityCheck {
+func newAggregatedAPIServiceReachabilityCheck(ipForKubernetesDefaultService net.IP, namespace, service string) *aggregatedAPIServiceAvailabilityCheck {
 	return &aggregatedAPIServiceAvailabilityCheck{
-		done:        make(chan struct{}),
-		namespace:   namespace,
-		serviceName: service,
+		done:                          make(chan struct{}),
+		ipForKubernetesDefaultService: ipForKubernetesDefaultService,
+		namespace:                     namespace,
+		serviceName:                   service,
 	}
 }
 
 type aggregatedAPIServiceAvailabilityCheck struct {
 	// done indicates that this check is complete (success or failure) and the check should return true
 	done chan struct{}
+
+	// ipForKubernetesDefaultService is used to determine whether this endpoint is the only one for the kubernetes.default.svc
+	// if so, it will report reachable immediately because honoring some requests is better than honoring no requests.
+	ipForKubernetesDefaultService net.IP
 
 	// namespace is the namespace hosting the service for the aggregated api
 	namespace string
@@ -76,6 +81,32 @@ func (c *aggregatedAPIServiceAvailabilityCheck) checkForConnection(context gener
 	if err != nil {
 		// shouldn't happen.  this means the loopback config didn't work.
 		panic(err)
+	}
+
+	ctx, cancel := gocontext.WithTimeout(gocontext.TODO(), 30*time.Second)
+	defer cancel()
+
+	// if the kubernetes.default.svc needs an endpoint and this is the only apiserver than can fulfill it, then we don't
+	// wait for reachability. We wait for other conditions, but unreachable apiservers correctly 503 for clients.
+	kubeEndpoints, err := kubeClient.CoreV1().Endpoints("default").Get(ctx, "kubernetes", metav1.GetOptions{})
+	switch {
+	case apierrors.IsNotFound(err):
+		utilruntime.HandleError(fmt.Errorf("%s did not find a kubernetes.default.svc endpoint", c.Name()))
+		return
+	case err != nil:
+		utilruntime.HandleError(fmt.Errorf("%s unable to read a kubernetes.default.svc endpoint: %w", c.Name(), err))
+		return
+	case len(kubeEndpoints.Subsets) == 0:
+		utilruntime.HandleError(fmt.Errorf("%s did not find any IPs for kubernetes.default.svc endpoint", c.Name()))
+		return
+	case len(kubeEndpoints.Subsets[0].Addresses) == 0:
+		utilruntime.HandleError(fmt.Errorf("%s did not find any IPs for kubernetes.default.svc endpoint", c.Name()))
+		return
+	case len(kubeEndpoints.Subsets[0].Addresses) == 1:
+		if kubeEndpoints.Subsets[0].Addresses[0].IP == c.ipForKubernetesDefaultService.String() {
+			utilruntime.HandleError(fmt.Errorf("%s only found this kube-apiserver's IP (%v) in kubernetes.default.svc endpoint", c.Name(), c.ipForKubernetesDefaultService))
+			return
+		}
 	}
 
 	// Start a thread which repeatedly tries to connect to any aggregated apiserver endpoint.
