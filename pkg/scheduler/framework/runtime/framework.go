@@ -1258,8 +1258,10 @@ func (f *frameworkImpl) RunReservePluginsReserve(ctx context.Context, state *fra
 		status = f.runReservePluginReserve(ctx, pl, state, pod, nodeName)
 		if !status.IsSuccess() {
 			err := status.AsError()
-			logger.Error(err, "Plugin failed", "plugin", pl.Name(), "pod", klog.KObj(pod))
-			return framework.AsStatus(fmt.Errorf("running Reserve plugin %q: %w", pl.Name(), err))
+			logger.Error(err, "Failed running Reserve plugin", "plugin", pl.Name(), "pod", klog.KObj(pod))
+			status := framework.AsStatus(fmt.Errorf("running Reserve plugin %q: %w", pl.Name(), err))
+			status.SetFailedPlugin(pl.Name())
+			return status
 		}
 	}
 	return nil
