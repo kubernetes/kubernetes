@@ -67,6 +67,10 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 			nodeShutdownGracePeriod = 30 * time.Second
 		)
 
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			e2eskipper.Skipf("Skipping NodeFeature:GracefulNodeShutdown as they are broken here!")
+		})
+
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			initialConfig.FeatureGates = map[string]bool{
 				string(features.GracefulNodeShutdown):                   true,
@@ -77,7 +81,6 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 		})
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
-			e2eskipper.Skipf("Skipping Node Shutdown tests as they are broken!")
 			ginkgo.By("Wait for the node to be ready")
 			waitForNodeReady(ctx)
 		})
@@ -171,6 +174,10 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 			nodeShutdownGracePeriodCriticalPods = 10 * time.Second
 		)
 
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			e2eskipper.Skipf("Skipping NodeFeature:GracefulNodeShutdown as they are broken here!")
+		})
+
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			initialConfig.FeatureGates = map[string]bool{
 				string(features.GracefulNodeShutdown):                   true,
@@ -181,7 +188,6 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 		})
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
-			e2eskipper.Skipf("Skipping Node Shutdown tests as they are broken!")
 			ginkgo.By("Wait for the node to be ready")
 			waitForNodeReady(ctx)
 		})
@@ -374,6 +380,10 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 			customClassC = getPriorityClass("custom-class-c", 1000)
 		)
 
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			e2eskipper.Skipf("Skipping NodeFeature:GracefulNodeShutdown as they are broken here!")
+		})
+
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			initialConfig.FeatureGates = map[string]bool{
 				string(features.GracefulNodeShutdown):                   true,
@@ -405,8 +415,6 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 		})
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
-			e2eskipper.Skipf("Skipping Node Shutdown tests as they are broken!")
-
 			ginkgo.By("Wait for the node to be ready")
 			waitForNodeReady(ctx)
 			customClasses := []*schedulingv1.PriorityClass{customClassA, customClassB, customClassC}

@@ -321,8 +321,10 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 	}
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
-		e2eskipper.Skipf("Skipping Memory Manager tests as they are broken!")
+		e2eskipper.Skipf("Skipping Feature:MemoryManager as they are broken here!")
+	})
 
+	ginkgo.BeforeEach(func(ctx context.Context) {
 		if isMultiNUMASupported == nil {
 			isMultiNUMASupported = pointer.BoolPtr(isMultiNUMA())
 		}

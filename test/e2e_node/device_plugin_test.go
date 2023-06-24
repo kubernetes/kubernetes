@@ -60,6 +60,11 @@ var (
 var _ = SIGDescribe("Device Plugin [Feature:DevicePluginProbe][NodeFeature:DevicePluginProbe][Serial]", func() {
 	f := framework.NewDefaultFramework("device-plugin-errors")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+
+	ginkgo.BeforeEach(func(ctx context.Context) {
+		e2eskipper.Skipf("Skipping Feature:DevicePluginProbe as they are broken here!")
+	})
+
 	testDevicePlugin(f, kubeletdevicepluginv1beta1.DevicePluginPath)
 	testDevicePluginNodeReboot(f, kubeletdevicepluginv1beta1.DevicePluginPath)
 })
@@ -95,8 +100,6 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 		var err error
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
-			e2eskipper.Skipf("Skipping NodeFeature:DevicePluginProbe as they are broken here!")
-
 			ginkgo.By("Wait for node to be ready")
 			gomega.Eventually(ctx, func(ctx context.Context) bool {
 				nodes, err := e2enode.TotalReady(ctx, f.ClientSet)
@@ -550,8 +553,6 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 		var triggerPathFile, triggerPathDir string
 		var err error
 		ginkgo.BeforeEach(func(ctx context.Context) {
-			e2eskipper.Skipf("Skipping NodeFeature:DevicePluginProbe as they are broken here!")
-
 			ginkgo.By("Wait for node to be ready")
 			gomega.Eventually(ctx, func(ctx context.Context) bool {
 				nodes, err := e2enode.TotalReady(ctx, f.ClientSet)
