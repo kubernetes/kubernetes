@@ -1944,97 +1944,113 @@ scheduler_plugin_execution_duration_seconds_count{extension_point="PreEnqueue",p
 // TestPerPodSchedulingMetrics makes sure pod schedule attempts is updated correctly while
 // initialAttemptTimestamp stays the same during multiple add/pop operations.
 func TestPerPodSchedulingMetrics(t *testing.T) {
-	pod := st.MakePod().Name("test-pod").Namespace("test-ns").UID("test-uid").Obj()
 	timestamp := time.Now()
 
-	// Case 1: A pod is created and scheduled after 1 attempt. The queue operations are
-	// Add -> Pop.
-	c := testingclock.NewFakeClock(timestamp)
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	queue := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(c))
-	queue.Add(logger, pod)
-	pInfo, err := queue.Pop()
-	if err != nil {
-		t.Fatalf("Failed to pop a pod %v", err)
-	}
-	checkPerPodSchedulingMetrics("Attempt once", t, pInfo, 1, timestamp)
 
-	// Case 2: A pod is created and scheduled after 2 attempts. The queue operations are
-	// Add -> Pop -> AddUnschedulableIfNotPresent -> flushUnschedulablePodsLeftover -> Pop.
-	c = testingclock.NewFakeClock(timestamp)
-	queue = NewTestQueue(ctx, newDefaultQueueSort(), WithClock(c))
-	queue.Add(logger, pod)
-	pInfo, err = queue.Pop()
-	if err != nil {
-		t.Fatalf("Failed to pop a pod %v", err)
-	}
-	queue.AddUnschedulableIfNotPresent(logger, pInfo, 1)
-	// Override clock to exceed the DefaultPodMaxInUnschedulablePodsDuration so that unschedulable pods
-	// will be moved to activeQ
-	c.SetTime(timestamp.Add(DefaultPodMaxInUnschedulablePodsDuration + 1))
-	queue.flushUnschedulablePodsLeftover(logger)
-	pInfo, err = queue.Pop()
-	if err != nil {
-		t.Fatalf("Failed to pop a pod %v", err)
-	}
-	checkPerPodSchedulingMetrics("Attempt twice", t, pInfo, 2, timestamp)
+	tests := []struct {
+		name                            string
+		perPodSchedulingMetricsScenario func(*testingclock.FakeClock, *PriorityQueue, *v1.Pod)
+		wantAttempts                    int
+		wantInitialAttemptTs            time.Time
+	}{
+		{
+			// The queue operations are Add -> Pop.
+			name: "pod is created and scheduled after 1 attempt",
+			perPodSchedulingMetricsScenario: func(c *testingclock.FakeClock, queue *PriorityQueue, pod *v1.Pod) {
+				queue.Add(logger, pod)
+			},
+			wantAttempts:         1,
+			wantInitialAttemptTs: timestamp,
+		},
+		{
+			// The queue operations are Add -> Pop -> AddUnschedulableIfNotPresent -> flushUnschedulablePodsLeftover -> Pop.
+			name: "pod is created and scheduled after 2 attempts",
+			perPodSchedulingMetricsScenario: func(c *testingclock.FakeClock, queue *PriorityQueue, pod *v1.Pod) {
+				queue.Add(logger, pod)
+				pInfo, err := queue.Pop()
+				if err != nil {
+					t.Fatalf("Failed to pop a pod %v", err)
+				}
 
-	// Case 3: Similar to case 2, but before the second pop, call update, the queue operations are
-	// Add -> Pop -> AddUnschedulableIfNotPresent -> flushUnschedulablePodsLeftover -> Update -> Pop.
-	c = testingclock.NewFakeClock(timestamp)
-	queue = NewTestQueue(ctx, newDefaultQueueSort(), WithClock(c))
-	queue.Add(logger, pod)
-	pInfo, err = queue.Pop()
-	if err != nil {
-		t.Fatalf("Failed to pop a pod %v", err)
-	}
-	queue.AddUnschedulableIfNotPresent(logger, pInfo, 1)
-	// Override clock to exceed the DefaultPodMaxInUnschedulablePodsDuration so that unschedulable pods
-	// will be moved to activeQ
-	c.SetTime(timestamp.Add(DefaultPodMaxInUnschedulablePodsDuration + 1))
-	queue.flushUnschedulablePodsLeftover(logger)
-	newPod := pod.DeepCopy()
-	newPod.Generation = 1
-	queue.Update(logger, pod, newPod)
-	pInfo, err = queue.Pop()
-	if err != nil {
-		t.Fatalf("Failed to pop a pod %v", err)
-	}
-	checkPerPodSchedulingMetrics("Attempt twice with update", t, pInfo, 2, timestamp)
+				queue.AddUnschedulableIfNotPresent(logger, pInfo, 1)
+				// Override clock to exceed the DefaultPodMaxInUnschedulablePodsDuration so that unschedulable pods
+				// will be moved to activeQ
+				c.SetTime(timestamp.Add(DefaultPodMaxInUnschedulablePodsDuration + 1))
+				queue.flushUnschedulablePodsLeftover(logger)
+			},
+			wantAttempts:         2,
+			wantInitialAttemptTs: timestamp,
+		},
+		{
+			// The queue operations are Add -> Pop -> AddUnschedulableIfNotPresent -> flushUnschedulablePodsLeftover -> Update -> Pop.
+			name: "pod is created and scheduled after 2 attempts but before the second pop, call update",
+			perPodSchedulingMetricsScenario: func(c *testingclock.FakeClock, queue *PriorityQueue, pod *v1.Pod) {
+				queue.Add(logger, pod)
+				pInfo, err := queue.Pop()
+				if err != nil {
+					t.Fatalf("Failed to pop a pod %v", err)
+				}
 
-	// Case 4: A gated pod is created and scheduled after lifting gate. The queue operations are
-	//  Add gated pod -> check unschedulablePods -> lift gate & update pod -> Pop.
-	c = testingclock.NewFakeClock(timestamp)
-	// Create a queue with PreEnqueuePlugin
-	m := map[string][]framework.PreEnqueuePlugin{"": {&preEnqueuePlugin{allowlists: []string{"foo"}}}}
-	queue = NewTestQueue(ctx, newDefaultQueueSort(), WithClock(c), WithPreEnqueuePluginMap(m), WithPluginMetricsSamplePercent(0))
+				queue.AddUnschedulableIfNotPresent(logger, pInfo, 1)
+				// Override clock to exceed the DefaultPodMaxInUnschedulablePodsDuration so that unschedulable pods
+				// will be moved to activeQ
+				updatedTimestamp := timestamp
+				c.SetTime(updatedTimestamp.Add(DefaultPodMaxInUnschedulablePodsDuration + 1))
+				queue.flushUnschedulablePodsLeftover(logger)
+				newPod := pod.DeepCopy()
+				newPod.Generation = 1
+				queue.Update(logger, pod, newPod)
+			},
+			wantAttempts:         2,
+			wantInitialAttemptTs: timestamp,
+		},
+		{
+			// The queue operations are Add gated pod -> check unschedulablePods -> lift gate & update pod -> Pop.
+			name: "A gated pod is created and scheduled after lifting gate",
+			perPodSchedulingMetricsScenario: func(c *testingclock.FakeClock, queue *PriorityQueue, pod *v1.Pod) {
+				// Create a queue with PreEnqueuePlugin
+				queue.preEnqueuePluginMap = map[string][]framework.PreEnqueuePlugin{"": {&preEnqueuePlugin{allowlists: []string{"foo"}}}}
+				queue.pluginMetricsSamplePercent = 0
+				queue.Add(logger, pod)
+				// Check pod is added to the unschedulablePods queue.
+				if getUnschedulablePod(queue, pod) != pod {
+					t.Errorf("Pod %v was not found in the unschedulablePods.", pod.Name)
+				}
+				// Override clock to get different InitialAttemptTimestamp
+				c.Step(1 * time.Minute)
 
-	// Create a pod without PreEnqueuePlugin label.
-	gatedPod := st.MakePod().Name("gated-test-pod").Namespace("test-ns").UID("test-uid").Obj()
-	err = queue.Add(logger, gatedPod)
-	if err != nil {
-		t.Fatalf("Failed to add a pod %v", err)
+				// Update pod with the required label to get it out of unschedulablePods queue.
+				updateGatedPod := pod.DeepCopy()
+				updateGatedPod.Labels = map[string]string{"foo": ""}
+				queue.Update(logger, pod, updateGatedPod)
+			},
+			wantAttempts:         1,
+			wantInitialAttemptTs: timestamp.Add(1 * time.Minute),
+		},
 	}
-	// Check pod is added to the unschedulablePods queue.
-	if getUnschedulablePod(queue, gatedPod) != gatedPod {
-		t.Errorf("Pod %v was not found in the unschedulablePods.", gatedPod.Name)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+
+			c := testingclock.NewFakeClock(timestamp)
+			pod := st.MakePod().Name("test-pod").Namespace("test-ns").UID("test-uid").Obj()
+			queue := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(c))
+
+			test.perPodSchedulingMetricsScenario(c, queue, pod)
+			podInfo, err := queue.Pop()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if podInfo.Attempts != test.wantAttempts {
+				t.Errorf("Pod schedule attempt unexpected, got %v, want %v", podInfo.Attempts, test.wantAttempts)
+			}
+			if *podInfo.InitialAttemptTimestamp != test.wantInitialAttemptTs {
+				t.Errorf("Pod initial schedule attempt timestamp unexpected, got %v, want %v", *podInfo.InitialAttemptTimestamp, test.wantInitialAttemptTs)
+			}
+		})
 	}
-	// Override clock to get different InitialAttemptTimestamp
-	c.Step(1 * time.Minute)
-
-	// Update pod with the required label to get it out of unschedulablePods queue.
-	updateGatedPod := gatedPod.DeepCopy()
-	updateGatedPod.Labels = map[string]string{"foo": ""}
-	queue.Update(logger, gatedPod, updateGatedPod)
-
-	pInfo, err = queue.Pop()
-	if err != nil {
-		t.Fatalf("Failed to pop a pod %v", err)
-	}
-
-	checkPerPodSchedulingMetrics("Attempt once/gated", t, pInfo, 1, timestamp.Add(1*time.Minute))
 }
 
 func TestIncomingPodsMetrics(t *testing.T) {
@@ -2124,15 +2140,6 @@ func TestIncomingPodsMetrics(t *testing.T) {
 			}
 
 		})
-	}
-}
-
-func checkPerPodSchedulingMetrics(name string, t *testing.T, pInfo *framework.QueuedPodInfo, wantAttempts int, wantInitialAttemptTs time.Time) {
-	if pInfo.Attempts != wantAttempts {
-		t.Errorf("[%s] Pod schedule attempt unexpected, got %v, want %v", name, pInfo.Attempts, wantAttempts)
-	}
-	if *pInfo.InitialAttemptTimestamp != wantInitialAttemptTs {
-		t.Errorf("[%s] Pod initial schedule attempt timestamp unexpected, got %v, want %v", name, *pInfo.InitialAttemptTimestamp, wantInitialAttemptTs)
 	}
 }
 

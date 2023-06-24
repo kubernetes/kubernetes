@@ -418,7 +418,7 @@ func (p *PriorityQueue) runPreEnqueuePlugins(ctx context.Context, pInfo *framewo
 	logger := klog.FromContext(ctx)
 	var s *framework.Status
 	pod := pInfo.Pod
-	startTime := time.Now()
+	startTime := p.clock.Now()
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(preEnqueue, s.Code().String(), pod.Spec.SchedulerName).Observe(metrics.SinceInSeconds(startTime))
 	}()
