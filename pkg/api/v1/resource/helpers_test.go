@@ -721,7 +721,7 @@ func TestPodResourceRequests(t *testing.T) {
 		{
 			description: "resized, infeasible",
 			expectedRequests: v1.ResourceList{
-				v1.ResourceCPU: resource.MustParse("2"),
+				v1.ResourceCPU: resource.MustParse("4"),
 			},
 			podResizeStatus: v1.PodResizeStatusInfeasible,
 			options:         PodResourcesOptions{InPlacePodVerticalScalingEnabled: true},

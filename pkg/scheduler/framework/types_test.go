@@ -1557,9 +1557,9 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 			requests:           v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
 			allocatedResources: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			resizeStatus:       v1.PodResizeStatusInfeasible,
-			expectedResource:   Resource{MilliCPU: cpu500m.MilliValue(), Memory: mem500M.Value()},
-			expectedNon0CPU:    cpu500m.MilliValue(),
-			expectedNon0Mem:    mem500M.Value(),
+			expectedResource:   Resource{MilliCPU: cpu700m.MilliValue(), Memory: mem800M.Value()},
+			expectedNon0CPU:    cpu700m.MilliValue(),
+			expectedNon0Mem:    mem800M.Value(),
 		},
 	}
 
