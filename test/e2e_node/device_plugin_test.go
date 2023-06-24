@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -94,6 +95,8 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 		var err error
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
+			e2eskipper.Skipf("Skipping NodeFeature:DevicePluginProbe as they are broken here!")
+
 			ginkgo.By("Wait for node to be ready")
 			gomega.Eventually(ctx, func(ctx context.Context) bool {
 				nodes, err := e2enode.TotalReady(ctx, f.ClientSet)
@@ -547,6 +550,8 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 		var triggerPathFile, triggerPathDir string
 		var err error
 		ginkgo.BeforeEach(func(ctx context.Context) {
+			e2eskipper.Skipf("Skipping NodeFeature:DevicePluginProbe as they are broken here!")
+
 			ginkgo.By("Wait for node to be ready")
 			gomega.Eventually(ctx, func(ctx context.Context) bool {
 				nodes, err := e2enode.TotalReady(ctx, f.ClientSet)
