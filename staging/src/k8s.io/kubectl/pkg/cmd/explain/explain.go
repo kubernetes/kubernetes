@@ -35,22 +35,30 @@ import (
 
 var (
 	explainLong = templates.LongDesc(i18n.T(`
-		List the fields for supported resources.
+		Describe fields and structure of various resources.
 
 		This command describes the fields associated with each supported API resource.
 		Fields are identified via a simple JSONPath identifier:
 
 			<type>.<fieldName>[.<fieldName>]
 
-		Add the --recursive flag to display all of the fields at once without descriptions.
 		Information about each field is retrieved from the server in OpenAPI format.`))
 
 	explainExamples = templates.Examples(i18n.T(`
 		# Get the documentation of the resource and its fields
 		kubectl explain pods
 
+		# Get all the fields in the resource
+		kubectl explain pods --recursive
+
+		# Get the explanation for deployment in supported api versions
+		kubectl explain deployments --api-version=apps/v1
+
 		# Get the documentation of a specific field of a resource
-		kubectl explain pods.spec.containers`))
+		kubectl explain pods.spec.containers
+		
+		# Get the documentation of resources in different format
+		kubectl explain deployment --output=plaintext-openapiv2`))
 
 	plaintextTemplateName          = "plaintext"
 	plaintextOpenAPIV2TemplateName = "plaintext-openapiv2"
@@ -89,7 +97,7 @@ func NewCmdExplain(parent string, f cmdutil.Factory, streams genericiooptions.IO
 	o := NewExplainOptions(parent, streams)
 
 	cmd := &cobra.Command{
-		Use:                   "explain RESOURCE",
+		Use:                   "explain TYPE [--recursive=FALSE|TRUE] [--api-version=api-version-group] [--output=plaintext|plaintext-openapiv2]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Get documentation for a resource"),
 		Long:                  explainLong + "\n\n" + cmdutil.SuggestAPIResources(parent),
@@ -100,11 +108,11 @@ func NewCmdExplain(parent string, f cmdutil.Factory, streams genericiooptions.IO
 			cmdutil.CheckErr(o.Run())
 		},
 	}
-	cmd.Flags().BoolVar(&o.Recursive, "recursive", o.Recursive, "Print the fields of fields (Currently only 1 level deep)")
-	cmd.Flags().StringVar(&o.APIVersion, "api-version", o.APIVersion, "Get different explanations for particular API version (API group/version)")
+	cmd.Flags().BoolVar(&o.Recursive, "recursive", o.Recursive, "When true, print the name of all the fields recursively. Otherwise, print the available fields with their description.")
+	cmd.Flags().StringVar(&o.APIVersion, "api-version", o.APIVersion, "Use given api-version (group/version) of the resource.")
 
 	// Only enable --output as a valid flag if the feature is enabled
-	cmd.Flags().StringVar(&o.OutputFormat, "output", plaintextTemplateName, "Format in which to render the schema (plaintext, plaintext-openapiv2)")
+	cmd.Flags().StringVar(&o.OutputFormat, "output", plaintextTemplateName, "Format in which to render the schema. Valid values are: (plaintext, plaintext-openapiv2).")
 
 	return cmd
 }
