@@ -190,9 +190,15 @@ No changes
   - The type `ContainerEventResponse` updated: the field `pod_sandbox_metadata` removed and fields `pod_sandbox_status` and `containers_statuses` added.
   - The type `PodSandboxStatusResponse` has a new fields `containers_statuses` and `timestamp`
 
+### v1.27
 
+`git diff v1.26.0 v1.27.0 -- staging/src/k8s.io/cri-api/pkg/apis/runtime/v1/api.proto`
 
+- [CRI: Add CDI device info for containers](https://github.com/kubernetes/kubernetes/pull/115891/)
+  - New type `CDIDevice` was introduced and added to container config
 
+- [Add mappings for volumes](https://github.com/kubernetes/kubernetes/pull/116377)
+  - Added new fields to the type `Mount` expressing runtime UID/GID mappings for the mount.
 
 ## Community, discussion, contribution, and support
 
