@@ -97,7 +97,7 @@ func NewController(ctx context.Context, p ControllerParameters) (*PersistentVolu
 		clusterName:                   p.ClusterName,
 		createProvisionedPVRetryCount: createProvisionedPVRetryCount,
 		createProvisionedPVInterval:   createProvisionedPVInterval,
-		claimQueue:                    workqueue.NewNamed("claims"),
+		claimQueue:                    workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
 		volumeQueue:                   workqueue.NewNamed("volumes"),
 		resyncPeriod:                  p.SyncPeriod,
 		operationTimestamps:           metrics.NewOperationStartTimeCache(),
@@ -254,7 +254,11 @@ func (ctrl *PersistentVolumeController) deleteVolume(ctx context.Context, volume
 
 // updateClaim runs in worker thread and handles "claim added",
 // "claim updated" and "periodic sync" events.
-func (ctrl *PersistentVolumeController) updateClaim(ctx context.Context, claim *v1.PersistentVolumeClaim) {
+func (ctrl *PersistentVolumeController) updateClaim(ctx context.Context, claim *v1.PersistentVolumeClaim) error {
+	// Only pvc not in bound status
+	if claim.Status.Phase == v1.ClaimBound {
+		return nil
+	}
 	// Store the new claim version in the cache and do not process it if this is
 	// an old version.
 	logger := klog.FromContext(ctx)
@@ -263,7 +267,7 @@ func (ctrl *PersistentVolumeController) updateClaim(ctx context.Context, claim *
 		logger.Error(err, "")
 	}
 	if !new {
-		return
+		return nil
 	}
 	err = ctrl.syncClaim(ctx, claim)
 	if err != nil {
@@ -275,6 +279,7 @@ func (ctrl *PersistentVolumeController) updateClaim(ctx context.Context, claim *
 			logger.Error(err, "Could not sync volume", "PVC", klog.KObj(claim))
 		}
 	}
+	return err
 }
 
 // Unit test [5-5] [5-6] [5-7]
@@ -574,7 +579,10 @@ func (ctrl *PersistentVolumeController) claimWorker(ctx context.Context) {
 		if err == nil {
 			// The claim still exists in informer cache, the event must have
 			// been add/update/sync
-			ctrl.updateClaim(ctx, claim)
+			if err := ctrl.updateClaim(ctx, claim); err != nil {
+				logger.V(2).Info("Error update claim status", "claimKey", key, "err", err)
+				ctrl.claimQueue.AddAfter(claim, time.Second*3)
+			}
 			return false
 		}
 		if !errors.IsNotFound(err) {
