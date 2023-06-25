@@ -56,6 +56,11 @@ type remoteRuntimeService struct {
 const (
 	// How frequently to report identical errors
 	identicalErrorDelay = 1 * time.Minute
+
+	// connection parameters
+	maxBackoffDelay      = 3 * time.Second
+	baseBackoffDelay     = 100 * time.Millisecond
+	minConnectionTimeout = 5 * time.Second
 )
 
 // CRIVersion is the type for valid Container Runtime Interface (CRI) API
@@ -80,11 +85,7 @@ func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration, t
 	ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
 	defer cancel()
 
-	dialOpts := []grpc.DialOption{
-		grpc.WithConnectParams(grpc.ConnectParams{
-			Backoff: backoff.DefaultConfig,
-		}),
-	}
+	var dialOpts []grpc.DialOption
 	dialOpts = append(dialOpts,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(dialer),
@@ -100,6 +101,17 @@ func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration, t
 			grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor(tracingOpts...)),
 			grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor(tracingOpts...)))
 	}
+
+	connParams := grpc.ConnectParams{
+		Backoff: backoff.DefaultConfig,
+	}
+	connParams.MinConnectTimeout = minConnectionTimeout
+	connParams.Backoff.BaseDelay = baseBackoffDelay
+	connParams.Backoff.MaxDelay = maxBackoffDelay
+	dialOpts = append(dialOpts,
+		grpc.WithConnectParams(connParams),
+	)
+
 	conn, err := grpc.DialContext(ctx, addr, dialOpts...)
 	if err != nil {
 		klog.ErrorS(err, "Connect remote runtime failed", "address", addr)
