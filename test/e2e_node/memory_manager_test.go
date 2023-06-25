@@ -23,7 +23,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"os"
 	"os/exec"
 	"regexp"
@@ -319,10 +318,6 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 			return nil
 		}, time.Minute, framework.Poll).Should(gomega.BeNil())
 	}
-
-	ginkgo.BeforeEach(func(ctx context.Context) {
-		e2eskipper.Skipf("Skipping Feature:MemoryManager as they are broken here!")
-	})
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		if isMultiNUMASupported == nil {

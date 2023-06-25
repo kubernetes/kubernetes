@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -60,10 +59,6 @@ var (
 var _ = SIGDescribe("Device Plugin [Feature:DevicePluginProbe][NodeFeature:DevicePluginProbe][Serial]", func() {
 	f := framework.NewDefaultFramework("device-plugin-errors")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
-
-	ginkgo.BeforeEach(func(ctx context.Context) {
-		e2eskipper.Skipf("Skipping Feature:DevicePluginProbe as they are broken here!")
-	})
 
 	testDevicePlugin(f, kubeletdevicepluginv1beta1.DevicePluginPath)
 	testDevicePluginNodeReboot(f, kubeletdevicepluginv1beta1.DevicePluginPath)
