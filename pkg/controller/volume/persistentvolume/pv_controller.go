@@ -202,7 +202,7 @@ type PersistentVolumeController struct {
 	// version errors in API server and other checks in this controller),
 	// however overall speed of multi-worker controller would be lower than if
 	// it runs single thread only.
-	claimQueue  *workqueue.Type
+	claimQueue  workqueue.RateLimitingInterface
 	volumeQueue *workqueue.Type
 
 	// Map of scheduled/running operations.
