@@ -217,17 +217,18 @@ func updateKubeletConfigWithMemoryManagerParams(initialCfg *kubeletconfig.Kubele
 		initialCfg.ReservedMemory = []kubeletconfig.MemoryReservation{}
 	}
 	for _, memoryReservation := range params.systemReservedMemory {
-		found := false
-		for _, rm := range initialCfg.ReservedMemory {
-			if rm.NumaNode == memoryReservation.NumaNode {
-				found = true
-				rm.Limits = memoryReservation.Limits
-				break
-			}
-		}
-		if !found {
-			initialCfg.ReservedMemory = append(initialCfg.ReservedMemory, memoryReservation)
-		}
+		initialCfg.ReservedMemory = append(initialCfg.ReservedMemory, memoryReservation)
+		//found := false
+		//for _, rm := range initialCfg.ReservedMemory {
+		//	if rm.NumaNode == memoryReservation.NumaNode {
+		//		found = true
+		//		rm.Limits = memoryReservation.Limits
+		//		break
+		//	}
+		//}
+		//if !found {
+		//	initialCfg.ReservedMemory = append(initialCfg.ReservedMemory, memoryReservation)
+		//}
 	}
 }
 
