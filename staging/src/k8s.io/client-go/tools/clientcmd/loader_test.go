@@ -149,7 +149,7 @@ func TestToleratingMissingFiles(t *testing.T) {
 
 func TestWarningMissingFiles(t *testing.T) {
 	envVarValue := "bogus"
-	os.Setenv(RecommendedConfigPathEnvVar, envVarValue)
+	t.Setenv(RecommendedConfigPathEnvVar, envVarValue)
 	loadingRules := NewDefaultClientConfigLoadingRules()
 
 	buffer := &bytes.Buffer{}
@@ -174,7 +174,7 @@ func TestWarningMissingFiles(t *testing.T) {
 
 func TestNoWarningMissingFiles(t *testing.T) {
 	envVarValue := "bogus"
-	os.Setenv(RecommendedConfigPathEnvVar, envVarValue)
+	t.Setenv(RecommendedConfigPathEnvVar, envVarValue)
 	loadingRules := NewDefaultClientConfigLoadingRules()
 
 	buffer := &bytes.Buffer{}

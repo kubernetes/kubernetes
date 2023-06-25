@@ -183,21 +183,16 @@ func TestLegacyServiceAccountTokenCleanUp(t *testing.T) {
 				}
 			}
 
-			_, err = c.CoreV1().Secrets(myns).Get(context.TODO(), test.secretName, metav1.GetOptions{})
-			if err != nil {
-				if apierrors.IsNotFound(err) {
-					t.Fatalf("The secret %s should not be cleaned up, err: %v", test.secretName, err)
-				} else {
-					t.Fatalf("Failed to get secret %s, err: %v", test.secretName, err)
-				}
-			}
-
 			fakeClock.Step(cleanUpPeriod + 24*time.Hour)
 			time.Sleep(2 * syncInterval)
 			liveSecret, err = c.CoreV1().Secrets(myns).Get(context.TODO(), test.secretName, metav1.GetOptions{})
-			if test.expectCleanedUp && err == nil {
-				t.Fatalf("The secret %s should be cleaned up. time: %v; creationTime: %v", test.secretName, fakeClock.Now().UTC(), liveSecret.CreationTimestamp)
-			} else if !test.expectCleanedUp && err != nil {
+			if test.expectCleanedUp {
+				if err == nil {
+					t.Fatalf("The secret %s should be cleaned up. time: %v; creationTime: %v", test.secretName, fakeClock.Now().UTC(), liveSecret.CreationTimestamp)
+				} else if !apierrors.IsNotFound(err) {
+					t.Fatalf("Failed to get secret %s, err: %v", test.secretName, err)
+				}
+			} else if err != nil {
 				if apierrors.IsNotFound(err) {
 					t.Fatalf("The secret %s should not be cleaned up, err: %v", test.secretName, err)
 				} else {

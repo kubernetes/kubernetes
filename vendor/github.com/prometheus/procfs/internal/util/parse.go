@@ -64,6 +64,21 @@ func ParsePInt64s(ss []string) ([]*int64, error) {
 	return us, nil
 }
 
+// Parses a uint64 from given hex in string.
+func ParseHexUint64s(ss []string) ([]*uint64, error) {
+	us := make([]*uint64, 0, len(ss))
+	for _, s := range ss {
+		u, err := strconv.ParseUint(s, 16, 64)
+		if err != nil {
+			return nil, err
+		}
+
+		us = append(us, &u)
+	}
+
+	return us, nil
+}
+
 // ReadUintFromFile reads a file and attempts to parse a uint64 from it.
 func ReadUintFromFile(path string) (uint64, error) {
 	data, err := os.ReadFile(path)

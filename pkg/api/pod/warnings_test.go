@@ -214,6 +214,24 @@ func TestWarnings(t *testing.T) {
 				}},
 			},
 			expected: []string{`spec.volumes[0].glusterfs: deprecated in v1.25, non-functional in v1.26+`},
+		}, {
+			name: "CephFS",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Volumes: []api.Volume{
+					{Name: "s", VolumeSource: api.VolumeSource{CephFS: &api.CephFSVolumeSource{}}},
+				}},
+			},
+			expected: []string{`spec.volumes[0].cephfs: deprecated in v1.28, non-functional in v1.31+`},
+		},
+
+		{
+			name: "rbd",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Volumes: []api.Volume{
+					{Name: "s", VolumeSource: api.VolumeSource{RBD: &api.RBDVolumeSource{}}},
+				}},
+			},
+			expected: []string{`spec.volumes[0].rbd: deprecated in v1.28, non-functional in v1.31+`},
 		},
 		{
 			name: "duplicate hostAlias",
@@ -255,38 +273,38 @@ func TestWarnings(t *testing.T) {
 			},
 		},
 		{
-			name: "duplicate volume",
-			template: &api.PodTemplateSpec{Spec: api.PodSpec{
-				Volumes: []api.Volume{
-					{Name: "a"},
-					{Name: "a"},
-					{Name: "a"},
-				}},
-			},
-			expected: []string{
-				`spec.volumes[1].name: duplicate name "a"`,
-				`spec.volumes[2].name: duplicate name "a"`,
-			},
-		},
-		{
 			name: "duplicate env",
 			template: &api.PodTemplateSpec{Spec: api.PodSpec{
 				InitContainers: []api.Container{{Env: []api.EnvVar{
-					{Name: "a"},
-					{Name: "a"},
-					{Name: "a"},
+					{Name: "a", Value: "a"},
+					{Name: "a", Value: "a"},
+					{Name: "a", Value: "other"},
+					{Name: "a", Value: ""},
+					{Name: "a", Value: "$(a)"},
+					{Name: "a", ValueFrom: &api.EnvVarSource{}},
+					{Name: "a", Value: "$(a) $(a)"}, // no warning
 				}}},
 				Containers: []api.Container{{Env: []api.EnvVar{
-					{Name: "b"},
-					{Name: "b"},
-					{Name: "b"},
+					{Name: "b", Value: "b"},
+					{Name: "b", Value: "b"},
+					{Name: "b", Value: "other"},
+					{Name: "b", Value: ""},
+					{Name: "b", Value: "$(b)"},
+					{Name: "b", ValueFrom: &api.EnvVarSource{}},
+					{Name: "b", Value: "$(b) $(b)"}, // no warning
 				}}},
 			}},
 			expected: []string{
-				`spec.initContainers[0].env[1].name: duplicate name "a"`,
-				`spec.initContainers[0].env[2].name: duplicate name "a"`,
-				`spec.containers[0].env[1].name: duplicate name "b"`,
-				`spec.containers[0].env[2].name: duplicate name "b"`,
+				`spec.initContainers[0].env[1]: hides previous definition of "a"`,
+				`spec.initContainers[0].env[2]: hides previous definition of "a"`,
+				`spec.initContainers[0].env[3]: hides previous definition of "a"`,
+				`spec.initContainers[0].env[4]: hides previous definition of "a"`,
+				`spec.initContainers[0].env[5]: hides previous definition of "a"`,
+				`spec.containers[0].env[1]: hides previous definition of "b"`,
+				`spec.containers[0].env[2]: hides previous definition of "b"`,
+				`spec.containers[0].env[3]: hides previous definition of "b"`,
+				`spec.containers[0].env[4]: hides previous definition of "b"`,
+				`spec.containers[0].env[5]: hides previous definition of "b"`,
 			},
 		},
 		{

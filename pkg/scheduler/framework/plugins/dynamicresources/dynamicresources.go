@@ -305,7 +305,7 @@ func (pl *dynamicResources) podResourceClaims(pod *v1.Pod) ([]*resourcev1alpha2.
 // the pod cannot be scheduled at the moment on any node.
 func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
 	if !pl.enabled {
-		return nil, nil
+		return nil, framework.NewStatus(framework.Skip)
 	}
 	logger := klog.FromContext(ctx)
 
@@ -321,10 +321,10 @@ func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 		return nil, statusUnschedulable(logger, err.Error())
 	}
 	logger.V(5).Info("pod resource claims", "pod", klog.KObj(pod), "resourceclaims", klog.KObjSlice(claims))
-	// If the pod does not reference any claim, we don't need to do
-	// anything for it.
+	// If the pod does not reference any claim,
+	// DynamicResources Filter has nothing to do with the Pod.
 	if len(claims) == 0 {
-		return nil, nil
+		return nil, framework.NewStatus(framework.Skip)
 	}
 
 	s.availableOnNodes = make([]*nodeaffinity.NodeSelector, len(claims))

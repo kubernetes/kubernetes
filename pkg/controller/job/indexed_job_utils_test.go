@@ -22,12 +22,14 @@ import (
 	"github.com/google/go-cmp/cmp"
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/pointer"
 )
 
 const noIndex = "-"
 
 func TestCalculateSucceededIndexes(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	cases := map[string]struct {
 		prevSucceeded       string
 		pods                []indexPhase
@@ -206,7 +208,7 @@ func TestCalculateSucceededIndexes(t *testing.T) {
 			for _, p := range pods {
 				p.Finalizers = append(p.Finalizers, batch.JobTrackingFinalizer)
 			}
-			gotStatusIntervals, gotIntervals := calculateSucceededIndexes(job, pods)
+			gotStatusIntervals, gotIntervals := calculateSucceededIndexes(logger, job, pods)
 			if diff := cmp.Diff(tc.wantStatusIntervals, gotStatusIntervals); diff != "" {
 				t.Errorf("Unexpected completed indexes from status (-want,+got):\n%s", diff)
 			}

@@ -609,9 +609,9 @@ const (
 	// owner: @ddebroy
 	// alpha: v1.25
 	//
-	// Enables reporting of PodHasNetwork condition in pod status after pod
+	// Enables reporting of PodReadyToStartContainersCondition condition in pod status after pod
 	// sandbox creation and network configuration completes successfully
-	PodHasNetworkCondition featuregate.Feature = "PodHasNetworkCondition"
+	PodReadyToStartContainersCondition featuregate.Feature = "PodReadyToStartContainersCondition"
 
 	// owner: @Huang-Wei
 	// kep: https://kep.k8s.io/3521
@@ -1010,7 +1010,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	PodDisruptionConditions: {Default: true, PreRelease: featuregate.Beta},
 
-	PodHasNetworkCondition: {Default: false, PreRelease: featuregate.Alpha},
+	PodReadyToStartContainersCondition: {Default: false, PreRelease: featuregate.Alpha},
 
 	PodSchedulingReadiness: {Default: true, PreRelease: featuregate.Beta},
 
@@ -1084,8 +1084,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	genericfeatures.APIPriorityAndFairness: {Default: true, PreRelease: featuregate.Beta},
 
 	genericfeatures.APIResponseCompression: {Default: true, PreRelease: featuregate.Beta},
-
-	genericfeatures.AdvancedAuditing: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 
 	genericfeatures.ValidatingAdmissionPolicy: {Default: false, PreRelease: featuregate.Alpha},
 

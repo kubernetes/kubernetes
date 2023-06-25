@@ -215,6 +215,15 @@ func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit
 		resources.CpuPeriod = cpuPeriod
 	}
 
+	// runc requires cgroupv2 for unified mode
+	if libcontainercgroups.IsCgroup2UnifiedMode() {
+		resources.Unified = map[string]string{
+			// Ask the kernel to kill all processes in the container cgroup in case of OOM.
+			// See memory.oom.group in https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html for
+			// more info.
+			"memory.oom.group": "1",
+		}
+	}
 	return &resources
 }
 

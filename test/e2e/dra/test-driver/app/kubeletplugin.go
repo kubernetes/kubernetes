@@ -43,6 +43,8 @@ type ExamplePlugin struct {
 	mutex     sync.Mutex
 	prepared  map[ClaimID]bool
 	gRPCCalls []GRPCCall
+
+	block bool
 }
 
 type GRPCCall struct {
@@ -135,12 +137,25 @@ func (ex *ExamplePlugin) IsRegistered() bool {
 	return status.PluginRegistered
 }
 
+// Block sets a flag to block Node[Un]PrepareResources
+// to emulate time consuming or stuck calls
+func (ex *ExamplePlugin) Block() {
+	ex.block = true
+}
+
 // NodePrepareResource ensures that the CDI file for the claim exists. It uses
 // a deterministic name to simplify NodeUnprepareResource (no need to remember
 // or discover the name) and idempotency (when called again, the file simply
 // gets written again).
 func (ex *ExamplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1.NodePrepareResourceRequest) (*drapbv1.NodePrepareResourceResponse, error) {
 	logger := klog.FromContext(ctx)
+
+	// Block to emulate plugin stuckness or slowness.
+	// By default the call will not be blocked as ex.block = false.
+	if ex.block {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
 
 	// Determine environment variables.
 	var p parameters
@@ -201,6 +216,13 @@ func (ex *ExamplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1.N
 // file is already gone.
 func (ex *ExamplePlugin) NodeUnprepareResource(ctx context.Context, req *drapbv1.NodeUnprepareResourceRequest) (*drapbv1.NodeUnprepareResourceResponse, error) {
 	logger := klog.FromContext(ctx)
+
+	// Block to emulate plugin stuckness or slowness.
+	// By default the call will not be blocked as ex.block = false.
+	if ex.block {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
 
 	filePath := ex.getJSONFilePath(req.ClaimUid)
 	if err := ex.fileOps.Remove(filePath); err != nil {

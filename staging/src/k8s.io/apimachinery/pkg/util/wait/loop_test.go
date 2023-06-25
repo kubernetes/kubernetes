@@ -145,12 +145,56 @@ func Test_loopConditionUntilContext_semantic(t *testing.T) {
 			errExpected:      context.Canceled,
 		},
 		{
+			name:    "context already canceled condition success and immediate 1 attempt expected",
+			context: cancelledContext,
+			callback: func(_ int) (bool, error) {
+				return true, nil
+			},
+			immediate:        true,
+			attemptsExpected: 1,
+		},
+		{
+			name:    "context already canceled condition fail and immediate 1 attempt expected",
+			context: cancelledContext,
+			callback: func(_ int) (bool, error) {
+				return false, conditionErr
+			},
+			immediate:        true,
+			attemptsExpected: 1,
+			errExpected:      conditionErr,
+		},
+		{
+			name:             "context already canceled and immediate 1 attempt expected",
+			context:          cancelledContext,
+			callback:         defaultCallback,
+			immediate:        true,
+			attemptsExpected: 1,
+			errExpected:      context.Canceled,
+		},
+		{
 			name:               "context cancelled after 5 attempts",
 			context:            defaultContext,
 			callback:           defaultCallback,
 			cancelContextAfter: 5,
 			attemptsExpected:   5,
 			errExpected:        context.Canceled,
+		},
+		{
+			name:               "context cancelled and immediate after 5 attempts",
+			context:            defaultContext,
+			callback:           defaultCallback,
+			immediate:          true,
+			cancelContextAfter: 5,
+			attemptsExpected:   5,
+			errExpected:        context.Canceled,
+		},
+		{
+			name:             "context at deadline and immediate 1 attempt expected",
+			context:          deadlinedContext,
+			callback:         defaultCallback,
+			immediate:        true,
+			attemptsExpected: 1,
+			errExpected:      context.DeadlineExceeded,
 		},
 		{
 			name:             "context at deadline no attempts expected",

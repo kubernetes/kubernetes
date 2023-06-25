@@ -6,10 +6,10 @@ description: >-
   Details of the metric data that Kubernetes components export.
 ---
 
-## Metrics (v1.27)
+## Metrics (v1.28)
 
-<!-- (auto-generated 2023 Mar 15) -->
-<!-- (auto-generated v1.27) -->
+<!-- (auto-generated 2023 Jun 23) -->
+<!-- (auto-generated v1.28) -->
 This page details the metrics that different Kubernetes components export. You can query the metrics endpoint for these 
 components using an HTTP scrape, and fetch the current metrics data in Prometheus format.
 
@@ -424,7 +424,21 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_labels_varying"></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
-<tr class="metric"><td class="metric_name">apiserver_crd_webhook_conversion_duration_seconds</td>
+<tr class="metric"><td class="metric_name">apiserver_conversion_webhook_duration_seconds</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="histogram">Histogram</td>
+<td class="metric_description">Conversion webhook request latency</td>
+<td class="metric_labels_varying"><div class="metric_label">failure_type</div><div class="metric_label">result</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">apiserver_conversion_webhook_request_total</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">Counter for conversion webhook requests with success/failure and failure error type</td>
+<td class="metric_labels_varying"><div class="metric_label">failure_type</div><div class="metric_label">result</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">apiserver_crd_conversion_webhook_duration_seconds</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="histogram">Histogram</td>
 <td class="metric_description">CRD webhook conversion duration in seconds</td>
@@ -1075,6 +1089,20 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_labels_varying"><div class="metric_label">status</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">authorization_attempts_total</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">Counter of authorization attempts broken down by result. It can be either 'allowed', 'denied', 'no-opinion' or 'error'.</td>
+<td class="metric_labels_varying"><div class="metric_label">result</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">authorization_duration_seconds</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="histogram">Histogram</td>
+<td class="metric_description">Authorization duration in seconds broken out by result.</td>
+<td class="metric_labels_varying"><div class="metric_label">result</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
 <tr class="metric"><td class="metric_name">cloud_provider_webhook_request_duration_seconds</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="histogram">Histogram</td>
@@ -1362,6 +1390,20 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_labels_varying"><div class="metric_label">operation</div><div class="metric_label">type</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">etcd_request_errors_total</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">Etcd failed request counts for each operation and object type.</td>
+<td class="metric_labels_varying"><div class="metric_label">operation</div><div class="metric_label">type</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">etcd_requests_total</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">Etcd request counts for each operation and object type.</td>
+<td class="metric_labels_varying"><div class="metric_label">operation</div><div class="metric_label">type</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
 <tr class="metric"><td class="metric_name">etcd_version_info</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="gauge">Gauge</td>
@@ -1409,6 +1451,20 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_type" data-type="counter">Counter</td>
 <td class="metric_description">Counter of failed Token() requests to the alternate token source</td>
 <td class="metric_labels_varying"></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">horizontal_pod_autoscaler_controller_metric_computation_duration_seconds</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="histogram">Histogram</td>
+<td class="metric_description">The time(seconds) that the HPA controller takes to calculate one metric. The label 'action' should be either 'scale_down', 'scale_up', or 'none'. The label 'error' should be either 'spec', 'internal', or 'none'. The label 'metric_type' corresponds to HPA.spec.metrics[*].type</td>
+<td class="metric_labels_varying"><div class="metric_label">action</div><div class="metric_label">error</div><div class="metric_label">metric_type</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">horizontal_pod_autoscaler_controller_metric_computation_total</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">Number of metric computations. The label 'action' should be either 'scale_down', 'scale_up', or 'none'. Also, the label 'error' should be either 'spec', 'internal', or 'none'. The label 'metric_type' corresponds to HPA.spec.metrics[*].type</td>
+<td class="metric_labels_varying"><div class="metric_label">action</div><div class="metric_label">error</div><div class="metric_label">metric_type</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
 <tr class="metric"><td class="metric_name">horizontal_pod_autoscaler_controller_reconciliation_duration_seconds</td>
@@ -1946,14 +2002,14 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <tr class="metric"><td class="metric_name">kubelet_started_host_process_containers_errors_total</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="counter">Counter</td>
-<td class="metric_description">Cumulative number of errors when starting hostprocess containers. This metric will only be collected on Windows and requires WindowsHostProcessContainers feature gate to be enabled.</td>
+<td class="metric_description">Cumulative number of errors when starting hostprocess containers. This metric will only be collected on Windows.</td>
 <td class="metric_labels_varying"><div class="metric_label">code</div><div class="metric_label">container_type</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
 <tr class="metric"><td class="metric_name">kubelet_started_host_process_containers_total</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="counter">Counter</td>
-<td class="metric_description">Cumulative number of hostprocess containers started. This metric will only be collected on Windows and requires WindowsHostProcessContainers feature gate to be enabled.</td>
+<td class="metric_description">Cumulative number of hostprocess containers started. This metric will only be collected on Windows.</td>
 <td class="metric_labels_varying"><div class="metric_label">container_type</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
@@ -2059,6 +2115,20 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="histogram">Histogram</td>
 <td class="metric_description">In Cluster Network Programming Latency in seconds</td>
+<td class="metric_labels_varying"></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">kubeproxy_sync_full_proxy_rules_duration_seconds</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="histogram">Histogram</td>
+<td class="metric_description">SyncProxyRules latency in seconds for full resyncs</td>
+<td class="metric_labels_varying"></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">kubeproxy_sync_partial_proxy_rules_duration_seconds</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="histogram">Histogram</td>
+<td class="metric_description">SyncProxyRules latency in seconds for partial resyncs</td>
 <td class="metric_labels_varying"></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
@@ -2510,6 +2580,20 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_labels_varying"><div class="metric_label">host</div><div class="metric_label">verb</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">rest_client_transport_cache_entries</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="gauge">Gauge</td>
+<td class="metric_description">Number of transport entries in the internal cache.</td>
+<td class="metric_labels_varying"></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">rest_client_transport_create_calls_total</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">Number of calls to get a new transport, partitioned by the result of the operation hit: obtained from the cache, miss: created and added to the cache, uncacheable: created and not cached</td>
+<td class="metric_labels_varying"><div class="metric_label">result</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
 <tr class="metric"><td class="metric_name">retroactive_storageclass_errors_total</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="counter">Counter</td>
@@ -2580,13 +2664,6 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_labels_varying"><div class="metric_label">type</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
-<tr class="metric"><td class="metric_name">scheduler_scheduler_goroutines</td>
-<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
-<td class="metric_type" data-type="gauge">Gauge</td>
-<td class="metric_description">Number of running goroutines split by the work they do such as binding. This metric is replaced by the \"goroutines\" metric.</td>
-<td class="metric_labels_varying"><div class="metric_label">work</div></td>
-<td class="metric_labels_constant"></td>
-<td class="metric_deprecated_version">1.26.0</td></tr>
 <tr class="metric"><td class="metric_name">scheduler_scheduling_algorithm_duration_seconds</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="histogram">Histogram</td>

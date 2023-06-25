@@ -261,17 +261,10 @@ func (o *CreateJobOptions) createJobFromCronJob(cronJob *batchv1.CronJob) *batch
 		// this is ok because we know exactly how we want to be serialized
 		TypeMeta: metav1.TypeMeta{APIVersion: batchv1.SchemeGroupVersion.String(), Kind: "Job"},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        o.Name,
-			Annotations: annotations,
-			Labels:      cronJob.Spec.JobTemplate.Labels,
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: batchv1.SchemeGroupVersion.String(),
-					Kind:       "CronJob",
-					Name:       cronJob.GetName(),
-					UID:        cronJob.GetUID(),
-				},
-			},
+			Name:            o.Name,
+			Annotations:     annotations,
+			Labels:          cronJob.Spec.JobTemplate.Labels,
+			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(cronJob, batchv1.SchemeGroupVersion.WithKind("CronJob"))},
 		},
 		Spec: cronJob.Spec.JobTemplate.Spec,
 	}

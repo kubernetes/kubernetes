@@ -167,7 +167,7 @@ func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (
 	if setup.ModifyServerConfig != nil {
 		setup.ModifyServerConfig(kubeAPIServerConfig)
 	}
-	kubeAPIServer, err := app.CreateKubeAPIServer(kubeAPIServerConfig, genericapiserver.NewEmptyDelegate())
+	kubeAPIServer, err := kubeAPIServerConfig.Complete().New(genericapiserver.NewEmptyDelegate())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package tests
+package cacher
 
 import (
 	"context"
@@ -24,7 +24,6 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/apitesting"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,25 +31,16 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/storage"
-	cacherstorage "k8s.io/apiserver/pkg/storage/cacher"
-	"k8s.io/apiserver/pkg/storage/etcd3"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
-	"k8s.io/apiserver/pkg/storage/value/encrypt/identity"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
-)
-
-var (
-	scheme = runtime.NewScheme()
-	codecs = serializer.NewCodecFactory(scheme)
 )
 
 const (
@@ -95,27 +85,10 @@ func AddObjectMetaFieldsSet(source fields.Set, objectMeta *metav1.ObjectMeta, ha
 	return source
 }
 
-func newPod() runtime.Object     { return &example.Pod{} }
-func newPodList() runtime.Object { return &example.PodList{} }
-
-func newEtcdTestStorage(t *testing.T, prefix string, pagingEnabled bool) (*etcd3testing.EtcdTestServer, storage.Interface) {
-	server, _ := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
-	storage := etcd3.New(
-		server.V3Client,
-		apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion),
-		newPod,
-		prefix,
-		schema.GroupResource{Resource: "pods"},
-		identity.NewEncryptCheckTransformer(),
-		pagingEnabled,
-		etcd3.NewDefaultLeaseManagerConfig())
-	return server, storage
-}
-
-func newTestCacherWithClock(s storage.Interface, clock clock.Clock) (*cacherstorage.Cacher, storage.Versioner, error) {
+func newTestCacherWithClock(s storage.Interface, clock clock.Clock) (*Cacher, storage.Versioner, error) {
 	prefix := "pods"
 	v := storage.APIObjectVersioner{}
-	config := cacherstorage.Config{
+	config := Config{
 		Storage:        s,
 		Versioner:      v,
 		GroupResource:  schema.GroupResource{Resource: "pods"},
@@ -127,15 +100,8 @@ func newTestCacherWithClock(s storage.Interface, clock clock.Clock) (*cacherstor
 		Codec:          codecs.LegacyCodec(examplev1.SchemeGroupVersion),
 		Clock:          clock,
 	}
-	cacher, err := cacherstorage.NewCacherFromConfig(config)
+	cacher, err := NewCacherFromConfig(config)
 	return cacher, v, err
-}
-
-func makeTestPod(name string) *example.Pod {
-	return &example.Pod{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: name},
-		Spec:       storagetesting.DeepEqualSafePodSpec(),
-	}
 }
 
 func updatePod(t *testing.T, s storage.Interface, obj, old *example.Pod) *example.Pod {
@@ -410,16 +376,16 @@ func TestWatchDeprecated(t *testing.T) {
 	}
 	defer cacher.Stop()
 
-	podFoo := makeTestPod("foo")
-	podBar := makeTestPod("bar")
+	podFoo := makeTestPodWithName("foo")
+	podBar := makeTestPodWithName("bar")
 
-	podFooPrime := makeTestPod("foo")
+	podFooPrime := makeTestPodWithName("foo")
 	podFooPrime.Spec.NodeName = "fakeNode"
 
-	podFooBis := makeTestPod("foo")
+	podFooBis := makeTestPodWithName("foo")
 	podFooBis.Spec.NodeName = "anotherFakeNode"
 
-	podFooNS2 := makeTestPod("foo")
+	podFooNS2 := makeTestPodWithName("foo")
 	podFooNS2.Namespace += "2"
 
 	// initialVersion is used to initate the watcher at the beginning of the world,
@@ -472,7 +438,7 @@ func TestWatchDeprecated(t *testing.T) {
 	// Make start and last event duration exceed eventFreshDuration(current 75s) to ensure watch cache won't expand.
 	for i := 0; i < watchCacheDefaultCapacity; i++ {
 		fakeClock.SetTime(time.Now().Add(time.Duration(i) * time.Minute))
-		podFoo := makeTestPod(fmt.Sprintf("foo-%d", i))
+		podFoo := makeTestPodWithName(fmt.Sprintf("foo-%d", i))
 		updatePod(t, etcdStorage, podFoo, nil)
 	}
 
@@ -553,7 +519,7 @@ func withoutPaging(options *setupOptions) {
 	options.pagingEnabled = false
 }
 
-func testSetup(t *testing.T, opts ...setupOption) (context.Context, *cacherstorage.Cacher, tearDownFunc) {
+func testSetup(t *testing.T, opts ...setupOption) (context.Context, *Cacher, tearDownFunc) {
 	setupOpts := setupOptions{}
 	opts = append([]setupOption{withDefaults}, opts...)
 	for _, opt := range opts {
@@ -567,7 +533,7 @@ func testSetup(t *testing.T, opts ...setupOption) (context.Context, *cacherstora
 		Errors:    1,
 	}
 
-	config := cacherstorage.Config{
+	config := Config{
 		Storage:        wrappedStorage,
 		Versioner:      storage.APIObjectVersioner{},
 		GroupResource:  schema.GroupResource{Resource: "pods"},
@@ -580,7 +546,7 @@ func testSetup(t *testing.T, opts ...setupOption) (context.Context, *cacherstora
 		Codec:          codecs.LegacyCodec(examplev1.SchemeGroupVersion),
 		Clock:          setupOpts.clock,
 	}
-	cacher, err := cacherstorage.NewCacherFromConfig(config)
+	cacher, err := NewCacherFromConfig(config)
 	if err != nil {
 		t.Fatalf("Failed to initialize cacher: %v", err)
 	}

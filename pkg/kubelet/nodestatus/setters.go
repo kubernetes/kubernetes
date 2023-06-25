@@ -109,7 +109,11 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 			if node.ObjectMeta.Annotations == nil {
 				node.ObjectMeta.Annotations = make(map[string]string)
 			}
-			node.ObjectMeta.Annotations[cloudproviderapi.AnnotationAlphaProvidedIPAddr] = nodeIP.String()
+			annotation := nodeIP.String()
+			if secondaryNodeIPSpecified {
+				annotation += "," + secondaryNodeIP.String()
+			}
+			node.ObjectMeta.Annotations[cloudproviderapi.AnnotationAlphaProvidedIPAddr] = annotation
 		} else if node.ObjectMeta.Annotations != nil {
 			// Clean up stale annotations if no longer using a cloud provider or
 			// no longer overriding node IP.

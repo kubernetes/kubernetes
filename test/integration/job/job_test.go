@@ -66,6 +66,7 @@ import (
 )
 
 const waitInterval = time.Second
+const fastPodFailureBackoff = 100 * time.Millisecond
 
 type metricLabelsWithValue struct {
 	Labels []string
@@ -467,6 +468,7 @@ func TestJobPodFailurePolicyWithFailedPodDeletedDuringControllerRestart(t *testi
 // TestJobPodFailurePolicy tests handling of pod failures with respect to the
 // configured pod failure policy rules
 func TestJobPodFailurePolicy(t *testing.T) {
+	t.Cleanup(setDurationDuringTest(&jobcontroller.DefaultJobPodFailureBackOff, fastPodFailureBackoff))
 	job := batchv1.Job{
 		Spec: batchv1.JobSpec{
 			Template: v1.PodTemplateSpec{
@@ -689,6 +691,7 @@ func TestJobPodFailurePolicy(t *testing.T) {
 // recreates the Job controller at some points to make sure a new controller
 // is able to pickup.
 func TestNonParallelJob(t *testing.T) {
+	t.Cleanup(setDurationDuringTest(&jobcontroller.DefaultJobPodFailureBackOff, fastPodFailureBackoff))
 	closeFn, restConfig, clientSet, ns := setup(t, "simple")
 	defer closeFn()
 	ctx, cancel := startJobControllerAndWaitForCaches(restConfig)
@@ -737,6 +740,7 @@ func TestNonParallelJob(t *testing.T) {
 }
 
 func TestParallelJob(t *testing.T) {
+	t.Cleanup(setDurationDuringTest(&jobcontroller.DefaultJobPodFailureBackOff, fastPodFailureBackoff))
 	cases := map[string]struct {
 		enableReadyPods bool
 	}{
@@ -893,6 +897,7 @@ func TestParallelJobWithCompletions(t *testing.T) {
 	// number of pods.
 	t.Cleanup(setDuringTest(&jobcontroller.MaxUncountedPods, 10))
 	t.Cleanup(setDuringTest(&jobcontroller.MaxPodCreateDeletePerSync, 10))
+	t.Cleanup(setDurationDuringTest(&jobcontroller.DefaultJobPodFailureBackOff, fastPodFailureBackoff))
 	cases := map[string]struct {
 		enableReadyPods bool
 	}{
@@ -977,6 +982,7 @@ func TestParallelJobWithCompletions(t *testing.T) {
 }
 
 func TestIndexedJob(t *testing.T) {
+	t.Cleanup(setDurationDuringTest(&jobcontroller.DefaultJobPodFailureBackOff, fastPodFailureBackoff))
 	closeFn, restConfig, clientSet, ns := setup(t, "indexed")
 	defer closeFn()
 	ctx, cancel := startJobControllerAndWaitForCaches(restConfig)
@@ -998,7 +1004,7 @@ func TestIndexedJob(t *testing.T) {
 		Active: 3,
 		Ready:  pointer.Int32(0),
 	})
-	validateIndexedJobPods(ctx, t, clientSet, jobObj, sets.NewInt(0, 1, 2), "")
+	validateIndexedJobPods(ctx, t, clientSet, jobObj, sets.New(0, 1, 2), "")
 
 	// One Pod succeeds.
 	if err := setJobPhaseForIndex(ctx, clientSet, jobObj, v1.PodSucceeded, 1); err != nil {
@@ -1009,7 +1015,7 @@ func TestIndexedJob(t *testing.T) {
 		Succeeded: 1,
 		Ready:     pointer.Int32(0),
 	})
-	validateIndexedJobPods(ctx, t, clientSet, jobObj, sets.NewInt(0, 2, 3), "1")
+	validateIndexedJobPods(ctx, t, clientSet, jobObj, sets.New(0, 2, 3), "1")
 
 	// One Pod fails, which should be recreated.
 	if err := setJobPhaseForIndex(ctx, clientSet, jobObj, v1.PodFailed, 2); err != nil {
@@ -1021,7 +1027,7 @@ func TestIndexedJob(t *testing.T) {
 		Succeeded: 1,
 		Ready:     pointer.Int32(0),
 	})
-	validateIndexedJobPods(ctx, t, clientSet, jobObj, sets.NewInt(0, 2, 3), "1")
+	validateIndexedJobPods(ctx, t, clientSet, jobObj, sets.New(0, 2, 3), "1")
 
 	// Remaining Pods succeed.
 	if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 3); err != nil {
@@ -1047,7 +1053,7 @@ func TestElasticIndexedJob(t *testing.T) {
 		failIndexes          []int
 		wantSucceededIndexes string
 		wantFailed           int
-		wantRemainingIndexes sets.Int
+		wantRemainingIndexes sets.Set[int]
 		wantActivePods       int
 	}
 	cases := map[string]struct {
@@ -1087,7 +1093,7 @@ func TestElasticIndexedJob(t *testing.T) {
 					failIndexes:          []int{2},
 					wantSucceededIndexes: "1",
 					wantFailed:           1,
-					wantRemainingIndexes: sets.NewInt(0, 2),
+					wantRemainingIndexes: sets.New(0, 2),
 					wantActivePods:       2,
 				},
 				// Scale down completions 3->1, verify prev failure out of range still counts
@@ -1107,13 +1113,13 @@ func TestElasticIndexedJob(t *testing.T) {
 				{
 					succeedIndexes:       []int{2},
 					wantSucceededIndexes: "2",
-					wantRemainingIndexes: sets.NewInt(0, 1),
+					wantRemainingIndexes: sets.New(0, 1),
 					wantActivePods:       2,
 				},
 				// Scale completions down 3->2 to exclude previously succeeded index.
 				{
 					completions:          pointer.Int32Ptr(2),
-					wantRemainingIndexes: sets.NewInt(0, 1),
+					wantRemainingIndexes: sets.New(0, 1),
 					wantActivePods:       2,
 				},
 				// Scale completions back up to include previously succeeded index that was temporarily out of range.
@@ -1378,11 +1384,7 @@ func TestFinalizersClearedWhenBackoffLimitExceeded(t *testing.T) {
 }
 
 func TestJobPodsCreatedWithExponentialBackoff(t *testing.T) {
-	// overwrite the default value for faster testing
-	oldBackoff := jobcontroller.DefaultJobBackOff
-	defer func() { jobcontroller.DefaultJobBackOff = oldBackoff }()
-	jobcontroller.DefaultJobBackOff = 2 * time.Second
-
+	t.Cleanup(setDurationDuringTest(&jobcontroller.DefaultJobPodFailureBackOff, 2*time.Second))
 	closeFn, restConfig, clientSet, ns := setup(t, "simple")
 	defer closeFn()
 	ctx, cancel := startJobControllerAndWaitForCaches(restConfig)
@@ -1441,25 +1443,25 @@ func TestJobPodsCreatedWithExponentialBackoff(t *testing.T) {
 		return finishTime[i].Before(finishTime[j])
 	})
 
-	if creationTime[1].Sub(finishTime[0]).Seconds() < jobcontroller.DefaultJobBackOff.Seconds() {
-		t.Fatalf("Second pod should be created at least %v seconds after the first pod", jobcontroller.DefaultJobBackOff)
+	if creationTime[1].Sub(finishTime[0]).Seconds() < jobcontroller.DefaultJobPodFailureBackOff.Seconds() {
+		t.Fatalf("Second pod should be created at least %v seconds after the first pod", jobcontroller.DefaultJobPodFailureBackOff)
 	}
 
-	if creationTime[1].Sub(finishTime[0]).Seconds() >= 2*jobcontroller.DefaultJobBackOff.Seconds() {
-		t.Fatalf("Second pod should be created before %v seconds after the first pod", 2*jobcontroller.DefaultJobBackOff)
+	if creationTime[1].Sub(finishTime[0]).Seconds() >= 2*jobcontroller.DefaultJobPodFailureBackOff.Seconds() {
+		t.Fatalf("Second pod should be created before %v seconds after the first pod", 2*jobcontroller.DefaultJobPodFailureBackOff)
 	}
 
 	diff := creationTime[2].Sub(finishTime[1]).Seconds()
 
 	// The third pod should not be created before 4 seconds
-	if diff < 2*jobcontroller.DefaultJobBackOff.Seconds() {
-		t.Fatalf("Third pod should be created at least %v seconds after the second pod", 2*jobcontroller.DefaultJobBackOff)
+	if diff < 2*jobcontroller.DefaultJobPodFailureBackOff.Seconds() {
+		t.Fatalf("Third pod should be created at least %v seconds after the second pod", 2*jobcontroller.DefaultJobPodFailureBackOff)
 	}
 
 	// The third pod should be created within 8 seconds
 	// This check rules out double counting
-	if diff >= 4*jobcontroller.DefaultJobBackOff.Seconds() {
-		t.Fatalf("Third pod should be created before %v seconds after the second pod", 4*jobcontroller.DefaultJobBackOff)
+	if diff >= 4*jobcontroller.DefaultJobPodFailureBackOff.Seconds() {
+		t.Fatalf("Third pod should be created before %v seconds after the second pod", 4*jobcontroller.DefaultJobPodFailureBackOff)
 	}
 }
 
@@ -1815,7 +1817,7 @@ func validateFinishedPodsNoFinalizer(ctx context.Context, t *testing.T, clientSe
 // validateIndexedJobPods validates indexes and hostname of
 // active and completed Pods of an Indexed Job.
 // Call after validateJobPodsStatus
-func validateIndexedJobPods(ctx context.Context, t *testing.T, clientSet clientset.Interface, jobObj *batchv1.Job, wantActive sets.Int, gotCompleted string) {
+func validateIndexedJobPods(ctx context.Context, t *testing.T, clientSet clientset.Interface, jobObj *batchv1.Job, wantActive sets.Set[int], gotCompleted string) {
 	t.Helper()
 	updatedJob, err := clientSet.BatchV1().Jobs(jobObj.Namespace).Get(ctx, jobObj.Name, metav1.GetOptions{})
 	if err != nil {
@@ -1828,7 +1830,7 @@ func validateIndexedJobPods(ctx context.Context, t *testing.T, clientSet clients
 	if err != nil {
 		t.Fatalf("Failed to list Job Pods: %v", err)
 	}
-	gotActive := sets.NewInt()
+	gotActive := sets.New[int]()
 	for _, pod := range pods.Items {
 		if metav1.IsControlledBy(&pod, jobObj) {
 			if pod.Status.Phase == v1.PodPending || pod.Status.Phase == v1.PodRunning {
@@ -1846,9 +1848,9 @@ func validateIndexedJobPods(ctx context.Context, t *testing.T, clientSet clients
 		}
 	}
 	if wantActive == nil {
-		wantActive = sets.NewInt()
+		wantActive = sets.New[int]()
 	}
-	if diff := cmp.Diff(wantActive.List(), gotActive.List()); diff != "" {
+	if diff := cmp.Diff(sets.List(wantActive), sets.List(gotActive)); diff != "" {
 		t.Errorf("Unexpected active indexes (-want,+got):\n%s", diff)
 	}
 }
@@ -2086,7 +2088,7 @@ func resetMetrics() {
 func createJobControllerWithSharedInformers(restConfig *restclient.Config, informerSet informers.SharedInformerFactory) (*jobcontroller.Controller, context.Context, context.CancelFunc) {
 	clientSet := clientset.NewForConfigOrDie(restclient.AddUserAgent(restConfig, "job-controller"))
 	ctx, cancel := context.WithCancel(context.Background())
-	jc := jobcontroller.NewController(informerSet.Core().V1().Pods(), informerSet.Batch().V1().Jobs(), clientSet)
+	jc := jobcontroller.NewController(ctx, informerSet.Core().V1().Pods(), informerSet.Batch().V1().Jobs(), clientSet)
 	return jc, ctx, cancel
 }
 
@@ -2134,6 +2136,14 @@ func hasJobTrackingFinalizer(obj metav1.Object) bool {
 }
 
 func setDuringTest(val *int, newVal int) func() {
+	origVal := *val
+	*val = newVal
+	return func() {
+		*val = origVal
+	}
+}
+
+func setDurationDuringTest(val *time.Duration, newVal time.Duration) func() {
 	origVal := *val
 	*val = newVal
 	return func() {

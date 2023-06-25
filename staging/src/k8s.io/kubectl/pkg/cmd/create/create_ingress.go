@@ -63,7 +63,7 @@ var (
 
 	ingressExample = templates.Examples(i18n.T(`
 		# Create a single ingress called 'simple' that directs requests to foo.com/bar to svc
-		# svc1:8080 with a tls secret "my-cert"
+		# svc1:8080 with a TLS secret "my-cert"
 		kubectl create ingress simple --rule="foo.com/bar=svc1:8080,tls=my-cert"
 
 		# Create a catch all ingress of "/path" pointing to service svc:port and Ingress Class as "otheringress"

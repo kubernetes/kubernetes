@@ -11,7 +11,7 @@ export KUBE_TEST_REPO_LIST=$(pwd)/repo_list
 1. Run only sig-windows tests:
 
     ```bash
-    ./e2e.test --provider=local --ginkgo.noColor --ginkgo.focus="\[sig-windows\]|\[Feature:Windows\]" --node-os-distro="windows"
+    ./e2e.test --provider=local --ginkgo.no-color --ginkgo.focus="\[sig-windows\]|\[Feature:Windows\]" --node-os-distro="windows"
     ```
 
 

@@ -246,7 +246,16 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 
 	t.Logf("runtime-config=%v", completedOptions.APIEnablement.RuntimeConfig)
 	t.Logf("Starting kube-apiserver on port %d...", s.SecureServing.BindPort)
-	server, err := app.CreateServerChain(completedOptions)
+
+	config, err := app.NewConfig(completedOptions)
+	if err != nil {
+		return result, err
+	}
+	completed, err := config.Complete()
+	if err != nil {
+		return result, err
+	}
+	server, err := app.CreateServerChain(completed)
 	if err != nil {
 		return result, fmt.Errorf("failed to create server chain: %v", err)
 	}

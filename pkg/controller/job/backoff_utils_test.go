@@ -148,7 +148,7 @@ func TestNewBackoffRecord(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			backoffRecordStore := newBackoffRecordStore()
+			backoffRecordStore := newBackoffStore()
 			tc.storeInitializer(backoffRecordStore)
 
 			newSucceededPods := []*v1.Pod{}

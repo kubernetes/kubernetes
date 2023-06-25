@@ -347,6 +347,8 @@ func newISCSIServer(ctx context.Context, cs clientset.Interface, namespace strin
 			"/sys/kernel": "/sys/kernel",
 			// iSCSI source "block devices" must be available on the host
 			"/srv/iscsi": "/srv/iscsi",
+			// targetcli uses dbus
+			"/run/dbus": "/run/dbus",
 		},
 		ServerReadyMessage: "iscsi target started",
 		ServerHostNetwork:  true,

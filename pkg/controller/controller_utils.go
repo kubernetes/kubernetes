@@ -186,13 +186,13 @@ func (r *ControllerExpectations) DeleteExpectations(controllerKey string) {
 func (r *ControllerExpectations) SatisfiedExpectations(controllerKey string) bool {
 	if exp, exists, err := r.GetExpectations(controllerKey); exists {
 		if exp.Fulfilled() {
-			klog.V(4).Infof("Controller expectations fulfilled %#v", exp)
+			klog.V(4).InfoS("Controller expectations fulfilled", "expectations", exp)
 			return true
 		} else if exp.isExpired() {
-			klog.V(4).Infof("Controller expectations expired %#v", exp)
+			klog.V(4).InfoS("Controller expectations expired", "expectations", exp)
 			return true
 		} else {
-			klog.V(4).Infof("Controller still waiting on expectations %#v", exp)
+			klog.V(4).InfoS("Controller still waiting on expectations", "expectations", exp)
 			return false
 		}
 	} else if err != nil {
@@ -220,7 +220,7 @@ func (exp *ControlleeExpectations) isExpired() bool {
 // SetExpectations registers new expectations for the given controller. Forgets existing expectations.
 func (r *ControllerExpectations) SetExpectations(controllerKey string, add, del int) error {
 	exp := &ControlleeExpectations{add: int64(add), del: int64(del), key: controllerKey, timestamp: clock.RealClock{}.Now()}
-	klog.V(4).Infof("Setting expectations %#v", exp)
+	klog.V(4).InfoS("Setting expectations", "expectations", exp)
 	return r.Add(exp)
 }
 
@@ -237,7 +237,7 @@ func (r *ControllerExpectations) LowerExpectations(controllerKey string, add, de
 	if exp, exists, err := r.GetExpectations(controllerKey); err == nil && exists {
 		exp.Add(int64(-add), int64(-del))
 		// The expectations might've been modified since the update on the previous line.
-		klog.V(4).Infof("Lowered expectations %#v", exp)
+		klog.V(4).InfoS("Lowered expectations", "expectations", exp)
 	}
 }
 
@@ -246,7 +246,7 @@ func (r *ControllerExpectations) RaiseExpectations(controllerKey string, add, de
 	if exp, exists, err := r.GetExpectations(controllerKey); err == nil && exists {
 		exp.Add(int64(add), int64(del))
 		// The expectations might've been modified since the update on the previous line.
-		klog.V(4).Infof("Raised expectations %#v", exp)
+		klog.V(4).Infof("Raised expectations", "expectations", exp)
 	}
 }
 
@@ -285,6 +285,20 @@ func (e *ControlleeExpectations) Fulfilled() bool {
 // GetExpectations returns the add and del expectations of the controllee.
 func (e *ControlleeExpectations) GetExpectations() (int64, int64) {
 	return atomic.LoadInt64(&e.add), atomic.LoadInt64(&e.del)
+}
+
+// MarshalLog makes a thread-safe copy of the values of the expectations that
+// can be used for logging.
+func (e *ControlleeExpectations) MarshalLog() interface{} {
+	return struct {
+		add int64
+		del int64
+		key string
+	}{
+		add: atomic.LoadInt64(&e.add),
+		del: atomic.LoadInt64(&e.del),
+		key: e.key,
+	}
 }
 
 // NewControllerExpectations returns a store for ControllerExpectations.

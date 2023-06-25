@@ -80,7 +80,7 @@ func (r *reconciler) reconcile(service *corev1.Service, pods []*corev1.Pod, exis
 	// for further adjustment
 	for _, existingSlice := range existingSlices {
 		// service no longer supports that address type, add it to deleted slices
-		if _, ok := serviceSupportedAddressesTypes[existingSlice.AddressType]; !ok {
+		if !serviceSupportedAddressesTypes.Has(existingSlice.AddressType) {
 			if r.topologyCache != nil {
 				svcKey, err := serviceControllerKey(existingSlice)
 				if err != nil {
@@ -413,9 +413,9 @@ func (r *reconciler) reconcileByPortMapping(
 	endpointMeta *endpointMeta,
 ) ([]*discovery.EndpointSlice, []*discovery.EndpointSlice, []*discovery.EndpointSlice, int, int) {
 	slicesByName := map[string]*discovery.EndpointSlice{}
-	sliceNamesUnchanged := sets.String{}
-	sliceNamesToUpdate := sets.String{}
-	sliceNamesToDelete := sets.String{}
+	sliceNamesUnchanged := sets.New[string]()
+	sliceNamesToUpdate := sets.New[string]()
+	sliceNamesToDelete := sets.New[string]()
 	numRemoved := 0
 
 	// 1. Iterate through existing slices to delete endpoints no longer desired

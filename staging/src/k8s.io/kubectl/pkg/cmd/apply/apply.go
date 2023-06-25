@@ -160,7 +160,7 @@ var (
 		# Apply the JSON passed into stdin to a pod
 		cat pod.json | kubectl apply -f -
 
-		# Apply the configuration from all files that end with '.json' - i.e. expand wildcard characters in file names
+		# Apply the configuration from all files that end with '.json'
 		kubectl apply -f '*.json'
 
 		# Note: --prune is still in Alpha

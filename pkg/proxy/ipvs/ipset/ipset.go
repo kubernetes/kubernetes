@@ -28,6 +28,8 @@ import (
 	netutils "k8s.io/utils/net"
 )
 
+var validationError = fmt.Errorf("failed to validate entry for ipset")
+
 // Interface is an injectable interface for running ipset commands.  Implementations must be goroutine-safe.
 type Interface interface {
 	// FlushSet deletes all entries from a named set.
@@ -165,7 +167,7 @@ type Entry struct {
 // Validate checks if a given ipset entry is valid or not.  The set parameter is the ipset that entry belongs to.
 func (e *Entry) Validate(set *IPSet) bool {
 	if e.Port < 0 {
-		klog.Errorf("Entry %v port number %d should be >=0 for ipset %v", e, e.Port, set)
+		klog.ErrorS(validationError, "port number should be >=0", "entry", e, "port", e.Port, "ipset", set)
 		return false
 	}
 	switch e.SetType {
@@ -187,7 +189,7 @@ func (e *Entry) Validate(set *IPSet) bool {
 
 		// IP2 can not be empty for `hash:ip,port,ip` type ip set
 		if netutils.ParseIPSloppy(e.IP2) == nil {
-			klog.Errorf("Error parsing entry %v second ip address %v for ipset %v", e, e.IP2, set)
+			klog.ErrorS(validationError, "error parsing second ip address", "entry", e, "ip", e.IP2, "ipset", set)
 			return false
 		}
 	case HashIPPortNet:
@@ -198,22 +200,22 @@ func (e *Entry) Validate(set *IPSet) bool {
 
 		// Net can not be empty for `hash:ip,port,net` type ip set
 		if _, ipNet, err := netutils.ParseCIDRSloppy(e.Net); ipNet == nil {
-			klog.Errorf("Error parsing entry %v ip net %v for ipset %v, error: %v", e, e.Net, set, err)
+			klog.ErrorS(err, "error parsing ip net", "entry", e, "net", e.Net, "set", set)
 			return false
 		}
 	case BitmapPort:
 		// check if port number satisfies its ipset's requirement of port range
 		if set == nil {
-			klog.Errorf("Unable to reference ip set where the entry %v exists", e)
+			klog.ErrorS(validationError, "unable to reference ip set where the entry exists", "entry", e)
 			return false
 		}
 		begin, end, err := parsePortRange(set.PortRange)
 		if err != nil {
-			klog.Errorf("Failed to parse set %v port range %s for ipset %v, error: %v", set, set.PortRange, set, err)
+			klog.ErrorS(err, "failed to parse set port range", "ipset", set, "portRange", set.PortRange)
 			return false
 		}
 		if e.Port < begin || e.Port > end {
-			klog.Errorf("Entry %v port number %d is not in the port range %s of its ipset %v", e, e.Port, set.PortRange, set)
+			klog.ErrorS(validationError, "port number is not in the port range of its ipset", "entry", e, "port", e.Port, "portRange", set.PortRange, "ipset", set)
 			return false
 		}
 	}
@@ -261,7 +263,7 @@ func (e *Entry) checkIPandProtocol(set *IPSet) bool {
 // checkIP checks if IP of Entry is valid.
 func (e *Entry) checkIP(set *IPSet) bool {
 	if netutils.ParseIPSloppy(e.IP) == nil {
-		klog.Errorf("Error parsing entry %v ip address %v for ipset %v", e, e.IP, set)
+		klog.ErrorS(validationError, "error parsing ip address", "entry", e, "ip", e.IP, "ipset", set)
 		return false
 	}
 
@@ -489,7 +491,7 @@ func validateProtocol(protocol string) bool {
 	if protocol == ProtocolTCP || protocol == ProtocolUDP || protocol == ProtocolSCTP {
 		return true
 	}
-	klog.Errorf("Invalid entry's protocol: %s, supported protocols are [%s, %s, %s]", protocol, ProtocolTCP, ProtocolUDP, ProtocolSCTP)
+	klog.ErrorS(validationError, "invalid protocol", "protocol", protocol, "supportedProtocols", []string{ProtocolTCP, ProtocolUDP, ProtocolSCTP})
 	return false
 }
 

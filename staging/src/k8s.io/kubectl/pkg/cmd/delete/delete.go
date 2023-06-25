@@ -84,7 +84,7 @@ var (
 		# Delete resources from a directory containing kustomization.yaml - e.g. dir/kustomization.yaml
 		kubectl delete -k dir
 
-		# Delete resources from all files that end with '.json' - i.e. expand wildcard characters in file names
+		# Delete resources from all files that end with '.json'
 		kubectl delete -f '*.json'
 
 		# Delete a pod based on the type and name in the JSON passed into stdin

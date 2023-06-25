@@ -1007,7 +1007,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		reported hard status values MUST equal the new spec hard values.
 		Getting the /status MUST succeed and the reported hard status
 		values MUST equal the spec hard values. Repatching the hard status
-		values MUST succeed. The spec spec MUST NOT be changed when
+		values MUST succeed. The spec MUST NOT be changed when
 		patching /status.
 	*/
 	framework.ConformanceIt("should apply changes to a resourcequota status", func(ctx context.Context) {

@@ -65,7 +65,6 @@ func Test_NewAttachDetachController_Positive(t *testing.T) {
 		false,
 		5*time.Second,
 		DefaultTimerConfig,
-		nil, /* filteredDialOptions */
 	)
 
 	// Assert
@@ -195,7 +194,6 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		false,
 		1*time.Second,
 		DefaultTimerConfig,
-		nil, /* filteredDialOptions */
 	)
 
 	if err != nil {
@@ -461,7 +459,6 @@ func volumeAttachmentRecoveryTestCase(t *testing.T, tc vaTest) {
 		false,
 		1*time.Second,
 		DefaultTimerConfig,
-		nil, /* filteredDialOptions */
 	)
 	if err != nil {
 		t.Fatalf("NewAttachDetachController failed with error. Expected: <no error> Actual: <%v>", err)
