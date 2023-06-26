@@ -543,10 +543,12 @@ func (q *delayingType) handleReportingAndSync(w *waitForPriorityQueue, knownEntr
 		r := waitingLoopResponse{}
 		switch req.action {
 		case waitForActionIsWaiting:
-			_, exists := knownEntries[req.data]
+			item, exists := knownEntries[req.data]
 			r.exists = &exists
-			nr := req.readyAt.Sub(q.clock.Now())
-			r.nextReady = &nr
+			if item != nil {
+				nr := item.readyAt.Sub(q.clock.Now())
+				r.nextReady = &nr
+			}
 		case waitForActionLenWaiting:
 			l := w.Len()
 			r.length = &l

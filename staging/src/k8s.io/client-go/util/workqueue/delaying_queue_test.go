@@ -478,6 +478,58 @@ func TestCopyShifting(t *testing.T) {
 	}
 }
 
+// TestReportQueueState ensures that the queue introspection methods are working as intended.
+func TestReportQueueState(t *testing.T) {
+	fakeClock := testingclock.NewFakeClock(time.Now().Truncate(1 * time.Second))
+	q := NewDelayingQueueWithCustomClock(fakeClock, "")
+
+	first := "foo"
+	second := "bar"
+	third := "baz"
+	fourth := "apple"
+	fifth := "orange"
+
+	if q.LenWaiting() != 0 {
+		t.Fatal("the length of the waiting queue must begin at 0")
+	}
+	waiting, itemReady := q.IsWaiting(first)
+	if waiting != false {
+		t.Fatal("the item foo can not be waiting on an empty queue")
+	}
+	if itemReady != time.Duration(0) {
+		t.Fatal("the next ready time should return empty/0 when the item is not found")
+	}
+
+	// Add some items to the 'waiting' queue
+	q.AddWithOptions(first, ExpandedDelayingOptions{Duration: 5 * time.Second})
+	q.AddWithOptions(second, ExpandedDelayingOptions{Duration: 10 * time.Second})
+	q.AddWithOptions(third, ExpandedDelayingOptions{Duration: 10 * time.Second})
+	q.AddWithOptions(fourth, ExpandedDelayingOptions{Duration: 15 * time.Second})
+	if q.LenWaiting() != 4 {
+		t.Fatal("there should be 4 items in the waiting queue")
+	}
+	waiting, itemReady = q.IsWaiting(first)
+	if waiting == false {
+		t.Errorf("the first item foo should be reported as waiting")
+	}
+	if itemReady != 5*time.Second {
+		t.Errorf("the first item was reported as being ready in %s where we were expecting 5 seconds", itemReady)
+	}
+	if waiting, _ := q.IsWaiting(fifth); waiting == true {
+		t.Errorf("the fifth item should not be reported as waiting")
+	}
+
+	// stepping the clock forward 1 second
+	fakeClock.Step(1 * time.Second)
+	waiting, itemReady = q.IsWaiting(third)
+	if waiting == false {
+		t.Errorf("the third item foo should be reported as waiting")
+	}
+	if itemReady != 9*time.Second {
+		t.Errorf("the first third item reports as being ready in %s where we were expecting 9 seconds", itemReady)
+	}
+}
+
 // TestCalculatenextReadyAt tests that the nextReadyAt timer is being correctly updated when the head item on the
 // 'waiting' queue changes.
 func TestCalculatenextReadyAt(t *testing.T) {
