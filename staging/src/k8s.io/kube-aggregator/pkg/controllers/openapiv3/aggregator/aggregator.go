@@ -73,10 +73,18 @@ func (s *specProxier) GetAPIServiceNames() []string {
 }
 
 // BuildAndRegisterAggregator registered OpenAPI aggregator handler. This function is not thread safe as it only being called on startup.
-func BuildAndRegisterAggregator(downloader Downloader, delegationTarget server.DelegationTarget, pathHandler common.PathHandlerByGroupVersion) (SpecProxier, error) {
+func BuildAndRegisterAggregator(downloader Downloader, aggregatorService http.Handler, delegationTarget server.DelegationTarget, pathHandler common.PathHandlerByGroupVersion) (SpecProxier, error) {
 	s := &specProxier{
 		apiServiceInfo: map[string]*openAPIV3APIServiceInfo{},
 		downloader:     downloader,
+	}
+
+	if aggregatorService != nil {
+		aggregatorLocalAPIService := v1.APIService{}
+		aggregatorLocalAPIService.Name = "kube-aggregator-local-types"
+
+		s.AddUpdateAPIService(aggregatorService, &aggregatorLocalAPIService)
+		s.UpdateAPIServiceSpec(aggregatorLocalAPIService.Name)
 	}
 
 	i := 1

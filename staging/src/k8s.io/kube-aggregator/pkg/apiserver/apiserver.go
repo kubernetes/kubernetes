@@ -32,6 +32,8 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/apiserver/pkg/server/egressselector"
+	"k8s.io/apiserver/pkg/server/mux"
+	"k8s.io/apiserver/pkg/server/routes"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
@@ -436,9 +438,17 @@ func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
 	}
 
 	if s.openAPIV3Config != nil && utilfeature.DefaultFeatureGate.Enabled(genericfeatures.OpenAPIV3) {
+		// Make native types exposed by aggregator available to the aggregated
+		// OpenAPI (normal handle is disabled by skipOpenAPIInstallation option)
+		v3Mux := mux.NewPathRecorderMux("kube-aggregator-local-types")
+		_ = routes.OpenAPI{
+			Config: s.openAPIV3Config,
+		}.InstallV3(s.GenericAPIServer.Handler.GoRestfulContainer, v3Mux)
+
 		specDownloaderV3 := openapiv3aggregator.NewDownloader()
 		openAPIV3Aggregator, err := openapiv3aggregator.BuildAndRegisterAggregator(
 			specDownloaderV3,
+			v3Mux,
 			s.GenericAPIServer.NextDelegate(),
 			s.GenericAPIServer.Handler.NonGoRestfulMux)
 		if err != nil {
