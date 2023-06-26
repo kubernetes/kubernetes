@@ -39,10 +39,10 @@ type ServerRunOptions struct {
 	GenericControlPlane *controlplaneapiserver.Options // embedded to avoid noise in existing consumers
 	CloudProvider       *kubeoptions.CloudProviderOptions
 
-	Extra
+	Values
 }
 
-type Extra struct {
+type Values struct {
 	AllowPrivileged           bool
 	KubeletConfig             kubeletclient.KubeletClientConfig
 	KubernetesServiceNodePort int
@@ -66,7 +66,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		GenericControlPlane: controlplaneapiserver.NewOptions(),
 		CloudProvider:       kubeoptions.NewCloudProviderOptions(),
 
-		Extra: Extra{
+		Values: Values{
 			EndpointReconcilerType: string(reconcilers.LeaseEndpointReconcilerType),
 			KubeletConfig: kubeletclient.KubeletClientConfig{
 				Port:         ports.KubeletPort,

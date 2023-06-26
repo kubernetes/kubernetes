@@ -298,7 +298,7 @@ func TestAddFlags(t *testing.T) {
 			AggregatorRejectForwardingRedirects: true,
 		},
 
-		Extra: Extra{
+		Values: Values{
 			ServiceNodePortRange:   kubeoptions.DefaultServiceNodePortRange,
 			ServiceClusterIPRanges: (&net.IPNet{IP: netutils.ParseIPSloppy("192.168.128.0"), Mask: net.CIDRMask(17, 32)}).String(),
 			EndpointReconcilerType: string(reconcilers.LeaseEndpointReconcilerType),

@@ -35,7 +35,7 @@ type completedOptions struct {
 	ControlPlane  controlplane.CompletedOptions
 	CloudProvider *kubeoptions.CloudProviderOptions
 
-	Extra
+	Values
 }
 
 type CompletedOptions struct {
@@ -65,7 +65,7 @@ func (opts *ServerRunOptions) Complete() (CompletedOptions, error) {
 		ControlPlane:  controlplane,
 		CloudProvider: opts.CloudProvider,
 
-		Extra: opts.Extra,
+		Values: opts.Values,
 	}
 
 	completed.PrimaryServiceClusterIPRange = primaryServiceIPRange
