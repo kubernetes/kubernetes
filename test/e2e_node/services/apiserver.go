@@ -96,7 +96,7 @@ func (a *APIServer) Start() error {
 	errCh := make(chan error)
 	go func() {
 		defer close(errCh)
-		completedOptions, err := options.Complete(o)
+		completedOptions, err := o.Complete()
 		if err != nil {
 			errCh <- fmt.Errorf("set apiserver default options error: %w", err)
 			return

@@ -47,13 +47,13 @@ import (
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 	informers "k8s.io/kube-aggregator/pkg/client/informers/externalversions/apiregistration/v1"
 	"k8s.io/kube-aggregator/pkg/controllers/autoregister"
-	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver/options"
 	"k8s.io/kubernetes/pkg/controlplane/controller/crdregistration"
 )
 
 func createAggregatorConfig(
 	kubeAPIServerConfig genericapiserver.Config,
-	commandOptions *options.ServerRunOptions,
+	commandOptions controlplaneapiserver.CompletedOptions,
 	externalInformers kubeexternalinformers.SharedInformerFactory,
 	serviceResolver aggregatorapiserver.ServiceResolver,
 	proxyTransport *http.Transport,
