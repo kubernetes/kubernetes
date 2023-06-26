@@ -230,7 +230,7 @@ func ensureServicesAreRemovedWhenNamespaceIsDeleted(ctx context.Context, f *fram
 // that each have a variable amount of content in the associated Namespace.
 // When run in [Serial] this test appears to delete Namespace objects at a
 // rate of approximately 1 per second.
-var _ = SIGDescribe("Namespaces [Serial]", func() {
+var _ = SIGDescribe("Namespaces [Serial]", ginkgo.Serial, func() {
 
 	f := framework.NewDefaultFramework("namespaces")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline

@@ -1377,7 +1377,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			e2estatefulset.DeleteAllStatefulSets(ctx, c, ns)
 		})
 
-		ginkgo.It("PVC should be recreated when pod is pending due to missing PVC [Disruptive][Serial]", func(ctx context.Context) {
+		ginkgo.It("PVC should be recreated when pod is pending due to missing PVC [Disruptive][Serial]", ginkgo.Serial, func(ctx context.Context) {
 			e2epv.SkipIfNoDefaultStorageClass(ctx, c)
 
 			readyNode, err := e2enode.GetRandomReadySchedulableNode(ctx, c)

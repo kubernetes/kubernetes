@@ -39,7 +39,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("[Feature:Windows] Memory Limits [Serial] [Slow]", func() {
+var _ = SIGDescribe("[Feature:Windows] Memory Limits [Serial] [Slow]", ginkgo.Serial, func() {
 
 	f := framework.NewDefaultFramework("memory-limit-test-windows")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged

@@ -150,7 +150,7 @@ func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDri
 		}
 	})
 
-	ginkgo.It("should provision volumes at scale within performance constraints [Slow] [Serial]", func(ctx context.Context) {
+	ginkgo.It("should provision volumes at scale within performance constraints [Slow] [Serial]", ginkgo.Serial, func(ctx context.Context) {
 		l = &local{
 			cs:      f.ClientSet,
 			ns:      f.Namespace,

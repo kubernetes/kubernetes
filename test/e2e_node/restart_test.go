@@ -72,7 +72,7 @@ func waitForPodsCondition(ctx context.Context, f *framework.Framework, podCount 
 	return runningPods
 }
 
-var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
+var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", ginkgo.Serial, func() {
 	const (
 		// Saturate the node. It's not necessary that all these pods enter
 		// Running/Ready, because we don't know the number of cores in the

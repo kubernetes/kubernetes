@@ -77,7 +77,7 @@ func validateOOMScoreAdjSettingIsInRange(pid int, expectedMinOOMScoreAdj, expect
 	return nil
 }
 
-var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
+var _ = SIGDescribe("Container Manager Misc [Serial]", ginkgo.Serial, func() {
 	f := framework.NewDefaultFramework("kubelet-container-manager")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Describe("Validate OOM score adjustments [NodeFeature:OOMScoreAdj]", func() {

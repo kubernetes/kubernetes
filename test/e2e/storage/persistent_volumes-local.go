@@ -450,7 +450,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 		})
 	})
 
-	ginkgo.Context("Stress with local volumes [Serial]", func() {
+	ginkgo.Context("Stress with local volumes [Serial]", ginkgo.Serial, func() {
 		var (
 			allLocalVolumes = make(map[string][]*localTestVolume)
 			volType         = TmpfsLocalVolumeType
@@ -642,7 +642,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 		})
 	})
 
-	ginkgo.Context("Pods sharing a single local PV [Serial]", func() {
+	ginkgo.Context("Pods sharing a single local PV [Serial]", ginkgo.Serial, func() {
 		var (
 			pv *v1.PersistentVolume
 		)

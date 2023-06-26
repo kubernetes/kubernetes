@@ -35,7 +35,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptive] [NodeFeature:SystemNodeCriticalPod]", func() {
+var _ = SIGDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptive] [NodeFeature:SystemNodeCriticalPod]", ginkgo.Serial, func() {
 	f := framework.NewDefaultFramework("system-node-critical-pod-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	// this test only manipulates pods in kube-system

@@ -161,7 +161,7 @@ const (
 // - lack of eviction of tolerating pods from a tainted node,
 // - delayed eviction of short-tolerating pod from a tainted node,
 // - lack of eviction of short-tolerating pod after taint removal.
-var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
+var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", ginkgo.Serial, func() {
 	var cs clientset.Interface
 	var ns string
 	f := framework.NewDefaultFramework("taint-single-pod")
@@ -370,7 +370,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 	})
 })
 
-var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods [Serial]", func() {
+var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods [Serial]", ginkgo.Serial, func() {
 	var cs clientset.Interface
 	var ns string
 	f := framework.NewDefaultFramework("taint-multiple-pods")

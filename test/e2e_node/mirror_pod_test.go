@@ -199,7 +199,7 @@ var _ = SIGDescribe("MirrorPod", func() {
 	})
 	ginkgo.Context("when recreating a static pod", func() {
 		var ns, podPath, staticPodName, mirrorPodName string
-		ginkgo.It("it should launch successfully even if it temporarily failed termination due to volume failing to unmount [NodeConformance] [Serial]", func(ctx context.Context) {
+		ginkgo.It("it should launch successfully even if it temporarily failed termination due to volume failing to unmount [NodeConformance] [Serial]", ginkgo.Serial, func(ctx context.Context) {
 			node := getNodeName(ctx, f)
 			ns = f.Namespace.Name
 			c := f.ClientSet

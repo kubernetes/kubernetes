@@ -46,7 +46,7 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: C
 	f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
 	f.NamespacePodSecurityEnforceLevel = api.LevelBaseline
 
-	ginkgo.Describe("[Serial] [Slow] Deployment (Pod Resource)", func() {
+	ginkgo.Describe("[Serial] [Slow] Deployment (Pod Resource)", ginkgo.Serial, func() {
 		ginkgo.It(titleUp+titleAverageUtilization, func(ctx context.Context) {
 			scaleUp(ctx, "test-deployment", e2eautoscaling.KindDeployment, cpuResource, utilizationMetricType, false, f)
 		})
@@ -58,7 +58,7 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: C
 		})
 	})
 
-	ginkgo.Describe("[Serial] [Slow] Deployment (Container Resource)", func() {
+	ginkgo.Describe("[Serial] [Slow] Deployment (Container Resource)", ginkgo.Serial, func() {
 		ginkgo.It(titleUp+titleAverageUtilization, func(ctx context.Context) {
 			scaleUpContainerResource(ctx, "test-deployment", e2eautoscaling.KindDeployment, cpuResource, utilizationMetricType, f)
 		})
@@ -67,7 +67,7 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: C
 		})
 	})
 
-	ginkgo.Describe("[Serial] [Slow] ReplicaSet", func() {
+	ginkgo.Describe("[Serial] [Slow] ReplicaSet", ginkgo.Serial, func() {
 		ginkgo.It(titleUp, func(ctx context.Context) {
 			scaleUp(ctx, "rs", e2eautoscaling.KindReplicaSet, cpuResource, utilizationMetricType, false, f)
 		})
@@ -77,7 +77,7 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: C
 	})
 
 	// These tests take ~20 minutes each.
-	ginkgo.Describe("[Serial] [Slow] ReplicationController", func() {
+	ginkgo.Describe("[Serial] [Slow] ReplicationController", ginkgo.Serial, func() {
 		ginkgo.It(titleUp+" and verify decision stability", func(ctx context.Context) {
 			scaleUp(ctx, "rc", e2eautoscaling.KindRC, cpuResource, utilizationMetricType, true, f)
 		})
@@ -117,7 +117,7 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: C
 		})
 	})
 
-	ginkgo.Describe("[Serial] [Slow] ReplicaSet with idle sidecar (ContainerResource use case)", func() {
+	ginkgo.Describe("[Serial] [Slow] ReplicaSet with idle sidecar (ContainerResource use case)", ginkgo.Serial, func() {
 		// ContainerResource CPU autoscaling on idle sidecar
 		ginkgo.It(titleUp+" on a busy application with an idle sidecar container", func(ctx context.Context) {
 			scaleOnIdleSideCar(ctx, "rs", e2eautoscaling.KindReplicaSet, cpuResource, utilizationMetricType, false, f)
@@ -151,7 +151,7 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: M
 	f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
 	f.NamespacePodSecurityEnforceLevel = api.LevelBaseline
 
-	ginkgo.Describe("[Serial] [Slow] Deployment (Pod Resource)", func() {
+	ginkgo.Describe("[Serial] [Slow] Deployment (Pod Resource)", ginkgo.Serial, func() {
 		ginkgo.It(titleUp+titleAverageUtilization, func(ctx context.Context) {
 			scaleUp(ctx, "test-deployment", e2eautoscaling.KindDeployment, memResource, utilizationMetricType, false, f)
 		})
@@ -160,7 +160,7 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: M
 		})
 	})
 
-	ginkgo.Describe("[Serial] [Slow] Deployment (Container Resource)", func() {
+	ginkgo.Describe("[Serial] [Slow] Deployment (Container Resource)", ginkgo.Serial, func() {
 		ginkgo.It(titleUp+titleAverageUtilization, func(ctx context.Context) {
 			scaleUpContainerResource(ctx, "test-deployment", e2eautoscaling.KindDeployment, memResource, utilizationMetricType, f)
 		})

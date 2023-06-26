@@ -237,7 +237,7 @@ func (t *snapshottableStressTestSuite) DefineTests(driver storageframework.TestD
 		framework.ExpectNoError(errors.NewAggregate(errs), "while cleaning up resources")
 	}
 
-	ginkgo.It("should support snapshotting of many volumes repeatedly [Slow] [Serial]", func(ctx context.Context) {
+	ginkgo.It("should support snapshotting of many volumes repeatedly [Slow] [Serial]", ginkgo.Serial, func(ctx context.Context) {
 		init(ctx)
 		ginkgo.DeferCleanup(cleanup)
 		createPodsAndVolumes(ctx)

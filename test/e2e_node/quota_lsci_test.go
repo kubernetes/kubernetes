@@ -96,7 +96,7 @@ func runOneQuotaTest(f *framework.Framework, quotasRequested bool) {
 // pod that creates a file, deletes it, and writes data to it.  If
 // quotas are used to monitor, it will detect this deleted-but-in-use
 // file; if du is used to monitor, it will not detect this.
-var _ = SIGDescribe("LocalStorageCapacityIsolationFSQuotaMonitoring [Slow] [Serial] [Disruptive] [Feature:LocalStorageCapacityIsolationQuota][NodeFeature:LSCIQuotaMonitoring]", func() {
+var _ = SIGDescribe("LocalStorageCapacityIsolationFSQuotaMonitoring [Slow] [Serial] [Disruptive] [Feature:LocalStorageCapacityIsolationQuota][NodeFeature:LSCIQuotaMonitoring]", ginkgo.Serial, func() {
 	f := framework.NewDefaultFramework("localstorage-quota-monitoring-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	runOneQuotaTest(f, true)

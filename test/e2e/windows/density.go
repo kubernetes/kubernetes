@@ -40,7 +40,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("[Feature:Windows] Density [Serial] [Slow]", func() {
+var _ = SIGDescribe("[Feature:Windows] Density [Serial] [Slow]", ginkgo.Serial, func() {
 	f := framework.NewDefaultFramework("density-test-windows")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 

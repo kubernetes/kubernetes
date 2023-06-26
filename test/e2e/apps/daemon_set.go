@@ -105,7 +105,7 @@ func updateDaemonSetWithRetries(ctx context.Context, c clientset.Interface, name
 // happen.  In the future, running in parallel may work if we have an eviction
 // model which lets the DS controller kick out other pods to make room.
 // See https://issues.k8s.io/21767 for more details
-var _ = SIGDescribe("Daemon set [Serial]", func() {
+var _ = SIGDescribe("Daemon set [Serial]", ginkgo.Serial, func() {
 	var f *framework.Framework
 
 	ginkgo.AfterEach(func(ctx context.Context) {

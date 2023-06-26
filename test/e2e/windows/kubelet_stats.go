@@ -36,7 +36,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 )
 
-var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats [Serial]", func() {
+var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats [Serial]", ginkgo.Serial, func() {
 	f := framework.NewDefaultFramework("kubelet-stats-test-windows-serial")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 

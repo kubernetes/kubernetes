@@ -37,7 +37,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 )
 
-var _ = SIGDescribe("Resource-usage [Serial] [Slow]", func() {
+var _ = SIGDescribe("Resource-usage [Serial] [Slow]", ginkgo.Serial, func() {
 	const (
 		// Interval to poll /stats/container on a node
 		containerStatsPollingPeriod = 10 * time.Second

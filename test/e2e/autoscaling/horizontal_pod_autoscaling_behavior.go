@@ -29,7 +29,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (non-default behavior)", func() {
+var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (non-default behavior)", ginkgo.Serial, func() {
 	f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 

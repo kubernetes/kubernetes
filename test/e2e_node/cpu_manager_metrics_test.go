@@ -39,7 +39,7 @@ import (
 	"k8s.io/utils/cpuset"
 )
 
-var _ = SIGDescribe("CPU Manager Metrics [Serial][Feature:CPUManager]", func() {
+var _ = SIGDescribe("CPU Manager Metrics [Serial][Feature:CPUManager]", ginkgo.Serial, func() {
 	f := framework.NewDefaultFramework("cpumanager-metrics")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 

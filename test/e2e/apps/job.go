@@ -584,7 +584,7 @@ var _ = SIGDescribe("Job", func() {
 		}
 	})
 
-	ginkgo.It("should run a job to completion with CPU requests [Serial]", func(ctx context.Context) {
+	ginkgo.It("should run a job to completion with CPU requests [Serial]", ginkgo.Serial, func(ctx context.Context) {
 		ginkgo.By("Creating a job that with CPU requests")
 
 		testNodeName := scheduling.GetNodeThatCanRunPod(ctx, f)

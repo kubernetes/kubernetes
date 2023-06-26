@@ -284,10 +284,16 @@ var _ = SIGDescribe("DisruptionController", func() {
 		// only one pod from the replicaset is assigned to each node. This
 		// requires these tests to be run serially.
 		var serial string
+		var annotation interface{}
 		if c.exclusive {
 			serial = " [Serial]"
+			annotation = ginkgo.Serial
+		} else {
+			annotation = ginkgo.BeforeEach(func() {
+				framework.Logf("test is not running in serial mode")
+			})
 		}
-		ginkgo.It(fmt.Sprintf("evictions: %s => %s%s", c.description, expectation, serial), func(ctx context.Context) {
+		ginkgo.It(fmt.Sprintf("evictions: %s => %s%s", c.description, expectation, serial), annotation, func(ctx context.Context) {
 			if c.skipForBigClusters {
 				e2eskipper.SkipUnlessNodeCountIsAtMost(bigClusterSize - 1)
 			}

@@ -45,7 +45,7 @@ import (
 
 // This test needs to run in serial because other tests could interfere
 // with metrics being tested here.
-var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
+var _ = utils.SIGDescribe("[Serial] Volume metrics", ginkgo.Serial, func() {
 	var (
 		c              clientset.Interface
 		ns             string

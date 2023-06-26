@@ -78,7 +78,7 @@ type pausePodConfig struct {
 	SchedulingGates                   []v1.PodSchedulingGate
 }
 
-var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
+var _ = SIGDescribe("SchedulerPredicates [Serial]", ginkgo.Serial, func() {
 	var cs clientset.Interface
 	var nodeList *v1.NodeList
 	var RCName string

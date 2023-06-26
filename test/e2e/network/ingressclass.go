@@ -45,7 +45,7 @@ var _ = common.SIGDescribe("IngressClass [Feature:Ingress]", func() {
 		cs = f.ClientSet
 	})
 
-	ginkgo.It("should set default value on new IngressClass [Serial]", func(ctx context.Context) {
+	ginkgo.It("should set default value on new IngressClass [Serial]", ginkgo.Serial, func(ctx context.Context) {
 		ingressClass1, err := createIngressClass(ctx, cs, "ingressclass1", true, f.UniqueName)
 		framework.ExpectNoError(err)
 		ginkgo.DeferCleanup(deleteIngressClass, cs, ingressClass1.Name)
@@ -82,7 +82,7 @@ var _ = common.SIGDescribe("IngressClass [Feature:Ingress]", func() {
 		}
 	})
 
-	ginkgo.It("should not set default value if no default IngressClass [Serial]", func(ctx context.Context) {
+	ginkgo.It("should not set default value if no default IngressClass [Serial]", ginkgo.Serial, func(ctx context.Context) {
 		ingressClass1, err := createIngressClass(ctx, cs, "ingressclass1", false, f.UniqueName)
 		framework.ExpectNoError(err)
 		ginkgo.DeferCleanup(deleteIngressClass, cs, ingressClass1.Name)
@@ -116,7 +116,7 @@ var _ = common.SIGDescribe("IngressClass [Feature:Ingress]", func() {
 		}
 	})
 
-	ginkgo.It("should choose the one with the later CreationTimestamp, if equal the one with the lower name when two ingressClasses are marked as default[Serial]", func(ctx context.Context) {
+	ginkgo.It("should choose the one with the later CreationTimestamp, if equal the one with the lower name when two ingressClasses are marked as default[Serial]", ginkgo.Serial, func(ctx context.Context) {
 		ingressClass1, err := createIngressClass(ctx, cs, "ingressclass1", true, f.UniqueName)
 		framework.ExpectNoError(err)
 		ginkgo.DeferCleanup(deleteIngressClass, cs, ingressClass1.Name)
@@ -164,7 +164,7 @@ var _ = common.SIGDescribe("IngressClass [Feature:Ingress]", func() {
 		}
 	})
 
-	ginkgo.It("should allow IngressClass to have Namespace-scoped parameters [Serial]", func(ctx context.Context) {
+	ginkgo.It("should allow IngressClass to have Namespace-scoped parameters [Serial]", ginkgo.Serial, func(ctx context.Context) {
 		ingressClass := &networkingv1.IngressClass{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "ingressclass1",

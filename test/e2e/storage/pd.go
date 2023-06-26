@@ -454,7 +454,7 @@ var _ = utils.SIGDescribe("Pod Disks [Feature:StorageProvider]", func() {
 
 	// This test is marked to run as serial so as device selection on AWS does not
 	// conflict with other concurrent attach operations.
-	ginkgo.It("[Serial] attach on previously attached volumes should work", func(ctx context.Context) {
+	ginkgo.It("[Serial] attach on previously attached volumes should work", ginkgo.Serial, func(ctx context.Context) {
 		e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
 		ginkgo.By("creating PD")
 		diskName, err := e2epv.CreatePDWithRetry(ctx)

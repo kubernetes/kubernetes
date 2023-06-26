@@ -42,7 +42,7 @@ const (
 	checkServicePercent          = 0.05
 )
 
-var _ = common.SIGDescribe("[Feature:PerformanceDNS][Serial]", func() {
+var _ = common.SIGDescribe("[Feature:PerformanceDNS][Serial]", ginkgo.Serial, func() {
 	f := framework.NewDefaultFramework("performancedns")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 

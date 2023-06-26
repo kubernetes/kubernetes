@@ -34,7 +34,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = SIGDescribe("[Feature:Windows] [Excluded:WindowsDocker] [MinimumKubeletVersion:1.22] RebootHost containers [Serial] [Disruptive] [Slow]", func() {
+var _ = SIGDescribe("[Feature:Windows] [Excluded:WindowsDocker] [MinimumKubeletVersion:1.22] RebootHost containers [Serial] [Disruptive] [Slow]", ginkgo.Serial, func() {
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
 	})

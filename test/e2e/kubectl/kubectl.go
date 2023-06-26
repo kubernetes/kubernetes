@@ -1830,7 +1830,7 @@ metadata:
 
 	// This test must run [Serial] because it modifies the node so it doesn't allow pods to execute on
 	// it, which will affect anything else running in parallel.
-	ginkgo.Describe("Kubectl taint [Serial]", func() {
+	ginkgo.Describe("Kubectl taint [Serial]", ginkgo.Serial, func() {
 		ginkgo.It("should update the taint on a node", func(ctx context.Context) {
 			testTaint := v1.Taint{
 				Key:    fmt.Sprintf("kubernetes.io/e2e-taint-key-001-%s", string(uuid.NewUUID())),

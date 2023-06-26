@@ -90,7 +90,7 @@ const (
 	gmsaSharedFolder = "write_test"
 )
 
-var _ = SIGDescribe("[Feature:Windows] GMSA Full [Serial] [Slow]", func() {
+var _ = SIGDescribe("[Feature:Windows] GMSA Full [Serial] [Slow]", ginkgo.Serial, func() {
 	f := framework.NewDefaultFramework("gmsa-full-test-windows")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 

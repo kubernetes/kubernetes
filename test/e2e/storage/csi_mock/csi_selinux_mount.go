@@ -250,7 +250,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics", func() {
 	m := newMockDriverSetup(f)
 
 	// [Serial]: the tests read global kube-controller-manager metrics, so no other test changes them in parallel.
-	ginkgo.Context("SELinuxMount metrics [LinuxOnly][Feature:SELinux][Feature:SELinuxMountReadWriteOncePod][Serial]", func() {
+	ginkgo.Context("SELinuxMount metrics [LinuxOnly][Feature:SELinux][Feature:SELinuxMountReadWriteOncePod][Serial]", ginkgo.Serial, func() {
 
 		// All SELinux metrics. Unless explicitly mentioned in test.expectIncreases, these metrics must not grow during
 		// a test.

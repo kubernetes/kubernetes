@@ -634,7 +634,7 @@ var _ = common.SIGDescribe("Networking", func() {
 
 	// This is [Serial] because it can't run at the same time as the
 	// [Feature:SCTPConnectivity] tests, since they may cause sctp.ko to be loaded.
-	ginkgo.It("should allow creating a Pod with an SCTP HostPort [LinuxOnly] [Serial]", func(ctx context.Context) {
+	ginkgo.It("should allow creating a Pod with an SCTP HostPort [LinuxOnly] [Serial]", ginkgo.Serial, func(ctx context.Context) {
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
 		framework.ExpectNoError(err)
 		hostExec := utils.NewHostExec(f)

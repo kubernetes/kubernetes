@@ -35,7 +35,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("[Feature:Windows] Cpu Resources [Serial]", func() {
+var _ = SIGDescribe("[Feature:Windows] Cpu Resources [Serial]", ginkgo.Serial, func() {
 	f := framework.NewDefaultFramework("cpu-resources-test-windows")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 

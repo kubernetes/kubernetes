@@ -277,7 +277,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		l.testCase.TestDynamicProvisioning(ctx)
 	})
 
-	ginkgo.It("should provision storage with any volume data source [Serial]", func(ctx context.Context) {
+	ginkgo.It("should provision storage with any volume data source [Serial]", ginkgo.Serial, func(ctx context.Context) {
 		if len(dInfo.InTreePluginName) != 0 {
 			e2eskipper.Skipf("AnyVolumeDataSource feature only works with CSI drivers - skipping")
 		}

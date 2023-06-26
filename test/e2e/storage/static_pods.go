@@ -61,7 +61,7 @@ var _ = utils.SIGDescribe("StaticPods [Feature:Kind]", func() {
 	// Test https://github.com/kubernetes/kubernetes/issues/117745
 	// I.e. kubelet starts and it must start the API server as a static pod,
 	// while there is a CSI volume mounted by the previous kubelet.
-	ginkgo.It("should run after kubelet stopped with CSI volume mounted [Disruptive][Serial]", func(ctx context.Context) {
+	ginkgo.It("should run after kubelet stopped with CSI volume mounted [Disruptive][Serial]", ginkgo.Serial, func(ctx context.Context) {
 		var timeout int64 = 5
 
 		ginkgo.By("Provision a new CSI volume")

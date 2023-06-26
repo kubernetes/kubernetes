@@ -32,7 +32,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 )
 
-var _ = SIGDescribe("Downward API [Serial] [Disruptive] [Feature:EphemeralStorage]", func() {
+var _ = SIGDescribe("Downward API [Serial] [Disruptive] [Feature:EphemeralStorage]", ginkgo.Serial, func() {
 	f := framework.NewDefaultFramework("downward-api")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 

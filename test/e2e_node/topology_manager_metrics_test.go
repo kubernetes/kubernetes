@@ -34,7 +34,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = SIGDescribe("Topology Manager Metrics [Serial][NodeFeature:TopologyManager]", func() {
+var _ = SIGDescribe("Topology Manager Metrics [Serial][NodeFeature:TopologyManager]", ginkgo.Serial, func() {
 	f := framework.NewDefaultFramework("topologymanager-metrics")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 

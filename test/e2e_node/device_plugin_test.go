@@ -56,7 +56,7 @@ var (
 )
 
 // Serial because the test restarts Kubelet
-var _ = SIGDescribe("Device Plugin [Feature:DevicePluginProbe][NodeFeature:DevicePluginProbe][Serial]", func() {
+var _ = SIGDescribe("Device Plugin [Feature:DevicePluginProbe][NodeFeature:DevicePluginProbe][Serial]", ginkgo.Serial, func() {
 	f := framework.NewDefaultFramework("device-plugin-errors")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	testDevicePlugin(f, kubeletdevicepluginv1beta1.DevicePluginPath)
@@ -87,7 +87,7 @@ const (
 
 func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 	pluginSockDir = filepath.Join(pluginSockDir) + "/"
-	ginkgo.Context("DevicePlugin [Serial] [Disruptive]", func() {
+	ginkgo.Context("DevicePlugin [Serial] [Disruptive]", ginkgo.Serial, func() {
 		var devicePluginPod, dptemplate *v1.Pod
 		var v1alphaPodResources *kubeletpodresourcesv1alpha1.ListPodResourcesResponse
 		var v1PodResources *kubeletpodresourcesv1.ListPodResourcesResponse
@@ -540,7 +540,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 }
 
 func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
-	ginkgo.Context("DevicePlugin [Serial] [Disruptive]", func() {
+	ginkgo.Context("DevicePlugin [Serial] [Disruptive]", ginkgo.Serial, func() {
 		var devicePluginPod *v1.Pod
 		var v1alphaPodResources *kubeletpodresourcesv1alpha1.ListPodResourcesResponse
 		var v1PodResources *kubeletpodresourcesv1.ListPodResourcesResponse

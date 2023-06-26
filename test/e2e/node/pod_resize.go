@@ -1633,7 +1633,7 @@ func doPodResizeSchedulerTests() {
 	})
 }
 
-var _ = SIGDescribe("[Serial] Pod InPlace Resize Container (scheduler-focused) [Feature:InPlacePodVerticalScaling]", func() {
+var _ = SIGDescribe("[Serial] Pod InPlace Resize Container (scheduler-focused) [Feature:InPlacePodVerticalScaling]", ginkgo.Serial, func() {
 	doPodResizeSchedulerTests()
 })
 

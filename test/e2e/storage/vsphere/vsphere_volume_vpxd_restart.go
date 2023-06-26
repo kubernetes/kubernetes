@@ -52,7 +52,7 @@ For the number of schedulable nodes:
 9. Delete the Pod and wait for the Volume to be detached.
 10. Delete the Volume.
 */
-var _ = utils.SIGDescribe("Verify Volume Attach Through vpxd Restart [Feature:vsphere][Serial][Disruptive]", func() {
+var _ = utils.SIGDescribe("Verify Volume Attach Through vpxd Restart [Feature:vsphere][Serial][Disruptive]", ginkgo.Serial, func() {
 	f := framework.NewDefaultFramework("restart-vpxd")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 

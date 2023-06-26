@@ -59,7 +59,7 @@ const (
 )
 
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeature:DeviceManager]", func() {
+var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeature:DeviceManager]", ginkgo.Serial, func() {
 	checkpointFullPath := filepath.Join(devicePluginDir, checkpointName)
 	f := framework.NewDefaultFramework("devicemanager-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
@@ -319,7 +319,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 		   12. Delete the sample device plugin pod.
 		   13. Remove `/var/lib/kubelet/device-plugins/sample/` and its content, the directory created to control registration
 	*/
-	ginkgo.Context("With sample device plugin [Serial] [Disruptive]", func() {
+	ginkgo.Context("With sample device plugin [Serial] [Disruptive]", ginkgo.Serial, func() {
 		var deviceCount int = 2
 		var devicePluginPod *v1.Pod
 		var triggerPathFile, triggerPathDir string

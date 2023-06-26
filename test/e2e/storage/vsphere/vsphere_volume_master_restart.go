@@ -100,7 +100,7 @@ For the number of schedulable nodes,
 6. Delete the pod and wait for the volume to be detached
 7. Delete the volume
 */
-var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disruptive]", func() {
+var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disruptive]", ginkgo.Serial, func() {
 	f := framework.NewDefaultFramework("restart-master")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 

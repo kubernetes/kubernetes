@@ -40,7 +40,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7 Scalability", func() {
 		ns = f.Namespace.Name
 	})
 
-	ginkgo.Describe("GCE [Slow] [Serial] [Feature:IngressScale]", func() {
+	ginkgo.Describe("GCE [Slow] [Serial] [Feature:IngressScale]", ginkgo.Serial, func() {
 		var (
 			scaleFramework *scale.IngressScaleFramework
 		)

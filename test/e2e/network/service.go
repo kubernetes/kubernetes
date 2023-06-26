@@ -3804,7 +3804,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 	// These is [Serial] because it can't run at the same time as the
 	// [Feature:SCTPConnectivity] tests, since they may cause sctp.ko to be loaded.
-	ginkgo.It("should allow creating a basic SCTP service with pod and endpoints [LinuxOnly] [Serial]", func(ctx context.Context) {
+	ginkgo.It("should allow creating a basic SCTP service with pod and endpoints [LinuxOnly] [Serial]", ginkgo.Serial, func(ctx context.Context) {
 		serviceName := "sctp-endpoint-test"
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)

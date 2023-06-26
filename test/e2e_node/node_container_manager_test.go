@@ -63,7 +63,7 @@ func setDesiredConfiguration(initialConfig *kubeletconfig.KubeletConfiguration) 
 	initialConfig.SystemReservedCgroup = systemReservedCgroup
 }
 
-var _ = SIGDescribe("Node Container Manager [Serial]", func() {
+var _ = SIGDescribe("Node Container Manager [Serial]", ginkgo.Serial, func() {
 	f := framework.NewDefaultFramework("node-container-manager")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Describe("Validate Node Allocatable [NodeFeature:NodeAllocatable]", func() {

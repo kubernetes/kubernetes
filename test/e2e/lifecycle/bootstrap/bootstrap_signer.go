@@ -70,7 +70,7 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should resign the bootstrap tokens when the clusterInfo ConfigMap updated [Serial][Disruptive]", func(ctx context.Context) {
+	ginkgo.It("should resign the bootstrap tokens when the clusterInfo ConfigMap updated [Serial][Disruptive]", ginkgo.Serial, func(ctx context.Context) {
 		ginkgo.By("create a new bootstrap token secret")
 		tokenID, err := GenerateTokenID()
 		framework.ExpectNoError(err)
