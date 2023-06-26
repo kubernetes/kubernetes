@@ -302,8 +302,6 @@ func (q *delayingType) AddAfter(item interface{}, duration time.Duration) {
 		return
 	}
 
-	q.metrics.retry()
-
 	// immediately add things with no delay
 	if duration <= 0 {
 		q.Add(item)
