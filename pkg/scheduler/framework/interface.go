@@ -323,13 +323,15 @@ type QueueSortPlugin interface {
 // move unschedulable Pods in internal scheduling queues. Plugins
 // that fail pod scheduling (e.g., Filter plugins) are expected to implement this interface.
 type EnqueueExtensions interface {
+	Plugin
 	// EventsToRegister returns a series of possible events that may cause a Pod
-	// failed by this plugin schedulable.
+	// failed by this plugin schedulable. Each event has a callback function that
+	// filters out events to reduce useless retry of Pod's scheduling.
 	// The events will be registered when instantiating the internal scheduling queue,
 	// and leveraged to build event handlers dynamically.
 	// Note: the returned list needs to be static (not depend on configuration parameters);
 	// otherwise it would lead to undefined behavior.
-	EventsToRegister() []ClusterEvent
+	EventsToRegister() []ClusterEventWithHint
 }
 
 // PreFilterExtensions is an interface that is included in plugins that allow specifying
@@ -512,6 +514,9 @@ type Framework interface {
 
 	// PreEnqueuePlugins returns the registered preEnqueue plugins.
 	PreEnqueuePlugins() []PreEnqueuePlugin
+
+	// EnqueueExtensions returns the registered Enqueue extensions.
+	EnqueueExtensions() []EnqueueExtensions
 
 	// QueueSortFunc returns the function to sort pods in scheduling queue
 	QueueSortFunc() LessFunc
