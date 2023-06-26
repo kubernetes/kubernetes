@@ -65,9 +65,11 @@ var _ = SIGDescribe("OOMKiller [LinuxOnly] [NodeConformance]", func() {
 
 func runOomKillerTest(f *framework.Framework, testCase testCase) {
 	ginkgo.Context(testCase.name, func() {
+		var podClient *e2epod.PodClient
 		ginkgo.BeforeEach(func() {
 			ginkgo.By("setting up the pod to be used in the test")
-			e2epod.NewPodClient(f).Create(context.TODO(), testCase.podSpec)
+			podClient = e2epod.NewPodClient(f)
+			podClient.Create(context.TODO(), testCase.podSpec)
 		})
 
 		ginkgo.It("The containers terminated by OOM killer should have the reason set to OOMKilled", func() {
@@ -81,6 +83,13 @@ func runOomKillerTest(f *framework.Framework, testCase testCase) {
 
 			ginkgo.By("Verifying the OOM target container has the expected reason")
 			verifyReasonForOOMKilledContainer(pod, testCase.oomTargetContainerName)
+
+			// further check cgroup files resources are cleaned up
+			podUID := string(pod.UID)
+			new_pod := makePodToVerifyCgroupRemoved("pod" + podUID)
+			podClient.Create(context.TODO(), new_pod)
+			err = e2epod.WaitForPodSuccessInNamespace(context.TODO(), f.ClientSet, new_pod.Name, f.Namespace.Name)
+			framework.ExpectNoError(err)
 		})
 
 		ginkgo.AfterEach(func() {

@@ -222,6 +222,10 @@ var _ = SIGDescribe("Kubelet Cgroup Manager", func() {
 					gp := int64(1)
 					err := e2epod.NewPodClient(f).Delete(ctx, guaranteedPod.Name, metav1.DeleteOptions{GracePeriodSeconds: &gp})
 					framework.ExpectNoError(err)
+					// verifying the kubelet observed the termination notice
+					// check pod status is from running to terminating status, after a while, pod is deleted in kubelet
+					err = e2epod.WaitForPodTerminatingInNamespaceTimeout(context.TODO(), f.ClientSet, guaranteedPod.Name, f.Namespace.Name, 30)
+					framework.ExpectNoError(err)
 					pod := makePodToVerifyCgroupRemoved("pod" + podUID)
 					e2epod.NewPodClient(f).Create(ctx, pod)
 					err = e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
@@ -267,6 +271,10 @@ var _ = SIGDescribe("Kubelet Cgroup Manager", func() {
 					gp := int64(1)
 					err := e2epod.NewPodClient(f).Delete(ctx, bestEffortPod.Name, metav1.DeleteOptions{GracePeriodSeconds: &gp})
 					framework.ExpectNoError(err)
+					// verifying the kubelet observed the termination notice
+					// check pod status is from running to terminating status, after a while, pod is deleted in kubelet
+					err = e2epod.WaitForPodTerminatingInNamespaceTimeout(context.TODO(), f.ClientSet, bestEffortPod.Name, f.Namespace.Name, 30)
+					framework.ExpectNoError(err)
 					pod := makePodToVerifyCgroupRemoved("besteffort/pod" + podUID)
 					e2epod.NewPodClient(f).Create(ctx, pod)
 					err = e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
@@ -311,6 +319,10 @@ var _ = SIGDescribe("Kubelet Cgroup Manager", func() {
 				ginkgo.By("Checking if the pod cgroup was deleted", func() {
 					gp := int64(1)
 					err := e2epod.NewPodClient(f).Delete(ctx, burstablePod.Name, metav1.DeleteOptions{GracePeriodSeconds: &gp})
+					framework.ExpectNoError(err)
+					// verifying the kubelet observed the termination notice
+					// check pod status is from running to terminating status, after a while, pod is deleted in kubelet
+					err = e2epod.WaitForPodTerminatingInNamespaceTimeout(context.TODO(), f.ClientSet, burstablePod.Name, f.Namespace.Name, 30)
 					framework.ExpectNoError(err)
 					pod := makePodToVerifyCgroupRemoved("burstable/pod" + podUID)
 					e2epod.NewPodClient(f).Create(ctx, pod)
