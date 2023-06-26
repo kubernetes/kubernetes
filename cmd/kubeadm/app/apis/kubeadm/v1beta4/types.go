@@ -150,6 +150,11 @@ type ControlPlaneComponent struct {
 	// ExtraVolumes is an extra set of host volumes, mounted to the control plane component.
 	// +optional
 	ExtraVolumes []HostPathMount `json:"extraVolumes,omitempty"`
+
+	// ExtraEnvs is an extra set of environment variables to pass to the control plane component.
+	// Environment variables passed using ExtraEnvs will override any existing environment variables, or *_proxy environment variables that kubeadm adds by default.
+	// +optional
+	ExtraEnvs []corev1.EnvVar `json:"extraEnvs,omitempty"`
 }
 
 // APIServer holds settings necessary for API server deployments in the cluster
@@ -281,6 +286,11 @@ type LocalEtcd struct {
 	// command line except without leading dash(es).
 	// +optional
 	ExtraArgs map[string]string `json:"extraArgs,omitempty"`
+
+	// ExtraEnvs is an extra set of environment variables to pass to the control plane component.
+	// Environment variables passed using ExtraEnvs will override any existing environment variables, or *_proxy environment variables that kubeadm adds by default.
+	// +optional
+	ExtraEnvs []corev1.EnvVar `json:"extraEnvs,omitempty"`
 
 	// ServerCertSANs sets extra Subject Alternative Names for the etcd server signing cert.
 	// +optional
