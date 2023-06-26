@@ -269,14 +269,21 @@ func (rc *reconciler) reconcile(ctx context.Context) {
 			verifySafeToDetach := !(timeout || hasOutOfServiceTaint)
 			err = rc.attacherDetacher.DetachVolume(logger, attachedVolume.AttachedVolume, verifySafeToDetach, rc.actualStateOfWorld)
 			if err == nil {
-				if !timeout {
+				if verifySafeToDetach { // normal detach
 					logger.Info("attacherDetacher.DetachVolume started", "node", klog.KRef("", string(attachedVolume.NodeName)), "volumeName", attachedVolume.VolumeName)
-				} else {
-					metrics.RecordForcedDetachMetric()
-					logger.Info("attacherDetacher.DetachVolume started: this volume is not safe to detach, but maxWaitForUnmountDuration expired, force detaching",
-						"duration", rc.maxWaitForUnmountDuration,
-						"node", klog.KRef("", string(attachedVolume.NodeName)),
-						"volumeName", attachedVolume.VolumeName)
+				} else { // force detach
+					if timeout {
+						metrics.RecordForcedDetachMetric(metrics.ForceDetachReasonTimeout)
+						logger.Info("attacherDetacher.DetachVolume started: this volume is not safe to detach, but maxWaitForUnmountDuration expired, force detaching",
+							"duration", rc.maxWaitForUnmountDuration,
+							"node", klog.KRef("", string(attachedVolume.NodeName)),
+							"volumeName", attachedVolume.VolumeName)
+					} else {
+						metrics.RecordForcedDetachMetric(metrics.ForceDetachReasonOutOfService)
+						logger.Info("attacherDetacher.DetachVolume started: node has out-of-service taint, force detaching",
+							"node", klog.KRef("", string(attachedVolume.NodeName)),
+							"volumeName", attachedVolume.VolumeName)
+					}
 				}
 			}
 			if err != nil {
