@@ -69,10 +69,10 @@ var _ = sigDescribe("Hybrid cluster network", skipUnlessWindows(func() {
 			ginkgo.By("verifying pod internal connectivity to the cluster dataplane")
 
 			ginkgo.By("checking connectivity from Linux to Windows")
-			assertConsistentConnectivity(ctx, f, linuxPod.ObjectMeta.Name, linuxOS, linuxCheck(windowsPod.Status.PodIP, 80))
+			assertConsistentConnectivity(ctx, f, linuxPod.ObjectMeta.Name, linuxOS, linuxCheck(windowsPod.Status.PodIP, 80), internalMaxTries)
 
 			ginkgo.By("checking connectivity from Windows to Linux")
-			assertConsistentConnectivity(ctx, f, windowsPod.ObjectMeta.Name, windowsOS, windowsCheck(linuxPod.Status.PodIP))
+			assertConsistentConnectivity(ctx, f, windowsPod.ObjectMeta.Name, windowsOS, windowsCheck(linuxPod.Status.PodIP), internalMaxTries)
 
 		})
 
@@ -84,7 +84,7 @@ var _ = sigDescribe("Hybrid cluster network", skipUnlessWindows(func() {
 			ginkgo.By("verifying pod external connectivity to the internet")
 
 			ginkgo.By("checking connectivity to 8.8.8.8 53 (google.com) from Linux")
-			assertConsistentConnectivity(ctx, f, linuxPod.ObjectMeta.Name, linuxOS, linuxCheck("8.8.8.8", 53))
+			assertConsistentConnectivity(ctx, f, linuxPod.ObjectMeta.Name, linuxOS, linuxCheck("8.8.8.8", 53), externalMaxTries)
 		})
 
 		ginkgo.It("should provide Internet connection for Windows containers using DNS [Feature:Networking-DNS]", func(ctx context.Context) {
@@ -95,7 +95,7 @@ var _ = sigDescribe("Hybrid cluster network", skipUnlessWindows(func() {
 			ginkgo.By("verifying pod external connectivity to the internet")
 
 			ginkgo.By("checking connectivity to 8.8.8.8 53 (google.com) from Windows")
-			assertConsistentConnectivity(ctx, f, windowsPod.ObjectMeta.Name, windowsOS, windowsCheck("www.google.com"))
+			assertConsistentConnectivity(ctx, f, windowsPod.ObjectMeta.Name, windowsOS, windowsCheck("www.google.com"), externalMaxTries)
 		})
 
 	})
@@ -106,14 +106,20 @@ var (
 	duration       = "10s"
 	pollInterval   = "1s"
 	timeoutSeconds = 10
+
+	externalMaxTries = 10
+	internalMaxTries = 1
 )
 
-func assertConsistentConnectivity(ctx context.Context, f *framework.Framework, podName string, os string, cmd []string) {
+func assertConsistentConnectivity(ctx context.Context, f *framework.Framework, podName string, os string, cmd []string, maxTries int) {
 	connChecker := func() error {
-		ginkgo.By(fmt.Sprintf("checking connectivity of %s-container in %s", os, podName))
-		// TODO, we should be retrying this similar to what is done in DialFromNode, in the test/e2e/networking/networking.go tests
-		stdout, stderr, err := e2epod.ExecCommandInContainerWithFullOutput(f, podName, os+"-container", cmd...)
-		if err != nil {
+		var err error
+		for i := 0; i < maxTries; i++ {
+			ginkgo.By(fmt.Sprintf("checking connectivity of %s-container in %s", os, podName))
+			stdout, stderr, err := e2epod.ExecCommandInContainerWithFullOutput(f, podName, os+"-container", cmd...)
+			if err == nil {
+				break
+			}
 			framework.Logf("Encountered error while running command: %v.\nStdout: %s\nStderr: %s\nErr: %v", cmd, stdout, stderr, err)
 		}
 		return err
