@@ -32,7 +32,7 @@ import (
 
 // completedOptions is a private wrapper that enforces a call of Complete() before Run can be invoked.
 type completedOptions struct {
-	controlplane.CompletedOptions
+	ControlPlane  controlplane.CompletedOptions
 	CloudProvider *kubeoptions.CloudProviderOptions
 
 	Extra
@@ -56,14 +56,14 @@ func (opts *ServerRunOptions) Complete() (CompletedOptions, error) {
 	if err != nil {
 		return CompletedOptions{}, err
 	}
-	controlplane, err := opts.Options.Complete([]string{"kubernetes.default.svc", "kubernetes.default", "kubernetes"}, []net.IP{apiServerServiceIP})
+	controlplane, err := opts.GenericControlPlane.Complete([]string{"kubernetes.default.svc", "kubernetes.default", "kubernetes"}, []net.IP{apiServerServiceIP})
 	if err != nil {
 		return CompletedOptions{}, err
 	}
 
 	completed := completedOptions{
-		CompletedOptions: controlplane,
-		CloudProvider:    opts.CloudProvider,
+		ControlPlane:  controlplane,
+		CloudProvider: opts.CloudProvider,
 
 		Extra: opts.Extra,
 	}
@@ -72,17 +72,17 @@ func (opts *ServerRunOptions) Complete() (CompletedOptions, error) {
 	completed.SecondaryServiceClusterIPRange = secondaryServiceIPRange
 	completed.APIServerServiceIP = apiServerServiceIP
 
-	if completed.Etcd != nil && completed.Etcd.EnableWatchCache {
+	if completed.ControlPlane.Etcd != nil && completed.ControlPlane.Etcd.EnableWatchCache {
 		sizes := kubeapiserver.DefaultWatchCacheSizes()
 		// Ensure that overrides parse correctly.
-		userSpecified, err := apiserveroptions.ParseWatchCacheSizes(completed.Etcd.WatchCacheSizes)
+		userSpecified, err := apiserveroptions.ParseWatchCacheSizes(completed.ControlPlane.Etcd.WatchCacheSizes)
 		if err != nil {
 			return CompletedOptions{}, err
 		}
 		for resource, size := range userSpecified {
 			sizes[resource] = size
 		}
-		completed.Etcd.WatchCacheSizes, err = apiserveroptions.WriteWatchCacheSizes(sizes)
+		completed.ControlPlane.Etcd.WatchCacheSizes, err = apiserveroptions.WriteWatchCacheSizes(sizes)
 		if err != nil {
 			return CompletedOptions{}, err
 		}

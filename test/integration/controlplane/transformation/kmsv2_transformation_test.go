@@ -263,7 +263,7 @@ resources:
 	t.Cleanup(cancel)
 
 	var firstEncryptedDEK []byte
-	assertPodDEKs(ctx, t, test.kubeAPIServer.ServerOpts.Etcd.StorageConfig,
+	assertPodDEKs(ctx, t, test.kubeAPIServer.ServerOpts.GenericControlPlane.Etcd.StorageConfig,
 		1, 1,
 		"k8s:enc:kms:v2:kms-provider:",
 		func(_ int, counter uint64, etcdKey string, obj kmstypes.EncryptedObject) {
@@ -392,7 +392,7 @@ resources:
 		t.Fatalf("Resource version should not have changed again after the initial version updated as a result of the keyID update. old pod: %v, new pod: %v", newPod, updatedNewPod)
 	}
 
-	assertPodDEKs(ctx, t, test.kubeAPIServer.ServerOpts.Etcd.StorageConfig,
+	assertPodDEKs(ctx, t, test.kubeAPIServer.ServerOpts.GenericControlPlane.Etcd.StorageConfig,
 		1, 1, "k8s:enc:kms:v2:kms-provider:", checkDEK,
 	)
 }
@@ -445,7 +445,7 @@ resources:
 		}
 	}
 
-	assertPodDEKs(ctx, t, test.kubeAPIServer.ServerOpts.Etcd.StorageConfig,
+	assertPodDEKs(ctx, t, test.kubeAPIServer.ServerOpts.GenericControlPlane.Etcd.StorageConfig,
 		podCount, 1, // key ID does not change during the test so we should only have a single DEK
 		"k8s:enc:kms:v2:kms-provider:",
 		func(i int, counter uint64, etcdKey string, obj kmstypes.EncryptedObject) {

@@ -57,7 +57,7 @@ func multiEtcdSetup(ctx context.Context, t *testing.T) (clientset.Interface, fra
 	clientSet, _, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Ensure we're using the same etcd across apiserver restarts.
-			opts.Etcd = etcdOptions
+			opts.GenericControlPlane.Etcd = etcdOptions
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
 			// Switch off endpoints reconciler to avoid unnecessary operations.

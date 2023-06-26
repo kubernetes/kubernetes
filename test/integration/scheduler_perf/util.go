@@ -87,11 +87,11 @@ func mustSetupScheduler(ctx context.Context, b *testing.B, config *config.KubeSc
 	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, b, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition", "Priority"}
+			opts.GenericControlPlane.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition", "Priority"}
 
 			// Enable DRA API group.
 			if enabledFeatures[features.DynamicResourceAllocation] {
-				opts.APIEnablement.RuntimeConfig = cliflag.ConfigurationMap{
+				opts.GenericControlPlane.APIEnablement.RuntimeConfig = cliflag.ConfigurationMap{
 					resourcev1alpha2.SchemeGroupVersion.String(): "true",
 				}
 			}

@@ -127,8 +127,8 @@ func TestServiceAllocIPAddress(t *testing.T) {
 	client, _, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.ServiceClusterIPRanges = serviceCIDR
-			opts.GenericServerRunOptions.AdvertiseAddress = netutils.ParseIPSloppy("2001:db8::10")
-			opts.APIEnablement.RuntimeConfig.Set("networking.k8s.io/v1alpha1=true")
+			opts.GenericControlPlane.GenericAPIServer.AdvertiseAddress = netutils.ParseIPSloppy("2001:db8::10")
+			opts.GenericControlPlane.APIEnablement.RuntimeConfig.Set("networking.k8s.io/v1alpha1=true")
 		},
 	})
 	defer tearDownFn()

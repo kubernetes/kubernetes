@@ -177,10 +177,10 @@ func testClientCA(t *testing.T, recreate bool) {
 
 	kubeClient, kubeconfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
-			opts.GenericServerRunOptions.MaxRequestBodyBytes = 1024 * 1024
-			clientCAFilename = opts.Authentication.ClientCert.ClientCA
-			frontProxyCAFilename = opts.Authentication.RequestHeader.ClientCAFile
-			opts.Authentication.RequestHeader.AllowedNames = append(opts.Authentication.RequestHeader.AllowedNames, "test-aggregated-apiserver")
+			opts.GenericControlPlane.GenericAPIServer.MaxRequestBodyBytes = 1024 * 1024
+			clientCAFilename = opts.GenericControlPlane.Authentication.ClientCert.ClientCA
+			frontProxyCAFilename = opts.GenericControlPlane.Authentication.RequestHeader.ClientCAFile
+			opts.GenericControlPlane.Authentication.RequestHeader.AllowedNames = append(opts.GenericControlPlane.Authentication.RequestHeader.AllowedNames, "test-aggregated-apiserver")
 		},
 	})
 	defer tearDownFn()
@@ -481,8 +481,8 @@ func testServingCert(t *testing.T, recreate bool) {
 
 	_, kubeconfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
-			opts.GenericServerRunOptions.MaxRequestBodyBytes = 1024 * 1024
-			servingCertPath = opts.SecureServing.ServerCert.CertDirectory
+			opts.GenericControlPlane.GenericAPIServer.MaxRequestBodyBytes = 1024 * 1024
+			servingCertPath = opts.GenericControlPlane.SecureServing.ServerCert.CertDirectory
 		},
 	})
 	defer tearDownFn()
@@ -524,8 +524,8 @@ func TestSNICert(t *testing.T) {
 
 	_, kubeconfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
-			opts.GenericServerRunOptions.MaxRequestBodyBytes = 1024 * 1024
-			servingCertPath = opts.SecureServing.ServerCert.CertDirectory
+			opts.GenericControlPlane.GenericAPIServer.MaxRequestBodyBytes = 1024 * 1024
+			servingCertPath = opts.GenericControlPlane.SecureServing.ServerCert.CertDirectory
 
 			if err := os.WriteFile(path.Join(servingCertPath, "foo.key"), anotherServerKey, 0644); err != nil {
 				t.Fatal(err)
@@ -534,7 +534,7 @@ func TestSNICert(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			opts.SecureServing.SNICertKeys = []flag.NamedCertKey{{
+			opts.GenericControlPlane.SecureServing.SNICertKeys = []flag.NamedCertKey{{
 				Names:    []string{"foo"},
 				CertFile: path.Join(servingCertPath, "foo.crt"),
 				KeyFile:  path.Join(servingCertPath, "foo.key"),

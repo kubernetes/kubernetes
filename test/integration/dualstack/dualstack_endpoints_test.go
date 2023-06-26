@@ -52,7 +52,7 @@ func TestDualStackEndpoints(t *testing.T) {
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.ServiceClusterIPRanges = fmt.Sprintf("%s,%s", serviceCIDR, secondaryServiceCIDR)
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+			opts.GenericControlPlane.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
 		},
 	})
 	defer tearDownFn()

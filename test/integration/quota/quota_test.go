@@ -68,7 +68,7 @@ func TestQuota(t *testing.T) {
 	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+			opts.GenericControlPlane.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
 		},
 	})
 	defer tearDownFn()
@@ -298,8 +298,8 @@ plugins:
 	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
-			opts.Admission.GenericAdmission.ConfigFile = admissionConfigFile.Name()
+			opts.GenericControlPlane.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+			opts.GenericControlPlane.Admission.GenericAdmission.ConfigFile = admissionConfigFile.Name()
 
 		},
 	})
@@ -425,8 +425,8 @@ plugins:
 	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
-			opts.Admission.GenericAdmission.ConfigFile = admissionConfigFile.Name()
+			opts.GenericControlPlane.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+			opts.GenericControlPlane.Admission.GenericAdmission.ConfigFile = admissionConfigFile.Name()
 
 		},
 	})

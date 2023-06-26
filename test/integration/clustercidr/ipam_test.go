@@ -53,8 +53,8 @@ func TestIPAMMultiCIDRRangeAllocatorCIDRAllocate(t *testing.T) {
 	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition"}
-			opts.APIEnablement.RuntimeConfig.Set("networking.k8s.io/v1alpha1=true")
+			opts.GenericControlPlane.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition"}
+			opts.GenericControlPlane.APIEnablement.RuntimeConfig.Set("networking.k8s.io/v1alpha1=true")
 		},
 	})
 	defer tearDownFn()
@@ -140,8 +140,8 @@ func TestIPAMMultiCIDRRangeAllocatorCIDRRelease(t *testing.T) {
 	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition"}
-			opts.APIEnablement.RuntimeConfig.Set("networking.k8s.io/v1alpha1=true")
+			opts.GenericControlPlane.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition"}
+			opts.GenericControlPlane.APIEnablement.RuntimeConfig.Set("networking.k8s.io/v1alpha1=true")
 		},
 	})
 	defer tearDownFn()
@@ -218,8 +218,8 @@ func TestIPAMMultiCIDRRangeAllocatorClusterCIDRDelete(t *testing.T) {
 	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition"}
-			opts.APIEnablement.RuntimeConfig.Set("networking.k8s.io/v1alpha1=true")
+			opts.GenericControlPlane.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition"}
+			opts.GenericControlPlane.APIEnablement.RuntimeConfig.Set("networking.k8s.io/v1alpha1=true")
 		},
 	})
 	defer tearDownFn()
@@ -315,8 +315,8 @@ func TestIPAMMultiCIDRRangeAllocatorClusterCIDRTerminate(t *testing.T) {
 	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition"}
-			opts.APIEnablement.RuntimeConfig.Set("networking.k8s.io/v1alpha1=true")
+			opts.GenericControlPlane.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition"}
+			opts.GenericControlPlane.APIEnablement.RuntimeConfig.Set("networking.k8s.io/v1alpha1=true")
 		},
 	})
 	defer tearDownFn()
@@ -401,8 +401,8 @@ func TestIPAMMultiCIDRRangeAllocatorClusterCIDRTieBreak(t *testing.T) {
 	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition"}
-			opts.APIEnablement.RuntimeConfig.Set("networking.k8s.io/v1alpha1=true")
+			opts.GenericControlPlane.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition"}
+			opts.GenericControlPlane.APIEnablement.RuntimeConfig.Set("networking.k8s.io/v1alpha1=true")
 		},
 	})
 	defer tearDownFn()

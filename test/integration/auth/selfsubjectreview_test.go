@@ -102,10 +102,10 @@ func TestGetsSelfAttributes(t *testing.T) {
 
 	kubeClient, _, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
-			opts.APIEnablement.RuntimeConfig.Set("authentication.k8s.io/v1alpha1=true")
-			opts.APIEnablement.RuntimeConfig.Set("authentication.k8s.io/v1beta1=true")
-			opts.APIEnablement.RuntimeConfig.Set("authentication.k8s.io/v1=true")
-			opts.Authorization.Modes = []string{"AlwaysAllow"}
+			opts.GenericControlPlane.APIEnablement.RuntimeConfig.Set("authentication.k8s.io/v1alpha1=true")
+			opts.GenericControlPlane.APIEnablement.RuntimeConfig.Set("authentication.k8s.io/v1beta1=true")
+			opts.GenericControlPlane.APIEnablement.RuntimeConfig.Set("authentication.k8s.io/v1=true")
+			opts.GenericControlPlane.Authorization.Modes = []string{"AlwaysAllow"}
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
 			// Unset BearerToken to disable BearerToken authenticator.
@@ -221,10 +221,10 @@ func TestGetsSelfAttributesError(t *testing.T) {
 
 	kubeClient, _, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
-			opts.APIEnablement.RuntimeConfig.Set("authentication.k8s.io/v1alpha1=true")
-			opts.APIEnablement.RuntimeConfig.Set("authentication.k8s.io/v1beta1=true")
-			opts.APIEnablement.RuntimeConfig.Set("authentication.k8s.io/v1=true")
-			opts.Authorization.Modes = []string{"AlwaysAllow"}
+			opts.GenericControlPlane.APIEnablement.RuntimeConfig.Set("authentication.k8s.io/v1alpha1=true")
+			opts.GenericControlPlane.APIEnablement.RuntimeConfig.Set("authentication.k8s.io/v1beta1=true")
+			opts.GenericControlPlane.APIEnablement.RuntimeConfig.Set("authentication.k8s.io/v1=true")
+			opts.GenericControlPlane.Authorization.Modes = []string{"AlwaysAllow"}
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
 			// Unset BearerToken to disable BearerToken authenticator.

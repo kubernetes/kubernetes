@@ -126,9 +126,9 @@ func TestAddFlags(t *testing.T) {
 
 	// This is a snapshot of expected options parsed by args.
 	expected := &ServerRunOptions{
-		Options: &controlplaneapiserver.Options{
+		GenericControlPlane: &controlplaneapiserver.Options{
 			MasterCount: 5,
-			GenericServerRunOptions: &apiserveroptions.ServerRunOptions{
+			GenericAPIServer: &apiserveroptions.ServerRunOptions{
 				AdvertiseAddress:            netutils.ParseIPSloppy("192.168.10.10"),
 				CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},
 				MaxRequestsInFlight:         400,
@@ -140,12 +140,12 @@ func TestAddFlags(t *testing.T) {
 			},
 			Admission: &kubeoptions.AdmissionOptions{
 				GenericAdmission: &apiserveroptions.AdmissionOptions{
-					RecommendedPluginOrder: s.Options.Admission.GenericAdmission.RecommendedPluginOrder,
-					DefaultOffPlugins:      s.Options.Admission.GenericAdmission.DefaultOffPlugins,
+					RecommendedPluginOrder: s.GenericControlPlane.Admission.GenericAdmission.RecommendedPluginOrder,
+					DefaultOffPlugins:      s.GenericControlPlane.Admission.GenericAdmission.DefaultOffPlugins,
 					EnablePlugins:          []string{"AlwaysDeny"},
 					ConfigFile:             "/admission-control-config",
-					Plugins:                s.Options.Admission.GenericAdmission.Plugins,
-					Decorators:             s.Options.Admission.GenericAdmission.Decorators,
+					Plugins:                s.GenericControlPlane.Admission.GenericAdmission.Plugins,
+					Decorators:             s.GenericControlPlane.Admission.GenericAdmission.Decorators,
 				},
 			},
 			Etcd: &apiserveroptions.EtcdOptions{

@@ -89,18 +89,18 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 	}
 
 	opts := options.NewServerRunOptions()
-	opts.Options.SecureServing.Listener = listener
-	opts.Options.SecureServing.ServerCert.CertDirectory = certDir
-	opts.Options.ServiceAccountSigningKeyFile = saSigningKeyFile.Name()
-	opts.Options.Etcd.StorageConfig.Transport.ServerList = []string{framework.GetEtcdURL()}
-	opts.Options.Etcd.DefaultStorageMediaType = runtime.ContentTypeJSON // force json we can easily interpret the result in etcd
+	opts.GenericControlPlane.SecureServing.Listener = listener
+	opts.GenericControlPlane.SecureServing.ServerCert.CertDirectory = certDir
+	opts.GenericControlPlane.ServiceAccountSigningKeyFile = saSigningKeyFile.Name()
+	opts.GenericControlPlane.Etcd.StorageConfig.Transport.ServerList = []string{framework.GetEtcdURL()}
+	opts.GenericControlPlane.Etcd.DefaultStorageMediaType = runtime.ContentTypeJSON // force json we can easily interpret the result in etcd
 	opts.ServiceClusterIPRanges = defaultServiceClusterIPRange.String()
-	opts.Options.Authentication.APIAudiences = []string{"https://foo.bar.example.com"}
-	opts.Options.Authentication.ServiceAccounts.Issuers = []string{"https://foo.bar.example.com"}
-	opts.Options.Authentication.ServiceAccounts.KeyFiles = []string{saSigningKeyFile.Name()}
-	opts.Options.Authorization.Modes = []string{"RBAC"}
-	opts.Options.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
-	opts.Options.APIEnablement.RuntimeConfig["api/all"] = "true"
+	opts.GenericControlPlane.Authentication.APIAudiences = []string{"https://foo.bar.example.com"}
+	opts.GenericControlPlane.Authentication.ServiceAccounts.Issuers = []string{"https://foo.bar.example.com"}
+	opts.GenericControlPlane.Authentication.ServiceAccounts.KeyFiles = []string{saSigningKeyFile.Name()}
+	opts.GenericControlPlane.Authorization.Modes = []string{"RBAC"}
+	opts.GenericControlPlane.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+	opts.GenericControlPlane.APIEnablement.RuntimeConfig["api/all"] = "true"
 	for _, f := range configFuncs {
 		f(opts)
 	}
@@ -114,7 +114,7 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 	}
 
 	// get etcd client before starting API server
-	rawClient, kvClient, err := integration.GetEtcdClients(completedOptions.Etcd.StorageConfig.Transport)
+	rawClient, kvClient, err := integration.GetEtcdClients(completedOptions.ControlPlane.Etcd.StorageConfig.Transport)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -554,9 +554,9 @@ func TestRBAC(t *testing.T) {
 					// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 					// Also disable namespace lifecycle to workaroung the test limitation that first creates
 					// roles/rolebindings and only then creates corresponding namespaces.
-					opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "NamespaceLifecycle"}
+					opts.GenericControlPlane.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "NamespaceLifecycle"}
 					// Disable built-in authorizers
-					opts.Authorization.Modes = []string{"AlwaysDeny"}
+					opts.GenericControlPlane.Authorization.Modes = []string{"AlwaysDeny"}
 				},
 				ModifyServerConfig: func(config *controlplane.Config) {
 					// Append our custom test authenticator
@@ -681,7 +681,7 @@ func TestBootstrapping(t *testing.T) {
 
 	clientset, _, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
-			opts.Authorization.Modes = []string{"RBAC"}
+			opts.GenericControlPlane.Authorization.Modes = []string{"RBAC"}
 		},
 	})
 	defer tearDownFn()
@@ -743,8 +743,8 @@ func TestDiscoveryUpgradeBootstrapping(t *testing.T) {
 	client, _, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Ensure we're using the same etcd across apiserver restarts.
-			opts.Etcd.StorageConfig = *etcdConfig
-			opts.Authorization.Modes = []string{"RBAC"}
+			opts.GenericControlPlane.Etcd.StorageConfig = *etcdConfig
+			opts.GenericControlPlane.Authorization.Modes = []string{"RBAC"}
 		},
 	})
 
@@ -791,8 +791,8 @@ func TestDiscoveryUpgradeBootstrapping(t *testing.T) {
 	client, _, tearDownFn = framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Ensure we're using the same etcd across apiserver restarts.
-			opts.Etcd.StorageConfig = *etcdConfig
-			opts.Authorization.Modes = []string{"RBAC"}
+			opts.GenericControlPlane.Etcd.StorageConfig = *etcdConfig
+			opts.GenericControlPlane.Authorization.Modes = []string{"RBAC"}
 		},
 	})
 

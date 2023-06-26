@@ -473,7 +473,7 @@ func (e *transformTest) inplaceUpdatePod(namespace string, obj *unstructured.Uns
 }
 
 func (e *transformTest) readRawRecordFromETCD(path string) (*clientv3.GetResponse, error) {
-	rawClient, etcdClient, err := integration.GetEtcdClients(e.kubeAPIServer.ServerOpts.Etcd.StorageConfig.Transport)
+	rawClient, etcdClient, err := integration.GetEtcdClients(e.kubeAPIServer.ServerOpts.GenericControlPlane.Etcd.StorageConfig.Transport)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create etcd client: %v", err)
 	}
@@ -490,7 +490,7 @@ func (e *transformTest) readRawRecordFromETCD(path string) (*clientv3.GetRespons
 }
 
 func (e *transformTest) writeRawRecordToETCD(path string, data []byte) (*clientv3.PutResponse, error) {
-	rawClient, etcdClient, err := integration.GetEtcdClients(e.kubeAPIServer.ServerOpts.Etcd.StorageConfig.Transport)
+	rawClient, etcdClient, err := integration.GetEtcdClients(e.kubeAPIServer.ServerOpts.GenericControlPlane.Etcd.StorageConfig.Transport)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create etcd client: %v", err)
 	}

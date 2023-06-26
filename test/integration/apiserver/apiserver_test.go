@@ -386,8 +386,8 @@ func TestListOptions(t *testing.T) {
 			var storageTransport *storagebackend.TransportConfig
 			clientSet, _, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 				ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
-					opts.Etcd.EnableWatchCache = watchCacheEnabled
-					storageTransport = &opts.Etcd.StorageConfig.Transport
+					opts.GenericControlPlane.Etcd.EnableWatchCache = watchCacheEnabled
+					storageTransport = &opts.GenericControlPlane.Etcd.StorageConfig.Transport
 				},
 			})
 			defer tearDownFn()
@@ -631,7 +631,7 @@ func TestListResourceVersion0(t *testing.T) {
 
 			clientSet, _, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 				ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
-					opts.Etcd.EnableWatchCache = tc.watchCacheEnabled
+					opts.GenericControlPlane.Etcd.EnableWatchCache = tc.watchCacheEnabled
 				},
 			})
 			defer tearDownFn()

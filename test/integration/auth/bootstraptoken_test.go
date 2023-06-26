@@ -129,7 +129,7 @@ func TestBootstrapTokenAuth(t *testing.T) {
 
 			kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 				ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
-					opts.Authorization.Modes = []string{"AlwaysAllow"}
+					opts.GenericControlPlane.Authorization.Modes = []string{"AlwaysAllow"}
 				},
 				ModifyServerConfig: func(config *controlplane.Config) {
 					config.GenericConfig.Authentication.Authenticator = authenticator

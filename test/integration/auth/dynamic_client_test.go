@@ -60,19 +60,19 @@ func TestDynamicClientBuilder(t *testing.T) {
 
 	baseClient, baseConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
-			opts.ServiceAccountSigningKeyFile = tmpfile.Name()
-			opts.ServiceAccountTokenMaxExpiration = maxExpirationDuration
-			if opts.Authentication == nil {
-				opts.Authentication = &kubeoptions.BuiltInAuthenticationOptions{}
+			opts.GenericControlPlane.ServiceAccountSigningKeyFile = tmpfile.Name()
+			opts.GenericControlPlane.ServiceAccountTokenMaxExpiration = maxExpirationDuration
+			if opts.GenericControlPlane.Authentication == nil {
+				opts.GenericControlPlane.Authentication = &kubeoptions.BuiltInAuthenticationOptions{}
 			}
 
-			opts.Authentication.APIAudiences = aud
-			if opts.Authentication.ServiceAccounts == nil {
-				opts.Authentication.ServiceAccounts = &kubeoptions.ServiceAccountAuthenticationOptions{}
+			opts.GenericControlPlane.Authentication.APIAudiences = aud
+			if opts.GenericControlPlane.Authentication.ServiceAccounts == nil {
+				opts.GenericControlPlane.Authentication.ServiceAccounts = &kubeoptions.ServiceAccountAuthenticationOptions{}
 			}
-			opts.Authentication.ServiceAccounts.Issuers = []string{iss}
-			opts.Authentication.ServiceAccounts.KeyFiles = []string{tmpfile.Name()}
-			opts.Authorization.Modes = []string{"AlwaysAllow"}
+			opts.GenericControlPlane.Authentication.ServiceAccounts.Issuers = []string{iss}
+			opts.GenericControlPlane.Authentication.ServiceAccounts.KeyFiles = []string{tmpfile.Name()}
+			opts.GenericControlPlane.Authorization.Modes = []string{"AlwaysAllow"}
 		},
 	})
 	defer tearDownFn()

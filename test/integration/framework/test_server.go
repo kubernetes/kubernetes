@@ -128,23 +128,23 @@ func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (
 	}
 
 	opts := options.NewServerRunOptions()
-	opts.SecureServing.Listener = listener
-	opts.SecureServing.BindAddress = netutils.ParseIPSloppy("127.0.0.1")
-	opts.SecureServing.ServerCert.CertDirectory = certDir
-	opts.ServiceAccountSigningKeyFile = saSigningKeyFile.Name()
-	opts.Etcd.StorageConfig.Prefix = path.Join("/", uuid.New().String(), "registry")
-	opts.Etcd.StorageConfig.Transport.ServerList = []string{GetEtcdURL()}
+	opts.GenericControlPlane.SecureServing.Listener = listener
+	opts.GenericControlPlane.SecureServing.BindAddress = netutils.ParseIPSloppy("127.0.0.1")
+	opts.GenericControlPlane.SecureServing.ServerCert.CertDirectory = certDir
+	opts.GenericControlPlane.ServiceAccountSigningKeyFile = saSigningKeyFile.Name()
+	opts.GenericControlPlane.Etcd.StorageConfig.Prefix = path.Join("/", uuid.New().String(), "registry")
+	opts.GenericControlPlane.Etcd.StorageConfig.Transport.ServerList = []string{GetEtcdURL()}
 	opts.ServiceClusterIPRanges = defaultServiceClusterIPRange.String()
-	opts.Authentication.RequestHeader.UsernameHeaders = []string{"X-Remote-User"}
-	opts.Authentication.RequestHeader.GroupHeaders = []string{"X-Remote-Group"}
-	opts.Authentication.RequestHeader.ExtraHeaderPrefixes = []string{"X-Remote-Extra-"}
-	opts.Authentication.RequestHeader.AllowedNames = []string{"kube-aggregator"}
-	opts.Authentication.RequestHeader.ClientCAFile = proxyCACertFile.Name()
-	opts.Authentication.APIAudiences = []string{"https://foo.bar.example.com"}
-	opts.Authentication.ServiceAccounts.Issuers = []string{"https://foo.bar.example.com"}
-	opts.Authentication.ServiceAccounts.KeyFiles = []string{saSigningKeyFile.Name()}
-	opts.Authentication.ClientCert.ClientCA = clientCACertFile.Name()
-	opts.Authorization.Modes = []string{"Node", "RBAC"}
+	opts.GenericControlPlane.Authentication.RequestHeader.UsernameHeaders = []string{"X-Remote-User"}
+	opts.GenericControlPlane.Authentication.RequestHeader.GroupHeaders = []string{"X-Remote-Group"}
+	opts.GenericControlPlane.Authentication.RequestHeader.ExtraHeaderPrefixes = []string{"X-Remote-Extra-"}
+	opts.GenericControlPlane.Authentication.RequestHeader.AllowedNames = []string{"kube-aggregator"}
+	opts.GenericControlPlane.Authentication.RequestHeader.ClientCAFile = proxyCACertFile.Name()
+	opts.GenericControlPlane.Authentication.APIAudiences = []string{"https://foo.bar.example.com"}
+	opts.GenericControlPlane.Authentication.ServiceAccounts.Issuers = []string{"https://foo.bar.example.com"}
+	opts.GenericControlPlane.Authentication.ServiceAccounts.KeyFiles = []string{saSigningKeyFile.Name()}
+	opts.GenericControlPlane.Authentication.ClientCert.ClientCA = clientCACertFile.Name()
+	opts.GenericControlPlane.Authorization.Modes = []string{"Node", "RBAC"}
 
 	if setup.ModifyServerRunOptions != nil {
 		setup.ModifyServerRunOptions(opts)

@@ -62,7 +62,7 @@ func TestValidateAPIPriorityAndFairness(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.runtimeConfig, func(t *testing.T) {
 			options := &Options{
-				GenericServerRunOptions: &genericoptions.ServerRunOptions{
+				GenericAPIServer: &genericoptions.ServerRunOptions{
 					EnablePriorityAndFairness: true,
 				},
 				APIEnablement: genericoptions.NewAPIEnablementOptions(),
@@ -90,11 +90,11 @@ func TestValidateOptions(t *testing.T) {
 			name:         "validate master count equal 0",
 			expectErrors: true,
 			options: &Options{
-				MasterCount:             0,
-				GenericServerRunOptions: &genericoptions.ServerRunOptions{},
-				Etcd:                    &genericoptions.EtcdOptions{},
-				SecureServing:           &genericoptions.SecureServingOptionsWithLoopback{},
-				Audit:                   &genericoptions.AuditOptions{},
+				MasterCount:      0,
+				GenericAPIServer: &genericoptions.ServerRunOptions{},
+				Etcd:             &genericoptions.EtcdOptions{},
+				SecureServing:    &genericoptions.SecureServingOptionsWithLoopback{},
+				Audit:            &genericoptions.AuditOptions{},
 				Admission: &kubeoptions.AdmissionOptions{
 					GenericAdmission: &genericoptions.AdmissionOptions{
 						EnablePlugins: []string{"foo"},
@@ -117,11 +117,11 @@ func TestValidateOptions(t *testing.T) {
 			name:         "validate token request enable not attempted",
 			expectErrors: true,
 			options: &Options{
-				MasterCount:             1,
-				GenericServerRunOptions: &genericoptions.ServerRunOptions{},
-				Etcd:                    &genericoptions.EtcdOptions{},
-				SecureServing:           &genericoptions.SecureServingOptionsWithLoopback{},
-				Audit:                   &genericoptions.AuditOptions{},
+				MasterCount:      1,
+				GenericAPIServer: &genericoptions.ServerRunOptions{},
+				Etcd:             &genericoptions.EtcdOptions{},
+				SecureServing:    &genericoptions.SecureServingOptionsWithLoopback{},
+				Audit:            &genericoptions.AuditOptions{},
 				Admission: &kubeoptions.AdmissionOptions{
 					GenericAdmission: &genericoptions.AdmissionOptions{
 						EnablePlugins: []string{""},

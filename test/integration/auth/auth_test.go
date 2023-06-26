@@ -461,8 +461,8 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 	kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
-			opts.Authorization.Modes = []string{"AlwaysAllow"}
+			opts.GenericControlPlane.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+			opts.GenericControlPlane.Authorization.Modes = []string{"AlwaysAllow"}
 		},
 	})
 	defer tearDownFn()
@@ -569,9 +569,9 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 	kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
-			opts.Authorization.Modes = []string{"AlwaysDeny"}
-			opts.Authentication.TokenFile.TokenFile = "testdata/tokens.csv"
+			opts.GenericControlPlane.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+			opts.GenericControlPlane.Authorization.Modes = []string{"AlwaysDeny"}
+			opts.GenericControlPlane.Authentication.TokenFile.TokenFile = "testdata/tokens.csv"
 		},
 	})
 	defer tearDownFn()
@@ -617,10 +617,10 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 	kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
-			opts.Authentication.TokenFile.TokenFile = "testdata/tokens.csv"
-			opts.Authorization.Modes = []string{"ABAC"}
-			opts.Authorization.PolicyFile = "testdata/allowalice.jsonl"
+			opts.GenericControlPlane.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+			opts.GenericControlPlane.Authentication.TokenFile.TokenFile = "testdata/tokens.csv"
+			opts.GenericControlPlane.Authorization.Modes = []string{"ABAC"}
+			opts.GenericControlPlane.Authorization.PolicyFile = "testdata/allowalice.jsonl"
 		},
 	})
 	defer tearDownFn()
@@ -697,10 +697,10 @@ func TestBobIsForbidden(t *testing.T) {
 	kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
-			opts.Authentication.TokenFile.TokenFile = "testdata/tokens.csv"
-			opts.Authorization.Modes = []string{"ABAC"}
-			opts.Authorization.PolicyFile = "testdata/allowalice.jsonl"
+			opts.GenericControlPlane.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+			opts.GenericControlPlane.Authentication.TokenFile.TokenFile = "testdata/tokens.csv"
+			opts.GenericControlPlane.Authorization.Modes = []string{"ABAC"}
+			opts.GenericControlPlane.Authorization.PolicyFile = "testdata/allowalice.jsonl"
 		},
 	})
 	defer tearDownFn()
@@ -750,10 +750,10 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 	kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
-			opts.Authentication.TokenFile.TokenFile = "testdata/tokens.csv"
-			opts.Authorization.Modes = []string{"ABAC"}
-			opts.Authorization.PolicyFile = "testdata/allowalice.jsonl"
+			opts.GenericControlPlane.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+			opts.GenericControlPlane.Authentication.TokenFile.TokenFile = "testdata/tokens.csv"
+			opts.GenericControlPlane.Authorization.Modes = []string{"ABAC"}
+			opts.GenericControlPlane.Authorization.PolicyFile = "testdata/allowalice.jsonl"
 		},
 	})
 	defer tearDownFn()
@@ -826,8 +826,8 @@ func TestImpersonateIsForbidden(t *testing.T) {
 	kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
-			opts.Authentication.TokenFile.TokenFile = "testdata/tokens.csv"
+			opts.GenericControlPlane.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+			opts.GenericControlPlane.Authentication.TokenFile.TokenFile = "testdata/tokens.csv"
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
 			// Prepend an impersonation authorizer with specific opinions about alice and bob
@@ -1134,8 +1134,8 @@ func TestAuthorizationAttributeDetermination(t *testing.T) {
 	kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
-			opts.Authentication.TokenFile.TokenFile = "testdata/tokens.csv"
+			opts.GenericControlPlane.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+			opts.GenericControlPlane.Authentication.TokenFile.TokenFile = "testdata/tokens.csv"
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
 			config.GenericConfig.Authorization.Authorizer = unionauthz.New(config.GenericConfig.Authorization.Authorizer, trackingAuthorizer)
@@ -1208,10 +1208,10 @@ func TestNamespaceAuthorization(t *testing.T) {
 	kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
-			opts.Authentication.TokenFile.TokenFile = "testdata/tokens.csv"
-			opts.Authorization.PolicyFile = newABACFileWithContents(t, `{"namespace": "auth-namespace"}`)
-			opts.Authorization.Modes = []string{"ABAC"}
+			opts.GenericControlPlane.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+			opts.GenericControlPlane.Authentication.TokenFile.TokenFile = "testdata/tokens.csv"
+			opts.GenericControlPlane.Authorization.PolicyFile = newABACFileWithContents(t, `{"namespace": "auth-namespace"}`)
+			opts.GenericControlPlane.Authorization.Modes = []string{"ABAC"}
 		},
 	})
 	defer tearDownFn()
@@ -1313,10 +1313,10 @@ func TestKindAuthorization(t *testing.T) {
 	kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
-			opts.Authentication.TokenFile.TokenFile = "testdata/tokens.csv"
-			opts.Authorization.PolicyFile = newABACFileWithContents(t, `{"resource": "services"}`)
-			opts.Authorization.Modes = []string{"ABAC"}
+			opts.GenericControlPlane.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+			opts.GenericControlPlane.Authentication.TokenFile.TokenFile = "testdata/tokens.csv"
+			opts.GenericControlPlane.Authorization.PolicyFile = newABACFileWithContents(t, `{"resource": "services"}`)
+			opts.GenericControlPlane.Authorization.Modes = []string{"ABAC"}
 		},
 	})
 	defer tearDownFn()
@@ -1400,10 +1400,10 @@ func TestReadOnlyAuthorization(t *testing.T) {
 	kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
-			opts.Authentication.TokenFile.TokenFile = "testdata/tokens.csv"
-			opts.Authorization.PolicyFile = newABACFileWithContents(t, `{"readonly": true}`)
-			opts.Authorization.Modes = []string{"ABAC"}
+			opts.GenericControlPlane.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+			opts.GenericControlPlane.Authentication.TokenFile.TokenFile = "testdata/tokens.csv"
+			opts.GenericControlPlane.Authorization.PolicyFile = newABACFileWithContents(t, `{"readonly": true}`)
+			opts.GenericControlPlane.Authorization.Modes = []string{"ABAC"}
 		},
 	})
 	defer tearDownFn()
@@ -1483,9 +1483,9 @@ func testWebhookTokenAuthenticator(customDialer bool, t *testing.T) {
 	kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
-			opts.Authorization.Modes = []string{"ABAC"}
-			opts.Authorization.PolicyFile = "testdata/allowalice.jsonl"
+			opts.GenericControlPlane.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+			opts.GenericControlPlane.Authorization.Modes = []string{"ABAC"}
+			opts.GenericControlPlane.Authorization.PolicyFile = "testdata/allowalice.jsonl"
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
 			config.GenericConfig.Authentication.Authenticator = group.NewAuthenticatedGroupAdder(authenticator)

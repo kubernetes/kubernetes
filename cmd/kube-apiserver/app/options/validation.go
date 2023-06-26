@@ -106,7 +106,7 @@ func validateServiceNodePort(options Extra) []error {
 func (s CompletedOptions) Validate() []error {
 	var errs []error
 
-	errs = append(errs, s.CompletedOptions.Validate()...)
+	errs = append(errs, s.ControlPlane.Validate()...)
 	errs = append(errs, validateClusterIPFlags(s.Extra)...)
 	errs = append(errs, validateServiceNodePort(s.Extra)...)
 

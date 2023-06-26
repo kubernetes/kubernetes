@@ -63,7 +63,7 @@ func BuildGenericConfig(
 	genericConfig = genericapiserver.NewConfig(legacyscheme.Codecs)
 	genericConfig.MergedResourceConfig = controlplane.DefaultAPIResourceConfigSource()
 
-	if lastErr = s.GenericServerRunOptions.ApplyTo(genericConfig); lastErr != nil {
+	if lastErr = s.GenericAPIServer.ApplyTo(genericConfig); lastErr != nil {
 		return
 	}
 
@@ -155,7 +155,7 @@ func BuildGenericConfig(
 		return
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) && s.GenericServerRunOptions.EnablePriorityAndFairness {
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) && s.GenericAPIServer.EnablePriorityAndFairness {
 		genericConfig.FlowControl, lastErr = BuildPriorityAndFairness(s, clientgoExternalClient, versionedInformers)
 	}
 
@@ -183,13 +183,13 @@ func BuildAuthorizer(s controlplaneapiserver.CompletedOptions, EgressSelector *e
 
 // BuildPriorityAndFairness constructs the guts of the API Priority and Fairness filter
 func BuildPriorityAndFairness(s controlplaneapiserver.CompletedOptions, extclient clientgoclientset.Interface, versionedInformer clientgoinformers.SharedInformerFactory) (utilflowcontrol.Interface, error) {
-	if s.GenericServerRunOptions.MaxRequestsInFlight+s.GenericServerRunOptions.MaxMutatingRequestsInFlight <= 0 {
-		return nil, fmt.Errorf("invalid configuration: MaxRequestsInFlight=%d and MaxMutatingRequestsInFlight=%d; they must add up to something positive", s.GenericServerRunOptions.MaxRequestsInFlight, s.GenericServerRunOptions.MaxMutatingRequestsInFlight)
+	if s.GenericAPIServer.MaxRequestsInFlight+s.GenericAPIServer.MaxMutatingRequestsInFlight <= 0 {
+		return nil, fmt.Errorf("invalid configuration: MaxRequestsInFlight=%d and MaxMutatingRequestsInFlight=%d; they must add up to something positive", s.GenericAPIServer.MaxRequestsInFlight, s.GenericAPIServer.MaxMutatingRequestsInFlight)
 	}
 	return utilflowcontrol.New(
 		versionedInformer,
 		extclient.FlowcontrolV1beta3(),
-		s.GenericServerRunOptions.MaxRequestsInFlight+s.GenericServerRunOptions.MaxMutatingRequestsInFlight,
-		s.GenericServerRunOptions.RequestTimeout/4,
+		s.GenericAPIServer.MaxRequestsInFlight+s.GenericAPIServer.MaxMutatingRequestsInFlight,
+		s.GenericAPIServer.RequestTimeout/4,
 	), nil
 }

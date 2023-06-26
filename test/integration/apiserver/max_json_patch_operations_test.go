@@ -39,7 +39,7 @@ func TestMaxJSONPatchOperations(t *testing.T) {
 
 	clientSet, _, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
-			opts.GenericServerRunOptions.MaxRequestBodyBytes = 1024 * 1024
+			opts.GenericControlPlane.GenericAPIServer.MaxRequestBodyBytes = 1024 * 1024
 		},
 	})
 	defer tearDownFn()

@@ -61,22 +61,22 @@ func (a *APIServer) Start() error {
 	const tokenFilePath = "known_tokens.csv"
 
 	o := options.NewServerRunOptions()
-	o.Etcd.StorageConfig = a.storageConfig
+	o.GenericControlPlane.Etcd.StorageConfig = a.storageConfig
 	_, ipnet, err := netutils.ParseCIDRSloppy(clusterIPRange)
 	if err != nil {
 		return err
 	}
 	if len(framework.TestContext.RuntimeConfig) > 0 {
-		o.APIEnablement.RuntimeConfig = framework.TestContext.RuntimeConfig
+		o.GenericControlPlane.APIEnablement.RuntimeConfig = framework.TestContext.RuntimeConfig
 	}
-	o.SecureServing.BindAddress = netutils.ParseIPSloppy("127.0.0.1")
+	o.GenericControlPlane.SecureServing.BindAddress = netutils.ParseIPSloppy("127.0.0.1")
 	o.ServiceClusterIPRanges = ipnet.String()
 	o.AllowPrivileged = true
 	if err := generateTokenFile(tokenFilePath); err != nil {
 		return fmt.Errorf("failed to generate token file %s: %w", tokenFilePath, err)
 	}
-	o.Authentication.TokenFile.TokenFile = tokenFilePath
-	o.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition"}
+	o.GenericControlPlane.Authentication.TokenFile.TokenFile = tokenFilePath
+	o.GenericControlPlane.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition"}
 
 	saSigningKeyFile, err := os.CreateTemp("/tmp", "insecure_test_key")
 	if err != nil {
@@ -86,10 +86,10 @@ func (a *APIServer) Start() error {
 	if err = os.WriteFile(saSigningKeyFile.Name(), []byte(ecdsaPrivateKey), 0666); err != nil {
 		return fmt.Errorf("write file %s failed: %w", saSigningKeyFile.Name(), err)
 	}
-	o.ServiceAccountSigningKeyFile = saSigningKeyFile.Name()
-	o.Authentication.APIAudiences = []string{"https://foo.bar.example.com"}
-	o.Authentication.ServiceAccounts.Issuers = []string{"https://foo.bar.example.com"}
-	o.Authentication.ServiceAccounts.KeyFiles = []string{saSigningKeyFile.Name()}
+	o.GenericControlPlane.ServiceAccountSigningKeyFile = saSigningKeyFile.Name()
+	o.GenericControlPlane.Authentication.APIAudiences = []string{"https://foo.bar.example.com"}
+	o.GenericControlPlane.Authentication.ServiceAccounts.Issuers = []string{"https://foo.bar.example.com"}
+	o.GenericControlPlane.Authentication.ServiceAccounts.KeyFiles = []string{saSigningKeyFile.Name()}
 
 	o.KubeletConfig.PreferredAddressTypes = []string{"InternalIP"}
 

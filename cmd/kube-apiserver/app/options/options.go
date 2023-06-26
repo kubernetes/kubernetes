@@ -36,8 +36,8 @@ import (
 
 // ServerRunOptions runs a kubernetes api server.
 type ServerRunOptions struct {
-	*controlplaneapiserver.Options // embedded to avoid noise in existing consumers
-	CloudProvider                  *kubeoptions.CloudProviderOptions
+	GenericControlPlane *controlplaneapiserver.Options // embedded to avoid noise in existing consumers
+	CloudProvider       *kubeoptions.CloudProviderOptions
 
 	Extra
 }
@@ -63,8 +63,8 @@ type Extra struct {
 // NewServerRunOptions creates a new ServerRunOptions object with default parameters
 func NewServerRunOptions() *ServerRunOptions {
 	s := ServerRunOptions{
-		Options:       controlplaneapiserver.NewOptions(),
-		CloudProvider: kubeoptions.NewCloudProviderOptions(),
+		GenericControlPlane: controlplaneapiserver.NewOptions(),
+		CloudProvider:       kubeoptions.NewCloudProviderOptions(),
 
 		Extra: Extra{
 			EndpointReconcilerType: string(reconcilers.LeaseEndpointReconcilerType),
@@ -94,7 +94,7 @@ func NewServerRunOptions() *ServerRunOptions {
 
 // Flags returns flags for a specific APIServer by section name
 func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
-	s.Options.AddFlags(&fss)
+	s.GenericControlPlane.AddFlags(&fss)
 	s.CloudProvider.AddFlags(fss.FlagSet("cloud provider"))
 
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to

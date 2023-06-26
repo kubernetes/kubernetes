@@ -84,7 +84,7 @@ Bgqc+dJN9xS9Ah5gLiGQJ6C4niUA11piCpvMsy+j/LQ1Erx47KMar5fuMXYk7iPq
 
 	clientSet, _, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
-			opts.GenericServerRunOptions.MaxRequestBodyBytes = 1024 * 1024
+			opts.GenericControlPlane.GenericAPIServer.MaxRequestBodyBytes = 1024 * 1024
 			// I have no idea what this cert is, but it doesn't matter, we just want something that always fails validation
 			opts.KubeletConfig.TLSClientConfig.CAFile = badCA
 		},
@@ -257,7 +257,7 @@ func TestPodLogsKubeletClientCertReload(t *testing.T) {
 
 	clientSet, _, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
-			opts.GenericServerRunOptions.MaxRequestBodyBytes = 1024 * 1024
+			opts.GenericControlPlane.GenericAPIServer.MaxRequestBodyBytes = 1024 * 1024
 			opts.KubeletConfig.TLSClientConfig.CAFile = kubeletCA
 			opts.KubeletConfig.TLSClientConfig.CertFile = startingCerts.clientCertFile
 			opts.KubeletConfig.TLSClientConfig.KeyFile = startingCerts.clientCertKeyFile

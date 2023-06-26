@@ -143,16 +143,16 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		fs.AddFlagSet(f)
 	}
 
-	s.SecureServing.Listener, s.SecureServing.BindPort, err = createLocalhostListenerOnFreePort()
+	s.GenericControlPlane.SecureServing.Listener, s.GenericControlPlane.SecureServing.BindPort, err = createLocalhostListenerOnFreePort()
 	if err != nil {
 		return result, fmt.Errorf("failed to create listener: %v", err)
 	}
-	s.SecureServing.ServerCert.CertDirectory = result.TmpDir
+	s.GenericControlPlane.SecureServing.ServerCert.CertDirectory = result.TmpDir
 
 	if instanceOptions.EnableCertAuth {
 		// set up default headers for request header auth
 		reqHeaders := serveroptions.NewDelegatingAuthenticationOptions()
-		s.Authentication.RequestHeader = &reqHeaders.RequestHeader
+		s.GenericControlPlane.Authentication.RequestHeader = &reqHeaders.RequestHeader
 
 		// create certificates for aggregation and client-cert auth
 		proxySigningKey, err := testutil.NewPrivateKey()
@@ -163,15 +163,15 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		if err != nil {
 			return result, err
 		}
-		proxyCACertFile := path.Join(s.SecureServing.ServerCert.CertDirectory, "proxy-ca.crt")
+		proxyCACertFile := path.Join(s.GenericControlPlane.SecureServing.ServerCert.CertDirectory, "proxy-ca.crt")
 		if err := os.WriteFile(proxyCACertFile, testutil.EncodeCertPEM(proxySigningCert), 0644); err != nil {
 			return result, err
 		}
-		s.Authentication.RequestHeader.ClientCAFile = proxyCACertFile
+		s.GenericControlPlane.Authentication.RequestHeader.ClientCAFile = proxyCACertFile
 
 		// give the kube api server an "identity" it can use to for request header auth
 		// so that aggregated api servers can understand who the calling user is
-		s.Authentication.RequestHeader.AllowedNames = []string{"ash", "misty", "brock"}
+		s.GenericControlPlane.Authentication.RequestHeader.AllowedNames = []string{"ash", "misty", "brock"}
 		// make a client certificate for the api server - common name has to match one of our defined names above
 		tenThousandHoursLater := time.Now().Add(10_000 * time.Hour)
 		clientCrtOfAPIServer, signer, err := pkiutil.NewCertAndKey(proxySigningCert, proxySigningKey, &pkiutil.CertConfig{
@@ -187,11 +187,11 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		if err != nil {
 			return result, err
 		}
-		if err := pkiutil.WriteCertAndKey(s.SecureServing.ServerCert.CertDirectory, "misty-crt", clientCrtOfAPIServer, signer); err != nil {
+		if err := pkiutil.WriteCertAndKey(s.GenericControlPlane.SecureServing.ServerCert.CertDirectory, "misty-crt", clientCrtOfAPIServer, signer); err != nil {
 			return result, err
 		}
-		s.ProxyClientKeyFile = path.Join(s.SecureServing.ServerCert.CertDirectory, "misty-crt.key")
-		s.ProxyClientCertFile = path.Join(s.SecureServing.ServerCert.CertDirectory, "misty-crt.crt")
+		s.GenericControlPlane.ProxyClientKeyFile = path.Join(s.GenericControlPlane.SecureServing.ServerCert.CertDirectory, "misty-crt.key")
+		s.GenericControlPlane.ProxyClientCertFile = path.Join(s.GenericControlPlane.SecureServing.ServerCert.CertDirectory, "misty-crt.crt")
 
 		clientSigningKey, err := testutil.NewPrivateKey()
 		if err != nil {
@@ -201,24 +201,24 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		if err != nil {
 			return result, err
 		}
-		clientCACertFile := path.Join(s.SecureServing.ServerCert.CertDirectory, "client-ca.crt")
+		clientCACertFile := path.Join(s.GenericControlPlane.SecureServing.ServerCert.CertDirectory, "client-ca.crt")
 		if err := os.WriteFile(clientCACertFile, testutil.EncodeCertPEM(clientSigningCert), 0644); err != nil {
 			return result, err
 		}
-		s.Authentication.ClientCert.ClientCA = clientCACertFile
+		s.GenericControlPlane.Authentication.ClientCert.ClientCA = clientCACertFile
 	}
 
-	s.SecureServing.ExternalAddress = s.SecureServing.Listener.Addr().(*net.TCPAddr).IP // use listener addr although it is a loopback device
+	s.GenericControlPlane.SecureServing.ExternalAddress = s.GenericControlPlane.SecureServing.Listener.Addr().(*net.TCPAddr).IP // use listener addr although it is a loopback device
 
 	pkgPath, err := pkgPath(t)
 	if err != nil {
 		return result, err
 	}
-	s.SecureServing.ServerCert.FixtureDirectory = filepath.Join(pkgPath, "testdata")
+	s.GenericControlPlane.SecureServing.ServerCert.FixtureDirectory = filepath.Join(pkgPath, "testdata")
 
 	s.ServiceClusterIPRanges = "10.0.0.0/16"
-	s.Etcd.StorageConfig = *storageConfig
-	s.APIEnablement.RuntimeConfig.Set("api/all=true")
+	s.GenericControlPlane.Etcd.StorageConfig = *storageConfig
+	s.GenericControlPlane.APIEnablement.RuntimeConfig.Set("api/all=true")
 
 	if err := fs.Parse(customFlags); err != nil {
 		return result, err
@@ -232,9 +232,9 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	if err = os.WriteFile(saSigningKeyFile.Name(), []byte(ecdsaPrivateKey), 0666); err != nil {
 		t.Fatalf("write file %s failed: %v", saSigningKeyFile.Name(), err)
 	}
-	s.ServiceAccountSigningKeyFile = saSigningKeyFile.Name()
-	s.Authentication.ServiceAccounts.Issuers = []string{"https://foo.bar.example.com"}
-	s.Authentication.ServiceAccounts.KeyFiles = []string{saSigningKeyFile.Name()}
+	s.GenericControlPlane.ServiceAccountSigningKeyFile = saSigningKeyFile.Name()
+	s.GenericControlPlane.Authentication.ServiceAccounts.Issuers = []string{"https://foo.bar.example.com"}
+	s.GenericControlPlane.Authentication.ServiceAccounts.KeyFiles = []string{saSigningKeyFile.Name()}
 
 	completedOptions, err := s.Complete()
 	if err != nil {
@@ -245,8 +245,8 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		return result, fmt.Errorf("failed to validate ServerRunOptions: %v", utilerrors.NewAggregate(errs))
 	}
 
-	t.Logf("runtime-config=%v", completedOptions.APIEnablement.RuntimeConfig)
-	t.Logf("Starting kube-apiserver on port %d...", s.SecureServing.BindPort)
+	t.Logf("runtime-config=%v", completedOptions.ControlPlane.APIEnablement.RuntimeConfig)
+	t.Logf("Starting kube-apiserver on port %d...", s.GenericControlPlane.SecureServing.BindPort)
 
 	config, err := app.NewConfig(completedOptions)
 	if err != nil {

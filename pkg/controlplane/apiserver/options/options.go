@@ -42,19 +42,19 @@ import (
 )
 
 type Options struct {
-	GenericServerRunOptions *genericoptions.ServerRunOptions
-	Etcd                    *genericoptions.EtcdOptions
-	SecureServing           *genericoptions.SecureServingOptionsWithLoopback
-	Audit                   *genericoptions.AuditOptions
-	Features                *genericoptions.FeatureOptions
-	Admission               *kubeoptions.AdmissionOptions
-	Authentication          *kubeoptions.BuiltInAuthenticationOptions
-	Authorization           *kubeoptions.BuiltInAuthorizationOptions
-	APIEnablement           *genericoptions.APIEnablementOptions
-	EgressSelector          *genericoptions.EgressSelectorOptions
-	Metrics                 *metrics.Options
-	Logs                    *logs.Options
-	Traces                  *genericoptions.TracingOptions
+	GenericAPIServer *genericoptions.ServerRunOptions
+	Etcd             *genericoptions.EtcdOptions
+	SecureServing    *genericoptions.SecureServingOptionsWithLoopback
+	Audit            *genericoptions.AuditOptions
+	Features         *genericoptions.FeatureOptions
+	Admission        *kubeoptions.AdmissionOptions
+	Authentication   *kubeoptions.BuiltInAuthenticationOptions
+	Authorization    *kubeoptions.BuiltInAuthorizationOptions
+	APIEnablement    *genericoptions.APIEnablementOptions
+	EgressSelector   *genericoptions.EgressSelectorOptions
+	Metrics          *metrics.Options
+	Logs             *logs.Options
+	Traces           *genericoptions.TracingOptions
 
 	EnableLogsHandler        bool
 	EventTTL                 time.Duration
@@ -88,19 +88,19 @@ type CompletedOptions struct {
 // NewOptions creates a new ServerRunOptions object with default parameters
 func NewOptions() *Options {
 	s := Options{
-		GenericServerRunOptions: genericoptions.NewServerRunOptions(),
-		Etcd:                    genericoptions.NewEtcdOptions(storagebackend.NewDefaultConfig(kubeoptions.DefaultEtcdPathPrefix, nil)),
-		SecureServing:           kubeoptions.NewSecureServingOptions(),
-		Audit:                   genericoptions.NewAuditOptions(),
-		Features:                genericoptions.NewFeatureOptions(),
-		Admission:               kubeoptions.NewAdmissionOptions(),
-		Authentication:          kubeoptions.NewBuiltInAuthenticationOptions().WithAll(),
-		Authorization:           kubeoptions.NewBuiltInAuthorizationOptions(),
-		APIEnablement:           genericoptions.NewAPIEnablementOptions(),
-		EgressSelector:          genericoptions.NewEgressSelectorOptions(),
-		Metrics:                 metrics.NewOptions(),
-		Logs:                    logs.NewOptions(),
-		Traces:                  genericoptions.NewTracingOptions(),
+		GenericAPIServer: genericoptions.NewServerRunOptions(),
+		Etcd:             genericoptions.NewEtcdOptions(storagebackend.NewDefaultConfig(kubeoptions.DefaultEtcdPathPrefix, nil)),
+		SecureServing:    kubeoptions.NewSecureServingOptions(),
+		Audit:            genericoptions.NewAuditOptions(),
+		Features:         genericoptions.NewFeatureOptions(),
+		Admission:        kubeoptions.NewAdmissionOptions(),
+		Authentication:   kubeoptions.NewBuiltInAuthenticationOptions().WithAll(),
+		Authorization:    kubeoptions.NewBuiltInAuthorizationOptions(),
+		APIEnablement:    genericoptions.NewAPIEnablementOptions(),
+		EgressSelector:   genericoptions.NewEgressSelectorOptions(),
+		Metrics:          metrics.NewOptions(),
+		Logs:             logs.NewOptions(),
+		Traces:           genericoptions.NewTracingOptions(),
 
 		EnableLogsHandler:                   true,
 		EventTTL:                            1 * time.Hour,
@@ -116,7 +116,7 @@ func NewOptions() *Options {
 
 func (s *Options) AddFlags(fss *cliflag.NamedFlagSets) {
 	// Add the generic flags.
-	s.GenericServerRunOptions.AddUniversalFlags(fss.FlagSet("generic"))
+	s.GenericAPIServer.AddUniversalFlags(fss.FlagSet("generic"))
 	s.Etcd.AddFlags(fss.FlagSet("etcd"))
 	s.SecureServing.AddFlags(fss.FlagSet("secure serving"))
 	s.Audit.AddFlags(fss.FlagSet("auditing"))
@@ -181,25 +181,25 @@ func (o *Options) Complete(alternateDNS []string, alternateIPs []net.IP) (Comple
 	}
 
 	// set defaults
-	if err := completed.GenericServerRunOptions.DefaultAdvertiseAddress(completed.SecureServing.SecureServingOptions); err != nil {
+	if err := completed.GenericAPIServer.DefaultAdvertiseAddress(completed.SecureServing.SecureServingOptions); err != nil {
 		return CompletedOptions{}, err
 	}
 
-	if err := completed.SecureServing.MaybeDefaultWithSelfSignedCerts(completed.GenericServerRunOptions.AdvertiseAddress.String(), alternateDNS, alternateIPs); err != nil {
+	if err := completed.SecureServing.MaybeDefaultWithSelfSignedCerts(completed.GenericAPIServer.AdvertiseAddress.String(), alternateDNS, alternateIPs); err != nil {
 		return CompletedOptions{}, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
-	if len(completed.GenericServerRunOptions.ExternalHost) == 0 {
-		if len(completed.GenericServerRunOptions.AdvertiseAddress) > 0 {
-			completed.GenericServerRunOptions.ExternalHost = completed.GenericServerRunOptions.AdvertiseAddress.String()
+	if len(completed.GenericAPIServer.ExternalHost) == 0 {
+		if len(completed.GenericAPIServer.AdvertiseAddress) > 0 {
+			completed.GenericAPIServer.ExternalHost = completed.GenericAPIServer.AdvertiseAddress.String()
 		} else {
 			hostname, err := os.Hostname()
 			if err != nil {
 				return CompletedOptions{}, fmt.Errorf("error finding host name: %v", err)
 			}
-			completed.GenericServerRunOptions.ExternalHost = hostname
+			completed.GenericAPIServer.ExternalHost = hostname
 		}
-		klog.Infof("external host was not specified, using %v", completed.GenericServerRunOptions.ExternalHost)
+		klog.Infof("external host was not specified, using %v", completed.GenericAPIServer.ExternalHost)
 	}
 
 	completed.Authentication.ApplyAuthorization(completed.Authorization)

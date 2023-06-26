@@ -284,7 +284,7 @@ func TestCreateServiceDualStackIPv6(t *testing.T) {
 	client, _, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.ServiceClusterIPRanges = serviceCIDR
-			opts.GenericServerRunOptions.AdvertiseAddress = netutils.ParseIPSloppy("2001:db8::10")
+			opts.GenericControlPlane.GenericAPIServer.AdvertiseAddress = netutils.ParseIPSloppy("2001:db8::10")
 		},
 	})
 	defer tearDownFn()
@@ -771,7 +771,7 @@ func TestCreateServiceDualStackIPv6IPv4(t *testing.T) {
 	client, _, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.ServiceClusterIPRanges = fmt.Sprintf("%s,%s", serviceCIDR, secondaryServiceCIDR)
-			opts.GenericServerRunOptions.AdvertiseAddress = netutils.ParseIPSloppy("2001:db8::10")
+			opts.GenericControlPlane.GenericAPIServer.AdvertiseAddress = netutils.ParseIPSloppy("2001:db8::10")
 		},
 	})
 	defer tearDownFn()
@@ -1427,7 +1427,7 @@ func TestUpgradeServicePreferToDualStack(t *testing.T) {
 
 	client, _, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
-			opts.Etcd.StorageConfig = *sharedEtcd
+			opts.GenericControlPlane.Etcd.StorageConfig = *sharedEtcd
 			opts.ServiceClusterIPRanges = serviceCIDR
 		},
 	})
@@ -1485,7 +1485,7 @@ func TestUpgradeServicePreferToDualStack(t *testing.T) {
 
 	client, _, tearDownFn = framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
-			opts.Etcd.StorageConfig = *sharedEtcd
+			opts.GenericControlPlane.Etcd.StorageConfig = *sharedEtcd
 			opts.ServiceClusterIPRanges = fmt.Sprintf("%s,%s", serviceCIDR, secondaryServiceCIDR)
 		},
 	})
@@ -1525,7 +1525,7 @@ func TestDowngradeServicePreferToDualStack(t *testing.T) {
 
 	client, _, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
-			opts.Etcd.StorageConfig = *sharedEtcd
+			opts.GenericControlPlane.Etcd.StorageConfig = *sharedEtcd
 			opts.ServiceClusterIPRanges = fmt.Sprintf("%s,%s", serviceCIDR, secondaryServiceCIDR)
 		},
 	})
@@ -1579,7 +1579,7 @@ func TestDowngradeServicePreferToDualStack(t *testing.T) {
 	// reset secondary
 	client, _, tearDownFn = framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
-			opts.Etcd.StorageConfig = *sharedEtcd
+			opts.GenericControlPlane.Etcd.StorageConfig = *sharedEtcd
 			opts.ServiceClusterIPRanges = serviceCIDR
 		},
 	})

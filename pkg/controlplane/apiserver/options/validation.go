@@ -50,7 +50,7 @@ func validateTokenRequest(options *Options) []error {
 }
 
 func validateAPIPriorityAndFairness(options *Options) []error {
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) && options.GenericServerRunOptions.EnablePriorityAndFairness {
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) && options.GenericAPIServer.EnablePriorityAndFairness {
 		// If none of the following runtime config options are specified,
 		// APF is assumed to be turned on. The internal APF controller uses
 		// v1beta3 so it should be enabled.

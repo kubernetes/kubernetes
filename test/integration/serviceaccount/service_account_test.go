@@ -354,7 +354,7 @@ func startServiceAccountTestServerAndWaitForCaches(ctx context.Context, t *testi
 	rootClientset, clientConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			var err error
-			serviceAccountKey, err = keyutil.PrivateKeyFromFile(opts.ServiceAccountSigningKeyFile)
+			serviceAccountKey, err = keyutil.PrivateKeyFromFile(opts.GenericControlPlane.ServiceAccountSigningKeyFile)
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -84,15 +84,15 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
-			opts.Authorization.Modes = []string{"AlwaysAllow"}
+			opts.GenericControlPlane.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+			opts.GenericControlPlane.Authorization.Modes = []string{"AlwaysAllow"}
 			// Disable token cache so we can check reaction to service account deletion quickly
-			opts.Authentication.TokenSuccessCacheTTL = 0
-			opts.Authentication.TokenFailureCacheTTL = 0
+			opts.GenericControlPlane.Authentication.TokenSuccessCacheTTL = 0
+			opts.GenericControlPlane.Authentication.TokenFailureCacheTTL = 0
 			// Pin to fixed URLs for easier testing
-			opts.Authentication.ServiceAccounts.JWKSURI = "https:///openid/v1/jwks"
-			opts.Authentication.ServiceAccounts.Issuers = []string{iss}
-			opts.Authentication.APIAudiences = aud
+			opts.GenericControlPlane.Authentication.ServiceAccounts.JWKSURI = "https:///openid/v1/jwks"
+			opts.GenericControlPlane.Authentication.ServiceAccounts.Issuers = []string{iss}
+			opts.GenericControlPlane.Authentication.APIAudiences = aud
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
 			// extract token generator

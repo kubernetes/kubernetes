@@ -147,11 +147,11 @@ func TestEmptyList(t *testing.T) {
 }
 
 func initStatusForbiddenControlPlaneConfig(options *options.ServerRunOptions) {
-	options.Authorization.Modes = []string{"AlwaysDeny"}
+	options.GenericControlPlane.Authorization.Modes = []string{"AlwaysDeny"}
 }
 
 func initUnauthorizedControlPlaneConfig(options *options.ServerRunOptions) {
-	options.Authentication.Anonymous.Allow = false
+	options.GenericControlPlane.Authentication.Anonymous.Allow = false
 }
 
 func TestStatus(t *testing.T) {

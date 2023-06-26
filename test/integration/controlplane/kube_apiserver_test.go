@@ -428,7 +428,7 @@ func getEndpointIPs(endpoints *corev1.Endpoints) []string {
 func verifyEndpointsWithIPs(servers []*kubeapiservertesting.TestServer, ips []string) bool {
 	listenAddresses := make([]string, 0)
 	for _, server := range servers {
-		listenAddresses = append(listenAddresses, server.ServerOpts.GenericServerRunOptions.AdvertiseAddress.String())
+		listenAddresses = append(listenAddresses, server.ServerOpts.GenericControlPlane.GenericAPIServer.AdvertiseAddress.String())
 	}
 	return reflect.DeepEqual(listenAddresses, ips)
 }

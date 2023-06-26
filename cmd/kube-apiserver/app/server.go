@@ -99,7 +99,7 @@ cluster's shared state through which all other components interact.`,
 
 			// Activate logging as soon as possible, after that
 			// show flags with the final logging configuration.
-			if err := logsapi.ValidateAndApply(s.Logs, utilfeature.DefaultFeatureGate); err != nil {
+			if err := logsapi.ValidateAndApply(s.GenericControlPlane.Logs, utilfeature.DefaultFeatureGate); err != nil {
 				return err
 			}
 			cliflag.PrintFlags(fs)
@@ -217,7 +217,7 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 	proxyTransport := CreateProxyTransport()
 
 	genericConfig, versionedInformers, storageFactory, err := controlplaneapiserver.BuildGenericConfig(
-		opts.CompletedOptions,
+		opts.ControlPlane,
 		[]*runtime.Scheme{legacyscheme.Scheme, extensionsapiserver.Scheme, aggregatorscheme.Scheme},
 		generatedopenapi.GetOpenAPIDefinitions,
 	)
@@ -225,9 +225,9 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 		return nil, nil, nil, err
 	}
 
-	capabilities.Setup(opts.AllowPrivileged, opts.MaxConnectionBytesPerSec)
+	capabilities.Setup(opts.AllowPrivileged, opts.ControlPlane.MaxConnectionBytesPerSec)
 
-	opts.Metrics.Apply()
+	opts.ControlPlane.Metrics.Apply()
 	serviceaccount.RegisterMetrics()
 
 	config := &controlplane.Config{
@@ -235,9 +235,9 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 		ExtraConfig: controlplane.ExtraConfig{
 			APIResourceConfigSource: storageFactory.APIResourceConfigSource,
 			StorageFactory:          storageFactory,
-			EventTTL:                opts.EventTTL,
+			EventTTL:                opts.ControlPlane.EventTTL,
 			KubeletClientConfig:     opts.KubeletConfig,
-			EnableLogsSupport:       opts.EnableLogsHandler,
+			EnableLogsSupport:       opts.ControlPlane.EnableLogsHandler,
 			ProxyTransport:          proxyTransport,
 
 			ServiceIPRange:          opts.PrimaryServiceClusterIPRange,
@@ -250,23 +250,23 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 			KubernetesServiceNodePort: opts.KubernetesServiceNodePort,
 
 			EndpointReconcilerType: reconcilers.Type(opts.EndpointReconcilerType),
-			MasterCount:            opts.MasterCount,
+			MasterCount:            opts.ControlPlane.MasterCount,
 
-			ServiceAccountIssuer:        opts.ServiceAccountIssuer,
-			ServiceAccountMaxExpiration: opts.ServiceAccountTokenMaxExpiration,
-			ExtendExpiration:            opts.Authentication.ServiceAccounts.ExtendExpiration,
+			ServiceAccountIssuer:        opts.ControlPlane.ServiceAccountIssuer,
+			ServiceAccountMaxExpiration: opts.ControlPlane.ServiceAccountTokenMaxExpiration,
+			ExtendExpiration:            opts.ControlPlane.Authentication.ServiceAccounts.ExtendExpiration,
 
 			VersionedInformers: versionedInformers,
 		},
 	}
 
-	clientCAProvider, err := opts.Authentication.ClientCert.GetClientCAContentProvider()
+	clientCAProvider, err := opts.ControlPlane.Authentication.ClientCert.GetClientCAContentProvider()
 	if err != nil {
 		return nil, nil, nil, err
 	}
 	config.ExtraConfig.ClusterAuthenticationInfo.ClientCA = clientCAProvider
 
-	requestHeaderConfig, err := opts.Authentication.RequestHeader.ToAuthenticationRequestHeaderConfig()
+	requestHeaderConfig, err := opts.ControlPlane.Authentication.RequestHeader.ToAuthenticationRequestHeaderConfig()
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -284,7 +284,7 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 		LoopbackClientConfig: genericConfig.LoopbackClientConfig,
 		CloudConfigFile:      opts.CloudProvider.CloudConfigFile,
 	}
-	serviceResolver := buildServiceResolver(opts.EnableAggregatorRouting, genericConfig.LoopbackClientConfig.Host, versionedInformers)
+	serviceResolver := buildServiceResolver(opts.ControlPlane.EnableAggregatorRouting, genericConfig.LoopbackClientConfig.Host, versionedInformers)
 	schemaResolver := resolver.NewDefinitionsSchemaResolver(k8sscheme.Scheme, genericConfig.OpenAPIConfig.GetDefinitions)
 	pluginInitializers, admissionPostStartHook, err := admissionConfig.New(proxyTransport, genericConfig.EgressSelector, serviceResolver, genericConfig.TracerProvider, schemaResolver)
 	if err != nil {
@@ -298,7 +298,7 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create real dynamic external client: %w", err)
 	}
-	err = opts.Admission.ApplyTo(
+	err = opts.ControlPlane.Admission.ApplyTo(
 		genericConfig,
 		versionedInformers,
 		clientgoExternalClient,
@@ -329,15 +329,15 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 
 	// Load and set the public keys.
 	var pubKeys []interface{}
-	for _, f := range opts.Authentication.ServiceAccounts.KeyFiles {
+	for _, f := range opts.ControlPlane.Authentication.ServiceAccounts.KeyFiles {
 		keys, err := keyutil.PublicKeysFromFile(f)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to parse key file %q: %v", f, err)
 		}
 		pubKeys = append(pubKeys, keys...)
 	}
-	config.ExtraConfig.ServiceAccountIssuerURL = opts.Authentication.ServiceAccounts.Issuers[0]
-	config.ExtraConfig.ServiceAccountJWKSURI = opts.Authentication.ServiceAccounts.JWKSURI
+	config.ExtraConfig.ServiceAccountIssuerURL = opts.ControlPlane.Authentication.ServiceAccounts.Issuers[0]
+	config.ExtraConfig.ServiceAccountJWKSURI = opts.ControlPlane.Authentication.ServiceAccounts.JWKSURI
 	config.ExtraConfig.ServiceAccountPublicKeys = pubKeys
 
 	return config, serviceResolver, pluginInitializers, nil

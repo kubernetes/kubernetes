@@ -128,7 +128,7 @@ users:
 - name: controller-manager
   user:
     token: %s
-`, server.ClientConfig.Host, server.ServerOpts.SecureServing.ServerCert.CertKey.CertFile, token))
+`, server.ClientConfig.Host, server.ServerOpts.GenericControlPlane.SecureServing.ServerCert.CertKey.CertFile, token))
 	apiserverConfig.Close()
 
 	// create BROKEN kubeconfig for the apiserver
@@ -154,7 +154,7 @@ users:
 - name: controller-manager
   user:
     token: WRONGTOKEN
-`, server.ClientConfig.Host, server.ServerOpts.SecureServing.ServerCert.CertKey.CertFile))
+`, server.ClientConfig.Host, server.ServerOpts.GenericControlPlane.SecureServing.ServerCert.CertKey.CertFile))
 	brokenApiserverConfig.Close()
 
 	tests := []struct {

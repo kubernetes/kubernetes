@@ -68,7 +68,7 @@ func setupWithServerSetup(t *testing.T, serverSetup framework.TestServerSetup) (
 			modifyServerRunOptions(opts)
 		}
 
-		opts.Admission.GenericAdmission.DisablePlugins = append(opts.Admission.GenericAdmission.DisablePlugins,
+		opts.GenericControlPlane.Admission.GenericAdmission.DisablePlugins = append(opts.GenericControlPlane.Admission.GenericAdmission.DisablePlugins,
 			// Disable ServiceAccount admission plugin as we don't have
 			// serviceaccount controller running.
 			"ServiceAccount",

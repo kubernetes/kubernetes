@@ -570,7 +570,7 @@ resources:
 			}
 		}
 
-		rawClient, etcdClient, err := integration.GetEtcdClients(test.kubeAPIServer.ServerOpts.Etcd.StorageConfig.Transport)
+		rawClient, etcdClient, err := integration.GetEtcdClients(test.kubeAPIServer.ServerOpts.GenericControlPlane.Etcd.StorageConfig.Transport)
 		if err != nil {
 			t.Fatalf("failed to create etcd client: %v", err)
 		}
@@ -578,7 +578,7 @@ resources:
 		// close the client (which we can do by closing rawClient).
 		defer rawClient.Close()
 
-		response, err := etcdClient.Get(context.TODO(), "/"+test.kubeAPIServer.ServerOpts.Etcd.StorageConfig.Prefix, clientv3.WithPrefix())
+		response, err := etcdClient.Get(context.TODO(), "/"+test.kubeAPIServer.ServerOpts.GenericControlPlane.Etcd.StorageConfig.Prefix, clientv3.WithPrefix())
 		if err != nil {
 			t.Fatalf("failed to retrieve secret from etcd %v", err)
 		}

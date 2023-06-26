@@ -56,9 +56,9 @@ func setup(t testing.TB, maxReadonlyRequestsInFlight, maxMutatingRequestsInFligh
 	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Ensure all clients are allowed to send requests.
-			opts.Authorization.Modes = []string{"AlwaysAllow"}
-			opts.GenericServerRunOptions.MaxRequestsInFlight = maxReadonlyRequestsInFlight
-			opts.GenericServerRunOptions.MaxMutatingRequestsInFlight = maxMutatingRequestsInFlight
+			opts.GenericControlPlane.Authorization.Modes = []string{"AlwaysAllow"}
+			opts.GenericControlPlane.GenericAPIServer.MaxRequestsInFlight = maxReadonlyRequestsInFlight
+			opts.GenericControlPlane.GenericAPIServer.MaxMutatingRequestsInFlight = maxMutatingRequestsInFlight
 		},
 	})
 

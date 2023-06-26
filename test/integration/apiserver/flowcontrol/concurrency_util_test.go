@@ -158,9 +158,9 @@ func TestConcurrencyIsolation(t *testing.T) {
 	_, kubeConfig, closeFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Ensure all clients are allowed to send requests.
-			opts.Authorization.Modes = []string{"AlwaysAllow"}
-			opts.GenericServerRunOptions.MaxRequestsInFlight = 10
-			opts.GenericServerRunOptions.MaxMutatingRequestsInFlight = 10
+			opts.GenericControlPlane.Authorization.Modes = []string{"AlwaysAllow"}
+			opts.GenericControlPlane.GenericAPIServer.MaxRequestsInFlight = 10
+			opts.GenericControlPlane.GenericAPIServer.MaxMutatingRequestsInFlight = 10
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
 			// Wrap default authorizer with one that delays requests from noxu clients
