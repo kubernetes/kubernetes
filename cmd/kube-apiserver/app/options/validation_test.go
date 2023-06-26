@@ -143,7 +143,7 @@ func TestClusterServiceIPRange(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRServiceAllocator, tc.gate)()
 
-			errs := validateClusterIPFlags(tc.options)
+			errs := validateClusterIPFlags(tc.options.Extra)
 			if len(errs) > 0 && !tc.expectErrors {
 				t.Errorf("expected no errors, errors found %+v", errs)
 			}
@@ -200,7 +200,7 @@ func TestValidateServiceNodePort(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			errs := validateServiceNodePort(tc.options)
+			errs := validateServiceNodePort(tc.options.Extra)
 			if errs != nil && !tc.expectErrors {
 				t.Errorf("expected no errors, error found %+v", errs)
 			}

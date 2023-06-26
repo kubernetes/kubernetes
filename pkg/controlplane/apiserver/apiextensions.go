@@ -30,14 +30,14 @@ import (
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/informers"
 
-	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver/options"
 )
 
 func CreateAPIExtensionsConfig(
 	kubeAPIServerConfig server.Config,
 	kubeInformers informers.SharedInformerFactory,
 	pluginInitializers []admission.PluginInitializer,
-	commandOptions *options.ServerRunOptions,
+	commandOptions controlplaneapiserver.CompletedOptions,
 	masterCount int,
 	serviceResolver webhook.ServiceResolver,
 	authResolverWrapper webhook.AuthenticationInfoResolverWrapper,

@@ -29,7 +29,7 @@ import (
 
 // TODO: Longer term we should read this from some config store, rather than a flag.
 // validateClusterIPFlags is expected to be called after Complete()
-func validateClusterIPFlags(options *ServerRunOptions) []error {
+func validateClusterIPFlags(options Extra) []error {
 	var errs []error
 	// maxCIDRBits is used to define the maximum CIDR size for the cluster ip(s)
 	maxCIDRBits := 20
@@ -89,7 +89,7 @@ func validateMaxCIDRRange(cidr net.IPNet, maxCIDRBits int, cidrFlag string) erro
 	return nil
 }
 
-func validateServiceNodePort(options *ServerRunOptions) []error {
+func validateServiceNodePort(options Extra) []error {
 	var errs []error
 
 	if options.KubernetesServiceNodePort < 0 || options.KubernetesServiceNodePort > 65535 {
@@ -103,12 +103,12 @@ func validateServiceNodePort(options *ServerRunOptions) []error {
 }
 
 // Validate checks ServerRunOptions and return a slice of found errs.
-func (s *ServerRunOptions) Validate() []error {
+func (s CompletedOptions) Validate() []error {
 	var errs []error
 
-	errs = append(errs, s.Options.Validate()...)
-	errs = append(errs, validateClusterIPFlags(s)...)
-	errs = append(errs, validateServiceNodePort(s)...)
+	errs = append(errs, s.CompletedOptions.Validate()...)
+	errs = append(errs, validateClusterIPFlags(s.Extra)...)
+	errs = append(errs, validateServiceNodePort(s.Extra)...)
 
 	return errs
 }

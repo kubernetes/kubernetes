@@ -45,7 +45,7 @@ type CompletedOptions struct {
 
 // Complete set default ServerRunOptions.
 // Should be called after kube-apiserver flags parsed.
-func Complete(opts *ServerRunOptions) (CompletedOptions, error) {
+func (opts *ServerRunOptions) Complete() (CompletedOptions, error) {
 	if opts == nil {
 		return CompletedOptions{completedOptions: &completedOptions{}}, nil
 	}

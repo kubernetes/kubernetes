@@ -105,7 +105,7 @@ cluster's shared state through which all other components interact.`,
 			cliflag.PrintFlags(fs)
 
 			// set default options
-			completedOptions, err := options.Complete(s)
+			completedOptions, err := s.Complete()
 			if err != nil {
 				return err
 			}
@@ -217,7 +217,7 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 	proxyTransport := CreateProxyTransport()
 
 	genericConfig, versionedInformers, storageFactory, err := controlplaneapiserver.BuildGenericConfig(
-		opts.ServerRunOptions,
+		opts.CompletedOptions,
 		[]*runtime.Scheme{legacyscheme.Scheme, extensionsapiserver.Scheme, aggregatorscheme.Scheme},
 		generatedopenapi.GetOpenAPIDefinitions,
 	)
