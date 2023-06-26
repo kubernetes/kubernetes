@@ -962,6 +962,7 @@ func checkIndexedJobPods(t *testing.T, control *controller.FakePodControl, wantI
 	gotIndexes := sets.New[int]()
 	for _, p := range control.Templates {
 		checkJobCompletionEnvVariable(t, &p.Spec)
+		checkJobCompletionLabel(t, &p)
 		ix := getCompletionIndex(p.Annotations)
 		if ix == -1 {
 			t.Errorf("Created pod %s didn't have completion index", p.Name)
@@ -4392,6 +4393,13 @@ func TestFinalizersRemovedExpectations(t *testing.T) {
 		return diff == "", nil
 	}); err != nil {
 		t.Errorf("Timeout waiting for expectations (-want, +got):\n%s", diff)
+	}
+}
+func checkJobCompletionLabel(t *testing.T, p *v1.PodTemplateSpec) {
+	t.Helper()
+	labels := p.GetLabels()
+	if labels == nil || labels[batch.JobCompletionIndexAnnotation] == "" {
+		t.Errorf("missing expected pod label %s", batch.JobCompletionIndexAnnotation)
 	}
 }
 

@@ -311,6 +311,14 @@ func addCompletionIndexAnnotation(template *v1.PodTemplateSpec, index int) {
 	template.Annotations[batch.JobCompletionIndexAnnotation] = strconv.Itoa(index)
 }
 
+func addCompletionIndexLabel(template *v1.PodTemplateSpec, index int) {
+	if template.Labels == nil {
+		template.Labels = make(map[string]string, 1)
+	}
+	// Use completion index annotation as label as well for consistency.
+	template.Labels[batch.JobCompletionIndexAnnotation] = strconv.Itoa(index)
+}
+
 func podGenerateNameWithIndex(jobName string, index int) string {
 	appendIndex := "-" + strconv.Itoa(index) + "-"
 	generateNamePrefix := jobName + appendIndex
