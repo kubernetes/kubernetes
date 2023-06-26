@@ -728,7 +728,7 @@ func (dsc *DaemonSetsController) getDaemonPods(ctx context.Context, ds *apps.Dae
 // This also reconciles ControllerRef by adopting/orphaning.
 // Note that returned Pods are pointers to objects in the cache.
 // If you want to modify one, you need to deep-copy it first.
-func (dsc *DaemonSetsController) getNodesToDaemonPods(ctx context.Context, ds *apps.DaemonSet) (map[string][]*v1.Pod, error) {
+func (dsc *DaemonSetsController) getNodesToDaemonPods(ctx context.Context, ds *apps.DaemonSet, includeDeletedTerminal bool) (map[string][]*v1.Pod, error) {
 	claimedPods, err := dsc.getDaemonPods(ctx, ds)
 	if err != nil {
 		return nil, err
@@ -736,7 +736,7 @@ func (dsc *DaemonSetsController) getNodesToDaemonPods(ctx context.Context, ds *a
 	// Group Pods by Node name.
 	nodeToDaemonPods := make(map[string][]*v1.Pod)
 	for _, pod := range claimedPods {
-		if podutil.IsPodTerminal(pod) && pod.DeletionTimestamp != nil {
+		if !includeDeletedTerminal && podutil.IsPodTerminal(pod) && pod.DeletionTimestamp != nil {
 			// This Pod has a finalizer or is already scheduled for deletion from the
 			// store by the kubelet or the Pod GC. The DS controller doesn't have
 			// anything else to do with it.
@@ -933,7 +933,7 @@ func (dsc *DaemonSetsController) updateDaemonSet(ctx context.Context, ds *apps.D
 // syncNodes with a list of pods to remove and a list of nodes to run a Pod of ds.
 func (dsc *DaemonSetsController) manage(ctx context.Context, ds *apps.DaemonSet, nodeList []*v1.Node, hash string) error {
 	// Find out the pods which are created for the nodes by DaemonSet.
-	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ctx, ds)
+	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ctx, ds, false)
 	if err != nil {
 		return fmt.Errorf("couldn't get node to daemon pod mapping for daemon set %q: %v", ds.Name, err)
 	}
@@ -1131,7 +1131,7 @@ func storeDaemonSetStatus(
 
 func (dsc *DaemonSetsController) updateDaemonSetStatus(ctx context.Context, ds *apps.DaemonSet, nodeList []*v1.Node, hash string, updateObservedGen bool) error {
 	klog.V(4).Infof("Updating daemon set status")
-	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ctx, ds)
+	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ctx, ds, false)
 	if err != nil {
 		return fmt.Errorf("couldn't get node to daemon pod mapping for daemon set %q: %v", ds.Name, err)
 	}
