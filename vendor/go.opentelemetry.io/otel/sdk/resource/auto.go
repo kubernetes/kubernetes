@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 var (
@@ -45,28 +46,65 @@ type Detector interface {
 // Detect calls all input detectors sequentially and merges each result with the previous one.
 // It returns the merged error too.
 func Detect(ctx context.Context, detectors ...Detector) (*Resource, error) {
-	var autoDetectedRes *Resource
-	var errInfo []string
+	r := new(Resource)
+	return r, detect(ctx, r, detectors)
+}
+
+// detect runs all detectors using ctx and merges the result into res. This
+// assumes res is allocated and not nil, it will panic otherwise.
+func detect(ctx context.Context, res *Resource, detectors []Detector) error {
+	var (
+		r    *Resource
+		errs detectErrs
+		err  error
+	)
+
 	for _, detector := range detectors {
 		if detector == nil {
 			continue
 		}
-		res, err := detector.Detect(ctx)
+		r, err = detector.Detect(ctx)
 		if err != nil {
-			errInfo = append(errInfo, err.Error())
+			errs = append(errs, err)
 			if !errors.Is(err, ErrPartialResource) {
 				continue
 			}
 		}
-		autoDetectedRes, err = Merge(autoDetectedRes, res)
+		r, err = Merge(res, r)
 		if err != nil {
-			errInfo = append(errInfo, err.Error())
+			errs = append(errs, err)
 		}
+		*res = *r
 	}
 
-	var aggregatedError error
-	if len(errInfo) > 0 {
-		aggregatedError = fmt.Errorf("detecting resources: %s", errInfo)
+	if len(errs) == 0 {
+		return nil
 	}
-	return autoDetectedRes, aggregatedError
+	return errs
+}
+
+type detectErrs []error
+
+func (e detectErrs) Error() string {
+	errStr := make([]string, len(e))
+	for i, err := range e {
+		errStr[i] = fmt.Sprintf("* %s", err)
+	}
+
+	format := "%d errors occurred detecting resource:\n\t%s"
+	return fmt.Sprintf(format, len(e), strings.Join(errStr, "\n\t"))
+}
+
+func (e detectErrs) Unwrap() error {
+	switch len(e) {
+	case 0:
+		return nil
+	case 1:
+		return e[0]
+	}
+	return e[1:]
+}
+
+func (e detectErrs) Is(target error) bool {
+	return len(e) != 0 && errors.Is(e[0], target)
 }

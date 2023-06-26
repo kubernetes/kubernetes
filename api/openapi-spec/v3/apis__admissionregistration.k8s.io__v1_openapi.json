@@ -1689,7 +1689,7 @@
   },
   "openapi": "3.0.0",
   "paths": {
-    "/apis/admissionregistration.k8s.io/v1/": {
+    "/apis/admissionregistration.k8s.io/v1": {
       "get": {
         "description": "get available resources",
         "operationId": "getAdmissionregistrationV1APIResources",

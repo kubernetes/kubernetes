@@ -1998,7 +1998,7 @@
   },
   "openapi": "3.0.0",
   "paths": {
-    "/apis/networking.k8s.io/v1/": {
+    "/apis/networking.k8s.io/v1": {
       "get": {
         "description": "get available resources",
         "operationId": "getNetworkingV1APIResources",

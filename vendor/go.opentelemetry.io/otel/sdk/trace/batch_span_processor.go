@@ -91,7 +91,7 @@ var _ SpanProcessor = (*batchSpanProcessor)(nil)
 // NewBatchSpanProcessor creates a new SpanProcessor that will send completed
 // span batches to the exporter with the supplied options.
 //
-// If the exporter is nil, the span processor will preform no action.
+// If the exporter is nil, the span processor will perform no action.
 func NewBatchSpanProcessor(exporter SpanExporter, options ...BatchSpanProcessorOption) SpanProcessor {
 	maxQueueSize := env.BatchSpanProcessorMaxQueueSize(DefaultMaxQueueSize)
 	maxExportBatchSize := env.BatchSpanProcessorMaxExportBatchSize(DefaultMaxExportBatchSize)

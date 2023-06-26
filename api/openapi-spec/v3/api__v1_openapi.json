@@ -9275,7 +9275,7 @@
   },
   "openapi": "3.0.0",
   "paths": {
-    "/api/v1/": {
+    "/api/v1": {
       "get": {
         "description": "get available resources",
         "operationId": "getCoreV1APIResources",

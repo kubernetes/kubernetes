@@ -164,7 +164,7 @@ func tokenizePath(path string) []string {
 	if "/" == path {
 		return nil
 	}
-	return strings.Split(strings.Trim(path, "/"), "/")
+	return strings.Split(strings.TrimLeft(path, "/"), "/")
 }
 
 // for debugging
@@ -176,3 +176,5 @@ func (r *Route) String() string {
 func (r *Route) EnableContentEncoding(enabled bool) {
 	r.contentEncodingEnabled = &enabled
 }
+
+var TrimRightSlashEnabled = false

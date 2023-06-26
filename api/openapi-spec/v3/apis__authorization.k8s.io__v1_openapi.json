@@ -797,7 +797,7 @@
   },
   "openapi": "3.0.0",
   "paths": {
-    "/apis/authorization.k8s.io/v1/": {
+    "/apis/authorization.k8s.io/v1": {
       "get": {
         "description": "get available resources",
         "operationId": "getAuthorizationV1APIResources",

@@ -5437,7 +5437,7 @@
   },
   "openapi": "3.0.0",
   "paths": {
-    "/apis/batch/v1/": {
+    "/apis/batch/v1": {
       "get": {
         "description": "get available resources",
         "operationId": "getBatchV1APIResources",

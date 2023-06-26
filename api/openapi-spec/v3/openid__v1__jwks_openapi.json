@@ -15,7 +15,7 @@
   },
   "openapi": "3.0.0",
   "paths": {
-    "/openid/v1/jwks/": {
+    "/openid/v1/jwks": {
       "get": {
         "description": "get service account issuer OpenID JSON Web Key Set (contains public token verification keys)",
         "operationId": "getServiceAccountIssuerOpenIDKeyset",

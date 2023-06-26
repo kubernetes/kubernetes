@@ -1265,7 +1265,7 @@
   },
   "openapi": "3.0.0",
   "paths": {
-    "/apis/coordination.k8s.io/v1/": {
+    "/apis/coordination.k8s.io/v1": {
       "get": {
         "description": "get available resources",
         "operationId": "getCoordinationV1APIResources",

@@ -2041,7 +2041,7 @@
   },
   "openapi": "3.0.0",
   "paths": {
-    "/apis/autoscaling/v2/": {
+    "/apis/autoscaling/v2": {
       "get": {
         "description": "get available resources",
         "operationId": "getAutoscalingV2APIResources",

@@ -156,7 +156,7 @@
   },
   "openapi": "3.0.0",
   "paths": {
-    "/apis/": {
+    "/apis": {
       "get": {
         "description": "get available API versions",
         "operationId": "getAPIVersions",

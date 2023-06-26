@@ -1698,7 +1698,7 @@
   },
   "openapi": "3.0.0",
   "paths": {
-    "/apis/rbac.authorization.k8s.io/v1/": {
+    "/apis/rbac.authorization.k8s.io/v1": {
       "get": {
         "description": "get available resources",
         "operationId": "getRbacAuthorizationV1APIResources",

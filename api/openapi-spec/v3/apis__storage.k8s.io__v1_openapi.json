@@ -3130,7 +3130,7 @@
   },
   "openapi": "3.0.0",
   "paths": {
-    "/apis/storage.k8s.io/v1/": {
+    "/apis/storage.k8s.io/v1": {
       "get": {
         "description": "get available resources",
         "operationId": "getStorageV1APIResources",

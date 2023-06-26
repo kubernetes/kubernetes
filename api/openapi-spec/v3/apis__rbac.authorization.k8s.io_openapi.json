@@ -120,7 +120,7 @@
   },
   "openapi": "3.0.0",
   "paths": {
-    "/apis/rbac.authorization.k8s.io/": {
+    "/apis/rbac.authorization.k8s.io": {
       "get": {
         "description": "get information of a group",
         "operationId": "getRbacAuthorizationAPIGroup",

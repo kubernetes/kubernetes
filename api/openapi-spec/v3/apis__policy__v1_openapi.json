@@ -1453,7 +1453,7 @@
   },
   "openapi": "3.0.0",
   "paths": {
-    "/apis/policy/v1/": {
+    "/apis/policy/v1": {
       "get": {
         "description": "get available resources",
         "operationId": "getPolicyV1APIResources",

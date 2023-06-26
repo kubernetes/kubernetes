@@ -244,19 +244,6 @@ func DialContext(ctx context.Context, target string, opts ...DialOption) (conn *
 		}
 	}()
 
-	scSet := false
-	if cc.dopts.scChan != nil {
-		// Try to get an initial service config.
-		select {
-		case sc, ok := <-cc.dopts.scChan:
-			if ok {
-				cc.sc = &sc
-				cc.safeConfigSelector.UpdateConfigSelector(&defaultConfigSelector{&sc})
-				scSet = true
-			}
-		default:
-		}
-	}
 	if cc.dopts.bs == nil {
 		cc.dopts.bs = backoff.DefaultExponential
 	}
@@ -272,7 +259,7 @@ func DialContext(ctx context.Context, target string, opts ...DialOption) (conn *
 	}
 	channelz.Infof(logger, cc.channelzID, "Channel authority set to %q", cc.authority)
 
-	if cc.dopts.scChan != nil && !scSet {
+	if cc.dopts.scChan != nil {
 		// Blocking wait for the initial service config.
 		select {
 		case sc, ok := <-cc.dopts.scChan:

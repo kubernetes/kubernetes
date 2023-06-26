@@ -120,7 +120,7 @@
   },
   "openapi": "3.0.0",
   "paths": {
-    "/apis/certificates.k8s.io/": {
+    "/apis/certificates.k8s.io": {
       "get": {
         "description": "get information of a group",
         "operationId": "getCertificatesAPIGroup",
