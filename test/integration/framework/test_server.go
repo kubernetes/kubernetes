@@ -150,7 +150,7 @@ func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (
 		setup.ModifyServerRunOptions(kubeAPIServerOptions)
 	}
 
-	completedOptions, err := app.Complete(kubeAPIServerOptions)
+	completedOptions, err := options.Complete(kubeAPIServerOptions)
 	if err != nil {
 		t.Fatal(err)
 	}

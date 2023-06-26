@@ -20,12 +20,13 @@ import (
 	apiextensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
 	"k8s.io/apiserver/pkg/util/webhook"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
+	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/pkg/controlplane/apiserver"
 )
 
 type Config struct {
-	Options completedServerRunOptions
+	Options options.CompletedOptions
 
 	Aggregator    *aggregatorapiserver.Config
 	ControlPlane  *controlplane.Config
@@ -38,7 +39,7 @@ type ExtraConfig struct {
 }
 
 type completedConfig struct {
-	Options completedServerRunOptions
+	Options options.CompletedOptions
 
 	Aggregator    aggregatorapiserver.CompletedConfig
 	ControlPlane  controlplane.CompletedConfig
@@ -65,7 +66,7 @@ func (c *Config) Complete() (CompletedConfig, error) {
 }
 
 // NewConfig creates all the resources for running kube-apiserver, but runs none of them.
-func NewConfig(opts completedServerRunOptions) (*Config, error) {
+func NewConfig(opts options.CompletedOptions) (*Config, error) {
 	c := &Config{
 		Options: opts,
 	}
