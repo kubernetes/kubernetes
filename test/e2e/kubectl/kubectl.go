@@ -54,6 +54,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilnettesting "k8s.io/apimachinery/pkg/util/net/testing"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
@@ -2063,6 +2064,66 @@ metadata:
 			)
 			gomega.Expect(outBuiltIn).To(gomega.Equal(outStatusSubresource))
 		})
+	})
+
+	ginkgo.Describe("kubectl explain", func() {
+		ginkgo.It("should be able to explain every resource advertised by the cluster", func() {
+			ginkgo.By("fetching all resources from cluster disccovery")
+			// Fetch k8s discovery. Ensure that every resource in discovery
+			// can be explained by kubectl explain
+			_, resources, err := f.ClientSet.Discovery().ServerGroupsAndResources()
+			framework.ExpectNoError(err, "expected to fetch discovery document successfully")
+
+			ginkgo.By("calling `kubectl explain` on each resource")
+
+			// These groups are not exposed by OpenAPI so can not be explained
+			excludeExpectedGroups := sets.New[string](
+			// "apiregistration.k8s.io",
+			)
+
+			for _, list := range resources {
+				defaultGroupVersion, err := schema.ParseGroupVersion(list.GroupVersion)
+				framework.ExpectNoError(err, "each apiresource list should have a groupversion")
+
+				if excludeExpectedGroups.Has(defaultGroupVersion.Group) {
+					continue
+				}
+
+				for _, resource := range list.APIResources {
+					// If the resource is a subresource, skip
+					if strings.Contains(resource.Name, "/") {
+						continue
+					}
+
+					gvr := defaultGroupVersion.WithResource(resource.Name)
+
+					versionsToTest := []string{gvr.GroupVersion().String()}
+					if len(resource.Version) == 0 || resource.Version == defaultGroupVersion.Version {
+						versionsToTest = append(versionsToTest, "")
+					}
+
+					for _, apiVersion := range versionsToTest {
+						namesToTest := []string{gvr.Resource}
+						namesToTest = append(namesToTest, resource.ShortNames...)
+
+						// Ensure output contains correct Group Version and Kind
+						for _, nameToTest := range namesToTest {
+							extraOpts := []string{}
+							if len(apiVersion) > 0 {
+								extraOpts = append(extraOpts, "--api-version", apiVersion)
+							}
+
+							args := append([]string{"explain", nameToTest}, extraOpts...)
+							ginkgo.By(fmt.Sprintf("calling `kubectl %s`", strings.Join(args, "")))
+							_, err := e2ekubectl.RunKubectl("", args...)
+							framework.ExpectNoError(err)
+						}
+					}
+
+				}
+			}
+		})
+
 	})
 })
 
