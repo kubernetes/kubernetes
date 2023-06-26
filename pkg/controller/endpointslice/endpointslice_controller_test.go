@@ -40,11 +40,11 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/endpointslice/topologycache"
+	endpointsliceutil "k8s.io/endpointslice/util"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/endpointslice/topologycache"
-	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
-	endpointsliceutil "k8s.io/kubernetes/pkg/controller/util/endpointslice"
+	endpointslicepkg "k8s.io/kubernetes/pkg/controller/util/endpointslice"
 	"k8s.io/utils/pointer"
 )
 
@@ -118,6 +118,65 @@ func newController(t *testing.T, nodeNames []string, batchPeriod time.Duration) 
 		informerFactory.Core().V1().Nodes().Informer().GetStore(),
 		informerFactory.Core().V1().Pods().Informer().GetStore(),
 		informerFactory.Core().V1().Services().Informer().GetStore(),
+	}
+}
+
+func newPod(n int, namespace string, ready bool, nPorts int, terminating bool) *v1.Pod {
+	status := v1.ConditionTrue
+	if !ready {
+		status = v1.ConditionFalse
+	}
+
+	var deletionTimestamp *metav1.Time
+	if terminating {
+		deletionTimestamp = &metav1.Time{
+			Time: time.Now(),
+		}
+	}
+
+	p := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:         namespace,
+			Name:              fmt.Sprintf("pod%d", n),
+			Labels:            map[string]string{"foo": "bar"},
+			DeletionTimestamp: deletionTimestamp,
+			ResourceVersion:   fmt.Sprint(n),
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name: "container-1",
+			}},
+			NodeName: "node-1",
+		},
+		Status: v1.PodStatus{
+			PodIP: fmt.Sprintf("1.2.3.%d", 4+n),
+			PodIPs: []v1.PodIP{{
+				IP: fmt.Sprintf("1.2.3.%d", 4+n),
+			}},
+			Conditions: []v1.PodCondition{
+				{
+					Type:   v1.PodReady,
+					Status: status,
+				},
+			},
+		},
+	}
+
+	return p
+}
+
+func expectActions(t *testing.T, actions []k8stesting.Action, num int, verb, resource string) {
+	t.Helper()
+	// if actions are less the below logic will panic
+	if num > len(actions) {
+		t.Fatalf("len of actions %v is unexpected. Expected to be at least %v", len(actions), num+1)
+	}
+
+	for i := 0; i < num; i++ {
+		relativePos := len(actions) - i - 1
+		assert.Equal(t, verb, actions[relativePos].GetVerb(), "Expected action -%d verb to be %s", i, verb)
+		assert.Equal(t, resource, actions[relativePos].GetResource().Resource, "Expected action -%d resource to be %s", i, resource)
 	}
 }
 
@@ -260,8 +319,8 @@ func TestSyncServiceMissing(t *testing.T) {
 
 	// Build up existing service
 	existingServiceName := "stillthere"
-	existingServiceKey := endpointutil.ServiceKey{Name: existingServiceName, Namespace: namespace}
-	esController.triggerTimeTracker.ServiceStates[existingServiceKey] = endpointutil.ServiceState{}
+	existingServiceKey := endpointsliceutil.ServiceKey{Name: existingServiceName, Namespace: namespace}
+	esController.triggerTimeTracker.ServiceStates[existingServiceKey] = endpointsliceutil.ServiceState{}
 	esController.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: existingServiceName, Namespace: namespace},
 		Spec: v1.ServiceSpec{
@@ -272,8 +331,8 @@ func TestSyncServiceMissing(t *testing.T) {
 
 	// Add missing service to triggerTimeTracker to ensure the reference is cleaned up
 	missingServiceName := "notthere"
-	missingServiceKey := endpointutil.ServiceKey{Name: missingServiceName, Namespace: namespace}
-	esController.triggerTimeTracker.ServiceStates[missingServiceKey] = endpointutil.ServiceState{}
+	missingServiceKey := endpointsliceutil.ServiceKey{Name: missingServiceName, Namespace: namespace}
+	esController.triggerTimeTracker.ServiceStates[missingServiceKey] = endpointsliceutil.ServiceState{}
 
 	logger, _ := ktesting.NewTestContext(t)
 	err := esController.syncService(logger, fmt.Sprintf("%s/%s", namespace, missingServiceName))
@@ -1709,7 +1768,7 @@ func TestSyncServiceStaleInformer(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
 			err = esController.syncService(logger, fmt.Sprintf("%s/%s", ns, serviceName))
 			// Check if we got a StaleInformerCache error
-			if endpointsliceutil.IsStaleInformerCacheErr(err) != testcase.expectError {
+			if endpointslicepkg.IsStaleInformerCacheErr(err) != testcase.expectError {
 				t.Fatalf("Expected error because informer cache is outdated")
 			}
 

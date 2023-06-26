@@ -5,6 +5,13 @@
 This repository contains packages related to the [EndpointSlices](https://github.com/kubernetes/enhancements/tree/master/keps/sig-network/0752-endpointslices)
 feature.
 
+This EndpointSlice reconciler library is not sufficiently generic to be used by
+the EndpointSlice Mirroring controller. The reconciler in the EndpointSlice
+mirroring controller has a 1:1 mapping between Service/Endpoints and
+EndpointSlice, which results in a simpler implementation then the EndpointSlice
+staging lib. Contributions to move towards the shared code being used by the
+mirroring controller would be welcome.
+
 ## Compatibility
 
 There are *NO compatibility guarantees* for this repository, yet.  It is in direct support of Kubernetes, so branches

@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
-	endpointsliceutil "k8s.io/kubernetes/pkg/controller/util/endpointslice"
 )
 
 const (
@@ -111,7 +110,7 @@ func (t *TopologyCache) AddHints(logger klog.Logger, si *SliceInfo) ([]*discover
 	// step 1: assign same-zone hints for all endpoints as a starting point.
 	for _, slice := range allocatableSlices {
 		for i, endpoint := range slice.Endpoints {
-			if !endpointsliceutil.EndpointReady(endpoint) {
+			if !EndpointReady(endpoint) {
 				endpoint.Hints = nil
 				continue
 			}

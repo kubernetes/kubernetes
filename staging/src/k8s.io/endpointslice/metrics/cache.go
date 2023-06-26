@@ -21,7 +21,7 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/types"
-	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
+	endpointsliceutil "k8s.io/endpointslice/util"
 )
 
 // NewCache returns a new Cache with the specified endpointsPerSlice.
@@ -58,7 +58,7 @@ type Cache struct {
 // as the efficiency of EndpointSlice endpoints distribution for each unique
 // Service Port combination.
 type ServicePortCache struct {
-	items map[endpointutil.PortMapKey]EfficiencyInfo
+	items map[endpointsliceutil.PortMapKey]EfficiencyInfo
 }
 
 // EfficiencyInfo stores the number of Endpoints and Slices for calculating
@@ -72,13 +72,13 @@ type EfficiencyInfo struct {
 // NewServicePortCache initializes and returns a new ServicePortCache.
 func NewServicePortCache() *ServicePortCache {
 	return &ServicePortCache{
-		items: map[endpointutil.PortMapKey]EfficiencyInfo{},
+		items: map[endpointsliceutil.PortMapKey]EfficiencyInfo{},
 	}
 }
 
 // Set updates the ServicePortCache to contain the provided EfficiencyInfo
 // for the provided PortMapKey.
-func (spc *ServicePortCache) Set(pmKey endpointutil.PortMapKey, eInfo EfficiencyInfo) {
+func (spc *ServicePortCache) Set(pmKey endpointsliceutil.PortMapKey, eInfo EfficiencyInfo) {
 	spc.items[pmKey] = eInfo
 }
 

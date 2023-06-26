@@ -28,11 +28,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
+	endpointsliceutil "k8s.io/endpointslice/util"
 	"k8s.io/klog/v2"
 	endpointsv1 "k8s.io/kubernetes/pkg/api/v1/endpoints"
 	"k8s.io/kubernetes/pkg/controller/endpointslicemirroring/metrics"
-	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
-	endpointsliceutil "k8s.io/kubernetes/pkg/controller/util/endpointslice"
 )
 
 // reconciler is responsible for transforming current EndpointSlice state into
@@ -145,7 +144,7 @@ func (r *reconciler) reconcile(logger klog.Logger, endpoints *corev1.Endpoints, 
 		slices.append(pmSlices)
 		totals.add(pmTotals)
 
-		epMetrics.Set(endpointutil.PortMapKey(portKey), metrics.EfficiencyInfo{
+		epMetrics.Set(endpointsliceutil.PortMapKey(portKey), metrics.EfficiencyInfo{
 			Endpoints: numEndpoints,
 			Slices:    len(existingSlicesByKey[portKey]) + len(pmSlices.toCreate) - len(pmSlices.toDelete),
 		})
@@ -324,7 +323,7 @@ func totalChanges(existingSlice *discovery.EndpointSlice, desiredSet endpointsli
 
 			// If existing version of endpoint doesn't match desired version
 			// increment number of endpoints to be updated.
-			if !endpointutil.EndpointsEqualBeyondHash(got, &endpoint) {
+			if !endpointsliceutil.EndpointsEqualBeyondHash(got, &endpoint) {
 				totals.updated++
 			}
 		}

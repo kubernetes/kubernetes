@@ -2061,6 +2061,12 @@ k8s.io/dynamic-resource-allocation/controller
 k8s.io/dynamic-resource-allocation/kubeletplugin
 k8s.io/dynamic-resource-allocation/leaderelection
 k8s.io/dynamic-resource-allocation/resourceclaim
+# k8s.io/endpointslice v0.0.0 => ./staging/src/k8s.io/endpointslice
+## explicit; go 1.20
+k8s.io/endpointslice
+k8s.io/endpointslice/metrics
+k8s.io/endpointslice/topologycache
+k8s.io/endpointslice/util
 # k8s.io/gengo v0.0.0-20220902162205-c0856e24416d
 ## explicit; go 1.13
 k8s.io/gengo/args

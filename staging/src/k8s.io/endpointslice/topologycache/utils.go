@@ -23,7 +23,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/klog/v2"
-	endpointsliceutil "k8s.io/kubernetes/pkg/controller/util/endpointslice"
 )
 
 // RemoveHintsFromSlices removes topology hints on EndpointSlices and returns
@@ -82,7 +81,7 @@ func redistributeHints(logger klog.Logger, slices []*discovery.EndpointSlice, gi
 
 	for _, slice := range slices {
 		for i, endpoint := range slice.Endpoints {
-			if !endpointsliceutil.EndpointReady(endpoint) {
+			if !EndpointReady(endpoint) {
 				endpoint.Hints = nil
 				continue
 			}
@@ -196,7 +195,7 @@ func getMost(zones map[string]float64) (string, float64) {
 func getHintsByZone(slice *discovery.EndpointSlice, allocatedHintsByZone EndpointZoneInfo, allocations map[string]allocation) map[string]int {
 	hintsByZone := map[string]int{}
 	for _, endpoint := range slice.Endpoints {
-		if !endpointsliceutil.EndpointReady(endpoint) {
+		if !EndpointReady(endpoint) {
 			continue
 		}
 		if endpoint.Hints == nil || len(endpoint.Hints.ForZones) == 0 {
@@ -272,4 +271,10 @@ func numReadyEndpoints(endpoints []discovery.Endpoint) int {
 		}
 	}
 	return total
+}
+
+// EndpointReady returns true if an Endpoint has the Ready condition set to
+// true.
+func EndpointReady(endpoint discovery.Endpoint) bool {
+	return endpoint.Conditions.Ready != nil && *endpoint.Conditions.Ready
 }

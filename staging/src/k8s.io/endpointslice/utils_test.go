@@ -479,7 +479,7 @@ func TestServiceControllerKey(t *testing.T) {
 		"nil EndpointSlice": {
 			endpointSlice: nil,
 			expectedKey:   "",
-			expectedErr:   fmt.Errorf("nil EndpointSlice passed to serviceControllerKey()"),
+			expectedErr:   fmt.Errorf("nil EndpointSlice passed to ServiceControllerKey()"),
 		},
 		"empty EndpointSlice": {
 			endpointSlice: &discovery.EndpointSlice{},
@@ -502,7 +502,7 @@ func TestServiceControllerKey(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			actualKey, actualErr := serviceControllerKey(tc.endpointSlice)
+			actualKey, actualErr := ServiceControllerKey(tc.endpointSlice)
 			if !reflect.DeepEqual(actualErr, tc.expectedErr) {
 				t.Errorf("Expected %s, got %s", tc.expectedErr, actualErr)
 			}

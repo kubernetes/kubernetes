@@ -26,6 +26,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -38,13 +39,13 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	endpointsliceutil "k8s.io/endpointslice/util"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/v1/endpoints"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/controller"
-	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
 	utillabels "k8s.io/kubernetes/pkg/util/labels"
 	utilnet "k8s.io/utils/net"
 )
@@ -104,7 +105,7 @@ func NewEndpointController(podInformer coreinformers.PodInformer, serviceInforme
 	e.endpointsLister = endpointsInformer.Lister()
 	e.endpointsSynced = endpointsInformer.Informer().HasSynced
 
-	e.triggerTimeTracker = endpointutil.NewTriggerTimeTracker()
+	e.triggerTimeTracker = endpointsliceutil.NewTriggerTimeTracker()
 	e.eventBroadcaster = broadcaster
 	e.eventRecorder = recorder
 
@@ -152,7 +153,7 @@ type Controller struct {
 
 	// triggerTimeTracker is an util used to compute and export the EndpointsLastChangeTriggerTime
 	// annotation.
-	triggerTimeTracker *endpointutil.TriggerTimeTracker
+	triggerTimeTracker *endpointsliceutil.TriggerTimeTracker
 
 	endpointUpdatesBatchPeriod time.Duration
 }
@@ -193,7 +194,7 @@ func (e *Controller) Run(ctx context.Context, workers int) {
 // enqueue them. obj must have *v1.Pod type.
 func (e *Controller) addPod(obj interface{}) {
 	pod := obj.(*v1.Pod)
-	services, err := endpointutil.GetPodServiceMemberships(e.serviceLister, pod)
+	services, err := endpointsliceutil.GetPodServiceMemberships(e.serviceLister, pod)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Unable to get pod %s/%s's service memberships: %v", pod.Namespace, pod.Name, err))
 		return
@@ -262,7 +263,7 @@ func podToEndpointAddressForService(svc *v1.Service, pod *v1.Pod) (*v1.EndpointA
 // and what services it will be a member of, and enqueue the union of these.
 // old and cur must be *v1.Pod types.
 func (e *Controller) updatePod(old, cur interface{}) {
-	services := endpointutil.GetServicesToUpdateOnPodChange(e.serviceLister, old, cur)
+	services := endpointsliceutil.GetServicesToUpdateOnPodChange(e.serviceLister, old, cur)
 	for key := range services {
 		e.queue.AddAfter(key, e.endpointUpdatesBatchPeriod)
 	}
@@ -271,7 +272,7 @@ func (e *Controller) updatePod(old, cur interface{}) {
 // When a pod is deleted, enqueue the services the pod used to be a member of.
 // obj could be an *v1.Pod, or a DeletionFinalStateUnknown marker item.
 func (e *Controller) deletePod(obj interface{}) {
-	pod := endpointutil.GetPodFromDeleteAction(obj)
+	pod := endpointsliceutil.GetPodFromDeleteAction(obj)
 	if pod != nil {
 		e.addPod(pod)
 	}
@@ -412,7 +413,7 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 	var totalNotReadyEps int
 
 	for _, pod := range pods {
-		if !endpointutil.ShouldPodBeInEndpoints(pod, service.Spec.PublishNotReadyAddresses) {
+		if !endpointsliceutil.ShouldPodBeInEndpoints(pod, service.Spec.PublishNotReadyAddresses) {
 			logger.V(5).Info("Pod is not included on endpoints for Service", "pod", klog.KObj(pod), "service", klog.KObj(service))
 			continue
 		}
@@ -426,7 +427,7 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 		}
 
 		epa := *ep
-		if endpointutil.ShouldSetHostname(pod, service) {
+		if endpointsliceutil.ShouldSetHostname(pod, service) {
 			epa.Hostname = pod.Spec.Hostname
 		}
 
@@ -483,7 +484,7 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 	// When comparing the subsets, we ignore the difference in ResourceVersion of Pod to avoid unnecessary Endpoints
 	// updates caused by Pod updates that we don't care, e.g. annotation update.
 	if !createEndpoints &&
-		endpointutil.EndpointSubsetsEqualIgnoreResourceVersion(currentEndpoints.Subsets, subsets) &&
+		endpointSubsetsEqualIgnoreResourceVersion(currentEndpoints.Subsets, subsets) &&
 		apiequality.Semantic.DeepEqual(compareLabels, service.Labels) &&
 		capacityAnnotationSetCorrectly(currentEndpoints.Annotations, currentEndpoints.Subsets) {
 		logger.V(5).Info("endpoints are equal, skipping update", "service", klog.KObj(service))
@@ -701,4 +702,22 @@ func addressSubset(addresses []v1.EndpointAddress, maxNum int) []v1.EndpointAddr
 		return addresses
 	}
 	return addresses[0:maxNum]
+}
+
+// semanticIgnoreResourceVersion does semantic deep equality checks for objects
+// but excludes ResourceVersion of ObjectReference. They are used when comparing
+// endpoints in Endpoints and EndpointSlice objects to avoid unnecessary updates
+// caused by Pod resourceVersion change.
+var semanticIgnoreResourceVersion = conversion.EqualitiesOrDie(
+	func(a, b v1.ObjectReference) bool {
+		a.ResourceVersion = ""
+		b.ResourceVersion = ""
+		return a == b
+	},
+)
+
+// endpointSubsetsEqualIgnoreResourceVersion returns true if EndpointSubsets
+// have equal attributes but excludes ResourceVersion of Pod.
+func endpointSubsetsEqualIgnoreResourceVersion(subsets1, subsets2 []v1.EndpointSubset) bool {
+	return semanticIgnoreResourceVersion.DeepEqual(subsets1, subsets2)
 }
