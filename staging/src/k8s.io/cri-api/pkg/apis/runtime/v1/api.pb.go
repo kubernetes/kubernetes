@@ -9672,6 +9672,12 @@ func (m *RuntimeConfigResponse) GetLinux() *LinuxRuntimeConfiguration {
 
 type LinuxRuntimeConfiguration struct {
 	// Cgroup driver to use
+	// Note: this field should not change for the lifecycle of the Kubelet,
+	// or while there are running containers.
+	// The Kubelet will not re-request this after startup, and will construct the cgroup
+	// hierarchy assuming it is static.
+	// If the runtime wishes to change this value, it must be accompanied by removal of
+	// all pods, and a restart of the Kubelet. The easiest way to do this is with a full node reboot.
 	CgroupDriver         CgroupDriver `protobuf:"varint,1,opt,name=cgroup_driver,json=cgroupDriver,proto3,enum=runtime.v1.CgroupDriver" json:"cgroup_driver,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}     `json:"-"`
 	XXX_sizecache        int32        `json:"-"`
@@ -10429,6 +10435,12 @@ type RuntimeServiceClient interface {
 	// ListPodSandboxMetrics gets pod sandbox metrics from CRI Runtime
 	ListPodSandboxMetrics(ctx context.Context, in *ListPodSandboxMetricsRequest, opts ...grpc.CallOption) (*ListPodSandboxMetricsResponse, error)
 	// RuntimeConfig returns configuration information of the runtime.
+	// A couple of notes:
+	//   - The RuntimeConfigRequest object is not to be confused with the contents of UpdateRuntimeConfigRequest.
+	//     The former is for having runtime tell Kubelet what to do, the latter vice versa.
+	//   - It is the expectation of the Kubelet that these fields are static for the lifecycle of the Kubelet.
+	//     The Kubelet will not re-request the RuntimeConfiguration after startup, and CRI implementations should
+	//     avoid updating them without a full node reboot.
 	RuntimeConfig(ctx context.Context, in *RuntimeConfigRequest, opts ...grpc.CallOption) (*RuntimeConfigResponse, error)
 }
 
@@ -10815,6 +10827,12 @@ type RuntimeServiceServer interface {
 	// ListPodSandboxMetrics gets pod sandbox metrics from CRI Runtime
 	ListPodSandboxMetrics(context.Context, *ListPodSandboxMetricsRequest) (*ListPodSandboxMetricsResponse, error)
 	// RuntimeConfig returns configuration information of the runtime.
+	// A couple of notes:
+	//   - The RuntimeConfigRequest object is not to be confused with the contents of UpdateRuntimeConfigRequest.
+	//     The former is for having runtime tell Kubelet what to do, the latter vice versa.
+	//   - It is the expectation of the Kubelet that these fields are static for the lifecycle of the Kubelet.
+	//     The Kubelet will not re-request the RuntimeConfiguration after startup, and CRI implementations should
+	//     avoid updating them without a full node reboot.
 	RuntimeConfig(context.Context, *RuntimeConfigRequest) (*RuntimeConfigResponse, error)
 }
 
