@@ -26,7 +26,7 @@ import (
 
 func NewPriorityLevelConfigurationOps(client flowcontrolclient.PriorityLevelConfigurationInterface, lister flowcontrollisters.PriorityLevelConfigurationLister) ObjectOps[*flowcontrolv1beta3.PriorityLevelConfiguration] {
 	return NewObjectOps[*flowcontrolv1beta3.PriorityLevelConfiguration](client, lister, (*flowcontrolv1beta3.PriorityLevelConfiguration).DeepCopy,
-		plcReplaceSpec, plcSpecEqual)
+		plcReplaceSpec, plcSpecEqualish)
 }
 
 func plcReplaceSpec(into, from *flowcontrolv1beta3.PriorityLevelConfiguration) *flowcontrolv1beta3.PriorityLevelConfiguration {
@@ -35,8 +35,15 @@ func plcReplaceSpec(into, from *flowcontrolv1beta3.PriorityLevelConfiguration) *
 	return copy
 }
 
-func plcSpecEqual(expected, actual *flowcontrolv1beta3.PriorityLevelConfiguration) bool {
+func plcSpecEqualish(expected, actual *flowcontrolv1beta3.PriorityLevelConfiguration) bool {
 	copiedExpected := expected.DeepCopy()
 	flowcontrolapisv1beta3.SetObjectDefaults_PriorityLevelConfiguration(copiedExpected)
+	if expected.Name == flowcontrolv1beta3.PriorityLevelConfigurationNameExempt {
+		if actual.Spec.Exempt == nil {
+			return false
+		}
+		copiedExpected.Spec.Exempt.NominalConcurrencyShares = actual.Spec.Exempt.NominalConcurrencyShares
+		copiedExpected.Spec.Exempt.LendablePercent = actual.Spec.Exempt.LendablePercent
+	}
 	return equality.Semantic.DeepEqual(copiedExpected.Spec, actual.Spec)
 }

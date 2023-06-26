@@ -69,8 +69,10 @@ type objectLocalOps[ObjectType configurationObject] interface {
 	// replaceSpec returns a deep copy of `into` except that the spec is a deep copy of `from`
 	ReplaceSpec(into, from ObjectType) ObjectType
 
-	// specEqual says whether applying defaulting to `expected` makes its spec equal that of `actual`
-	SpecEqual(expected, actual ObjectType) bool
+	// SpecEqualish says whether applying defaulting to `expected`
+	// makes its spec more or less equal (as appropriate for the
+	// object at hand) that of `actual`.
+	SpecEqualish(expected, actual ObjectType) bool
 }
 
 // ObjectOps is the needed operations, both as a receiver from a server and server-independent, on configurationObjects
@@ -109,21 +111,21 @@ type configurationObjectType interface {
 type objectOps[ObjectType configurationObjectType] struct {
 	client[ObjectType]
 	cache[ObjectType]
-	deepCopy    func(ObjectType) ObjectType
-	replaceSpec func(ObjectType, ObjectType) ObjectType
-	specEqual   func(expected, actual ObjectType) bool
+	deepCopy     func(ObjectType) ObjectType
+	replaceSpec  func(ObjectType, ObjectType) ObjectType
+	specEqualish func(expected, actual ObjectType) bool
 }
 
 func NewObjectOps[ObjectType configurationObjectType](client client[ObjectType], cache cache[ObjectType],
 	deepCopy func(ObjectType) ObjectType,
 	replaceSpec func(ObjectType, ObjectType) ObjectType,
-	specEqual func(expected, actual ObjectType) bool,
+	specEqualish func(expected, actual ObjectType) bool,
 ) ObjectOps[ObjectType] {
 	return objectOps[ObjectType]{client: client,
-		cache:       cache,
-		deepCopy:    deepCopy,
-		replaceSpec: replaceSpec,
-		specEqual:   specEqual}
+		cache:        cache,
+		deepCopy:     deepCopy,
+		replaceSpec:  replaceSpec,
+		specEqualish: specEqualish}
 }
 
 func (oo objectOps[ObjectType]) DeepCopy(obj ObjectType) ObjectType { return oo.deepCopy(obj) }
@@ -132,39 +134,30 @@ func (oo objectOps[ObjectType]) ReplaceSpec(into, from ObjectType) ObjectType {
 	return oo.replaceSpec(into, from)
 }
 
-func (oo objectOps[ObjectType]) SpecEqual(expected, actual ObjectType) bool {
-	return oo.specEqual(expected, actual)
+func (oo objectOps[ObjectType]) SpecEqualish(expected, actual ObjectType) bool {
+	return oo.specEqualish(expected, actual)
 }
 
 // NewSuggestedEnsureStrategy returns an EnsureStrategy for suggested config objects
 func NewSuggestedEnsureStrategy[ObjectType configurationObjectType]() EnsureStrategy[ObjectType] {
 	return &strategy[ObjectType]{
-		alwaysAutoUpdateSpecFn: func(want, have ObjectType) bool {
-			return false
-		},
-		name: "suggested",
+		alwaysAutoUpdateSpec: false,
+		name:                 "suggested",
 	}
 }
 
 // NewMandatoryEnsureStrategy returns an EnsureStrategy for mandatory config objects
 func NewMandatoryEnsureStrategy[ObjectType configurationObjectType]() EnsureStrategy[ObjectType] {
 	return &strategy[ObjectType]{
-		alwaysAutoUpdateSpecFn: func(want, have ObjectType) bool {
-			if want.GetName() == flowcontrolv1beta3.PriorityLevelConfigurationNameExempt {
-				// we allow the cluster operator to update the spec of the
-				// singleton 'exempt' prioritylevelconfiguration object.
-				return false
-			}
-			return true
-		},
-		name: "mandatory",
+		alwaysAutoUpdateSpec: true,
+		name:                 "mandatory",
 	}
 }
 
 // auto-update strategy for the configuration objects
 type strategy[ObjectType configurationObjectType] struct {
-	alwaysAutoUpdateSpecFn func(want, have ObjectType) bool
-	name                   string
+	alwaysAutoUpdateSpec bool
+	name                 string
 }
 
 func (s *strategy[ObjectType]) Name() string {
@@ -177,14 +170,13 @@ func (s *strategy[ObjectType]) ReviseIfNeeded(objectOps objectLocalOps[ObjectTyp
 		return zero, false, nil
 	}
 
-	autoUpdateSpec := s.alwaysAutoUpdateSpecFn(bootstrap, current)
+	autoUpdateSpec := s.alwaysAutoUpdateSpec
 	if !autoUpdateSpec {
 		autoUpdateSpec = shouldUpdateSpec(current)
 	}
 	updateAnnotation := shouldUpdateAnnotation(current, autoUpdateSpec)
 
-	// specChanged := autoUpdateSpec && wah.specsDiffer()
-	specChanged := autoUpdateSpec && !objectOps.SpecEqual(bootstrap, current)
+	specChanged := autoUpdateSpec && !objectOps.SpecEqualish(bootstrap, current)
 
 	if !(updateAnnotation || specChanged) {
 		// the annotation key is up to date and the spec has not changed, no update is necessary
