@@ -103,6 +103,26 @@ func (VolumeAttachmentStatus) SwaggerDoc() map[string]string {
 	return map_VolumeAttachmentStatus
 }
 
+var map_VolumeAttributesClass = map[string]string{
+	"":           "VolumeAttributesClass represents a class of volume attributes. It holds the mutable attributes of volumes for the provisioner that should create and update volumes.\n\nVolumeAttributesClasses are non-namespaced; the name of the volume attributes class according to etcd is in ObjectMeta.Name.",
+	"metadata":   "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"parameters": "parameters holds the mutable attributes of volumes for the provisioner that should create and update volumes of this volume attributes class. And these parameters are immutable.",
+}
+
+func (VolumeAttributesClass) SwaggerDoc() map[string]string {
+	return map_VolumeAttributesClass
+}
+
+var map_VolumeAttributesClassList = map[string]string{
+	"":         "VolumeAttributesClassList is a collection of VolumeAttributesClass objects.",
+	"metadata": "Standard list metadata More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"items":    "items is the list of VolumeAttributesClass objects.",
+}
+
+func (VolumeAttributesClassList) SwaggerDoc() map[string]string {
+	return map_VolumeAttributesClassList
+}
+
 var map_VolumeError = map[string]string{
 	"":        "VolumeError captures an error encountered during a volume operation.",
 	"time":    "time represents the time the error was encountered.",

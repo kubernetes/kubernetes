@@ -5346,6 +5346,62 @@ func TestPrintStorageClass(t *testing.T) {
 	}
 }
 
+func TestPrintVolumeAttributesClass(t *testing.T) {
+	tests := []struct {
+		vac      storage.VolumeAttributesClass
+		expected []metav1.TableRow
+	}{
+		{
+			vac: storage.VolumeAttributesClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "vac1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+			},
+			expected: []metav1.TableRow{{Cells: []interface{}{"vac1", int64(0), "0s"}}},
+		},
+		{
+			vac: storage.VolumeAttributesClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "vac2",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Parameters: map[string]string{
+					"iops":       "500",
+					"throughput": "50MiB/s",
+				},
+			},
+			expected: []metav1.TableRow{{Cells: []interface{}{"vac2", int64(2), "0s"}}},
+		},
+		{
+			vac: storage.VolumeAttributesClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "vac3",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Parameters: map[string]string{
+					"iops":       "500",
+					"throughput": "50MiB/s",
+				},
+			},
+			expected: []metav1.TableRow{{Cells: []interface{}{"vac3", int64(2), "5m"}}},
+		},
+	}
+
+	for i, test := range tests {
+		rows, err := printVolumeAttributesClass(&test.vac, printers.GenerateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+		}
+	}
+}
+
 func TestPrintLease(t *testing.T) {
 	holder1 := "holder1"
 	holder2 := "holder2"

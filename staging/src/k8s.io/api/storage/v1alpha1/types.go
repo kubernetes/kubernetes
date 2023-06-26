@@ -251,3 +251,46 @@ type CSIStorageCapacityList struct {
 	// +listMapKey=name
 	Items []CSIStorageCapacity `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:prerelease-lifecycle-gen:introduced=1.28
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// VolumeAttributesClass represents a class of volume attributes. It holds the mutable
+// attributes of volumes for the provisioner that should create and update volumes.
+//
+// VolumeAttributesClasses are non-namespaced; the name of the volume attributes class
+// according to etcd is in ObjectMeta.Name.
+type VolumeAttributesClass struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// parameters holds the mutable attributes of volumes for the provisioner that should
+	// create and update volumes of this volume attributes class. And these parameters are
+	// immutable.
+	// +optional
+	Parameters map[string]string `json:"parameters,omitempty" protobuf:"bytes,3,rep,name=parameters"`
+}
+
+// +k8s:prerelease-lifecycle-gen:introduced=1.28
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// VolumeAttributesClassList is a collection of VolumeAttributesClass objects.
+type VolumeAttributesClassList struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// Standard list metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// items is the list of VolumeAttributesClass objects.
+	// +listType=map
+	// +listMapKey=name
+	Items []VolumeAttributesClass `json:"items" protobuf:"bytes,2,rep,name=items"`
+}

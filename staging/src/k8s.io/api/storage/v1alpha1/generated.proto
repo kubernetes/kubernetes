@@ -216,6 +216,37 @@ message VolumeAttachmentStatus {
   optional VolumeError detachError = 4;
 }
 
+// VolumeAttributesClass represents a class of volume attributes. It holds the mutable
+// attributes of volumes for the provisioner that should create and update volumes.
+//
+// VolumeAttributesClasses are non-namespaced; the name of the volume attributes class
+// according to etcd is in ObjectMeta.Name.
+message VolumeAttributesClass {
+  // Standard object's metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  // parameters holds the mutable attributes of volumes for the provisioner that should
+  // create and update volumes of this volume attributes class. And these parameters are
+  // immutable.
+  // +optional
+  map<string, string> parameters = 3;
+}
+
+// VolumeAttributesClassList is a collection of VolumeAttributesClass objects.
+message VolumeAttributesClassList {
+  // Standard list metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+
+  // items is the list of VolumeAttributesClass objects.
+  // +listType=map
+  // +listMapKey=name
+  repeated VolumeAttributesClass items = 2;
+}
+
 // VolumeError captures an error encountered during a volume operation.
 message VolumeError {
   // time represents the time the error was encountered.

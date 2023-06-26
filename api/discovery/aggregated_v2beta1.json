@@ -1179,6 +1179,35 @@
             }
           ],
           "version": "v1"
+        },
+        {
+          "freshness": "Current",
+          "resources": [
+            {
+              "resource": "volumeattributesclasses",
+              "responseKind": {
+                "group": "",
+                "kind": "VolumeAttributesClass",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "shortNames": [
+                "vac"
+              ],
+              "singularResource": "volumeattributesclass",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            }
+          ],
+          "version": "v1alpha1"
         }
       ]
     },
