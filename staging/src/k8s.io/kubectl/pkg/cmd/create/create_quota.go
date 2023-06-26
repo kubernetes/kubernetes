@@ -43,14 +43,14 @@ var (
 
 	quotaExample = templates.Examples(i18n.T(`
 		# Create a new resource quota named my-quota
-		kubectl create quota my-quota --hard=cpu=1,memory=1G,pods=2,services=3,replicationcontrollers=2,resourcequotas=1,secrets=5,persistentvolumeclaims=10
+		kubectl create resourcequota my-quota --hard=cpu=1,memory=1G,pods=2,services=3,replicationcontrollers=2,resourcequotas=1,secrets=5,persistentvolumeclaims=10
 
 		# Create a new resource quota named best-effort
-		kubectl create quota best-effort --hard=pods=100 --scopes=BestEffort`))
+		kubectl create resourcequota best-effort --hard=pods=100 --scopes=BestEffort`))
 )
 
-// QuotaOpts holds the command-line options for 'create quota' sub command
-type QuotaOpts struct {
+// QuotaOpts holds the command-line options for 'create resourcequota' sub command
+type ResourceQuotaOpts struct {
 	// PrintFlags holds options necessary for obtaining a printer
 	PrintFlags *genericclioptions.PrintFlags
 	PrintObj   func(obj runtime.Object) error
@@ -73,22 +73,22 @@ type QuotaOpts struct {
 }
 
 // NewQuotaOpts creates a new *QuotaOpts with sane defaults
-func NewQuotaOpts(ioStreams genericiooptions.IOStreams) *QuotaOpts {
-	return &QuotaOpts{
+func NewResourceQuotaOpts(ioStreams genericiooptions.IOStreams) *ResourceQuotaOpts {
+	return &ResourceQuotaOpts{
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
 	}
 }
 
-// NewCmdCreateQuota is a macro command to create a new quota
-func NewCmdCreateQuota(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
-	o := NewQuotaOpts(ioStreams)
+// NewCmdCreateQuota is a macro command to create a new resourcequota
+func NewCmdCreateResourceQuota(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
+	o := NewResourceQuotaOpts(ioStreams)
 
 	cmd := &cobra.Command{
-		Use:                   "quota NAME [--hard=key1=value1,key2=value2] [--scopes=Scope1,Scope2] [--dry-run=server|client|none]",
+		Use:                   "resourcequota NAME [--hard=key1=value1,key2=value2] [--scopes=Scope1,Scope2] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
-		Aliases:               []string{"resourcequota"},
-		Short:                 i18n.T("Create a quota with the specified name"),
+		Aliases:               []string{"quota"},
+		Short:                 i18n.T("Create a resource quota with the specified name"),
 		Long:                  quotaLong,
 		Example:               quotaExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -104,13 +104,13 @@ func NewCmdCreateQuota(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) 
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddDryRunFlag(cmd)
 	cmd.Flags().StringVar(&o.Hard, "hard", o.Hard, i18n.T("A comma-delimited set of resource=quantity pairs that define a hard limit."))
-	cmd.Flags().StringVar(&o.Scopes, "scopes", o.Scopes, i18n.T("A comma-delimited set of quota scopes that must all match each object tracked by the quota."))
+	cmd.Flags().StringVar(&o.Scopes, "scopes", o.Scopes, i18n.T("A comma-delimited set of resourcequota scopes that must all match each object tracked by the resourcequota."))
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
 	return cmd
 }
 
 // Complete completes all the required options
-func (o *QuotaOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *ResourceQuotaOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	var err error
 	o.Name, err = NameFromCommandArgs(cmd, args)
 	if err != nil {
@@ -158,7 +158,7 @@ func (o *QuotaOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []strin
 }
 
 // Validate checks to the QuotaOpts to see if there is sufficient information run the command.
-func (o *QuotaOpts) Validate() error {
+func (o *ResourceQuotaOpts) Validate() error {
 	if len(o.Name) == 0 {
 		return fmt.Errorf("name must be specified")
 	}
@@ -166,8 +166,8 @@ func (o *QuotaOpts) Validate() error {
 }
 
 // Run does the work
-func (o *QuotaOpts) Run() error {
-	resourceQuota, err := o.createQuota()
+func (o *ResourceQuotaOpts) Run() error {
+	resourceQuota, err := o.createResourceQuota()
 	if err != nil {
 		return err
 	}
@@ -187,13 +187,13 @@ func (o *QuotaOpts) Run() error {
 		}
 		resourceQuota, err = o.Client.ResourceQuotas(o.Namespace).Create(context.TODO(), resourceQuota, createOptions)
 		if err != nil {
-			return fmt.Errorf("failed to create quota: %v", err)
+			return fmt.Errorf("failed to create resourcequota: %v", err)
 		}
 	}
 	return o.PrintObj(resourceQuota)
 }
 
-func (o *QuotaOpts) createQuota() (*corev1.ResourceQuota, error) {
+func (o *ResourceQuotaOpts) createResourceQuota() (*corev1.ResourceQuota, error) {
 	namespace := ""
 	if o.EnforceNamespace {
 		namespace = o.Namespace
@@ -259,7 +259,7 @@ func parseScopes(spec string) ([]corev1.ResourceQuotaScope, error) {
 		// intentionally do not verify the scope against the valid scope list. This is done by the apiserver anyway.
 
 		if scope == "" {
-			return nil, fmt.Errorf("invalid resource quota scope \"\"")
+			return nil, fmt.Errorf("invalid resource resoucequota scope \"\"")
 		}
 
 		result = append(result, corev1.ResourceQuotaScope(scope))

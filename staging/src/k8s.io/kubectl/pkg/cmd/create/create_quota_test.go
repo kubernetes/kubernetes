@@ -36,11 +36,11 @@ func TestCreateQuota(t *testing.T) {
 	}
 
 	tests := map[string]struct {
-		options  *QuotaOpts
+		options  *ResourceQuotaOpts
 		expected *corev1.ResourceQuota
 	}{
 		"single resource": {
-			options: &QuotaOpts{
+			options: &ResourceQuotaOpts{
 				Name:   "my-quota",
 				Hard:   hards[0],
 				Scopes: "",
@@ -59,7 +59,7 @@ func TestCreateQuota(t *testing.T) {
 			},
 		},
 		"single resource with a scope": {
-			options: &QuotaOpts{
+			options: &ResourceQuotaOpts{
 				Name:   "my-quota",
 				Hard:   hards[0],
 				Scopes: "BestEffort",
@@ -79,7 +79,7 @@ func TestCreateQuota(t *testing.T) {
 			},
 		},
 		"multiple resources": {
-			options: &QuotaOpts{
+			options: &ResourceQuotaOpts{
 				Name:   "my-quota",
 				Hard:   hards[1],
 				Scopes: "BestEffort",
@@ -99,7 +99,7 @@ func TestCreateQuota(t *testing.T) {
 			},
 		},
 		"single resource with multiple scopes": {
-			options: &QuotaOpts{
+			options: &ResourceQuotaOpts{
 				Name:   "my-quota",
 				Hard:   hards[0],
 				Scopes: "BestEffort,NotTerminating",
@@ -122,7 +122,7 @@ func TestCreateQuota(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			resourceQuota, err := tc.options.createQuota()
+			resourceQuota, err := tc.options.createResourceQuota()
 			if err != nil {
 				t.Errorf("unexpected error:\n%#v\n", err)
 				return

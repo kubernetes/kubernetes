@@ -140,7 +140,7 @@ func NewCmdCreate(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobr
 
 	// create subcommands
 	cmd.AddCommand(NewCmdCreateNamespace(f, ioStreams))
-	cmd.AddCommand(NewCmdCreateQuota(f, ioStreams))
+	cmd.AddCommand(NewCmdCreateResourceQuota(f, ioStreams))
 	cmd.AddCommand(NewCmdCreateSecret(f, ioStreams))
 	cmd.AddCommand(NewCmdCreateConfigMap(f, ioStreams))
 	cmd.AddCommand(NewCmdCreateServiceAccount(f, ioStreams))
