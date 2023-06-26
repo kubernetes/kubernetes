@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	v1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
+	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
@@ -121,12 +121,12 @@ func TestNewInitData(t *testing.T) {
 							AdvertiseAddress: "1.2.3.4",
 							BindPort:         6443,
 						},
-						BootstrapTokens: []v1.BootstrapToken{
+						BootstrapTokens: []bootstraptokenv1.BootstrapToken{
 							{
-								Token:  &v1.BootstrapTokenString{ID: "abcdef", Secret: "0123456789abcdef"},
+								Token:  &bootstraptokenv1.BootstrapTokenString{ID: "abcdef", Secret: "0123456789abcdef"},
 								Usages: []string{"signing", "authentication"},
 								TTL: &metav1.Duration{
-									Duration: constants.DefaultTokenDuration,
+									Duration: bootstraptokenv1.DefaultTokenDuration,
 								},
 								Groups: []string{"system:bootstrappers:kubeadm:default-node-token"},
 							},

@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
-	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	componentversion "k8s.io/component-base/version"
 	netutils "k8s.io/utils/net"
 )
@@ -243,10 +242,6 @@ const (
 	// The node subnet mask size must be no more than the pod subnet mask size + 16
 	PodSubnetNodeMaskMaxDiff = 16
 
-	// DefaultTokenDuration specifies the default amount of time that a bootstrap token will be valid
-	// Default behaviour is 24 hours
-	DefaultTokenDuration = 24 * time.Hour
-
 	// DefaultCertTokenDuration specifies the default amount of time that the token used by upload certs will be valid
 	// Default behaviour is 2 hours
 	DefaultCertTokenDuration = 2 * time.Hour
@@ -446,12 +441,6 @@ var (
 		Key:    LabelNodeRoleControlPlane,
 		Effect: v1.TaintEffectNoSchedule,
 	}
-
-	// DefaultTokenUsages specifies the default functions a token will get
-	DefaultTokenUsages = bootstrapapi.KnownTokenUsages
-
-	// DefaultTokenGroups specifies the default groups that this token will authenticate as when used for authentication
-	DefaultTokenGroups = []string{NodeBootstrapTokenAuthGroup}
 
 	// ControlPlaneComponents defines the control-plane component names
 	ControlPlaneComponents = []string{KubeAPIServer, KubeControllerManager, KubeScheduler}
