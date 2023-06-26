@@ -114,6 +114,7 @@ func (s *specProxier) AddUpdateAPIService(handler http.Handler, apiservice *v1.A
 	if apiServiceInfo, ok := s.apiServiceInfo[apiservice.Name]; ok {
 		apiServiceInfo.apiService = *apiservice
 		apiServiceInfo.handler = handler
+		return
 	}
 	s.apiServiceInfo[apiservice.Name] = &openAPIV3APIServiceInfo{
 		apiService: *apiservice,
