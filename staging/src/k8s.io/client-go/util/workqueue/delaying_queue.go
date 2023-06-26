@@ -311,7 +311,13 @@ func (q *delayingType) AddAfter(item interface{}, duration time.Duration) {
 	select {
 	case <-q.stopCh:
 		// unblock if ShutDown() is called
-	case q.waitingForAddCh <- &waitFor{data: item, readyAt: q.clock.Now().Add(duration)}:
+	case q.waitingForAddCh <- &waitFor{
+		data:    item,
+		readyAt: q.clock.Now().Add(duration),
+		options: ExpandedDelayingOptions{
+			PermitActiveAndWaiting: true,
+		}}:
+		// set PermitActiveAndWaiting to true so that the "active" and "waiting" queues act in isolation from each other.
 	}
 }
 

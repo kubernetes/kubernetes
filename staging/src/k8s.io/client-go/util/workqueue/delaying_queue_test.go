@@ -105,17 +105,21 @@ func TestImmediateAdd(t *testing.T) {
 	q.AddWithOptions(second, ExpandedDelayingOptions{})
 	q.syncFill()
 	assertDelayedQueueState(t, q, QueueState{
-		active: []interface{}{second},
+		active: []interface{}{first},
 	})
+
+	// AddAfter should always queue a waiting item when it is already in the "active" queue
+	q.AddAfter(first, 1*time.Second)
+	q.syncFill()
+	assertDelayedQueueState(t, q, QueueState{
+		active:  []interface{}{first},
+		waiting: []interface{}{first},
+	})
+	// remove the active "foo"
 	item, _ = q.Get()
 	q.Done(item)
 
 	// Show that AddWithOptions with the PermitActiveAndWaiting option gives us the original behaviour again
-	q.AddAfter(first, 1*time.Second)
-	q.syncFill()
-	assertDelayedQueueState(t, q, QueueState{
-		waiting: []interface{}{first},
-	})
 	q.AddWithOptions(second, ExpandedDelayingOptions{PermitActiveAndWaiting: true})
 	q.syncFill()
 	assertDelayedQueueState(t, q, QueueState{
