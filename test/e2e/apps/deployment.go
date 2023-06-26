@@ -194,6 +194,7 @@ var _ = SIGDescribe("Deployment", func() {
 		testDeploymentDefaultReplicas := int32(2)
 		testDeploymentMinimumReplicas := int32(1)
 		testDeploymentNoReplicas := int32(0)
+		testDeploymentAvailableReplicas := int32(0)
 		testDeploymentLabels := map[string]string{"test-deployment-static": "true"}
 		testDeploymentLabelsFlat := "test-deployment-static=true"
 		w := &cache.ListWatch{
@@ -399,14 +400,14 @@ var _ = SIGDescribe("Deployment", func() {
 				"labels": map[string]string{"test-deployment": "patched-status"},
 			},
 			"status": map[string]interface{}{
-				"readyReplicas": testDeploymentNoReplicas,
+				"readyReplicas":     testDeploymentNoReplicas,
+				"availableReplicas": testDeploymentAvailableReplicas,
 			},
 		})
 		framework.ExpectNoError(err, "failed to Marshal Deployment JSON patch")
-		// This test is broken, patching fails with:
-		// Deployment.apps "test-deployment" is invalid: status.availableReplicas: Invalid value: 2: cannot be greater than readyReplicas
-		// https://github.com/kubernetes/kubernetes/issues/113259
-		_, _ = dc.Resource(deploymentResource).Namespace(testNamespaceName).Patch(ctx, testDeploymentName, types.StrategicMergePatchType, []byte(deploymentStatusPatch), metav1.PatchOptions{}, "status")
+
+		_, err = dc.Resource(deploymentResource).Namespace(testNamespaceName).Patch(ctx, testDeploymentName, types.StrategicMergePatchType, []byte(deploymentStatusPatch), metav1.PatchOptions{}, "status")
+		framework.ExpectNoError(err)
 
 		ctxUntil, cancel = context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
