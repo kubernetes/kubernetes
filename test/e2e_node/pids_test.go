@@ -120,7 +120,7 @@ func runPodPidsLimitTests(f *framework.Framework) {
 }
 
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("PodPidsLimit [Serial]", func() {
+var _ = SIGDescribe("PodPidsLimit [Serial]", ginkgo.Serial, ginkgo.Ordered, func() {
 	f := framework.NewDefaultFramework("pids-limit-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("With config updated with pids limits", func() {

@@ -41,7 +41,7 @@ const (
 	rotationConsistentlyTimeout = 2 * time.Minute
 )
 
-var _ = SIGDescribe("ContainerLogRotation [Slow] [Serial] [Disruptive]", func() {
+var _ = SIGDescribe("ContainerLogRotation [Slow] [Serial] [Disruptive]", ginkgo.Serial, ginkgo.Ordered, func() {
 	f := framework.NewDefaultFramework("container-log-rotation-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when a container generates a lot of log", func() {

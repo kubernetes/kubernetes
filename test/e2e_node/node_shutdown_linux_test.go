@@ -53,7 +53,7 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
-var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShutdown] [NodeFeature:GracefulNodeShutdownBasedOnPodPriority]", func() {
+var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShutdown] [NodeFeature:GracefulNodeShutdownBasedOnPodPriority]", ginkgo.Serial, ginkgo.Ordered, func() {
 	f := framework.NewDefaultFramework("graceful-node-shutdown")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 

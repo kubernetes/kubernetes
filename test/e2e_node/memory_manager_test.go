@@ -243,7 +243,7 @@ func getAllNUMANodes() []int {
 }
 
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager]", func() {
+var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager]", ginkgo.Serial, ginkgo.Ordered, func() {
 	// TODO: add more complex tests that will include interaction between CPUManager, MemoryManager and TopologyManager
 	var (
 		allNUMANodes             []int

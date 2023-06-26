@@ -43,7 +43,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 )
 
-var _ = SIGDescribe("Pod conditions managed by Kubelet", func() {
+var _ = SIGDescribe("Pod conditions managed by Kubelet", ginkgo.Serial, ginkgo.Ordered, func() {
 	f := framework.NewDefaultFramework("pod-conditions")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
