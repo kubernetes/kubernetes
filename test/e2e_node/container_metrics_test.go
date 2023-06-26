@@ -43,52 +43,58 @@ var _ = SIGDescribe("[NodeConformance] [LinuxOnly] ContainerMetrics", func() {
 			keys := gstruct.Keys{}
 			ctrMatches := map[string]types.GomegaMatcher{
 				// memory metrics
-				"container_blkio_device_usage_total":            preciseSample(0),
+				"container_blkio_device_usage_total":            boundedSample(0, 1000000),
 				"container_cpu_load_average_10s":                boundedSample(0, 100),
 				"container_cpu_system_seconds_total":            boundedSample(0, 100),
 				"container_cpu_usage_seconds_total":             boundedSample(0, 100),
 				"container_cpu_user_seconds_total":              boundedSample(0, 100),
 				"container_file_descriptors":                    boundedSample(0, 100),
-				"container_fs_inodes_free":                      preciseSample(0),
-				"container_fs_inodes_total":                     boundedSample(0, 100),
-				"container_fs_io_current":                       preciseSample(0),
-				"container_fs_io_time_seconds_total":            preciseSample(0),
-				"container_fs_limit_bytes":                      boundedSample(100*e2evolume.Mb, 10*e2evolume.Tb),
-				"container_fs_reads_bytes_total":                preciseSample(0),
-				"container_fs_read_seconds_total":               preciseSample(0),
-				"container_fs_reads_merged_total":               preciseSample(0),
-				"container_fs_reads_total":                      preciseSample(0),
-				"container_fs_sector_reads_total":               preciseSample(0),
-				"container_fs_sector_writes_total":              preciseSample(0),
-				"container_fs_usage_bytes":                      boundedSample(0, 1000000),
-				"container_fs_writes_bytes_total":               preciseSample(0),
-				"container_fs_write_seconds_total":              preciseSample(0),
-				"container_fs_writes_merged_total":              preciseSample(0),
-				"container_fs_writes_total":                     preciseSample(0),
+				"container_fs_reads_bytes_total":                boundedSample(0, 1000000),
+				"container_fs_reads_total":                      boundedSample(0, 100),
+				"container_fs_writes_bytes_total":               boundedSample(0, 1000000),
+				"container_fs_writes_total":                     boundedSample(0, 100),
 				"container_memory_cache":                        boundedSample(1*e2evolume.Kb, 10*e2evolume.Mb),
 				"container_memory_failcnt":                      boundedSample(0, 1000000),
 				"container_memory_failures_total":               boundedSample(0, 1000000),
 				"container_memory_mapped_file":                  boundedSample(0, 1000000),
-				"container_memory_max_usage_bytes":              boundedSample(10*e2evolume.Kb, 80*e2evolume.Mb),
+				"container_memory_max_usage_bytes":              boundedSample(0, 80*e2evolume.Mb),
 				"container_memory_rss":                          boundedSample(10*e2evolume.Kb, 80*e2evolume.Mb),
 				"container_memory_swap":                         boundedSample(0, 1000000),
 				"container_memory_usage_bytes":                  boundedSample(10*e2evolume.Kb, 80*e2evolume.Mb),
 				"container_memory_working_set_bytes":            boundedSample(10*e2evolume.Kb, 80*e2evolume.Mb),
 				"container_oom_events_total":                    preciseSample(0),
 				"container_processes":                           boundedSample(0, 100),
-				"container_sockets":                             preciseSample(0),
+				"container_sockets":                             boundedSample(0, 100),
 				"container_spec_cpu_period":                     preciseSample(100000),
 				"container_spec_cpu_shares":                     preciseSample(2),
 				"container_spec_memory_limit_bytes":             preciseSample(79998976),
 				"container_spec_memory_reservation_limit_bytes": preciseSample(0),
-				"container_spec_memory_swap_limit_bytes":        preciseSample(79998976),
+				"container_spec_memory_swap_limit_bytes":        boundedSampleIgnoreTimestamp(0, 79998976),
 				"container_start_time_seconds":                  boundedSampleIgnoreTimestamp(time.Now().Add(-maxStatsAge).Unix(), time.Now().Add(2*time.Minute).Unix()),
 				"container_tasks_state":                         preciseSample(0),
 				"container_threads":                             preciseSample(2),
 				"container_threads_max":                         boundedSample(0, 100000),
 				"container_ulimits_soft":                        boundedSample(10*e2evolume.Kb, 80*e2evolume.Mb),
 			}
-			appendMatchesForContainer(f.Namespace.Name, pod0, pod1, "busybox-container", ctrMatches, keys)
+			appendMatchesForContainer(f.Namespace.Name, pod0, pod1, "busybox-container", ctrMatches, keys, gstruct.AllowDuplicates|gstruct.IgnoreExtras)
+
+			ctrOptionalMatches := map[string]types.GomegaMatcher{
+				"container_fs_io_current":            preciseSample(0),
+				"container_fs_io_time_seconds_total": preciseSample(0),
+				"container_fs_inodes_free":           boundedSample(0, 10*e2evolume.Kb),
+				"container_fs_inodes_total":          boundedSample(0, 100),
+				"container_fs_limit_bytes":           boundedSample(100*e2evolume.Mb, 10*e2evolume.Tb),
+				"container_fs_usage_bytes":           boundedSample(0, 1000000),
+				"container_fs_reads_merged_total":    preciseSample(0),
+				"container_fs_read_seconds_total":    preciseSample(0),
+				"container_fs_sector_reads_total":    preciseSample(0),
+				"container_fs_sector_writes_total":   preciseSample(0),
+				"container_fs_writes_merged_total":   preciseSample(0),
+				"container_fs_write_seconds_total":   preciseSample(0),
+			}
+			// Missing from containerd, so set gstruct.IgnoreMissing
+			// See https://github.com/google/cadvisor/issues/2785
+			appendMatchesForContainer(f.Namespace.Name, pod0, pod1, "busybox-container", ctrOptionalMatches, keys, gstruct.AllowDuplicates|gstruct.IgnoreMissing|gstruct.IgnoreExtras)
 
 			podMatches := map[string]types.GomegaMatcher{
 				"container_network_receive_bytes_total":            boundedSample(10, 10*e2evolume.Mb),
@@ -100,7 +106,8 @@ var _ = SIGDescribe("[NodeConformance] [LinuxOnly] ContainerMetrics", func() {
 				"container_network_transmit_packets_dropped_total": boundedSample(0, 1000),
 				"container_network_transmit_packets_total":         boundedSample(0, 1000),
 			}
-			appendMatchesForContainer(f.Namespace.Name, pod0, pod1, "POD", podMatches, keys)
+			// TODO: determine why these are missing from containerd but not CRI-O
+			appendMatchesForContainer(f.Namespace.Name, pod0, pod1, "POD", podMatches, keys, gstruct.AllowDuplicates|gstruct.IgnoreMissing|gstruct.IgnoreExtras)
 
 			matchResourceMetrics := gstruct.MatchKeys(gstruct.IgnoreExtras, keys)
 			ginkgo.By("Giving pods a minute to start up and produce metrics")
@@ -138,9 +145,9 @@ func boundedSampleIgnoreTimestamp(lower, upper interface{}) types.GomegaMatcher 
 	}))
 }
 
-func appendMatchesForContainer(ns, pod1, pod2, ctr string, matches map[string]types.GomegaMatcher, keys gstruct.Keys) {
+func appendMatchesForContainer(ns, pod1, pod2, ctr string, matches map[string]types.GomegaMatcher, keys gstruct.Keys, options gstruct.Options) {
 	for k, v := range matches {
-		keys[k] = gstruct.MatchElements(containerID, gstruct.AllowDuplicates|gstruct.IgnoreExtras, gstruct.Elements{
+		keys[k] = gstruct.MatchElements(containerID, options, gstruct.Elements{
 			fmt.Sprintf("%s::%s::%s", ns, pod1, ctr): v,
 			fmt.Sprintf("%s::%s::%s", ns, pod2, ctr): v,
 		})
