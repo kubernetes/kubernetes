@@ -606,6 +606,13 @@ const (
 	// the pod is being deleted due to a disruption.
 	PodDisruptionConditions featuregate.Feature = "PodDisruptionConditions"
 
+	// owner: @danielvegamyhre
+	// kep: https://kep.k8s.io/4017
+	// beta: v1.28
+	//
+	// Set pod completion index as a pod label for Indexed Jobs and StatefulSets.
+	PodIndexLabel featuregate.Feature = "PodIndexLabel"
+
 	// owner: @ddebroy
 	// alpha: v1.25
 	//
@@ -843,13 +850,6 @@ const (
 	//
 	// Enables In-Place Pod Vertical Scaling
 	InPlacePodVerticalScaling featuregate.Feature = "InPlacePodVerticalScaling"
-
-	// owner: @danielvegamyhre
-	// kep: https://kep.k8s.io/4017
-	// beta: v1.28
-	//
-	// Set pod completion index as a pod label for Indexed Jobs and StatefulSets.
-	PodIndexLabel featuregate.Feature = "PodIndexLabel"
 )
 
 func init() {
