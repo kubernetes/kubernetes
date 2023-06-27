@@ -358,7 +358,7 @@ func TestStatefulSetStatusWithPodFail(t *testing.T) {
 	limitedPodNumber := 2
 	c, config, closeFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerConfig: func(config *controlplane.Config) {
-			config.GenericConfig.AdmissionControl = &fakePodFailAdmission{
+			config.ControlPlane.Generic.AdmissionControl = &fakePodFailAdmission{
 				limitedPodNumber: limitedPodNumber,
 			}
 		},

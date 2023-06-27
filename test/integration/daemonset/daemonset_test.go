@@ -1180,7 +1180,7 @@ func TestUpdateStatusDespitePodCreationFailure(t *testing.T) {
 		limitedPodNumber := 2
 		ctx, closeFn, dc, informers, clientset := setupWithServerSetup(t, framework.TestServerSetup{
 			ModifyServerConfig: func(config *controlplane.Config) {
-				config.GenericConfig.AdmissionControl = &fakePodFailAdmission{
+				config.ControlPlane.Generic.AdmissionControl = &fakePodFailAdmission{
 					limitedPodNumber: limitedPodNumber,
 				}
 			},

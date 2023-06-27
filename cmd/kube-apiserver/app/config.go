@@ -31,7 +31,7 @@ type Config struct {
 	Options options.CompletedOptions
 
 	Aggregator    *aggregatorapiserver.Config
-	ControlPlane  *controlplane.Config
+	KubeAPIs      *controlplane.Config
 	ApiExtensions *apiextensionsapiserver.Config
 
 	ExtraConfig
@@ -44,7 +44,7 @@ type completedConfig struct {
 	Options options.CompletedOptions
 
 	Aggregator    aggregatorapiserver.CompletedConfig
-	ControlPlane  controlplane.CompletedConfig
+	KubeAPIs      controlplane.CompletedConfig
 	ApiExtensions apiextensionsapiserver.CompletedConfig
 
 	ExtraConfig
@@ -60,7 +60,7 @@ func (c *Config) Complete() (CompletedConfig, error) {
 		Options: c.Options,
 
 		Aggregator:    c.Aggregator.Complete(),
-		ControlPlane:  c.ControlPlane.Complete(),
+		KubeAPIs:      c.KubeAPIs.Complete(),
 		ApiExtensions: c.ApiExtensions.Complete(),
 
 		ExtraConfig: c.ExtraConfig,
@@ -73,25 +73,25 @@ func NewConfig(opts options.CompletedOptions) (*Config, error) {
 		Options: opts,
 	}
 
-	controlPlane, serviceResolver, pluginInitializer, err := CreateKubeAPIServerConfig(opts)
+	kubeAPIs, serviceResolver, pluginInitializer, err := CreateKubeAPIServerConfig(opts)
 	if err != nil {
 		return nil, err
 	}
-	c.ControlPlane = controlPlane
+	c.KubeAPIs = kubeAPIs
 
-	authInfoResolver := webhook.NewDefaultAuthenticationInfoResolverWrapper(controlPlane.ExtraConfig.ProxyTransport, controlPlane.GenericConfig.EgressSelector, controlPlane.GenericConfig.LoopbackClientConfig, controlPlane.GenericConfig.TracerProvider)
+	authInfoResolver := webhook.NewDefaultAuthenticationInfoResolverWrapper(kubeAPIs.ControlPlane.ProxyTransport, kubeAPIs.ControlPlane.Generic.EgressSelector, kubeAPIs.ControlPlane.Generic.LoopbackClientConfig, kubeAPIs.ControlPlane.Generic.TracerProvider)
 	conversionFactory, err := conversion.NewCRConverterFactory(serviceResolver, authInfoResolver)
 	if err != nil {
 		return nil, err
 	}
 
-	apiExtensions, err := apiserver.CreateAPIExtensionsConfig(*controlPlane.GenericConfig, controlPlane.ExtraConfig.VersionedInformers, pluginInitializer, opts.CompletedOptions, opts.MasterCount, conversionFactory)
+	apiExtensions, err := apiserver.CreateAPIExtensionsConfig(*kubeAPIs.ControlPlane.Generic, kubeAPIs.ControlPlane.VersionedInformers, pluginInitializer, opts.CompletedOptions, opts.MasterCount, conversionFactory)
 	if err != nil {
 		return nil, err
 	}
 	c.ApiExtensions = apiExtensions
 
-	aggregator, err := createAggregatorConfig(*controlPlane.GenericConfig, opts.CompletedOptions, controlPlane.ExtraConfig.VersionedInformers, serviceResolver, controlPlane.ExtraConfig.ProxyTransport, controlPlane.ExtraConfig.PeerProxy, pluginInitializer)
+	aggregator, err := createAggregatorConfig(*kubeAPIs.ControlPlane.Generic, opts.CompletedOptions, kubeAPIs.ControlPlane.VersionedInformers, serviceResolver, kubeAPIs.ControlPlane.ProxyTransport, kubeAPIs.ControlPlane.Extra.PeerProxy, pluginInitializer)
 	if err != nil {
 		return nil, err
 	}

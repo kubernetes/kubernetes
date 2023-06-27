@@ -147,33 +147,8 @@ var (
 
 // ExtraConfig defines extra configuration for the master
 type ExtraConfig struct {
-	ClusterAuthenticationInfo clusterauthenticationtrust.ClusterAuthenticationInfo
-
-	APIResourceConfigSource  serverstorage.APIResourceConfigSource
-	StorageFactory           serverstorage.StorageFactory
 	EndpointReconcilerConfig EndpointReconcilerConfig
-	EventTTL                 time.Duration
 	KubeletClientConfig      kubeletclient.KubeletClientConfig
-
-	EnableLogsSupport bool
-	ProxyTransport    *http.Transport
-
-	// PeerProxy, if not nil, sets proxy transport between kube-apiserver peers for requests
-	// that can not be served locally
-	PeerProxy utilpeerproxy.Interface
-
-	// PeerEndpointLeaseReconciler updates the peer endpoint leases
-	PeerEndpointLeaseReconciler peerreconcilers.PeerEndpointLeaseReconciler
-
-	// PeerCAFile is the ca bundle used by this kube-apiserver to verify peer apiservers'
-	// serving certs when routing a request to the peer in the case the request can not be served
-	// locally due to version skew.
-	PeerCAFile string
-
-	// PeerAdvertiseAddress is the IP for this kube-apiserver which is used by peer apiservers to route a request
-	// to this apiserver. This happens in cases where the peer is not able to serve the request due to
-	// version skew. If unset, AdvertiseAddress/BindAddress will be used.
-	PeerAdvertiseAddress peerreconcilers.PeerAdvertiseAddress
 
 	// Values to build the IP addresses used by discovery
 	// The range of IPs to be assigned to services with type=ClusterIP or greater
@@ -215,17 +190,6 @@ type ExtraConfig struct {
 	// Selects which reconciler to use
 	EndpointReconcilerType reconcilers.Type
 
-	ServiceAccountIssuer        serviceaccount.TokenGenerator
-	ServiceAccountMaxExpiration time.Duration
-	ExtendExpiration            bool
-
-	// ServiceAccountIssuerDiscovery
-	ServiceAccountIssuerURL  string
-	ServiceAccountJWKSURI    string
-	ServiceAccountPublicKeys []interface{}
-
-	VersionedInformers informers.SharedInformerFactory
-
 	// RepairServicesInterval interval used by the repair loops for
 	// the Services NodePort and ClusterIP resources
 	RepairServicesInterval time.Duration
@@ -233,13 +197,13 @@ type ExtraConfig struct {
 
 // Config defines configuration for the master
 type Config struct {
-	GenericConfig *genericapiserver.Config
-	ExtraConfig   ExtraConfig
+	ControlPlane controlplaneapiserver.Config
+	ExtraConfig
 }
 
 type completedConfig struct {
-	GenericConfig genericapiserver.CompletedConfig
-	ExtraConfig   *ExtraConfig
+	ControlPlane controlplaneapiserver.CompletedConfig
+	*ExtraConfig
 }
 
 // CompletedConfig embeds a private pointer that cannot be instantiated outside of this package
@@ -262,8 +226,8 @@ type Instance struct {
 }
 
 func (c *Config) createMasterCountReconciler() reconcilers.EndpointReconciler {
-	endpointClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
-	endpointSliceClient := discoveryclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
+	endpointClient := corev1client.NewForConfigOrDie(c.ControlPlane.Generic.LoopbackClientConfig)
+	endpointSliceClient := discoveryclient.NewForConfigOrDie(c.ControlPlane.Generic.LoopbackClientConfig)
 	endpointsAdapter := reconcilers.NewEndpointsAdapter(endpointClient, endpointSliceClient)
 
 	return reconcilers.NewMasterCountEndpointReconciler(c.ExtraConfig.MasterCount, endpointsAdapter)
@@ -274,12 +238,12 @@ func (c *Config) createNoneReconciler() reconcilers.EndpointReconciler {
 }
 
 func (c *Config) createLeaseReconciler() reconcilers.EndpointReconciler {
-	endpointClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
-	endpointSliceClient := discoveryclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
+	endpointClient := corev1client.NewForConfigOrDie(c.ControlPlane.Generic.LoopbackClientConfig)
+	endpointSliceClient := discoveryclient.NewForConfigOrDie(c.ControlPlane.Generic.LoopbackClientConfig)
 	endpointsAdapter := reconcilers.NewEndpointsAdapter(endpointClient, endpointSliceClient)
 
 	ttl := c.ExtraConfig.MasterEndpointReconcileTTL
-	config, err := c.ExtraConfig.StorageFactory.NewConfig(api.Resource("apiServerIPInfo"))
+	config, err := c.ControlPlane.StorageFactory.NewConfig(api.Resource("apiServerIPInfo"))
 	if err != nil {
 		klog.Fatalf("Error creating storage factory config: %v", err)
 	}
@@ -325,10 +289,11 @@ func (c *Config) Complete() CompletedConfig {
 		cfg.ExtraConfig.APIServerServiceIP = apiServerServiceIP
 	}
 
-	discoveryAddresses := discovery.DefaultAddresses{DefaultAddress: cfg.GenericConfig.ExternalAddress}
+	// override the default discovery addresses in the generic controlplane adding service IP support
+	discoveryAddresses := discovery.DefaultAddresses{DefaultAddress: cfg.ControlPlane.Generic.ExternalAddress}
 	discoveryAddresses.CIDRRules = append(discoveryAddresses.CIDRRules,
 		discovery.CIDRRule{IPRange: cfg.ExtraConfig.ServiceIPRange, Address: net.JoinHostPort(cfg.ExtraConfig.APIServerServiceIP.String(), strconv.Itoa(cfg.ExtraConfig.APIServerServicePort))})
-	cfg.GenericConfig.DiscoveryAddresses = discoveryAddresses
+	cfg.ControlPlane.Generic.DiscoveryAddresses = discoveryAddresses
 
 	if cfg.ExtraConfig.ServiceNodePortRange.Size == 0 {
 		// TODO: Currently no way to specify an empty range (do we need to allow this?)
@@ -367,7 +332,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		return nil, fmt.Errorf("Master.New() called with empty config.KubeletClientConfig")
 	}
 
-	s, err := c.GenericConfig.New("kube-apiserver", delegationTarget)
+	cp, err := c.ControlPlane.New("kube-apiserver", delegationTarget)
 	if err != nil {
 		return nil, err
 	}
@@ -412,27 +377,27 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		ClusterAuthenticationInfo: c.ExtraConfig.ClusterAuthenticationInfo,
 	}
 
-	clientset, err := kubernetes.NewForConfig(c.GenericConfig.LoopbackClientConfig)
+	client, err := kubernetes.NewForConfig(c.ControlPlane.Generic.LoopbackClientConfig)
 	if err != nil {
 		return nil, err
 	}
 
 	// TODO: update to a version that caches success but will recheck on failure, unlike memcache discovery
-	discoveryClientForAdmissionRegistration := clientset.Discovery()
+	discoveryClientForAdmissionRegistration := client.Discovery()
 
 	legacyRESTStorageProvider, err := corerest.New(corerest.Config{
 		GenericConfig: corerest.GenericConfig{
-			StorageFactory:              c.ExtraConfig.StorageFactory,
-			EventTTL:                    c.ExtraConfig.EventTTL,
-			LoopbackClientConfig:        c.GenericConfig.LoopbackClientConfig,
-			ServiceAccountIssuer:        c.ExtraConfig.ServiceAccountIssuer,
-			ExtendExpiration:            c.ExtraConfig.ExtendExpiration,
-			ServiceAccountMaxExpiration: c.ExtraConfig.ServiceAccountMaxExpiration,
-			APIAudiences:                c.GenericConfig.Authentication.APIAudiences,
-			Informers:                   c.ExtraConfig.VersionedInformers,
+			StorageFactory:              c.ControlPlane.Extra.StorageFactory,
+			EventTTL:                    c.ControlPlane.Extra.EventTTL,
+			LoopbackClientConfig:        c.ControlPlane.Generic.LoopbackClientConfig,
+			ServiceAccountIssuer:        c.ControlPlane.Extra.ServiceAccountIssuer,
+			ExtendExpiration:            c.ControlPlane.Extra.ExtendExpiration,
+			ServiceAccountMaxExpiration: c.ControlPlane.Extra.ServiceAccountMaxExpiration,
+			APIAudiences:                c.ControlPlane.Generic.Authentication.APIAudiences,
+			Informers:                   c.ControlPlane.Extra.VersionedInformers,
 		},
 		Proxy: corerest.ProxyConfig{
-			Transport:           c.ExtraConfig.ProxyTransport,
+			Transport:           c.ControlPlane.Extra.ProxyTransport,
 			KubeletClientConfig: c.ExtraConfig.KubeletClientConfig,
 		},
 		Services: corerest.ServicesConfig{
@@ -456,8 +421,8 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	restStorageProviders := []RESTStorageProvider{
 		legacyRESTStorageProvider,
 		apiserverinternalrest.StorageProvider{},
-		authenticationrest.RESTStorageProvider{Authenticator: c.GenericConfig.Authentication.Authenticator, APIAudiences: c.GenericConfig.Authentication.APIAudiences},
-		authorizationrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorization.Authorizer, RuleResolver: c.GenericConfig.RuleResolver},
+		authenticationrest.RESTStorageProvider{Authenticator: c.ControlPlane.Generic.Authentication.Authenticator, APIAudiences: c.ControlPlane.Generic.Authentication.APIAudiences},
+		authorizationrest.RESTStorageProvider{Authorizer: c.ControlPlane.Generic.Authorization.Authorizer, RuleResolver: c.ControlPlane.Generic.RuleResolver},
 		autoscalingrest.RESTStorageProvider{},
 		batchrest.RESTStorageProvider{},
 		certificatesrest.RESTStorageProvider{},
@@ -466,15 +431,15 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		networkingrest.RESTStorageProvider{},
 		noderest.RESTStorageProvider{},
 		policyrest.RESTStorageProvider{},
-		rbacrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorization.Authorizer},
+		rbacrest.RESTStorageProvider{Authorizer: c.ControlPlane.Generic.Authorization.Authorizer},
 		schedulingrest.RESTStorageProvider{},
 		storagerest.RESTStorageProvider{},
-		flowcontrolrest.RESTStorageProvider{InformerFactory: c.GenericConfig.SharedInformerFactory},
+		flowcontrolrest.RESTStorageProvider{InformerFactory: c.ControlPlane.Generic.SharedInformerFactory},
 		// keep apps after extensions so legacy clients resolve the extensions versions of shared resource names.
 		// See https://github.com/kubernetes/kubernetes/issues/42392
 		appsrest.StorageProvider{},
-		admissionregistrationrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorization.Authorizer, DiscoveryClient: discoveryClientForAdmissionRegistration},
-		eventsrest.RESTStorageProvider{TTL: c.ExtraConfig.EventTTL},
+		admissionregistrationrest.RESTStorageProvider{Authorizer: c.ControlPlane.Generic.Authorization.Authorizer, DiscoveryClient: discoveryClientForAdmissionRegistration},
+		eventsrest.RESTStorageProvider{TTL: c.ControlPlane.EventTTL},
 		resourcerest.RESTStorageProvider{},
 	}
 	if err := m.InstallAPIs(c.ExtraConfig.APIResourceConfigSource, c.GenericConfig.RESTOptionsGetter, restStorageProviders...); err != nil {
@@ -486,12 +451,12 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		return nil
 	})
 
-	_, publicServicePort, err := c.GenericConfig.SecureServing.HostPort()
+	_, publicServicePort, err := c.ControlPlane.Generic.SecureServing.HostPort()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get listener address: %w", err)
 	}
 	kubernetesServiceCtrl := kubernetesservice.New(kubernetesservice.Config{
-		PublicIP: c.GenericConfig.PublicAddress,
+		PublicIP: c.ControlPlane.Generic.PublicAddress,
 
 		EndpointReconciler: c.ExtraConfig.EndpointReconcilerConfig.Reconciler,
 		EndpointInterval:   c.ExtraConfig.EndpointReconcilerConfig.Interval,
@@ -500,12 +465,12 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		ServicePort:               c.ExtraConfig.APIServerServicePort,
 		PublicServicePort:         publicServicePort,
 		KubernetesServiceNodePort: c.ExtraConfig.KubernetesServiceNodePort,
-	}, clientset, c.ExtraConfig.VersionedInformers.Core().V1().Services())
-	m.GenericAPIServer.AddPostStartHookOrDie("bootstrap-controller", func(hookContext genericapiserver.PostStartHookContext) error {
+	}, client, c.ControlPlane.Extra.VersionedInformers.Core().V1().Services())
+	s.ControlPlane.GenericAPIServer.AddPostStartHookOrDie("bootstrap-controller", func(hookContext genericapiserver.PostStartHookContext) error {
 		kubernetesServiceCtrl.Start(hookContext.StopCh)
 		return nil
 	})
-	m.GenericAPIServer.AddPreShutdownHookOrDie("stop-kubernetes-service-controller", func() error {
+	s.ControlPlane.GenericAPIServer.AddPreShutdownHookOrDie("stop-kubernetes-service-controller", func() error {
 		kubernetesServiceCtrl.Stop()
 		return nil
 	})
