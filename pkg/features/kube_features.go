@@ -374,15 +374,6 @@ const (
 	// Causes kubelet to no longer create legacy IPTables rules
 	IPTablesOwnershipCleanup featuregate.Feature = "IPTablesOwnershipCleanup"
 
-	// owner: @mimowo
-	// kep: https://kep.k8s.io/3329
-	// alpha: v1.25
-	// beta: v1.26
-	//
-	// Allow users to specify handling of pod failures based on container exit codes
-	// and pod conditions.
-	JobPodFailurePolicy featuregate.Feature = "JobPodFailurePolicy"
-
 	// owner: @ahg
 	// beta: v1.23
 	// stable: v1.27
@@ -391,6 +382,15 @@ const (
 	// node affinity, selector and tolerations. This is allowed only for suspended jobs
 	// that have never been unsuspended before.
 	JobMutableNodeSchedulingDirectives featuregate.Feature = "JobMutableNodeSchedulingDirectives"
+
+	// owner: @mimowo
+	// kep: https://kep.k8s.io/3329
+	// alpha: v1.25
+	// beta: v1.26
+	//
+	// Allow users to specify handling of pod failures based on container exit codes
+	// and pod conditions.
+	JobPodFailurePolicy featuregate.Feature = "JobPodFailurePolicy"
 
 	// owner: @alculquicondor
 	// alpha: v1.23
@@ -948,9 +948,9 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	IPTablesOwnershipCleanup: {Default: true, PreRelease: featuregate.Beta},
 
-	JobPodFailurePolicy: {Default: true, PreRelease: featuregate.Beta},
-
 	JobMutableNodeSchedulingDirectives: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
+
+	JobPodFailurePolicy: {Default: true, PreRelease: featuregate.Beta},
 
 	JobReadyPods: {Default: true, PreRelease: featuregate.Beta},
 
