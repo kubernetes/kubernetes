@@ -49,6 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	"k8s.io/kubernetes/test/integration/framework"
+	testutils "k8s.io/kubernetes/test/integration/util"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
@@ -155,6 +156,7 @@ func newDaemonSet(name, namespace string) *apps.DaemonSet {
 }
 
 func cleanupDaemonSets(t *testing.T, cs clientset.Interface, ds *apps.DaemonSet) {
+	t.Helper()
 	ds, err := cs.AppsV1().DaemonSets(ds.Namespace).Get(context.TODO(), ds.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("Failed to get DaemonSet %s/%s: %v", ds.Namespace, ds.Name, err)
@@ -174,6 +176,10 @@ func cleanupDaemonSets(t *testing.T, cs clientset.Interface, ds *apps.DaemonSet)
 	if ds, err = cs.AppsV1().DaemonSets(ds.Namespace).Update(context.TODO(), ds, metav1.UpdateOptions{}); err != nil {
 		t.Errorf("Failed to update DaemonSet %s/%s: %v", ds.Namespace, ds.Name, err)
 		return
+	}
+
+	if len(ds.Spec.Template.Finalizers) > 0 {
+		testutils.RemovePodFinalizersInNamespace(context.TODO(), cs, t, ds.Namespace)
 	}
 
 	// Wait for the daemon set controller to kill all the daemon pods.
@@ -275,9 +281,7 @@ func validateDaemonSetPodsAndMarkReady(
 ) {
 	if err := wait.Poll(time.Second, 60*time.Second, func() (bool, error) {
 		objects := podInformer.GetIndexer().List()
-		if len(objects) != numberPods {
-			return false, nil
-		}
+		nonTerminatedPods := 0
 
 		for _, object := range objects {
 			pod := object.(*v1.Pod)
@@ -294,6 +298,10 @@ func validateDaemonSetPodsAndMarkReady(
 				t.Errorf("controllerRef.Controller is not set to true")
 			}
 
+			if podutil.IsPodPhaseTerminal(pod.Status.Phase) {
+				continue
+			}
+			nonTerminatedPods++
 			if !podutil.IsPodReady(pod) && len(pod.Spec.NodeName) != 0 {
 				podCopy := pod.DeepCopy()
 				podCopy.Status = v1.PodStatus{
@@ -307,7 +315,7 @@ func validateDaemonSetPodsAndMarkReady(
 			}
 		}
 
-		return true, nil
+		return nonTerminatedPods == numberPods, nil
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -536,8 +544,23 @@ func TestSimpleDaemonSetLaunchesPods(t *testing.T) {
 }
 
 func TestSimpleDaemonSetRestartsPodsOnTerminalPhase(t *testing.T) {
-	for _, podPhase := range []v1.PodPhase{v1.PodSucceeded, v1.PodFailed} {
-		t.Run(string(podPhase), func(t *testing.T) {
+	cases := map[string]struct {
+		phase     v1.PodPhase
+		finalizer bool
+	}{
+		"Succeeded": {
+			phase: v1.PodSucceeded,
+		},
+		"Failed": {
+			phase: v1.PodFailed,
+		},
+		"Succeeded with finalizer": {
+			phase:     v1.PodSucceeded,
+			finalizer: true,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
 			forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
 				ctx, closeFn, dc, informers, clientset := setup(t)
 				defer closeFn()
@@ -553,6 +576,9 @@ func TestSimpleDaemonSetRestartsPodsOnTerminalPhase(t *testing.T) {
 				go dc.Run(ctx, 2)
 
 				ds := newDaemonSet("restart-terminal-pod", ns.Name)
+				if tc.finalizer {
+					ds.Spec.Template.Finalizers = append(ds.Spec.Template.Finalizers, "test.k8s.io/finalizer")
+				}
 				ds.Spec.UpdateStrategy = *strategy
 				if _, err := dsClient.Create(ctx, ds, metav1.CreateOptions{}); err != nil {
 					t.Fatalf("Failed to create DaemonSet: %v", err)
@@ -566,9 +592,9 @@ func TestSimpleDaemonSetRestartsPodsOnTerminalPhase(t *testing.T) {
 				validateDaemonSetStatus(dsClient, ds.Name, int32(numNodes), t)
 				podToMarkAsTerminal := podInformer.GetIndexer().List()[0].(*v1.Pod)
 				podCopy := podToMarkAsTerminal.DeepCopy()
-				podCopy.Status.Phase = podPhase
+				podCopy.Status.Phase = tc.phase
 				if _, err := podClient.UpdateStatus(ctx, podCopy, metav1.UpdateOptions{}); err != nil {
-					t.Fatalf("Failed to mark the pod as terminal with phase: %v. Error: %v", podPhase, err)
+					t.Fatalf("Failed to mark the pod as terminal with phase: %v. Error: %v", tc.phase, err)
 				}
 				// verify all pods are active. They either continue Running or are Pending after restart
 				validateDaemonSetPodsActive(podClient, podInformer, numNodes, t)
