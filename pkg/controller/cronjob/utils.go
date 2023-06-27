@@ -72,7 +72,8 @@ func deleteFromActiveList(cj *batchv1.CronJob, uid types.UID) {
 // mostRecentScheduleTime returns:
 //   - the last schedule time or CronJob's creation time,
 //   - the most recent time a Job should be created or nil, if that's after now,
-//   - number of missed schedules
+//   - very rough approximation of number of missed schedules (based on difference
+//     between two schedules),
 //   - error in an edge case where the schedule specification is grammatically correct,
 //     but logically doesn't make sense (31st day for months with only 30 days, for example).
 func mostRecentScheduleTime(cj *batchv1.CronJob, now time.Time, schedule cron.Schedule, includeStartingDeadlineSeconds bool) (time.Time, *time.Time, int64, error) {
@@ -106,10 +107,29 @@ func mostRecentScheduleTime(cj *batchv1.CronJob, now time.Time, schedule cron.Sc
 	if timeBetweenTwoSchedules < 1 {
 		return earliestTime, nil, 0, fmt.Errorf("time difference between two schedules is less than 1 second")
 	}
+	// this logic used for calculating number of missed schedules does a rough
+	// approximation, by calculating a diff between two schedules (t1 and t2),
+	// and counting how many of these will fit in between last schedule and now
 	timeElapsed := int64(now.Sub(t1).Seconds())
 	numberOfMissedSchedules := (timeElapsed / timeBetweenTwoSchedules) + 1
-	mostRecentTime := time.Unix(t1.Unix()+((numberOfMissedSchedules-1)*timeBetweenTwoSchedules), 0).UTC()
 
+	var mostRecentTime time.Time
+	// to get the most recent time accurate for regular schedules and the ones
+	// specified with @every form, we first need to calculate the potential earliest
+	// time by multiplying the initial number of missed schedules by its interval,
+	// this is critical to ensure @every starts at the correct time, this explains
+	// the numberOfMissedSchedules-1, the additional -1 serves there to go back
+	// in time one more time unit, and let the cron library calculate a proper
+	// schedule, for case where the schedule is not consistent, for example
+	// something like  30 6-16/4 * * 1-5
+	potentialEarliest := t1.Add(time.Duration((numberOfMissedSchedules-1-1)*timeBetweenTwoSchedules) * time.Second)
+	for t := schedule.Next(potentialEarliest); !t.After(now); t = schedule.Next(t) {
+		mostRecentTime = t
+	}
+
+	if mostRecentTime.IsZero() {
+		return earliestTime, nil, numberOfMissedSchedules, nil
+	}
 	return earliestTime, &mostRecentTime, numberOfMissedSchedules, nil
 }
 
