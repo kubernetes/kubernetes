@@ -19,6 +19,7 @@ package apiserver
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
 
 	oteltrace "go.opentelemetry.io/otel/trace"
@@ -47,28 +48,56 @@ import (
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/controlplane"
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver/options"
+	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
+	"k8s.io/kubernetes/pkg/serviceaccount"
 )
+
+// Config defines configuration for the master
+type Config struct {
+	Generic *genericapiserver.Config
+	Extra
+}
+
+type Extra struct {
+	ClusterAuthenticationInfo clusterauthenticationtrust.ClusterAuthenticationInfo
+
+	APIResourceConfigSource serverstorage.APIResourceConfigSource
+	StorageFactory          serverstorage.StorageFactory
+	EventTTL                time.Duration
+
+	EnableLogsSupport bool
+	ProxyTransport    *http.Transport
+
+	ServiceAccountIssuer        serviceaccount.TokenGenerator
+	ServiceAccountMaxExpiration time.Duration
+	ExtendExpiration            bool
+
+	// ServiceAccountIssuerDiscovery
+	ServiceAccountIssuerURL  string
+	ServiceAccountJWKSURI    string
+	ServiceAccountPublicKeys []interface{}
+
+	VersionedInformers clientgoinformers.SharedInformerFactory
+}
 
 // BuildGenericConfig takes the master server options and produces the genericapiserver.Config associated with it
 func BuildGenericConfig(
 	s controlplaneapiserver.CompletedOptions,
 	schemes []*runtime.Scheme,
+	resourceConfig *serverstorage.ResourceConfig,
 	getOpenAPIDefinitions func(ref openapicommon.ReferenceCallback) map[string]openapicommon.OpenAPIDefinition,
 ) (
 	genericConfig *genericapiserver.Config,
 	versionedInformers clientgoinformers.SharedInformerFactory,
 	storageFactory *serverstorage.DefaultStorageFactory,
-
 	lastErr error,
 ) {
 	genericConfig = genericapiserver.NewConfig(legacyscheme.Codecs)
-	genericConfig.MergedResourceConfig = controlplane.DefaultAPIResourceConfigSource()
+	genericConfig.MergedResourceConfig = resourceConfig
 
 	if lastErr = s.GenericServerRunOptions.ApplyTo(genericConfig); lastErr != nil {
 		return
@@ -98,7 +127,7 @@ func BuildGenericConfig(
 	if lastErr = s.Features.ApplyTo(genericConfig, clientgoExternalClient, versionedInformers); lastErr != nil {
 		return
 	}
-	if lastErr = s.APIEnablement.ApplyTo(genericConfig, controlplane.DefaultAPIResourceConfigSource(), legacyscheme.Scheme); lastErr != nil {
+	if lastErr = s.APIEnablement.ApplyTo(genericConfig, resourceConfig, legacyscheme.Scheme); lastErr != nil {
 		return
 	}
 	if lastErr = s.EgressSelector.ApplyTo(genericConfig); lastErr != nil {
@@ -208,18 +237,6 @@ func BuildAuthorizer(ctx context.Context, s controlplaneapiserver.CompletedOptio
 	authorizer, ruleResolver, err := authorizationConfig.New(ctx, apiserverID)
 
 	return authorizer, ruleResolver, enablesRBAC, err
-}
-
-// CreatePeerEndpointLeaseReconciler creates a apiserver endpoint lease reconciliation loop
-// The peer endpoint leases are used to find network locations of apiservers for peer proxy
-func CreatePeerEndpointLeaseReconciler(c genericapiserver.Config, storageFactory serverstorage.StorageFactory) (reconcilers.PeerEndpointLeaseReconciler, error) {
-	ttl := controlplane.DefaultEndpointReconcilerTTL
-	config, err := storageFactory.NewConfig(api.Resource("apiServerPeerIPInfo"))
-	if err != nil {
-		return nil, fmt.Errorf("error creating storage factory config: %w", err)
-	}
-	reconciler, err := reconcilers.NewPeerEndpointLeaseReconciler(config, "/peerserverleases/", ttl)
-	return reconciler, err
 }
 
 func BuildPeerProxy(versionedInformer clientgoinformers.SharedInformerFactory, svm storageversion.Manager,

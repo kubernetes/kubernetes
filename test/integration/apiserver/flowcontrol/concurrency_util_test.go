@@ -155,7 +155,7 @@ func TestConcurrencyIsolation(t *testing.T) {
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
 			// Wrap default authorizer with one that delays requests from noxu clients
-			config.GenericConfig.Authorization.Authorizer = &noxuDelayingAuthorizer{config.GenericConfig.Authorization.Authorizer}
+			config.ControlPlane.Generic.Authorization.Authorizer = &noxuDelayingAuthorizer{config.ControlPlane.Generic.Authorization.Authorizer}
 		},
 	})
 	defer closeFn()

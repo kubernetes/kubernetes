@@ -28,6 +28,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	autoscalingapiv2beta1 "k8s.io/api/autoscaling/v2beta1"
 	autoscalingapiv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	batchapiv1beta1 "k8s.io/api/batch/v1beta1"
@@ -57,8 +59,11 @@ import (
 	restclient "k8s.io/client-go/rest"
 	kubeversion "k8s.io/component-base/version"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
+	netutils "k8s.io/utils/net"
+
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	flowcontrolv1bet3 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta3"
+	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	"k8s.io/kubernetes/pkg/controlplane/storageversionhashdata"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
@@ -67,9 +72,6 @@ import (
 	certificatesrest "k8s.io/kubernetes/pkg/registry/certificates/rest"
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
-	netutils "k8s.io/utils/net"
-
-	"github.com/stretchr/testify/assert"
 )
 
 // setUp is a convenience function for setting up for (most) tests.
@@ -77,53 +79,57 @@ func setUp(t *testing.T) (*etcd3testing.EtcdTestServer, Config, *assert.Assertio
 	server, storageConfig := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 
 	config := &Config{
-		GenericConfig: genericapiserver.NewConfig(legacyscheme.Codecs),
-		ExtraConfig: ExtraConfig{
-			APIResourceConfigSource: DefaultAPIResourceConfigSource(),
-			APIServerServicePort:    443,
-			MasterCount:             1,
-			EndpointReconcilerType:  reconcilers.MasterCountReconcilerType,
-			ServiceIPRange:          net.IPNet{IP: netutils.ParseIPSloppy("10.0.0.0"), Mask: net.CIDRMask(24, 32)},
+		ControlPlane: controlplaneapiserver.Config{
+			Generic: genericapiserver.NewConfig(legacyscheme.Codecs),
+			Extra: controlplaneapiserver.Extra{
+				APIResourceConfigSource: DefaultAPIResourceConfigSource(),
+			},
+		},
+		Extra: Extra{
+			APIServerServicePort:   443,
+			MasterCount:            1,
+			EndpointReconcilerType: reconcilers.MasterCountReconcilerType,
+			ServiceIPRange:         net.IPNet{IP: netutils.ParseIPSloppy("10.0.0.0"), Mask: net.CIDRMask(24, 32)},
 		},
 	}
 
 	storageFactoryConfig := kubeapiserver.NewStorageFactoryConfig()
-	storageConfig.StorageObjectCountTracker = config.GenericConfig.StorageObjectCountTracker
+	storageConfig.StorageObjectCountTracker = config.ControlPlane.Generic.StorageObjectCountTracker
 	resourceEncoding := resourceconfig.MergeResourceEncodingConfigs(storageFactoryConfig.DefaultResourceEncoding, storageFactoryConfig.ResourceEncodingOverrides)
 	storageFactory := serverstorage.NewDefaultStorageFactory(*storageConfig, "application/vnd.kubernetes.protobuf", storageFactoryConfig.Serializer, resourceEncoding, DefaultAPIResourceConfigSource(), nil)
 	etcdOptions := options.NewEtcdOptions(storageConfig)
 	// unit tests don't need watch cache and it leaks lots of goroutines with etcd testing functions during unit tests
 	etcdOptions.EnableWatchCache = false
-	err := etcdOptions.ApplyWithStorageFactoryTo(storageFactory, config.GenericConfig)
+	err := etcdOptions.ApplyWithStorageFactoryTo(storageFactory, config.ControlPlane.Generic)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	kubeVersion := kubeversion.Get()
-	config.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
-	config.GenericConfig.Version = &kubeVersion
-	config.ExtraConfig.StorageFactory = storageFactory
-	config.GenericConfig.LoopbackClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs}}
-	config.GenericConfig.PublicAddress = netutils.ParseIPSloppy("192.168.10.4")
-	config.GenericConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
-	config.ExtraConfig.KubeletClientConfig = kubeletclient.KubeletClientConfig{Port: 10250}
-	config.ExtraConfig.ProxyTransport = utilnet.SetTransportDefaults(&http.Transport{
+	config.ControlPlane.Generic.Authorization.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
+	config.ControlPlane.Generic.Version = &kubeVersion
+	config.ControlPlane.StorageFactory = storageFactory
+	config.ControlPlane.Generic.LoopbackClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs}}
+	config.ControlPlane.Generic.PublicAddress = netutils.ParseIPSloppy("192.168.10.4")
+	config.ControlPlane.Generic.LegacyAPIGroupPrefixes = sets.NewString("/api")
+	config.Extra.KubeletClientConfig = kubeletclient.KubeletClientConfig{Port: 10250}
+	config.ControlPlane.ProxyTransport = utilnet.SetTransportDefaults(&http.Transport{
 		DialContext:     func(ctx context.Context, network, addr string) (net.Conn, error) { return nil, nil },
 		TLSClientConfig: &tls.Config{},
 	})
 
 	// set fake SecureServingInfo because the listener port is needed for the kubernetes service
-	config.GenericConfig.SecureServing = &genericapiserver.SecureServingInfo{Listener: fakeLocalhost443Listener{}}
+	config.ControlPlane.Generic.SecureServing = &genericapiserver.SecureServingInfo{Listener: fakeLocalhost443Listener{}}
 
 	getOpenAPIDefinitions := openapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(generatedopenapi.GetOpenAPIDefinitions)
 	namer := openapinamer.NewDefinitionNamer(legacyscheme.Scheme, extensionsapiserver.Scheme, aggregatorscheme.Scheme)
-	config.GenericConfig.OpenAPIV3Config = genericapiserver.DefaultOpenAPIV3Config(getOpenAPIDefinitions, namer)
+	config.ControlPlane.Generic.OpenAPIV3Config = genericapiserver.DefaultOpenAPIV3Config(getOpenAPIDefinitions, namer)
 
-	clientset, err := kubernetes.NewForConfig(config.GenericConfig.LoopbackClientConfig)
+	clientset, err := kubernetes.NewForConfig(config.ControlPlane.Generic.LoopbackClientConfig)
 	if err != nil {
 		t.Fatalf("unable to create client set due to %v", err)
 	}
-	config.ExtraConfig.VersionedInformers = informers.NewSharedInformerFactory(clientset, config.GenericConfig.LoopbackClientConfig.Timeout)
+	config.ControlPlane.VersionedInformers = informers.NewSharedInformerFactory(clientset, config.ControlPlane.Generic.LoopbackClientConfig.Timeout)
 
 	return server, *config, assert.New(t)
 }
@@ -154,25 +160,25 @@ func TestLegacyRestStorageStrategies(t *testing.T) {
 
 	storageProvider, err := corerest.New(corerest.Config{
 		GenericConfig: corerest.GenericConfig{
-			StorageFactory:       apiserverCfg.ExtraConfig.StorageFactory,
-			EventTTL:             apiserverCfg.ExtraConfig.EventTTL,
-			LoopbackClientConfig: apiserverCfg.GenericConfig.LoopbackClientConfig,
-			Informers:            apiserverCfg.ExtraConfig.VersionedInformers,
+			StorageFactory:       apiserverCfg.ControlPlane.Extra.StorageFactory,
+			EventTTL:             apiserverCfg.ControlPlane.Extra.EventTTL,
+			LoopbackClientConfig: apiserverCfg.ControlPlane.Generic.LoopbackClientConfig,
+			Informers:            apiserverCfg.ControlPlane.Extra.VersionedInformers,
 		},
 		Proxy: corerest.ProxyConfig{
-			Transport:           apiserverCfg.ExtraConfig.ProxyTransport,
-			KubeletClientConfig: apiserverCfg.ExtraConfig.KubeletClientConfig,
+			Transport:           apiserverCfg.ControlPlane.Extra.ProxyTransport,
+			KubeletClientConfig: apiserverCfg.Extra.KubeletClientConfig,
 		},
 		Services: corerest.ServicesConfig{
-			ClusterIPRange: apiserverCfg.ExtraConfig.ServiceIPRange,
-			NodePortRange:  apiserverCfg.ExtraConfig.ServiceNodePortRange,
+			ClusterIPRange: apiserverCfg.Extra.ServiceIPRange,
+			NodePortRange:  apiserverCfg.Extra.ServiceNodePortRange,
 		},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
 
-	apiGroupInfo, err := storageProvider.NewRESTStorage(serverstorage.NewResourceConfig(), apiserverCfg.GenericConfig.RESTOptionsGetter)
+	apiGroupInfo, err := storageProvider.NewRESTStorage(serverstorage.NewResourceConfig(), apiserverCfg.ControlPlane.Generic.RESTOptionsGetter)
 	if err != nil {
 		t.Errorf("failed to create legacy REST storage: %v", err)
 	}
@@ -188,7 +194,7 @@ func TestCertificatesRestStorageStrategies(t *testing.T) {
 	defer etcdserver.Terminate(t)
 
 	certStorageProvider := certificatesrest.RESTStorageProvider{}
-	apiGroupInfo, err := certStorageProvider.NewRESTStorage(apiserverCfg.ExtraConfig.APIResourceConfigSource, apiserverCfg.GenericConfig.RESTOptionsGetter)
+	apiGroupInfo, err := certStorageProvider.NewRESTStorage(apiserverCfg.ControlPlane.APIResourceConfigSource, apiserverCfg.ControlPlane.Generic.RESTOptionsGetter)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
