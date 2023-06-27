@@ -168,7 +168,7 @@ func overrideAllocatableMemoryTest(ctx context.Context, f *framework.Framework, 
 			}
 		}
 		return false
-	}, 3*time.Minute, 10*time.Second).Should(gomega.Equal(true))
+	}, 3*time.Minute, 10*time.Second).Should(gomega.BeTrue())
 
 }
 

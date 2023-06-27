@@ -627,7 +627,7 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 
 					return true
 				}, time.Minute, 5*time.Second).Should(
-					gomega.Equal(true),
+					gomega.BeTrue(),
 					"the pod succeeded to start, when it should fail with the admission error",
 				)
 			})
