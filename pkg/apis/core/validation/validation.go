@@ -2816,6 +2816,19 @@ func validatePodResourceClaimSource(claimSource core.ClaimSource, fldPath *field
 	return allErrs
 }
 
+func validateReadinessProbe(probe *core.Probe, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if probe == nil {
+		return allErrs
+	}
+	allErrs = append(allErrs, validateProbe(probe, fldPath)...)
+	if probe.TerminationGracePeriodSeconds != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("terminationGracePeriodSeconds"), probe.TerminationGracePeriodSeconds, "must not be set for readinessProbes"))
+	}
+	return allErrs
+}
+
 func validateStartupProbe(probe *core.Probe, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
@@ -3223,10 +3236,7 @@ func validateInitContainers(containers []core.Container, regularContainers []cor
 			if ctr.LivenessProbe != nil {
 				allErrs = append(allErrs, field.Forbidden(idxPath.Child("livenessProbe"), "may not be set for init containers"))
 			}
-			// TODO: Allow restartable init containers to have a readiness probe.
-			if ctr.ReadinessProbe != nil {
-				allErrs = append(allErrs, field.Forbidden(idxPath.Child("readinessProbe"), "may not be set for init containers"))
-			}
+			allErrs = append(allErrs, validateReadinessProbe(ctr.ReadinessProbe, idxPath.Child("readinessProbe"))...)
 			allErrs = append(allErrs, validateStartupProbe(ctr.StartupProbe, idxPath.Child("startupProbe"))...)
 
 		default:
@@ -3238,7 +3248,7 @@ func validateInitContainers(containers []core.Container, regularContainers []cor
 				allErrs = append(allErrs, field.Forbidden(idxPath.Child("livenessProbe"), "may not be set for init containers"))
 			}
 			if ctr.ReadinessProbe != nil {
-				allErrs = append(allErrs, field.Forbidden(idxPath.Child("readinessProbe"), "may not be set for init containers"))
+				allErrs = append(allErrs, field.Forbidden(idxPath.Child("readinessProbe"), "may not be set for init containers without restartPolicy=Always"))
 			}
 			if ctr.StartupProbe != nil {
 				allErrs = append(allErrs, field.Forbidden(idxPath.Child("startupProbe"), "may not be set for init containers without restartPolicy=Always"))
@@ -3359,10 +3369,7 @@ func validateContainers(containers []core.Container, volumes map[string]core.Vol
 		if ctr.LivenessProbe != nil && ctr.LivenessProbe.SuccessThreshold != 1 {
 			allErrs = append(allErrs, field.Invalid(path.Child("livenessProbe", "successThreshold"), ctr.LivenessProbe.SuccessThreshold, "must be 1"))
 		}
-		allErrs = append(allErrs, validateProbe(ctr.ReadinessProbe, path.Child("readinessProbe"))...)
-		if ctr.ReadinessProbe != nil && ctr.ReadinessProbe.TerminationGracePeriodSeconds != nil {
-			allErrs = append(allErrs, field.Invalid(path.Child("readinessProbe", "terminationGracePeriodSeconds"), ctr.ReadinessProbe.TerminationGracePeriodSeconds, "must not be set for readinessProbes"))
-		}
+		allErrs = append(allErrs, validateReadinessProbe(ctr.ReadinessProbe, path.Child("readinessProbe"))...)
 		allErrs = append(allErrs, validateStartupProbe(ctr.StartupProbe, path.Child("startupProbe"))...)
 
 		// These fields are disallowed for regular containers

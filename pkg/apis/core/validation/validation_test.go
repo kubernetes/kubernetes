@@ -8164,11 +8164,18 @@ func TestValidateInitContainers(t *testing.T) {
 		ImagePullPolicy:          "IfNotPresent",
 		TerminationMessagePolicy: "File",
 	}, {
-		Name:                     "container-3-restart-always-with-startup-probe",
+		Name:                     "container-3-restart-always-with-probes",
 		Image:                    "image",
 		ImagePullPolicy:          "IfNotPresent",
 		TerminationMessagePolicy: "File",
 		RestartPolicy:            &containerRestartPolicyAlways,
+		ReadinessProbe: &core.Probe{
+			ProbeHandler: core.ProbeHandler{
+				TCPSocket: &core.TCPSocketAction{
+					Port: intstr.FromInt32(80),
+				},
+			},
+		},
 		StartupProbe: &core.Probe{
 			ProbeHandler: core.ProbeHandler{
 				TCPSocket: &core.TCPSocketAction{Port: intstr.FromInt(80)},
@@ -8392,6 +8399,25 @@ func TestValidateInitContainers(t *testing.T) {
 			},
 		}},
 		field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "initContainers[0].startupProbe.successThreshold", BadValue: int32(2)}},
+	}, {
+		"invalid readiness probe, terminationGracePeriodSeconds set.",
+		line(),
+		[]core.Container{{
+			Name:                     "life-123",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyAlways,
+			ReadinessProbe: &core.Probe{
+				ProbeHandler: core.ProbeHandler{
+					TCPSocket: &core.TCPSocketAction{
+						Port: intstr.FromInt32(80),
+					},
+				},
+				TerminationGracePeriodSeconds: utilpointer.Int64(10),
+			},
+		}},
+		field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "initContainers[0].readinessProbe.terminationGracePeriodSeconds", BadValue: utilpointer.Int64(10)}},
 	},
 	}
 	for _, tc := range errorCases {
