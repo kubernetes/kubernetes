@@ -86,6 +86,21 @@ dependencies:
       match: BUNDLED_ETCD_VERSIONS\?|LATEST_ETCD_VERSION\?
     - path: cluster/images/etcd/migrate/options.go
 
+  - name: "node-problem-detector"
+    version: 0.8.13
+    refPaths:
+    - path: test/e2e_node/image_list.go
+      match: const defaultImage
+    # TODO(dims): Ensure newer versions get uploaded to
+    # - https://console.cloud.google.com/storage/browser/gke-release/winnode/node-problem-detector
+    # - https://gcsweb.k8s.io/gcs/kubernetes-release/node-problem-detector/
+    # and then the following references get fixed.
+    #
+    # - path: cluster/gce/gci/configure.sh
+    #  match: DEFAULT_NPD_VERSION=
+    #- path: cluster/gce/windows/k8s-node-setup.psm1
+    #  match: DEFAULT_NPD_VERSION
+
   # From https://github.com/etcd-io/etcd/blob/main/Makefile
   - name: "golang: etcd release version"
     version: 1.19.9 # https://github.com/etcd-io/etcd/blob/main/CHANGELOG/CHANGELOG-3.5.md
