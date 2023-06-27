@@ -81,7 +81,7 @@ type testRESTOptionsGetter struct {
 }
 
 func (getter *testRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
-	storageConfig, err := getter.config.ExtraConfig.StorageFactory.NewConfig(resource)
+	storageConfig, err := getter.config.ControlPlane.Extra.StorageFactory.NewConfig(resource)
 	if err != nil {
 		return generic.RESTOptions{}, fmt.Errorf("failed to get storage: %v", err)
 	}
@@ -556,11 +556,11 @@ func TestRBAC(t *testing.T) {
 				},
 				ModifyServerConfig: func(config *controlplane.Config) {
 					// Append our custom test authenticator
-					config.GenericConfig.Authentication.Authenticator = unionauthn.New(config.GenericConfig.Authentication.Authenticator, authenticator)
+					config.ControlPlane.Generic.Authentication.Authenticator = unionauthn.New(config.ControlPlane.Generic.Authentication.Authenticator, authenticator)
 					// Append our custom test authorizer
 					var rbacAuthz authorizer.Authorizer
 					rbacAuthz, tearDownAuthorizerFn = newRBACAuthorizer(t, config)
-					config.GenericConfig.Authorization.Authorizer = unionauthz.New(config.GenericConfig.Authorization.Authorizer, rbacAuthz)
+					config.ControlPlane.Generic.Authorization.Authorizer = unionauthz.New(config.ControlPlane.Generic.Authorization.Authorizer, rbacAuthz)
 				},
 			})
 			defer tearDownFn()

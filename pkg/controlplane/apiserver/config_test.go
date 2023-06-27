@@ -17,6 +17,9 @@ limitations under the License.
 package apiserver
 
 import (
+	"net"
+	"testing"
+
 	extensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -26,8 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane/apiserver/options"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
 	netutils "k8s.io/utils/net"
-	"net"
-	"testing"
 )
 
 func TestBuildGenericConfig(t *testing.T) {
@@ -52,6 +53,7 @@ func TestBuildGenericConfig(t *testing.T) {
 	genericConfig, _, storageFactory, err := BuildGenericConfig(
 		completedOptions,
 		[]*runtime.Scheme{legacyscheme.Scheme, extensionsapiserver.Scheme, aggregatorscheme.Scheme},
+		nil,
 		generatedopenapi.GetOpenAPIDefinitions,
 	)
 	if err != nil {

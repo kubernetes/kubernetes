@@ -84,7 +84,7 @@ func setupWithResources(t *testing.T, groupVersions []schema.GroupVersion, resou
 				resourceConfig := controlplane.DefaultAPIResourceConfigSource()
 				resourceConfig.EnableVersions(groupVersions...)
 				resourceConfig.EnableResources(resources...)
-				config.ExtraConfig.APIResourceConfigSource = resourceConfig
+				config.ControlPlane.Extra.APIResourceConfigSource = resourceConfig
 			}
 		},
 	})
