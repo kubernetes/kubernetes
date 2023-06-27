@@ -965,7 +965,7 @@ func waitForTopologyUnawareResources(ctx context.Context, f *framework.Framework
 func getPodResourcesMetrics(ctx context.Context) (e2emetrics.KubeletMetrics, error) {
 	// we are running out of good names, so we need to be unnecessarily specific to avoid clashes
 	ginkgo.By("getting Pod Resources metrics from the metrics API")
-	return e2emetrics.GrabKubeletMetricsWithoutProxy(ctx, framework.TestContext.NodeName+":10255", "/metrics")
+	return e2emetrics.GrabKubeletMetricsWithoutProxy(ctx, nodeNameOrIP()+":10255", "/metrics")
 }
 
 func timelessSampleAtLeast(lower interface{}) types.GomegaMatcher {
