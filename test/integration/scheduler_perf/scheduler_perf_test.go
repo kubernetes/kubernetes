@@ -31,7 +31,6 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
@@ -51,7 +50,6 @@ import (
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
@@ -1221,41 +1219,22 @@ func cleanupWorkload(ctx context.Context, tb testing.TB, tc *testCase, client cl
 	// actually removing a namespace can take some time (garbage collecting
 	// other generated object like secrets, etc.) and we don't want to
 	// start the next workloads while that cleanup is still going on.
-	gomega.NewGomegaWithT(tb).Eventually(ctx, func(ctx context.Context) ([]interface{}, error) {
-		var objects []interface{}
+	if err := wait.PollUntilContextTimeout(ctx, time.Second, 5*time.Minute, false, func(ctx context.Context) (bool, error) {
 		namespaces, err := client.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
 		if err != nil {
-			return nil, err
+			return false, err
 		}
-		// Collecting several objects of interest (pods, claims) is done to
-		// provide a more informative failure message when a namespace doesn't
-		// disappear quickly enough.
 		for _, namespace := range namespaces.Items {
-			if _, ok := numPodsScheduledPerNamespace[namespace.Name]; !ok {
-				// Not a namespace created by the workload.
-				continue
+			if _, ok := numPodsScheduledPerNamespace[namespace.Name]; ok {
+				// A namespace created by the workload, need to wait.
+				return false, nil
 			}
-			pods, err := client.CoreV1().Pods(namespace.Name).List(ctx, metav1.ListOptions{})
-			if err != nil {
-				return nil, err
-			}
-			if len(pods.Items) > 0 {
-				// Record one pod per namespace - that's usually enough information.
-				objects = append(objects, pods.Items[0])
-			}
-			if tc.FeatureGates[features.DynamicResourceAllocation] {
-				claims, err := client.ResourceV1alpha2().ResourceClaims(namespace.Name).List(ctx, metav1.ListOptions{})
-				if err != nil {
-					return nil, err
-				}
-				if len(claims.Items) > 0 {
-					objects = append(objects, claims.Items[0])
-				}
-			}
-			objects = append(objects, namespace)
 		}
-		return objects, nil
-	}).WithTimeout(5*time.Minute).Should(gomega.BeEmpty(), "deleting namespaces")
+		// All namespaces gone.
+		return true, nil
+	}); err != nil {
+		tb.Fatalf("failed while waiting for namespace removal: %v", err)
+	}
 }
 
 func createNamespaceIfNotPresent(ctx context.Context, tb testing.TB, client clientset.Interface, namespace string, podsPerNamespace *map[string]int) {
