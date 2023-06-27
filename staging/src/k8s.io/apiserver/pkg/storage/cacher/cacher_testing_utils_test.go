@@ -17,6 +17,7 @@ limitations under the License.
 package cacher
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -66,13 +67,53 @@ func newEtcdTestStorage(t *testing.T, prefix string, pagingEnabled bool) (*etcd3
 	return server, storage
 }
 
-func makeTestPodWithName(name string) *example.Pod {
-	return &example.Pod{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: name},
-		Spec:       storagetesting.DeepEqualSafePodSpec(),
-	}
-}
-
 func computePodKey(obj *example.Pod) string {
 	return fmt.Sprintf("/pods/%s/%s", obj.Namespace, obj.Name)
+}
+
+func compactStorage(c *Cacher) storagetesting.Compaction {
+	return func(ctx context.Context, t *testing.T, resourceVersion string) {
+		versioner := storage.APIObjectVersioner{}
+		rv, err := versioner.ParseResourceVersion(resourceVersion)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = c.watchCache.waitUntilFreshAndBlock(context.TODO(), rv)
+		if err != nil {
+			t.Fatalf("WatchCache didn't caught up to RV: %v", rv)
+		}
+		c.watchCache.RUnlock()
+
+		c.watchCache.Lock()
+		defer c.watchCache.Unlock()
+		c.Lock()
+		defer c.Unlock()
+
+		if c.watchCache.resourceVersion < rv {
+			t.Fatalf("Can't compact into a future version: %v", resourceVersion)
+		}
+		if rv < c.watchCache.listResourceVersion {
+			t.Fatalf("Can't compact into a past version: %v", resourceVersion)
+		}
+
+		if len(c.watchers.allWatchers) > 0 || len(c.watchers.valueWatchers) > 0 {
+			// We could consider terminating those watchers, but given
+			// watchcache doesn't really support compaction and we don't
+			// exercise it in tests, we just throw an error here.
+			t.Error("Open watchers are not supported during compaction")
+		}
+
+		for c.watchCache.startIndex < c.watchCache.endIndex {
+			index := c.watchCache.startIndex % c.watchCache.capacity
+			if c.watchCache.cache[index].ResourceVersion > rv {
+				break
+			}
+
+			c.watchCache.startIndex++
+		}
+		c.watchCache.listResourceVersion = rv
+
+		// TODO(wojtek-t): We should also compact the underlying etcd storage.
+	}
 }
