@@ -110,10 +110,14 @@ func (plugin *projectedPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (b
 }
 
 func (plugin *projectedPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+	var sources []v1.VolumeProjection
+	if spec.Volume.Projected != nil {
+		sources = spec.Volume.Projected.Sources
+	}
 	return &projectedVolumeMounter{
 		projectedVolume: &projectedVolume{
 			volName:         spec.Name(),
-			sources:         spec.Volume.Projected.Sources,
+			sources:         sources,
 			podUID:          pod.UID,
 			plugin:          plugin,
 			MetricsProvider: volume.NewCachedMetrics(volume.NewMetricsDu(getPath(pod.UID, spec.Name(), plugin.host))),
