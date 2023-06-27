@@ -22,6 +22,10 @@ issues:
     - linters:
         - stylecheck
       text: "ST1003: should not use underscores in Go names; func (Convert_.*_To_.*|SetDefaults_)"
+    # This check currently has some false positives (https://github.com/nunnatsa/ginkgolinter/issues/91).
+    - linters:
+       - ginkgolinter
+      text: use a function call in (Eventually|Consistently)
 
 linters:
   disable-all: true # not disabled in golangci-strict.yaml
