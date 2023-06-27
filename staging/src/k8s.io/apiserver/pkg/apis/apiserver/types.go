@@ -157,3 +157,44 @@ type TracingConfiguration struct {
 	// Embed the component config tracing configuration struct
 	tracingapi.TracingConfiguration
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// AuthenticationConfiguration provides versioned configuration for authentication.
+type AuthenticationConfiguration struct {
+	metav1.TypeMeta
+
+	JWT []JWTAuthenticator
+}
+
+// JWTAuthenticator provides the configuration for a single JWT authenticator.
+type JWTAuthenticator struct {
+	Issuer               Issuer
+	ClaimValidationRules []ClaimValidationRule
+	ClaimMappings        ClaimMappings
+}
+
+// Issuer provides the configuration for a external provider specific settings.
+type Issuer struct {
+	URL                  string
+	CertificateAuthority string
+	Audiences            []string
+}
+
+// ClaimValidationRule provides the configuration for a single claim validation rule.
+type ClaimValidationRule struct {
+	Claim         string
+	RequiredValue string
+}
+
+// ClaimMappings provides the configuration for claim mapping
+type ClaimMappings struct {
+	Username PrefixedClaimOrExpression
+	Groups   PrefixedClaimOrExpression
+}
+
+// PrefixedClaimOrExpression provides the configuration for a single prefixed claim or expression.
+type PrefixedClaimOrExpression struct {
+	Claim  string
+	Prefix *string
+}
