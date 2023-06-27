@@ -120,7 +120,7 @@ func SetPodTerminationReason(ctx context.Context, kubeClient clientset.Interface
 // given node from master return true if success
 func MarkPodsNotReady(ctx context.Context, kubeClient clientset.Interface, recorder record.EventRecorder, pods []*v1.Pod, nodeName string) error {
 	logger := klog.FromContext(ctx)
-	logger.V(2).Info("Update ready status of pods on node", "node", klog.KRef("", nodeName))
+	logger.V(2).Info("Update not ready status of pods on node", "node", klog.KRef("", nodeName))
 
 	errs := []error{}
 	for i := range pods {
