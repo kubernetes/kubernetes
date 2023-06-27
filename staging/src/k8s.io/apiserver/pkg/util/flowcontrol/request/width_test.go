@@ -23,9 +23,14 @@ import (
 	"time"
 
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 func TestWorkEstimator(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)()
+
 	defaultCfg := DefaultWorkEstimatorConfig()
 	minimumSeats := defaultCfg.MinimumSeats
 	maximumSeats := defaultCfg.MaximumSeats
@@ -283,6 +288,45 @@ func TestWorkEstimator(t *testing.T) {
 				"events.foo.bar": 799,
 			},
 			initialSeatsExpected: minimumSeats,
+		},
+		{
+			name:       "request verb is watch, sendInitialEvents is nil",
+			requestURI: "http://server/apis/foo.bar/v1/events?watch=true",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "watch",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			counts: map[string]int64{
+				"events.foo.bar": 799,
+			},
+			initialSeatsExpected: minimumSeats,
+		},
+		{
+			name:       "request verb is watch, sendInitialEvents is false",
+			requestURI: "http://server/apis/foo.bar/v1/events?watch=true&sendInitialEvents=false",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "watch",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			counts: map[string]int64{
+				"events.foo.bar": 799,
+			},
+			initialSeatsExpected: minimumSeats,
+		},
+		{
+			name:       "request verb is watch, sendInitialEvents is true",
+			requestURI: "http://server/apis/foo.bar/v1/events?watch=true&sendInitialEvents=true",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "watch",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			counts: map[string]int64{
+				"events.foo.bar": 799,
+			},
+			initialSeatsExpected: 8,
 		},
 		{
 			name:       "request verb is create, no watches",
