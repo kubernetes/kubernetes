@@ -110,5 +110,9 @@ func (s CompletedOptions) Validate() []error {
 	errs = append(errs, validateClusterIPFlags(s.Extra)...)
 	errs = append(errs, validateServiceNodePort(s.Extra)...)
 
+	if s.MasterCount <= 0 {
+		errs = append(errs, fmt.Errorf("--apiserver-count should be a positive number, but value '%d' provided", s.MasterCount))
+	}
+
 	return errs
 }

@@ -72,9 +72,7 @@ func validateAPIPriorityAndFairness(options *Options) []error {
 // Validate checks Options and return a slice of found errs.
 func (s *Options) Validate() []error {
 	var errs []error
-	if s.MasterCount <= 0 {
-		errs = append(errs, fmt.Errorf("--apiserver-count should be a positive number, but value '%d' provided", s.MasterCount))
-	}
+
 	errs = append(errs, s.Etcd.Validate()...)
 	errs = append(errs, validateAPIPriorityAndFairness(s)...)
 	errs = append(errs, s.SecureServing.Validate()...)

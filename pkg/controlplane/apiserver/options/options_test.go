@@ -54,7 +54,6 @@ func TestAddFlags(t *testing.T) {
 		"--admission-control-config-file=/admission-control-config",
 		"--advertise-address=192.168.10.10",
 		"--anonymous-auth=false",
-		"--apiserver-count=5",
 		"--audit-log-maxage=11",
 		"--audit-log-maxbackup=12",
 		"--audit-log-maxsize=13",
@@ -114,7 +113,6 @@ func TestAddFlags(t *testing.T) {
 
 	// This is a snapshot of expected options parsed by args.
 	expected := &Options{
-		MasterCount: 5,
 		GenericServerRunOptions: &apiserveroptions.ServerRunOptions{
 			AdvertiseAddress:            netutils.ParseIPSloppy("192.168.10.10"),
 			CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},

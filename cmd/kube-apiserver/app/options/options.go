@@ -58,6 +58,8 @@ type Extra struct {
 	ServiceNodePortRange utilnet.PortRange
 
 	EndpointReconcilerType string
+
+	MasterCount int
 }
 
 // NewServerRunOptions creates a new ServerRunOptions object with default parameters
@@ -86,6 +88,7 @@ func NewServerRunOptions() *ServerRunOptions {
 				HTTPTimeout: time.Duration(5) * time.Second,
 			},
 			ServiceNodePortRange: kubeoptions.DefaultServiceNodePortRange,
+			MasterCount:          1,
 		},
 	}
 
@@ -145,6 +148,10 @@ func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 
 	fs.StringVar(&s.KubeletConfig.TLSClientConfig.CAFile, "kubelet-certificate-authority", s.KubeletConfig.TLSClientConfig.CAFile,
 		"Path to a cert file for the certificate authority.")
+
+	fs.IntVar(&s.MasterCount, "apiserver-count", s.MasterCount,
+		"The number of apiservers running in the cluster, must be a positive number. (In use when --endpoint-reconciler-type=master-count is enabled.)")
+	fs.MarkDeprecated("apiserver-count", "apiserver-count is deprecated and will be removed in a future version.")
 
 	return fss
 }

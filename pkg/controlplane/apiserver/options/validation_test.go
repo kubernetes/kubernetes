@@ -90,7 +90,6 @@ func TestValidateOptions(t *testing.T) {
 			name:         "validate master count equal 0",
 			expectErrors: true,
 			options: &Options{
-				MasterCount:             0,
 				GenericServerRunOptions: &genericoptions.ServerRunOptions{},
 				Etcd:                    &genericoptions.EtcdOptions{},
 				SecureServing:           &genericoptions.SecureServingOptionsWithLoopback{},
@@ -117,7 +116,6 @@ func TestValidateOptions(t *testing.T) {
 			name:         "validate token request enable not attempted",
 			expectErrors: true,
 			options: &Options{
-				MasterCount:             1,
 				GenericServerRunOptions: &genericoptions.ServerRunOptions{},
 				Etcd:                    &genericoptions.EtcdOptions{},
 				SecureServing:           &genericoptions.SecureServingOptionsWithLoopback{},

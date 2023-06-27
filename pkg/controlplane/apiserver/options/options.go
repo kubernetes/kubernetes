@@ -66,8 +66,6 @@ type Options struct {
 	EnableAggregatorRouting             bool
 	AggregatorRejectForwardingRedirects bool
 
-	MasterCount int
-
 	ServiceAccountSigningKeyFile     string
 	ServiceAccountIssuer             serviceaccount.TokenGenerator
 	ServiceAccountTokenMaxExpiration time.Duration
@@ -104,7 +102,6 @@ func NewOptions() *Options {
 
 		EnableLogsHandler:                   true,
 		EventTTL:                            1 * time.Hour,
-		MasterCount:                         1,
 		AggregatorRejectForwardingRedirects: true,
 	}
 
@@ -143,10 +140,6 @@ func (s *Options) AddFlags(fss *cliflag.NamedFlagSets) {
 	fs.Int64Var(&s.MaxConnectionBytesPerSec, "max-connection-bytes-per-sec", s.MaxConnectionBytesPerSec, ""+
 		"If non-zero, throttle each user connection to this number of bytes/sec. "+
 		"Currently only applies to long-running requests.")
-
-	fs.IntVar(&s.MasterCount, "apiserver-count", s.MasterCount,
-		"The number of apiservers running in the cluster, must be a positive number. (In use when --endpoint-reconciler-type=master-count is enabled.)")
-	fs.MarkDeprecated("apiserver-count", "apiserver-count is deprecated and will be removed in a future version.")
 
 	fs.StringVar(&s.ProxyClientCertFile, "proxy-client-cert-file", s.ProxyClientCertFile, ""+
 		"Client certificate used to prove the identity of the aggregator or kube-apiserver "+
