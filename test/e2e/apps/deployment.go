@@ -695,7 +695,7 @@ func stopDeployment(ctx context.Context, c clientset.Interface, ns, deploymentNa
 	options := metav1.ListOptions{LabelSelector: selector.String()}
 	rss, err := c.AppsV1().ReplicaSets(ns).List(ctx, options)
 	framework.ExpectNoError(err)
-	gomega.Expect(rss.Items).Should(gomega.HaveLen(0))
+	gomega.Expect(rss.Items).Should(gomega.BeEmpty())
 	framework.Logf("Ensuring deployment %s's Pods were deleted", deploymentName)
 	var pods *v1.PodList
 	if err := wait.PollImmediate(time.Second, timeout, func() (bool, error) {
