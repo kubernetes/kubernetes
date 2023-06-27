@@ -763,7 +763,7 @@ func (dsc *DaemonSetsController) getNodesToDaemonPods(ctx context.Context, ds *a
 	for _, pod := range claimedPods {
 		nodeName, err := util.GetTargetNodeName(pod)
 		if err != nil {
-			logger.Info("Failed to get target node name of Pod in DaemonSet",
+			logger.V(4).Info("Failed to get target node name of Pod in DaemonSet",
 				"pod", klog.KObj(pod), "daemonset", klog.KObj(ds))
 			continue
 		}
