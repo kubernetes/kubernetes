@@ -48,7 +48,7 @@ const cniConfig = `{
 }
 `
 
-const credentialProviderConfig = `kind: CredentialProviderConfig
+const credentialGCPProviderConfig = `kind: CredentialProviderConfig
 apiVersion: kubelet.config.k8s.io/v1
 providers:
   - name: gcp-credential-provider
@@ -59,6 +59,19 @@ providers:
     - "container.cloud.google.com"
     - "*.pkg.dev"
     defaultCacheDuration: 1m`
+
+const credentialAWSProviderConfig = `kind: CredentialProviderConfig
+apiVersion: kubelet.config.k8s.io/v1
+providers:
+- name: ecr-credential-provider
+  apiVersion: credentialprovider.kubelet.k8s.io/v1
+  matchImages:
+  - "*.dkr.ecr.*.amazonaws.com"
+  - "*.dkr.ecr.*.amazonaws.com.cn"
+  - "*.dkr.ecr-fips.*.amazonaws.com"
+  - "*.dkr.ecr.us-iso-east-1.c2s.ic.gov"
+  - "*.dkr.ecr.us-isob-east-1.sc2s.sgov.gov"
+  defaultCacheDuration: 12h`
 
 func getCNIURL() string {
 	cniArch := "amd64"
@@ -101,6 +114,11 @@ func setupCNI(host, workspace string) error {
 
 func configureCredentialProvider(host, workspace string) error {
 	klog.V(2).Infof("Configuring kubelet credential provider on %q", host)
+
+	credentialProviderConfig := credentialGCPProviderConfig
+	if GetSSHUser() == "ec2-user" {
+		credentialProviderConfig = credentialAWSProviderConfig
+	}
 
 	cmd := getSSHCommand(" ; ",
 		fmt.Sprintf("echo %s > %s", quote(credentialProviderConfig), filepath.Join(workspace, "credential-provider.yaml")),
