@@ -1518,6 +1518,62 @@ func TestComputePodActionsWithRestartableInitContainers(t *testing.T) {
 				ContainersToKill:      getKillMapWithInitContainers(basePod, baseStatus, []int{}),
 			},
 		},
+		"livenessProbe has not been run; start the nothing": {
+			mutatePodFn: func(pod *v1.Pod) { pod.Spec.RestartPolicy = v1.RestartPolicyAlways },
+			mutateStatusFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
+				m.livenessManager.Remove(status.ContainerStatuses[1].ID)
+				status.ContainerStatuses = status.ContainerStatuses[:2]
+			},
+			actions: podActions{
+				SandboxID:             baseStatus.SandboxStatuses[0].Id,
+				InitContainersToStart: []int{2},
+				ContainersToStart:     []int{},
+				ContainersToKill:      getKillMapWithInitContainers(basePod, baseStatus, []int{}),
+			},
+		},
+		"livenessProbe in progress; start the next": {
+			mutatePodFn: func(pod *v1.Pod) { pod.Spec.RestartPolicy = v1.RestartPolicyAlways },
+			mutateStatusFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
+				m.livenessManager.Set(status.ContainerStatuses[1].ID, proberesults.Unknown, basePod)
+				status.ContainerStatuses = status.ContainerStatuses[:2]
+			},
+			actions: podActions{
+				SandboxID:             baseStatus.SandboxStatuses[0].Id,
+				InitContainersToStart: []int{2},
+				ContainersToStart:     []int{},
+				ContainersToKill:      getKillMapWithInitContainers(basePod, baseStatus, []int{}),
+			},
+			resetStatusFn: func(status *kubecontainer.PodStatus) {
+				m.livenessManager.Remove(status.ContainerStatuses[1].ID)
+			},
+		},
+		"livenessProbe has completed; start the next": {
+			mutatePodFn: func(pod *v1.Pod) { pod.Spec.RestartPolicy = v1.RestartPolicyAlways },
+			mutateStatusFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
+				status.ContainerStatuses = status.ContainerStatuses[:2]
+			},
+			actions: podActions{
+				SandboxID:             baseStatus.SandboxStatuses[0].Id,
+				InitContainersToStart: []int{2},
+				ContainersToStart:     []int{},
+				ContainersToKill:      getKillMapWithInitContainers(basePod, baseStatus, []int{}),
+			},
+		},
+		"kill and recreate the restartable init container if the liveness check has failed": {
+			mutatePodFn: func(pod *v1.Pod) { pod.Spec.RestartPolicy = v1.RestartPolicyAlways },
+			mutateStatusFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
+				m.livenessManager.Set(status.ContainerStatuses[2].ID, proberesults.Failure, basePod)
+			},
+			actions: podActions{
+				SandboxID:             baseStatus.SandboxStatuses[0].Id,
+				InitContainersToStart: []int{2},
+				ContainersToKill:      getKillMapWithInitContainers(basePod, baseStatus, []int{2}),
+				ContainersToStart:     []int{0, 1, 2},
+			},
+			resetStatusFn: func(status *kubecontainer.PodStatus) {
+				m.livenessManager.Remove(status.ContainerStatuses[2].ID)
+			},
+		},
 		"startupProbe has not been run; do nothing": {
 			mutatePodFn: func(pod *v1.Pod) { pod.Spec.RestartPolicy = v1.RestartPolicyAlways },
 			mutateStatusFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
@@ -1740,7 +1796,9 @@ func TestComputePodActionsWithRestartableInitContainers(t *testing.T) {
 		},
 	} {
 		pod, status := makeBasePodAndStatusWithRestartableInitContainers()
+		m.livenessManager.Set(status.ContainerStatuses[1].ID, proberesults.Success, basePod)
 		m.startupManager.Set(status.ContainerStatuses[1].ID, proberesults.Success, basePod)
+		m.livenessManager.Set(status.ContainerStatuses[2].ID, proberesults.Success, basePod)
 		m.startupManager.Set(status.ContainerStatuses[2].ID, proberesults.Success, basePod)
 		if test.mutatePodFn != nil {
 			test.mutatePodFn(pod)
@@ -1769,12 +1827,14 @@ func makeBasePodAndStatusWithRestartableInitContainers() (*v1.Pod, *kubecontaine
 			Name:          "restartable-init-2",
 			Image:         "bar-image",
 			RestartPolicy: &containerRestartPolicyAlways,
+			LivenessProbe: &v1.Probe{},
 			StartupProbe:  &v1.Probe{},
 		},
 		{
 			Name:          "restartable-init-3",
 			Image:         "bar-image",
 			RestartPolicy: &containerRestartPolicyAlways,
+			LivenessProbe: &v1.Probe{},
 			StartupProbe:  &v1.Probe{},
 		},
 	}
