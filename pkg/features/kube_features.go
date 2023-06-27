@@ -843,6 +843,13 @@ const (
 	//
 	// Enables In-Place Pod Vertical Scaling
 	InPlacePodVerticalScaling featuregate.Feature = "InPlacePodVerticalScaling"
+
+	// owner: @danielvegamyhre
+	// kep: https://kep.k8s.io/4017
+	// beta: v1.28
+	//
+	// Set pod completion index as a pod label for Indexed Jobs and StatefulSets.
+	PodIndexLabel featuregate.Feature = "PodIndexLabel"
 )
 
 func init() {
@@ -1071,6 +1078,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	SELinuxMountReadWriteOncePod: {Default: false, PreRelease: featuregate.Beta}, // disabled for https://github.com/kubernetes/kubernetes/issues/117745
 
 	InPlacePodVerticalScaling: {Default: false, PreRelease: featuregate.Alpha},
+
+	PodIndexLabel: {Default: true, PreRelease: featuregate.Beta},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
