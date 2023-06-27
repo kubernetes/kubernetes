@@ -67,22 +67,9 @@ func NewManagerImpl(kubeClient clientset.Interface, stateFileDirectory string) (
 // containerResources on success.
 func (m *ManagerImpl) PrepareResources(pod *v1.Pod) error {
 	for i := range pod.Spec.ResourceClaims {
-		claimName := resourceclaim.Name(pod, &pod.Spec.ResourceClaims[i])
+		podClaim := &pod.Spec.ResourceClaims[i]
+		claimName := resourceclaim.Name(pod, podClaim)
 		klog.V(3).InfoS("Processing resource", "claim", claimName, "pod", pod.Name)
-
-		// Resource is already prepared, add pod UID to it
-		if claimInfo := m.cache.get(claimName, pod.Namespace); claimInfo != nil {
-			// We delay checkpointing of this change until this call
-			// returns successfully. It is OK to do this because we
-			// will only return successfully from this call if the
-			// checkpoint has succeeded. That means if the kubelet is
-			// ever restarted before this checkpoint succeeds, the pod
-			// whose resources are being prepared would never have
-			// started, so it's OK (actually correct) to not include it
-			// in the cache.
-			claimInfo.addPodReference(pod.UID)
-			continue
-		}
 
 		// Query claim object from the API server
 		resourceClaim, err := m.kubeClient.ResourceV1alpha2().ResourceClaims(pod.Namespace).Get(
@@ -97,6 +84,27 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod) error {
 		if !resourceclaim.IsReservedForPod(pod, resourceClaim) {
 			return fmt.Errorf("pod %s(%s) is not allowed to use resource claim %s(%s)",
 				pod.Name, pod.UID, claimName, resourceClaim.UID)
+		}
+
+		// If no container actually uses the claim, then we don't need
+		// to prepare it.
+		if !claimIsUsedByPod(podClaim, pod) {
+			klog.V(5).InfoS("Skipping unused resource", "claim", claimName, "pod", pod.Name)
+			continue
+		}
+
+		// Is the resource already prepared? Then add the pod UID to it.
+		if claimInfo := m.cache.get(claimName, pod.Namespace); claimInfo != nil {
+			// We delay checkpointing of this change until this call
+			// returns successfully. It is OK to do this because we
+			// will only return successfully from this call if the
+			// checkpoint has succeeded. That means if the kubelet is
+			// ever restarted before this checkpoint succeeds, the pod
+			// whose resources are being prepared would never have
+			// started, so it's OK (actually correct) to not include it
+			// in the cache.
+			claimInfo.addPodReference(pod.UID)
+			continue
 		}
 
 		// Grab the allocation.resourceHandles. If there are no
@@ -176,6 +184,34 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod) error {
 		return fmt.Errorf("failed to checkpoint claimInfo state, err: %+v", err)
 	}
 	return nil
+}
+
+func claimIsUsedByPod(podClaim *v1.PodResourceClaim, pod *v1.Pod) bool {
+	if claimIsUsedByContainers(podClaim, pod.Spec.InitContainers) {
+		return true
+	}
+	if claimIsUsedByContainers(podClaim, pod.Spec.Containers) {
+		return true
+	}
+	return false
+}
+
+func claimIsUsedByContainers(podClaim *v1.PodResourceClaim, containers []v1.Container) bool {
+	for i := range containers {
+		if claimIsUsedByContainer(podClaim, &containers[i]) {
+			return true
+		}
+	}
+	return false
+}
+
+func claimIsUsedByContainer(podClaim *v1.PodResourceClaim, container *v1.Container) bool {
+	for _, c := range container.Resources.Claims {
+		if c.Name == podClaim.Name {
+			return true
+		}
+	}
+	return false
 }
 
 // GetResources gets a ContainerInfo object from the claimInfo cache.
