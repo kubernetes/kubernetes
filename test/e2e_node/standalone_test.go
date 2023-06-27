@@ -88,7 +88,7 @@ var _ = SIGDescribe("[Feature:StandaloneMode] ", func() {
 					return nil
 				}
 				return fmt.Errorf("pod (%v/%v) still exists", ns, staticPodName)
-			})
+			}).Should(gomega.Succeed())
 		})
 	})
 })

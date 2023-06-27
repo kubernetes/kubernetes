@@ -84,7 +84,7 @@ var _ = SIGDescribe("NodeLease", func() {
 				}
 				return nil
 			}, time.Duration(*lease.Spec.LeaseDurationSeconds)*time.Second,
-				time.Duration(*lease.Spec.LeaseDurationSeconds/4)*time.Second)
+				time.Duration(*lease.Spec.LeaseDurationSeconds/4)*time.Second).Should(gomega.Succeed())
 		})
 
 		ginkgo.It("should have OwnerReferences set", func(ctx context.Context) {

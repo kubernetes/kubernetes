@@ -238,8 +238,8 @@ func verifyPodResizePolicy(pod *v1.Pod, tcInfo []TestContainerInfo) {
 		cMap[c.Name] = &pod.Spec.Containers[i]
 	}
 	for _, ci := range tcInfo {
-		c, found := cMap[ci.Name]
-		gomega.Expect(found == true)
+		gomega.Expect(cMap).Should(gomega.HaveKey(ci.Name))
+		c := cMap[ci.Name]
 		tc, _ := makeTestContainer(ci)
 		framework.ExpectEqual(tc.ResizePolicy, c.ResizePolicy)
 	}
@@ -251,8 +251,8 @@ func verifyPodResources(pod *v1.Pod, tcInfo []TestContainerInfo) {
 		cMap[c.Name] = &pod.Spec.Containers[i]
 	}
 	for _, ci := range tcInfo {
-		c, found := cMap[ci.Name]
-		gomega.Expect(found == true)
+		gomega.Expect(cMap).Should(gomega.HaveKey(ci.Name))
+		c := cMap[ci.Name]
 		tc, _ := makeTestContainer(ci)
 		framework.ExpectEqual(tc.Resources, c.Resources)
 	}
@@ -265,8 +265,8 @@ func verifyPodAllocations(pod *v1.Pod, tcInfo []TestContainerInfo, flagError boo
 	}
 
 	for _, ci := range tcInfo {
-		cStatus, found := cStatusMap[ci.Name]
-		gomega.Expect(found == true)
+		gomega.Expect(cStatusMap).Should(gomega.HaveKey(ci.Name))
+		cStatus := cStatusMap[ci.Name]
 		if ci.Allocations == nil {
 			if ci.Resources != nil {
 				alloc := &ContainerAllocations{CPUAlloc: ci.Resources.CPUReq, MemAlloc: ci.Resources.MemReq}
@@ -294,8 +294,8 @@ func verifyPodStatusResources(pod *v1.Pod, tcInfo []TestContainerInfo) {
 		csMap[c.Name] = &pod.Status.ContainerStatuses[i]
 	}
 	for _, ci := range tcInfo {
-		cs, found := csMap[ci.Name]
-		gomega.Expect(found == true)
+		gomega.Expect(csMap).Should(gomega.HaveKey(ci.Name))
+		cs := csMap[ci.Name]
 		tc, _ := makeTestContainer(ci)
 		framework.ExpectEqual(tc.Resources, *cs.Resources)
 		//framework.ExpectEqual(cs.RestartCount, ci.RestartCount)
@@ -334,7 +334,7 @@ func verifyPodContainersCgroupValues(pod *v1.Pod, tcInfo []TestContainerInfo, fl
 		}
 		cgValue = strings.Trim(cgValue, "\n")
 		if flagError {
-			gomega.Expect(cgValue == expectedCgValue)
+			gomega.Expect(cgValue).Should(gomega.Equal(expectedCgValue), "cgroup value")
 		}
 		if cgValue != expectedCgValue {
 			return false
@@ -1220,7 +1220,7 @@ func doPodResizeTests() {
 			options := metav1.ListOptions{LabelSelector: selector.String()}
 			podList, err := podClient.List(context.TODO(), options)
 			framework.ExpectNoError(err, "failed to query for pods")
-			gomega.Expect(len(podList.Items) == 1)
+			gomega.Expect(podList.Items).Should(gomega.HaveLen(1))
 
 			ginkgo.By("verifying initial pod resources, allocations, and policy are as expected")
 			verifyPodResources(newPod, tc.containers)
@@ -1319,7 +1319,7 @@ func doPodResizeResourceQuotaTests() {
 		options := metav1.ListOptions{LabelSelector: selector.String()}
 		podList, listErr := podClient.List(context.TODO(), options)
 		framework.ExpectNoError(listErr, "failed to query for pods")
-		gomega.Expect(len(podList.Items) == 2)
+		gomega.Expect(podList.Items).Should(gomega.HaveLen(2))
 
 		ginkgo.By("verifying initial pod resources, allocations, and policy are as expected")
 		verifyPodResources(newPod1, containers)
@@ -1431,7 +1431,7 @@ func doPodResizeErrorTests() {
 			options := metav1.ListOptions{LabelSelector: selector.String()}
 			podList, err := podClient.List(context.TODO(), options)
 			framework.ExpectNoError(err, "failed to query for pods")
-			gomega.Expect(len(podList.Items) == 1)
+			gomega.Expect(podList.Items).Should(gomega.HaveLen(1))
 
 			ginkgo.By("verifying initial pod resources, allocations, and policy are as expected")
 			verifyPodResources(newPod, tc.containers)
@@ -1477,7 +1477,7 @@ func doPodResizeSchedulerTests() {
 	ginkgo.It("pod-resize-scheduler-tests", func(ctx context.Context) {
 		nodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
 		framework.ExpectNoError(err, "failed to get running nodes")
-		gomega.Expect(len(nodes.Items) > 0)
+		gomega.Expect(nodes.Items).ShouldNot(gomega.BeEmpty())
 		framework.Logf("Found %d schedulable nodes", len(nodes.Items))
 
 		//
@@ -1485,7 +1485,7 @@ func doPodResizeSchedulerTests() {
 		//
 		getNodeAllocatableAndAvailableMilliCPUValues := func(n *v1.Node) (int64, int64) {
 			nodeAllocatableMilliCPU := n.Status.Allocatable.Cpu().MilliValue()
-			gomega.Expect(n.Status.Allocatable != nil)
+			gomega.Expect(n.Status.Allocatable).ShouldNot(gomega.BeNil(), "allocatable")
 			podAllocatedMilliCPU := int64(0)
 
 			// Exclude pods that are in the Succeeded or Failed states
