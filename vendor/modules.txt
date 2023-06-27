@@ -359,7 +359,7 @@ github.com/golang/protobuf/ptypes/wrappers
 # github.com/google/btree v1.0.1 => github.com/google/btree v1.0.1
 ## explicit; go 1.12
 github.com/google/btree
-# github.com/google/cadvisor v0.45.0 => github.com/google/cadvisor v0.45.0
+# github.com/google/cadvisor v0.45.1 => github.com/google/cadvisor v0.45.1
 ## explicit; go 1.16
 github.com/google/cadvisor/accelerators
 github.com/google/cadvisor/cache/memory
@@ -2700,7 +2700,7 @@ sigs.k8s.io/yaml
 # github.com/golangplus/fmt => github.com/golangplus/fmt v1.0.0
 # github.com/golangplus/testing => github.com/golangplus/testing v1.0.0
 # github.com/google/btree => github.com/google/btree v1.0.1
-# github.com/google/cadvisor => github.com/google/cadvisor v0.45.0
+# github.com/google/cadvisor => github.com/google/cadvisor v0.45.1
 # github.com/google/cel-go => github.com/google/cel-go v0.12.6
 # github.com/google/gnostic => github.com/google/gnostic v0.5.7-v3refs
 # github.com/google/go-cmp => github.com/google/go-cmp v0.5.8
