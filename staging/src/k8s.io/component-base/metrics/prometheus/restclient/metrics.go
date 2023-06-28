@@ -41,6 +41,18 @@ var (
 		[]string{"verb", "host"},
 	)
 
+	// resolverLatency is a Prometheus Histogram metric type partitioned by
+	// "host" labels. It is used for the rest client DNS resolver latency metrics.
+	resolverLatency = k8smetrics.NewHistogramVec(
+		&k8smetrics.HistogramOpts{
+			Name:           "rest_client_dns_resolution_duration_seconds",
+			Help:           "DNS resolver latency in seconds. Broken down by host.",
+			StabilityLevel: k8smetrics.ALPHA,
+			Buckets:        []float64{0.005, 0.025, 0.1, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 15.0, 30.0},
+		},
+		[]string{"host"},
+	)
+
 	requestSize = k8smetrics.NewHistogramVec(
 		&k8smetrics.HistogramOpts{
 			Name:           "rest_client_request_size_bytes",
@@ -189,6 +201,7 @@ func init() {
 		ClientCertExpiry:      execPluginCertTTLAdapter,
 		ClientCertRotationAge: &rotationAdapter{m: execPluginCertRotation},
 		RequestLatency:        &latencyAdapter{m: requestLatency},
+		ResolverLatency:       &resolverLatencyAdapter{m: resolverLatency},
 		RequestSize:           &sizeAdapter{m: requestSize},
 		ResponseSize:          &sizeAdapter{m: responseSize},
 		RateLimiterLatency:    &latencyAdapter{m: rateLimiterLatency},
@@ -206,6 +219,14 @@ type latencyAdapter struct {
 
 func (l *latencyAdapter) Observe(ctx context.Context, verb string, u url.URL, latency time.Duration) {
 	l.m.WithContext(ctx).WithLabelValues(verb, u.Host).Observe(latency.Seconds())
+}
+
+type resolverLatencyAdapter struct {
+	m *k8smetrics.HistogramVec
+}
+
+func (l *resolverLatencyAdapter) Observe(ctx context.Context, host string, latency time.Duration) {
+	l.m.WithContext(ctx).WithLabelValues(host).Observe(latency.Seconds())
 }
 
 type sizeAdapter struct {
