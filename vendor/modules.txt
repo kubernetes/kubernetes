@@ -1488,6 +1488,7 @@ k8s.io/apiserver/pkg/authorization/union
 k8s.io/apiserver/pkg/cel
 k8s.io/apiserver/pkg/cel/common
 k8s.io/apiserver/pkg/cel/environment
+k8s.io/apiserver/pkg/cel/lazy
 k8s.io/apiserver/pkg/cel/library
 k8s.io/apiserver/pkg/cel/metrics
 k8s.io/apiserver/pkg/cel/openapi
