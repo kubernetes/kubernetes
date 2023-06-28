@@ -353,13 +353,13 @@ func (p *PriorityQueue) Run(logger klog.Logger) {
 	}, 30*time.Second, p.stop)
 }
 
-// isPodWorthRequeuing calls QueueingHintFn of only plugins registered in pInfo.unschedulablePlugins.
+// requeueingHint calls QueueingHintFn of only plugins registered in pInfo.unschedulablePlugins.
 // If any QueueingHintFn returns QueueImmediately, the scheduling queue is supposed to enqueue this Pod to activeQ.
 // If no QueueingHintFn returns QueueImmediately, but some return QueueAfterBackoff,
 // the scheduling queue is supposed to enqueue this Pod to activeQ/backoffQ depending on the remaining backoff time of the Pod.
 // If all QueueingHintFn returns QueueSkip, the scheduling queue enqueues the Pod back to unschedulable Pod pool
 // because no plugin changes the scheduling result via the event.
-func (p *PriorityQueue) isPodWorthRequeuing(logger klog.Logger, pInfo *framework.QueuedPodInfo, event framework.ClusterEvent, oldObj, newObj interface{}) framework.QueueingHint {
+func (p *PriorityQueue) requeueingHint(logger klog.Logger, pInfo *framework.QueuedPodInfo, event framework.ClusterEvent, oldObj, newObj interface{}) framework.QueueingHint {
 	if pInfo.UnschedulablePlugins.Len() == 0 {
 		logger.V(6).Info("Worth requeuing because no unschedulable plugins", "pod", klog.KObj(pInfo.Pod))
 		return framework.QueueAfterBackoff
@@ -374,7 +374,7 @@ func (p *PriorityQueue) isPodWorthRequeuing(logger klog.Logger, pInfo *framework
 	if !ok {
 		// shouldn't reach here unless bug.
 		logger.Error(nil, "No QueueingHintMap is registered for this profile", "profile", pInfo.Pod.Spec.SchedulerName, "pod", klog.KObj(pInfo.Pod))
-		return framework.QueueAfterBackoff
+		return framework.QueueSkip
 	}
 
 	pod := pInfo.Pod
@@ -389,23 +389,20 @@ func (p *PriorityQueue) isPodWorthRequeuing(logger klog.Logger, pInfo *framework
 				continue
 			}
 
-			h := hintfn.QueueingHintFn(pod, oldObj, newObj)
-			if h == framework.QueueSkip {
+			switch h := hintfn.QueueingHintFn(pod, oldObj, newObj); h {
+			case framework.QueueSkip:
 				continue
-			}
-
-			if h == framework.QueueImmediately {
+			case framework.QueueImmediately:
 				return h
+			case framework.QueueAfterBackoff:
+				if queueHint != framework.QueueAfterBackoff {
+					// replace queueHint with the returned value,
+					// but continue to other queueHintFn to check because other plugins may want to return QueueImmediately.
+					queueHint = h
+				}
 			}
-
-			// replace queueHint with the returned value,
-			// but continue to other queueHintFn to check because other plugins may want to return QueueImmediately.
-			queueHint = h
 		}
 	}
-
-	// No queueing hint function is registered for this event
-	// or no queueing hint fn returns the value other than QueueSkip.
 	return queueHint
 }
 
@@ -855,7 +852,7 @@ func (p *PriorityQueue) requeuePodViaQueueingHint(logger klog.Logger, pInfo *fra
 	}
 
 	pod := pInfo.Pod
-	if p.isPodBackingoff(pInfo) && schedulingHint == framework.QueueAfterBackoff {
+	if schedulingHint == framework.QueueAfterBackoff && p.isPodBackingoff(pInfo) {
 		if err := p.podBackoffQ.Add(pInfo); err != nil {
 			logger.Error(err, "Error adding pod to the backoff queue, queue this Pod to unschedulable pod pool", "pod", klog.KObj(pod))
 			p.unschedulablePods.addOrUpdate(pInfo)
@@ -880,7 +877,7 @@ func (p *PriorityQueue) requeuePodViaQueueingHint(logger klog.Logger, pInfo *fra
 func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(logger klog.Logger, podInfoList []*framework.QueuedPodInfo, event framework.ClusterEvent, oldObj, newObj interface{}) {
 	activated := false
 	for _, pInfo := range podInfoList {
-		schedulingHint := p.isPodWorthRequeuing(logger, pInfo, event, oldObj, newObj)
+		schedulingHint := p.requeueingHint(logger, pInfo, event, oldObj, newObj)
 		if schedulingHint == framework.QueueSkip {
 			// QueueingHintFn determined that this Pod isn't worth putting to activeQ or backoffQ by this event.
 			logger.V(5).Info("Event is not making pod schedulable", "pod", klog.KObj(pInfo.Pod), "event", event.Label)

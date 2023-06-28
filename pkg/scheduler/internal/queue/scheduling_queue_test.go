@@ -2359,8 +2359,8 @@ func mustNewPodInfo(pod *v1.Pod) *framework.PodInfo {
 	return podInfo
 }
 
-// Test_isPodWorthRequeuing tests isPodWorthRequeuing function.
-func Test_isPodWorthRequeuing(t *testing.T) {
+// Test_requeueingHint tests requeueingHint function.
+func Test_requeueingHint(t *testing.T) {
 	count := 0
 	queueHintReturnQueueImmediately := func(pod *v1.Pod, oldObj, newObj interface{}) framework.QueueingHint {
 		count++
@@ -2558,6 +2558,22 @@ func Test_isPodWorthRequeuing(t *testing.T) {
 				},
 			},
 		},
+		{
+			// This should not happen, just to cover the scenario.
+			name: "return QueueSkip when not registered",
+			podInfo: &framework.QueuedPodInfo{
+				UnschedulablePlugins: sets.New("fooPlugin1"),
+				PodInfo:              mustNewPodInfo(st.MakePod().Name("pod1").Namespace("ns1").UID("1").SchedulerName("foo").Obj()),
+			},
+			event:                  NodeAdd,
+			oldObj:                 nil,
+			newObj:                 st.MakeNode().Node,
+			expected:               framework.QueueSkip,
+			expectedExecutionCount: 0,
+			queueingHintMap: QueueingHintMapPerProfile{
+				"fake-profile": {},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -2565,7 +2581,7 @@ func Test_isPodWorthRequeuing(t *testing.T) {
 			count = 0 // reset count every time
 			logger, ctx := ktesting.NewTestContext(t)
 			q := NewTestQueue(ctx, newDefaultQueueSort(), WithQueueingHintMapPerProfile(test.queueingHintMap))
-			actual := q.isPodWorthRequeuing(logger, test.podInfo, test.event, test.oldObj, test.newObj)
+			actual := q.requeueingHint(logger, test.podInfo, test.event, test.oldObj, test.newObj)
 			if actual != test.expected {
 				t.Errorf("isPodWorthRequeuing() = %v, want %v", actual, test.expected)
 			}
