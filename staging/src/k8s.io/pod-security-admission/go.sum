@@ -399,6 +399,8 @@ github.com/rogpeppe/go-internal v1.3.0/go.mod h1:M8bDsm7K2OlrFYOpmOWEs/qY81heoFR
 github.com/rogpeppe/go-internal v1.10.0 h1:TMyTOH3F/DB16zRVcYyreMH6GnZZrwQVAoYjRBZyWFQ=
 github.com/rogpeppe/go-internal v1.10.0/go.mod h1:UQnix2H7Ngw/k4C5ijL5+65zddjncjaFoBhdsK/akog=
 github.com/russross/blackfriday/v2 v2.1.0/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
+github.com/serathius/etcd/client/v3 v3.0.0-20230829133936-3a794fbb8970 h1:gZts8iKkSF3ZF16ji93lNt3bHE7PduMQLIS31F8Hd+I=
+github.com/serathius/etcd/client/v3 v3.0.0-20230829133936-3a794fbb8970/go.mod h1:i/Eo5LrZ5IKqpbtpPDuaUnDOUv471oDg8cjQaUr2MbA=
 github.com/sirupsen/logrus v1.9.0 h1:trlNQbNUG3OdDrDil03MCb1H2o9nJ1x4/5LYw7byDE0=
 github.com/sirupsen/logrus v1.9.0/go.mod h1:naHLuLoDiP4jHNo9R0sCBMtWGeIprob74mVsIT4qYEQ=
 github.com/soheilhy/cmux v0.1.5 h1:jjzc5WVemNEDTLwv9tlmemhC73tI08BNOIGwBOo10Js=
@@ -439,8 +441,6 @@ go.etcd.io/etcd/client/pkg/v3 v3.5.9 h1:oidDC4+YEuSIQbsR94rY9gur91UPL6DnxDCIYd2I
 go.etcd.io/etcd/client/pkg/v3 v3.5.9/go.mod h1:y+CzeSmkMpWN2Jyu1npecjB9BBnABxGM4pN8cGuJeL4=
 go.etcd.io/etcd/client/v2 v2.305.9 h1:YZ2OLi0OvR0H75AcgSUajjd5uqKDKocQUqROTG11jIo=
 go.etcd.io/etcd/client/v2 v2.305.9/go.mod h1:0NBdNx9wbxtEQLwAQtrDHwx58m02vXpDcgSYI2seohQ=
-go.etcd.io/etcd/client/v3 v3.5.9 h1:r5xghnU7CwbUxD/fbUtRyJGaYNfDun8sp/gTr1hew6E=
-go.etcd.io/etcd/client/v3 v3.5.9/go.mod h1:i/Eo5LrZ5IKqpbtpPDuaUnDOUv471oDg8cjQaUr2MbA=
 go.etcd.io/etcd/pkg/v3 v3.5.9 h1:6R2jg/aWd/zB9+9JxmijDKStGJAPFsX3e6BeJkMi6eQ=
 go.etcd.io/etcd/pkg/v3 v3.5.9/go.mod h1:BZl0SAShQFk0IpLWR78T/+pyt8AruMHhTNNX73hkNVY=
 go.etcd.io/etcd/raft/v3 v3.5.9 h1:ZZ1GIHoUlHsn0QVqiRysAm3/81Xx7+i2d7nSdWxlOiI=

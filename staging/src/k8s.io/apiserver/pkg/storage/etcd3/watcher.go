@@ -67,7 +67,9 @@ func TestOnlySetFatalOnDecodeError(b bool) {
 }
 
 type watcher struct {
-	client        *clientv3.Client
+	client  clientv3.Kubernetes
+	watchID clientv3.WatchID
+
 	codec         runtime.Codec
 	newFunc       func() runtime.Object
 	objectType    string
@@ -206,7 +208,7 @@ func (wc *watchChan) ResultChan() <-chan watch.Event {
 }
 
 func (wc *watchChan) RequestWatchProgress() error {
-	return wc.watcher.client.RequestProgress(wc.ctx)
+	return wc.watcher.client.RequestProgress(wc.ctx, wc.watcher.watchID)
 }
 
 // sync tries to retrieve existing data and send them to process.
@@ -220,53 +222,55 @@ func (wc *watchChan) sync() error {
 		opts = append(opts, clientv3.WithRange(rangeEnd))
 	}
 
-	var err error
 	var lastKey []byte
 	var withRev int64
-	var getResp *clientv3.GetResponse
+	var continueKey string
 
-	metricsOp := "get"
 	if wc.recursive {
-		metricsOp = "list"
-	}
+		var hasMore = true
 
-	preparedKey := wc.key
+		for hasMore {
+			startTime := time.Now()
+			resp, err := wc.watcher.client.List(wc.ctx, wc.key, clientv3.ListOptions{
+				Limit:    defaultWatcherMaxLimit,
+				Continue: continueKey,
+				Revision: withRev,
+			})
+			metrics.RecordEtcdRequest("list", wc.watcher.groupResource.String(), err, startTime)
 
-	for {
+			if err != nil {
+				return interpretListError(err, true, continueKey)
+			}
+			hasMore = int64(len(resp.KVs)) < resp.Count
+
+			if len(resp.KVs) == 0 && hasMore {
+				return fmt.Errorf("no results were found, but etcd indicated there were more values remaining")
+			}
+
+			// send items from the response until no more results
+			for i, kv := range resp.KVs {
+				lastKey = kv.Key
+				wc.sendEvent(parseKV(kv))
+				// free kv early. Long lists can take O(seconds) to decode.
+				resp.KVs[i] = nil
+			}
+			if withRev == 0 {
+				withRev = resp.Revision
+			}
+			continueKey = strings.TrimPrefix(string(lastKey)+"\x00", wc.key)
+		}
+	} else {
 		startTime := time.Now()
-		getResp, err = wc.watcher.client.KV.Get(wc.ctx, preparedKey, opts...)
-		metrics.RecordEtcdRequest(metricsOp, wc.watcher.groupResource.String(), err, startTime)
+		resp, err := wc.watcher.client.Get(wc.ctx, wc.key, clientv3.GetOptions{})
 		if err != nil {
-			return interpretListError(err, true, preparedKey, wc.key)
+			return err
 		}
-
-		if len(getResp.Kvs) == 0 && getResp.More {
-			return fmt.Errorf("no results were found, but etcd indicated there were more values remaining")
-		}
-
-		// send items from the response until no more results
-		for i, kv := range getResp.Kvs {
-			lastKey = kv.Key
-			wc.sendEvent(parseKV(kv))
-			// free kv early. Long lists can take O(seconds) to decode.
-			getResp.Kvs[i] = nil
-		}
-
-		if withRev == 0 {
-			wc.initialRev = getResp.Header.Revision
-		}
-
-		// no more results remain
-		if !getResp.More {
-			return nil
-		}
-
-		preparedKey = string(lastKey) + "\x00"
-		if withRev == 0 {
-			withRev = getResp.Header.Revision
-			opts = append(opts, clientv3.WithRev(withRev))
-		}
+		metrics.RecordEtcdRequest("get", wc.watcher.groupResource.String(), err, startTime)
+		wc.sendEvent(parseKV(resp.KV))
+		return nil
 	}
+	wc.initialRev = withRev
+	return nil
 }
 
 func logWatchChannelErr(err error) {
@@ -292,14 +296,7 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}) {
 			return
 		}
 	}
-	opts := []clientv3.OpOption{clientv3.WithRev(wc.initialRev + 1), clientv3.WithPrevKV()}
-	if wc.recursive {
-		opts = append(opts, clientv3.WithPrefix())
-	}
-	if wc.progressNotify {
-		opts = append(opts, clientv3.WithProgressNotify())
-	}
-	wch := wc.watcher.client.Watch(wc.ctx, wc.key, opts...)
+	_, wch := wc.watcher.client.Watch(wc.ctx, wc.key, clientv3.WatchOptions{Revision: wc.initialRev + 1, Prefix: wc.recursive, ID: wc.watcher.watchID})
 	for wres := range wch {
 		if wres.Err() != nil {
 			err := wres.Err()

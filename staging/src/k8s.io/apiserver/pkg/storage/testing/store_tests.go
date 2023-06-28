@@ -492,7 +492,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		t.Errorf("Unexpected error: %v", err)
 	}
 	continueRV, _ := strconv.Atoi(list.ResourceVersion)
-	secondContinuation, err := storage.EncodeContinue("/second/foo", "/second/", int64(continueRV))
+	secondContinuation, err := storage.EncodeContinue("foo", int64(continueRV))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1518,7 +1518,7 @@ func RunTestListContinuation(ctx context.Context, t *testing.T, store storage.In
 	if len(out.Continue) != 0 {
 		t.Fatalf("Unexpected continuation token set")
 	}
-	key, rv, err := storage.DecodeContinue(continueFromSecondItem, "/pods")
+	key, rv, err := storage.DecodeContinue(continueFromSecondItem)
 	t.Logf("continue token was %d %s %v", rv, key, err)
 	ExpectNoDiff(t, "incorrect second page", []example.Pod{*preset[1].storedObj, *preset[2].storedObj}, out.Items)
 	if validation != nil {

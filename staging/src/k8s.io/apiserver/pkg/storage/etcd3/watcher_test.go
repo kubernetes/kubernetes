@@ -212,7 +212,7 @@ func TestWatchChanSync(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			kvWrapper := newEtcdClientKVWrapper(store.client.KV)
+			kvWrapper := newEtcdClientKVWrapper(store.client)
 			kvWrapper.getReactors = append(kvWrapper.getReactors, func() {
 				barThird := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "third", Name: "bar"}}
 				podKey := fmt.Sprintf("/pods/%s/%s", barThird.Namespace, barThird.Name)
@@ -224,7 +224,7 @@ func TestWatchChanSync(t *testing.T) {
 				}
 			})
 
-			store.client.KV = kvWrapper
+			store.client = kvWrapper
 
 			w := store.watcher.createWatchChan(
 				origCtx,
@@ -261,25 +261,25 @@ func TestWatchChanSync(t *testing.T) {
 
 // NOTE: it's not thread-safe
 type etcdClientKVWrapper struct {
-	clientv3.KV
+	clientv3.Kubernetes
 	// keeps track of the number of times Get method is called
 	getCallCounter int
 	// getReactors is called after the etcd KV's get function is executed.
 	getReactors []func()
 }
 
-func newEtcdClientKVWrapper(kv clientv3.KV) *etcdClientKVWrapper {
+func newEtcdClientKVWrapper(client clientv3.Kubernetes) *etcdClientKVWrapper {
 	return &etcdClientKVWrapper{
-		KV:             kv,
+		Kubernetes:     client,
 		getCallCounter: 0,
 	}
 }
 
-func (ecw *etcdClientKVWrapper) Get(ctx context.Context, key string, opts ...clientv3.OpOption) (*clientv3.GetResponse, error) {
-	resp, err := ecw.KV.Get(ctx, key, opts...)
+func (ecw *etcdClientKVWrapper) Get(ctx context.Context, key string, opts clientv3.GetOptions) (clientv3.KubernetesGetResponse, error) {
+	resp, err := ecw.Kubernetes.Get(ctx, key, opts)
 	ecw.getCallCounter++
 	if err != nil {
-		return nil, err
+		return clientv3.KubernetesGetResponse{}, err
 	}
 
 	if len(ecw.getReactors) > 0 {

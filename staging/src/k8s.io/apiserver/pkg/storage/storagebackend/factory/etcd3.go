@@ -432,6 +432,7 @@ func newETCD3Storage(c storagebackend.ConfigForResource, newFunc, newListFunc fu
 	}
 
 	// decorate the KV instance so we can track etcd latency per request.
+	// TODO Provide this for Kubernetes interface
 	client.KV = etcd3.NewETCDLatencyTracker(client.KV)
 
 	stopDBSizeMonitor, err := startDBSizeMonitorPerEndpoint(client, c.DBMetricPollInterval)

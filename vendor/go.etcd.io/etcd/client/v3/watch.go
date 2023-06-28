@@ -249,6 +249,10 @@ func NewWatcher(c *Client) Watcher {
 }
 
 func NewWatchFromWatchClient(wc pb.WatchClient, c *Client) Watcher {
+	return newWatchFromWatchClient(wc, c)
+}
+
+func newWatchFromWatchClient(wc pb.WatchClient, c *Client) *watcher {
 	w := &watcher{
 		remote:  wc,
 		streams: make(map[string]*watchGrpcStream),
@@ -295,6 +299,11 @@ func (w *watcher) newWatcherGrpcStream(inctx context.Context) *watchGrpcStream {
 
 // Watch posts a watch request to run() and waits for a new watcher channel
 func (w *watcher) Watch(ctx context.Context, key string, opts ...OpOption) WatchChan {
+	ctxKey := streamKeyFromCtx(ctx)
+	return w.watch(ctx, ctxKey, key, opts...)
+}
+
+func (w *watcher) watch(ctx context.Context, ctxKey, key string, opts ...OpOption) WatchChan {
 	ow := opWatch(key, opts...)
 
 	var filters []pb.WatchCreateRequest_FilterType
@@ -319,7 +328,6 @@ func (w *watcher) Watch(ctx context.Context, key string, opts ...OpOption) Watch
 	}
 
 	ok := false
-	ctxKey := streamKeyFromCtx(ctx)
 
 	var closeCh chan WatchResponse
 	for {
@@ -404,7 +412,10 @@ func (w *watcher) Close() (err error) {
 // RequestProgress requests a progress notify response be sent in all watch channels.
 func (w *watcher) RequestProgress(ctx context.Context) (err error) {
 	ctxKey := streamKeyFromCtx(ctx)
+	return w.requestProgress(ctx, ctxKey)
+}
 
+func (w *watcher) requestProgress(ctx context.Context, ctxKey string) (err error) {
 	w.mu.Lock()
 	if w.streams == nil {
 		w.mu.Unlock()

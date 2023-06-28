@@ -231,7 +231,7 @@ func checkStorageCallsInvariants(transformer *storagetesting.PrefixTransformer, 
 			}
 		}
 		if reads := recorder.GetReadsAndReset(); reads != estimatedGetCalls {
-			t.Errorf("unexpected reads: %d", reads)
+			t.Errorf("unexpected reads, got: %d, want: %d", reads, estimatedGetCalls)
 		}
 	}
 }
@@ -239,21 +239,21 @@ func checkStorageCallsInvariants(transformer *storagetesting.PrefixTransformer, 
 func TestListContinuation(t *testing.T) {
 	ctx, store, etcdClient := testSetup(t, withRecorder())
 	validation := checkStorageCallsInvariants(
-		store.transformer.(*storagetesting.PrefixTransformer), etcdClient.KV.(*clientRecorder))
+		store.transformer.(*storagetesting.PrefixTransformer), etcdClient.Kubernetes.(*clientRecorder))
 	storagetesting.RunTestListContinuation(ctx, t, store, validation)
 }
 
 func TestListPaginationRareObject(t *testing.T) {
 	ctx, store, etcdClient := testSetup(t, withRecorder())
 	validation := checkStorageCallsInvariants(
-		store.transformer.(*storagetesting.PrefixTransformer), etcdClient.KV.(*clientRecorder))
+		store.transformer.(*storagetesting.PrefixTransformer), etcdClient.Kubernetes.(*clientRecorder))
 	storagetesting.RunTestListPaginationRareObject(ctx, t, store, validation)
 }
 
 func TestListContinuationWithFilter(t *testing.T) {
 	ctx, store, etcdClient := testSetup(t, withRecorder())
 	validation := checkStorageCallsInvariants(
-		store.transformer.(*storagetesting.PrefixTransformer), etcdClient.KV.(*clientRecorder))
+		store.transformer.(*storagetesting.PrefixTransformer), etcdClient.Kubernetes.(*clientRecorder))
 	storagetesting.RunTestListContinuationWithFilter(ctx, t, store, validation)
 }
 
@@ -459,12 +459,17 @@ func newTestTransformer() value.Transformer {
 
 type clientRecorder struct {
 	reads uint64
-	clientv3.KV
+	clientv3.Kubernetes
 }
 
-func (r *clientRecorder) Get(ctx context.Context, key string, opts ...clientv3.OpOption) (*clientv3.GetResponse, error) {
+func (r *clientRecorder) Get(ctx context.Context, key string, opts clientv3.GetOptions) (clientv3.KubernetesGetResponse, error) {
 	atomic.AddUint64(&r.reads, 1)
-	return r.KV.Get(ctx, key, opts...)
+	return r.Kubernetes.Get(ctx, key, opts)
+}
+
+func (r *clientRecorder) List(ctx context.Context, prefix string, opts clientv3.ListOptions) (clientv3.KubernetesListResponse, error) {
+	atomic.AddUint64(&r.reads, 1)
+	return r.Kubernetes.List(ctx, prefix, opts)
 }
 
 func (r *clientRecorder) GetReadsAndReset() uint64 {
@@ -545,7 +550,7 @@ func testSetup(t testing.TB, opts ...setupOption) (context.Context, *store, *cli
 	}
 	client := setupOpts.client(t)
 	if setupOpts.recorderEnabled {
-		client.KV = &clientRecorder{KV: client.KV}
+		client.Kubernetes = &clientRecorder{Kubernetes: client.Kubernetes}
 	}
 	store := newStore(
 		client,

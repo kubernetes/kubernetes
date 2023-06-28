@@ -46,22 +46,22 @@ const (
 		"and now may show up in the list."
 )
 
-func interpretListError(err error, paging bool, continueKey, keyPrefix string) error {
+func interpretListError(err error, paging bool, continueKey string) error {
 	switch {
 	case err == etcdrpc.ErrCompacted:
 		if paging {
-			return handleCompactedErrorForPaging(continueKey, keyPrefix)
+			return handleCompactedErrorForPaging(continueKey)
 		}
 		return errors.NewResourceExpired(expired)
 	}
 	return err
 }
 
-func handleCompactedErrorForPaging(continueKey, keyPrefix string) error {
+func handleCompactedErrorForPaging(continueKey string) error {
 	// continueToken.ResoureVersion=-1 means that the apiserver can
 	// continue the list at the latest resource version. We don't use rv=0
 	// for this purpose to distinguish from a bad token that has empty rv.
-	newToken, err := storage.EncodeContinue(continueKey, keyPrefix, -1)
+	newToken, err := storage.EncodeContinue(continueKey, -1)
 	if err != nil {
 		utilruntime.HandleError(err)
 		return errors.NewResourceExpired(continueExpired)

@@ -126,6 +126,7 @@ require (
 )
 
 replace (
+	go.etcd.io/etcd/client/v3 => github.com/serathius/etcd/client/v3 v3.0.0-20230829133936-3a794fbb8970
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/apiserver => ../apiserver
