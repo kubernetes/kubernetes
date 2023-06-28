@@ -45,7 +45,7 @@ const (
 
 var _ = SIGDescribe("ResourceMetricsAPI [NodeFeature:ResourceMetrics]", func() {
 	f := framework.NewDefaultFramework("resource-metrics")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when querying /resource/metrics", func() {
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			ginkgo.By("Creating test pods to measure their resource usage")

@@ -40,7 +40,7 @@ import (
 
 var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 	f := framework.NewDefaultFramework("mirror-pod-with-grace-period")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	ginkgo.Context("when create a mirror pod ", func() {
 		var ns, podPath, staticPodName, mirrorPodName string
 		ginkgo.BeforeEach(func(ctx context.Context) {

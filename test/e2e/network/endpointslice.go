@@ -46,7 +46,7 @@ import (
 
 var _ = common.SIGDescribe("EndpointSlice", func() {
 	f := framework.NewDefaultFramework("endpointslice")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	var cs clientset.Interface
 	var podClient *e2epod.PodClient

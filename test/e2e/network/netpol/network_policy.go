@@ -111,7 +111,7 @@ and what is happening in practice:
 var _ = common.SIGDescribe("Netpol", func() {
 	f := framework.NewDefaultFramework("netpol")
 	f.SkipNamespaceCreation = true // we create our own 3 test namespaces, we don't need the default one
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.Context("NetworkPolicy between server and client", func() {
 		var k8s *kubeManager
@@ -1247,7 +1247,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 var _ = common.SIGDescribe("Netpol [LinuxOnly]", func() {
 	f := framework.NewDefaultFramework("udp-network-policy")
 	f.SkipNamespaceCreation = true
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var k8s *kubeManager
 	ginkgo.BeforeEach(func() {
 		// Windows does not support UDP testing via agnhost.
@@ -1327,7 +1327,7 @@ var _ = common.SIGDescribe("Netpol [LinuxOnly]", func() {
 var _ = common.SIGDescribe("Netpol [Feature:SCTPConnectivity][LinuxOnly]", func() {
 	f := framework.NewDefaultFramework("sctp-network-policy")
 	f.SkipNamespaceCreation = true
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var k8s *kubeManager
 	ginkgo.BeforeEach(func() {
 		// Windows does not support network policies.

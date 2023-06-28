@@ -64,7 +64,7 @@ var (
 // We use the [Feature:NoSNAT] tag so that most jobs will skip this test by default.
 var _ = common.SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
 	f := framework.NewDefaultFramework("no-snat-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.It("Should be able to send traffic between Pods without SNAT", func(ctx context.Context) {
 		cs := f.ClientSet
 		pc := cs.CoreV1().Pods(f.Namespace.Name)

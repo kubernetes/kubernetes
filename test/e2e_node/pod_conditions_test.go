@@ -45,7 +45,7 @@ import (
 
 var _ = SIGDescribe("Pod conditions managed by Kubelet", func() {
 	f := framework.NewDefaultFramework("pod-conditions")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.Context("including PodReadyToStartContainers condition [Serial] [Feature:PodReadyToStartContainersCondition]", func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {

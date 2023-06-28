@@ -59,7 +59,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 		conformanceTests []e2eingress.ConformanceTests
 	)
 	f := framework.NewDefaultFramework("ingress")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		jig = e2eingress.NewIngressTestJig(f.ClientSet)
@@ -541,7 +541,7 @@ func detectNegAnnotation(ctx context.Context, f *framework.Framework, jig *e2ein
 
 var _ = common.SIGDescribe("Ingress API", func() {
 	f := framework.NewDefaultFramework("ingress")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	/*
 		Release: v1.19
 		Testname: Ingress API

@@ -37,7 +37,7 @@ import (
 // exit code is 137 and the exit reason is `Error`
 var _ = SIGDescribe("Pod SIGKILL [LinuxOnly] [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("sigkill-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	podName := "sigkill-pod-" + string(uuid.NewUUID())
 	containerName := "sigkill-target-container"

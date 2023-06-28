@@ -46,7 +46,7 @@ var (
 
 var _ = SIGDescribe("[Feature:Windows] Windows volume mounts ", func() {
 	f := framework.NewDefaultFramework("windows-volumes")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var (
 		emptyDirSource = v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{

@@ -82,7 +82,7 @@ func preparePod(name string, node *v1.Node, propagation *v1.MountPropagationMode
 
 var _ = SIGDescribe("Mount propagation", func() {
 	f := framework.NewDefaultFramework("mount-propagation")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should propagate mounts within defined scopes", func(ctx context.Context) {
 		// This test runs two pods: master and slave with respective mount

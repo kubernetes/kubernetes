@@ -40,7 +40,7 @@ var _ = SIGDescribe("[Feature:Windows] [Excluded:WindowsDocker] [MinimumKubeletV
 	})
 
 	f := framework.NewDefaultFramework("reboot-host-test-windows")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should run as a reboot process on the host/node", func(ctx context.Context) {
 

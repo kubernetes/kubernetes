@@ -571,7 +571,7 @@ func podresourcesGetAllocatableResourcesTests(ctx context.Context, cli kubeletpo
 // Serial because the test updates kubelet configuration.
 var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:PodResources]", func() {
 	f := framework.NewDefaultFramework("podresources-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	reservedSystemCPUs := cpuset.New(1)
 

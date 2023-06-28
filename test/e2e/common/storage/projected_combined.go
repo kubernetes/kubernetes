@@ -33,7 +33,7 @@ import (
 
 var _ = SIGDescribe("Projected combined", func() {
 	f := framework.NewDefaultFramework("projected")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	// Test multiple projections
 	/*

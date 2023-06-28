@@ -49,7 +49,7 @@ var _ = SIGDescribe("NodeProblemDetector", func() {
 		maxNodesToProcess = 10
 	)
 	f := framework.NewDefaultFramework("node-problem-detector")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		e2eskipper.SkipUnlessSSHKeyPresent()

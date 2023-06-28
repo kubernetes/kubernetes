@@ -45,7 +45,7 @@ import (
 var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin]", func() {
 
 	f := framework.NewDefaultFramework("custom-resource-definition")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("Simple CustomResourceDefinition", func() {
 		/*

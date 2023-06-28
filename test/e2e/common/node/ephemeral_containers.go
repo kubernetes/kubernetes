@@ -39,7 +39,7 @@ import (
 
 var _ = SIGDescribe("Ephemeral Containers [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("ephemeral-containers-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var podClient *e2epod.PodClient
 	ginkgo.BeforeEach(func() {
 		podClient = e2epod.NewPodClient(f)

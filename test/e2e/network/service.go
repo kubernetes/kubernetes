@@ -757,7 +757,7 @@ func getEndpointNodesWithInternalIP(ctx context.Context, jig *e2eservice.TestJig
 
 var _ = common.SIGDescribe("Services", func() {
 	f := framework.NewDefaultFramework("services")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var cs clientset.Interface
 

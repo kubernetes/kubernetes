@@ -52,7 +52,7 @@ const (
 
 var _ = utils.SIGDescribe("Volume Provisioning on Datastore [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("volume-datastore")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var (
 		client                     clientset.Interface
 		namespace                  string

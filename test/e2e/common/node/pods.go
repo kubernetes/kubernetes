@@ -188,7 +188,7 @@ func expectNoErrorWithRetries(fn func() error, maxRetries int, explain ...interf
 
 var _ = SIGDescribe("Pods", func() {
 	f := framework.NewDefaultFramework("pods")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelRestricted
+	f.NamespacePodSecurityLevel = admissionapi.LevelRestricted
 	var podClient *e2epod.PodClient
 	var dc dynamic.Interface
 

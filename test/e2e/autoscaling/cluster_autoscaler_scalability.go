@@ -62,7 +62,7 @@ type scaleUpTestConfig struct {
 
 var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 	f := framework.NewDefaultFramework("autoscaling")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var c clientset.Interface
 	var nodeCount int
 	var coresPerNode int

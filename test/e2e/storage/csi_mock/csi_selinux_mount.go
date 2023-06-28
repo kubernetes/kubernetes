@@ -42,7 +42,7 @@ import (
 
 var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 	f := framework.NewDefaultFramework("csi-mock-volumes-selinux")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	m := newMockDriverSetup(f)
 
 	ginkgo.Context("SELinuxMount [LinuxOnly][Feature:SELinux]", func() {
@@ -246,7 +246,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 
 var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics", func() {
 	f := framework.NewDefaultFramework("csi-mock-volumes-selinux-metrics")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	m := newMockDriverSetup(f)
 
 	// [Serial]: the tests read global kube-controller-manager metrics, so no other test changes them in parallel.

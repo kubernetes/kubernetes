@@ -51,7 +51,7 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 	})
 
 	f := framework.NewDefaultFramework("stackdriver-monitoring")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var kubeClient clientset.Interface
 
 	ginkgo.It("should run Stackdriver Metadata Agent [Feature:StackdriverMetadataAgent]", func(ctx context.Context) {

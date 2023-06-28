@@ -38,7 +38,7 @@ import (
 
 var _ = utils.SIGDescribe("HostPathType Directory [Slow]", func() {
 	f := framework.NewDefaultFramework("host-path-type-directory")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var (
 		ns           string
@@ -105,7 +105,7 @@ var _ = utils.SIGDescribe("HostPathType Directory [Slow]", func() {
 
 var _ = utils.SIGDescribe("HostPathType File [Slow]", func() {
 	f := framework.NewDefaultFramework("host-path-type-file")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var (
 		ns           string
@@ -174,7 +174,7 @@ var _ = utils.SIGDescribe("HostPathType File [Slow]", func() {
 
 var _ = utils.SIGDescribe("HostPathType Socket [Slow]", func() {
 	f := framework.NewDefaultFramework("host-path-type-socket")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var (
 		ns           string
@@ -240,7 +240,7 @@ var _ = utils.SIGDescribe("HostPathType Socket [Slow]", func() {
 
 var _ = utils.SIGDescribe("HostPathType Character Device [Slow]", func() {
 	f := framework.NewDefaultFramework("host-path-type-char-dev")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var (
 		ns            string
@@ -310,7 +310,7 @@ var _ = utils.SIGDescribe("HostPathType Character Device [Slow]", func() {
 
 var _ = utils.SIGDescribe("HostPathType Block Device [Slow]", func() {
 	f := framework.NewDefaultFramework("host-path-type-block-dev")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var (
 		ns             string

@@ -202,7 +202,7 @@ func getHugepagesTestPod(f *framework.Framework, limits v1.ResourceList, mounts 
 // Serial because the test updates kubelet configuration.
 var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:HugePages]", func() {
 	f := framework.NewDefaultFramework("hugepages-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should remove resources for huge page sizes no longer supported", func(ctx context.Context) {
 		ginkgo.By("mimicking support for 9Mi of 3Mi huge page memory by patching the node status")

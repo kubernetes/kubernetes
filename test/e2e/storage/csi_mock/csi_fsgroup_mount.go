@@ -31,7 +31,7 @@ import (
 
 var _ = utils.SIGDescribe("CSI Mock fsgroup as mount option", func() {
 	f := framework.NewDefaultFramework("csi-mock-volumes-fsgroup-mount")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	m := newMockDriverSetup(f)
 
 	ginkgo.Context("Delegate FSGroup to CSI driver [LinuxOnly]", func() {

@@ -78,7 +78,7 @@ func checkForControllerManagerHealthy(ctx context.Context, duration time.Duratio
 var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 
 	f := framework.NewDefaultFramework("disruptive-pv")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var (
 		c                           clientset.Interface
 		ns                          string

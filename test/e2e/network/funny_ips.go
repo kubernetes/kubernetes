@@ -74,7 +74,7 @@ var _ = common.SIGDescribe("CVE-2021-29923", func() {
 	)
 
 	f := framework.NewDefaultFramework("funny-ips")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.BeforeEach(func() {
 		if framework.TestContext.ClusterIsIPv6() {

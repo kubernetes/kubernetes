@@ -35,7 +35,7 @@ var upgradeTests = []upgrades.Test{
 
 var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 	f := framework.NewDefaultFramework("gpu-upgrade")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	testFrameworks := upgrades.CreateUpgradeFrameworks(upgradeTests)
 
 	ginkgo.Describe("master upgrade", func() {

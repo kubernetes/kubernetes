@@ -121,7 +121,7 @@ func getReadySchedulableWorkerNode(ctx context.Context, c clientset.Interface) (
 
 var _ = common.SIGDescribe("LoadBalancers", func() {
 	f := framework.NewDefaultFramework("loadbalancers")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var cs clientset.Interface
 	var subnetPrefix *net.IPNet
@@ -1301,7 +1301,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 
 var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 	f := framework.NewDefaultFramework("esipp")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var loadBalancerCreateTimeout time.Duration
 
 	var cs clientset.Interface

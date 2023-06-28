@@ -36,7 +36,7 @@ import (
 
 var _ = SIGDescribe("client-go should negotiate", func() {
 	f := framework.NewDefaultFramework("protocol")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	for _, s := range []string{
 		"application/json",

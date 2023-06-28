@@ -41,7 +41,7 @@ func prefixedName(namePrefix string, name string) string {
 
 var _ = SIGDescribe("[NodeConformance] Containers Lifecycle ", func() {
 	f := framework.NewDefaultFramework("containers-lifecycle-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should launch init container serially before a regular container", func() {
 

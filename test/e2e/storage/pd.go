@@ -67,7 +67,7 @@ var _ = utils.SIGDescribe("Pod Disks [Feature:StorageProvider]", func() {
 		nodes      *v1.NodeList
 	)
 	f := framework.NewDefaultFramework("pod-disks")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		e2eskipper.SkipUnlessNodeCountIsAtLeast(minNodes)

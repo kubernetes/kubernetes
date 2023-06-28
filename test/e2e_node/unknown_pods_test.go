@@ -46,7 +46,7 @@ import (
  */
 var _ = SIGDescribe("Unknown Pods [Serial] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("unknown-pods")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.Context("when creating a mirror pod", func() {
 		var ns, podPath, staticPodName, mirrorPodName string

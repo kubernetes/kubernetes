@@ -67,7 +67,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 	var podServer *v1.Pod
 	var podServerLabelSelector string
 	f := framework.NewDefaultFramework("network-policy")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		// Windows does not support network policies.
@@ -1737,7 +1737,7 @@ var _ = common.SIGDescribe("NetworkPolicy [Feature:SCTPConnectivity][LinuxOnly]"
 	var podServer *v1.Pod
 	var podServerLabelSelector string
 	f := framework.NewDefaultFramework("sctp-network-policy")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		// Windows does not support network policies.
@@ -2191,7 +2191,7 @@ func cleanupNetworkPolicy(ctx context.Context, f *framework.Framework, policy *n
 
 var _ = common.SIGDescribe("NetworkPolicy API", func() {
 	f := framework.NewDefaultFramework("networkpolicies")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	/*
 		Release: v1.20
 		Testname: NetworkPolicies API
