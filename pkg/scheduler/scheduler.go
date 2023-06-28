@@ -100,6 +100,9 @@ type Scheduler struct {
 	// otherwise logging functions will access a nil sink and
 	// panic.
 	logger klog.Logger
+
+	// registeredHandlers contains the registrations of all handlers. It's used to check if all handlers have finished syncing before the scheduling cycles start.
+	registeredHandlers []cache.ResourceEventHandlerRegistration
 }
 
 func (sched *Scheduler) applyDefaultHandlers() {
@@ -349,7 +352,9 @@ func New(ctx context.Context,
 	}
 	sched.applyDefaultHandlers()
 
-	addAllEventHandlers(sched, informerFactory, dynInformerFactory, unionedGVKs(queueingHintsPerProfile))
+	if err = addAllEventHandlers(sched, informerFactory, dynInformerFactory, unionedGVKs(queueingHintsPerProfile)); err != nil {
+		return nil, fmt.Errorf("adding event handlers: %w", err)
+	}
 
 	return sched, nil
 }

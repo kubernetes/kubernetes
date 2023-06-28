@@ -82,6 +82,8 @@ func StartScheduler(ctx context.Context, clientSet clientset.Interface, kubeConf
 
 	evtBroadcaster.StartRecordingToSink(ctx.Done())
 
+	logger := klog.FromContext(ctx)
+
 	sched, err := scheduler.New(
 		ctx,
 		clientSet,
@@ -96,11 +98,17 @@ func StartScheduler(ctx context.Context, clientSet clientset.Interface, kubeConf
 		scheduler.WithExtenders(cfg.Extenders...),
 		scheduler.WithParallelism(cfg.Parallelism))
 	if err != nil {
-		klog.Fatalf("Error creating scheduler: %v", err)
+		logger.Error(err, "Error creating scheduler")
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 
 	informerFactory.Start(ctx.Done())
 	informerFactory.WaitForCacheSync(ctx.Done())
+	if err = sched.WaitForHandlersSync(ctx); err != nil {
+		logger.Error(err, "Failed waiting for handlers to sync")
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+	}
+	logger.V(3).Info("Handlers synced")
 	go sched.Run(ctx)
 
 	return sched, informerFactory
