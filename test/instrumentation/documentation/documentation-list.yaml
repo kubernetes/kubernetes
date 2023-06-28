@@ -3612,6 +3612,7 @@
   - 2
   - 5
   - 10
+  - 15
   - 30
 - name: seat_fair_frac
   subsystem: flowcontrol
