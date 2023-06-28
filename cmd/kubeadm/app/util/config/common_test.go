@@ -226,26 +226,34 @@ func TestMigrateOldConfig(t *testing.T) {
 		gvExperimental = kubeadmapiv1.SchemeGroupVersion.String()
 	)
 	tests := []struct {
-		desc              string
+		name              string
 		oldCfg            string
 		expectedKinds     []string
 		expectErr         bool
 		allowExperimental bool
 	}{
 		{
-			desc:      "empty file produces empty result",
+			name:      "empty file produces empty result",
 			oldCfg:    "",
 			expectErr: false,
 		},
 		{
-			desc: "bad config produces error",
+			name: "bad config produces error",
 			oldCfg: dedent.Dedent(fmt.Sprintf(`
 			apiVersion: %s
 			`, gv)),
 			expectErr: true,
 		},
 		{
-			desc: "InitConfiguration only gets migrated",
+			name: "unknown API produces error",
+			oldCfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
+			kind: Foo
+			`, gv)),
+			expectErr: true,
+		},
+		{
+			name: "InitConfiguration only gets migrated",
 			oldCfg: dedent.Dedent(fmt.Sprintf(`
 			apiVersion: %s
 			kind: InitConfiguration
@@ -257,7 +265,7 @@ func TestMigrateOldConfig(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			desc: "ClusterConfiguration only gets migrated",
+			name: "ClusterConfiguration only gets migrated",
 			oldCfg: dedent.Dedent(fmt.Sprintf(`
 			apiVersion: %s
 			kind: ClusterConfiguration
@@ -269,7 +277,7 @@ func TestMigrateOldConfig(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			desc: "JoinConfiguration only gets migrated",
+			name: "JoinConfiguration only gets migrated",
 			oldCfg: dedent.Dedent(fmt.Sprintf(`
 			apiVersion: %s
 			kind: JoinConfiguration
@@ -285,7 +293,7 @@ func TestMigrateOldConfig(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			desc: "Init + Cluster Configurations are migrated",
+			name: "Init + Cluster Configurations are migrated",
 			oldCfg: dedent.Dedent(fmt.Sprintf(`
 			apiVersion: %s
 			kind: InitConfiguration
@@ -300,31 +308,10 @@ func TestMigrateOldConfig(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			desc: "Init + Join Configurations are migrated",
+			name: "Init + Join Configurations are migrated",
 			oldCfg: dedent.Dedent(fmt.Sprintf(`
 			apiVersion: %s
 			kind: InitConfiguration
-			---
-			apiVersion: %[1]s
-			kind: JoinConfiguration
-			discovery:
-			  bootstrapToken:
-			    token: abcdef.0123456789abcdef
-			    apiServerEndpoint: kube-apiserver:6443
-			    unsafeSkipCAVerification: true
-			`, gv)),
-			expectedKinds: []string{
-				constants.InitConfigurationKind,
-				constants.ClusterConfigurationKind,
-				constants.JoinConfigurationKind,
-			},
-			expectErr: false,
-		},
-		{
-			desc: "Cluster + Join Configurations are migrated",
-			oldCfg: dedent.Dedent(fmt.Sprintf(`
-			apiVersion: %s
-			kind: ClusterConfiguration
 			---
 			apiVersion: %[1]s
 			kind: JoinConfiguration
@@ -342,12 +329,9 @@ func TestMigrateOldConfig(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			desc: "Init + Cluster + Join Configurations are migrated",
+			name: "Cluster + Join Configurations are migrated",
 			oldCfg: dedent.Dedent(fmt.Sprintf(`
 			apiVersion: %s
-			kind: InitConfiguration
-			---
-			apiVersion: %[1]s
 			kind: ClusterConfiguration
 			---
 			apiVersion: %[1]s
@@ -366,7 +350,31 @@ func TestMigrateOldConfig(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			desc: "component configs are not migrated",
+			name: "Init + Cluster + Join Configurations are migrated",
+			oldCfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
+			kind: InitConfiguration
+			---
+			apiVersion: %[1]s
+			kind: ClusterConfiguration
+			---
+			apiVersion: %[1]s
+			kind: JoinConfiguration
+			discovery:
+			  bootstrapToken:
+			    token: abcdef.0123456789abcdef
+			    apiServerEndpoint: kube-apiserver:6443
+			    unsafeSkipCAVerification: true
+			`, gv)),
+			expectedKinds: []string{
+				constants.InitConfigurationKind,
+				constants.ClusterConfigurationKind,
+				constants.JoinConfigurationKind,
+			},
+			expectErr: false,
+		},
+		{
+			name: "component configs are not migrated",
 			oldCfg: dedent.Dedent(fmt.Sprintf(`
 			apiVersion: %s
 			kind: InitConfiguration
@@ -396,7 +404,7 @@ func TestMigrateOldConfig(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			desc: "ClusterConfiguration gets migrated from experimental API",
+			name: "ClusterConfiguration gets migrated from experimental API",
 			oldCfg: dedent.Dedent(fmt.Sprintf(`
 			apiVersion: %s
 			kind: ClusterConfiguration
@@ -408,10 +416,19 @@ func TestMigrateOldConfig(t *testing.T) {
 			allowExperimental: true,
 			expectErr:         false,
 		},
+		{
+			name: "ClusterConfiguration from experimental API cannot be migrated",
+			oldCfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
+			kind: ClusterConfiguration
+			`, gvExperimental)),
+			allowExperimental: false,
+			expectErr:         true,
+		},
 	}
 
 	for _, test := range tests {
-		t.Run(test.desc, func(t *testing.T) {
+		t.Run(test.name, func(t *testing.T) {
 			b, err := MigrateOldConfig([]byte(test.oldCfg), test.allowExperimental)
 			if test.expectErr {
 				if err == nil {
@@ -434,6 +451,103 @@ func TestMigrateOldConfig(t *testing.T) {
 						t.Fatalf("migration failed to produce config kind: %s", expectedKind)
 					}
 				}
+			}
+		})
+	}
+}
+
+// NOTE: do not delete this test once an older API is removed and there is only one API left.
+// Update the inline "gv" and "gvExperimental" variables, to have the GroupVersion String of
+// the API to be tested. If there are no experimental APIs make "gvExperimental" point to
+// an non-experimental API.
+func TestValidateConfig(t *testing.T) {
+	var (
+		gv             = kubeadmapiv1old.SchemeGroupVersion.String()
+		gvExperimental = kubeadmapiv1.SchemeGroupVersion.String()
+	)
+	tests := []struct {
+		name              string
+		cfg               string
+		expectedError     bool
+		allowExperimental bool
+	}{
+		{
+			name: "invalid subdomain",
+			cfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
+			kind: InitConfiguration
+			nodeRegistration:
+			  criSocket: %s
+			  name: foo bar # not a valid subdomain
+			`, gv, constants.UnknownCRISocket)),
+			expectedError: true,
+		},
+		{
+			name: "unknown API GVK",
+			cfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: foo/bar # not a valid GroupVersion
+			kind: zzz # not a valid Kind
+			nodeRegistration:
+			  criSocket: %s
+			`, constants.UnknownCRISocket)),
+			expectedError: true,
+		},
+		{
+			name: "legacy API GVK",
+			cfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: kubeadm.k8s.io/v1beta1 # legacy API
+			kind: InitConfiguration
+			nodeRegistration:
+			  criSocket: %s
+			`, constants.UnknownCRISocket)),
+			expectedError: true,
+		},
+		{
+			name: "unknown field",
+			cfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
+			kind: InitConfiguration
+			foo: bar
+			nodeRegistration:
+			  criSocket: %s
+			`, gv, constants.UnknownCRISocket)),
+			expectedError: true,
+		},
+		{
+			name: "valid",
+			cfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
+			kind: InitConfiguration
+			nodeRegistration:
+			  criSocket: %s
+			`, gv, constants.UnknownCRISocket)),
+			expectedError: false,
+		},
+		{
+			name: "valid: experimental API",
+			cfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
+			kind: InitConfiguration
+			`, gvExperimental)),
+			expectedError:     false,
+			allowExperimental: true,
+		},
+		{
+			name: "invalid: experimental API",
+			cfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
+			kind: InitConfiguration
+			`, gvExperimental)),
+			expectedError:     true,
+			allowExperimental: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := ValidateConfig([]byte(test.cfg), test.allowExperimental)
+			if (err != nil) != test.expectedError {
+				t.Fatalf("expected error: %v, got: %v, error: %v", test.expectedError, (err != nil), err)
 			}
 		})
 	}

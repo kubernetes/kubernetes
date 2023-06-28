@@ -289,8 +289,8 @@ func MigrateOldConfig(oldConfig []byte, allowExperimental bool) ([]byte, error) 
 
 // ValidateConfig takes a byte slice containing a kubeadm configuration and performs conversion
 // to internal types and validation.
-func ValidateConfig(oldConfig []byte, allowExperimental bool) error {
-	gvkmap, err := kubeadmutil.SplitYAMLDocuments(oldConfig)
+func ValidateConfig(config []byte, allowExperimental bool) error {
+	gvkmap, err := kubeadmutil.SplitYAMLDocuments(config)
 	if err != nil {
 		return err
 	}
