@@ -2727,6 +2727,9 @@
   - 0.3
   - 1
   - 5
+  - 10
+  - 15
+  - 30
 - name: request_post_timeout_total
   subsystem: apiserver
   help: Tracks the activity of the request handlers after the associated requests
