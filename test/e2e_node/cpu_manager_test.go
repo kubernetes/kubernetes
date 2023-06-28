@@ -266,7 +266,7 @@ func runNonGuPodTest(ctx context.Context, f *framework.Framework, cpuCap int64) 
 	pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
 
 	ginkgo.By("checking if the expected cpuset was assigned")
-	expAllowedCPUsListRegex = fmt.Sprintf("^0-%d\n$", cpuCap-1)
+	expAllowedCPUsListRegex = fmt.Sprintf("^0[-,]%d\n$", cpuCap-1)
 	// on the single CPU node the only possible value is 0
 	if cpuCap == 1 {
 		expAllowedCPUsListRegex = "^0\n$"
