@@ -36,10 +36,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/component-base/metrics/testutil"
-	"k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/volume"
 	csitesting "k8s.io/kubernetes/pkg/volume/csi/testing"
-	"k8s.io/kubernetes/pkg/volume/gcepd"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -58,12 +56,12 @@ func TestOperationGenerator_GenerateUnmapVolumeFunc_PluginName(t *testing.T) {
 	testcases := []testcase{
 		{
 			name:       "gce pd plugin: csi migration disabled",
-			pluginName: plugins.GCEPDInTreePluginName,
+			pluginName: "fake-plugin",
 			pvSpec: v1.PersistentVolumeSpec{
 				PersistentVolumeSource: v1.PersistentVolumeSource{
 					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{},
 				}},
-			probVolumePlugins: gcepd.ProbeVolumePlugins(),
+			probVolumePlugins: volumetesting.ProbeVolumePlugins(volume.VolumeConfig{}),
 		},
 	}
 

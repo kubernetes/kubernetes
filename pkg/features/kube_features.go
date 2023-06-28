@@ -130,14 +130,6 @@ const (
 	// Enables the Azure File in-tree driver to Azure File Driver migration feature.
 	CSIMigrationAzureFile featuregate.Feature = "CSIMigrationAzureFile"
 
-	// owner: @davidz627
-	// alpha: v1.14
-	// beta: v1.17
-	// GA: 1.25
-	//
-	// Enables the GCE PD in-tree driver to GCE CSI Driver migration feature.
-	CSIMigrationGCE featuregate.Feature = "CSIMigrationGCE"
-
 	// owner: @mfordjody
 	// alpha: v1.26
 	//
@@ -881,8 +873,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CPUManagerPolicyOptions: {Default: true, PreRelease: featuregate.Beta},
 
 	CSIMigrationAzureFile: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
-
-	CSIMigrationGCE: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.27
 
 	CSIMigrationPortworx: {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires Portworx CSI driver)
 
