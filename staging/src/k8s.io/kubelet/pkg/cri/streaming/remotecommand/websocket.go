@@ -21,9 +21,9 @@ import (
 	"net/http"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/httpstream/wsstream"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/endpoints/responsewriter"
-	"k8s.io/apiserver/pkg/util/wsstream"
 )
 
 const (
