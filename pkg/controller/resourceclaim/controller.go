@@ -456,6 +456,28 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 		// TODO (#113700): patch
 		claim := claim.DeepCopy()
 		claim.Status.ReservedFor = valid
+
+		// When a ResourceClaim uses delayed allocation, then it makes sense to
+		// deallocate the claim as soon as the last consumer stops using
+		// it. This ensures that the claim can be allocated again as needed by
+		// some future consumer instead of trying to schedule that consumer
+		// onto the node that was chosen for the previous consumer. It also
+		// releases the underlying resources for use by other claims.
+		//
+		// This has to be triggered by the transition from "was being used" to
+		// "is not used anymore" because a DRA driver is not required to set
+		// `status.reservedFor` together with `status.allocation`, i.e. a claim
+		// that is "currently unused" should not get deallocated.
+		//
+		// This does not matter for claims that were created for a pod. For
+		// those, the resource claim controller will trigger deletion when the
+		// pod is done. However, it doesn't hurt to also trigger deallocation
+		// for such claims and not checking for them keeps this code simpler.
+		if len(valid) == 0 &&
+			claim.Spec.AllocationMode == resourcev1alpha2.AllocationModeWaitForFirstConsumer {
+			claim.Status.DeallocationRequested = true
+		}
+
 		_, err := ec.kubeClient.ResourceV1alpha2().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
 		if err != nil {
 			return err
