@@ -305,7 +305,7 @@ func logKubeletLatencyMetrics(ctx context.Context, metricNames ...string) {
 	for _, key := range metricNames {
 		metricSet.Insert(kubeletmetrics.KubeletSubsystem + "_" + key)
 	}
-	metric, err := e2emetrics.GrabKubeletMetricsWithoutProxy(ctx, fmt.Sprintf("%s:%d", nodeNameOrIP(), ports.KubeletReadOnlyPort), "/metrics")
+	metric, err := e2emetrics.GrabKubeletMetricsWithoutProxy(ctx, fmt.Sprintf("%s:%d", nodeNameOrIP(ctx), ports.KubeletReadOnlyPort), "/metrics")
 	if err != nil {
 		framework.Logf("Error getting kubelet metrics: %v", err)
 	} else {
@@ -640,20 +640,18 @@ func WaitForPodInitContainerToFail(ctx context.Context, c clientset.Interface, n
 	})
 }
 
-func nodeNameOrIP() string {
+func nodeNameOrIP(ctx context.Context) string {
 	// Check if the node name in test context can be resolved
-	if ips, err := net.LookupIP(framework.TestContext.NodeName); err != nil {
+	if ips, err := net.DefaultResolver.LookupIP(ctx, "ip4", framework.TestContext.NodeName); err != nil {
 		if dnsErr, ok := err.(*net.DNSError); ok && dnsErr.IsNotFound {
 			// if it can't be resolved, pick a host interface
 			if ip, err := utilnet.ChooseHostInterface(); err == nil {
 				return ip.String()
 			}
 		}
-	} else {
-		if len(ips) > 0 {
-			// yay, node name resolved correctly, pick the first
-			return ips[0].String()
-		}
+	} else if len(ips) > 0 {
+		// yay, node name resolved correctly, pick the first
+		return ips[0].String()
 	}
 	// fallback to node name in test context
 	return framework.TestContext.NodeName
