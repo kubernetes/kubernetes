@@ -77,6 +77,8 @@ func TestEndpointSliceMirroring(t *testing.T) {
 
 	// Start informer and controllers
 	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	informers.Start(ctx.Done())
 	go epController.Run(ctx, 5)
 	go epsController.Run(5, ctx.Done())
@@ -331,6 +333,8 @@ func TestEndpointSliceMirroringUpdates(t *testing.T) {
 
 	// Start informer and controllers
 	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	informers.Start(ctx.Done())
 	go epsmController.Run(ctx, 1)
 
