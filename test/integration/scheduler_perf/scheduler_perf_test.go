@@ -30,6 +30,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -41,6 +43,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/restmapper"
@@ -125,7 +128,7 @@ type testCase struct {
 	Workloads []*workload
 	// SchedulerConfigPath is the path of scheduler configuration
 	// Optional
-	SchedulerConfigPath *string
+	SchedulerConfigPath string
 	// Default path to spec file describing the pods to create.
 	// This path can be overridden in createPodsOp by setting PodTemplatePath .
 	// Optional
@@ -637,7 +640,7 @@ func initTestOutput(tb testing.TB) io.Writer {
 	return output
 }
 
-var perfSchedulingLabelFilter = flag.String("perf-scheduling-label-filter", "performance", "comma-separated list of labels which a testcase must have (no prefix or +) or must not have (-)")
+var perfSchedulingLabelFilter = flag.String("perf-scheduling-label-filter", "performance", "comma-separated list of labels which a testcase must have (no prefix or +) or must not have (-), used by BenchmarkPerfScheduling")
 
 func BenchmarkPerfScheduling(b *testing.B) {
 	testCases, err := getTestCases(configFile)
@@ -696,7 +699,8 @@ func BenchmarkPerfScheduling(b *testing.B) {
 					for feature, flag := range tc.FeatureGates {
 						defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, feature, flag)()
 					}
-					results := runWorkload(ctx, b, tc, w)
+					informerFactory, client, dyncClient := setupClusterForWorkload(ctx, b, tc.SchedulerConfigPath, tc.FeatureGates)
+					results := runWorkload(ctx, b, tc, w, informerFactory, client, dyncClient, false)
 					dataItems.DataItems = append(dataItems.DataItems, results...)
 
 					if len(results) > 0 {
@@ -734,6 +738,95 @@ func BenchmarkPerfScheduling(b *testing.B) {
 	}
 }
 
+var testSchedulingLabelFilter = flag.String("test-scheduling-label-filter", "integration-test", "comma-separated list of labels which a testcase must have (no prefix or +) or must not have (-), used by TestScheduling")
+
+func TestScheduling(t *testing.T) {
+	testCases, err := getTestCases(configFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = validateTestCases(testCases); err != nil {
+		t.Fatal(err)
+	}
+
+	// Check for leaks at the very end.
+	framework.GoleakCheck(t)
+
+	// All integration test cases share the same etcd, similar to
+	// https://github.com/kubernetes/kubernetes/blob/18d05b646d09b2971dc5400bc288062b0414e8cf/test/integration/framework/etcd.go#L186-L222.
+	framework.StartEtcd(t, nil)
+
+	// Workloads with the same configuration share the same apiserver. For that
+	// we first need to determine what those different configs are.
+	var configs []schedulerConfig
+	for _, tc := range testCases {
+		tcEnabled := false
+		for _, w := range tc.Workloads {
+			if enabled(*testSchedulingLabelFilter, append(tc.Labels, w.Labels...)...) {
+				tcEnabled = true
+				break
+			}
+		}
+		if !tcEnabled {
+			continue
+		}
+		exists := false
+		for _, config := range configs {
+			if config.equals(tc) {
+				exists = true
+				break
+			}
+		}
+		if !exists {
+			configs = append(configs, schedulerConfig{schedulerConfigPath: tc.SchedulerConfigPath, featureGates: tc.FeatureGates})
+		}
+	}
+	for _, config := range configs {
+		// Not a sub test because we don't have a good name for it.
+		func() {
+			_, ctx := ktesting.NewTestContext(t)
+			// No timeout here because the `go test -timeout` will ensure that
+			// the test doesn't get stuck forever.
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			for feature, flag := range config.featureGates {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, flag)()
+			}
+			informerFactory, client, dynClient := setupClusterForWorkload(ctx, t, config.schedulerConfigPath, config.featureGates)
+
+			for _, tc := range testCases {
+				if !config.equals(tc) {
+					// Runs with some other config.
+					continue
+				}
+
+				t.Run(tc.Name, func(t *testing.T) {
+					for _, w := range tc.Workloads {
+						t.Run(w.Name, func(t *testing.T) {
+							if !enabled(*testSchedulingLabelFilter, append(tc.Labels, w.Labels...)...) {
+								t.Skipf("disabled by label filter %q", *testSchedulingLabelFilter)
+							}
+							_, ctx := ktesting.NewTestContext(t)
+							runWorkload(ctx, t, tc, w, informerFactory, client, dynClient, true)
+						})
+					}
+				})
+			}
+		}()
+	}
+}
+
+type schedulerConfig struct {
+	schedulerConfigPath string
+	featureGates        map[featuregate.Feature]bool
+}
+
+func (c schedulerConfig) equals(tc *testCase) bool {
+	return c.schedulerConfigPath == tc.SchedulerConfigPath &&
+		cmp.Equal(c.featureGates, tc.FeatureGates)
+}
+
 func loadSchedulerConfig(file string) (*config.KubeSchedulerConfiguration, error) {
 	data, err := os.ReadFile(file)
 	if err != nil {
@@ -750,16 +843,16 @@ func loadSchedulerConfig(file string) (*config.KubeSchedulerConfiguration, error
 	return nil, fmt.Errorf("couldn't decode as KubeSchedulerConfiguration, got %s: ", gvk)
 }
 
-func unrollWorkloadTemplate(b *testing.B, wt []op, w *workload) []op {
+func unrollWorkloadTemplate(tb testing.TB, wt []op, w *workload) []op {
 	var unrolled []op
 	for opIndex, o := range wt {
 		realOp, err := o.realOp.patchParams(w)
 		if err != nil {
-			b.Fatalf("op %d: %v", opIndex, err)
+			tb.Fatalf("op %d: %v", opIndex, err)
 		}
 		switch concreteOp := realOp.(type) {
 		case *createPodSetsOp:
-			b.Logf("Creating %d pod sets %s", concreteOp.Count, concreteOp.CountParam)
+			tb.Logf("Creating %d pod sets %s", concreteOp.Count, concreteOp.CountParam)
 			for i := 0; i < concreteOp.Count; i++ {
 				copy := concreteOp.CreatePodsOp
 				ns := fmt.Sprintf("%s-%d", concreteOp.NamespacePrefix, i)
@@ -773,34 +866,55 @@ func unrollWorkloadTemplate(b *testing.B, wt []op, w *workload) []op {
 	return unrolled
 }
 
-func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload) []DataItem {
-	start := time.Now()
-	b.Cleanup(func() {
-		duration := time.Now().Sub(start)
-		// This includes startup and shutdown time and thus does not
-		// reflect scheduling performance. It's useful to get a feeling
-		// for how long each workload runs overall.
-		b.ReportMetric(duration.Seconds(), "runtime_seconds")
-	})
-
+func setupClusterForWorkload(ctx context.Context, tb testing.TB, configPath string, featureGates map[featuregate.Feature]bool) (informers.SharedInformerFactory, clientset.Interface, dynamic.Interface) {
 	var cfg *config.KubeSchedulerConfiguration
 	var err error
-	if tc.SchedulerConfigPath != nil {
-		cfg, err = loadSchedulerConfig(*tc.SchedulerConfigPath)
+	if configPath != "" {
+		cfg, err = loadSchedulerConfig(configPath)
 		if err != nil {
-			b.Fatalf("error loading scheduler config file: %v", err)
+			tb.Fatalf("error loading scheduler config file: %v", err)
 		}
 		if err = validation.ValidateKubeSchedulerConfiguration(cfg); err != nil {
-			b.Fatalf("validate scheduler config file failed: %v", err)
+			tb.Fatalf("validate scheduler config file failed: %v", err)
 		}
 	}
-	informerFactory, client, dynClient := mustSetupScheduler(ctx, b, cfg, tc.FeatureGates)
+	return mustSetupCluster(ctx, tb, cfg, featureGates)
+}
+
+func runWorkload(ctx context.Context, tb testing.TB, tc *testCase, w *workload, informerFactory informers.SharedInformerFactory, client clientset.Interface, dynClient dynamic.Interface, cleanup bool) []DataItem {
+	b, benchmarking := tb.(*testing.B)
+	if benchmarking {
+		start := time.Now()
+		b.Cleanup(func() {
+			duration := time.Since(start)
+			// This includes startup and shutdown time and thus does not
+			// reflect scheduling performance. It's useful to get a feeling
+			// for how long each workload runs overall.
+			b.ReportMetric(duration.Seconds(), "runtime_seconds")
+		})
+	}
+
+	// Disable error checking of the sampling interval length in the
+	// throughput collector by default. When running benchmarks, report
+	// it as test failure when samples are not taken regularly.
+	var throughputErrorMargin float64
+	if benchmarking {
+		// TODO: To prevent the perf-test failure, we increased the error margin, if still not enough
+		// one day, we should think of another approach to avoid this trick.
+		throughputErrorMargin = 30
+	}
 
 	// Additional informers needed for testing. The pod informer was
 	// already created before (scheduler.NewInformerFactory) and the
-	// factory was started for it (mustSetupScheduler), therefore we don't
+	// factory was started for it (mustSetupCluster), therefore we don't
 	// need to start again.
 	podInformer := informerFactory.Core().V1().Pods()
+
+	// Everything else started by this function gets stopped before it returns.
+	ctx, cancel := context.WithCancel(ctx)
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	defer cancel()
 
 	var mu sync.Mutex
 	var dataItems []DataItem
@@ -809,48 +923,47 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload) [
 	// All namespaces listed in numPodsScheduledPerNamespace will be cleaned up.
 	numPodsScheduledPerNamespace := make(map[string]int)
 
-	b.Cleanup(func() {
-		for namespace := range numPodsScheduledPerNamespace {
-			if err := client.CoreV1().Namespaces().Delete(ctx, namespace, metav1.DeleteOptions{}); err != nil {
-				b.Errorf("Deleting Namespace in numPodsScheduledPerNamespace: %v", err)
-			}
-		}
-	})
+	if cleanup {
+		// This must run before controllers get shut down.
+		defer cleanupWorkload(ctx, tb, tc, client, numPodsScheduledPerNamespace)
+	}
 
-	for opIndex, op := range unrollWorkloadTemplate(b, tc.WorkloadTemplate, w) {
+	for opIndex, op := range unrollWorkloadTemplate(tb, tc.WorkloadTemplate, w) {
 		realOp, err := op.realOp.patchParams(w)
 		if err != nil {
-			b.Fatalf("op %d: %v", opIndex, err)
+			tb.Fatalf("op %d: %v", opIndex, err)
 		}
 		select {
 		case <-ctx.Done():
-			b.Fatalf("op %d: %v", opIndex, ctx.Err())
+			tb.Fatalf("op %d: %v", opIndex, ctx.Err())
 		default:
 		}
 		switch concreteOp := realOp.(type) {
 		case *createNodesOp:
 			nodePreparer, err := getNodePreparer(fmt.Sprintf("node-%d-", opIndex), concreteOp, client)
 			if err != nil {
-				b.Fatalf("op %d: %v", opIndex, err)
+				tb.Fatalf("op %d: %v", opIndex, err)
 			}
 			if err := nodePreparer.PrepareNodes(ctx, nextNodeIndex); err != nil {
-				b.Fatalf("op %d: %v", opIndex, err)
+				tb.Fatalf("op %d: %v", opIndex, err)
 			}
-			b.Cleanup(func() {
-				if err := nodePreparer.CleanupNodes(ctx); err != nil {
-					b.Fatalf("failed to clean up nodes, error: %v", err)
-				}
-			})
+			if cleanup {
+				defer func() {
+					if err := nodePreparer.CleanupNodes(ctx); err != nil {
+						tb.Fatalf("failed to clean up nodes, error: %v", err)
+					}
+				}()
+			}
 			nextNodeIndex += concreteOp.Count
 
 		case *createNamespacesOp:
-			nsPreparer, err := newNamespacePreparer(concreteOp, client, b)
+			nsPreparer, err := newNamespacePreparer(concreteOp, client, tb)
 			if err != nil {
-				b.Fatalf("op %d: %v", opIndex, err)
+				tb.Fatalf("op %d: %v", opIndex, err)
 			}
 			if err := nsPreparer.prepare(ctx); err != nil {
 				nsPreparer.cleanup(ctx)
-				b.Fatalf("op %d: %v", opIndex, err)
+				tb.Fatalf("op %d: %v", opIndex, err)
 			}
 			for _, n := range nsPreparer.namespaces() {
 				if _, ok := numPodsScheduledPerNamespace[n]; ok {
@@ -867,18 +980,23 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload) [
 			if concreteOp.Namespace != nil {
 				namespace = *concreteOp.Namespace
 			}
-			createNamespaceIfNotPresent(ctx, b, client, namespace, &numPodsScheduledPerNamespace)
+			createNamespaceIfNotPresent(ctx, tb, client, namespace, &numPodsScheduledPerNamespace)
 			if concreteOp.PodTemplatePath == nil {
 				concreteOp.PodTemplatePath = tc.DefaultPodTemplatePath
 			}
 			var collectors []testDataCollector
+			// This needs a separate context and wait group because
+			// the code below needs to be sure that the goroutines
+			// are stopped.
 			var collectorCtx context.Context
 			var collectorCancel func()
 			var collectorWG sync.WaitGroup
+			defer collectorWG.Wait()
+
 			if concreteOp.CollectMetrics {
 				collectorCtx, collectorCancel = context.WithCancel(ctx)
 				defer collectorCancel()
-				collectors = getTestDataCollectors(b, podInformer, fmt.Sprintf("%s/%s", b.Name(), namespace), namespace, tc.MetricsCollectorConfig)
+				collectors = getTestDataCollectors(tb, podInformer, fmt.Sprintf("%s/%s", tb.Name(), namespace), namespace, tc.MetricsCollectorConfig, throughputErrorMargin)
 				for _, collector := range collectors {
 					// Need loop-local variable for function below.
 					collector := collector
@@ -889,8 +1007,8 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload) [
 					}()
 				}
 			}
-			if err := createPods(ctx, b, namespace, concreteOp, client); err != nil {
-				b.Fatalf("op %d: %v", opIndex, err)
+			if err := createPods(ctx, tb, namespace, concreteOp, client); err != nil {
+				tb.Fatalf("op %d: %v", opIndex, err)
 			}
 			if concreteOp.SkipWaitToCompletion {
 				// Only record those namespaces that may potentially require barriers
@@ -901,8 +1019,8 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload) [
 					numPodsScheduledPerNamespace[namespace] = concreteOp.Count
 				}
 			} else {
-				if err := waitUntilPodsScheduledInNamespace(ctx, b, podInformer, namespace, concreteOp.Count); err != nil {
-					b.Fatalf("op %d: error in waiting for pods to get scheduled: %v", opIndex, err)
+				if err := waitUntilPodsScheduledInNamespace(ctx, tb, podInformer, namespace, concreteOp.Count); err != nil {
+					tb.Fatalf("op %d: error in waiting for pods to get scheduled: %v", opIndex, err)
 				}
 			}
 			if concreteOp.CollectMetrics {
@@ -936,7 +1054,7 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload) [
 			// Ensure the namespace exists.
 			nsObj := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
 			if _, err := client.CoreV1().Namespaces().Create(ctx, nsObj, metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
-				b.Fatalf("op %d: unable to create namespace %v: %v", opIndex, namespace, err)
+				tb.Fatalf("op %d: unable to create namespace %v: %v", opIndex, namespace, err)
 			}
 
 			var churnFns []func(name string) string
@@ -944,12 +1062,12 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload) [
 			for i, path := range concreteOp.TemplatePaths {
 				unstructuredObj, gvk, err := getUnstructuredFromFile(path)
 				if err != nil {
-					b.Fatalf("op %d: unable to parse the %v-th template path: %v", opIndex, i, err)
+					tb.Fatalf("op %d: unable to parse the %v-th template path: %v", opIndex, i, err)
 				}
 				// Obtain GVR.
 				mapping, err := restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 				if err != nil {
-					b.Fatalf("op %d: unable to find GVR for %v: %v", opIndex, gvk, err)
+					tb.Fatalf("op %d: unable to find GVR for %v: %v", opIndex, gvk, err)
 				}
 				gvr := mapping.Resource
 				// Distinguish cluster-scoped with namespaced API objects.
@@ -983,7 +1101,9 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload) [
 
 			switch concreteOp.Mode {
 			case Create:
+				wg.Add(1)
 				go func() {
+					defer wg.Done()
 					count, threshold := 0, concreteOp.Number
 					if threshold == 0 {
 						threshold = math.MaxInt32
@@ -1001,7 +1121,9 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload) [
 					}
 				}()
 			case Recreate:
+				wg.Add(1)
 				go func() {
+					defer wg.Done()
 					retVals := make([][]string, len(churnFns))
 					// For each churn function, instantiate a slice of strings with length "concreteOp.Number".
 					for i := range retVals {
@@ -1026,11 +1148,11 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload) [
 		case *barrierOp:
 			for _, namespace := range concreteOp.Namespaces {
 				if _, ok := numPodsScheduledPerNamespace[namespace]; !ok {
-					b.Fatalf("op %d: unknown namespace %s", opIndex, namespace)
+					tb.Fatalf("op %d: unknown namespace %s", opIndex, namespace)
 				}
 			}
-			if err := waitUntilPodsScheduled(ctx, b, podInformer, concreteOp.Namespaces, numPodsScheduledPerNamespace); err != nil {
-				b.Fatalf("op %d: %v", opIndex, err)
+			if err := waitUntilPodsScheduled(ctx, tb, podInformer, concreteOp.Namespaces, numPodsScheduledPerNamespace); err != nil {
+				tb.Fatalf("op %d: %v", opIndex, err)
 			}
 			// At the end of the barrier, we can be sure that there are no pods
 			// pending scheduling in the namespaces that we just blocked on.
@@ -1050,19 +1172,19 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload) [
 		default:
 			runable, ok := concreteOp.(runnableOp)
 			if !ok {
-				b.Fatalf("op %d: invalid op %v", opIndex, concreteOp)
+				tb.Fatalf("op %d: invalid op %v", opIndex, concreteOp)
 			}
 			for _, namespace := range runable.requiredNamespaces() {
-				createNamespaceIfNotPresent(ctx, b, client, namespace, &numPodsScheduledPerNamespace)
+				createNamespaceIfNotPresent(ctx, tb, client, namespace, &numPodsScheduledPerNamespace)
 			}
-			runable.run(ctx, b, client)
+			runable.run(ctx, tb, client)
 		}
 	}
 
 	// check unused params and inform users
 	unusedParams := w.unusedParams()
 	if len(unusedParams) != 0 {
-		b.Fatalf("the parameters %v are defined on workload %s, but unused.\nPlease make sure there are no typos.", unusedParams, w.Name)
+		tb.Fatalf("the parameters %v are defined on workload %s, but unused.\nPlease make sure there are no typos.", unusedParams, w.Name)
 	}
 
 	// Some tests have unschedulable pods. Do not add an implicit barrier at the
@@ -1070,13 +1192,58 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload) [
 	return dataItems
 }
 
-func createNamespaceIfNotPresent(ctx context.Context, b *testing.B, client clientset.Interface, namespace string, podsPerNamespace *map[string]int) {
+// cleanupWorkload ensures that everything is removed from the API server that
+// might have been created by runWorkload. This must be done before starting
+// the next workload because otherwise it might stumble over previously created
+// objects. For example, the namespaces are the same in different workloads, so
+// not deleting them would cause the next one to fail with "cannot create
+// namespace: already exists".
+//
+// Calling cleanupWorkload can be skipped if it is known that the next workload
+// will run with a fresh etcd instance.
+func cleanupWorkload(ctx context.Context, tb testing.TB, tc *testCase, client clientset.Interface, numPodsScheduledPerNamespace map[string]int) {
+	deleteNow := *metav1.NewDeleteOptions(0)
+	for namespace := range numPodsScheduledPerNamespace {
+		// Pods have to be deleted explicitly, with no grace period. Normally
+		// kubelet will set the DeletionGracePeriodSeconds to zero when it's okay
+		// to remove a deleted pod, but we don't run kubelet...
+		if err := client.CoreV1().Pods(namespace).DeleteCollection(ctx, deleteNow, metav1.ListOptions{}); err != nil {
+			tb.Fatalf("failed to delete pods in namespace %q: %v", namespace, err)
+		}
+		if err := client.CoreV1().Namespaces().Delete(ctx, namespace, deleteNow); err != nil {
+			tb.Fatalf("Deleting Namespace %q in numPodsScheduledPerNamespace: %v", namespace, err)
+		}
+	}
+
+	// We need to wait here because even with deletion timestamp set,
+	// actually removing a namespace can take some time (garbage collecting
+	// other generated object like secrets, etc.) and we don't want to
+	// start the next workloads while that cleanup is still going on.
+	if err := wait.PollUntilContextTimeout(ctx, time.Second, 5*time.Minute, false, func(ctx context.Context) (bool, error) {
+		namespaces, err := client.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return false, err
+		}
+		for _, namespace := range namespaces.Items {
+			if _, ok := numPodsScheduledPerNamespace[namespace.Name]; ok {
+				// A namespace created by the workload, need to wait.
+				return false, nil
+			}
+		}
+		// All namespaces gone.
+		return true, nil
+	}); err != nil {
+		tb.Fatalf("failed while waiting for namespace removal: %v", err)
+	}
+}
+
+func createNamespaceIfNotPresent(ctx context.Context, tb testing.TB, client clientset.Interface, namespace string, podsPerNamespace *map[string]int) {
 	if _, ok := (*podsPerNamespace)[namespace]; !ok {
 		// The namespace has not created yet.
 		// So, create that and register it.
 		_, err := client.CoreV1().Namespaces().Create(ctx, &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}, metav1.CreateOptions{})
 		if err != nil {
-			b.Fatalf("failed to create namespace for Pod: %v", namespace)
+			tb.Fatalf("failed to create namespace for Pod: %v", namespace)
 		}
 		(*podsPerNamespace)[namespace] = 0
 	}
@@ -1087,12 +1254,12 @@ type testDataCollector interface {
 	collect() []DataItem
 }
 
-func getTestDataCollectors(tb testing.TB, podInformer coreinformers.PodInformer, name, namespace string, mcc *metricsCollectorConfig) []testDataCollector {
+func getTestDataCollectors(tb testing.TB, podInformer coreinformers.PodInformer, name, namespace string, mcc *metricsCollectorConfig, throughputErrorMargin float64) []testDataCollector {
 	if mcc == nil {
 		mcc = &defaultMetricsCollectorConfig
 	}
 	return []testDataCollector{
-		newThroughputCollector(tb, podInformer, map[string]string{"Name": name}, []string{namespace}),
+		newThroughputCollector(tb, podInformer, map[string]string{"Name": name}, []string{namespace}, throughputErrorMargin),
 		newMetricsCollector(mcc, map[string]string{"Name": name}),
 	}
 }
@@ -1125,12 +1292,12 @@ func getNodePreparer(prefix string, cno *createNodesOp, clientset clientset.Inte
 	), nil
 }
 
-func createPods(ctx context.Context, b *testing.B, namespace string, cpo *createPodsOp, clientset clientset.Interface) error {
+func createPods(ctx context.Context, tb testing.TB, namespace string, cpo *createPodsOp, clientset clientset.Interface) error {
 	strategy, err := getPodStrategy(cpo)
 	if err != nil {
 		return err
 	}
-	b.Logf("creating %d pods in namespace %q", cpo.Count, namespace)
+	tb.Logf("creating %d pods in namespace %q", cpo.Count, namespace)
 	config := testutils.NewTestPodCreatorConfig()
 	config.AddStrategy(namespace, cpo.Count, strategy)
 	podCreator := testutils.NewTestPodCreator(clientset, config)
@@ -1140,7 +1307,7 @@ func createPods(ctx context.Context, b *testing.B, namespace string, cpo *create
 // waitUntilPodsScheduledInNamespace blocks until all pods in the given
 // namespace are scheduled. Times out after 10 minutes because even at the
 // lowest observed QPS of ~10 pods/sec, a 5000-node test should complete.
-func waitUntilPodsScheduledInNamespace(ctx context.Context, b *testing.B, podInformer coreinformers.PodInformer, namespace string, wantCount int) error {
+func waitUntilPodsScheduledInNamespace(ctx context.Context, tb testing.TB, podInformer coreinformers.PodInformer, namespace string, wantCount int) error {
 	return wait.PollImmediate(1*time.Second, 10*time.Minute, func() (bool, error) {
 		select {
 		case <-ctx.Done():
@@ -1152,17 +1319,17 @@ func waitUntilPodsScheduledInNamespace(ctx context.Context, b *testing.B, podInf
 			return false, err
 		}
 		if len(scheduled) >= wantCount {
-			b.Logf("scheduling succeed")
+			tb.Logf("scheduling succeed")
 			return true, nil
 		}
-		b.Logf("namespace: %s, pods: want %d, got %d", namespace, wantCount, len(scheduled))
+		tb.Logf("namespace: %s, pods: want %d, got %d", namespace, wantCount, len(scheduled))
 		return false, nil
 	})
 }
 
 // waitUntilPodsScheduled blocks until the all pods in the given namespaces are
 // scheduled.
-func waitUntilPodsScheduled(ctx context.Context, b *testing.B, podInformer coreinformers.PodInformer, namespaces []string, numPodsScheduledPerNamespace map[string]int) error {
+func waitUntilPodsScheduled(ctx context.Context, tb testing.TB, podInformer coreinformers.PodInformer, namespaces []string, numPodsScheduledPerNamespace map[string]int) error {
 	// If unspecified, default to all known namespaces.
 	if len(namespaces) == 0 {
 		for namespace := range numPodsScheduledPerNamespace {
@@ -1179,7 +1346,7 @@ func waitUntilPodsScheduled(ctx context.Context, b *testing.B, podInformer corei
 		if !ok {
 			return fmt.Errorf("unknown namespace %s", namespace)
 		}
-		if err := waitUntilPodsScheduledInNamespace(ctx, b, podInformer, namespace, wantCount); err != nil {
+		if err := waitUntilPodsScheduledInNamespace(ctx, tb, podInformer, namespace, wantCount); err != nil {
 			return fmt.Errorf("error waiting for pods in namespace %q: %w", namespace, err)
 		}
 	}
@@ -1333,10 +1500,10 @@ type namespacePreparer struct {
 	count  int
 	prefix string
 	spec   *v1.Namespace
-	t      testing.TB
+	tb     testing.TB
 }
 
-func newNamespacePreparer(cno *createNamespacesOp, clientset clientset.Interface, b *testing.B) (*namespacePreparer, error) {
+func newNamespacePreparer(cno *createNamespacesOp, clientset clientset.Interface, tb testing.TB) (*namespacePreparer, error) {
 	ns := &v1.Namespace{}
 	if cno.NamespaceTemplatePath != nil {
 		if err := getSpecFromFile(cno.NamespaceTemplatePath, ns); err != nil {
@@ -1349,7 +1516,7 @@ func newNamespacePreparer(cno *createNamespacesOp, clientset clientset.Interface
 		count:  cno.Count,
 		prefix: cno.Prefix,
 		spec:   ns,
-		t:      b,
+		tb:     tb,
 	}, nil
 }
 
@@ -1368,7 +1535,7 @@ func (p *namespacePreparer) prepare(ctx context.Context) error {
 	if p.spec != nil {
 		base = p.spec
 	}
-	p.t.Logf("Making %d namespaces with prefix %q and template %v", p.count, p.prefix, *base)
+	p.tb.Logf("Making %d namespaces with prefix %q and template %v", p.count, p.prefix, *base)
 	for i := 0; i < p.count; i++ {
 		n := base.DeepCopy()
 		n.Name = fmt.Sprintf("%s-%d", p.prefix, i)
@@ -1388,7 +1555,7 @@ func (p *namespacePreparer) cleanup(ctx context.Context) error {
 	for i := 0; i < p.count; i++ {
 		n := fmt.Sprintf("%s-%d", p.prefix, i)
 		if err := p.client.CoreV1().Namespaces().Delete(ctx, n, metav1.DeleteOptions{}); err != nil {
-			p.t.Errorf("Deleting Namespace: %v", err)
+			p.tb.Errorf("Deleting Namespace: %v", err)
 			errRet = err
 		}
 	}

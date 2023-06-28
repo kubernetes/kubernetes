@@ -38,17 +38,22 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/metadata"
+	"k8s.io/client-go/metadata/metadatainformer"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
 	pvutil "k8s.io/component-helpers/storage/volume"
+	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-scheduler/config/v1beta3"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/disruption"
+	"k8s.io/kubernetes/pkg/controller/garbagecollector"
+	"k8s.io/kubernetes/pkg/controller/namespace"
 	"k8s.io/kubernetes/pkg/controller/resourceclaim"
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/pkg/scheduler"
@@ -137,7 +142,13 @@ func StartFakePVController(ctx context.Context, clientSet clientset.Interface, i
 			claimRef := obj.Spec.ClaimRef
 			pvc, err := clientSet.CoreV1().PersistentVolumeClaims(claimRef.Namespace).Get(ctx, claimRef.Name, metav1.GetOptions{})
 			if err != nil {
-				klog.Errorf("error while getting %v/%v: %v", claimRef.Namespace, claimRef.Name, err)
+				// Note that the error can be anything, because components like
+				// apiserver are also shutting down at the same time, but this
+				// check is conservative and only ignores the "context canceled"
+				// error while shutting down.
+				if ctx.Err() == nil || !errors.Is(err, context.Canceled) {
+					klog.Errorf("error while getting %v/%v: %v", claimRef.Namespace, claimRef.Name, err)
+				}
 				return
 			}
 
@@ -146,7 +157,10 @@ func StartFakePVController(ctx context.Context, clientSet clientset.Interface, i
 				metav1.SetMetaDataAnnotation(&pvc.ObjectMeta, pvutil.AnnBindCompleted, "yes")
 				_, err := clientSet.CoreV1().PersistentVolumeClaims(claimRef.Namespace).Update(ctx, pvc, metav1.UpdateOptions{})
 				if err != nil {
-					klog.Errorf("error while updating %v/%v: %v", claimRef.Namespace, claimRef.Name, err)
+					if ctx.Err() == nil || !errors.Is(err, context.Canceled) {
+						// Shutting down, no need to record this.
+						klog.Errorf("error while updating %v/%v: %v", claimRef.Namespace, claimRef.Name, err)
+					}
 					return
 				}
 			}
@@ -161,6 +175,67 @@ func StartFakePVController(ctx context.Context, clientSet clientset.Interface, i
 			syncPV(obj.(*v1.PersistentVolume))
 		},
 	})
+}
+
+// CreateGCController creates a garbage controller and returns a run function
+// for it. The informer factory needs to be started before invoking that
+// function.
+func CreateGCController(ctx context.Context, tb testing.TB, restConfig restclient.Config, informerSet informers.SharedInformerFactory) func() {
+	restclient.AddUserAgent(&restConfig, "gc-controller")
+	clientSet := clientset.NewForConfigOrDie(&restConfig)
+	metadataClient, err := metadata.NewForConfig(&restConfig)
+	if err != nil {
+		tb.Fatalf("Failed to create metadataClient: %v", err)
+	}
+	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cacheddiscovery.NewMemCacheClient(clientSet.Discovery()))
+	restMapper.Reset()
+	metadataInformers := metadatainformer.NewSharedInformerFactory(metadataClient, 0)
+	alwaysStarted := make(chan struct{})
+	close(alwaysStarted)
+	gc, err := garbagecollector.NewGarbageCollector(
+		clientSet,
+		metadataClient,
+		restMapper,
+		garbagecollector.DefaultIgnoredResources(),
+		informerfactory.NewInformerFactory(informerSet, metadataInformers),
+		alwaysStarted,
+	)
+	if err != nil {
+		tb.Fatalf("Failed creating garbage collector")
+	}
+	startGC := func() {
+		syncPeriod := 5 * time.Second
+		go wait.Until(func() {
+			restMapper.Reset()
+		}, syncPeriod, ctx.Done())
+		go gc.Run(ctx, 1)
+		go gc.Sync(ctx, clientSet.Discovery(), syncPeriod)
+	}
+	return startGC
+}
+
+// CreateNamespaceController creates a namespace controller and returns a run
+// function for it. The informer factory needs to be started before invoking
+// that function.
+func CreateNamespaceController(ctx context.Context, tb testing.TB, restConfig restclient.Config, informerSet informers.SharedInformerFactory) func() {
+	restclient.AddUserAgent(&restConfig, "namespace-controller")
+	clientSet := clientset.NewForConfigOrDie(&restConfig)
+	metadataClient, err := metadata.NewForConfig(&restConfig)
+	if err != nil {
+		tb.Fatalf("Failed to create metadataClient: %v", err)
+	}
+	discoverResourcesFn := clientSet.Discovery().ServerPreferredNamespacedResources
+	controller := namespace.NewNamespaceController(
+		ctx,
+		clientSet,
+		metadataClient,
+		discoverResourcesFn,
+		informerSet.Core().V1().Namespaces(),
+		10*time.Hour,
+		v1.FinalizerKubernetes)
+	return func() {
+		go controller.Run(ctx, 5)
+	}
 }
 
 // TestContext store necessary context info

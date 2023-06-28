@@ -73,18 +73,20 @@ func newDefaultComponentConfig() (*config.KubeSchedulerConfiguration, error) {
 	return &cfg, nil
 }
 
-// mustSetupScheduler starts the following components:
+// mustSetupCluster starts the following components:
 // - k8s api server
 // - scheduler
+// - some of the kube-controller-manager controllers
+//
 // It returns regular and dynamic clients, and destroyFunc which should be used to
 // remove resources after finished.
 // Notes on rate limiter:
 //   - client rate limit is set to 5000.
-func mustSetupScheduler(ctx context.Context, b *testing.B, config *config.KubeSchedulerConfiguration, enabledFeatures map[featuregate.Feature]bool) (informers.SharedInformerFactory, clientset.Interface, dynamic.Interface) {
+func mustSetupCluster(ctx context.Context, tb testing.TB, config *config.KubeSchedulerConfiguration, enabledFeatures map[featuregate.Feature]bool) (informers.SharedInformerFactory, clientset.Interface, dynamic.Interface) {
 	// Run API server with minimimal logging by default. Can be raised with -v.
 	framework.MinVerbosity = 0
 
-	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, b, framework.TestServerSetup{
+	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, tb, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition", "Priority"}
@@ -97,12 +99,12 @@ func mustSetupScheduler(ctx context.Context, b *testing.B, config *config.KubeSc
 			}
 		},
 	})
-	b.Cleanup(tearDownFn)
+	tb.Cleanup(tearDownFn)
 
 	// Cleanup will be in reverse order: first the clients get cancelled,
 	// then the apiserver is torn down.
 	ctx, cancel := context.WithCancel(ctx)
-	b.Cleanup(cancel)
+	tb.Cleanup(cancel)
 
 	// TODO: client connection configuration, such as QPS or Burst is configurable in theory, this could be derived from the `config`, need to
 	// support this when there is any testcase that depends on such configuration.
@@ -115,7 +117,7 @@ func mustSetupScheduler(ctx context.Context, b *testing.B, config *config.KubeSc
 		var err error
 		config, err = newDefaultComponentConfig()
 		if err != nil {
-			b.Fatalf("Error creating default component config: %v", err)
+			tb.Fatalf("Error creating default component config: %v", err)
 		}
 	}
 
@@ -126,16 +128,20 @@ func mustSetupScheduler(ctx context.Context, b *testing.B, config *config.KubeSc
 	// be applied to start a scheduler, most of them are defined in `scheduler.schedulerOptions`.
 	_, informerFactory := util.StartScheduler(ctx, client, cfg, config)
 	util.StartFakePVController(ctx, client, informerFactory)
+	runGC := util.CreateGCController(ctx, tb, *cfg, informerFactory)
+	runNS := util.CreateNamespaceController(ctx, tb, *cfg, informerFactory)
 
 	runResourceClaimController := func() {}
 	if enabledFeatures[features.DynamicResourceAllocation] {
 		// Testing of DRA with inline resource claims depends on this
 		// controller for creating and removing ResourceClaims.
-		runResourceClaimController = util.CreateResourceClaimController(ctx, b, client, informerFactory)
+		runResourceClaimController = util.CreateResourceClaimController(ctx, tb, client, informerFactory)
 	}
 
 	informerFactory.Start(ctx.Done())
 	informerFactory.WaitForCacheSync(ctx.Done())
+	go runGC()
+	go runNS()
 	go runResourceClaimController()
 
 	return informerFactory, client, dynClient
@@ -314,14 +320,16 @@ type throughputCollector struct {
 	schedulingThroughputs []float64
 	labels                map[string]string
 	namespaces            []string
+	errorMargin           float64
 }
 
-func newThroughputCollector(tb testing.TB, podInformer coreinformers.PodInformer, labels map[string]string, namespaces []string) *throughputCollector {
+func newThroughputCollector(tb testing.TB, podInformer coreinformers.PodInformer, labels map[string]string, namespaces []string, errorMargin float64) *throughputCollector {
 	return &throughputCollector{
 		tb:          tb,
 		podInformer: podInformer,
 		labels:      labels,
 		namespaces:  namespaces,
+		errorMargin: errorMargin,
 	}
 }
 
@@ -382,9 +390,7 @@ func (tc *throughputCollector) run(ctx context.Context) {
 			throughput := float64(newScheduled) / durationInSeconds
 			expectedDuration := throughputSampleInterval * time.Duration(skipped+1)
 			errorMargin := (duration - expectedDuration).Seconds() / expectedDuration.Seconds() * 100
-			// TODO: To prevent the perf-test failure, we increased the error margin, if still not enough
-			// one day, we should think of another approach to avoid this trick.
-			if math.Abs(errorMargin) > 30 {
+			if tc.errorMargin > 0 && math.Abs(errorMargin) > tc.errorMargin {
 				// This might affect the result, report it.
 				tc.tb.Errorf("ERROR: Expected throuput collector to sample at regular time intervals. The %d most recent intervals took %s instead of %s, a difference of %0.1f%%.", skipped+1, duration, expectedDuration, errorMargin)
 			}
