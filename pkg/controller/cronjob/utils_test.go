@@ -284,11 +284,11 @@ func TestGetMostRecentScheduleTime(t *testing.T) {
 		schedule     string
 	}
 	tests := []struct {
-		name                   string
-		args                   args
-		expectedTime           *time.Time
-		expectedNumberOfMisses int64
-		wantErr                bool
+		name                  string
+		args                  args
+		expectedTime          *time.Time
+		expectedTooManyMissed bool
+		wantErr               bool
 	}{
 		{
 			name: "now before next schedule",
@@ -306,8 +306,7 @@ func TestGetMostRecentScheduleTime(t *testing.T) {
 				now:          topOfTheHour().Add(time.Minute * 61),
 				schedule:     "0 * * * *",
 			},
-			expectedTime:           deltaTimeAfterTopOfTheHour(time.Minute * 60),
-			expectedNumberOfMisses: 1,
+			expectedTime: deltaTimeAfterTopOfTheHour(time.Minute * 60),
 		},
 		{
 			name: "missed 5 schedules",
@@ -316,8 +315,7 @@ func TestGetMostRecentScheduleTime(t *testing.T) {
 				now:          *deltaTimeAfterTopOfTheHour(time.Minute * 301),
 				schedule:     "0 * * * *",
 			},
-			expectedTime:           deltaTimeAfterTopOfTheHour(time.Minute * 300),
-			expectedNumberOfMisses: 5,
+			expectedTime: deltaTimeAfterTopOfTheHour(time.Minute * 300),
 		},
 		{
 			name: "complex schedule",
@@ -326,8 +324,7 @@ func TestGetMostRecentScheduleTime(t *testing.T) {
 				now:          *deltaTimeAfterTopOfTheHour(24*time.Hour + 31*time.Minute),
 				schedule:     "30 6-16/4 * * 1-5",
 			},
-			expectedTime:           deltaTimeAfterTopOfTheHour(24*time.Hour + 30*time.Minute),
-			expectedNumberOfMisses: 2,
+			expectedTime: deltaTimeAfterTopOfTheHour(24*time.Hour + 30*time.Minute),
 		},
 		{
 			name: "another complex schedule",
@@ -336,8 +333,7 @@ func TestGetMostRecentScheduleTime(t *testing.T) {
 				now:          *deltaTimeAfterTopOfTheHour(30*time.Hour + 30*time.Minute),
 				schedule:     "30 10,11,12 * * 1-5",
 			},
-			expectedTime:           nil,
-			expectedNumberOfMisses: 30,
+			expectedTime: nil,
 		},
 		{
 			name: "complex schedule with longer diff between executions",
@@ -346,8 +342,7 @@ func TestGetMostRecentScheduleTime(t *testing.T) {
 				now:          *deltaTimeAfterTopOfTheHour(96*time.Hour + 31*time.Minute),
 				schedule:     "30 6-16/4 * * 1-5",
 			},
-			expectedTime:           deltaTimeAfterTopOfTheHour(96*time.Hour + 30*time.Minute),
-			expectedNumberOfMisses: 6,
+			expectedTime: deltaTimeAfterTopOfTheHour(96*time.Hour + 30*time.Minute),
 		},
 		{
 			name: "complex schedule with shorter diff between executions",
@@ -356,8 +351,7 @@ func TestGetMostRecentScheduleTime(t *testing.T) {
 				now:          *deltaTimeAfterTopOfTheHour(24*time.Hour + 31*time.Minute),
 				schedule:     "30 6-16/4 * * 1-5",
 			},
-			expectedTime:           deltaTimeAfterTopOfTheHour(24*time.Hour + 30*time.Minute),
-			expectedNumberOfMisses: 7,
+			expectedTime: deltaTimeAfterTopOfTheHour(24*time.Hour + 30*time.Minute),
 		},
 		{
 			name: "@every schedule",
@@ -366,8 +360,8 @@ func TestGetMostRecentScheduleTime(t *testing.T) {
 				now:          *deltaTimeAfterTopOfTheHour(7 * 24 * time.Hour),
 				schedule:     "@every 1h",
 			},
-			expectedTime:           deltaTimeAfterTopOfTheHour((6 * 24 * time.Hour) + 23*time.Hour + 1*time.Minute),
-			expectedNumberOfMisses: 167,
+			expectedTime:          deltaTimeAfterTopOfTheHour((6 * 24 * time.Hour) + 23*time.Hour + 1*time.Minute),
+			expectedTooManyMissed: true,
 		},
 		{
 			name: "rogue cronjob",
@@ -376,9 +370,8 @@ func TestGetMostRecentScheduleTime(t *testing.T) {
 				now:          *deltaTimeAfterTopOfTheHour(time.Hour * 1000000),
 				schedule:     "59 23 31 2 *",
 			},
-			expectedTime:           nil,
-			expectedNumberOfMisses: 0,
-			wantErr:                true,
+			expectedTime: nil,
+			wantErr:      true,
 		},
 	}
 	for _, tt := range tests {
@@ -387,7 +380,7 @@ func TestGetMostRecentScheduleTime(t *testing.T) {
 			if err != nil {
 				t.Errorf("error setting up the test, %s", err)
 			}
-			gotTime, gotNumberOfMisses, err := getMostRecentScheduleTime(*tt.args.earliestTime, tt.args.now, sched)
+			gotTime, gotTooManyMissed, err := getMostRecentScheduleTime(*tt.args.earliestTime, tt.args.now, sched)
 			if tt.wantErr {
 				if err == nil {
 					t.Error("getMostRecentScheduleTime() got no error when expected one")
@@ -403,8 +396,8 @@ func TestGetMostRecentScheduleTime(t *testing.T) {
 			if gotTime != nil && tt.expectedTime != nil && !gotTime.Equal(*tt.expectedTime) {
 				t.Errorf("getMostRecentScheduleTime() got = %v, want %v", gotTime, tt.expectedTime)
 			}
-			if gotNumberOfMisses != tt.expectedNumberOfMisses {
-				t.Errorf("getMostRecentScheduleTime() got1 = %v, want %v", gotNumberOfMisses, tt.expectedNumberOfMisses)
+			if gotTooManyMissed != tt.expectedTooManyMissed {
+				t.Errorf("getMostRecentScheduleTime() got1 = %v, want %v", gotTooManyMissed, tt.expectedTooManyMissed)
 			}
 		})
 	}
