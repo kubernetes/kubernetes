@@ -1131,7 +1131,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	RecoverVolumeExpansionFailure: {Default: false, PreRelease: featuregate.Alpha},
 
-	RetroactiveDefaultStorageClass: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
+	RetroactiveDefaultStorageClass: {Default: true, PreRelease: featuregate.GA, LockToDefault: false}, // remove in 1.29
 
 	RotateKubeletServerCertificate: {Default: true, PreRelease: featuregate.Beta},
 
