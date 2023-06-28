@@ -188,6 +188,66 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin][Alpha][
 			gomega.Expect(warning.Warning).To(gomega.ContainSubstring("found no matching overload for '_+_' applied to '(string, int)'"))
 		})
 	})
+
+	ginkgo.It("should allow expressions to refer variables.", func(ctx context.Context) {
+		ginkgo.By("creating a policy with variables", func() {
+			policy := newValidatingAdmissionPolicyBuilder(f.UniqueName+".policy.example.com").
+				MatchUniqueNamespace(f.UniqueName).
+				StartResourceRule().
+				MatchResource([]string{"apps"}, []string{"v1"}, []string{"deployments"}).
+				EndResourceRule().
+				WithVariable(admissionregistrationv1alpha1.Variable{
+					Name:       "replicas",
+					Expression: "object.spec.replicas",
+				}).
+				WithVariable(admissionregistrationv1alpha1.Variable{
+					Name:       "replicasReminder", // a bit artificial but good for testing purpose
+					Expression: "variables.replicas % 2",
+				}).
+				WithValidation(admissionregistrationv1alpha1.Validation{
+					Expression: "variables.replicas > 1 && variables.replicasReminder == 1",
+				}).
+				Build()
+			policy, err := client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Create(ctx, policy, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "create policy")
+			ginkgo.DeferCleanup(func(ctx context.Context, name string) error {
+				return client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Delete(ctx, name, metav1.DeleteOptions{})
+			}, policy.Name)
+			binding := createBinding(f.UniqueName+".binding.example.com", f.UniqueName, policy.Name)
+			binding, err = client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicyBindings().Create(ctx, binding, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "create policy binding")
+			ginkgo.DeferCleanup(func(ctx context.Context, name string) error {
+				return client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicyBindings().Delete(ctx, name, metav1.DeleteOptions{})
+			}, binding.Name)
+		})
+		ginkgo.By("waiting until the marker is denied", func() {
+			deployment := basicDeployment("marker-deployment", 1)
+			err := wait.PollUntilContextCancel(ctx, 100*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
+				_, err = client.AppsV1().Deployments(f.Namespace.Name).Create(ctx, deployment, metav1.CreateOptions{})
+				defer client.AppsV1().Deployments(f.Namespace.Name).Delete(ctx, deployment.Name, metav1.DeleteOptions{})
+				if err != nil {
+					if apierrors.IsInvalid(err) {
+						return true, nil
+					}
+					return false, err
+				}
+				return false, nil
+			})
+			framework.ExpectNoError(err, "wait for marker")
+		})
+		ginkgo.By("testing a replicated Deployment to be allowed", func() {
+			deployment := basicDeployment("replicated", 3)
+			deployment, err := client.AppsV1().Deployments(f.Namespace.Name).Create(ctx, deployment, metav1.CreateOptions{})
+			defer client.AppsV1().Deployments(f.Namespace.Name).Delete(ctx, deployment.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "create replicated Deployment")
+		})
+		ginkgo.By("testing a non-replicated ReplicaSet not to be denied", func() {
+			replicaSet := basicReplicaSet("non-replicated", 1)
+			replicaSet, err := client.AppsV1().ReplicaSets(f.Namespace.Name).Create(ctx, replicaSet, metav1.CreateOptions{})
+			defer client.AppsV1().ReplicaSets(f.Namespace.Name).Delete(ctx, replicaSet.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "create non-replicated ReplicaSet")
+		})
+	})
 })
 
 func createBinding(bindingName string, uniqueLabel string, policyName string) *admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding {
@@ -329,6 +389,11 @@ func (rb *resourceRuleBuilder) EndResourceRule() *validatingAdmissionPolicyBuild
 
 func (b *validatingAdmissionPolicyBuilder) WithValidation(validation admissionregistrationv1alpha1.Validation) *validatingAdmissionPolicyBuilder {
 	b.policy.Spec.Validations = append(b.policy.Spec.Validations, validation)
+	return b
+}
+
+func (b *validatingAdmissionPolicyBuilder) WithVariable(variable admissionregistrationv1alpha1.Variable) *validatingAdmissionPolicyBuilder {
+	b.policy.Spec.Variables = append(b.policy.Spec.Variables, variable)
 	return b
 }
 
