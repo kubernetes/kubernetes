@@ -2019,18 +2019,15 @@ type PersistentVolumeClaimSpecValidationOptions struct {
 	AllowReadWriteOncePod bool
 	// Allow users to recover from previously failing expansion operation
 	EnableRecoverFromExpansionFailure bool
-	// Allow assigning StorageClass to unbound PVCs retroactively
-	EnableRetroactiveDefaultStorageClass bool
 	// Allow to validate the label value of the label selector
 	AllowInvalidLabelValueInSelector bool
 }
 
 func ValidationOptionsForPersistentVolumeClaim(pvc, oldPvc *core.PersistentVolumeClaim) PersistentVolumeClaimSpecValidationOptions {
 	opts := PersistentVolumeClaimSpecValidationOptions{
-		AllowReadWriteOncePod:                utilfeature.DefaultFeatureGate.Enabled(features.ReadWriteOncePod),
-		EnableRecoverFromExpansionFailure:    utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure),
-		EnableRetroactiveDefaultStorageClass: utilfeature.DefaultFeatureGate.Enabled(features.RetroactiveDefaultStorageClass),
-		AllowInvalidLabelValueInSelector:     false,
+		AllowReadWriteOncePod:             utilfeature.DefaultFeatureGate.Enabled(features.ReadWriteOncePod),
+		EnableRecoverFromExpansionFailure: utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure),
+		AllowInvalidLabelValueInSelector:  false,
 	}
 	if oldPvc == nil {
 		// If there's no old PVC, use the options based solely on feature enablement
@@ -2286,16 +2283,14 @@ func validateStorageClassUpgradeFromAnnotation(oldAnnotations, newAnnotations ma
 
 // Provide an upgrade path from PVC with nil storage class. We allow update of
 // StorageClassName only if following four conditions are met at the same time:
-// 1. RetroactiveDefaultStorageClass FeatureGate is enabled
-// 2. The new pvc's StorageClassName is not nil
-// 3. The old pvc's StorageClassName is nil
-// 4. The old pvc either does not have beta annotation set, or the beta annotation matches new pvc's StorageClassName
+// 1. The new pvc's StorageClassName is not nil
+// 2. The old pvc's StorageClassName is nil
+// 3. The old pvc either does not have beta annotation set, or the beta annotation matches new pvc's StorageClassName
 func validateStorageClassUpgradeFromNil(oldAnnotations map[string]string, oldScName, newScName *string, opts PersistentVolumeClaimSpecValidationOptions) bool {
 	oldAnnotation, oldAnnotationExist := oldAnnotations[core.BetaStorageClassAnnotation]
-	return opts.EnableRetroactiveDefaultStorageClass /* condition 1 */ &&
-		newScName != nil /* condition 2 */ &&
-		oldScName == nil /* condition 3 */ &&
-		(!oldAnnotationExist || *newScName == oldAnnotation) /* condition 4 */
+	return newScName != nil /* condition 1 */ &&
+		oldScName == nil /* condition 2 */ &&
+		(!oldAnnotationExist || *newScName == oldAnnotation) /* condition 3 */
 }
 
 var resizeStatusSet = sets.NewString(string(core.PersistentVolumeClaimNoExpansionInProgress),

@@ -349,18 +349,16 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(ctx context.Context, cl
 			// No PV could be found
 			// OBSERVATION: pvc is "Pending", will retry
 
-			if utilfeature.DefaultFeatureGate.Enabled(features.RetroactiveDefaultStorageClass) {
-				logger.V(4).Info("FeatureGate is enabled, attempting to assign storage class to unbound PersistentVolumeClaim", "featureGate", features.RetroactiveDefaultStorageClass, "PVC", klog.KObj(claim))
-				updated, err := ctrl.assignDefaultStorageClass(ctx, claim)
-				if err != nil {
-					metrics.RecordRetroactiveStorageClassMetric(false)
-					return fmt.Errorf("can't update PersistentVolumeClaim[%q]: %w", claimToClaimKey(claim), err)
-				}
-				if updated {
-					logger.V(4).Info("PersistentVolumeClaim update successful, restarting claim sync", "PVC", klog.KObj(claim))
-					metrics.RecordRetroactiveStorageClassMetric(true)
-					return nil
-				}
+			logger.V(4).Info("Attempting to assign storage class to unbound PersistentVolumeClaim", "PVC", klog.KObj(claim))
+			updated, err := ctrl.assignDefaultStorageClass(ctx, claim)
+			if err != nil {
+				metrics.RecordRetroactiveStorageClassMetric(false)
+				return fmt.Errorf("can't update PersistentVolumeClaim[%q]: %w", claimToClaimKey(claim), err)
+			}
+			if updated {
+				logger.V(4).Info("PersistentVolumeClaim update successful, restarting claim sync", "PVC", klog.KObj(claim))
+				metrics.RecordRetroactiveStorageClassMetric(true)
+				return nil
 			}
 
 			switch {
