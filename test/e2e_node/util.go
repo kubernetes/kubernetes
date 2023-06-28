@@ -23,6 +23,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"net"
 	"net/http"
 	"os"
@@ -40,7 +41,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -305,7 +305,7 @@ func logKubeletLatencyMetrics(ctx context.Context, metricNames ...string) {
 	for _, key := range metricNames {
 		metricSet.Insert(kubeletmetrics.KubeletSubsystem + "_" + key)
 	}
-	metric, err := e2emetrics.GrabKubeletMetricsWithoutProxy(ctx, fmt.Sprintf("%s:%d", nodeNameOrIP(), ports.KubeletReadOnlyPort), "/metrics")
+	metric, err := e2emetrics.GrabKubeletMetricsWithoutProxy(ctx, fmt.Sprintf("%s:%d", nodeNameOrIP(ctx), ports.KubeletReadOnlyPort), "/metrics")
 	if err != nil {
 		framework.Logf("Error getting kubelet metrics: %v", err)
 	} else {
@@ -640,19 +640,26 @@ func WaitForPodInitContainerToFail(ctx context.Context, c clientset.Interface, n
 	})
 }
 
-func nodeNameOrIP() string {
+func nodeNameOrIP(ctx context.Context) string {
 	// Check if the node name in test context can be resolved
-	if ips, err := net.LookupIP(framework.TestContext.NodeName); err != nil {
-		if dnsErr, ok := err.(*net.DNSError); ok && dnsErr.IsNotFound {
-			// if it can't be resolved, pick a host interface
-			if ip, err := utilnet.ChooseHostInterface(); err == nil {
-				return ip.String()
+	attempts := 10
+	for i := 0; i < attempts; i++ {
+		ips, err := net.DefaultResolver.LookupIP(ctx, "ipv4", framework.TestContext.NodeName)
+		if err != nil {
+			if len(ips) > 0 {
+				// yay, node name resolved correctly, pick the first
+				return ips[0].String()
 			}
 		}
-	} else {
-		if len(ips) > 0 {
-			// yay, node name resolved correctly, pick the first
-			return ips[0].String()
+		if dnsErr, ok := err.(*net.DNSError); ok {
+			if dnsErr.Temporary() {
+				// Temporary failure, let's try again
+				time.Sleep(5 * time.Millisecond)
+				continue
+			}
+		}
+		if ip, err := utilnet.ChooseHostInterface(); err == nil {
+			return ip.String()
 		}
 	}
 	// fallback to node name in test context
