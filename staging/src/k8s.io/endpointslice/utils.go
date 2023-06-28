@@ -124,7 +124,7 @@ func getEndpointAddresses(podStatus v1.PodStatus, service *v1.Service, addressTy
 
 // newEndpointSlice returns an EndpointSlice generated from a service and
 // endpointMeta.
-func newEndpointSlice(logger klog.Logger, service *v1.Service, endpointMeta *endpointMeta) *discovery.EndpointSlice {
+func newEndpointSlice(logger klog.Logger, service *v1.Service, endpointMeta *endpointMeta, controllerName string) *discovery.EndpointSlice {
 	gvk := schema.GroupVersionKind{Version: "v1", Kind: "Service"}
 	ownerRef := metav1.NewControllerRef(service, gvk)
 	epSlice := &discovery.EndpointSlice{
@@ -139,7 +139,7 @@ func newEndpointSlice(logger klog.Logger, service *v1.Service, endpointMeta *end
 		Endpoints:   []discovery.Endpoint{},
 	}
 	// add parent service labels
-	epSlice.Labels, _ = setEndpointSliceLabels(logger, epSlice, service)
+	epSlice.Labels, _ = setEndpointSliceLabels(logger, epSlice, service, controllerName)
 
 	return epSlice
 }
@@ -213,7 +213,7 @@ func ServiceControllerKey(endpointSlice *discovery.EndpointSlice) (string, error
 // setEndpointSliceLabels returns a map with the new endpoint slices labels and true if there was an update.
 // Slices labels must be equivalent to the Service labels except for the reserved IsHeadlessService, LabelServiceName and LabelManagedBy labels
 // Changes to IsHeadlessService, LabelServiceName and LabelManagedBy labels on the Service do not result in updates to EndpointSlice labels.
-func setEndpointSliceLabels(logger klog.Logger, epSlice *discovery.EndpointSlice, service *v1.Service) (map[string]string, bool) {
+func setEndpointSliceLabels(logger klog.Logger, epSlice *discovery.EndpointSlice, service *v1.Service, controllerName string) (map[string]string, bool) {
 	updated := false
 	epLabels := make(map[string]string)
 	svcLabels := make(map[string]string)
@@ -366,19 +366,6 @@ func hintsEnabled(annotations map[string]string) bool {
 		}
 	}
 	return val == "Auto" || val == "auto"
-}
-
-// ManagedByChanged returns true if one of the provided EndpointSlices is
-// managed by the EndpointSlice controller while the other is not.
-func ManagedByChanged(endpointSlice1, endpointSlice2 *discovery.EndpointSlice) bool {
-	return ManagedByController(endpointSlice1) != ManagedByController(endpointSlice2)
-}
-
-// ManagedByController returns true if the controller of the provided
-// EndpointSlices is the EndpointSlice controller.
-func ManagedByController(endpointSlice *discovery.EndpointSlice) bool {
-	managedBy := endpointSlice.Labels[discovery.LabelManagedBy]
-	return managedBy == controllerName
 }
 
 // isServiceIPSet aims to check if the service's ClusterIP is set or not

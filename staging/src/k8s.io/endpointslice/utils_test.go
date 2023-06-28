@@ -209,7 +209,7 @@ func TestNewEndpointSlice(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
 			svc := tc.updateSvc(service)
-			generatedSlice := newEndpointSlice(logger, &svc, &endpointMeta)
+			generatedSlice := newEndpointSlice(logger, &svc, &endpointMeta, controllerName)
 			assert.EqualValues(t, tc.expectedSlice, generatedSlice)
 		})
 	}
@@ -880,7 +880,7 @@ func TestSetEndpointSliceLabels(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
 			svc := tc.updateSvc(service)
-			labels, updated := setEndpointSliceLabels(logger, tc.epSlice, &svc)
+			labels, updated := setEndpointSliceLabels(logger, tc.epSlice, &svc, controllerName)
 			assert.EqualValues(t, updated, tc.expectedUpdate)
 			assert.EqualValues(t, tc.expectedLabels, labels)
 		})

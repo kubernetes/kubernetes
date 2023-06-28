@@ -174,6 +174,7 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
 		c.endpointSliceTracker,
 		c.topologyCache,
 		c.eventRecorder,
+		controllerName,
 	)
 
 	return c
@@ -366,7 +367,7 @@ func (c *Controller) syncService(logger klog.Logger, key string) error {
 
 	esLabelSelector := labels.Set(map[string]string{
 		discovery.LabelServiceName: service.Name,
-		discovery.LabelManagedBy:   endpointslicerec.GetReconcilerName(),
+		discovery.LabelManagedBy:   c.reconciler.GetControllerName(),
 	}).AsSelectorPreValidated()
 	endpointSlices, err := c.endpointSliceLister.EndpointSlices(service.Namespace).List(esLabelSelector)
 
@@ -432,7 +433,7 @@ func (c *Controller) onEndpointSliceAdd(obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("Invalid EndpointSlice provided to onEndpointSliceAdd()"))
 		return
 	}
-	if endpointslicerec.ManagedByController(endpointSlice) && c.endpointSliceTracker.ShouldSync(endpointSlice) {
+	if c.reconciler.ManagedByController(endpointSlice) && c.endpointSliceTracker.ShouldSync(endpointSlice) {
 		c.queueServiceForEndpointSlice(endpointSlice)
 	}
 }
@@ -459,7 +460,7 @@ func (c *Controller) onEndpointSliceUpdate(logger klog.Logger, prevObj, obj inte
 		c.queueServiceForEndpointSlice(prevEndpointSlice)
 		return
 	}
-	if endpointslicerec.ManagedByChanged(prevEndpointSlice, endpointSlice) || (endpointslicerec.ManagedByController(endpointSlice) && c.endpointSliceTracker.ShouldSync(endpointSlice)) {
+	if c.reconciler.ManagedByChanged(prevEndpointSlice, endpointSlice) || (c.reconciler.ManagedByController(endpointSlice) && c.endpointSliceTracker.ShouldSync(endpointSlice)) {
 		c.queueServiceForEndpointSlice(endpointSlice)
 	}
 }
@@ -469,7 +470,7 @@ func (c *Controller) onEndpointSliceUpdate(logger klog.Logger, prevObj, obj inte
 // endpointSliceTracker.
 func (c *Controller) onEndpointSliceDelete(obj interface{}) {
 	endpointSlice := getEndpointSliceFromDeleteAction(obj)
-	if endpointSlice != nil && endpointslicerec.ManagedByController(endpointSlice) && c.endpointSliceTracker.Has(endpointSlice) {
+	if endpointSlice != nil && c.reconciler.ManagedByController(endpointSlice) && c.endpointSliceTracker.Has(endpointSlice) {
 		// This returns false if we didn't expect the EndpointSlice to be
 		// deleted. If that is the case, we queue the Service for another sync.
 		if !c.endpointSliceTracker.HandleDeletion(endpointSlice) {

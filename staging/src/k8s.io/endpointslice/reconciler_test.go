@@ -46,6 +46,10 @@ import (
 	"k8s.io/utils/pointer"
 )
 
+const (
+	controllerName = "endpointslice-controller.k8s.io"
+)
+
 func expectAction(t *testing.T, actions []k8stesting.Action, index int, verb, resource string) {
 	t.Helper()
 	if len(actions) <= index {
@@ -555,7 +559,7 @@ func TestReconcile1EndpointSlice(t *testing.T) {
 		},
 		{
 			desc:        "Existing placeholder that's the same",
-			existing:    newEndpointSlice(logger, &svc, &endpointMeta{ports: []discovery.EndpointPort{}, addressType: discovery.AddressTypeIPv4}),
+			existing:    newEndpointSlice(logger, &svc, &endpointMeta{ports: []discovery.EndpointPort{}, addressType: discovery.AddressTypeIPv4}, controllerName),
 			wantMetrics: expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 0, addedPerSync: 0, removedPerSync: 0, numCreated: 0, numUpdated: 0, numDeleted: 0, slicesChangedPerSync: 0},
 		},
 		{
@@ -1986,6 +1990,7 @@ func newReconciler(client *fake.Clientset, nodes []*corev1.Node, maxEndpointsPer
 		endpointsliceutil.NewEndpointSliceTracker(),
 		nil,
 		eventRecorder,
+		controllerName,
 	)
 }
 
