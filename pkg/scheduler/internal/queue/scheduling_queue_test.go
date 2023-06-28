@@ -199,8 +199,8 @@ func TestInFlightPods(t *testing.T) {
 	}
 
 	q.MoveAllToActiveOrBackoffQueue(logger, WildCardEvent, nil, nil, func(pod *v1.Pod) bool {
-		// pretend that medPriorityPodInfo is moved to activeQ from unschedulable pod pool.
-		return medPriorityPodInfo.Pod != pod
+		// prevend that medPriorityPodInfo is moved to activeQ from unschedulable pod pool.
+		return medPriorityPodInfo.Pod.UID != pod.UID
 	})
 
 	q.AddUnschedulableIfNotPresent(logger, newQueuedPodInfoForLookup(highPriNominatedPodInfo.Pod), q.SchedulingCycle())
@@ -281,7 +281,7 @@ func TestPriorityQueue_AddUnschedulableIfNotPresent_Backoff(t *testing.T) {
 	}
 
 	// move all pods to active queue when we were trying to schedule them
-	q.MoveAllToActiveOrBackoffQueue(logger, TestEvent, nil, nil, nil)
+	q.MoveAllToActiveOrBackoffQueue(logger, WildCardEvent, nil, nil, nil)
 	oldCycle := q.SchedulingCycle()
 
 	firstPod, _ := q.Pop()
@@ -789,6 +789,10 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueueWithQueueingHint(t *testing.
 			cl := testingclock.NewFakeClock(now)
 			q := NewTestQueue(ctx, newDefaultQueueSort(), WithQueueingHintMapPerProfile(m), WithClock(cl))
 			// add to unsched pod pool
+			q.activeQ.Add(q.newQueuedPodInfo(test.podInfo.Pod))
+			if p, err := q.Pop(); err != nil || p.Pod != test.podInfo.Pod {
+				t.Errorf("Expected: %v after Pop, but got: %v", test.podInfo.Pod.Name, p.Pod.Name)
+			}
 			q.AddUnschedulableIfNotPresent(logger, test.podInfo, q.SchedulingCycle())
 
 			cl.Step(test.duration)
@@ -1640,7 +1644,7 @@ var (
 		queue.AddUnschedulableIfNotPresent(logger, pInfo, 1)
 	}
 	addUnschedulablePodBackToBackoffQ = func(logger klog.Logger, queue *PriorityQueue, pInfo *framework.QueuedPodInfo) {
-		queue.AddUnschedulableIfNotPresent(logger, pInfo, -1)
+		queue.AddUnschedulableIfNotPresent(logger, pInfo, 1)
 	}
 	addPodActiveQ = func(logger klog.Logger, queue *PriorityQueue, pInfo *framework.QueuedPodInfo) {
 		queue.activeQ.Add(pInfo)
@@ -2171,13 +2175,15 @@ func TestPerPodSchedulingMetrics(t *testing.T) {
 
 func TestIncomingPodsMetrics(t *testing.T) {
 	timestamp := time.Now()
+	unschedulablePlg := "unschedulable_plugin"
 	metrics.Register()
 	var pInfos = make([]*framework.QueuedPodInfo, 0, 3)
 	for i := 1; i <= 3; i++ {
 		p := &framework.QueuedPodInfo{
 			PodInfo: mustNewTestPodInfo(t,
 				st.MakePod().Name(fmt.Sprintf("test-pod-%d", i)).Namespace(fmt.Sprintf("ns%d", i)).UID(fmt.Sprintf("tp-%d", i)).Obj()),
-			Timestamp: timestamp,
+			Timestamp:            timestamp,
+			UnschedulablePlugins: sets.New(unschedulablePlg),
 		}
 		pInfos = append(pInfos, p)
 	}
