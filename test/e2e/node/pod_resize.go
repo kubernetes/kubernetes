@@ -429,7 +429,7 @@ func waitForPodResizeActuation(c clientset.Interface, podClient *e2epod.PodClien
 			if err != nil {
 				return nil, err
 			}
-			if verifyPodAllocations(pod, expectedContainers, false) == false {
+			if !verifyPodAllocations(pod, expectedContainers, false) {
 				continue
 			}
 			return pod, nil
@@ -438,7 +438,7 @@ func waitForPodResizeActuation(c clientset.Interface, podClient *e2epod.PodClien
 	}
 	waitContainerCgroupValuesEqualsExpected := func() error {
 		for start := time.Now(); time.Since(start) < PollTimeout; time.Sleep(PollInterval) {
-			if verifyPodContainersCgroupValues(patchedPod, expectedContainers, false) == false {
+			if !verifyPodContainersCgroupValues(patchedPod, expectedContainers, false) {
 				continue
 			}
 			return nil

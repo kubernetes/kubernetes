@@ -194,15 +194,15 @@ func verifyDiskFormat(ctx context.Context, client clientset.Interface, nodeName 
 	}
 	isDiskFormatCorrect := false
 	if diskFormat == "eagerzeroedthick" {
-		if eagerlyScrub == true && thinProvisioned == false {
+		if eagerlyScrub && !thinProvisioned {
 			isDiskFormatCorrect = true
 		}
 	} else if diskFormat == "zeroedthick" {
-		if eagerlyScrub == false && thinProvisioned == false {
+		if !eagerlyScrub && !thinProvisioned {
 			isDiskFormatCorrect = true
 		}
 	} else if diskFormat == "thin" {
-		if eagerlyScrub == false && thinProvisioned == true {
+		if !eagerlyScrub && thinProvisioned {
 			isDiskFormatCorrect = true
 		}
 	}

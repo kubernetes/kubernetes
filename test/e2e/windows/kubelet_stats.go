@@ -224,7 +224,7 @@ func findWindowsNode(ctx context.Context, f *framework.Framework) (v1.Node, erro
 		}
 	}
 
-	if foundNode == false {
+	if !foundNode {
 		e2eskipper.Skipf("Could not find and ready and schedulable Windows nodes")
 	}
 

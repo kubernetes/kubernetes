@@ -726,7 +726,7 @@ func (v *podStartVerifier) Verify(event watch.Event) error {
 	}
 
 	if status := e2epod.FindContainerStatusInPod(pod, "blocked"); status != nil {
-		if (status.Started != nil && *status.Started == true) || status.LastTerminationState.Terminated != nil || status.State.Waiting == nil {
+		if (status.Started != nil && *status.Started) || status.LastTerminationState.Terminated != nil || status.State.Waiting == nil {
 			return fmt.Errorf("pod %s on node %s should not have started the blocked container: %#v", pod.Name, pod.Spec.NodeName, status)
 		}
 	}

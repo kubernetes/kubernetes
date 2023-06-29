@@ -354,7 +354,7 @@ func copyFileLogs(ctx context.Context, w io.Writer, services []string) {
 // in that order stopping on first success.
 func heuristicsCopyFileLogs(ctx context.Context, w io.Writer, service string) {
 	logFileNames := [3]string{
-		fmt.Sprintf("%s", service),
+		service,
 		fmt.Sprintf("%s.log", service),
 		fmt.Sprintf("%s/%s.log", service, service),
 	}
