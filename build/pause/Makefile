@@ -122,14 +122,17 @@ bin/wincat-windows-${ARCH}: windows/wincat/wincat.go
 
 container: .container-${OS}-$(ARCH)
 .container-linux-$(ARCH): bin/$(BIN)-$(OS)-$(ARCH)
-	docker buildx build --pull --output=type=${OUTPUT_TYPE} --platform ${OS}/$(ARCH) \
+	docker buildx build --provenance=false --sbom=false --pull --output=type=${OUTPUT_TYPE} --platform ${OS}/$(ARCH) \
 		-t $(IMAGE):$(TAG)-${OS}-$(ARCH) --build-arg BASE=${BASE} --build-arg ARCH=$(ARCH) .
 	touch $@
 
 .container-windows-$(ARCH): $(foreach binary, ${BIN}, bin/${binary}-${OS}-${ARCH})
-	docker buildx build --pull --output=type=${OUTPUT_TYPE} --platform ${OS}/$(ARCH) \
+	docker builder rm windows-builder || true
+	docker builder create --name windows-builder --platform windows/amd64
+	docker buildx build --builder=windows-builder --provenance=false --sbom=false --pull --output=type=${OUTPUT_TYPE} --platform ${OS}/$(ARCH) \
 		-t $(IMAGE):$(TAG)-${OS}-$(ARCH)-${OSVERSION} --build-arg BASE=${BASE}-windows-${OSVERSION}-${ARCH} --build-arg ARCH=$(ARCH) -f Dockerfile_windows .
 	touch $@
+	docker builder rm windows-builder || true
 
 # Useful for testing, not automatically included in container image
 orphan: bin/orphan-linux-$(ARCH)
