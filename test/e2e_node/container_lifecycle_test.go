@@ -845,7 +845,7 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 			framework.ExpectNoError(results.StartsBefore(restartableInit2, init3))
 		})
 
-		ginkgo.It("should run both restartable init cotnainers and third init container together", func() {
+		ginkgo.It("should run both restartable init containers and third init container together", func() {
 			framework.ExpectNoError(results.RunTogether(restartableInit2, restartableInit1))
 			framework.ExpectNoError(results.RunTogether(restartableInit1, init3))
 			framework.ExpectNoError(results.RunTogether(restartableInit2, init3))
@@ -856,7 +856,7 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 			framework.ExpectNoError(results.ExitsBefore(init3, regular1))
 		})
 
-		ginkgo.It("should run both restartable init cotnainers and a regular container together", func() {
+		ginkgo.It("should run both restartable init containers and a regular container together", func() {
 			framework.ExpectNoError(results.RunTogether(restartableInit1, regular1))
 			framework.ExpectNoError(results.RunTogether(restartableInit2, regular1))
 		})
@@ -1249,7 +1249,6 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 			ginkgo.It("should be running restartable init container and a failed Init container in parallel", func() {
 				framework.ExpectNoError(results.RunTogether(restartableInit1, init1))
 			})
-			// TODO: check preStop hooks when they are enabled
 		})
 	})
 
@@ -1661,7 +1660,6 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 			ginkgo.It("should be running restartable init container and a failed Init container in parallel", func() {
 				framework.ExpectNoError(results.RunTogether(restartableInit1, init1))
 			})
-			// TODO: check preStop hooks when they are enabled
 		})
 	})
 
@@ -2075,11 +2073,10 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 			ginkgo.It("should be running restartable init container and a failed Init container in parallel", func() {
 				framework.ExpectNoError(results.RunTogether(restartableInit1, init1))
 			})
-			// TODO: check preStop hooks when they are enabled
 		})
 	})
 
-	ginkgo.It("should launch restartable init cotnainers serially considering the startup probe", func() {
+	ginkgo.It("should launch restartable init containers serially considering the startup probe", func() {
 
 		restartableInit1 := "restartable-init-1"
 		restartableInit2 := "restartable-init-2"
@@ -2158,7 +2155,7 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 		framework.ExpectNoError(results.StartsBefore(restartableInit2, regular1))
 	})
 
-	ginkgo.It("should not launch next container if the restartable init cotnainer failed to complete startup probe", func() {
+	ginkgo.It("should call the container's preStop hook and not launch next container if the restartable init container's startup probe fails", func() {
 
 		restartableInit1 := "restartable-init-1"
 		regular1 := "regular-1"
@@ -2174,16 +2171,30 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 						Name:  restartableInit1,
 						Image: busyboxImage,
 						Command: ExecCommand(restartableInit1, execCommand{
-							StartDelay: 30,
-							Delay:      600,
-							ExitCode:   0,
+							Delay:              600,
+							TerminationSeconds: 15,
+							ExitCode:           0,
 						}),
 						StartupProbe: &v1.Probe{
-							PeriodSeconds:    1,
-							FailureThreshold: 1,
+							InitialDelaySeconds: 5,
+							FailureThreshold:    1,
 							ProbeHandler: v1.ProbeHandler{
 								Exec: &v1.ExecAction{
-									Command: []string{"test", "-f", "started"},
+									Command: []string{
+										"sh",
+										"-c",
+										"exit 1",
+									},
+								},
+							},
+						},
+						Lifecycle: &v1.Lifecycle{
+							PreStop: &v1.LifecycleHandler{
+								Exec: &v1.ExecAction{
+									Command: ExecCommand(prefixedName(PreStopPrefix, restartableInit1), execCommand{
+										Delay:    1,
+										ExitCode: 0,
+									}),
 								},
 							},
 						},
@@ -2208,7 +2219,7 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 		client := e2epod.NewPodClient(f)
 		pod = client.Create(context.TODO(), pod)
 
-		ginkgo.By("Waiting for the restartable init cotnainer to restart")
+		ginkgo.By("Waiting for the restartable init container to restart")
 		err := WaitForPodInitContainerRestartCount(context.TODO(), f.ClientSet, pod.Namespace, pod.Name, 0, 2, 2*time.Minute)
 		framework.ExpectNoError(err)
 
@@ -2222,6 +2233,92 @@ var _ = SIGDescribe("[NodeAlphaFeature:SidecarContainers] Containers Lifecycle "
 		results := parseOutput(pod)
 
 		ginkgo.By("Analyzing results")
+		framework.ExpectNoError(results.RunTogether(restartableInit1, prefixedName(PreStopPrefix, restartableInit1)))
+		framework.ExpectNoError(results.Starts(prefixedName(PreStopPrefix, restartableInit1)))
+		framework.ExpectNoError(results.Exits(restartableInit1))
 		framework.ExpectNoError(results.DoesntStart(regular1))
+	})
+
+	ginkgo.It("should call the container's preStop hook and start the next container if the restartable init container's liveness probe fails", func() {
+
+		restartableInit1 := "restartable-init-1"
+		regular1 := "regular-1"
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "restartable-init-container-failed-startup",
+			},
+			Spec: v1.PodSpec{
+				RestartPolicy: v1.RestartPolicyAlways,
+				InitContainers: []v1.Container{
+					{
+						Name:  restartableInit1,
+						Image: busyboxImage,
+						Command: ExecCommand(restartableInit1, execCommand{
+							Delay:              600,
+							TerminationSeconds: 15,
+							ExitCode:           0,
+						}),
+						LivenessProbe: &v1.Probe{
+							InitialDelaySeconds: 5,
+							FailureThreshold:    1,
+							ProbeHandler: v1.ProbeHandler{
+								Exec: &v1.ExecAction{
+									Command: []string{
+										"sh",
+										"-c",
+										"exit 1",
+									},
+								},
+							},
+						},
+						Lifecycle: &v1.Lifecycle{
+							PreStop: &v1.LifecycleHandler{
+								Exec: &v1.ExecAction{
+									Command: ExecCommand(prefixedName(PreStopPrefix, restartableInit1), execCommand{
+										Delay:    1,
+										ExitCode: 0,
+									}),
+								},
+							},
+						},
+						RestartPolicy: &containerRestartPolicyAlways,
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name:  regular1,
+						Image: busyboxImage,
+						Command: ExecCommand(regular1, execCommand{
+							Delay:    1,
+							ExitCode: 0,
+						}),
+					},
+				},
+			},
+		}
+
+		preparePod(pod)
+
+		client := e2epod.NewPodClient(f)
+		pod = client.Create(context.TODO(), pod)
+
+		ginkgo.By("Waiting for the restartable init container to restart")
+		err := WaitForPodInitContainerRestartCount(context.TODO(), f.ClientSet, pod.Namespace, pod.Name, 0, 2, 2*time.Minute)
+		framework.ExpectNoError(err)
+
+		err = WaitForPodContainerRestartCount(context.TODO(), f.ClientSet, pod.Namespace, pod.Name, 0, 1, 2*time.Minute)
+		framework.ExpectNoError(err)
+
+		pod, err = client.Get(context.TODO(), pod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+
+		results := parseOutput(pod)
+
+		ginkgo.By("Analyzing results")
+		framework.ExpectNoError(results.RunTogether(restartableInit1, prefixedName(PreStopPrefix, restartableInit1)))
+		framework.ExpectNoError(results.Starts(prefixedName(PreStopPrefix, restartableInit1)))
+		framework.ExpectNoError(results.Exits(restartableInit1))
+		framework.ExpectNoError(results.Starts(regular1))
 	})
 })

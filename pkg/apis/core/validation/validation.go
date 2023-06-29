@@ -3241,9 +3241,8 @@ func validateInitContainers(containers []core.Container, regularContainers []cor
 
 		switch {
 		case restartAlways:
-			// TODO: Allow restartable init containers to have a lifecycle hook.
 			if ctr.Lifecycle != nil {
-				allErrs = append(allErrs, field.Forbidden(idxPath.Child("lifecycle"), "may not be set for init containers"))
+				allErrs = append(allErrs, validateLifecycle(ctr.Lifecycle, idxPath.Child("lifecycle"))...)
 			}
 			allErrs = append(allErrs, validateLivenessProbe(ctr.LivenessProbe, idxPath.Child("livenessProbe"))...)
 			allErrs = append(allErrs, validateReadinessProbe(ctr.ReadinessProbe, idxPath.Child("readinessProbe"))...)
@@ -3252,7 +3251,7 @@ func validateInitContainers(containers []core.Container, regularContainers []cor
 		default:
 			// These fields are disallowed for init containers.
 			if ctr.Lifecycle != nil {
-				allErrs = append(allErrs, field.Forbidden(idxPath.Child("lifecycle"), "may not be set for init containers"))
+				allErrs = append(allErrs, field.Forbidden(idxPath.Child("lifecycle"), "may not be set for init containers without restartPolicy=Always"))
 			}
 			if ctr.LivenessProbe != nil {
 				allErrs = append(allErrs, field.Forbidden(idxPath.Child("livenessProbe"), "may not be set for init containers without restartPolicy=Always"))
@@ -3370,8 +3369,10 @@ func validateContainers(containers []core.Container, volumes map[string]core.Vol
 			allNames.Insert(ctr.Name)
 		}
 
-		// These fields are only allowed for regular containers, so only check supported values here.
-		// Init and ephemeral container validation will return field.Forbidden() for these paths.
+		// These fields are allowed for regular containers and restartable init
+		// containers.
+		// Regular init container and ephemeral container validation will return
+		// field.Forbidden() for these paths.
 		if ctr.Lifecycle != nil {
 			allErrs = append(allErrs, validateLifecycle(ctr.Lifecycle, path.Child("lifecycle"))...)
 		}
