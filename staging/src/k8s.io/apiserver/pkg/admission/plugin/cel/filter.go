@@ -167,7 +167,9 @@ func (f *filter) ForInput(ctx context.Context, versionedAttr *admission.Versione
 
 	// composition is an optional feature that only applies for ValidatingAdmissionPolicy.
 	// check if the context allows composition
-	if compositionCtx, ok := ctx.(CompositionContext); ok {
+	var compositionCtx CompositionContext
+	var ok bool
+	if compositionCtx, ok = ctx.(CompositionContext); ok {
 		va.variables = compositionCtx.Variables(va)
 	}
 
@@ -194,6 +196,17 @@ func (f *filter) ForInput(ctx context.Context, versionedAttr *admission.Versione
 		}
 		t1 := time.Now()
 		evalResult, evalDetails, err := compilationResult.Program.ContextEval(ctx, va)
+		// budget may be spent due to lazy evaluation of composited variables
+		if compositionCtx != nil {
+			compositionCost := compositionCtx.GetAndResetCost()
+			if compositionCost > remainingBudget {
+				return nil, -1, &cel.Error{
+					Type:   cel.ErrorTypeInvalid,
+					Detail: fmt.Sprintf("validation failed due to running out of cost budget, no further validation rules will be run"),
+				}
+			}
+			remainingBudget -= compositionCost
+		}
 		elapsed := time.Since(t1)
 		evaluation.Elapsed = elapsed
 		if evalDetails == nil {

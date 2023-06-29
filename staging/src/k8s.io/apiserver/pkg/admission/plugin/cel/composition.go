@@ -18,6 +18,7 @@ package cel
 
 import (
 	"context"
+	"math"
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
@@ -124,12 +125,14 @@ func (c *CompositionEnv) CreateContext(parent context.Context) CompositionContex
 type CompositionContext interface {
 	context.Context
 	Variables(activation any) ref.Val
+	GetAndResetCost() int64
 }
 
 type compositionContext struct {
 	context.Context
 
-	compositionEnv *CompositionEnv
+	compositionEnv  *CompositionEnv
+	accumulatedCost int64
 }
 
 func (c *compositionContext) Variables(activation any) ref.Val {
@@ -139,6 +142,7 @@ func (c *compositionContext) Variables(activation any) ref.Val {
 			name:       name,
 			result:     result,
 			activation: activation,
+			context:    c,
 		}
 		lazyMap.Append(name, accessor.Callback)
 	}
@@ -150,17 +154,42 @@ func (f *CompositedFilter) ForInput(ctx context.Context, versionedAttr *admissio
 	return f.Filter.ForInput(ctx, versionedAttr, request, optionalVars, runtimeCELCostBudget)
 }
 
+func (c *compositionContext) reportCost(cost int64) {
+	c.accumulatedCost += cost
+}
+
+func (c *compositionContext) GetAndResetCost() int64 {
+	cost := c.accumulatedCost
+	c.accumulatedCost = 0
+	return cost
+}
+
 type variableAccessor struct {
 	name       string
 	result     CompilationResult
 	activation any
+	context    *compositionContext
 }
 
 func (a *variableAccessor) Callback(_ *lazy.MapValue) ref.Val {
 	if a.result.Error != nil {
 		return types.NewErr("composited variable %q fails to compile: %v", a.name, a.result.Error)
 	}
-	v, _, err := a.result.Program.Eval(a.activation)
+
+	v, details, err := a.result.Program.Eval(a.activation)
+	if details == nil {
+		return types.NewErr("unable to get evaluation details of variable %q", a.name)
+	}
+	costPtr := details.ActualCost()
+	if costPtr == nil {
+		return types.NewErr("unable to calculate cost of variable %q", a.name)
+	}
+	cost := int64(*costPtr)
+	if *costPtr > math.MaxInt64 {
+		cost = math.MaxInt64
+	}
+	a.context.reportCost(cost)
+
 	if err != nil {
 		return types.NewErr("composited variable %q fails to evaluate: %v", a.name, err)
 	}
