@@ -274,7 +274,8 @@ func TestControllerSyncJob(t *testing.T) {
 		expectedPodPatches      int
 
 		// features
-		jobReadyPodsEnabled bool
+		jobReadyPodsEnabled  bool
+		podIndexLabelEnabled bool
 	}{
 		"job start": {
 			parallelism:       2,
@@ -781,11 +782,22 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedActive:     2,
 			expectedPodPatches: 2,
 		},
+		"indexed job with podIndexLabel feature enabled": {
+			parallelism:            2,
+			completions:            5,
+			backoffLimit:           6,
+			completionMode:         batch.IndexedCompletion,
+			expectedCreations:      2,
+			expectedActive:         2,
+			expectedCreatedIndexes: sets.New(0, 1),
+			podIndexLabelEnabled:   true,
+		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobReadyPods, tc.jobReadyPodsEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodIndexLabel, tc.podIndexLabelEnabled)()
 
 			// job manager setup
 			clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
