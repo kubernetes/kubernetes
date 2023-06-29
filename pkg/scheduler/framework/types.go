@@ -93,7 +93,6 @@ type ClusterEventWithHint struct {
 // It's called before a Pod gets moved from unschedulableQ to backoffQ or activeQ.
 //
 // - `pod`: the Pod to be enqueued, which is rejected by this plugin in the past.
-// - `event`: By which event the pod will be moved back to schedQ/backoffQ.
 // - `oldObj` `newObj`: the object involved in that event.
 //   - For example, the given event is "Node deleted", the `oldObj` will be that deleted Node.
 //   - `oldObj` is nil if the event is add event.
