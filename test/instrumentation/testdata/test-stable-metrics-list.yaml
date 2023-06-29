@@ -192,6 +192,23 @@
   labels:
   - namespace
   - persistentvolumeclaim
+- name: healthcheck
+  namespace: kubernetes
+  help: This metric records the result of a single healthcheck.
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - name
+  - type
+- name: healthchecks_total
+  namespace: kubernetes
+  help: This metric records the results of all healthcheck.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - name
+  - status
+  - type
 - name: priority_level_seat_utilization
   subsystem: subsystem
   namespace: namespace

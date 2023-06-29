@@ -25,7 +25,7 @@ import (
 const (
 	errNotDirectCall                = "Opts for STABLE metric was not directly passed to new metric function"
 	errPositionalArguments          = "Positional arguments are not supported"
-	errStabilityLevel               = "StabilityLevel should be passed STABLE, ALPHA or removed"
+	errStabilityLevel               = "StabilityLevel should be passed STABLE, BETA, ALPHA or removed"
 	errInvalidNewMetricCall         = "Invalid new metric call, please ensure code compiles"
 	errNonStringAttribute           = "Non string attribute is not supported"
 	errBadVariableAttribute         = "Metric attribute was not correctly set. Please use only global consts in same file"
