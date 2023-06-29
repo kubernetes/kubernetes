@@ -233,7 +233,11 @@ func WaitForPodCondition(ctx context.Context, c clientset.Interface, ns, podName
 				return nil, nil
 			}
 			return func() string {
-				return fmt.Sprintf("expected pod to be %s, got instead:\n%s", conditionDesc, format.Object(pod, 1))
+				logs, err := GetPodLogs(ctx, c, ns, podName, pod.Spec.Containers[0].Name)
+				if err != nil {
+					framework.Logf("Error pulling logs: %v", err)
+				}
+				return fmt.Sprintf("expected pod to be %s, got instead:\n%s\nPhase: %s\nLogs:\n%s", conditionDesc, format.Object(pod, 1), pod.Status.Phase, logs)
 			}, nil
 		}))
 }
