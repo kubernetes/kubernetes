@@ -601,7 +601,7 @@ var _ = metrics.NewCounter(
 `},
 		{
 			testName: "Fail on metric with stability set to function return",
-			err:      fmt.Errorf("testdata/metric.go:9:20: StabilityLevel should be passed STABLE, ALPHA or removed"),
+			err:      fmt.Errorf("testdata/metric.go:9:20: %s", errStabilityLevel),
 			src: `
 package test
 import "k8s.io/component-base/metrics"
@@ -616,7 +616,7 @@ var _ = metrics.NewCounter(
 `},
 		{
 			testName: "error for passing stability as string",
-			err:      fmt.Errorf("testdata/metric.go:6:20: StabilityLevel should be passed STABLE, ALPHA or removed"),
+			err:      fmt.Errorf("testdata/metric.go:6:20: %s", errStabilityLevel),
 			src: `
 package test
 import "k8s.io/component-base/metrics"
@@ -628,7 +628,7 @@ var _ = metrics.NewCounter(
 `},
 		{
 			testName: "error for passing stability as variable",
-			err:      fmt.Errorf("testdata/metric.go:7:20: StabilityLevel should be passed STABLE, ALPHA or removed"),
+			err:      fmt.Errorf("testdata/metric.go:7:20: %s", errStabilityLevel),
 			src: `
 package test
 import "k8s.io/component-base/metrics"
