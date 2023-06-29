@@ -48,10 +48,11 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
+func newQuantity(value int64) resource.Quantity {
+	return *resource.NewQuantity(value, resource.BinarySI)
+}
+
 func TestNodeAllocatableChanged(t *testing.T) {
-	newQuantity := func(value int64) resource.Quantity {
-		return *resource.NewQuantity(value, resource.BinarySI)
-	}
 	for _, test := range []struct {
 		Name           string
 		Changed        bool
@@ -194,6 +195,115 @@ func TestNodeConditionsChanged(t *testing.T) {
 			changed := nodeConditionsChanged(newNode, oldNode)
 			if changed != test.Changed {
 				t.Errorf("Test case %q failed: should be %t, got %t", test.Name, test.Changed, changed)
+			}
+		})
+	}
+}
+
+func TestNodeSchedulingPropertiesChange(t *testing.T) {
+
+	type ClusterEvents []*framework.ClusterEvent
+
+	for _, test := range []struct {
+		Name           string
+		ExpectedEvents ClusterEvents
+		OldNode        v1.Node
+		NewNode        v1.Node
+	}{
+		{
+			Name:           "no allocatable resources changed",
+			ExpectedEvents: nil,
+			OldNode:        v1.Node{Status: v1.NodeStatus{Allocatable: v1.ResourceList{v1.ResourceMemory: newQuantity(1024)}}},
+			NewNode:        v1.Node{Status: v1.NodeStatus{Allocatable: v1.ResourceList{v1.ResourceMemory: newQuantity(1024)}}},
+		},
+		{
+			Name:           "new node has more allocatable resources",
+			ExpectedEvents: ClusterEvents{&queue.NodeAllocatableChange},
+			OldNode:        v1.Node{Status: v1.NodeStatus{Allocatable: v1.ResourceList{v1.ResourceMemory: newQuantity(1024)}}},
+			NewNode:        v1.Node{Status: v1.NodeStatus{Allocatable: v1.ResourceList{v1.ResourceMemory: newQuantity(1024), v1.ResourceStorage: newQuantity(1024)}}},
+		},
+		{
+			Name:           "no labels changed",
+			ExpectedEvents: nil,
+			OldNode:        v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "bar"}}},
+			NewNode:        v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "bar"}}},
+		},
+		{
+			Name:           "new node has more labels",
+			ExpectedEvents: ClusterEvents{&queue.NodeLabelChange},
+			OldNode:        v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "bar"}}},
+			NewNode:        v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "bar", "test": "value"}}},
+		},
+		{
+			Name:           "no taint changed",
+			ExpectedEvents: nil,
+			OldNode:        v1.Node{Spec: v1.NodeSpec{Taints: []v1.Taint{{Key: "key", Value: "value"}}}},
+			NewNode:        v1.Node{Spec: v1.NodeSpec{Taints: []v1.Taint{{Key: "key", Value: "value"}}}},
+		},
+		{
+			Name:           "taint value changed",
+			ExpectedEvents: ClusterEvents{&queue.NodeTaintChange},
+			OldNode:        v1.Node{Spec: v1.NodeSpec{Taints: []v1.Taint{{Key: "key", Value: "value1"}}}},
+			NewNode:        v1.Node{Spec: v1.NodeSpec{Taints: []v1.Taint{{Key: "key", Value: "value2"}}}},
+		},
+		{
+			Name:           "no condition changed",
+			ExpectedEvents: nil,
+			OldNode:        v1.Node{Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeDiskPressure, Status: v1.ConditionTrue}}}},
+			NewNode:        v1.Node{Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeDiskPressure, Status: v1.ConditionTrue}}}},
+		},
+		{
+			Name:           "only LastHeartbeatTime changed",
+			ExpectedEvents: nil,
+			OldNode:        v1.Node{Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeDiskPressure, Status: v1.ConditionTrue, LastHeartbeatTime: metav1.Unix(1, 0)}}}},
+			NewNode:        v1.Node{Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeDiskPressure, Status: v1.ConditionTrue, LastHeartbeatTime: metav1.Unix(2, 0)}}}},
+		},
+		{
+			Name:           "new node has more healthy conditions",
+			ExpectedEvents: ClusterEvents{&queue.NodeConditionChange},
+			OldNode:        v1.Node{Status: v1.NodeStatus{Conditions: []v1.NodeCondition{}}},
+			NewNode:        v1.Node{Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}},
+		},
+		{
+			Name:           "new node has less unhealthy conditions",
+			ExpectedEvents: ClusterEvents{&queue.NodeConditionChange},
+			OldNode:        v1.Node{Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeDiskPressure, Status: v1.ConditionTrue}}}},
+			NewNode:        v1.Node{Status: v1.NodeStatus{Conditions: []v1.NodeCondition{}}},
+		},
+		{
+			Name:           "condition status changed",
+			ExpectedEvents: ClusterEvents{&queue.NodeConditionChange},
+			OldNode:        v1.Node{Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}}}},
+			NewNode:        v1.Node{Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}},
+		},
+		// NOTE: when testing multiple events, it is important to maintain the order of events
+		// in which the nodeSchedulingPropertiesChange function handles them.
+		{
+			Name:           "condition status and taint value changed at the same time",
+			ExpectedEvents: ClusterEvents{&queue.NodeTaintChange, &queue.NodeConditionChange},
+			OldNode: v1.Node{
+				Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}}},
+				Spec:   v1.NodeSpec{Taints: []v1.Taint{{Key: "key", Value: "value1"}}},
+			},
+			NewNode: v1.Node{
+				Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}},
+				Spec:   v1.NodeSpec{Taints: []v1.Taint{{Key: "key", Value: "value2"}}},
+			},
+		},
+	} {
+		t.Run(test.Name, func(t *testing.T) {
+			events := nodeSchedulingPropertiesChange(&test.NewNode, &test.OldNode)
+			expectLen := len(test.ExpectedEvents)
+			rtnLen := len(events)
+			if expectLen != rtnLen {
+				t.Errorf("Expected nodeSchedulingPropertiesChange events len: %d, got: %d", expectLen, rtnLen)
+			}
+			if rtnLen != 0 && rtnLen == expectLen {
+				for idx := range events {
+					if events[idx] != test.ExpectedEvents[idx] {
+						t.Errorf("Expected nodeSchedulingPropertiesChange events: %v, got: %v", test.ExpectedEvents, events)
+					}
+				}
 			}
 		})
 	}
