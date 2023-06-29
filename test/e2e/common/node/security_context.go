@@ -72,7 +72,7 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 		}
 
-		ginkgo.It("must create the user namespace if set to false [LinuxOnly] [Feature:UserNamespacesStatelessPodsSupport]", func(ctx context.Context) {
+		ginkgo.It("must create the user namespace if set to false [LinuxOnly] [Feature:UserNamespacesSupport]", func(ctx context.Context) {
 			// with hostUsers=false the pod must use a new user namespace
 			podClient := e2epod.PodClientNS(f, f.Namespace.Name)
 
@@ -110,7 +110,7 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 		})
 
-		ginkgo.It("must not create the user namespace if set to true [LinuxOnly] [Feature:UserNamespacesStatelessPodsSupport]", func(ctx context.Context) {
+		ginkgo.It("must not create the user namespace if set to true [LinuxOnly] [Feature:UserNamespacesSupport]", func(ctx context.Context) {
 			// with hostUsers=true the pod must use the host user namespace
 			pod := makePod(true)
 			// When running in the host's user namespace, the /proc/self/uid_map file content looks like:
@@ -121,7 +121,7 @@ var _ = SIGDescribe("Security Context", func() {
 			})
 		})
 
-		ginkgo.It("should mount all volumes with proper permissions with hostUsers=false [LinuxOnly] [Feature:UserNamespacesStatelessPodsSupport]", func(ctx context.Context) {
+		ginkgo.It("should mount all volumes with proper permissions with hostUsers=false [LinuxOnly] [Feature:UserNamespacesSupport]", func(ctx context.Context) {
 			// Create all volume types supported: configmap, secret, downwardAPI, projected.
 
 			// Create configmap.
@@ -245,7 +245,7 @@ var _ = SIGDescribe("Security Context", func() {
 			})
 		})
 
-		ginkgo.It("should set FSGroup to user inside the container with hostUsers=false [LinuxOnly] [Feature:UserNamespacesStatelessPodsSupport]", func(ctx context.Context) {
+		ginkgo.It("should set FSGroup to user inside the container with hostUsers=false [LinuxOnly] [Feature:UserNamespacesSupport]", func(ctx context.Context) {
 			// Create configmap.
 			name := "userns-volumes-test-" + string(uuid.NewUUID())
 			configMap := newConfigMap(f, name)
