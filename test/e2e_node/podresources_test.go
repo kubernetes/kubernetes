@@ -903,6 +903,14 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 			gomega.Expect(errLimitExceededCount).ToNot(gomega.BeZero(), "never hit the rate limit trying %d calls in %v", tries, elapsed)
 
 			framework.Logf("got %d/%d rate limit errors, at least one needed, the more the better", errLimitExceededCount, tries)
+
+			// this is not needed for this test. We're done. But we need to play nice with *other* tests which may run just after,
+			// and which need to query the API. If they run "too fast", they can still be throttled because the throttling period
+			// is not exhausted yet, yielding false negatives, leading to flakes.
+			// We can't reset the period for the rate limit, we just wait "long enough" to make sure we absorb the burst
+			// and other queries are not rejected because happening to soon
+			ginkgo.By("Cooling down to reset the podresources API rate limit")
+			time.Sleep(5 * time.Second)
 		})
 	})
 })
