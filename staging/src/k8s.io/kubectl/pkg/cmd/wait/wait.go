@@ -250,14 +250,14 @@ func processJSONPathInput(jsonPathInput []string) (string, string, error) {
 	if err != nil {
 		return "", "", err
 	}
-	if len(jsonPathInput) > 1 {
-		jsonPathValue := jsonPathInput[1]
-		if jsonPathValue == "" {
-			return "", "", errors.New("jsonpath wait value cannot be empty")
-		}
-		return relaxedJSONPathExp, strings.Trim(jsonPathValue, `'"`), nil
+	if len(jsonPathInput) == 1 {
+		return relaxedJSONPathExp, "", nil
 	}
-	return relaxedJSONPathExp, "", nil
+	jsonPathValue := strings.Trim(jsonPathInput[1], `'"`)
+	if jsonPathValue == "" {
+		return "", "", errors.New("jsonpath wait has to have a value after equal sign, like --for=jsonpath='{.status.readyReplicas}'=3")
+	}
+	return relaxedJSONPathExp, jsonPathValue, nil
 }
 
 // ResourceLocation holds the location of a resource

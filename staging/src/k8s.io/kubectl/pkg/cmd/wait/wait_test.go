@@ -1556,13 +1556,13 @@ func TestWaitForJSONPathBadConditionParsing(t *testing.T) {
 		{
 			name:        "undefined value",
 			condition:   "jsonpath={.metadata.name}=",
-			expectedErr: "jsonpath wait value cannot be empty",
+			expectedErr: "jsonpath wait has to have a value after equal sign, like --for=jsonpath='{.status.readyReplicas}'=3",
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			_, err := conditionFuncFor(test.condition, io.Discard)
-			if err == nil {
+			if err == nil && test.expectedErr != "" {
 				t.Fatalf("expected %q, got empty", test.expectedErr)
 			}
 			if !strings.Contains(err.Error(), test.expectedErr) {
