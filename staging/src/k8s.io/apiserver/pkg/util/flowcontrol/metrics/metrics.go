@@ -241,13 +241,24 @@ var (
 		},
 		[]string{priorityLevel, flowSchema},
 	)
-	apiserverRequestConcurrencyInUse = compbasemetrics.NewGaugeVec(
+	apiserverCurrentExecutingSeats = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
 			Namespace:      namespace,
 			Subsystem:      subsystem,
-			Name:           "request_concurrency_in_use",
+			Name:           "current_executing_seats",
 			Help:           "Concurrency (number of seats) occupied by the currently executing (initial stage for a WATCH, any stage otherwise) requests in the API Priority and Fairness subsystem",
 			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{priorityLevel, flowSchema},
+	)
+	apiserverRequestConcurrencyInUse = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
+			Namespace:         namespace,
+			Subsystem:         subsystem,
+			Name:              "request_concurrency_in_use",
+			Help:              "Concurrency (number of seats) occupied by the currently executing (initial stage for a WATCH, any stage otherwise) requests in the API Priority and Fairness subsystem",
+			DeprecatedVersion: "1.28.0",
+			StabilityLevel:    compbasemetrics.ALPHA,
 		},
 		[]string{priorityLevel, flowSchema},
 	)
@@ -444,6 +455,7 @@ var (
 		apiserverRequestQueueLength,
 		apiserverRequestConcurrencyLimit,
 		apiserverRequestConcurrencyInUse,
+		apiserverCurrentExecutingSeats,
 		apiserverCurrentExecutingRequests,
 		apiserverRequestWaitingSeconds,
 		apiserverRequestExecutionSeconds,
@@ -523,9 +535,10 @@ func SetDispatchMetrics(priorityLevel string, r, s, sMin, sMax, discountedSMin, 
 	apiserverNextDiscountedSBounds.WithLabelValues(priorityLevel, "max").Set(discountedSMax)
 }
 
-// AddRequestConcurrencyInUse adds the given delta to the gauge of concurrency in use by
+// AddSeatConcurrencyInUse adds the given delta to the gauge of seats in use by
 // the currently executing requests of the given flowSchema and priorityLevel
-func AddRequestConcurrencyInUse(priorityLevel, flowSchema string, delta int) {
+func AddSeatConcurrencyInUse(priorityLevel, flowSchema string, delta int) {
+	apiserverCurrentExecutingSeats.WithLabelValues(priorityLevel, flowSchema).Add(float64(delta))
 	apiserverRequestConcurrencyInUse.WithLabelValues(priorityLevel, flowSchema).Add(float64(delta))
 }
 

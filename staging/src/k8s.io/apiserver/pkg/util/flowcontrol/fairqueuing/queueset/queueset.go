@@ -726,7 +726,7 @@ func (qs *queueSet) dispatchSansQueueLocked(ctx context.Context, workEstimate *f
 	qs.totRequestsExecuting++
 	qs.totSeatsInUse += req.MaxSeats()
 	metrics.AddRequestsExecuting(ctx, qs.qCfg.Name, fsName, 1)
-	metrics.AddRequestConcurrencyInUse(qs.qCfg.Name, fsName, req.MaxSeats())
+	metrics.AddSeatConcurrencyInUse(qs.qCfg.Name, fsName, req.MaxSeats())
 	qs.reqsGaugePair.RequestsExecuting.Add(1)
 	qs.execSeatsGauge.Add(float64(req.MaxSeats()))
 	qs.seatDemandIntegrator.Set(float64(qs.totSeatsInUse + qs.totSeatsWaiting))
@@ -771,7 +771,7 @@ func (qs *queueSet) dispatchLocked() bool {
 	queue.requestsExecuting++
 	queue.seatsInUse += request.MaxSeats()
 	metrics.AddRequestsExecuting(request.ctx, qs.qCfg.Name, request.fsName, 1)
-	metrics.AddRequestConcurrencyInUse(qs.qCfg.Name, request.fsName, request.MaxSeats())
+	metrics.AddSeatConcurrencyInUse(qs.qCfg.Name, request.fsName, request.MaxSeats())
 	qs.reqsGaugePair.RequestsExecuting.Add(1)
 	qs.execSeatsGauge.Add(float64(request.MaxSeats()))
 	qs.seatDemandIntegrator.Set(float64(qs.totSeatsInUse + qs.totSeatsWaiting))
@@ -935,7 +935,7 @@ func (qs *queueSet) finishRequestLocked(r *request) {
 		defer qs.removeQueueIfEmptyLocked(r)
 
 		qs.totSeatsInUse -= r.MaxSeats()
-		metrics.AddRequestConcurrencyInUse(qs.qCfg.Name, r.fsName, -r.MaxSeats())
+		metrics.AddSeatConcurrencyInUse(qs.qCfg.Name, r.fsName, -r.MaxSeats())
 		qs.execSeatsGauge.Add(-float64(r.MaxSeats()))
 		qs.seatDemandIntegrator.Set(float64(qs.totSeatsInUse + qs.totSeatsWaiting))
 		if r.queue != nil {
