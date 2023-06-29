@@ -1532,7 +1532,7 @@ func (p *podWorkers) SyncKnownPods(desiredPods []*v1.Pod) map[types.UID]PodWorke
 	p.podsSynced = true
 	for uid, status := range p.podSyncStatuses {
 		// We retain the worker history of any pod that is still desired according to
-		// its UID. However, there are ]two scenarios during a sync that result in us
+		// its UID. However, there are two scenarios during a sync that result in us
 		// needing to purge the history:
 		//
 		// 1. The pod is no longer desired (the local version is orphaned)
