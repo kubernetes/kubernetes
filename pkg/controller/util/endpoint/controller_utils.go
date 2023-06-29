@@ -185,7 +185,7 @@ func GetServicesToUpdateOnPodChange(serviceLister v1listers.ServiceLister, old, 
 	if labelsChanged {
 		oldServices, err := GetPodServiceMemberships(serviceLister, oldPod)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("unable to get pod %s/%s's service memberships: %v", newPod.Namespace, newPod.Name, err))
+			utilruntime.HandleError(fmt.Errorf("unable to get pod %s/%s's service memberships: %v", oldPod.Namespace, oldPod.Name, err))
 		}
 		services = determineNeededServiceUpdates(oldServices, services, podChanged)
 	}
