@@ -115,6 +115,8 @@ func setupCNI(host, workspace string) error {
 func configureCredentialProvider(host, workspace string) error {
 	klog.V(2).Infof("Configuring kubelet credential provider on %q", host)
 
+	klog.V(2).Infof(">>>> GetSSHUser: %q", GetSSHUser())
+	klog.V(2).Infof(">>>> *sshEnv: %q", *sshEnv)
 	credentialProviderConfig := credentialGCPProviderConfig
 	if GetSSHUser() == "ec2-user" {
 		credentialProviderConfig = credentialAWSProviderConfig
