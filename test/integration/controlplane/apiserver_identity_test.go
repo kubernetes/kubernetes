@@ -98,7 +98,9 @@ func TestCreateLeaseOnStart(t *testing.T) {
 		}
 
 		lease := leases.Items[0]
-		if lease.Name != expectedAPIServerIdentity(t, hostname) {
+		// we skip last 4 chars in lease.Name for validation since these are a part of randomly generated suffix
+		// to ensure unique names/IDs across apiservers that can exist on the same host during upgrade/downgrade
+		if lease.Name[:len(lease.Name)-4] != expectedAPIServerIdentity(t, hostname) {
 			return false, fmt.Errorf("unexpected apiserver identity, got: %v, expected: %v", lease.Name, expectedAPIServerIdentity(t, hostname))
 		}
 

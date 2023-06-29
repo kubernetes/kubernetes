@@ -389,7 +389,11 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		}
 
 		hash := sha256.Sum256(hashData)
-		id = "apiserver-" + strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(hash[:16]))
+		// random 4 digit uuid at the end is added to ensure unique IDs for apiservers especially for
+		// cases when there could be multiple apiservers at varying versions. Just using hostname in that case
+		// will lead to both apiservers having same ID
+		randsuffix := uuid.NewString()[:4]
+		id = "apiserver-" + strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(hash[:16])) + randsuffix
 	}
 	lifecycleSignals := newLifecycleSignals()
 
