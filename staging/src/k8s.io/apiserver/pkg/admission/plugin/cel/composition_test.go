@@ -54,6 +54,7 @@ func TestCompositedPolicies(t *testing.T) {
 		expectedResult       any
 		expectErr            bool
 		expectedErrorMessage string
+		runtimeCostBudget    int64
 	}{
 		{
 			name: "simple",
@@ -93,6 +94,34 @@ func TestCompositedPolicies(t *testing.T) {
 			expectErr:            true,
 			expectedErrorMessage: `composited variable "name" fails to evaluate:`,
 		},
+		{
+			name: "out of budget during lazy evaluation",
+			variables: []NamedExpressionAccessor{
+				&testVariable{
+					name:       "name",
+					expression: "object.metadata.name", // cost = 3
+				},
+			},
+			attributes:           endpointCreateAttributes(),
+			expression:           "variables.name == 'endpoints1'", // cost = 3
+			expectedResult:       true,
+			runtimeCostBudget:    4, // enough for main variable but not for entire expression
+			expectErr:            true,
+			expectedErrorMessage: "running out of cost budget",
+		},
+		{
+			name: "lazy evaluation, budget counts only once",
+			variables: []NamedExpressionAccessor{
+				&testVariable{
+					name:       "name",
+					expression: "object.metadata.name", // cost = 3
+				},
+			},
+			attributes:        endpointCreateAttributes(),
+			expression:        "variables.name == 'endpoints1' && variables.name == 'endpoints1' ", // cost = 7
+			expectedResult:    true,
+			runtimeCostBudget: 10, // enough for one lazy evaluation but not two, should pass
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -108,16 +137,21 @@ func TestCompositedPolicies(t *testing.T) {
 				t.Fatal(err)
 			}
 			optionalVars := OptionalVariableBindings{}
-			result, remainingBudget, err := f.ForInput(context.Background(), versionedAttr, CreateAdmissionRequest(versionedAttr.Attributes), optionalVars, celconfig.RuntimeCELCostBudget)
+			costBudget := tc.runtimeCostBudget
+			if costBudget == 0 {
+				costBudget = celconfig.RuntimeCELCostBudget
+			}
+			result, _, err := f.ForInput(context.Background(), versionedAttr, CreateAdmissionRequest(versionedAttr.Attributes), optionalVars, costBudget)
 			if !tc.expectErr && err != nil {
 				t.Fatalf("failed evaluation: %v", err)
 			}
-			_ = remainingBudget
-			if len(result) == 0 {
+			if !tc.expectErr && len(result) == 0 {
 				t.Fatal("unexpected empty result")
 			}
+			if err == nil {
+				err = result[0].Error
+			}
 			if tc.expectErr {
-				err := result[0].Error
 				if err == nil {
 					t.Fatal("unexpected no error")
 				}
@@ -126,7 +160,7 @@ func TestCompositedPolicies(t *testing.T) {
 				}
 				return
 			}
-			if result[0].Error != nil {
+			if err != nil {
 				t.Fatalf("failed validation: %v", result[0].Error)
 			}
 			if tc.expectedResult != result[0].EvalResult.Value() {
