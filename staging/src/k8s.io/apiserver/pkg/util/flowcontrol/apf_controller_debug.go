@@ -75,22 +75,6 @@ func (cfgCtlr *configController) dumpPriorityLevels(w http.ResponseWriter, r *ht
 			continue
 		}
 
-		if plState.queues == nil {
-			tabPrint(tabWriter, row(
-				plState.pl.Name, // 1
-				"<none>",        // 2
-				"<none>",        // 3
-				"<none>",        // 4
-				"<none>",        // 5
-				"<none>",        // 6
-				"<none>",        // 7
-				"<none>",        // 8
-				"<none>",        // 9
-				"<none>",        // 10
-			))
-			endLine(tabWriter)
-			continue
-		}
 		queueSetDigest := plState.queues.Dump(false)
 		activeQueueNum := 0
 		for _, q := range queueSetDigest.Queues {
@@ -134,21 +118,6 @@ func (cfgCtlr *configController) dumpQueues(w http.ResponseWriter, r *http.Reque
 	tabPrint(tabWriter, rowForHeaders(columnHeaders))
 	endLine(tabWriter)
 	for _, plState := range cfgCtlr.priorityLevelStates {
-		if plState.queues == nil {
-			tabPrint(tabWriter, row(
-				plState.pl.Name, // 1
-				"<none>",        // 2
-				"<none>",        // 3
-				"<none>",        // 4
-				"<none>",        // 5
-				"<none>",        // 6
-				"<none>",        // 7
-				"<none>",        // 8
-				"<none>",        // 9
-			))
-			endLine(tabWriter)
-			continue
-		}
 		queueSetDigest := plState.queues.Dump(false)
 		for i, q := range queueSetDigest.Queues {
 			tabPrint(tabWriter, row(
@@ -201,9 +170,6 @@ func (cfgCtlr *configController) dumpRequests(w http.ResponseWriter, r *http.Req
 	}
 	endLine(tabWriter)
 	for _, plState := range cfgCtlr.priorityLevelStates {
-		if plState.queues == nil {
-			continue
-		}
 		queueSetDigest := plState.queues.Dump(includeRequestDetails)
 		for iq, q := range queueSetDigest.Queues {
 			for ir, r := range q.Requests {

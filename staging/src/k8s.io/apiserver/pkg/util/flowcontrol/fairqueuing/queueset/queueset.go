@@ -197,7 +197,7 @@ func (qsf *queueSetFactory) BeginConstruction(qCfg fq.QueuingConfig, reqsGaugePa
 // calls for one, and returns a non-nil error if the given config is
 // invalid.
 func checkConfig(qCfg fq.QueuingConfig) (*shufflesharding.Dealer, error) {
-	if qCfg.DesiredNumQueues == 0 {
+	if qCfg.DesiredNumQueues <= 0 {
 		return nil, nil
 	}
 	dealer, err := shufflesharding.NewDealer(qCfg.DesiredNumQueues, qCfg.HandSize)
@@ -280,8 +280,8 @@ func (qs *queueSet) setConfiguration(ctx context.Context, qCfg fq.QueuingConfig,
 		qll *= qCfg.DesiredNumQueues
 	}
 	qs.reqsGaugePair.RequestsWaiting.SetDenominator(float64(qll))
-	qs.reqsGaugePair.RequestsExecuting.SetDenominator(float64(dCfg.ConcurrencyLimit))
-	qs.execSeatsGauge.SetDenominator(float64(dCfg.ConcurrencyLimit))
+	qs.reqsGaugePair.RequestsExecuting.SetDenominator(float64(dCfg.ConcurrencyDenominator))
+	qs.execSeatsGauge.SetDenominator(float64(dCfg.ConcurrencyDenominator))
 
 	qs.dispatchAsMuchAsPossibleLocked()
 }
@@ -796,6 +796,9 @@ func (qs *queueSet) dispatchLocked() bool {
 // otherwise it returns false.
 func (qs *queueSet) canAccommodateSeatsLocked(seats int) bool {
 	switch {
+	case qs.qCfg.DesiredNumQueues < 0:
+		// This is code for exemption from limitation
+		return true
 	case seats > qs.dCfg.ConcurrencyLimit:
 		// we have picked the queue with the minimum virtual finish time, but
 		// the number of seats this request asks for exceeds the concurrency limit.
