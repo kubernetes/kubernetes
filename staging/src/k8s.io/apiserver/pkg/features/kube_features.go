@@ -111,6 +111,13 @@ const (
 
 	// owner: @aramase
 	// kep: https://kep.k8s.io/3299
+	// deprecated: v1.28
+	//
+	// Enables KMS v1 API for encryption at rest.
+	KMSv1 featuregate.Feature = "KMSv1"
+
+	// owner: @aramase
+	// kep: https://kep.k8s.io/3299
 	// alpha: v1.25
 	// beta: v1.27
 	//
@@ -231,6 +238,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CustomResourceValidationExpressions: {Default: true, PreRelease: featuregate.Beta},
 
 	EfficientWatchResumption: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+
+	KMSv1: {Default: true, PreRelease: featuregate.Deprecated},
 
 	KMSv2: {Default: true, PreRelease: featuregate.Beta},
 
