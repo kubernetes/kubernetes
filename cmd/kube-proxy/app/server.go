@@ -572,7 +572,18 @@ func newProxyServer(config *kubeproxyconfig.KubeProxyConfiguration, master strin
 		return nil, err
 	}
 
-	s.Proxier, err = s.createProxier(config)
+	ipv4Supported, ipv6Supported, dualStackSupported, err := s.platformCheckSupported()
+	if err != nil {
+		return nil, err
+	} else if (s.PrimaryIPFamily == v1.IPv4Protocol && !ipv4Supported) || (s.PrimaryIPFamily == v1.IPv6Protocol && !ipv6Supported) {
+		return nil, fmt.Errorf("no support for primary IP family %q", s.PrimaryIPFamily)
+	} else if dualStackSupported {
+		klog.InfoS("kube-proxy running in dual-stack mode", "primary ipFamily", s.PrimaryIPFamily)
+	} else {
+		klog.InfoS("kube-proxy running in single-stack mode", "ipFamily", s.PrimaryIPFamily)
+	}
+
+	s.Proxier, err = s.createProxier(config, dualStackSupported)
 	if err != nil {
 		return nil, err
 	}

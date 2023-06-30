@@ -30,7 +30,6 @@ import (
 	// Enable pprof HTTP handlers.
 	_ "net/http/pprof"
 
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/winkernel"
@@ -52,26 +51,38 @@ func (s *ProxyServer) platformSetup() error {
 	return nil
 }
 
+// platformCheckSupported is called immediately before creating the Proxier, to check
+// what IP families are supported (and whether the configuration is usable at all).
+func (s *ProxyServer) platformCheckSupported() (ipv4Supported, ipv6Supported, dualStackSupported bool, err error) {
+	// Check if Kernel proxier can be used at all
+	_, err = winkernel.CanUseWinKernelProxier(winkernel.WindowsKernelCompatTester{})
+	if err != nil {
+		return false, false, false, err
+	}
+
+	// winkernel always supports both single-stack IPv4 and single-stack IPv6, but may
+	// not support dual-stack.
+	ipv4Supported = true
+	ipv6Supported = true
+
+	compatTester := winkernel.DualStackCompatTester{}
+	dualStackSupported = compatTester.DualStackCompatible(s.Config.Winkernel.NetworkName)
+
+	return
+}
+
 // createProxier creates the proxy.Provider
-func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguration) (proxy.Provider, error) {
+func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguration, dualStackMode bool) (proxy.Provider, error) {
 	var healthzPort int
 	if len(config.HealthzBindAddress) > 0 {
 		_, port, _ := net.SplitHostPort(config.HealthzBindAddress)
 		healthzPort, _ = strconv.Atoi(port)
 	}
 
-	// Check if Kernel Space can be used.
-	canUseWinKernelProxy, err := winkernel.CanUseWinKernelProxier(winkernel.WindowsKernelCompatTester{})
-	if !canUseWinKernelProxy && err != nil {
-		return nil, err
-	}
-
 	var proxier proxy.Provider
+	var err error
 
-	dualStackMode := getDualStackMode(config.Winkernel.NetworkName, winkernel.DualStackCompatTester{})
 	if dualStackMode {
-		klog.InfoS("Creating dualStackProxier for Windows kernel.")
-
 		proxier, err = winkernel.NewDualStackProxier(
 			config.IPTables.SyncPeriod.Duration,
 			config.IPTables.MinSyncPeriod.Duration,
@@ -101,10 +112,6 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 	}
 
 	return proxier, nil
-}
-
-func getDualStackMode(networkname string, compatTester winkernel.StackCompatTester) bool {
-	return compatTester.DualStackCompatible(networkname)
 }
 
 // cleanupAndExit cleans up after a previous proxy run

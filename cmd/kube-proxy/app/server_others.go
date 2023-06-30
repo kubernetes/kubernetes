@@ -101,8 +101,32 @@ func (s *ProxyServer) platformSetup() error {
 	return nil
 }
 
+// platformCheckSupported is called immediately before creating the Proxier, to check
+// what IP families are supported (and whether the configuration is usable at all).
+func (s *ProxyServer) platformCheckSupported() (ipv4Supported, ipv6Supported, dualStackSupported bool, err error) {
+	execer := exec.New()
+	ipt := utiliptables.New(execer, utiliptables.ProtocolIPv4)
+	ipv4Supported = ipt.Present()
+	ipt = utiliptables.New(execer, utiliptables.ProtocolIPv6)
+	ipv6Supported = ipt.Present()
+
+	// The Linux proxies can always support dual-stack if they can support both IPv4
+	// and IPv6.
+	dualStackSupported = ipv4Supported && ipv6Supported
+
+	if !ipv4Supported && !ipv6Supported {
+		err = fmt.Errorf("iptables is not available on this host")
+	} else if !ipv4Supported {
+		klog.InfoS("No iptables support for family", "ipFamily", v1.IPv4Protocol)
+	} else if !ipv6Supported {
+		klog.InfoS("No iptables support for family", "ipFamily", v1.IPv6Protocol)
+	}
+
+	return
+}
+
 // createProxier creates the proxy.Provider
-func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguration) (proxy.Provider, error) {
+func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguration, dualStack bool) (proxy.Provider, error) {
 	var proxier proxy.Provider
 	var err error
 
@@ -114,7 +138,6 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 	iptInterface := utiliptables.New(execer, primaryProtocol)
 
 	var ipt [2]utiliptables.Interface
-	dualStack := true // While we assume that node supports, we do further checks below
 
 	// Create iptables handlers for both families, one is already created
 	// Always ordered as IPv4, IPv6
@@ -126,12 +149,7 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 		ipt[1] = iptInterface
 	}
 
-	if !ipt[0].Present() {
-		return nil, fmt.Errorf("iptables is not supported for primary IP family %q", primaryProtocol)
-	} else if !ipt[1].Present() {
-		klog.InfoS("kube-proxy running in single-stack mode: secondary ipFamily is not supported", "ipFamily", ipt[1].Protocol())
-		dualStack = false
-
+	if !dualStack {
 		// Validate NodePortAddresses is single-stack
 		npaByFamily := proxyutil.MapCIDRsByIPFamily(config.NodePortAddresses)
 		secondaryFamily := proxyutil.OtherIPFamily(s.PrimaryIPFamily)
@@ -145,8 +163,6 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 		klog.InfoS("Using iptables Proxier")
 
 		if dualStack {
-			klog.InfoS("kube-proxy running in dual-stack mode", "ipFamily", iptInterface.Protocol())
-			klog.InfoS("Creating dualStackProxier for iptables")
 			// Always ordered to match []ipt
 			var localDetectors [2]proxyutiliptables.LocalTrafficDetector
 			localDetectors, err = getDualStackLocalDetectorTuple(config.DetectLocalMode, config, ipt, s.podCIDRs)
@@ -212,8 +228,6 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 
 		klog.InfoS("Using ipvs Proxier")
 		if dualStack {
-			klog.InfoS("Creating dualStackProxier for ipvs")
-
 			// Always ordered to match []ipt
 			var localDetectors [2]proxyutiliptables.LocalTrafficDetector
 			localDetectors, err = getDualStackLocalDetectorTuple(config.DetectLocalMode, config, ipt, s.podCIDRs)
