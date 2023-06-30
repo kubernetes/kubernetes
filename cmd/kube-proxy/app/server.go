@@ -567,6 +567,11 @@ func newProxyServer(config *kubeproxyconfig.KubeProxyConfiguration, master strin
 		s.HealthzServer = healthcheck.NewProxierHealthServer(config.HealthzBindAddress, 2*config.IPTables.SyncPeriod.Duration, s.Recorder, s.NodeRef)
 	}
 
+	err = s.platformSetup()
+	if err != nil {
+		return nil, err
+	}
+
 	s.Proxier, err = s.createProxier(config)
 	if err != nil {
 		return nil, err
@@ -705,12 +710,6 @@ func (s *ProxyServer) Run() error {
 
 	// Start up a metrics server if requested
 	serveMetrics(s.Config.MetricsBindAddress, s.Config.Mode, s.Config.EnableProfiling, errCh)
-
-	// Do platform-specific setup
-	err := s.platformSetup()
-	if err != nil {
-		return err
-	}
 
 	noProxyName, err := labels.NewRequirement(apis.LabelServiceProxyName, selection.DoesNotExist, nil)
 	if err != nil {

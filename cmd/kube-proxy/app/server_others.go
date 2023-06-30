@@ -63,6 +63,8 @@ import (
 // node after it is registered.
 var timeoutForNodePodCIDR = 5 * time.Minute
 
+// platformApplyDefaults is called after parsing command-line flags and/or reading the
+// config file, to apply platform-specific default values to config.
 func (o *Options) platformApplyDefaults(config *proxyconfigapi.KubeProxyConfiguration) {
 	if config.Mode == "" {
 		klog.InfoS("Using iptables proxy")
@@ -76,20 +78,33 @@ func (o *Options) platformApplyDefaults(config *proxyconfigapi.KubeProxyConfigur
 	klog.V(2).InfoS("DetectLocalMode", "localMode", string(config.DetectLocalMode))
 }
 
-// createProxier creates the proxy.Provider
-func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguration) (proxy.Provider, error) {
-	var proxier proxy.Provider
-	var err error
-
-	if config.DetectLocalMode == proxyconfigapi.LocalModeNodeCIDR {
+// platformSetup is called after setting up the ProxyServer, but before creating the
+// Proxier. It should fill in any platform-specific fields and perform other
+// platform-specific setup.
+func (s *ProxyServer) platformSetup() error {
+	if s.Config.DetectLocalMode == proxyconfigapi.LocalModeNodeCIDR {
 		klog.InfoS("Watching for node, awaiting podCIDR allocation", "hostname", s.Hostname)
 		node, err := waitForPodCIDR(s.Client, s.Hostname)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		s.podCIDRs = node.Spec.PodCIDRs
 		klog.InfoS("NodeInfo", "podCIDRs", node.Spec.PodCIDRs)
 	}
+
+	err := s.setupConntrack()
+	if err != nil {
+		return err
+	}
+
+	proxymetrics.RegisterMetrics()
+	return nil
+}
+
+// createProxier creates the proxy.Provider
+func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguration) (proxy.Provider, error) {
+	var proxier proxy.Provider
+	var err error
 
 	primaryProtocol := utiliptables.ProtocolIPv4
 	if s.PrimaryIPFamily == v1.IPv6Protocol {
@@ -271,7 +286,7 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 	return proxier, nil
 }
 
-func (s *ProxyServer) platformSetup() error {
+func (s *ProxyServer) setupConntrack() error {
 	ct := &realConntracker{}
 
 	max, err := getConntrackMax(s.Config.Conntrack)
@@ -311,7 +326,6 @@ func (s *ProxyServer) platformSetup() error {
 		}
 	}
 
-	proxymetrics.RegisterMetrics()
 	return nil
 }
 

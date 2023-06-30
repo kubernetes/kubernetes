@@ -36,10 +36,20 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/winkernel"
 )
 
+// platformApplyDefaults is called after parsing command-line flags and/or reading the
+// config file, to apply platform-specific default values to config.
 func (o *Options) platformApplyDefaults(config *proxyconfigapi.KubeProxyConfiguration) {
 	if config.Mode == "" {
 		config.Mode = proxyconfigapi.ProxyModeKernelspace
 	}
+}
+
+// platformSetup is called after setting up the ProxyServer, but before creating the
+// Proxier. It should fill in any platform-specific fields and perform other
+// platform-specific setup.
+func (s *ProxyServer) platformSetup() error {
+	winkernel.RegisterMetrics()
+	return nil
 }
 
 // createProxier creates the proxy.Provider
@@ -91,11 +101,6 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 	}
 
 	return proxier, nil
-}
-
-func (s *ProxyServer) platformSetup() error {
-	winkernel.RegisterMetrics()
-	return nil
 }
 
 func getDualStackMode(networkname string, compatTester winkernel.StackCompatTester) bool {

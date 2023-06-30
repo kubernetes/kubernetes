@@ -646,7 +646,7 @@ func TestGetConntrackMax(t *testing.T) {
 	}
 }
 
-func TestProxyServer_createProxier(t *testing.T) {
+func TestProxyServer_platformSetup(t *testing.T) {
 	tests := []struct {
 		name         string
 		node         *v1.Node
@@ -683,9 +683,8 @@ func TestProxyServer_createProxier(t *testing.T) {
 					v1.IPv6Protocol: net.IPv6zero,
 				},
 			}
-			_, err := s.createProxier(tt.config)
-			// TODO: mock the exec.Interface to not fail probing iptables
-			if (err != nil) && !strings.Contains(err.Error(), "iptables is not supported for primary IP family") {
+			err := s.platformSetup()
+			if err != nil {
 				t.Errorf("ProxyServer.createProxier() error = %v", err)
 				return
 			}
