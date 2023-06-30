@@ -2103,6 +2103,21 @@ rules:
     source:
       branch: release-1.27
       dir: staging/src/k8s.io/dynamic-resource-allocation
+- destination: endpointslice
+  branches:
+  - name: master
+    dependencies:
+    - repository: api
+      branch: master
+    - repository: apimachinery
+      branch: master
+    - repository: client-go
+      branch: master
+    - repository: component-base
+      branch: master
+    source:
+      branch: master
+      dir: staging/src/k8s.io/endpointslice
 recursive-delete-patterns:
 - '*/.gitattributes'
 default-go-version: 1.20.5
