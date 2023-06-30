@@ -111,8 +111,6 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 		ipt[1] = iptInterface
 	}
 
-	nodePortAddresses := config.NodePortAddresses
-
 	if !ipt[0].Present() {
 		return nil, fmt.Errorf("iptables is not supported for primary IP family %q", primaryProtocol)
 	} else if !ipt[1].Present() {
@@ -125,7 +123,6 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 		badAddrs := npaByFamily[secondaryFamily]
 		if len(badAddrs) > 0 {
 			klog.InfoS("Ignoring --nodeport-addresses of the wrong family", "ipFamily", secondaryFamily, "addresses", badAddrs)
-			nodePortAddresses = npaByFamily[s.PrimaryIPFamily]
 		}
 	}
 
@@ -157,7 +154,7 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 				s.NodeIPs,
 				s.Recorder,
 				s.HealthzServer,
-				nodePortAddresses,
+				config.NodePortAddresses,
 			)
 		} else {
 			// Create a single-stack proxier if and only if the node does not support dual-stack (i.e, no iptables support).
@@ -183,7 +180,7 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 				s.NodeIPs[s.PrimaryIPFamily],
 				s.Recorder,
 				s.HealthzServer,
-				nodePortAddresses,
+				config.NodePortAddresses,
 			)
 		}
 
@@ -230,7 +227,7 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 				s.Recorder,
 				s.HealthzServer,
 				config.IPVS.Scheduler,
-				nodePortAddresses,
+				config.NodePortAddresses,
 				kernelHandler,
 			)
 		} else {
@@ -262,7 +259,7 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 				s.Recorder,
 				s.HealthzServer,
 				config.IPVS.Scheduler,
-				nodePortAddresses,
+				config.NodePortAddresses,
 				kernelHandler,
 			)
 		}
