@@ -109,14 +109,14 @@ func Test_platformApplyDefaults(t *testing.T) {
 
 func Test_getLocalDetector(t *testing.T) {
 	cases := []struct {
-		mode        proxyconfigapi.LocalMode
-		config      *proxyconfigapi.KubeProxyConfiguration
-		ipt         utiliptables.Interface
-		expected    proxyutiliptables.LocalTrafficDetector
-		nodeInfo    *v1.Node
-		errExpected bool
+		mode         proxyconfigapi.LocalMode
+		config       *proxyconfigapi.KubeProxyConfiguration
+		ipt          utiliptables.Interface
+		expected     proxyutiliptables.LocalTrafficDetector
+		nodePodCIDRs []string
+		errExpected  bool
 	}{
-		// LocalModeClusterCIDR, nodeInfo would be nil for these cases
+		// LocalModeClusterCIDR
 		{
 			mode:        proxyconfigapi.LocalModeClusterCIDR,
 			config:      &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: "10.0.0.0/14"},
@@ -154,46 +154,46 @@ func Test_getLocalDetector(t *testing.T) {
 		},
 		// LocalModeNodeCIDR
 		{
-			mode:        proxyconfigapi.LocalModeNodeCIDR,
-			config:      &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: "10.0.0.0/14"},
-			ipt:         utiliptablestest.NewFake(),
-			expected:    resolveLocalDetector(t)(proxyutiliptables.NewDetectLocalByCIDR("10.0.0.0/24", utiliptablestest.NewFake())),
-			nodeInfo:    makeNodeWithPodCIDRs("10.0.0.0/24"),
-			errExpected: false,
+			mode:         proxyconfigapi.LocalModeNodeCIDR,
+			config:       &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: "10.0.0.0/14"},
+			ipt:          utiliptablestest.NewFake(),
+			expected:     resolveLocalDetector(t)(proxyutiliptables.NewDetectLocalByCIDR("10.0.0.0/24", utiliptablestest.NewFake())),
+			nodePodCIDRs: []string{"10.0.0.0/24"},
+			errExpected:  false,
 		},
 		{
-			mode:        proxyconfigapi.LocalModeNodeCIDR,
-			config:      &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: "2002::1234:abcd:ffff:c0a8:101/64"},
-			ipt:         utiliptablestest.NewIPv6Fake(),
-			expected:    resolveLocalDetector(t)(proxyutiliptables.NewDetectLocalByCIDR("2002::1234:abcd:ffff:c0a8:101/96", utiliptablestest.NewIPv6Fake())),
-			nodeInfo:    makeNodeWithPodCIDRs("2002::1234:abcd:ffff:c0a8:101/96"),
-			errExpected: false,
+			mode:         proxyconfigapi.LocalModeNodeCIDR,
+			config:       &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: "2002::1234:abcd:ffff:c0a8:101/64"},
+			ipt:          utiliptablestest.NewIPv6Fake(),
+			expected:     resolveLocalDetector(t)(proxyutiliptables.NewDetectLocalByCIDR("2002::1234:abcd:ffff:c0a8:101/96", utiliptablestest.NewIPv6Fake())),
+			nodePodCIDRs: []string{"2002::1234:abcd:ffff:c0a8:101/96"},
+			errExpected:  false,
 		},
 		{
-			mode:        proxyconfigapi.LocalModeNodeCIDR,
-			config:      &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: "10.0.0.0/14"},
-			ipt:         utiliptablestest.NewIPv6Fake(),
-			expected:    nil,
-			nodeInfo:    makeNodeWithPodCIDRs("10.0.0.0/24"),
-			errExpected: true,
+			mode:         proxyconfigapi.LocalModeNodeCIDR,
+			config:       &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: "10.0.0.0/14"},
+			ipt:          utiliptablestest.NewIPv6Fake(),
+			expected:     nil,
+			nodePodCIDRs: []string{"10.0.0.0/24"},
+			errExpected:  true,
 		},
 		{
-			mode:        proxyconfigapi.LocalModeNodeCIDR,
-			config:      &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: "2002::1234:abcd:ffff:c0a8:101/64"},
-			ipt:         utiliptablestest.NewFake(),
-			expected:    nil,
-			nodeInfo:    makeNodeWithPodCIDRs("2002::1234:abcd:ffff:c0a8:101/96"),
-			errExpected: true,
+			mode:         proxyconfigapi.LocalModeNodeCIDR,
+			config:       &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: "2002::1234:abcd:ffff:c0a8:101/64"},
+			ipt:          utiliptablestest.NewFake(),
+			expected:     nil,
+			nodePodCIDRs: []string{"2002::1234:abcd:ffff:c0a8:101/96"},
+			errExpected:  true,
 		},
 		{
-			mode:        proxyconfigapi.LocalModeNodeCIDR,
-			config:      &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: ""},
-			ipt:         utiliptablestest.NewFake(),
-			expected:    proxyutiliptables.NewNoOpLocalDetector(),
-			nodeInfo:    makeNodeWithPodCIDRs(),
-			errExpected: false,
+			mode:         proxyconfigapi.LocalModeNodeCIDR,
+			config:       &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: ""},
+			ipt:          utiliptablestest.NewFake(),
+			expected:     proxyutiliptables.NewNoOpLocalDetector(),
+			nodePodCIDRs: []string{},
+			errExpected:  false,
 		},
-		// unknown mode, nodeInfo would be nil for these cases
+		// unknown mode
 		{
 			mode:        proxyconfigapi.LocalMode("abcd"),
 			config:      &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: "10.0.0.0/14"},
@@ -201,7 +201,7 @@ func Test_getLocalDetector(t *testing.T) {
 			expected:    proxyutiliptables.NewNoOpLocalDetector(),
 			errExpected: false,
 		},
-		// LocalModeBridgeInterface, nodeInfo and ipt are not needed for these cases
+		// LocalModeBridgeInterface
 		{
 			mode: proxyconfigapi.LocalModeBridgeInterface,
 			config: &proxyconfigapi.KubeProxyConfiguration{
@@ -218,7 +218,7 @@ func Test_getLocalDetector(t *testing.T) {
 			expected:    resolveLocalDetector(t)(proxyutiliptables.NewDetectLocalByBridgeInterface("1234567890123456789")),
 			errExpected: false,
 		},
-		// LocalModeInterfaceNamePrefix, nodeInfo and ipt are not needed for these cases
+		// LocalModeInterfaceNamePrefix
 		{
 			mode: proxyconfigapi.LocalModeInterfaceNamePrefix,
 			config: &proxyconfigapi.KubeProxyConfiguration{
@@ -237,7 +237,7 @@ func Test_getLocalDetector(t *testing.T) {
 		},
 	}
 	for i, c := range cases {
-		r, err := getLocalDetector(c.mode, c.config, c.ipt, c.nodeInfo)
+		r, err := getLocalDetector(c.mode, c.config, c.ipt, c.nodePodCIDRs)
 		if c.errExpected {
 			if err == nil {
 				t.Errorf("Case[%d] Expected error, but succeeded with %v", i, r)
@@ -256,14 +256,14 @@ func Test_getLocalDetector(t *testing.T) {
 
 func Test_getDualStackLocalDetectorTuple(t *testing.T) {
 	cases := []struct {
-		mode        proxyconfigapi.LocalMode
-		config      *proxyconfigapi.KubeProxyConfiguration
-		ipt         [2]utiliptables.Interface
-		expected    [2]proxyutiliptables.LocalTrafficDetector
-		nodeInfo    *v1.Node
-		errExpected bool
+		mode         proxyconfigapi.LocalMode
+		config       *proxyconfigapi.KubeProxyConfiguration
+		ipt          [2]utiliptables.Interface
+		expected     [2]proxyutiliptables.LocalTrafficDetector
+		nodePodCIDRs []string
+		errExpected  bool
 	}{
-		// LocalModeClusterCIDR, nodeInfo would be nil for these cases
+		// LocalModeClusterCIDR
 		{
 			mode:   proxyconfigapi.LocalModeClusterCIDR,
 			config: &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: "10.0.0.0/14,2002::1234:abcd:ffff:c0a8:101/64"},
@@ -315,8 +315,8 @@ func Test_getDualStackLocalDetectorTuple(t *testing.T) {
 			expected: resolveDualStackLocalDetectors(t)(
 				proxyutiliptables.NewDetectLocalByCIDR("10.0.0.0/24", utiliptablestest.NewFake()))(
 				proxyutiliptables.NewDetectLocalByCIDR("2002::1234:abcd:ffff:c0a8:101/96", utiliptablestest.NewIPv6Fake())),
-			nodeInfo:    makeNodeWithPodCIDRs("10.0.0.0/24", "2002::1234:abcd:ffff:c0a8:101/96"),
-			errExpected: false,
+			nodePodCIDRs: []string{"10.0.0.0/24", "2002::1234:abcd:ffff:c0a8:101/96"},
+			errExpected:  false,
 		},
 		{
 			mode:   proxyconfigapi.LocalModeNodeCIDR,
@@ -325,8 +325,8 @@ func Test_getDualStackLocalDetectorTuple(t *testing.T) {
 			expected: resolveDualStackLocalDetectors(t)(
 				proxyutiliptables.NewDetectLocalByCIDR("10.0.0.0/24", utiliptablestest.NewFake()))(
 				proxyutiliptables.NewDetectLocalByCIDR("2002::1234:abcd:ffff:c0a8:101/96", utiliptablestest.NewIPv6Fake())),
-			nodeInfo:    makeNodeWithPodCIDRs("2002::1234:abcd:ffff:c0a8:101/96", "10.0.0.0/24"),
-			errExpected: false,
+			nodePodCIDRs: []string{"2002::1234:abcd:ffff:c0a8:101/96", "10.0.0.0/24"},
+			errExpected:  false,
 		},
 		{
 			mode:   proxyconfigapi.LocalModeNodeCIDR,
@@ -335,8 +335,8 @@ func Test_getDualStackLocalDetectorTuple(t *testing.T) {
 			expected: [2]proxyutiliptables.LocalTrafficDetector{
 				resolveLocalDetector(t)(proxyutiliptables.NewDetectLocalByCIDR("10.0.0.0/24", utiliptablestest.NewFake())),
 				proxyutiliptables.NewNoOpLocalDetector()},
-			nodeInfo:    makeNodeWithPodCIDRs("10.0.0.0/24"),
-			errExpected: false,
+			nodePodCIDRs: []string{"10.0.0.0/24"},
+			errExpected:  false,
 		},
 		{
 			mode:   proxyconfigapi.LocalModeNodeCIDR,
@@ -345,18 +345,18 @@ func Test_getDualStackLocalDetectorTuple(t *testing.T) {
 			expected: [2]proxyutiliptables.LocalTrafficDetector{
 				proxyutiliptables.NewNoOpLocalDetector(),
 				resolveLocalDetector(t)(proxyutiliptables.NewDetectLocalByCIDR("2002::1234:abcd:ffff:c0a8:101/96", utiliptablestest.NewIPv6Fake()))},
-			nodeInfo:    makeNodeWithPodCIDRs("2002::1234:abcd:ffff:c0a8:101/96"),
-			errExpected: false,
+			nodePodCIDRs: []string{"2002::1234:abcd:ffff:c0a8:101/96"},
+			errExpected:  false,
 		},
 		{
-			mode:        proxyconfigapi.LocalModeNodeCIDR,
-			config:      &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: ""},
-			ipt:         [2]utiliptables.Interface{utiliptablestest.NewFake(), utiliptablestest.NewIPv6Fake()},
-			expected:    [2]proxyutiliptables.LocalTrafficDetector{proxyutiliptables.NewNoOpLocalDetector(), proxyutiliptables.NewNoOpLocalDetector()},
-			nodeInfo:    makeNodeWithPodCIDRs(),
-			errExpected: false,
+			mode:         proxyconfigapi.LocalModeNodeCIDR,
+			config:       &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: ""},
+			ipt:          [2]utiliptables.Interface{utiliptablestest.NewFake(), utiliptablestest.NewIPv6Fake()},
+			expected:     [2]proxyutiliptables.LocalTrafficDetector{proxyutiliptables.NewNoOpLocalDetector(), proxyutiliptables.NewNoOpLocalDetector()},
+			nodePodCIDRs: []string{},
+			errExpected:  false,
 		},
-		// LocalModeBridgeInterface, nodeInfo and ipt are not needed for these cases
+		// LocalModeBridgeInterface
 		{
 			mode: proxyconfigapi.LocalModeBridgeInterface,
 			config: &proxyconfigapi.KubeProxyConfiguration{
@@ -367,7 +367,7 @@ func Test_getDualStackLocalDetectorTuple(t *testing.T) {
 				proxyutiliptables.NewDetectLocalByBridgeInterface("eth")),
 			errExpected: false,
 		},
-		// LocalModeInterfaceNamePrefix, nodeInfo and ipt are not needed for these cases
+		// LocalModeInterfaceNamePrefix
 		{
 			mode: proxyconfigapi.LocalModeInterfaceNamePrefix,
 			config: &proxyconfigapi.KubeProxyConfiguration{
@@ -380,7 +380,7 @@ func Test_getDualStackLocalDetectorTuple(t *testing.T) {
 		},
 	}
 	for i, c := range cases {
-		r, err := getDualStackLocalDetectorTuple(c.mode, c.config, c.ipt, c.nodeInfo)
+		r, err := getDualStackLocalDetectorTuple(c.mode, c.config, c.ipt, c.nodePodCIDRs)
 		if c.errExpected {
 			if err == nil {
 				t.Errorf("Case[%d] expected error, but succeeded with %q", i, r)
