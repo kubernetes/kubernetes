@@ -674,6 +674,11 @@ func kmsPrefixTransformer(ctx context.Context, config *apiserverconfig.KMSConfig
 	kmsName := config.Name
 	switch config.APIVersion {
 	case kmsAPIVersionV1:
+		if !utilfeature.DefaultFeatureGate.Enabled(features.KMSv1) {
+			return storagevalue.PrefixTransformer{}, nil, nil, fmt.Errorf("KMSv1 is deprecated and will only receive security updates going forward. Use KMSv2 instead.  Set --feature-gates=KMSv1=true to use the deprecated KMSv1 feature.")
+		}
+		klog.InfoS("KMSv1 is deprecated and will only receive security updates going forward. Use KMSv2 instead.")
+
 		envelopeService, err := envelopeServiceFactory(ctx, config.Endpoint, config.Timeout.Duration)
 		if err != nil {
 			return storagevalue.PrefixTransformer{}, nil, nil, fmt.Errorf("could not configure KMSv1-Plugin's probe %q, error: %w", kmsName, err)
