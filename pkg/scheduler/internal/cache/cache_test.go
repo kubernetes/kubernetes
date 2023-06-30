@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -49,8 +48,10 @@ func deepEqualWithoutGeneration(actual *nodeInfoListItem, expected *framework.No
 	if expected != nil {
 		expected.Generation = 0
 	}
-	if actual != nil && !reflect.DeepEqual(actual.info, expected) {
-		return fmt.Errorf("got node info %s, want %s", actual.info, expected)
+	if actual != nil {
+		if diff := cmp.Diff(expected, actual.info, cmp.AllowUnexported(framework.NodeInfo{})); diff != "" {
+			return fmt.Errorf("Unexpected node info (-want,+got):\n%s", diff)
+		}
 	}
 	return nil
 }
@@ -461,12 +462,12 @@ func TestDump(t *testing.T) {
 	}
 	for name, ni := range snapshot.Nodes {
 		nItem := cache.nodes[name]
-		if !reflect.DeepEqual(ni, nItem.info) {
-			t.Errorf("expect \n%+v; got \n%+v", nItem.info, ni)
+		if diff := cmp.Diff(nItem.info, ni, cmp.AllowUnexported(framework.NodeInfo{})); diff != "" {
+			t.Errorf("Unexpected node info (-want,+got):\n%s", diff)
 		}
 	}
-	if !reflect.DeepEqual(snapshot.AssumedPods, cache.assumedPods) {
-		t.Errorf("expect \n%+v; got \n%+v", cache.assumedPods, snapshot.AssumedPods)
+	if diff := cmp.Diff(cache.assumedPods, snapshot.AssumedPods); diff != "" {
+		t.Errorf("Unexpected assumedPods (-want,+got):\n%s", diff)
 	}
 
 }
@@ -777,8 +778,8 @@ func TestUpdatePodAndGet(t *testing.T) {
 			if err != nil {
 				t.Fatalf("GetPod failed: %v", err)
 			}
-			if !reflect.DeepEqual(tc.podToUpdate, cachedPod) {
-				t.Fatalf("pod get=%s, want=%s", cachedPod, tc.podToUpdate)
+			if diff := cmp.Diff(tc.podToUpdate, cachedPod); diff != "" {
+				t.Fatalf("Unexpected pod (-want, +got):\n%s", diff)
 			}
 		})
 	}
@@ -1213,8 +1214,8 @@ func TestNodeOperators(t *testing.T) {
 
 			// Generations are globally unique. We check in our unit tests that they are incremented correctly.
 			expected.Generation = got.info.Generation
-			if !reflect.DeepEqual(got.info, expected) {
-				t.Errorf("Failed to add node into scheduler cache:\n got: %+v \nexpected: %+v", got, expected)
+			if diff := cmp.Diff(expected, got.info, cmp.AllowUnexported(framework.NodeInfo{})); diff != "" {
+				t.Errorf("Unexpected node info from cache (-want, +got):\n%s", diff)
 			}
 
 			// Step 2: dump cached nodes successfully.
@@ -1227,8 +1228,8 @@ func TestNodeOperators(t *testing.T) {
 				t.Errorf("failed to dump cached nodes:\n got: %v \nexpected: %v", cachedNodes, cache.nodes)
 			}
 			expected.Generation = newNode.Generation
-			if !reflect.DeepEqual(newNode, expected) {
-				t.Errorf("Failed to clone node:\n got: %+v, \n expected: %+v", newNode, expected)
+			if diff := cmp.Diff(expected, newNode, cmp.AllowUnexported(framework.NodeInfo{})); diff != "" {
+				t.Errorf("Unexpected clone node info (-want, +got):\n%s", diff)
 			}
 
 			// Step 3: update node attribute successfully.
@@ -1245,8 +1246,8 @@ func TestNodeOperators(t *testing.T) {
 			}
 			expected.Generation = got.info.Generation
 
-			if !reflect.DeepEqual(got.info, expected) {
-				t.Errorf("Failed to update node in schedulertypes:\n got: %+v \nexpected: %+v", got, expected)
+			if diff := cmp.Diff(expected, got.info, cmp.AllowUnexported(framework.NodeInfo{})); diff != "" {
+				t.Errorf("Unexpected schedulertypes after updating node (-want, +got):\n%s", diff)
 			}
 			// Check nodeTree after update
 			nodesList, err = cache.nodeTree.list()
@@ -1714,8 +1715,8 @@ func compareCacheWithNodeInfoSnapshot(t *testing.T, cache *cacheImpl, snapshot *
 		if want.Node() == nil {
 			want = nil
 		}
-		if !reflect.DeepEqual(snapshot.nodeInfoMap[name], want) {
-			return fmt.Errorf("unexpected node info for node %q.Expected:\n%v, got:\n%v", name, ni.info, snapshot.nodeInfoMap[name])
+		if diff := cmp.Diff(want, snapshot.nodeInfoMap[name], cmp.AllowUnexported(framework.NodeInfo{})); diff != "" {
+			return fmt.Errorf("Unexpected node info for node (-want, +got):\n%s", diff)
 		}
 	}
 
@@ -1909,8 +1910,8 @@ func TestSchedulerCache_updateNodeInfoSnapshotList(t *testing.T) {
 			for i, nodeInfo := range snapshot.nodeInfoList {
 				nodeNames[i] = nodeInfo.Node().Name
 			}
-			if !reflect.DeepEqual(nodeNames, test.expected) {
-				t.Errorf("The nodeInfoList is incorrect. Expected %v , got %v", test.expected, nodeNames)
+			if diff := cmp.Diff(test.expected, nodeNames); diff != "" {
+				t.Errorf("Unexpected nodeInfoList (-want, +got):\n%s", diff)
 			}
 		})
 	}
