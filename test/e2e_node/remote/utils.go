@@ -31,6 +31,8 @@ const (
 	cniVersion       = "v1.2.0"
 	cniDirectory     = "cni/bin" // The CNI tarball places binaries under directory under "cni/bin".
 	cniConfDirectory = "cni/net.d"
+
+	ecrCredentialProviderVersion = "v1.27.1"
 )
 
 const cniConfig = `{
@@ -112,12 +114,36 @@ func setupCNI(host, workspace string) error {
 	return nil
 }
 
+func getECRCredentialProviderURL() string {
+	arch := "amd64"
+	if builder.IsTargetArchArm64() {
+		arch = "arm64"
+	}
+	return fmt.Sprintf("https://artifacts.k8s.io/binaries/cloud-provider-aws/%s/linux/%s/ecr-credential-provider-linux-%s", ecrCredentialProviderVersion, arch, arch)
+}
+
+func setupECRCredentialProvider(host, workspace string) error {
+	klog.V(2).Infof("Install ecr-credential-provider on %q at %q", host, workspace)
+	cmd := getSSHCommand(" ; ",
+		fmt.Sprintf("curl -s -Lo %s/ecr-credential-provider %s", workspace, getECRCredentialProviderURL()),
+		fmt.Sprintf("chmod a+x %s/ecr-credential-provider", workspace),
+	)
+	if output, err := SSH(host, "sh", "-c", cmd); err != nil {
+		return fmt.Errorf("failed to install ecr-credential-provider plugin on %q: %v output: %q", host, err, output)
+	}
+	return nil
+}
+
 func configureCredentialProvider(host, workspace string) error {
 	klog.V(2).Infof("Configuring kubelet credential provider on %q", host)
 
 	credentialProviderConfig := credentialGCPProviderConfig
 	if GetSSHUser() == "ec2-user" {
 		credentialProviderConfig = credentialAWSProviderConfig
+		err := setupECRCredentialProvider(host, workspace)
+		if err != nil {
+			return err
+		}
 	}
 
 	cmd := getSSHCommand(" ; ",
