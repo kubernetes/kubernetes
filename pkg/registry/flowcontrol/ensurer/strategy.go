@@ -269,7 +269,7 @@ func EnsureConfiguration[ObjectType configurationObjectType](ctx context.Context
 		}
 
 		// we always re-create a missing configuration object
-		if _, err = ops.Create(ctx, bootstrap, metav1.CreateOptions{FieldManager: fieldManager}); err == nil {
+		if _, err = ops.Create(ctx, ops.DeepCopy(bootstrap), metav1.CreateOptions{FieldManager: fieldManager}); err == nil {
 			klog.V(2).InfoS(fmt.Sprintf("Successfully created %s", bootstrap.GetObjectKind().GroupVersionKind().Kind), "type", configurationType, "name", name)
 			return nil
 		}
