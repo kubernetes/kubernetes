@@ -50,7 +50,6 @@ import (
 	utilipset "k8s.io/kubernetes/pkg/proxy/ipvs/ipset"
 	utilipvs "k8s.io/kubernetes/pkg/proxy/ipvs/util"
 	proxymetrics "k8s.io/kubernetes/pkg/proxy/metrics"
-	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	"k8s.io/utils/exec"
@@ -147,16 +146,6 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 	} else {
 		ipt[0] = utiliptables.New(execer, utiliptables.ProtocolIPv4)
 		ipt[1] = iptInterface
-	}
-
-	if !dualStack {
-		// Validate NodePortAddresses is single-stack
-		npaByFamily := proxyutil.MapCIDRsByIPFamily(config.NodePortAddresses)
-		secondaryFamily := proxyutil.OtherIPFamily(s.PrimaryIPFamily)
-		badAddrs := npaByFamily[secondaryFamily]
-		if len(badAddrs) > 0 {
-			klog.InfoS("Ignoring --nodeport-addresses of the wrong family", "ipFamily", secondaryFamily, "addresses", badAddrs)
-		}
 	}
 
 	if config.Mode == proxyconfigapi.ProxyModeIPTables {
