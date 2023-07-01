@@ -254,6 +254,27 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 		ginkgo.Context("with immediate allocation", func() {
 			claimTests(resourcev1alpha2.AllocationModeImmediate)
 		})
+
+		ginkgo.It("must deallocate after use when using delayed allocation", func(ctx context.Context) {
+			parameters := b.parameters()
+			pod := b.podExternal()
+			claim := b.externalClaim(resourcev1alpha2.AllocationModeWaitForFirstConsumer)
+			b.create(ctx, parameters, claim, pod)
+
+			gomega.Eventually(ctx, func(ctx context.Context) (*resourcev1alpha2.ResourceClaim, error) {
+				return b.f.ClientSet.ResourceV1alpha2().ResourceClaims(b.f.Namespace.Name).Get(ctx, claim.Name, metav1.GetOptions{})
+			}).WithTimeout(f.Timeouts.PodDelete).ShouldNot(gomega.HaveField("Status.Allocation", (*resourcev1alpha2.AllocationResult)(nil)))
+
+			b.testPod(ctx, f.ClientSet, pod)
+
+			ginkgo.By(fmt.Sprintf("deleting pod %s", klog.KObj(pod)))
+			framework.ExpectNoError(b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{}))
+
+			ginkgo.By("waiting for claim to get deallocated")
+			gomega.Eventually(ctx, func(ctx context.Context) (*resourcev1alpha2.ResourceClaim, error) {
+				return b.f.ClientSet.ResourceV1alpha2().ResourceClaims(b.f.Namespace.Name).Get(ctx, claim.Name, metav1.GetOptions{})
+			}).WithTimeout(f.Timeouts.PodDelete).Should(gomega.HaveField("Status.Allocation", (*resourcev1alpha2.AllocationResult)(nil)))
+		})
 	})
 
 	ginkgo.Context("multiple nodes", func() {
