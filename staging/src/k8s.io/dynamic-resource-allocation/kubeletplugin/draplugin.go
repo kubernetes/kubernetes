@@ -24,7 +24,8 @@ import (
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
 
-	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1alpha2"
+	drapbv1alpha2 "k8s.io/kubelet/pkg/apis/dra/v1alpha2"
+	drapbv1alpha3 "k8s.io/kubelet/pkg/apis/dra/v1alpha3"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 )
 
@@ -144,6 +145,24 @@ func GRPCInterceptor(interceptor grpc.UnaryServerInterceptor) Option {
 	}
 }
 
+// NodeV1alpha2 explicitly chooses whether the DRA gRPC API v1alpha2
+// gets enabled.
+func NodeV1alpha2(enabled bool) Option {
+	return func(o *options) error {
+		o.nodeV1alpha2 = enabled
+		return nil
+	}
+}
+
+// NodeV1alpha2 explicitly chooses whether the DRA gRPC API v1alpha3
+// gets enabled.
+func NodeV1alpha3(enabled bool) Option {
+	return func(o *options) error {
+		o.nodeV1alpha3 = enabled
+		return nil
+	}
+}
+
 type options struct {
 	logger                     klog.Logger
 	grpcVerbosity              int
@@ -152,6 +171,8 @@ type options struct {
 	draAddress                 string
 	pluginRegistrationEndpoint endpoint
 	interceptors               []grpc.UnaryServerInterceptor
+
+	nodeV1alpha2, nodeV1alpha3 bool
 }
 
 // draPlugin combines the kubelet registration service and the DRA node plugin
@@ -162,13 +183,15 @@ type draPlugin struct {
 }
 
 // Start sets up two gRPC servers (one for registration, one for the DRA node
-// client).
-func Start(nodeServer drapbv1.NodeServer, opts ...Option) (result DRAPlugin, finalErr error) {
+// client). By default, all APIs implemented by the nodeServer get registered.
+func Start(nodeServer interface{}, opts ...Option) (result DRAPlugin, finalErr error) {
 	d := &draPlugin{}
 
 	o := options{
 		logger:        klog.Background(),
 		grpcVerbosity: 4,
+		nodeV1alpha2:  true,
+		nodeV1alpha3:  true,
 	}
 	for _, option := range opts {
 		if err := option(&o); err != nil {
@@ -191,8 +214,18 @@ func Start(nodeServer drapbv1.NodeServer, opts ...Option) (result DRAPlugin, fin
 	}
 
 	// Run the node plugin gRPC server first to ensure that it is ready.
+	implemented := false
 	plugin, err := startGRPCServer(klog.LoggerWithName(o.logger, "dra"), o.grpcVerbosity, o.interceptors, o.draEndpoint, func(grpcServer *grpc.Server) {
-		drapbv1.RegisterNodeServer(grpcServer, nodeServer)
+		if nodeServer, ok := nodeServer.(drapbv1alpha3.NodeServer); ok && o.nodeV1alpha3 {
+			o.logger.V(5).Info("registering drapbv1alpha3.NodeServer")
+			drapbv1alpha3.RegisterNodeServer(grpcServer, nodeServer)
+			implemented = true
+		}
+		if nodeServer, ok := nodeServer.(drapbv1alpha2.NodeServer); ok && o.nodeV1alpha2 {
+			o.logger.V(5).Info("registering drapbv1alpha2.NodeServer")
+			drapbv1alpha2.RegisterNodeServer(grpcServer, nodeServer)
+			implemented = true
+		}
 	})
 	if err != nil {
 		return nil, fmt.Errorf("start node client: %v", err)
@@ -208,6 +241,9 @@ func Start(nodeServer drapbv1.NodeServer, opts ...Option) (result DRAPlugin, fin
 			plugin.stop()
 		}
 	}()
+	if !implemented {
+		return nil, errors.New("no supported DRA gRPC API is implemented and enabled")
+	}
 
 	// Now make it available to kubelet.
 	registrar, err := startRegistrar(klog.LoggerWithName(o.logger, "registrar"), o.grpcVerbosity, o.interceptors, o.driverName, o.draAddress, o.pluginRegistrationEndpoint)

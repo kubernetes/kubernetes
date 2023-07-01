@@ -109,8 +109,8 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation][Node
 			framework.ExpectNoError(err)
 		})
 
-		ginkgo.It("must keep pod in pending state if NodePrepareResource times out", func(ctx context.Context) {
-			ginkgo.By("set delay for the NodePrepareResource call")
+		ginkgo.It("must keep pod in pending state if NodePrepareResources times out", func(ctx context.Context) {
+			ginkgo.By("set delay for the NodePrepareResources call")
 			kubeletPlugin.Block()
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod")
 
@@ -120,8 +120,8 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation][Node
 			})
 			framework.ExpectNoError(err)
 
-			ginkgo.By("wait for NodePrepareResource call")
-			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(dra.PluginClientTimeout * 2).Should(testdriver.NodePrepareResourceCalled)
+			ginkgo.By("wait for NodePrepareResources call")
+			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(dra.PluginClientTimeout * 2).Should(testdriver.NodePrepareResourcesCalled)
 
 			// TODO: Check condition or event when implemented
 			// see https://github.com/kubernetes/kubernetes/issues/118468 for details
