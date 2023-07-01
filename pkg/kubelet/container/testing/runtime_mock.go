@@ -30,7 +30,7 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	v1 "k8s.io/api/core/v1"
 	types "k8s.io/apimachinery/pkg/types"
-	remotecommand "k8s.io/client-go/tools/remotecommand"
+	remotecommand "k8s.io/apimachinery/pkg/util/remotecommand"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
 	v10 "k8s.io/cri-api/pkg/apis/runtime/v1"
 	container "k8s.io/kubernetes/pkg/kubelet/container"

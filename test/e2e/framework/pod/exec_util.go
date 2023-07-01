@@ -25,9 +25,10 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/remotecommand"
+	remoteclient "k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	"github.com/onsi/gomega"
@@ -140,7 +141,7 @@ func ExecShellInPodWithFullOutput(ctx context.Context, f *framework.Framework, p
 }
 
 func execute(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
-	exec, err := remotecommand.NewSPDYExecutor(config, method, url)
+	exec, err := remoteclient.NewSPDYExecutor(config, method, url)
 	if err != nil {
 		return err
 	}

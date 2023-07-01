@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
@@ -6862,20 +6863,21 @@ const (
 	// Command to run for remote command execution
 	ExecCommandParam = "command"
 
+	// Deprecated: use stream types in k8s.io/apimachinery/pkg/util/httpstream.
 	// Name of header that specifies stream type
-	StreamType = "streamType"
+	StreamType = httpstream.StreamType
 	// Value for streamType header for stdin stream
-	StreamTypeStdin = "stdin"
+	StreamTypeStdin = httpstream.StreamTypeStdin
 	// Value for streamType header for stdout stream
-	StreamTypeStdout = "stdout"
+	StreamTypeStdout = httpstream.StreamTypeStdout
 	// Value for streamType header for stderr stream
-	StreamTypeStderr = "stderr"
+	StreamTypeStderr = httpstream.StreamTypeStderr
 	// Value for streamType header for data stream
-	StreamTypeData = "data"
+	StreamTypeData = httpstream.StreamTypeData
 	// Value for streamType header for error stream
-	StreamTypeError = "error"
+	StreamTypeError = httpstream.StreamTypeError
 	// Value for streamType header for terminal resize stream
-	StreamTypeResize = "resize"
+	StreamTypeResize = httpstream.StreamTypeResize
 
 	// Name of header that specifies the port being forwarded
 	PortHeader = "port"

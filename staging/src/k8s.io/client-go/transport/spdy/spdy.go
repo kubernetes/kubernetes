@@ -27,14 +27,12 @@ import (
 	restclient "k8s.io/client-go/rest"
 )
 
-// Upgrader validates a response from the server after a SPDY upgrade.
-type Upgrader interface {
-	// NewConnection validates the response and creates a new Connection.
-	NewConnection(resp *http.Response) (httpstream.Connection, error)
-}
+type Upgrader = spdy.Upgrader
+
+var Negotiate = spdy.Negotiate
 
 // RoundTripperFor returns a round tripper and upgrader to use with SPDY.
-func RoundTripperFor(config *restclient.Config) (http.RoundTripper, Upgrader, error) {
+func RoundTripperFor(config *restclient.Config) (http.RoundTripper, spdy.Upgrader, error) {
 	tlsConfig, err := restclient.TLSConfigFor(config)
 	if err != nil {
 		return nil, nil, err
@@ -58,7 +56,7 @@ func RoundTripperFor(config *restclient.Config) (http.RoundTripper, Upgrader, er
 // dialer implements the httpstream.Dialer interface.
 type dialer struct {
 	client   *http.Client
-	upgrader Upgrader
+	upgrader spdy.Upgrader
 	method   string
 	url      *url.URL
 }
@@ -66,7 +64,7 @@ type dialer struct {
 var _ httpstream.Dialer = &dialer{}
 
 // NewDialer will create a dialer that connects to the provided URL and upgrades the connection to SPDY.
-func NewDialer(upgrader Upgrader, client *http.Client, method string, url *url.URL) httpstream.Dialer {
+func NewDialer(upgrader spdy.Upgrader, client *http.Client, method string, url *url.URL) httpstream.Dialer {
 	return &dialer{
 		client:   client,
 		upgrader: upgrader,
@@ -80,24 +78,5 @@ func (d *dialer) Dial(protocols ...string) (httpstream.Connection, string, error
 	if err != nil {
 		return nil, "", fmt.Errorf("error creating request: %v", err)
 	}
-	return Negotiate(d.upgrader, d.client, req, protocols...)
-}
-
-// Negotiate opens a connection to a remote server and attempts to negotiate
-// a SPDY connection. Upon success, it returns the connection and the protocol selected by
-// the server. The client transport must use the upgradeRoundTripper - see RoundTripperFor.
-func Negotiate(upgrader Upgrader, client *http.Client, req *http.Request, protocols ...string) (httpstream.Connection, string, error) {
-	for i := range protocols {
-		req.Header.Add(httpstream.HeaderProtocolVersion, protocols[i])
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, "", fmt.Errorf("error sending request: %v", err)
-	}
-	defer resp.Body.Close()
-	conn, err := upgrader.NewConnection(resp)
-	if err != nil {
-		return nil, "", err
-	}
-	return conn, resp.Header.Get(httpstream.HeaderProtocolVersion), nil
+	return spdy.Negotiate(d.upgrader, d.client, req, protocols...)
 }

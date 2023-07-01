@@ -24,7 +24,6 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
@@ -47,7 +46,7 @@ type fakeStreamCreator struct {
 var _ streamCreator = &fakeStreamCreator{}
 
 func (f *fakeStreamCreator) CreateStream(headers http.Header) (httpstream.Stream, error) {
-	streamType := headers.Get(v1.StreamType)
+	streamType := headers.Get(httpstream.StreamType)
 	f.created[streamType] = true
 	return nil, f.errors[streamType]
 }
@@ -111,10 +110,10 @@ func TestV2CreateStreams(t *testing.T) {
 		conn := &fakeStreamCreator{
 			created: make(map[string]bool),
 			errors: map[string]error{
-				v1.StreamTypeStdin:  test.stdinError,
-				v1.StreamTypeStdout: test.stdoutError,
-				v1.StreamTypeStderr: test.stderrError,
-				v1.StreamTypeError:  test.errorError,
+				httpstream.StreamTypeStdin:  test.stdinError,
+				httpstream.StreamTypeStdout: test.stdoutError,
+				httpstream.StreamTypeStderr: test.stderrError,
+				httpstream.StreamTypeError:  test.errorError,
 			},
 		}
 
@@ -157,20 +156,20 @@ func TestV2CreateStreams(t *testing.T) {
 			continue
 		}
 
-		if test.stdin && !conn.created[v1.StreamTypeStdin] {
+		if test.stdin && !conn.created[httpstream.StreamTypeStdin] {
 			t.Errorf("%s: expected stdin stream", test.name)
 		}
-		if test.stdout && !conn.created[v1.StreamTypeStdout] {
+		if test.stdout && !conn.created[httpstream.StreamTypeStdout] {
 			t.Errorf("%s: expected stdout stream", test.name)
 		}
 		if test.stderr {
-			if test.tty && conn.created[v1.StreamTypeStderr] {
+			if test.tty && conn.created[httpstream.StreamTypeStderr] {
 				t.Errorf("%s: unexpected stderr stream because tty is set", test.name)
-			} else if !test.tty && !conn.created[v1.StreamTypeStderr] {
+			} else if !test.tty && !conn.created[httpstream.StreamTypeStderr] {
 				t.Errorf("%s: expected stderr stream", test.name)
 			}
 		}
-		if !conn.created[v1.StreamTypeError] {
+		if !conn.created[httpstream.StreamTypeError] {
 			t.Errorf("%s: expected error stream", test.name)
 		}
 

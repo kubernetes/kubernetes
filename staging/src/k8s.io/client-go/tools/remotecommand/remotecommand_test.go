@@ -36,12 +36,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
-	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
+	remotecommand "k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 )
 
-type AttachFunc func(in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan TerminalSize) error
+type AttachFunc func(in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error
 type streamContext struct {
 	conn         io.Closer
 	stdinStream  io.ReadCloser
@@ -53,17 +53,6 @@ type streamContext struct {
 type streamAndReply struct {
 	httpstream.Stream
 	replySent <-chan struct{}
-}
-
-type fakeEmptyDataPty struct {
-}
-
-func (s *fakeEmptyDataPty) Read(p []byte) (int, error) {
-	return len(p), nil
-}
-
-func (s *fakeEmptyDataPty) Write(p []byte) (int, error) {
-	return len(p), nil
 }
 
 type fakeMassiveDataPty struct{}
@@ -78,7 +67,7 @@ func (s *fakeMassiveDataPty) Write(p []byte) (int, error) {
 	return len(p), errors.New("return err")
 }
 
-func fakeMassiveDataAttacher(stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan TerminalSize) error {
+func fakeMassiveDataAttacher(stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
 
 	copyDone := make(chan struct{}, 3)
 
@@ -125,13 +114,13 @@ func TestSPDYExecutorStream(t *testing.T) {
 	tests := []struct {
 		timeout     time.Duration
 		name        string
-		options     StreamOptions
+		options     remotecommand.StreamOptions
 		expectError string
 		attacher    AttachFunc
 	}{
 		{
 			name: "stdoutBlockTest",
-			options: StreamOptions{
+			options: remotecommand.StreamOptions{
 				Stdin:  &fakeMassiveDataPty{},
 				Stdout: &fakeMassiveDataPty{},
 			},
@@ -140,7 +129,7 @@ func TestSPDYExecutorStream(t *testing.T) {
 		},
 		{
 			name: "stderrBlockTest",
-			options: StreamOptions{
+			options: remotecommand.StreamOptions{
 				Stdin:  &fakeMassiveDataPty{},
 				Stderr: &fakeMassiveDataPty{},
 			},
@@ -150,7 +139,7 @@ func TestSPDYExecutorStream(t *testing.T) {
 		{
 			timeout: 500 * time.Millisecond,
 			name:    "timeoutTest",
-			options: StreamOptions{
+			options: remotecommand.StreamOptions{
 				Stdin:  &fakeMassiveDataPty{},
 				Stderr: &fakeMassiveDataPty{},
 			},
@@ -183,7 +172,7 @@ func TestSPDYExecutorStream(t *testing.T) {
 	}
 }
 
-func newTestHTTPServer(f AttachFunc, options *StreamOptions) *httptest.Server {
+func newTestHTTPServer(f AttachFunc, options *remotecommand.StreamOptions) *httptest.Server {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		ctx, err := createHTTPStreams(writer, request, options)
 		if err != nil {
@@ -204,7 +193,7 @@ func newTestHTTPServer(f AttachFunc, options *StreamOptions) *httptest.Server {
 	return server
 }
 
-func attach2Server(ctx context.Context, rawURL string, options StreamOptions) error {
+func attach2Server(ctx context.Context, rawURL string, options remotecommand.StreamOptions) error {
 	uri, _ := url.Parse(rawURL)
 	exec, err := NewSPDYExecutor(&rest.Config{Host: uri.Host}, "POST", uri)
 	if err != nil {
@@ -224,8 +213,8 @@ func attach2Server(ctx context.Context, rawURL string, options StreamOptions) er
 }
 
 // simplify createHttpStreams , only support StreamProtocolV4Name
-func createHTTPStreams(w http.ResponseWriter, req *http.Request, opts *StreamOptions) (*streamContext, error) {
-	_, err := httpstream.Handshake(req, w, []string{remotecommandconsts.StreamProtocolV4Name})
+func createHTTPStreams(w http.ResponseWriter, req *http.Request, opts *remotecommand.StreamOptions) (*streamContext, error) {
+	_, err := httpstream.Handshake(req, w, []string{remotecommand.StreamProtocolV4Name})
 	if err != nil {
 		return nil, err
 	}
@@ -298,81 +287,10 @@ func v4WriteStatusFunc(stream io.Writer) func(status *apierrors.StatusError) err
 	}
 }
 
-// writeDetector provides a helper method to block until the underlying writer written.
-type writeDetector struct {
-	written chan bool
-	closed  bool
-	io.Writer
-}
-
-func newWriterDetector(w io.Writer) *writeDetector {
-	return &writeDetector{
-		written: make(chan bool),
-		Writer:  w,
-	}
-}
-
-func (w *writeDetector) BlockUntilWritten() {
-	<-w.written
-}
-
-func (w *writeDetector) Write(p []byte) (n int, err error) {
-	if !w.closed {
-		close(w.written)
-		w.closed = true
-	}
-	return w.Writer.Write(p)
-}
-
-// `Executor.StreamWithContext` starts a goroutine in the background to do the streaming
-// and expects the deferred close of the connection leads to the exit of the goroutine on cancellation.
-// This test verifies that works.
-func TestStreamExitsAfterConnectionIsClosed(t *testing.T) {
-	writeDetector := newWriterDetector(&fakeEmptyDataPty{})
-	options := StreamOptions{
-		Stdin:  &fakeEmptyDataPty{},
-		Stdout: writeDetector,
-	}
-	server := newTestHTTPServer(fakeMassiveDataAttacher, &options)
-
-	ctx, cancelFn := context.WithTimeout(context.Background(), 500*time.Millisecond)
-	defer cancelFn()
-
-	uri, _ := url.Parse(server.URL)
-	exec, err := NewSPDYExecutor(&rest.Config{Host: uri.Host}, "POST", uri)
-	if err != nil {
-		t.Fatal(err)
-	}
-	streamExec := exec.(*streamExecutor)
-
-	conn, streamer, err := streamExec.newConnectionAndStream(ctx, options)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	errorChan := make(chan error)
-	go func() {
-		errorChan <- streamer.stream(conn)
-	}()
-
-	// Wait until stream goroutine starts.
-	writeDetector.BlockUntilWritten()
-
-	// Close the connection
-	conn.Close()
-
-	select {
-	case <-time.After(1 * time.Second):
-		t.Fatalf("expect stream to be closed after connection is closed.")
-	case <-errorChan:
-		return
-	}
-}
-
 func TestStreamRandomData(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		var stdin, stdout bytes.Buffer
-		ctx, err := createHTTPStreams(w, req, &StreamOptions{
+		ctx, err := createHTTPStreams(w, req, &remotecommand.StreamOptions{
 			Stdin:  &stdin,
 			Stdout: &stdout,
 		})
@@ -398,7 +316,7 @@ func TestStreamRandomData(t *testing.T) {
 		t.Errorf("unexpected error reading random data: %v", err)
 	}
 	var stdout bytes.Buffer
-	options := &StreamOptions{
+	options := &remotecommand.StreamOptions{
 		Stdin:  bytes.NewReader(randomData),
 		Stdout: &stdout,
 	}

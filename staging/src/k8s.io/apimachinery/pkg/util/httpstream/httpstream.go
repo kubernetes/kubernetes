@@ -29,6 +29,21 @@ const (
 	HeaderUpgrade                  = "Upgrade"
 	HeaderProtocolVersion          = "X-Stream-Protocol-Version"
 	HeaderAcceptedProtocolVersions = "X-Accepted-Stream-Protocol-Versions"
+
+	// Name of header that specifies stream type
+	StreamType = "streamType"
+	// Value for streamType header for stdin stream
+	StreamTypeStdin = "stdin"
+	// Value for streamType header for stdout stream
+	StreamTypeStdout = "stdout"
+	// Value for streamType header for stderr stream
+	StreamTypeStderr = "stderr"
+	// Value for streamType header for data stream
+	StreamTypeData = "data"
+	// Value for streamType header for error stream
+	StreamTypeError = "error"
+	// Value for streamType header for terminal resize stream
+	StreamTypeResize = "resize"
 )
 
 // NewStreamHandler defines a function that is called when a new Stream is

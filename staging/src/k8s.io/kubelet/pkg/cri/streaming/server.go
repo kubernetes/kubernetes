@@ -33,8 +33,7 @@ import (
 	restful "github.com/emicklei/go-restful/v3"
 
 	"k8s.io/apimachinery/pkg/types"
-	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
-	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/apimachinery/pkg/util/remotecommand"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubelet/pkg/cri/streaming/portforward"
 	remotecommandserver "k8s.io/kubelet/pkg/cri/streaming/remotecommand"
@@ -99,8 +98,8 @@ type Config struct {
 // some fields like Addr must still be provided.
 var DefaultConfig = Config{
 	StreamIdleTimeout:               4 * time.Hour,
-	StreamCreationTimeout:           remotecommandconsts.DefaultStreamCreationTimeout,
-	SupportedRemoteCommandProtocols: remotecommandconsts.SupportedStreamingProtocols,
+	StreamCreationTimeout:           remotecommand.DefaultStreamCreationTimeout,
+	SupportedRemoteCommandProtocols: remotecommand.SupportedStreamingProtocols,
 	SupportedPortForwardProtocols:   portforward.SupportedProtocols,
 }
 

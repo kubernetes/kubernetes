@@ -30,10 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	"k8s.io/apimachinery/pkg/util/httpstream/wsstream"
-	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
+	"k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/tools/remotecommand"
-
 	"k8s.io/klog/v2"
 )
 
@@ -148,16 +146,16 @@ func createHTTPStreamStreams(req *http.Request, w http.ResponseWriter, opts *Opt
 
 	var handler protocolHandler
 	switch protocol {
-	case remotecommandconsts.StreamProtocolV4Name:
+	case remotecommand.StreamProtocolV4Name:
 		handler = &v4ProtocolHandler{}
-	case remotecommandconsts.StreamProtocolV3Name:
+	case remotecommand.StreamProtocolV3Name:
 		handler = &v3ProtocolHandler{}
-	case remotecommandconsts.StreamProtocolV2Name:
+	case remotecommand.StreamProtocolV2Name:
 		handler = &v2ProtocolHandler{}
 	case "":
-		klog.V(4).InfoS("Client did not request protocol negotiation. Falling back", "protocol", remotecommandconsts.StreamProtocolV1Name)
+		klog.V(4).InfoS("Client did not request protocol negotiation. Falling back", "protocol", remotecommand.StreamProtocolV1Name)
 		fallthrough
-	case remotecommandconsts.StreamProtocolV1Name:
+	case remotecommand.StreamProtocolV1Name:
 		handler = &v1ProtocolHandler{}
 	}
 

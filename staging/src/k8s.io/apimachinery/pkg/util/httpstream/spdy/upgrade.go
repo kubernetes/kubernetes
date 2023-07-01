@@ -32,6 +32,12 @@ import (
 
 const HeaderSpdy31 = "SPDY/3.1"
 
+// Upgrader validates a response from the server after a SPDY upgrade.
+type Upgrader interface {
+	// NewConnection validates the response and creates a new Connection.
+	NewConnection(resp *http.Response) (httpstream.Connection, error)
+}
+
 // responseUpgrader knows how to upgrade HTTP responses. It
 // implements the httpstream.ResponseUpgrader interface.
 type responseUpgrader struct {
@@ -117,4 +123,23 @@ func (u responseUpgrader) UpgradeResponse(w http.ResponseWriter, req *http.Reque
 	}
 
 	return spdyConn
+}
+
+// Negotiate opens a connection to a remote server and attempts to negotiate
+// a SPDY connection. Upon success, it returns the connection and the protocol selected by
+// the server. The client transport must use the upgradeRoundTripper - see RoundTripperFor.
+func Negotiate(upgrader Upgrader, client *http.Client, req *http.Request, protocols ...string) (httpstream.Connection, string, error) {
+	for i := range protocols {
+		req.Header.Add(httpstream.HeaderProtocolVersion, protocols[i])
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, "", fmt.Errorf("error sending request: %v", err)
+	}
+	defer resp.Body.Close()
+	conn, err := upgrader.NewConnection(resp)
+	if err != nil {
+		return nil, "", err
+	}
+	return conn, resp.Header.Get(httpstream.HeaderProtocolVersion), nil
 }

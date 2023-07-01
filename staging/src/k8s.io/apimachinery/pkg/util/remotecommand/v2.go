@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/runtime"
 )
 
@@ -52,7 +52,7 @@ func (p *streamProtocolV2) createStreams(conn streamCreator) error {
 	headers := http.Header{}
 
 	// set up error stream
-	headers.Set(v1.StreamType, v1.StreamTypeError)
+	headers.Set(httpstream.StreamType, httpstream.StreamTypeError)
 	p.errorStream, err = conn.CreateStream(headers)
 	if err != nil {
 		return err
@@ -60,7 +60,7 @@ func (p *streamProtocolV2) createStreams(conn streamCreator) error {
 
 	// set up stdin stream
 	if p.Stdin != nil {
-		headers.Set(v1.StreamType, v1.StreamTypeStdin)
+		headers.Set(httpstream.StreamType, httpstream.StreamTypeStdin)
 		p.remoteStdin, err = conn.CreateStream(headers)
 		if err != nil {
 			return err
@@ -69,7 +69,7 @@ func (p *streamProtocolV2) createStreams(conn streamCreator) error {
 
 	// set up stdout stream
 	if p.Stdout != nil {
-		headers.Set(v1.StreamType, v1.StreamTypeStdout)
+		headers.Set(httpstream.StreamType, httpstream.StreamTypeStdout)
 		p.remoteStdout, err = conn.CreateStream(headers)
 		if err != nil {
 			return err
@@ -78,7 +78,7 @@ func (p *streamProtocolV2) createStreams(conn streamCreator) error {
 
 	// set up stderr stream
 	if p.Stderr != nil && !p.Tty {
-		headers.Set(v1.StreamType, v1.StreamTypeStderr)
+		headers.Set(httpstream.StreamType, httpstream.StreamTypeStderr)
 		p.remoteStderr, err = conn.CreateStream(headers)
 		if err != nil {
 			return err

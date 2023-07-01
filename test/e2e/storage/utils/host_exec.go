@@ -21,8 +21,8 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/util/exec"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
@@ -124,7 +124,7 @@ func (h *hostExecutor) launchNodeExecPod(ctx context.Context, node string) *v1.P
 // This works like ssh.SSH(...) utility.
 func (h *hostExecutor) Execute(ctx context.Context, cmd string, node *v1.Node) (Result, error) {
 	result, err := h.exec(ctx, cmd, node)
-	if codeExitErr, ok := err.(exec.CodeExitError); ok {
+	if codeExitErr, ok := err.(apierrors.CodeExitError); ok {
 		// extract the exit code of remote command and silence the command
 		// non-zero exit code error
 		result.Code = codeExitErr.ExitStatus()

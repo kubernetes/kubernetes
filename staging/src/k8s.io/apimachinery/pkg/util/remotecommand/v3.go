@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/runtime"
 )
 
@@ -51,7 +51,7 @@ func (p *streamProtocolV3) createStreams(conn streamCreator) error {
 	// set up resize stream
 	if p.Tty {
 		headers := http.Header{}
-		headers.Set(v1.StreamType, v1.StreamTypeResize)
+		headers.Set(httpstream.StreamType, httpstream.StreamTypeResize)
 		var err error
 		p.resizeStream, err = conn.CreateStream(headers)
 		if err != nil {

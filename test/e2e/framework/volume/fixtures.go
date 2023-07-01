@@ -53,7 +53,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	clientexec "k8s.io/client-go/util/exec"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -693,7 +692,7 @@ func VerifyExecInPodSucceed(f *framework.Framework, pod *v1.Pod, shExec string) 
 func VerifyExecInPodFail(f *framework.Framework, pod *v1.Pod, shExec string, exitCode int) {
 	stdout, stderr, err := PodExec(f, pod, shExec)
 	if err != nil {
-		if exiterr, ok := err.(clientexec.ExitError); ok {
+		if exiterr, ok := err.(apierrors.ExitError); ok {
 			actualExitCode := exiterr.ExitStatus()
 			framework.ExpectEqual(actualExitCode, exitCode,
 				"%q should fail with exit code %d, but failed with exit code %d and error message %q\nstdout: %s\nstderr: %s",

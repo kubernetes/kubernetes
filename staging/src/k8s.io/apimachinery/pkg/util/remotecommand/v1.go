@@ -21,7 +21,6 @@ import (
 	"io"
 	"net/http"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/klog/v2"
 )
@@ -57,7 +56,7 @@ func (p *streamProtocolV1) stream(conn streamCreator) error {
 		if _, err := io.Copy(dst, src); err != nil && err != io.EOF {
 			klog.Errorf("Error copying %s: %v", s, err)
 		}
-		if s == v1.StreamTypeStdout || s == v1.StreamTypeStderr {
+		if s == httpstream.StreamTypeStdout || s == httpstream.StreamTypeStderr {
 			doneChan <- struct{}{}
 		}
 	}
@@ -65,7 +64,7 @@ func (p *streamProtocolV1) stream(conn streamCreator) error {
 	// set up all the streams first
 	var err error
 	headers := http.Header{}
-	headers.Set(v1.StreamType, v1.StreamTypeError)
+	headers.Set(httpstream.StreamType, httpstream.StreamTypeError)
 	p.errorStream, err = conn.CreateStream(headers)
 	if err != nil {
 		return err
@@ -80,7 +79,7 @@ func (p *streamProtocolV1) stream(conn streamCreator) error {
 	// gets all the streams. By creating all the streams first, we ensure that the server is ready to
 	// process data before the client starts sending any. See https://issues.k8s.io/16373 for more info.
 	if p.Stdin != nil {
-		headers.Set(v1.StreamType, v1.StreamTypeStdin)
+		headers.Set(httpstream.StreamType, httpstream.StreamTypeStdin)
 		p.remoteStdin, err = conn.CreateStream(headers)
 		if err != nil {
 			return err
@@ -89,7 +88,7 @@ func (p *streamProtocolV1) stream(conn streamCreator) error {
 	}
 
 	if p.Stdout != nil {
-		headers.Set(v1.StreamType, v1.StreamTypeStdout)
+		headers.Set(httpstream.StreamType, httpstream.StreamTypeStdout)
 		p.remoteStdout, err = conn.CreateStream(headers)
 		if err != nil {
 			return err
@@ -98,7 +97,7 @@ func (p *streamProtocolV1) stream(conn streamCreator) error {
 	}
 
 	if p.Stderr != nil && !p.Tty {
-		headers.Set(v1.StreamType, v1.StreamTypeStderr)
+		headers.Set(httpstream.StreamType, httpstream.StreamTypeStderr)
 		p.remoteStderr, err = conn.CreateStream(headers)
 		if err != nil {
 			return err
@@ -126,7 +125,7 @@ func (p *streamProtocolV1) stream(conn streamCreator) error {
 		// because stdin is not closed until the process exits. If we try to call
 		// stdin.Close(), it returns no error but doesn't unblock the copy. It will
 		// exit when the process exits, instead.
-		go cp(v1.StreamTypeStdin, p.remoteStdin, readerWrapper{p.Stdin})
+		go cp(httpstream.StreamTypeStdin, p.remoteStdin, readerWrapper{p.Stdin})
 	}
 
 	waitCount := 0
@@ -134,12 +133,12 @@ func (p *streamProtocolV1) stream(conn streamCreator) error {
 
 	if p.Stdout != nil {
 		waitCount++
-		go cp(v1.StreamTypeStdout, p.Stdout, p.remoteStdout)
+		go cp(httpstream.StreamTypeStdout, p.Stdout, p.remoteStdout)
 	}
 
 	if p.Stderr != nil && !p.Tty {
 		waitCount++
-		go cp(v1.StreamTypeStderr, p.Stderr, p.remoteStderr)
+		go cp(httpstream.StreamTypeStderr, p.Stderr, p.remoteStderr)
 	}
 
 Loop:
