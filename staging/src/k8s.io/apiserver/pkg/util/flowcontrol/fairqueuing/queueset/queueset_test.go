@@ -30,9 +30,13 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/clock"
 
+	"k8s.io/apiserver/pkg/authentication/user"
+	genericrequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
+	"k8s.io/apiserver/pkg/util/flowcontrol/debug"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
 	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/promise"
 	test "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing"
@@ -183,6 +187,7 @@ type uniformScenario struct {
 	expectedAverages                         []float64
 	expectedEpochAdvances                    int
 	seatDemandIntegratorSubject              fq.Integrator
+	dontDump                                 bool
 }
 
 func (us uniformScenario) exercise(t *testing.T) {
@@ -275,7 +280,10 @@ func (ust *uniformScenarioThread) callK(k int) {
 	maxWidth := float64(uint64max(ust.uc.initialSeats, ust.uc.finalSeats))
 	ust.uss.seatDemandIntegratorCheck.Add(maxWidth)
 	returnSeatDemand := func(time.Time) { ust.uss.seatDemandIntegratorCheck.Add(-maxWidth) }
-	req, idle := ust.uss.qs.StartRequest(context.Background(), &fcrequest.WorkEstimate{InitialSeats: ust.uc.initialSeats, FinalSeats: ust.uc.finalSeats, AdditionalLatency: ust.uc.padDuration}, ust.uc.hash, "", ust.fsName, ust.uss.name, []int{ust.i, ust.j, k}, nil)
+	ctx := context.Background()
+	username := fmt.Sprintf("%d:%d:%d", ust.i, ust.j, k)
+	ctx = genericrequest.WithUser(ctx, &user.DefaultInfo{Name: username})
+	req, idle := ust.uss.qs.StartRequest(ctx, &fcrequest.WorkEstimate{InitialSeats: ust.uc.initialSeats, FinalSeats: ust.uc.finalSeats, AdditionalLatency: ust.uc.padDuration}, ust.uc.hash, "", ust.fsName, ust.uss.name, []int{ust.i, ust.j, k}, nil)
 	ust.uss.t.Logf("%s: %d, %d, %d got req=%p, idle=%v", ust.uss.clk.Now().Format(nsTimeFmt), ust.i, ust.j, k, req, idle)
 	if req == nil {
 		atomic.AddUint64(&ust.uss.failedCount, 1)
@@ -285,6 +293,9 @@ func (ust *uniformScenarioThread) callK(k int) {
 	}
 	if idle {
 		ust.uss.t.Error("got request but QueueSet reported idle")
+	}
+	if (!ust.uss.dontDump) && k%100 == 0 {
+		insistRequestFromUser(ust.uss.t, ust.uss.qs, username)
 	}
 	var executed bool
 	var returnTime time.Time
@@ -309,6 +320,26 @@ func (ust *uniformScenarioThread) callK(k int) {
 	} else if now != returnTime {
 		ust.uss.t.Errorf("%s: %d, %d, %d returnTime=%s", now.Format(nsTimeFmt), ust.i, ust.j, k, returnTime.Format(nsTimeFmt))
 	}
+}
+
+func insistRequestFromUser(t *testing.T, qs fq.QueueSet, username string) {
+	qsd := qs.Dump(true)
+	goodRequest := func(rd debug.RequestDump) bool {
+		return rd.UserName == username
+	}
+	goodSliceOfRequests := SliceMapReduce(goodRequest, or)
+	if goodSliceOfRequests(qsd.QueuelessExecutingRequests) {
+		t.Logf("Found user %s among queueless requests", username)
+		return
+	}
+	goodQueueDump := func(qd debug.QueueDump) bool {
+		return goodSliceOfRequests(qd.Requests) || goodSliceOfRequests(qd.RequestsExecuting)
+	}
+	if SliceMapReduce(goodQueueDump, or)(qsd.Queues) {
+		t.Logf("Found user %s among queued requests", username)
+		return
+	}
+	t.Errorf("Failed to find request from user %s", username)
 }
 
 func (uss *uniformScenarioState) evalTo(lim time.Time, last, expectFair bool, margin float64) {
@@ -491,6 +522,7 @@ func TestNoRestraint(t *testing.T) {
 				expectAllRequests:      true,
 				clk:                    clk,
 				counter:                counter,
+				dontDump:               true,
 			}.exercise(t)
 		})
 	}
@@ -1268,13 +1300,14 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 			queues: []*queue{
 				{
 					nextDispatchR: fcrequest.SeatsTimesDuration(1, 200*time.Second),
-					requests: newFIFO(
+					requestsWaiting: newFIFO(
 						&request{workEstimate: qs0.completeWorkEstimate(&fcrequest.WorkEstimate{InitialSeats: 1})},
 					),
+					requestsExecuting: sets.New[*request](),
 				},
 				{
 					nextDispatchR: fcrequest.SeatsTimesDuration(1, 100*time.Second),
-					requests: newFIFO(
+					requestsWaiting: newFIFO(
 						&request{workEstimate: qs0.completeWorkEstimate(&fcrequest.WorkEstimate{InitialSeats: 1})},
 					),
 				},
@@ -1291,9 +1324,10 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 			queues: []*queue{
 				{
 					nextDispatchR: fcrequest.SeatsTimesDuration(1, 200*time.Second),
-					requests: newFIFO(
+					requestsWaiting: newFIFO(
 						&request{workEstimate: qs0.completeWorkEstimate(&fcrequest.WorkEstimate{InitialSeats: 1})},
 					),
+					requestsExecuting: sets.New[*request](),
 				},
 			},
 			attempts:              1,
@@ -1308,15 +1342,17 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 			queues: []*queue{
 				{
 					nextDispatchR: fcrequest.SeatsTimesDuration(1, 200*time.Second),
-					requests: newFIFO(
+					requestsWaiting: newFIFO(
 						&request{workEstimate: qs0.completeWorkEstimate(&fcrequest.WorkEstimate{InitialSeats: 50})},
 					),
+					requestsExecuting: sets.New[*request](),
 				},
 				{
 					nextDispatchR: fcrequest.SeatsTimesDuration(1, 100*time.Second),
-					requests: newFIFO(
+					requestsWaiting: newFIFO(
 						&request{workEstimate: qs0.completeWorkEstimate(&fcrequest.WorkEstimate{InitialSeats: 25})},
 					),
+					requestsExecuting: sets.New[*request](),
 				},
 			},
 			attempts:              1,
@@ -1331,15 +1367,17 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 			queues: []*queue{
 				{
 					nextDispatchR: fcrequest.SeatsTimesDuration(1, 200*time.Second),
-					requests: newFIFO(
+					requestsWaiting: newFIFO(
 						&request{workEstimate: qs0.completeWorkEstimate(&fcrequest.WorkEstimate{InitialSeats: 10})},
 					),
+					requestsExecuting: sets.New[*request](),
 				},
 				{
 					nextDispatchR: fcrequest.SeatsTimesDuration(1, 100*time.Second),
-					requests: newFIFO(
+					requestsWaiting: newFIFO(
 						&request{workEstimate: qs0.completeWorkEstimate(&fcrequest.WorkEstimate{InitialSeats: 25})},
 					),
+					requestsExecuting: sets.New[*request](),
 				},
 			},
 			attempts:              3,
@@ -1354,15 +1392,17 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 			queues: []*queue{
 				{
 					nextDispatchR: fcrequest.SeatsTimesDuration(1, 200*time.Second),
-					requests: newFIFO(
+					requestsWaiting: newFIFO(
 						&request{workEstimate: qs0.completeWorkEstimate(&fcrequest.WorkEstimate{InitialSeats: 10})},
 					),
+					requestsExecuting: sets.New[*request](),
 				},
 				{
 					nextDispatchR: fcrequest.SeatsTimesDuration(1, 100*time.Second),
-					requests: newFIFO(
+					requestsWaiting: newFIFO(
 						&request{workEstimate: qs0.completeWorkEstimate(&fcrequest.WorkEstimate{InitialSeats: 25})},
 					),
+					requestsExecuting: sets.New[*request](),
 				},
 			},
 			beforeSelectQueueLocked: func(attempt int, qs *queueSet) {
@@ -1457,23 +1497,25 @@ func TestFinishRequestLocked(t *testing.T) {
 				seatDemandIntegrator:     fq.NewNamedIntegrator(clk, "seatDemandSubject"),
 			}
 			queue := &queue{
-				requests: newRequestFIFO(),
+				requestsWaiting:   newRequestFIFO(),
+				requestsExecuting: sets.New[*request](),
 			}
 			r := &request{
 				qs:           qs,
 				queue:        queue,
 				workEstimate: qs.completeWorkEstimate(&test.workEstimate),
 			}
+			rOther := &request{qs: qs, queue: queue}
 
 			qs.totRequestsExecuting = 111
 			qs.totSeatsInUse = 222
-			queue.requestsExecuting = 11
+			queue.requestsExecuting = sets.New(r, rOther)
 			queue.seatsInUse = 22
 
 			var (
 				queuesetTotalRequestsExecutingExpected = qs.totRequestsExecuting - 1
 				queuesetTotalSeatsInUseExpected        = qs.totSeatsInUse - test.workEstimate.MaxSeats()
-				queueRequestsExecutingExpected         = queue.requestsExecuting - 1
+				queueRequestsExecutingExpected         = sets.New(rOther)
 				queueSeatsInUseExpected                = queue.seatsInUse - test.workEstimate.MaxSeats()
 			)
 
@@ -1488,8 +1530,8 @@ func TestFinishRequestLocked(t *testing.T) {
 			if queuesetTotalSeatsInUseExpected != qs.totSeatsInUse {
 				t.Errorf("Expected total seats in use: %d, but got: %d", queuesetTotalSeatsInUseExpected, qs.totSeatsInUse)
 			}
-			if queueRequestsExecutingExpected != queue.requestsExecuting {
-				t.Errorf("Expected requests executing for queue: %d, but got: %d", queueRequestsExecutingExpected, queue.requestsExecuting)
+			if !queueRequestsExecutingExpected.Equal(queue.requestsExecuting) {
+				t.Errorf("Expected requests executing for queue: %v, but got: %v", queueRequestsExecutingExpected, queue.requestsExecuting)
 			}
 			if queueSeatsInUseExpected != queue.seatsInUse {
 				t.Errorf("Expected seats in use for queue: %d, but got: %d", queueSeatsInUseExpected, queue.seatsInUse)
