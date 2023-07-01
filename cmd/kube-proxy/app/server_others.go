@@ -50,6 +50,7 @@ import (
 	utilipset "k8s.io/kubernetes/pkg/proxy/ipvs/ipset"
 	utilipvs "k8s.io/kubernetes/pkg/proxy/ipvs/util"
 	proxymetrics "k8s.io/kubernetes/pkg/proxy/metrics"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	"k8s.io/utils/exec"
@@ -179,7 +180,7 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 		} else {
 			// Create a single-stack proxier if and only if the node does not support dual-stack (i.e, no iptables support).
 			var localDetector proxyutiliptables.LocalTrafficDetector
-			localDetector, err = getLocalDetector(config.DetectLocalMode, config, iptInterface, s.podCIDRs)
+			localDetector, err = getLocalDetector(s.PrimaryIPFamily, config.DetectLocalMode, config, iptInterface, s.podCIDRs)
 			if err != nil {
 				return nil, fmt.Errorf("unable to create proxier: %v", err)
 			}
@@ -250,7 +251,7 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 			)
 		} else {
 			var localDetector proxyutiliptables.LocalTrafficDetector
-			localDetector, err = getLocalDetector(config.DetectLocalMode, config, iptInterface, s.podCIDRs)
+			localDetector, err = getLocalDetector(s.PrimaryIPFamily, config.DetectLocalMode, config, iptInterface, s.podCIDRs)
 			if err != nil {
 				return nil, fmt.Errorf("unable to create proxier: %v", err)
 			}
@@ -402,28 +403,40 @@ func detectNumCPU() int {
 	return numCPU
 }
 
-func getLocalDetector(mode proxyconfigapi.LocalMode, config *proxyconfigapi.KubeProxyConfiguration, ipt utiliptables.Interface, nodePodCIDRs []string) (proxyutiliptables.LocalTrafficDetector, error) {
+func getLocalDetector(ipFamily v1.IPFamily, mode proxyconfigapi.LocalMode, config *proxyconfigapi.KubeProxyConfiguration, ipt utiliptables.Interface, nodePodCIDRs []string) (proxyutiliptables.LocalTrafficDetector, error) {
 	switch mode {
 	case proxyconfigapi.LocalModeClusterCIDR:
 		// LocalModeClusterCIDR is the default if --detect-local-mode wasn't passed,
 		// but --cluster-cidr is optional.
-		if len(strings.TrimSpace(config.ClusterCIDR)) == 0 {
+		clusterCIDRs := strings.TrimSpace(config.ClusterCIDR)
+		if len(clusterCIDRs) == 0 {
 			klog.InfoS("Detect-local-mode set to ClusterCIDR, but no cluster CIDR defined")
 			break
 		}
-		return proxyutiliptables.NewDetectLocalByCIDR(config.ClusterCIDR, ipt)
-	case proxyconfigapi.LocalModeNodeCIDR:
-		if len(nodePodCIDRs) == 0 {
-			klog.InfoS("Detect-local-mode set to NodeCIDR, but no PodCIDR defined at node")
-			break
+
+		cidrsByFamily := proxyutil.MapCIDRsByIPFamily(strings.Split(clusterCIDRs, ","))
+		if len(cidrsByFamily[ipFamily]) != 0 {
+			return proxyutiliptables.NewDetectLocalByCIDR(cidrsByFamily[ipFamily][0], ipt)
 		}
-		return proxyutiliptables.NewDetectLocalByCIDR(nodePodCIDRs[0], ipt)
+
+		klog.InfoS("Detect-local-mode set to ClusterCIDR, but no cluster CIDR for family", "ipFamily", ipFamily)
+
+	case proxyconfigapi.LocalModeNodeCIDR:
+		cidrsByFamily := proxyutil.MapCIDRsByIPFamily(nodePodCIDRs)
+		if len(cidrsByFamily[ipFamily]) != 0 {
+			return proxyutiliptables.NewDetectLocalByCIDR(cidrsByFamily[ipFamily][0], ipt)
+		}
+
+		klog.InfoS("Detect-local-mode set to NodeCIDR, but no PodCIDR defined at node for family", "ipFamily", ipFamily)
+
 	case proxyconfigapi.LocalModeBridgeInterface:
 		return proxyutiliptables.NewDetectLocalByBridgeInterface(config.DetectLocal.BridgeInterface)
+
 	case proxyconfigapi.LocalModeInterfaceNamePrefix:
 		return proxyutiliptables.NewDetectLocalByInterfaceNamePrefix(config.DetectLocal.InterfaceNamePrefix)
 	}
-	klog.InfoS("Defaulting to no-op detect-local", "detectLocalMode", string(mode))
+
+	klog.InfoS("Defaulting to no-op detect-local")
 	return proxyutiliptables.NewNoOpLocalDetector(), nil
 }
 
@@ -482,7 +495,7 @@ func getDualStackLocalDetectorTuple(mode proxyconfigapi.LocalMode, config *proxy
 		}
 		return localDetectors, err
 	case proxyconfigapi.LocalModeBridgeInterface, proxyconfigapi.LocalModeInterfaceNamePrefix:
-		localDetector, err := getLocalDetector(mode, config, ipt[0], nodePodCIDRs)
+		localDetector, err := getLocalDetector("", mode, config, nil, nodePodCIDRs)
 		if err == nil {
 			localDetectors[0] = localDetector
 			localDetectors[1] = localDetector
