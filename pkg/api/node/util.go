@@ -31,7 +31,7 @@ var deprecatedNodeLabels = map[string]string{
 	`failure-domain.beta.kubernetes.io/region`:      `deprecated since v1.17; use "topology.kubernetes.io/region" instead`,
 	`failure-domain.beta.kubernetes.io/zone`:        `deprecated since v1.17; use "topology.kubernetes.io/zone" instead`,
 	`beta.kubernetes.io/instance-type`:              `deprecated since v1.17; use "node.kubernetes.io/instance-type" instead`,
-	`scheduler.alpha.kubernetes.io/preferAvoidPods`: `deprecated since v1.17; use Taints and Tolerations instead`,
+	`scheduler.alpha.kubernetes.io/preferAvoidPods`: `deprecated since v1.22; use Taints and Tolerations instead`,
 	`node-role.kubernetes.io/master`:                `use "node-role.kubernetes.io/control-plane" instead`,
 }
 
