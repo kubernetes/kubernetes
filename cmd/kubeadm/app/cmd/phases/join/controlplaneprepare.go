@@ -203,7 +203,7 @@ func runControlPlanePrepareControlPlaneSubphase(c workflow.RunData) error {
 		err := controlplane.CreateStaticPodFiles(
 			data.ManifestDir(),
 			data.PatchesDir(),
-			&cfg.ClusterConfiguration,
+			cfg,
 			&cfg.LocalAPIEndpoint,
 			data.DryRun(),
 			component,

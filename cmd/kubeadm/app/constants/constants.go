@@ -209,8 +209,8 @@ const (
 	DiscoveryRetryInterval = 5 * time.Second
 	// PatchNodeTimeout specifies how long kubeadm should wait for applying the label and taint on the control-plane before timing out
 	PatchNodeTimeout = 2 * time.Minute
-	// TLSBootstrapTimeout specifies how long kubeadm should wait for the kubelet to perform the TLS Bootstrap
-	TLSBootstrapTimeout = 5 * time.Minute
+	// KubeletTLSBootstrap specifies how long kubeadm should wait for the kubelet to perform the TLS Bootstrap
+	KubeletTLSBootstrap = 5 * time.Minute
 	// TLSBootstrapRetryInterval specifies how long kubeadm should wait before retrying the TLS Bootstrap check
 	TLSBootstrapRetryInterval = 1 * time.Second
 	// APICallWithWriteTimeout specifies how long kubeadm should wait for api calls with at least one write

@@ -34,3 +34,12 @@ func Convert_v1beta3_InitConfiguration_To_kubeadm_InitConfiguration(in *InitConf
 	err = Convert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(&ClusterConfiguration{}, &out.ClusterConfiguration, s)
 	return err
 }
+
+// Convert_kubeadm_APIServer_To_v1beta3_APIServer is required since APIServer.TimeoutForControlPlane has be removed
+func Convert_kubeadm_APIServer_To_v1beta3_APIServer(in *kubeadm.APIServer, out *APIServer, s conversion.Scope) error {
+	return autoConvert_kubeadm_APIServer_To_v1beta3_APIServer(in, out, s)
+}
+
+func Convert_v1beta3_APIServer_To_kubeadm_APIServer(in *APIServer, out *kubeadm.APIServer, s conversion.Scope) error {
+	return autoConvert_v1beta3_APIServer_To_kubeadm_APIServer(in, out, s)
+}

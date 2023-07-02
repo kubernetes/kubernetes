@@ -25,6 +25,18 @@ limitations under the License.
 // A list of changes since v1beta3:
 //   - TODO https://github.com/kubernetes/kubeadm/issues/2890
 //
+// - Add InitTimeouts to hold timeout fields that relate to registering a new control-plane to the cluster,
+// via "kubeadm init"
+// - Add JoinTimeouts to hold timeout fields that relate to registering a new control-plane or node to the cluster,
+// via "kubeadm join"
+// - Add Timeouts(InitTimeouts) field into InitConfiguration struct to holds timeout fields that relate to registering a new control-plane
+// to the cluster
+// - Add Timeouts(JoinTimeouts) field into JoinConfiguration struct to holds timeout fields that relate to registering a new control-plane or
+// node to the cluster
+// - Remove TimeoutForControlPlane field from APIServer, because TimeoutForControlPlane has been removed into InitTimeouts and JoinTimeouts
+// structure and renamed to ApiServerHealthCheck
+// - Add KubeletTLSBootstrap field into JoinTimeouts to specifies how long kubeadm should wait for the kubelet to perform the TLS Bootstrap
+
 // Migration from old kubeadm config versions
 //
 //   - kubeadm v1.15.x and newer can be used to migrate from v1beta1 to v1beta2.

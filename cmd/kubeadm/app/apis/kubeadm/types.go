@@ -67,6 +67,10 @@ type InitConfiguration struct {
 	// Patches contains options related to applying patches to components deployed by kubeadm during
 	// "kubeadm init".
 	Patches *Patches
+
+	// Timeouts holds fields controlling timeouts when registering a control plane node during
+	// "kubeadm init".
+	Timeouts *InitTimeouts `json:"timeout,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -311,6 +315,10 @@ type JoinConfiguration struct {
 	// Patches contains options related to applying patches to components deployed by kubeadm during
 	// "kubeadm join".
 	Patches *Patches
+
+	// Timeout holds timeout fields that relate to registering a new control-plane or node to the cluster,
+	// either via "kubeadm init" or "kubeadm join"
+	Timeouts *JoinTimeouts
 }
 
 // JoinControlPlane contains elements describing an additional control plane instance to be deployed on the joining node.
@@ -457,3 +465,22 @@ type ComponentConfig interface {
 
 // ComponentConfigMap is a map between a group name (as in GVK group) and a ComponentConfig
 type ComponentConfigMap map[string]ComponentConfig
+
+// InitTimeouts holds timeout fields that relate to registering a new control-plane to the cluster,
+// via "kubeadm init"
+type InitTimeouts struct {
+	// ApiServerHealthCheck controls the timeout that we use for API server to appear
+	// +optional
+	ApiServerHealthCheck *metav1.Duration
+}
+
+// JoinTimeouts holds timeout fields that relate to registering a new control-plane or node to the cluster,
+// via "kubeadm join
+type JoinTimeouts struct {
+	// ApiServerHealthCheck specifies how long kubeadm should check for the kube-apiserver to return
+	// status OK on the /healthz endpoint during "kubeadm join".
+	// +optional
+	ApiServerHealthCheck *metav1.Duration
+	// kubeletTLSBootstrap specifies how long kubeadm should wait for the kubelet to perform TLS bootstrap.
+	KubeletTLSBootstrap *metav1.Duration
+}
