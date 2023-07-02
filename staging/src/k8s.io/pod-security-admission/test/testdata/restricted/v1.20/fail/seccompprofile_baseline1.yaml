@@ -4,14 +4,14 @@ metadata:
   name: seccompprofile_baseline1
 spec:
   containers:
-  - image: k8s.gcr.io/pause
+  - image: registry.k8s.io/pause
     name: container1
     securityContext:
       allowPrivilegeEscalation: false
       seccompProfile:
         type: Unconfined
   initContainers:
-  - image: k8s.gcr.io/pause
+  - image: registry.k8s.io/pause
     name: initcontainer1
     securityContext:
       allowPrivilegeEscalation: false

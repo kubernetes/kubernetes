@@ -19,8 +19,8 @@ package webhook
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -63,6 +63,30 @@ func TestAuthenticationDetection(t *testing.T) {
 				},
 			},
 			expected: rest.Config{BearerToken: "foo"},
+		},
+		{
+			name:       "match with impersonation",
+			serverName: "foo.com",
+			kubeconfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo.com": {
+						Token:                "foo",
+						Impersonate:          "user-a",
+						ImpersonateUID:       "user-a-uid-1111",
+						ImpersonateGroups:    []string{"user-a-group1", "user-a-group2"},
+						ImpersonateUserExtra: map[string][]string{"foo": {"bar", "baz", "etc"}},
+					},
+				},
+			},
+			expected: rest.Config{
+				BearerToken: "foo",
+				Impersonate: rest.ImpersonationConfig{
+					UserName: "user-a",
+					UID:      "user-a-uid-1111",
+					Groups:   []string{"user-a-group1", "user-a-group2"},
+					Extra:    map[string][]string{"foo": {"bar", "baz", "etc"}},
+				},
+			},
 		},
 		{
 			name:       "partial star match",
@@ -206,7 +230,7 @@ func TestAuthenticationDetection(t *testing.T) {
 			actual.Timeout = 0
 
 			if !equality.Semantic.DeepEqual(*actual, tc.expected) {
-				t.Errorf("%v", diff.ObjectReflectDiff(tc.expected, *actual))
+				t.Errorf("%v", cmp.Diff(tc.expected, *actual))
 			}
 		})
 	}

@@ -75,7 +75,7 @@ var _ = utils.SIGDescribe("PersistentVolumes GCEPD [Feature:StorageProvider]", f
 	)
 
 	f := framework.NewDefaultFramework("pv")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		c = f.ClientSet
 		ns = f.Namespace.Name

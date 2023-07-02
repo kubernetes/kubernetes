@@ -66,14 +66,7 @@ func TestKMSPluginLateStart(t *testing.T) {
 	defer destroyService(service)
 
 	time.Sleep(callTimeout / 2)
-	f, err := mock.NewBase64Plugin(s.path)
-	if err != nil {
-		t.Fatalf("failed to start test KMS provider server, error: %v", err)
-	}
-	if err := f.Start(); err != nil {
-		t.Fatalf("Failed to start kms-plugin, err: %v", err)
-	}
-	defer f.CleanUp()
+	_ = mock.NewBase64Plugin(t, s.path)
 
 	data := []byte("test data")
 	_, err = service.Encrypt(data)
@@ -144,7 +137,8 @@ func TestTimeouts(t *testing.T) {
 
 				service, err = NewGRPCService(ctx, socketName.endpoint, tt.callTimeout)
 				if err != nil {
-					t.Fatalf("failed to create envelope service, error: %v", err)
+					t.Errorf("failed to create envelope service, error: %v", err)
+					return
 				}
 				defer destroyService(service)
 				kubeAPIServerWG.Done()
@@ -157,20 +151,17 @@ func TestTimeouts(t *testing.T) {
 				// Simulating delayed start of kms-plugin, kube-apiserver is up before the plugin, if requested by the testcase.
 				time.Sleep(tt.pluginDelay)
 
-				f, err := mock.NewBase64Plugin(socketName.path)
-				if err != nil {
-					t.Fatalf("failed to construct test KMS provider server, error: %v", err)
-				}
-				if err := f.Start(); err != nil {
-					t.Fatalf("Failed to start test KMS provider server, error: %v", err)
-				}
-				defer f.CleanUp()
+				_ = mock.NewBase64Plugin(t, socketName.path)
+
 				kmsPluginWG.Done()
 				// Keeping plugin up to process requests.
 				testCompletedWG.Wait()
 			}()
 
 			kubeAPIServerWG.Wait()
+			if t.Failed() {
+				return
+			}
 			_, err = service.Encrypt(data)
 
 			if err == nil && tt.wantErr != "" {
@@ -200,13 +191,7 @@ func TestIntermittentConnectionLoss(t *testing.T) {
 		encryptErr error
 	)
 	// Start KMS Plugin
-	f, err := mock.NewBase64Plugin(endpoint.path)
-	if err != nil {
-		t.Fatalf("failed to start test KMS provider server, error: %v", err)
-	}
-	if err := f.Start(); err != nil {
-		t.Fatalf("Failed to start kms-plugin, err: %v", err)
-	}
+	f := mock.NewBase64Plugin(t, endpoint.path)
 
 	ctx := testContext(t)
 
@@ -222,10 +207,10 @@ func TestIntermittentConnectionLoss(t *testing.T) {
 		t.Fatalf("failed when execute encrypt, error: %v", err)
 	}
 	t.Log("Connected to KMSPlugin")
+	f.CleanUp()
 
 	// Stop KMS Plugin - simulating connection loss
 	t.Log("KMS Plugin is stopping")
-	f.CleanUp()
 	time.Sleep(2 * time.Second)
 
 	wg1.Add(1)
@@ -244,14 +229,7 @@ func TestIntermittentConnectionLoss(t *testing.T) {
 	wg1.Wait()
 	time.Sleep(blackOut)
 	// Start KMS Plugin
-	f, err = mock.NewBase64Plugin(endpoint.path)
-	if err != nil {
-		t.Fatalf("failed to start test KMS provider server, error: %v", err)
-	}
-	if err := f.Start(); err != nil {
-		t.Fatalf("Failed to start kms-plugin, err: %v", err)
-	}
-	defer f.CleanUp()
+	_ = mock.NewBase64Plugin(t, endpoint.path)
 	t.Log("Restarted KMS Plugin")
 
 	wg2.Wait()
@@ -268,15 +246,8 @@ func TestUnsupportedVersion(t *testing.T) {
 	wantErr := fmt.Errorf(versionErrorf, ver, kmsapiVersion)
 	endpoint := newEndpoint()
 
-	f, err := mock.NewBase64Plugin(endpoint.path)
-	if err != nil {
-		t.Fatalf("failed to start test KMS provider server, error: %ver", err)
-	}
+	f := mock.NewBase64Plugin(t, endpoint.path)
 	f.SetVersion(ver)
-	if err := f.Start(); err != nil {
-		t.Fatalf("Failed to start kms-plugin, err: %v", err)
-	}
-	defer f.CleanUp()
 
 	ctx := testContext(t)
 
@@ -312,14 +283,7 @@ func TestGRPCService(t *testing.T) {
 	t.Parallel()
 	// Start a test gRPC server.
 	endpoint := newEndpoint()
-	f, err := mock.NewBase64Plugin(endpoint.path)
-	if err != nil {
-		t.Fatalf("failed to construct test KMS provider server, error: %v", err)
-	}
-	if err := f.Start(); err != nil {
-		t.Fatalf("Failed to start kms-plugin, err: %v", err)
-	}
-	defer f.CleanUp()
+	_ = mock.NewBase64Plugin(t, endpoint.path)
 
 	ctx := testContext(t)
 
@@ -353,14 +317,7 @@ func TestGRPCServiceConcurrentAccess(t *testing.T) {
 	t.Parallel()
 	// Start a test gRPC server.
 	endpoint := newEndpoint()
-	f, err := mock.NewBase64Plugin(endpoint.path)
-	if err != nil {
-		t.Fatalf("failed to start test KMS provider server, error: %v", err)
-	}
-	if err := f.Start(); err != nil {
-		t.Fatalf("Failed to start kms-plugin, err: %v", err)
-	}
-	defer f.CleanUp()
+	_ = mock.NewBase64Plugin(t, endpoint.path)
 
 	ctx := testContext(t)
 
@@ -410,14 +367,7 @@ func destroyService(service Service) {
 func TestInvalidConfiguration(t *testing.T) {
 	t.Parallel()
 	// Start a test gRPC server.
-	f, err := mock.NewBase64Plugin(newEndpoint().path)
-	if err != nil {
-		t.Fatalf("failed to start test KMS provider server, error: %v", err)
-	}
-	if err := f.Start(); err != nil {
-		t.Fatalf("Failed to start kms-plugin, err: %v", err)
-	}
-	defer f.CleanUp()
+	_ = mock.NewBase64Plugin(t, newEndpoint().path)
 
 	ctx := testContext(t)
 

@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -108,8 +108,8 @@ func (c *ServiceAccountsController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	klog.Infof("Starting service account controller")
-	defer klog.Infof("Shutting down service account controller")
+	klog.FromContext(ctx).Info("Starting service account controller")
+	defer klog.FromContext(ctx).Info("Shutting down service account controller")
 
 	if !cache.WaitForNamedCacheSync("service account", ctx.Done(), c.saListerSynced, c.nsListerSynced) {
 		return
@@ -179,7 +179,7 @@ func (c *ServiceAccountsController) processNextWorkItem(ctx context.Context) boo
 func (c *ServiceAccountsController) syncNamespace(ctx context.Context, key string) error {
 	startTime := time.Now()
 	defer func() {
-		klog.V(4).Infof("Finished syncing namespace %q (%v)", key, time.Since(startTime))
+		klog.FromContext(ctx).V(4).Info("Finished syncing namespace", "namespace", key, "duration", time.Since(startTime))
 	}()
 
 	ns, err := c.nsLister.Get(key)

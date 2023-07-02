@@ -6,7 +6,7 @@ must be benchmarked before and after the change.
 ## Running the benchmark
 
 ```
-$ go test -bench=. -test.benchmem -benchmem .
+go test -v -bench=. -benchmem -benchtime=10s .
 ```
 
 ## Real log data
@@ -28,9 +28,29 @@ Prow job:
 - `artifacts/logs/kind-control-plane/containers`
 - `artifacts/logs/kind-*/kubelet.log`
 
-With sufficient credentials, `gsutil` can be used to download everything for a job with:
+With sufficient credentials, `gsutil` can be used to download everything for a job directly
+into a directory that then will be used by the benchmarks automatically:
+
 ```
-gsutil -m cp -R gs://kubernetes-jenkins/logs/ci-kubernetes-kind-e2e-json-logging/<job ID> .
+kubernetes$ test/integration/logs/benchmark/get-logs.sh
+++ dirname test/integration/logs/benchmark/get-logs.sh
++ cd test/integration/logs/benchmark
+++ latest_job
+++ gsutil cat gs://kubernetes-jenkins/logs/ci-kubernetes-kind-e2e-json-logging/latest-build.txt
++ job=1618864842834186240
++ rm -rf ci-kubernetes-kind-e2e-json-logging
++ mkdir ci-kubernetes-kind-e2e-json-logging
+...
+```
+
+This sets up the `data` directory so that additional test cases are available
+(`BenchmarkEncoding/v3/kind-worker-kubelet/`,
+`BenchmarkEncoding/kube-scheduler/`, etc.).
+
+
+To clean up, use
+```
+git clean -fx test/integration/logs/benchmark
 ```
 
 ## Analyzing log data
@@ -39,5 +59,5 @@ While loading a file, some statistics about it are collected. Those are shown
 when running with:
 
 ```
-$ go test -v -bench=. -test.benchmem -benchmem .
+go test -v -bench=BenchmarkEncoding/none -run=none  .
 ```

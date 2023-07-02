@@ -62,7 +62,7 @@ type dnsTestCommon struct {
 
 func newDNSTestCommon() dnsTestCommon {
 	framework := framework.NewDefaultFramework("dns-config-map")
-	framework.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	framework.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	return dnsTestCommon{
 		f:  framework,
 		ns: "kube-system",
@@ -77,7 +77,7 @@ func (t *dnsTestCommon) init(ctx context.Context) {
 	namespace := "kube-system"
 	pods, err := t.f.ClientSet.CoreV1().Pods(namespace).List(ctx, options)
 	framework.ExpectNoError(err, "failed to list pods in namespace: %s", namespace)
-	gomega.Expect(len(pods.Items)).Should(gomega.BeNumerically(">=", 1))
+	gomega.Expect(pods.Items).ToNot(gomega.BeEmpty())
 
 	t.dnsPod = &pods.Items[0]
 	framework.Logf("Using DNS pod: %v", t.dnsPod.Name)
@@ -487,6 +487,14 @@ func assertFilesContain(ctx context.Context, fileNames []string, fileDir string,
 			return true, nil
 		}
 		framework.Logf("Lookups using %s/%s failed for: %v\n", pod.Namespace, pod.Name, failed)
+
+		// grab logs from all the containers
+		for _, container := range pod.Spec.Containers {
+			logs, err := e2epod.GetPodLogs(ctx, client, pod.Namespace, pod.Name, container.Name)
+			framework.ExpectNoError(err)
+			framework.Logf("Pod client logs for %s: %s", container.Name, logs)
+		}
+
 		return false, nil
 	}))
 	framework.ExpectEqual(len(failed), 0)

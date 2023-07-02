@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/errors"
 )
 
@@ -39,15 +40,28 @@ type Context interface {
 	AuthenticatedData() []byte
 }
 
-// Transformer allows a value to be transformed before being read from or written to the underlying store. The methods
-// must be able to undo the transformation caused by the other.
-type Transformer interface {
+type Read interface {
 	// TransformFromStorage may transform the provided data from its underlying storage representation or return an error.
 	// Stale is true if the object on disk is stale and a write to etcd should be issued, even if the contents of the object
 	// have not changed.
 	TransformFromStorage(ctx context.Context, data []byte, dataCtx Context) (out []byte, stale bool, err error)
+}
+
+type Write interface {
 	// TransformToStorage may transform the provided data into the appropriate form in storage or return an error.
 	TransformToStorage(ctx context.Context, data []byte, dataCtx Context) (out []byte, err error)
+}
+
+// Transformer allows a value to be transformed before being read from or written to the underlying store. The methods
+// must be able to undo the transformation caused by the other.
+type Transformer interface {
+	Read
+	Write
+}
+
+// ResourceTransformers returns a transformer for the provided resource.
+type ResourceTransformers interface {
+	TransformerForResource(resource schema.GroupResource) Transformer
 }
 
 // DefaultContext is a simple implementation of Context for a slice of bytes.
@@ -100,9 +114,9 @@ func (t *prefixTransformers) TransformFromStorage(ctx context.Context, data []by
 				continue
 			}
 			if len(transformer.Prefix) == 0 {
-				RecordTransformation("from_storage", "identity", start, err)
+				RecordTransformation("from_storage", "identity", time.Since(start), err)
 			} else {
-				RecordTransformation("from_storage", string(transformer.Prefix), start, err)
+				RecordTransformation("from_storage", string(transformer.Prefix), time.Since(start), err)
 			}
 
 			// It is valid to have overlapping prefixes when the same encryption provider
@@ -146,7 +160,7 @@ func (t *prefixTransformers) TransformFromStorage(ctx context.Context, data []by
 	if err := errors.Reduce(errors.NewAggregate(errs)); err != nil {
 		return nil, false, err
 	}
-	RecordTransformation("from_storage", "unknown", start, t.err)
+	RecordTransformation("from_storage", "unknown", time.Since(start), t.err)
 	return nil, false, t.err
 }
 
@@ -155,7 +169,7 @@ func (t *prefixTransformers) TransformToStorage(ctx context.Context, data []byte
 	start := time.Now()
 	transformer := t.transformers[0]
 	result, err := transformer.Transformer.TransformToStorage(ctx, data, dataCtx)
-	RecordTransformation("to_storage", string(transformer.Prefix), start, err)
+	RecordTransformation("to_storage", string(transformer.Prefix), time.Since(start), err)
 	if err != nil {
 		return nil, err
 	}

@@ -127,7 +127,7 @@ func (pl *DefaultPreemption) GetOffsetAndNumCandidates(numNodes int32) (int32, i
 // This function is not applicable for out-of-tree preemption plugins that exercise
 // different preemption candidates on the same nominated node.
 func (pl *DefaultPreemption) CandidatesToVictimsMap(candidates []preemption.Candidate) map[string]*extenderv1.Victims {
-	m := make(map[string]*extenderv1.Victims)
+	m := make(map[string]*extenderv1.Victims, len(candidates))
 	for _, c := range candidates {
 		m[c.Name()] = c.Victims()
 	}
@@ -142,6 +142,7 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 	pod *v1.Pod,
 	nodeInfo *framework.NodeInfo,
 	pdbs []*policy.PodDisruptionBudget) ([]*v1.Pod, int, *framework.Status) {
+	logger := klog.FromContext(ctx)
 	var potentialVictims []*framework.PodInfo
 	removePod := func(rpi *framework.PodInfo) error {
 		if err := nodeInfo.RemovePod(rpi.Pod); err != nil {
@@ -207,7 +208,7 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 			}
 			rpi := pi.Pod
 			victims = append(victims, rpi)
-			klog.V(5).InfoS("Pod is a potential preemption victim on node", "pod", klog.KObj(rpi), "node", klog.KObj(nodeInfo.Node()))
+			logger.V(5).Info("Pod is a potential preemption victim on node", "pod", klog.KObj(rpi), "node", klog.KObj(nodeInfo.Node()))
 		}
 		return fits, nil
 	}

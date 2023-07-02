@@ -39,7 +39,7 @@ func RunWithPrivateKeyFixtureDirectory(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// Reset() indicates a new test is starting and previously returned private key fixtures may be reused.
+// Reset indicates a new test is starting and previously returned private key fixtures may be reused.
 func Reset() {
 	lock.Lock()
 	defer lock.Unlock()

@@ -50,7 +50,7 @@ var _ = utils.SIGDescribe("PV Protection", func() {
 	)
 
 	f := framework.NewDefaultFramework("pv-protection")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		client = f.ClientSet
 		nameSpace = f.Namespace.Name

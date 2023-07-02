@@ -37,6 +37,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	watchtools "k8s.io/client-go/tools/watch"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/controller"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
@@ -59,8 +60,12 @@ const (
 //	quota_test.go:100: Took 4.196205966s to scale up without quota
 //	quota_test.go:115: Took 12.021640372s to scale up with quota
 func TestQuota(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	// Set up a API server
-	_, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
@@ -74,9 +79,6 @@ func TestQuota(t *testing.T) {
 	defer framework.DeleteNamespaceOrDie(clientset, ns, t)
 	ns2 := framework.CreateNamespaceOrDie(clientset, "non-quotaed", t)
 	defer framework.DeleteNamespaceOrDie(clientset, ns2, t)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	informers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
 	rm := replicationcontroller.NewReplicationManager(
@@ -102,14 +104,14 @@ func TestQuota(t *testing.T) {
 		InformersStarted:          informersStarted,
 		Registry:                  generic.NewRegistry(qc.Evaluators()),
 	}
-	resourceQuotaController, err := resourcequotacontroller.NewController(resourceQuotaControllerOptions)
+	resourceQuotaController, err := resourcequotacontroller.NewController(ctx, resourceQuotaControllerOptions)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 	go resourceQuotaController.Run(ctx, 2)
 
 	// Periodically the quota controller to detect new resource types
-	go resourceQuotaController.Sync(discoveryFunc, 30*time.Second, ctx.Done())
+	go resourceQuotaController.Sync(ctx, discoveryFunc, 30*time.Second)
 
 	informers.Start(ctx.Done())
 	close(informersStarted)
@@ -288,8 +290,12 @@ plugins:
 		t.Fatal(err)
 	}
 
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	// Set up an API server
-	_, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
@@ -303,9 +309,6 @@ plugins:
 
 	ns := framework.CreateNamespaceOrDie(clientset, "quota", t)
 	defer framework.DeleteNamespaceOrDie(clientset, ns, t)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	informers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
 	rm := replicationcontroller.NewReplicationManager(
@@ -331,14 +334,14 @@ plugins:
 		InformersStarted:          informersStarted,
 		Registry:                  generic.NewRegistry(qc.Evaluators()),
 	}
-	resourceQuotaController, err := resourcequotacontroller.NewController(resourceQuotaControllerOptions)
+	resourceQuotaController, err := resourcequotacontroller.NewController(ctx, resourceQuotaControllerOptions)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 	go resourceQuotaController.Run(ctx, 2)
 
 	// Periodically the quota controller to detect new resource types
-	go resourceQuotaController.Sync(discoveryFunc, 30*time.Second, ctx.Done())
+	go resourceQuotaController.Sync(ctx, discoveryFunc, 30*time.Second)
 
 	informers.Start(ctx.Done())
 	close(informersStarted)
@@ -414,8 +417,12 @@ plugins:
 		t.Fatal(err)
 	}
 
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	// Set up an API server
-	_, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
@@ -429,9 +436,6 @@ plugins:
 
 	ns := framework.CreateNamespaceOrDie(clientset, "quota", t)
 	defer framework.DeleteNamespaceOrDie(clientset, ns, t)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	informers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
 	rm := replicationcontroller.NewReplicationManager(
@@ -457,14 +461,14 @@ plugins:
 		InformersStarted:          informersStarted,
 		Registry:                  generic.NewRegistry(qc.Evaluators()),
 	}
-	resourceQuotaController, err := resourcequotacontroller.NewController(resourceQuotaControllerOptions)
+	resourceQuotaController, err := resourcequotacontroller.NewController(ctx, resourceQuotaControllerOptions)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 	go resourceQuotaController.Run(ctx, 2)
 
 	// Periodically the quota controller to detect new resource types
-	go resourceQuotaController.Sync(discoveryFunc, 30*time.Second, ctx.Done())
+	go resourceQuotaController.Sync(ctx, discoveryFunc, 30*time.Second)
 
 	informers.Start(ctx.Done())
 	close(informersStarted)

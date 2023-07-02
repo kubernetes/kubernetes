@@ -37,6 +37,4 @@ const (
 	UnknownFunction           = "unknown function"
 	IncorrectFunctionArgument = "incorrect function argument"
 	NotGivenFunctionArgument  = "not given function argument"
-
-	FrameworkName = "horizontal-pod-autoscaling"
 )

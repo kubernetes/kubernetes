@@ -247,12 +247,12 @@ func TestConnectionPings(t *testing.T) {
 		t.Fatalf("client: error connecting to proxy: %v", err)
 	}
 	defer clConn.Close()
-	start := time.Now()
 	clSPDYConn, err := NewClientConnection(clConn)
 	if err != nil {
 		t.Fatalf("client: error creating spdy connection: %v", err)
 	}
 	defer clSPDYConn.Close()
+	start := time.Now()
 	clSPDYStream, err := clSPDYConn.CreateStream(http.Header{})
 	if err != nil {
 		t.Fatalf("client: error creating stream: %v", err)

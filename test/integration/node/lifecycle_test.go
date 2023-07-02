@@ -17,7 +17,6 @@ limitations under the License.
 package node
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -104,9 +103,6 @@ func TestEvictionForNoExecuteTaintAddedByUser(t *testing.T) {
 
 			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
 			testCtx := testutils.InitTestAPIServer(t, "taint-no-execute", nil)
-
-			// Build clientset and informers for controllers.
-			defer testutils.CleanupTest(t, testCtx)
 			cs := testCtx.ClientSet
 
 			// Build clientset and informers for controllers.
@@ -126,12 +122,10 @@ func TestEvictionForNoExecuteTaintAddedByUser(t *testing.T) {
 				1*time.Second,    // Node monitor grace period
 				time.Minute,      // Node startup grace period
 				time.Millisecond, // Node monitor period
-				1,                // Pod eviction timeout
 				100,              // Eviction limiter QPS
 				100,              // Secondary eviction limiter QPS
 				50,               // Large cluster threshold
 				0.55,             // Unhealthy zone threshold
-				true,             // Run taint manager
 			)
 			if err != nil {
 				t.Fatalf("Failed to create node controller: %v", err)
@@ -265,7 +259,6 @@ func TestTaintBasedEvictions(t *testing.T) {
 			podTolerations.SetExternalKubeClientSet(externalClientset)
 			podTolerations.SetExternalKubeInformerFactory(externalInformers)
 
-			defer testutils.CleanupTest(t, testCtx)
 			cs := testCtx.ClientSet
 
 			// Start NodeLifecycleController for taint.
@@ -279,12 +272,10 @@ func TestTaintBasedEvictions(t *testing.T) {
 				1*time.Second,    // Node monitor grace period
 				time.Minute,      // Node startup grace period
 				time.Millisecond, // Node monitor period
-				time.Second,      // Pod eviction timeout
 				100,              // Eviction limiter QPS
 				100,              // Secondary eviction limiter QPS
 				50,               // Large cluster threshold
 				0.55,             // Unhealthy zone threshold
-				true,             // Run taint manager
 			)
 			if err != nil {
 				t.Fatalf("Failed to create node controller: %v", err)
@@ -329,7 +320,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 					})
 				}
 				nodes = append(nodes, node)
-				if _, err := cs.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{}); err != nil {
+				if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
 					t.Fatalf("Failed to create node: %q, err: %v", klog.KObj(node), err)
 				}
 			}
@@ -341,7 +332,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 					test.pod.Spec.Tolerations[0].TolerationSeconds = &test.tolerationSeconds
 				}
 
-				test.pod, err = cs.CoreV1().Pods(testCtx.NS.Name).Create(context.TODO(), test.pod, metav1.CreateOptions{})
+				test.pod, err = cs.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, test.pod, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("Test Failed: error: %q, while creating pod %q", err, klog.KObj(test.pod))
 				}
@@ -353,7 +344,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 
 			if test.pod != nil {
 				err = wait.PollImmediate(time.Second, time.Second*15, func() (bool, error) {
-					pod, err := cs.CoreV1().Pods(test.pod.Namespace).Get(context.TODO(), test.pod.Name, metav1.GetOptions{})
+					pod, err := cs.CoreV1().Pods(test.pod.Namespace).Get(testCtx.Ctx, test.pod.Name, metav1.GetOptions{})
 					if err != nil {
 						return false, err
 					}
@@ -368,10 +359,10 @@ func TestTaintBasedEvictions(t *testing.T) {
 					return false, nil
 				})
 				if err != nil {
-					pod, _ := cs.CoreV1().Pods(testCtx.NS.Name).Get(context.TODO(), test.pod.Name, metav1.GetOptions{})
+					pod, _ := cs.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, test.pod.Name, metav1.GetOptions{})
 					t.Fatalf("Error: %v, Expected test pod to be %s but it's %v", err, test.expectedWaitForPodCondition, pod)
 				}
-				testutils.CleanupPods(cs, t, []*v1.Pod{test.pod})
+				testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{test.pod})
 			}
 			testutils.CleanupNodes(cs, t)
 		})

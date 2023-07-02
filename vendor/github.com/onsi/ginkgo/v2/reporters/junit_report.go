@@ -36,6 +36,9 @@ type JunitReportConfig struct {
 
 	// Enable OmitLeafNodeType to prevent the spec leaf node type from appearing in the spec name
 	OmitLeafNodeType bool
+
+	// Enable OmitSuiteSetupNodes to prevent the creation of testcase entries for setup nodes
+	OmitSuiteSetupNodes bool
 }
 
 type JUnitTestSuites struct {
@@ -177,6 +180,9 @@ func GenerateJUnitReportWithConfig(report types.Report, dst string, config Junit
 		},
 	}
 	for _, spec := range report.SpecReports {
+		if config.OmitSuiteSetupNodes && spec.LeafNodeType != types.NodeTypeIt {
+			continue
+		}
 		name := fmt.Sprintf("[%s]", spec.LeafNodeType)
 		if config.OmitLeafNodeType {
 			name = ""
@@ -338,8 +344,12 @@ func failureDescriptionForUnstructuredReporters(spec types.SpecReport) string {
 }
 
 func systemErrForUnstructuredReporters(spec types.SpecReport) string {
+	return RenderTimeline(spec, true)
+}
+
+func RenderTimeline(spec types.SpecReport, noColor bool) string {
 	out := &strings.Builder{}
-	NewDefaultReporter(types.ReporterConfig{NoColor: true, VeryVerbose: true}, out).emitTimeline(0, spec, spec.Timeline())
+	NewDefaultReporter(types.ReporterConfig{NoColor: noColor, VeryVerbose: true}, out).emitTimeline(0, spec, spec.Timeline())
 	return out.String()
 }
 

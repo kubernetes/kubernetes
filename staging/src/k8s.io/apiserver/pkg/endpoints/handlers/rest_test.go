@@ -28,6 +28,7 @@ import (
 	"time"
 
 	jsonpatch "github.com/evanphx/json-patch"
+	"github.com/google/go-cmp/cmp"
 	fuzz "github.com/google/gofuzz"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -38,8 +39,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/yaml"
@@ -451,6 +452,13 @@ func (tc *patchTestCase) Run(t *testing.T) {
 	schemaReferenceObj := &examplev1.Pod{}
 	hubVersion := example.SchemeGroupVersion
 
+	fieldmanager, err := managedfields.NewDefaultFieldManager(
+		managedfields.NewDeducedTypeConverter(),
+		convertor, defaulter, creater, kind, hubVersion, "", nil)
+
+	if err != nil {
+		t.Fatalf("failed to create field manager: %v", err)
+	}
 	for _, patchType := range []types.PatchType{types.JSONPatchType, types.MergePatchType, types.StrategicMergePatchType} {
 		// This needs to be reset on each iteration.
 		testPatcher := &testPatcher{
@@ -536,10 +544,15 @@ func (tc *patchTestCase) Run(t *testing.T) {
 			name:        name,
 			patchType:   patchType,
 			patchBytes:  patch,
+			options: &metav1.PatchOptions{
+				FieldManager: "test-manager",
+			},
 		}
 
 		ctx, cancel := context.WithTimeout(ctx, time.Second)
-		resultObj, _, err := p.patchResource(ctx, &RequestScope{})
+		resultObj, _, err := p.patchResource(ctx, &RequestScope{
+			FieldManager: fieldmanager,
+		})
 		cancel()
 
 		if len(tc.expectedError) != 0 {
@@ -583,7 +596,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 		reallyExpectedPod := expectedObj.(*example.Pod)
 
 		if !reflect.DeepEqual(*reallyExpectedPod, *resultPod) {
-			t.Errorf("%s mismatch: %v\n", tc.name, diff.ObjectGoPrintDiff(reallyExpectedPod, resultPod))
+			t.Errorf("%s mismatch: %v\n", tc.name, cmp.Diff(reallyExpectedPod, resultPod))
 			continue
 		}
 	}
@@ -1279,7 +1292,7 @@ func TestDedupOwnerReferences(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			deduped, _ := dedupOwnerReferences(tc.ownerReferences)
 			if !apiequality.Semantic.DeepEqual(deduped, tc.expected) {
-				t.Errorf("diff: %v", diff.ObjectReflectDiff(deduped, tc.expected))
+				t.Errorf("diff: %v", cmp.Diff(deduped, tc.expected))
 			}
 		})
 	}

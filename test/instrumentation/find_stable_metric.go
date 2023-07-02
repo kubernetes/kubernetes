@@ -66,7 +66,7 @@ func (f *stableMetricFinder) Visit(node ast.Node) (w ast.Visitor) {
 	case *ast.CallExpr:
 		if se, ok := opts.Fun.(*ast.SelectorExpr); ok {
 			if se.Sel.Name == "NewDesc" {
-				sl, _ := decodeStabilityLevel(opts.Args[4], "metrics")
+				sl, _ := decodeStabilityLevel(opts.Args[4], f.metricsImportName)
 				if sl != nil {
 					classes := []metrics.StabilityLevel{metrics.STABLE, metrics.BETA}
 					if ALL_STABILITY_CLASSES {

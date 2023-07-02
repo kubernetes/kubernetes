@@ -55,7 +55,7 @@ func (client ApplicationSecurityGroupsClient) CreateOrUpdate(ctx context.Context
 
 	result, err = client.CreateOrUpdateSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.ApplicationSecurityGroupsClient", "CreateOrUpdate", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.ApplicationSecurityGroupsClient", "CreateOrUpdate", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -90,6 +90,7 @@ func (client ApplicationSecurityGroupsClient) CreateOrUpdatePreparer(ctx context
 // http.Response Body if it receives an error.
 func (client ApplicationSecurityGroupsClient) CreateOrUpdateSender(req *http.Request) (future ApplicationSecurityGroupsCreateOrUpdateFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -136,7 +137,7 @@ func (client ApplicationSecurityGroupsClient) Delete(ctx context.Context, resour
 
 	result, err = client.DeleteSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.ApplicationSecurityGroupsClient", "Delete", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.ApplicationSecurityGroupsClient", "Delete", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -168,6 +169,7 @@ func (client ApplicationSecurityGroupsClient) DeletePreparer(ctx context.Context
 // http.Response Body if it receives an error.
 func (client ApplicationSecurityGroupsClient) DeleteSender(req *http.Request) (future ApplicationSecurityGroupsDeleteFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -519,7 +521,7 @@ func (client ApplicationSecurityGroupsClient) UpdateTags(ctx context.Context, re
 
 	result, err = client.UpdateTagsSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.ApplicationSecurityGroupsClient", "UpdateTags", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.ApplicationSecurityGroupsClient", "UpdateTags", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -553,6 +555,7 @@ func (client ApplicationSecurityGroupsClient) UpdateTagsPreparer(ctx context.Con
 // http.Response Body if it receives an error.
 func (client ApplicationSecurityGroupsClient) UpdateTagsSender(req *http.Request) (future ApplicationSecurityGroupsUpdateTagsFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return

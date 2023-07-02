@@ -25,10 +25,6 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/ec2"
-
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -58,63 +54,6 @@ const (
 	externalPluginName = "example.com/nfs"
 )
 
-// checkAWSEBS checks properties of an AWS EBS. Test framework does not
-// instantiate full AWS provider, therefore we need use ec2 API directly.
-func checkAWSEBS(volume *v1.PersistentVolume, volumeType string, encrypted bool) error {
-	diskName := volume.Spec.AWSElasticBlockStore.VolumeID
-
-	var client *ec2.EC2
-
-	tokens := strings.Split(diskName, "/")
-	volumeID := tokens[len(tokens)-1]
-
-	zone := framework.TestContext.CloudConfig.Zone
-
-	awsSession, err := session.NewSession()
-	if err != nil {
-		return fmt.Errorf("error creating session: %w", err)
-	}
-
-	if len(zone) > 0 {
-		region := zone[:len(zone)-1]
-		cfg := aws.Config{Region: &region}
-		framework.Logf("using region %s", region)
-		client = ec2.New(awsSession, &cfg)
-	} else {
-		framework.Logf("no region configured")
-		client = ec2.New(awsSession)
-	}
-
-	request := &ec2.DescribeVolumesInput{
-		VolumeIds: []*string{&volumeID},
-	}
-	info, err := client.DescribeVolumes(request)
-	if err != nil {
-		return fmt.Errorf("error querying ec2 for volume %q: %w", volumeID, err)
-	}
-	if len(info.Volumes) == 0 {
-		return fmt.Errorf("no volumes found for volume %q", volumeID)
-	}
-	if len(info.Volumes) > 1 {
-		return fmt.Errorf("multiple volumes found for volume %q", volumeID)
-	}
-
-	awsVolume := info.Volumes[0]
-	if awsVolume.VolumeType == nil {
-		return fmt.Errorf("expected volume type %q, got nil", volumeType)
-	}
-	if *awsVolume.VolumeType != volumeType {
-		return fmt.Errorf("expected volume type %q, got %q", volumeType, *awsVolume.VolumeType)
-	}
-	if encrypted && awsVolume.Encrypted == nil {
-		return fmt.Errorf("expected encrypted volume, got no encryption")
-	}
-	if encrypted && !*awsVolume.Encrypted {
-		return fmt.Errorf("expected encrypted volume, got %v", *awsVolume.Encrypted)
-	}
-	return nil
-}
-
 func checkGCEPD(volume *v1.PersistentVolume, volumeType string) error {
 	cloud, err := gce.GetGCECloud()
 	if err != nil {
@@ -134,7 +73,7 @@ func checkGCEPD(volume *v1.PersistentVolume, volumeType string) error {
 
 var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 	f := framework.NewDefaultFramework("volume-provisioning")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	// filled in BeforeEach
 	var c clientset.Interface
@@ -206,9 +145,6 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					PvCheck: func(ctx context.Context, claim *v1.PersistentVolumeClaim) {
 						volume := testsuites.PVWriteReadSingleNodeCheck(ctx, c, f.Timeouts, claim, e2epod.NodeSelection{})
 						gomega.Expect(volume).NotTo(gomega.BeNil(), "get bound PV")
-
-						err := checkAWSEBS(volume, "gp2", false)
-						framework.ExpectNoError(err, "checkAWSEBS gp2")
 					},
 				},
 				{
@@ -225,9 +161,6 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					PvCheck: func(ctx context.Context, claim *v1.PersistentVolumeClaim) {
 						volume := testsuites.PVWriteReadSingleNodeCheck(ctx, c, f.Timeouts, claim, e2epod.NodeSelection{})
 						gomega.Expect(volume).NotTo(gomega.BeNil(), "get bound PV")
-
-						err := checkAWSEBS(volume, "io1", false)
-						framework.ExpectNoError(err, "checkAWSEBS io1")
 					},
 				},
 				{
@@ -243,9 +176,6 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					PvCheck: func(ctx context.Context, claim *v1.PersistentVolumeClaim) {
 						volume := testsuites.PVWriteReadSingleNodeCheck(ctx, c, f.Timeouts, claim, e2epod.NodeSelection{})
 						gomega.Expect(volume).NotTo(gomega.BeNil(), "get bound PV")
-
-						err := checkAWSEBS(volume, "sc1", false)
-						framework.ExpectNoError(err, "checkAWSEBS sc1")
 					},
 				},
 				{
@@ -261,9 +191,6 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					PvCheck: func(ctx context.Context, claim *v1.PersistentVolumeClaim) {
 						volume := testsuites.PVWriteReadSingleNodeCheck(ctx, c, f.Timeouts, claim, e2epod.NodeSelection{})
 						gomega.Expect(volume).NotTo(gomega.BeNil(), "get bound PV")
-
-						err := checkAWSEBS(volume, "st1", false)
-						framework.ExpectNoError(err, "checkAWSEBS st1")
 					},
 				},
 				{
@@ -279,9 +206,6 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					PvCheck: func(ctx context.Context, claim *v1.PersistentVolumeClaim) {
 						volume := testsuites.PVWriteReadSingleNodeCheck(ctx, c, f.Timeouts, claim, e2epod.NodeSelection{})
 						gomega.Expect(volume).NotTo(gomega.BeNil(), "get bound PV")
-
-						err := checkAWSEBS(volume, "gp2", true)
-						framework.ExpectNoError(err, "checkAWSEBS gp2 encrypted")
 					},
 				},
 				// OpenStack generic tests (works on all OpenStack deployments)
@@ -714,7 +638,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			ginkgo.By("creating a StorageClass")
 			test.Class = testsuites.SetupStorageClass(ctx, test.Client, newStorageClass(test, ns, "invalid-aws"))
 
-			ginkgo.By("creating a claim object with a suffix for gluster dynamic provisioner")
+			ginkgo.By("creating a claim object")
 			claim := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 				ClaimSize:        test.ClaimSize,
 				StorageClassName: &test.Class.Name,

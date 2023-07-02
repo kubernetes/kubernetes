@@ -93,6 +93,10 @@ type NodeTimeout time.Duration
 type SpecTimeout time.Duration
 type GracePeriod time.Duration
 
+func (l Labels) MatchesLabelFilter(query string) bool {
+	return types.MustParseLabelFilter(query)(l)
+}
+
 func UnionOfLabels(labels ...Labels) Labels {
 	out := Labels{}
 	seen := map[string]bool{}

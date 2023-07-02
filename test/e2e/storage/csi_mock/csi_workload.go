@@ -30,7 +30,7 @@ import (
 var _ = utils.SIGDescribe("CSI Mock workload info", func() {
 	// The CSIDriverRegistry feature gate is needed for this test in Kubernetes 1.12.
 	f := framework.NewDefaultFramework("csi-mock-volumes-workload")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	m := newMockDriverSetup(f)
 	ginkgo.Context("CSI workload information using mock driver", func() {
 		var (

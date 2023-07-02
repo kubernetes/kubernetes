@@ -325,7 +325,8 @@ func TestPodRequestsAndLimits(t *testing.T) {
 		},
 	}
 	for idx, tc := range cases {
-		resRequests, resLimits := PodRequestsAndLimits(tc.pod)
+		resRequests := PodRequests(tc.pod, PodResourcesOptions{})
+		resLimits := PodLimits(tc.pod, PodResourcesOptions{})
 
 		if !equality.Semantic.DeepEqual(tc.expectedRequests, resRequests) {
 			t.Errorf("test case failure[%d]: %v, requests:\n expected:\t%v\ngot\t\t%v", idx, tc.cName, tc.expectedRequests, resRequests)
@@ -511,7 +512,8 @@ func TestPodRequestsAndLimitsWithoutOverhead(t *testing.T) {
 		},
 	}
 	for idx, tc := range cases {
-		resRequests, resLimits := PodRequestsAndLimitsWithoutOverhead(tc.pod)
+		resRequests := PodRequests(tc.pod, PodResourcesOptions{ExcludeOverhead: true})
+		resLimits := PodLimits(tc.pod, PodResourcesOptions{ExcludeOverhead: true})
 
 		if !equality.Semantic.DeepEqual(tc.expectedRequests, resRequests) {
 			t.Errorf("test case failure[%d]: %v, requests:\n expected:\t%v\ngot\t\t%v", idx, tc.name, tc.expectedRequests, resRequests)
@@ -571,4 +573,506 @@ func getPod(cname string, resources podResources) *v1.Pod {
 			Overhead: overhead,
 		},
 	}
+}
+
+func TestPodResourceRequests(t *testing.T) {
+	testCases := []struct {
+		description      string
+		options          PodResourcesOptions
+		overhead         v1.ResourceList
+		podResizeStatus  v1.PodResizeStatus
+		initContainers   []v1.Container
+		containers       []v1.Container
+		containerStatus  []v1.ContainerStatus
+		expectedRequests v1.ResourceList
+	}{
+		{
+			description: "nil options, larger init container",
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("4"),
+			},
+			initContainers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("4"),
+						},
+					},
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("1"),
+						},
+					},
+				},
+			},
+		},
+		{
+			description: "nil options, larger containers",
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("5"),
+			},
+			initContainers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("2"),
+						},
+					},
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("2"),
+						},
+					},
+				},
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("3"),
+						},
+					},
+				},
+			},
+		},
+		{
+			description: "pod overhead excluded",
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("5"),
+			},
+			options: PodResourcesOptions{
+				ExcludeOverhead: true,
+			},
+			overhead: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("1"),
+			},
+			initContainers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("2"),
+						},
+					},
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("2"),
+						},
+					},
+				},
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("3"),
+						},
+					},
+				},
+			},
+		},
+		{
+			description: "pod overhead included",
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("6"),
+				v1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+			overhead: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1"),
+				v1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+			initContainers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("2"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("2"),
+						},
+					},
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("2"),
+						},
+					},
+				},
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("3"),
+						},
+					},
+				},
+			},
+		},
+		{
+			description: "resized, infeasible",
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("2"),
+			},
+			podResizeStatus: v1.PodResizeStatusInfeasible,
+			options:         PodResourcesOptions{InPlacePodVerticalScalingEnabled: true},
+			containers: []v1.Container{
+				{
+					Name: "container-1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("4"),
+						},
+					},
+				},
+			},
+			containerStatus: []v1.ContainerStatus{
+				{
+					Name: "container-1",
+					AllocatedResources: v1.ResourceList{
+						v1.ResourceCPU: resource.MustParse("2"),
+					},
+				},
+			},
+		},
+		{
+			description: "resized, no resize status",
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("4"),
+			},
+			options: PodResourcesOptions{InPlacePodVerticalScalingEnabled: true},
+			containers: []v1.Container{
+				{
+					Name: "container-1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("4"),
+						},
+					},
+				},
+			},
+			containerStatus: []v1.ContainerStatus{
+				{
+					Name: "container-1",
+					AllocatedResources: v1.ResourceList{
+						v1.ResourceCPU: resource.MustParse("2"),
+					},
+				},
+			},
+		},
+		{
+			description: "resized, infeasible, feature gate disabled",
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("4"),
+			},
+			podResizeStatus: v1.PodResizeStatusInfeasible,
+			options:         PodResourcesOptions{InPlacePodVerticalScalingEnabled: false},
+			containers: []v1.Container{
+				{
+					Name: "container-1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("4"),
+						},
+					},
+				},
+			},
+			containerStatus: []v1.ContainerStatus{
+				{
+					Name: "container-1",
+					AllocatedResources: v1.ResourceList{
+						v1.ResourceCPU: resource.MustParse("2"),
+					},
+				},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		p := &v1.Pod{
+			Spec: v1.PodSpec{
+				Containers:     tc.containers,
+				InitContainers: tc.initContainers,
+				Overhead:       tc.overhead,
+			},
+			Status: v1.PodStatus{
+				ContainerStatuses: tc.containerStatus,
+				Resize:            tc.podResizeStatus,
+			},
+		}
+		request := PodRequests(p, tc.options)
+		if !resourcesEqual(tc.expectedRequests, request) {
+			t.Errorf("[%s] expected requests = %v, got %v", tc.description, tc.expectedRequests, request)
+		}
+	}
+}
+
+func TestPodResourceRequestsReuse(t *testing.T) {
+	expectedRequests := v1.ResourceList{
+		v1.ResourceCPU: resource.MustParse("1"),
+	}
+	p := &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: expectedRequests,
+					},
+				},
+			},
+		},
+	}
+
+	opts := PodResourcesOptions{
+		Reuse: v1.ResourceList{
+			v1.ResourceCPU: resource.MustParse("25"),
+		},
+	}
+	requests := PodRequests(p, opts)
+
+	if !resourcesEqual(expectedRequests, requests) {
+		t.Errorf("expected requests = %v, got %v", expectedRequests, requests)
+	}
+
+	// should re-use the maps we passed in
+	if !resourcesEqual(expectedRequests, opts.Reuse) {
+		t.Errorf("expected to re-use the requests")
+	}
+}
+
+func TestPodResourceLimits(t *testing.T) {
+	testCases := []struct {
+		description    string
+		options        PodResourcesOptions
+		overhead       v1.ResourceList
+		initContainers []v1.Container
+		containers     []v1.Container
+		expectedLimits v1.ResourceList
+	}{
+		{
+			description: "nil options, larger init container",
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("4"),
+			},
+			initContainers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("4"),
+						},
+					},
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("1"),
+						},
+					},
+				},
+			},
+		},
+		{
+			description: "nil options, larger containers",
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("5"),
+			},
+			initContainers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("2"),
+						},
+					},
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("2"),
+						},
+					},
+				},
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("3"),
+						},
+					},
+				},
+			},
+		},
+		{
+			description: "pod overhead excluded",
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("5"),
+			},
+			options: PodResourcesOptions{
+				ExcludeOverhead: true,
+			},
+			overhead: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("1"),
+			},
+			initContainers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("2"),
+						},
+					},
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("2"),
+						},
+					},
+				},
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("3"),
+						},
+					},
+				},
+			},
+		},
+		{
+			description: "pod overhead included",
+			overhead: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1"),
+				v1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("6"),
+				// overhead is only added to non-zero limits, so there will be no expected memory limit
+			},
+			initContainers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("2"),
+						},
+					},
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("2"),
+						},
+					},
+				},
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("3"),
+						},
+					},
+				},
+			},
+		},
+		{
+			description:    "no limited containers should result in no limits for the pod",
+			expectedLimits: v1.ResourceList{},
+			initContainers: []v1.Container{},
+			containers: []v1.Container{
+				{
+					// Unlimited container
+				},
+			},
+		},
+		{
+			description: "one limited and one unlimited container should result in the limited container's limits for the pod",
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("2"),
+				v1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+			initContainers: []v1.Container{},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("2"),
+							v1.ResourceMemory: resource.MustParse("2Gi"),
+						},
+					},
+				},
+				{
+					// Unlimited container
+				},
+			},
+		},
+		{
+			description: "one limited and one unlimited init container should result in the limited init container's limits for the pod",
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("2"),
+				v1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+			initContainers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("2"),
+							v1.ResourceMemory: resource.MustParse("2Gi"),
+						},
+					},
+				},
+				{
+					// Unlimited init container
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("1"),
+							v1.ResourceMemory: resource.MustParse("1Gi"),
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		p := &v1.Pod{
+			Spec: v1.PodSpec{
+				Containers:     tc.containers,
+				InitContainers: tc.initContainers,
+				Overhead:       tc.overhead,
+			},
+		}
+		limits := PodLimits(p, tc.options)
+		if !resourcesEqual(tc.expectedLimits, limits) {
+			t.Errorf("[%s] expected limits = %v, got %v", tc.description, tc.expectedLimits, limits)
+		}
+	}
+}
+
+func resourcesEqual(lhs, rhs v1.ResourceList) bool {
+	if len(lhs) != len(rhs) {
+		return false
+	}
+	for name, lhsv := range lhs {
+		rhsv, ok := rhs[name]
+		if !ok {
+			return false
+		}
+		if !lhsv.Equal(rhsv) {
+			return false
+		}
+	}
+	return true
 }

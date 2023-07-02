@@ -82,11 +82,11 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 
 	if source == "tmpfs" {
 		klog.V(3).Infof("mounting source (%q), target (%q), with options (%q)", source, target, sanitizedOptionsForLogging)
-		return os.MkdirAll(target, 0755)
+		return os.MkdirAll(target, 0o755)
 	}
 
 	parentDir := filepath.Dir(target)
-	if err := os.MkdirAll(parentDir, 0755); err != nil {
+	if err := os.MkdirAll(parentDir, 0o755); err != nil {
 		return err
 	}
 
@@ -299,26 +299,20 @@ func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target
 	}
 	klog.V(4).Infof("diskMount: Disk successfully formatted, disk: %q, fstype: %q", source, fstype)
 
-	volumeIds, err := listVolumesOnDisk(source)
+	volumeIds, err := ListVolumesOnDisk(source)
 	if err != nil {
 		return err
 	}
 	driverPath := volumeIds[0]
-	target = NormalizeWindowsPath(target)
-	output, err := mounter.Exec.Command("cmd", "/c", "mklink", "/D", target, driverPath).CombinedOutput()
-	if err != nil {
-		klog.Errorf("mklink(%s, %s) failed: %v, output: %q", target, driverPath, err, string(output))
-		return err
-	}
-	klog.V(2).Infof("formatAndMount disk(%s) fstype(%s) on(%s) with output(%s) successfully", driverPath, fstype, target, string(output))
-	return nil
+	return mounter.MountSensitive(driverPath, target, fstype, options, sensitiveOptions)
 }
 
 // ListVolumesOnDisk - returns back list of volumes(volumeIDs) in the disk (requested in diskID).
-func listVolumesOnDisk(diskID string) (volumeIDs []string, err error) {
-	cmd := fmt.Sprintf("(Get-Disk -DeviceId %s | Get-Partition | Get-Volume).UniqueId", diskID)
+func ListVolumesOnDisk(diskID string) (volumeIDs []string, err error) {
+	// If a Disk has multiple volumes, Get-Volume may not return items in the same order.
+	cmd := fmt.Sprintf("(Get-Disk -DeviceId %s | Get-Partition | Get-Volume | Sort-Object -Property UniqueId).UniqueId", diskID)
 	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
-	klog.V(4).Infof("listVolumesOnDisk id from %s: %s", diskID, string(output))
+	klog.V(4).Infof("ListVolumesOnDisk id from %s: %s", diskID, string(output))
 	if err != nil {
 		return []string{}, fmt.Errorf("error list volumes on disk. cmd: %s, output: %s, error: %v", cmd, string(output), err)
 	}

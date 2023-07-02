@@ -44,6 +44,7 @@ import (
 	"k8s.io/client-go/util/cert"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-aggregator/pkg/apiserver"
+
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
@@ -62,6 +63,9 @@ type TearDownFunc func()
 
 // TestServerInstanceOptions Instance options the TestServer
 type TestServerInstanceOptions struct {
+	// SkipHealthzCheck returns without waiting for the server to become healthy.
+	// Useful for testing server configurations expected to prevent /healthz from completing.
+	SkipHealthzCheck bool
 	// Enable cert-auth for the kube-apiserver
 	EnableCertAuth bool
 	// Wrap the storage version interface of the created server's generic server.
@@ -232,7 +236,7 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	s.Authentication.ServiceAccounts.Issuers = []string{"https://foo.bar.example.com"}
 	s.Authentication.ServiceAccounts.KeyFiles = []string{saSigningKeyFile.Name()}
 
-	completedOptions, err := app.Complete(s)
+	completedOptions, err := s.Complete()
 	if err != nil {
 		return result, fmt.Errorf("failed to set default ServerRunOptions: %v", err)
 	}
@@ -243,7 +247,16 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 
 	t.Logf("runtime-config=%v", completedOptions.APIEnablement.RuntimeConfig)
 	t.Logf("Starting kube-apiserver on port %d...", s.SecureServing.BindPort)
-	server, err := app.CreateServerChain(completedOptions)
+
+	config, err := app.NewConfig(completedOptions)
+	if err != nil {
+		return result, err
+	}
+	completed, err := config.Complete()
+	if err != nil {
+		return result, err
+	}
+	server, err := app.CreateServerChain(completed)
 	if err != nil {
 		return result, fmt.Errorf("failed to create server chain: %v", err)
 	}
@@ -262,40 +275,42 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		}
 	}(stopCh)
 
-	t.Logf("Waiting for /healthz to be ok...")
-
 	client, err := kubernetes.NewForConfig(server.GenericAPIServer.LoopbackClientConfig)
 	if err != nil {
 		return result, fmt.Errorf("failed to create a client: %v", err)
 	}
 
-	// wait until healthz endpoint returns ok
-	err = wait.Poll(100*time.Millisecond, time.Minute, func() (bool, error) {
-		select {
-		case err := <-errCh:
-			return false, err
-		default:
-		}
+	if !instanceOptions.SkipHealthzCheck {
+		t.Logf("Waiting for /healthz to be ok...")
 
-		req := client.CoreV1().RESTClient().Get().AbsPath("/healthz")
-		// The storage version bootstrap test wraps the storage version post-start
-		// hook, so the hook won't become health when the server bootstraps
-		if instanceOptions.StorageVersionWrapFunc != nil {
-			// We hardcode the param instead of having a new instanceOptions field
-			// to avoid confusing users with more options.
-			storageVersionCheck := fmt.Sprintf("poststarthook/%s", apiserver.StorageVersionPostStartHookName)
-			req.Param("exclude", storageVersionCheck)
+		// wait until healthz endpoint returns ok
+		err = wait.Poll(100*time.Millisecond, time.Minute, func() (bool, error) {
+			select {
+			case err := <-errCh:
+				return false, err
+			default:
+			}
+
+			req := client.CoreV1().RESTClient().Get().AbsPath("/healthz")
+			// The storage version bootstrap test wraps the storage version post-start
+			// hook, so the hook won't become health when the server bootstraps
+			if instanceOptions.StorageVersionWrapFunc != nil {
+				// We hardcode the param instead of having a new instanceOptions field
+				// to avoid confusing users with more options.
+				storageVersionCheck := fmt.Sprintf("poststarthook/%s", apiserver.StorageVersionPostStartHookName)
+				req.Param("exclude", storageVersionCheck)
+			}
+			result := req.Do(context.TODO())
+			status := 0
+			result.StatusCode(&status)
+			if status == 200 {
+				return true, nil
+			}
+			return false, nil
+		})
+		if err != nil {
+			return result, fmt.Errorf("failed to wait for /healthz to return ok: %v", err)
 		}
-		result := req.Do(context.TODO())
-		status := 0
-		result.StatusCode(&status)
-		if status == 200 {
-			return true, nil
-		}
-		return false, nil
-	})
-	if err != nil {
-		return result, fmt.Errorf("failed to wait for /healthz to return ok: %v", err)
 	}
 
 	// wait until default namespace is created

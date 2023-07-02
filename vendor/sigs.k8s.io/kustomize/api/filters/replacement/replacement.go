@@ -4,13 +4,13 @@
 package replacement
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
 	"sigs.k8s.io/kustomize/api/internal/utils"
 	"sigs.k8s.io/kustomize/api/resource"
 	"sigs.k8s.io/kustomize/api/types"
+	"sigs.k8s.io/kustomize/kyaml/errors"
 	"sigs.k8s.io/kustomize/kyaml/resid"
 	kyaml_utils "sigs.k8s.io/kustomize/kyaml/utils"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
@@ -105,7 +105,7 @@ func getRefinedValue(options *types.FieldOptions, rn *yaml.RNode) (*yaml.RNode, 
 func applyReplacement(nodes []*yaml.RNode, value *yaml.RNode, targetSelectors []*types.TargetSelector) ([]*yaml.RNode, error) {
 	for _, selector := range targetSelectors {
 		if selector.Select == nil {
-			return nil, errors.New("target must specify resources to select")
+			return nil, errors.Errorf("target must specify resources to select")
 		}
 		if len(selector.FieldPaths) == 0 {
 			selector.FieldPaths = []string{types.DefaultReplacementFieldPath}
@@ -179,29 +179,22 @@ func rejectId(rejects []*types.Selector, id *resid.ResId) bool {
 
 func copyValueToTarget(target *yaml.RNode, value *yaml.RNode, selector *types.TargetSelector) error {
 	for _, fp := range selector.FieldPaths {
-		fieldPath := kyaml_utils.SmarterPathSplitter(fp, ".")
-		create, err := shouldCreateField(selector.Options, fieldPath)
-		if err != nil {
-			return err
+		createKind := yaml.Kind(0) // do not create
+		if selector.Options != nil && selector.Options.Create {
+			createKind = value.YNode().Kind
 		}
-
-		var targetFields []*yaml.RNode
-		if create {
-			createdField, createErr := target.Pipe(yaml.LookupCreate(value.YNode().Kind, fieldPath...))
-			if createErr != nil {
-				return fmt.Errorf("error creating replacement node: %w", createErr)
-			}
-			targetFields = append(targetFields, createdField)
-		} else {
-			// may return multiple fields, always wrapped in a sequence node
-			foundFieldSequence, lookupErr := target.Pipe(&yaml.PathMatcher{Path: fieldPath})
-			if lookupErr != nil {
-				return fmt.Errorf("error finding field in replacement target: %w", lookupErr)
-			}
-			targetFields, err = foundFieldSequence.Elements()
-			if err != nil {
-				return fmt.Errorf("error fetching elements in replacement target: %w", err)
-			}
+		targetFieldList, err := target.Pipe(&yaml.PathMatcher{
+			Path:   kyaml_utils.SmarterPathSplitter(fp, "."),
+			Create: createKind})
+		if err != nil {
+			return errors.WrapPrefixf(err, fieldRetrievalError(fp, createKind != 0))
+		}
+		targetFields, err := targetFieldList.Elements()
+		if err != nil {
+			return errors.WrapPrefixf(err, fieldRetrievalError(fp, createKind != 0))
+		}
+		if len(targetFields) == 0 {
+			return errors.Errorf(fieldRetrievalError(fp, createKind != 0))
 		}
 
 		for _, t := range targetFields {
@@ -209,9 +202,15 @@ func copyValueToTarget(target *yaml.RNode, value *yaml.RNode, selector *types.Ta
 				return err
 			}
 		}
-
 	}
 	return nil
+}
+
+func fieldRetrievalError(fieldPath string, isCreate bool) string {
+	if isCreate {
+		return fmt.Sprintf("unable to find or create field %q in replacement target", fieldPath)
+	}
+	return fmt.Sprintf("unable to find field %q in replacement target", fieldPath)
 }
 
 func setFieldValue(options *types.FieldOptions, targetField *yaml.RNode, value *yaml.RNode) error {
@@ -242,17 +241,4 @@ func setFieldValue(options *types.FieldOptions, targetField *yaml.RNode, value *
 	}
 
 	return nil
-}
-
-func shouldCreateField(options *types.FieldOptions, fieldPath []string) (bool, error) {
-	if options == nil || !options.Create {
-		return false, nil
-	}
-	// create option is not supported in a wildcard matching
-	for _, f := range fieldPath {
-		if f == "*" {
-			return false, fmt.Errorf("cannot support create option in a multi-value target")
-		}
-	}
-	return true, nil
 }

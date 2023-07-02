@@ -30,7 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
-	apiv1pod "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubectl/pkg/util/podutils"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -121,6 +121,15 @@ func LookForStringInLog(ns, podName, container, expectedString string, timeout t
 	})
 }
 
+// LookForStringInLogWithoutKubectl looks for the given string in the log of a specific pod container
+func LookForStringInLogWithoutKubectl(ctx context.Context, client clientset.Interface, ns string, podName string, container string, expectedString string, timeout time.Duration) (result string, err error) {
+	return lookForString(expectedString, timeout, func() string {
+		podLogs, err := e2epod.GetPodLogs(ctx, client, ns, podName, container)
+		framework.ExpectNoError(err)
+		return podLogs
+	})
+}
+
 // CreateEmptyFileOnPod creates empty file at given path on the pod.
 func CreateEmptyFileOnPod(namespace string, podName string, filePath string) error {
 	_, err := e2ekubectl.RunKubectl(namespace, "exec", podName, "--", "/bin/sh", "-c", fmt.Sprintf("touch %s", filePath))
@@ -171,7 +180,7 @@ func MatchContainerOutput(
 
 	if podErr != nil {
 		// Pod failed. Dump all logs from all containers to see what's wrong
-		_ = apiv1pod.VisitContainers(&podStatus.Spec, apiv1pod.AllFeatureEnabledContainers(), func(c *v1.Container, containerType apiv1pod.ContainerType) bool {
+		_ = podutils.VisitContainers(&podStatus.Spec, podutils.AllContainers, func(c *v1.Container, containerType podutils.ContainerType) bool {
 			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, ns, podStatus.Name, c.Name)
 			if err != nil {
 				framework.Logf("Failed to get logs from node %q pod %q container %q: %v",

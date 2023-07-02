@@ -97,6 +97,14 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	oldPod := old.(*api.Pod)
 	newPod.Status = oldPod.Status
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		// With support for in-place pod resizing, container resources are now mutable.
+		// If container resources are updated with new resource requests values, a pod resize is
+		// desired. The status of this request is reflected by setting Resize field to "Proposed"
+		// as a signal to the caller that the request is being considered.
+		podutil.MarkPodProposedForResize(oldPod, newPod)
+	}
+
 	podutil.DropDisabledPodFields(newPod, oldPod)
 }
 
@@ -104,6 +112,7 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 func (podStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	pod := obj.(*api.Pod)
 	opts := podutil.GetValidationOptionsFromPodSpecAndMeta(&pod.Spec, nil, &pod.ObjectMeta, nil)
+	opts.ResourceIsPod = true
 	return corevalidation.ValidatePodCreate(pod, opts)
 }
 
@@ -133,6 +142,7 @@ func (podStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) 
 	pod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
 	opts := podutil.GetValidationOptionsFromPodSpecAndMeta(&pod.Spec, &oldPod.Spec, &pod.ObjectMeta, &oldPod.ObjectMeta)
+	opts.ResourceIsPod = true
 	return corevalidation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod), opts)
 }
 
@@ -217,6 +227,7 @@ func (podStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 	pod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
 	opts := podutil.GetValidationOptionsFromPodSpecAndMeta(&pod.Spec, &oldPod.Spec, &pod.ObjectMeta, &oldPod.ObjectMeta)
+	opts.ResourceIsPod = true
 
 	return corevalidation.ValidatePodStatusUpdate(obj.(*api.Pod), old.(*api.Pod), opts)
 }
@@ -256,6 +267,7 @@ func (podEphemeralContainersStrategy) ValidateUpdate(ctx context.Context, obj, o
 	newPod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
 	opts := podutil.GetValidationOptionsFromPodSpecAndMeta(&newPod.Spec, &oldPod.Spec, &newPod.ObjectMeta, &oldPod.ObjectMeta)
+	opts.ResourceIsPod = true
 	return corevalidation.ValidatePodEphemeralContainersUpdate(newPod, oldPod, opts)
 }
 
@@ -311,11 +323,17 @@ func ToSelectableFields(pod *api.Pod) fields.Set {
 	// amount of allocations needed to create the fields.Set. If you add any
 	// field here or the number of object-meta related fields changes, this should
 	// be adjusted.
-	podSpecificFieldsSet := make(fields.Set, 9)
+	podSpecificFieldsSet := make(fields.Set, 10)
 	podSpecificFieldsSet["spec.nodeName"] = pod.Spec.NodeName
 	podSpecificFieldsSet["spec.restartPolicy"] = string(pod.Spec.RestartPolicy)
 	podSpecificFieldsSet["spec.schedulerName"] = string(pod.Spec.SchedulerName)
 	podSpecificFieldsSet["spec.serviceAccountName"] = string(pod.Spec.ServiceAccountName)
+	if pod.Spec.SecurityContext != nil {
+		podSpecificFieldsSet["spec.hostNetwork"] = strconv.FormatBool(pod.Spec.SecurityContext.HostNetwork)
+	} else {
+		// default to false
+		podSpecificFieldsSet["spec.hostNetwork"] = strconv.FormatBool(false)
+	}
 	podSpecificFieldsSet["status.phase"] = string(pod.Status.Phase)
 	// TODO: add podIPs as a downward API value(s) with proper format
 	podIP := ""

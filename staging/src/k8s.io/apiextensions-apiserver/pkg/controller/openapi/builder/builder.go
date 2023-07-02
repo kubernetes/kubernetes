@@ -40,9 +40,11 @@ import (
 	"k8s.io/apiserver/pkg/endpoints"
 	"k8s.io/apiserver/pkg/endpoints/openapi"
 	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
+	"k8s.io/client-go/kubernetes/scheme"
 	openapibuilder "k8s.io/kube-openapi/pkg/builder"
 	"k8s.io/kube-openapi/pkg/builder3"
 	"k8s.io/kube-openapi/pkg/common"
+	"k8s.io/kube-openapi/pkg/common/restfuladapter"
 	"k8s.io/kube-openapi/pkg/spec3"
 	"k8s.io/kube-openapi/pkg/util"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -199,7 +201,7 @@ func BuildOpenAPIV3(crd *apiextensionsv1.CustomResourceDefinition, version strin
 		return nil, err
 	}
 
-	return builder3.BuildOpenAPISpec([]*restful.WebService{b.ws}, b.getOpenAPIConfig(false))
+	return builder3.BuildOpenAPISpecFromRoutes(restfuladapter.AdaptWebServices([]*restful.WebService{b.ws}), b.getOpenAPIConfig(false))
 }
 
 // BuildOpenAPIV2 builds OpenAPI v2 for the given crd in the given version
@@ -209,7 +211,7 @@ func BuildOpenAPIV2(crd *apiextensionsv1.CustomResourceDefinition, version strin
 		return nil, err
 	}
 
-	return openapibuilder.BuildOpenAPISpec([]*restful.WebService{b.ws}, b.getOpenAPIConfig(true))
+	return openapibuilder.BuildOpenAPISpecFromRoutes(restfuladapter.AdaptWebServices([]*restful.WebService{b.ws}), b.getOpenAPIConfig(true))
 }
 
 // Implements CanonicalTypeNamer
@@ -467,7 +469,7 @@ func withDescription(s spec.Schema, desc string) spec.Schema {
 }
 
 func generateBuildDefinitionsFunc() {
-	namer = openapi.NewDefinitionNamer(runtime.NewScheme())
+	namer = openapi.NewDefinitionNamer(scheme.Scheme)
 	definitionsV3 = utilopenapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(generatedopenapi.GetOpenAPIDefinitions)(func(name string) spec.Ref {
 		defName, _ := namer.GetDefinitionName(name)
 		prefix := v3DefinitionPrefix

@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/klog/v2/ktesting"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -278,18 +279,21 @@ func TestSchedulerWithExtenders(t *testing.T) {
 			for ii := range test.extenders {
 				extenders = append(extenders, &test.extenders[ii])
 			}
-			ctx, cancel := context.WithCancel(context.Background())
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			cache := internalcache.New(time.Duration(0), ctx.Done())
+			cache := internalcache.New(ctx, time.Duration(0))
 			for _, name := range test.nodes {
-				cache.AddNode(createNode(name))
+				cache.AddNode(logger, createNode(name))
 			}
 			fwk, err := st.NewFramework(
-				test.registerPlugins, "", ctx.Done(),
+				ctx,
+				test.registerPlugins, "",
 				runtime.WithClientSet(client),
 				runtime.WithInformerFactory(informerFactory),
 				runtime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
+				runtime.WithLogger(logger),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -300,6 +304,7 @@ func TestSchedulerWithExtenders(t *testing.T) {
 				nodeInfoSnapshot:         emptySnapshot,
 				percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
 				Extenders:                extenders,
+				logger:                   logger,
 			}
 			sched.applyDefaultHandlers()
 
@@ -329,7 +334,7 @@ func createNode(name string) *v1.Node {
 
 func TestIsInterested(t *testing.T) {
 	mem := &HTTPExtender{
-		managedResources: sets.NewString(),
+		managedResources: sets.New[string](),
 	}
 	mem.managedResources.Insert("memory")
 
@@ -342,7 +347,7 @@ func TestIsInterested(t *testing.T) {
 		{
 			label: "Empty managed resources",
 			extender: &HTTPExtender{
-				managedResources: sets.NewString(),
+				managedResources: sets.New[string](),
 			},
 			pod:  &v1.Pod{},
 			want: true,

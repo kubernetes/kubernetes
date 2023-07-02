@@ -40,7 +40,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
-	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
@@ -213,7 +212,7 @@ type DeletableVolumePlugin interface {
 	// NewDeleter creates a new volume.Deleter which knows how to delete this
 	// resource in accordance with the underlying storage provider after the
 	// volume's release from a claim
-	NewDeleter(spec *Spec) (Deleter, error)
+	NewDeleter(logger klog.Logger, spec *Spec) (Deleter, error)
 }
 
 // ProvisionableVolumePlugin is an extended interface of VolumePlugin and is
@@ -223,7 +222,7 @@ type ProvisionableVolumePlugin interface {
 	// NewProvisioner creates a new volume.Provisioner which knows how to
 	// create PersistentVolumes in accordance with the plugin's underlying
 	// storage provider
-	NewProvisioner(options VolumeOptions) (Provisioner, error)
+	NewProvisioner(logger klog.Logger, options VolumeOptions) (Provisioner, error)
 }
 
 // AttachableVolumePlugin is an extended interface of VolumePlugin and is used for volumes that require attachment
@@ -334,13 +333,6 @@ type KubeletVolumeHost interface {
 	WaitForCacheSync() error
 	// Returns hostutil.HostUtils
 	GetHostUtil() hostutil.HostUtils
-	// GetHostIDsForPod if the pod uses user namespaces, takes the uid and
-	// gid inside the container and returns the host UID and GID those are
-	// mapped to on the host. If containerUID/containerGID is nil, then it
-	// returns the host UID/GID for ID 0 inside the container.
-	// If the pod is not using user namespaces, as there is no mapping needed, the
-	// same containerUID and containerGID params are returned.
-	GetHostIDsForPod(pod *v1.Pod, containerUID, containerGID *int64) (hostUID, hostGID *int64, err error)
 }
 
 // AttachDetachVolumeHost is a AttachDetach Controller specific interface that plugins can use
@@ -450,9 +442,6 @@ type VolumeHost interface {
 
 	// Returns an interface that should be used to execute subpath operations
 	GetSubpather() subpath.Interface
-
-	// Returns options to pass for proxyutil filtered dialers.
-	GetFilteredDialOptions() *proxyutil.FilteredDialOptions
 }
 
 // VolumePluginMgr tracks registered plugins.
@@ -701,13 +690,11 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 	return match, nil
 }
 
-// FindPluginByName fetches a plugin by name or by legacy name.  If no plugin
-// is found, returns error.
+// FindPluginByName fetches a plugin by name. If no plugin is found, returns error.
 func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 	pm.mutex.RLock()
 	defer pm.mutex.RUnlock()
 
-	// Once we can get rid of legacy names we can reduce this to a map lookup.
 	var match VolumePlugin
 	if v, found := pm.plugins[name]; found {
 		match = v
@@ -1072,7 +1059,7 @@ func NewPersistentVolumeRecyclerPodTemplate() *v1.Pod {
 					Name:    "pv-recycler",
 					Image:   "registry.k8s.io/debian-base:v2.0.0",
 					Command: []string{"/bin/sh"},
-					Args:    []string{"-c", "test -e /scrub && rm -rf /scrub/..?* /scrub/.[!.]* /scrub/*  && test -z \"$(ls -A /scrub)\" || exit 1"},
+					Args:    []string{"-c", "test -e /scrub && find /scrub -mindepth 1 -delete && test -z \"$(ls -A /scrub)\" || exit 1"},
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      "vol",

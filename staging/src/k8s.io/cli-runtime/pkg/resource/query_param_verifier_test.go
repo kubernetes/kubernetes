@@ -20,7 +20,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	openapi_v2 "github.com/google/gnostic/openapiv2"
+	openapi_v2 "github.com/google/gnostic-models/openapiv2"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	openapitesting "k8s.io/kube-openapi/pkg/util/proto/testing"
 )
@@ -66,6 +66,16 @@ func TestSupportsQueryParam(t *testing.T) {
 				Kind:    "NodeProxyOptions",
 			},
 			success:    true,
+			supports:   false,
+			queryParam: QueryParamFieldValidation,
+		},
+		{
+			gvk: schema.GroupVersionKind{
+				Group:   "",
+				Version: "v1",
+				Kind:    "List",
+			},
+			success:    false,
 			supports:   false,
 			queryParam: QueryParamFieldValidation,
 		},
@@ -124,6 +134,11 @@ func TestFieldValidationVerifier(t *testing.T) {
 	if err == nil {
 		t.Fatalf("Random doesn't support fieldValidation, yet no error found")
 	}
+
+	err = fieldValidationVerifier.HasSupport(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "List"})
+	if err == nil {
+		t.Fatalf("List does not support fieldValidation, yet no error found")
+	}
 }
 
 type EmptyOpenAPI struct{}
@@ -158,5 +173,10 @@ func TestFieldValidationVerifierNoOpenAPI(t *testing.T) {
 	err = fieldValidationVerifier.HasSupport(schema.GroupVersionKind{Group: "crd.com", Version: "v1", Kind: "MyCRD"})
 	if err == nil {
 		t.Fatalf("MyCRD doesn't support fieldValidation, yet no error found")
+	}
+
+	err = fieldValidationVerifier.HasSupport(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "List"})
+	if err == nil {
+		t.Fatalf("List does not support fieldValidation, yet no error found")
 	}
 }

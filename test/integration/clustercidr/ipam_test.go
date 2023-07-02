@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/controller/nodeipam"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
@@ -42,11 +43,14 @@ import (
 )
 
 func TestIPAMMultiCIDRRangeAllocatorCIDRAllocate(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	// set the feature gate to enable MultiCIDRRangeAllocator
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRRangeAllocator, true)()
 
-	_, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition"}
@@ -60,10 +64,7 @@ func TestIPAMMultiCIDRRangeAllocatorCIDRAllocate(t *testing.T) {
 
 	ipamController := booststrapMultiCIDRRangeAllocator(t, clientSet, sharedInformer)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	go ipamController.Run(ctx.Done())
+	go ipamController.Run(ctx)
 	sharedInformer.Start(ctx.Done())
 
 	tests := []struct {
@@ -129,10 +130,14 @@ func TestIPAMMultiCIDRRangeAllocatorCIDRAllocate(t *testing.T) {
 }
 
 func TestIPAMMultiCIDRRangeAllocatorCIDRRelease(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	// set the feature gate to enable MultiCIDRRangeAllocator
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRRangeAllocator, true)()
 
-	_, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition"}
@@ -146,10 +151,7 @@ func TestIPAMMultiCIDRRangeAllocatorCIDRRelease(t *testing.T) {
 
 	ipamController := booststrapMultiCIDRRangeAllocator(t, clientSet, sharedInformer)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	go ipamController.Run(ctx.Done())
+	go ipamController.Run(ctx)
 	sharedInformer.Start(ctx.Done())
 
 	t.Run("Pod CIDR release after node delete", func(t *testing.T) {
@@ -206,10 +208,14 @@ func TestIPAMMultiCIDRRangeAllocatorCIDRRelease(t *testing.T) {
 }
 
 func TestIPAMMultiCIDRRangeAllocatorClusterCIDRDelete(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	// set the feature gate to enable MultiCIDRRangeAllocator.
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRRangeAllocator, true)()
 
-	_, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition"}
@@ -223,10 +229,7 @@ func TestIPAMMultiCIDRRangeAllocatorClusterCIDRDelete(t *testing.T) {
 
 	ipamController := booststrapMultiCIDRRangeAllocator(t, clientSet, sharedInformer)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	go ipamController.Run(ctx.Done())
+	go ipamController.Run(ctx)
 	sharedInformer.Start(ctx.Done())
 
 	t.Run("delete cc with node associated", func(t *testing.T) {
@@ -302,10 +305,14 @@ func TestIPAMMultiCIDRRangeAllocatorClusterCIDRDelete(t *testing.T) {
 }
 
 func TestIPAMMultiCIDRRangeAllocatorClusterCIDRTerminate(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	// set the feature gate to enable MultiCIDRRangeAllocator.
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRRangeAllocator, true)()
 
-	_, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition"}
@@ -319,10 +326,7 @@ func TestIPAMMultiCIDRRangeAllocatorClusterCIDRTerminate(t *testing.T) {
 
 	ipamController := booststrapMultiCIDRRangeAllocator(t, clientSet, sharedInformer)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	go ipamController.Run(ctx.Done())
+	go ipamController.Run(ctx)
 	sharedInformer.Start(ctx.Done())
 
 	t.Run("Pod CIDRS must not be allocated from a terminating CC", func(t *testing.T) {
@@ -387,10 +391,14 @@ func TestIPAMMultiCIDRRangeAllocatorClusterCIDRTerminate(t *testing.T) {
 }
 
 func TestIPAMMultiCIDRRangeAllocatorClusterCIDRTieBreak(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	// set the feature gate to enable MultiCIDRRangeAllocator
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRRangeAllocator, true)()
 
-	_, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition"}
@@ -404,10 +412,7 @@ func TestIPAMMultiCIDRRangeAllocatorClusterCIDRTieBreak(t *testing.T) {
 
 	ipamController := booststrapMultiCIDRRangeAllocator(t, clientSet, sharedInformer)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	go ipamController.Run(ctx.Done())
+	go ipamController.Run(ctx)
 	sharedInformer.Start(ctx.Done())
 
 	tests := []struct {
@@ -557,8 +562,9 @@ func booststrapMultiCIDRRangeAllocator(t *testing.T,
 	if _, err := clientSet.CoreV1().Nodes().Create(context.TODO(), initialNode, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
-
+	_, ctx := ktesting.NewTestContext(t)
 	ipamController, err := nodeipam.NewNodeIpamController(
+		ctx,
 		sharedInformer.Core().V1().Nodes(),
 		sharedInformer.Networking().V1alpha1().ClusterCIDRs(),
 		nil,

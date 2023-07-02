@@ -24,20 +24,21 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/sets"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	testingclock "k8s.io/utils/clock/testing"
-
-	"github.com/davecgh/go-spew/spew"
 )
 
 type fakeListener struct {
-	openPorts sets.String
+	openPorts sets.Set[string]
 }
 
 func newFakeListener() *fakeListener {
 	return &fakeListener{
-		openPorts: sets.String{},
+		openPorts: sets.Set[string]{},
 	}
 }
 
@@ -120,7 +121,8 @@ type hcPayload struct {
 		Namespace string
 		Name      string
 	}
-	LocalEndpoints int
+	LocalEndpoints      int
+	ServiceProxyHealthy bool
 }
 
 type healthzPayload struct {
@@ -128,11 +130,21 @@ type healthzPayload struct {
 	CurrentTime string
 }
 
+type fakeProxierHealthChecker struct {
+	healthy bool
+}
+
+func (fake fakeProxierHealthChecker) IsHealthy() bool {
+	return fake.healthy
+}
+
 func TestServer(t *testing.T) {
 	listener := newFakeListener()
 	httpFactory := newFakeHTTPServerFactory()
+	nodePortAddresses := proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{})
+	proxyChecker := &fakeProxierHealthChecker{true}
 
-	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory, []string{})
+	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory, nodePortAddresses, proxyChecker)
 	hcs := hcsi.(*server)
 	if len(hcs.services) != 0 {
 		t.Errorf("expected 0 services, got %d", len(hcs.services))
@@ -164,10 +176,10 @@ func TestServer(t *testing.T) {
 		t.Errorf("expected 0 endpoints, got %d", hcs.services[nsn].endpoints)
 	}
 	if len(listener.openPorts) != 1 {
-		t.Errorf("expected 1 open port, got %d\n%s", len(listener.openPorts), spew.Sdump(listener.openPorts))
+		t.Errorf("expected 1 open port, got %d\n%s", len(listener.openPorts), dump.Pretty(listener.openPorts))
 	}
-	if !listener.hasPort(":9376") {
-		t.Errorf("expected port :9376 to be open\n%s", spew.Sdump(listener.openPorts))
+	if !listener.hasPort("0.0.0.0:9376") {
+		t.Errorf("expected port :9376 to be open\n%s", dump.Pretty(listener.openPorts))
 	}
 	// test the handler
 	testHandler(hcs, nsn, http.StatusServiceUnavailable, 0, t)
@@ -250,7 +262,7 @@ func TestServer(t *testing.T) {
 		t.Errorf("expected 0 endpoints, got %d", hcs.services[nsn3].endpoints)
 	}
 	if len(listener.openPorts) != 3 {
-		t.Errorf("expected 3 open ports, got %d\n%s", len(listener.openPorts), spew.Sdump(listener.openPorts))
+		t.Errorf("expected 3 open ports, got %d\n%s", len(listener.openPorts), dump.Pretty(listener.openPorts))
 	}
 	// test the handlers
 	testHandler(hcs, nsn1, http.StatusServiceUnavailable, 0, t)
@@ -349,9 +361,29 @@ func TestServer(t *testing.T) {
 	testHandler(hcs, nsn2, http.StatusServiceUnavailable, 0, t)
 	testHandler(hcs, nsn3, http.StatusOK, 7, t)
 	testHandler(hcs, nsn4, http.StatusOK, 6, t)
+
+	// fake a temporary unhealthy proxy
+	proxyChecker.healthy = false
+	testHandlerWithHealth(hcs, nsn2, http.StatusServiceUnavailable, 0, false, t)
+	testHandlerWithHealth(hcs, nsn3, http.StatusServiceUnavailable, 7, false, t)
+	testHandlerWithHealth(hcs, nsn4, http.StatusServiceUnavailable, 6, false, t)
+
+	// fake a healthy proxy
+	proxyChecker.healthy = true
+	testHandlerWithHealth(hcs, nsn2, http.StatusServiceUnavailable, 0, true, t)
+	testHandlerWithHealth(hcs, nsn3, http.StatusOK, 7, true, t)
+	testHandlerWithHealth(hcs, nsn4, http.StatusOK, 6, true, t)
 }
 
 func testHandler(hcs *server, nsn types.NamespacedName, status int, endpoints int, t *testing.T) {
+	tHandler(hcs, nsn, status, endpoints, true, t)
+}
+
+func testHandlerWithHealth(hcs *server, nsn types.NamespacedName, status int, endpoints int, kubeProxyHealthy bool, t *testing.T) {
+	tHandler(hcs, nsn, status, endpoints, kubeProxyHealthy, t)
+}
+
+func tHandler(hcs *server, nsn types.NamespacedName, status int, endpoints int, kubeProxyHealthy bool, t *testing.T) {
 	instance := hcs.services[nsn]
 	for _, h := range instance.httpServers {
 		handler := h.(*fakeHTTPServer).handler
@@ -376,6 +408,9 @@ func testHandler(hcs *server, nsn types.NamespacedName, status int, endpoints in
 		}
 		if payload.LocalEndpoints != endpoints {
 			t.Errorf("expected %d endpoints, got %d", endpoints, payload.LocalEndpoints)
+		}
+		if payload.ServiceProxyHealthy != kubeProxyHealthy {
+			t.Errorf("expected %v kubeProxyHealthy, got %v", kubeProxyHealthy, payload.ServiceProxyHealthy)
 		}
 	}
 }
@@ -432,11 +467,13 @@ func testHealthzHandler(server httpServer, status int, t *testing.T) {
 func TestServerWithSelectiveListeningAddress(t *testing.T) {
 	listener := newFakeListener()
 	httpFactory := newFakeHTTPServerFactory()
+	proxyChecker := &fakeProxierHealthChecker{true}
 
 	// limiting addresses to loop back. We don't want any cleverness here around getting IP for
 	// machine nor testing ipv6 || ipv4. using loop back guarantees the test will work on any machine
+	nodePortAddresses := proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{"127.0.0.0/8"})
 
-	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory, []string{"127.0.0.0/8"})
+	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory, nodePortAddresses, proxyChecker)
 	hcs := hcsi.(*server)
 	if len(hcs.services) != 0 {
 		t.Errorf("expected 0 services, got %d", len(hcs.services))
@@ -468,10 +505,10 @@ func TestServerWithSelectiveListeningAddress(t *testing.T) {
 		t.Errorf("expected 0 endpoints, got %d", hcs.services[nsn].endpoints)
 	}
 	if len(listener.openPorts) != 1 {
-		t.Errorf("expected 1 open port, got %d\n%s", len(listener.openPorts), spew.Sdump(listener.openPorts))
+		t.Errorf("expected 1 open port, got %d\n%s", len(listener.openPorts), dump.Pretty(listener.openPorts))
 	}
 	if !listener.hasPort("127.0.0.1:9376") {
-		t.Errorf("expected port :9376 to be open\n%s", spew.Sdump(listener.openPorts))
+		t.Errorf("expected port :9376 to be open\n%s", dump.Pretty(listener.openPorts))
 	}
 	// test the handler
 	testHandler(hcs, nsn, http.StatusServiceUnavailable, 0, t)

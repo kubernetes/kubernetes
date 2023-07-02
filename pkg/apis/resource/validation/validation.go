@@ -25,21 +25,13 @@ import (
 	"k8s.io/kubernetes/pkg/apis/resource"
 )
 
-// validateResourceClaimName can be used to check whether the given
-// name for a ResourceClaim is valid.
-var validateResourceClaimName = apimachineryvalidation.NameIsDNSSubdomain
-
-// validateResourceClaimTemplateName can be used to check whether the given
-// name for a ResourceClaimTemplate is valid.
-var validateResourceClaimTemplateName = apimachineryvalidation.NameIsDNSSubdomain
-
 // validateResourceDriverName reuses the validation of a CSI driver because
 // the allowed values are exactly the same.
 var validateResourceDriverName = corevalidation.ValidateCSIDriverName
 
 // ValidateClaim validates a ResourceClaim.
 func ValidateClaim(resourceClaim *resource.ResourceClaim) field.ErrorList {
-	allErrs := corevalidation.ValidateObjectMeta(&resourceClaim.ObjectMeta, true, validateResourceClaimName, field.NewPath("metadata"))
+	allErrs := corevalidation.ValidateObjectMeta(&resourceClaim.ObjectMeta, true, corevalidation.ValidateResourceClaimName, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateResourceClaimSpec(&resourceClaim.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
@@ -155,6 +147,11 @@ func ValidateClaimStatusUpdate(resourceClaim, oldClaim *resource.ResourceClaim) 
 		}
 	}
 
+	// Updates to a populated resourceClaim.Status.Allocation are not allowed
+	if oldClaim.Status.Allocation != nil && resourceClaim.Status.Allocation != nil {
+		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(resourceClaim.Status.Allocation, oldClaim.Status.Allocation, fldPath.Child("allocation"))...)
+	}
+
 	if !oldClaim.Status.DeallocationRequested &&
 		resourceClaim.Status.DeallocationRequested &&
 		len(resourceClaim.Status.ReservedFor) > 0 {
@@ -185,12 +182,30 @@ func ValidateClaimStatusUpdate(resourceClaim, oldClaim *resource.ResourceClaim) 
 func validateAllocationResult(allocation *resource.AllocationResult, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if allocation != nil {
-		if len(allocation.ResourceHandle) > resource.ResourceHandleMaxSize {
-			allErrs = append(allErrs, field.TooLongMaxLength(fldPath.Child("resourceHandle"), len(allocation.ResourceHandle), resource.ResourceHandleMaxSize))
+		if len(allocation.ResourceHandles) > 0 {
+			allErrs = append(allErrs, validateResourceHandles(allocation.ResourceHandles, resource.AllocationResultResourceHandlesMaxSize, fldPath.Child("resourceHandles"))...)
 		}
 		if allocation.AvailableOnNodes != nil {
 			allErrs = append(allErrs, corevalidation.ValidateNodeSelector(allocation.AvailableOnNodes, fldPath.Child("availableOnNodes"))...)
 		}
+	}
+	return allErrs
+}
+
+func validateResourceHandles(resourceHandles []resource.ResourceHandle, maxSize int, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	for i, resourceHandle := range resourceHandles {
+		idxPath := fldPath.Index(i)
+		allErrs = append(allErrs, validateResourceDriverName(resourceHandle.DriverName, idxPath.Child("driverName"))...)
+		if len(resourceHandle.Data) > resource.ResourceHandleDataMaxSize {
+			allErrs = append(allErrs, field.TooLongMaxLength(idxPath.Child("data"), len(resourceHandle.Data), resource.ResourceHandleDataMaxSize))
+		}
+	}
+	if len(resourceHandles) > maxSize {
+		// Dumping the entire field into the error message is likely to be too long,
+		// in particular when it is already beyond the maximum size. Instead this
+		// just shows the number of entries.
+		allErrs = append(allErrs, field.TooLongMaxLength(fldPath, len(resourceHandles), maxSize))
 	}
 	return allErrs
 }
@@ -253,33 +268,33 @@ func validateResourceClaimConsumers(consumers []resource.ResourceClaimConsumerRe
 	return allErrs
 }
 
-// ValidatePodScheduling validates a PodScheduling.
-func ValidatePodScheduling(resourceClaim *resource.PodScheduling) field.ErrorList {
-	allErrs := corevalidation.ValidateObjectMeta(&resourceClaim.ObjectMeta, true, corevalidation.ValidatePodName, field.NewPath("metadata"))
-	allErrs = append(allErrs, validatePodSchedulingSpec(&resourceClaim.Spec, field.NewPath("spec"))...)
+// ValidatePodSchedulingContext validates a PodSchedulingContext.
+func ValidatePodSchedulingContexts(schedulingCtx *resource.PodSchedulingContext) field.ErrorList {
+	allErrs := corevalidation.ValidateObjectMeta(&schedulingCtx.ObjectMeta, true, corevalidation.ValidatePodName, field.NewPath("metadata"))
+	allErrs = append(allErrs, validatePodSchedulingSpec(&schedulingCtx.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
 
-func validatePodSchedulingSpec(spec *resource.PodSchedulingSpec, fldPath *field.Path) field.ErrorList {
+func validatePodSchedulingSpec(spec *resource.PodSchedulingContextSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := validateSliceIsASet(spec.PotentialNodes, resource.PodSchedulingNodeListMaxSize, validateNodeName, fldPath.Child("potentialNodes"))
 	return allErrs
 }
 
-// ValidatePodSchedulingUpdate tests if an update to PodScheduling is valid.
-func ValidatePodSchedulingUpdate(resourceClaim, oldPodScheduling *resource.PodScheduling) field.ErrorList {
-	allErrs := corevalidation.ValidateObjectMetaUpdate(&resourceClaim.ObjectMeta, &oldPodScheduling.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidatePodScheduling(resourceClaim)...)
+// ValidatePodSchedulingContextUpdate tests if an update to PodSchedulingContext is valid.
+func ValidatePodSchedulingContextUpdate(schedulingCtx, oldSchedulingCtx *resource.PodSchedulingContext) field.ErrorList {
+	allErrs := corevalidation.ValidateObjectMetaUpdate(&schedulingCtx.ObjectMeta, &oldSchedulingCtx.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidatePodSchedulingContexts(schedulingCtx)...)
 	return allErrs
 }
 
-// ValidatePodSchedulingStatusUpdate tests if an update to the status of a PodScheduling is valid.
-func ValidatePodSchedulingStatusUpdate(resourceClaim, oldPodScheduling *resource.PodScheduling) field.ErrorList {
-	allErrs := corevalidation.ValidateObjectMetaUpdate(&resourceClaim.ObjectMeta, &oldPodScheduling.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, validatePodSchedulingStatus(&resourceClaim.Status, field.NewPath("status"))...)
+// ValidatePodSchedulingContextStatusUpdate tests if an update to the status of a PodSchedulingContext is valid.
+func ValidatePodSchedulingContextStatusUpdate(schedulingCtx, oldSchedulingCtx *resource.PodSchedulingContext) field.ErrorList {
+	allErrs := corevalidation.ValidateObjectMetaUpdate(&schedulingCtx.ObjectMeta, &oldSchedulingCtx.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, validatePodSchedulingStatus(&schedulingCtx.Status, field.NewPath("status"))...)
 	return allErrs
 }
 
-func validatePodSchedulingStatus(status *resource.PodSchedulingStatus, fldPath *field.Path) field.ErrorList {
+func validatePodSchedulingStatus(status *resource.PodSchedulingContextStatus, fldPath *field.Path) field.ErrorList {
 	return validatePodSchedulingClaims(status.ResourceClaims, fldPath.Child("claims"))
 }
 
@@ -304,7 +319,7 @@ func validatePodSchedulingClaim(status resource.ResourceClaimSchedulingStatus, f
 
 // ValidateClaimTemplace validates a ResourceClaimTemplate.
 func ValidateClaimTemplate(template *resource.ResourceClaimTemplate) field.ErrorList {
-	allErrs := corevalidation.ValidateObjectMeta(&template.ObjectMeta, true, validateResourceClaimTemplateName, field.NewPath("metadata"))
+	allErrs := corevalidation.ValidateObjectMeta(&template.ObjectMeta, true, corevalidation.ValidateResourceClaimTemplateName, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateResourceClaimTemplateSpec(&template.Spec, field.NewPath("spec"))...)
 	return allErrs
 }

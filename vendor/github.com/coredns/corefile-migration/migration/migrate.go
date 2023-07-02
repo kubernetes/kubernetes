@@ -20,12 +20,18 @@ import (
 // any deprecated, removed, or ignored plugins/directives present in the Corefile.  Notifications are also returned for
 // any new default plugins that would be added in a migration.
 func Deprecated(fromCoreDNSVersion, toCoreDNSVersion, corefileStr string) ([]Notice, error) {
+	if fromCoreDNSVersion == toCoreDNSVersion {
+		return nil, nil
+	}
 	return getStatus(fromCoreDNSVersion, toCoreDNSVersion, corefileStr, SevAll)
 }
 
 // Unsupported returns a list notifications of plugins/options that are not handled supported by this migration tool,
 // but may still be valid in CoreDNS.
 func Unsupported(fromCoreDNSVersion, toCoreDNSVersion, corefileStr string) ([]Notice, error) {
+	if fromCoreDNSVersion == toCoreDNSVersion {
+		return nil, nil
+	}
 	return getStatus(fromCoreDNSVersion, toCoreDNSVersion, corefileStr, SevUnsupported)
 }
 

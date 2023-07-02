@@ -42,7 +42,7 @@ limitations under the License.
 package ktesting
 
 import (
-	"bytes"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -50,8 +50,10 @@ import (
 	"github.com/go-logr/logr"
 
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/internal/buffer"
 	"k8s.io/klog/v2/internal/dbg"
 	"k8s.io/klog/v2/internal/serialize"
+	"k8s.io/klog/v2/internal/severity"
 	"k8s.io/klog/v2/internal/verbosity"
 )
 
@@ -80,6 +82,23 @@ func (n NopTL) Log(args ...interface{}) {}
 
 var _ TL = NopTL{}
 
+// BufferTL implements TL with an in-memory buffer.
+//
+// # Experimental
+//
+// Notice: This type is EXPERIMENTAL and may be changed or removed in a
+// later release.
+type BufferTL struct {
+	strings.Builder
+}
+
+func (n *BufferTL) Helper() {}
+func (n *BufferTL) Log(args ...interface{}) {
+	n.Builder.WriteString(fmt.Sprintln(args...))
+}
+
+var _ TL = &BufferTL{}
+
 // NewLogger constructs a new logger for the given test interface.
 //
 // Beware that testing.T does not support logging after the test that
@@ -87,6 +106,9 @@ var _ TL = NopTL{}
 // and those goroutines log something after test completion,
 // that output will be printed via the global klog logger with
 // `<test name> leaked goroutine` as prefix.
+//
+// Verbosity can be modified at any time through the Config.V and
+// Config.VModule API.
 //
 // # Experimental
 //
@@ -98,6 +120,9 @@ func NewLogger(t TL, c *Config) logr.Logger {
 			t:      t,
 			config: c,
 		},
+	}
+	if c.co.anyToString != nil {
+		l.shared.formatter.AnyToStringHook = c.co.anyToString
 	}
 
 	type testCleanup interface {
@@ -230,19 +255,19 @@ type Underlier interface {
 	GetBuffer() Buffer
 }
 
-type buffer struct {
+type logBuffer struct {
 	mutex sync.Mutex
 	text  strings.Builder
 	log   Log
 }
 
-func (b *buffer) String() string {
+func (b *logBuffer) String() string {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 	return b.text.String()
 }
 
-func (b *buffer) Data() Log {
+func (b *logBuffer) Data() Log {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 	return b.log.DeepCopy()
@@ -261,9 +286,10 @@ type tloggerShared struct {
 	// it logs after test completion.
 	goroutineWarningDone bool
 
+	formatter serialize.Formatter
 	testName  string
 	config    *Config
-	buffer    buffer
+	buffer    logBuffer
 	callDepth int
 }
 
@@ -318,10 +344,9 @@ func (l tlogger) Info(level int, msg string, kvList ...interface{}) {
 	}
 
 	l.shared.t.Helper()
-	buffer := &bytes.Buffer{}
-	merged := serialize.MergeKVs(l.values, kvList)
-	serialize.KVListFormat(buffer, merged...)
-	l.log(LogInfo, msg, level, buffer, nil, kvList)
+	buf := buffer.GetBuffer()
+	l.shared.formatter.MergeAndFormatKVs(&buf.Buffer, l.values, kvList)
+	l.log(LogInfo, msg, level, buf, nil, kvList)
 }
 
 func (l tlogger) Enabled(level int) bool {
@@ -337,27 +362,34 @@ func (l tlogger) Error(err error, msg string, kvList ...interface{}) {
 	}
 
 	l.shared.t.Helper()
-	buffer := &bytes.Buffer{}
+	buf := buffer.GetBuffer()
 	if err != nil {
-		serialize.KVListFormat(buffer, "err", err)
+		l.shared.formatter.KVFormat(&buf.Buffer, "err", err)
 	}
-	merged := serialize.MergeKVs(l.values, kvList)
-	serialize.KVListFormat(buffer, merged...)
-	l.log(LogError, msg, 0, buffer, err, kvList)
+	l.shared.formatter.MergeAndFormatKVs(&buf.Buffer, l.values, kvList)
+	l.log(LogError, msg, 0, buf, err, kvList)
 }
 
-func (l tlogger) log(what LogType, msg string, level int, buffer *bytes.Buffer, err error, kvList []interface{}) {
+func (l tlogger) log(what LogType, msg string, level int, buf *buffer.Buffer, err error, kvList []interface{}) {
 	l.shared.t.Helper()
-	args := []interface{}{what}
+	s := severity.InfoLog
+	if what == LogError {
+		s = severity.ErrorLog
+	}
+	args := []interface{}{buf.SprintHeader(s, time.Now())}
 	if l.prefix != "" {
 		args = append(args, l.prefix+":")
 	}
 	args = append(args, msg)
-	if buffer.Len() > 0 {
+	if buf.Len() > 0 {
 		// Skip leading space inserted by serialize.KVListFormat.
-		args = append(args, string(buffer.Bytes()[1:]))
+		args = append(args, string(buf.Bytes()[1:]))
 	}
 	l.shared.t.Log(args...)
+
+	if !l.shared.config.co.bufferLogs {
+		return
+	}
 
 	l.shared.buffer.mutex.Lock()
 	defer l.shared.buffer.mutex.Unlock()

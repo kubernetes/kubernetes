@@ -58,7 +58,7 @@ const (
 var localStorageVersion = utilversion.MustParseSemantic("v1.8.0-beta.0")
 
 // variable populated in BeforeEach, never modified afterwards
-var workerNodes = sets.String{}
+var workerNodes = sets.Set[string]{}
 
 type pausePodConfig struct {
 	Name                              string
@@ -84,7 +84,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 	var RCName string
 	var ns string
 	f := framework.NewDefaultFramework("sched-pred")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.AfterEach(func(ctx context.Context) {
 		rc, err := cs.CoreV1().ReplicationControllers(ns).Get(ctx, RCName, metav1.GetOptions{})
@@ -806,7 +806,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		})
 	})
 
-	ginkgo.It("validates Pods with non-empty schedulingGates are blocked on scheduling [Feature:PodSchedulingReadiness] [alpha]", func(ctx context.Context) {
+	ginkgo.It("validates Pods with non-empty schedulingGates are blocked on scheduling", func(ctx context.Context) {
 		podLabel := "e2e-scheduling-gates"
 		replicas := 3
 		ginkgo.By(fmt.Sprintf("Creating a ReplicaSet with replicas=%v, carrying scheduling gates [foo bar]", replicas))
@@ -1154,7 +1154,7 @@ func createHostPortPodOnNode(ctx context.Context, f *framework.Framework, podNam
 }
 
 // GetPodsScheduled returns a number of currently scheduled and not scheduled Pods on worker nodes.
-func GetPodsScheduled(workerNodes sets.String, pods *v1.PodList) (scheduledPods, notScheduledPods []v1.Pod) {
+func GetPodsScheduled(workerNodes sets.Set[string], pods *v1.PodList) (scheduledPods, notScheduledPods []v1.Pod) {
 	for _, pod := range pods.Items {
 		if pod.Spec.NodeName != "" && workerNodes.Has(pod.Spec.NodeName) {
 			_, scheduledCondition := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)

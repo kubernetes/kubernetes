@@ -47,7 +47,7 @@ const (
 
 var (
 	queueLengthBuckets            = []float64{0, 10, 25, 50, 100, 250, 500, 1000}
-	requestDurationSecondsBuckets = []float64{0, 0.005, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 30}
+	requestDurationSecondsBuckets = []float64{0, 0.005, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30}
 )
 
 var registerMetrics sync.Once

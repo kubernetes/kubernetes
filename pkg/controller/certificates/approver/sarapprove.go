@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	certificatesinformers "k8s.io/client-go/informers/certificates/v1"
 	clientset "k8s.io/client-go/kubernetes"
-
 	capihelper "k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/controller/certificates"
 )
@@ -46,12 +45,13 @@ type sarApprover struct {
 }
 
 // NewCSRApprovingController creates a new CSRApprovingController.
-func NewCSRApprovingController(client clientset.Interface, csrInformer certificatesinformers.CertificateSigningRequestInformer) *certificates.CertificateController {
+func NewCSRApprovingController(ctx context.Context, client clientset.Interface, csrInformer certificatesinformers.CertificateSigningRequestInformer) *certificates.CertificateController {
 	approver := &sarApprover{
 		client:      client,
 		recognizers: recognizers(),
 	}
 	return certificates.NewCertificateController(
+		ctx,
 		"csrapproving",
 		client,
 		csrInformer,
@@ -63,12 +63,12 @@ func recognizers() []csrRecognizer {
 	recognizers := []csrRecognizer{
 		{
 			recognize:      isSelfNodeClientCert,
-			permission:     authorization.ResourceAttributes{Group: "certificates.k8s.io", Resource: "certificatesigningrequests", Verb: "create", Subresource: "selfnodeclient"},
+			permission:     authorization.ResourceAttributes{Group: "certificates.k8s.io", Resource: "certificatesigningrequests", Verb: "create", Subresource: "selfnodeclient", Version: "*"},
 			successMessage: "Auto approving self kubelet client certificate after SubjectAccessReview.",
 		},
 		{
 			recognize:      isNodeClientCert,
-			permission:     authorization.ResourceAttributes{Group: "certificates.k8s.io", Resource: "certificatesigningrequests", Verb: "create", Subresource: "nodeclient"},
+			permission:     authorization.ResourceAttributes{Group: "certificates.k8s.io", Resource: "certificatesigningrequests", Verb: "create", Subresource: "nodeclient", Version: "*"},
 			successMessage: "Auto approving kubelet client certificate after SubjectAccessReview.",
 		},
 	}

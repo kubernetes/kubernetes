@@ -152,7 +152,10 @@ func (pl *PodTopologySpread) PreFilter(ctx context.Context, cycleState *framewor
 	s, err := pl.calPreFilterState(ctx, pod)
 	if err != nil {
 		return nil, framework.AsStatus(err)
+	} else if s != nil && len(s.Constraints) == 0 {
+		return nil, framework.NewStatus(framework.Skip)
 	}
+
 	cycleState.Write(preFilterStateKey, s)
 	return nil, nil
 }
@@ -236,11 +239,8 @@ func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error
 
 // calPreFilterState computes preFilterState describing how pods are spread on topologies.
 func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod) (*preFilterState, error) {
-	allNodes, err := pl.sharedLister.NodeInfos().List()
-	if err != nil {
-		return nil, fmt.Errorf("listing NodeInfos: %w", err)
-	}
 	var constraints []topologySpreadConstraint
+	var err error
 	if len(pod.Spec.TopologySpreadConstraints) > 0 {
 		// We have feature gating in APIServer to strip the spec
 		// so don't need to re-check feature gate, just check length of Constraints.
@@ -262,6 +262,11 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod)
 		return &preFilterState{}, nil
 	}
 
+	allNodes, err := pl.sharedLister.NodeInfos().List()
+	if err != nil {
+		return nil, fmt.Errorf("listing NodeInfos: %w", err)
+	}
+
 	s := preFilterState{
 		Constraints:          constraints,
 		TpKeyToCriticalPaths: make(map[string]*criticalPaths, len(constraints)),
@@ -273,10 +278,6 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod)
 	processNode := func(i int) {
 		nodeInfo := allNodes[i]
 		node := nodeInfo.Node()
-		if node == nil {
-			klog.ErrorS(nil, "Node not found")
-			return
-		}
 
 		if !pl.enableNodeInclusionPolicyInPodTopologySpread {
 			// spreading is applied to nodes that pass those filters.
@@ -333,9 +334,6 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod)
 // Filter invoked at the filter extension point.
 func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	node := nodeInfo.Node()
-	if node == nil {
-		return framework.AsStatus(fmt.Errorf("node not found"))
-	}
 
 	s, err := getPreFilterState(cycleState)
 	if err != nil {
@@ -347,12 +345,13 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 		return nil
 	}
 
+	logger := klog.FromContext(ctx)
 	podLabelSet := labels.Set(pod.Labels)
 	for _, c := range s.Constraints {
 		tpKey := c.TopologyKey
 		tpVal, ok := node.Labels[c.TopologyKey]
 		if !ok {
-			klog.V(5).InfoS("Node doesn't have required label", "node", klog.KObj(node), "label", tpKey)
+			logger.V(5).Info("Node doesn't have required label", "node", klog.KObj(node), "label", tpKey)
 			return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonNodeLabelNotMatch)
 		}
 
@@ -360,7 +359,7 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 		// 'existing matching num' + 'if self-match (1 or 0)' - 'global minimum' <= 'maxSkew'
 		minMatchNum, err := s.minMatchNum(tpKey, c.MinDomains, pl.enableMinDomainsInPodTopologySpread)
 		if err != nil {
-			klog.ErrorS(err, "Internal error occurred while retrieving value precalculated in PreFilter", "topologyKey", tpKey, "paths", s.TpKeyToCriticalPaths)
+			logger.Error(err, "Internal error occurred while retrieving value precalculated in PreFilter", "topologyKey", tpKey, "paths", s.TpKeyToCriticalPaths)
 			continue
 		}
 
@@ -376,7 +375,7 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 		}
 		skew := matchNum + selfMatchNum - minMatchNum
 		if skew > int(c.MaxSkew) {
-			klog.V(5).InfoS("Node failed spreadConstraint: matchNum + selfMatchNum - minMatchNum > maxSkew", "node", klog.KObj(node), "topologyKey", tpKey, "matchNum", matchNum, "selfMatchNum", selfMatchNum, "minMatchNum", minMatchNum, "maxSkew", c.MaxSkew)
+			logger.V(5).Info("Node failed spreadConstraint: matchNum + selfMatchNum - minMatchNum > maxSkew", "node", klog.KObj(node), "topologyKey", tpKey, "matchNum", matchNum, "selfMatchNum", selfMatchNum, "minMatchNum", minMatchNum, "maxSkew", c.MaxSkew)
 			return framework.NewStatus(framework.Unschedulable, ErrReasonConstraintsNotMatch)
 		}
 	}

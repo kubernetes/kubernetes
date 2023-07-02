@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/json"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
@@ -346,7 +346,7 @@ func TestLabelErrors(t *testing.T) {
 
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-			ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
+			ioStreams, _, _, _ := genericiooptions.NewTestIOStreams()
 			buf := bytes.NewBuffer([]byte{})
 			cmd := NewCmdLabel(tf, ioStreams)
 			cmd.SetOut(buf)
@@ -365,7 +365,7 @@ func TestLabelErrors(t *testing.T) {
 				return
 			}
 			if buf.Len() > 0 {
-				t.Errorf("buffer should be empty: %s", string(buf.Bytes()))
+				t.Errorf("buffer should be empty: %s", buf.String())
 			}
 		})
 	}
@@ -406,7 +406,7 @@ func TestLabelForResourceFromFile(t *testing.T) {
 	}
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdLabel(tf, ioStreams)
 	opts := NewLabelOptions(ioStreams)
 	opts.Filenames = []string{"../../../testdata/controller.yaml"}
@@ -438,7 +438,7 @@ func TestLabelLocal(t *testing.T) {
 	}
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdLabel(tf, ioStreams)
 	opts := NewLabelOptions(ioStreams)
 	opts.Filenames = []string{"../../../testdata/controller.yaml"}
@@ -495,7 +495,7 @@ func TestLabelMultipleObjects(t *testing.T) {
 	}
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	opts := NewLabelOptions(ioStreams)
 	opts.all = true
 	cmd := NewCmdLabel(tf, ioStreams)
@@ -564,7 +564,7 @@ func TestLabelResourceVersion(t *testing.T) {
 	}
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-	iostreams, _, bufOut, _ := genericclioptions.NewTestIOStreams()
+	iostreams, _, bufOut, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdLabel(tf, iostreams)
 	cmd.SetOut(bufOut)
 	cmd.SetErr(bufOut)
@@ -689,7 +689,7 @@ pod/foo not labeled
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			iostreams, _, bufOut, _ := genericclioptions.NewTestIOStreams()
+			iostreams, _, bufOut, _ := genericiooptions.NewTestIOStreams()
 			cmd := NewCmdLabel(tf, iostreams)
 			cmd.SetOut(bufOut)
 			cmd.SetErr(bufOut)

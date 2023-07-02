@@ -17,7 +17,6 @@ limitations under the License.
 package deployment
 
 import (
-	"context"
 	"math"
 	"testing"
 	"time"
@@ -30,6 +29,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	testclient "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 )
@@ -298,7 +298,9 @@ func TestScale(t *testing.T) {
 				deploymentutil.SetReplicasAnnotations(rs, desiredReplicas, desiredReplicas+deploymentutil.MaxSurge(*test.oldDeployment))
 			}
 
-			if err := dc.scale(context.TODO(), test.deployment, test.newRS, test.oldRSs); err != nil {
+			_, ctx := ktesting.NewTestContext(t)
+
+			if err := dc.scale(ctx, test.deployment, test.newRS, test.oldRSs); err != nil {
 				t.Errorf("%s: unexpected error: %v", test.name, err)
 				return
 			}
@@ -412,9 +414,11 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 		test := tests[i]
 		t.Logf("scenario %d", i)
 
+		_, ctx := ktesting.NewTestContext(t)
+
 		fake := &fake.Clientset{}
 		informers := informers.NewSharedInformerFactory(fake, controller.NoResyncPeriodFunc())
-		controller, err := NewDeploymentController(informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), fake)
+		controller, err := NewDeploymentController(ctx, informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), fake)
 		if err != nil {
 			t.Fatalf("error creating Deployment controller: %v", err)
 		}
@@ -434,7 +438,7 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 
 		t.Logf(" &test.revisionHistoryLimit: %d", test.revisionHistoryLimit)
 		d := newDeployment("foo", 1, &test.revisionHistoryLimit, nil, nil, map[string]string{"foo": "bar"})
-		controller.cleanupDeployment(context.TODO(), test.oldRSs, d)
+		controller.cleanupDeployment(ctx, test.oldRSs, d)
 
 		gotDeletions := 0
 		for _, action := range fake.Actions() {
@@ -546,9 +550,11 @@ func TestDeploymentController_cleanupDeploymentOrder(t *testing.T) {
 		test := tests[i]
 		t.Logf("scenario %d", i)
 
+		_, ctx := ktesting.NewTestContext(t)
+
 		fake := &fake.Clientset{}
 		informers := informers.NewSharedInformerFactory(fake, controller.NoResyncPeriodFunc())
-		controller, err := NewDeploymentController(informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), fake)
+		controller, err := NewDeploymentController(ctx, informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), fake)
 		if err != nil {
 			t.Fatalf("error creating Deployment controller: %v", err)
 		}
@@ -566,7 +572,7 @@ func TestDeploymentController_cleanupDeploymentOrder(t *testing.T) {
 		informers.Start(stopCh)
 
 		d := newDeployment("foo", 1, &test.revisionHistoryLimit, nil, nil, map[string]string{"foo": "bar"})
-		controller.cleanupDeployment(context.TODO(), test.oldRSs, d)
+		controller.cleanupDeployment(ctx, test.oldRSs, d)
 
 		deletedRSs := sets.String{}
 		for _, action := range fake.Actions() {

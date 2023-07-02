@@ -18,6 +18,7 @@ package testing
 
 import (
 	"fmt"
+	"k8s.io/klog/v2"
 	"os"
 	"path/filepath"
 	goruntime "runtime"
@@ -94,6 +95,8 @@ const (
 	volumeNotMounted     = "volumeNotMounted"
 	volumeMountUncertain = "volumeMountUncertain"
 	volumeMounted        = "volumeMounted"
+
+	FailNewMounter = "fail-new-mounter"
 )
 
 // CommandScript is used to pre-configure a command that will be executed and
@@ -297,6 +300,9 @@ func (plugin *FakeVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (
 func (plugin *FakeVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	plugin.Lock()
 	defer plugin.Unlock()
+	if spec.Name() == FailNewMounter {
+		return nil, fmt.Errorf("AlwaysFailNewMounter")
+	}
 	fakeVolume := plugin.getFakeVolume(&plugin.Mounters)
 	fakeVolume.Lock()
 	defer fakeVolume.Unlock()
@@ -441,11 +447,11 @@ func (plugin *FakeVolumePlugin) Recycle(pvName string, spec *volume.Spec, eventR
 	return nil
 }
 
-func (plugin *FakeVolumePlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
+func (plugin *FakeVolumePlugin) NewDeleter(logger klog.Logger, spec *volume.Spec) (volume.Deleter, error) {
 	return &FakeDeleter{"/attributesTransferredFromSpec", volume.MetricsNil{}}, nil
 }
 
-func (plugin *FakeVolumePlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
+func (plugin *FakeVolumePlugin) NewProvisioner(logger klog.Logger, options volume.VolumeOptions) (volume.Provisioner, error) {
 	plugin.Lock()
 	defer plugin.Unlock()
 	plugin.LastProvisionerOptions = options

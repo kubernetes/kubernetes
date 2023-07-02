@@ -46,11 +46,11 @@ type privateClaims struct {
 }
 
 type kubernetes struct {
-	Namespace string          `json:"namespace,omitempty"`
-	Svcacct   ref             `json:"serviceaccount,omitempty"`
-	Pod       *ref            `json:"pod,omitempty"`
-	Secret    *ref            `json:"secret,omitempty"`
-	WarnAfter jwt.NumericDate `json:"warnafter,omitempty"`
+	Namespace string           `json:"namespace,omitempty"`
+	Svcacct   ref              `json:"serviceaccount,omitempty"`
+	Pod       *ref             `json:"pod,omitempty"`
+	Secret    *ref             `json:"secret,omitempty"`
+	WarnAfter *jwt.NumericDate `json:"warnafter,omitempty"`
 }
 
 type ref struct {
@@ -128,6 +128,9 @@ func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, 
 	case jwt.ErrNotValidYet:
 		return nil, errors.New("service account token is not valid yet")
 
+	case jwt.ErrIssuedInTheFuture:
+		return nil, errors.New("service account token is issued in the future")
+
 	// our current use of jwt.Expected above should make these cases impossible to hit
 	case jwt.ErrInvalidAudience, jwt.ErrInvalidID, jwt.ErrInvalidIssuer, jwt.ErrInvalidSubject:
 		klog.Errorf("service account token claim validation got unexpected validation failure: %v", err)
@@ -198,7 +201,7 @@ func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, 
 
 	// Check special 'warnafter' field for projected service account token transition.
 	warnafter := private.Kubernetes.WarnAfter
-	if warnafter != 0 {
+	if warnafter != nil && *warnafter != 0 {
 		if nowTime.After(warnafter.Time()) {
 			secondsAfterWarn := nowTime.Unix() - warnafter.Time().Unix()
 			auditInfo := fmt.Sprintf("subject: %s, seconds after warning threshold: %d", public.Subject, secondsAfterWarn)

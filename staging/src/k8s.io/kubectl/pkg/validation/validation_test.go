@@ -36,9 +36,9 @@ var _ = Describe("resource validation using OpenAPI Schema", func() {
 	var validator Schema
 	BeforeEach(func() {
 		s, err := fakeSchema.OpenAPISchema()
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 		resources, err := openapi.NewOpenAPIData(s)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 		validator = NewSchemaValidation(resources)
 		Expect(validator).ToNot(BeNil())
 	})
@@ -65,7 +65,7 @@ spec:
       - image: redis
         name: redis
 `))
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	It("validates a valid pod", func() {
@@ -87,7 +87,7 @@ spec:
     image: gcr.io/fake_project/fake_image:fake_tag
     name: master
 `))
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	It("finds invalid command (string instead of []string) in Json Pod", func() {
@@ -317,7 +317,7 @@ spec:
     command:
 `))
 
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	It("can validate lists", func() {
@@ -336,7 +336,7 @@ items:
       - name: name
 `))
 
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	It("fails because apiVersion is not provided", func() {
@@ -407,6 +407,6 @@ metadata:
 spec:
   foo: bar
 `))
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 	})
 })

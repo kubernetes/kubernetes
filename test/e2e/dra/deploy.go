@@ -48,8 +48,8 @@ import (
 )
 
 const (
-	NodePrepareResourceMethod   = "/v1alpha1.Node/NodePrepareResource"
-	NodeUnprepareResourceMethod = "/v1alpha1.Node/NodeUnprepareResource"
+	NodePrepareResourceMethod   = "/v1alpha2.Node/NodePrepareResource"
+	NodeUnprepareResourceMethod = "/v1alpha2.Node/NodeUnprepareResource"
 )
 
 type Nodes struct {
@@ -140,10 +140,7 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 	d.ctx = ctx
 	d.cleanup = append(d.cleanup, cancel)
 
-	// The controller is easy: we simply connect to the API server. It
-	// would be slightly nicer if we had a way to wait for all goroutines, but
-	// SharedInformerFactory has no API for that. At least we can wait
-	// for our own goroutine to stop once the context gets cancelled.
+	// The controller is easy: we simply connect to the API server.
 	d.Controller = app.NewController(d.f.ClientSet, d.Name, resources)
 	d.wg.Add(1)
 	go func() {
@@ -217,11 +214,11 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 		plugin, err := app.StartPlugin(logger, "/cdi", d.Name, nodename,
 			app.FileOperations{
 				Create: func(name string, content []byte) error {
-					ginkgo.By(fmt.Sprintf("creating CDI file %s on node %s:\n%s", name, nodename, string(content)))
+					klog.Background().Info("creating CDI file", "node", nodename, "filename", name, "content", string(content))
 					return d.createFile(&pod, name, content)
 				},
 				Remove: func(name string) error {
-					ginkgo.By(fmt.Sprintf("deleting CDI file %s on node %s", name, nodename))
+					klog.Background().Info("deleting CDI file", "node", nodename, "filename", name)
 					return d.removeFile(&pod, name)
 				},
 			},
@@ -243,14 +240,14 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 
 	// Wait for registration.
 	ginkgo.By("wait for plugin registration")
-	gomega.Eventually(func() []string {
-		var notRegistered []string
+	gomega.Eventually(func() map[string][]app.GRPCCall {
+		notRegistered := make(map[string][]app.GRPCCall)
 		for nodename, plugin := range d.Nodes {
-			if !plugin.IsRegistered() {
-				notRegistered = append(notRegistered, nodename)
+			calls := plugin.GetGRPCCalls()
+			if contains, err := app.BeRegistered.Match(calls); err != nil || !contains {
+				notRegistered[nodename] = calls
 			}
 		}
-		sort.Strings(notRegistered)
 		return notRegistered
 	}).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "hosts where the plugin has not been registered yet")
 }

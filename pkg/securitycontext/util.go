@@ -188,9 +188,10 @@ func AddNoNewPrivileges(sc *v1.SecurityContext) bool {
 
 var (
 	// These *must* be kept in sync with moby/moby.
-	// https://github.com/moby/moby/blob/master/oci/defaults.go#L116-L134
+	// https://github.com/moby/moby/blob/master/oci/defaults.go#L105-L123
 	// @jessfraz will watch changes to those files upstream.
 	defaultMaskedPaths = []string{
+		"/proc/asound",
 		"/proc/acpi",
 		"/proc/kcore",
 		"/proc/keys",
@@ -202,7 +203,6 @@ var (
 		"/sys/firmware",
 	}
 	defaultReadonlyPaths = []string{
-		"/proc/asound",
 		"/proc/bus",
 		"/proc/fs",
 		"/proc/irq",

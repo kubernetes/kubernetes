@@ -28,7 +28,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/kubectl/pkg/scheme"
@@ -62,7 +62,7 @@ func TestRolloutRestartOne(t *testing.T) {
 		},
 	}
 
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdRolloutRestart(tf, streams)
 
 	cmd.Run(cmd, []string{deploymentName})
@@ -98,7 +98,7 @@ func TestRolloutRestartError(t *testing.T) {
 		},
 	}
 
-	streams, _, bufOut, _ := genericclioptions.NewTestIOStreams()
+	streams, _, bufOut, _ := genericiooptions.NewTestIOStreams()
 	opt := NewRolloutRestartOptions(streams)
 	err := opt.Complete(tf, nil, []string{deploymentName})
 	assert.NoError(t, err)
@@ -150,7 +150,7 @@ func TestRolloutRestartSelectorNone(t *testing.T) {
 		},
 	}
 
-	streams, _, outBuf, errBuf := genericclioptions.NewTestIOStreams()
+	streams, _, outBuf, errBuf := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdRolloutRestart(tf, streams)
 	cmd.Flags().Set("selector", "app=test")
 
@@ -205,7 +205,7 @@ func TestRolloutRestartSelectorMany(t *testing.T) {
 		},
 	}
 
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdRolloutRestart(tf, streams)
 	cmd.Flags().Set("selector", labelSelector)
 

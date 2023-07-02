@@ -35,6 +35,9 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/fsquota/common"
 )
 
+// Pod -> External Pod UID
+var podUidMap = make(map[types.UID]types.UID)
+
 // Pod -> ID
 var podQuotaMap = make(map[types.UID]common.QuotaID)
 
@@ -314,19 +317,31 @@ func AssignQuota(m mount.Interface, path string, poduid types.UID, bytes *resour
 	}
 	quotaLock.Lock()
 	defer quotaLock.Unlock()
-	// Current policy is to set individual quotas on each volumes.
+	// Current policy is to set individual quotas on each volume,
+	// for each new volume we generate a random UUID and we use that as
+	// the internal pod uid.
+	// From fsquota point of view each volume is attached to a
+	// single unique pod.
 	// If we decide later that we want to assign one quota for all
-	// volumes in a pod, we can simply remove this line of code.
+	// volumes in a pod, we can simply use poduid parameter directly
 	// If and when we decide permanently that we're going to adopt
 	// one quota per volume, we can rip all of the pod code out.
-	volumeuid := types.UID(uuid.NewUUID())
-	if pod, ok := dirPodMap[path]; ok && pod != volumeuid {
-		return fmt.Errorf("requesting quota on existing directory %s but different pod %s %s", path, pod, volumeuid)
+	externalPodUid := poduid
+	internalPodUid, ok := dirPodMap[path]
+	if ok {
+		if podUidMap[internalPodUid] != externalPodUid {
+			return fmt.Errorf("requesting quota on existing directory %s but different pod %s %s", path, podUidMap[internalPodUid], externalPodUid)
+		}
+	} else {
+		internalPodUid = types.UID(uuid.NewUUID())
 	}
-	oid, ok := podQuotaMap[volumeuid]
+	oid, ok := podQuotaMap[internalPodUid]
 	if ok {
 		if quotaSizeMap[oid] != ibytes {
 			return fmt.Errorf("requesting quota of different size: old %v new %v", quotaSizeMap[oid], bytes)
+		}
+		if _, ok := dirPodMap[path]; ok {
+			return nil
 		}
 	} else {
 		oid = common.BadQuotaID
@@ -338,17 +353,19 @@ func AssignQuota(m mount.Interface, path string, poduid types.UID, bytes *resour
 		}
 		// When enforcing quotas are enabled, we'll condition this
 		// on their being disabled also.
-		if ibytes > 0 {
-			ibytes = -1
+		fsbytes := ibytes
+		if fsbytes > 0 {
+			fsbytes = -1
 		}
-		if err = setQuotaOnDir(path, id, ibytes); err == nil {
-			quotaPodMap[id] = volumeuid
+		if err = setQuotaOnDir(path, id, fsbytes); err == nil {
+			quotaPodMap[id] = internalPodUid
 			quotaSizeMap[id] = ibytes
-			podQuotaMap[volumeuid] = id
+			podQuotaMap[internalPodUid] = id
 			dirQuotaMap[path] = id
-			dirPodMap[path] = volumeuid
-			podDirCountMap[volumeuid]++
-			klog.V(4).Infof("Assigning quota ID %d (%d) to %s", id, ibytes, path)
+			dirPodMap[path] = internalPodUid
+			podUidMap[internalPodUid] = externalPodUid
+			podDirCountMap[internalPodUid]++
+			klog.V(4).Infof("Assigning quota ID %d (request limit %d, actual limit %d) to %s", id, ibytes, fsbytes, path)
 			return nil
 		}
 		removeProjectID(path, id)
@@ -436,6 +453,7 @@ func ClearQuota(m mount.Interface, path string) error {
 		delete(quotaPodMap, podQuotaMap[poduid])
 		delete(podDirCountMap, poduid)
 		delete(podQuotaMap, poduid)
+		delete(podUidMap, poduid)
 	} else {
 		err = removeProjectID(path, projid)
 		podDirCountMap[poduid]--

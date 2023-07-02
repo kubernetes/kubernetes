@@ -30,12 +30,11 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/api/job"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	batchvalidation "k8s.io/kubernetes/pkg/apis/batch/validation"
-	"k8s.io/kubernetes/pkg/features"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -91,10 +90,6 @@ func (cronJobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object)
 
 	cronJob.Generation = 1
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CronJobTimeZone) {
-		cronJob.Spec.TimeZone = nil
-	}
-
 	pod.DropDisabledTemplateFields(&cronJob.Spec.JobTemplate.Spec.Template, nil)
 }
 
@@ -103,10 +98,6 @@ func (cronJobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Ob
 	newCronJob := obj.(*batch.CronJob)
 	oldCronJob := old.(*batch.CronJob)
 	newCronJob.Status = oldCronJob.Status
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CronJobTimeZone) && oldCronJob.Spec.TimeZone == nil {
-		newCronJob.Spec.TimeZone = nil
-	}
 
 	pod.DropDisabledTemplateFields(&newCronJob.Spec.JobTemplate.Spec.Template, &oldCronJob.Spec.JobTemplate.Spec.Template)
 
@@ -131,7 +122,7 @@ func (cronJobStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object)
 	if msgs := utilvalidation.IsDNS1123Label(newCronJob.Name); len(msgs) != 0 {
 		warnings = append(warnings, fmt.Sprintf("metadata.name: this is used in Pod names and hostnames, which can result in surprising behavior; a DNS label is recommended: %v", msgs))
 	}
-	warnings = append(warnings, pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "jobTemplate", "spec", "template"), &newCronJob.Spec.JobTemplate.Spec.Template, nil)...)
+	warnings = append(warnings, job.WarningsForJobSpec(ctx, field.NewPath("spec", "jobTemplate", "spec"), &newCronJob.Spec.JobTemplate.Spec, nil)...)
 	if strings.Contains(newCronJob.Spec.Schedule, "TZ") {
 		warnings = append(warnings, fmt.Sprintf("CRON_TZ or TZ used in %s is not officially supported, see https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/ for more details", field.NewPath("spec", "spec", "schedule")))
 	}
@@ -166,7 +157,7 @@ func (cronJobStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Ob
 	newCronJob := obj.(*batch.CronJob)
 	oldCronJob := old.(*batch.CronJob)
 	if newCronJob.Generation != oldCronJob.Generation {
-		warnings = pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "jobTemplate", "spec", "template"), &newCronJob.Spec.JobTemplate.Spec.Template, &oldCronJob.Spec.JobTemplate.Spec.Template)
+		warnings = job.WarningsForJobSpec(ctx, field.NewPath("spec", "jobTemplate", "spec"), &newCronJob.Spec.JobTemplate.Spec, &oldCronJob.Spec.JobTemplate.Spec)
 	}
 	if strings.Contains(newCronJob.Spec.Schedule, "TZ") {
 		warnings = append(warnings, fmt.Sprintf("CRON_TZ or TZ used in %s is not officially supported, see https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/ for more details", field.NewPath("spec", "spec", "schedule")))

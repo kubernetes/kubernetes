@@ -18,14 +18,14 @@ limitations under the License.
  * This test checks that various VolumeSources are working.
  *
  * There are two ways, how to test the volumes:
- * 1) With containerized server (NFS, Ceph, Gluster, iSCSI, ...)
+ * 1) With containerized server (NFS, Ceph, iSCSI, ...)
  * The test creates a server pod, exporting simple 'index.html' file.
  * Then it uses appropriate VolumeSource to import this file into a client pod
  * and checks that the pod can see the file. It does so by importing the file
- * into web server root and loadind the index.html from it.
+ * into web server root and loading the index.html from it.
  *
  * These tests work only when privileged containers are allowed, exporting
- * various filesystems (NFS, GlusterFS, ...) usually needs some mounting or
+ * various filesystems (ex: NFS) usually needs some mounting or
  * other privileged magic in the server pod.
  *
  * Note that the server containers are for testing purposes only and should not
@@ -87,7 +87,7 @@ const (
 	VolumeServerPodStartupTimeout = 3 * time.Minute
 
 	// PodCleanupTimeout is a waiting period for pod to be cleaned up and unmount its volumes so we
-	// don't tear down containers with NFS/Ceph/Gluster server too early.
+	// don't tear down containers with NFS/Ceph server too early.
 	PodCleanupTimeout = 20 * time.Second
 )
 
@@ -149,6 +149,10 @@ type Test struct {
 
 // NewNFSServer is a NFS-specific wrapper for CreateStorageServer.
 func NewNFSServer(ctx context.Context, cs clientset.Interface, namespace string, args []string) (config TestConfig, pod *v1.Pod, host string) {
+	return NewNFSServerWithNodeName(ctx, cs, namespace, args, "")
+}
+
+func NewNFSServerWithNodeName(ctx context.Context, cs clientset.Interface, namespace string, args []string, nodeName string) (config TestConfig, pod *v1.Pod, host string) {
 	config = TestConfig{
 		Namespace:          namespace,
 		Prefix:             "nfs",
@@ -157,6 +161,10 @@ func NewNFSServer(ctx context.Context, cs clientset.Interface, namespace string,
 		ServerVolumes:      map[string]string{"": "/exports"},
 		ServerReadyMessage: "NFS started",
 	}
+	if nodeName != "" {
+		config.ClientNodeSelection = e2epod.NodeSelection{Name: nodeName}
+	}
+
 	if len(args) > 0 {
 		config.ServerArgs = args
 	}
@@ -174,7 +182,7 @@ func CreateStorageServer(ctx context.Context, cs clientset.Interface, config Tes
 	pod = startVolumeServer(ctx, cs, config)
 	gomega.Expect(pod).NotTo(gomega.BeNil(), "storage server pod should not be nil")
 	ip = pod.Status.PodIP
-	gomega.Expect(len(ip)).NotTo(gomega.BeZero(), fmt.Sprintf("pod %s's IP should not be empty", pod.Name))
+	gomega.Expect(ip).NotTo(gomega.BeEmpty(), fmt.Sprintf("pod %s's IP should not be empty", pod.Name))
 	framework.Logf("%s server pod IP address: %s", config.Prefix, ip)
 	return pod, ip
 }
@@ -329,6 +337,10 @@ func startVolumeServer(ctx context.Context, client clientset.Interface, config T
 		},
 	}
 
+	if config.ClientNodeSelection.Name != "" {
+		serverPod.Spec.NodeName = config.ClientNodeSelection.Name
+	}
+
 	var pod *v1.Pod
 	serverPod, err := podClient.Create(ctx, serverPod, metav1.CreateOptions{})
 	// ok if the server pod already exists. TODO: make this controllable by callers
@@ -355,7 +367,7 @@ func startVolumeServer(ctx context.Context, client clientset.Interface, config T
 		}
 	}
 	if config.ServerReadyMessage != "" {
-		_, err := e2epodoutput.LookForStringInLog(pod.Namespace, pod.Name, serverPodName, config.ServerReadyMessage, VolumeServerPodStartupTimeout)
+		_, err := e2epodoutput.LookForStringInLogWithoutKubectl(ctx, client, pod.Namespace, pod.Name, serverPodName, config.ServerReadyMessage, VolumeServerPodStartupTimeout)
 		framework.ExpectNoError(err, "Failed to find %q in pod logs: %s", config.ServerReadyMessage, err)
 	}
 	return pod
@@ -371,7 +383,7 @@ func TestServerCleanup(ctx context.Context, f *framework.Framework, config TestC
 	}
 
 	err := e2epod.DeletePodWithWaitByName(ctx, f.ClientSet, config.Prefix+"-server", config.Namespace)
-	gomega.Expect(err).To(gomega.BeNil(), "Failed to delete pod %v in namespace %v", config.Prefix+"-server", config.Namespace)
+	framework.ExpectNoError(err, "delete pod %v in namespace %v", config.Prefix+"-server", config.Namespace)
 }
 
 func runVolumeTesterPod(ctx context.Context, client clientset.Interface, timeouts *framework.TimeoutContext, config TestConfig, podSuffix string, privileged bool, fsGroup *int64, tests []Test, slow bool) (*v1.Pod, error) {
@@ -463,7 +475,7 @@ func runVolumeTesterPod(ctx context.Context, client clientset.Interface, timeout
 	}
 	if err != nil {
 		e2epod.DeletePodOrFail(ctx, client, clientPod.Namespace, clientPod.Name)
-		_ = e2epod.WaitForPodNotFoundInNamespace(ctx, client, clientPod.Namespace, clientPod.Name, timeouts.PodDelete)
+		_ = e2epod.WaitForPodNotFoundInNamespace(ctx, client, clientPod.Name, clientPod.Namespace, timeouts.PodDelete)
 		return nil, err
 	}
 	return clientPod, nil
@@ -541,7 +553,7 @@ func testVolumeClient(ctx context.Context, f *framework.Framework, config TestCo
 		// testVolumeClient might get used more than once per test, therefore
 		// we have to clean up before returning.
 		e2epod.DeletePodOrFail(ctx, f.ClientSet, clientPod.Namespace, clientPod.Name)
-		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, clientPod.Namespace, clientPod.Name, timeouts.PodDelete))
+		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, clientPod.Name, clientPod.Namespace, timeouts.PodDelete))
 	}()
 
 	testVolumeContent(f, clientPod, "", fsGroup, fsType, tests)
@@ -576,7 +588,7 @@ func InjectContent(ctx context.Context, f *framework.Framework, config TestConfi
 		// This pod must get deleted before the function returns becaue the test relies on
 		// the volume not being in use.
 		e2epod.DeletePodOrFail(ctx, f.ClientSet, injectorPod.Namespace, injectorPod.Name)
-		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, injectorPod.Namespace, injectorPod.Name, timeouts.PodDelete))
+		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, injectorPod.Name, injectorPod.Namespace, timeouts.PodDelete))
 	}()
 
 	ginkgo.By("Writing text file contents in the container.")
@@ -608,7 +620,7 @@ func generateWriteCmd(content, path string) []string {
 	return commands
 }
 
-// generateReadBlockCmd generates the corresponding command lines to read from a block device with the given file path.
+// GenerateReadBlockCmd generates the corresponding command lines to read from a block device with the given file path.
 func GenerateReadBlockCmd(fullPath string, numberOfCharacters int) []string {
 	var commands []string
 	commands = []string{"head", "-c", strconv.Itoa(numberOfCharacters), fullPath}

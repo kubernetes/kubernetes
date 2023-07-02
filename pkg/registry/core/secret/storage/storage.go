@@ -20,7 +20,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
-	"k8s.io/apiserver/pkg/storage"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -51,7 +50,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	options := &generic.StoreOptions{
 		RESTOptions: optsGetter,
 		AttrFunc:    secret.GetAttrs,
-		TriggerFunc: map[string]storage.IndexerFunc{"metadata.name": secret.NameTriggerFunc},
 	}
 	if err := store.CompleteWithOptions(options); err != nil {
 		return nil, err

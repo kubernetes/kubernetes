@@ -88,7 +88,7 @@ func (p *capacityTestSuite) DefineTests(driver storageframework.TestDriver, patt
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewFrameworkWithCustomTimeouts("capacity", storageframework.GetDriverTimeouts(driver))
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	init := func(ctx context.Context) {
 		dDriver, _ = driver.(storageframework.DynamicPVTestDriver)

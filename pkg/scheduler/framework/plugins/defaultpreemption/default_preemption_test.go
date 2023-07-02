@@ -36,10 +36,11 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/events"
-	kubeschedulerconfigv1beta2 "k8s.io/kube-scheduler/config/v1beta2"
+	"k8s.io/klog/v2/ktesting"
+	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	configv1beta2 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta2"
+	configv1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
@@ -87,10 +88,10 @@ var (
 )
 
 func getDefaultDefaultPreemptionArgs() *config.DefaultPreemptionArgs {
-	v1beta2dpa := &kubeschedulerconfigv1beta2.DefaultPreemptionArgs{}
-	configv1beta2.SetDefaults_DefaultPreemptionArgs(v1beta2dpa)
+	v1dpa := &kubeschedulerconfigv1.DefaultPreemptionArgs{}
+	configv1.SetDefaults_DefaultPreemptionArgs(v1dpa)
 	dpa := &config.DefaultPreemptionArgs{}
-	configv1beta2.Convert_v1beta2_DefaultPreemptionArgs_To_config_DefaultPreemptionArgs(v1beta2dpa, dpa, nil)
+	configv1.Convert_v1_DefaultPreemptionArgs_To_config_DefaultPreemptionArgs(v1dpa, dpa, nil)
 	return dpa
 }
 
@@ -351,15 +352,17 @@ func TestPostFilter(t *testing.T) {
 			if tt.extender != nil {
 				extenders = append(extenders, tt.extender)
 			}
-			ctx, cancel := context.WithCancel(context.Background())
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			f, err := st.NewFramework(registeredPlugins, "", ctx.Done(),
+			f, err := st.NewFramework(ctx, registeredPlugins, "",
 				frameworkruntime.WithClientSet(cs),
 				frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithExtenders(extenders),
 				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(tt.pods, tt.nodes)),
+				frameworkruntime.WithLogger(logger),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -1086,14 +1089,17 @@ func TestDryRunPreemption(t *testing.T) {
 				parallelism = 1
 			}
 
-			ctx, cancel := context.WithCancel(context.Background())
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			fwk, err := st.NewFramework(
-				registeredPlugins, "", ctx.Done(),
+				ctx,
+				registeredPlugins, "",
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithParallelism(parallelism),
+				frameworkruntime.WithLogger(logger),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -1337,18 +1343,20 @@ func TestSelectBestCandidate(t *testing.T) {
 			cs := clientsetfake.NewSimpleClientset(objs...)
 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
 			snapshot := internalcache.NewSnapshot(tt.pods, nodes)
-			ctx, cancel := context.WithCancel(context.Background())
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			fwk, err := st.NewFramework(
+				ctx,
 				[]st.RegisterPluginFunc{
 					tt.registerPlugin,
 					st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 					st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 				},
 				"",
-				ctx.Done(),
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithLogger(logger),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -1380,7 +1388,7 @@ func TestSelectBestCandidate(t *testing.T) {
 			}
 			offset, numCandidates := pl.GetOffsetAndNumCandidates(int32(len(nodeInfos)))
 			candidates, _, _ := pe.DryRunPreemption(ctx, tt.pod, nodeInfos, nil, offset, numCandidates)
-			s := pe.SelectCandidate(candidates)
+			s := pe.SelectCandidate(logger, candidates)
 			if s == nil || len(s.Name()) == 0 {
 				return
 			}
@@ -1478,6 +1486,9 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
 			var nodes []*v1.Node
 			for _, n := range test.nodes {
 				nodes = append(nodes, st.MakeNode().Name(n).Obj())
@@ -1486,10 +1497,9 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			}
-			stopCh := make(chan struct{})
-			defer close(stopCh)
-			f, err := st.NewFramework(registeredPlugins, "", stopCh,
+			f, err := st.NewFramework(ctx, registeredPlugins, "",
 				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(test.pods, nodes)),
+				frameworkruntime.WithLogger(logger),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -1676,8 +1686,8 @@ func TestPreempt(t *testing.T) {
 				podInformer.GetStore().Add(test.pods[i])
 			}
 
-			deletedPodNames := make(sets.String)
-			patchedPodNames := make(sets.String)
+			deletedPodNames := sets.New[string]()
+			patchedPodNames := sets.New[string]()
 			client.PrependReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
 				patchedPodNames.Insert(action.(clienttesting.PatchAction).GetName())
 				return true, nil, nil
@@ -1687,12 +1697,13 @@ func TestPreempt(t *testing.T) {
 				return true, nil, nil
 			})
 
-			ctx, cancel := context.WithCancel(context.Background())
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			cache := internalcache.New(time.Duration(0), ctx.Done())
+			cache := internalcache.New(ctx, time.Duration(0))
 			for _, pod := range test.pods {
-				cache.AddPod(pod)
+				cache.AddPod(logger, pod)
 			}
 			cachedNodeInfoMap := map[string]*framework.NodeInfo{}
 			nodes := make([]*v1.Node, len(test.nodeNames))
@@ -1705,7 +1716,7 @@ func TestPreempt(t *testing.T) {
 					node.ObjectMeta.Labels[labelKeys[i]] = label
 				}
 				node.Name = node.ObjectMeta.Labels["hostname"]
-				cache.AddNode(node)
+				cache.AddNode(logger, node)
 				nodes[i] = node
 
 				// Set nodeInfo to extenders to mock extenders' cache for preemption.
@@ -1720,19 +1731,20 @@ func TestPreempt(t *testing.T) {
 				extenders = append(extenders, extender)
 			}
 			fwk, err := st.NewFramework(
+				ctx,
 				[]st.RegisterPluginFunc{
 					test.registerPlugin,
 					st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 					st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 				},
 				"",
-				ctx.Done(),
 				frameworkruntime.WithClientSet(client),
 				frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
 				frameworkruntime.WithExtenders(extenders),
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(test.pods, nodes)),
 				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithLogger(logger),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -1769,7 +1781,7 @@ func TestPreempt(t *testing.T) {
 			if len(deletedPodNames) != len(test.expectedPods) {
 				t.Errorf("expected %v pods, got %v.", len(test.expectedPods), len(deletedPodNames))
 			}
-			if diff := cmp.Diff(patchedPodNames.List(), deletedPodNames.List()); diff != "" {
+			if diff := cmp.Diff(sets.List(patchedPodNames), sets.List(deletedPodNames)); diff != "" {
 				t.Errorf("unexpected difference in the set of patched and deleted pods: %s", diff)
 			}
 			for victimName := range deletedPodNames {

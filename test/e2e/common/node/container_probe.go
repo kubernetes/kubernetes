@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"net/url"
 	"strings"
 	"time"
@@ -56,7 +55,7 @@ const (
 
 var _ = SIGDescribe("Probing container", func() {
 	f := framework.NewDefaultFramework("container-probe")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var podClient *e2epod.PodClient
 	probe := webserverProbeBuilder{}
 
@@ -460,7 +459,7 @@ var _ = SIGDescribe("Probing container", func() {
 		Testname: Set terminationGracePeriodSeconds for livenessProbe
 		Description: A pod with a long terminationGracePeriod is created with a shorter livenessProbe-level terminationGracePeriodSeconds. We confirm the shorter termination period is used.
 	*/
-	ginkgo.It("should override timeoutGracePeriodSeconds when LivenessProbe field is set [Feature:ProbeTerminationGracePeriod]", func(ctx context.Context) {
+	ginkgo.It("should override timeoutGracePeriodSeconds when LivenessProbe field is set [NodeConformance]", func(ctx context.Context) {
 		pod := e2epod.NewAgnhostPod(f.Namespace.Name, "liveness-override-"+string(uuid.NewUUID()), nil, nil, nil, "/bin/sh", "-c", "sleep 1000")
 		longGracePeriod := int64(500)
 		pod.Spec.TerminationGracePeriodSeconds = &longGracePeriod
@@ -480,7 +479,8 @@ var _ = SIGDescribe("Probing container", func() {
 		}
 
 		// 10s delay + 10s period + 5s grace period = 25s < 30s << pod-level timeout 500
-		RunLivenessTest(ctx, f, pod, 1, time.Second*30)
+		// add 10s more for kubelet syncing information to apiserver
+		RunLivenessTest(ctx, f, pod, 1, time.Second*40)
 	})
 
 	/*
@@ -488,7 +488,7 @@ var _ = SIGDescribe("Probing container", func() {
 		Testname: Set terminationGracePeriodSeconds for startupProbe
 		Description: A pod with a long terminationGracePeriod is created with a shorter startupProbe-level terminationGracePeriodSeconds. We confirm the shorter termination period is used.
 	*/
-	ginkgo.It("should override timeoutGracePeriodSeconds when StartupProbe field is set [Feature:ProbeTerminationGracePeriod]", func(ctx context.Context) {
+	ginkgo.It("should override timeoutGracePeriodSeconds when StartupProbe field is set [NodeConformance]", func(ctx context.Context) {
 		pod := e2epod.NewAgnhostPod(f.Namespace.Name, "startup-override-"+string(uuid.NewUUID()), nil, nil, nil, "/bin/sh", "-c", "sleep 1000")
 		longGracePeriod := int64(500)
 		pod.Spec.TerminationGracePeriodSeconds = &longGracePeriod
@@ -513,7 +513,8 @@ var _ = SIGDescribe("Probing container", func() {
 		}
 
 		// 10s delay + 10s period + 5s grace period = 25s < 30s << pod-level timeout 500
-		RunLivenessTest(ctx, f, pod, 1, time.Second*30)
+		// add 10s more for kubelet syncing information to apiserver
+		RunLivenessTest(ctx, f, pod, 1, time.Second*40)
 	})
 
 	/*
@@ -521,11 +522,11 @@ var _ = SIGDescribe("Probing container", func() {
 		Testname: Pod liveness probe, using grpc call, success
 		Description: A Pod is created with liveness probe on grpc service. Liveness probe on this endpoint will not fail. When liveness probe does not fail then the restart count MUST remain zero.
 	*/
-	ginkgo.It("should *not* be restarted with a GRPC liveness probe [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should *not* be restarted with a GRPC liveness probe [NodeConformance]", func(ctx context.Context) {
 		livenessProbe := &v1.Probe{
 			ProbeHandler: v1.ProbeHandler{
 				GRPC: &v1.GRPCAction{
-					Port:    2379,
+					Port:    5000,
 					Service: nil,
 				},
 			},
@@ -534,7 +535,7 @@ var _ = SIGDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 
-		pod := gRPCServerPodSpec(nil, livenessProbe, "etcd")
+		pod := gRPCServerPodSpec(nil, livenessProbe, "agnhost")
 		RunLivenessTest(ctx, f, pod, 0, defaultObservationTimeout)
 	})
 
@@ -544,7 +545,7 @@ var _ = SIGDescribe("Probing container", func() {
 			Description: A Pod is created with liveness probe on grpc service. Liveness probe on this endpoint should fail because of wrong probe port.
 		                 When liveness probe does  fail then the restart count should +1.
 	*/
-	ginkgo.It("should be restarted with a GRPC liveness probe [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should be restarted with a GRPC liveness probe [NodeConformance]", func(ctx context.Context) {
 		livenessProbe := &v1.Probe{
 			ProbeHandler: v1.ProbeHandler{
 				GRPC: &v1.GRPCAction{
@@ -555,7 +556,7 @@ var _ = SIGDescribe("Probing container", func() {
 			TimeoutSeconds:      5, // default 1s can be pretty aggressive in CI environments with low resources
 			FailureThreshold:    1,
 		}
-		pod := gRPCServerPodSpec(nil, livenessProbe, "etcd")
+		pod := gRPCServerPodSpec(nil, livenessProbe, "agnhost")
 		RunLivenessTest(ctx, f, pod, 1, defaultObservationTimeout)
 	})
 
@@ -630,7 +631,7 @@ done
 		podClient := e2epod.NewPodClient(f)
 		terminationGracePeriod := int64(30)
 		script := `
-_term() { 
+_term() {
 	rm -f /tmp/ready
 	rm -f /tmp/liveness
 	sleep 20
@@ -641,7 +642,7 @@ trap _term SIGTERM
 touch /tmp/ready
 touch /tmp/liveness
 
-while true; do 
+while true; do
   echo \"hello\"
   sleep 10
 done
@@ -971,11 +972,14 @@ func RunLivenessTest(ctx context.Context, f *framework.Framework, pod *v1.Pod, e
 	framework.Logf("Initial restart count of pod %s is %d", pod.Name, initialRestartCount)
 
 	// Wait for the restart state to be as desired.
-	deadline := time.Now().Add(timeout)
+	// If initialRestartCount is not zero, there is restarting back-off time.
+	deadline := time.Now().Add(timeout + time.Duration(initialRestartCount*10)*time.Second)
+
 	lastRestartCount := initialRestartCount
 	observedRestarts := int32(0)
 	for start := time.Now(); time.Now().Before(deadline); time.Sleep(2 * time.Second) {
 		pod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
+		framework.Logf("Get pod %s in namespace %s", pod.Name, ns)
 		framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", pod.Name))
 		restartCount := podutil.GetExistingContainerStatus(pod.Status.ContainerStatuses, containerName).RestartCount
 		if restartCount != lastRestartCount {
@@ -998,8 +1002,8 @@ func RunLivenessTest(ctx context.Context, f *framework.Framework, pod *v1.Pod, e
 	// If we expected n restarts (n > 0), fail if we observed < n restarts.
 	if (expectNumRestarts == 0 && observedRestarts > 0) || (expectNumRestarts > 0 &&
 		int(observedRestarts) < expectNumRestarts) {
-		framework.Failf("pod %s/%s - expected number of restarts: %d, found restarts: %d",
-			ns, pod.Name, expectNumRestarts, observedRestarts)
+		framework.Failf("pod %s/%s - expected number of restarts: %d, found restarts: %d. Pod status: %s.",
+			ns, pod.Name, expectNumRestarts, observedRestarts, &pod.Status)
 	}
 }
 
@@ -1036,27 +1040,18 @@ func runReadinessFailTest(ctx context.Context, f *framework.Framework, pod *v1.P
 }
 
 func gRPCServerPodSpec(readinessProbe, livenessProbe *v1.Probe, containerName string) *v1.Pod {
-	etcdLocalhostAddress := "127.0.0.1"
-	if framework.TestContext.ClusterIsIPv6() {
-		etcdLocalhostAddress = "::1"
-	}
-	etcdURL := fmt.Sprintf("http://%s", net.JoinHostPort(etcdLocalhostAddress, "2379"))
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-grpc-" + string(uuid.NewUUID())},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
 					Name:  containerName,
-					Image: imageutils.GetE2EImage(imageutils.Etcd),
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
 					Command: []string{
-						"/usr/local/bin/etcd",
-						"--listen-client-urls",
-						"http://0.0.0.0:2379", //should listen on all addresses
-						"--advertise-client-urls",
-						etcdURL,
+						"/agnhost",
+						"grpc-health-checking",
 					},
-					// 2380 is an automatic peer URL
-					Ports:          []v1.ContainerPort{{ContainerPort: int32(2379)}, {ContainerPort: int32(2380)}},
+					Ports:          []v1.ContainerPort{{ContainerPort: int32(5000)}, {ContainerPort: int32(8080)}},
 					LivenessProbe:  livenessProbe,
 					ReadinessProbe: readinessProbe,
 				},

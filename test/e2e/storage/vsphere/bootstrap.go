@@ -26,21 +26,21 @@ import (
 
 var once sync.Once
 var waiting = make(chan bool)
-var f *framework.Framework
 
 // Bootstrap takes care of initializing necessary test context for vSphere tests
 func Bootstrap(fw *framework.Framework) {
 	done := make(chan bool)
-	f = fw
 	go func() {
-		once.Do(bootstrapOnce)
+		once.Do(func() {
+			bootstrapOnce(fw)
+		})
 		<-waiting
 		done <- true
 	}()
 	<-done
 }
 
-func bootstrapOnce() {
+func bootstrapOnce(f *framework.Framework) {
 	// 1. Read vSphere conf and get VSphere instances
 	vsphereInstances, err := GetVSphereInstances()
 	if err != nil {

@@ -1758,7 +1758,7 @@ function prepare-kube-proxy-manifest-variables {
       exit 1
     fi
   fi
-  params+=" --iptables-sync-period=1m --iptables-min-sync-period=1s --ipvs-sync-period=1m --ipvs-min-sync-period=1s"
+  params+=" --iptables-sync-period=1m --iptables-min-sync-period=10s --ipvs-sync-period=1m --ipvs-min-sync-period=10s"
   if [[ -n "${KUBEPROXY_TEST_ARGS:-}" ]]; then
     params+=" ${KUBEPROXY_TEST_ARGS}"
   fi
@@ -1783,6 +1783,7 @@ function prepare-kube-proxy-manifest-variables {
   sed -i -e "s@{{kube_cache_mutation_detector_env_name}}@${kube_cache_mutation_detector_env_name}@g" "${src_file}"
   sed -i -e "s@{{kube_cache_mutation_detector_env_value}}@${kube_cache_mutation_detector_env_value}@g" "${src_file}"
   sed -i -e "s@{{ cpurequest }}@${KUBE_PROXY_CPU_REQUEST:-100m}@g" "${src_file}"
+  sed -i -e "s@{{ memoryrequest }}@${KUBE_PROXY_MEMORY_REQUEST:-50Mi}@g" "${src_file}"
   sed -i -e "s@{{api_servers_with_port}}@${api_servers}@g" "${src_file}"
   sed -i -e "s@{{kubernetes_service_host_env_value}}@${KUBERNETES_MASTER_NAME}@g" "${src_file}"
   if [[ -n "${CLUSTER_IP_RANGE:-}" ]]; then
@@ -2246,7 +2247,6 @@ function start-kube-controller-manager {
   cp "${src_file}" /etc/kubernetes/manifests
 }
 
-# (TODO/cloud-provider-gcp): Figure out how to inject
 # Starts cloud controller manager.
 # It prepares the log file, loads the docker image, calculates variables, sets them
 # in the manifest file, and then copies the manifest file to /etc/kubernetes/manifests.
@@ -2309,8 +2309,8 @@ function start-cloud-controller-manager {
       echo "None of the given feature gates (${FEATURE_GATES}) were found to be safe to pass to the CCM"
     fi
   fi
-  if [[ -n "${RUN_CONTROLLERS:-}" ]]; then
-    params+=("--controllers=${RUN_CONTROLLERS}")
+  if [[ -n "${RUN_CCM_CONTROLLERS:-}" ]]; then
+    params+=("--controllers=${RUN_CCM_CONTROLLERS}")
   fi
 
   echo "Converting manifest for cloud provider controller-manager"
@@ -3116,7 +3116,7 @@ spec:
     - /bin/sh
     args:
     - -c
-    - test -e /scrub && rm -rf /scrub/..?* /scrub/.[!.]* /scrub/* && test -z $(ls -A /scrub) || exit 1
+    - test -e /scrub && find /scrub -mindepth 1 -delete && test -z $(ls -A /scrub) || exit 1
     volumeMounts:
     - name: vol
       mountPath: /scrub
@@ -3572,7 +3572,6 @@ function main() {
       log-wrap 'StartKonnectivityServer' start-konnectivity-server
     fi
     log-wrap 'StartKubeControllerManager' start-kube-controller-manager
-    # (TODO/cloud-provider-gcp): Figure out how to inject
     if [[ "${CLOUD_PROVIDER_FLAG:-gce}" == "external" ]]; then
       log-wrap 'StartCloudControllerManager' start-cloud-controller-manager
     fi

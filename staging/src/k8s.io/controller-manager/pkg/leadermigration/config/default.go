@@ -26,13 +26,13 @@ func DefaultLeaderMigrationConfiguration() *internal.LeaderMigrationConfiguratio
 		ResourceLock: ResourceLockLeases,
 		ControllerLeaders: []internal.ControllerLeaderConfiguration{
 			{
-				Name:      "route",
+				Name:      "route-controller",
 				Component: "*",
 			}, {
-				Name:      "service",
+				Name:      "service-controller",
 				Component: "*",
 			}, {
-				Name:      "cloud-node-lifecycle",
+				Name:      "cloud-node-lifecycle-controller",
 				Component: "*",
 			},
 		},

@@ -476,7 +476,7 @@ func TestCreateAdmissionObjects(t *testing.T) {
 
 	testcases := []struct {
 		name       string
-		attrs      *generic.VersionedAttributes
+		attrs      *admission.VersionedAttributes
 		invocation *generic.WebhookInvocation
 
 		expectRequest  func(uid types.UID) runtime.Object
@@ -501,7 +501,7 @@ func TestCreateAdmissionObjects(t *testing.T) {
 		},
 		{
 			name: "v1",
-			attrs: &generic.VersionedAttributes{
+			attrs: &admission.VersionedAttributes{
 				VersionedObject:    versionedObj.DeepCopyObject(),
 				VersionedOldObject: versionedObjOld.DeepCopyObject(),
 				Attributes:         attrs,
@@ -544,7 +544,7 @@ func TestCreateAdmissionObjects(t *testing.T) {
 		},
 		{
 			name: "v1beta1",
-			attrs: &generic.VersionedAttributes{
+			attrs: &admission.VersionedAttributes{
 				VersionedObject:    versionedObj.DeepCopyObject(),
 				VersionedOldObject: versionedObjOld.DeepCopyObject(),
 				Attributes:         attrs,

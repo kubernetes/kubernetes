@@ -132,10 +132,7 @@ func TestInvalidObjectMetaInStorage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	RESTOptionsGetter, err := serveroptions.NewCRDRESTOptionsGetter(*options.RecommendedOptions.Etcd)
-	if err != nil {
-		t.Fatal(err)
-	}
+	RESTOptionsGetter := serveroptions.NewCRDRESTOptionsGetter(*options.RecommendedOptions.Etcd, nil, nil)
 	restOptions, err := RESTOptionsGetter.GetRESTOptions(schema.GroupResource{Group: noxuDefinition.Spec.Group, Resource: noxuDefinition.Spec.Names.Plural})
 	if err != nil {
 		t.Fatal(err)
@@ -450,7 +447,7 @@ func TestEmbeddedResources(t *testing.T) {
 	}
 
 	t.Logf("Creating CR and expect 'unspecified' fields to be pruned inside ObjectMetas")
-	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Versions[0].Name, crd.Spec.Names.Plural})
+	fooClient := dynamicClient.Resource(schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Versions[0].Name, Resource: crd.Spec.Names.Plural})
 	foo := &unstructured.Unstructured{}
 	if err := yaml.Unmarshal([]byte(embeddedResourceInstance), &foo.Object); err != nil {
 		t.Fatal(err)

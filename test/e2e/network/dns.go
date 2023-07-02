@@ -40,7 +40,7 @@ const dnsTestServiceName = "dns-test-service"
 
 var _ = common.SIGDescribe("DNS", func() {
 	f := framework.NewDefaultFramework("dns")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	/*
 		Release: v1.9
@@ -600,7 +600,7 @@ var _ = common.SIGDescribe("DNS", func() {
 
 var _ = common.SIGDescribe("DNS HostNetwork", func() {
 	f := framework.NewDefaultFramework("hostnetworkdns")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should resolve DNS of partial qualified names for services on hostNetwork pods with dnsPolicy: ClusterFirstWithHostNet [LinuxOnly]", func(ctx context.Context) {
 		// Create a test headless service.

@@ -39,7 +39,7 @@ import (
 
 var _ = SIGDescribe("FieldValidation", func() {
 	f := framework.NewDefaultFramework("field-validation")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	var client clientset.Interface
 	var ns string
@@ -61,7 +61,7 @@ var _ = SIGDescribe("FieldValidation", func() {
 		Testname: Server side field validation, typed object
 		Description: It should reject the request if a typed object has unknown or duplicate fields.
 	*/
-	ginkgo.It("should detect unknown and duplicate fields of a typed object", func(ctx context.Context) {
+	framework.ConformanceIt("should detect unknown and duplicate fields of a typed object", func(ctx context.Context) {
 		ginkgo.By("apply creating a deployment")
 		invalidMetaDeployment := `{
 		"apiVersion": "apps/v1",
@@ -114,7 +114,7 @@ var _ = SIGDescribe("FieldValidation", func() {
 		Testname: Server side field validation, typed unknown metadata
 		Description: It should reject the request if a typed object has unknown fields in the metadata.
 	*/
-	ginkgo.It("should detect unknown metadata fields of a typed object", func(ctx context.Context) {
+	framework.ConformanceIt("should detect unknown metadata fields of a typed object", func(ctx context.Context) {
 		ginkgo.By("apply creating a deployment")
 		invalidMetaDeployment := `{
 		"apiVersion": "apps/v1",
@@ -165,7 +165,7 @@ var _ = SIGDescribe("FieldValidation", func() {
 		Testname: Server side field validation, valid CR with validation schema
 		Description: When a CRD has a validation schema, it should succeed when a valid CR is applied.
 	*/
-	ginkgo.It("should create/apply a valid CR for CRD with validation schema", func(ctx context.Context) {
+	framework.ConformanceIt("should create/apply a valid CR for CRD with validation schema", func(ctx context.Context) {
 		config, err := framework.LoadConfig()
 		if err != nil {
 			framework.Failf("%s", err)
@@ -247,6 +247,11 @@ var _ = SIGDescribe("FieldValidation", func() {
 			framework.Failf("cannot create crd %s", err)
 		}
 
+		defer func() {
+			err = fixtures.DeleteV1CustomResourceDefinition(noxuDefinition, apiExtensionClient)
+			framework.ExpectNoError(err, "deleting CustomResourceDefinition")
+		}()
+
 		kind := noxuDefinition.Spec.Names.Kind
 		apiVersion := noxuDefinition.Spec.Group + "/" + noxuDefinition.Spec.Versions[0].Name
 		name := "mytest"
@@ -257,8 +262,6 @@ apiVersion: %s
 kind: %s
 metadata:
   name: %s
-  finalizers:
-  - test-finalizer
 spec:
   foo: foo1
   cronSpec: "* * * * */5"
@@ -283,7 +286,7 @@ spec:
 		Testname: Server side field validation, unknown fields CR no validation schema
 		Description: When a CRD does not have a validation schema, it should succeed when a CR with unknown fields is applied.
 	*/
-	ginkgo.It("should create/apply a CR with unknown fields for CRD with no validation schema", func(ctx context.Context) {
+	framework.ConformanceIt("should create/apply a CR with unknown fields for CRD with no validation schema", func(ctx context.Context) {
 		config, err := framework.LoadConfig()
 		if err != nil {
 			framework.Failf("%s", err)
@@ -304,6 +307,11 @@ spec:
 			framework.Failf("cannot create crd %s", err)
 		}
 
+		defer func() {
+			err = fixtures.DeleteV1CustomResourceDefinition(noxuDefinition, apiExtensionClient)
+			framework.ExpectNoError(err, "deleting CustomResourceDefinition")
+		}()
+
 		kind := noxuDefinition.Spec.Names.Kind
 		apiVersion := noxuDefinition.Spec.Group + "/" + noxuDefinition.Spec.Versions[0].Name
 		name := "mytest"
@@ -314,8 +322,6 @@ apiVersion: %s
 kind: %s
 metadata:
   name: %s
-  finalizers:
-  - test-finalizer
 spec:
   unknown: uk1
   cronSpec: "* * * * */5"
@@ -341,7 +347,7 @@ spec:
 		Testname: Server side field validation, unknown fields CR fails validation
 		Description: When a CRD does have a validation schema, it should reject CRs with unknown fields.
 	*/
-	ginkgo.It("should create/apply an invalid CR with extra properties for CRD with validation schema", func(ctx context.Context) {
+	framework.ConformanceIt("should create/apply an invalid CR with extra properties for CRD with validation schema", func(ctx context.Context) {
 		config, err := framework.LoadConfig()
 		if err != nil {
 			framework.Failf("%s", err)
@@ -424,6 +430,11 @@ spec:
 			framework.Failf("cannot create crd %s", err)
 		}
 
+		defer func() {
+			err = fixtures.DeleteV1CustomResourceDefinition(noxuDefinition, apiExtensionClient)
+			framework.ExpectNoError(err, "deleting CustomResourceDefinition")
+		}()
+
 		kind := noxuDefinition.Spec.Names.Kind
 		apiVersion := noxuDefinition.Spec.Group + "/" + noxuDefinition.Spec.Versions[0].Name
 		name := "mytest"
@@ -434,8 +445,6 @@ apiVersion: %s
 kind: %s
 metadata:
   name: %s
-  finalizers:
-  - test-finalizer
 unknownField: unknown
 spec:
   foo: foo1
@@ -462,7 +471,7 @@ spec:
 		Description: The server should reject CRs with unknown metadata fields in both the root and embedded objects
 		of a CR.
 	*/
-	ginkgo.It("should detect unknown metadata fields in both the root and embedded object of a CR", func(ctx context.Context) {
+	framework.ConformanceIt("should detect unknown metadata fields in both the root and embedded object of a CR", func(ctx context.Context) {
 		config, err := framework.LoadConfig()
 		if err != nil {
 			framework.Failf("%s", err)
@@ -563,6 +572,11 @@ spec:
 			framework.Failf("cannot create crd %s", err)
 		}
 
+		defer func() {
+			err = fixtures.DeleteV1CustomResourceDefinition(noxuDefinition, apiExtensionClient)
+			framework.ExpectNoError(err, "deleting CustomResourceDefinition")
+		}()
+
 		kind := noxuDefinition.Spec.Names.Kind
 		apiVersion := noxuDefinition.Spec.Group + "/" + noxuDefinition.Spec.Versions[0].Name
 		name := "mytest"
@@ -574,8 +588,6 @@ kind: %s
 metadata:
   name: %s
   unknownMeta: unknown
-  finalizers:
-  - test-finalizer
 spec:
   template:
     apiversion: foo/v1
@@ -607,7 +619,7 @@ spec:
 		Testname: Server side field validation, CR duplicates
 		Description: The server should reject CRs with duplicate fields even when preserving unknown fields.
 	*/
-	ginkgo.It("should detect duplicates in a CR when preserving unknown fields", func(ctx context.Context) {
+	framework.ConformanceIt("should detect duplicates in a CR when preserving unknown fields", func(ctx context.Context) {
 		config, err := framework.LoadConfig()
 		if err != nil {
 			framework.Failf("%s", err)
@@ -690,6 +702,11 @@ spec:
 			framework.Failf("cannot create crd %s", err)
 		}
 
+		defer func() {
+			err = fixtures.DeleteV1CustomResourceDefinition(noxuDefinition, apiExtensionClient)
+			framework.ExpectNoError(err, "deleting CustomResourceDefinition")
+		}()
+
 		kind := noxuDefinition.Spec.Names.Kind
 		apiVersion := noxuDefinition.Spec.Group + "/" + noxuDefinition.Spec.Versions[0].Name
 		name := "mytest"
@@ -700,8 +717,6 @@ apiVersion: %s
 kind: %s
 metadata:
   name: %s
-  finalizers:
-  - test-finalizer
 spec:
   unknown: uk1
   foo: foo1
@@ -718,7 +733,7 @@ spec:
 			Param("fieldValidation", "Strict").
 			Body(yamlBody).
 			DoRaw(ctx)
-		if !(strings.Contains(string(result), `line 11: key \"foo\" already set in map`)) {
+		if !(strings.Contains(string(result), `line 9: key \"foo\" already set in map`)) {
 			framework.Failf("error missing duplicate field: %v:\n%v", err, string(result))
 		}
 	})

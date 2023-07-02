@@ -37,10 +37,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	client "k8s.io/client-go/kubernetes"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	utiltesting "k8s.io/client-go/util/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -76,10 +74,10 @@ egressSelections:
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tracingConfigFile.Name())
+	defer utiltesting.CloseAndRemove(t, tracingConfigFile)
 
 	if err := os.WriteFile(tracingConfigFile.Name(), []byte(fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1beta1
 kind: TracingConfiguration
 endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 		t.Fatal(err)
@@ -107,7 +105,6 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 }
 
 func TestAPIServerTracing(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.APIServerTracing, true)()
 	// Listen for traces from the API Server before starting it, so the
 	// API Server will successfully connect right away during the test.
 	listener, err := net.Listen("tcp", "localhost:")
@@ -122,7 +119,7 @@ func TestAPIServerTracing(t *testing.T) {
 	defer os.Remove(tracingConfigFile.Name())
 
 	if err := os.WriteFile(tracingConfigFile.Name(), []byte(fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1beta1
 kind: TracingConfiguration
 samplingRatePerMillion: 1000000
 endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {

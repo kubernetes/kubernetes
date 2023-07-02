@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	goruntime "runtime"
 	"strings"
 	"testing"
 	"time"
@@ -28,6 +29,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -230,6 +232,115 @@ func TestToKubeContainerStatus(t *testing.T) {
 	}
 }
 
+// TestToKubeContainerStatusWithResources tests the converting the CRI container status to
+// the internal type (i.e., toKubeContainerStatus()) for containers that returns Resources.
+func TestToKubeContainerStatusWithResources(t *testing.T) {
+	// TODO: remove this check on this PR merges: https://github.com/kubernetes/kubernetes/pull/112599
+	if goruntime.GOOS == "windows" {
+		t.Skip("Updating Pod Container Resources is not supported on Windows.")
+	}
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+	cid := &kubecontainer.ContainerID{Type: "testRuntime", ID: "dummyid"}
+	meta := &runtimeapi.ContainerMetadata{Name: "cname", Attempt: 3}
+	imageSpec := &runtimeapi.ImageSpec{Image: "fimage"}
+	var (
+		createdAt int64 = 327
+		startedAt int64 = 999
+	)
+
+	for desc, test := range map[string]struct {
+		input    *runtimeapi.ContainerStatus
+		expected *kubecontainer.Status
+	}{
+		"container reporting cpu and memory": {
+			input: &runtimeapi.ContainerStatus{
+				Id:        cid.ID,
+				Metadata:  meta,
+				Image:     imageSpec,
+				State:     runtimeapi.ContainerState_CONTAINER_RUNNING,
+				CreatedAt: createdAt,
+				StartedAt: startedAt,
+				Resources: &runtimeapi.ContainerResources{
+					Linux: &runtimeapi.LinuxContainerResources{
+						CpuQuota:           25000,
+						CpuPeriod:          100000,
+						MemoryLimitInBytes: 524288000,
+						OomScoreAdj:        -998,
+					},
+				},
+			},
+			expected: &kubecontainer.Status{
+				ID:        *cid,
+				Image:     imageSpec.Image,
+				State:     kubecontainer.ContainerStateRunning,
+				CreatedAt: time.Unix(0, createdAt),
+				StartedAt: time.Unix(0, startedAt),
+				Resources: &kubecontainer.ContainerResources{
+					CPULimit:    resource.NewMilliQuantity(250, resource.DecimalSI),
+					MemoryLimit: resource.NewQuantity(524288000, resource.BinarySI),
+				},
+			},
+		},
+		"container reporting cpu only": {
+			input: &runtimeapi.ContainerStatus{
+				Id:        cid.ID,
+				Metadata:  meta,
+				Image:     imageSpec,
+				State:     runtimeapi.ContainerState_CONTAINER_RUNNING,
+				CreatedAt: createdAt,
+				StartedAt: startedAt,
+				Resources: &runtimeapi.ContainerResources{
+					Linux: &runtimeapi.LinuxContainerResources{
+						CpuQuota:  50000,
+						CpuPeriod: 100000,
+					},
+				},
+			},
+			expected: &kubecontainer.Status{
+				ID:        *cid,
+				Image:     imageSpec.Image,
+				State:     kubecontainer.ContainerStateRunning,
+				CreatedAt: time.Unix(0, createdAt),
+				StartedAt: time.Unix(0, startedAt),
+				Resources: &kubecontainer.ContainerResources{
+					CPULimit: resource.NewMilliQuantity(500, resource.DecimalSI),
+				},
+			},
+		},
+		"container reporting memory only": {
+			input: &runtimeapi.ContainerStatus{
+				Id:        cid.ID,
+				Metadata:  meta,
+				Image:     imageSpec,
+				State:     runtimeapi.ContainerState_CONTAINER_RUNNING,
+				CreatedAt: createdAt,
+				StartedAt: startedAt,
+				Resources: &runtimeapi.ContainerResources{
+					Linux: &runtimeapi.LinuxContainerResources{
+						MemoryLimitInBytes: 524288000,
+						OomScoreAdj:        -998,
+					},
+				},
+			},
+			expected: &kubecontainer.Status{
+				ID:        *cid,
+				Image:     imageSpec.Image,
+				State:     kubecontainer.ContainerStateRunning,
+				CreatedAt: time.Unix(0, createdAt),
+				StartedAt: time.Unix(0, startedAt),
+				Resources: &kubecontainer.ContainerResources{
+					MemoryLimit: resource.NewQuantity(524288000, resource.BinarySI),
+				},
+			},
+		},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			actual := toKubeContainerStatus(test.input, cid.Type)
+			assert.Equal(t, test.expected, actual, desc)
+		})
+	}
+}
+
 func TestLifeCycleHook(t *testing.T) {
 
 	// Setup
@@ -331,7 +442,7 @@ func TestLifeCycleHook(t *testing.T) {
 		t.Run("consistent", func(t *testing.T) {
 			ctx := context.Background()
 			defer func() { fakeHTTP.req = nil }()
-			httpLifeCycle.PreStop.HTTPGet.Port = intstr.FromInt(80)
+			httpLifeCycle.PreStop.HTTPGet.Port = intstr.FromInt32(80)
 			testPod.Spec.Containers[0].Lifecycle = httpLifeCycle
 			m.killContainer(ctx, testPod, cID, "foo", "testKill", "", &gracePeriod)
 
@@ -695,4 +806,45 @@ func TestKillContainerGracePeriod(t *testing.T) {
 			require.Equal(t, test.expectedGracePeriod, actualGracePeriod)
 		})
 	}
+}
+
+// TestUpdateContainerResources tests updating a container in a Pod.
+func TestUpdateContainerResources(t *testing.T) {
+	// TODO: remove this check on this PR merges: https://github.com/kubernetes/kubernetes/pull/112599
+	if goruntime.GOOS == "windows" {
+		t.Skip("Updating Pod Container Resources is not supported on Windows.")
+	}
+	fakeRuntime, _, m, errCreate := createTestRuntimeManager()
+	require.NoError(t, errCreate)
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "bar",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:            "foo",
+					Image:           "busybox",
+					ImagePullPolicy: v1.PullIfNotPresent,
+				},
+			},
+		},
+	}
+
+	// Create fake sandbox and container
+	_, fakeContainers := makeAndSetFakePod(t, m, fakeRuntime, pod)
+	assert.Equal(t, len(fakeContainers), 1)
+
+	ctx := context.Background()
+	cStatus, err := m.getPodContainerStatuses(ctx, pod.UID, pod.Name, pod.Namespace)
+	assert.NoError(t, err)
+	containerID := cStatus[0].ID
+
+	err = m.updateContainerResources(pod, &pod.Spec.Containers[0], containerID)
+	assert.NoError(t, err)
+
+	// Verify container is updated
+	assert.Contains(t, fakeRuntime.Called, "UpdateContainerResources")
 }

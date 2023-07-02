@@ -430,6 +430,7 @@ type CSIDriverSpec struct {
 	//
 	// Default is "false".
 	//
+	// +featureGate=SELinuxMountReadWriteOncePod
 	// +optional
 	SELinuxMount *bool `json:"seLinuxMount,omitempty" protobuf:"varint,8,opt,name=seLinuxMount"`
 }

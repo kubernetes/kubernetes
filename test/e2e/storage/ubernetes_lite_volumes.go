@@ -25,6 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -37,7 +38,7 @@ import (
 
 var _ = utils.SIGDescribe("Multi-AZ Cluster Volumes", func() {
 	f := framework.NewDefaultFramework("multi-az")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var zoneCount int
 	var err error
 	image := framework.ServeHostnameImage
@@ -82,7 +83,7 @@ func PodsUseStaticPVsOrFail(ctx context.Context, f *framework.Framework, podCoun
 
 	zones, err := e2enode.GetSchedulableClusterZones(ctx, c)
 	framework.ExpectNoError(err)
-	zonelist := zones.List()
+	zonelist := sets.List(zones)
 	ginkgo.By("Creating static PVs across zones")
 	configs := make([]*staticPVTestConfig, podCount)
 	for i := range configs {
@@ -100,7 +101,7 @@ func PodsUseStaticPVsOrFail(ctx context.Context, f *framework.Framework, podCoun
 			go func(config *staticPVTestConfig) {
 				defer ginkgo.GinkgoRecover()
 				defer wg.Done()
-				err := e2epod.WaitForPodNotFoundInNamespace(ctx, c, ns, config.pod.Name, f.Timeouts.PodDelete)
+				err := e2epod.WaitForPodNotFoundInNamespace(ctx, c, config.pod.Name, ns, f.Timeouts.PodDelete)
 				framework.ExpectNoError(err, "while waiting for pod to disappear")
 				errs := e2epv.PVPVCCleanup(ctx, c, ns, config.pv, config.pvc)
 				framework.ExpectNoError(utilerrors.NewAggregate(errs), "while cleaning up PVs and PVCs")

@@ -46,7 +46,7 @@ const numberOfTotalResources = 400
 
 var _ = SIGDescribe("Servers with support for API chunking", func() {
 	f := framework.NewDefaultFramework("chunking")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		ns := f.Namespace.Name

@@ -98,7 +98,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 
 	// global vars for the ginkgo.Context()s and ginkgo.It()'s below
 	f := framework.NewDefaultFramework("pv")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var (
 		c         clientset.Interface
 		ns        string
@@ -110,7 +110,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 		pvc       *v1.PersistentVolumeClaim
 		err       error
 	)
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		c = f.ClientSet

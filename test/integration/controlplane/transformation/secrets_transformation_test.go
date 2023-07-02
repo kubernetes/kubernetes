@@ -140,7 +140,10 @@ func unSealWithGCMTransformer(ctx context.Context, cipherText []byte, dataCtx va
 		return nil, fmt.Errorf("failed to create block cipher: %v", err)
 	}
 
-	gcmTransformer := aestransformer.NewGCMTransformer(block)
+	gcmTransformer, err := aestransformer.NewGCMTransformer(block)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transformer from block: %v", err)
+	}
 
 	clearText, _, err := gcmTransformer.TransformFromStorage(ctx, cipherText, dataCtx)
 	if err != nil {

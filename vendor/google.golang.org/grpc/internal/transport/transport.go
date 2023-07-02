@@ -257,6 +257,9 @@ type Stream struct {
 	fc           *inFlow
 	wq           *writeQuota
 
+	// Holds compressor names passed in grpc-accept-encoding metadata from the
+	// client. This is empty for the client side stream.
+	clientAdvertisedCompressors string
 	// Callback to state application's intentions to read data. This
 	// is used to adjust flow control, if needed.
 	requestRead func(int)
@@ -345,8 +348,24 @@ func (s *Stream) RecvCompress() string {
 }
 
 // SetSendCompress sets the compression algorithm to the stream.
-func (s *Stream) SetSendCompress(str string) {
-	s.sendCompress = str
+func (s *Stream) SetSendCompress(name string) error {
+	if s.isHeaderSent() || s.getState() == streamDone {
+		return errors.New("transport: set send compressor called after headers sent or stream done")
+	}
+
+	s.sendCompress = name
+	return nil
+}
+
+// SendCompress returns the send compressor name.
+func (s *Stream) SendCompress() string {
+	return s.sendCompress
+}
+
+// ClientAdvertisedCompressors returns the compressor names advertised by the
+// client via grpc-accept-encoding header.
+func (s *Stream) ClientAdvertisedCompressors() string {
+	return s.clientAdvertisedCompressors
 }
 
 // Done returns a channel which is closed when it receives the final status
@@ -583,8 +602,8 @@ type ConnectOptions struct {
 
 // NewClientTransport establishes the transport with the required ConnectOptions
 // and returns it to the caller.
-func NewClientTransport(connectCtx, ctx context.Context, addr resolver.Address, opts ConnectOptions, onGoAway func(GoAwayReason), onClose func()) (ClientTransport, error) {
-	return newHTTP2Client(connectCtx, ctx, addr, opts, onGoAway, onClose)
+func NewClientTransport(connectCtx, ctx context.Context, addr resolver.Address, opts ConnectOptions, onClose func(GoAwayReason)) (ClientTransport, error) {
+	return newHTTP2Client(connectCtx, ctx, addr, opts, onClose)
 }
 
 // Options provides additional hints and information for message
@@ -701,7 +720,7 @@ type ServerTransport interface {
 	// Close tears down the transport. Once it is called, the transport
 	// should not be accessed any more. All the pending streams and their
 	// handlers will be terminated asynchronously.
-	Close()
+	Close(err error)
 
 	// RemoteAddr returns the remote network address.
 	RemoteAddr() net.Addr

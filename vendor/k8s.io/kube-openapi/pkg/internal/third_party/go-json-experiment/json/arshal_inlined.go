@@ -5,6 +5,7 @@
 package json
 
 import (
+	"bytes"
 	"errors"
 	"reflect"
 )
@@ -89,35 +90,61 @@ func marshalInlinedFallbackAll(mo MarshalOptions, enc *Encoder, va addressableVa
 		}
 		return nil
 	} else {
-		if v.Len() == 0 {
+		m := v // must be a map[string]V
+		n := m.Len()
+		if n == 0 {
 			return nil
 		}
-		m := v
+		mk := newAddressableValue(stringType)
 		mv := newAddressableValue(m.Type().Elem())
-		for iter := m.MapRange(); iter.Next(); {
-			b, err := appendString(enc.UnusedBuffer(), iter.Key().String(), !enc.options.AllowInvalidUTF8, nil)
+		marshalKey := func(mk addressableValue) error {
+			b, err := appendString(enc.UnusedBuffer(), mk.String(), !enc.options.AllowInvalidUTF8, nil)
 			if err != nil {
 				return err
 			}
 			if insertUnquotedName != nil {
-				isVerbatim := consumeSimpleString(b) == len(b)
+				isVerbatim := bytes.IndexByte(b, '\\') < 0
 				name := unescapeStringMayCopy(b, isVerbatim)
 				if !insertUnquotedName(name) {
 					return &SyntacticError{str: "duplicate name " + string(b) + " in object"}
 				}
 			}
-			if err := enc.WriteValue(b); err != nil {
-				return err
+			return enc.WriteValue(b)
+		}
+		marshalVal := f.fncs.marshal
+		if mo.Marshalers != nil {
+			marshalVal, _ = mo.Marshalers.lookup(marshalVal, mv.Type())
+		}
+		if !mo.Deterministic || n <= 1 {
+			for iter := m.MapRange(); iter.Next(); {
+				mk.SetIterKey(iter)
+				if err := marshalKey(mk); err != nil {
+					return err
+				}
+				mv.Set(iter.Value())
+				if err := marshalVal(mo, enc, mv); err != nil {
+					return err
+				}
 			}
-
-			mv.Set(iter.Value())
-			marshal := f.fncs.marshal
-			if mo.Marshalers != nil {
-				marshal, _ = mo.Marshalers.lookup(marshal, mv.Type())
+		} else {
+			names := getStrings(n)
+			for i, iter := 0, m.Value.MapRange(); i < n && iter.Next(); i++ {
+				mk.SetIterKey(iter)
+				(*names)[i] = mk.String()
 			}
-			if err := marshal(mo, enc, mv); err != nil {
-				return err
+			names.Sort()
+			for _, name := range *names {
+				mk.SetString(name)
+				if err := marshalKey(mk); err != nil {
+					return err
+				}
+				// TODO(https://go.dev/issue/57061): Use mv.SetMapIndexOf.
+				mv.Set(m.MapIndex(mk.Value))
+				if err := marshalVal(mo, enc, mv); err != nil {
+					return err
+				}
 			}
+			putStrings(names)
 		}
 		return nil
 	}
@@ -162,7 +189,7 @@ func unmarshalInlinedFallbackNext(uo UnmarshalOptions, dec *Decoder, va addressa
 	} else {
 		name := string(unquotedName) // TODO: Intern this?
 
-		m := v
+		m := v // must be a map[string]V
 		if m.IsNil() {
 			m.Set(reflect.MakeMap(m.Type()))
 		}

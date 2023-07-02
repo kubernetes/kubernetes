@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
@@ -83,7 +84,7 @@ var (
 		# Delete resources from a directory containing kustomization.yaml - e.g. dir/kustomization.yaml
 		kubectl delete -k dir
 
-		# Delete resources from all files that end with '.json' - i.e. expand wildcard characters in file names
+		# Delete resources from all files that end with '.json'
 		kubectl delete -f '*.json'
 
 		# Delete a pod based on the type and name in the JSON passed into stdin
@@ -132,11 +133,11 @@ type DeleteOptions struct {
 	Mapper        meta.RESTMapper
 	Result        *resource.Result
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 	WarningPrinter *printers.WarningPrinter
 }
 
-func NewCmdDelete(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdDelete(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	deleteFlags := NewDeleteCommandFlags("containing the resource to delete.")
 
 	cmd := &cobra.Command{

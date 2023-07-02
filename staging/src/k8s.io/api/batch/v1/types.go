@@ -23,8 +23,11 @@ import (
 )
 
 const (
-	JobCompletionIndexAnnotation = "batch.kubernetes.io/job-completion-index"
+	// All Kubernetes labels need to be prefixed with Kubernetes to distinguish them from end-user labels
+	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#label-selector-and-annotation-conventions
+	labelPrefix = "batch.kubernetes.io/"
 
+	JobCompletionIndexAnnotation = labelPrefix + "job-completion-index"
 	// JobTrackingFinalizer is a finalizer for Job's pods. It prevents them from
 	// being deleted before being accounted in the Job status.
 	//
@@ -34,7 +37,14 @@ const (
 	// 1.27+, one release after JobTrackingWithFinalizers graduates to GA, the
 	// apiserver and job controller will ignore this annotation and they will
 	// always track jobs using finalizers.
-	JobTrackingFinalizer = "batch.kubernetes.io/job-tracking"
+	JobTrackingFinalizer = labelPrefix + "job-tracking"
+	// The Job labels will use batch.kubernetes.io as a prefix for all labels
+	// Historically the job controller uses unprefixed labels for job-name and controller-uid and
+	// Kubernetes continutes to recognize those unprefixed labels for consistency.
+	JobNameLabel = labelPrefix + "job-name"
+	// ControllerUid is used to programatically get pods corresponding to a Job.
+	// There is a corresponding label without the batch.kubernetes.io that we support for legacy reasons.
+	ControllerUidLabel = labelPrefix + "controller-uid"
 )
 
 // +genclient
@@ -242,8 +252,8 @@ type JobSpec struct {
 	// checked against the backoffLimit. This field cannot be used in combination
 	// with restartPolicy=OnFailure.
 	//
-	// This field is alpha-level. To use this field, you must enable the
-	// `JobPodFailurePolicy` feature gate (disabled by default).
+	// This field is beta-level. It can be used when the `JobPodFailurePolicy`
+	// feature gate is enabled (enabled by default).
 	// +optional
 	PodFailurePolicy *PodFailurePolicy `json:"podFailurePolicy,omitempty" protobuf:"bytes,11,opt,name=podFailurePolicy"`
 
@@ -277,6 +287,7 @@ type JobSpec struct {
 	ManualSelector *bool `json:"manualSelector,omitempty" protobuf:"varint,5,opt,name=manualSelector"`
 
 	// Describes the pod that will be created when executing a job.
+	// The only allowed template.spec.restartPolicy values are "Never" or "OnFailure".
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/
 	Template corev1.PodTemplateSpec `json:"template" protobuf:"bytes,6,opt,name=template"`
 
@@ -516,7 +527,6 @@ type CronJobSpec struct {
 	// configuration, the controller will stop creating new new Jobs and will create a system event with the
 	// reason UnknownTimeZone.
 	// More information can be found in https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#time-zones
-	// This is beta field and must be enabled via the `CronJobTimeZone` feature gate.
 	// +optional
 	TimeZone *string `json:"timeZone,omitempty" protobuf:"bytes,8,opt,name=timeZone"`
 

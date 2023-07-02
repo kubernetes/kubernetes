@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"sigs.k8s.io/kustomize/kyaml/yaml"
+	k8syaml "sigs.k8s.io/yaml"
 )
 
 const (
@@ -200,50 +201,57 @@ func (s *StorageMount) String() string {
 //
 // The FunctionSpec is read from the resource metadata.annotation
 // "config.kubernetes.io/function"
-func GetFunctionSpec(n *yaml.RNode) *FunctionSpec {
+func GetFunctionSpec(n *yaml.RNode) (*FunctionSpec, error) {
 	meta, err := n.GetMeta()
 	if err != nil {
-		return nil
+		return nil, fmt.Errorf("failed to get ResourceMeta: %w", err)
 	}
-	if fn := getFunctionSpecFromAnnotation(n, meta); fn != nil {
-		return fn
+
+	fn, err := getFunctionSpecFromAnnotation(n, meta)
+	if err != nil {
+		return nil, err
+	}
+	if fn != nil {
+		return fn, nil
 	}
 
 	// legacy function specification for backwards compatibility
 	container := meta.Annotations["config.kubernetes.io/container"]
 	if container != "" {
-		return &FunctionSpec{Container: ContainerSpec{Image: container}}
+		return &FunctionSpec{Container: ContainerSpec{Image: container}}, nil
 	}
-	return nil
+	return nil, nil
 }
 
 // getFunctionSpecFromAnnotation parses the config function from an annotation
 // if it is found
-func getFunctionSpecFromAnnotation(n *yaml.RNode, meta yaml.ResourceMeta) *FunctionSpec {
+func getFunctionSpecFromAnnotation(n *yaml.RNode, meta yaml.ResourceMeta) (*FunctionSpec, error) {
 	var fs FunctionSpec
 	for _, s := range functionAnnotationKeys {
 		fn := meta.Annotations[s]
 		if fn != "" {
-			err := yaml.Unmarshal([]byte(fn), &fs)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "%v\n", err)
+			if err := k8syaml.UnmarshalStrict([]byte(fn), &fs); err != nil {
+				return nil, fmt.Errorf("%s unmarshal error: %w", s, err)
 			}
-			return &fs
+			return &fs, nil
 		}
 	}
 	n, err := n.Pipe(yaml.Lookup("metadata", "configFn"))
-	if err != nil || yaml.IsMissingOrNull(n) {
-		return nil
+	if err != nil {
+		return nil, fmt.Errorf("failed to look up metadata.configFn: %w", err)
+	}
+	if yaml.IsMissingOrNull(n) {
+		return nil, nil
 	}
 	s, err := n.String()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
+		fmt.Fprintf(os.Stderr, "configFn parse error: %v\n", err)
+		return nil, fmt.Errorf("configFn parse error: %w", err)
 	}
-	err = yaml.Unmarshal([]byte(s), &fs)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
+	if err := k8syaml.UnmarshalStrict([]byte(s), &fs); err != nil {
+		return nil, fmt.Errorf("%s unmarshal error: %w", "configFn", err)
 	}
-	return &fs
+	return &fs, nil
 }
 
 func StringToStorageMount(s string) StorageMount {
@@ -288,7 +296,11 @@ type IsReconcilerFilter struct {
 func (c *IsReconcilerFilter) Filter(inputs []*yaml.RNode) ([]*yaml.RNode, error) {
 	var out []*yaml.RNode
 	for i := range inputs {
-		isFnResource := GetFunctionSpec(inputs[i]) != nil
+		functionSpec, err := GetFunctionSpec(inputs[i])
+		if err != nil {
+			return nil, err
+		}
+		isFnResource := functionSpec != nil
 		if isFnResource && !c.ExcludeReconcilers {
 			out = append(out, inputs[i])
 		}

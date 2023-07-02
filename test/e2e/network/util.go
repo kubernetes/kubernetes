@@ -158,7 +158,7 @@ func execHostnameTest(sourcePod v1.Pod, targetAddr, targetHostname string) {
 	)
 
 	framework.Logf("Waiting up to %v to get response from %s", timeout, targetAddr)
-	cmd := fmt.Sprintf(`curl -q -s --connect-timeout 30 %s/hostname`, targetAddr)
+	cmd := fmt.Sprintf(`curl -q -s --max-time 30 %s/hostname`, targetAddr)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2 * time.Second) {
 		stdout, err = e2eoutput.RunHostCmd(sourcePod.Namespace, sourcePod.Name, cmd)
 		if err != nil {
@@ -217,4 +217,35 @@ func createSecondNodePortService(ctx context.Context, f *framework.Framework, co
 	}
 
 	return createdService, httpPort
+}
+
+// testEndpointReachability tests reachability to endpoints (i.e. IP, ServiceName) and ports. Test request is initiated from specified execPod.
+// TCP and UDP protocol based service are supported at this moment
+func testEndpointReachability(ctx context.Context, endpoint string, port int32, protocol v1.Protocol, execPod *v1.Pod, timeout time.Duration) error {
+	cmd := ""
+	switch protocol {
+	case v1.ProtocolTCP:
+		cmd = fmt.Sprintf("echo hostName | nc -v -t -w 2 %s %v", endpoint, port)
+	case v1.ProtocolUDP:
+		cmd = fmt.Sprintf("echo hostName | nc -v -u -w 2 %s %v", endpoint, port)
+	default:
+		return fmt.Errorf("service reachability check is not supported for %v", protocol)
+	}
+
+	err := wait.PollImmediateWithContext(ctx, framework.Poll, timeout, func(ctx context.Context) (bool, error) {
+		stdout, err := e2eoutput.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
+		if err != nil {
+			framework.Logf("Service reachability failing with error: %v\nRetrying...", err)
+			return false, nil
+		}
+		trimmed := strings.TrimSpace(stdout)
+		if trimmed != "" {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return fmt.Errorf("service is not reachable within %v timeout on endpoint %s %d over %s protocol", timeout, endpoint, port, protocol)
+	}
+	return nil
 }

@@ -18,7 +18,6 @@ package format
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -33,17 +32,6 @@ func fakeCreatePod(name, namespace string, uid types.UID) *v1.Pod {
 			Name:      name,
 			Namespace: namespace,
 			UID:       uid,
-		},
-	}
-}
-
-func fakeCreatePodWithDeletionTimestamp(name, namespace string, uid types.UID, deletionTimestamp *metav1.Time) *v1.Pod {
-	return &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              name,
-			Namespace:         namespace,
-			UID:               uid,
-			DeletionTimestamp: deletionTimestamp,
 		},
 	}
 }
@@ -69,7 +57,7 @@ func TestPodAndPodDesc(t *testing.T) {
 	testCases := []struct {
 		caseName      string
 		podName       string
-		podNamesapce  string
+		podNamespace  string
 		podUID        types.UID
 		expectedValue string
 	}{
@@ -78,37 +66,7 @@ func TestPodAndPodDesc(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		realPodDesc := PodDesc(testCase.podName, testCase.podNamesapce, testCase.podUID)
+		realPodDesc := PodDesc(testCase.podName, testCase.podNamespace, testCase.podUID)
 		assert.Equalf(t, testCase.expectedValue, realPodDesc, "Failed to test: %s", testCase.caseName)
-	}
-}
-
-func TestPodWithDeletionTimestamp(t *testing.T) {
-	normalDeletionTime := metav1.Date(2017, time.September, 26, 14, 37, 50, 00, time.UTC)
-
-	testCases := []struct {
-		caseName               string
-		isPodNil               bool
-		isdeletionTimestampNil bool
-		deletionTimestamp      metav1.Time
-		expectedValue          string
-	}{
-		{"timestamp_is_nil_case", false, true, normalDeletionTime, "test-pod_default(551f5a43-9f2f-11e7-a589-fa163e148d75)"},
-		{"timestamp_is_normal_case", false, false, normalDeletionTime, "test-pod_default(551f5a43-9f2f-11e7-a589-fa163e148d75):DeletionTimestamp=2017-09-26T14:37:50Z"},
-		{"pod_is_nil_case", true, false, normalDeletionTime, "<nil>"},
-	}
-
-	for _, testCase := range testCases {
-		fakePod := fakeCreatePodWithDeletionTimestamp("test-pod", metav1.NamespaceDefault, "551f5a43-9f2f-11e7-a589-fa163e148d75", &testCase.deletionTimestamp)
-
-		if testCase.isdeletionTimestampNil {
-			fakePod.SetDeletionTimestamp(nil)
-		}
-		if testCase.isPodNil {
-			fakePod = nil
-		}
-
-		realPodWithDeletionTimestamp := PodWithDeletionTimestamp(fakePod)
-		assert.Equalf(t, testCase.expectedValue, realPodWithDeletionTimestamp, "Failed to test: %s", testCase.caseName)
 	}
 }

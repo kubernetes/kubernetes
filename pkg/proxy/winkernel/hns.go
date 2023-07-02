@@ -97,6 +97,12 @@ func (hns hns) getAllEndpointsByNetwork(networkName string) (map[string]*(endpoi
 	}
 	endpointInfos := make(map[string]*(endpointsInfo))
 	for _, ep := range endpoints {
+
+		if len(ep.IpConfigurations) == 0 {
+			klog.V(3).InfoS("No IpConfigurations found in endpoint info of queried endpoints", "endpoint", ep)
+			continue
+		}
+
 		// Add to map with key endpoint ID or IP address
 		// Storing this is expensive in terms of memory, however there is a bug in Windows Server 2019 that can cause two endpoints to be created with the same IP address.
 		// TODO: Store by IP only and remove any lookups by endpoint ID.

@@ -134,3 +134,10 @@ type withCreds google.Credentials
 func (w *withCreds) Apply(o *internal.DialSettings) {
 	o.InternalCredentials = (*google.Credentials)(w)
 }
+
+// EmbeddableAdapter is a no-op option.ClientOption that allow libraries to
+// create their own client options by embedding this type into their own
+// client-specific option wrapper. See example for usage.
+type EmbeddableAdapter struct{}
+
+func (*EmbeddableAdapter) Apply(_ *internal.DialSettings) {}

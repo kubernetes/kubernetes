@@ -180,6 +180,10 @@ func NodeRules() []rbacv1.PolicyRule {
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 		nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("get").Groups(resourceGroup).Resources("resourceclaims").RuleOrDie())
 	}
+	// Kubelet needs access to ClusterTrustBundles to support the pemTrustAnchors volume type.
+	if utilfeature.DefaultFeatureGate.Enabled(features.ClusterTrustBundle) {
+		nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("get", "list", "watch").Groups(certificatesGroup).Resources("clustertrustbundles").RuleOrDie())
+	}
 
 	return nodePolicyRules
 }
@@ -227,10 +231,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 
 	basicUserRules := []rbacv1.PolicyRule{
 		rbacv1helpers.NewRule("create").Groups(authorizationGroup).Resources("selfsubjectaccessreviews", "selfsubjectrulesreviews").RuleOrDie(),
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.APISelfSubjectReview) {
-		basicUserRules = append(basicUserRules, rbacv1helpers.NewRule("create").Groups(authenticationGroup).Resources("selfsubjectreviews").RuleOrDie())
+		rbacv1helpers.NewRule("create").Groups(authenticationGroup).Resources("selfsubjectreviews").RuleOrDie(),
 	}
 
 	roles = append(roles, []rbacv1.ClusterRole{
@@ -370,7 +371,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 		},
 		{
 			// a role for nodes to use to have the access they need for running pods
-			ObjectMeta: metav1.ObjectMeta{Name: "system:node"},
+			ObjectMeta: metav1.ObjectMeta{Name: systemNodeRoleName},
 			Rules:      NodeRules(),
 		},
 		{
@@ -428,9 +429,6 @@ func ClusterRoles() []rbacv1.ClusterRole {
 				// Needed for leader election.
 				rbacv1helpers.NewRule("create").Groups(coordinationGroup).Resources("leases").RuleOrDie(),
 				rbacv1helpers.NewRule("get", "update").Groups(coordinationGroup).Resources("leases").Names("kube-controller-manager").RuleOrDie(),
-				// TODO: Remove once we fully migrate to lease in leader-election.
-				rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("endpoints").RuleOrDie(),
-				rbacv1helpers.NewRule("get", "update").Groups(legacyGroup).Resources("endpoints").Names("kube-controller-manager").RuleOrDie(),
 				// Fundamental resources.
 				rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("secrets", "serviceaccounts").RuleOrDie(),
 				rbacv1helpers.NewRule("delete").Groups(legacyGroup).Resources("secrets").RuleOrDie(),
@@ -544,9 +542,6 @@ func ClusterRoles() []rbacv1.ClusterRole {
 		// TODO: scope this to the kube-system namespace
 		rbacv1helpers.NewRule("create").Groups(coordinationGroup).Resources("leases").RuleOrDie(),
 		rbacv1helpers.NewRule("get", "update").Groups(coordinationGroup).Resources("leases").Names("kube-scheduler").RuleOrDie(),
-		// TODO: Remove once we fully migrate to lease in leader-election.
-		rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("endpoints").RuleOrDie(),
-		rbacv1helpers.NewRule("get", "update").Groups(legacyGroup).Resources("endpoints").Names("kube-scheduler").RuleOrDie(),
 
 		// Fundamental resources
 		rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("nodes").RuleOrDie(),
@@ -575,8 +570,8 @@ func ClusterRoles() []rbacv1.ClusterRole {
 		kubeSchedulerRules = append(kubeSchedulerRules,
 			rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("resourceclaims", "resourceclasses").RuleOrDie(),
 			rbacv1helpers.NewRule(ReadUpdate...).Groups(resourceGroup).Resources("resourceclaims/status").RuleOrDie(),
-			rbacv1helpers.NewRule(ReadWrite...).Groups(resourceGroup).Resources("podschedulings").RuleOrDie(),
-			rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("podschedulings/status").RuleOrDie(),
+			rbacv1helpers.NewRule(ReadWrite...).Groups(resourceGroup).Resources("podschedulingcontexts").RuleOrDie(),
+			rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("podschedulingcontexts/status").RuleOrDie(),
 		)
 	}
 	roles = append(roles, rbacv1.ClusterRole{
@@ -584,6 +579,16 @@ func ClusterRoles() []rbacv1.ClusterRole {
 		ObjectMeta: metav1.ObjectMeta{Name: "system:kube-scheduler"},
 		Rules:      kubeSchedulerRules,
 	})
+
+	// Default ClusterRole to allow reading ClusterTrustBundle objects
+	if utilfeature.DefaultFeatureGate.Enabled(features.ClusterTrustBundle) {
+		roles = append(roles, rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: "system:cluster-trust-bundle-discovery"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule(Read...).Groups(certificatesGroup).Resources("clustertrustbundles").RuleOrDie(),
+			},
+		})
+	}
 
 	addClusterRoleLabel(roles)
 	return roles
@@ -624,6 +629,11 @@ func ClusterRoleBindings() []rbacv1.ClusterRoleBinding {
 	rolebindings = append(rolebindings,
 		rbacv1helpers.NewClusterBinding("system:service-account-issuer-discovery").Groups(serviceaccount.AllServiceAccountsGroup).BindingOrDie(),
 	)
+
+	// Service accounts can read ClusterTrustBundle objects.
+	if utilfeature.DefaultFeatureGate.Enabled(features.ClusterTrustBundle) {
+		rolebindings = append(rolebindings, rbacv1helpers.NewClusterBinding("system:cluster-trust-bundle-discovery").Groups(serviceaccount.AllServiceAccountsGroup).BindingOrDie())
+	}
 
 	addClusterRoleBindingLabel(rolebindings)
 

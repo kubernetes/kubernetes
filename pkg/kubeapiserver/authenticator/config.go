@@ -19,6 +19,7 @@ package authenticator
 import (
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -141,12 +142,11 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 		}
 		tokenAuthenticators = append(tokenAuthenticators, serviceAccountAuth)
 	}
-	if config.BootstrapToken {
-		if config.BootstrapTokenAuthenticator != nil {
-			// TODO: This can sometimes be nil because of
-			tokenAuthenticators = append(tokenAuthenticators, authenticator.WrapAudienceAgnosticToken(config.APIAudiences, config.BootstrapTokenAuthenticator))
-		}
+
+	if config.BootstrapToken && config.BootstrapTokenAuthenticator != nil {
+		tokenAuthenticators = append(tokenAuthenticators, authenticator.WrapAudienceAgnosticToken(config.APIAudiences, config.BootstrapTokenAuthenticator))
 	}
+
 	// NOTE(ericchiang): Keep the OpenID Connect after Service Accounts.
 	//
 	// Because both plugins verify JWTs whichever comes first in the union experiences
@@ -158,7 +158,7 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 		var oidcCAContent oidc.CAContentProvider
 		if len(config.OIDCCAFile) != 0 {
 			var oidcCAErr error
-			oidcCAContent, oidcCAErr = dynamiccertificates.NewDynamicCAContentFromFile("oidc-authenticator", config.OIDCCAFile)
+			oidcCAContent, oidcCAErr = staticCAContentProviderFromFile("oidc-authenticator", config.OIDCCAFile)
 			if oidcCAErr != nil {
 				return nil, nil, oidcCAErr
 			}
@@ -317,4 +317,13 @@ func newWebhookTokenAuthenticator(config Config) (authenticator.Token, error) {
 	}
 
 	return tokencache.New(webhookTokenAuthenticator, false, config.WebhookTokenAuthnCacheTTL, config.WebhookTokenAuthnCacheTTL), nil
+}
+
+func staticCAContentProviderFromFile(purpose, filename string) (dynamiccertificates.CAContentProvider, error) {
+	fileBytes, err := os.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	return dynamiccertificates.NewStaticCAContent(purpose, fileBytes)
 }

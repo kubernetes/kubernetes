@@ -58,7 +58,7 @@ func (client ExpressRouteCircuitConnectionsClient) CreateOrUpdate(ctx context.Co
 
 	result, err = client.CreateOrUpdateSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.ExpressRouteCircuitConnectionsClient", "CreateOrUpdate", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.ExpressRouteCircuitConnectionsClient", "CreateOrUpdate", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -96,6 +96,7 @@ func (client ExpressRouteCircuitConnectionsClient) CreateOrUpdatePreparer(ctx co
 // http.Response Body if it receives an error.
 func (client ExpressRouteCircuitConnectionsClient) CreateOrUpdateSender(req *http.Request) (future ExpressRouteCircuitConnectionsCreateOrUpdateFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
@@ -144,7 +145,7 @@ func (client ExpressRouteCircuitConnectionsClient) Delete(ctx context.Context, r
 
 	result, err = client.DeleteSender(req)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.ExpressRouteCircuitConnectionsClient", "Delete", nil, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "network.ExpressRouteCircuitConnectionsClient", "Delete", result.Response(), "Failure sending request")
 		return
 	}
 
@@ -178,6 +179,7 @@ func (client ExpressRouteCircuitConnectionsClient) DeletePreparer(ctx context.Co
 // http.Response Body if it receives an error.
 func (client ExpressRouteCircuitConnectionsClient) DeleteSender(req *http.Request) (future ExpressRouteCircuitConnectionsDeleteFuture, err error) {
 	var resp *http.Response
+	future.FutureAPI = &azure.Future{}
 	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return

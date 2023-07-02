@@ -69,6 +69,9 @@ var (
 	e2es *services.E2EServices
 	// featureGates is a map of feature names to bools that enable or disable alpha/experimental features.
 	featureGates map[string]bool
+	// serviceFeatureGates is a map of feature names to bools that enable or
+	// disable alpha/experimental features for API service.
+	serviceFeatureGates map[string]bool
 
 	// TODO(random-liu): Change the following modes to sub-command.
 	runServicesMode    = flag.Bool("run-services-mode", false, "If true, only run services (etcd, apiserver) in current process, and not run test.")
@@ -100,6 +103,8 @@ func registerNodeFlags(flags *flag.FlagSet) {
 	flag.Var(cliflag.NewMapStringString(&framework.TestContext.RuntimeConfig), "runtime-config", "The runtime configuration used on node e2e tests.")
 	flags.BoolVar(&framework.TestContext.RequireDevices, "require-devices", false, "If true, require device plugins to be installed in the running environment.")
 	flags.Var(cliflag.NewMapStringBool(&featureGates), "feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features.")
+	flags.Var(cliflag.NewMapStringBool(&serviceFeatureGates), "service-feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features for API service.")
+	flags.BoolVar(&framework.TestContext.StandaloneMode, "standalone-mode", false, "If true, starts kubelet in standalone mode.")
 }
 
 func init() {
@@ -130,6 +135,12 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "ERROR: initialize feature gates: %v", err)
 		os.Exit(1)
 	}
+
+	if err := services.SetFeatureGatesForInProcessComponents(serviceFeatureGates); err != nil {
+		fmt.Fprintf(os.Stderr, "ERROR: initialize process feature gates for API service: %v", err)
+		os.Exit(1)
+	}
+
 	setExtraEnvs()
 	os.Exit(m.Run())
 }
@@ -221,8 +232,10 @@ var _ = ginkgo.SynchronizedBeforeSuite(func(ctx context.Context) []byte {
 		klog.Infof("Running tests without starting services.")
 	}
 
-	klog.Infof("Wait for the node to be ready")
-	waitForNodeReady(ctx)
+	if !framework.TestContext.StandaloneMode {
+		klog.Infof("Wait for the node to be ready")
+		waitForNodeReady(ctx)
+	}
 
 	// Reference common test to make the import valid.
 	commontest.CurrentSuite = commontest.NodeE2E
@@ -235,6 +248,13 @@ var _ = ginkgo.SynchronizedBeforeSuite(func(ctx context.Context) []byte {
 	framework.TestContext.BearerToken = string(token)
 	// update test context with node configuration.
 	gomega.Expect(updateTestContext(ctx)).To(gomega.Succeed(), "update test context with node config.")
+
+	// Store current Kubelet configuration in the package variable
+	// This assumes all tests which dynamically change kubelet configuration
+	// must: 1) run in serial; 2) restore kubelet configuration after test.
+	var err error
+	kubeletCfg, err = getCurrentKubeletConfig(ctx)
+	framework.ExpectNoError(err)
 })
 
 // Tear down the kubelet on the node
@@ -309,20 +329,18 @@ func updateTestContext(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to get apiserver client: %w", err)
 	}
-	// Update test context with current node object.
-	node, err := getNode(client)
-	if err != nil {
-		return fmt.Errorf("failed to get node: %w", err)
+
+	if !framework.TestContext.StandaloneMode {
+		// Update test context with current node object.
+		node, err := getNode(client)
+		if err != nil {
+			return fmt.Errorf("failed to get node: %w", err)
+		}
+		framework.TestContext.NodeName = node.Name // Set node name from API server, it is already set to the computer name by default.
 	}
-	framework.TestContext.NodeName = node.Name // Set node name.
-	// Update test context with current kubelet configuration.
-	// This assumes all tests which dynamically change kubelet configuration
-	// must: 1) run in serial; 2) restore kubelet configuration after test.
-	kubeletCfg, err := getCurrentKubeletConfig(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get kubelet configuration: %w", err)
-	}
-	framework.TestContext.KubeletConfig = *kubeletCfg // Set kubelet config
+
+	framework.Logf("Node name: %s", framework.TestContext.NodeName)
+
 	return nil
 }
 

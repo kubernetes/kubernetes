@@ -25,9 +25,8 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"runtime"
-	"strings"
 	"sync"
+	"testing"
 	"time"
 
 	"google.golang.org/grpc"
@@ -60,7 +59,7 @@ type Base64Plugin struct {
 }
 
 // NewBase64Plugin is a constructor for Base64Plugin.
-func NewBase64Plugin(socketPath string) (*Base64Plugin, error) {
+func NewBase64Plugin(t *testing.T, socketPath string) *Base64Plugin {
 	server := grpc.NewServer()
 	result := &Base64Plugin{
 		grpcServer: server,
@@ -70,19 +69,26 @@ func NewBase64Plugin(socketPath string) (*Base64Plugin, error) {
 	}
 
 	kmsapi.RegisterKeyManagementServiceServer(server, result)
-	return result, nil
+	if err := result.start(); err != nil {
+		t.Fatalf("failed to start KMS plugin, err: %v", err)
+	}
+	t.Cleanup(result.CleanUp)
+	if err := waitForBase64PluginToBeUp(result); err != nil {
+		t.Fatalf("failed to start KMS plugin: err: %v", err)
+	}
+	return result
 }
 
-// WaitForBase64PluginToBeUp waits until the plugin is ready to serve requests.
-func WaitForBase64PluginToBeUp(plugin *Base64Plugin) error {
+// waitForBase64PluginToBeUp waits until the plugin is ready to serve requests.
+func waitForBase64PluginToBeUp(plugin *Base64Plugin) error {
 	var gRPCErr error
 	pollErr := wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
 		_, gRPCErr = plugin.Encrypt(context.Background(), &kmsapi.EncryptRequest{Plain: []byte("foo")})
 		return gRPCErr == nil, nil
 	})
 
-	if pollErr == wait.ErrWaitTimeout {
-		return fmt.Errorf("failed to start kms-plugin, error: %v", gRPCErr)
+	if pollErr != nil {
+		return fmt.Errorf("failed to start KMS plugin, gRPC error: %v, poll error: %v", gRPCErr, pollErr)
 	}
 
 	return nil
@@ -98,14 +104,14 @@ func (s *Base64Plugin) SetVersion(ver string) {
 	s.ver = ver
 }
 
-// Start starts plugin's gRPC service.
-func (s *Base64Plugin) Start() error {
+// start starts plugin's gRPC service.
+func (s *Base64Plugin) start() error {
 	var err error
 	s.listener, err = net.Listen(unixProtocol, s.socketPath)
 	if err != nil {
 		return fmt.Errorf("failed to listen on the unix socket, error: %v", err)
 	}
-	klog.Infof("Listening on %s", s.socketPath)
+	klog.InfoS("Starting KMS Plugin", "socketPath", s.socketPath)
 
 	go s.grpcServer.Serve(s.listener)
 	return nil
@@ -114,10 +120,8 @@ func (s *Base64Plugin) Start() error {
 // CleanUp stops gRPC server and the underlying listener.
 func (s *Base64Plugin) CleanUp() {
 	s.grpcServer.Stop()
-	s.listener.Close()
-	if !strings.HasPrefix(s.socketPath, "@") || runtime.GOOS != "linux" {
-		os.Remove(s.socketPath)
-	}
+	_ = s.listener.Close()
+	_ = os.Remove(s.socketPath)
 }
 
 // EnterFailedState places the plugin into failed state.
@@ -136,13 +140,13 @@ func (s *Base64Plugin) ExitFailedState() {
 
 // Version returns the version of the kms-plugin.
 func (s *Base64Plugin) Version(ctx context.Context, request *kmsapi.VersionRequest) (*kmsapi.VersionResponse, error) {
-	klog.Infof("Received request for Version: %v", request)
+	klog.V(3).InfoS("Received request for Version", "request", request)
 	return &kmsapi.VersionResponse{Version: s.ver, RuntimeName: "testKMS", RuntimeVersion: "0.0.1"}, nil
 }
 
 // Decrypt performs base64 decoding of the payload of kms.DecryptRequest.
 func (s *Base64Plugin) Decrypt(ctx context.Context, request *kmsapi.DecryptRequest) (*kmsapi.DecryptResponse, error) {
-	klog.V(3).Infof("Received Decrypt Request for DEK: %s", string(request.Cipher))
+	klog.V(3).InfoS("Received Decrypt Request", "cipher", string(request.Cipher))
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -161,7 +165,7 @@ func (s *Base64Plugin) Decrypt(ctx context.Context, request *kmsapi.DecryptReque
 
 // Encrypt performs base64 encoding of the payload of kms.EncryptRequest.
 func (s *Base64Plugin) Encrypt(ctx context.Context, request *kmsapi.EncryptRequest) (*kmsapi.EncryptResponse, error) {
-	klog.V(3).Infof("Received Encrypt Request for DEK: %x", request.Plain)
+	klog.V(3).InfoS("Received Encrypt Request", "plain", string(request.Plain))
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.lastEncryptRequest = request

@@ -127,3 +127,41 @@ func TestApplySandboxResources(t *testing.T) {
 		assert.Equal(t, test.expectedOverhead, config.Linux.Overhead, "TestCase[%d]: %s", i, test.description)
 	}
 }
+
+func TestGeneratePodSandboxConfigWithLinuxSecurityContext(t *testing.T) {
+	_, _, m, err := createTestRuntimeManager()
+	require.NoError(t, err)
+	pod := newTestPodWithLinuxSecurityContext()
+
+	expectedLinuxPodSandboxConfig := &runtimeapi.LinuxPodSandboxConfig{
+		SecurityContext: &runtimeapi.LinuxSandboxSecurityContext{
+			SelinuxOptions: &runtimeapi.SELinuxOption{
+				User: "qux",
+			},
+			RunAsUser:  &runtimeapi.Int64Value{Value: 1000},
+			RunAsGroup: &runtimeapi.Int64Value{Value: 10},
+		},
+	}
+
+	podSandboxConfig, err := m.generatePodSandboxConfig(pod, 1)
+	assert.NoError(t, err)
+	assert.Equal(t, expectedLinuxPodSandboxConfig.SecurityContext.SelinuxOptions, podSandboxConfig.Linux.SecurityContext.SelinuxOptions)
+	assert.Equal(t, expectedLinuxPodSandboxConfig.SecurityContext.RunAsUser, podSandboxConfig.Linux.SecurityContext.RunAsUser)
+	assert.Equal(t, expectedLinuxPodSandboxConfig.SecurityContext.RunAsGroup, podSandboxConfig.Linux.SecurityContext.RunAsGroup)
+}
+
+func newTestPodWithLinuxSecurityContext() *v1.Pod {
+	anyGroup := int64(10)
+	anyUser := int64(1000)
+	pod := newTestPod()
+
+	pod.Spec.SecurityContext = &v1.PodSecurityContext{
+		SELinuxOptions: &v1.SELinuxOptions{
+			User: "qux",
+		},
+		RunAsUser:  &anyUser,
+		RunAsGroup: &anyGroup,
+	}
+
+	return pod
+}

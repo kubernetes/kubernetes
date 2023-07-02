@@ -63,6 +63,9 @@ func (r *Responses) UnmarshalJSON(data []byte) error {
 
 // MarshalJSON converts this items object to JSON
 func (r Responses) MarshalJSON() ([]byte, error) {
+	if internal.UseOptimizedJSONMarshaling {
+		return internal.DeterministicMarshal(r)
+	}
 	b1, err := json.Marshal(r.ResponsesProps)
 	if err != nil {
 		return nil, err
@@ -73,6 +76,25 @@ func (r Responses) MarshalJSON() ([]byte, error) {
 	}
 	concated := swag.ConcatJSON(b1, b2)
 	return concated, nil
+}
+
+func (r Responses) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+	type ArbitraryKeys map[string]interface{}
+	var x struct {
+		ArbitraryKeys
+		Default *Response `json:"default,omitempty"`
+	}
+	x.ArbitraryKeys = make(map[string]any, len(r.Extensions)+len(r.StatusCodeResponses))
+	for k, v := range r.Extensions {
+		if internal.IsExtensionKey(k) {
+			x.ArbitraryKeys[k] = v
+		}
+	}
+	for k, v := range r.StatusCodeResponses {
+		x.ArbitraryKeys[strconv.Itoa(k)] = v
+	}
+	x.Default = r.Default
+	return opts.MarshalNext(enc, x)
 }
 
 // ResponsesProps describes all responses for an operation.
@@ -148,7 +170,7 @@ func (r *Responses) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.
 				return nil
 			}
 			switch k := tok.String(); {
-			case isExtensionKey(k):
+			case internal.IsExtensionKey(k):
 				ext = nil
 				if err := opts.UnmarshalNext(dec, &ext); err != nil {
 					return err

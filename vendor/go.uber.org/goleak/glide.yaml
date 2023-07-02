@@ -1,0 +1,8 @@
+package: go.uber.org/goleak
+import: []
+testImport:
+- package: github.com/stretchr/testify
+  version: ^1.1.4
+  subpackages:
+  - assert
+  - require

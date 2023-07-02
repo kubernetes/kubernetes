@@ -25,6 +25,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -1093,365 +1094,6 @@ func TestValidatePodDeletionCostOption(t *testing.T) {
 	}
 }
 
-func TestHaveSameExpandedDNSConfig(t *testing.T) {
-	testCases := []struct {
-		desc       string
-		podSpec    *api.PodSpec
-		oldPodSpec *api.PodSpec
-		want       bool
-	}{
-		{
-			desc:       "nil DNSConfig",
-			podSpec:    &api.PodSpec{},
-			oldPodSpec: &api.PodSpec{},
-			want:       false,
-		},
-		{
-			desc: "empty DNSConfig",
-			podSpec: &api.PodSpec{
-				DNSConfig: &api.PodDNSConfig{},
-			},
-			oldPodSpec: &api.PodSpec{
-				DNSConfig: &api.PodDNSConfig{},
-			},
-			want: false,
-		},
-		{
-			desc: "same legacy DNSConfig",
-			podSpec: &api.PodSpec{
-				DNSConfig: &api.PodDNSConfig{
-					Searches: []string{
-						"foo.com",
-						"bar.io",
-						"3.com",
-						"4.com",
-						"5.com",
-						"6.com",
-					},
-				},
-			},
-			oldPodSpec: &api.PodSpec{
-				DNSConfig: &api.PodDNSConfig{
-					Searches: []string{
-						"foo.com",
-						"bar.io",
-						"3.com",
-						"4.com",
-						"5.com",
-						"6.com",
-					},
-				},
-			},
-			want: false,
-		},
-		{
-			desc: "update legacy DNSConfig",
-			podSpec: &api.PodSpec{
-				DNSConfig: &api.PodDNSConfig{
-					Searches: []string{
-						"foo.com",
-						"bar.io",
-						"baz.com",
-						"4.com",
-						"5.com",
-						"6.com",
-					},
-				},
-			},
-			oldPodSpec: &api.PodSpec{
-				DNSConfig: &api.PodDNSConfig{
-					Searches: []string{
-						"foo.com",
-						"bar.io",
-						"3.com",
-						"4.com",
-						"5.com",
-						"6.com",
-					},
-				},
-			},
-			want: false,
-		},
-		{
-			desc: "same expanded DNSConfig",
-			podSpec: &api.PodSpec{
-				DNSConfig: &api.PodDNSConfig{
-					Searches: []string{
-						"foo.com",
-						"bar.io",
-						"3.com",
-						"4.com",
-						"5.com",
-						"6.com",
-						"7.expanded.com",
-						"8.expanded.com",
-						"9.expanded.com",
-						"10.expanded.com",
-						"11.expanded.com",
-						"12.expanded.com",
-						"13.expanded.com",
-						"14.expanded.com",
-						"15.expanded.com",
-						"16.expanded.com",
-						"17.expanded.com",
-						"18.expanded.com",
-						"19.expanded.com",
-						"20.expanded.com",
-						"21.expanded.com",
-						"22.expanded.com",
-						"23.expanded.com",
-						"24.expanded.com",
-						"25.expanded.com",
-						"26.expanded.com",
-						"27.expanded.com",
-						"28.expanded.com",
-						"29.expanded.com",
-						"30.expanded.com",
-						"31.expanded.com",
-						"32.expanded.com",
-					},
-				},
-			},
-			oldPodSpec: &api.PodSpec{
-				DNSConfig: &api.PodDNSConfig{
-					Searches: []string{
-						"foo.com",
-						"bar.io",
-						"3.com",
-						"4.com",
-						"5.com",
-						"6.com",
-						"7.expanded.com",
-						"8.expanded.com",
-						"9.expanded.com",
-						"10.expanded.com",
-						"11.expanded.com",
-						"12.expanded.com",
-						"13.expanded.com",
-						"14.expanded.com",
-						"15.expanded.com",
-						"16.expanded.com",
-						"17.expanded.com",
-						"18.expanded.com",
-						"19.expanded.com",
-						"20.expanded.com",
-						"21.expanded.com",
-						"22.expanded.com",
-						"23.expanded.com",
-						"24.expanded.com",
-						"25.expanded.com",
-						"26.expanded.com",
-						"27.expanded.com",
-						"28.expanded.com",
-						"29.expanded.com",
-						"30.expanded.com",
-						"31.expanded.com",
-						"32.expanded.com",
-					},
-				},
-			},
-			want: true,
-		},
-		{
-			desc: "update expanded DNSConfig",
-			podSpec: &api.PodSpec{
-				DNSConfig: &api.PodDNSConfig{
-					Searches: []string{
-						"foo.com",
-						"bar.io",
-						"3.com",
-						"4.com",
-						"5.com",
-						"6.com",
-						"baz.expanded.com",
-						"8.expanded.com",
-						"9.expanded.com",
-						"10.expanded.com",
-						"11.expanded.com",
-						"12.expanded.com",
-						"13.expanded.com",
-						"14.expanded.com",
-						"15.expanded.com",
-						"16.expanded.com",
-						"17.expanded.com",
-						"18.expanded.com",
-						"19.expanded.com",
-						"20.expanded.com",
-						"21.expanded.com",
-						"22.expanded.com",
-						"23.expanded.com",
-						"24.expanded.com",
-						"25.expanded.com",
-						"26.expanded.com",
-						"27.expanded.com",
-						"28.expanded.com",
-						"29.expanded.com",
-						"30.expanded.com",
-						"31.expanded.com",
-						"32.expanded.com",
-					},
-				},
-			},
-			oldPodSpec: &api.PodSpec{
-				DNSConfig: &api.PodDNSConfig{
-					Searches: []string{
-						"foo.com",
-						"bar.io",
-						"3.com",
-						"4.com",
-						"5.com",
-						"6.com",
-						"7.expanded.com",
-						"8.expanded.com",
-						"9.expanded.com",
-						"10.expanded.com",
-						"11.expanded.com",
-						"12.expanded.com",
-						"13.expanded.com",
-						"14.expanded.com",
-						"15.expanded.com",
-						"16.expanded.com",
-						"17.expanded.com",
-						"18.expanded.com",
-						"19.expanded.com",
-						"20.expanded.com",
-						"21.expanded.com",
-						"22.expanded.com",
-						"23.expanded.com",
-						"24.expanded.com",
-						"25.expanded.com",
-						"26.expanded.com",
-						"27.expanded.com",
-						"28.expanded.com",
-						"29.expanded.com",
-						"30.expanded.com",
-						"31.expanded.com",
-						"32.expanded.com",
-					},
-				},
-			},
-			want: false,
-		},
-		{
-			desc: "update to legacy DNSConfig",
-			podSpec: &api.PodSpec{
-				DNSConfig: &api.PodDNSConfig{
-					Searches: []string{
-						"foo.com",
-						"bar.io",
-						"baz.com",
-						"4.com",
-						"5.com",
-						"6.com",
-					},
-				},
-			},
-			oldPodSpec: &api.PodSpec{
-				DNSConfig: &api.PodDNSConfig{
-					Searches: []string{
-						"foo.com",
-						"bar.io",
-						"3.com",
-						"4.com",
-						"5.com",
-						"6.com",
-						"7.expanded.com",
-						"8.expanded.com",
-						"9.expanded.com",
-						"10.expanded.com",
-						"11.expanded.com",
-						"12.expanded.com",
-						"13.expanded.com",
-						"14.expanded.com",
-						"15.expanded.com",
-						"16.expanded.com",
-						"17.expanded.com",
-						"18.expanded.com",
-						"19.expanded.com",
-						"20.expanded.com",
-						"21.expanded.com",
-						"22.expanded.com",
-						"23.expanded.com",
-						"24.expanded.com",
-						"25.expanded.com",
-						"26.expanded.com",
-						"27.expanded.com",
-						"28.expanded.com",
-						"29.expanded.com",
-						"30.expanded.com",
-						"31.expanded.com",
-						"32.expanded.com",
-					},
-				},
-			},
-			want: false,
-		},
-		{
-			desc: "update to expanded DNSConfig",
-			podSpec: &api.PodSpec{
-				DNSConfig: &api.PodDNSConfig{
-					Searches: []string{
-						"foo.com",
-						"bar.io",
-						"3.com",
-						"4.com",
-						"5.com",
-						"6.com",
-						"baz.expanded.com",
-						"8.expanded.com",
-						"9.expanded.com",
-						"10.expanded.com",
-						"11.expanded.com",
-						"12.expanded.com",
-						"13.expanded.com",
-						"14.expanded.com",
-						"15.expanded.com",
-						"16.expanded.com",
-						"17.expanded.com",
-						"18.expanded.com",
-						"19.expanded.com",
-						"20.expanded.com",
-						"21.expanded.com",
-						"22.expanded.com",
-						"23.expanded.com",
-						"24.expanded.com",
-						"25.expanded.com",
-						"26.expanded.com",
-						"27.expanded.com",
-						"28.expanded.com",
-						"29.expanded.com",
-						"30.expanded.com",
-						"31.expanded.com",
-						"32.expanded.com",
-					},
-				},
-			},
-			oldPodSpec: &api.PodSpec{
-				DNSConfig: &api.PodDNSConfig{
-					Searches: []string{
-						"foo.com",
-						"bar.io",
-						"3.com",
-						"4.com",
-						"5.com",
-						"6.com",
-					},
-				},
-			},
-			want: false,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.desc, func(t *testing.T) {
-			got := haveSameExpandedDNSConfig(tc.podSpec, tc.oldPodSpec)
-			if tc.want != got {
-				t.Errorf("unexpected diff, want: %v, got: %v", tc.want, got)
-			}
-		})
-	}
-}
-
 func TestDropDisabledTopologySpreadConstraintsFields(t *testing.T) {
 	testCases := []struct {
 		name        string
@@ -2058,7 +1700,7 @@ func TestDropHostUsers(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.UserNamespacesStatelessPodsSupport, enabled)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.UserNamespacesSupport, enabled)()
 
 					DropDisabledPodFields(newPod, oldPod)
 
@@ -2232,6 +1874,435 @@ func TestValidateTopologySpreadConstraintLabelSelectorOption(t *testing.T) {
 			gotOptions := GetValidationOptionsFromPodSpecAndMeta(&api.PodSpec{}, tc.oldPodSpec, nil, nil)
 			if tc.wantOption != gotOptions.AllowInvalidTopologySpreadConstraintLabelSelector {
 				t.Errorf("Got AllowInvalidLabelValueInSelector=%t, want %t", gotOptions.AllowInvalidTopologySpreadConstraintLabelSelector, tc.wantOption)
+			}
+		})
+	}
+}
+
+func TestDropVolumesClaimField(t *testing.T) {
+	pod := &api.Pod{
+		Spec: api.PodSpec{
+			Volumes: []api.Volume{
+				{},
+				{
+					VolumeSource: api.VolumeSource{
+						Ephemeral: &api.EphemeralVolumeSource{},
+					},
+				},
+				{
+					VolumeSource: api.VolumeSource{
+						Ephemeral: &api.EphemeralVolumeSource{
+							VolumeClaimTemplate: &api.PersistentVolumeClaimTemplate{
+								Spec: api.PersistentVolumeClaimSpec{
+									Resources: api.ResourceRequirements{
+										Claims: []api.ResourceClaim{
+											{Name: "dra"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	DropDisabledPodFields(pod, nil)
+
+	for i, volume := range pod.Spec.Volumes {
+		if volume.Ephemeral != nil && volume.Ephemeral.VolumeClaimTemplate != nil && volume.Ephemeral.VolumeClaimTemplate.Spec.Resources.Claims != nil {
+			t.Errorf("volume #%d: Resources.Claim should be nil", i)
+		}
+	}
+}
+
+func TestDropInPlacePodVerticalScaling(t *testing.T) {
+	podWithInPlaceVerticalScaling := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:  "c1",
+						Image: "image",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+						},
+						ResizePolicy: []api.ContainerResizePolicy{
+							{ResourceName: api.ResourceCPU, RestartPolicy: api.NotRequired},
+							{ResourceName: api.ResourceMemory, RestartPolicy: api.RestartContainer},
+						},
+					},
+				},
+			},
+			Status: api.PodStatus{
+				Resize: api.PodResizeStatusInProgress,
+				ContainerStatuses: []api.ContainerStatus{
+					{
+						Name:               "c1",
+						Image:              "image",
+						AllocatedResources: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+						Resources: &api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("300m")},
+						},
+					},
+				},
+			},
+		}
+	}
+	podWithoutInPlaceVerticalScaling := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:  "c1",
+						Image: "image",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+						},
+					},
+				},
+			},
+			Status: api.PodStatus{
+				ContainerStatuses: []api.ContainerStatus{
+					{
+						Name:  "c1",
+						Image: "image",
+					},
+				},
+			},
+		}
+	}
+
+	podInfo := []struct {
+		description               string
+		hasInPlaceVerticalScaling bool
+		pod                       func() *api.Pod
+	}{
+		{
+			description:               "has in-place vertical scaling enabled with resources",
+			hasInPlaceVerticalScaling: true,
+			pod:                       podWithInPlaceVerticalScaling,
+		},
+		{
+			description:               "has in-place vertical scaling disabled",
+			hasInPlaceVerticalScaling: false,
+			pod:                       podWithoutInPlaceVerticalScaling,
+		},
+		{
+			description:               "is nil",
+			hasInPlaceVerticalScaling: false,
+			pod:                       func() *api.Pod { return nil },
+		},
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for _, oldPodInfo := range podInfo {
+			for _, newPodInfo := range podInfo {
+				oldPodHasInPlaceVerticalScaling, oldPod := oldPodInfo.hasInPlaceVerticalScaling, oldPodInfo.pod()
+				newPodHasInPlaceVerticalScaling, newPod := newPodInfo.hasInPlaceVerticalScaling, newPodInfo.pod()
+				if newPod == nil {
+					continue
+				}
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, enabled)()
+
+					var oldPodSpec *api.PodSpec
+					var oldPodStatus *api.PodStatus
+					if oldPod != nil {
+						oldPodSpec = &oldPod.Spec
+						oldPodStatus = &oldPod.Status
+					}
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
+					dropDisabledPodStatusFields(&newPod.Status, oldPodStatus, &newPod.Spec, oldPodSpec)
+
+					// old pod should never be changed
+					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+						t.Errorf("old pod changed: %v", cmp.Diff(oldPod, oldPodInfo.pod()))
+					}
+
+					switch {
+					case enabled || oldPodHasInPlaceVerticalScaling:
+						// new pod shouldn't change if feature enabled or if old pod has ResizePolicy set
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
+						}
+					case newPodHasInPlaceVerticalScaling:
+						// new pod should be changed
+						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod was not changed")
+						}
+						// new pod should not have ResizePolicy
+						if !reflect.DeepEqual(newPod, podWithoutInPlaceVerticalScaling()) {
+							t.Errorf("new pod has ResizePolicy: %v", cmp.Diff(newPod, podWithoutInPlaceVerticalScaling()))
+						}
+					default:
+						// new pod should not need to be changed
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestMarkPodProposedForResize(t *testing.T) {
+	testCases := []struct {
+		desc        string
+		newPod      *api.Pod
+		oldPod      *api.Pod
+		expectedPod *api.Pod
+	}{
+		{
+			desc: "nil requests",
+			newPod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "c1",
+							Image: "image",
+						},
+					},
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name:  "c1",
+							Image: "image",
+						},
+					},
+				},
+			},
+			oldPod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "c1",
+							Image: "image",
+						},
+					},
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name:  "c1",
+							Image: "image",
+						},
+					},
+				},
+			},
+			expectedPod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "c1",
+							Image: "image",
+						},
+					},
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name:  "c1",
+							Image: "image",
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "resources unchanged",
+			newPod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "c1",
+							Image: "image",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+								Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name:  "c1",
+							Image: "image",
+						},
+					},
+				},
+			},
+			oldPod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "c1",
+							Image: "image",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+								Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name:  "c1",
+							Image: "image",
+						},
+					},
+				},
+			},
+			expectedPod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "c1",
+							Image: "image",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+								Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name:  "c1",
+							Image: "image",
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "resize desired",
+			newPod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "c1",
+							Image: "image",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+								Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+							},
+						},
+						{
+							Name:  "c2",
+							Image: "image",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("300m")},
+								Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("400m")},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name:               "c1",
+							Image:              "image",
+							AllocatedResources: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+						},
+						{
+							Name:               "c2",
+							Image:              "image",
+							AllocatedResources: api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+						},
+					},
+				},
+			},
+			oldPod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "c1",
+							Image: "image",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+								Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+							},
+						},
+						{
+							Name:  "c2",
+							Image: "image",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+								Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("300m")},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name:               "c1",
+							Image:              "image",
+							AllocatedResources: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+						},
+						{
+							Name:               "c2",
+							Image:              "image",
+							AllocatedResources: api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+						},
+					},
+				},
+			},
+			expectedPod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "c1",
+							Image: "image",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+								Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+							},
+						},
+						{
+							Name:  "c2",
+							Image: "image",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("300m")},
+								Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("400m")},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					Resize: api.PodResizeStatusProposed,
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name:               "c1",
+							Image:              "image",
+							AllocatedResources: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+						},
+						{
+							Name:               "c2",
+							Image:              "image",
+							AllocatedResources: api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			MarkPodProposedForResize(tc.oldPod, tc.newPod)
+			if diff := cmp.Diff(tc.expectedPod, tc.newPod); diff != "" {
+				t.Errorf("unexpected pod spec (-want, +got):\n%s", diff)
 			}
 		})
 	}

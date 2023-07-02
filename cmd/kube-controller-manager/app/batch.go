@@ -30,6 +30,7 @@ import (
 
 func startJobController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	go job.NewController(
+		ctx,
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Batch().V1().Jobs(),
 		controllerContext.ClientBuilder.ClientOrDie("job-controller"),
@@ -38,8 +39,7 @@ func startJobController(ctx context.Context, controllerContext ControllerContext
 }
 
 func startCronJobController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
-
-	cj2c, err := cronjob.NewControllerV2(controllerContext.InformerFactory.Batch().V1().Jobs(),
+	cj2c, err := cronjob.NewControllerV2(ctx, controllerContext.InformerFactory.Batch().V1().Jobs(),
 		controllerContext.InformerFactory.Batch().V1().CronJobs(),
 		controllerContext.ClientBuilder.ClientOrDie("cronjob-controller"),
 	)

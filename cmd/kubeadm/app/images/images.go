@@ -77,7 +77,7 @@ func GetEtcdImage(cfg *kubeadmapi.ClusterConfiguration) string {
 		etcdImageTag = etcdVersion.String()
 	}
 	if warning != nil {
-		klog.Warningln(warning)
+		klog.V(1).Infof("WARNING: %v", warning)
 	}
 	// unless an override is specified
 	if cfg.Etcd.Local != nil && cfg.Etcd.Local.ImageTag != "" {

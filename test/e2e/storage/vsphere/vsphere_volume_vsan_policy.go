@@ -77,7 +77,7 @@ const (
 
 var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("volume-vsan-policy")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var (
 		client       clientset.Interface
 		namespace    string

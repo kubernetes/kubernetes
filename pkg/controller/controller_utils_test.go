@@ -838,6 +838,7 @@ func TestAddOrUpdateTaintOnNode(t *testing.T) {
 		taintsToAdd    []*v1.Taint
 		expectedTaints []v1.Taint
 		requestCount   int
+		expectedErr    error
 	}{
 		{
 			name: "add one taint on node",
@@ -1026,9 +1027,35 @@ func TestAddOrUpdateTaintOnNode(t *testing.T) {
 			},
 			requestCount: 5,
 		},
+		{
+			name: "add taint to non-exist node",
+			nodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:            "node1",
+							ResourceVersion: "1",
+						},
+						Spec: v1.NodeSpec{
+							Taints: []v1.Taint{
+								{Key: "key1", Value: "value1", Effect: "NoSchedule"},
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			nodeName:    "node2",
+			taintsToAdd: []*v1.Taint{{Key: "key2", Value: "value2", Effect: "NoExecute"}},
+			expectedErr: apierrors.NewNotFound(schema.GroupResource{Resource: "nodes"}, "node2"),
+		},
 	}
 	for _, test := range tests {
 		err := AddOrUpdateTaintOnNode(context.TODO(), test.nodeHandler, test.nodeName, test.taintsToAdd...)
+		if test.expectedErr != nil {
+			assert.Equal(t, test.expectedErr, err, "AddOrUpdateTaintOnNode get unexpected error")
+			continue
+		}
 		assert.NoError(t, err, "%s: AddOrUpdateTaintOnNode() error = %v", test.name, err)
 
 		node, _ := test.nodeHandler.Get(context.TODO(), test.nodeName, metav1.GetOptions{})

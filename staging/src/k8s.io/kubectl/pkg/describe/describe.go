@@ -216,6 +216,7 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]ResourceDescr
 		{Group: networkingv1.GroupName, Kind: "Ingress"}:                          &IngressDescriber{c},
 		{Group: networkingv1.GroupName, Kind: "IngressClass"}:                     &IngressClassDescriber{c},
 		{Group: networkingv1alpha1.GroupName, Kind: "ClusterCIDR"}:                &ClusterCIDRDescriber{c},
+		{Group: networkingv1alpha1.GroupName, Kind: "IPAddress"}:                  &IPAddressDescriber{c},
 		{Group: batchv1.GroupName, Kind: "Job"}:                                   &JobDescriber{c},
 		{Group: batchv1.GroupName, Kind: "CronJob"}:                               &CronJobDescriber{c},
 		{Group: batchv1beta1.GroupName, Kind: "CronJob"}:                          &CronJobDescriber{c},
@@ -380,14 +381,35 @@ var DefaultObjectDescriber ObjectDescriber
 func init() {
 	d := &Describers{}
 	err := d.Add(
-		describeLimitRange,
-		describeQuota,
-		describePod,
-		describeService,
-		describeReplicationController,
+		describeCertificateSigningRequest,
+		describeCronJob,
+		describeCSINode,
 		describeDaemonSet,
-		describeNode,
+		describeDeployment,
+		describeEndpoints,
+		describeEndpointSliceV1,
+		describeEndpointSliceV1beta1,
+		describeHorizontalPodAutoscalerV1,
+		describeHorizontalPodAutoscalerV2,
+		describeJob,
+		describeLimitRange,
 		describeNamespace,
+		describeNetworkPolicy,
+		describeNode,
+		describePersistentVolume,
+		describePersistentVolumeClaim,
+		describePod,
+		describePodDisruptionBudgetV1,
+		describePodDisruptionBudgetV1beta1,
+		describePriorityClass,
+		describeQuota,
+		describeReplicaSet,
+		describeReplicationController,
+		describeSecret,
+		describeService,
+		describeServiceAccount,
+		describeStatefulSet,
+		describeStorageClass,
 	)
 	if err != nil {
 		klog.Fatalf("Cannot register describers: %v", err)
@@ -2325,22 +2347,14 @@ func (d *CronJobDescriber) Describe(namespace, name string, describerSettings De
 	var events *corev1.EventList
 
 	cronJob, err := d.client.BatchV1().CronJobs(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-	if err == nil {
-		if describerSettings.ShowEvents {
-			events, _ = searchEvents(d.client.CoreV1(), cronJob, describerSettings.ChunkSize)
-		}
-		return describeCronJob(cronJob, events)
-	}
-
-	// TODO: drop this condition when beta disappears in 1.25
-	cronJobBeta, err := d.client.BatchV1beta1().CronJobs(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
+
 	if describerSettings.ShowEvents {
-		events, _ = searchEvents(d.client.CoreV1(), cronJobBeta, describerSettings.ChunkSize)
+		events, _ = searchEvents(d.client.CoreV1(), cronJob, describerSettings.ChunkSize)
 	}
-	return describeCronJobBeta(cronJobBeta, events)
+	return describeCronJob(cronJob, events)
 }
 
 func describeCronJob(cronJob *batchv1.CronJob, events *corev1.EventList) (string, error) {
@@ -2383,71 +2397,6 @@ func describeCronJob(cronJob *batchv1.CronJob, events *corev1.EventList) (string
 }
 
 func describeJobTemplate(jobTemplate batchv1.JobTemplateSpec, w PrefixWriter) {
-	if jobTemplate.Spec.Selector != nil {
-		if selector, err := metav1.LabelSelectorAsSelector(jobTemplate.Spec.Selector); err == nil {
-			w.Write(LEVEL_0, "Selector:\t%s\n", selector)
-		} else {
-			w.Write(LEVEL_0, "Selector:\tFailed to get selector: %s\n", err)
-		}
-	} else {
-		w.Write(LEVEL_0, "Selector:\t<unset>\n")
-	}
-	if jobTemplate.Spec.Parallelism != nil {
-		w.Write(LEVEL_0, "Parallelism:\t%d\n", *jobTemplate.Spec.Parallelism)
-	} else {
-		w.Write(LEVEL_0, "Parallelism:\t<unset>\n")
-	}
-	if jobTemplate.Spec.Completions != nil {
-		w.Write(LEVEL_0, "Completions:\t%d\n", *jobTemplate.Spec.Completions)
-	} else {
-		w.Write(LEVEL_0, "Completions:\t<unset>\n")
-	}
-	if jobTemplate.Spec.ActiveDeadlineSeconds != nil {
-		w.Write(LEVEL_0, "Active Deadline Seconds:\t%ds\n", *jobTemplate.Spec.ActiveDeadlineSeconds)
-	}
-	DescribePodTemplate(&jobTemplate.Spec.Template, w)
-}
-
-func describeCronJobBeta(cronJob *batchv1beta1.CronJob, events *corev1.EventList) (string, error) {
-	return tabbedString(func(out io.Writer) error {
-		w := NewPrefixWriter(out)
-		w.Write(LEVEL_0, "Name:\t%s\n", cronJob.Name)
-		w.Write(LEVEL_0, "Namespace:\t%s\n", cronJob.Namespace)
-		printLabelsMultiline(w, "Labels", cronJob.Labels)
-		printAnnotationsMultiline(w, "Annotations", cronJob.Annotations)
-		w.Write(LEVEL_0, "Schedule:\t%s\n", cronJob.Spec.Schedule)
-		w.Write(LEVEL_0, "Concurrency Policy:\t%s\n", cronJob.Spec.ConcurrencyPolicy)
-		w.Write(LEVEL_0, "Suspend:\t%s\n", printBoolPtr(cronJob.Spec.Suspend))
-		if cronJob.Spec.SuccessfulJobsHistoryLimit != nil {
-			w.Write(LEVEL_0, "Successful Job History Limit:\t%d\n", *cronJob.Spec.SuccessfulJobsHistoryLimit)
-		} else {
-			w.Write(LEVEL_0, "Successful Job History Limit:\t<unset>\n")
-		}
-		if cronJob.Spec.FailedJobsHistoryLimit != nil {
-			w.Write(LEVEL_0, "Failed Job History Limit:\t%d\n", *cronJob.Spec.FailedJobsHistoryLimit)
-		} else {
-			w.Write(LEVEL_0, "Failed Job History Limit:\t<unset>\n")
-		}
-		if cronJob.Spec.StartingDeadlineSeconds != nil {
-			w.Write(LEVEL_0, "Starting Deadline Seconds:\t%ds\n", *cronJob.Spec.StartingDeadlineSeconds)
-		} else {
-			w.Write(LEVEL_0, "Starting Deadline Seconds:\t<unset>\n")
-		}
-		describeJobTemplateBeta(cronJob.Spec.JobTemplate, w)
-		if cronJob.Status.LastScheduleTime != nil {
-			w.Write(LEVEL_0, "Last Schedule Time:\t%s\n", cronJob.Status.LastScheduleTime.Time.Format(time.RFC1123Z))
-		} else {
-			w.Write(LEVEL_0, "Last Schedule Time:\t<unset>\n")
-		}
-		printActiveJobs(w, "Active Jobs", cronJob.Status.Active)
-		if events != nil {
-			DescribeEvents(events, w)
-		}
-		return nil
-	})
-}
-
-func describeJobTemplateBeta(jobTemplate batchv1beta1.JobTemplateSpec, w PrefixWriter) {
 	if jobTemplate.Spec.Selector != nil {
 		if selector, err := metav1.LabelSelectorAsSelector(jobTemplate.Spec.Selector); err == nil {
 			w.Write(LEVEL_0, "Selector:\t%s\n", selector)
@@ -2917,6 +2866,46 @@ func (c *ClusterCIDRDescriber) describeClusterCIDRV1alpha1(cc *networkingv1alpha
 
 		if cc.Spec.IPv6 != "" {
 			w.Write(LEVEL_0, "IPv6:\t%s\n", cc.Spec.IPv6)
+		}
+
+		if events != nil {
+			DescribeEvents(events, w)
+		}
+		return nil
+	})
+}
+
+// IPAddressDescriber generates information about an IPAddress.
+type IPAddressDescriber struct {
+	client clientset.Interface
+}
+
+func (c *IPAddressDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+	var events *corev1.EventList
+
+	ipV1alpha1, err := c.client.NetworkingV1alpha1().IPAddresses().Get(context.TODO(), name, metav1.GetOptions{})
+	if err == nil {
+		if describerSettings.ShowEvents {
+			events, _ = searchEvents(c.client.CoreV1(), ipV1alpha1, describerSettings.ChunkSize)
+		}
+		return c.describeIPAddressV1alpha1(ipV1alpha1, events)
+	}
+	return "", err
+}
+
+func (c *IPAddressDescriber) describeIPAddressV1alpha1(ip *networkingv1alpha1.IPAddress, events *corev1.EventList) (string, error) {
+	return tabbedString(func(out io.Writer) error {
+		w := NewPrefixWriter(out)
+		w.Write(LEVEL_0, "Name:\t%v\n", ip.Name)
+		printLabelsMultiline(w, "Labels", ip.Labels)
+		printAnnotationsMultiline(w, "Annotations", ip.Annotations)
+
+		if ip.Spec.ParentRef != nil {
+			w.Write(LEVEL_0, "Parent Reference:\n")
+			w.Write(LEVEL_1, "Group:\t%v\n", ip.Spec.ParentRef.Group)
+			w.Write(LEVEL_1, "Resource:\t%v\n", ip.Spec.ParentRef.Resource)
+			w.Write(LEVEL_1, "Namespace:\t%v\n", ip.Spec.ParentRef.Namespace)
+			w.Write(LEVEL_1, "Name:\t%v\n", ip.Spec.ParentRef.Name)
 		}
 
 		if events != nil {
@@ -5041,8 +5030,12 @@ func (fn typeFunc) Matches(types []reflect.Type) bool {
 // Describe invokes the nested function with the exact number of arguments.
 func (fn typeFunc) Describe(exact interface{}, extra ...interface{}) (string, error) {
 	values := []reflect.Value{reflect.ValueOf(exact)}
-	for _, obj := range extra {
-		values = append(values, reflect.ValueOf(obj))
+	for i, obj := range extra {
+		if obj != nil {
+			values = append(values, reflect.ValueOf(obj))
+		} else {
+			values = append(values, reflect.New(fn.Extra[i]).Elem())
+		}
 	}
 	out := fn.Fn.Call(values)
 	s := out[0].Interface().(string)
@@ -5216,8 +5209,7 @@ func tabbedString(f func(io.Writer) error) (string, error) {
 	}
 
 	out.Flush()
-	str := string(buf.String())
-	return str, nil
+	return buf.String(), nil
 }
 
 type SortableResourceNames []corev1.ResourceName

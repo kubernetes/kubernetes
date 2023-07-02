@@ -73,21 +73,39 @@ type ServerRunOptions struct {
 	// If enabled, after ShutdownDelayDuration elapses, any incoming request is
 	// rejected with a 429 status code and a 'Retry-After' response.
 	ShutdownSendRetryAfter bool
+
+	// ShutdownWatchTerminationGracePeriod, if set to a positive value,
+	// is the maximum duration the apiserver will wait for all active
+	// watch request(s) to drain.
+	// Once this grace period elapses, the apiserver will no longer
+	// wait for any active watch request(s) in flight to drain, it will
+	// proceed to the next step in the graceful server shutdown process.
+	// If set to a positive value, the apiserver will keep track of the
+	// number of active watch request(s) in flight and during shutdown
+	// it will wait, at most, for the specified duration and allow these
+	// active watch requests to drain with some rate limiting in effect.
+	// The default is zero, which implies the apiserver will not keep
+	// track of active watch request(s) in flight and will not wait
+	// for them to drain, this maintains backward compatibility.
+	// This grace period is orthogonal to other grace periods, and
+	// it is not overridden by any other grace period.
+	ShutdownWatchTerminationGracePeriod time.Duration
 }
 
 func NewServerRunOptions() *ServerRunOptions {
 	defaults := server.NewConfig(serializer.CodecFactory{})
 	return &ServerRunOptions{
-		MaxRequestsInFlight:         defaults.MaxRequestsInFlight,
-		MaxMutatingRequestsInFlight: defaults.MaxMutatingRequestsInFlight,
-		RequestTimeout:              defaults.RequestTimeout,
-		LivezGracePeriod:            defaults.LivezGracePeriod,
-		MinRequestTimeout:           defaults.MinRequestTimeout,
-		ShutdownDelayDuration:       defaults.ShutdownDelayDuration,
-		JSONPatchMaxCopyBytes:       defaults.JSONPatchMaxCopyBytes,
-		MaxRequestBodyBytes:         defaults.MaxRequestBodyBytes,
-		EnablePriorityAndFairness:   true,
-		ShutdownSendRetryAfter:      false,
+		MaxRequestsInFlight:                 defaults.MaxRequestsInFlight,
+		MaxMutatingRequestsInFlight:         defaults.MaxMutatingRequestsInFlight,
+		RequestTimeout:                      defaults.RequestTimeout,
+		LivezGracePeriod:                    defaults.LivezGracePeriod,
+		MinRequestTimeout:                   defaults.MinRequestTimeout,
+		ShutdownDelayDuration:               defaults.ShutdownDelayDuration,
+		ShutdownWatchTerminationGracePeriod: defaults.ShutdownWatchTerminationGracePeriod,
+		JSONPatchMaxCopyBytes:               defaults.JSONPatchMaxCopyBytes,
+		MaxRequestBodyBytes:                 defaults.MaxRequestBodyBytes,
+		EnablePriorityAndFairness:           true,
+		ShutdownSendRetryAfter:              false,
 	}
 }
 
@@ -107,6 +125,7 @@ func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.MaxRequestBodyBytes = s.MaxRequestBodyBytes
 	c.PublicAddress = s.AdvertiseAddress
 	c.ShutdownSendRetryAfter = s.ShutdownSendRetryAfter
+	c.ShutdownWatchTerminationGracePeriod = s.ShutdownWatchTerminationGracePeriod
 
 	return nil
 }
@@ -158,6 +177,10 @@ func (s *ServerRunOptions) Validate() []error {
 
 	if s.ShutdownDelayDuration < 0 {
 		errors = append(errors, fmt.Errorf("--shutdown-delay-duration can not be negative value"))
+	}
+
+	if s.ShutdownWatchTerminationGracePeriod < 0 {
+		errors = append(errors, fmt.Errorf("shutdown-watch-termination-grace-period, if provided, can not be a negative value"))
 	}
 
 	if s.JSONPatchMaxCopyBytes < 0 {
@@ -314,6 +337,10 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"If true the HTTP Server will continue listening until all non long running request(s) in flight have been drained, "+
 		"during this window all incoming requests will be rejected with a status code 429 and a 'Retry-After' response header, "+
 		"in addition 'Connection: close' response header is set in order to tear down the TCP connection when idle.")
+
+	fs.DurationVar(&s.ShutdownWatchTerminationGracePeriod, "shutdown-watch-termination-grace-period", s.ShutdownWatchTerminationGracePeriod, ""+
+		"This option, if set, represents the maximum amount of grace period the apiserver will wait "+
+		"for active watch request(s) to drain during the graceful server shutdown window.")
 
 	utilfeature.DefaultMutableFeatureGate.AddFlag(fs)
 }

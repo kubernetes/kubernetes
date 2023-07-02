@@ -7,13 +7,18 @@ import (
 	"time"
 )
 
-
 // DecodePaddingAllowed will switch the codec used for decoding JWTs respectively. Note that the JWS RFC7515
 // states that the tokens will utilize a Base64url encoding with no padding. Unfortunately, some implementations
 // of JWT are producing non-standard tokens, and thus require support for decoding. Note that this is a global
 // variable, and updating it will change the behavior on a package level, and is also NOT go-routine safe.
 // To use the non-recommended decoding, set this boolean to `true` prior to using this package.
 var DecodePaddingAllowed bool
+
+// DecodeStrict will switch the codec used for decoding JWTs into strict mode.
+// In this mode, the decoder requires that trailing padding bits are zero, as described in RFC 4648 section 3.5.
+// Note that this is a global variable, and updating it will change the behavior on a package level, and is also NOT go-routine safe.
+// To use strict decoding, set this boolean to `true` prior to using this package.
+var DecodeStrict bool
 
 // TimeFunc provides the current time when parsing token to validate "exp" claim (expiration time).
 // You can override it to use another time value.  This is useful for testing or if your
@@ -74,22 +79,19 @@ func (t *Token) SignedString(key interface{}) (string, error) {
 // the SignedString.
 func (t *Token) SigningString() (string, error) {
 	var err error
-	parts := make([]string, 2)
-	for i := range parts {
-		var jsonValue []byte
-		if i == 0 {
-			if jsonValue, err = json.Marshal(t.Header); err != nil {
-				return "", err
-			}
-		} else {
-			if jsonValue, err = json.Marshal(t.Claims); err != nil {
-				return "", err
-			}
-		}
+	var jsonValue []byte
 
-		parts[i] = EncodeSegment(jsonValue)
+	if jsonValue, err = json.Marshal(t.Header); err != nil {
+		return "", err
 	}
-	return strings.Join(parts, "."), nil
+	header := EncodeSegment(jsonValue)
+
+	if jsonValue, err = json.Marshal(t.Claims); err != nil {
+		return "", err
+	}
+	claim := EncodeSegment(jsonValue)
+
+	return strings.Join([]string{header, claim}, "."), nil
 }
 
 // Parse parses, validates, verifies the signature and returns the parsed token.
@@ -103,6 +105,11 @@ func Parse(tokenString string, keyFunc Keyfunc, options ...ParserOption) (*Token
 	return NewParser(options...).Parse(tokenString, keyFunc)
 }
 
+// ParseWithClaims is a shortcut for NewParser().ParseWithClaims().
+//
+// Note: If you provide a custom claim implementation that embeds one of the standard claims (such as RegisteredClaims),
+// make sure that a) you either embed a non-pointer version of the claims or b) if you are using a pointer, allocate the
+// proper memory for it before passing in the overall claims, otherwise you might run into a panic.
 func ParseWithClaims(tokenString string, claims Claims, keyFunc Keyfunc, options ...ParserOption) (*Token, error) {
 	return NewParser(options...).ParseWithClaims(tokenString, claims, keyFunc)
 }
@@ -120,12 +127,17 @@ func EncodeSegment(seg []byte) string {
 // Deprecated: In a future release, we will demote this function to a non-exported function, since it
 // should only be used internally
 func DecodeSegment(seg string) ([]byte, error) {
+	encoding := base64.RawURLEncoding
+
 	if DecodePaddingAllowed {
 		if l := len(seg) % 4; l > 0 {
 			seg += strings.Repeat("=", 4-l)
 		}
-		return base64.URLEncoding.DecodeString(seg)
+		encoding = base64.URLEncoding
 	}
 
-	return base64.RawURLEncoding.DecodeString(seg)
+	if DecodeStrict {
+		encoding = encoding.Strict()
+	}
+	return encoding.DecodeString(seg)
 }

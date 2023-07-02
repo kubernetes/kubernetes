@@ -1,9 +1,10 @@
 package errors
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"runtime"
 	"strings"
 )
@@ -52,7 +53,7 @@ func (frame *StackFrame) Func() *runtime.Func {
 func (frame *StackFrame) String() string {
 	str := fmt.Sprintf("%s:%d (0x%x)\n", frame.File, frame.LineNumber, frame.ProgramCounter)
 
-	source, err := frame.SourceLine()
+	source, err := frame.sourceLine()
 	if err != nil {
 		return str
 	}
@@ -62,18 +63,37 @@ func (frame *StackFrame) String() string {
 
 // SourceLine gets the line of code (from File and Line) of the original source if possible.
 func (frame *StackFrame) SourceLine() (string, error) {
-	data, err := ioutil.ReadFile(frame.File)
-
+	source, err := frame.sourceLine()
 	if err != nil {
-		return "", New(err)
+		return source, New(err)
 	}
+	return source, err
+}
 
-	lines := bytes.Split(data, []byte{'\n'})
-	if frame.LineNumber <= 0 || frame.LineNumber >= len(lines) {
+func (frame *StackFrame) sourceLine() (string, error) {
+	if frame.LineNumber <= 0 {
 		return "???", nil
 	}
-	// -1 because line-numbers are 1 based, but our array is 0 based
-	return string(bytes.Trim(lines[frame.LineNumber-1], " \t")), nil
+
+	file, err := os.Open(frame.File)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	currentLine := 1
+	for scanner.Scan() {
+		if currentLine == frame.LineNumber {
+			return string(bytes.Trim(scanner.Bytes(), " \t")), nil
+		}
+		currentLine++
+	}
+	if err := scanner.Err(); err != nil {
+		return "", err
+	}
+
+	return "???", nil
 }
 
 func packageAndName(fn *runtime.Func) (string, string) {

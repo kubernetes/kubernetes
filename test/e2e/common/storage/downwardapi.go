@@ -34,7 +34,7 @@ import (
 
 var _ = SIGDescribe("Downward API [Serial] [Disruptive] [Feature:EphemeralStorage]", func() {
 	f := framework.NewDefaultFramework("downward-api")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("Downward API tests for local ephemeral storage", func() {
 		ginkgo.It("should provide container's limits.ephemeral-storage and requests.ephemeral-storage as env vars", func(ctx context.Context) {

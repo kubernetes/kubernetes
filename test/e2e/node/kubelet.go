@@ -272,7 +272,7 @@ var _ = SIGDescribe("kubelet", func() {
 		ns string
 	)
 	f := framework.NewDefaultFramework("kubelet")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		c = f.ClientSet

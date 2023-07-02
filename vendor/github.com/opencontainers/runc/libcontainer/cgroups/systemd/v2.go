@@ -182,7 +182,7 @@ func genV2ResourcesProperties(r *configs.Resources, cm *dbusConnManager) ([]syst
 	//       aren't the end of the world, but it is a bit concerning. However
 	//       it's unclear if systemd removes all eBPF programs attached when
 	//       doing SetUnitProperties...
-	deviceProperties, err := generateDeviceProperties(r)
+	deviceProperties, err := generateDeviceProperties(r, systemdVersion(cm))
 	if err != nil {
 		return nil, err
 	}
@@ -284,7 +284,7 @@ func (m *unifiedManager) Apply(pid int) error {
 
 	properties = append(properties, c.SystemdProps...)
 
-	if err := startUnit(m.dbus, unitName, properties); err != nil {
+	if err := startUnit(m.dbus, unitName, properties, pid == -1); err != nil {
 		return fmt.Errorf("unable to start unit %q (properties %+v): %w", unitName, properties, err)
 	}
 

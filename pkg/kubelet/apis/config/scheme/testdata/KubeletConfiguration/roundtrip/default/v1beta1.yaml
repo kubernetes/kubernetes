@@ -29,6 +29,7 @@ enableDebuggingHandlers: true
 enableProfilingHandler: true
 enableServer: true
 enableSystemLogHandler: true
+enableSystemLogQuery: false
 enforceNodeAllocatable:
 - pods
 eventBurst: 10
@@ -46,8 +47,8 @@ imageMinimumGCAge: 2m0s
 iptablesDropBit: 15
 iptablesMasqueradeBit: 14
 kind: KubeletConfiguration
-kubeAPIBurst: 10
-kubeAPIQPS: 5
+kubeAPIBurst: 100
+kubeAPIQPS: 50
 localStorageCapacityIsolation: true
 logging:
   flushFrequency: 5000000000
@@ -61,7 +62,7 @@ maxOpenFiles: 1000000
 maxPods: 110
 memoryManagerPolicy: None
 memorySwap: {}
-memoryThrottlingFactor: 0.8
+memoryThrottlingFactor: 0.9
 nodeLeaseDurationSeconds: 40
 nodeStatusMaxImages: 50
 nodeStatusReportFrequency: 5m0s

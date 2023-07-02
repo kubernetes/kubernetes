@@ -60,7 +60,7 @@ except:
 
 var _ = common.SIGDescribe("ClusterDns [Feature:Example]", func() {
 	f := framework.NewDefaultFramework("cluster-dns")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var c clientset.Interface
 	ginkgo.BeforeEach(func() {

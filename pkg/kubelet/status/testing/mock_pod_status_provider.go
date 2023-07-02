@@ -27,7 +27,90 @@ import (
 	v1 "k8s.io/api/core/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	container "k8s.io/kubernetes/pkg/kubelet/container"
+	types0 "k8s.io/kubernetes/pkg/kubelet/types"
 )
+
+// MockPodManager is a mock of PodManager interface.
+type MockPodManager struct {
+	ctrl     *gomock.Controller
+	recorder *MockPodManagerMockRecorder
+}
+
+// MockPodManagerMockRecorder is the mock recorder for MockPodManager.
+type MockPodManagerMockRecorder struct {
+	mock *MockPodManager
+}
+
+// NewMockPodManager creates a new mock instance.
+func NewMockPodManager(ctrl *gomock.Controller) *MockPodManager {
+	mock := &MockPodManager{ctrl: ctrl}
+	mock.recorder = &MockPodManagerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockPodManager) EXPECT() *MockPodManagerMockRecorder {
+	return m.recorder
+}
+
+// GetMirrorPodByPod mocks base method.
+func (m *MockPodManager) GetMirrorPodByPod(arg0 *v1.Pod) (*v1.Pod, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetMirrorPodByPod", arg0)
+	ret0, _ := ret[0].(*v1.Pod)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// GetMirrorPodByPod indicates an expected call of GetMirrorPodByPod.
+func (mr *MockPodManagerMockRecorder) GetMirrorPodByPod(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMirrorPodByPod", reflect.TypeOf((*MockPodManager)(nil).GetMirrorPodByPod), arg0)
+}
+
+// GetPodByUID mocks base method.
+func (m *MockPodManager) GetPodByUID(arg0 types.UID) (*v1.Pod, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPodByUID", arg0)
+	ret0, _ := ret[0].(*v1.Pod)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// GetPodByUID indicates an expected call of GetPodByUID.
+func (mr *MockPodManagerMockRecorder) GetPodByUID(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPodByUID", reflect.TypeOf((*MockPodManager)(nil).GetPodByUID), arg0)
+}
+
+// GetUIDTranslations mocks base method.
+func (m *MockPodManager) GetUIDTranslations() (map[types0.ResolvedPodUID]types0.MirrorPodUID, map[types0.MirrorPodUID]types0.ResolvedPodUID) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetUIDTranslations")
+	ret0, _ := ret[0].(map[types0.ResolvedPodUID]types0.MirrorPodUID)
+	ret1, _ := ret[1].(map[types0.MirrorPodUID]types0.ResolvedPodUID)
+	return ret0, ret1
+}
+
+// GetUIDTranslations indicates an expected call of GetUIDTranslations.
+func (mr *MockPodManagerMockRecorder) GetUIDTranslations() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUIDTranslations", reflect.TypeOf((*MockPodManager)(nil).GetUIDTranslations))
+}
+
+// TranslatePodUID mocks base method.
+func (m *MockPodManager) TranslatePodUID(uid types.UID) types0.ResolvedPodUID {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "TranslatePodUID", uid)
+	ret0, _ := ret[0].(types0.ResolvedPodUID)
+	return ret0
+}
+
+// TranslatePodUID indicates an expected call of TranslatePodUID.
+func (mr *MockPodManagerMockRecorder) TranslatePodUID(uid interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TranslatePodUID", reflect.TypeOf((*MockPodManager)(nil).TranslatePodUID), uid)
+}
 
 // MockPodStatusProvider is a mock of PodStatusProvider interface.
 type MockPodStatusProvider struct {
@@ -104,20 +187,6 @@ func (mr *MockPodDeletionSafetyProviderMockRecorder) PodCouldHaveRunningContaine
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PodCouldHaveRunningContainers", reflect.TypeOf((*MockPodDeletionSafetyProvider)(nil).PodCouldHaveRunningContainers), pod)
 }
 
-// PodResourcesAreReclaimed mocks base method.
-func (m *MockPodDeletionSafetyProvider) PodResourcesAreReclaimed(pod *v1.Pod, status v1.PodStatus) bool {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PodResourcesAreReclaimed", pod, status)
-	ret0, _ := ret[0].(bool)
-	return ret0
-}
-
-// PodResourcesAreReclaimed indicates an expected call of PodResourcesAreReclaimed.
-func (mr *MockPodDeletionSafetyProviderMockRecorder) PodResourcesAreReclaimed(pod, status interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PodResourcesAreReclaimed", reflect.TypeOf((*MockPodDeletionSafetyProvider)(nil).PodResourcesAreReclaimed), pod, status)
-}
-
 // MockPodStartupLatencyStateHelper is a mock of PodStartupLatencyStateHelper interface.
 type MockPodStartupLatencyStateHelper struct {
 	ctrl     *gomock.Controller
@@ -188,6 +257,36 @@ func (m *MockManager) EXPECT() *MockManagerMockRecorder {
 	return m.recorder
 }
 
+// GetContainerResourceAllocation mocks base method.
+func (m *MockManager) GetContainerResourceAllocation(podUID, containerName string) (v1.ResourceList, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetContainerResourceAllocation", podUID, containerName)
+	ret0, _ := ret[0].(v1.ResourceList)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// GetContainerResourceAllocation indicates an expected call of GetContainerResourceAllocation.
+func (mr *MockManagerMockRecorder) GetContainerResourceAllocation(podUID, containerName interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetContainerResourceAllocation", reflect.TypeOf((*MockManager)(nil).GetContainerResourceAllocation), podUID, containerName)
+}
+
+// GetPodResizeStatus mocks base method.
+func (m *MockManager) GetPodResizeStatus(podUID string) (v1.PodResizeStatus, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPodResizeStatus", podUID)
+	ret0, _ := ret[0].(v1.PodResizeStatus)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// GetPodResizeStatus indicates an expected call of GetPodResizeStatus.
+func (mr *MockManagerMockRecorder) GetPodResizeStatus(podUID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPodResizeStatus", reflect.TypeOf((*MockManager)(nil).GetPodResizeStatus), podUID)
+}
+
 // GetPodStatus mocks base method.
 func (m *MockManager) GetPodStatus(uid types.UID) (v1.PodStatus, bool) {
 	m.ctrl.T.Helper()
@@ -237,6 +336,34 @@ func (m *MockManager) SetContainerStartup(podUID types.UID, containerID containe
 func (mr *MockManagerMockRecorder) SetContainerStartup(podUID, containerID, started interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetContainerStartup", reflect.TypeOf((*MockManager)(nil).SetContainerStartup), podUID, containerID, started)
+}
+
+// SetPodAllocation mocks base method.
+func (m *MockManager) SetPodAllocation(pod *v1.Pod) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetPodAllocation", pod)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetPodAllocation indicates an expected call of SetPodAllocation.
+func (mr *MockManagerMockRecorder) SetPodAllocation(pod interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetPodAllocation", reflect.TypeOf((*MockManager)(nil).SetPodAllocation), pod)
+}
+
+// SetPodResizeStatus mocks base method.
+func (m *MockManager) SetPodResizeStatus(podUID types.UID, resize v1.PodResizeStatus) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetPodResizeStatus", podUID, resize)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetPodResizeStatus indicates an expected call of SetPodResizeStatus.
+func (mr *MockManagerMockRecorder) SetPodResizeStatus(podUID, resize interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetPodResizeStatus", reflect.TypeOf((*MockManager)(nil).SetPodResizeStatus), podUID, resize)
 }
 
 // SetPodStatus mocks base method.

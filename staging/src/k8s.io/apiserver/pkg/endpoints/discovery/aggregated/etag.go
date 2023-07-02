@@ -54,7 +54,7 @@ func ServeHTTPWithETag(
 	// Otherwise, we delegate to the handler for actual content
 	//
 	// According to documentation, An Etag within an If-None-Match
-	// header will be enclosed within doule quotes:
+	// header will be enclosed within double quotes:
 	// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/If-None-Match#directives
 	if clientCachedHash := req.Header.Get("If-None-Match"); quotedHash == clientCachedHash {
 		w.WriteHeader(http.StatusNotModified)

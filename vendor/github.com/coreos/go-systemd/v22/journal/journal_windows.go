@@ -33,3 +33,11 @@ func Enabled() bool {
 func Send(message string, priority Priority, vars map[string]string) error {
 	return errors.New("could not initialize socket to journald")
 }
+
+func StderrIsJournalStream() (bool, error) {
+	return false, nil
+}
+
+func StdoutIsJournalStream() (bool, error) {
+	return false, nil
+}

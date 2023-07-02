@@ -18,6 +18,7 @@ package networking
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -34,11 +35,6 @@ type NetworkPolicy struct {
 	// spec represents the specification of the desired behavior for this NetworkPolicy.
 	// +optional
 	Spec NetworkPolicySpec
-
-	// status represents the current state of the NetworkPolicy.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-	// +optional
-	Status NetworkPolicyStatus
 }
 
 // PolicyType describes the NetworkPolicy type
@@ -198,42 +194,6 @@ type NetworkPolicyPeer struct {
 	// neither of the other fields can be.
 	// +optional
 	IPBlock *IPBlock
-}
-
-// NetworkPolicyConditionType is the type for status conditions on
-// a NetworkPolicy. This type should be used with the
-// NetworkPolicyStatus.Conditions field.
-type NetworkPolicyConditionType string
-
-const (
-	// NetworkPolicyConditionStatusAccepted represents status of a Network Policy that could be properly parsed by
-	// the Network Policy provider and will be implemented in the cluster
-	NetworkPolicyConditionStatusAccepted NetworkPolicyConditionType = "Accepted"
-
-	// NetworkPolicyConditionStatusPartialFailure represents status of a Network Policy that could be partially
-	// parsed by the Network Policy provider and may not be completely implemented due to a lack of a feature or some
-	// other condition
-	NetworkPolicyConditionStatusPartialFailure NetworkPolicyConditionType = "PartialFailure"
-
-	// NetworkPolicyConditionStatusFailure represents status of a Network Policy that could not be parsed by the
-	// Network Policy provider and will not be implemented in the cluster
-	NetworkPolicyConditionStatusFailure NetworkPolicyConditionType = "Failure"
-)
-
-// NetworkPolicyConditionReason defines the set of reasons that explain why a
-// particular NetworkPolicy condition type has been raised.
-type NetworkPolicyConditionReason string
-
-const (
-	// NetworkPolicyConditionReasonFeatureNotSupported represents a reason where the Network Policy may not have been
-	// implemented in the cluster due to a lack of some feature not supported by the Network Policy provider
-	NetworkPolicyConditionReasonFeatureNotSupported NetworkPolicyConditionReason = "FeatureNotSupported"
-)
-
-// NetworkPolicyStatus describes the current state of the NetworkPolicy.
-type NetworkPolicyStatus struct {
-	// conditions holds an array of metav1.Condition that describes the state of the NetworkPolicy.
-	Conditions []metav1.Condition
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -698,4 +658,56 @@ type ClusterCIDRList struct {
 
 	// items is the list of ClusterCIDRs.
 	Items []ClusterCIDR
+}
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// IPAddress represents a single IP of a single IP Family. The object is designed to be used by APIs
+// that operate on IP addresses. The object is used by the Service core API for allocation of IP addresses.
+// An IP address can be represented in different formats, to guarantee the uniqueness of the IP,
+// the name of the object is the IP address in canonical format, four decimal digits separated
+// by dots suppressing leading zeros for IPv4 and the representation defined by RFC 5952 for IPv6.
+// Valid: 192.168.1.5 or 2001:db8::1 or 2001:db8:aaaa:bbbb:cccc:dddd:eeee:1
+// Invalid: 10.01.2.3 or 2001:db8:0:0:0::1
+type IPAddress struct {
+	metav1.TypeMeta
+	// +optional
+	metav1.ObjectMeta
+	// +optional
+	Spec IPAddressSpec
+}
+
+// IPAddressSpec describe the attributes in an IP Address,
+type IPAddressSpec struct {
+	// ParentRef references the resource that an IPAddress is attached to.
+	// An IPAddress must reference a parent object.
+	// +required
+	ParentRef *ParentReference
+}
+type ParentReference struct {
+	// Group is the group of the object being referenced.
+	Group string
+	// Resource is the resource of the object being referenced.
+	Resource string
+	// Namespace is the namespace of the object being referenced.
+	Namespace string
+	// Name is the name of the object being referenced.
+	Name string
+	// UID is the uid of the object being referenced.
+	// +optional
+	UID types.UID
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// IPAddressList contains a list of IPAddress.
+type IPAddressList struct {
+	metav1.TypeMeta
+	// +optional
+	metav1.ListMeta
+
+	// Items is the list of IPAddress
+	Items []IPAddress
 }

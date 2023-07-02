@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/describe"
@@ -62,9 +62,9 @@ var (
 		kubectl describe pods
 
 		# Describe pods by label name=myLabel
-		kubectl describe po -l name=myLabel
+		kubectl describe pods -l name=myLabel
 
-		# Describe all pods managed by the 'frontend' replication controller 
+		# Describe all pods managed by the 'frontend' replication controller
 		# (rc-created pods get the name of the rc as a prefix in the pod name)
 		kubectl describe pods frontend`))
 )
@@ -77,11 +77,11 @@ type DescribeFlags struct {
 	AllNamespaces     bool
 	FilenameOptions   *resource.FilenameOptions
 	DescriberSettings *describe.DescriberSettings
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewDescribeFlags returns a default DescribeFlags
-func NewDescribeFlags(f cmdutil.Factory, streams genericclioptions.IOStreams) *DescribeFlags {
+func NewDescribeFlags(f cmdutil.Factory, streams genericiooptions.IOStreams) *DescribeFlags {
 	return &DescribeFlags{
 		Factory:         f,
 		FilenameOptions: &resource.FilenameOptions{},
@@ -141,7 +141,7 @@ func (flags *DescribeFlags) ToOptions(parent string, args []string) (*DescribeOp
 	return o, nil
 }
 
-func NewCmdDescribe(parent string, f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdDescribe(parent string, f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	flags := NewDescribeFlags(f, streams)
 
 	cmd := &cobra.Command{
@@ -290,5 +290,5 @@ type DescribeOptions struct {
 	DescriberSettings *describe.DescriberSettings
 	FilenameOptions   *resource.FilenameOptions
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }

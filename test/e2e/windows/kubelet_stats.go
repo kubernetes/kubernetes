@@ -38,7 +38,7 @@ import (
 
 var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats [Serial]", func() {
 	f := framework.NewDefaultFramework("kubelet-stats-test-windows-serial")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Describe("Kubelet stats collection for Windows nodes", func() {
 
@@ -115,7 +115,7 @@ var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats [Serial]", func() {
 })
 var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats", func() {
 	f := framework.NewDefaultFramework("kubelet-stats-test-windows")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Describe("Kubelet stats collection for Windows nodes", func() {
 

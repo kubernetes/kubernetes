@@ -23,6 +23,8 @@ import (
 	"strings"
 	"testing"
 
+	utiltesting "k8s.io/client-go/util/testing"
+
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -296,7 +298,7 @@ func TestValidateCleanClusterInfo(t *testing.T) {
 
 func TestValidateCleanWithCAClusterInfo(t *testing.T) {
 	tempFile, _ := os.CreateTemp("", "")
-	defer os.Remove(tempFile.Name())
+	defer utiltesting.CloseAndRemove(t, tempFile)
 
 	config := clientcmdapi.NewConfig()
 	config.Clusters["clean"] = &clientcmdapi.Cluster{
@@ -339,7 +341,7 @@ func TestValidateCertFilesNotFoundAuthInfo(t *testing.T) {
 
 func TestValidateCertDataOverridesFiles(t *testing.T) {
 	tempFile, _ := os.CreateTemp("", "")
-	defer os.Remove(tempFile.Name())
+	defer utiltesting.CloseAndRemove(t, tempFile)
 
 	config := clientcmdapi.NewConfig()
 	config.AuthInfos["clean"] = &clientcmdapi.AuthInfo{
@@ -359,7 +361,7 @@ func TestValidateCertDataOverridesFiles(t *testing.T) {
 
 func TestValidateCleanCertFilesAuthInfo(t *testing.T) {
 	tempFile, _ := os.CreateTemp("", "")
-	defer os.Remove(tempFile.Name())
+	defer utiltesting.CloseAndRemove(t, tempFile)
 
 	config := clientcmdapi.NewConfig()
 	config.AuthInfos["clean"] = &clientcmdapi.AuthInfo{
@@ -748,37 +750,31 @@ func TestErrConfigurationInvalidWithErrorsIs(t *testing.T) {
 		err          error
 		matchAgainst error
 		expectMatch  bool
-	}{
-		{
-			name:         "no match",
-			err:          errConfigurationInvalid{errors.New("my-error"), errors.New("my-other-error")},
-			matchAgainst: fmt.Errorf("no entry %s", "here"),
-		},
-		{
-			name:         "match via .Is()",
-			err:          errConfigurationInvalid{errors.New("forbidden"), alwaysMatchingError{}},
-			matchAgainst: errors.New("unauthorized"),
-			expectMatch:  true,
-		},
-		{
-			name:         "match via equality",
-			err:          errConfigurationInvalid{errors.New("err"), someError{}},
-			matchAgainst: someError{},
-			expectMatch:  true,
-		},
-		{
-			name:         "match via nested aggregate",
-			err:          errConfigurationInvalid{errors.New("closed today"), errConfigurationInvalid{errConfigurationInvalid{someError{}}}},
-			matchAgainst: someError{},
-			expectMatch:  true,
-		},
-		{
-			name:         "match via wrapped aggregate",
-			err:          fmt.Errorf("wrap: %w", errConfigurationInvalid{errors.New("err"), someError{}}),
-			matchAgainst: someError{},
-			expectMatch:  true,
-		},
-	}
+	}{{
+		name:         "no match",
+		err:          errConfigurationInvalid{errors.New("my-error"), errors.New("my-other-error")},
+		matchAgainst: fmt.Errorf("no entry %s", "here"),
+	}, {
+		name:         "match via .Is()",
+		err:          errConfigurationInvalid{errors.New("forbidden"), alwaysMatchingError{}},
+		matchAgainst: errors.New("unauthorized"),
+		expectMatch:  true,
+	}, {
+		name:         "match via equality",
+		err:          errConfigurationInvalid{errors.New("err"), someError{}},
+		matchAgainst: someError{},
+		expectMatch:  true,
+	}, {
+		name:         "match via nested aggregate",
+		err:          errConfigurationInvalid{errors.New("closed today"), errConfigurationInvalid{errConfigurationInvalid{someError{}}}},
+		matchAgainst: someError{},
+		expectMatch:  true,
+	}, {
+		name:         "match via wrapped aggregate",
+		err:          fmt.Errorf("wrap: %w", errConfigurationInvalid{errors.New("err"), someError{}}),
+		matchAgainst: someError{},
+		expectMatch:  true,
+	}}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {

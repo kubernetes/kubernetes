@@ -19,10 +19,10 @@ package csistoragecapacity
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/apis/storage"
 )
@@ -80,7 +80,7 @@ func TestCSIStorageCapacityStrategy(t *testing.T) {
 
 	// Create with status should have kept status and all other fields.
 	if !apiequality.Semantic.DeepEqual(capacity, original) {
-		t.Errorf("unexpected objects difference after creation: %v", diff.ObjectDiff(original, capacity))
+		t.Errorf("unexpected objects difference after creation: %v", cmp.Diff(original, capacity))
 	}
 
 	// Update of immutable fields is disallowed

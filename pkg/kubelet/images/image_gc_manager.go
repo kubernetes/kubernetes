@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	"go.opentelemetry.io/otel/trace"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
@@ -37,6 +38,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 )
+
+// instrumentationScope is OpenTelemetry instrumentation scope name
+const instrumentationScope = "k8s.io/kubernetes/pkg/kubelet/images"
 
 // StatsProvider is an interface for fetching stats used during image garbage
 // collection.
@@ -104,6 +108,9 @@ type realImageGCManager struct {
 
 	// sandbox image exempted from GC
 	sandboxImage string
+
+	// tracer for recording spans
+	tracer trace.Tracer
 }
 
 // imageCache caches latest result of ListImages.
@@ -153,7 +160,7 @@ type imageRecord struct {
 }
 
 // NewImageGCManager instantiates a new ImageGCManager object.
-func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, recorder record.EventRecorder, nodeRef *v1.ObjectReference, policy ImageGCPolicy, sandboxImage string) (ImageGCManager, error) {
+func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, recorder record.EventRecorder, nodeRef *v1.ObjectReference, policy ImageGCPolicy, sandboxImage string, tracerProvider trace.TracerProvider) (ImageGCManager, error) {
 	// Validate policy.
 	if policy.HighThresholdPercent < 0 || policy.HighThresholdPercent > 100 {
 		return nil, fmt.Errorf("invalid HighThresholdPercent %d, must be in range [0-100]", policy.HighThresholdPercent)
@@ -164,6 +171,7 @@ func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, r
 	if policy.LowThresholdPercent > policy.HighThresholdPercent {
 		return nil, fmt.Errorf("LowThresholdPercent %d can not be higher than HighThresholdPercent %d", policy.LowThresholdPercent, policy.HighThresholdPercent)
 	}
+	tracer := tracerProvider.Tracer(instrumentationScope)
 	im := &realImageGCManager{
 		runtime:       runtime,
 		policy:        policy,
@@ -173,6 +181,7 @@ func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, r
 		nodeRef:       nodeRef,
 		initialized:   false,
 		sandboxImage:  sandboxImage,
+		tracer:        tracer,
 	}
 
 	return im, nil
@@ -279,6 +288,8 @@ func (im *realImageGCManager) detectImages(ctx context.Context, detectTime time.
 }
 
 func (im *realImageGCManager) GarbageCollect(ctx context.Context) error {
+	ctx, otelSpan := im.tracer.Start(ctx, "Images/GarbageCollect")
+	defer otelSpan.End()
 	// Get disk usage on disk holding images.
 	fsStats, err := im.statsProvider.ImageFsStats(ctx)
 	if err != nil {

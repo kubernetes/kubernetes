@@ -36,7 +36,7 @@ import (
 
 var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 	f := framework.NewDefaultFramework("metrics-grabber")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var c, ec clientset.Interface
 	var grabber *e2emetrics.Grabber
 	ginkgo.BeforeEach(func(ctx context.Context) {

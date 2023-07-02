@@ -49,7 +49,7 @@ func (d durations) Swap(i, j int)      { d[i], d[j] = d[j], d[i] }
 
 var _ = common.SIGDescribe("Service endpoints latency", func() {
 	f := framework.NewDefaultFramework("svc-latency")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	/*
 		Release: v1.9

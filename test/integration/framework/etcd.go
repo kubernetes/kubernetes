@@ -24,15 +24,16 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"runtime"
 	"strings"
+	"sync"
 	"syscall"
+	"testing"
 	"time"
 
+	"go.uber.org/goleak"
 	"google.golang.org/grpc/grpclog"
 	"k8s.io/klog/v2"
 
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/env"
 )
 
@@ -63,11 +64,7 @@ func getAvailablePort() (int, error) {
 
 // startEtcd executes an etcd instance. The returned function will signal the
 // etcd process and wait for it to exit.
-func startEtcd() (func(), error) {
-	if runtime.GOARCH == "arm64" {
-		os.Setenv("ETCD_UNSUPPORTED_ARCH", "arm64")
-	}
-
+func startEtcd(output io.Writer) (func(), error) {
 	etcdURL := env.GetEnvAsStringOrFallback("KUBE_INTEGRATION_ETCD_URL", "http://127.0.0.1:2379")
 	conn, err := net.Dial("tcp", strings.TrimPrefix(etcdURL, "http://"))
 	if err == nil {
@@ -77,7 +74,7 @@ func startEtcd() (func(), error) {
 	}
 	klog.V(1).Infof("could not connect to etcd: %v", err)
 
-	currentURL, stop, err := RunCustomEtcd("integration_test_etcd_data", nil)
+	currentURL, stop, err := RunCustomEtcd("integration_test_etcd_data", nil, output)
 	if err != nil {
 		return nil, err
 	}
@@ -87,8 +84,10 @@ func startEtcd() (func(), error) {
 	return stop, nil
 }
 
+var initGRPCOnce sync.Once
+
 // RunCustomEtcd starts a custom etcd instance for test purposes.
-func RunCustomEtcd(dataDir string, customFlags []string) (url string, stopFn func(), err error) {
+func RunCustomEtcd(dataDir string, customFlags []string, output io.Writer) (url string, stopFn func(), err error) {
 	// TODO: Check for valid etcd version.
 	etcdPath, err := getEtcdPath()
 	if err != nil {
@@ -124,8 +123,13 @@ func RunCustomEtcd(dataDir string, customFlags []string) (url string, stopFn fun
 	}
 	args = append(args, customFlags...)
 	cmd := exec.CommandContext(ctx, etcdPath, args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	if output == nil {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	} else {
+		cmd.Stdout = output
+		cmd.Stderr = output
+	}
 	stop := func() {
 		// try to exit etcd gracefully
 		defer cancel()
@@ -149,7 +153,9 @@ func RunCustomEtcd(dataDir string, customFlags []string) (url string, stopFn fun
 
 	// Quiet etcd logs for integration tests
 	// Comment out to get verbose logs if desired
-	grpclog.SetLoggerV2(grpclog.NewLoggerV2(io.Discard, io.Discard, os.Stderr))
+	initGRPCOnce.Do(func() {
+		grpclog.SetLoggerV2(grpclog.NewLoggerV2(io.Discard, io.Discard, os.Stderr))
+	})
 
 	if err := cmd.Start(); err != nil {
 		return "", nil, fmt.Errorf("failed to run etcd: %v", err)
@@ -182,41 +188,57 @@ func EtcdMain(tests func() int) {
 	// Bail out early when -help was given as parameter.
 	flag.Parse()
 
-	before := runtime.NumGoroutine()
-	stop, err := startEtcd()
+	// Must be called *before* creating new goroutines.
+	goleakOpts := IgnoreBackgroundGoroutines()
+
+	goleakOpts = append(goleakOpts,
+		// lumberjack leaks a goroutine:
+		// https://github.com/natefinch/lumberjack/issues/56 This affects tests
+		// using --audit-log-path (like
+		// ./test/integration/apiserver/admissionwebhook/reinvocation_test.go).
+		// In normal production that should be harmless. We don't know here
+		// whether the test is using that, so we have to suppress reporting
+		// this leak for all tests.
+		//
+		// Both names occurred in practice.
+		goleak.IgnoreTopFunction("k8s.io/kubernetes/vendor/gopkg.in/natefinch/lumberjack%2ev2.(*Logger).millRun"),
+		goleak.IgnoreTopFunction("gopkg.in/natefinch/lumberjack%2ev2.(*Logger).millRun"),
+	)
+
+	stop, err := startEtcd(nil)
 	if err != nil {
 		klog.Fatalf("cannot run integration tests: unable to start etcd: %v", err)
 	}
 	result := tests()
 	stop() // Don't defer this. See os.Exit documentation.
+	klog.StopFlushDaemon()
 
-	checkNumberOfGoroutines := func() (bool, error) {
-		// We leave some room for leaked goroutines as there are
-		// still some leaks, mostly:
-		// - leak from lumberjack package we're vendoring
-		// - leak from apiserve healthz
-		// - leak from opencensus library
-		// Once fixed, we should be able to bring it down to zero.
-		if dg := runtime.NumGoroutine() - before; dg <= 3 {
-			return true, nil
-		}
-		// Allow goroutines to schedule and die off.
-		runtime.Gosched()
-		return false, nil
+	if err := goleakFindRetry(goleakOpts...); err != nil {
+		klog.ErrorS(err, "EtcdMain goroutine check")
+		result = 1
 	}
 
-	// It generally takes visibly less than 1s to finish all goroutines.
-	// But we keep the limit higher to account for cpu-starved environments.
-	if err := wait.Poll(100*time.Millisecond, 5*time.Second, checkNumberOfGoroutines); err != nil {
-		after := runtime.NumGoroutine()
-		stacktraces := make([]byte, 1<<20)
-		runtime.Stack(stacktraces, true)
-		klog.Fatalf("unexpected number of goroutines: before: %d after %d\n%sd", before, after, string(stacktraces))
-	}
 	os.Exit(result)
 }
 
-// GetEtcdURL returns the URL of the etcd instance started by EtcdMain.
+// GetEtcdURL returns the URL of the etcd instance started by EtcdMain or StartEtcd.
 func GetEtcdURL() string {
 	return env.GetEnvAsStringOrFallback("KUBE_INTEGRATION_ETCD_URL", "http://127.0.0.1:2379")
+}
+
+// StartEtcd starts an etcd instance inside a test. It will abort the test if
+// startup fails and clean up after the test automatically. Stdout and stderr
+// of the etcd binary go to the provided writer.
+//
+// In contrast to EtcdMain, StartEtcd will not do automatic leak checking.
+// Tests can decide if and where they want to do that.
+//
+// Starting etcd multiple times per test run instead of once with EtcdMain
+// provides better separation between different tests.
+func StartEtcd(tb testing.TB, etcdOutput io.Writer) {
+	stop, err := startEtcd(etcdOutput)
+	if err != nil {
+		tb.Fatalf("unable to start etcd: %v", err)
+	}
+	tb.Cleanup(stop)
 }

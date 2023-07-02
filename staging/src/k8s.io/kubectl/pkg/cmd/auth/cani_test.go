@@ -27,7 +27,7 @@ import (
 	authorizationv1 "k8s.io/api/authorization/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
@@ -215,7 +215,7 @@ func TestRunAccessList(t *testing.T) {
 				}
 			}),
 		}
-		ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+		ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
 		options.IOStreams = ioStreams
 		if err := options.Complete(tf, []string{}); err != nil {
 			t.Errorf("got unexpected error when do Complete(): %v", err)
@@ -291,7 +291,7 @@ func TestRunResourceFor(t *testing.T) {
 			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
-			ioStreams, _, _, buf := genericclioptions.NewTestIOStreams()
+			ioStreams, _, _, buf := genericiooptions.NewTestIOStreams()
 			test.o.IOStreams = ioStreams
 			test.o.WarningPrinter = printers.NewWarningPrinter(test.o.IOStreams.ErrOut, printers.WarningPrinterOptions{Color: false})
 

@@ -72,7 +72,6 @@ message CronJobSpec {
   // configuration, the controller will stop creating new new Jobs and will create a system event with the
   // reason UnknownTimeZone.
   // More information can be found in https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#time-zones
-  // This is beta field and must be enabled via the `CronJobTimeZone` feature gate.
   // +optional
   optional string timeZone = 8;
 
@@ -214,8 +213,8 @@ message JobSpec {
   // checked against the backoffLimit. This field cannot be used in combination
   // with restartPolicy=OnFailure.
   //
-  // This field is alpha-level. To use this field, you must enable the
-  // `JobPodFailurePolicy` feature gate (disabled by default).
+  // This field is beta-level. It can be used when the `JobPodFailurePolicy`
+  // feature gate is enabled (enabled by default).
   // +optional
   optional PodFailurePolicy podFailurePolicy = 11;
 
@@ -244,6 +243,7 @@ message JobSpec {
   optional bool manualSelector = 5;
 
   // Describes the pod that will be created when executing a job.
+  // The only allowed template.spec.restartPolicy values are "Never" or "OnFailure".
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/
   optional k8s.io.api.core.v1.PodTemplateSpec template = 6;
 

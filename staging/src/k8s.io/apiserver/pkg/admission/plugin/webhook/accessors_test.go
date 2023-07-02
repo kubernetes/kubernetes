@@ -21,9 +21,9 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	fuzz "github.com/google/gofuzz"
-	"k8s.io/api/admissionregistration/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
+	v1 "k8s.io/api/admissionregistration/v1"
 )
 
 func TestMutatingWebhookAccessor(t *testing.T) {
@@ -46,7 +46,7 @@ func TestMutatingWebhookAccessor(t *testing.T) {
 				t.Errorf("expected GetMutatingWebhook to return ok for mutating webhook accessor")
 			}
 			if !reflect.DeepEqual(orig, m) {
-				t.Errorf("expected GetMutatingWebhook to return original webhook, diff:\n%s", diff.ObjectReflectDiff(orig, m))
+				t.Errorf("expected GetMutatingWebhook to return original webhook, diff:\n%s", cmp.Diff(orig, m))
 			}
 			if _, ok := accessor.GetValidatingWebhook(); ok {
 				t.Errorf("expected GetValidatingWebhook to be nil for mutating webhook accessor")
@@ -62,9 +62,10 @@ func TestMutatingWebhookAccessor(t *testing.T) {
 				SideEffects:             accessor.GetSideEffects(),
 				TimeoutSeconds:          accessor.GetTimeoutSeconds(),
 				AdmissionReviewVersions: accessor.GetAdmissionReviewVersions(),
+				MatchConditions:         accessor.GetMatchConditions(),
 			}
 			if !reflect.DeepEqual(orig, copy) {
-				t.Errorf("expected mutatingWebhook to round trip through WebhookAccessor, diff:\n%s", diff.ObjectReflectDiff(orig, copy))
+				t.Errorf("expected mutatingWebhook to round trip through WebhookAccessor, diff:\n%s", cmp.Diff(orig, copy))
 			}
 		})
 	}
@@ -86,7 +87,7 @@ func TestValidatingWebhookAccessor(t *testing.T) {
 				t.Errorf("expected GetValidatingWebhook to return ok for validating webhook accessor")
 			}
 			if !reflect.DeepEqual(orig, m) {
-				t.Errorf("expected GetValidatingWebhook to return original webhook, diff:\n%s", diff.ObjectReflectDiff(orig, m))
+				t.Errorf("expected GetValidatingWebhook to return original webhook, diff:\n%s", cmp.Diff(orig, m))
 			}
 			if _, ok := accessor.GetMutatingWebhook(); ok {
 				t.Errorf("expected GetMutatingWebhook to be nil for validating webhook accessor")
@@ -102,9 +103,10 @@ func TestValidatingWebhookAccessor(t *testing.T) {
 				SideEffects:             accessor.GetSideEffects(),
 				TimeoutSeconds:          accessor.GetTimeoutSeconds(),
 				AdmissionReviewVersions: accessor.GetAdmissionReviewVersions(),
+				MatchConditions:         accessor.GetMatchConditions(),
 			}
 			if !reflect.DeepEqual(orig, copy) {
-				t.Errorf("expected validatingWebhook to round trip through WebhookAccessor, diff:\n%s", diff.ObjectReflectDiff(orig, copy))
+				t.Errorf("expected validatingWebhook to round trip through WebhookAccessor, diff:\n%s", cmp.Diff(orig, copy))
 			}
 		})
 	}

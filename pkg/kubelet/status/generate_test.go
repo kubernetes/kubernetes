@@ -422,7 +422,7 @@ func TestGeneratePodInitializedCondition(t *testing.T) {
 	}
 }
 
-func TestGeneratePodHasNetworkCondition(t *testing.T) {
+func TestGeneratePodReadyToStartContainersCondition(t *testing.T) {
 	for desc, test := range map[string]struct {
 		pod      *v1.Pod
 		status   *kubecontainer.PodStatus
@@ -485,8 +485,8 @@ func TestGeneratePodHasNetworkCondition(t *testing.T) {
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			test.expected.Type = kubetypes.PodHasNetwork
-			condition := GeneratePodHasNetworkCondition(test.pod, test.status)
+			test.expected.Type = kubetypes.PodReadyToStartContainers
+			condition := GeneratePodReadyToStartContainersCondition(test.pod, test.status)
 			require.Equal(t, test.expected.Type, condition.Type)
 			require.Equal(t, test.expected.Status, condition.Status)
 		})

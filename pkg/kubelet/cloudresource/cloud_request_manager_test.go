@@ -22,8 +22,8 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
+	"github.com/google/go-cmp/cmp"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/cloud-provider/fake"
 )
 
@@ -54,7 +54,7 @@ func TestNodeAddressesDelay(t *testing.T) {
 		t.Errorf("Unexpected err: %q\n", err)
 	}
 	if !reflect.DeepEqual(nodeAddresses, cloud.Addresses) {
-		t.Errorf("Unexpected diff of node addresses: %v", diff.ObjectReflectDiff(nodeAddresses, cloud.Addresses))
+		t.Errorf("Unexpected diff of node addresses: %v", cmp.Diff(nodeAddresses, cloud.Addresses))
 	}
 
 	// Change the IP address
@@ -87,16 +87,23 @@ func TestNodeAddressesUsesLastSuccess(t *testing.T) {
 
 	// These tests are stateful and order dependent.
 	tests := []struct {
-		name      string
-		addrs     []v1.NodeAddress
-		err       error
-		wantAddrs []v1.NodeAddress
-		wantErr   bool
+		name                   string
+		addrs                  []v1.NodeAddress
+		err                    error
+		wantAddrs              []v1.NodeAddress
+		wantErr                bool
+		shouldDisableInstances bool
 	}{
 		{
 			name:    "first sync loop encounters an error",
 			err:     errors.New("bad"),
 			wantErr: true,
+		},
+		{
+			name:                   "failed to get instances from cloud provider",
+			err:                    errors.New("failed to get instances from cloud provider"),
+			wantErr:                true,
+			shouldDisableInstances: true,
 		},
 		{
 			name:      "subsequent sync loop succeeds",
@@ -120,13 +127,20 @@ func TestNodeAddressesUsesLastSuccess(t *testing.T) {
 			cloud.Addresses = test.addrs
 			cloud.Err = test.err
 
+			if test.shouldDisableInstances {
+				cloud.DisableInstances = true
+				defer func() {
+					cloud.DisableInstances = false
+				}()
+			}
+
 			manager.syncNodeAddresses()
 			nodeAddresses, err := manager.NodeAddresses()
 			if (err != nil) != test.wantErr {
 				t.Errorf("unexpected err: %v", err)
 			}
 			if got, want := nodeAddresses, test.wantAddrs; !reflect.DeepEqual(got, want) {
-				t.Errorf("Unexpected diff of node addresses: %v", diff.ObjectReflectDiff(got, want))
+				t.Errorf("Unexpected diff of node addresses: %v", cmp.Diff(got, want))
 			}
 		})
 	}

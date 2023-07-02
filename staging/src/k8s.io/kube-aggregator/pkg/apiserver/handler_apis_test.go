@@ -23,10 +23,10 @@ import (
 	"net/http/httputil"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
 
@@ -327,7 +327,7 @@ func TestAPIs(t *testing.T) {
 			continue
 		}
 		if !apiequality.Semantic.DeepEqual(tc.expected, actual) {
-			t.Errorf("%s: %v", tc.name, diff.ObjectDiff(tc.expected, actual))
+			t.Errorf("%s: %v", tc.name, cmp.Diff(tc.expected, actual))
 			continue
 		}
 	}
@@ -514,7 +514,7 @@ func TestAPIGroup(t *testing.T) {
 			continue
 		}
 		if !apiequality.Semantic.DeepEqual(tc.expected, actual) {
-			t.Errorf("%s: %v", tc.name, diff.ObjectDiff(tc.expected, actual))
+			t.Errorf("%s: %v", tc.name, cmp.Diff(tc.expected, actual))
 			continue
 		}
 	}

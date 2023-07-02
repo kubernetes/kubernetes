@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	apiservice "k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
-	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 )
 
 // BaseServicePortInfo contains base information that defines a service.
@@ -165,7 +165,7 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 		stickyMaxAgeSeconds = int(*service.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds)
 	}
 
-	clusterIP := utilproxy.GetClusterIPByFamily(sct.ipFamily, service)
+	clusterIP := proxyutil.GetClusterIPByFamily(sct.ipFamily, service)
 	info := &BaseServicePortInfo{
 		clusterIP:             netutils.ParseIPSloppy(clusterIP),
 		port:                  int(port.Port),
@@ -176,7 +176,13 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 		externalPolicyLocal:   externalPolicyLocal,
 		internalPolicyLocal:   internalPolicyLocal,
 		internalTrafficPolicy: service.Spec.InternalTrafficPolicy,
-		hintsAnnotation:       service.Annotations[v1.AnnotationTopologyAwareHints],
+	}
+
+	// v1.DeprecatedAnnotationTopologyAwareHints has precedence over v1.AnnotationTopologyMode.
+	var ok bool
+	info.hintsAnnotation, ok = service.Annotations[v1.DeprecatedAnnotationTopologyAwareHints]
+	if !ok {
+		info.hintsAnnotation, _ = service.Annotations[v1.AnnotationTopologyMode]
 	}
 
 	loadBalancerSourceRanges := make([]string, len(service.Spec.LoadBalancerSourceRanges))
@@ -188,21 +194,21 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 	// services, this is actually expected. Hence we downgraded from reporting by events
 	// to just log lines with high verbosity
 
-	ipFamilyMap := utilproxy.MapIPsByIPFamily(service.Spec.ExternalIPs)
+	ipFamilyMap := proxyutil.MapIPsByIPFamily(service.Spec.ExternalIPs)
 	info.externalIPs = ipFamilyMap[sct.ipFamily]
 
 	// Log the IPs not matching the ipFamily
-	if ips, ok := ipFamilyMap[utilproxy.OtherIPFamily(sct.ipFamily)]; ok && len(ips) > 0 {
+	if ips, ok := ipFamilyMap[proxyutil.OtherIPFamily(sct.ipFamily)]; ok && len(ips) > 0 {
 		klog.V(4).InfoS("Service change tracker ignored the following external IPs for given service as they don't match IP Family",
-			"ipFamily", sct.ipFamily, "externalIPs", strings.Join(ips, ","), "service", klog.KObj(service))
+			"ipFamily", sct.ipFamily, "externalIPs", strings.Join(ips, ", "), "service", klog.KObj(service))
 	}
 
-	ipFamilyMap = utilproxy.MapCIDRsByIPFamily(loadBalancerSourceRanges)
+	ipFamilyMap = proxyutil.MapCIDRsByIPFamily(loadBalancerSourceRanges)
 	info.loadBalancerSourceRanges = ipFamilyMap[sct.ipFamily]
 	// Log the CIDRs not matching the ipFamily
-	if cidrs, ok := ipFamilyMap[utilproxy.OtherIPFamily(sct.ipFamily)]; ok && len(cidrs) > 0 {
+	if cidrs, ok := ipFamilyMap[proxyutil.OtherIPFamily(sct.ipFamily)]; ok && len(cidrs) > 0 {
 		klog.V(4).InfoS("Service change tracker ignored the following load balancer source ranges for given Service as they don't match IP Family",
-			"ipFamily", sct.ipFamily, "loadBalancerSourceRanges", strings.Join(cidrs, ","), "service", klog.KObj(service))
+			"ipFamily", sct.ipFamily, "loadBalancerSourceRanges", strings.Join(cidrs, ", "), "service", klog.KObj(service))
 	}
 
 	// Obtain Load Balancer Ingress IPs
@@ -214,11 +220,11 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 	}
 
 	if len(ips) > 0 {
-		ipFamilyMap = utilproxy.MapIPsByIPFamily(ips)
+		ipFamilyMap = proxyutil.MapIPsByIPFamily(ips)
 
-		if ipList, ok := ipFamilyMap[utilproxy.OtherIPFamily(sct.ipFamily)]; ok && len(ipList) > 0 {
+		if ipList, ok := ipFamilyMap[proxyutil.OtherIPFamily(sct.ipFamily)]; ok && len(ipList) > 0 {
 			klog.V(4).InfoS("Service change tracker ignored the following load balancer ingress IPs for given Service as they don't match the IP Family",
-				"ipFamily", sct.ipFamily, "loadBalancerIngressIps", strings.Join(ipList, ","), "service", klog.KObj(service))
+				"ipFamily", sct.ipFamily, "loadBalancerIngressIps", strings.Join(ipList, ", "), "service", klog.KObj(service))
 		}
 		// Create the LoadBalancerStatus with the filtered IPs
 		for _, ip := range ipFamilyMap[sct.ipFamily] {
@@ -324,11 +330,11 @@ func (sct *ServiceChangeTracker) Update(previous, current *v1.Service) bool {
 // PendingChanges returns a set whose keys are the names of the services that have changed
 // since the last time sct was used to update a ServiceMap. (You must call this _before_
 // calling sm.Update(sct).)
-func (sct *ServiceChangeTracker) PendingChanges() sets.String {
+func (sct *ServiceChangeTracker) PendingChanges() sets.Set[string] {
 	sct.lock.Lock()
 	defer sct.lock.Unlock()
 
-	changes := sets.NewString()
+	changes := sets.New[string]()
 	for name := range sct.items {
 		changes.Insert(name.String())
 	}
@@ -337,29 +343,31 @@ func (sct *ServiceChangeTracker) PendingChanges() sets.String {
 
 // UpdateServiceMapResult is the updated results after applying service changes.
 type UpdateServiceMapResult struct {
-	// HCServiceNodePorts is a map of Service names to node port numbers which indicate the health of that Service on this Node.
-	// The value(uint16) of HCServices map is the service health check node port.
-	HCServiceNodePorts map[types.NamespacedName]uint16
-	// UDPStaleClusterIP holds stale (no longer assigned to a Service) Service IPs that had UDP ports.
-	// Callers can use this to abort timeout-waits or clear connection-tracking information.
-	UDPStaleClusterIP sets.String
+	// DeletedUDPClusterIPs holds stale (no longer assigned to a Service) Service IPs
+	// that had UDP ports. Callers can use this to abort timeout-waits or clear
+	// connection-tracking information.
+	DeletedUDPClusterIPs sets.Set[string]
 }
 
 // Update updates ServicePortMap base on the given changes.
 func (sm ServicePortMap) Update(changes *ServiceChangeTracker) (result UpdateServiceMapResult) {
-	result.UDPStaleClusterIP = sets.NewString()
-	sm.apply(changes, result.UDPStaleClusterIP)
+	result.DeletedUDPClusterIPs = sets.New[string]()
+	sm.apply(changes, result.DeletedUDPClusterIPs)
+	return result
+}
 
+// HealthCheckNodePorts returns a map of Service names to HealthCheckNodePort values
+// for all Services in sm with non-zero HealthCheckNodePort.
+func (sm ServicePortMap) HealthCheckNodePorts() map[types.NamespacedName]uint16 {
 	// TODO: If this will appear to be computationally expensive, consider
 	// computing this incrementally similarly to svcPortMap.
-	result.HCServiceNodePorts = make(map[types.NamespacedName]uint16)
+	ports := make(map[types.NamespacedName]uint16)
 	for svcPortName, info := range sm {
 		if info.HealthCheckNodePort() != 0 {
-			result.HCServiceNodePorts[svcPortName.NamespacedName] = uint16(info.HealthCheckNodePort())
+			ports[svcPortName.NamespacedName] = uint16(info.HealthCheckNodePort())
 		}
 	}
-
-	return result
+	return ports
 }
 
 // ServicePortMap maps a service to its ServicePort.
@@ -373,11 +381,11 @@ func (sct *ServiceChangeTracker) serviceToServiceMap(service *v1.Service) Servic
 		return nil
 	}
 
-	if utilproxy.ShouldSkipService(service) {
+	if proxyutil.ShouldSkipService(service) {
 		return nil
 	}
 
-	clusterIP := utilproxy.GetClusterIPByFamily(sct.ipFamily, service)
+	clusterIP := proxyutil.GetClusterIPByFamily(sct.ipFamily, service)
 	if clusterIP == "" {
 		return nil
 	}
@@ -397,10 +405,9 @@ func (sct *ServiceChangeTracker) serviceToServiceMap(service *v1.Service) Servic
 	return svcPortMap
 }
 
-// apply the changes to ServicePortMap and update the stale udp cluster IP set. The UDPStaleClusterIP argument is passed in to store the
-// udp protocol service cluster ip when service is deleted from the ServicePortMap.
+// apply the changes to ServicePortMap and update the deleted UDP cluster IP set.
 // apply triggers processServiceMapChange on every change.
-func (sm *ServicePortMap) apply(changes *ServiceChangeTracker, UDPStaleClusterIP sets.String) {
+func (sm *ServicePortMap) apply(changes *ServiceChangeTracker, deletedUDPClusterIPs sets.Set[string]) {
 	changes.lock.Lock()
 	defer changes.lock.Unlock()
 	for _, change := range changes.items {
@@ -411,7 +418,7 @@ func (sm *ServicePortMap) apply(changes *ServiceChangeTracker, UDPStaleClusterIP
 		// filter out the Update event of current changes from previous changes before calling unmerge() so that can
 		// skip deleting the Update events.
 		change.previous.filter(change.current)
-		sm.unmerge(change.previous, UDPStaleClusterIP)
+		sm.unmerge(change.previous, deletedUDPClusterIPs)
 	}
 	// clear changes after applying them to ServicePortMap.
 	changes.items = make(map[types.NamespacedName]*serviceChange)
@@ -439,9 +446,9 @@ func (sm *ServicePortMap) apply(changes *ServiceChangeTracker, UDPStaleClusterIP
 //	B{{"ns", "cluster-ip", "http"}: {"172.16.55.10", 1234, "TCP"}}
 //	  A updated to be {{"ns", "cluster-ip", "http"}: {"172.16.55.10", 1234, "TCP"}}
 //	  produce string set {"ns/cluster-ip:http"}
-func (sm *ServicePortMap) merge(other ServicePortMap) sets.String {
+func (sm *ServicePortMap) merge(other ServicePortMap) sets.Set[string] {
 	// existingPorts is going to store all identifiers of all services in `other` ServicePortMap.
-	existingPorts := sets.NewString()
+	existingPorts := sets.New[string]()
 	for svcPortName, info := range other {
 		// Take ServicePortName.String() as the newly merged service's identifier and put it into existingPorts.
 		existingPorts.Insert(svcPortName.String())
@@ -466,15 +473,15 @@ func (sm *ServicePortMap) filter(other ServicePortMap) {
 	}
 }
 
-// unmerge deletes all other ServicePortMap's elements from current ServicePortMap.  We pass in the UDPStaleClusterIP strings sets
-// for storing the stale udp service cluster IPs. We will clear stale udp connection base on UDPStaleClusterIP later
-func (sm *ServicePortMap) unmerge(other ServicePortMap, UDPStaleClusterIP sets.String) {
+// unmerge deletes all other ServicePortMap's elements from current ServicePortMap and
+// updates deletedUDPClusterIPs with all of the newly-deleted UDP cluster IPs.
+func (sm *ServicePortMap) unmerge(other ServicePortMap, deletedUDPClusterIPs sets.Set[string]) {
 	for svcPortName := range other {
 		info, exists := (*sm)[svcPortName]
 		if exists {
 			klog.V(4).InfoS("Removing service port", "portName", svcPortName)
 			if info.Protocol() == v1.ProtocolUDP {
-				UDPStaleClusterIP.Insert(info.ClusterIP().String())
+				deletedUDPClusterIPs.Insert(info.ClusterIP().String())
 			}
 			delete(*sm, svcPortName)
 		} else {

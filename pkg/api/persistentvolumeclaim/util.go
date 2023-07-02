@@ -26,8 +26,9 @@ import (
 )
 
 const (
-	pvc            string = "PersistentVolumeClaim"
-	volumeSnapshot string = "VolumeSnapshot"
+	pvc                                  string = "PersistentVolumeClaim"
+	volumeSnapshot                       string = "VolumeSnapshot"
+	deprecatedStorageClassAnnotationsMsg        = `deprecated since v1.8; use "storageClassName" attribute instead`
 )
 
 // DropDisabledFields removes disabled fields from the pvc spec.
@@ -49,6 +50,10 @@ func DropDisabledFields(pvcSpec, oldPVCSpec *core.PersistentVolumeClaimSpec) {
 			pvcSpec.DataSourceRef = nil
 		}
 	}
+
+	// Setting VolumeClaimTemplate.Resources.Claims should have been caught by validation when
+	// extending ResourceRequirements in 1.26. Now we can only accept it and drop the field.
+	pvcSpec.Resources.Claims = nil
 }
 
 // EnforceDataSourceBackwardsCompatibility drops the data source field under certain conditions
@@ -193,11 +198,25 @@ func allocatedResourcesInUse(oldPVC *core.PersistentVolumeClaim) bool {
 }
 
 func GetWarningsForPersistentVolumeClaim(pv *core.PersistentVolumeClaim) []string {
+	var warnings []string
+
 	if pv == nil {
 		return nil
 	}
 
-	return GetWarningsForPersistentVolumeClaimSpec(field.NewPath("spec"), pv.Spec)
+	if _, ok := pv.ObjectMeta.Annotations[core.BetaStorageClassAnnotation]; ok {
+		warnings = append(warnings,
+			fmt.Sprintf(
+				"%s: %s",
+				field.NewPath("metadata", "annotations").Key(core.BetaStorageClassAnnotation),
+				deprecatedStorageClassAnnotationsMsg,
+			),
+		)
+	}
+
+	warnings = append(warnings, GetWarningsForPersistentVolumeClaimSpec(field.NewPath("spec"), pv.Spec)...)
+
+	return warnings
 }
 
 func GetWarningsForPersistentVolumeClaimSpec(fieldPath *field.Path, pvSpec core.PersistentVolumeClaimSpec) []string {

@@ -114,6 +114,21 @@ func (m *MockPodsProvider) EXPECT() *MockPodsProviderMockRecorder {
 	return m.recorder
 }
 
+// GetPodByName mocks base method.
+func (m *MockPodsProvider) GetPodByName(namespace, name string) (*v1.Pod, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPodByName", namespace, name)
+	ret0, _ := ret[0].(*v1.Pod)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// GetPodByName indicates an expected call of GetPodByName.
+func (mr *MockPodsProviderMockRecorder) GetPodByName(namespace, name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPodByName", reflect.TypeOf((*MockPodsProvider)(nil).GetPodByName), namespace, name)
+}
+
 // GetPods mocks base method.
 func (m *MockPodsProvider) GetPods() []*v1.Pod {
 	m.ctrl.T.Helper()
@@ -228,4 +243,41 @@ func (m *MockMemoryProvider) GetMemory(podUID, containerName string) []*v10.Cont
 func (mr *MockMemoryProviderMockRecorder) GetMemory(podUID, containerName interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMemory", reflect.TypeOf((*MockMemoryProvider)(nil).GetMemory), podUID, containerName)
+}
+
+// MockDynamicResourcesProvider is a mock of DynamicResourcesProvider interface.
+type MockDynamicResourcesProvider struct {
+	ctrl     *gomock.Controller
+	recorder *MockDynamicResourcesProviderMockRecorder
+}
+
+// MockDynamicResourcesProviderMockRecorder is the mock recorder for MockDynamicResourcesProvider.
+type MockDynamicResourcesProviderMockRecorder struct {
+	mock *MockDynamicResourcesProvider
+}
+
+// NewMockDynamicResourcesProvider creates a new mock instance.
+func NewMockDynamicResourcesProvider(ctrl *gomock.Controller) *MockDynamicResourcesProvider {
+	mock := &MockDynamicResourcesProvider{ctrl: ctrl}
+	mock.recorder = &MockDynamicResourcesProviderMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockDynamicResourcesProvider) EXPECT() *MockDynamicResourcesProviderMockRecorder {
+	return m.recorder
+}
+
+// GetDynamicResources mocks base method.
+func (m *MockDynamicResourcesProvider) GetDynamicResources(pod *v1.Pod, container *v1.Container) []*v10.DynamicResource {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetDynamicResources", pod, container)
+	ret0, _ := ret[0].([]*v10.DynamicResource)
+	return ret0
+}
+
+// GetDynamicResources indicates an expected call of GetDynamicResources.
+func (mr *MockDynamicResourcesProviderMockRecorder) GetDynamicResources(pod, container interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDynamicResources", reflect.TypeOf((*MockDynamicResourcesProvider)(nil).GetDynamicResources), pod, container)
 }

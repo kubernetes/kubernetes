@@ -18,7 +18,10 @@ package spec3
 
 import (
 	"encoding/json"
+
 	"github.com/go-openapi/swag"
+	"k8s.io/kube-openapi/pkg/internal"
+	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
@@ -41,12 +44,29 @@ func (e *Encoding) MarshalJSON() ([]byte, error) {
 }
 
 func (e *Encoding) UnmarshalJSON(data []byte) error {
+	if internal.UseOptimizedJSONUnmarshalingV3 {
+		return jsonv2.Unmarshal(data, e)
+	}
 	if err := json.Unmarshal(data, &e.EncodingProps); err != nil {
 		return err
 	}
 	if err := json.Unmarshal(data, &e.VendorExtensible); err != nil {
 		return err
 	}
+	return nil
+}
+
+func (e *Encoding) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
+	var x struct {
+		spec.Extensions
+		EncodingProps
+	}
+	if err := opts.UnmarshalNext(dec, &x); err != nil {
+		return err
+	}
+
+	e.Extensions = internal.SanitizeExtensions(x.Extensions)
+	e.EncodingProps = x.EncodingProps
 	return nil
 }
 

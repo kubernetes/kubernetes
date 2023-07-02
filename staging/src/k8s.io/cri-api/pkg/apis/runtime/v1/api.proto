@@ -199,7 +199,7 @@ message PortMapping {
 }
 
 enum MountPropagation {
-    // No mount propagation ("private" in Linux terminology).
+    // No mount propagation ("rprivate" in Linux terminology).
     PROPAGATION_PRIVATE = 0;
     // Mounts get propagated from the host to the container ("rslave" in Linux).
     PROPAGATION_HOST_TO_CONTAINER = 1;
@@ -222,6 +222,10 @@ message Mount {
     bool selinux_relabel = 4;
     // Requested propagation mode.
     MountPropagation propagation = 5;
+    // UidMappings specifies the runtime UID mappings for the mount.
+    repeated IDMapping uidMappings = 6;
+    // GidMappings specifies the runtime GID mappings for the mount.
+    repeated IDMapping gidMappings = 7;
 }
 
 // IDMapping describes host to container ID mappings for a pod sandbox.
@@ -1017,6 +1021,15 @@ message Device {
     string permissions = 3;
 }
 
+// CDIDevice specifies a CDI device information.
+message CDIDevice {
+    // Fully qualified CDI device name
+    // for example: vendor.com/gpu=gpudevice1
+    // see more details in the CDI specification:
+    // https://github.com/container-orchestrated-devices/container-device-interface/blob/main/SPEC.md
+    string name = 1;
+}
+
 // ContainerConfig holds all the required and optional fields for creating a
 // container.
 message ContainerConfig {
@@ -1074,6 +1087,9 @@ message ContainerConfig {
     LinuxContainerConfig linux = 15;
     // Configuration specific to Windows containers.
     WindowsContainerConfig windows = 16;
+
+    // CDI devices for the container.
+    repeated CDIDevice CDI_devices = 17;
 }
 
 message CreateContainerRequest {
@@ -1211,6 +1227,7 @@ message ContainerStatus {
     // image ID
     string image_ref = 9;
     // Brief CamelCase string explaining why container is in its current state.
+    // Must be set to "OOMKilled" for containers terminated by cgroup-based Out-of-Memory killer.
     string reason = 10;
     // Human-readable message indicating details about why container is in its
     // current state.
@@ -1274,8 +1291,16 @@ message ExecSyncRequest {
 
 message ExecSyncResponse {
     // Captured command stdout output.
+	// The runtime should cap the output of this response to 16MB.
+	// If the stdout of the command produces more than 16MB, the remaining output
+	// should be discarded, and the command should proceed with no error.
+	// See CVE-2022-1708 and CVE-2022-31030 for more information.
     bytes stdout = 1;
     // Captured command stderr output.
+	// The runtime should cap the output of this response to 16MB.
+	// If the stderr of the command produces more than 16MB, the remaining output
+	// should be discarded, and the command should proceed with no error.
+	// See CVE-2022-1708 and CVE-2022-31030 for more information.
     bytes stderr = 2;
     // Exit code the command finished with. Default: 0 (success).
     int32 exit_code = 3;

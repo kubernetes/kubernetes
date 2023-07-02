@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
+	v1svc "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/client-go/discovery"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
@@ -55,6 +56,7 @@ import (
 const (
 	// DefaultNamespaceDeletionTimeout is timeout duration for waiting for a namespace deletion.
 	DefaultNamespaceDeletionTimeout = 5 * time.Minute
+	defaultServiceAccountName       = "default"
 )
 
 var (
@@ -87,6 +89,12 @@ var (
 
 // Framework supports common operations used by e2e tests; it will keep a client & a namespace for you.
 // Eventual goal is to merge this with integration test framework.
+//
+// You can configure the pod security level for your test by setting the `NamespacePodSecurityLevel`
+// which will set all three of pod security admission enforce, warn and audit labels on the namespace.
+// The default pod security profile is "restricted".
+// Each of the labels can be overridden by using more specific NamespacePodSecurity* attributes of this
+// struct.
 type Framework struct {
 	BaseName string
 
@@ -104,10 +112,14 @@ type Framework struct {
 	ScalesGetter scaleclient.ScalesGetter
 
 	SkipNamespaceCreation            bool            // Whether to skip creating a namespace
+	SkipSecretCreation               bool            // Whether to skip creating secret for a test
 	Namespace                        *v1.Namespace   // Every test has at least one namespace unless creation is skipped
 	namespacesToDelete               []*v1.Namespace // Some tests have more than one.
 	NamespaceDeletionTimeout         time.Duration
 	NamespacePodSecurityEnforceLevel admissionapi.Level // The pod security enforcement level for namespaces to be applied.
+	NamespacePodSecurityWarnLevel    admissionapi.Level // The pod security warn (client logging) level for namespaces to be applied.
+	NamespacePodSecurityAuditLevel   admissionapi.Level // The pod security audit (server logging) level for namespaces to be applied.
+	NamespacePodSecurityLevel        admissionapi.Level // The pod security level to be used for all of enforcement, warn and audit. Can be rewritten by more specific configuration attributes.
 
 	// Flaky operation failures in an e2e test can be captured through this.
 	flakeReport *FlakeReport
@@ -262,6 +274,7 @@ func (f *Framework) BeforeEach(ctx context.Context) {
 		} else {
 			Logf("Skipping waiting for service account")
 		}
+
 		f.UniqueName = f.Namespace.GetName()
 	} else {
 		// not guaranteed to be unique, but very likely
@@ -444,18 +457,64 @@ func (f *Framework) CreateNamespace(ctx context.Context, baseName string, labels
 		labels = labelsCopy
 	}
 
-	enforceLevel := admissionapi.LevelRestricted
-	if f.NamespacePodSecurityEnforceLevel != "" {
-		enforceLevel = f.NamespacePodSecurityEnforceLevel
-	}
-	labels[admissionapi.EnforceLevelLabel] = string(enforceLevel)
+	labels[admissionapi.EnforceLevelLabel] = firstNonEmptyPSaLevelOrRestricted(f.NamespacePodSecurityEnforceLevel, f.NamespacePodSecurityLevel)
+	labels[admissionapi.WarnLevelLabel] = firstNonEmptyPSaLevelOrRestricted(f.NamespacePodSecurityWarnLevel, f.NamespacePodSecurityLevel)
+	labels[admissionapi.AuditLevelLabel] = firstNonEmptyPSaLevelOrRestricted(f.NamespacePodSecurityAuditLevel, f.NamespacePodSecurityLevel)
 
 	ns, err := createTestingNS(ctx, baseName, f.ClientSet, labels)
 	// check ns instead of err to see if it's nil as we may
 	// fail to create serviceAccount in it.
 	f.AddNamespacesToDelete(ns)
 
+	if TestContext.E2EDockerConfigFile != "" && !f.SkipSecretCreation {
+		// With the Secret created, the default service account (in the new namespace)
+		// is patched with the secret and can then be referenced by all the pods spawned by E2E process, and repository authentication should be successful.
+		secret, err := f.createSecretFromDockerConfig(ctx, ns.Name)
+		if err != nil {
+			return ns, fmt.Errorf("failed to create secret from docker config file: %v", err)
+		}
+
+		serviceAccountClient := f.ClientSet.CoreV1().ServiceAccounts(ns.Name)
+		serviceAccountConfig := v1svc.ServiceAccount(defaultServiceAccountName, ns.Name)
+		serviceAccountConfig.ImagePullSecrets = append(serviceAccountConfig.ImagePullSecrets, v1svc.LocalObjectReferenceApplyConfiguration{Name: &secret.Name})
+
+		svc, err := serviceAccountClient.Apply(ctx, serviceAccountConfig, metav1.ApplyOptions{FieldManager: "e2e-framework"})
+		if err != nil {
+			return ns, fmt.Errorf("failed to patch imagePullSecret [%s] to service account [%s]: %v", secret.Name, svc.Name, err)
+		}
+
+	}
+
 	return ns, err
+}
+
+func firstNonEmptyPSaLevelOrRestricted(levelConfig ...admissionapi.Level) string {
+	for _, l := range levelConfig {
+		if len(l) > 0 {
+			return string(l)
+		}
+	}
+	return string(admissionapi.LevelRestricted)
+}
+
+// createSecretFromDockerConfig creates a secret using the private image registry credentials.
+// The credentials are provided by --e2e-docker-config-file flag.
+func (f *Framework) createSecretFromDockerConfig(ctx context.Context, namespace string) (*v1.Secret, error) {
+	contents, err := os.ReadFile(TestContext.E2EDockerConfigFile)
+	if err != nil {
+		return nil, fmt.Errorf("error reading docker config file: %v", err)
+	}
+
+	secretObject := &v1.Secret{
+		Data: map[string][]byte{v1.DockerConfigJsonKey: contents},
+		Type: v1.SecretTypeDockerConfigJson,
+	}
+	secretObject.GenerateName = "registry-cred"
+	Logf("create image pull secret %s", secretObject.Name)
+
+	secret, err := f.ClientSet.CoreV1().Secrets(namespace).Create(ctx, secretObject, metav1.CreateOptions{})
+
+	return secret, err
 }
 
 // RecordFlakeIfError records flakeness info if error happens.

@@ -27,18 +27,24 @@ import (
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
+
+// PodManager is the subset of methods the manager needs to observe the actual state of the kubelet.
+// See pkg/k8s.io/kubernetes/pkg/kubelet/pod.Manager for method godoc.
+type PodManager interface {
+	TranslatePodUID(uid types.UID) kubetypes.ResolvedPodUID
+}
 
 // NewCRIStatsProvider returns a Provider that provides the node stats
 // from cAdvisor and the container stats from CRI.
 func NewCRIStatsProvider(
 	cadvisor cadvisor.Interface,
 	resourceAnalyzer stats.ResourceAnalyzer,
-	podManager kubepod.Manager,
+	podManager PodManager,
 	runtimeCache kubecontainer.RuntimeCache,
 	runtimeService internalapi.RuntimeService,
 	imageService internalapi.ImageManagerService,
@@ -54,7 +60,7 @@ func NewCRIStatsProvider(
 func NewCadvisorStatsProvider(
 	cadvisor cadvisor.Interface,
 	resourceAnalyzer stats.ResourceAnalyzer,
-	podManager kubepod.Manager,
+	podManager PodManager,
 	runtimeCache kubecontainer.RuntimeCache,
 	imageService kubecontainer.ImageService,
 	statusProvider status.PodStatusProvider,
@@ -67,7 +73,7 @@ func NewCadvisorStatsProvider(
 // cAdvisor and the container stats using the containerStatsProvider.
 func newStatsProvider(
 	cadvisor cadvisor.Interface,
-	podManager kubepod.Manager,
+	podManager PodManager,
 	runtimeCache kubecontainer.RuntimeCache,
 	containerStatsProvider containerStatsProvider,
 ) *Provider {
@@ -82,10 +88,9 @@ func newStatsProvider(
 // Provider provides the stats of the node and the pod-managed containers.
 type Provider struct {
 	cadvisor     cadvisor.Interface
-	podManager   kubepod.Manager
+	podManager   PodManager
 	runtimeCache kubecontainer.RuntimeCache
 	containerStatsProvider
-	rlimitStatsProvider
 }
 
 // containerStatsProvider is an interface that provides the stats of the
@@ -96,10 +101,6 @@ type containerStatsProvider interface {
 	ListPodCPUAndMemoryStats(ctx context.Context) ([]statsapi.PodStats, error)
 	ImageFsStats(ctx context.Context) (*statsapi.FsStats, error)
 	ImageFsDevice(ctx context.Context) (string, error)
-}
-
-type rlimitStatsProvider interface {
-	RlimitStats() (*statsapi.RlimitStats, error)
 }
 
 // RlimitStats returns base information about process count

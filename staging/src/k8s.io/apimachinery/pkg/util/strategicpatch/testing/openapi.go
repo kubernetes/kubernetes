@@ -17,11 +17,10 @@ limitations under the License.
 package testing
 
 import (
-	"io/ioutil"
 	"os"
 	"sync"
 
-	openapi_v2 "github.com/google/gnostic/openapiv2"
+	openapi_v2 "github.com/google/gnostic-models/openapiv2"
 	openapi "k8s.io/kube-openapi/pkg/util/proto"
 )
 
@@ -43,7 +42,7 @@ func (f *Fake) OpenAPISchema() (*openapi_v2.Document, error) {
 			f.err = err
 			return
 		}
-		spec, err := ioutil.ReadFile(f.Path)
+		spec, err := os.ReadFile(f.Path)
 		if err != nil {
 			f.err = err
 			return

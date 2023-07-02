@@ -17,7 +17,11 @@ limitations under the License.
 package fieldmanager_test
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -27,9 +31,41 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/fieldmanagertest"
+	"k8s.io/apimachinery/pkg/util/managedfields"
+	"k8s.io/apimachinery/pkg/util/managedfields/managedfieldstest"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 	"sigs.k8s.io/yaml"
 )
+
+var fakeTypeConverter = func() managedfields.TypeConverter {
+	data, err := ioutil.ReadFile(filepath.Join(strings.Repeat(".."+string(filepath.Separator), 8),
+		"api", "openapi-spec", "swagger.json"))
+	if err != nil {
+		panic(err)
+	}
+	swagger := spec.Swagger{}
+	if err := json.Unmarshal(data, &swagger); err != nil {
+		panic(err)
+	}
+	definitions := map[string]*spec.Schema{}
+	for k, v := range swagger.Definitions {
+		p := v
+		definitions[k] = &p
+	}
+	typeConverter, err := managedfields.NewTypeConverter(definitions, false)
+	if err != nil {
+		panic(err)
+	}
+	return typeConverter
+}()
+
+func getObjectBytes(file string) []byte {
+	s, err := ioutil.ReadFile(file)
+	if err != nil {
+		panic(err)
+	}
+	return s
+}
 
 func BenchmarkNewObject(b *testing.B) {
 	tests := []struct {
@@ -55,7 +91,7 @@ func BenchmarkNewObject(b *testing.B) {
 	}
 	for _, test := range tests {
 		b.Run(test.gvk.Kind, func(b *testing.B) {
-			f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, test.gvk)
+			f := managedfieldstest.NewTestFieldManager(fakeTypeConverter, test.gvk)
 
 			decoder := serializer.NewCodecFactory(scheme).UniversalDecoder(test.gvk.GroupVersion())
 			newObj, err := runtime.Decode(decoder, test.obj)
@@ -268,7 +304,7 @@ func BenchmarkCompare(b *testing.B) {
 }
 
 func BenchmarkRepeatedUpdate(b *testing.B) {
-	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"))
+	f := managedfieldstest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"))
 	podBytes := getObjectBytes("pod.yaml")
 
 	var obj *corev1.Pod

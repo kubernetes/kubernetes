@@ -19,6 +19,7 @@ package kubelet
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -71,8 +72,7 @@ func TestRunOnce(t *testing.T) {
 	}, nil).AnyTimes()
 	fakeSecretManager := secret.NewFakeManager()
 	fakeConfigMapManager := configmap.NewFakeManager()
-	podManager := kubepod.NewBasicPodManager(
-		podtest.NewFakeMirrorClient())
+	podManager := kubepod.NewBasicPodManager()
 	fakeRuntime := &containertest.FakeRuntime{}
 	podStartupLatencyTracker := kubeletutil.NewPodStartupLatencyTracker()
 	basePath, err := utiltesting.MkTmpdir("kubelet")
@@ -81,11 +81,12 @@ func TestRunOnce(t *testing.T) {
 	}
 	defer os.RemoveAll(basePath)
 	kb := &Kubelet{
-		rootDirectory:    basePath,
+		rootDirectory:    filepath.Clean(basePath),
 		recorder:         &record.FakeRecorder{},
 		cadvisor:         cadvisor,
 		nodeLister:       testNodeLister{},
-		statusManager:    status.NewManager(nil, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker),
+		statusManager:    status.NewManager(nil, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker, basePath),
+		mirrorPodClient:  podtest.NewFakeMirrorClient(),
 		podManager:       podManager,
 		podWorkers:       &fakePodWorkers{},
 		os:               &containertest.FakeOS{},
@@ -133,8 +134,7 @@ func TestRunOnce(t *testing.T) {
 	fakeKillPodFunc := func(pod *v1.Pod, evict bool, gracePeriodOverride *int64, fn func(*v1.PodStatus)) error {
 		return nil
 	}
-	fakeMirrodPodFunc := func(*v1.Pod) (*v1.Pod, bool) { return nil, false }
-	evictionManager, evictionAdmitHandler := eviction.NewManager(kb.resourceAnalyzer, eviction.Config{}, fakeKillPodFunc, fakeMirrodPodFunc, nil, nil, kb.recorder, nodeRef, kb.clock, kb.supportLocalStorageCapacityIsolation())
+	evictionManager, evictionAdmitHandler := eviction.NewManager(kb.resourceAnalyzer, eviction.Config{}, fakeKillPodFunc, nil, nil, kb.recorder, nodeRef, kb.clock, kb.supportLocalStorageCapacityIsolation())
 
 	kb.evictionManager = evictionManager
 	kb.admitHandlers.AddPodAdmitHandler(evictionAdmitHandler)

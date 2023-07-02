@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
@@ -67,10 +68,10 @@ var (
 		# Wait for the pod "busybox1" to contain the status condition of type "Ready"
 		kubectl wait --for=condition=Ready pod/busybox1
 
-		# The default value of status condition is true; you can wait for other targets after an equal delimiter (compared after Unicode simple case folding, which is a more general form of case-insensitivity):
+		# The default value of status condition is true; you can wait for other targets after an equal delimiter (compared after Unicode simple case folding, which is a more general form of case-insensitivity)
 		kubectl wait --for=condition=Ready=false pod/busybox1
 
-		# Wait for the pod "busybox1" to contain the status phase to be "Running".
+		# Wait for the pod "busybox1" to contain the status phase to be "Running"
 		kubectl wait --for=jsonpath='{.status.phase}'=Running pod/busybox1
 
 		# Wait for the pod "busybox1" to be deleted, with a timeout of 60s, after having issued the "delete" command
@@ -92,11 +93,11 @@ type WaitFlags struct {
 	Timeout      time.Duration
 	ForCondition string
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewWaitFlags returns a default WaitFlags
-func NewWaitFlags(restClientGetter genericclioptions.RESTClientGetter, streams genericclioptions.IOStreams) *WaitFlags {
+func NewWaitFlags(restClientGetter genericclioptions.RESTClientGetter, streams genericiooptions.IOStreams) *WaitFlags {
 	return &WaitFlags{
 		RESTClientGetter: restClientGetter,
 		PrintFlags:       genericclioptions.NewPrintFlags("condition met"),
@@ -115,7 +116,7 @@ func NewWaitFlags(restClientGetter genericclioptions.RESTClientGetter, streams g
 }
 
 // NewCmdWait returns a cobra command for waiting
-func NewCmdWait(restClientGetter genericclioptions.RESTClientGetter, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdWait(restClientGetter genericclioptions.RESTClientGetter, streams genericiooptions.IOStreams) *cobra.Command {
 	flags := NewWaitFlags(restClientGetter, streams)
 
 	cmd := &cobra.Command{
@@ -276,7 +277,7 @@ type WaitOptions struct {
 
 	Printer     printers.ResourcePrinter
 	ConditionFn ConditionFunc
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // ConditionFunc is the interface for providing condition checks

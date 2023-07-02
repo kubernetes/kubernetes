@@ -31,6 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -317,6 +319,8 @@ func TestClaimOwnerMatchesSetAndPod(t *testing.T) {
 		for _, useOtherRefs := range []bool{false, true} {
 			for _, setPodRef := range []bool{false, true} {
 				for _, setSetRef := range []bool{false, true} {
+					_, ctx := ktesting.NewTestContext(t)
+					logger := klog.FromContext(ctx)
 					claim := v1.PersistentVolumeClaim{}
 					claim.Name = "target-claim"
 					pod := v1.Pod{}
@@ -347,7 +351,7 @@ func TestClaimOwnerMatchesSetAndPod(t *testing.T) {
 						setOwnerRef(&claim, &randomObject2, &randomObject2.TypeMeta)
 					}
 					shouldMatch := setPodRef == tc.needsPodRef && setSetRef == tc.needsSetRef
-					if claimOwnerMatchesSetAndPod(&claim, &set, &pod) != shouldMatch {
+					if claimOwnerMatchesSetAndPod(logger, &claim, &set, &pod) != shouldMatch {
 						t.Errorf("Bad match for %s with pod=%v,set=%v,others=%v", tc.name, setPodRef, setSetRef, useOtherRefs)
 					}
 				}
@@ -417,6 +421,8 @@ func TestUpdateClaimOwnerRefForSetAndPod(t *testing.T) {
 	for _, tc := range testCases {
 		for _, hasPodRef := range []bool{true, false} {
 			for _, hasSetRef := range []bool{true, false} {
+				_, ctx := ktesting.NewTestContext(t)
+				logger := klog.FromContext(ctx)
 				set := apps.StatefulSet{}
 				set.Name = "ss"
 				numReplicas := int32(5)
@@ -441,7 +447,7 @@ func TestUpdateClaimOwnerRefForSetAndPod(t *testing.T) {
 					setOwnerRef(&claim, &set, &set.TypeMeta)
 				}
 				needsUpdate := hasPodRef != tc.needsPodRef || hasSetRef != tc.needsSetRef
-				shouldUpdate := updateClaimOwnerRefForSetAndPod(&claim, &set, &pod)
+				shouldUpdate := updateClaimOwnerRefForSetAndPod(logger, &claim, &set, &pod)
 				if shouldUpdate != needsUpdate {
 					t.Errorf("Bad update for %s hasPodRef=%v hasSetRef=%v", tc.name, hasPodRef, hasSetRef)
 				}
@@ -948,9 +954,9 @@ func TestGetStatefulSetMaxUnavailable(t *testing.T) {
 	}{
 		// it wouldn't hurt to also test 0 and 0%, even if they should have been forbidden by API validation.
 		{maxUnavailable: nil, replicaCount: 10, expectedMaxUnavailable: 1},
-		{maxUnavailable: intOrStrP(intstr.FromInt(3)), replicaCount: 10, expectedMaxUnavailable: 3},
-		{maxUnavailable: intOrStrP(intstr.FromInt(3)), replicaCount: 0, expectedMaxUnavailable: 3},
-		{maxUnavailable: intOrStrP(intstr.FromInt(0)), replicaCount: 0, expectedMaxUnavailable: 1},
+		{maxUnavailable: intOrStrP(intstr.FromInt32(3)), replicaCount: 10, expectedMaxUnavailable: 3},
+		{maxUnavailable: intOrStrP(intstr.FromInt32(3)), replicaCount: 0, expectedMaxUnavailable: 3},
+		{maxUnavailable: intOrStrP(intstr.FromInt32(0)), replicaCount: 0, expectedMaxUnavailable: 1},
 		{maxUnavailable: intOrStrP(intstr.FromString("10%")), replicaCount: 25, expectedMaxUnavailable: 2},
 		{maxUnavailable: intOrStrP(intstr.FromString("100%")), replicaCount: 5, expectedMaxUnavailable: 5},
 		{maxUnavailable: intOrStrP(intstr.FromString("50%")), replicaCount: 5, expectedMaxUnavailable: 2},

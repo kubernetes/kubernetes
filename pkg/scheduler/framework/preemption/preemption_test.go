@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/klog/v2/ktesting"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
@@ -86,7 +87,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 	tests := []struct {
 		name          string
 		nodesStatuses framework.NodeToStatusMap
-		expected      sets.String // set of expected node names.
+		expected      sets.Set[string] // set of expected node names.
 	}{
 		{
 			name: "No node should be attempted",
@@ -96,7 +97,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node3": framework.NewStatus(framework.UnschedulableAndUnresolvable, tainttoleration.ErrReasonNotMatch),
 				"node4": framework.NewStatus(framework.UnschedulableAndUnresolvable, interpodaffinity.ErrReasonAffinityRulesNotMatch),
 			},
-			expected: sets.NewString(),
+			expected: sets.New[string](),
 		},
 		{
 			name: "ErrReasonAntiAffinityRulesNotMatch should be tried as it indicates that the pod is unschedulable due to inter-pod anti-affinity",
@@ -105,7 +106,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodename.ErrReason),
 				"node3": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodeunschedulable.ErrReasonUnschedulable),
 			},
-			expected: sets.NewString("node1", "node4"),
+			expected: sets.New("node1", "node4"),
 		},
 		{
 			name: "ErrReasonAffinityRulesNotMatch should not be tried as it indicates that the pod is unschedulable due to inter-pod affinity, but ErrReasonAntiAffinityRulesNotMatch should be tried as it indicates that the pod is unschedulable due to inter-pod anti-affinity",
@@ -113,7 +114,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, interpodaffinity.ErrReasonAffinityRulesNotMatch),
 				"node2": framework.NewStatus(framework.Unschedulable, interpodaffinity.ErrReasonAntiAffinityRulesNotMatch),
 			},
-			expected: sets.NewString("node2", "node3", "node4"),
+			expected: sets.New("node2", "node3", "node4"),
 		},
 		{
 			name: "Mix of failed predicates works fine",
@@ -121,14 +122,14 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, volumerestrictions.ErrReasonDiskConflict),
 				"node2": framework.NewStatus(framework.Unschedulable, fmt.Sprintf("Insufficient %v", v1.ResourceMemory)),
 			},
-			expected: sets.NewString("node2", "node3", "node4"),
+			expected: sets.New("node2", "node3", "node4"),
 		},
 		{
 			name: "Node condition errors should be considered unresolvable",
 			nodesStatuses: framework.NodeToStatusMap{
 				"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodeunschedulable.ErrReasonUnknownCondition),
 			},
-			expected: sets.NewString("node2", "node3", "node4"),
+			expected: sets.New("node2", "node3", "node4"),
 		},
 		{
 			name: "ErrVolume... errors should not be tried as it indicates that the pod is unschedulable due to no matching volumes for pod on node",
@@ -137,7 +138,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, string(volumebinding.ErrReasonNodeConflict)),
 				"node3": framework.NewStatus(framework.UnschedulableAndUnresolvable, string(volumebinding.ErrReasonBindConflict)),
 			},
-			expected: sets.NewString("node4"),
+			expected: sets.New("node4"),
 		},
 		{
 			name: "ErrReasonConstraintsNotMatch should be tried as it indicates that the pod is unschedulable due to topology spread constraints",
@@ -146,7 +147,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodename.ErrReason),
 				"node3": framework.NewStatus(framework.Unschedulable, podtopologyspread.ErrReasonConstraintsNotMatch),
 			},
-			expected: sets.NewString("node1", "node3", "node4"),
+			expected: sets.New("node1", "node3", "node4"),
 		},
 		{
 			name: "UnschedulableAndUnresolvable status should be skipped but Unschedulable should be tried",
@@ -155,7 +156,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node3": framework.NewStatus(framework.Unschedulable, ""),
 				"node4": framework.NewStatus(framework.UnschedulableAndUnresolvable, ""),
 			},
-			expected: sets.NewString("node1", "node3"),
+			expected: sets.New("node1", "node3"),
 		},
 		{
 			name: "ErrReasonNodeLabelNotMatch should not be tried as it indicates that the pod is unschedulable due to node doesn't have the required label",
@@ -164,7 +165,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node3": framework.NewStatus(framework.Unschedulable, ""),
 				"node4": framework.NewStatus(framework.UnschedulableAndUnresolvable, ""),
 			},
-			expected: sets.NewString("node1", "node3"),
+			expected: sets.New("node1", "node3"),
 		},
 	}
 
@@ -266,6 +267,7 @@ func TestDryRunPreemption(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
 			registeredPlugins := append([]st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New)},
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
@@ -279,14 +281,17 @@ func TestDryRunPreemption(t *testing.T) {
 			}
 			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewSimpleClientset(objs...), 0)
 			parallelism := parallelize.DefaultParallelism
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			fwk, err := st.NewFramework(
-				registeredPlugins, "", ctx.Done(),
+				ctx,
+				registeredPlugins, "",
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithParallelism(parallelism),
 				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(tt.testPods, tt.nodes)),
+				frameworkruntime.WithLogger(logger),
 			)
 			if err != nil {
 				t.Fatal(err)

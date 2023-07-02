@@ -49,6 +49,7 @@ import (
 	scalefake "k8s.io/client-go/scale/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
@@ -187,6 +188,7 @@ func newFakeDisruptionControllerWithTime(ctx context.Context, now time.Time) (*d
 	dc.rsListerSynced = alwaysReady
 	dc.dListerSynced = alwaysReady
 	dc.ssListerSynced = alwaysReady
+	dc.recorder = record.NewFakeRecorder(100)
 	informerFactory.Start(ctx.Done())
 	informerFactory.WaitForCacheSync(ctx.Done())
 
@@ -424,7 +426,7 @@ func add(t *testing.T, store cache.Store, obj interface{}) {
 func TestNoSelector(t *testing.T) {
 	dc, ps := newFakeDisruptionController()
 
-	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromInt(3))
+	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromInt32(3))
 	pdb.Spec.Selector = &metav1.LabelSelector{}
 	pod, _ := newPod(t, "yo-yo-yo")
 
@@ -443,7 +445,7 @@ func TestNoSelector(t *testing.T) {
 func TestUnavailable(t *testing.T) {
 	dc, ps := newFakeDisruptionController()
 
-	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromInt(3))
+	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromInt32(3))
 	ctx := context.TODO()
 	add(t, dc.pdbStore, pdb)
 	dc.sync(ctx, pdbName)
@@ -473,7 +475,7 @@ func TestUnavailable(t *testing.T) {
 func TestIntegerMaxUnavailable(t *testing.T) {
 	dc, ps := newFakeDisruptionController()
 
-	pdb, pdbName := newMaxUnavailablePodDisruptionBudget(t, intstr.FromInt(1))
+	pdb, pdbName := newMaxUnavailablePodDisruptionBudget(t, intstr.FromInt32(1))
 	add(t, dc.pdbStore, pdb)
 	ctx := context.TODO()
 	dc.sync(ctx, pdbName)
@@ -485,6 +487,8 @@ func TestIntegerMaxUnavailable(t *testing.T) {
 	dc.sync(ctx, pdbName)
 
 	ps.VerifyDisruptionAllowed(t, pdbName, 0)
+	verifyEventEmitted(t, dc, "UnmanagedPods")
+
 }
 
 // Verify that an integer MaxUnavailable will recompute allowed disruptions when the scale of
@@ -492,7 +496,7 @@ func TestIntegerMaxUnavailable(t *testing.T) {
 func TestIntegerMaxUnavailableWithScaling(t *testing.T) {
 	dc, ps := newFakeDisruptionController()
 
-	pdb, pdbName := newMaxUnavailablePodDisruptionBudget(t, intstr.FromInt(2))
+	pdb, pdbName := newMaxUnavailablePodDisruptionBudget(t, intstr.FromInt32(2))
 	add(t, dc.pdbStore, pdb)
 
 	rs, _ := newReplicaSet(t, 7)
@@ -556,6 +560,36 @@ func TestNakedPod(t *testing.T) {
 	dc.sync(ctx, pdbName)
 
 	ps.VerifyDisruptionAllowed(t, pdbName, 0)
+	verifyEventEmitted(t, dc, "UnmanagedPods")
+}
+
+// Create a pod  with unsupported controller, and verify that a PDB with a percentage
+// specified won't allow a disruption.
+func TestUnsupportedControllerPod(t *testing.T) {
+	dc, ps := newFakeDisruptionController()
+
+	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromString("28%"))
+	add(t, dc.pdbStore, pdb)
+	ctx := context.TODO()
+	dc.sync(ctx, pdbName)
+	// This verifies that when a PDB has 0 pods, disruptions are not allowed.
+	ps.VerifyDisruptionAllowed(t, pdbName, 0)
+
+	pod, _ := newPod(t, "naked")
+	isController := true
+	pod.OwnerReferences = append(pod.OwnerReferences, metav1.OwnerReference{
+		APIVersion: "apps.test.io/v1",
+		Kind:       "TestWorkload",
+		Name:       "fake-controller",
+		UID:        "b7329742-8daa-493a-8881-6ca07139172b",
+		Controller: &isController,
+	})
+
+	add(t, dc.podStore, pod)
+	dc.sync(ctx, pdbName)
+
+	ps.VerifyDisruptionAllowed(t, pdbName, 0)
+	verifyEventEmitted(t, dc, "CalculateExpectedPodCountFailed")
 }
 
 // Verify that disruption controller is not erroring when unmanaged pods are found
@@ -572,9 +606,8 @@ func TestStatusForUnmanagedPod(t *testing.T) {
 	pod, _ := newPod(t, "unmanaged")
 	add(t, dc.podStore, pod)
 	dc.sync(ctx, pdbName)
-
 	ps.VerifyNoStatusError(t, pdbName)
-
+	verifyEventEmitted(t, dc, "UnmanagedPods")
 }
 
 // Check if the unmanaged pods are correctly collected or not
@@ -598,7 +631,7 @@ func TestTotalUnmanagedPods(t *testing.T) {
 		t.Fatalf("expected one pod to be unmanaged pod but found %d", len(unmanagedPods))
 	}
 	ps.VerifyNoStatusError(t, pdbName)
-
+	verifyEventEmitted(t, dc, "UnmanagedPods")
 }
 
 // Verify that we count the scale of a ReplicaSet even when it has no Deployment.
@@ -639,7 +672,7 @@ func TestScaleResource(t *testing.T) {
 		return true, obj, nil
 	})
 
-	pdb, pdbName := newMaxUnavailablePodDisruptionBudget(t, intstr.FromInt(int(maxUnavailable)))
+	pdb, pdbName := newMaxUnavailablePodDisruptionBudget(t, intstr.FromInt32(maxUnavailable))
 	add(t, dc.pdbStore, pdb)
 
 	trueVal := true
@@ -997,7 +1030,7 @@ func TestPDBNotExist(t *testing.T) {
 func TestUpdateDisruptedPods(t *testing.T) {
 	dc, ps := newFakeDisruptionController()
 	dc.recheckQueue = workqueue.NewNamedDelayingQueue("pdb_queue")
-	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromInt(1))
+	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromInt32(1))
 	currentTime := dc.clock.Now()
 	pdb.Status.DisruptedPods = map[string]metav1.Time{
 		"p1":       {Time: currentTime},                       // Should be removed, pod deletion started.
@@ -1239,7 +1272,7 @@ func TestUpdatePDBStatusRetries(t *testing.T) {
 	dc.getUpdater = func() updater { return dc.writePdbStatus }
 	ctx := context.TODO()
 	// Create a PDB and 3 pods that match it.
-	pdb, pdbKey := newMinAvailablePodDisruptionBudget(t, intstr.FromInt(1))
+	pdb, pdbKey := newMinAvailablePodDisruptionBudget(t, intstr.FromInt32(1))
 	pdb, err := dc.coreClient.PolicyV1().PodDisruptionBudgets(pdb.Namespace).Create(ctx, pdb, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create PDB: %v", err)
@@ -1376,7 +1409,7 @@ func TestInvalidSelectors(t *testing.T) {
 		t.Run(tn, func(t *testing.T) {
 			dc, ps := newFakeDisruptionController()
 
-			pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromInt(3))
+			pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromInt32(3))
 			pdb.Spec.Selector = tc.labelSelector
 
 			add(t, dc.pdbStore, pdb)
@@ -1536,6 +1569,20 @@ func waitForCacheCount(store cache.Store, n int) error {
 	return wait.Poll(10*time.Millisecond, 10*time.Second, func() (bool, error) {
 		return len(store.List()) == n, nil
 	})
+}
+
+func verifyEventEmitted(t *testing.T, dc *disruptionController, expectedEvent string) {
+	ticker := time.NewTicker(500 * time.Millisecond)
+	for {
+		select {
+		case e := <-dc.recorder.(*record.FakeRecorder).Events:
+			if strings.Contains(e, expectedEvent) {
+				return
+			}
+		case <-ticker.C:
+			t.Fatalf("Timed out: expected event not generated: %v", expectedEvent)
+		}
+	}
 }
 
 // TestMain adds klog flags to make debugging tests easier.

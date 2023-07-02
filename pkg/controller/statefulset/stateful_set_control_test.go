@@ -174,6 +174,7 @@ func TestStatefulSetControl(t *testing.T) {
 		{UpdateSetStatusFailure, simpleSetFn},
 		{PodRecreateDeleteFailure, simpleSetFn},
 		{NewRevisionDeletePodFailure, simpleSetFn},
+		{RecreatesPVCForPendingPod, simpleSetFn},
 	}
 
 	for _, testCase := range testCases {
@@ -697,6 +698,45 @@ func CreatesPodsWithStartOrdinal(t *testing.T, set *apps.StatefulSet, invariants
 	}
 }
 
+func RecreatesPVCForPendingPod(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
+	client := fake.NewSimpleClientset()
+	om, _, ssc := setupController(client)
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		t.Error(err)
+	}
+	pods, err := om.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Error(err)
+	}
+	if _, err := ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
+		t.Errorf("Error updating StatefulSet %s", err)
+	}
+	if err := invariants(set, om); err != nil {
+		t.Error(err)
+	}
+	pods, err = om.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Error(err)
+	}
+	for _, claim := range getPersistentVolumeClaims(set, pods[0]) {
+		om.claimsIndexer.Delete(&claim)
+	}
+	pods[0].Status.Phase = v1.PodPending
+	om.podsIndexer.Update(pods[0])
+	if _, err := ssc.UpdateStatefulSet(context.TODO(), set, pods); err != nil {
+		t.Errorf("Error updating StatefulSet %s", err)
+	}
+	// invariants check if there any missing PVCs for the Pods
+	if err := invariants(set, om); err != nil {
+		t.Error(err)
+	}
+	_, err = om.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
 func TestStatefulSetControlScaleDownDeleteError(t *testing.T) {
 	runTestOverPVCRetentionPolicies(
 		t, "", func(t *testing.T, policy *apps.StatefulSetPersistentVolumeClaimRetentionPolicy) {
@@ -1002,7 +1042,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 		// Setup the statefulSet controller
 		totalPods := 6
 		var partition int32 = 3
-		var maxUnavailable = intstr.FromInt(2)
+		var maxUnavailable = intstr.FromInt32(2)
 		set := setupPodManagementPolicy(tc.policyType, newStatefulSet(totalPods))
 		set.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{
 			Type: apps.RollingUpdateStatefulSetStrategyType,
@@ -1090,7 +1130,7 @@ func setupForInvariant(t *testing.T) (*apps.StatefulSet, *fakeObjectManager, Sta
 	set := newStatefulSet(totalPods)
 	// update all pods >=3(3,4,5)
 	var partition int32 = 3
-	var maxUnavailable = intstr.FromInt(2)
+	var maxUnavailable = intstr.FromInt32(2)
 	set.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{
 		Type: apps.RollingUpdateStatefulSetStrategyType,
 		RollingUpdate: func() *apps.RollingUpdateStatefulSetStrategy {

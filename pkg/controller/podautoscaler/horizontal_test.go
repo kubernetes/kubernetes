@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -43,6 +44,7 @@ import (
 	autoscalingapiv2 "k8s.io/kubernetes/pkg/apis/autoscaling/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
+	"k8s.io/kubernetes/pkg/controller/podautoscaler/monitor"
 	"k8s.io/kubernetes/pkg/controller/util/selectors"
 	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2"
 	emapi "k8s.io/metrics/pkg/apis/external_metrics/v1beta1"
@@ -133,6 +135,12 @@ type testCase struct {
 	// Channel with names of HPA objects which we have reconciled.
 	processed chan string
 
+	// expected results reported to the mock monitor at first.
+	expectedReportedReconciliationActionLabel     monitor.ActionLabel
+	expectedReportedReconciliationErrorLabel      monitor.ErrorLabel
+	expectedReportedMetricComputationActionLabels map[autoscalingv2.MetricSourceType]monitor.ActionLabel
+	expectedReportedMetricComputationErrorLabels  map[autoscalingv2.MetricSourceType]monitor.ErrorLabel
+
 	// Target resource information.
 	resource *fakeResource
 
@@ -148,6 +156,8 @@ type testCase struct {
 
 	recommendations []timestampedRecommendation
 	hpaSelectors    *selectors.BiMultimap
+
+	containerResourceMetricsEnabled bool
 }
 
 // Needs to be called under a lock.
@@ -665,7 +675,7 @@ func findCpuUtilization(metricStatus []autoscalingv2.MetricStatus) (utilization 
 	return nil
 }
 
-func (tc *testCase) verifyResults(t *testing.T) {
+func (tc *testCase) verifyResults(t *testing.T, m *mockMonitor) {
 	tc.Lock()
 	defer tc.Unlock()
 
@@ -673,6 +683,38 @@ func (tc *testCase) verifyResults(t *testing.T) {
 	assert.True(t, tc.statusUpdated, "the status should have been updated")
 	if tc.verifyEvents {
 		assert.Equal(t, tc.specReplicas != tc.expectedDesiredReplicas, tc.eventCreated, "an event should have been created only if we expected a change in replicas")
+	}
+
+	tc.verifyRecordedMetric(t, m)
+}
+
+func (tc *testCase) verifyRecordedMetric(t *testing.T, m *mockMonitor) {
+	// First, wait for the reconciliation completed at least once.
+	m.waitUntilRecorded(t)
+
+	assert.Equal(t, tc.expectedReportedReconciliationActionLabel, m.reconciliationActionLabels[0], "the reconciliation action should be recorded in monitor expectedly")
+	assert.Equal(t, tc.expectedReportedReconciliationErrorLabel, m.reconciliationErrorLabels[0], "the reconciliation error should be recorded in monitor expectedly")
+
+	if len(tc.expectedReportedMetricComputationActionLabels) != len(m.metricComputationActionLabels) {
+		t.Fatalf("the metric computation actions for %d types should be recorded, but actually only %d was recorded", len(tc.expectedReportedMetricComputationActionLabels), len(m.metricComputationActionLabels))
+	}
+	if len(tc.expectedReportedMetricComputationErrorLabels) != len(m.metricComputationErrorLabels) {
+		t.Fatalf("the metric computation errors for %d types should be recorded, but actually only %d was recorded", len(tc.expectedReportedMetricComputationErrorLabels), len(m.metricComputationErrorLabels))
+	}
+
+	for metricType, l := range tc.expectedReportedMetricComputationActionLabels {
+		_, ok := m.metricComputationActionLabels[metricType]
+		if !ok {
+			t.Fatalf("the metric computation action should be recorded with metricType %s, but actually nothing was recorded", metricType)
+		}
+		assert.Equal(t, l, m.metricComputationActionLabels[metricType][0], "the metric computation action should be recorded in monitor expectedly")
+	}
+	for metricType, l := range tc.expectedReportedMetricComputationErrorLabels {
+		_, ok := m.metricComputationErrorLabels[metricType]
+		if !ok {
+			t.Fatalf("the metric computation error should be recorded with metricType %s, but actually nothing was recorded", metricType)
+		}
+		assert.Equal(t, l, m.metricComputationErrorLabels[metricType][0], "the metric computation error should be recorded in monitor expectedly")
 	}
 }
 
@@ -738,6 +780,7 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 		defaultTestingTolerance,
 		defaultTestingCPUInitializationPeriod,
 		defaultTestingDelayOfInitialReadinessStatus,
+		tc.containerResourceMetricsEnabled,
 	)
 	hpaController.hpaListerSynced = alwaysReady
 	if tc.recommendations != nil {
@@ -747,6 +790,7 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 		hpaController.hpaSelectors = tc.hpaSelectors
 	}
 
+	hpaController.monitor = newMockMonitor()
 	return hpaController, informerFactory
 }
 
@@ -784,12 +828,63 @@ func (tc *testCase) runTestWithController(t *testing.T, hpaController *Horizonta
 		// Wait for HPA to be processed.
 		<-tc.processed
 	}
-	tc.verifyResults(t)
+	m, ok := hpaController.monitor.(*mockMonitor)
+	if !ok {
+		t.Fatalf("test HPA controller should have mockMonitor, but actually not")
+	}
+	tc.verifyResults(t, m)
 }
 
 func (tc *testCase) runTest(t *testing.T) {
 	hpaController, informerFactory := tc.setupController(t)
 	tc.runTestWithController(t, hpaController, informerFactory)
+}
+
+// mockMonitor implements monitor.Monitor interface.
+// It records which results are observed in slices.
+type mockMonitor struct {
+	sync.RWMutex
+	reconciliationActionLabels []monitor.ActionLabel
+	reconciliationErrorLabels  []monitor.ErrorLabel
+
+	metricComputationActionLabels map[autoscalingv2.MetricSourceType][]monitor.ActionLabel
+	metricComputationErrorLabels  map[autoscalingv2.MetricSourceType][]monitor.ErrorLabel
+}
+
+func newMockMonitor() *mockMonitor {
+	return &mockMonitor{
+		metricComputationActionLabels: make(map[autoscalingv2.MetricSourceType][]monitor.ActionLabel),
+		metricComputationErrorLabels:  make(map[autoscalingv2.MetricSourceType][]monitor.ErrorLabel),
+	}
+}
+
+func (m *mockMonitor) ObserveReconciliationResult(action monitor.ActionLabel, err monitor.ErrorLabel, _ time.Duration) {
+	m.Lock()
+	defer m.Unlock()
+	m.reconciliationActionLabels = append(m.reconciliationActionLabels, action)
+	m.reconciliationErrorLabels = append(m.reconciliationErrorLabels, err)
+}
+
+func (m *mockMonitor) ObserveMetricComputationResult(action monitor.ActionLabel, err monitor.ErrorLabel, duration time.Duration, metricType autoscalingv2.MetricSourceType) {
+	m.Lock()
+	defer m.Unlock()
+
+	m.metricComputationActionLabels[metricType] = append(m.metricComputationActionLabels[metricType], action)
+	m.metricComputationErrorLabels[metricType] = append(m.metricComputationErrorLabels[metricType], err)
+}
+
+// waitUntilRecorded waits for the HPA controller to reconcile at least once.
+func (m *mockMonitor) waitUntilRecorded(t *testing.T) {
+	if err := wait.Poll(20*time.Millisecond, 100*time.Millisecond, func() (done bool, err error) {
+		m.RWMutex.RLock()
+		defer m.RWMutex.RUnlock()
+		if len(m.reconciliationActionLabels) == 0 || len(m.reconciliationErrorLabels) == 0 {
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		t.Fatalf("no reconciliation is recorded in the monitor, len(monitor.reconciliationActionLabels)=%v len(monitor.reconciliationErrorLabels)=%v ", len(m.reconciliationActionLabels), len(m.reconciliationErrorLabels))
+	}
 }
 
 func TestScaleUp(t *testing.T) {
@@ -804,6 +899,14 @@ func TestScaleUp(t *testing.T) {
 		reportedLevels:          []uint64{300, 500, 700},
 		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		useMetricsAPI:           true,
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleUp,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -826,10 +929,59 @@ func TestScaleUpContainer(t *testing.T) {
 				Container: "container1",
 			},
 		}},
-		reportedLevels:      []uint64{300, 500, 700},
-		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-		useMetricsAPI:       true,
+		reportedLevels:                            []uint64{300, 500, 700},
+		reportedCPURequests:                       []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsAPI:                             true,
+		containerResourceMetricsEnabled:           true,
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ContainerResourceMetricSourceType: monitor.ActionLabelScaleUp,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ContainerResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
+	tc.runTest(t)
+}
+
+func TestContainerMetricWithTheFeatureGateDisabled(t *testing.T) {
+	// In this test case, the container metrics will be ignored
+	// and only the CPUTarget will be taken into consideration.
+
+	tc := testCase{
+		minReplicas:             2,
+		maxReplicas:             6,
+		specReplicas:            3,
+		statusReplicas:          3,
+		expectedDesiredReplicas: 4,
+		CPUTarget:               30,
+		verifyCPUCurrent:        true,
+		metricsTarget: []autoscalingv2.MetricSpec{{
+			Type: autoscalingv2.ContainerResourceMetricSourceType,
+			ContainerResource: &autoscalingv2.ContainerResourceMetricSource{
+				Name: v1.ResourceCPU,
+				Target: autoscalingv2.MetricTarget{
+					Type:               autoscalingv2.UtilizationMetricType,
+					AverageUtilization: pointer.Int32(10),
+				},
+				Container: "container1",
+			},
+		}},
+		reportedLevels:      []uint64{300, 400, 500},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelInternal,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType:          monitor.ActionLabelScaleUp,
+			autoscalingv2.ContainerResourceMetricSourceType: monitor.ActionLabelNone,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType:          monitor.ErrorLabelNone,
+			autoscalingv2.ContainerResourceMetricSourceType: monitor.ErrorLabelInternal,
+		},
+	}
+
 	tc.runTest(t)
 }
 
@@ -847,6 +999,14 @@ func TestScaleUpUnreadyLessScale(t *testing.T) {
 		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		reportedPodReadiness:    []v1.ConditionStatus{v1.ConditionFalse, v1.ConditionTrue, v1.ConditionTrue},
 		useMetricsAPI:           true,
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleUp,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -865,6 +1025,14 @@ func TestScaleUpHotCpuLessScale(t *testing.T) {
 		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		reportedPodStartTime:    []metav1.Time{hotCPUCreationTime(), coolCPUCreationTime(), coolCPUCreationTime()},
 		useMetricsAPI:           true,
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleUp,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -888,6 +1056,14 @@ func TestScaleUpUnreadyNoScale(t *testing.T) {
 			Status: v1.ConditionTrue,
 			Reason: "ReadyForNewScale",
 		}),
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelNone,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -912,6 +1088,14 @@ func TestScaleUpHotCpuNoScale(t *testing.T) {
 			Status: v1.ConditionTrue,
 			Reason: "ReadyForNewScale",
 		}),
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelNone,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -931,6 +1115,14 @@ func TestScaleUpIgnoresFailedPods(t *testing.T) {
 		reportedPodReadiness:    []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
 		reportedPodPhase:        []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodFailed, v1.PodFailed},
 		useMetricsAPI:           true,
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleUp,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -951,6 +1143,14 @@ func TestScaleUpIgnoresDeletionPods(t *testing.T) {
 		reportedPodPhase:             []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning},
 		reportedPodDeletionTimestamp: []bool{false, false, true, true},
 		useMetricsAPI:                true,
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleUp,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -972,6 +1172,14 @@ func TestScaleUpDeployment(t *testing.T) {
 			apiVersion: "apps/v1",
 			kind:       "Deployment",
 		},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleUp,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -992,6 +1200,14 @@ func TestScaleUpReplicaSet(t *testing.T) {
 			name:       "test-replicaset",
 			apiVersion: "apps/v1",
 			kind:       "ReplicaSet",
+		},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleUp,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
 		},
 	}
 	tc.runTest(t)
@@ -1022,6 +1238,14 @@ func TestScaleUpCM(t *testing.T) {
 		},
 		reportedLevels:      []uint64{20000, 10000, 30000},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.PodsMetricSourceType: monitor.ActionLabelScaleUp,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.PodsMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -1049,10 +1273,18 @@ func TestScaleUpCMUnreadyAndHotCpuNoLessScale(t *testing.T) {
 				},
 			},
 		},
-		reportedLevels:       []uint64{50000, 10000, 30000},
-		reportedPodReadiness: []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse},
-		reportedPodStartTime: []metav1.Time{coolCPUCreationTime(), coolCPUCreationTime(), hotCPUCreationTime()},
-		reportedCPURequests:  []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		reportedLevels:                            []uint64{50000, 10000, 30000},
+		reportedPodReadiness:                      []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse},
+		reportedPodStartTime:                      []metav1.Time{coolCPUCreationTime(), coolCPUCreationTime(), hotCPUCreationTime()},
+		reportedCPURequests:                       []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.PodsMetricSourceType: monitor.ActionLabelScaleUp,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.PodsMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -1093,6 +1325,14 @@ func TestScaleUpCMUnreadyandCpuHot(t *testing.T) {
 			Status: v1.ConditionTrue,
 			Reason: "TooManyReplicas",
 		}),
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.PodsMetricSourceType: monitor.ActionLabelScaleUp,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.PodsMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -1132,6 +1372,14 @@ func TestScaleUpHotCpuNoScaleWouldScaleDown(t *testing.T) {
 			Status: v1.ConditionTrue,
 			Reason: "TooManyReplicas",
 		}),
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.PodsMetricSourceType: monitor.ActionLabelScaleUp,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.PodsMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -1165,6 +1413,14 @@ func TestScaleUpCMObject(t *testing.T) {
 			},
 		},
 		reportedLevels: []uint64{20000},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ObjectMetricSourceType: monitor.ActionLabelScaleUp,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ObjectMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -1198,6 +1454,14 @@ func TestScaleUpFromZeroCMObject(t *testing.T) {
 			},
 		},
 		reportedLevels: []uint64{20000},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ObjectMetricSourceType: monitor.ActionLabelScaleUp,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ObjectMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -1231,6 +1495,14 @@ func TestScaleUpFromZeroIgnoresToleranceCMObject(t *testing.T) {
 			},
 		},
 		reportedLevels: []uint64{1000},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ObjectMetricSourceType: monitor.ActionLabelScaleUp,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ObjectMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -1264,6 +1536,14 @@ func TestScaleUpPerPodCMObject(t *testing.T) {
 			},
 		},
 		reportedLevels: []uint64{40000},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ObjectMetricSourceType: monitor.ActionLabelScaleUp,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ObjectMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -1291,6 +1571,14 @@ func TestScaleUpCMExternal(t *testing.T) {
 			},
 		},
 		reportedLevels: []uint64{8600},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ExternalMetricSourceType: monitor.ActionLabelScaleUp,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ExternalMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -1318,6 +1606,14 @@ func TestScaleUpPerPodCMExternal(t *testing.T) {
 			},
 		},
 		reportedLevels: []uint64{8600},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ExternalMetricSourceType: monitor.ActionLabelScaleUp,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ExternalMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -1335,6 +1631,14 @@ func TestScaleDown(t *testing.T) {
 		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		useMetricsAPI:           true,
 		recommendations:         []timestampedRecommendation{},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleDown,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleDown,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -1359,8 +1663,17 @@ func TestScaleDownContainerResource(t *testing.T) {
 				},
 			},
 		}},
-		useMetricsAPI:   true,
-		recommendations: []timestampedRecommendation{},
+		useMetricsAPI:                             true,
+		containerResourceMetricsEnabled:           true,
+		recommendations:                           []timestampedRecommendation{},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleDown,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ContainerResourceMetricSourceType: monitor.ActionLabelScaleDown,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ContainerResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -1379,6 +1692,14 @@ func TestScaleDownWithScalingRules(t *testing.T) {
 		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		useMetricsAPI:           true,
 		recommendations:         []timestampedRecommendation{},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleDown,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleDown,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -1399,6 +1720,18 @@ func TestScaleUpOneMetricInvalid(t *testing.T) {
 		},
 		reportedLevels:      []uint64{300, 400, 500},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelInternal,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleUp,
+			// Actually, such an invalid type should be validated in the kube-apiserver and invalid metric type shouldn't be recorded.
+			"CheddarCheese": monitor.ActionLabelNone,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+			// Actually, such an invalid type should be validated in the kube-apiserver and invalid metric type shouldn't be recorded.
+			"CheddarCheese": monitor.ErrorLabelSpec,
+		},
 	}
 	tc.runTest(t)
 }
@@ -1420,6 +1753,18 @@ func TestScaleUpFromZeroOneMetricInvalid(t *testing.T) {
 		reportedLevels:      []uint64{300, 400, 500},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		recommendations:     []timestampedRecommendation{},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelInternal,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleUp,
+			// Actually, such an invalid type should be validated in the kube-apiserver and invalid metric type shouldn't be recorded.
+			"CheddarCheese": monitor.ActionLabelNone,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+			// Actually, such an invalid type should be validated in the kube-apiserver and invalid metric type shouldn't be recorded.
+			"CheddarCheese": monitor.ErrorLabelSpec,
+		},
 	}
 	tc.runTest(t)
 }
@@ -1442,6 +1787,16 @@ func TestScaleUpBothMetricsEmpty(t *testing.T) { // Switch to missing
 		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
 			{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
 			{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "InvalidMetricSourceType"},
+		},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelInternal,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			// Actually, such an invalid type should be validated in the kube-apiserver and invalid metric type shouldn't be recorded.
+			"CheddarCheese": monitor.ActionLabelNone,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			// Actually, such an invalid type should be validated in the kube-apiserver and invalid metric type shouldn't be recorded.
+			"CheddarCheese": monitor.ErrorLabelSpec,
 		},
 	}
 	tc.runTest(t)
@@ -1469,6 +1824,14 @@ func TestScaleDownStabilizeInitialSize(t *testing.T) {
 			Status: v1.ConditionTrue,
 			Reason: "ScaleDownStabilized",
 		}),
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleDown,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -1499,6 +1862,14 @@ func TestScaleDownCM(t *testing.T) {
 		reportedLevels:      []uint64{12000, 12000, 12000, 12000, 12000},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		recommendations:     []timestampedRecommendation{},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleDown,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.PodsMetricSourceType: monitor.ActionLabelScaleDown,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.PodsMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -1534,6 +1905,14 @@ func TestScaleDownCMObject(t *testing.T) {
 		reportedLevels:      []uint64{12000},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		recommendations:     []timestampedRecommendation{},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleDown,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ObjectMetricSourceType: monitor.ActionLabelScaleDown,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ObjectMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -1569,6 +1948,14 @@ func TestScaleDownToZeroCMObject(t *testing.T) {
 		reportedLevels:      []uint64{0},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		recommendations:     []timestampedRecommendation{},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleDown,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ObjectMetricSourceType: monitor.ActionLabelScaleDown,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ObjectMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -1604,6 +1991,14 @@ func TestScaleDownPerPodCMObject(t *testing.T) {
 		reportedLevels:      []uint64{60000},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		recommendations:     []timestampedRecommendation{},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleDown,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ObjectMetricSourceType: monitor.ActionLabelScaleDown,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ObjectMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -1632,6 +2027,14 @@ func TestScaleDownCMExternal(t *testing.T) {
 		},
 		reportedLevels:  []uint64{8600},
 		recommendations: []timestampedRecommendation{},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleDown,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ExternalMetricSourceType: monitor.ActionLabelScaleDown,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ExternalMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -1660,6 +2063,14 @@ func TestScaleDownToZeroCMExternal(t *testing.T) {
 		},
 		reportedLevels:  []uint64{0},
 		recommendations: []timestampedRecommendation{},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleDown,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ExternalMetricSourceType: monitor.ActionLabelScaleDown,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ExternalMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -1688,6 +2099,14 @@ func TestScaleDownPerPodCMExternal(t *testing.T) {
 		},
 		reportedLevels:  []uint64{8600},
 		recommendations: []timestampedRecommendation{},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleDown,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ExternalMetricSourceType: monitor.ActionLabelScaleDown,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ExternalMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -1707,6 +2126,14 @@ func TestScaleDownIncludeUnreadyPods(t *testing.T) {
 		useMetricsAPI:           true,
 		reportedPodReadiness:    []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
 		recommendations:         []timestampedRecommendation{},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleDown,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleDown,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -1726,6 +2153,14 @@ func TestScaleDownIgnoreHotCpuPods(t *testing.T) {
 		useMetricsAPI:           true,
 		reportedPodStartTime:    []metav1.Time{coolCPUCreationTime(), coolCPUCreationTime(), coolCPUCreationTime(), hotCPUCreationTime(), hotCPUCreationTime()},
 		recommendations:         []timestampedRecommendation{},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleDown,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleDown,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -1746,6 +2181,14 @@ func TestScaleDownIgnoresFailedPods(t *testing.T) {
 		reportedPodReadiness:    []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
 		reportedPodPhase:        []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodFailed, v1.PodFailed},
 		recommendations:         []timestampedRecommendation{},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleDown,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleDown,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -1767,6 +2210,14 @@ func TestScaleDownIgnoresDeletionPods(t *testing.T) {
 		reportedPodPhase:             []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning},
 		reportedPodDeletionTimestamp: []bool{false, false, false, false, false, true, true},
 		recommendations:              []timestampedRecommendation{},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleDown,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleDown,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -1787,6 +2238,14 @@ func TestTolerance(t *testing.T) {
 			Status: v1.ConditionTrue,
 			Reason: "ReadyForNewScale",
 		}),
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelNone,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -1820,6 +2279,14 @@ func TestToleranceCM(t *testing.T) {
 			Status: v1.ConditionTrue,
 			Reason: "ReadyForNewScale",
 		}),
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.PodsMetricSourceType: monitor.ActionLabelNone,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.PodsMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -1858,6 +2325,14 @@ func TestToleranceCMObject(t *testing.T) {
 			Status: v1.ConditionTrue,
 			Reason: "ReadyForNewScale",
 		}),
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ObjectMetricSourceType: monitor.ActionLabelNone,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ObjectMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -1890,6 +2365,14 @@ func TestToleranceCMExternal(t *testing.T) {
 			Status: v1.ConditionTrue,
 			Reason: "ReadyForNewScale",
 		}),
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ExternalMetricSourceType: monitor.ActionLabelNone,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ExternalMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -1927,6 +2410,14 @@ func TestTolerancePerPodCMObject(t *testing.T) {
 			Status: v1.ConditionTrue,
 			Reason: "ReadyForNewScale",
 		}),
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ObjectMetricSourceType: monitor.ActionLabelNone,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ObjectMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -1959,6 +2450,14 @@ func TestTolerancePerPodCMExternal(t *testing.T) {
 			Status: v1.ConditionTrue,
 			Reason: "ReadyForNewScale",
 		}),
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ExternalMetricSourceType: monitor.ActionLabelNone,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ExternalMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -1980,6 +2479,14 @@ func TestMinReplicas(t *testing.T) {
 			Reason: "TooFewReplicas",
 		}),
 		recommendations: []timestampedRecommendation{},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleDown,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleDown,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -2001,6 +2508,14 @@ func TestZeroMinReplicasDesiredZero(t *testing.T) {
 			Reason: "DesiredWithinRange",
 		}),
 		recommendations: []timestampedRecommendation{},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleDown,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleDown,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -2022,6 +2537,14 @@ func TestMinReplicasDesiredZero(t *testing.T) {
 			Reason: "TooFewReplicas",
 		}),
 		recommendations: []timestampedRecommendation{},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleDown,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleDown,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -2041,6 +2564,10 @@ func TestZeroReplicas(t *testing.T) {
 			{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
 			{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "ScalingDisabled"},
 		},
+		expectedReportedReconciliationActionLabel:     monitor.ActionLabelNone,
+		expectedReportedReconciliationErrorLabel:      monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{},
+		expectedReportedMetricComputationErrorLabels:  map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{},
 	}
 	tc.runTest(t)
 }
@@ -2059,6 +2586,10 @@ func TestTooFewReplicas(t *testing.T) {
 		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
 			{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededRescale"},
 		},
+		expectedReportedReconciliationActionLabel:     monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:      monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{},
+		expectedReportedMetricComputationErrorLabels:  map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{},
 	}
 	tc.runTest(t)
 }
@@ -2077,6 +2608,10 @@ func TestTooManyReplicas(t *testing.T) {
 		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
 			{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededRescale"},
 		},
+		expectedReportedReconciliationActionLabel:     monitor.ActionLabelScaleDown,
+		expectedReportedReconciliationErrorLabel:      monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{},
+		expectedReportedMetricComputationErrorLabels:  map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{},
 	}
 	tc.runTest(t)
 }
@@ -2097,6 +2632,14 @@ func TestMaxReplicas(t *testing.T) {
 			Status: v1.ConditionTrue,
 			Reason: "TooManyReplicas",
 		}),
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleUp,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -2117,6 +2660,14 @@ func TestSuperfluousMetrics(t *testing.T) {
 			Status: v1.ConditionTrue,
 			Reason: "TooManyReplicas",
 		}),
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleUp,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -2133,6 +2684,14 @@ func TestMissingMetrics(t *testing.T) {
 		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		useMetricsAPI:           true,
 		recommendations:         []timestampedRecommendation{},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleDown,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleDown,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -2151,6 +2710,14 @@ func TestEmptyMetrics(t *testing.T) {
 		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
 			{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
 			{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "FailedGetResourceMetric"},
+		},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelInternal,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelNone,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelInternal,
 		},
 	}
 	tc.runTest(t)
@@ -2171,6 +2738,14 @@ func TestEmptyCPURequest(t *testing.T) {
 			{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
 			{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "FailedGetResourceMetric"},
 		},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelInternal,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelNone,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelInternal,
+		},
 	}
 	tc.runTest(t)
 }
@@ -2187,6 +2762,14 @@ func TestEventCreated(t *testing.T) {
 		reportedCPURequests:     []resource.Quantity{resource.MustParse("0.2")},
 		verifyEvents:            true,
 		useMetricsAPI:           true,
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleUp,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -2208,6 +2791,14 @@ func TestEventNotCreated(t *testing.T) {
 			Status: v1.ConditionTrue,
 			Reason: "ReadyForNewScale",
 		}),
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelNone,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -2224,6 +2815,14 @@ func TestMissingReports(t *testing.T) {
 		reportedCPURequests:     []resource.Quantity{resource.MustParse("0.2")},
 		useMetricsAPI:           true,
 		recommendations:         []timestampedRecommendation{},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleDown,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleDown,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -2246,6 +2845,14 @@ func TestUpscaleCap(t *testing.T) {
 			Status: v1.ConditionTrue,
 			Reason: "ScaleUpLimit",
 		}),
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleUp,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -2269,6 +2876,14 @@ func TestUpscaleCapGreaterThanMaxReplicas(t *testing.T) {
 			Status: v1.ConditionTrue,
 			Reason: "TooManyReplicas",
 		}),
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleUp,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -2295,6 +2910,14 @@ func TestMoreReplicasThanSpecNoScale(t *testing.T) {
 			Status: v1.ConditionTrue,
 			Reason: "ReadyForNewScale",
 		}),
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelNone,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -2322,6 +2945,10 @@ func TestConditionInvalidSelectorMissing(t *testing.T) {
 				Reason: "InvalidSelector",
 			},
 		},
+		expectedReportedReconciliationActionLabel:     monitor.ActionLabelNone,
+		expectedReportedReconciliationErrorLabel:      monitor.ErrorLabelInternal,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{},
+		expectedReportedMetricComputationErrorLabels:  map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{},
 	}
 
 	_, _, _, _, testScaleClient := tc.prepareTestClient(t)
@@ -2368,6 +2995,10 @@ func TestConditionInvalidSelectorUnparsable(t *testing.T) {
 				Reason: "InvalidSelector",
 			},
 		},
+		expectedReportedReconciliationActionLabel:     monitor.ActionLabelNone,
+		expectedReportedReconciliationErrorLabel:      monitor.ErrorLabelInternal,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{},
+		expectedReportedMetricComputationErrorLabels:  map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{},
 	}
 
 	_, _, _, _, testScaleClient := tc.prepareTestClient(t)
@@ -2407,6 +3038,14 @@ func TestConditionNoAmbiguousSelectorWhenNoSelectorOverlapBetweenHPAs(t *testing
 		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		useMetricsAPI:           true,
 		hpaSelectors:            hpaSelectors,
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleUp,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -2438,6 +3077,10 @@ func TestConditionAmbiguousSelectorWhenFullSelectorOverlapBetweenHPAs(t *testing
 			},
 		},
 		hpaSelectors: hpaSelectors,
+		expectedReportedReconciliationActionLabel:     monitor.ActionLabelNone,
+		expectedReportedReconciliationErrorLabel:      monitor.ErrorLabelInternal,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{},
+		expectedReportedMetricComputationErrorLabels:  map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{},
 	}
 	tc.runTest(t)
 }
@@ -2469,6 +3112,10 @@ func TestConditionAmbiguousSelectorWhenPartialSelectorOverlapBetweenHPAs(t *test
 			},
 		},
 		hpaSelectors: hpaSelectors,
+		expectedReportedReconciliationActionLabel:     monitor.ActionLabelNone,
+		expectedReportedReconciliationErrorLabel:      monitor.ErrorLabelInternal,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{},
+		expectedReportedMetricComputationErrorLabels:  map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{},
 	}
 
 	testClient, _, _, _, _ := tc.prepareTestClient(t)
@@ -2554,6 +3201,10 @@ func TestConditionFailedGetMetrics(t *testing.T) {
 	}
 
 	for reason, specs := range metricsTargets {
+		metricType := autoscalingv2.ResourceMetricSourceType
+		if specs != nil {
+			metricType = specs[0].Type
+		}
 		tc := testCase{
 			minReplicas:             1,
 			maxReplicas:             100,
@@ -2564,6 +3215,14 @@ func TestConditionFailedGetMetrics(t *testing.T) {
 			reportedLevels:          []uint64{100, 200, 300},
 			reportedCPURequests:     []resource.Quantity{resource.MustParse("0.1"), resource.MustParse("0.1"), resource.MustParse("0.1")},
 			useMetricsAPI:           true,
+			expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
+			expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelInternal,
+			expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+				metricType: monitor.ActionLabelNone,
+			},
+			expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+				metricType: monitor.ErrorLabelInternal,
+			},
 		}
 		_, testMetricsClient, testCMClient, testEMClient, _ := tc.prepareTestClient(t)
 		tc.testMetricsClient = testMetricsClient
@@ -2620,6 +3279,16 @@ func TestConditionInvalidSourceType(t *testing.T) {
 				Reason: "InvalidMetricSourceType",
 			},
 		},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelInternal,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			// Actually, such an invalid type should be validated in the kube-apiserver and invalid metric type shouldn't be recorded.
+			"CheddarCheese": monitor.ActionLabelNone,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			// Actually, such an invalid type should be validated in the kube-apiserver and invalid metric type shouldn't be recorded.
+			"CheddarCheese": monitor.ErrorLabelSpec,
+		},
 	}
 	tc.runTest(t)
 }
@@ -2642,6 +3311,10 @@ func TestConditionFailedGetScale(t *testing.T) {
 				Reason: "FailedGetScale",
 			},
 		},
+		expectedReportedReconciliationActionLabel:     monitor.ActionLabelNone,
+		expectedReportedReconciliationErrorLabel:      monitor.ErrorLabelInternal,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{},
+		expectedReportedMetricComputationErrorLabels:  map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{},
 	}
 
 	_, _, _, _, testScaleClient := tc.prepareTestClient(t)
@@ -2670,6 +3343,14 @@ func TestConditionFailedUpdateScale(t *testing.T) {
 			Status: v1.ConditionFalse,
 			Reason: "FailedUpdateScale",
 		}),
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelInternal,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleUp,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 
 	_, _, _, _, testScaleClient := tc.prepareTestClient(t)
@@ -2723,6 +3404,14 @@ func TestNoBackoffUpscaleCM(t *testing.T) {
 			Status: v1.ConditionFalse,
 			Reason: "DesiredWithinRange",
 		}),
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.PodsMetricSourceType: monitor.ActionLabelScaleUp,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.PodsMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -2768,6 +3457,16 @@ func TestNoBackoffUpscaleCMNoBackoffCpu(t *testing.T) {
 			Status: v1.ConditionTrue,
 			Reason: "TooManyReplicas",
 		}),
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleUp,
+			autoscalingv2.PodsMetricSourceType:     monitor.ActionLabelScaleUp,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+			autoscalingv2.PodsMetricSourceType:     monitor.ErrorLabelNone,
+		},
 	}
 	tc.runTest(t)
 }
@@ -2795,6 +3494,14 @@ func TestStabilizeDownscale(t *testing.T) {
 		recommendations: []timestampedRecommendation{
 			{10, time.Now().Add(-10 * time.Minute)},
 			{4, time.Now().Add(-1 * time.Minute)},
+		},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleDown,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
 		},
 	}
 	tc.runTest(t)
@@ -2857,6 +3564,14 @@ func TestComputedToleranceAlgImplementation(t *testing.T) {
 		},
 		useMetricsAPI:   true,
 		recommendations: []timestampedRecommendation{},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleDown,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleDown,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc1.runTest(t)
 
@@ -2900,6 +3615,14 @@ func TestComputedToleranceAlgImplementation(t *testing.T) {
 			Status: v1.ConditionTrue,
 			Reason: "ReadyForNewScale",
 		}),
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelNone,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	tc2.runTest(t)
 }
@@ -2920,6 +3643,10 @@ func TestScaleUpRCImmediately(t *testing.T) {
 		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
 			{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededRescale"},
 		},
+		expectedReportedReconciliationActionLabel:     monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:      monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{},
+		expectedReportedMetricComputationErrorLabels:  map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{},
 	}
 	tc.runTest(t)
 }
@@ -2940,6 +3667,10 @@ func TestScaleDownRCImmediately(t *testing.T) {
 		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
 			{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededRescale"},
 		},
+		expectedReportedReconciliationActionLabel:     monitor.ActionLabelScaleDown,
+		expectedReportedReconciliationErrorLabel:      monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{},
+		expectedReportedMetricComputationErrorLabels:  map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{},
 	}
 	tc.runTest(t)
 }
@@ -2961,6 +3692,14 @@ func TestAvoidUnnecessaryUpdates(t *testing.T) {
 		useMetricsAPI:           true,
 		lastScaleTime:           &now,
 		recommendations:         []timestampedRecommendation{},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleDown,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
 	testClient, _, _, _, _ := tc.prepareTestClient(t)
 	tc.testClient = testClient
@@ -4218,6 +4957,16 @@ func TestScaleUpOneMetricEmpty(t *testing.T) {
 		},
 		reportedLevels:      []uint64{300, 400, 500},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelInternal,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleUp,
+			autoscalingv2.ExternalMetricSourceType: monitor.ActionLabelNone,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+			autoscalingv2.ExternalMetricSourceType: monitor.ErrorLabelInternal,
+		},
 	}
 	_, _, _, testEMClient, _ := tc.prepareTestClient(t)
 	testEMClient.PrependReactor("list", "*", func(action core.Action) (handled bool, ret runtime.Object, err error) {
@@ -4247,6 +4996,16 @@ func TestNoScaleDownOneMetricInvalid(t *testing.T) {
 		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
 			{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
 			{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "InvalidMetricSourceType"},
+		},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelInternal,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleDown,
+			"CheddarCheese":                        monitor.ActionLabelNone,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+			"CheddarCheese":                        monitor.ErrorLabelSpec,
 		},
 	}
 
@@ -4283,6 +5042,16 @@ func TestNoScaleDownOneMetricEmpty(t *testing.T) {
 		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
 			{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
 			{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "FailedGetExternalMetric"},
+		},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelInternal,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleDown,
+			autoscalingv2.ExternalMetricSourceType: monitor.ActionLabelNone,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+			autoscalingv2.ExternalMetricSourceType: monitor.ErrorLabelInternal,
 		},
 	}
 	_, _, _, testEMClient, _ := tc.prepareTestClient(t)
@@ -4536,6 +5305,7 @@ func TestMultipleHPAs(t *testing.T) {
 		defaultTestingTolerance,
 		defaultTestingCPUInitializationPeriod,
 		defaultTestingDelayOfInitialReadinessStatus,
+		false,
 	)
 	hpaController.scaleUpEvents = scaleUpEventsMap
 	hpaController.scaleDownEvents = scaleDownEventsMap

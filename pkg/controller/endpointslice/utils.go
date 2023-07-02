@@ -138,8 +138,8 @@ func newEndpointSlice(service *v1.Service, endpointMeta *endpointMeta) *discover
 			OwnerReferences: []metav1.OwnerReference{*ownerRef},
 			Namespace:       service.Namespace,
 		},
-		Ports:       endpointMeta.Ports,
-		AddressType: endpointMeta.AddressType,
+		Ports:       endpointMeta.ports,
+		AddressType: endpointMeta.addressType,
 		Endpoints:   []discovery.Endpoint{},
 	}
 	// add parent service labels
@@ -246,7 +246,7 @@ func setEndpointSliceLabels(epSlice *discovery.EndpointSlice, service *v1.Servic
 	// check if the endpoint slice and the service have the same labels
 	// clone current slice labels except the reserved labels
 	for key, value := range epSlice.Labels {
-		if IsReservedLabelKey(key) {
+		if isReservedLabelKey(key) {
 			continue
 		}
 		// copy endpoint slice labels
@@ -254,7 +254,7 @@ func setEndpointSliceLabels(epSlice *discovery.EndpointSlice, service *v1.Servic
 	}
 
 	for key, value := range service.Labels {
-		if IsReservedLabelKey(key) {
+		if isReservedLabelKey(key) {
 			klog.Warningf("Service %s/%s using reserved endpoint slices label, skipping label %s: %s", service.Namespace, service.Name, key, value)
 			continue
 		}
@@ -281,8 +281,8 @@ func setEndpointSliceLabels(epSlice *discovery.EndpointSlice, service *v1.Servic
 	return svcLabels, updated
 }
 
-// IsReservedLabelKey return true if the label is one of the reserved label for slices
-func IsReservedLabelKey(label string) bool {
+// isReservedLabelKey return true if the label is one of the reserved label for slices
+func isReservedLabelKey(label string) bool {
 	if label == discovery.LabelServiceName ||
 		label == discovery.LabelManagedBy ||
 		label == v1.IsHeadlessService {
@@ -302,8 +302,8 @@ func (sl endpointSliceEndpointLen) Less(i, j int) bool {
 }
 
 // returns a map of address types used by a service
-func getAddressTypesForService(service *v1.Service) map[discovery.AddressType]struct{} {
-	serviceSupportedAddresses := make(map[discovery.AddressType]struct{})
+func getAddressTypesForService(service *v1.Service) sets.Set[discovery.AddressType] {
+	serviceSupportedAddresses := sets.New[discovery.AddressType]()
 	// TODO: (khenidak) when address types are removed in favor of
 	// v1.IPFamily this will need to be removed, and work directly with
 	// v1.IPFamily types
@@ -312,15 +312,15 @@ func getAddressTypesForService(service *v1.Service) map[discovery.AddressType]st
 	// as it gets deprecated
 	for _, family := range service.Spec.IPFamilies {
 		if family == v1.IPv4Protocol {
-			serviceSupportedAddresses[discovery.AddressTypeIPv4] = struct{}{}
+			serviceSupportedAddresses.Insert(discovery.AddressTypeIPv4)
 		}
 
 		if family == v1.IPv6Protocol {
-			serviceSupportedAddresses[discovery.AddressTypeIPv6] = struct{}{}
+			serviceSupportedAddresses.Insert(discovery.AddressTypeIPv6)
 		}
 	}
 
-	if len(serviceSupportedAddresses) > 0 {
+	if serviceSupportedAddresses.Len() > 0 {
 		return serviceSupportedAddresses // we have found families for this service
 	}
 
@@ -344,7 +344,7 @@ func getAddressTypesForService(service *v1.Service) map[discovery.AddressType]st
 		if utilnet.IsIPv6String(service.Spec.ClusterIP) {
 			addrType = discovery.AddressTypeIPv6
 		}
-		serviceSupportedAddresses[addrType] = struct{}{}
+		serviceSupportedAddresses.Insert(addrType)
 		klog.V(2).Infof("couldn't find ipfamilies for service: %v/%v. This could happen if controller manager is connected to an old apiserver that does not support ip families yet. EndpointSlices for this Service will use %s as the IP Family based on familyOf(ClusterIP:%v).", service.Namespace, service.Name, addrType, service.Spec.ClusterIP)
 		return serviceSupportedAddresses
 	}
@@ -354,14 +354,14 @@ func getAddressTypesForService(service *v1.Service) map[discovery.AddressType]st
 	// if the service is headless with no selector, then this will remain the case
 	// if the service is headless with selector then chances are pods are still using single family
 	// since kubelet will need to restart in order to start patching pod status with multiple ips
-	serviceSupportedAddresses[discovery.AddressTypeIPv4] = struct{}{}
-	serviceSupportedAddresses[discovery.AddressTypeIPv6] = struct{}{}
+	serviceSupportedAddresses.Insert(discovery.AddressTypeIPv4)
+	serviceSupportedAddresses.Insert(discovery.AddressTypeIPv6)
 	klog.V(2).Infof("couldn't find ipfamilies for headless service: %v/%v likely because controller manager is likely connected to an old apiserver that does not support ip families yet. The service endpoint slice will use dual stack families until api-server default it correctly", service.Namespace, service.Name)
 	return serviceSupportedAddresses
 }
 
 func unchangedSlices(existingSlices, slicesToUpdate, slicesToDelete []*discovery.EndpointSlice) []*discovery.EndpointSlice {
-	changedSliceNames := sets.String{}
+	changedSliceNames := sets.New[string]()
 	for _, slice := range slicesToUpdate {
 		changedSliceNames.Insert(slice.Name)
 	}
@@ -378,12 +378,17 @@ func unchangedSlices(existingSlices, slicesToUpdate, slicesToDelete []*discovery
 	return unchangedSlices
 }
 
-// hintsEnabled returns true if the provided annotations include a
-// v1.AnnotationTopologyAwareHints key with a value set to "Auto" or "auto".
+// hintsEnabled returns true if the provided annotations include either
+// v1.AnnotationTopologyMode or v1.DeprecatedAnnotationTopologyAwareHints key
+// with a value set to "Auto" or "auto". When both are set,
+// v1.DeprecatedAnnotationTopologyAwareHints has precedence.
 func hintsEnabled(annotations map[string]string) bool {
-	val, ok := annotations[v1.AnnotationTopologyAwareHints]
+	val, ok := annotations[v1.DeprecatedAnnotationTopologyAwareHints]
 	if !ok {
-		return false
+		val, ok = annotations[v1.AnnotationTopologyMode]
+		if !ok {
+			return false
+		}
 	}
 	return val == "Auto" || val == "auto"
 }
@@ -397,6 +402,16 @@ func managedByChanged(endpointSlice1, endpointSlice2 *discovery.EndpointSlice) b
 // managedByController returns true if the controller of the provided
 // EndpointSlices is the EndpointSlice controller.
 func managedByController(endpointSlice *discovery.EndpointSlice) bool {
-	managedBy, _ := endpointSlice.Labels[discovery.LabelManagedBy]
+	managedBy := endpointSlice.Labels[discovery.LabelManagedBy]
 	return managedBy == controllerName
+}
+
+// isNodeReady returns true if a node is ready; false otherwise.
+func isNodeReady(node *v1.Node) bool {
+	for _, c := range node.Status.Conditions {
+		if c.Type == v1.NodeReady {
+			return c.Status == v1.ConditionTrue
+		}
+	}
+	return false
 }

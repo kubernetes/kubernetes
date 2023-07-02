@@ -28,4 +28,5 @@ type Features struct {
 	EnableMatchLabelKeysInPodTopologySpread      bool
 	EnablePodSchedulingReadiness                 bool
 	EnablePodDisruptionConditions                bool
+	EnableInPlacePodVerticalScaling              bool
 }

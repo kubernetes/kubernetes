@@ -84,6 +84,10 @@ type CgroupManager interface {
 	ReduceCPULimits(cgroupName CgroupName) error
 	// MemoryUsage returns current memory usage of the specified cgroup, as read from the cgroupfs.
 	MemoryUsage(name CgroupName) (int64, error)
+	// Get the resource config values applied to the cgroup for specified resource type
+	GetCgroupConfig(name CgroupName, resource v1.ResourceName) (*ResourceConfig, error)
+	// Set resource config for the specified resource type on the cgroup
+	SetCgroupConfig(name CgroupName, resource v1.ResourceName, resourceConfig *ResourceConfig) error
 }
 
 // QOSContainersInfo stores the names of containers per qos
@@ -119,4 +123,13 @@ type PodContainerManager interface {
 
 	// IsPodCgroup returns true if the literal cgroupfs name corresponds to a pod
 	IsPodCgroup(cgroupfs string) (bool, types.UID)
+
+	// Get value of memory usage for the pod Cgroup
+	GetPodCgroupMemoryUsage(pod *v1.Pod) (uint64, error)
+
+	// Get the resource config values applied to the pod cgroup for specified resource type
+	GetPodCgroupConfig(pod *v1.Pod, resource v1.ResourceName) (*ResourceConfig, error)
+
+	// Set resource config values for the specified resource type on the pod cgroup
+	SetPodCgroupConfig(pod *v1.Pod, resource v1.ResourceName, resourceConfig *ResourceConfig) error
 }

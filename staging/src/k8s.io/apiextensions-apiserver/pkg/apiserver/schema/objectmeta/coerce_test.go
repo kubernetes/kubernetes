@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -30,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
-	"k8s.io/apimachinery/pkg/util/diff"
 	utiljson "k8s.io/apimachinery/pkg/util/json"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -56,7 +56,7 @@ func TestRoundtripObjectMeta(t *testing.T) {
 		}
 
 		if !equality.Semantic.DeepEqual(original, o) {
-			t.Errorf("diff: %v\nCodec: %#v", diff.ObjectReflectDiff(original, o), codec)
+			t.Errorf("diff: %v\nCodec: %#v", cmp.Diff(original, o), codec)
 		}
 	}
 }
@@ -153,7 +153,7 @@ func TestMalformedObjectMetaFields(t *testing.T) {
 				}
 
 				if !equality.Semantic.DeepEqual(expectedObjectMeta, actualObjectMeta) {
-					t.Errorf("%v=%#v, diff: %v\n", pth, v, diff.ObjectReflectDiff(expectedObjectMeta, actualObjectMeta))
+					t.Errorf("%v=%#v, diff: %v\n", pth, v, cmp.Diff(expectedObjectMeta, actualObjectMeta))
 					t.Errorf("expectedObjectMeta %#v", expectedObjectMeta)
 				}
 			}

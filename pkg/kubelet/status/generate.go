@@ -198,7 +198,7 @@ func GeneratePodInitializedCondition(spec *v1.PodSpec, containerStatuses []v1.Co
 	}
 }
 
-func GeneratePodHasNetworkCondition(pod *v1.Pod, podStatus *kubecontainer.PodStatus) v1.PodCondition {
+func GeneratePodReadyToStartContainersCondition(pod *v1.Pod, podStatus *kubecontainer.PodStatus) v1.PodCondition {
 	newSandboxNeeded, _, _ := runtimeutil.PodSandboxChanged(pod, podStatus)
 	// if a new sandbox does not need to be created for a pod, it indicates that
 	// a sandbox for the pod with networking configured already exists.
@@ -206,12 +206,12 @@ func GeneratePodHasNetworkCondition(pod *v1.Pod, podStatus *kubecontainer.PodSta
 	// fresh sandbox and configure networking for the sandbox.
 	if !newSandboxNeeded {
 		return v1.PodCondition{
-			Type:   kubetypes.PodHasNetwork,
+			Type:   kubetypes.PodReadyToStartContainers,
 			Status: v1.ConditionTrue,
 		}
 	}
 	return v1.PodCondition{
-		Type:   kubetypes.PodHasNetwork,
+		Type:   kubetypes.PodReadyToStartContainers,
 		Status: v1.ConditionFalse,
 	}
 }

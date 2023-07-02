@@ -104,6 +104,8 @@ func SetDefaults_KubeControllerManagerConfiguration(obj *kubectrlmgrconfigv1alph
 	resourcequotaconfigv1alpha1.RecommendedDefaultResourceQuotaControllerConfiguration(&obj.ResourceQuotaController)
 	// Use the default RecommendedDefaultGenericControllerManagerConfiguration options
 	serviceconfigv1alpha1.RecommendedDefaultServiceControllerConfiguration(&obj.ServiceController)
+	// Use the default RecommendedDefaultLegacySATokenCleanerConfiguration options
+	serviceaccountconfigv1alpha1.RecommendedDefaultLegacySATokenCleanerConfiguration(&obj.LegacySATokenCleaner)
 	// Use the default RecommendedDefaultSAControllerConfiguration options
 	serviceaccountconfigv1alpha1.RecommendedDefaultSAControllerConfiguration(&obj.SAController)
 	// Use the default RecommendedDefaultTTLAfterFinishedControllerConfiguration options

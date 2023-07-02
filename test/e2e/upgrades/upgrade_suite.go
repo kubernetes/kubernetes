@@ -68,7 +68,7 @@ func CreateUpgradeFrameworks(tests []Test) map[string]*framework.Framework {
 		ns := nsFilter.ReplaceAllString(t.Name(), "-") // and replace with a single hyphen
 		ns = strings.Trim(ns, "-")
 		f := framework.NewDefaultFramework(ns)
-		f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+		f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 		testFrameworks[t.Name()] = f
 	}
 	return testFrameworks

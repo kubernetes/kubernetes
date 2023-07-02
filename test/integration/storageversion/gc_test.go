@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/storageversiongc"
 	"k8s.io/kubernetes/pkg/controlplane"
@@ -62,7 +63,8 @@ func TestStorageVersionGarbageCollection(t *testing.T) {
 	leaseInformer := informers.Coordination().V1().Leases()
 	storageVersionInformer := informers.Internal().V1alpha1().StorageVersions()
 
-	controller := storageversiongc.NewStorageVersionGC(kubeclient, leaseInformer, storageVersionInformer)
+	_, ctx := ktesting.NewTestContext(t)
+	controller := storageversiongc.NewStorageVersionGC(ctx, kubeclient, leaseInformer, storageVersionInformer)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

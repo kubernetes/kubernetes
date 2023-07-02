@@ -54,7 +54,7 @@ const (
 
 var _ = SIGDescribe("CronJob", func() {
 	f := framework.NewDefaultFramework("cronjob")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	sleepCommand := []string{"sleep", "300"}
 
@@ -110,7 +110,7 @@ var _ = SIGDescribe("CronJob", func() {
 		ginkgo.By("Ensuring no job exists by listing jobs explicitly")
 		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 		framework.ExpectNoError(err, "Failed to list the CronJobs in namespace %s", f.Namespace.Name)
-		gomega.Expect(jobs.Items).To(gomega.HaveLen(0))
+		gomega.Expect(jobs.Items).To(gomega.BeEmpty())
 
 		ginkgo.By("Removing cronjob")
 		err = deleteCronJob(ctx, f.ClientSet, f.Namespace.Name, cronJob.Name)
@@ -208,7 +208,7 @@ var _ = SIGDescribe("CronJob", func() {
 		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 		framework.ExpectNoError(err, "Failed to list the CronJobs in namespace %s", f.Namespace.Name)
 		activeJobs, _ := filterActiveJobs(jobs)
-		gomega.Expect(len(activeJobs)).To(gomega.BeNumerically(">=", 1))
+		gomega.Expect(activeJobs).ToNot(gomega.BeEmpty())
 
 		ginkgo.By("Removing cronjob")
 		err = deleteCronJob(ctx, f.ClientSet, f.Namespace.Name, cronJob.Name)
@@ -459,8 +459,7 @@ var _ = SIGDescribe("CronJob", func() {
 		// CronJob resource delete operations
 		expectFinalizer := func(cj *batchv1.CronJob, msg string) {
 			framework.ExpectNotEqual(cj.DeletionTimestamp, nil, fmt.Sprintf("expected deletionTimestamp, got nil on step: %q, cronjob: %+v", msg, cj))
-			gomega.Expect(len(cj.Finalizers)).To(gomega.BeNumerically(">", 0), "expected finalizers on cronjob, got none on step: %q, cronjob: %+v", msg, cj)
-
+			gomega.Expect(cj.Finalizers).ToNot(gomega.BeEmpty(), "expected finalizers on cronjob, got none on step: %q, cronjob: %+v", msg, cj)
 		}
 
 		ginkgo.By("deleting")

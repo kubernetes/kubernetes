@@ -54,7 +54,7 @@ import (
 
 var _ = utils.SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("volume-ops-storm")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	const defaultVolumeOpsScale = 30
 	var (
 		client            clientset.Interface
@@ -70,7 +70,7 @@ var _ = utils.SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
-		gomega.Expect(GetReadySchedulableNodeInfos(ctx)).NotTo(gomega.BeEmpty())
+		gomega.Expect(GetReadySchedulableNodeInfos(ctx, client)).NotTo(gomega.BeEmpty())
 		if scale := os.Getenv("VOLUME_OPS_SCALE"); scale != "" {
 			volumeOpsScale, err = strconv.Atoi(scale)
 			framework.ExpectNoError(err)

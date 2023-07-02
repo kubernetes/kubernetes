@@ -23,18 +23,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
-
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -210,11 +210,12 @@ func TestPVProtectionController(t *testing.T) {
 		}
 
 		// Create the controller
-		ctrl := NewPVProtectionController(pvInformer, client)
+		logger, _ := ktesting.NewTestContext(t)
+		ctrl := NewPVProtectionController(logger, pvInformer, client)
 
 		// Start the test by simulating an event
 		if test.updatedPV != nil {
-			ctrl.pvAddedUpdated(test.updatedPV)
+			ctrl.pvAddedUpdated(logger, test.updatedPV)
 		}
 
 		// Process the controller queue until we get expected results
@@ -250,7 +251,7 @@ func TestPVProtectionController(t *testing.T) {
 		actions := client.Actions()
 
 		if !reflect.DeepEqual(actions, test.expectedActions) {
-			t.Errorf("Test %q: action not expected\nExpected:\n%s\ngot:\n%s", test.name, spew.Sdump(test.expectedActions), spew.Sdump(actions))
+			t.Errorf("Test %q: action not expected\nExpected:\n%s\ngot:\n%s", test.name, dump.Pretty(test.expectedActions), dump.Pretty(actions))
 		}
 
 	}

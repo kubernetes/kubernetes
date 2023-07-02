@@ -62,6 +62,8 @@ import (
 	fakebatchv1beta1 "k8s.io/client-go/kubernetes/typed/batch/v1beta1/fake"
 	certificatesv1 "k8s.io/client-go/kubernetes/typed/certificates/v1"
 	fakecertificatesv1 "k8s.io/client-go/kubernetes/typed/certificates/v1/fake"
+	certificatesv1alpha1 "k8s.io/client-go/kubernetes/typed/certificates/v1alpha1"
+	fakecertificatesv1alpha1 "k8s.io/client-go/kubernetes/typed/certificates/v1alpha1/fake"
 	certificatesv1beta1 "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	fakecertificatesv1beta1 "k8s.io/client-go/kubernetes/typed/certificates/v1beta1/fake"
 	coordinationv1 "k8s.io/client-go/kubernetes/typed/coordination/v1"
@@ -110,8 +112,8 @@ import (
 	fakerbacv1alpha1 "k8s.io/client-go/kubernetes/typed/rbac/v1alpha1/fake"
 	rbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1"
 	fakerbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1/fake"
-	resourcev1alpha1 "k8s.io/client-go/kubernetes/typed/resource/v1alpha1"
-	fakeresourcev1alpha1 "k8s.io/client-go/kubernetes/typed/resource/v1alpha1/fake"
+	resourcev1alpha2 "k8s.io/client-go/kubernetes/typed/resource/v1alpha2"
+	fakeresourcev1alpha2 "k8s.io/client-go/kubernetes/typed/resource/v1alpha2/fake"
 	schedulingv1 "k8s.io/client-go/kubernetes/typed/scheduling/v1"
 	fakeschedulingv1 "k8s.io/client-go/kubernetes/typed/scheduling/v1/fake"
 	schedulingv1alpha1 "k8s.io/client-go/kubernetes/typed/scheduling/v1alpha1"
@@ -277,6 +279,11 @@ func (c *Clientset) CertificatesV1beta1() certificatesv1beta1.CertificatesV1beta
 	return &fakecertificatesv1beta1.FakeCertificatesV1beta1{Fake: &c.Fake}
 }
 
+// CertificatesV1alpha1 retrieves the CertificatesV1alpha1Client
+func (c *Clientset) CertificatesV1alpha1() certificatesv1alpha1.CertificatesV1alpha1Interface {
+	return &fakecertificatesv1alpha1.FakeCertificatesV1alpha1{Fake: &c.Fake}
+}
+
 // CoordinationV1beta1 retrieves the CoordinationV1beta1Client
 func (c *Clientset) CoordinationV1beta1() coordinationv1beta1.CoordinationV1beta1Interface {
 	return &fakecoordinationv1beta1.FakeCoordinationV1beta1{Fake: &c.Fake}
@@ -392,9 +399,9 @@ func (c *Clientset) RbacV1alpha1() rbacv1alpha1.RbacV1alpha1Interface {
 	return &fakerbacv1alpha1.FakeRbacV1alpha1{Fake: &c.Fake}
 }
 
-// ResourceV1alpha1 retrieves the ResourceV1alpha1Client
-func (c *Clientset) ResourceV1alpha1() resourcev1alpha1.ResourceV1alpha1Interface {
-	return &fakeresourcev1alpha1.FakeResourceV1alpha1{Fake: &c.Fake}
+// ResourceV1alpha2 retrieves the ResourceV1alpha2Client
+func (c *Clientset) ResourceV1alpha2() resourcev1alpha2.ResourceV1alpha2Interface {
+	return &fakeresourcev1alpha2.FakeResourceV1alpha2{Fake: &c.Fake}
 }
 
 // SchedulingV1alpha1 retrieves the SchedulingV1alpha1Client

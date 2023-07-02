@@ -90,6 +90,14 @@ func FormatCheckedType(t *exprpb.Type) string {
 		return "!error!"
 	case kindTypeParam:
 		return t.GetTypeParam()
+	case kindAbstract:
+		at := t.GetAbstractType()
+		params := at.GetParameterTypes()
+		paramStrs := make([]string, len(params))
+		for i, p := range params {
+			paramStrs[i] = FormatCheckedType(p)
+		}
+		return fmt.Sprintf("%s(%s)", at.GetName(), strings.Join(paramStrs, ", "))
 	}
 	return t.String()
 }
@@ -110,12 +118,39 @@ func isDyn(t *exprpb.Type) bool {
 
 // isDynOrError returns true if the input is either an Error, DYN, or well-known ANY message.
 func isDynOrError(t *exprpb.Type) bool {
-	switch kindOf(t) {
-	case kindError:
-		return true
-	default:
-		return isDyn(t)
+	return isError(t) || isDyn(t)
+}
+
+func isError(t *exprpb.Type) bool {
+	return kindOf(t) == kindError
+}
+
+func isOptional(t *exprpb.Type) bool {
+	if kindOf(t) == kindAbstract {
+		at := t.GetAbstractType()
+		return at.GetName() == "optional"
 	}
+	return false
+}
+
+func maybeUnwrapOptional(t *exprpb.Type) (*exprpb.Type, bool) {
+	if isOptional(t) {
+		at := t.GetAbstractType()
+		return at.GetParameterTypes()[0], true
+	}
+	return t, false
+}
+
+func maybeUnwrapString(e *exprpb.Expr) (string, bool) {
+	switch e.GetExprKind().(type) {
+	case *exprpb.Expr_ConstExpr:
+		literal := e.GetConstExpr()
+		switch literal.GetConstantKind().(type) {
+		case *exprpb.Constant_StringValue:
+			return literal.GetStringValue(), true
+		}
+	}
+	return "", false
 }
 
 // isEqualOrLessSpecific checks whether one type is equal or less specific than the other one.
@@ -236,7 +271,7 @@ func internalIsAssignable(m *mapping, t1 *exprpb.Type, t2 *exprpb.Type) bool {
 // substitution for t1, and whether t2 has a type substitution in mapping m.
 //
 // The type t2 is a valid substitution for t1 if any of the following statements is true
-// - t2 has a type substitition (t2sub) equal to t1
+// - t2 has a type substitution (t2sub) equal to t1
 // - t2 has a type substitution (t2sub) assignable to t1
 // - t2 does not occur within t1.
 func isValidTypeSubstitution(m *mapping, t1, t2 *exprpb.Type) (valid, hasSub bool) {

@@ -38,7 +38,7 @@ import (
 var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 
 	f := framework.NewDefaultFramework("node-authn")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var ns string
 	var nodeIPs []string
 	ginkgo.BeforeEach(func(ctx context.Context) {

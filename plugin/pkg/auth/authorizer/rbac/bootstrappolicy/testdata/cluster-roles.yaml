@@ -420,6 +420,12 @@ items:
     - selfsubjectrulesreviews
     verbs:
     - create
+  - apiGroups:
+    - authentication.k8s.io
+    resources:
+    - selfsubjectreviews
+    verbs:
+    - create
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
@@ -633,21 +639,6 @@ items:
   - apiGroups:
     - ""
     resources:
-    - endpoints
-    verbs:
-    - create
-  - apiGroups:
-    - ""
-    resourceNames:
-    - kube-controller-manager
-    resources:
-    - endpoints
-    verbs:
-    - get
-    - update
-  - apiGroups:
-    - ""
-    resources:
     - secrets
     - serviceaccounts
     verbs:
@@ -748,21 +739,6 @@ items:
     - kube-scheduler
     resources:
     - leases
-    verbs:
-    - get
-    - update
-  - apiGroups:
-    - ""
-    resources:
-    - endpoints
-    verbs:
-    - create
-  - apiGroups:
-    - ""
-    resourceNames:
-    - kube-scheduler
-    resources:
-    - endpoints
     verbs:
     - get
     - update

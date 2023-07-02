@@ -46,7 +46,9 @@ import (
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/cri/remote"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -134,7 +136,6 @@ func calcRestartCountByLogDir(path string) (int, error) {
 	if _, err := os.Stat(path); err != nil {
 		return 0, nil
 	}
-	restartCount := int(0)
 	files, err := os.ReadDir(path)
 	if err != nil {
 		return 0, err
@@ -142,6 +143,7 @@ func calcRestartCountByLogDir(path string) (int, error) {
 	if len(files) == 0 {
 		return 0, nil
 	}
+	restartCount := 0
 	restartCountLogFileRegex := regexp.MustCompile(`^(\d+)\.log(\..*)?`)
 	for _, file := range files {
 		if file.IsDir() {
@@ -333,6 +335,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(ctx context.Context,
 		Labels:      newContainerLabels(container, pod),
 		Annotations: newContainerAnnotations(container, pod, restartCount, opts),
 		Devices:     makeDevices(opts),
+		CDIDevices:  makeCDIDevices(opts),
 		Mounts:      m.makeMounts(opts, container),
 		LogPath:     containerLogsPath,
 		Stdin:       container.Stdin,
@@ -359,6 +362,19 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(ctx context.Context,
 	return config, cleanupAction, nil
 }
 
+func (m *kubeGenericRuntimeManager) updateContainerResources(pod *v1.Pod, container *v1.Container, containerID kubecontainer.ContainerID) error {
+	containerResources := m.generateContainerResources(pod, container)
+	if containerResources == nil {
+		return fmt.Errorf("container %q updateContainerResources failed: cannot generate resources config", containerID.String())
+	}
+	ctx := context.Background()
+	err := m.runtimeService.UpdateContainerResources(ctx, containerID.ID, containerResources)
+	if err != nil {
+		klog.ErrorS(err, "UpdateContainerResources failed", "container", containerID.String())
+	}
+	return err
+}
+
 // makeDevices generates container devices for kubelet runtime v1.
 func makeDevices(opts *kubecontainer.RunContainerOptions) []*runtimeapi.Device {
 	devices := make([]*runtimeapi.Device, len(opts.Devices))
@@ -369,6 +385,19 @@ func makeDevices(opts *kubecontainer.RunContainerOptions) []*runtimeapi.Device {
 			HostPath:      device.PathOnHost,
 			ContainerPath: device.PathInContainer,
 			Permissions:   device.Permissions,
+		}
+	}
+
+	return devices
+}
+
+// makeCDIDevices generates container CDIDevices for kubelet runtime v1.
+func makeCDIDevices(opts *kubecontainer.RunContainerOptions) []*runtimeapi.CDIDevice {
+	devices := make([]*runtimeapi.CDIDevice, len(opts.CDIDevices))
+
+	for i, device := range opts.CDIDevices {
+		devices[i] = &runtimeapi.CDIDevice{
+			Name: device.Name,
 		}
 	}
 
@@ -557,18 +586,25 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(ctx context.Context,
 func toKubeContainerStatus(status *runtimeapi.ContainerStatus, runtimeName string) *kubecontainer.Status {
 	annotatedInfo := getContainerInfoFromAnnotations(status.Annotations)
 	labeledInfo := getContainerInfoFromLabels(status.Labels)
+	var cStatusResources *kubecontainer.ContainerResources
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		// If runtime reports cpu & memory resources info, add it to container status
+		cStatusResources = toKubeContainerResources(status.Resources)
+	}
 	cStatus := &kubecontainer.Status{
 		ID: kubecontainer.ContainerID{
 			Type: runtimeName,
 			ID:   status.Id,
 		},
-		Name:         labeledInfo.ContainerName,
-		Image:        status.Image.Image,
-		ImageID:      status.ImageRef,
-		Hash:         annotatedInfo.Hash,
-		RestartCount: annotatedInfo.RestartCount,
-		State:        toKubeContainerState(status.State),
-		CreatedAt:    time.Unix(0, status.CreatedAt),
+		Name:                 labeledInfo.ContainerName,
+		Image:                status.Image.Image,
+		ImageID:              status.ImageRef,
+		Hash:                 annotatedInfo.Hash,
+		HashWithoutResources: annotatedInfo.HashWithoutResources,
+		RestartCount:         annotatedInfo.RestartCount,
+		State:                toKubeContainerState(status.State),
+		CreatedAt:            time.Unix(0, status.CreatedAt),
+		Resources:            cStatusResources,
 	}
 
 	if status.State != runtimeapi.ContainerState_CONTAINER_CREATED {
@@ -689,23 +725,20 @@ func (m *kubeGenericRuntimeManager) killContainer(ctx context.Context, pod *v1.P
 	}
 	m.recordContainerEvent(pod, containerSpec, containerID.ID, v1.EventTypeNormal, events.KillingContainer, message)
 
-	// Run internal pre-stop lifecycle hook
-	if err := m.internalLifecycle.PreStopContainer(containerID.ID); err != nil {
-		return err
+	if gracePeriodOverride != nil {
+		gracePeriod = *gracePeriodOverride
+		klog.V(3).InfoS("Killing container with a grace period override", "pod", klog.KObj(pod), "podUID", pod.UID,
+			"containerName", containerName, "containerID", containerID.String(), "gracePeriod", gracePeriod)
 	}
 
 	// Run the pre-stop lifecycle hooks if applicable and if there is enough time to run it
 	if containerSpec.Lifecycle != nil && containerSpec.Lifecycle.PreStop != nil && gracePeriod > 0 {
 		gracePeriod = gracePeriod - m.executePreStopHook(ctx, pod, containerID, containerSpec, gracePeriod)
 	}
+
 	// always give containers a minimal shutdown window to avoid unnecessary SIGKILLs
 	if gracePeriod < minimumGracePeriodInSeconds {
 		gracePeriod = minimumGracePeriodInSeconds
-	}
-	if gracePeriodOverride != nil {
-		gracePeriod = *gracePeriodOverride
-		klog.V(3).InfoS("Killing container with a grace period override", "pod", klog.KObj(pod), "podUID", pod.UID,
-			"containerName", containerName, "containerID", containerID.String(), "gracePeriod", gracePeriod)
 	}
 
 	klog.V(2).InfoS("Killing container with a grace period", "pod", klog.KObj(pod), "podUID", pod.UID,

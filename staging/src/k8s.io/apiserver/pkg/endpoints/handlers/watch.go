@@ -30,11 +30,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
+	"k8s.io/apimachinery/pkg/util/httpstream/wsstream"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
-	"k8s.io/apiserver/pkg/util/wsstream"
+	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 )
 
 // nothing will ever be sent down this channel
@@ -105,6 +106,11 @@ func serveWatch(watcher watch.Interface, scope *RequestScope, mediaTypeOptions n
 		embeddedEncoder = scope.Serializer.EncoderForVersion(serializer.Serializer, contentKind.GroupVersion())
 	}
 
+	var serverShuttingDownCh <-chan struct{}
+	if signals := apirequest.ServerShutdownSignalFrom(req.Context()); signals != nil {
+		serverShuttingDownCh = signals.ShuttingDown()
+	}
+
 	ctx := req.Context()
 
 	server := &WatchServer{
@@ -132,7 +138,8 @@ func serveWatch(watcher watch.Interface, scope *RequestScope, mediaTypeOptions n
 			return result
 		},
 
-		TimeoutFactory: &realTimeoutFactory{timeout},
+		TimeoutFactory:       &realTimeoutFactory{timeout},
+		ServerShuttingDownCh: serverShuttingDownCh,
 	}
 
 	server.ServeHTTP(w, req)
@@ -156,7 +163,8 @@ type WatchServer struct {
 	// used to correct the object before we send it to the serializer
 	Fixup func(runtime.Object) runtime.Object
 
-	TimeoutFactory TimeoutFactory
+	TimeoutFactory       TimeoutFactory
+	ServerShuttingDownCh <-chan struct{}
 }
 
 // ServeHTTP serves a series of encoded events via HTTP with Transfer-Encoding: chunked
@@ -211,7 +219,7 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	var unknown runtime.Unknown
 	internalEvent := &metav1.InternalEvent{}
 	outEvent := &metav1.WatchEvent{}
-	buf := &bytes.Buffer{}
+	buf := runtime.NewSpliceBuffer()
 	ch := s.Watching.ResultChan()
 	done := req.Context().Done()
 
@@ -230,6 +238,15 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	for {
 		select {
+		case <-s.ServerShuttingDownCh:
+			// the server has signaled that it is shutting down (not accepting
+			// any new request), all active watch request(s) should return
+			// immediately here. The WithWatchTerminationDuringShutdown server
+			// filter will ensure that the response to the client is rate
+			// limited in order to avoid any thundering herd issue when the
+			// client(s) try to reestablish the WATCH on the other
+			// available apiserver instance(s).
+			return
 		case <-done:
 			return
 		case <-timeoutCh:

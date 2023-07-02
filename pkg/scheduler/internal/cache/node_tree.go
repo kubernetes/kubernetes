@@ -36,24 +36,24 @@ type nodeTree struct {
 }
 
 // newNodeTree creates a NodeTree from nodes.
-func newNodeTree(nodes []*v1.Node) *nodeTree {
+func newNodeTree(logger klog.Logger, nodes []*v1.Node) *nodeTree {
 	nt := &nodeTree{
 		tree: make(map[string][]string, len(nodes)),
 	}
 	for _, n := range nodes {
-		nt.addNode(n)
+		nt.addNode(logger, n)
 	}
 	return nt
 }
 
 // addNode adds a node and its corresponding zone to the tree. If the zone already exists, the node
 // is added to the array of nodes in that zone.
-func (nt *nodeTree) addNode(n *v1.Node) {
+func (nt *nodeTree) addNode(logger klog.Logger, n *v1.Node) {
 	zone := utilnode.GetZoneKey(n)
 	if na, ok := nt.tree[zone]; ok {
 		for _, nodeName := range na {
 			if nodeName == n.Name {
-				klog.InfoS("Node already exists in the NodeTree", "node", klog.KObj(n))
+				logger.Info("Did not add to the NodeTree because it already exists", "node", klog.KObj(n))
 				return
 			}
 		}
@@ -62,12 +62,12 @@ func (nt *nodeTree) addNode(n *v1.Node) {
 		nt.zones = append(nt.zones, zone)
 		nt.tree[zone] = []string{n.Name}
 	}
-	klog.V(2).InfoS("Added node in listed group to NodeTree", "node", klog.KObj(n), "zone", zone)
+	logger.V(2).Info("Added node in listed group to NodeTree", "node", klog.KObj(n), "zone", zone)
 	nt.numNodes++
 }
 
 // removeNode removes a node from the NodeTree.
-func (nt *nodeTree) removeNode(n *v1.Node) error {
+func (nt *nodeTree) removeNode(logger klog.Logger, n *v1.Node) error {
 	zone := utilnode.GetZoneKey(n)
 	if na, ok := nt.tree[zone]; ok {
 		for i, nodeName := range na {
@@ -76,13 +76,13 @@ func (nt *nodeTree) removeNode(n *v1.Node) error {
 				if len(nt.tree[zone]) == 0 {
 					nt.removeZone(zone)
 				}
-				klog.V(2).InfoS("Removed node in listed group from NodeTree", "node", klog.KObj(n), "zone", zone)
+				logger.V(2).Info("Removed node in listed group from NodeTree", "node", klog.KObj(n), "zone", zone)
 				nt.numNodes--
 				return nil
 			}
 		}
 	}
-	klog.ErrorS(nil, "Node in listed group was not found", "node", klog.KObj(n), "zone", zone)
+	logger.Error(nil, "Did not remove Node in NodeTree because it was not found", "node", klog.KObj(n), "zone", zone)
 	return fmt.Errorf("node %q in group %q was not found", n.Name, zone)
 }
 
@@ -99,7 +99,7 @@ func (nt *nodeTree) removeZone(zone string) {
 }
 
 // updateNode updates a node in the NodeTree.
-func (nt *nodeTree) updateNode(old, new *v1.Node) {
+func (nt *nodeTree) updateNode(logger klog.Logger, old, new *v1.Node) {
 	var oldZone string
 	if old != nil {
 		oldZone = utilnode.GetZoneKey(old)
@@ -110,8 +110,8 @@ func (nt *nodeTree) updateNode(old, new *v1.Node) {
 	if oldZone == newZone {
 		return
 	}
-	nt.removeNode(old) // No error checking. We ignore whether the old node exists or not.
-	nt.addNode(new)
+	nt.removeNode(logger, old) // No error checking. We ignore whether the old node exists or not.
+	nt.addNode(logger, new)
 }
 
 // list returns the list of names of the node. NodeTree iterates over zones and in each zone iterates

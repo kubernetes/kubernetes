@@ -311,6 +311,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.MaxParallelImagePulls != nil {
+		in, out := &in.MaxParallelImagePulls, &out.MaxParallelImagePulls
+		*out = new(int32)
+		**out = **in
+	}
 	if in.EvictionHard != nil {
 		in, out := &in.EvictionHard, &out.EvictionHard
 		*out = make(map[string]string, len(*in))
@@ -405,6 +410,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	in.Logging.DeepCopyInto(&out.Logging)
 	if in.EnableSystemLogHandler != nil {
 		in, out := &in.EnableSystemLogHandler, &out.EnableSystemLogHandler
+		*out = new(bool)
+		**out = **in
+	}
+	if in.EnableSystemLogQuery != nil {
+		in, out := &in.EnableSystemLogQuery, &out.EnableSystemLogQuery
 		*out = new(bool)
 		**out = **in
 	}

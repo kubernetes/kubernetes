@@ -16,9 +16,6 @@ limitations under the License.
 
 // This test checks that various VolumeSources are working.
 
-// test/e2e/common/volumes.go duplicates the GlusterFS test from this file.  Any changes made to this
-// test should be made there as well.
-
 package testsuites
 
 import (
@@ -130,7 +127,7 @@ func (t *volumesTestSuite) DefineTests(driver storageframework.TestDriver, patte
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewFrameworkWithCustomTimeouts("volume", storageframework.GetDriverTimeouts(driver))
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	init := func(ctx context.Context) {
 		l = local{}

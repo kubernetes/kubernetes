@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"net/http"
 	"strconv"
 	"strings"
 
@@ -136,16 +135,6 @@ func IsProxyableHostname(ctx context.Context, resolv Resolver, hostname string) 
 	return nil
 }
 
-// IsAllowedHost checks if the given IP host address is in a network in the denied list.
-func IsAllowedHost(host net.IP, denied []*net.IPNet) error {
-	for _, ipNet := range denied {
-		if ipNet.Contains(host) {
-			return ErrAddressNotAllowed
-		}
-	}
-	return nil
-}
-
 // GetLocalAddrs returns a list of all network addresses on the local system
 func GetLocalAddrs() ([]net.IP, error) {
 	var localAddrs []net.IP
@@ -199,8 +188,8 @@ func ShouldSkipService(service *v1.Service) bool {
 
 // AddressSet validates the addresses in the slice using the "isValid" function.
 // Addresses that pass the validation are returned as a string Set.
-func AddressSet(isValid func(ip net.IP) bool, addrs []net.Addr) sets.String {
-	ips := sets.NewString()
+func AddressSet(isValid func(ip net.IP) bool, addrs []net.Addr) sets.Set[string] {
+	ips := sets.New[string]()
 	for _, a := range addrs {
 		var ip net.IP
 		switch v := a.(type) {
@@ -347,66 +336,6 @@ func EnsureSysctl(sysctl utilsysctl.Interface, name string, newVal int) error {
 	return nil
 }
 
-// DialContext is a dial function matching the signature of net.Dialer.DialContext.
-type DialContext = func(context.Context, string, string) (net.Conn, error)
-
-// FilteredDialOptions configures how a DialContext is wrapped by NewFilteredDialContext.
-type FilteredDialOptions struct {
-	// DialHostIPDenylist restricts hosts from being dialed.
-	DialHostCIDRDenylist []*net.IPNet
-	// AllowLocalLoopback controls connections to local loopback hosts (as defined by
-	// IsProxyableIP).
-	AllowLocalLoopback bool
-}
-
-// NewFilteredDialContext returns a DialContext function that filters connections based on a FilteredDialOptions.
-func NewFilteredDialContext(wrapped DialContext, resolv Resolver, opts *FilteredDialOptions) DialContext {
-	if wrapped == nil {
-		wrapped = http.DefaultTransport.(*http.Transport).DialContext
-	}
-	if opts == nil {
-		// Do no filtering
-		return wrapped
-	}
-	if resolv == nil {
-		resolv = net.DefaultResolver
-	}
-	if len(opts.DialHostCIDRDenylist) == 0 && opts.AllowLocalLoopback {
-		// Do no filtering.
-		return wrapped
-	}
-	return func(ctx context.Context, network, address string) (net.Conn, error) {
-		// DialContext is given host:port. LookupIPAddress expects host.
-		addressToResolve, _, err := net.SplitHostPort(address)
-		if err != nil {
-			addressToResolve = address
-		}
-
-		resp, err := resolv.LookupIPAddr(ctx, addressToResolve)
-		if err != nil {
-			return nil, err
-		}
-
-		if len(resp) == 0 {
-			return nil, ErrNoAddresses
-		}
-
-		for _, host := range resp {
-			if !opts.AllowLocalLoopback {
-				if err := isProxyableIP(host.IP); err != nil {
-					return nil, err
-				}
-			}
-			if opts.DialHostCIDRDenylist != nil {
-				if err := IsAllowedHost(host.IP, opts.DialHostCIDRDenylist); err != nil {
-					return nil, err
-				}
-			}
-		}
-		return wrapped(ctx, network, address)
-	}
-}
-
 // GetClusterIPByFamily returns a service clusterip by family
 func GetClusterIPByFamily(ipFamily v1.IPFamily, service *v1.Service) string {
 	// allowing skew
@@ -481,6 +410,11 @@ func (buf *LineBuffer) Reset() {
 // Bytes returns the contents of buf as a []byte
 func (buf *LineBuffer) Bytes() []byte {
 	return buf.b.Bytes()
+}
+
+// String returns the contents of buf as a string
+func (buf *LineBuffer) String() string {
+	return buf.b.String()
 }
 
 // Lines returns the number of lines in buf. Note that more precisely, this returns the

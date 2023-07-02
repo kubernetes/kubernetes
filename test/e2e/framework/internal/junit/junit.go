@@ -26,7 +26,7 @@ import (
 // normally written by `ginkgo --junit-report`. This is needed because the full
 // report can become too large for tools like Spyglass
 // (https://github.com/kubernetes/kubernetes/issues/111510).
-func WriteJUnitReport(report ginkgo.Report, filename string) {
+func WriteJUnitReport(report ginkgo.Report, filename string) error {
 	config := reporters.JunitReportConfig{
 		// Remove details for specs where we don't care.
 		OmitTimelinesForSpecState: types.SpecStatePassed | types.SpecStateSkipped,
@@ -38,5 +38,5 @@ func WriteJUnitReport(report ginkgo.Report, filename string) {
 		OmitFailureMessageAttr: true,
 	}
 
-	reporters.GenerateJUnitReportWithConfig(report, filename, config)
+	return reporters.GenerateJUnitReportWithConfig(report, filename, config)
 }

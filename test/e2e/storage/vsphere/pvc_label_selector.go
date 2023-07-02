@@ -50,7 +50,7 @@ Test Steps
 */
 var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:LabelSelector]", func() {
 	f := framework.NewDefaultFramework("pvclabelselector")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var (
 		c          clientset.Interface
 		ns         string
@@ -68,7 +68,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:LabelSele
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		Bootstrap(f)
-		nodeInfo = GetReadySchedulableRandomNodeInfo(ctx)
+		nodeInfo = GetReadySchedulableRandomNodeInfo(ctx, c)
 		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, c, f.Timeouts.NodeSchedulable))
 		ssdlabels = make(map[string]string)
 		ssdlabels["volume-type"] = "ssd"
@@ -111,7 +111,6 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:LabelSele
 
 func testSetupVSpherePVClabelselector(ctx context.Context, c clientset.Interface, nodeInfo *NodeInfo, ns string, ssdlabels map[string]string, vvollabels map[string]string) (volumePath string, pvSsd *v1.PersistentVolume, pvcSsd *v1.PersistentVolumeClaim, pvcVvol *v1.PersistentVolumeClaim, err error) {
 	ginkgo.By("creating vmdk")
-	volumePath = ""
 	volumePath, err = nodeInfo.VSphere.CreateVolume(&VolumeOptions{}, nodeInfo.DataCenterRef)
 	if err != nil {
 		return

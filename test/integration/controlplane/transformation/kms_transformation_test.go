@@ -34,13 +34,21 @@ import (
 	"testing"
 	"time"
 
+	clientv3 "go.etcd.io/etcd/client/v3"
 	"golang.org/x/crypto/cryptobyte"
+
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/storage/value"
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
 	mock "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/testing/v1beta1"
+	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/dynamic"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kmsapi "k8s.io/kms/apis/v1beta1"
+	"k8s.io/kubernetes/test/integration"
+	"k8s.io/kubernetes/test/integration/etcd"
 )
 
 const (
@@ -87,7 +95,10 @@ func (r envelope) plainTextPayload(secretETCDPath string) ([]byte, error) {
 	// etcd path of the key is used as the authenticated context - need to pass it to decrypt
 	ctx := context.Background()
 	dataCtx := value.DefaultContext([]byte(secretETCDPath))
-	aesgcmTransformer := aestransformer.NewGCMTransformer(block)
+	aesgcmTransformer, err := aestransformer.NewGCMTransformer(block)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transformer from block: %v", err)
+	}
 	plainSecret, _, err := aesgcmTransformer.TransformFromStorage(ctx, r.cipherTextPayload(), dataCtx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to transform from storage via AESGCM, err: %w", err)
@@ -121,17 +132,7 @@ resources:
        endpoint: unix:///@kms-provider.sock
 `
 	providerName := "kms-provider"
-	pluginMock, err := mock.NewBase64Plugin("@kms-provider.sock")
-	if err != nil {
-		t.Fatalf("failed to create mock of KMS Plugin: %v", err)
-	}
-
-	go pluginMock.Start()
-	if err := mock.WaitForBase64PluginToBeUp(pluginMock); err != nil {
-		t.Fatalf("Failed start plugin, err: %v", err)
-	}
-	defer pluginMock.CleanUp()
-
+	pluginMock := mock.NewBase64Plugin(t, "@kms-provider.sock")
 	test, err := newTransformTest(t, encryptionConfig, false, "")
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
@@ -306,17 +307,7 @@ resources:
        cachesize: 1000
        endpoint: unix:///@kms-provider.sock
 `
-	pluginMock, err := mock.NewBase64Plugin("@kms-provider.sock")
-	if err != nil {
-		t.Fatalf("failed to create mock of KMS Plugin: %v", err)
-	}
-
-	go pluginMock.Start()
-	if err := mock.WaitForBase64PluginToBeUp(pluginMock); err != nil {
-		t.Fatalf("Failed start plugin, err: %v", err)
-	}
-	defer pluginMock.CleanUp()
-
+	_ = mock.NewBase64Plugin(t, "@kms-provider.sock")
 	var restarted bool
 	test, err := newTransformTest(t, encryptionConfig, true, "")
 	if err != nil {
@@ -372,17 +363,7 @@ resources:
     - identity: {}
 `
 	// start new KMS Plugin
-	newPluginMock, err := mock.NewBase64Plugin("@new-kms-provider.sock")
-	if err != nil {
-		t.Fatalf("failed to create mock of KMS Plugin: %v", err)
-	}
-
-	go newPluginMock.Start()
-	if err := mock.WaitForBase64PluginToBeUp(newPluginMock); err != nil {
-		t.Fatalf("Failed start plugin, err: %v", err)
-	}
-	defer newPluginMock.CleanUp()
-
+	_ = mock.NewBase64Plugin(t, "@new-kms-provider.sock")
 	// update encryption config
 	if err := os.WriteFile(path.Join(test.configDir, encryptionConfigFileName), []byte(encryptionConfigWithNewProvider), 0644); err != nil {
 		t.Fatalf("failed to update encryption config, err: %v", err)
@@ -450,7 +431,6 @@ resources:
 	}
 
 	rawConfigmapEnvelope, err := test.readRawRecordFromETCD(test.getETCDPathForResource(test.storageConfig.Prefix, "", "configmaps", testConfigmap, testNamespace))
-
 	if err != nil {
 		t.Fatalf("failed to read %s from etcd: %v", test.getETCDPathForResource(test.storageConfig.Prefix, "", "configmaps", testConfigmap, testNamespace), err)
 	}
@@ -533,6 +513,205 @@ resources:
 	}
 }
 
+func TestEncryptAll(t *testing.T) {
+	encryptionConfig := `
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+resources:
+  - resources:
+    - '*.*'
+    providers:
+    - kms:
+        name: encrypt-all-kms-provider
+        cachesize: 1000
+        endpoint: unix:///@encrypt-all-kms-provider.sock
+`
+
+	t.Run("encrypt all resources", func(t *testing.T) {
+		_ = mock.NewBase64Plugin(t, "@encrypt-all-kms-provider.sock")
+		defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllAlpha", true)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllBeta", true)()
+		test, err := newTransformTest(t, encryptionConfig, false, "")
+		if err != nil {
+			t.Fatalf("failed to start KUBE API Server with encryptionConfig")
+		}
+		defer test.cleanUp()
+
+		_, serverResources, err := test.restClient.Discovery().ServerGroupsAndResources()
+		if err != nil {
+			t.Fatal(err)
+		}
+		resources := etcd.GetResources(t, serverResources)
+		client := dynamic.NewForConfigOrDie(test.kubeAPIServer.ClientConfig)
+
+		etcdStorageData := etcd.GetEtcdStorageDataForNamespace(testNamespace)
+		for _, resource := range resources {
+			gvr := resource.Mapping.Resource
+			stub := etcdStorageData[gvr].Stub
+
+			// continue if stub is empty
+			if stub == "" {
+				t.Errorf("skipping resource %s because stub is empty", gvr)
+				continue
+			}
+
+			dynamicClient, obj, err := etcd.JSONToUnstructured(stub, testNamespace, &meta.RESTMapping{
+				Resource:         gvr,
+				GroupVersionKind: gvr.GroupVersion().WithKind(resource.Mapping.GroupVersionKind.Kind),
+				Scope:            resource.Mapping.Scope,
+			}, client)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, err = dynamicClient.Create(context.TODO(), obj, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		rawClient, etcdClient, err := integration.GetEtcdClients(test.kubeAPIServer.ServerOpts.Etcd.StorageConfig.Transport)
+		if err != nil {
+			t.Fatalf("failed to create etcd client: %v", err)
+		}
+		// kvClient is a wrapper around rawClient and to avoid leaking goroutines we need to
+		// close the client (which we can do by closing rawClient).
+		defer rawClient.Close()
+
+		response, err := etcdClient.Get(context.TODO(), "/"+test.kubeAPIServer.ServerOpts.Etcd.StorageConfig.Prefix, clientv3.WithPrefix())
+		if err != nil {
+			t.Fatalf("failed to retrieve secret from etcd %v", err)
+		}
+
+		// assert that total key values in response in greater than 0
+		if len(response.Kvs) == 0 {
+			t.Fatalf("expected total number of keys to be greater than 0, but got %d", len(response.Kvs))
+		}
+
+		// assert that total response keys are greater or equal to total resources
+		if len(response.Kvs) < len(resources) {
+			t.Fatalf("expected total number of keys to be greater or equal to total resources, but got %d", len(response.Kvs))
+		}
+
+		wantPrefix := "k8s:enc:kms:v1:encrypt-all-kms-provider:"
+		for _, kv := range response.Kvs {
+			// the following resources are not encrypted as they are not REST APIs and hence are not expected
+			// to be encrypted because it would be impossible to perform a storage migration on them
+			if strings.Contains(kv.String(), "masterleases") ||
+				strings.Contains(kv.String(), "serviceips") ||
+				strings.Contains(kv.String(), "servicenodeports") {
+				// assert that these resources are not encrypted with any provider
+				if bytes.HasPrefix(kv.Value, []byte("k8s:enc:")) {
+					t.Errorf("expected resource %s to not be prefixed with %s, but got %s", kv.Key, "k8s:enc:", kv.Value)
+				}
+				continue
+			}
+
+			// assert that all other resources are encrypted
+			if !bytes.HasPrefix(kv.Value, []byte(wantPrefix)) {
+				t.Errorf("expected resource %s to be prefixed with %s, but got %s", kv.Key, wantPrefix, kv.Value)
+			}
+		}
+	})
+}
+
+func TestEncryptAllWithWildcard(t *testing.T) {
+	encryptionConfig := `
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+resources:
+  - resources:
+    - configmaps
+    providers:
+    - identity: {}
+  - resources:
+    - '*.batch'
+    providers:
+    - kms:
+        name: kms-provider
+        cachesize: 1000
+        endpoint: unix:///@kms-provider.sock
+  - resources:
+    - '*.*'
+    providers:
+    - kms:
+        name: encrypt-all-kms-provider
+        cachesize: 1000
+        endpoint: unix:///@encrypt-all-kms-provider.sock
+`
+	_ = mock.NewBase64Plugin(t, "@kms-provider.sock")
+	_ = mock.NewBase64Plugin(t, "@encrypt-all-kms-provider.sock")
+
+	test, err := newTransformTest(t, encryptionConfig, false, "")
+	if err != nil {
+		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
+	}
+	defer test.cleanUp()
+
+	wantPrefix := "k8s:enc:kms:v1:kms-provider:"
+	wantPrefixForEncryptAll := "k8s:enc:kms:v1:encrypt-all-kms-provider:"
+
+	_, err = test.createJob("test-job", "default")
+	if err != nil {
+		t.Fatalf("failed to create job: %v", err)
+	}
+
+	rawJobsEnvelope, err := test.readRawRecordFromETCD(test.getETCDPathForResource(test.storageConfig.Prefix, "", "jobs", "test-job", "default"))
+	if err != nil {
+		t.Fatalf("failed to read %s from etcd: %v", test.getETCDPathForResource(test.storageConfig.Prefix, "", "jobs", "test-job", "default"), err)
+	}
+
+	// assert prefix for jobs
+	if !bytes.HasPrefix(rawJobsEnvelope.Kvs[0].Value, []byte(wantPrefix)) {
+		t.Fatalf("expected jobs to be prefixed with %s, but got %s", wantPrefix, rawJobsEnvelope.Kvs[0].Value)
+	}
+
+	_, err = test.createDeployment("test-deployment", "default")
+	if err != nil {
+		t.Fatalf("failed to create deployment: %v", err)
+	}
+
+	rawDeploymentsEnvelope, err := test.readRawRecordFromETCD(test.getETCDPathForResource(test.storageConfig.Prefix, "", "deployments", "test-deployment", "default"))
+	if err != nil {
+		t.Fatalf("failed to read %s from etcd: %v", test.getETCDPathForResource(test.storageConfig.Prefix, "", "deployments", "test-deployment", "default"), err)
+	}
+
+	// assert prefix for deployments
+	if !bytes.HasPrefix(rawDeploymentsEnvelope.Kvs[0].Value, []byte(wantPrefixForEncryptAll)) {
+		t.Fatalf("expected deployments to be prefixed with %s, but got %s", wantPrefixForEncryptAll, rawDeploymentsEnvelope.Kvs[0].Value)
+	}
+
+	test.secret, err = test.createSecret(testSecret, testNamespace)
+	if err != nil {
+		t.Fatalf("Failed to create test secret, error: %v", err)
+	}
+
+	rawSecretEnvelope, err := test.getRawSecretFromETCD()
+	if err != nil {
+		t.Fatalf("failed to read secrets from etcd: %v", err)
+	}
+
+	// assert prefix for secrets
+	if !bytes.HasPrefix(rawSecretEnvelope, []byte(wantPrefixForEncryptAll)) {
+		t.Fatalf("expected secrets to be prefixed with %s, but got %s", wantPrefixForEncryptAll, rawSecretEnvelope)
+	}
+
+	_, err = test.createConfigMap(testConfigmap, testNamespace)
+	if err != nil {
+		t.Fatalf("Failed to create test configmap, error: %v", err)
+	}
+
+	rawConfigMapEnvelope, err := test.readRawRecordFromETCD(test.getETCDPathForResource(test.storageConfig.Prefix, "", "configmaps", testConfigmap, testNamespace))
+	if err != nil {
+		t.Fatalf("failed to read configmaps from etcd: %v", err)
+	}
+
+	// assert configmaps do not have the encrypted data prefix
+	if bytes.HasPrefix(rawConfigMapEnvelope.Kvs[0].Value, []byte("k8s:enc:")) {
+		t.Fatalf("expected configmaps to be not encrypted, got %s", rawConfigMapEnvelope.Kvs[0].Value)
+	}
+}
+
 func TestEncryptionConfigHotReloadFileWatch(t *testing.T) {
 	testCases := []struct {
 		sleep      time.Duration
@@ -603,16 +782,7 @@ resources:
        endpoint: unix:///@kms-provider.sock
        timeout: 1s
 `
-			pluginMock, err := mock.NewBase64Plugin("@kms-provider.sock")
-			if err != nil {
-				t.Fatalf("failed to create mock of KMS Plugin: %v", err)
-			}
-
-			go pluginMock.Start()
-			if err := mock.WaitForBase64PluginToBeUp(pluginMock); err != nil {
-				t.Fatalf("Failed start plugin, err: %v", err)
-			}
-			defer pluginMock.CleanUp()
+			_ = mock.NewBase64Plugin(t, "@kms-provider.sock")
 
 			test, err := newTransformTest(t, encryptionConfig, true, "")
 			if err != nil {
@@ -657,17 +827,7 @@ resources:
     - identity: {}
 `
 			// start new KMS Plugin
-			newPluginMock, err := mock.NewBase64Plugin("@new-kms-provider.sock")
-			if err != nil {
-				t.Fatalf("failed to create mock of KMS Plugin: %v", err)
-			}
-
-			go newPluginMock.Start()
-			if err := mock.WaitForBase64PluginToBeUp(newPluginMock); err != nil {
-				t.Fatalf("Failed start plugin, err: %v", err)
-			}
-			defer newPluginMock.CleanUp()
-
+			_ = mock.NewBase64Plugin(t, "@new-kms-provider.sock")
 			// update encryption config
 			if err := tc.updateFile(filepath.Join(test.configDir, encryptionConfigFileName), encryptionConfigWithNewProvider); err != nil {
 				t.Fatalf("failed to update encryption config, err: %v", err)
@@ -786,34 +946,12 @@ resources:
        endpoint: unix:///@kms-provider-2.sock
 `
 
-	pluginMock1, err := mock.NewBase64Plugin("@kms-provider-1.sock")
-	if err != nil {
-		t.Fatalf("failed to create mock of KMS Plugin #1: %v", err)
-	}
-
-	if err := pluginMock1.Start(); err != nil {
-		t.Fatalf("Failed to start kms-plugin, err: %v", err)
-	}
-	defer pluginMock1.CleanUp()
-	if err := mock.WaitForBase64PluginToBeUp(pluginMock1); err != nil {
-		t.Fatalf("Failed to start plugin #1, err: %v", err)
-	}
-
-	pluginMock2, err := mock.NewBase64Plugin("@kms-provider-2.sock")
-	if err != nil {
-		t.Fatalf("Failed to create mock of KMS Plugin #2: err: %v", err)
-	}
-	if err := pluginMock2.Start(); err != nil {
-		t.Fatalf("Failed to start kms-plugin, err: %v", err)
-	}
-	defer pluginMock2.CleanUp()
-	if err := mock.WaitForBase64PluginToBeUp(pluginMock2); err != nil {
-		t.Fatalf("Failed to start KMS Plugin #2: err: %v", err)
-	}
+	pluginMock1 := mock.NewBase64Plugin(t, "@kms-provider-1.sock")
+	pluginMock2 := mock.NewBase64Plugin(t, "@kms-provider-2.sock")
 
 	test, err := newTransformTest(t, encryptionConfig, false, "")
 	if err != nil {
-		t.Fatalf("Failed to start kube-apiserver, error: %v", err)
+		t.Fatalf("failed to start kube-apiserver, error: %v", err)
 	}
 	defer test.cleanUp()
 
@@ -864,30 +1002,8 @@ resources:
        endpoint: unix:///@kms-provider-2.sock
 `
 
-	pluginMock1, err := mock.NewBase64Plugin("@kms-provider-1.sock")
-	if err != nil {
-		t.Fatalf("failed to create mock of KMS Plugin #1: %v", err)
-	}
-
-	if err := pluginMock1.Start(); err != nil {
-		t.Fatalf("Failed to start kms-plugin, err: %v", err)
-	}
-	defer pluginMock1.CleanUp()
-	if err := mock.WaitForBase64PluginToBeUp(pluginMock1); err != nil {
-		t.Fatalf("Failed to start plugin #1, err: %v", err)
-	}
-
-	pluginMock2, err := mock.NewBase64Plugin("@kms-provider-2.sock")
-	if err != nil {
-		t.Fatalf("Failed to create mock of KMS Plugin #2: err: %v", err)
-	}
-	if err := pluginMock2.Start(); err != nil {
-		t.Fatalf("Failed to start kms-plugin, err: %v", err)
-	}
-	defer pluginMock2.CleanUp()
-	if err := mock.WaitForBase64PluginToBeUp(pluginMock2); err != nil {
-		t.Fatalf("Failed to start KMS Plugin #2: err: %v", err)
-	}
+	pluginMock1 := mock.NewBase64Plugin(t, "@kms-provider-1.sock")
+	pluginMock2 := mock.NewBase64Plugin(t, "@kms-provider-2.sock")
 
 	test, err := newTransformTest(t, encryptionConfig, true, "")
 	if err != nil {

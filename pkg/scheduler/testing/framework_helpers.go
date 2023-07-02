@@ -17,8 +17,10 @@ limitations under the License.
 package testing
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kube-scheduler/config/v1beta2"
+	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -28,7 +30,7 @@ import (
 var configDecoder = scheme.Codecs.UniversalDecoder()
 
 // NewFramework creates a Framework from the register functions and options.
-func NewFramework(fns []RegisterPluginFunc, profileName string, stopCh <-chan struct{}, opts ...runtime.Option) (framework.Framework, error) {
+func NewFramework(ctx context.Context, fns []RegisterPluginFunc, profileName string, opts ...runtime.Option) (framework.Framework, error) {
 	registry := runtime.Registry{}
 	profile := &schedulerapi.KubeSchedulerProfile{
 		SchedulerName: profileName,
@@ -37,7 +39,7 @@ func NewFramework(fns []RegisterPluginFunc, profileName string, stopCh <-chan st
 	for _, f := range fns {
 		f(&registry, profile)
 	}
-	return runtime.NewFramework(registry, profile, stopCh, opts...)
+	return runtime.NewFramework(ctx, registry, profile, opts...)
 }
 
 // RegisterPluginFunc is a function signature used in method RegisterFilterPlugin()
@@ -107,7 +109,7 @@ func RegisterPluginAsExtensionsWithWeight(pluginName string, weight int32, plugi
 		}
 		// Use defaults from latest config API version.
 		var gvk schema.GroupVersionKind
-		gvk = v1beta2.SchemeGroupVersion.WithKind(pluginName + "Args")
+		gvk = kubeschedulerconfigv1.SchemeGroupVersion.WithKind(pluginName + "Args")
 		if args, _, err := configDecoder.Decode(nil, &gvk, nil); err == nil {
 			profile.PluginConfig = append(profile.PluginConfig, schedulerapi.PluginConfig{
 				Name: pluginName,

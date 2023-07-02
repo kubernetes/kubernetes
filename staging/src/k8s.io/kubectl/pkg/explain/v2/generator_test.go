@@ -22,7 +22,17 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/openapi/openapitest"
 )
+
+var appsv1Path = "apis/apps/v1"
+
+var appsDeploymentGVR = schema.GroupVersionResource{
+	Group:    "apps",
+	Version:  "v1",
+	Resource: "deployments",
+}
 
 // Shows generic throws error when attempting to `Render“ an invalid output name
 // And if it is then added as a template, no error is thrown upon `Render`
@@ -30,12 +40,13 @@ func TestGeneratorMissingOutput(t *testing.T) {
 	var buf bytes.Buffer
 	var doc map[string]interface{}
 
-	err := json.Unmarshal([]byte(apiDiscoveryJSON), &doc)
+	appsv1Bytes := bytesForGV(t, appsv1Path)
+	err := json.Unmarshal(appsv1Bytes, &doc)
 	require.NoError(t, err)
 
 	gen := NewGenerator()
 	badTemplateName := "bad-template"
-	err = gen.Render(badTemplateName, doc, apiGroupsGVR, nil, false, &buf)
+	err = gen.Render(badTemplateName, doc, appsDeploymentGVR, nil, false, &buf)
 
 	require.ErrorContains(t, err, "unrecognized format: "+badTemplateName)
 	require.Zero(t, buf.Len())
@@ -43,7 +54,7 @@ func TestGeneratorMissingOutput(t *testing.T) {
 	err = gen.AddTemplate(badTemplateName, "ok")
 	require.NoError(t, err)
 
-	err = gen.Render(badTemplateName, doc, apiGroupsGVR, nil, false, &buf)
+	err = gen.Render(badTemplateName, doc, appsDeploymentGVR, nil, false, &buf)
 	require.NoError(t, err)
 	require.Equal(t, "ok", buf.String())
 }
@@ -53,7 +64,8 @@ func TestGeneratorContext(t *testing.T) {
 	var buf bytes.Buffer
 	var doc map[string]interface{}
 
-	err := json.Unmarshal([]byte(apiDiscoveryJSON), &doc)
+	appsv1Bytes := bytesForGV(t, appsv1Path)
+	err := json.Unmarshal(appsv1Bytes, &doc)
 	require.NoError(t, err)
 
 	gen := NewGenerator()
@@ -62,7 +74,7 @@ func TestGeneratorContext(t *testing.T) {
 
 	expectedContext := TemplateContext{
 		Document:  doc,
-		GVR:       apiGroupsGVR,
+		GVR:       appsDeploymentGVR,
 		Recursive: false,
 		FieldPath: nil,
 	}
@@ -79,4 +91,20 @@ func TestGeneratorContext(t *testing.T) {
 	err = json.Unmarshal(buf.Bytes(), &actualContext)
 	require.NoError(t, err)
 	require.Equal(t, expectedContext, actualContext)
+}
+
+// bytesForGV returns the OpenAPI V3 spec for the passed
+// group/version as a byte slice. Assumes bytes are in json
+// format. The passed path string looks like:
+//
+//	apis/apps/v1
+func bytesForGV(t *testing.T, gvPath string) []byte {
+	fakeClient := openapitest.NewEmbeddedFileClient()
+	paths, err := fakeClient.Paths()
+	require.NoError(t, err)
+	gv, found := paths[gvPath]
+	require.True(t, found)
+	gvBytes, err := gv.Schema("application/json")
+	require.NoError(t, err)
+	return gvBytes
 }

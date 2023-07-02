@@ -46,11 +46,12 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
+	"k8s.io/utils/pointer"
 )
 
 var _ = SIGDescribe("ReplicationController", func() {
 	f := framework.NewDefaultFramework("replication-controller")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	var ns string
 	var dc dynamic.Interface
@@ -369,7 +370,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 			ginkgo.By("listing all ReplicationControllers")
 			rcs, err := f.ClientSet.CoreV1().ReplicationControllers("").List(ctx, metav1.ListOptions{LabelSelector: "test-rc-static=true"})
 			framework.ExpectNoError(err, "failed to list ReplicationController")
-			gomega.Expect(len(rcs.Items)).To(gomega.BeNumerically(">", 0), "Expected to find a ReplicationController but none was found")
+			gomega.Expect(rcs.Items).ToNot(gomega.BeEmpty(), "Expected to find a ReplicationController but none was found")
 
 			ginkgo.By("checking that ReplicationController has expected values")
 			foundRc := false
@@ -458,7 +459,7 @@ func newRC(rsName string, replicas int32, rcPodLabels map[string]string, imageNa
 			Name: rsName,
 		},
 		Spec: v1.ReplicationControllerSpec{
-			Replicas: func(i int32) *int32 { return &i }(replicas),
+			Replicas: pointer.Int32(replicas),
 			Template: &v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: rcPodLabels,
@@ -500,7 +501,7 @@ func TestReplicationControllerServeImageOrFail(ctx context.Context, f *framework
 	pods, err := e2epod.PodsCreated(ctx, f.ClientSet, f.Namespace.Name, name, replicas)
 	framework.ExpectNoError(err)
 
-	// Wait for the pods to enter the running state. Waiting loops until the pods
+	// Wait for the pods to enter the running state and are Ready. Waiting loops until the pods
 	// are running so non-running pods cause a timeout for this test.
 	framework.Logf("Ensuring all pods for ReplicationController %q are running", name)
 	running := int32(0)
@@ -508,7 +509,7 @@ func TestReplicationControllerServeImageOrFail(ctx context.Context, f *framework
 		if pod.DeletionTimestamp != nil {
 			continue
 		}
-		err = e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
+		err = e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout)
 		if err != nil {
 			updatePod, getErr := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
 			if getErr == nil {
@@ -518,12 +519,12 @@ func TestReplicationControllerServeImageOrFail(ctx context.Context, f *framework
 			}
 		}
 		framework.ExpectNoError(err)
-		framework.Logf("Pod %q is running (conditions: %+v)", pod.Name, pod.Status.Conditions)
+		framework.Logf("Pod %q is running and ready(conditions: %+v)", pod.Name, pod.Status.Conditions)
 		running++
 	}
 
 	// Sanity check
-	framework.ExpectEqual(running, replicas, "unexpected number of running pods: %+v", pods.Items)
+	framework.ExpectEqual(running, replicas, "unexpected number of running and ready pods: %+v", pods.Items)
 
 	// Verify that something is listening.
 	framework.Logf("Trying to dial the pod")

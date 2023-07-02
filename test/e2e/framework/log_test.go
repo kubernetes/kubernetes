@@ -168,7 +168,9 @@ INFO: before
 < Exit [BeforeEach] log - log_test.go:48 <time>
 > Enter [It] error - log_test.go:63 <time>
 INFO: Unexpected error: hard-coded error: 
-    <*errors.errorString>: {
+    <*errors.errorString>: 
+    an error with a long, useless description
+    {
         s: "an error with a long, useless description",
     }
 [FAILED] hard-coded error: an error with a long, useless description

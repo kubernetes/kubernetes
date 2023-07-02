@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog/v2/ktesting"
 )
 
 func TestGetJobFromTemplate2(t *testing.T) {
@@ -89,6 +90,7 @@ func TestGetJobFromTemplate2(t *testing.T) {
 }
 
 func TestNextScheduleTime(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	// schedule is hourly on the hour
 	schedule := "0 * * * ?"
 
@@ -124,7 +126,7 @@ func TestNextScheduleTime(t *testing.T) {
 		cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: T1.Add(-10 * time.Minute)}
 		// Current time is more than creation time, but less than T1.
 		now := T1.Add(-7 * time.Minute)
-		schedule, _ := nextScheduleTime(&cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
+		schedule, _ := nextScheduleTime(logger, &cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
 		if schedule != nil {
 			t.Errorf("expected no start time, got:  %v", schedule)
 		}
@@ -135,7 +137,7 @@ func TestNextScheduleTime(t *testing.T) {
 		cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: T1.Add(-10 * time.Minute)}
 		// Current time is after T1
 		now := T1.Add(2 * time.Second)
-		schedule, _ := nextScheduleTime(&cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
+		schedule, _ := nextScheduleTime(logger, &cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
 		if schedule == nil {
 			t.Errorf("expected 1 start time, got nil")
 		} else if !schedule.Equal(T1) {
@@ -150,7 +152,7 @@ func TestNextScheduleTime(t *testing.T) {
 		cj.Status.LastScheduleTime = &metav1.Time{Time: T1}
 		// Current time is after T1
 		now := T1.Add(2 * time.Minute)
-		schedule, _ := nextScheduleTime(&cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
+		schedule, _ := nextScheduleTime(logger, &cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
 		if schedule != nil {
 			t.Errorf("expected 0 start times, got: %v", schedule)
 		}
@@ -163,7 +165,7 @@ func TestNextScheduleTime(t *testing.T) {
 		cj.Status.LastScheduleTime = &metav1.Time{Time: T1}
 		// Current time is after T1 and after T2
 		now := T2.Add(5 * time.Minute)
-		schedule, _ := nextScheduleTime(&cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
+		schedule, _ := nextScheduleTime(logger, &cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
 		if schedule == nil {
 			t.Errorf("expected 1 start times, got nil")
 		} else if !schedule.Equal(T2) {
@@ -176,7 +178,7 @@ func TestNextScheduleTime(t *testing.T) {
 		cj.Status.LastScheduleTime = &metav1.Time{Time: T1.Add(-1 * time.Hour)}
 		// Current time is after T1 and after T2
 		now := T2.Add(5 * time.Minute)
-		schedule, _ := nextScheduleTime(&cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
+		schedule, _ := nextScheduleTime(logger, &cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
 		if schedule == nil {
 			t.Errorf("expected 1 start times, got nil")
 		} else if !schedule.Equal(T2) {
@@ -188,7 +190,7 @@ func TestNextScheduleTime(t *testing.T) {
 		cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: T1.Add(-2 * time.Hour)}
 		cj.Status.LastScheduleTime = &metav1.Time{Time: T1.Add(-1 * time.Hour)}
 		now := T2.Add(10 * 24 * time.Hour)
-		schedule, _ := nextScheduleTime(&cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
+		schedule, _ := nextScheduleTime(logger, &cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
 		if schedule == nil {
 			t.Errorf("expected more than 0 missed times")
 		}
@@ -201,7 +203,7 @@ func TestNextScheduleTime(t *testing.T) {
 		// Deadline is short
 		deadline := int64(2 * 60 * 60)
 		cj.Spec.StartingDeadlineSeconds = &deadline
-		schedule, _ := nextScheduleTime(&cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
+		schedule, _ := nextScheduleTime(logger, &cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
 		if schedule == nil {
 			t.Errorf("expected more than 0 missed times")
 		}
@@ -212,7 +214,7 @@ func TestNextScheduleTime(t *testing.T) {
 		cj.Status.LastScheduleTime = nil
 		now := *deltaTimeAfterTopOfTheHour(1 * time.Hour)
 		// rouge schedule
-		schedule, err := nextScheduleTime(&cj, now, PraseSchedule("59 23 31 2 *"), recorder)
+		schedule, err := nextScheduleTime(logger, &cj, now, PraseSchedule("59 23 31 2 *"), recorder)
 		if schedule != nil {
 			t.Errorf("expected no start time, got:  %v", schedule)
 		}
@@ -288,7 +290,9 @@ func TestByJobStartTime(t *testing.T) {
 func TestMostRecentScheduleTime(t *testing.T) {
 	metav1TopOfTheHour := metav1.NewTime(*topOfTheHour())
 	metav1HalfPastTheHour := metav1.NewTime(*deltaTimeAfterTopOfTheHour(30 * time.Minute))
+	metav1MinuteAfterTopOfTheHour := metav1.NewTime(*deltaTimeAfterTopOfTheHour(1 * time.Minute))
 	oneMinute := int64(60)
+	tenSeconds := int64(10)
 
 	tests := []struct {
 		name                   string
@@ -343,6 +347,94 @@ func TestMostRecentScheduleTime(t *testing.T) {
 			expectedRecentTime:     deltaTimeAfterTopOfTheHour(300 * time.Minute),
 			expectedEarliestTime:   *deltaTimeAfterTopOfTheHour(10 * time.Second),
 			expectedNumberOfMisses: 5,
+		},
+		{
+			name: "complex schedule",
+			cj: &batchv1.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					CreationTimestamp: metav1TopOfTheHour,
+				},
+				Spec: batchv1.CronJobSpec{
+					Schedule: "30 6-16/4 * * 1-5",
+				},
+				Status: batchv1.CronJobStatus{
+					LastScheduleTime: &metav1HalfPastTheHour,
+				},
+			},
+			now:                    *deltaTimeAfterTopOfTheHour(24*time.Hour + 31*time.Minute),
+			expectedRecentTime:     deltaTimeAfterTopOfTheHour(24*time.Hour + 30*time.Minute),
+			expectedEarliestTime:   *deltaTimeAfterTopOfTheHour(30 * time.Minute),
+			expectedNumberOfMisses: 2,
+		},
+		{
+			name: "another complex schedule",
+			cj: &batchv1.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					CreationTimestamp: metav1TopOfTheHour,
+				},
+				Spec: batchv1.CronJobSpec{
+					Schedule: "30 10,11,12 * * 1-5",
+				},
+				Status: batchv1.CronJobStatus{
+					LastScheduleTime: &metav1HalfPastTheHour,
+				},
+			},
+			now:                    *deltaTimeAfterTopOfTheHour(30*time.Hour + 30*time.Minute),
+			expectedRecentTime:     nil,
+			expectedEarliestTime:   *deltaTimeAfterTopOfTheHour(30 * time.Minute),
+			expectedNumberOfMisses: 30,
+		},
+		{
+			name: "complex schedule with longer diff between executions",
+			cj: &batchv1.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					CreationTimestamp: metav1TopOfTheHour,
+				},
+				Spec: batchv1.CronJobSpec{
+					Schedule: "30 6-16/4 * * 1-5",
+				},
+				Status: batchv1.CronJobStatus{
+					LastScheduleTime: &metav1HalfPastTheHour,
+				},
+			},
+			now:                    *deltaTimeAfterTopOfTheHour(96*time.Hour + 31*time.Minute),
+			expectedRecentTime:     deltaTimeAfterTopOfTheHour(96*time.Hour + 30*time.Minute),
+			expectedEarliestTime:   *deltaTimeAfterTopOfTheHour(30 * time.Minute),
+			expectedNumberOfMisses: 6,
+		},
+		{
+			name: "complex schedule with shorter diff between executions",
+			cj: &batchv1.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					CreationTimestamp: metav1TopOfTheHour,
+				},
+				Spec: batchv1.CronJobSpec{
+					Schedule: "30 6-16/4 * * 1-5",
+				},
+			},
+			now:                    *deltaTimeAfterTopOfTheHour(24*time.Hour + 31*time.Minute),
+			expectedRecentTime:     deltaTimeAfterTopOfTheHour(24*time.Hour + 30*time.Minute),
+			expectedEarliestTime:   *topOfTheHour(),
+			expectedNumberOfMisses: 7,
+		},
+		{
+			name: "@every schedule",
+			cj: &batchv1.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					CreationTimestamp: metav1.NewTime(*deltaTimeAfterTopOfTheHour(-59 * time.Minute)),
+				},
+				Spec: batchv1.CronJobSpec{
+					Schedule:                "@every 1h",
+					StartingDeadlineSeconds: &tenSeconds,
+				},
+				Status: batchv1.CronJobStatus{
+					LastScheduleTime: &metav1MinuteAfterTopOfTheHour,
+				},
+			},
+			now:                    *deltaTimeAfterTopOfTheHour(7 * 24 * time.Hour),
+			expectedRecentTime:     deltaTimeAfterTopOfTheHour((6 * 24 * time.Hour) + 23*time.Hour + 1*time.Minute),
+			expectedEarliestTime:   *deltaTimeAfterTopOfTheHour(1 * time.Minute),
+			expectedNumberOfMisses: 167,
 		},
 		{
 			name: "rogue cronjob",

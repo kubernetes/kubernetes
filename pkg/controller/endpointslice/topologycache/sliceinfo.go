@@ -52,7 +52,7 @@ func (si *SliceInfo) getTotalReadyEndpoints() int {
 //   - It has endpoint hints that would make the minimum allocations necessary
 //     impossible with changes to slices that are already being updated or
 //     created.
-func (si *SliceInfo) getAllocatedHintsByZone(allocations map[string]Allocation) EndpointZoneInfo {
+func (si *SliceInfo) getAllocatedHintsByZone(allocations map[string]allocation) EndpointZoneInfo {
 	allocatedHintsByZone := EndpointZoneInfo{}
 
 	// Using filtering in place to remove any endpoints that are no longer

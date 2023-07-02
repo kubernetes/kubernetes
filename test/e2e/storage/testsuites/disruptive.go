@@ -90,7 +90,7 @@ func (s *disruptiveTestSuite) DefineTests(driver storageframework.TestDriver, pa
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewFrameworkWithCustomTimeouts("disruptive", storageframework.GetDriverTimeouts(driver))
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	init := func(ctx context.Context, accessModes []v1.PersistentVolumeAccessMode) {
 		l = local{}
@@ -207,26 +207,26 @@ func (s *disruptiveTestSuite) DefineTests(driver storageframework.TestDriver, pa
 	}
 	multiplePodTests := []multiplePodTest{
 		{
-			testItStmt: "Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].",
+			testItStmt: "Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].",
 			runTestFile: func(ctx context.Context, c clientset.Interface, f *framework.Framework, pod1, pod2 *v1.Pod) {
 				storageutils.TestVolumeUnmountsFromDeletedPodWithForceOption(ctx, c, f, pod1, false, false, pod2, e2epod.VolumeMountPath1)
 			},
 		},
 		{
-			testItStmt: "Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].",
+			testItStmt: "Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux].",
 			runTestFile: func(ctx context.Context, c clientset.Interface, f *framework.Framework, pod1, pod2 *v1.Pod) {
 				storageutils.TestVolumeUnmountsFromDeletedPodWithForceOption(ctx, c, f, pod1, true, false, pod2, e2epod.VolumeMountPath1)
 			},
 		},
 		{
-			testItStmt:            "Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].",
+			testItStmt:            "Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].",
 			changeSELinuxContexts: true,
 			runTestFile: func(ctx context.Context, c clientset.Interface, f *framework.Framework, pod1, pod2 *v1.Pod) {
 				storageutils.TestVolumeUnmountsFromDeletedPodWithForceOption(ctx, c, f, pod1, false, false, pod2, e2epod.VolumeMountPath1)
 			},
 		},
 		{
-			testItStmt:            "Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux][Feature:SELinuxMountReadWriteOncePod].",
+			testItStmt:            "Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux].",
 			changeSELinuxContexts: true,
 			runTestFile: func(ctx context.Context, c clientset.Interface, f *framework.Framework, pod1, pod2 *v1.Pod) {
 				storageutils.TestVolumeUnmountsFromDeletedPodWithForceOption(ctx, c, f, pod1, true, false, pod2, e2epod.VolumeMountPath1)

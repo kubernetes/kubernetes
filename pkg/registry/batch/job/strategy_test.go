@@ -21,7 +21,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -186,7 +185,7 @@ func TestJobStrategy_PrepareForUpdate(t *testing.T) {
 		},
 		"add tracking annotation back": {
 			job: batch.Job{
-				ObjectMeta: getValidObjectMetaWithAnnotations(0, map[string]string{batchv1.JobTrackingFinalizer: ""}),
+				ObjectMeta: getValidObjectMeta(0),
 				Spec: batch.JobSpec{
 					Selector:         validSelector,
 					Template:         validPodTemplateSpec,
@@ -201,7 +200,7 @@ func TestJobStrategy_PrepareForUpdate(t *testing.T) {
 				},
 			},
 			wantJob: batch.Job{
-				ObjectMeta: getValidObjectMetaWithAnnotations(1, map[string]string{batchv1.JobTrackingFinalizer: ""}),
+				ObjectMeta: getValidObjectMeta(1),
 				Spec: batch.JobSpec{
 					Selector: validSelector,
 					Template: validPodTemplateSpec,
@@ -373,7 +372,7 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 				},
 			},
 			wantJob: batch.Job{
-				ObjectMeta: getValidObjectMetaWithAnnotations(1, map[string]string{batchv1.JobTrackingFinalizer: ""}),
+				ObjectMeta: getValidObjectMeta(1),
 				Spec: batch.JobSpec{
 					Selector:         validSelector,
 					Template:         validPodTemplateSpec,
@@ -392,7 +391,7 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 				},
 			},
 			wantJob: batch.Job{
-				ObjectMeta: getValidObjectMetaWithAnnotations(1, map[string]string{batchv1.JobTrackingFinalizer: ""}),
+				ObjectMeta: getValidObjectMeta(1),
 				Spec: batch.JobSpec{
 					Selector:         validSelector,
 					Template:         validPodTemplateSpec,
@@ -412,7 +411,7 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 				},
 			},
 			wantJob: batch.Job{
-				ObjectMeta: getValidObjectMetaWithAnnotations(1, map[string]string{batchv1.JobTrackingFinalizer: ""}),
+				ObjectMeta: getValidObjectMeta(1),
 				Spec: batch.JobSpec{
 					Selector: validSelector,
 					Template: validPodTemplateSpec,
@@ -472,10 +471,9 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 	}
 	now := metav1.Now()
 	cases := map[string]struct {
-		job                                *batch.Job
-		update                             func(*batch.Job)
-		wantErrs                           field.ErrorList
-		mutableSchedulingDirectivesEnabled bool
+		job      *batch.Job
+		update   func(*batch.Job)
+		wantErrs field.ErrorList
 	}{
 		"update parallelism": {
 			job: &batch.Job{
@@ -515,28 +513,6 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 			},
 			wantErrs: field.ErrorList{
 				{Type: field.ErrorTypeInvalid, Field: "spec.completions"},
-			},
-		},
-		"adding tracking annotation disallowed": {
-			job: &batch.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "myjob",
-					Namespace:       metav1.NamespaceDefault,
-					ResourceVersion: "0",
-					Annotations:     map[string]string{"foo": "bar"},
-				},
-				Spec: batch.JobSpec{
-					Selector:       validSelector,
-					Template:       validPodTemplateSpec,
-					ManualSelector: pointer.BoolPtr(true),
-					Parallelism:    pointer.Int32Ptr(1),
-				},
-			},
-			update: func(job *batch.Job) {
-				job.Annotations[batch.JobTrackingFinalizer] = ""
-			},
-			wantErrs: field.ErrorList{
-				{Type: field.ErrorTypeForbidden, Field: "metadata.annotations[batch.kubernetes.io/job-tracking]"},
 			},
 		},
 		"preserving tracking annotation": {
@@ -603,7 +579,6 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{Type: field.ErrorTypeInvalid, Field: "spec.template"},
 			},
-			mutableSchedulingDirectivesEnabled: true,
 		},
 		"updating node selector for suspended but previously started job disallowed": {
 			job: &batch.Job{
@@ -630,7 +605,6 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{Type: field.ErrorTypeInvalid, Field: "spec.template"},
 			},
-			mutableSchedulingDirectivesEnabled: true,
 		},
 		"updating node selector for suspended and not previously started job allowed": {
 			job: &batch.Job{
@@ -651,31 +625,6 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 			update: func(job *batch.Job) {
 				job.Spec.Template.Spec.NodeSelector = map[string]string{"foo": "bar"}
 			},
-			mutableSchedulingDirectivesEnabled: true,
-		},
-		"updating node selector whilte gate disabled disallowed": {
-			job: &batch.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "myjob",
-					Namespace:       metav1.NamespaceDefault,
-					ResourceVersion: "0",
-					Annotations:     map[string]string{"foo": "bar"},
-				},
-				Spec: batch.JobSpec{
-					Selector:       validSelector,
-					Template:       validPodTemplateSpec,
-					ManualSelector: pointer.BoolPtr(true),
-					Parallelism:    pointer.Int32Ptr(1),
-					Suspend:        pointer.BoolPtr(true),
-				},
-			},
-			update: func(job *batch.Job) {
-				job.Spec.Template.Spec.NodeSelector = map[string]string{"foo": "bar"}
-			},
-			wantErrs: field.ErrorList{
-				{Type: field.ErrorTypeInvalid, Field: "spec.template"},
-			},
-			mutableSchedulingDirectivesEnabled: false,
 		},
 		"invalid label selector": {
 			job: &batch.Job{
@@ -698,10 +647,69 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 				job.Annotations["hello"] = "world"
 			},
 		},
+		"old job has no batch.kubernetes.io labels": {
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					UID:             "test",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "10",
+					Annotations:     map[string]string{"hello": "world"},
+				},
+				Spec: batch.JobSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{batch.LegacyControllerUidLabel: "test"},
+					},
+					Parallelism: pointer.Int32(4),
+					Template: api.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{batch.LegacyJobNameLabel: "myjob", batch.LegacyControllerUidLabel: "test"},
+						},
+						Spec: api.PodSpec{
+							RestartPolicy: api.RestartPolicyOnFailure,
+							DNSPolicy:     api.DNSClusterFirst,
+							Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+						},
+					},
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Annotations["hello"] = "world"
+			},
+		},
+		"old job has all labels": {
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					UID:             "test",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "10",
+					Annotations:     map[string]string{"foo": "bar"},
+				},
+				Spec: batch.JobSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{batch.ControllerUidLabel: "test"},
+					},
+					Parallelism: pointer.Int32(4),
+					Template: api.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{batch.LegacyJobNameLabel: "myjob", batch.JobNameLabel: "myjob", batch.LegacyControllerUidLabel: "test", batch.ControllerUidLabel: "test"},
+						},
+						Spec: api.PodSpec{
+							RestartPolicy: api.RestartPolicyOnFailure,
+							DNSPolicy:     api.DNSClusterFirst,
+							Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+						},
+					},
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Annotations["hello"] = "world"
+			},
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobMutableNodeSchedulingDirectives, tc.mutableSchedulingDirectivesEnabled)()
 			newJob := tc.job.DeepCopy()
 			tc.update(newJob)
 			errs := Strategy.ValidateUpdate(ctx, newJob, tc.job)
@@ -805,7 +813,7 @@ func TestJobStrategy_WarningsOnUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector: validSelector,
 					Template: api.PodTemplateSpec{
-						Spec: api.PodSpec{Volumes: []api.Volume{{Name: "volume-name"}, {Name: "volume-name"}}},
+						Spec: api.PodSpec{ImagePullSecrets: []api.LocalObjectReference{{Name: ""}}},
 					},
 					ManualSelector: pointer.BoolPtr(true),
 					Parallelism:    pointer.Int32Ptr(1),
@@ -828,6 +836,37 @@ func TestJobStrategy_WarningsOnUpdate(t *testing.T) {
 			},
 			wantWarningsCount: 1,
 		},
+		"Invalid transition to high parallelism": {
+			wantWarningsCount: 1,
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob2",
+					Namespace:       metav1.NamespaceDefault,
+					Generation:      1,
+					ResourceVersion: "0",
+				},
+				Spec: batch.JobSpec{
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					Completions:    pointer.Int32(100_001),
+					Parallelism:    pointer.Int32(10_001),
+					Template:       validPodTemplateSpec,
+				},
+			},
+			oldJob: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob2",
+					Namespace:       metav1.NamespaceDefault,
+					Generation:      0,
+					ResourceVersion: "0",
+				},
+				Spec: batch.JobSpec{
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					Completions:    pointer.Int32(100_001),
+					Parallelism:    pointer.Int32(10_000),
+					Template:       validPodTemplateSpec,
+				},
+			},
+		},
 	}
 	for val, tc := range cases {
 		t.Run(val, func(t *testing.T) {
@@ -845,18 +884,20 @@ func TestJobStrategy_WarningsOnCreate(t *testing.T) {
 	validSelector := &metav1.LabelSelector{
 		MatchLabels: map[string]string{"a": "b"},
 	}
-	validSpec := batch.JobSpec{
-		Selector: nil,
-		Template: api.PodTemplateSpec{
-			ObjectMeta: metav1.ObjectMeta{
-				Labels: validSelector.MatchLabels,
-			},
-			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicyOnFailure,
-				DNSPolicy:     api.DNSClusterFirst,
-				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
-			},
+	validPodTemplate := api.PodTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: validSelector.MatchLabels,
 		},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicyOnFailure,
+			DNSPolicy:     api.DNSClusterFirst,
+			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+		},
+	}
+	validSpec := batch.JobSpec{
+		CompletionMode: completionModePtr(batch.NonIndexedCompletion),
+		Selector:       nil,
+		Template:       validPodTemplate,
 	}
 
 	testcases := map[string]struct {
@@ -884,6 +925,22 @@ func TestJobStrategy_WarningsOnCreate(t *testing.T) {
 				Spec: validSpec,
 			},
 		},
+		"high completions and parallelism": {
+			wantWarningsCount: 1,
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "myjob2",
+					Namespace: metav1.NamespaceDefault,
+					UID:       theUID,
+				},
+				Spec: batch.JobSpec{
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					Parallelism:    pointer.Int32(100_001),
+					Completions:    pointer.Int32(100_001),
+					Template:       validPodTemplate,
+				},
+			},
+		},
 	}
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
@@ -901,7 +958,8 @@ func TestJobStrategy_Validate(t *testing.T) {
 	validSelector := &metav1.LabelSelector{
 		MatchLabels: map[string]string{"a": "b"},
 	}
-
+	validLabels := map[string]string{batch.LegacyJobNameLabel: "myjob2", batch.JobNameLabel: "myjob2", batch.LegacyControllerUidLabel: string(theUID), batch.ControllerUidLabel: string(theUID)}
+	labelsWithNonBatch := map[string]string{"a": "b", batch.LegacyJobNameLabel: "myjob2", batch.JobNameLabel: "myjob2", batch.LegacyControllerUidLabel: string(theUID), batch.ControllerUidLabel: string(theUID)}
 	validPodSpec := api.PodSpec{
 		RestartPolicy: api.RestartPolicyOnFailure,
 		DNSPolicy:     api.DNSClusterFirst,
@@ -932,7 +990,7 @@ func TestJobStrategy_Validate(t *testing.T) {
 			wantJob: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"controller-uid": string(theUID)}},
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{batch.ControllerUidLabel: string(theUID)}},
 					Template: api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: validSelector.MatchLabels,
@@ -953,10 +1011,10 @@ func TestJobStrategy_Validate(t *testing.T) {
 			wantJob: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"controller-uid": string(theUID)}},
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{batch.ControllerUidLabel: string(theUID)}},
 					Template: api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
-							Labels: map[string]string{"job-name": "myjob2", "controller-uid": string(theUID)},
+							Labels: validLabels,
 						},
 						Spec: validPodSpec,
 					}},
@@ -969,7 +1027,7 @@ func TestJobStrategy_Validate(t *testing.T) {
 					Selector: nil,
 					Template: api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
-							Labels: map[string]string{"a": "b", "job-name": "myjob2", "controller-uid": string(theUID)},
+							Labels: labelsWithNonBatch,
 						},
 						Spec: validPodSpec,
 					}},
@@ -977,10 +1035,10 @@ func TestJobStrategy_Validate(t *testing.T) {
 			wantJob: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"controller-uid": string(theUID)}},
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{batch.ControllerUidLabel: string(theUID)}},
 					Template: api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
-							Labels: map[string]string{"a": "b", "job-name": "myjob2", "controller-uid": string(theUID)},
+							Labels: labelsWithNonBatch,
 						},
 						Spec: validPodSpec,
 					}},
@@ -1036,10 +1094,10 @@ func TestJobStrategy_Validate(t *testing.T) {
 			wantJob: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"controller-uid": string(theUID)}},
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{batch.ControllerUidLabel: string(theUID)}},
 					Template: api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
-							Labels: map[string]string{"a": "b", "job-name": "myjob2", "controller-uid": string(theUID)},
+							Labels: labelsWithNonBatch,
 						},
 						Spec: validPodSpec,
 					},
@@ -1071,10 +1129,10 @@ func TestJobStrategy_Validate(t *testing.T) {
 			wantJob: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"controller-uid": string(theUID)}},
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{batch.ControllerUidLabel: string(theUID)}},
 					Template: api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
-							Labels: map[string]string{"a": "b", "job-name": "myjob2", "controller-uid": string(theUID)},
+							Labels: labelsWithNonBatch,
 						},
 						Spec: api.PodSpec{
 							RestartPolicy: api.RestartPolicyOnFailure,
@@ -1104,14 +1162,14 @@ func TestJobStrategy_Validate(t *testing.T) {
 func TestStrategy_ResetFields(t *testing.T) {
 	resetFields := Strategy.GetResetFields()
 	if len(resetFields) != 1 {
-		t.Error("ResetFields should have 1 element")
+		t.Errorf("ResetFields should have 1 element, but have %d", len(resetFields))
 	}
 }
 
 func TestJobStatusStrategy_ResetFields(t *testing.T) {
 	resetFields := StatusStrategy.GetResetFields()
 	if len(resetFields) != 1 {
-		t.Error("ResetFields should have 1 element")
+		t.Errorf("ResetFields should have 1 element, but have %d", len(resetFields))
 	}
 }
 

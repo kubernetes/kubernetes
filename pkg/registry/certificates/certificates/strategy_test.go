@@ -22,9 +22,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apiserver/pkg/authentication/user"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	certapi "k8s.io/kubernetes/pkg/apis/certificates"
@@ -137,7 +137,7 @@ func TestStrategyCreate(t *testing.T) {
 			obj := tc.obj
 			Strategy.PrepareForCreate(tc.ctx, obj)
 			if !reflect.DeepEqual(obj, tc.expectedObj) {
-				t.Errorf("object diff: %s", diff.ObjectDiff(obj, tc.expectedObj))
+				t.Errorf("object diff: %s", cmp.Diff(obj, tc.expectedObj))
 			}
 		})
 	}
@@ -225,7 +225,7 @@ func TestStatusUpdate(t *testing.T) {
 			obj := tt.newObj.DeepCopy()
 			StatusStrategy.PrepareForUpdate(context.TODO(), obj, tt.oldObj.DeepCopy())
 			if !reflect.DeepEqual(obj, tt.expectedObj) {
-				t.Errorf("object diff: %s", diff.ObjectDiff(obj, tt.expectedObj))
+				t.Errorf("object diff: %s", cmp.Diff(obj, tt.expectedObj))
 			}
 		})
 	}

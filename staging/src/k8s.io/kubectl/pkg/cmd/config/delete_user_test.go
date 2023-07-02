@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
@@ -51,7 +51,7 @@ func TestDeleteUserComplete(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
-			ioStreams, _, out, _ := genericclioptions.NewTestIOStreams()
+			ioStreams, _, out, _ := genericiooptions.NewTestIOStreams()
 			pathOptions, err := tf.PathOptionsWithConfig(clientcmdapi.Config{})
 			if err != nil {
 				t.Fatalf("unexpected error executing command: %v", err)
@@ -116,7 +116,7 @@ func TestDeleteUserValidate(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
-			ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
+			ioStreams, _, _, _ := genericiooptions.NewTestIOStreams()
 			pathOptions, err := tf.PathOptionsWithConfig(test.config)
 			if err != nil {
 				t.Fatalf("unexpected error executing command: %v", err)
@@ -165,7 +165,7 @@ func TestDeleteUserRun(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
-			ioStreams, _, out, _ := genericclioptions.NewTestIOStreams()
+			ioStreams, _, out, _ := genericiooptions.NewTestIOStreams()
 			pathOptions, err := tf.PathOptionsWithConfig(test.config)
 			if err != nil {
 				t.Fatalf("unexpected error executing command: %v", err)

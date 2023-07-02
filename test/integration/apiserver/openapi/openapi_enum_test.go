@@ -17,6 +17,7 @@ limitations under the License.
 package openapi
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"testing"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane"
 	generated "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestEnablingOpenAPIEnumTypes(t *testing.T) {
@@ -54,6 +56,10 @@ func TestEnablingOpenAPIEnumTypes(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.OpenAPIEnums, tc.featureEnabled)()
 
 			getDefinitionsFn := openapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(func(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
@@ -73,7 +79,7 @@ func TestEnablingOpenAPIEnumTypes(t *testing.T) {
 				return defs
 			})
 
-			_, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+			_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 				ModifyServerConfig: func(config *controlplane.Config) {
 					config.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
 					config.GenericConfig.OpenAPIConfig.GetDefinitions = getDefinitionsFn

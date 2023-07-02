@@ -662,6 +662,15 @@ func (f *Framer) WriteData(streamID uint32, endStream bool, data []byte) error {
 // It is the caller's responsibility not to violate the maximum frame size
 // and to not call other Write methods concurrently.
 func (f *Framer) WriteDataPadded(streamID uint32, endStream bool, data, pad []byte) error {
+	if err := f.startWriteDataPadded(streamID, endStream, data, pad); err != nil {
+		return err
+	}
+	return f.endWrite()
+}
+
+// startWriteDataPadded is WriteDataPadded, but only writes the frame to the Framer's internal buffer.
+// The caller should call endWrite to flush the frame to the underlying writer.
+func (f *Framer) startWriteDataPadded(streamID uint32, endStream bool, data, pad []byte) error {
 	if !validStreamID(streamID) && !f.AllowIllegalWrites {
 		return errStreamID
 	}
@@ -691,7 +700,7 @@ func (f *Framer) WriteDataPadded(streamID uint32, endStream bool, data, pad []by
 	}
 	f.wbuf = append(f.wbuf, data...)
 	f.wbuf = append(f.wbuf, pad...)
-	return f.endWrite()
+	return nil
 }
 
 // A SettingsFrame conveys configuration parameters that affect how

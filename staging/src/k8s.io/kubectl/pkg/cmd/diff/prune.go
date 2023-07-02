@@ -24,43 +24,52 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubectl/pkg/util/prune"
 )
 
+type tracker struct {
+	visitedUids       sets.Set[types.UID]
+	visitedNamespaces sets.Set[string]
+}
+
+func newTracker() *tracker {
+	return &tracker{
+		visitedUids:       sets.New[types.UID](),
+		visitedNamespaces: sets.New[string](),
+	}
+}
+
 type pruner struct {
 	mapper        meta.RESTMapper
 	dynamicClient dynamic.Interface
 
-	visitedUids       sets.String
-	visitedNamespaces sets.String
-	labelSelector     string
-	resources         []prune.Resource
+	labelSelector string
+	resources     []prune.Resource
 }
 
 func newPruner(dc dynamic.Interface, m meta.RESTMapper, r []prune.Resource, selector string) *pruner {
 	return &pruner{
-		visitedUids:       sets.NewString(),
-		visitedNamespaces: sets.NewString(),
-		dynamicClient:     dc,
-		mapper:            m,
-		resources:         r,
-		labelSelector:     selector,
+		dynamicClient: dc,
+		mapper:        m,
+		resources:     r,
+		labelSelector: selector,
 	}
 }
 
-func (p *pruner) pruneAll(namespaceSpecified bool) ([]runtime.Object, error) {
+func (p *pruner) pruneAll(tracker *tracker, namespaceSpecified bool) ([]runtime.Object, error) {
 	var allPruned []runtime.Object
 	namespacedRESTMappings, nonNamespacedRESTMappings, err := prune.GetRESTMappings(p.mapper, p.resources, namespaceSpecified)
 	if err != nil {
 		return allPruned, fmt.Errorf("error retrieving RESTMappings to prune: %v", err)
 	}
 
-	for n := range p.visitedNamespaces {
+	for n := range tracker.visitedNamespaces {
 		for _, m := range namespacedRESTMappings {
-			if pobjs, err := p.prune(n, m); err != nil {
+			if pobjs, err := p.prune(tracker, n, m); err != nil {
 				return pobjs, fmt.Errorf("error pruning namespaced object %v: %v", m.GroupVersionKind, err)
 			} else {
 				allPruned = append(allPruned, pobjs...)
@@ -68,7 +77,7 @@ func (p *pruner) pruneAll(namespaceSpecified bool) ([]runtime.Object, error) {
 		}
 	}
 	for _, m := range nonNamespacedRESTMappings {
-		if pobjs, err := p.prune(metav1.NamespaceNone, m); err != nil {
+		if pobjs, err := p.prune(tracker, metav1.NamespaceNone, m); err != nil {
 			return allPruned, fmt.Errorf("error pruning nonNamespaced object %v: %v", m.GroupVersionKind, err)
 		} else {
 			allPruned = append(allPruned, pobjs...)
@@ -78,7 +87,7 @@ func (p *pruner) pruneAll(namespaceSpecified bool) ([]runtime.Object, error) {
 	return allPruned, nil
 }
 
-func (p *pruner) prune(namespace string, mapping *meta.RESTMapping) ([]runtime.Object, error) {
+func (p *pruner) prune(tracker *tracker, namespace string, mapping *meta.RESTMapping) ([]runtime.Object, error) {
 	objList, err := p.dynamicClient.Resource(mapping.Resource).
 		Namespace(namespace).
 		List(context.TODO(), metav1.ListOptions{
@@ -104,7 +113,7 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping) ([]runtime.O
 			continue
 		}
 		uid := metadata.GetUID()
-		if p.visitedUids.Has(string(uid)) {
+		if tracker.visitedUids.Has(uid) {
 			continue
 		}
 
@@ -114,14 +123,14 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping) ([]runtime.O
 }
 
 // MarkVisited marks visited namespaces and uids
-func (p *pruner) MarkVisited(info *resource.Info) {
+func (t *tracker) MarkVisited(info *resource.Info) {
 	if info.Namespaced() {
-		p.visitedNamespaces.Insert(info.Namespace)
+		t.visitedNamespaces.Insert(info.Namespace)
 	}
 
 	metadata, err := meta.Accessor(info.Object)
 	if err != nil {
 		return
 	}
-	p.visitedUids.Insert(string(metadata.GetUID()))
+	t.visitedUids.Insert(metadata.GetUID())
 }

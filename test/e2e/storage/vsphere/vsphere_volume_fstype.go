@@ -70,7 +70,7 @@ const (
 
 var _ = utils.SIGDescribe("Volume FStype [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("volume-fstype")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var (
 		client    clientset.Interface
 		namespace string
@@ -80,7 +80,7 @@ var _ = utils.SIGDescribe("Volume FStype [Feature:vsphere]", func() {
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
-		gomega.Expect(GetReadySchedulableNodeInfos(ctx)).NotTo(gomega.BeEmpty())
+		gomega.Expect(GetReadySchedulableNodeInfos(ctx, client)).NotTo(gomega.BeEmpty())
 	})
 
 	ginkgo.It("verify fstype - ext3 formatted volume", func(ctx context.Context) {

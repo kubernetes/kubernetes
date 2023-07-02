@@ -18,7 +18,6 @@ package options
 
 import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 const (
@@ -36,7 +35,6 @@ var (
 // default values.
 func NewContainerRuntimeOptions() *config.ContainerRuntimeOptions {
 	return &config.ContainerRuntimeOptions{
-		ContainerRuntime: kubetypes.RemoteContainerRuntime,
-		PodSandboxImage:  defaultPodSandboxImage,
+		PodSandboxImage: defaultPodSandboxImage,
 	}
 }

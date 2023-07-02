@@ -27,10 +27,11 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope/util"
+	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope/metrics"
 	"k8s.io/klog/v2"
-	kmsapi "k8s.io/kms/apis/v2alpha1"
-	kmsservice "k8s.io/kms/service"
+	kmsapi "k8s.io/kms/apis/v2"
+	kmsservice "k8s.io/kms/pkg/service"
+	"k8s.io/kms/pkg/util"
 )
 
 const (
@@ -46,8 +47,8 @@ type gRPCService struct {
 }
 
 // NewGRPCService returns an envelope.Service which use gRPC to communicate the remote KMS provider.
-func NewGRPCService(ctx context.Context, endpoint string, callTimeout time.Duration) (kmsservice.Service, error) {
-	klog.V(4).Infof("Configure KMS provider with endpoint: %s", endpoint)
+func NewGRPCService(ctx context.Context, endpoint, providerName string, callTimeout time.Duration) (kmsservice.Service, error) {
+	klog.V(4).InfoS("Configure KMS provider", "endpoint", endpoint)
 
 	addr, err := util.ParseEndpoint(endpoint)
 	if err != nil {
@@ -65,12 +66,14 @@ func NewGRPCService(ctx context.Context, endpoint string, callTimeout time.Durat
 				// addr - comes from the closure
 				c, err := net.DialUnix(unixProtocol, nil, &net.UnixAddr{Name: addr})
 				if err != nil {
-					klog.Errorf("failed to create connection to unix socket: %s, error: %v", addr, err)
+					klog.ErrorS(err, "failed to create connection to unix socket", "addr", addr)
 				} else {
-					klog.V(4).Infof("Successfully dialed Unix socket %v", addr)
+					klog.V(4).InfoS("Successfully dialed Unix socket", "addr", addr)
 				}
 				return c, err
-			}))
+			}),
+		grpc.WithChainUnaryInterceptor(recordMetricsInterceptor(providerName)),
+	)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create connection to %s, error: %v", endpoint, err)
@@ -137,4 +140,14 @@ func (g *gRPCService) Status(ctx context.Context) (*kmsservice.StatusResponse, e
 		return nil, err
 	}
 	return &kmsservice.StatusResponse{Version: response.Version, Healthz: response.Healthz, KeyID: response.KeyId}, nil
+}
+
+func recordMetricsInterceptor(providerName string) grpc.UnaryClientInterceptor {
+	return func(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+		start := NowFunc()
+		respErr := invoker(ctx, method, req, reply, cc, opts...)
+		elapsed := NowFunc().Sub(start)
+		metrics.RecordKMSOperationLatency(providerName, method, elapsed, respErr)
+		return respErr
+	}
 }

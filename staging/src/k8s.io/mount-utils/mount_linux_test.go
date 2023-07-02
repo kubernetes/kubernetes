@@ -21,20 +21,22 @@ package mount
 
 import (
 	"errors"
-	"io/ioutil"
+	"fmt"
 	"os"
+	"os/exec"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	utilexec "k8s.io/utils/exec"
 	testexec "k8s.io/utils/exec/testing"
 )
 
 func TestReadProcMountsFrom(t *testing.T) {
-	successCase :=
-		`/dev/0 /path/to/0 type0 flags 0 0
+	successCase := `/dev/0 /path/to/0 type0 flags 0 0
 /dev/1    /path/to/1   type1	flags 1 1
 /dev/2 /path/to/2 type2 flags,1,2=3 2 2
 `
@@ -145,10 +147,14 @@ func setEquivalent(set1, set2 []string) bool {
 func TestGetDeviceNameFromMount(t *testing.T) {
 	fm := NewFakeMounter(
 		[]MountPoint{
-			{Device: "/dev/disk/by-path/prefix-lun-1",
-				Path: "/mnt/111"},
-			{Device: "/dev/disk/by-path/prefix-lun-1",
-				Path: "/mnt/222"},
+			{
+				Device: "/dev/disk/by-path/prefix-lun-1",
+				Path:   "/mnt/111",
+			},
+			{
+				Device: "/dev/disk/by-path/prefix-lun-1",
+				Path:   "/mnt/222",
+			},
 		})
 
 	tests := []struct {
@@ -200,7 +206,6 @@ func TestGetMountRefsByDev(t *testing.T) {
 	}
 
 	for i, test := range tests {
-
 		if refs, err := getMountRefsByDev(fm, test.mountPath); err != nil || !setEquivalent(test.expectedRefs, refs) {
 			t.Errorf("%d. getMountRefsByDev(%q) = %v, %v; expected %v, nil", i, test.mountPath, refs, err, test.expectedRefs)
 		}
@@ -291,7 +296,6 @@ func TestPathWithinBase(t *testing.T) {
 		if PathWithinBase(test.fullPath, test.basePath) != test.expected {
 			t.Errorf("test %q failed: expected %v", test.name, test.expected)
 		}
-
 	}
 }
 
@@ -419,27 +423,31 @@ func TestSearchMountPoints(t *testing.T) {
 62 25 7:1 / /var/lib/kubelet/pods/f19fe4e2-5a63-11e8-962f-000c29bb0377/volumes/kubernetes.io~local-volume/local-pv-test rw,relatime shared:38 - ext4 /dev/loop1 rw,data=ordered
 95 25 7:1 / /var/lib/kubelet/pods/4854a48b-5a64-11e8-962f-000c29bb0377/volumes/kubernetes.io~local-volume/local-pv-test rw,relatime shared:38 - ext4 /dev/loop1 rw,data=ordered
 `,
-			[]string{"/var/lib/kubelet/pods/f19fe4e2-5a63-11e8-962f-000c29bb0377/volumes/kubernetes.io~local-volume/local-pv-test",
-				"/var/lib/kubelet/pods/4854a48b-5a64-11e8-962f-000c29bb0377/volumes/kubernetes.io~local-volume/local-pv-test"},
+			[]string{
+				"/var/lib/kubelet/pods/f19fe4e2-5a63-11e8-962f-000c29bb0377/volumes/kubernetes.io~local-volume/local-pv-test",
+				"/var/lib/kubelet/pods/4854a48b-5a64-11e8-962f-000c29bb0377/volumes/kubernetes.io~local-volume/local-pv-test",
+			},
 			nil,
 		},
 	}
-	tmpFile, err := ioutil.TempFile("", "test-get-filetype")
+	tmpFile, err := os.CreateTemp("", "test-get-filetype")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.Remove(tmpFile.Name())
 	defer tmpFile.Close()
 	for _, v := range testcases {
-		tmpFile.Truncate(0)
-		tmpFile.Seek(0, 0)
-		tmpFile.WriteString(v.mountInfos)
-		tmpFile.Sync()
+		assert.NoError(t, tmpFile.Truncate(0))
+		_, err := tmpFile.Seek(0, 0)
+		assert.NoError(t, err)
+		_, err = tmpFile.WriteString(v.mountInfos)
+		assert.NoError(t, err)
+		assert.NoError(t, tmpFile.Sync())
 		refs, err := SearchMountPoints(v.source, tmpFile.Name())
 		if !reflect.DeepEqual(refs, v.expectedRefs) {
 			t.Errorf("test %q: expected Refs: %#v, got %#v", v.name, v.expectedRefs, refs)
 		}
-		if !reflect.DeepEqual(err, v.expectedErr) {
+		if err != v.expectedErr {
 			t.Errorf("test %q: expected err: %v, got %v", v.name, v.expectedErr, err)
 		}
 	}
@@ -456,7 +464,6 @@ func TestSensitiveMountOptions(t *testing.T) {
 		mountFlags       []string
 	}{
 		{
-
 			source:           "mySrc",
 			target:           "myTarget",
 			fstype:           "myFS",
@@ -465,7 +472,6 @@ func TestSensitiveMountOptions(t *testing.T) {
 			mountFlags:       []string{},
 		},
 		{
-
 			source:           "mySrc",
 			target:           "myTarget",
 			fstype:           "myFS",
@@ -474,7 +480,6 @@ func TestSensitiveMountOptions(t *testing.T) {
 			mountFlags:       []string{},
 		},
 		{
-
 			source:           "mySrc",
 			target:           "myTarget",
 			fstype:           "myFS",
@@ -483,7 +488,6 @@ func TestSensitiveMountOptions(t *testing.T) {
 			mountFlags:       []string{},
 		},
 		{
-
 			source:           "mySrc",
 			target:           "myTarget",
 			fstype:           "myFS",
@@ -560,44 +564,40 @@ func mountArgsContainOption(t *testing.T, mountArgs []string, option string) boo
 }
 
 func TestDetectSafeNotMountedBehavior(t *testing.T) {
-	// example output for umount from util-linux 2.30.2
+	// Example output for umount from util-linux 2.30.2
 	notMountedOutput := "umount: /foo: not mounted."
 
-	// Arrange
 	testcases := []struct {
 		fakeCommandAction testexec.FakeCommandAction
 		expectedSafe      bool
 	}{
 		{
-			fakeCommandAction: makeFakeCommandAction(notMountedOutput, errors.New("any error")),
+			fakeCommandAction: makeFakeCommandAction(notMountedOutput, errors.New("any error"), nil),
 			expectedSafe:      true,
 		},
 		{
-			fakeCommandAction: makeFakeCommandAction(notMountedOutput, nil),
+			fakeCommandAction: makeFakeCommandAction(notMountedOutput, nil, nil),
 			expectedSafe:      false,
 		},
 		{
-			fakeCommandAction: makeFakeCommandAction("any output", nil),
+			fakeCommandAction: makeFakeCommandAction("any output", nil, nil),
 			expectedSafe:      false,
 		},
 		{
-			fakeCommandAction: makeFakeCommandAction("any output", errors.New("any error")),
+			fakeCommandAction: makeFakeCommandAction("any output", errors.New("any error"), nil),
 			expectedSafe:      false,
 		},
 	}
 
 	for _, v := range testcases {
-		// Prepare
 		fakeexec := &testexec.FakeExec{
 			LookPathFunc: func(s string) (string, error) {
 				return "fake-umount", nil
 			},
 			CommandScript: []testexec.FakeCommandAction{v.fakeCommandAction},
 		}
-		// Act
-		isSafe := detectSafeNotMountedBehaviorWithExec(fakeexec)
-		// Assert
-		if isSafe != v.expectedSafe {
+
+		if detectSafeNotMountedBehaviorWithExec(fakeexec) != v.expectedSafe {
 			var adj string
 			if v.expectedSafe {
 				adj = "safe"
@@ -609,40 +609,221 @@ func TestDetectSafeNotMountedBehavior(t *testing.T) {
 	}
 }
 
-func makeFakeCommandAction(stdout string, err error) testexec.FakeCommandAction {
+func TestCheckUmountError(t *testing.T) {
+	target := "/test/path"
+	withSafeNotMountedBehavior := true
+	command := exec.Command("uname", "-r") // dummy command return status 0
+
+	if err := command.Run(); err != nil {
+		t.Errorf("Faild to exec dummy command. err: %s", err)
+	}
+
+	testcases := []struct {
+		output   []byte
+		err      error
+		expected bool
+	}{
+		{
+			err:      errors.New("wait: no child processes"),
+			expected: true,
+		},
+		{
+			output:   []byte("umount: /test/path: not mounted."),
+			err:      errors.New("exit status 1"),
+			expected: true,
+		},
+		{
+			output:   []byte("umount: /test/path: No such file or directory"),
+			err:      errors.New("exit status 1"),
+			expected: false,
+		},
+	}
+
+	for _, v := range testcases {
+		if err := checkUmountError(target, command, v.output, v.err, withSafeNotMountedBehavior); (err == nil) != v.expected {
+			if v.expected {
+				t.Errorf("Expected to return nil, but did not. err: %s", err)
+			} else {
+				t.Errorf("Expected to return error, but did not.")
+			}
+		}
+	}
+}
+
+// TODO https://github.com/kubernetes/kubernetes/pull/117539#discussion_r1181873355
+func TestFormatConcurrency(t *testing.T) {
+	const (
+		formatCount    = 5
+		fstype         = "ext4"
+		output         = "complete"
+		defaultTimeout = 1 * time.Minute
+	)
+
+	tests := []struct {
+		desc    string
+		max     int
+		timeout time.Duration
+	}{
+		{
+			max: 2,
+		},
+		{
+			max: 3,
+		},
+		{
+			max: 4,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(fmt.Sprintf("max=%d,timeout=%s", tc.max, tc.timeout.String()), func(t *testing.T) {
+			if tc.timeout == 0 {
+				tc.timeout = defaultTimeout
+			}
+
+			var concurrent int
+			var mu sync.Mutex
+			witness := make(chan struct{})
+
+			exec := &testexec.FakeExec{}
+			for i := 0; i < formatCount; i++ {
+				exec.CommandScript = append(exec.CommandScript, makeFakeCommandAction(output, nil, func() {
+					mu.Lock()
+					concurrent++
+					mu.Unlock()
+
+					<-witness
+
+					mu.Lock()
+					concurrent--
+					mu.Unlock()
+				}))
+			}
+			mounter := NewSafeFormatAndMount(nil, exec, WithMaxConcurrentFormat(tc.max, tc.timeout))
+
+			// we run max+1 goroutines and block the command execution
+			// only max goroutine should be running and the additional one should wait
+			// for one to be released
+			for i := 0; i < tc.max+1; i++ {
+				go func() {
+					_, err := mounter.format(fstype, nil)
+					if err != nil {
+						t.Errorf("format(%q): %v", fstype, err)
+					}
+				}()
+			}
+
+			// wait for all goorutines to be scheduled
+			time.Sleep(100 * time.Millisecond)
+
+			mu.Lock()
+			if concurrent != tc.max {
+				t.Errorf("SafeFormatAndMount.format() got concurrency: %d, want: %d", concurrent, tc.max)
+			}
+			mu.Unlock()
+
+			// signal the commands to finish the goroutines, this will allow the command
+			// that is pending to be executed
+			for i := 0; i < tc.max; i++ {
+				witness <- struct{}{}
+			}
+
+			// wait for all goroutines to acquire the lock and decrement the counter
+			time.Sleep(100 * time.Millisecond)
+
+			mu.Lock()
+			if concurrent != 1 {
+				t.Errorf("SafeFormatAndMount.format() got concurrency: %d, want: 1", concurrent)
+			}
+			mu.Unlock()
+
+			// signal the pending command to finish, no more command should be running
+			close(witness)
+
+			// wait a few for the last goroutine to acquire the lock and decrements the counter down to zero
+			time.Sleep(10 * time.Millisecond)
+
+			mu.Lock()
+			if concurrent != 0 {
+				t.Errorf("SafeFormatAndMount.format() got concurrency: %d, want: 0", concurrent)
+			}
+			mu.Unlock()
+		})
+	}
+}
+
+// TODO https://github.com/kubernetes/kubernetes/pull/117539#discussion_r1181873355
+func TestFormatTimeout(t *testing.T) {
+	const (
+		formatCount    = 5
+		fstype         = "ext4"
+		output         = "complete"
+		maxConcurrency = 4
+		timeout        = 200 * time.Millisecond
+	)
+
+	var concurrent int
+	var mu sync.Mutex
+	witness := make(chan struct{})
+
+	exec := &testexec.FakeExec{}
+	for i := 0; i < formatCount; i++ {
+		exec.CommandScript = append(exec.CommandScript, makeFakeCommandAction(output, nil, func() {
+			mu.Lock()
+			concurrent++
+			mu.Unlock()
+
+			<-witness
+
+			mu.Lock()
+			concurrent--
+			mu.Unlock()
+		}))
+	}
+	mounter := NewSafeFormatAndMount(nil, exec, WithMaxConcurrentFormat(maxConcurrency, timeout))
+
+	for i := 0; i < maxConcurrency+1; i++ {
+		go func() {
+			_, err := mounter.format(fstype, nil)
+			if err != nil {
+				t.Errorf("format(%q): %v", fstype, err)
+			}
+		}()
+	}
+
+	// wait a bit more than the configured timeout
+	time.Sleep(timeout + 100*time.Millisecond)
+
+	mu.Lock()
+	if concurrent != maxConcurrency+1 {
+		t.Errorf("SafeFormatAndMount.format() got concurrency: %d, want: %d", concurrent, maxConcurrency+1)
+	}
+	mu.Unlock()
+
+	// signal the pending commands to finish
+	close(witness)
+	// wait for all goroutines to acquire the lock and decrement the counter
+	time.Sleep(100 * time.Millisecond)
+
+	mu.Lock()
+	if concurrent != 0 {
+		t.Errorf("SafeFormatAndMount.format() got concurrency: %d, want: 0", concurrent)
+	}
+	mu.Unlock()
+}
+
+func makeFakeCommandAction(stdout string, err error, cmdFn func()) testexec.FakeCommandAction {
 	c := testexec.FakeCmd{
 		CombinedOutputScript: []testexec.FakeAction{
 			func() ([]byte, []byte, error) {
+				if cmdFn != nil {
+					cmdFn()
+				}
 				return []byte(stdout), nil, err
 			},
 		},
 	}
 	return func(cmd string, args ...string) utilexec.Cmd {
 		return testexec.InitFakeCmd(&c, cmd, args...)
-	}
-}
-
-func TestNotMountedBehaviorOfUnmount(t *testing.T) {
-	target, err := ioutil.TempDir("", "kubelet-umount")
-	if err != nil {
-		t.Errorf("Cannot create temp dir: %v", err)
-	}
-
-	defer os.RemoveAll(target)
-
-	m := Mounter{withSafeNotMountedBehavior: true}
-	if err = m.Unmount(target); err != nil {
-		t.Errorf(`Expect complete Unmount(), but it dose not: %v`, err)
-	}
-
-	if err = tryUnmount(target, m.withSafeNotMountedBehavior, time.Minute); err != nil {
-		t.Errorf(`Expect complete tryUnmount(), but it does not: %v`, err)
-	}
-
-	// forceUmount exec "umount -f", so skip this case if user is not root.
-	if os.Getuid() == 0 {
-		if err = forceUmount(target, m.withSafeNotMountedBehavior); err != nil {
-			t.Errorf(`Expect complete forceUnmount(), but it does not: %v`, err)
-		}
 	}
 }

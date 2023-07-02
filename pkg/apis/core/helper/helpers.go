@@ -453,41 +453,6 @@ func PersistentVolumeClaimHasClass(claim *core.PersistentVolumeClaim) bool {
 	return false
 }
 
-func toResourceNames(resources core.ResourceList) []core.ResourceName {
-	result := []core.ResourceName{}
-	for resourceName := range resources {
-		result = append(result, resourceName)
-	}
-	return result
-}
-
-func toSet(resourceNames []core.ResourceName) sets.String {
-	result := sets.NewString()
-	for _, resourceName := range resourceNames {
-		result.Insert(string(resourceName))
-	}
-	return result
-}
-
-// toContainerResourcesSet returns a set of resources names in container resource requirements
-func toContainerResourcesSet(ctr *core.Container) sets.String {
-	resourceNames := toResourceNames(ctr.Resources.Requests)
-	resourceNames = append(resourceNames, toResourceNames(ctr.Resources.Limits)...)
-	return toSet(resourceNames)
-}
-
-// ToPodResourcesSet returns a set of resource names in all containers in a pod.
-func ToPodResourcesSet(podSpec *core.PodSpec) sets.String {
-	result := sets.NewString()
-	for i := range podSpec.InitContainers {
-		result = result.Union(toContainerResourcesSet(&podSpec.InitContainers[i]))
-	}
-	for i := range podSpec.Containers {
-		result = result.Union(toContainerResourcesSet(&podSpec.Containers[i]))
-	}
-	return result
-}
-
 // GetDeletionCostFromPodAnnotations returns the integer value of pod-deletion-cost. Returns 0
 // if not set or the value is invalid.
 func GetDeletionCostFromPodAnnotations(annotations map[string]string) (int32, error) {

@@ -44,7 +44,7 @@ var (
 
 var _ = SIGDescribe("EmptyDir volumes", func() {
 	f := framework.NewDefaultFramework("emptydir")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.Context("when FSGroup is specified [LinuxOnly] [NodeFeature:FSGroup]", func() {
 

@@ -20,24 +20,178 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 func TestFindPortByName(t *testing.T) {
-	container := v1.Container{
-		Ports: []v1.ContainerPort{
-			{
-				Name:          "foo",
-				ContainerPort: 8080,
+	t.Parallel()
+	type args struct {
+		container *v1.Container
+		portName  string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantErr bool
+	}{
+		{
+			name: "get port from exist port name",
+			args: args{
+				container: &v1.Container{
+					Ports: []v1.ContainerPort{
+						{
+							Name:          "foo",
+							ContainerPort: 8080,
+						},
+						{
+							Name:          "bar",
+							ContainerPort: 9000,
+						},
+					},
+				},
+				portName: "foo",
 			},
-			{
-				Name:          "bar",
-				ContainerPort: 9000,
+			want:    8080,
+			wantErr: false,
+		},
+		{
+			name: "get port from not exist port name",
+			args: args{
+				container: &v1.Container{
+					Ports: []v1.ContainerPort{
+						{
+							Name:          "foo",
+							ContainerPort: 8080,
+						},
+						{
+							Name:          "bar",
+							ContainerPort: 9000,
+						},
+					},
+				},
+				portName: "http",
 			},
+			want:    0,
+			wantErr: true,
 		},
 	}
-	want := 8080
-	got, err := findPortByName(&container, "foo")
-	if got != want || err != nil {
-		t.Errorf("Expected %v, got %v, err: %v", want, got, err)
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := findPortByName(tt.args.container, tt.args.portName)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("findPortByName() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("findPortByName() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestResolveContainerPort(t *testing.T) {
+	t.Parallel()
+	type args struct {
+		param     intstr.IntOrString
+		container *v1.Container
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantErr bool
+	}{
+		{
+			name: "get port by int type",
+			args: args{
+				param:     intstr.IntOrString{Type: 0, IntVal: 443},
+				container: &v1.Container{},
+			},
+			want:    443,
+			wantErr: false,
+		},
+		{
+			name: "invalid port",
+			args: args{
+				param:     intstr.IntOrString{Type: 0, IntVal: 66666},
+				container: &v1.Container{},
+			},
+			want:    66666,
+			wantErr: true,
+		},
+		{
+			name: "get port by port name",
+			args: args{
+				param: intstr.IntOrString{Type: 1, StrVal: "foo"},
+				container: &v1.Container{
+					Ports: []v1.ContainerPort{
+						{
+							Name:          "foo",
+							ContainerPort: 8080,
+						},
+						{
+							Name:          "bar",
+							ContainerPort: 9000,
+						},
+					},
+				},
+			},
+			want:    8080,
+			wantErr: false,
+		},
+		{
+			name: "no port name",
+			args: args{
+				param: intstr.IntOrString{Type: 1, StrVal: "foo"},
+				container: &v1.Container{
+					Ports: []v1.ContainerPort{
+						{
+							Name:          "bar",
+							ContainerPort: 9000,
+						},
+					},
+				},
+			},
+			want:    0,
+			wantErr: true,
+		},
+		{
+			name: "invalid param type",
+			args: args{
+				param: intstr.IntOrString{Type: 2, StrVal: "foo"},
+				container: &v1.Container{
+					Ports: []v1.ContainerPort{
+						{
+							Name:          "foo",
+							ContainerPort: 8080,
+						},
+						{
+							Name:          "bar",
+							ContainerPort: 9000,
+						},
+					},
+				},
+			},
+			want:    -1,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := ResolveContainerPort(tt.args.param, tt.args.container)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ResolveContainerPort() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("ResolveContainerPort() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

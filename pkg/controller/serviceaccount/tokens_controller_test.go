@@ -21,17 +21,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"gopkg.in/square/go-jose.v2/jwt"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/dump"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 type testGenerator struct {
@@ -438,6 +439,8 @@ func TestTokenCreation(t *testing.T) {
 
 	for k, tc := range testcases {
 		t.Run(k, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+
 			// Re-seed to reset name generation
 			utilrand.Seed(1)
 
@@ -497,10 +500,10 @@ func TestTokenCreation(t *testing.T) {
 
 			for {
 				if controller.syncServiceAccountQueue.Len() > 0 {
-					controller.syncServiceAccount()
+					controller.syncServiceAccount(ctx)
 				}
 				if controller.syncSecretQueue.Len() > 0 {
-					controller.syncSecret()
+					controller.syncSecret(ctx)
 				}
 
 				// The queues still have things to work on
@@ -544,7 +547,7 @@ func TestTokenCreation(t *testing.T) {
 
 				expectedAction := tc.ExpectedActions[i]
 				if !reflect.DeepEqual(expectedAction, action) {
-					t.Errorf("%s:\nExpected:\n%s\ngot:\n%s", k, spew.Sdump(expectedAction), spew.Sdump(action))
+					t.Errorf("%s:\nExpected:\n%s\ngot:\n%s", k, dump.Pretty(expectedAction), dump.Pretty(action))
 					continue
 				}
 			}

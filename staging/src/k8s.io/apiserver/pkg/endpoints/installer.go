@@ -32,12 +32,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/endpoints/deprecation"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/apiserver/pkg/endpoints/handlers"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	utilwarning "k8s.io/apiserver/pkg/endpoints/warning"
@@ -343,13 +343,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 	if isNamedCreater {
 		isCreater = true
-	}
-
-	var resetFields map[fieldpath.APIVersion]*fieldpath.Set
-	if a.group.OpenAPIModels != nil {
-		if resetFieldsStrategy, isResetFieldsStrategy := storage.(rest.ResetFieldsStrategy); isResetFieldsStrategy {
-			resetFields = resetFieldsStrategy.GetResetFields()
-		}
 	}
 
 	var versionedList interface{}
@@ -680,21 +673,26 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	if a.group.MetaGroupVersion != nil {
 		reqScope.MetaGroupVersion = *a.group.MetaGroupVersion
 	}
-	if a.group.OpenAPIModels != nil {
-		reqScope.FieldManager, err = fieldmanager.NewDefaultFieldManager(
-			a.group.TypeConverter,
-			a.group.UnsafeConvertor,
-			a.group.Defaulter,
-			a.group.Creater,
-			fqKindToRegister,
-			reqScope.HubGroupVersion,
-			subresource,
-			resetFields,
-		)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create field manager: %v", err)
-		}
+
+	var resetFields map[fieldpath.APIVersion]*fieldpath.Set
+	if resetFieldsStrategy, isResetFieldsStrategy := storage.(rest.ResetFieldsStrategy); isResetFieldsStrategy {
+		resetFields = resetFieldsStrategy.GetResetFields()
 	}
+
+	reqScope.FieldManager, err = managedfields.NewDefaultFieldManager(
+		a.group.TypeConverter,
+		a.group.UnsafeConvertor,
+		a.group.Defaulter,
+		a.group.Creater,
+		fqKindToRegister,
+		reqScope.HubGroupVersion,
+		subresource,
+		resetFields,
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create field manager: %v", err)
+	}
+
 	for _, action := range actions {
 		producedObject := storageMeta.ProducesObject(action.Verb)
 		if producedObject == nil {

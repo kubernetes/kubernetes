@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	deploymentstorage "k8s.io/kubernetes/pkg/registry/apps/deployment/storage"
@@ -279,7 +279,7 @@ func TestScaleUpdateOnlyStatus(t *testing.T) {
 func TestAllKnownVersionsAreInMappings(t *testing.T) {
 	cases := []struct {
 		groupKind schema.GroupKind
-		mappings  fieldmanager.ResourcePathMappings
+		mappings  managedfields.ResourcePathMappings
 	}{
 		{
 			groupKind: schema.GroupKind{Group: "apps", Kind: "ReplicaSet"},

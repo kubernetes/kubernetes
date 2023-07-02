@@ -17,8 +17,10 @@ limitations under the License.
 package klog
 
 import (
+	"bytes"
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/go-logr/logr"
 )
@@ -31,9 +33,28 @@ type ObjectRef struct {
 
 func (ref ObjectRef) String() string {
 	if ref.Namespace != "" {
-		return fmt.Sprintf("%s/%s", ref.Namespace, ref.Name)
+		var builder strings.Builder
+		builder.Grow(len(ref.Namespace) + len(ref.Name) + 1)
+		builder.WriteString(ref.Namespace)
+		builder.WriteRune('/')
+		builder.WriteString(ref.Name)
+		return builder.String()
 	}
 	return ref.Name
+}
+
+func (ref ObjectRef) WriteText(out *bytes.Buffer) {
+	out.WriteRune('"')
+	ref.writeUnquoted(out)
+	out.WriteRune('"')
+}
+
+func (ref ObjectRef) writeUnquoted(out *bytes.Buffer) {
+	if ref.Namespace != "" {
+		out.WriteString(ref.Namespace)
+		out.WriteRune('/')
+	}
+	out.WriteString(ref.Name)
 }
 
 // MarshalLog ensures that loggers with support for structured output will log
@@ -117,31 +138,31 @@ var _ fmt.Stringer = kobjSlice{}
 var _ logr.Marshaler = kobjSlice{}
 
 func (ks kobjSlice) String() string {
-	objectRefs, err := ks.process()
-	if err != nil {
-		return err.Error()
+	objectRefs, errStr := ks.process()
+	if errStr != "" {
+		return errStr
 	}
 	return fmt.Sprintf("%v", objectRefs)
 }
 
 func (ks kobjSlice) MarshalLog() interface{} {
-	objectRefs, err := ks.process()
-	if err != nil {
-		return err.Error()
+	objectRefs, errStr := ks.process()
+	if errStr != "" {
+		return errStr
 	}
 	return objectRefs
 }
 
-func (ks kobjSlice) process() ([]interface{}, error) {
+func (ks kobjSlice) process() (objs []interface{}, err string) {
 	s := reflect.ValueOf(ks.arg)
 	switch s.Kind() {
 	case reflect.Invalid:
 		// nil parameter, print as nil.
-		return nil, nil
+		return nil, ""
 	case reflect.Slice:
 		// Okay, handle below.
 	default:
-		return nil, fmt.Errorf("<KObjSlice needs a slice, got type %T>", ks.arg)
+		return nil, fmt.Sprintf("<KObjSlice needs a slice, got type %T>", ks.arg)
 	}
 	objectRefs := make([]interface{}, 0, s.Len())
 	for i := 0; i < s.Len(); i++ {
@@ -151,8 +172,41 @@ func (ks kobjSlice) process() ([]interface{}, error) {
 		} else if v, ok := item.(KMetadata); ok {
 			objectRefs = append(objectRefs, KObj(v))
 		} else {
-			return nil, fmt.Errorf("<KObjSlice needs a slice of values implementing KMetadata, got type %T>", item)
+			return nil, fmt.Sprintf("<KObjSlice needs a slice of values implementing KMetadata, got type %T>", item)
 		}
 	}
-	return objectRefs, nil
+	return objectRefs, ""
+}
+
+var nilToken = []byte("null")
+
+func (ks kobjSlice) WriteText(out *bytes.Buffer) {
+	s := reflect.ValueOf(ks.arg)
+	switch s.Kind() {
+	case reflect.Invalid:
+		// nil parameter, print as null.
+		out.Write(nilToken)
+		return
+	case reflect.Slice:
+		// Okay, handle below.
+	default:
+		fmt.Fprintf(out, `"<KObjSlice needs a slice, got type %T>"`, ks.arg)
+		return
+	}
+	out.Write([]byte{'['})
+	defer out.Write([]byte{']'})
+	for i := 0; i < s.Len(); i++ {
+		if i > 0 {
+			out.Write([]byte{','})
+		}
+		item := s.Index(i).Interface()
+		if item == nil {
+			out.Write(nilToken)
+		} else if v, ok := item.(KMetadata); ok {
+			KObj(v).WriteText(out)
+		} else {
+			fmt.Fprintf(out, `"<KObjSlice needs a slice of values implementing KMetadata, got type %T>"`, item)
+			return
+		}
+	}
 }

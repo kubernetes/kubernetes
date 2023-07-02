@@ -45,8 +45,7 @@ const (
 	//   Calico, Cillium, Antrea seem to do different things.
 	// Since different CNIs have different results, that causes tests including loopback to fail
 	//   on some CNIs.  So let's just ignore loopback calls for the purposes of deciding test pass/fail.
-	ignoreLoopback = true
-
+	ignoreLoopback    = true
 	namespaceLabelKey = "kubernetes.io/metadata.name"
 )
 
@@ -112,22 +111,35 @@ and what is happening in practice:
 var _ = common.SIGDescribe("Netpol", func() {
 	f := framework.NewDefaultFramework("netpol")
 	f.SkipNamespaceCreation = true // we create our own 3 test namespaces, we don't need the default one
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.Context("NetworkPolicy between server and client", func() {
 		var k8s *kubeManager
 
 		ginkgo.It("should support a 'default-deny-ingress' policy [Feature:NetworkPolicy]", func(ctx context.Context) {
+
+			// Only poll TCP
 			protocols := []v1.Protocol{protocolTCP}
+
+			// Only testing port 80
 			ports := []int32{80}
+
+			// Create pods and namespaces for this test
 			k8s = initializeResources(ctx, f, protocols, ports)
+
+			// Only going to make a policy in namespace X
 			nsX, _, _ := getK8sNamespaces(k8s)
 			policy := GenNetworkPolicyWithNameAndPodSelector("deny-ingress", metav1.LabelSelector{}, SetSpecIngressRules())
+
+			// Create the policy
 			CreatePolicy(ctx, k8s, policy, nsX)
 
+			// Make a truth table of connectivity for all pods in ns x y z
 			reachability := NewReachability(k8s.AllPodStrings(), true)
+			// Set the nsX as false, since it has a policy that blocks traffic
 			reachability.ExpectPeer(&Peer{}, &Peer{Namespace: nsX}, false)
 
+			// Confirm that the real world connectivity matches our matrix
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
 		})
 
@@ -614,7 +626,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachability.ExpectAllIngress(NewPodString(nsX, "a"), false)
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
 
-			// add a new label, we'll remove it after this test is completed
+			// add a new label
 			AddNamespaceLabel(ctx, k8s, nsY, "ns2", "updated")
 
 			// anything from namespace 'y' should be able to get to x/a
@@ -631,7 +643,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			nsX, _, _ := getK8sNamespaces(k8s)
 			ginkgo.DeferCleanup(ResetPodLabels, k8s, nsX, "b")
 
-			// add a new label, we'll remove it after this test is done
+			// add a new label
 			matchLabels := map[string]string{"pod": "b", "pod2": "updated"}
 			allowedLabels := &metav1.LabelSelector{MatchLabels: matchLabels}
 			ingressRule := networkingv1.NetworkPolicyIngressRule{}
@@ -725,8 +737,8 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ingressRule := networkingv1.NetworkPolicyIngressRule{}
 			ingressRule.From = append(ingressRule.From, networkingv1.NetworkPolicyPeer{PodSelector: allowedPodLabels})
 			policy := GenNetworkPolicyWithNameAndPodMatchLabel("allow-client-a-via-pod-selector", map[string]string{"pod": "a"}, SetSpecIngressRules(ingressRule))
-			// add an egress rule on to it...
 
+			// add an egress rule on to it...
 			policy.Spec.Egress = []networkingv1.NetworkPolicyEgressRule{
 				{
 					Ports: []networkingv1.NetworkPolicyPort{
@@ -1235,7 +1247,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 var _ = common.SIGDescribe("Netpol [LinuxOnly]", func() {
 	f := framework.NewDefaultFramework("udp-network-policy")
 	f.SkipNamespaceCreation = true
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var k8s *kubeManager
 	ginkgo.BeforeEach(func() {
 		// Windows does not support UDP testing via agnhost.
@@ -1315,7 +1327,7 @@ var _ = common.SIGDescribe("Netpol [LinuxOnly]", func() {
 var _ = common.SIGDescribe("Netpol [Feature:SCTPConnectivity][LinuxOnly]", func() {
 	f := framework.NewDefaultFramework("sctp-network-policy")
 	f.SkipNamespaceCreation = true
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var k8s *kubeManager
 	ginkgo.BeforeEach(func() {
 		// Windows does not support network policies.

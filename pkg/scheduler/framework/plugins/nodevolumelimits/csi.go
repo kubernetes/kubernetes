@@ -60,6 +60,7 @@ type CSILimits struct {
 	translator InTreeToCSITranslator
 }
 
+var _ framework.PreFilterPlugin = &CSILimits{}
 var _ framework.FilterPlugin = &CSILimits{}
 var _ framework.EnqueueExtensions = &CSILimits{}
 
@@ -73,11 +74,31 @@ func (pl *CSILimits) Name() string {
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *CSILimits) EventsToRegister() []framework.ClusterEvent {
-	return []framework.ClusterEvent{
-		{Resource: framework.CSINode, ActionType: framework.Add},
-		{Resource: framework.Pod, ActionType: framework.Delete},
+func (pl *CSILimits) EventsToRegister() []framework.ClusterEventWithHint {
+	return []framework.ClusterEventWithHint{
+		{Event: framework.ClusterEvent{Resource: framework.CSINode, ActionType: framework.Add}},
+		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Delete}},
 	}
+}
+
+// PreFilter invoked at the prefilter extension point
+//
+// If the pod haven't those types of volumes, we'll skip the Filter phase
+func (pl *CSILimits) PreFilter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+	volumes := pod.Spec.Volumes
+	for i := range volumes {
+		vol := &volumes[i]
+		if vol.PersistentVolumeClaim != nil || vol.Ephemeral != nil || pl.translator.IsInlineMigratable(vol) {
+			return nil, nil
+		}
+	}
+
+	return nil, framework.NewStatus(framework.Skip)
+}
+
+// PreFilterExtensions returns prefilter extensions, pod add and remove.
+func (pl *CSILimits) PreFilterExtensions() framework.PreFilterExtensions {
+	return nil
 }
 
 // Filter invoked at the filter extension point.
@@ -88,9 +109,6 @@ func (pl *CSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v
 	}
 
 	node := nodeInfo.Node()
-	if node == nil {
-		return framework.NewStatus(framework.Error, "node not found")
-	}
 
 	// If CSINode doesn't exist, the predicate may read the limits from Node object
 	csiNode, err := pl.csiNodeLister.Get(node.Name)
@@ -172,7 +190,7 @@ func (pl *CSILimits) filterAttachableVolumes(
 			// - If the volume is migratable and CSI migration is enabled, need to count it
 			// as well.
 			// - If the volume is not migratable, it will be count in non_csi filter.
-			if err := pl.checkAttachableInlineVolume(vol, csiNode, pod, result); err != nil {
+			if err := pl.checkAttachableInlineVolume(&vol, csiNode, pod, result); err != nil {
 				return err
 			}
 
@@ -220,15 +238,15 @@ func (pl *CSILimits) filterAttachableVolumes(
 
 // checkAttachableInlineVolume takes an inline volume and add to the result map if the
 // volume is migratable and CSI migration for this plugin has been enabled.
-func (pl *CSILimits) checkAttachableInlineVolume(vol v1.Volume, csiNode *storagev1.CSINode,
+func (pl *CSILimits) checkAttachableInlineVolume(vol *v1.Volume, csiNode *storagev1.CSINode,
 	pod *v1.Pod, result map[string]string) error {
-	if !pl.translator.IsInlineMigratable(&vol) {
+	if !pl.translator.IsInlineMigratable(vol) {
 		return nil
 	}
 	// Check if the intree provisioner CSI migration has been enabled.
-	inTreeProvisionerName, err := pl.translator.GetInTreePluginNameFromSpec(nil, &vol)
+	inTreeProvisionerName, err := pl.translator.GetInTreePluginNameFromSpec(nil, vol)
 	if err != nil {
-		return fmt.Errorf("looking up provisioner name for volume %v: %w", vol, err)
+		return fmt.Errorf("looking up provisioner name for volume %s: %w", vol.Name, err)
 	}
 	if !isCSIMigrationOn(csiNode, inTreeProvisionerName) {
 		csiNodeName := ""
@@ -240,9 +258,9 @@ func (pl *CSILimits) checkAttachableInlineVolume(vol v1.Volume, csiNode *storage
 		return nil
 	}
 	// Do translation for the in-tree volume.
-	translatedPV, err := pl.translator.TranslateInTreeInlineVolumeToCSI(&vol, pod.Namespace)
+	translatedPV, err := pl.translator.TranslateInTreeInlineVolumeToCSI(vol, pod.Namespace)
 	if err != nil || translatedPV == nil {
-		return fmt.Errorf("converting volume(%v) from inline to csi: %w", vol, err)
+		return fmt.Errorf("converting volume(%s) from inline to csi: %w", vol.Name, err)
 	}
 	driverName, err := pl.translator.GetCSINameFromInTreeName(inTreeProvisionerName)
 	if err != nil {

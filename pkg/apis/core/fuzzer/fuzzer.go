@@ -524,7 +524,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				ss.SessionAffinityConfig = nil
 			}
 			if ss.AllocateLoadBalancerNodePorts == nil {
-				ss.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
+				ss.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
 			}
 		},
 		func(s *core.NodeStatus, c fuzz.Continue) {

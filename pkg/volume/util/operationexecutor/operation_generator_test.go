@@ -18,6 +18,9 @@ package operationexecutor
 
 import (
 	"fmt"
+	"os"
+	"testing"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -25,8 +28,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
-	"os"
-	"testing"
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
@@ -35,11 +36,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/component-base/metrics/testutil"
-	"k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/awsebs"
 	csitesting "k8s.io/kubernetes/pkg/volume/csi/testing"
-	"k8s.io/kubernetes/pkg/volume/gcepd"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -58,21 +56,12 @@ func TestOperationGenerator_GenerateUnmapVolumeFunc_PluginName(t *testing.T) {
 	testcases := []testcase{
 		{
 			name:       "gce pd plugin: csi migration disabled",
-			pluginName: plugins.GCEPDInTreePluginName,
+			pluginName: "fake-plugin",
 			pvSpec: v1.PersistentVolumeSpec{
 				PersistentVolumeSource: v1.PersistentVolumeSource{
 					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{},
 				}},
-			probVolumePlugins: gcepd.ProbeVolumePlugins(),
-		},
-		{
-			name:       "aws ebs plugin: csi migration disabled",
-			pluginName: plugins.AWSEBSInTreePluginName,
-			pvSpec: v1.PersistentVolumeSpec{
-				PersistentVolumeSource: v1.PersistentVolumeSource{
-					AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{},
-				}},
-			probVolumePlugins: awsebs.ProbeVolumePlugins(),
+			probVolumePlugins: volumetesting.ProbeVolumePlugins(volume.VolumeConfig{}),
 		},
 	}
 

@@ -277,7 +277,7 @@ func (b *vsphereVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArg
 		os.Remove(dir)
 		return err
 	}
-	volume.SetVolumeOwnership(b, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(b.plugin, nil))
+	volume.SetVolumeOwnership(b, dir, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(b.plugin, nil))
 	klog.V(3).Infof("vSphere volume %s mounted to %s", b.volPath, dir)
 
 	return nil
@@ -324,7 +324,7 @@ type vsphereVolumeDeleter struct {
 
 var _ volume.Deleter = &vsphereVolumeDeleter{}
 
-func (plugin *vsphereVolumePlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
+func (plugin *vsphereVolumePlugin) NewDeleter(logger klog.Logger, spec *volume.Spec) (volume.Deleter, error) {
 	return plugin.newDeleterInternal(spec, &VsphereDiskUtil{})
 }
 
@@ -353,7 +353,7 @@ type vsphereVolumeProvisioner struct {
 
 var _ volume.Provisioner = &vsphereVolumeProvisioner{}
 
-func (plugin *vsphereVolumePlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
+func (plugin *vsphereVolumePlugin) NewProvisioner(logger klog.Logger, options volume.VolumeOptions) (volume.Provisioner, error) {
 	return plugin.newProvisionerInternal(options, &VsphereDiskUtil{})
 }
 

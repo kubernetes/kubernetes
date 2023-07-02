@@ -18,7 +18,9 @@ package set
 
 import (
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+
+	"k8s.io/cli-runtime/pkg/genericiooptions"
+
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -32,7 +34,7 @@ var (
 )
 
 // NewCmdSet returns an initialized Command instance for 'set' sub command
-func NewCmdSet(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdSet(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "set SUBCOMMAND",
 		DisableFlagsInUseLine: true,
