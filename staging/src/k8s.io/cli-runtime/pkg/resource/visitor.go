@@ -28,6 +28,7 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/text/encoding/unicode"
 	"golang.org/x/text/transform"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -199,6 +200,33 @@ func (l VisitorList) Visit(fn VisitorFunc) error {
 		}
 	}
 	return nil
+}
+
+type ConcurrentVisitorList struct {
+	visitors    []Visitor
+	concurrency int
+}
+
+func (l ConcurrentVisitorList) Visit(fn VisitorFunc) error {
+	g := errgroup.Group{}
+
+	// Concurrency 1 just runs the visitors sequentially, this is the default
+	// as it preserves the previous behavior, but allows components to opt into
+	// concurrency.
+	concurrency := 1
+	if l.concurrency > concurrency {
+		concurrency = l.concurrency
+	}
+	g.SetLimit(concurrency)
+
+	for i := range l.visitors {
+		i := i
+		g.Go(func() error {
+			return l.visitors[i].Visit(fn)
+		})
+	}
+
+	return g.Wait()
 }
 
 // EagerVisitorList implements Visit for the sub visitors it contains. All errors
