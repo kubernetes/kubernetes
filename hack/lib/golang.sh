@@ -469,8 +469,25 @@ kube::golang::verify_go_version() {
   # only setup go if we haven't set FORCE_HOST_GO, or `go version` doesn't match GO_VERSION
   if ! ([ -n "${FORCE_HOST_GO:-}" ] || \
       (command -v go >/dev/null && [ "$(go version | cut -d' ' -f3)" = "go${GO_VERSION}" ])); then
-      export GIMME_ENV_PREFIX=${GIMME_ENV_PREFIX:-"${KUBE_OUTPUT}/.gimme/envs"}
-      export GIMME_VERSION_PREFIX=${GIMME_VERSION_PREFIX:-"${KUBE_OUTPUT}/.gimme/versions"}
+      # Placing the Go toolchain inside a module (like k/k) is problematic for
+      # golangci-lint: it led to "load embedded ruleguard rules: rules/rules.go:13: can't load fmt"
+      # with Go 1.20 and golangci-lint 1.53.2 because one linter changed go/build.Default (fixed
+      # in 1.53.3) and again with Go 1.21 (unknown reason). So instead of _output/local/.gimme,
+      # $GOPATH/pkg/kubernetes/gimme is used. A slight advantage is that different Kubernetes
+      # work trees can share the same toolchain.
+      #
+      # Bootstrapping is tricky, though.
+      local gimme_root gopath
+      if command -v go >/dev/null; then
+          gopath="$(go env GOPATH)"
+      elif [[ -n "${GOPATH:-}" ]]; then
+          gopath="${GOPATH}"
+      else
+          gopath="${HOME:-/tmp}/go"
+      fi
+      gimme_root="${gopath:-}/pkg/kubernetes/gimme"
+      export GIMME_ENV_PREFIX=${GIMME_ENV_PREFIX:-"${gimme_root}/envs"}
+      export GIMME_VERSION_PREFIX=${GIMME_VERSION_PREFIX:-"${gimme_root}/versions"}
       # eval because the output of this is shell to set PATH etc.
       eval "$("${KUBE_ROOT}/third_party/gimme/gimme" "${GO_VERSION}")"
   fi
