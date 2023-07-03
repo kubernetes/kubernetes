@@ -17,7 +17,6 @@ limitations under the License.
 package util
 
 import (
-	"context"
 	"math/rand"
 	"net"
 	"reflect"
@@ -93,76 +92,6 @@ func TestBuildPortsToEndpointsMap(t *testing.T) {
 	portsToEndpoints := BuildPortsToEndpointsMap(endpoints)
 	if !reflect.DeepEqual(expectedPortsToEndpoints, portsToEndpoints) {
 		t.Errorf("expected ports to endpoints not seen")
-	}
-}
-
-func TestIsProxyableIP(t *testing.T) {
-	testCases := []struct {
-		ip   string
-		want error
-	}{
-		{"0.0.0.0", ErrAddressNotAllowed},
-		{"127.0.0.1", ErrAddressNotAllowed},
-		{"127.0.0.2", ErrAddressNotAllowed},
-		{"169.254.169.254", ErrAddressNotAllowed},
-		{"169.254.1.1", ErrAddressNotAllowed},
-		{"224.0.0.0", ErrAddressNotAllowed},
-		{"10.0.0.1", nil},
-		{"192.168.0.1", nil},
-		{"172.16.0.1", nil},
-		{"8.8.8.8", nil},
-		{"::", ErrAddressNotAllowed},
-		{"::1", ErrAddressNotAllowed},
-		{"fe80::", ErrAddressNotAllowed},
-		{"ff02::", ErrAddressNotAllowed},
-		{"ff01::", ErrAddressNotAllowed},
-		{"2600::", nil},
-		{"1", ErrAddressNotAllowed},
-		{"", ErrAddressNotAllowed},
-	}
-
-	for i := range testCases {
-		got := IsProxyableIP(testCases[i].ip)
-		if testCases[i].want != got {
-			t.Errorf("case %d: expected %v, got %v", i, testCases[i].want, got)
-		}
-	}
-}
-
-type dummyResolver struct {
-	ips []string
-	err error
-}
-
-func (r *dummyResolver) LookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, error) {
-	if r.err != nil {
-		return nil, r.err
-	}
-	resp := []net.IPAddr{}
-	for _, ipString := range r.ips {
-		resp = append(resp, net.IPAddr{IP: netutils.ParseIPSloppy(ipString)})
-	}
-	return resp, nil
-}
-
-func TestIsProxyableHostname(t *testing.T) {
-	testCases := []struct {
-		hostname string
-		ips      []string
-		want     error
-	}{
-		{"k8s.io", []string{}, ErrNoAddresses},
-		{"k8s.io", []string{"8.8.8.8"}, nil},
-		{"k8s.io", []string{"169.254.169.254"}, ErrAddressNotAllowed},
-		{"k8s.io", []string{"127.0.0.1", "8.8.8.8"}, ErrAddressNotAllowed},
-	}
-
-	for i := range testCases {
-		resolv := dummyResolver{ips: testCases[i].ips}
-		got := IsProxyableHostname(context.Background(), &resolv, testCases[i].hostname)
-		if testCases[i].want != got {
-			t.Errorf("case %d: expected %v, got %v", i, testCases[i].want, got)
-		}
 	}
 }
 
