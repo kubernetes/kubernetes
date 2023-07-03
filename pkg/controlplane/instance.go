@@ -80,6 +80,7 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane/apiserver/options"
 	"k8s.io/kubernetes/pkg/controlplane/controller/apiserverleasegc"
 	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
+	"k8s.io/kubernetes/pkg/controlplane/controller/kubernetesservice"
 	"k8s.io/kubernetes/pkg/controlplane/controller/legacytokentracking"
 	"k8s.io/kubernetes/pkg/controlplane/controller/systemnamespaces"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
@@ -88,6 +89,7 @@ import (
 	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/utils/clock"
+	netutils "k8s.io/utils/net"
 
 	// RESTStorage installers
 	admissionregistrationrest "k8s.io/kubernetes/pkg/registry/admissionregistration/rest"
@@ -605,17 +607,66 @@ func (m *Instance) InstallLegacyAPI(c *completedConfig, restOptionsGetter generi
 		return nil
 	})
 
-	bootstrapController, err := c.NewBootstrapController(legacyRESTStorage, client)
+	kubenetesserviceConfig, err := c.newKubernetesServiceControllerConfig(client)
+	if err != nil {
+		return err
+	}
+	bootstrapController, err := kubernetesservice.New(*kubenetesserviceConfig, legacyRESTStorage)
 	if err != nil {
 		return fmt.Errorf("error creating bootstrap controller: %v", err)
 	}
-	m.GenericAPIServer.AddPostStartHookOrDie(controllerName, bootstrapController.PostStartHook)
-	m.GenericAPIServer.AddPreShutdownHookOrDie(controllerName, bootstrapController.PreShutdownHook)
+	m.GenericAPIServer.AddPostStartHookOrDie(controllerName, func(genericapiserver.PostStartHookContext) error { bootstrapController.Start(); return nil })
+	m.GenericAPIServer.AddPreShutdownHookOrDie(controllerName, func() error { bootstrapController.Stop(); return nil })
 
 	if err := m.GenericAPIServer.InstallLegacyAPIGroup(genericapiserver.DefaultLegacyAPIPrefix, &apiGroupInfo); err != nil {
 		return fmt.Errorf("error in registering group versions: %v", err)
 	}
 	return nil
+}
+
+// newKubernetesServiceControllerConfig returns a configuration for the kubernetes service controller.
+func (c completedConfig) newKubernetesServiceControllerConfig(client kubernetes.Interface) (*kubernetesservice.Config, error) {
+	_, publicServicePort, err := c.GenericConfig.SecureServing.HostPort()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get listener address: %w", err)
+	}
+
+	// The "kubernetes.default" Service is SingleStack based on the configured ServiceIPRange.
+	// If the bootstrap controller reconcile the kubernetes.default Service and Endpoints, it must
+	// guarantee that the Service ClusterIP and the associated Endpoints have the same IP family, or
+	// it will not work for clients because of the IP family mismatch.
+	// TODO: revisit for dual-stack https://github.com/kubernetes/enhancements/issues/2438
+	if c.ExtraConfig.EndpointReconcilerType != reconcilers.NoneEndpointReconcilerType {
+		if netutils.IsIPv4CIDR(&c.ExtraConfig.ServiceIPRange) != netutils.IsIPv4(c.GenericConfig.PublicAddress) {
+			return nil, fmt.Errorf("service IP family %q must match public address family %q", c.ExtraConfig.ServiceIPRange.String(), c.GenericConfig.PublicAddress.String())
+		}
+	}
+
+	return &kubernetesservice.Config{
+		Client:    client,
+		Informers: c.ExtraConfig.VersionedInformers,
+		KubernetesService: kubernetesservice.KubernetesService{
+			PublicIP: c.GenericConfig.PublicAddress,
+
+			EndpointReconciler: c.ExtraConfig.EndpointReconcilerConfig.Reconciler,
+			EndpointInterval:   c.ExtraConfig.EndpointReconcilerConfig.Interval,
+
+			ServiceIP:                 c.ExtraConfig.APIServerServiceIP,
+			ServicePort:               c.ExtraConfig.APIServerServicePort,
+			PublicServicePort:         publicServicePort,
+			KubernetesServiceNodePort: c.ExtraConfig.KubernetesServiceNodePort,
+		},
+		ClusterIP: kubernetesservice.ClusterIP{
+			ServiceClusterIPRange:          c.ExtraConfig.ServiceIPRange,
+			SecondaryServiceClusterIPRange: c.ExtraConfig.SecondaryServiceIPRange,
+
+			ServiceClusterIPInterval: c.ExtraConfig.RepairServicesInterval,
+		},
+		NodePort: kubernetesservice.NodePort{
+			ServiceNodePortRange:    c.ExtraConfig.ServiceNodePortRange,
+			ServiceNodePortInterval: c.ExtraConfig.RepairServicesInterval,
+		},
+	}, nil
 }
 
 // RESTStorageProvider is a factory type for REST storage.

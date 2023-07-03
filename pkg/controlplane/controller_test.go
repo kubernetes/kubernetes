@@ -24,7 +24,6 @@ import (
 	netutils "k8s.io/utils/net"
 
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
-	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
 )
 
 func Test_completedConfig_NewBootstrapController(t *testing.T) {
@@ -42,8 +41,7 @@ func Test_completedConfig_NewBootstrapController(t *testing.T) {
 	ipv6address := netutils.ParseIPSloppy("2001:db8::1")
 
 	type args struct {
-		legacyRESTStorage corerest.LegacyRESTStorage
-		client            kubernetes.Interface
+		client kubernetes.Interface
 	}
 	tests := []struct {
 		name        string
@@ -167,7 +165,7 @@ func Test_completedConfig_NewBootstrapController(t *testing.T) {
 				GenericConfig: tt.config.Complete(nil),
 				ExtraConfig:   tt.extraConfig,
 			}
-			_, err := c.NewBootstrapController(tt.args.legacyRESTStorage, tt.args.client)
+			_, err := c.newKubernetesServiceControllerConfig(tt.args.client)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("completedConfig.NewBootstrapController() error = %v, wantErr %v", err, tt.wantErr)
 				return
