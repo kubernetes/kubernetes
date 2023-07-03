@@ -216,6 +216,9 @@ spec:
                           description: gatewayConfig holds the configuration for node gateway options.
                           type: object
                           properties:
+                            ipForwarding:
+                              description: IPForwarding controls IP forwarding for all traffic on OVN-Kubernetes managed interfaces (such as br-ex). By default this is set to Restricted, and Kubernetes related traffic is still forwarded appropriately, but other IP traffic will not be routed by the OCP node. If there is a desire to allow the host to forward traffic across OVN-Kubernetes managed interfaces, then set this field to "Global". The supported values are "Restricted" and "Global".
+                              type: string
                             routingViaHost:
                               description: RoutingViaHost allows pod egress traffic to exit via the ovn-k8s-mp0 management port into the host before sending it out. If this is not set, traffic will always egress directly from OVN to outside without touching the host stack. Setting this to true means hardware offload will not be supported. Default is false if GatewayConfig is specified.
                               type: boolean
@@ -268,6 +271,10 @@ spec:
                               format: int32
                               default: 50
                               minimum: 1
+                            maxLogFiles:
+                              description: 'maxLogFiles specifies the maximum number of ACL_audit log files that can be present. Default: 5'
+                              type: integer
+                              format: int32
                             rateLimit:
                               description: rateLimit is the approximate maximum number of messages to generate per-second per-node. If unset the default of 20 msg/sec is used.
                               type: integer

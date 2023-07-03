@@ -30,7 +30,7 @@ func (DelegatedAuthorization) SwaggerDoc() map[string]string {
 }
 
 var map_GenerationHistory = map[string]string{
-	"":               "GenerationHistory keeps track of the generation for a given resource so that decisions about forced updated can be made.",
+	"":               "GenerationHistory keeps track of the generation for a given resource so that decisions about forced updated can be made. DEPRECATED: Use fields in v1.GenerationStatus instead",
 	"group":          "group is the group of the thing you're tracking",
 	"resource":       "resource is the resource type of the thing you're tracking",
 	"namespace":      "namespace is where the thing you're tracking is",
@@ -55,7 +55,7 @@ func (GenericOperatorConfig) SwaggerDoc() map[string]string {
 }
 
 var map_LoggingConfig = map[string]string{
-	"":        "LoggingConfig holds information about configuring logging",
+	"":        "LoggingConfig holds information about configuring logging DEPRECATED: Use v1.LogLevel instead",
 	"level":   "level is passed to glog.",
 	"vmodule": "vmodule is passed to glog.",
 }
@@ -65,7 +65,7 @@ func (LoggingConfig) SwaggerDoc() map[string]string {
 }
 
 var map_NodeStatus = map[string]string{
-	"":                               "NodeStatus provides information about the current state of a particular node managed by this operator.",
+	"":                               "NodeStatus provides information about the current state of a particular node managed by this operator. Deprecated: Use v1.NodeStatus instead",
 	"nodeName":                       "nodeName is the name of the node",
 	"currentDeploymentGeneration":    "currentDeploymentGeneration is the generation of the most recently successful deployment",
 	"targetDeploymentGeneration":     "targetDeploymentGeneration is the generation of the deployment we're trying to apply",
@@ -78,7 +78,7 @@ func (NodeStatus) SwaggerDoc() map[string]string {
 }
 
 var map_OperatorCondition = map[string]string{
-	"": "OperatorCondition is just the standard condition fields.",
+	"": "OperatorCondition is just the standard condition fields. DEPRECATED: Use v1.OperatorCondition instead",
 }
 
 func (OperatorCondition) SwaggerDoc() map[string]string {
@@ -86,7 +86,7 @@ func (OperatorCondition) SwaggerDoc() map[string]string {
 }
 
 var map_OperatorSpec = map[string]string{
-	"":                "OperatorSpec contains common fields for an operator to need.  It is intended to be anonymous included inside of the Spec struct for you particular operator.",
+	"":                "OperatorSpec contains common fields for an operator to need.  It is intended to be anonymous included inside of the Spec struct for you particular operator. DEPRECATED: Use v1.OperatorSpec instead",
 	"managementState": "managementState indicates whether and how the operator should manage the component",
 	"imagePullSpec":   "imagePullSpec is the image to use for the component.",
 	"imagePullPolicy": "imagePullPolicy specifies the image pull policy. One of Always, Never, IfNotPresent. Defaults to Always if :latest tag is specified, or IfNotPresent otherwise.",
@@ -99,7 +99,7 @@ func (OperatorSpec) SwaggerDoc() map[string]string {
 }
 
 var map_OperatorStatus = map[string]string{
-	"":                           "OperatorStatus contains common fields for an operator to need.  It is intended to be anonymous included inside of the Status struct for you particular operator.",
+	"":                           "OperatorStatus contains common fields for an operator to need.  It is intended to be anonymous included inside of the Status struct for you particular operator. DEPRECATED: Use v1.OperatorStatus instead",
 	"observedGeneration":         "observedGeneration is the last generation change you've dealt with",
 	"conditions":                 "conditions is a list of conditions and their status",
 	"state":                      "state indicates what the operator has observed to be its current operational status.",
@@ -113,7 +113,7 @@ func (OperatorStatus) SwaggerDoc() map[string]string {
 }
 
 var map_StaticPodOperatorStatus = map[string]string{
-	"":                                    "StaticPodOperatorStatus is status for controllers that manage static pods.  There are different needs because individual node status must be tracked.",
+	"":                                    "StaticPodOperatorStatus is status for controllers that manage static pods.  There are different needs because individual node status must be tracked. DEPRECATED: Use v1.StaticPodOperatorStatus instead",
 	"latestAvailableDeploymentGeneration": "latestAvailableDeploymentGeneration is the deploymentID of the most recent deployment",
 	"nodeStatuses":                        "nodeStatuses track the deployment values and errors across individual nodes",
 }
@@ -123,7 +123,7 @@ func (StaticPodOperatorStatus) SwaggerDoc() map[string]string {
 }
 
 var map_VersionAvailability = map[string]string{
-	"":                "VersionAvailability gives information about the synchronization and operational status of a particular version of the component",
+	"":                "VersionAvailability gives information about the synchronization and operational status of a particular version of the component DEPRECATED: Use fields in v1.OperatorStatus instead",
 	"version":         "version is the level this availability applies to",
 	"updatedReplicas": "updatedReplicas indicates how many replicas are at the desired state",
 	"readyReplicas":   "readyReplicas indicates how many replicas are ready and at the desired state",
@@ -171,6 +171,27 @@ var map_RepositoryDigestMirrors = map[string]string{
 
 func (RepositoryDigestMirrors) SwaggerDoc() map[string]string {
 	return map_RepositoryDigestMirrors
+}
+
+var map_OLM = map[string]string{
+	"":         "OLM provides information to configure an operator to manage the OLM controllers\n\nCompatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.",
+	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "spec holds user settable values for configuration",
+	"status":   "status holds observed values from the cluster. They may not be overridden.",
+}
+
+func (OLM) SwaggerDoc() map[string]string {
+	return map_OLM
+}
+
+var map_OLMList = map[string]string{
+	"":         "OLMList is a collection of items\n\nCompatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.",
+	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"items":    "Items contains the items",
+}
+
+func (OLMList) SwaggerDoc() map[string]string {
+	return map_OLMList
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE

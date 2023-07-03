@@ -307,6 +307,14 @@ spec:
                           properties:
                             container:
                               description: container holds parameters for the Container logging destination. Present only if type is Container.
+                              properties:
+                                maxLength:
+                                  default: 1024
+                                  description: "maxLength is the maximum length of the log message. \n Valid values are integers in the range 480 to 8192, inclusive. \n When omitted, the default value is 1024."
+                                  format: int32
+                                  maximum: 8192
+                                  minimum: 480
+                                  type: integer
                               type: object
                             syslog:
                               description: syslog holds parameters for a syslog endpoint.  Present only if type is Syslog.
@@ -351,7 +359,7 @@ spec:
                                   type: string
                                 maxLength:
                                   default: 1024
-                                  description: "maxLength is the maximum length of the syslog message \n If this field is empty, the maxLength is set to \"1024\"."
+                                  description: "maxLength is the maximum length of the log message. \n Valid values are integers in the range 480 to 4096, inclusive. \n When omitted, the default value is 1024."
                                   format: int32
                                   maximum: 4096
                                   minimum: 480

@@ -7,4 +7,7 @@ const (
 	SupplementalGroupsAnnotation = "openshift.io/sa.scc.supplemental-groups"
 	MCSAnnotation                = "openshift.io/sa.scc.mcs"
 	ValidatedSCCAnnotation       = "openshift.io/scc"
+	// This annotation pins required SCCs for core OpenShift workloads to prevent preemption of custom SCCs.
+	// It is being used in the SCC admission plugin.
+	RequiredSCCAnnotation = "openshift.io/required-scc"
 )

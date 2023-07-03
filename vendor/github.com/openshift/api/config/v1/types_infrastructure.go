@@ -114,7 +114,7 @@ type InfrastructureStatus struct {
 	// +kubebuilder:default=None
 	// +default="None"
 	// +kubebuilder:validation:Enum=None;AllNodes
-	// +openshift:enable:FeatureSets=TechPreviewNoUpgrade
+	// +openshift:enable:FeatureSets=CustomNoUpgrade;TechPreviewNoUpgrade
 	// +optional
 	CPUPartitioning CPUPartitioningMode `json:"cpuPartitioning,omitempty"`
 }
@@ -315,8 +315,48 @@ type PlatformSpec struct {
 	External *ExternalPlatformSpec `json:"external,omitempty"`
 }
 
+// CloudControllerManagerState defines whether Cloud Controller Manager presence is expected or not
+type CloudControllerManagerState string
+
+const (
+	// Cloud Controller Manager is enabled and expected to be installed.
+	// This value indicates that new nodes should be tainted as uninitialized when created,
+	// preventing them from running workloads until they are initialized by the cloud controller manager.
+	CloudControllerManagerExternal CloudControllerManagerState = "External"
+
+	// Cloud Controller Manager is disabled and not expected to be installed.
+	// This value indicates that new nodes should not be tainted
+	// and no extra node initialization is expected from the cloud controller manager.
+	CloudControllerManagerNone CloudControllerManagerState = "None"
+)
+
+// CloudControllerManagerStatus holds the state of Cloud Controller Manager (a.k.a. CCM or CPI) related settings
+// +kubebuilder:validation:XValidation:rule="(has(self.state) == has(oldSelf.state)) || (!has(oldSelf.state) && self.state != \"External\")",message="state may not be added or removed once set"
+type CloudControllerManagerStatus struct {
+	// state determines whether or not an external Cloud Controller Manager is expected to
+	// be installed within the cluster.
+	// https://kubernetes.io/docs/tasks/administer-cluster/running-cloud-controller/#running-cloud-controller-manager
+	//
+	// Valid values are "External", "None" and omitted.
+	// When set to "External", new nodes will be tainted as uninitialized when created,
+	// preventing them from running workloads until they are initialized by the cloud controller manager.
+	// When omitted or set to "None", new nodes will be not tainted
+	// and no extra initialization from the cloud controller manager is expected.
+	// +kubebuilder:validation:Enum="";External;None
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="state is immutable once set"
+	// +optional
+	State CloudControllerManagerState `json:"state"`
+}
+
 // ExternalPlatformStatus holds the current status of the generic External infrastructure provider.
-type ExternalPlatformStatus struct{}
+type ExternalPlatformStatus struct {
+	// cloudControllerManager contains settings specific to the external Cloud Controller Manager (a.k.a. CCM or CPI).
+	// When omitted, new nodes will be not tainted
+	// and no extra initialization from the cloud controller manager is expected.
+	// +openshift:enable:FeatureSets=TechPreviewNoUpgrade
+	// +optional
+	CloudControllerManager CloudControllerManagerStatus `json:"cloudControllerManager"`
+}
 
 // PlatformStatus holds the current status specific to the underlying infrastructure provider
 // of the current cluster. Since these are used at status-level for the underlying cluster, it
@@ -621,7 +661,7 @@ type BareMetalPlatformStatus struct {
 	// loadBalancer defines how the load balancer used by the cluster is configured.
 	// +default={"type": "OpenShiftManagedDefault"}
 	// +kubebuilder:default={"type": "OpenShiftManagedDefault"}
-	// +openshift:enable:FeatureSets=TechPreviewNoUpgrade
+	// +openshift:enable:FeatureSets=CustomNoUpgrade;TechPreviewNoUpgrade
 	// +optional
 	LoadBalancer *BareMetalPlatformLoadBalancer `json:"loadBalancer,omitempty"`
 }
@@ -771,7 +811,7 @@ type OvirtPlatformStatus struct {
 	// loadBalancer defines how the load balancer used by the cluster is configured.
 	// +default={"type": "OpenShiftManagedDefault"}
 	// +kubebuilder:default={"type": "OpenShiftManagedDefault"}
-	// +openshift:enable:FeatureSets=TechPreviewNoUpgrade
+	// +openshift:enable:FeatureSets=CustomNoUpgrade;TechPreviewNoUpgrade
 	// +optional
 	LoadBalancer *OvirtPlatformLoadBalancer `json:"loadBalancer,omitempty"`
 }
@@ -1037,7 +1077,7 @@ type VSpherePlatformStatus struct {
 	// loadBalancer defines how the load balancer used by the cluster is configured.
 	// +default={"type": "OpenShiftManagedDefault"}
 	// +kubebuilder:default={"type": "OpenShiftManagedDefault"}
-	// +openshift:enable:FeatureSets=TechPreviewNoUpgrade
+	// +openshift:enable:FeatureSets=CustomNoUpgrade;TechPreviewNoUpgrade
 	// +optional
 	LoadBalancer *VSpherePlatformLoadBalancer `json:"loadBalancer,omitempty"`
 }
@@ -1320,7 +1360,7 @@ type NutanixPlatformStatus struct {
 	// loadBalancer defines how the load balancer used by the cluster is configured.
 	// +default={"type": "OpenShiftManagedDefault"}
 	// +kubebuilder:default={"type": "OpenShiftManagedDefault"}
-	// +openshift:enable:FeatureSets=TechPreviewNoUpgrade
+	// +openshift:enable:FeatureSets=CustomNoUpgrade;TechPreviewNoUpgrade
 	// +optional
 	LoadBalancer *NutanixPlatformLoadBalancer `json:"loadBalancer,omitempty"`
 }

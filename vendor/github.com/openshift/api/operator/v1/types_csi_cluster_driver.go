@@ -83,6 +83,7 @@ const (
 	AlibabaDiskCSIDriver     CSIDriverName = "diskplugin.csi.alibabacloud.com"
 	IBMVPCBlockCSIDriver     CSIDriverName = "vpc.block.csi.ibm.io"
 	IBMPowerVSBlockCSIDriver CSIDriverName = "powervs.csi.ibm.com"
+	SecretsStoreCSIDriver    CSIDriverName = "secrets-store.csi.k8s.io"
 )
 
 // ClusterCSIDriverSpec is the desired behavior of CSI driver operator

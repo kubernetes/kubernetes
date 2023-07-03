@@ -211,3 +211,454 @@ tests:
               type: FooBar
           type: BareMetal
     expectedStatusError: "status.platformStatus.baremetal.loadBalancer.type: Unsupported value: \"FooBar\": supported values: \"OpenShiftManagedDefault\", \"UserManaged\""
+  - name: Should not be able to update cloudControllerManager state to empty string when state is already set to None
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager:
+              state: None
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platformStatus:
+          external:
+            cloudControllerManager:
+              state: ""
+    expectedStatusError: " status.platformStatus.external.cloudControllerManager.state: Invalid value: \"string\": state is immutable once set"
+  - name: Should not be able to update cloudControllerManager state to External when state is already set to None
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager:
+              state: None
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager:
+              state: External
+    expectedStatusError: " status.platformStatus.external.cloudControllerManager.state: Invalid value: \"string\": state is immutable once set"
+  - name: Should be able to update cloudControllerManager state to None when state is already set to None
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager:
+              state: None
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager:
+              state: None
+    expected: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        controlPlaneTopology: HighlyAvailable
+        cpuPartitioning: None
+        infrastructureTopology: HighlyAvailable
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager:
+              state: None
+  - name: Should not be able to unset cloudControllerManager state when state is already set to None
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager:
+              state: None
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager: {}
+    expectedStatusError: " status.platformStatus.external.cloudControllerManager: Invalid value: \"object\": state may not be added or removed once set"
+  - name: Should not be able to update cloudControllerManager state to empty string when state is already set to External
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager:
+              state: External
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager:
+              state: ""
+    expectedStatusError: " status.platformStatus.external.cloudControllerManager.state: Invalid value: \"string\": state is immutable once set"
+  - name: Should not be able to update cloudControllerManager state to None when state is already set to External
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager:
+              state: External
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager:
+              state: None
+    expectedStatusError: " status.platformStatus.external.cloudControllerManager.state: Invalid value: \"string\": state is immutable once set"
+  - name: Should be able to update cloudControllerManager state to External when state is already set to External
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager:
+              state: External
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager:
+              state: External
+    expected: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        controlPlaneTopology: HighlyAvailable
+        cpuPartitioning: None
+        infrastructureTopology: HighlyAvailable
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager:
+              state: External
+  - name: Should not be able to unset cloudControllerManager state when state is already set to External
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager:
+              state: External
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager: {}
+    expectedStatusError: " status.platformStatus.external.cloudControllerManager: Invalid value: \"object\": state may not be added or removed once set"
+  - name: Should not be able to update cloudControllerManager state to None when state is already set to empty string
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager:
+              state: ""
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager:
+              state: None
+    expectedStatusError: " status.platformStatus.external.cloudControllerManager.state: Invalid value: \"string\": state is immutable once set"
+  - name: Should not be able to update cloudControllerManager state to External when state is already set to empty string
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager:
+              state: ""
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager:
+              state: External
+    expectedStatusError: " status.platformStatus.external.cloudControllerManager.state: Invalid value: \"string\": state is immutable once set"
+  - name: Should be able to update cloudControllerManager state to empty string when state is already set to empty string
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager:
+              state: ""
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager:
+              state: ""
+    expected: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        controlPlaneTopology: HighlyAvailable
+        cpuPartitioning: None
+        infrastructureTopology: HighlyAvailable
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager:
+              state: ""
+  - name: Should not be able to unset cloudControllerManager state when state is already set to empty string
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager:
+              state: ""
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager: {}
+    expectedStatusError: " status.platformStatus.external.cloudControllerManager: Invalid value: \"object\": state may not be added or removed once set"
+  - name: Should be able to update cloudControllerManager state to None when cloudControllerManager state is unset
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager: {}
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager:
+              state: None
+    expected: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        controlPlaneTopology: HighlyAvailable
+        cpuPartitioning: None
+        infrastructureTopology: HighlyAvailable
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager:
+              state: None
+  - name: Should be able to update cloudControllerManager state to empty string when cloudControllerManager state is unset
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager: {}
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager:
+              state: ""
+    expected: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        controlPlaneTopology: HighlyAvailable
+        cpuPartitioning: None
+        infrastructureTopology: HighlyAvailable
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager:
+              state: ""
+  - name: Should not be able to update cloudControllerManager state to External when cloudControllerManager state is unset
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager: {}
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager:
+              state: External
+    expectedStatusError: " status.platformStatus.external.cloudControllerManager: Invalid value: \"object\": state may not be added or removed once set"
+  - name: Should be able to unset cloudControllerManager state when cloudControllerManager state is unset
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager: {}
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager: {}
+    expected: |
+      apiVersion: config.openshift.io/v1
+      kind: Infrastructure
+      spec: {}
+      status:
+        controlPlaneTopology: HighlyAvailable
+        cpuPartitioning: None
+        infrastructureTopology: HighlyAvailable
+        platform: External
+        platformStatus:
+          type: External
+          external:
+            cloudControllerManager: {}

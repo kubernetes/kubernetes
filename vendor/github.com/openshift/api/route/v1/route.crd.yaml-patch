@@ -65,22 +65,3 @@
         properties:
           termination:
             enum: ["edge"]
-  # Any insecure edge-termination policy may be used if we terminate TLS.
-  - anyOf:
-    - properties:
-        insecureEdgeTerminationPolicy:
-          enum: ["", "None", "Allow", "Redirect"]
-    - not:
-        properties:
-          termination:
-            enum: ["edge","reencrypt"]
-  # Any insecure edge-termination policy *except* for "Allow" maybe used when
-  # using passthrough TLS.
-  - anyOf:
-    - properties:
-        insecureEdgeTerminationPolicy:
-          enum: ["", "None", "Redirect"]
-    - not:
-        properties:
-          termination:
-            enum: ["passthrough"]

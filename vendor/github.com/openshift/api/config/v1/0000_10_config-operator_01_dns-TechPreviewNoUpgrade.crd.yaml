@@ -6,6 +6,7 @@ metadata:
     include.release.openshift.io/ibm-cloud-managed: "true"
     include.release.openshift.io/self-managed-high-availability: "true"
     include.release.openshift.io/single-node-developer: "true"
+    release.openshift.io/feature-set: TechPreviewNoUpgrade
   name: dnses.config.openshift.io
 spec:
   group: config.openshift.io
@@ -39,6 +40,47 @@ spec:
                 baseDomain:
                   description: "baseDomain is the base domain of the cluster. All managed DNS records will be sub-domains of this base. \n For example, given the base domain `openshift.example.com`, an API server DNS record may be created for `cluster-api.openshift.example.com`. \n Once set, this field cannot be changed."
                   type: string
+                platform:
+                  description: platform holds configuration specific to the underlying infrastructure provider for DNS. When omitted, this means the user has no opinion and the platform is left to choose reasonable defaults. These defaults are subject to change over time.
+                  type: object
+                  required:
+                    - type
+                  properties:
+                    aws:
+                      description: aws contains DNS configuration specific to the Amazon Web Services cloud provider.
+                      type: object
+                      properties:
+                        privateZoneIAMRole:
+                          description: privateZoneIAMRole contains the ARN of an IAM role that should be assumed when performing operations on the cluster's private hosted zone specified in the cluster DNS config. When left empty, no role should be assumed.
+                          type: string
+                          pattern: ^arn:(aws|aws-cn|aws-us-gov):iam::[0-9]{12}:role\/.*$
+                    type:
+                      description: "type is the underlying infrastructure provider for the cluster. Allowed values: \"\", \"AWS\". \n Individual components may not support all platforms, and must handle unrecognized platforms with best-effort defaults."
+                      type: string
+                      enum:
+                        - ""
+                        - AWS
+                        - Azure
+                        - BareMetal
+                        - GCP
+                        - Libvirt
+                        - OpenStack
+                        - None
+                        - VSphere
+                        - oVirt
+                        - IBMCloud
+                        - KubeVirt
+                        - EquinixMetal
+                        - PowerVS
+                        - AlibabaCloud
+                        - Nutanix
+                        - External
+                      x-kubernetes-validations:
+                        - rule: self in ['','AWS']
+                          message: allowed values are '' and 'AWS'
+                  x-kubernetes-validations:
+                    - rule: 'has(self.type) && self.type == ''AWS'' ?  has(self.aws) : !has(self.aws)'
+                      message: aws configuration is required when platform is AWS, and forbidden otherwise
                 privateZone:
                   description: "privateZone is the location where all the DNS records that are only available internally to the cluster exist. \n If this field is nil, no private records should be created. \n Once set, this field cannot be changed."
                   type: object
