@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
@@ -172,16 +173,16 @@ func TestAuditAnnotation(t *testing.T) {
 	scheme := runtime.NewScheme()
 	negotiatedSerializer := serializer.NewCodecFactory(scheme).WithoutConversion()
 	for k, tc := range testcases {
-		audit := &auditinternal.Event{Level: auditinternal.LevelMetadata}
 		handler := WithAuthorization(&fakeHTTPHandler{}, tc.authorizer, negotiatedSerializer)
 		// TODO: fake audit injector
 
 		req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
-		req = withTestContext(req, nil, audit)
+		req = withTestContext(req, nil, &auditinternal.Event{Level: auditinternal.LevelMetadata})
+		ae := audit.AuditEventFrom(req.Context())
 		req.RemoteAddr = "127.0.0.1"
 		handler.ServeHTTP(httptest.NewRecorder(), req)
-		assert.Equal(t, tc.decisionAnnotation, audit.Annotations[decisionAnnotationKey], k+": unexpected decision annotation")
-		assert.Equal(t, tc.reasonAnnotation, audit.Annotations[reasonAnnotationKey], k+": unexpected reason annotation")
+		assert.Equal(t, tc.decisionAnnotation, ae.Annotations[decisionAnnotationKey], k+": unexpected decision annotation")
+		assert.Equal(t, tc.reasonAnnotation, ae.Annotations[reasonAnnotationKey], k+": unexpected reason annotation")
 	}
 
 }

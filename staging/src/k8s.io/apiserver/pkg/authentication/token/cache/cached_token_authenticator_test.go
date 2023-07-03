@@ -547,7 +547,7 @@ func (s *singleBenchmark) bench(b *testing.B) {
 func withAudit(ctx context.Context) context.Context {
 	ctx = audit.WithAuditContext(ctx)
 	ac := audit.AuditContextFrom(ctx)
-	ac.Event = &auditinternal.Event{Level: auditinternal.LevelMetadata}
+	ac.Event.Level = auditinternal.LevelMetadata
 	return ctx
 }
 

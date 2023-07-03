@@ -115,11 +115,11 @@ func withFailedRequestAudit(failedHandler http.Handler, statusErr *apierrors.Sta
 			return
 		}
 
-		if ac == nil || ac.Event == nil {
+		if !ac.Enabled() {
 			failedHandler.ServeHTTP(w, req)
 			return
 		}
-		ev := ac.Event
+		ev := &ac.Event
 
 		ev.ResponseStatus = &metav1.Status{}
 		ev.Stage = auditinternal.StageResponseStarted
