@@ -395,12 +395,6 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		ClusterAuthenticationInfo: c.ExtraConfig.ClusterAuthenticationInfo,
 	}
 
-	// install legacy rest storage
-
-	if err := m.InstallLegacyAPI(&c, c.GenericConfig.RESTOptionsGetter); err != nil {
-		return nil, err
-	}
-
 	clientset, err := kubernetes.NewForConfig(c.GenericConfig.LoopbackClientConfig)
 	if err != nil {
 		return nil, err
@@ -417,6 +411,23 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	// TODO: describe the priority all the way down in the RESTStorageProviders and plumb it back through the various discovery
 	// handlers that we have.
 	restStorageProviders := []RESTStorageProvider{
+		corerest.LegacyRESTStorageProvider{
+			GenericLegacyRESTStorageProvider: corerest.GenericLegacyRESTStorageProvider{
+				StorageFactory:              c.ExtraConfig.StorageFactory,
+				EventTTL:                    c.ExtraConfig.EventTTL,
+				LoopbackClientConfig:        c.GenericConfig.LoopbackClientConfig,
+				ServiceAccountIssuer:        c.ExtraConfig.ServiceAccountIssuer,
+				ExtendExpiration:            c.ExtraConfig.ExtendExpiration,
+				ServiceAccountMaxExpiration: c.ExtraConfig.ServiceAccountMaxExpiration,
+				APIAudiences:                c.GenericConfig.Authentication.APIAudiences,
+				Informers:                   c.ExtraConfig.VersionedInformers,
+			},
+			ProxyTransport:          c.ExtraConfig.ProxyTransport,
+			KubeletClientConfig:     c.ExtraConfig.KubeletClientConfig,
+			ServiceIPRange:          c.ExtraConfig.ServiceIPRange,
+			SecondaryServiceIPRange: c.ExtraConfig.SecondaryServiceIPRange,
+			ServiceNodePortRange:    c.ExtraConfig.ServiceNodePortRange,
+		},
 		apiserverinternalrest.StorageProvider{},
 		authenticationrest.RESTStorageProvider{Authenticator: c.GenericConfig.Authentication.Authenticator, APIAudiences: c.GenericConfig.Authentication.APIAudiences},
 		authorizationrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorization.Authorizer, RuleResolver: c.GenericConfig.RuleResolver},
@@ -443,12 +454,13 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		return nil, err
 	}
 
+	m.GenericAPIServer.AddPostStartHookOrDie("start-system-namespaces-controller", func(hookContext genericapiserver.PostStartHookContext) error {
+		go systemnamespaces.NewController(clientset, c.ExtraConfig.VersionedInformers.Core().V1().Namespaces()).Run(hookContext.StopCh)
+		return nil
+	})
+
 	m.GenericAPIServer.AddPostStartHookOrDie("start-cluster-authentication-info-controller", func(hookContext genericapiserver.PostStartHookContext) error {
-		kubeClient, err := kubernetes.NewForConfig(hookContext.LoopbackClientConfig)
-		if err != nil {
-			return err
-		}
-		controller := clusterauthenticationtrust.NewClusterAuthenticationTrustController(m.ClusterAuthenticationInfo, kubeClient)
+		controller := clusterauthenticationtrust.NewClusterAuthenticationTrustController(m.ClusterAuthenticationInfo, clientset)
 
 		// generate a context  from stopCh. This is to avoid modifying files which are relying on apiserver
 		// TODO: See if we can pass ctx to the current method
@@ -572,59 +584,6 @@ func labelAPIServerHeartbeatFunc(identity string) lease.ProcessLeaseFunc {
 	}
 }
 
-// InstallLegacyAPI will install the legacy APIs for the restStorageProviders if they are enabled.
-func (m *Instance) InstallLegacyAPI(c *completedConfig, restOptionsGetter generic.RESTOptionsGetter) error {
-	legacyRESTStorageProvider := corerest.LegacyRESTStorageProvider{
-		GenericLegacyRESTStorageProvider: corerest.GenericLegacyRESTStorageProvider{
-			StorageFactory:              c.ExtraConfig.StorageFactory,
-			EventTTL:                    c.ExtraConfig.EventTTL,
-			LoopbackClientConfig:        c.GenericConfig.LoopbackClientConfig,
-			ServiceAccountIssuer:        c.ExtraConfig.ServiceAccountIssuer,
-			ExtendExpiration:            c.ExtraConfig.ExtendExpiration,
-			ServiceAccountMaxExpiration: c.ExtraConfig.ServiceAccountMaxExpiration,
-			APIAudiences:                c.GenericConfig.Authentication.APIAudiences,
-			Informers:                   c.ExtraConfig.VersionedInformers,
-		},
-		ProxyTransport:          c.ExtraConfig.ProxyTransport,
-		KubeletClientConfig:     c.ExtraConfig.KubeletClientConfig,
-		ServiceIPRange:          c.ExtraConfig.ServiceIPRange,
-		SecondaryServiceIPRange: c.ExtraConfig.SecondaryServiceIPRange,
-		ServiceNodePortRange:    c.ExtraConfig.ServiceNodePortRange,
-	}
-	rangeRegistries, apiGroupInfo, err := legacyRESTStorageProvider.NewLegacyRESTStorage(c.ExtraConfig.APIResourceConfigSource, restOptionsGetter)
-	if err != nil {
-		return fmt.Errorf("error building core storage: %v", err)
-	}
-	if len(apiGroupInfo.VersionedResourcesStorageMap) == 0 { // if all core storage is disabled, return.
-		return nil
-	}
-
-	controllerName := "bootstrap-controller"
-	client := kubernetes.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
-	// Kubernetes clusters contains the following system namespaces:
-	// kube-system, kube-node-lease, kube-public, default
-	m.GenericAPIServer.AddPostStartHookOrDie("start-system-namespaces-controller", func(hookContext genericapiserver.PostStartHookContext) error {
-		go systemnamespaces.NewController(client, c.ExtraConfig.VersionedInformers.Core().V1().Namespaces()).Run(hookContext.StopCh)
-		return nil
-	})
-
-	kubenetesserviceConfig, err := c.newKubernetesServiceControllerConfig(client)
-	if err != nil {
-		return err
-	}
-	bootstrapController, err := kubernetesservice.New(*kubenetesserviceConfig, rangeRegistries)
-	if err != nil {
-		return fmt.Errorf("error creating bootstrap controller: %v", err)
-	}
-	m.GenericAPIServer.AddPostStartHookOrDie(controllerName, func(genericapiserver.PostStartHookContext) error { bootstrapController.Start(); return nil })
-	m.GenericAPIServer.AddPreShutdownHookOrDie(controllerName, func() error { bootstrapController.Stop(); return nil })
-
-	if err := m.GenericAPIServer.InstallLegacyAPIGroup(genericapiserver.DefaultLegacyAPIPrefix, &apiGroupInfo); err != nil {
-		return fmt.Errorf("error in registering group versions: %v", err)
-	}
-	return nil
-}
-
 // newKubernetesServiceControllerConfig returns a configuration for the kubernetes service controller.
 func (c completedConfig) newKubernetesServiceControllerConfig(client kubernetes.Interface) (*kubernetesservice.Config, error) {
 	_, publicServicePort, err := c.GenericConfig.SecureServing.HostPort()
@@ -667,7 +626,7 @@ type RESTStorageProvider interface {
 
 // InstallAPIs will install the APIs for the restStorageProviders if they are enabled.
 func (m *Instance) InstallAPIs(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter, restStorageProviders ...RESTStorageProvider) error {
-	apiGroupsInfo := []*genericapiserver.APIGroupInfo{}
+	nonLegacy := []*genericapiserver.APIGroupInfo{}
 
 	// used later in the loop to filter the served resource by those that have expired.
 	resourceExpirationEvaluator, err := genericapiserver.NewResourceExpirationEvaluator(*m.GenericAPIServer.Version)
@@ -707,10 +666,16 @@ func (m *Instance) InstallAPIs(apiResourceConfigSource serverstorage.APIResource
 			m.GenericAPIServer.AddPostStartHookOrDie(name, hook)
 		}
 
-		apiGroupsInfo = append(apiGroupsInfo, &apiGroupInfo)
+		if len(groupName) == 0 {
+			if err := m.GenericAPIServer.InstallLegacyAPIGroup(genericapiserver.DefaultLegacyAPIPrefix, &apiGroupInfo); err != nil {
+				return fmt.Errorf("error in registering legacy API: %w", err)
+			}
+		} else {
+			nonLegacy = append(nonLegacy, &apiGroupInfo)
+		}
 	}
 
-	if err := m.GenericAPIServer.InstallAPIGroups(apiGroupsInfo...); err != nil {
+	if err := m.GenericAPIServer.InstallAPIGroups(nonLegacy...); err != nil {
 		return fmt.Errorf("error in registering group versions: %v", err)
 	}
 	return nil

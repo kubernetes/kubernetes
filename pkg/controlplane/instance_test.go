@@ -165,7 +165,7 @@ func TestLegacyRestStorageStrategies(t *testing.T) {
 		ServiceNodePortRange: apiserverCfg.ExtraConfig.ServiceNodePortRange,
 	}
 
-	_, apiGroupInfo, err := storageProvider.NewLegacyRESTStorage(serverstorage.NewResourceConfig(), apiserverCfg.GenericConfig.RESTOptionsGetter)
+	apiGroupInfo, err := storageProvider.NewRESTStorage(serverstorage.NewResourceConfig(), apiserverCfg.GenericConfig.RESTOptionsGetter)
 	if err != nil {
 		t.Errorf("failed to create legacy REST storage: %v", err)
 	}
