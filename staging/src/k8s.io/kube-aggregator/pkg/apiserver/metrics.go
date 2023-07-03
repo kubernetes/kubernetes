@@ -64,7 +64,7 @@ var (
 		&metrics.HistogramOpts{
 			Name:           "extension_apiserver_request_duration_seconds",
 			Help:           "extension apiserver request duration in seconds broken out by result.",
-			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
+			Buckets:        []float64{0.005, 0.025, 0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3, 4, 5, 6, 8, 10, 15, 20, 30, 45, 60},
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"result"},
