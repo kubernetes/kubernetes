@@ -32,8 +32,7 @@ func main() {
 	klog.InitFlags(nil)
 	gengo := getArgs()
 
-	// FIXME: these functions could be named better
-	if err := gengo.Execute(getPackageNamers(), getDefaultNamer(), getPackages); err != nil {
+	if err := gengo.Execute(getGlobalNamers(), getDefaultNamer(), getPackages); err != nil {
 		klog.Fatalf("ERROR: %v", err)
 	}
 	klog.V(2).Info("completed successfully")
@@ -72,8 +71,10 @@ func validateArgs(stdArgs *args.GeneratorArgs) error {
 	return nil
 }
 
-// getPackageNamers returns the name systems used by the generators in this package.
-func getPackageNamers() namer.NameSystems {
+// getGlobalNamers returns the name systems available to all generators in
+// all packages.  Individual generators can add their own later.
+// FIXME: just say []NameSystem instead of a type
+func getGlobalNamers() namer.NameSystems {
 	return nil
 }
 
@@ -84,6 +85,7 @@ func getDefaultNamer() string {
 }
 
 // getPackages returns a set of packages to be processed by this tool.
+// FIXME: just say []generator.Package instead
 func getPackages(context *generator.Context, arguments *args.GeneratorArgs) generator.Packages {
 	return nil
 }
