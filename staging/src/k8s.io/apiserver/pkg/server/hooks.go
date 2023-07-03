@@ -57,6 +57,11 @@ type PostStartHookProvider interface {
 	PostStartHook() (string, PostStartHookFunc, error)
 }
 
+// PreShutdownHookProvider is an interface in addition to provide a pre shutdown hook for the api server
+type PreShutdownHookProvider interface {
+	PreShutdownHook() (string, PreShutdownHookFunc, error)
+}
+
 type postStartHookEntry struct {
 	hook PostStartHookFunc
 	// originatingStack holds the stack that registered postStartHooks. This allows us to show a more helpful message

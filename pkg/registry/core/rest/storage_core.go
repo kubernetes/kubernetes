@@ -36,9 +36,11 @@ import (
 	networkingv1alpha1client "k8s.io/client-go/kubernetes/typed/networking/v1alpha1"
 	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1"
 	restclient "k8s.io/client-go/rest"
+
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/cluster/ports"
+	"k8s.io/kubernetes/pkg/controlplane/controller/kubernetesservice"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/registry/core/componentstatus"
@@ -67,8 +69,7 @@ import (
 )
 
 // GenericLegacyRESTStorageProvider provides information needed to build RESTStorage
-// for generic resources in core, but does NOT implement the "normal"
-// RESTStorageProvider (yet!)
+// for generic resources in core. It implements the "normal" RESTStorageProvider interface.
 type GenericLegacyRESTStorageProvider struct {
 	StorageFactory serverstorage.StorageFactory
 	// Used for custom proxy dialing, and proxy TLS options
@@ -98,14 +99,8 @@ type LegacyRESTStorageProvider struct {
 	// allocates ips for secondary service cidr in dual  stack clusters
 	SecondaryServiceIPRange net.IPNet
 	ServiceNodePortRange    utilnet.PortRange
-}
 
-// legacyRESTStorage holds the IP range registries used by the API server, to be
-// wired into the bootstrap controller.
-type legacyRESTStorage struct {
-	ServiceClusterIPAllocator          rangeallocation.RangeRegistry
-	SecondaryServiceClusterIPAllocator rangeallocation.RangeRegistry
-	ServiceNodePortAllocator           rangeallocation.RangeRegistry
+	KubernetesServiceControllerConfig kubernetesservice.Config
 }
 
 func (c GenericLegacyRESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {
@@ -188,45 +183,46 @@ func (c GenericLegacyRESTStorageProvider) NewRESTStorage(apiResourceConfigSource
 
 	return apiGroupInfo, nil
 }
-func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (legacyRESTStorage, genericapiserver.APIGroupInfo, error) {
+
+func (c LegacyRESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {
 	apiGroupInfo, err := c.GenericLegacyRESTStorageProvider.NewRESTStorage(apiResourceConfigSource, restOptionsGetter)
 	if err != nil {
-		return legacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+		return genericapiserver.APIGroupInfo{}, err
 	}
 
 	podDisruptionClient, err := policyclient.NewForConfig(c.LoopbackClientConfig)
 	if err != nil {
-		return legacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+		return genericapiserver.APIGroupInfo{}, err
 	}
-	restStorage := legacyRESTStorage{}
+	rangeRegistries := kubernetesservice.RangeRegistries{}
 
 	podTemplateStorage, err := podtemplatestore.NewREST(restOptionsGetter)
 	if err != nil {
-		return legacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+		return genericapiserver.APIGroupInfo{}, err
 	}
 
 	limitRangeStorage, err := limitrangestore.NewREST(restOptionsGetter)
 	if err != nil {
-		return legacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+		return genericapiserver.APIGroupInfo{}, err
 	}
 
 	persistentVolumeStorage, persistentVolumeStatusStorage, err := pvstore.NewREST(restOptionsGetter)
 	if err != nil {
-		return legacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+		return genericapiserver.APIGroupInfo{}, err
 	}
 	persistentVolumeClaimStorage, persistentVolumeClaimStatusStorage, err := pvcstore.NewREST(restOptionsGetter)
 	if err != nil {
-		return legacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+		return genericapiserver.APIGroupInfo{}, err
 	}
 
 	endpointsStorage, err := endpointsstore.NewREST(restOptionsGetter)
 	if err != nil {
-		return legacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+		return genericapiserver.APIGroupInfo{}, err
 	}
 
 	nodeStorage, err := nodestore.NewStorage(restOptionsGetter, c.KubeletClientConfig, c.ProxyTransport)
 	if err != nil {
-		return legacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+		return genericapiserver.APIGroupInfo{}, err
 	}
 
 	podStorage, err := podstore.NewStorage(
@@ -236,18 +232,18 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(apiResourceConfigSource 
 		podDisruptionClient,
 	)
 	if err != nil {
-		return legacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+		return genericapiserver.APIGroupInfo{}, err
 	}
 
 	var serviceClusterIPRegistry rangeallocation.RangeRegistry
 	serviceClusterIPRange := c.ServiceIPRange
 	if serviceClusterIPRange.IP == nil {
-		return legacyRESTStorage{}, genericapiserver.APIGroupInfo{}, fmt.Errorf("service clusterIPRange is missing")
+		return genericapiserver.APIGroupInfo{}, fmt.Errorf("service clusterIPRange is missing")
 	}
 
 	serviceStorageConfig, err := c.StorageFactory.NewConfig(api.Resource("services"))
 	if err != nil {
-		return legacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+		return genericapiserver.APIGroupInfo{}, err
 	}
 	var serviceClusterIPAllocator, secondaryServiceClusterIPAllocator ipallocator.Interface
 
@@ -264,21 +260,21 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(apiResourceConfigSource 
 			return etcd, nil
 		})
 		if err != nil {
-			return legacyRESTStorage{}, genericapiserver.APIGroupInfo{}, fmt.Errorf("cannot create cluster IP allocator: %v", err)
+			return genericapiserver.APIGroupInfo{}, fmt.Errorf("cannot create cluster IP allocator: %v", err)
 		}
 	} else {
 		networkingv1alphaClient, err := networkingv1alpha1client.NewForConfig(c.LoopbackClientConfig)
 		if err != nil {
-			return legacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+			return genericapiserver.APIGroupInfo{}, err
 		}
 		serviceClusterIPAllocator, err = ipallocator.NewIPAllocator(&serviceClusterIPRange, networkingv1alphaClient, c.Informers.Networking().V1alpha1().IPAddresses())
 		if err != nil {
-			return legacyRESTStorage{}, genericapiserver.APIGroupInfo{}, fmt.Errorf("cannot create cluster IP allocator: %v", err)
+			return genericapiserver.APIGroupInfo{}, fmt.Errorf("cannot create cluster IP allocator: %v", err)
 		}
 	}
 
 	serviceClusterIPAllocator.EnableMetrics()
-	restStorage.ServiceClusterIPAllocator = serviceClusterIPRegistry
+	rangeRegistries.ServiceClusterIPRegistry = serviceClusterIPRegistry
 
 	// allocator for secondary service ip range
 	if c.SecondaryServiceIPRange.IP != nil {
@@ -296,20 +292,20 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(apiResourceConfigSource 
 				return etcd, nil
 			})
 			if err != nil {
-				return legacyRESTStorage{}, genericapiserver.APIGroupInfo{}, fmt.Errorf("cannot create cluster secondary IP allocator: %v", err)
+				return genericapiserver.APIGroupInfo{}, fmt.Errorf("cannot create cluster secondary IP allocator: %v", err)
 			}
 		} else {
 			networkingv1alphaClient, err := networkingv1alpha1client.NewForConfig(c.LoopbackClientConfig)
 			if err != nil {
-				return legacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+				return genericapiserver.APIGroupInfo{}, err
 			}
 			secondaryServiceClusterIPAllocator, err = ipallocator.NewIPAllocator(&c.SecondaryServiceIPRange, networkingv1alphaClient, c.Informers.Networking().V1alpha1().IPAddresses())
 			if err != nil {
-				return legacyRESTStorage{}, genericapiserver.APIGroupInfo{}, fmt.Errorf("cannot create cluster secondary IP allocator: %v", err)
+				return genericapiserver.APIGroupInfo{}, fmt.Errorf("cannot create cluster secondary IP allocator: %v", err)
 			}
 		}
 		secondaryServiceClusterIPAllocator.EnableMetrics()
-		restStorage.SecondaryServiceClusterIPAllocator = secondaryServiceClusterIPRegistry
+		rangeRegistries.SecondaryServiceClusterIPRegistry = secondaryServiceClusterIPRegistry
 	}
 
 	var serviceNodePortRegistry rangeallocation.RangeRegistry
@@ -324,10 +320,14 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(apiResourceConfigSource 
 		return etcd, nil
 	})
 	if err != nil {
-		return legacyRESTStorage{}, genericapiserver.APIGroupInfo{}, fmt.Errorf("cannot create cluster port allocator: %v", err)
+		return genericapiserver.APIGroupInfo{}, fmt.Errorf("cannot create cluster port allocator: %v", err)
+	}
+	ctrl, err := kubernetesservice.New(c.KubernetesServiceControllerConfig, rangeRegistries)
+	if err != nil {
+		return genericapiserver.APIGroupInfo{}, fmt.Errorf("cannot create kubernetes service controller: %w", err)
 	}
 	serviceNodePortAllocator.EnableMetrics()
-	restStorage.ServiceNodePortAllocator = serviceNodePortRegistry
+	rangeRegistries.ServiceNodePortRegistry = serviceNodePortRegistry
 
 	serviceIPAllocators := map[api.IPFamily]ipallocator.Interface{
 		serviceClusterIPAllocator.IPFamily(): serviceClusterIPAllocator,
@@ -336,7 +336,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(apiResourceConfigSource 
 		serviceIPAllocators[secondaryServiceClusterIPAllocator.IPFamily()] = secondaryServiceClusterIPAllocator
 	}
 
-	serviceRESTStorage, serviceStatusStorage, serviceRESTProxy, err := servicestore.NewREST(
+	serviceRESTStorageRaw, serviceStatusStorage, serviceRESTProxy, err := servicestore.NewREST(
 		restOptionsGetter,
 		serviceClusterIPAllocator.IPFamily(),
 		serviceIPAllocators,
@@ -345,7 +345,12 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(apiResourceConfigSource 
 		podStorage.Pod,
 		c.ProxyTransport)
 	if err != nil {
-		return legacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+		return genericapiserver.APIGroupInfo{}, err
+	}
+	serviceRESTStorage := withHooks{
+		REST:          serviceRESTStorageRaw,
+		postStartHook: func(context genericapiserver.PostStartHookContext) error { ctrl.Start(); return nil },
+		preStartHook:  func() error { ctrl.Stop(); return nil },
 	}
 
 	storage := apiGroupInfo.VersionedResourcesStorageMap["v1"]
@@ -358,7 +363,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(apiResourceConfigSource 
 	if c.ServiceAccountIssuer != nil {
 		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, c.ServiceAccountIssuer, c.APIAudiences, c.ServiceAccountMaxExpiration, podStorage.Pod.Store, storage["secrets"].(rest.Getter), c.ExtendExpiration)
 		if err != nil {
-			return legacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+			return genericapiserver.APIGroupInfo{}, err
 		}
 	}
 
@@ -387,7 +392,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(apiResourceConfigSource 
 	if resource := "replicationcontrollers"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
 		controllerStorage, err := controllerstore.NewStorage(restOptionsGetter)
 		if err != nil {
-			return legacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+			return genericapiserver.APIGroupInfo{}, err
 		}
 
 		storage[resource] = controllerStorage.Controller
@@ -440,7 +445,24 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(apiResourceConfigSource 
 		apiGroupInfo.VersionedResourcesStorageMap["v1"] = storage
 	}
 
-	return restStorage, apiGroupInfo, nil
+	return apiGroupInfo, nil
+}
+
+type withHooks struct {
+	*servicestore.REST
+	postStartHook genericapiserver.PostStartHookFunc
+	preStartHook  genericapiserver.PreShutdownHookFunc
+}
+
+var _ genericapiserver.PostStartHookProvider = withHooks{}
+var _ genericapiserver.PreShutdownHookProvider = withHooks{}
+
+func (w withHooks) PostStartHook() (string, genericapiserver.PostStartHookFunc, error) {
+	return "start-kubernetes-service-controller", w.postStartHook, nil
+}
+
+func (w withHooks) PreShutdownHook() (string, genericapiserver.PreShutdownHookFunc, error) {
+	return "stop-kubernetes-service-controller", w.preStartHook, nil
 }
 
 func (p LegacyRESTStorageProvider) GroupName() string {

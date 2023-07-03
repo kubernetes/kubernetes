@@ -23,11 +23,12 @@ import (
 	"k8s.io/client-go/kubernetes"
 	netutils "k8s.io/utils/net"
 
+	"k8s.io/kubernetes/pkg/controlplane/controller/kubernetesservice"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
-	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
 )
 
 func Test_completedConfig_NewBootstrapController(t *testing.T) {
+
 	_, ipv4cidr, err := netutils.ParseCIDRSloppy("192.168.0.0/24")
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
@@ -42,7 +43,7 @@ func Test_completedConfig_NewBootstrapController(t *testing.T) {
 	ipv6address := netutils.ParseIPSloppy("2001:db8::1")
 
 	type args struct {
-		legacyRESTStorage corerest.LegacyRESTStorage
+		legacyRESTStorage kubernetesservice.RangeRegistries
 		client            kubernetes.Interface
 	}
 	tests := []struct {
@@ -167,12 +168,16 @@ func Test_completedConfig_NewBootstrapController(t *testing.T) {
 				GenericConfig: tt.config.Complete(nil),
 				ExtraConfig:   tt.extraConfig,
 			}
-			_, err := c.newKubernetesServiceControllerConfig(tt.args.client)
+			ctrlConfig, err := c.newKubernetesServiceControllerConfig(tt.args.client)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("completedConfig.NewBootstrapController() error = %v, wantErr %v", err, tt.wantErr)
-				return
+				t.Fatalf("completedConfig.newKubernetesServiceControllerConfig() error = %v, wantErr %v", err, tt.wantErr)
 			}
-
+			if err == nil {
+				_, err = kubernetesservice.New(*ctrlConfig, tt.args.legacyRESTStorage)
+				if (err != nil) != tt.wantErr {
+					t.Fatalf("kubernetesservice.New() error = %v, wantErr %v", err, tt.wantErr)
+				}
+			}
 		})
 	}
 }
