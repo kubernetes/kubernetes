@@ -74,6 +74,35 @@
   stabilityLevel: STABLE
   labels:
   - zone
+- name: pod_scheduling_sli_duration_seconds
+  subsystem: scheduler
+  help: E2e latency for a pod being scheduled, from the time the pod enters the scheduling
+    queue an d might involve multiple scheduling attempts.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - attempts
+  buckets:
+  - 0.01
+  - 0.02
+  - 0.04
+  - 0.08
+  - 0.16
+  - 0.32
+  - 0.64
+  - 1.28
+  - 2.56
+  - 5.12
+  - 10.24
+  - 20.48
+  - 40.96
+  - 81.92
+  - 163.84
+  - 327.68
+  - 655.36
+  - 1310.72
+  - 2621.44
+  - 5242.88
 - name: kube_pod_resource_limit
   help: Resources limit for workloads on the cluster, broken down by pod. This shows
     the resource usage the scheduler and kubelet expect per pod for resources along
@@ -151,6 +180,7 @@
   help: E2e latency for a pod being scheduled which may include multiple scheduling
     attempts.
   type: Histogram
+  deprecatedVersion: 1.28.0
   stabilityLevel: STABLE
   labels:
   - attempts
