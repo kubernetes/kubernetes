@@ -167,7 +167,7 @@ func Test_completedConfig_NewBootstrapController(t *testing.T) {
 				GenericConfig: tt.config.Complete(nil),
 				ExtraConfig:   tt.extraConfig,
 			}
-			_, err := c.NewBootstrapController(tt.args.legacyRESTStorage, tt.args.client)
+			_, err := c.newKubernetesServiceControllerConfig(tt.args.client)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("completedConfig.NewBootstrapController() error = %v, wantErr %v", err, tt.wantErr)
 				return
