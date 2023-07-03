@@ -275,7 +275,7 @@ while IFS= read -r repo; do
       echo "=== computing imports for ${repo}"
       go list all
       echo "=== computing tools imports for ${repo}"
-      go list -tags=tools all
+      go list -e -tags=tools all
     } >> "${LOG_FILE}" 2>&1
 
     # capture module dependencies
