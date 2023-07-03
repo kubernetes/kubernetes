@@ -68,8 +68,7 @@ import (
 )
 
 // GenericLegacyRESTStorageProvider provides information needed to build RESTStorage
-// for generic resources in core, but does NOT implement the "normal"
-// RESTStorageProvider (yet!)
+// for generic resources in core. It implements the "normal" RESTStorageProvider interface.
 type GenericLegacyRESTStorageProvider struct {
 	StorageFactory serverstorage.StorageFactory
 	// Used for custom proxy dialing, and proxy TLS options
@@ -187,44 +186,45 @@ func (c GenericLegacyRESTStorageProvider) NewRESTStorage(apiResourceConfigSource
 
 	return apiGroupInfo, nil
 }
-func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (serviceIPRangeRegistries, genericapiserver.APIGroupInfo, error) {
+
+func (c LegacyRESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {
 	apiGroupInfo, err := c.GenericLegacyRESTStorageProvider.NewRESTStorage(apiResourceConfigSource, restOptionsGetter)
 	if err != nil {
-		return serviceIPRangeRegistries{}, genericapiserver.APIGroupInfo{}, err
+		return genericapiserver.APIGroupInfo{}, err
 	}
 
 	podDisruptionClient, err := policyclient.NewForConfig(c.LoopbackClientConfig)
 	if err != nil {
-		return serviceIPRangeRegistries{}, genericapiserver.APIGroupInfo{}, err
+		return genericapiserver.APIGroupInfo{}, err
 	}
 
 	podTemplateStorage, err := podtemplatestore.NewREST(restOptionsGetter)
 	if err != nil {
-		return serviceIPRangeRegistries{}, genericapiserver.APIGroupInfo{}, err
+		return genericapiserver.APIGroupInfo{}, err
 	}
 
 	limitRangeStorage, err := limitrangestore.NewREST(restOptionsGetter)
 	if err != nil {
-		return serviceIPRangeRegistries{}, genericapiserver.APIGroupInfo{}, err
+		return genericapiserver.APIGroupInfo{}, err
 	}
 
 	persistentVolumeStorage, persistentVolumeStatusStorage, err := pvstore.NewREST(restOptionsGetter)
 	if err != nil {
-		return serviceIPRangeRegistries{}, genericapiserver.APIGroupInfo{}, err
+		return genericapiserver.APIGroupInfo{}, err
 	}
 	persistentVolumeClaimStorage, persistentVolumeClaimStatusStorage, err := pvcstore.NewREST(restOptionsGetter)
 	if err != nil {
-		return serviceIPRangeRegistries{}, genericapiserver.APIGroupInfo{}, err
+		return genericapiserver.APIGroupInfo{}, err
 	}
 
 	endpointsStorage, err := endpointsstore.NewREST(restOptionsGetter)
 	if err != nil {
-		return serviceIPRangeRegistries{}, genericapiserver.APIGroupInfo{}, err
+		return genericapiserver.APIGroupInfo{}, err
 	}
 
 	nodeStorage, err := nodestore.NewStorage(restOptionsGetter, c.KubeletClientConfig, c.ProxyTransport)
 	if err != nil {
-		return serviceIPRangeRegistries{}, genericapiserver.APIGroupInfo{}, err
+		return genericapiserver.APIGroupInfo{}, err
 	}
 
 	podStorage, err := podstore.NewStorage(
@@ -234,12 +234,12 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(apiResourceConfigSource 
 		podDisruptionClient,
 	)
 	if err != nil {
-		return serviceIPRangeRegistries{}, genericapiserver.APIGroupInfo{}, err
+		return genericapiserver.APIGroupInfo{}, err
 	}
 
-	rangeRegistries, serviceClusterIPAllocator, serviceIPAllocators, serviceNodePortAllocator, err := c.newServiceIPAllocators()
+	_, serviceClusterIPAllocator, serviceIPAllocators, serviceNodePortAllocator, err := c.newServiceIPAllocators()
 	if err != nil {
-		return serviceIPRangeRegistries{}, genericapiserver.APIGroupInfo{}, err
+		return genericapiserver.APIGroupInfo{}, err
 	}
 	serviceRESTStorage, serviceStatusStorage, serviceRESTProxy, err := servicestore.NewREST(
 		restOptionsGetter,
@@ -250,7 +250,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(apiResourceConfigSource 
 		podStorage.Pod,
 		c.ProxyTransport)
 	if err != nil {
-		return serviceIPRangeRegistries{}, genericapiserver.APIGroupInfo{}, err
+		return genericapiserver.APIGroupInfo{}, err
 	}
 
 	storage := apiGroupInfo.VersionedResourcesStorageMap["v1"]
@@ -263,7 +263,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(apiResourceConfigSource 
 	if c.ServiceAccountIssuer != nil {
 		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, c.ServiceAccountIssuer, c.APIAudiences, c.ServiceAccountMaxExpiration, podStorage.Pod.Store, storage["secrets"].(rest.Getter), c.ExtendExpiration)
 		if err != nil {
-			return serviceIPRangeRegistries{}, genericapiserver.APIGroupInfo{}, err
+			return genericapiserver.APIGroupInfo{}, err
 		}
 	}
 
@@ -292,7 +292,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(apiResourceConfigSource 
 	if resource := "replicationcontrollers"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
 		controllerStorage, err := controllerstore.NewStorage(restOptionsGetter)
 		if err != nil {
-			return serviceIPRangeRegistries{}, genericapiserver.APIGroupInfo{}, err
+			return genericapiserver.APIGroupInfo{}, err
 		}
 
 		storage[resource] = controllerStorage.Controller
@@ -354,7 +354,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(apiResourceConfigSource 
 		apiGroupInfo.VersionedResourcesStorageMap["v1"] = storage
 	}
 
-	return rangeRegistries, apiGroupInfo, nil
+	return apiGroupInfo, nil
 }
 
 func (c LegacyRESTStorageProvider) newServiceIPAllocators() (registries serviceIPRangeRegistries, serviceClusterIPAllocator ipallocator.Interface, clusterIPAllocators map[api.IPFamily]ipallocator.Interface, serviceNodePortAllocator *portallocator.PortAllocator, err error) {
