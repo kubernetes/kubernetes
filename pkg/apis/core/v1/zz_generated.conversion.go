@@ -8242,6 +8242,7 @@ func autoConvert_v1_TypedObjectReference_To_core_TypedObjectReference(in *v1.Typ
 	out.Kind = in.Kind
 	out.Name = in.Name
 	out.Namespace = (*string)(unsafe.Pointer(in.Namespace))
+	out.Resource = in.Resource
 	return nil
 }
 
@@ -8255,6 +8256,7 @@ func autoConvert_core_TypedObjectReference_To_v1_TypedObjectReference(in *core.T
 	out.Kind = in.Kind
 	out.Name = in.Name
 	out.Namespace = (*string)(unsafe.Pointer(in.Namespace))
+	out.Resource = in.Resource
 	return nil
 }
 

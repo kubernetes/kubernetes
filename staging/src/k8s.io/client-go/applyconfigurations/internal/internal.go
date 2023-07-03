@@ -7394,6 +7394,10 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: namespace
       type:
         scalar: string
+    - name: resource
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.core.v1.Volume
   map:
     fields:

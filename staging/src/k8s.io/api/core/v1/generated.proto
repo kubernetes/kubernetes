@@ -5741,6 +5741,7 @@ message TypedObjectReference {
   optional string apiGroup = 1;
 
   // Kind is the type of resource being referenced
+  // Deprecated: use Resource instead. Planned removal in 1.31.
   optional string kind = 2;
 
   // Name is the name of resource being referenced
@@ -5752,6 +5753,9 @@ message TypedObjectReference {
   // +featureGate=CrossNamespaceVolumeDataSource
   // +optional
   optional string namespace = 4;
+
+  // Resource is the plural name of resource type being referenced
+  optional string resource = 5;
 }
 
 // Volume represents a named volume in a pod that may be accessed by any container in the pod.

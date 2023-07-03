@@ -545,7 +545,8 @@
                         "apiGroup": "apiGroupValue",
                         "kind": "kindValue",
                         "name": "nameValue",
-                        "namespace": "namespaceValue"
+                        "namespace": "namespaceValue",
+                        "resource": "resourceValue"
                       }
                     }
                   }

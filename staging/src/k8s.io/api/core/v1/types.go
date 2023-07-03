@@ -536,6 +536,7 @@ type TypedObjectReference struct {
 	// +optional
 	APIGroup *string `json:"apiGroup" protobuf:"bytes,1,opt,name=apiGroup"`
 	// Kind is the type of resource being referenced
+	// Deprecated: use Resource instead. Planned removal in 1.31.
 	Kind string `json:"kind" protobuf:"bytes,2,opt,name=kind"`
 	// Name is the name of resource being referenced
 	Name string `json:"name" protobuf:"bytes,3,opt,name=name"`
@@ -545,6 +546,8 @@ type TypedObjectReference struct {
 	// +featureGate=CrossNamespaceVolumeDataSource
 	// +optional
 	Namespace *string `json:"namespace,omitempty" protobuf:"bytes,4,opt,name=namespace"`
+	// Resource is the plural name of resource type being referenced
+	Resource string `json:"resource" protobuf:"bytes,5,opt,name=resource"`
 }
 
 // PersistentVolumeClaimConditionType is a valid value of PersistentVolumeClaimCondition.Type

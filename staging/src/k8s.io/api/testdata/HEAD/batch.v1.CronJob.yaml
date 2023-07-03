@@ -1038,6 +1038,7 @@ spec:
                     kind: kindValue
                     name: nameValue
                     namespace: namespaceValue
+                    resource: resourceValue
                   resources:
                     claims:
                     - name: nameValue

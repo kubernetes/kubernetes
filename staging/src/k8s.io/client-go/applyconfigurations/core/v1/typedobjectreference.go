@@ -25,6 +25,7 @@ type TypedObjectReferenceApplyConfiguration struct {
 	Kind      *string `json:"kind,omitempty"`
 	Name      *string `json:"name,omitempty"`
 	Namespace *string `json:"namespace,omitempty"`
+	Resource  *string `json:"resource,omitempty"`
 }
 
 // TypedObjectReferenceApplyConfiguration constructs an declarative configuration of the TypedObjectReference type for use with
@@ -62,5 +63,13 @@ func (b *TypedObjectReferenceApplyConfiguration) WithName(value string) *TypedOb
 // If called multiple times, the Namespace field is set to the value of the last call.
 func (b *TypedObjectReferenceApplyConfiguration) WithNamespace(value string) *TypedObjectReferenceApplyConfiguration {
 	b.Namespace = &value
+	return b
+}
+
+// WithResource sets the Resource field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Resource field is set to the value of the last call.
+func (b *TypedObjectReferenceApplyConfiguration) WithResource(value string) *TypedObjectReferenceApplyConfiguration {
+	b.Resource = &value
 	return b
 }

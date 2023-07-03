@@ -27755,7 +27755,7 @@ func schema_k8sio_api_core_v1_TypedObjectReference(ref common.ReferenceCallback)
 					},
 					"kind": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Kind is the type of resource being referenced",
+							Description: "Kind is the type of resource being referenced Deprecated: use Resource instead. Planned removal in 1.31.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -27776,8 +27776,16 @@ func schema_k8sio_api_core_v1_TypedObjectReference(ref common.ReferenceCallback)
 							Format:      "",
 						},
 					},
+					"resource": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Resource is the plural name of resource type being referenced",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
-				Required: []string{"kind", "name"},
+				Required: []string{"kind", "name", "resource"},
 			},
 		},
 	}

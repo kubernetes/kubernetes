@@ -491,6 +491,7 @@ type TypedObjectReference struct {
 	// +optional
 	APIGroup *string
 	// Kind is the type of resource being referenced
+	// Deprecated: use Resource instead. Planned removal for 1.31.
 	Kind string
 	// Name is the name of resource being referenced
 	Name string
@@ -500,6 +501,8 @@ type TypedObjectReference struct {
 	// +featureGate=CrossNamespaceVolumeDataSource
 	// +optional
 	Namespace *string
+	// Resource is the plural name of resource type being referenced
+	Resource string
 }
 
 // PersistentVolumeClaimConditionType defines the condition of PV claim.
