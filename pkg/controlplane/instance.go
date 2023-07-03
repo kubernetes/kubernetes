@@ -575,19 +575,21 @@ func labelAPIServerHeartbeatFunc(identity string) lease.ProcessLeaseFunc {
 // InstallLegacyAPI will install the legacy APIs for the restStorageProviders if they are enabled.
 func (m *Instance) InstallLegacyAPI(c *completedConfig, restOptionsGetter generic.RESTOptionsGetter) error {
 	legacyRESTStorageProvider := corerest.LegacyRESTStorageProvider{
-		StorageFactory:              c.ExtraConfig.StorageFactory,
-		ProxyTransport:              c.ExtraConfig.ProxyTransport,
-		KubeletClientConfig:         c.ExtraConfig.KubeletClientConfig,
-		EventTTL:                    c.ExtraConfig.EventTTL,
-		ServiceIPRange:              c.ExtraConfig.ServiceIPRange,
-		SecondaryServiceIPRange:     c.ExtraConfig.SecondaryServiceIPRange,
-		ServiceNodePortRange:        c.ExtraConfig.ServiceNodePortRange,
-		LoopbackClientConfig:        c.GenericConfig.LoopbackClientConfig,
-		ServiceAccountIssuer:        c.ExtraConfig.ServiceAccountIssuer,
-		ExtendExpiration:            c.ExtraConfig.ExtendExpiration,
-		ServiceAccountMaxExpiration: c.ExtraConfig.ServiceAccountMaxExpiration,
-		APIAudiences:                c.GenericConfig.Authentication.APIAudiences,
-		Informers:                   c.ExtraConfig.VersionedInformers,
+		GenericLegacyRESTStorageProvider: corerest.GenericLegacyRESTStorageProvider{
+			StorageFactory:              c.ExtraConfig.StorageFactory,
+			EventTTL:                    c.ExtraConfig.EventTTL,
+			LoopbackClientConfig:        c.GenericConfig.LoopbackClientConfig,
+			ServiceAccountIssuer:        c.ExtraConfig.ServiceAccountIssuer,
+			ExtendExpiration:            c.ExtraConfig.ExtendExpiration,
+			ServiceAccountMaxExpiration: c.ExtraConfig.ServiceAccountMaxExpiration,
+			APIAudiences:                c.GenericConfig.Authentication.APIAudiences,
+			Informers:                   c.ExtraConfig.VersionedInformers,
+		},
+		ProxyTransport:          c.ExtraConfig.ProxyTransport,
+		KubeletClientConfig:     c.ExtraConfig.KubeletClientConfig,
+		ServiceIPRange:          c.ExtraConfig.ServiceIPRange,
+		SecondaryServiceIPRange: c.ExtraConfig.SecondaryServiceIPRange,
+		ServiceNodePortRange:    c.ExtraConfig.ServiceNodePortRange,
 	}
 	legacyRESTStorage, apiGroupInfo, err := legacyRESTStorageProvider.NewLegacyRESTStorage(c.ExtraConfig.APIResourceConfigSource, restOptionsGetter)
 	if err != nil {
