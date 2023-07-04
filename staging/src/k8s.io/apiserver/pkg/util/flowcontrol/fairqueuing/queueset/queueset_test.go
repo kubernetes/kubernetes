@@ -514,7 +514,7 @@ func TestBaseline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 1})
+	qs := qsComplete(qsc, 1)
 
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
@@ -532,6 +532,47 @@ func TestBaseline(t *testing.T) {
 		counter:                     counter,
 		seatDemandIntegratorSubject: seatDemandIntegratorSubject,
 	}.exercise(t)
+}
+
+func TestExampt(t *testing.T) {
+	metrics.Register()
+	for concurrencyLimit := 0; concurrencyLimit <= 2; concurrencyLimit += 2 {
+		t.Run(fmt.Sprintf("concurrency=%d", concurrencyLimit), func(t *testing.T) {
+			now := time.Now()
+			clk, counter := testeventclock.NewFake(now, 0, nil)
+			qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
+			qCfg := fq.QueuingConfig{
+				Name:             "TestBaseline",
+				DesiredNumQueues: -1,
+				QueueLengthLimit: 2,
+				HandSize:         3,
+				RequestWaitLimit: 10 * time.Minute,
+			}
+			seatDemandIntegratorSubject := fq.NewNamedIntegrator(clk, "seatDemandSubject")
+			qsc, err := qsf.BeginConstruction(qCfg, newGaugePair(clk), newExecSeatsGauge(clk), seatDemandIntegratorSubject)
+			if err != nil {
+				t.Fatal(err)
+			}
+			qs := qsComplete(qsc, concurrencyLimit)
+			uniformScenario{name: qCfg.Name,
+				qs: qs,
+				clients: []uniformClient{
+					newUniformClient(1001001001, 5, 20, time.Second, time.Second).setInitWidth(3),
+				},
+				concurrencyLimit:            1,
+				evalDuration:                time.Second * 40,
+				expectedFair:                []bool{true}, // "fair" is a bit odd-sounding here, but it "expectFair" here means expect `expectedAverages`
+				expectedAverages:            []float64{7.5},
+				expectedFairnessMargin:      []float64{0.00000001},
+				expectAllRequests:           true,
+				evalInqueueMetrics:          false,
+				evalExecutingMetrics:        true,
+				clk:                         clk,
+				counter:                     counter,
+				seatDemandIntegratorSubject: seatDemandIntegratorSubject,
+			}.exercise(t)
+		})
+	}
 }
 
 func TestSeparations(t *testing.T) {
@@ -585,7 +626,7 @@ func TestSeparations(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: seps.conc})
+			qs := qsComplete(qsc, seps.conc)
 			uniformScenario{name: qCfg.Name,
 				qs: qs,
 				clients: []uniformClient{
@@ -626,7 +667,7 @@ func TestUniformFlowsHandSize1(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 4})
+	qs := qsComplete(qsc, 4)
 
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
@@ -665,7 +706,7 @@ func TestUniformFlowsHandSize3(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 4})
+	qs := qsComplete(qsc, 4)
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
 		clients: []uniformClient{
@@ -703,7 +744,7 @@ func TestDifferentFlowsExpectEqual(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 4})
+	qs := qsComplete(qsc, 4)
 
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
@@ -745,7 +786,7 @@ func TestSeatSecondsRollover(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 2000})
+	qs := qsComplete(qsc, 2000)
 
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
@@ -785,7 +826,7 @@ func TestDifferentFlowsExpectUnequal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 3})
+	qs := qsComplete(qsc, 3)
 
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
@@ -824,7 +865,7 @@ func TestDifferentWidths(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 6})
+	qs := qsComplete(qsc, 6)
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
 		clients: []uniformClient{
@@ -862,7 +903,7 @@ func TestTooWide(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 6})
+	qs := qsComplete(qsc, 6)
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
 		clients: []uniformClient{
@@ -925,7 +966,7 @@ func TestWindup(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 3})
+			qs := qsComplete(qsc, 3)
 
 			uniformScenario{name: qCfg.Name, qs: qs,
 				clients: []uniformClient{
@@ -962,7 +1003,7 @@ func TestDifferentFlowsWithoutQueuing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 4})
+	qs := qsComplete(qsc, 4)
 
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
@@ -1000,7 +1041,7 @@ func TestTimeout(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 1})
+	qs := qsComplete(qsc, 1)
 
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
@@ -1053,7 +1094,7 @@ func TestContextCancel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 1})
+	qs := qsComplete(qsc, 1)
 	counter.Add(1) // account for main activity of the goroutine running this test
 	ctx1 := context.Background()
 	pZero := func() *int32 { var zero int32; return &zero }
@@ -1159,7 +1200,7 @@ func TestTotalRequestsExecutingWithPanic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 1})
+	qs := qsComplete(qsc, 1)
 	counter.Add(1) // account for the goroutine running this test
 
 	queue, ok := qs.(*queueSet)
@@ -1544,4 +1585,12 @@ func float64NaNTo0(x float64) float64 {
 		return 0
 	}
 	return x
+}
+
+func qsComplete(qsc fq.QueueSetCompleter, concurrencyLimit int) fq.QueueSet {
+	concurrencyDenominator := concurrencyLimit
+	if concurrencyDenominator <= 0 {
+		concurrencyDenominator = 1
+	}
+	return qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: concurrencyLimit, ConcurrencyDenominator: concurrencyDenominator})
 }
