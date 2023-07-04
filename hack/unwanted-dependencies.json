@@ -153,6 +153,10 @@
         "sigs.k8s.io/kustomize/api",
         "sigs.k8s.io/kustomize/kustomize/v5"
       ],
+      "golang.org/x/exp": [
+        "github.com/antlr/antlr4/runtime/Go/antlr/v4",
+        "github.com/google/cel-go"
+      ],
       "google.golang.org/api": [
         "cloud.google.com/go",
         "cloud.google.com/go/bigquery",
@@ -184,10 +188,6 @@
         "google.golang.org/genproto/googleapis/api",
         "google.golang.org/grpc",
         "sigs.k8s.io/apiserver-network-proxy/konnectivity-client"
-      ],
-      "golang.org/x/exp": [
-        "github.com/google/cel-go",
-        "github.com/antlr/antlr4/runtime/Go/antlr/v4"
       ]
     }
   }
