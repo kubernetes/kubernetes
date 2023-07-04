@@ -67,7 +67,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 	for _, test := range createTests {
 		master := Controller{}
 		fakeClient := fake.NewSimpleClientset()
-		master.Client = fakeClient
+		master.client = fakeClient
 		master.CreateOrUpdateMasterServiceIfNeeded(test.serviceName, netutils.ParseIPSloppy("1.2.3.4"), test.servicePorts, test.serviceType, false)
 		creates := []core.CreateAction{}
 		for _, action := range fakeClient.Actions() {
@@ -349,7 +349,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 	for _, test := range reconcileTests {
 		master := Controller{}
 		fakeClient := fake.NewSimpleClientset(test.service)
-		master.Client = fakeClient
+		master.client = fakeClient
 		err := master.CreateOrUpdateMasterServiceIfNeeded(test.serviceName, netutils.ParseIPSloppy("1.2.3.4"), test.servicePorts, test.serviceType, true)
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
@@ -408,7 +408,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 	for _, test := range nonReconcileTests {
 		master := Controller{}
 		fakeClient := fake.NewSimpleClientset(test.service)
-		master.Client = fakeClient
+		master.client = fakeClient
 		err := master.CreateOrUpdateMasterServiceIfNeeded(test.serviceName, netutils.ParseIPSloppy("1.2.3.4"), test.servicePorts, test.serviceType, false)
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
