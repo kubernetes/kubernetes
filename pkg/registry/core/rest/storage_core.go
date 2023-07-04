@@ -33,6 +33,7 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	networkingv1alpha1client "k8s.io/client-go/kubernetes/typed/networking/v1alpha1"
 	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1"
 	restclient "k8s.io/client-go/rest"
@@ -40,7 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/cluster/ports"
-	"k8s.io/kubernetes/pkg/controlplane/controller/kubernetesservice"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/registry/core/componentstatus"
@@ -92,15 +92,17 @@ type LegacyRESTStorageProvider struct {
 	GenericLegacyRESTStorageProvider
 
 	KubeletClientConfig kubeletclient.KubeletClientConfig
+	Services            ServicesConfig
+}
 
-	// ServiceIPRange is used to build cluster IPs for discovery.
-	ServiceIPRange net.IPNet
-
+type ServicesConfig struct {
+	// ClusterIPRange is used to build cluster IPs for discovery.
+	ClusterIPRange net.IPNet
 	// allocates ips for secondary service cidr in dual  stack clusters
-	SecondaryServiceIPRange net.IPNet
-	ServiceNodePortRange    utilnet.PortRange
+	SecondaryClusterIPRange net.IPNet
+	NodePortRange           utilnet.PortRange
 
-	KubernetesServiceControllerConfig kubernetesservice.Config
+	RepairInterval time.Duration
 }
 
 func (c GenericLegacyRESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {
@@ -194,7 +196,7 @@ func (c LegacyRESTStorageProvider) NewRESTStorage(apiResourceConfigSource server
 	if err != nil {
 		return genericapiserver.APIGroupInfo{}, err
 	}
-	rangeRegistries := kubernetesservice.RangeRegistries{}
+	rangeRegistries := servicestore.RangeRegistries{}
 
 	podTemplateStorage, err := podtemplatestore.NewREST(restOptionsGetter)
 	if err != nil {
@@ -236,7 +238,7 @@ func (c LegacyRESTStorageProvider) NewRESTStorage(apiResourceConfigSource server
 	}
 
 	var serviceClusterIPRegistry rangeallocation.RangeRegistry
-	serviceClusterIPRange := c.ServiceIPRange
+	serviceClusterIPRange := c.Services.ClusterIPRange
 	if serviceClusterIPRange.IP == nil {
 		return genericapiserver.APIGroupInfo{}, fmt.Errorf("service clusterIPRange is missing")
 	}
@@ -274,13 +276,13 @@ func (c LegacyRESTStorageProvider) NewRESTStorage(apiResourceConfigSource server
 	}
 
 	serviceClusterIPAllocator.EnableMetrics()
-	rangeRegistries.ServiceClusterIPRegistry = serviceClusterIPRegistry
+	rangeRegistries.ServiceClusterIP = serviceClusterIPRegistry
 
 	// allocator for secondary service ip range
-	if c.SecondaryServiceIPRange.IP != nil {
+	if c.Services.SecondaryClusterIPRange.IP != nil {
 		var secondaryServiceClusterIPRegistry rangeallocation.RangeRegistry
 		if !utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
-			secondaryServiceClusterIPAllocator, err = ipallocator.New(&c.SecondaryServiceIPRange, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
+			secondaryServiceClusterIPAllocator, err = ipallocator.New(&c.Services.SecondaryClusterIPRange, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
 				var mem allocator.Snapshottable
 				mem = allocator.NewAllocationMapWithOffset(max, rangeSpec, offset)
 				// TODO etcdallocator package to return a storage interface via the storageFactory
@@ -299,17 +301,17 @@ func (c LegacyRESTStorageProvider) NewRESTStorage(apiResourceConfigSource server
 			if err != nil {
 				return genericapiserver.APIGroupInfo{}, err
 			}
-			secondaryServiceClusterIPAllocator, err = ipallocator.NewIPAllocator(&c.SecondaryServiceIPRange, networkingv1alphaClient, c.Informers.Networking().V1alpha1().IPAddresses())
+			secondaryServiceClusterIPAllocator, err = ipallocator.NewIPAllocator(&c.Services.SecondaryClusterIPRange, networkingv1alphaClient, c.Informers.Networking().V1alpha1().IPAddresses())
 			if err != nil {
 				return genericapiserver.APIGroupInfo{}, fmt.Errorf("cannot create cluster secondary IP allocator: %v", err)
 			}
 		}
 		secondaryServiceClusterIPAllocator.EnableMetrics()
-		rangeRegistries.SecondaryServiceClusterIPRegistry = secondaryServiceClusterIPRegistry
+		rangeRegistries.SecondaryServiceClusterIP = secondaryServiceClusterIPRegistry
 	}
 
 	var serviceNodePortRegistry rangeallocation.RangeRegistry
-	serviceNodePortAllocator, err := portallocator.New(c.ServiceNodePortRange, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
+	serviceNodePortAllocator, err := portallocator.New(c.Services.NodePortRange, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
 		mem := allocator.NewAllocationMapWithOffset(max, rangeSpec, offset)
 		// TODO etcdallocator package to return a storage interface via the storageFactory
 		etcd, err := serviceallocator.NewEtcd(mem, "/ranges/servicenodeports", serviceStorageConfig.ForResource(api.Resource("servicenodeportallocations")))
@@ -322,12 +324,12 @@ func (c LegacyRESTStorageProvider) NewRESTStorage(apiResourceConfigSource server
 	if err != nil {
 		return genericapiserver.APIGroupInfo{}, fmt.Errorf("cannot create cluster port allocator: %v", err)
 	}
-	ctrl, err := kubernetesservice.New(c.KubernetesServiceControllerConfig, rangeRegistries)
+	client, err := kubernetes.NewForConfig(c.LoopbackClientConfig)
 	if err != nil {
-		return genericapiserver.APIGroupInfo{}, fmt.Errorf("cannot create kubernetes service controller: %w", err)
+		return genericapiserver.APIGroupInfo{}, err
 	}
 	serviceNodePortAllocator.EnableMetrics()
-	rangeRegistries.ServiceNodePortRegistry = serviceNodePortRegistry
+	rangeRegistries.ServiceNodePort = serviceNodePortRegistry
 
 	serviceIPAllocators := map[api.IPFamily]ipallocator.Interface{
 		serviceClusterIPAllocator.IPFamily(): serviceClusterIPAllocator,
@@ -336,21 +338,24 @@ func (c LegacyRESTStorageProvider) NewRESTStorage(apiResourceConfigSource server
 		serviceIPAllocators[secondaryServiceClusterIPAllocator.IPFamily()] = secondaryServiceClusterIPAllocator
 	}
 
-	serviceRESTStorageRaw, serviceStatusStorage, serviceRESTProxy, err := servicestore.NewREST(
+	serviceRESTStorage, serviceStatusStorage, serviceRESTProxy, err := servicestore.NewREST(
 		restOptionsGetter,
 		serviceClusterIPAllocator.IPFamily(),
 		serviceIPAllocators,
 		serviceNodePortAllocator,
 		endpointsStorage,
 		podStorage.Pod,
-		c.ProxyTransport)
+		c.ProxyTransport,
+		rangeRegistries,
+		client,
+		c.Informers,
+		c.Services.ClusterIPRange,
+		c.Services.SecondaryClusterIPRange,
+		c.Services.NodePortRange,
+		c.Services.RepairInterval,
+	)
 	if err != nil {
 		return genericapiserver.APIGroupInfo{}, err
-	}
-	serviceRESTStorage := withHooks{
-		REST:          serviceRESTStorageRaw,
-		postStartHook: func(context genericapiserver.PostStartHookContext) error { ctrl.Start(); return nil },
-		preStartHook:  func() error { ctrl.Stop(); return nil },
 	}
 
 	storage := apiGroupInfo.VersionedResourcesStorageMap["v1"]
@@ -446,23 +451,6 @@ func (c LegacyRESTStorageProvider) NewRESTStorage(apiResourceConfigSource server
 	}
 
 	return apiGroupInfo, nil
-}
-
-type withHooks struct {
-	*servicestore.REST
-	postStartHook genericapiserver.PostStartHookFunc
-	preStartHook  genericapiserver.PreShutdownHookFunc
-}
-
-var _ genericapiserver.PostStartHookProvider = withHooks{}
-var _ genericapiserver.PreShutdownHookProvider = withHooks{}
-
-func (w withHooks) PostStartHook() (string, genericapiserver.PostStartHookFunc, error) {
-	return "start-kubernetes-service-controller", w.postStartHook, nil
-}
-
-func (w withHooks) PreShutdownHook() (string, genericapiserver.PreShutdownHookFunc, error) {
-	return "stop-kubernetes-service-controller", w.preStartHook, nil
 }
 
 func (p LegacyRESTStorageProvider) GroupName() string {

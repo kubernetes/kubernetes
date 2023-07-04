@@ -24,9 +24,11 @@ import (
 	stdruntime "runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -39,6 +41,10 @@ import (
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
+	netutils "k8s.io/utils/net"
+
 	epstest "k8s.io/kubernetes/pkg/api/endpoints/testing"
 	svctest "k8s.io/kubernetes/pkg/api/service/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -47,7 +53,6 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
-	netutils "k8s.io/utils/net"
 )
 
 // Most tests will use this to create a registry to run tests against.
@@ -118,7 +123,22 @@ func newStorageWithPods(t *testing.T, ipFamilies []api.IPFamily, pods []api.Pod,
 		}
 	}
 
-	serviceStorage, statusStorage, _, err := NewREST(restOptions, ipFamilies[0], ipAllocs, portAlloc, endpointsStorage, podStorage.Pod, nil)
+	serviceStorage, statusStorage, _, err := NewREST(
+		restOptions,
+		ipFamilies[0],
+		ipAllocs,
+		portAlloc,
+		endpointsStorage,
+		podStorage.Pod,
+		nil,
+		RangeRegistries{},
+		&fake.Clientset{},
+		informers.NewSharedInformerFactory(&fake.Clientset{}, time.Minute*30),
+		net.IPNet{},
+		net.IPNet{},
+		machineryutilnet.PortRange{},
+		time.Minute,
+	)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}

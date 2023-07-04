@@ -115,7 +115,7 @@ func NewRepair(interval time.Duration, serviceClient corev1client.ServicesGetter
 }
 
 // RunUntil starts the controller until the provided ch is closed.
-func (c *Repair) RunUntil(onFirstSuccess func(), stopCh chan struct{}) {
+func (c *Repair) RunUntil(onFirstSuccess func(), stopCh <-chan struct{}) {
 	c.broadcaster.StartRecordingToSink(stopCh)
 	defer c.broadcaster.Shutdown()
 

@@ -18,12 +18,15 @@ package storage
 
 import (
 	"context"
+	goerrors "errors"
 	"fmt"
 	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
 	"strconv"
+	"sync"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,17 +38,27 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
+	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/util/dryrun"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+	netutil "k8s.io/utils/net"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
+	"k8s.io/kubernetes/pkg/registry/core/rangeallocation"
 	svcreg "k8s.io/kubernetes/pkg/registry/core/service"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
+	servicecontroller "k8s.io/kubernetes/pkg/registry/core/service/ipallocator/controller"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
-	netutil "k8s.io/utils/net"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	portallocatorcontroller "k8s.io/kubernetes/pkg/registry/core/service/portallocator/controller"
+	"k8s.io/kubernetes/pkg/util/async"
 )
 
 type EndpointsStorage interface {
@@ -65,6 +78,8 @@ type REST struct {
 	endpoints         EndpointsStorage
 	pods              PodStorage
 	proxyTransport    http.RoundTripper
+
+	startNodePortsRepair, startClusterIPRepair func(onFirstSuccess func(), stopCh <-chan struct{})
 }
 
 var (
@@ -75,6 +90,12 @@ var (
 	_ rest.Redirector             = &REST{}
 )
 
+type RangeRegistries struct {
+	ServiceClusterIP          rangeallocation.RangeRegistry
+	SecondaryServiceClusterIP rangeallocation.RangeRegistry
+	ServiceNodePort           rangeallocation.RangeRegistry
+}
+
 // NewREST returns a REST object that will work against services.
 func NewREST(
 	optsGetter generic.RESTOptionsGetter,
@@ -83,7 +104,14 @@ func NewREST(
 	portAlloc portallocator.Interface,
 	endpoints EndpointsStorage,
 	pods PodStorage,
-	proxyTransport http.RoundTripper) (*REST, *StatusREST, *svcreg.ProxyREST, error) {
+	proxyTransport http.RoundTripper,
+	registries RangeRegistries,
+	client kubernetes.Interface,
+	informers informers.SharedInformerFactory,
+	clusterIPRange, secondaryClusterIPRange net.IPNet,
+	nodePortRange utilnet.PortRange,
+	repairInterval time.Duration,
+) (*REST, *StatusREST, *svcreg.ProxyREST, error) {
 
 	store := &genericregistry.Store{
 		NewFunc:                   func() runtime.Object { return &api.Service{} },
@@ -113,19 +141,39 @@ func NewREST(
 	if len(ipAllocs) > 1 {
 		secondaryIPFamily = otherFamily(serviceIPFamily)
 	}
+	repairNodePorts := portallocatorcontroller.NewRepair(repairInterval, client.CoreV1(), client.EventsV1(), nodePortRange, registries.ServiceNodePort)
 	genericStore := &REST{
-		Store:             store,
-		primaryIPFamily:   primaryIPFamily,
-		secondaryIPFamily: secondaryIPFamily,
-		alloc:             makeAlloc(serviceIPFamily, ipAllocs, portAlloc),
-		endpoints:         endpoints,
-		pods:              pods,
-		proxyTransport:    proxyTransport,
+		Store:                store,
+		primaryIPFamily:      primaryIPFamily,
+		secondaryIPFamily:    secondaryIPFamily,
+		alloc:                makeAlloc(serviceIPFamily, ipAllocs, portAlloc),
+		endpoints:            endpoints,
+		pods:                 pods,
+		proxyTransport:       proxyTransport,
+		startNodePortsRepair: repairNodePorts.RunUntil,
 	}
 	store.Decorator = genericStore.defaultOnRead
 	store.AfterDelete = genericStore.afterDelete
 	store.BeginCreate = genericStore.beginCreate
 	store.BeginUpdate = genericStore.beginUpdate
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
+		genericStore.startClusterIPRepair = servicecontroller.NewRepair(repairInterval,
+			client.CoreV1(),
+			client.EventsV1(),
+			&clusterIPRange,
+			registries.ServiceClusterIP,
+			&secondaryClusterIPRange,
+			registries.SecondaryServiceClusterIP).RunUntil
+	} else {
+		genericStore.startClusterIPRepair = servicecontroller.NewRepairIPAddress(repairInterval,
+			client,
+			&clusterIPRange,
+			&secondaryClusterIPRange,
+			informers.Core().V1().Services(),
+			informers.Networking().V1alpha1().IPAddresses(),
+		).RunUntil
+	}
 
 	return genericStore, &StatusREST{store: &statusStore}, &svcreg.ProxyREST{Redirector: genericStore, ProxyTransport: proxyTransport}, nil
 }
@@ -249,7 +297,7 @@ func (r *REST) defaultOnReadService(service *api.Service) {
 		return
 	}
 
-	// We might find Services that were written before ClusterIP became plural.
+	// We might find Services that were written before ClusterIPRepairConfig became plural.
 	// We still want to present a consistent view of them.
 	normalizeClusterIPs(After{service}, Before{nil})
 
@@ -350,7 +398,7 @@ func (r *REST) afterDelete(obj runtime.Object, options *metav1.DeleteOptions) {
 func (r *REST) beginCreate(ctx context.Context, obj runtime.Object, options *metav1.CreateOptions) (genericregistry.FinishFunc, error) {
 	svc := obj.(*api.Service)
 
-	// Make sure ClusterIP and ClusterIPs are in sync.  This has to happen
+	// Make sure ClusterIPRepairConfig and ClusterIPs are in sync.  This has to happen
 	// early, before anyone looks at them.
 	normalizeClusterIPs(After{svc}, Before{nil})
 
@@ -389,7 +437,7 @@ func (r *REST) beginUpdate(ctx context.Context, obj, oldObj runtime.Object, opti
 	// idempotence).
 	patchAllocatedValues(After{newSvc}, Before{oldSvc})
 
-	// Make sure ClusterIP and ClusterIPs are in sync.  This has to happen
+	// Make sure ClusterIPRepairConfig and ClusterIPs are in sync.  This has to happen
 	// early, before anyone looks at them.
 	normalizeClusterIPs(After{newSvc}, Before{oldSvc})
 
@@ -484,6 +532,46 @@ func (r *REST) ResourceLocation(ctx context.Context, id string) (*url.URL, http.
 	return nil, nil, errors.NewServiceUnavailable(fmt.Sprintf("no endpoints available for service %q", id))
 }
 
+var _ genericapiserver.PostStartHookProvider = &REST{}
+
+func (r *REST) PostStartHook() (string, genericapiserver.PostStartHookFunc, error) {
+	return "start-service-storage-controllers", func(context genericapiserver.PostStartHookContext) error {
+		// We start both repairClusterIPs and repairNodePorts to ensure repair
+		// loops of ClusterIPs and NodePorts.
+		// We run both repair loops using RunUntil public interface.
+		// However, we want to fail liveness/readiness until the first
+		// successful repair loop, so we basically pass appropriate
+		// callbacks to RunUtil methods.
+		// Additionally, we ensure that we don't wait for it for longer
+		// than 1 minute for backward compatibility of failing the whole
+		// apiserver if we can't repair them.
+		wg := sync.WaitGroup{}
+		wg.Add(2)
+		runners := []func(stopCh chan struct{}){
+			func(stopCh chan struct{}) { r.startClusterIPRepair(wg.Done, stopCh) },
+			func(stopCh chan struct{}) { r.startNodePortsRepair(wg.Done, stopCh) },
+		}
+
+		async.NewRunner(runners...).Start()
+
+		// For backward compatibility, we ensure that if we never are able
+		// to repair clusterIPs and/or nodeports, we not only fail the liveness
+		// and/or readiness, but also explicitly fail.
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			wg.Wait()
+		}()
+		select {
+		case <-done:
+		case <-time.After(time.Minute):
+			return goerrors.New("unable to perform initial IP and Port allocation check")
+		}
+
+		return nil
+	}, nil
+}
+
 func isValidAddress(ctx context.Context, addr *api.EndpointAddress, pods rest.Getter) error {
 	if addr.TargetRef == nil {
 		return fmt.Errorf("Address has no target ref, skipping: %v", addr)
@@ -510,7 +598,7 @@ func isValidAddress(ctx context.Context, addr *api.EndpointAddress, pods rest.Ge
 	return fmt.Errorf("pod ip(s) doesn't match endpoint ip, skipping: %v vs %s (%s/%s)", pod.Status.PodIPs, addr.IP, addr.TargetRef.Namespace, addr.TargetRef.Name)
 }
 
-// normalizeClusterIPs adjust clusterIPs based on ClusterIP.  This must not
+// normalizeClusterIPs adjust clusterIPs based on ClusterIPRepairConfig.  This must not
 // consider any other fields.
 func normalizeClusterIPs(after After, before Before) {
 	oldSvc, newSvc := before.Service, after.Service
@@ -547,7 +635,7 @@ func normalizeClusterIPs(after After, before Before) {
 	// ClusterIPs were cleared by an old client which was trying to patch
 	// some field and didn't provide ClusterIPs
 	if len(oldSvc.Spec.ClusterIPs) > 0 && len(newSvc.Spec.ClusterIPs) == 0 {
-		// if ClusterIP is the same, then it is an old client trying to
+		// if ClusterIPRepairConfig is the same, then it is an old client trying to
 		// patch service and didn't provide ClusterIPs
 		if oldSvc.Spec.ClusterIP == newSvc.Spec.ClusterIP {
 			newSvc.Spec.ClusterIPs = oldSvc.Spec.ClusterIPs
@@ -566,8 +654,8 @@ func normalizeClusterIPs(after After, before Before) {
 			// if they provided nil, then we are fine (handled by patching case above)
 			// if they changed it then validation will catch it
 		} else {
-			// ClusterIP has changed but not cleared *and* ClusterIPs are the same
-			// then we set ClusterIPs based on ClusterIP
+			// ClusterIPRepairConfig has changed but not cleared *and* ClusterIPs are the same
+			// then we set ClusterIPs based on ClusterIPRepairConfig
 			if sameClusterIPs(oldSvc, newSvc) {
 				newSvc.Spec.ClusterIPs = []string{newSvc.Spec.ClusterIP}
 			}
@@ -577,7 +665,7 @@ func normalizeClusterIPs(after After, before Before) {
 
 // patchAllocatedValues allows clients to avoid a read-modify-write cycle while
 // preserving values that we allocated on their behalf.  For example, they
-// might create a Service without specifying the ClusterIP, in which case we
+// might create a Service without specifying the ClusterIPRepairConfig, in which case we
 // allocate one.  If they resubmit that same YAML, we want it to succeed.
 func patchAllocatedValues(after After, before Before) {
 	oldSvc, newSvc := before.Service, after.Service

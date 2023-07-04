@@ -190,7 +190,7 @@ func NewRepairIPAddress(interval time.Duration,
 }
 
 // RunUntil starts the controller until the provided ch is closed.
-func (r *RepairIPAddress) RunUntil(onFirstSuccess func(), stopCh chan struct{}) {
+func (r *RepairIPAddress) RunUntil(onFirstSuccess func(), stopCh <-chan struct{}) {
 	defer r.ipQueue.ShutDown()
 	defer r.svcQueue.ShutDown()
 	r.broadcaster.StartRecordingToSink(stopCh)
