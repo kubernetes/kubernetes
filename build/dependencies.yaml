@@ -93,6 +93,8 @@ dependencies:
       match: const defaultImage
     - path: test/kubemark/resources/hollow-node_template.yaml
       match: registry.k8s.io/node-problem-detector/node-problem-detector
+    - path: cluster/addons/node-problem-detector/npd.yaml
+      match: registry.k8s.io/node-problem-detector/node-problem-detector
     # TODO(dims): Ensure newer versions get uploaded to
     # - https://console.cloud.google.com/storage/browser/gke-release/winnode/node-problem-detector
     # - https://gcsweb.k8s.io/gcs/kubernetes-release/node-problem-detector/
