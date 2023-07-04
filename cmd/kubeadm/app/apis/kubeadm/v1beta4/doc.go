@@ -20,10 +20,13 @@ limitations under the License.
 // +k8s:conversion-gen=k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm
 
 // Package v1beta4 defines the v1beta4 version of the kubeadm configuration file format.
-// This version improves on the v1beta2 format by fixing some minor issues and adding a few new fields.
+// This version improves on the v1beta3 format by fixing some minor issues and adding a few new fields.
 //
 // A list of changes since v1beta3:
+//
 //   - TODO https://github.com/kubernetes/kubeadm/issues/2890
+//   - Support custom environment variables in control plane components under `ClusterConfiguration`.
+//     Use `APIServer.ExtraEnvs`, `ControllerManager.ExtraEnvs`, `Scheduler.ExtraEnvs`,  `Etcd.Local.ExtraEnvs`.
 //
 // Migration from old kubeadm config versions
 //
@@ -39,7 +42,7 @@ limitations under the License.
 // configuration options defined in the kubeadm config file are also available as command line flags, but only
 // the most common/simple use case are supported with this approach.
 //
-// A kubeadm config file could contain multiple configuration types separated using three dashes (“---”).
+// A kubeadm config file could contain multiple configuration types separated using three dashes ("---").
 //
 // kubeadm supports the following configuration types:
 //
