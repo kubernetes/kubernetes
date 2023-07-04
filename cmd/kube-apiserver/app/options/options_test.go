@@ -127,7 +127,6 @@ func TestAddFlags(t *testing.T) {
 	// This is a snapshot of expected options parsed by args.
 	expected := &ServerRunOptions{
 		Options: &controlplaneapiserver.Options{
-			MasterCount: 5,
 			GenericServerRunOptions: &apiserveroptions.ServerRunOptions{
 				AdvertiseAddress:            netutils.ParseIPSloppy("192.168.10.10"),
 				CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},
@@ -320,6 +319,7 @@ func TestAddFlags(t *testing.T) {
 					CAFile:   "/var/run/kubernetes/caserver.crt",
 				},
 			},
+			MasterCount: 5,
 		},
 		CloudProvider: &kubeoptions.CloudProviderOptions{
 			CloudConfigFile: "/cloud-config",
