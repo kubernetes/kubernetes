@@ -20,10 +20,10 @@ limitations under the License.
 package volume
 
 import (
+	"fmt"
+	"os"
 	"path/filepath"
 	"syscall"
-
-	"os"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -40,32 +40,54 @@ const (
 // SetVolumeOwnership modifies the given volume to be owned by
 // fsGroup, and sets SetGid so that newly created files are owned by
 // fsGroup. If fsGroup is nil nothing is done.
-func SetVolumeOwnership(mounter Mounter, dir string, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy, completeFunc func(types.CompleteFuncParam)) error {
+func SetVolumeOwnership(mounter Mounter, dir string, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy, completeFunc func(types.CompleteFuncParam), eventRecorderFunc func(string)) error {
 	if fsGroup == nil {
 		return nil
 	}
-
-	timer := time.AfterFunc(30*time.Second, func() {
-		klog.Warningf("Setting volume ownership for %s and fsGroup set. If the volume has a lot of files then setting volume ownership could be slow, see https://github.com/kubernetes/kubernetes/issues/69699", dir)
-	})
-	defer timer.Stop()
 
 	if skipPermissionChange(mounter, dir, fsGroup, fsGroupChangePolicy) {
 		klog.V(3).InfoS("Skipping permission and ownership change for volume", "path", dir)
 		return nil
 	}
 
-	err := walkDeep(dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		return changeFilePermission(path, fsGroup, mounter.GetAttributes().ReadOnly, info)
-	})
-	if completeFunc != nil {
-		completeFunc(types.CompleteFuncParam{
-			Err: &err,
+	var (
+		err         error
+		requestTime = time.Now()
+		done        = make(chan bool)
+	)
+
+	go func() {
+		err = walkDeep(dir, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			return changeFilePermission(path, fsGroup, mounter.GetAttributes().ReadOnly, info)
 		})
+
+		done <- true
+	}()
+
+	tick := time.NewTicker(30 * time.Second)
+	defer tick.Stop()
+
+	for {
+		select {
+		case <-done:
+			if completeFunc != nil {
+				completeFunc(types.CompleteFuncParam{
+					Err: &err,
+				})
+			}
+
+		case <-tick.C:
+			klog.Warningf("Setting volume ownership for %s and fsGroup set. If the volume has a lot of files then setting volume ownership could be slow, see https://github.com/kubernetes/kubernetes/issues/69699", dir)
+			if eventRecorderFunc != nil {
+				timeTaken := time.Since(requestTime).Seconds()
+				eventRecorderFunc(fmt.Sprintf("Setting volume ownership for %s and fsGroup set take %d seconds", dir, timeTaken))
+			}
+		}
 	}
+
 	return err
 }
 

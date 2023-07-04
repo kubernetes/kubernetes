@@ -396,6 +396,11 @@ func (p *csiPlugin) NewMounter(
 		return nil, errors.New(log("failed to get a kubernetes client"))
 	}
 
+	recorder := p.host.GetEventRecorder()
+	if recorder == nil {
+		return nil, errors.New(log("failed to get a event recorder"))
+	}
+
 	kvh, ok := p.host.(volume.KubeletVolumeHost)
 	if !ok {
 		return nil, errors.New(log("cast from VolumeHost to KubeletVolumeHost failed"))
@@ -404,6 +409,7 @@ func (p *csiPlugin) NewMounter(
 	mounter := &csiMountMgr{
 		plugin:              p,
 		k8s:                 k8s,
+		recorder:            recorder,
 		spec:                spec,
 		pod:                 pod,
 		podUID:              pod.UID,
