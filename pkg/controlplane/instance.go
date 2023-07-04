@@ -591,7 +591,7 @@ func (m *Instance) InstallLegacyAPI(c *completedConfig, restOptionsGetter generi
 		SecondaryServiceIPRange: c.ExtraConfig.SecondaryServiceIPRange,
 		ServiceNodePortRange:    c.ExtraConfig.ServiceNodePortRange,
 	}
-	legacyRESTStorage, apiGroupInfo, err := legacyRESTStorageProvider.NewLegacyRESTStorage(c.ExtraConfig.APIResourceConfigSource, restOptionsGetter)
+	rangeRegistries, apiGroupInfo, err := legacyRESTStorageProvider.NewLegacyRESTStorage(c.ExtraConfig.APIResourceConfigSource, restOptionsGetter)
 	if err != nil {
 		return fmt.Errorf("error building core storage: %v", err)
 	}
@@ -612,7 +612,7 @@ func (m *Instance) InstallLegacyAPI(c *completedConfig, restOptionsGetter generi
 	if err != nil {
 		return err
 	}
-	bootstrapController, err := kubernetesservice.New(*kubenetesserviceConfig, legacyRESTStorage)
+	bootstrapController, err := kubernetesservice.New(*kubenetesserviceConfig, rangeRegistries)
 	if err != nil {
 		return fmt.Errorf("error creating bootstrap controller: %v", err)
 	}
