@@ -99,6 +99,7 @@ func (m *Helper) WithSubresource(subresource string) *Helper {
 }
 
 // WithResourceVersion sets the helper to request a resource with a specific version
+// (<resource>/[ns/<namespace>/]<name>?ResourceVersion=<resourceVersion>)
 func (m *Helper) WithResourceVersion(resourceVersion string) *Helper {
 	m.ResourceVersion = resourceVersion
 	return m

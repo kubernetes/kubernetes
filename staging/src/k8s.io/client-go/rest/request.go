@@ -315,7 +315,7 @@ func (r *Request) NamespaceIfScoped(namespace string, scoped bool) *Request {
 	return r
 }
 
-// ResourceVersion sets the requested version of the resource
+// ResourceVersion sets the requested version of the resource as a request parameter
 func (r *Request) ResourceVersion(resourceVersion string) *Request {
 	if r.err != nil {
 		return r

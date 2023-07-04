@@ -572,7 +572,8 @@ func (b *Builder) Subresource(subresource string) *Builder {
 }
 
 // ResourceVersion instructs the builder to retrieve the object at a
-// specific version instead of the latest version.
+// specific version instead of the latest version by adding the ResourceVersion parameter
+// to the request.
 func (b *Builder) ResourceVersion(resourceVersion string) *Builder {
 	b.resourceVersion = resourceVersion
 	return b
@@ -1039,6 +1040,7 @@ func (b *Builder) visitByResource() *Result {
 			Namespace:   selectorNamespace,
 			Name:        tuple.Name,
 			Subresource: b.subresource,
+			ResourceVersion: b.resourceVersion,
 		}
 		items = append(items, info)
 	}
