@@ -187,8 +187,7 @@ type KubeletConfiguration struct {
 	NodeStatusUpdateFrequency metav1.Duration
 	// nodeStatusReportFrequency is the frequency that kubelet posts node
 	// status to master if node status does not change. Kubelet will ignore this
-	// frequency and post node status immediately if any change is detected. It is
-	// only used when node lease feature is enabled.
+	// frequency and post node status immediately if any change is detected.
 	NodeStatusReportFrequency metav1.Duration
 	// nodeLeaseDurationSeconds is the duration the Kubelet will set on its corresponding Lease.
 	NodeLeaseDurationSeconds int32

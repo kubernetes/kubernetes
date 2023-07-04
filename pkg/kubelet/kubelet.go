@@ -1150,7 +1150,7 @@ type Kubelet struct {
 	nodeStatusUpdateFrequency time.Duration
 
 	// nodeStatusReportFrequency is the frequency that kubelet posts node
-	// status to master. It is only used when node lease feature is enabled.
+	// status to master.
 	nodeStatusReportFrequency time.Duration
 
 	// lastStatusReportTime is the time when node status was last reported.
