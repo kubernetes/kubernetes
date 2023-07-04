@@ -71,6 +71,7 @@ spec:
                           - Storage
                           - CSISnapshot
                           - NodeTuning
+                          - MachineAPI
                       x-kubernetes-list-type: atomic
                     baselineCapabilitySet:
                       description: baselineCapabilitySet selects an initial set of optional capabilities to enable, which can be extended via additionalEnabledCapabilities.  If unset, the cluster will choose a default, and the default may change over time. The current default is vCurrent.
@@ -80,6 +81,7 @@ spec:
                         - v4.11
                         - v4.12
                         - v4.13
+                        - v4.14
                         - vCurrent
                 channel:
                   description: channel is an identifier for explicitly requesting that a non-default set of updates be applied to this cluster. The default channel will be contain stable updates that are appropriate for production clusters.
@@ -192,6 +194,7 @@ spec:
                           - Storage
                           - CSISnapshot
                           - NodeTuning
+                          - MachineAPI
                       x-kubernetes-list-type: atomic
                     knownCapabilities:
                       description: knownCapabilities lists all the capabilities known to the current cluster.
@@ -208,6 +211,7 @@ spec:
                           - Storage
                           - CSISnapshot
                           - NodeTuning
+                          - MachineAPI
                       x-kubernetes-list-type: atomic
                 conditionalUpdates:
                   description: conditionalUpdates contains the list of updates that may be recommended for this cluster if it meets specific required conditions. Consumers interested in the set of updates that are actually recommended for this cluster should use availableUpdates. This list may be empty if no updates are recommended, if the update service is unavailable, or if an empty or invalid channel has been specified.

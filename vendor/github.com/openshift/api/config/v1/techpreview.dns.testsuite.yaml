@@ -1,0 +1,104 @@
+apiVersion: apiextensions.k8s.io/v1 # Hack because controller-gen complains if we don't have this
+name: "[TechPreview] DNS"
+crd: 0000_10_config-operator_01_dns-TechPreviewNoUpgrade.crd.yaml
+tests:
+  onCreate:
+  - name: Should be able to create a minimal DNS
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: DNS
+      spec: {} # No spec is required for a DNS
+    expected: |
+      apiVersion: config.openshift.io/v1
+      kind: DNS
+      spec: {}
+  - name: Should be able to specify an AWS role ARN for a private hosted zone
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: DNS
+      spec:
+        platform:
+          type: AWS
+          aws:
+            privateZoneIAMRole: arn:aws:iam::123456789012:role/foo
+    expected: |
+      apiVersion: config.openshift.io/v1
+      kind: DNS
+      spec:
+        platform:
+          type: AWS
+          aws:
+            privateZoneIAMRole: arn:aws:iam::123456789012:role/foo
+  - name: Should not be able to specify unsupported platform
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: DNS
+      spec:
+        platform:
+          type: Azure
+          azure:
+            privateZoneIAMRole: arn:aws:iam::123456789012:role/foo
+    expectedError: "Invalid value: \"string\": allowed values are '' and 'AWS'"
+  - name: Should not be able to specify invalid AWS role ARN
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: DNS
+      metadata:
+        name: cluster
+      spec:
+        platform:
+          type: AWS
+          aws:
+            privateZoneIAMRole: arn:aws:iam:bad:123456789012:role/foo
+    expectedError: "DNS.config.openshift.io \"cluster\" is invalid: spec.platform.aws.privateZoneIAMRole: Invalid value: \"arn:aws:iam:bad:123456789012:role/foo\": spec.platform.aws.privateZoneIAMRole in body should match '^arn:(aws|aws-cn|aws-us-gov):iam::[0-9]{12}:role\\/.*$'"
+  - name: Should not be able to specify different type and platform
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: DNS
+      spec:
+        platform:
+          type: ""
+          aws:
+            privateZoneIAMRole: arn:aws:iam::123456789012:role/foo
+    expectedError: "Invalid value: \"object\": aws configuration is required when platform is AWS, and forbidden otherwise"
+  onUpdate:
+  - name: Can switch from empty (default), to AWS
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: DNS
+      spec:
+        platform:
+          type: ""
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: DNS
+      spec:
+        platform:
+          type: AWS
+          aws:
+            privateZoneIAMRole: arn:aws:iam::123456789012:role/foo
+    expected: |
+      apiVersion: config.openshift.io/v1
+      kind: DNS
+      spec:
+        platform:
+          type: AWS
+          aws:
+            privateZoneIAMRole: arn:aws:iam::123456789012:role/foo
+  - name: Upgrade case is valid
+    initial: |
+      apiVersion: config.openshift.io/v1
+      kind: DNS
+      spec: {} # No spec is required for a DNS
+    updated: |
+      apiVersion: config.openshift.io/v1
+      kind: DNS
+      spec:
+        platform:
+          type: ""
+    expected: |
+      apiVersion: config.openshift.io/v1
+      kind: DNS
+      spec:
+        platform:
+          type: ""

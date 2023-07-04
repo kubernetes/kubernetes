@@ -3512,6 +3512,11 @@ func (in *PolicyAuditConfig) DeepCopyInto(out *PolicyAuditConfig) {
 		*out = new(uint32)
 		**out = **in
 	}
+	if in.MaxLogFiles != nil {
+		in, out := &in.MaxLogFiles, &out.MaxLogFiles
+		*out = new(int32)
+		**out = **in
+	}
 	return
 }
 

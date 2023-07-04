@@ -615,6 +615,24 @@ spec:
                       type: object
                     external:
                       description: External contains settings specific to the generic External infrastructure provider.
+                      properties:
+                        cloudControllerManager:
+                          description: cloudControllerManager contains settings specific to the external Cloud Controller Manager (a.k.a. CCM or CPI). When omitted, new nodes will be not tainted and no extra initialization from the cloud controller manager is expected.
+                          properties:
+                            state:
+                              description: "state determines whether or not an external Cloud Controller Manager is expected to be installed within the cluster. https://kubernetes.io/docs/tasks/administer-cluster/running-cloud-controller/#running-cloud-controller-manager \n Valid values are \"External\", \"None\" and omitted. When set to \"External\", new nodes will be tainted as uninitialized when created, preventing them from running workloads until they are initialized by the cloud controller manager. When omitted or set to \"None\", new nodes will be not tainted and no extra initialization from the cloud controller manager is expected."
+                              enum:
+                                - ""
+                                - External
+                                - None
+                              type: string
+                              x-kubernetes-validations:
+                                - message: state is immutable once set
+                                  rule: self == oldSelf
+                          type: object
+                          x-kubernetes-validations:
+                            - message: state may not be added or removed once set
+                              rule: (has(self.state) == has(oldSelf.state)) || (!has(oldSelf.state) && self.state != "External")
                       type: object
                     gcp:
                       description: GCP contains settings specific to the Google Cloud Platform infrastructure provider.

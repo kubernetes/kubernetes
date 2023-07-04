@@ -6,19 +6,24 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 )
 
+// DEPRECATED: Use v1.ManagementState instead
 type ManagementState string
 
 const (
 	// Managed means that the operator is actively managing its resources and trying to keep the component active
+	// DEPRECATED: Use v1.Managed instead
 	Managed ManagementState = "Managed"
 	// Unmanaged means that the operator is not taking any action related to the component
+	// DEPRECATED: Use v1.Unmanaged instead
 	Unmanaged ManagementState = "Unmanaged"
 	// Removed means that the operator is actively managing its resources and trying to remove all traces of the component
+	// DEPRECATED: Use v1.Removed instead
 	Removed ManagementState = "Removed"
 )
 
 // OperatorSpec contains common fields for an operator to need.  It is intended to be anonymous included
 // inside of the Spec struct for you particular operator.
+// DEPRECATED: Use v1.OperatorSpec instead
 type OperatorSpec struct {
 	// managementState indicates whether and how the operator should manage the component
 	ManagementState ManagementState `json:"managementState"`
@@ -38,6 +43,7 @@ type OperatorSpec struct {
 }
 
 // LoggingConfig holds information about configuring logging
+// DEPRECATED: Use v1.LogLevel instead
 type LoggingConfig struct {
 	// level is passed to glog.
 	Level int64 `json:"level"`
@@ -46,24 +52,34 @@ type LoggingConfig struct {
 	Vmodule string `json:"vmodule"`
 }
 
+// DEPRECATED: Use v1.ConditionStatus instead
 type ConditionStatus string
 
 const (
-	ConditionTrue    ConditionStatus = "True"
-	ConditionFalse   ConditionStatus = "False"
+	// DEPRECATED: Use v1.ConditionTrue instead
+	ConditionTrue ConditionStatus = "True"
+	// DEPRECATED: Use v1.ConditionFalse instead
+	ConditionFalse ConditionStatus = "False"
+	// DEPRECATED: Use v1.ConditionUnknown instead
 	ConditionUnknown ConditionStatus = "Unknown"
 
 	// these conditions match the conditions for the ClusterOperator type.
-	OperatorStatusTypeAvailable   = "Available"
+	// DEPRECATED: Use v1.OperatorStatusTypeAvailable instead
+	OperatorStatusTypeAvailable = "Available"
+	// DEPRECATED: Use v1.OperatorStatusTypeProgressing instead
 	OperatorStatusTypeProgressing = "Progressing"
-	OperatorStatusTypeFailing     = "Failing"
+	// DEPRECATED: Use v1.OperatorStatusTypeDegraded instead
+	OperatorStatusTypeFailing = "Failing"
 
+	// DEPRECATED: Use v1.OperatorStatusTypeProgressing instead
 	OperatorStatusTypeMigrating = "Migrating"
 	// TODO this is going to be removed
+	// DEPRECATED: Use v1.OperatorStatusTypeAvailable instead
 	OperatorStatusTypeSyncSuccessful = "SyncSuccessful"
 )
 
 // OperatorCondition is just the standard condition fields.
+// DEPRECATED: Use v1.OperatorCondition instead
 type OperatorCondition struct {
 	Type               string          `json:"type"`
 	Status             ConditionStatus `json:"status"`
@@ -73,6 +89,7 @@ type OperatorCondition struct {
 }
 
 // VersionAvailability gives information about the synchronization and operational status of a particular version of the component
+// DEPRECATED: Use fields in v1.OperatorStatus instead
 type VersionAvailability struct {
 	// version is the level this availability applies to
 	Version string `json:"version"`
@@ -87,6 +104,7 @@ type VersionAvailability struct {
 }
 
 // GenerationHistory keeps track of the generation for a given resource so that decisions about forced updated can be made.
+// DEPRECATED: Use fields in v1.GenerationStatus instead
 type GenerationHistory struct {
 	// group is the group of the thing you're tracking
 	Group string `json:"group"`
@@ -102,6 +120,7 @@ type GenerationHistory struct {
 
 // OperatorStatus contains common fields for an operator to need.  It is intended to be anonymous included
 // inside of the Status struct for you particular operator.
+// DEPRECATED: Use v1.OperatorStatus instead
 type OperatorStatus struct {
 	// observedGeneration is the last generation change you've dealt with
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
@@ -156,6 +175,7 @@ type DelegatedAuthorization struct {
 
 // StaticPodOperatorStatus is status for controllers that manage static pods.  There are different needs because individual
 // node status must be tracked.
+// DEPRECATED: Use v1.StaticPodOperatorStatus instead
 type StaticPodOperatorStatus struct {
 	OperatorStatus `json:",inline"`
 
@@ -167,6 +187,7 @@ type StaticPodOperatorStatus struct {
 }
 
 // NodeStatus provides information about the current state of a particular node managed by this operator.
+// Deprecated: Use v1.NodeStatus instead
 type NodeStatus struct {
 	// nodeName is the name of the node
 	NodeName string `json:"nodeName"`

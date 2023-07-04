@@ -45,6 +45,7 @@ spec:
                     - diskplugin.csi.alibabacloud.com
                     - vpc.block.csi.ibm.io
                     - powervs.csi.ibm.com
+                    - secrets-store.csi.k8s.io
                   type: string
               type: object
             spec:

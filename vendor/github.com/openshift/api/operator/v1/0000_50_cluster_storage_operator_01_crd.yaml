@@ -77,13 +77,8 @@ spec:
                     - LegacyDeprecatedInTreeDriver
                     - CSIWithMigrationDriver
                   x-kubernetes-validations:
-                    - rule: oldSelf != "CSIWithMigrationDriver" || self == "CSIWithMigrationDriver"
-                      message: VSphereStorageDriver can not be changed once it is set to CSIWithMigrationDriver
                     - rule: self != "LegacyDeprecatedInTreeDriver"
                       message: VSphereStorageDriver can not be set to LegacyDeprecatedInTreeDriver
-              x-kubernetes-validations:
-                - rule: '!has(oldSelf.vsphereStorageDriver) || has(self.vsphereStorageDriver)'
-                  message: VSphereStorageDriver is required once set
             status:
               description: status holds observed values from the cluster. They may not be overridden.
               type: object

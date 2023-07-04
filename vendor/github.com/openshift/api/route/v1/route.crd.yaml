@@ -151,32 +151,6 @@ spec:
                               termination:
                                 enum:
                                   - edge
-                    - anyOf:
-                        - properties:
-                            insecureEdgeTerminationPolicy:
-                              enum:
-                                - ""
-                                - None
-                                - Allow
-                                - Redirect
-                        - not:
-                            properties:
-                              termination:
-                                enum:
-                                  - edge
-                                  - reencrypt
-                    - anyOf:
-                        - properties:
-                            insecureEdgeTerminationPolicy:
-                              enum:
-                                - ""
-                                - None
-                                - Redirect
-                        - not:
-                            properties:
-                              termination:
-                                enum:
-                                  - passthrough
                   description: The tls field provides the ability to configure certificates and termination for the route.
                   properties:
                     caCertificate:
@@ -189,7 +163,12 @@ spec:
                       description: destinationCACertificate provides the contents of the ca certificate of the final destination.  When using reencrypt termination this file should be provided in order to have routers use it for health checks on the secure connection. If this field is not specified, the router may provide its own destination CA and perform hostname validation using the short service name (service.namespace.svc), which allows infrastructure generated certificates to automatically verify.
                       type: string
                     insecureEdgeTerminationPolicy:
-                      description: "insecureEdgeTerminationPolicy indicates the desired behavior for insecure connections to a route. While each router may make its own decisions on which ports to expose, this is normally port 80. \n * Allow - traffic is sent to the server on the insecure port (default) * Disable - no traffic is allowed on the insecure port. * Redirect - clients are redirected to the secure port."
+                      description: "insecureEdgeTerminationPolicy indicates the desired behavior for insecure connections to a route. While each router may make its own decisions on which ports to expose, this is normally port 80. \n * Allow - traffic is sent to the server on the insecure port (edge/reencrypt terminations only) (default). * None - no traffic is allowed on the insecure port. * Redirect - clients are redirected to the secure port."
+                      enum:
+                        - Allow
+                        - None
+                        - Redirect
+                        - ""
                       type: string
                     key:
                       description: key provides key file contents
@@ -204,6 +183,9 @@ spec:
                   required:
                     - termination
                   type: object
+                  x-kubernetes-validations:
+                    - message: 'cannot have both spec.tls.termination: passthrough and spec.tls.insecureEdgeTerminationPolicy: Allow'
+                      rule: 'has(self.termination) && has(self.insecureEdgeTerminationPolicy) ? !((self.termination==''passthrough'') && (self.insecureEdgeTerminationPolicy==''Allow'')) : true'
                 to:
                   description: to is an object the route should use as the primary backend. Only the Service kind is allowed, and it will be defaulted to Service. If the weight field (0-256 default 100) is set to zero, no traffic will be sent to this backend.
                   properties:
