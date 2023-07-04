@@ -80,6 +80,7 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane/apiserver/options"
 	"k8s.io/kubernetes/pkg/controlplane/controller/apiserverleasegc"
 	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
+	"k8s.io/kubernetes/pkg/controlplane/controller/defaultservice"
 	"k8s.io/kubernetes/pkg/controlplane/controller/legacytokentracking"
 	"k8s.io/kubernetes/pkg/controlplane/controller/systemnamespaces"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
@@ -596,7 +597,6 @@ func (m *Instance) InstallLegacyAPI(c *completedConfig, restOptionsGetter generi
 		return nil
 	}
 
-	controllerName := "bootstrap-controller"
 	client := kubernetes.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
 	// Kubernetes clusters contains the following system namespaces:
 	// kube-system, kube-node-lease, kube-public, default
@@ -605,6 +605,33 @@ func (m *Instance) InstallLegacyAPI(c *completedConfig, restOptionsGetter generi
 		return nil
 	})
 
+	// Kubernetes clusters create a kubernetes.default Service used
+	// for InCluster configuration.
+	_, publicServicePort, err := c.GenericConfig.SecureServing.HostPort()
+	if err != nil {
+		return fmt.Errorf("failed to get listener address: %w", err)
+	}
+
+	defaultServiceController, err := defaultservice.NewController(
+		// Service
+		c.ExtraConfig.APIServerServiceIP,
+		c.ExtraConfig.APIServerServicePort,
+		c.ExtraConfig.KubernetesServiceNodePort,
+		// Endpoints
+		c.GenericConfig.PublicAddress,
+		publicServicePort,
+		c.ExtraConfig.EndpointReconcilerConfig.Reconciler,
+		c.ExtraConfig.EndpointReconcilerConfig.Interval,
+		c.ExtraConfig.EndpointReconcilerType,
+		client,
+	)
+	if err != nil {
+		return fmt.Errorf("error creating kubernetes.default service controller: %v", err)
+	}
+	m.GenericAPIServer.AddPostStartHookOrDie("start-default-service-controller", defaultServiceController.PostStartHook)
+	m.GenericAPIServer.AddPreShutdownHookOrDie("stop-default-service-controller", defaultServiceController.PreShutdownHook)
+
+	controllerName := "bootstrap-controller"
 	bootstrapController, err := c.NewBootstrapController(legacyRESTStorage, client)
 	if err != nil {
 		return fmt.Errorf("error creating bootstrap controller: %v", err)

@@ -36,12 +36,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	"k8s.io/kube-openapi/pkg/validation/spec"
+	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -603,6 +605,77 @@ func TestMultiAPIServerNodePortAllocation(t *testing.T) {
 	// shutdown the api servers
 	for _, server := range kubeAPIServers {
 		server.TearDownFn()
+	}
+
+}
+
+func TestKubernetesDefaultServiceReconcile(t *testing.T) {
+	serviceCIDR := "192.168.0.0/24"
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	client, _, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			opts.ServiceClusterIPRanges = serviceCIDR
+		},
+	})
+	defer tearDownFn()
+
+	var defaultService *corev1.Service
+	// Wait until the default "kubernetes" service is created.
+	if err := wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
+		var err error
+		defaultService, err = client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return false, err
+		}
+		return !apierrors.IsNotFound(err), nil
+	}); err != nil {
+		t.Fatalf("creating kubernetes service timed out")
+	}
+
+	// update the Service
+	svc := defaultService.DeepCopy()
+	svc.Spec.Ports = append(svc.Spec.Ports, corev1.ServicePort{
+		Name:       "wrong-port",
+		Port:       80,
+		TargetPort: intstr.IntOrString{IntVal: 8080},
+	})
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Update(context.TODO(), svc, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	// validate the service was not reconciled
+	if err := wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
+		svc, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+
+		return !reflect.DeepEqual(svc.Spec, defaultService.Spec), nil
+	}); err != nil {
+		t.Fatalf("reconciling kubernetes service timed out")
+	}
+
+	// delete the Service
+	err = client.CoreV1().Services(metav1.NamespaceDefault).Delete(context.TODO(), "kubernetes", metav1.DeleteOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	// validate the service was reconciled correctly
+	if err := wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
+		svc, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+
+		return reflect.DeepEqual(svc.Spec, defaultService.Spec), nil
+	}); err != nil {
+		t.Fatalf("reconciling kubernetes service timed out")
 	}
 
 }
