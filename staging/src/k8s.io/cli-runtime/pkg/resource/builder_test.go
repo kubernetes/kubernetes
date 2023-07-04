@@ -46,6 +46,7 @@ import (
 	"k8s.io/client-go/rest/fake"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/client-go/restmapper"
+
 	// TODO we need to remove this linkage and create our own scheme
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -1702,6 +1703,62 @@ func TestListObjectSubresource(t *testing.T) {
 	_, err := b.Do().Object()
 	if err == nil || !strings.Contains(err.Error(), "subresource cannot be used when bulk resources are specified") {
 		t.Fatalf("unexpected response: %v", err)
+	}
+}
+
+func TestGetObjectResourceVersion(t *testing.T) {
+	targetRV := "13"
+	newPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "13"},
+	}
+	obj, err := newDefaultBuilderWith(fakeClientWith("", t, map[string]string{
+		"/namespaces/test/pods/foo?resourceVersion=" + targetRV: runtime.EncodeOrDie(corev1Codec, newPod),
+	})).
+		NamespaceParam("test").
+		ResourceNames("pods", "foo").
+		ResourceVersion(targetRV).
+		Flatten().
+		Do().Object()
+
+	if err != nil {
+		t.Fatalf("unexpected response: %v", err)
+	}
+	pod, ok := obj.(*v1.Pod)
+	if !ok {
+		t.Fatalf("unexpected object: %#v", obj)
+	}
+	if pod.ResourceVersion != targetRV {
+		t.Errorf("unexpected pod: %#v", pod)
+	}
+}
+
+func TestListObjectResourceVersion(t *testing.T) {
+	targetRV := "13"
+	newPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "13"},
+	}
+	obj, err := newDefaultBuilderWith(fakeClientWith("", t, map[string]string{
+		"/namespaces/test/pods?resourceVersion=" + targetRV: runtime.EncodeOrDie(corev1Codec, newPod),
+	})).
+		NamespaceParam("test").
+		ResourceTypeOrNameArgs(true, "pods").
+		ResourceVersion(targetRV).
+		Flatten().
+		Do().Object()
+
+	if err != nil {
+		t.Fatalf("unexpected response: %v", err)
+	}
+	list, ok := obj.(*v1.List)
+	if !ok {
+		t.Fatalf("unexpected object: %#v", obj)
+	}
+	pod, ok := list.Items[0].Object.(*v1.Pod)
+	if !ok {
+		t.Errorf("unexpected list: %#v", list)
+	}
+	if targetRV != pod.ObjectMeta.ResourceVersion {
+		t.Errorf("unexpected pod resourceVersion: %#v", list)
 	}
 }
 
