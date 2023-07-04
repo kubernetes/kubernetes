@@ -183,6 +183,11 @@ func TestCheckpointStateStore(t *testing.T) {
 
 	expectedCheckpoint := `{"version":"v1","entries":[{"DriverName":"test-driver.cdi.k8s.io","ClassName":"class-name","ClaimUID":"067798be-454e-4be4-9047-1aa06aea63f7","ClaimName":"example","Namespace":"default","PodUIDs":{"139cdb46-f989-4f17-9561-ca10cfb509a6":{}},"CDIDevices":{"test-driver.cdi.k8s.io":["example.com/example=cdi-example"]}}],"checksum":153446146}`
 
+	// Should return an error, stateDir cannot be an empty string
+	if _, err := NewCheckpointState("", testingCheckpoint); err == nil {
+		t.Fatal("expected error but got nil")
+	}
+
 	// create temp dir
 	testingDir, err := os.MkdirTemp("", "dramanager_state_test")
 	if err != nil {
@@ -203,4 +208,9 @@ func TestCheckpointStateStore(t *testing.T) {
 	checkpointData, err := checkpoint.MarshalCheckpoint()
 	assert.NoError(t, err, "could not Marshal Checkpoint")
 	assert.Equal(t, expectedCheckpoint, string(checkpointData), "expected ClaimInfoState does not equal to restored one")
+
+	// NewCheckpointState with an empty checkpointName should return an error
+	if _, err = NewCheckpointState(testingDir, ""); err == nil {
+		t.Fatal("expected error but got nil")
+	}
 }

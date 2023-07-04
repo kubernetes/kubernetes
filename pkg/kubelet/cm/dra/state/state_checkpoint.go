@@ -67,6 +67,10 @@ type stateCheckpoint struct {
 
 // NewCheckpointState creates new State for keeping track of claim info  with checkpoint backend
 func NewCheckpointState(stateDir, checkpointName string) (*stateCheckpoint, error) {
+	if len(checkpointName) == 0 {
+		return nil, fmt.Errorf("received empty string instead of checkpointName")
+	}
+
 	checkpointManager, err := checkpointmanager.NewCheckpointManager(stateDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize checkpoint manager: %v", err)
