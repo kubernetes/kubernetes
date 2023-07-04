@@ -159,10 +159,14 @@ func TestLegacyRestStorageStrategies(t *testing.T) {
 			LoopbackClientConfig: apiserverCfg.GenericConfig.LoopbackClientConfig,
 			Informers:            apiserverCfg.ExtraConfig.VersionedInformers,
 		},
-		ProxyTransport:       apiserverCfg.ExtraConfig.ProxyTransport,
-		KubeletClientConfig:  apiserverCfg.ExtraConfig.KubeletClientConfig,
-		ServiceIPRange:       apiserverCfg.ExtraConfig.ServiceIPRange,
-		ServiceNodePortRange: apiserverCfg.ExtraConfig.ServiceNodePortRange,
+		Proxy: corerest.ProxyConfig{
+			Transport:           apiserverCfg.ExtraConfig.ProxyTransport,
+			KubeletClientConfig: apiserverCfg.ExtraConfig.KubeletClientConfig,
+		},
+		Services: corerest.ServicesConfig{
+			ClusterIPRange: apiserverCfg.ExtraConfig.ServiceIPRange,
+			NodePortRange:  apiserverCfg.ExtraConfig.ServiceNodePortRange,
+		},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)

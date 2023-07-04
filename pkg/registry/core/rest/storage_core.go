@@ -93,16 +93,22 @@ type GenericConfig struct {
 type Config struct {
 	GenericConfig
 
-	// Used for custom proxy dialing, and proxy TLS options
-	ProxyTransport      http.RoundTripper
+	Proxy    ProxyConfig
+	Services ServicesConfig
+}
+
+type ProxyConfig struct {
+	Transport           http.RoundTripper
 	KubeletClientConfig kubeletclient.KubeletClientConfig
+}
 
+type ServicesConfig struct {
 	// Service IP ranges
-	ServiceIPRange          net.IPNet
-	ServiceSecondaryIPRange net.IPNet
-	ServiceNodePortRange    utilnet.PortRange
+	ClusterIPRange          net.IPNet
+	SecondaryClusterIPRange net.IPNet
+	NodePortRange           utilnet.PortRange
 
-	ServiceIPRepairInterval time.Duration
+	IPRepairInterval time.Duration
 }
 
 type rangeRegistries struct {
@@ -140,25 +146,25 @@ func New(c Config) (*legacyProvider, error) {
 	if err != nil {
 		return nil, err
 	}
-	p.startServiceNodePortsRepair = portallocatorcontroller.NewRepair(c.ServiceIPRepairInterval, client.CoreV1(), client.EventsV1(), c.ServiceNodePortRange, rangeRegistries.nodePort).RunUntil
+	p.startServiceNodePortsRepair = portallocatorcontroller.NewRepair(c.Services.IPRepairInterval, client.CoreV1(), client.EventsV1(), c.Services.NodePortRange, rangeRegistries.nodePort).RunUntil
 
 	// create service cluster ip repair controller
 	if !utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
 		p.startServiceClusterIPRepair = serviceipallocatorcontroller.NewRepair(
-			c.ServiceIPRepairInterval,
+			c.Services.IPRepairInterval,
 			client.CoreV1(),
 			client.EventsV1(),
-			&c.ServiceIPRange,
+			&c.Services.ClusterIPRange,
 			rangeRegistries.clusterIP,
-			&c.ServiceSecondaryIPRange,
+			&c.Services.SecondaryClusterIPRange,
 			rangeRegistries.secondaryClusterIP,
 		).RunUntil
 	} else {
 		p.startServiceClusterIPRepair = serviceipallocatorcontroller.NewRepairIPAddress(
-			c.ServiceIPRepairInterval,
+			c.Services.IPRepairInterval,
 			client,
-			&c.ServiceIPRange,
-			&c.ServiceSecondaryIPRange,
+			&c.Services.ClusterIPRange,
+			&c.Services.SecondaryClusterIPRange,
 			c.Informers.Core().V1().Services(),
 			c.Informers.Networking().V1alpha1().IPAddresses(),
 		).RunUntil
@@ -287,7 +293,7 @@ func (c *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 		return genericapiserver.APIGroupInfo{}, err
 	}
 
-	nodeStorage, err := nodestore.NewStorage(restOptionsGetter, c.KubeletClientConfig, c.ProxyTransport)
+	nodeStorage, err := nodestore.NewStorage(restOptionsGetter, c.Proxy.KubeletClientConfig, c.Proxy.Transport)
 	if err != nil {
 		return genericapiserver.APIGroupInfo{}, err
 	}
@@ -295,7 +301,7 @@ func (c *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 	podStorage, err := podstore.NewStorage(
 		restOptionsGetter,
 		nodeStorage.KubeletConnectionInfo,
-		c.ProxyTransport,
+		c.Proxy.Transport,
 		podDisruptionClient,
 	)
 	if err != nil {
@@ -309,7 +315,7 @@ func (c *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 		c.serviceNodePortAllocator,
 		endpointsStorage,
 		podStorage.Pod,
-		c.ProxyTransport)
+		c.Proxy.Transport)
 	if err != nil {
 		return genericapiserver.APIGroupInfo{}, err
 	}
@@ -426,7 +432,7 @@ func (c *Config) newServiceIPAllocators() (registries rangeRegistries, primaryCl
 		return rangeRegistries{}, nil, nil, nil, err
 	}
 
-	serviceClusterIPRange := c.ServiceIPRange
+	serviceClusterIPRange := c.Services.ClusterIPRange
 	if serviceClusterIPRange.IP == nil {
 		return rangeRegistries{}, nil, nil, nil, fmt.Errorf("service clusterIPRange is missing")
 	}
@@ -460,10 +466,10 @@ func (c *Config) newServiceIPAllocators() (registries rangeRegistries, primaryCl
 	clusterIPAllocators[primaryClusterIPAllocator.IPFamily()] = primaryClusterIPAllocator
 
 	var secondaryClusterIPAllocator ipallocator.Interface
-	if c.ServiceSecondaryIPRange.IP != nil {
+	if c.Services.SecondaryClusterIPRange.IP != nil {
 		if !utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
 			var err error
-			secondaryClusterIPAllocator, err = ipallocator.New(&c.ServiceSecondaryIPRange, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
+			secondaryClusterIPAllocator, err = ipallocator.New(&c.Services.SecondaryClusterIPRange, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
 				var mem allocator.Snapshottable
 				mem = allocator.NewAllocationMapWithOffset(max, rangeSpec, offset)
 				// TODO etcdallocator package to return a storage interface via the storageFactory
@@ -482,7 +488,7 @@ func (c *Config) newServiceIPAllocators() (registries rangeRegistries, primaryCl
 			if err != nil {
 				return rangeRegistries{}, nil, nil, nil, err
 			}
-			secondaryClusterIPAllocator, err = ipallocator.NewIPAllocator(&c.ServiceSecondaryIPRange, networkingv1alphaClient, c.Informers.Networking().V1alpha1().IPAddresses())
+			secondaryClusterIPAllocator, err = ipallocator.NewIPAllocator(&c.Services.SecondaryClusterIPRange, networkingv1alphaClient, c.Informers.Networking().V1alpha1().IPAddresses())
 			if err != nil {
 				return rangeRegistries{}, nil, nil, nil, fmt.Errorf("cannot create cluster secondary IP allocator: %v", err)
 			}
@@ -491,7 +497,7 @@ func (c *Config) newServiceIPAllocators() (registries rangeRegistries, primaryCl
 		clusterIPAllocators[secondaryClusterIPAllocator.IPFamily()] = secondaryClusterIPAllocator
 	}
 
-	nodePortAllocator, err = portallocator.New(c.ServiceNodePortRange, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
+	nodePortAllocator, err = portallocator.New(c.Services.NodePortRange, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
 		mem := allocator.NewAllocationMapWithOffset(max, rangeSpec, offset)
 		// TODO etcdallocator package to return a storage interface via the storageFactory
 		etcd, err := serviceallocator.NewEtcd(mem, "/ranges/servicenodeports", serviceStorageConfig.ForResource(api.Resource("servicenodeportallocations")))

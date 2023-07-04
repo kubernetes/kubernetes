@@ -414,12 +414,16 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			APIAudiences:                c.GenericConfig.Authentication.APIAudiences,
 			Informers:                   c.ExtraConfig.VersionedInformers,
 		},
-		ProxyTransport:          c.ExtraConfig.ProxyTransport,
-		KubeletClientConfig:     c.ExtraConfig.KubeletClientConfig,
-		ServiceIPRange:          c.ExtraConfig.ServiceIPRange,
-		ServiceSecondaryIPRange: c.ExtraConfig.SecondaryServiceIPRange,
-		ServiceNodePortRange:    c.ExtraConfig.ServiceNodePortRange,
-		ServiceIPRepairInterval: c.ExtraConfig.RepairServicesInterval,
+		Proxy: corerest.ProxyConfig{
+			Transport:           c.ExtraConfig.ProxyTransport,
+			KubeletClientConfig: c.ExtraConfig.KubeletClientConfig,
+		},
+		Services: corerest.ServicesConfig{
+			ClusterIPRange:          c.ExtraConfig.ServiceIPRange,
+			SecondaryClusterIPRange: c.ExtraConfig.SecondaryServiceIPRange,
+			NodePortRange:           c.ExtraConfig.ServiceNodePortRange,
+			IPRepairInterval:        c.ExtraConfig.RepairServicesInterval,
+		},
 	})
 	if err != nil {
 		return nil, err
