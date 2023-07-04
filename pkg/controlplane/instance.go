@@ -415,11 +415,13 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			APIAudiences:                c.GenericConfig.Authentication.APIAudiences,
 			Informers:                   c.ExtraConfig.VersionedInformers,
 		},
-		KubeletClientConfig:     c.ExtraConfig.KubeletClientConfig,
-		ServiceIPRange:          c.ExtraConfig.ServiceIPRange,
-		ServiceSecondaryIPRange: c.ExtraConfig.SecondaryServiceIPRange,
-		ServiceNodePortRange:    c.ExtraConfig.ServiceNodePortRange,
-		ServiceIPRepairInterval: c.ExtraConfig.RepairServicesInterval,
+		KubeletClientConfig: c.ExtraConfig.KubeletClientConfig,
+		Services: corerest.ServicesConfig{
+			ClusterIPRange:          c.ExtraConfig.ServiceIPRange,
+			SecondaryClusterIPRange: c.ExtraConfig.SecondaryServiceIPRange,
+			NodePortRange:           c.ExtraConfig.ServiceNodePortRange,
+			IPRepairInterval:        c.ExtraConfig.RepairServicesInterval,
+		},
 	})
 	if err != nil {
 		return nil, err

@@ -96,13 +96,16 @@ type Config struct {
 	GenericConfig
 
 	KubeletClientConfig kubeletclient.KubeletClientConfig
+	Services            ServicesConfig
+}
 
+type ServicesConfig struct {
 	// Service IP ranges
-	ServiceIPRange          net.IPNet
-	ServiceSecondaryIPRange net.IPNet
-	ServiceNodePortRange    utilnet.PortRange
+	ClusterIPRange          net.IPNet
+	SecondaryClusterIPRange net.IPNet
+	NodePortRange           utilnet.PortRange
 
-	ServiceIPRepairInterval time.Duration
+	IPRepairInterval time.Duration
 }
 
 type serviceIPRangeRegistries struct {
@@ -140,25 +143,25 @@ func New(c Config) (*legacyProvider, error) {
 	if err != nil {
 		return nil, err
 	}
-	p.startServiceNodePortsRepair = portallocatorcontroller.NewRepair(c.ServiceIPRepairInterval, client.CoreV1(), client.EventsV1(), c.ServiceNodePortRange, rangeRegistries.nodePort).RunUntil
+	p.startServiceNodePortsRepair = portallocatorcontroller.NewRepair(c.Services.IPRepairInterval, client.CoreV1(), client.EventsV1(), c.Services.NodePortRange, rangeRegistries.nodePort).RunUntil
 
 	// create service cluster ip repair controller
 	if !utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
 		p.startServiceClusterIPRepair = serviceipallocatorcontroller.NewRepair(
-			c.ServiceIPRepairInterval,
+			c.Services.IPRepairInterval,
 			client.CoreV1(),
 			client.EventsV1(),
-			&c.ServiceIPRange,
+			&c.Services.ClusterIPRange,
 			rangeRegistries.clusterIP,
-			&c.ServiceSecondaryIPRange,
+			&c.Services.SecondaryClusterIPRange,
 			rangeRegistries.secondaryClusterIP,
 		).RunUntil
 	} else {
 		p.startServiceClusterIPRepair = serviceipallocatorcontroller.NewRepairIPAddress(
-			c.ServiceIPRepairInterval,
+			c.Services.IPRepairInterval,
 			client,
-			&c.ServiceIPRange,
-			&c.ServiceSecondaryIPRange,
+			&c.Services.ClusterIPRange,
+			&c.Services.SecondaryClusterIPRange,
 			c.Informers.Core().V1().Services(),
 			c.Informers.Networking().V1alpha1().IPAddresses(),
 		).RunUntil
@@ -424,7 +427,7 @@ func (c Config) newServiceIPAllocators() (registries serviceIPRangeRegistries, s
 		return serviceIPRangeRegistries{}, nil, nil, nil, err
 	}
 
-	serviceClusterIPRange := c.ServiceIPRange
+	serviceClusterIPRange := c.Services.ClusterIPRange
 	if serviceClusterIPRange.IP == nil {
 		return serviceIPRangeRegistries{}, nil, nil, nil, fmt.Errorf("service clusterIPRange is missing")
 	}
@@ -457,10 +460,10 @@ func (c Config) newServiceIPAllocators() (registries serviceIPRangeRegistries, s
 	serviceClusterIPAllocator.EnableMetrics()
 
 	var secondaryServiceClusterIPAllocator ipallocator.Interface
-	if c.ServiceSecondaryIPRange.IP != nil {
+	if c.Services.SecondaryClusterIPRange.IP != nil {
 		if !utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
 			var err error
-			secondaryServiceClusterIPAllocator, err = ipallocator.New(&c.ServiceSecondaryIPRange, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
+			secondaryServiceClusterIPAllocator, err = ipallocator.New(&c.Services.SecondaryClusterIPRange, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
 				var mem allocator.Snapshottable
 				mem = allocator.NewAllocationMapWithOffset(max, rangeSpec, offset)
 				// TODO etcdallocator package to return a storage interface via the storageFactory
@@ -479,7 +482,7 @@ func (c Config) newServiceIPAllocators() (registries serviceIPRangeRegistries, s
 			if err != nil {
 				return serviceIPRangeRegistries{}, nil, nil, nil, err
 			}
-			secondaryServiceClusterIPAllocator, err = ipallocator.NewIPAllocator(&c.ServiceSecondaryIPRange, networkingv1alphaClient, c.Informers.Networking().V1alpha1().IPAddresses())
+			secondaryServiceClusterIPAllocator, err = ipallocator.NewIPAllocator(&c.Services.SecondaryClusterIPRange, networkingv1alphaClient, c.Informers.Networking().V1alpha1().IPAddresses())
 			if err != nil {
 				return serviceIPRangeRegistries{}, nil, nil, nil, fmt.Errorf("cannot create cluster secondary IP allocator: %v", err)
 			}
@@ -487,7 +490,7 @@ func (c Config) newServiceIPAllocators() (registries serviceIPRangeRegistries, s
 		secondaryServiceClusterIPAllocator.EnableMetrics()
 	}
 
-	serviceNodePortAllocator, err = portallocator.New(c.ServiceNodePortRange, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
+	serviceNodePortAllocator, err = portallocator.New(c.Services.NodePortRange, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
 		mem := allocator.NewAllocationMapWithOffset(max, rangeSpec, offset)
 		// TODO etcdallocator package to return a storage interface via the storageFactory
 		etcd, err := serviceallocator.NewEtcd(mem, "/ranges/servicenodeports", serviceStorageConfig.ForResource(api.Resource("servicenodeportallocations")))
