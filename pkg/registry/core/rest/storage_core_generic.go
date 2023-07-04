@@ -17,6 +17,7 @@ limitations under the License.
 package rest
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -67,61 +68,63 @@ func (c *GenericConfig) NewRESTStorage(apiResourceConfigSource serverstorage.API
 		NegotiatedSerializer:         legacyscheme.Codecs,
 	}
 
-	eventStorage, err := eventstore.NewREST(restOptionsGetter, uint64(c.EventTTL.Seconds()))
-	if err != nil {
-		return genericapiserver.APIGroupInfo{}, err
-	}
-
-	resourceQuotaStorage, resourceQuotaStatusStorage, err := resourcequotastore.NewREST(restOptionsGetter)
-	if err != nil {
-		return genericapiserver.APIGroupInfo{}, err
-	}
-	secretStorage, err := secretstore.NewREST(restOptionsGetter)
-	if err != nil {
-		return genericapiserver.APIGroupInfo{}, err
-	}
-
-	configMapStorage, err := configmapstore.NewREST(restOptionsGetter)
-	if err != nil {
-		return genericapiserver.APIGroupInfo{}, err
-	}
-
-	namespaceStorage, namespaceStatusStorage, namespaceFinalizeStorage, err := namespacestore.NewREST(restOptionsGetter)
-	if err != nil {
-		return genericapiserver.APIGroupInfo{}, err
-	}
-
-	var serviceAccountStorage *serviceaccountstore.REST
-	if c.ServiceAccountIssuer != nil {
-		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, c.ServiceAccountIssuer, c.APIAudiences, c.ServiceAccountMaxExpiration, nil, secretStorage.Store, c.ExtendExpiration)
-	} else {
-		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, nil, nil, 0, nil, nil, false)
-	}
-	if err != nil {
-		return genericapiserver.APIGroupInfo{}, err
-	}
-
 	storage := map[string]rest.Storage{}
 	if resource := "events"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
-		storage[resource] = eventStorage
+		eventsStorage, err := eventstore.NewREST(restOptionsGetter, uint64(c.EventTTL.Seconds()))
+		if err != nil {
+			return genericapiserver.APIGroupInfo{}, err
+		}
+
+		storage[resource] = eventsStorage
 	}
 
 	if resource := "resourcequotas"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
+		resourceQuotaStorage, resourceQuotaStorageStatus, err := resourcequotastore.NewREST(restOptionsGetter)
+		if err != nil {
+			return genericapiserver.APIGroupInfo{}, err
+		}
+
 		storage[resource] = resourceQuotaStorage
-		storage[resource+"/status"] = resourceQuotaStatusStorage
+		storage[resource+"/status"] = resourceQuotaStorageStatus
 	}
 
 	if resource := "namespaces"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
+		namespaceStorage, namespaceStorageStatus, namespaceStorageFinalize, err := namespacestore.NewREST(restOptionsGetter)
+		if err != nil {
+			return genericapiserver.APIGroupInfo{}, err
+		}
+
 		storage[resource] = namespaceStorage
-		storage[resource+"/status"] = namespaceStatusStorage
-		storage[resource+"/finalize"] = namespaceFinalizeStorage
+		storage[resource+"/status"] = namespaceStorageStatus
+		storage[resource+"/finalize"] = namespaceStorageFinalize
 	}
 
+	var secretStorage *secretstore.REST
 	if resource := "secrets"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
+		var err error
+		secretStorage, err = secretstore.NewREST(restOptionsGetter)
+		if err != nil {
+			return genericapiserver.APIGroupInfo{}, err
+		}
+
 		storage[resource] = secretStorage
 	}
 
 	if resource := "serviceaccounts"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
+		if secretStorage == nil {
+			return genericapiserver.APIGroupInfo{}, fmt.Errorf("serviceaccounts depend on secrets, but secrets are disabled")
+		}
+		var serviceAccountStorage *serviceaccountstore.REST
+		var err error
+		if c.ServiceAccountIssuer != nil {
+			serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, c.ServiceAccountIssuer, c.APIAudiences, c.ServiceAccountMaxExpiration, nil, secretStorage.Store, c.ExtendExpiration)
+		} else {
+			serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, nil, nil, 0, nil, nil, false)
+		}
+		if err != nil {
+			return genericapiserver.APIGroupInfo{}, err
+		}
+
 		storage[resource] = serviceAccountStorage
 		if serviceAccountStorage.Token != nil {
 			storage[resource+"/token"] = serviceAccountStorage.Token
@@ -129,7 +132,12 @@ func (c *GenericConfig) NewRESTStorage(apiResourceConfigSource serverstorage.API
 	}
 
 	if resource := "configmaps"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
-		storage[resource] = configMapStorage
+		configmapsStorage, err := configmapstore.NewREST(restOptionsGetter)
+		if err != nil {
+			return genericapiserver.APIGroupInfo{}, err
+		}
+
+		storage[resource] = configmapsStorage
 	}
 
 	if len(storage) > 0 {
