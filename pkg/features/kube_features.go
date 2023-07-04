@@ -566,8 +566,9 @@ const (
 	// Allow pods to failover to a different node in case of non graceful node shutdown
 	NodeOutOfServiceVolumeDetach featuregate.Feature = "NodeOutOfServiceVolumeDetach"
 
-	// owner: @ehashman
+	// owner: @iholder101
 	// alpha: v1.22
+	// beta1: v1.28. For more info, please look at the KEP: https://kep.k8s.io/2400.
 	//
 	// Permits kubelet to run with swap enabled
 	NodeSwap featuregate.Feature = "NodeSwap"
@@ -1010,7 +1011,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	NodeOutOfServiceVolumeDetach: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
 
-	NodeSwap: {Default: false, PreRelease: featuregate.Alpha},
+	NodeSwap: {Default: false, PreRelease: featuregate.Beta},
 
 	PDBUnhealthyPodEvictionPolicy: {Default: true, PreRelease: featuregate.Beta},
 
