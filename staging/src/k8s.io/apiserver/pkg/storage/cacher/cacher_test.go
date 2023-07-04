@@ -145,9 +145,9 @@ func TestPreconditionalDeleteWithSuggestion(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t)
+	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 	t.Cleanup(terminate)
-	storagetesting.RunTestList(ctx, t, cacher, true)
+	storagetesting.RunTestList(ctx, t, cacher, compactStorage(cacher, server.V3Client), true)
 }
 
 func TestListWithoutPaging(t *testing.T) {
@@ -238,9 +238,9 @@ func TestWatch(t *testing.T) {
 }
 
 func TestWatchFromZero(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t)
+	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 	t.Cleanup(terminate)
-	storagetesting.RunTestWatchFromZero(ctx, t, cacher, compactStorage(cacher))
+	storagetesting.RunTestWatchFromZero(ctx, t, cacher, compactStorage(cacher, server.V3Client))
 }
 
 func TestDeleteTriggerWatch(t *testing.T) {
@@ -365,6 +365,11 @@ func withoutPaging(options *setupOptions) {
 }
 
 func testSetup(t *testing.T, opts ...setupOption) (context.Context, *Cacher, tearDownFunc) {
+	ctx, cacher, _, tearDown := testSetupWithEtcdServer(t, opts...)
+	return ctx, cacher, tearDown
+}
+
+func testSetupWithEtcdServer(t *testing.T, opts ...setupOption) (context.Context, *Cacher, *etcd3testing.EtcdTestServer, tearDownFunc) {
 	setupOpts := setupOptions{}
 	opts = append([]setupOption{withDefaults}, opts...)
 	for _, opt := range opts {
@@ -407,5 +412,5 @@ func testSetup(t *testing.T, opts ...setupOption) (context.Context, *Cacher, tea
 		t.Fatalf("Failed to inject list errors: %v", err)
 	}
 
-	return ctx, cacher, terminate
+	return ctx, cacher, server, terminate
 }

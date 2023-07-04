@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"testing"
 
+	clientv3 "go.etcd.io/etcd/client/v3"
+
 	"k8s.io/apimachinery/pkg/api/apitesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -71,7 +73,7 @@ func computePodKey(obj *example.Pod) string {
 	return fmt.Sprintf("/pods/%s/%s", obj.Namespace, obj.Name)
 }
 
-func compactStorage(c *Cacher) storagetesting.Compaction {
+func compactStorage(c *Cacher, client *clientv3.Client) storagetesting.Compaction {
 	return func(ctx context.Context, t *testing.T, resourceVersion string) {
 		versioner := storage.APIObjectVersioner{}
 		rv, err := versioner.ParseResourceVersion(resourceVersion)
@@ -93,9 +95,6 @@ func compactStorage(c *Cacher) storagetesting.Compaction {
 		if c.watchCache.resourceVersion < rv {
 			t.Fatalf("Can't compact into a future version: %v", resourceVersion)
 		}
-		if rv < c.watchCache.listResourceVersion {
-			t.Fatalf("Can't compact into a past version: %v", resourceVersion)
-		}
 
 		if len(c.watchers.allWatchers) > 0 || len(c.watchers.valueWatchers) > 0 {
 			// We could consider terminating those watchers, but given
@@ -114,6 +113,11 @@ func compactStorage(c *Cacher) storagetesting.Compaction {
 		}
 		c.watchCache.listResourceVersion = rv
 
-		// TODO(wojtek-t): We should also compact the underlying etcd storage.
+		if _, err = client.KV.Put(ctx, "compact_rev_key", resourceVersion); err != nil {
+			t.Fatalf("Could not update compact_rev_key: %v", err)
+		}
+		if _, err = client.Compact(ctx, int64(rv)); err != nil {
+			t.Fatalf("Could not compact: %v", err)
+		}
 	}
 }
