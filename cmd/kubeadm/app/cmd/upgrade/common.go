@@ -33,6 +33,7 @@ import (
 	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
@@ -223,7 +224,7 @@ func printConfiguration(clustercfg *kubeadmapi.ClusterConfiguration, w io.Writer
 		return
 	}
 
-	cfgYaml, err := configutil.MarshalKubeadmConfigObject(clustercfg)
+	cfgYaml, err := configutil.MarshalKubeadmConfigObject(clustercfg, kubeadmapiv1.SchemeGroupVersion)
 	if err == nil {
 		printer.Fprintln(w, "[upgrade/config] Configuration used:")
 

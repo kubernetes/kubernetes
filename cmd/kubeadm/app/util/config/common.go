@@ -36,7 +36,8 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	kubeadmapiv1old "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -44,12 +45,12 @@ import (
 )
 
 // MarshalKubeadmConfigObject marshals an Object registered in the kubeadm scheme. If the object is a InitConfiguration or ClusterConfiguration, some extra logic is run
-func MarshalKubeadmConfigObject(obj runtime.Object) ([]byte, error) {
+func MarshalKubeadmConfigObject(obj runtime.Object, gv schema.GroupVersion) ([]byte, error) {
 	switch internalcfg := obj.(type) {
 	case *kubeadmapi.InitConfiguration:
-		return MarshalInitConfigurationToBytes(internalcfg, kubeadmapiv1.SchemeGroupVersion)
+		return MarshalInitConfigurationToBytes(internalcfg, gv)
 	default:
-		return kubeadmutil.MarshalToYamlForCodecs(obj, kubeadmapiv1.SchemeGroupVersion, kubeadmscheme.Codecs)
+		return kubeadmutil.MarshalToYamlForCodecs(obj, gv, kubeadmscheme.Codecs)
 	}
 }
 
@@ -258,13 +259,17 @@ func MigrateOldConfig(oldConfig []byte, allowExperimental bool) ([]byte, error) 
 		return []byte{}, err
 	}
 
+	gv := kubeadmapiv1old.SchemeGroupVersion
+	if allowExperimental {
+		gv = kubeadmapiv1.SchemeGroupVersion
+	}
 	// Migrate InitConfiguration and ClusterConfiguration if there are any in the config
 	if kubeadmutil.GroupVersionKindsHasInitConfiguration(gvks...) || kubeadmutil.GroupVersionKindsHasClusterConfiguration(gvks...) {
 		o, err := documentMapToInitConfiguration(gvkmap, true, allowExperimental, true)
 		if err != nil {
 			return []byte{}, err
 		}
-		b, err := MarshalKubeadmConfigObject(o)
+		b, err := MarshalKubeadmConfigObject(o, gv)
 		if err != nil {
 			return []byte{}, err
 		}
@@ -277,7 +282,7 @@ func MigrateOldConfig(oldConfig []byte, allowExperimental bool) ([]byte, error) 
 		if err != nil {
 			return []byte{}, err
 		}
-		b, err := MarshalKubeadmConfigObject(o)
+		b, err := MarshalKubeadmConfigObject(o, gv)
 		if err != nil {
 			return []byte{}, err
 		}

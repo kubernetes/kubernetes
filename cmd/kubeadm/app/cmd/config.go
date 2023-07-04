@@ -199,7 +199,7 @@ func getDefaultInitConfigBytes() ([]byte, error) {
 		return []byte{}, err
 	}
 
-	return configutil.MarshalKubeadmConfigObject(internalcfg)
+	return configutil.MarshalKubeadmConfigObject(internalcfg, kubeadmapiv1.SchemeGroupVersion)
 }
 
 func getDefaultNodeConfigBytes() ([]byte, error) {
@@ -219,7 +219,7 @@ func getDefaultNodeConfigBytes() ([]byte, error) {
 		return []byte{}, err
 	}
 
-	return configutil.MarshalKubeadmConfigObject(internalcfg)
+	return configutil.MarshalKubeadmConfigObject(internalcfg, kubeadmapiv1.SchemeGroupVersion)
 }
 
 // newCmdConfigMigrate returns cobra.Command for "kubeadm config migrate" command
