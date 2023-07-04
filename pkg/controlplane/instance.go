@@ -89,7 +89,6 @@ import (
 	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/utils/clock"
-	netutils "k8s.io/utils/net"
 
 	// RESTStorage installers
 	admissionregistrationrest "k8s.io/kubernetes/pkg/registry/admissionregistration/rest"
@@ -404,6 +403,28 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	// TODO: update to a version that caches success but will recheck on failure, unlike memcache discovery
 	discoveryClientForAdmissionRegistration := clientset.Discovery()
 
+	legacyRESTStorageProvider, err := corerest.New(corerest.Config{
+		GenericConfig: corerest.GenericConfig{
+			StorageFactory:              c.ExtraConfig.StorageFactory,
+			ProxyTransport:              c.ExtraConfig.ProxyTransport,
+			EventTTL:                    c.ExtraConfig.EventTTL,
+			LoopbackClientConfig:        c.GenericConfig.LoopbackClientConfig,
+			ServiceAccountIssuer:        c.ExtraConfig.ServiceAccountIssuer,
+			ExtendExpiration:            c.ExtraConfig.ExtendExpiration,
+			ServiceAccountMaxExpiration: c.ExtraConfig.ServiceAccountMaxExpiration,
+			APIAudiences:                c.GenericConfig.Authentication.APIAudiences,
+			Informers:                   c.ExtraConfig.VersionedInformers,
+		},
+		KubeletClientConfig:     c.ExtraConfig.KubeletClientConfig,
+		ServiceIPRange:          c.ExtraConfig.ServiceIPRange,
+		ServiceSecondaryIPRange: c.ExtraConfig.SecondaryServiceIPRange,
+		ServiceNodePortRange:    c.ExtraConfig.ServiceNodePortRange,
+		ServiceIPRepairInterval: c.ExtraConfig.RepairServicesInterval,
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	// The order here is preserved in discovery.
 	// If resources with identical names exist in more than one of these groups (e.g. "deployments.apps"" and "deployments.extensions"),
 	// the order of this list determines which group an unqualified resource name (e.g. "deployments") should prefer.
@@ -412,23 +433,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	// TODO: describe the priority all the way down in the RESTStorageProviders and plumb it back through the various discovery
 	// handlers that we have.
 	restStorageProviders := []RESTStorageProvider{
-		corerest.LegacyRESTStorageProvider{
-			GenericLegacyRESTStorageProvider: corerest.GenericLegacyRESTStorageProvider{
-				StorageFactory:              c.ExtraConfig.StorageFactory,
-				ProxyTransport:              c.ExtraConfig.ProxyTransport,
-				EventTTL:                    c.ExtraConfig.EventTTL,
-				LoopbackClientConfig:        c.GenericConfig.LoopbackClientConfig,
-				ServiceAccountIssuer:        c.ExtraConfig.ServiceAccountIssuer,
-				ExtendExpiration:            c.ExtraConfig.ExtendExpiration,
-				ServiceAccountMaxExpiration: c.ExtraConfig.ServiceAccountMaxExpiration,
-				APIAudiences:                c.GenericConfig.Authentication.APIAudiences,
-				Informers:                   c.ExtraConfig.VersionedInformers,
-			},
-			KubeletClientConfig:     c.ExtraConfig.KubeletClientConfig,
-			ServiceIPRange:          c.ExtraConfig.ServiceIPRange,
-			SecondaryServiceIPRange: c.ExtraConfig.SecondaryServiceIPRange,
-			ServiceNodePortRange:    c.ExtraConfig.ServiceNodePortRange,
-		},
+		legacyRESTStorageProvider,
 		apiserverinternalrest.StorageProvider{},
 		authenticationrest.RESTStorageProvider{Authenticator: c.GenericConfig.Authentication.Authenticator, APIAudiences: c.GenericConfig.Authentication.APIAudiences},
 		authorizationrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorization.Authorizer, RuleResolver: c.GenericConfig.RuleResolver},
@@ -457,6 +462,30 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 
 	m.GenericAPIServer.AddPostStartHookOrDie("start-system-namespaces-controller", func(hookContext genericapiserver.PostStartHookContext) error {
 		go systemnamespaces.NewController(clientset, c.ExtraConfig.VersionedInformers.Core().V1().Namespaces()).Run(hookContext.StopCh)
+		return nil
+	})
+
+	_, publicServicePort, err := c.GenericConfig.SecureServing.HostPort()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get listener address: %w", err)
+	}
+	kubernetesServiceCtrl := kubernetesservice.New(kubernetesservice.Config{
+		PublicIP: c.GenericConfig.PublicAddress,
+
+		EndpointReconciler: c.ExtraConfig.EndpointReconcilerConfig.Reconciler,
+		EndpointInterval:   c.ExtraConfig.EndpointReconcilerConfig.Interval,
+
+		ServiceIP:                 c.ExtraConfig.APIServerServiceIP,
+		ServicePort:               c.ExtraConfig.APIServerServicePort,
+		PublicServicePort:         publicServicePort,
+		KubernetesServiceNodePort: c.ExtraConfig.KubernetesServiceNodePort,
+	}, clientset)
+	m.GenericAPIServer.AddPostStartHookOrDie("start-kubernetes-service-controller", func(hookContext genericapiserver.PostStartHookContext) error {
+		kubernetesServiceCtrl.Start(hookContext.StopCh)
+		return nil
+	})
+	m.GenericAPIServer.AddPreShutdownHookOrDie("stop-kubernetes-service-controller", func() error {
+		kubernetesServiceCtrl.Stop()
 		return nil
 	})
 
@@ -583,51 +612,6 @@ func labelAPIServerHeartbeatFunc(identity string) lease.ProcessLeaseFunc {
 		lease.Labels[apiv1.LabelHostname] = hostname
 		return nil
 	}
-}
-
-// newKubernetesServiceControllerConfig returns a configuration for the kubernetes service controller.
-func (c completedConfig) newKubernetesServiceControllerConfig(client kubernetes.Interface) (*kubernetesservice.Config, error) {
-	_, publicServicePort, err := c.GenericConfig.SecureServing.HostPort()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get listener address: %w", err)
-	}
-
-	// The "kubernetes.default" Service is SingleStack based on the configured ServiceIPRange.
-	// If the bootstrap controller reconcile the kubernetes.default Service and Endpoints, it must
-	// guarantee that the Service ClusterIP and the associated Endpoints have the same IP family, or
-	// it will not work for clients because of the IP family mismatch.
-	// TODO: revisit for dual-stack https://github.com/kubernetes/enhancements/issues/2438
-	if c.ExtraConfig.EndpointReconcilerType != reconcilers.NoneEndpointReconcilerType {
-		if netutils.IsIPv4CIDR(&c.ExtraConfig.ServiceIPRange) != netutils.IsIPv4(c.GenericConfig.PublicAddress) {
-			return nil, fmt.Errorf("service IP family %q must match public address family %q", c.ExtraConfig.ServiceIPRange.String(), c.GenericConfig.PublicAddress.String())
-		}
-	}
-
-	return &kubernetesservice.Config{
-		Client:    client,
-		Informers: c.ExtraConfig.VersionedInformers,
-		KubernetesService: kubernetesservice.KubernetesService{
-			PublicIP: c.GenericConfig.PublicAddress,
-
-			EndpointReconciler: c.ExtraConfig.EndpointReconcilerConfig.Reconciler,
-			EndpointInterval:   c.ExtraConfig.EndpointReconcilerConfig.Interval,
-
-			ServiceIP:                 c.ExtraConfig.APIServerServiceIP,
-			ServicePort:               c.ExtraConfig.APIServerServicePort,
-			PublicServicePort:         publicServicePort,
-			KubernetesServiceNodePort: c.ExtraConfig.KubernetesServiceNodePort,
-		},
-		ClusterIP: kubernetesservice.ClusterIP{
-			ServiceClusterIPRange:          c.ExtraConfig.ServiceIPRange,
-			SecondaryServiceClusterIPRange: c.ExtraConfig.SecondaryServiceIPRange,
-
-			ServiceClusterIPInterval: c.ExtraConfig.RepairServicesInterval,
-		},
-		NodePort: kubernetesservice.NodePort{
-			ServiceNodePortRange:    c.ExtraConfig.ServiceNodePortRange,
-			ServiceNodePortInterval: c.ExtraConfig.RepairServicesInterval,
-		},
-	}, nil
 }
 
 // RESTStorageProvider is a factory type for REST storage.

@@ -153,16 +153,18 @@ func TestLegacyRestStorageStrategies(t *testing.T) {
 	defer etcdserver.Terminate(t)
 
 	storageProvider := corerest.LegacyRESTStorageProvider{
-		GenericLegacyRESTStorageProvider: corerest.GenericLegacyRESTStorageProvider{
+		GenericConfig: corerest.GenericConfig{
 			StorageFactory:       apiserverCfg.ExtraConfig.StorageFactory,
 			ProxyTransport:       apiserverCfg.ExtraConfig.ProxyTransport,
 			EventTTL:             apiserverCfg.ExtraConfig.EventTTL,
 			LoopbackClientConfig: apiserverCfg.GenericConfig.LoopbackClientConfig,
 			Informers:            apiserverCfg.ExtraConfig.VersionedInformers,
 		},
-		KubeletClientConfig:  apiserverCfg.ExtraConfig.KubeletClientConfig,
-		ServiceIPRange:       apiserverCfg.ExtraConfig.ServiceIPRange,
-		ServiceNodePortRange: apiserverCfg.ExtraConfig.ServiceNodePortRange,
+		KubeletClientConfig: apiserverCfg.ExtraConfig.KubeletClientConfig,
+		Services: corerest.ServicesConfig{
+			ClusterIPRange: apiserverCfg.ExtraConfig.ServiceIPRange,
+			NodePortRange:  apiserverCfg.ExtraConfig.ServiceNodePortRange,
+		},
 	}
 
 	apiGroupInfo, err := storageProvider.NewRESTStorage(serverstorage.NewResourceConfig(), apiserverCfg.GenericConfig.RESTOptionsGetter)
