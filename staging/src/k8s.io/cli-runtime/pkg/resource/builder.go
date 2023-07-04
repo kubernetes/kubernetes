@@ -1035,11 +1035,11 @@ func (b *Builder) visitByResource() *Result {
 		}
 
 		info := &Info{
-			Client:      client,
-			Mapping:     mapping,
-			Namespace:   selectorNamespace,
-			Name:        tuple.Name,
-			Subresource: b.subresource,
+			Client:          client,
+			Mapping:         mapping,
+			Namespace:       selectorNamespace,
+			Name:            tuple.Name,
+			Subresource:     b.subresource,
 			ResourceVersion: b.resourceVersion,
 		}
 		items = append(items, info)
