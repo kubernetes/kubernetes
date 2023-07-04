@@ -36,10 +36,10 @@ func LoadConfigFromFile(logger klog.Logger, file string) (*config.KubeSchedulerC
 		return nil, err
 	}
 
-	return LoadConfig(logger, data)
+	return loadConfig(logger, data)
 }
 
-func LoadConfig(logger klog.Logger, data []byte) (*config.KubeSchedulerConfiguration, error) {
+func loadConfig(logger klog.Logger, data []byte) (*config.KubeSchedulerConfiguration, error) {
 	// The UniversalDecoder runs defaulting and returns the internal type by default.
 	obj, gvk, err := scheme.Codecs.UniversalDecoder().Decode(data, nil, nil)
 	if err != nil {
