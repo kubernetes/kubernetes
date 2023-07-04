@@ -451,6 +451,15 @@ func TestMigrateOldConfig(t *testing.T) {
 						t.Fatalf("migration failed to produce config kind: %s", expectedKind)
 					}
 				}
+				expectedGV := gv
+				if test.allowExperimental {
+					expectedGV = gvExperimental
+				}
+				for _, gvk := range gvks {
+					if gvk.GroupVersion().String() != expectedGV {
+						t.Errorf("GV mismatch, expected GV: %s, got GV: %s", expectedGV, gvk.GroupVersion().String())
+					}
+				}
 			}
 		})
 	}
