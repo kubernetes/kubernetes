@@ -21,10 +21,12 @@ import (
 	"testing"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
+
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func makeOptionsWithCIDRs(serviceCIDR string, secondaryServiceCIDR string) *ServerRunOptions {
@@ -150,6 +152,136 @@ func TestClusterServiceIPRange(t *testing.T) {
 
 			if len(errs) == 0 && tc.expectErrors {
 				t.Errorf("expected errors, no errors found")
+			}
+		})
+	}
+}
+
+func TestValidatePublicIPServiceClusterIPRangeIPFamilies(t *testing.T) {
+	_, ipv4cidr, err := netutils.ParseCIDRSloppy("192.168.0.0/24")
+	if err != nil {
+		t.Fatalf("Unexpected error %v", err)
+	}
+
+	_, ipv6cidr, err := netutils.ParseCIDRSloppy("2001:db8::/112")
+	if err != nil {
+		t.Fatalf("Unexpected error %v", err)
+	}
+
+	ipv4address := netutils.ParseIPSloppy("192.168.1.1")
+	ipv6address := netutils.ParseIPSloppy("2001:db8::1")
+
+	tests := []struct {
+		name    string
+		generic apiserveroptions.ServerRunOptions
+		extra   Extra
+		wantErr bool
+	}{
+		{
+			name: "master endpoint reconciler - IPv4 families",
+			extra: Extra{
+				EndpointReconcilerType:       "master-count",
+				PrimaryServiceClusterIPRange: *ipv4cidr,
+			},
+			generic: apiserveroptions.ServerRunOptions{
+				AdvertiseAddress: ipv4address,
+			},
+			wantErr: false,
+		},
+		{
+			name: "master endpoint reconciler - IPv6 families",
+			extra: Extra{
+				EndpointReconcilerType:       "master-count",
+				PrimaryServiceClusterIPRange: *ipv6cidr,
+			},
+			generic: apiserveroptions.ServerRunOptions{
+				AdvertiseAddress: ipv6address,
+			},
+			wantErr: false,
+		},
+		{
+			name: "master endpoint reconciler - wrong IP families",
+			extra: Extra{
+				EndpointReconcilerType:       "master-count",
+				PrimaryServiceClusterIPRange: *ipv4cidr,
+			},
+			generic: apiserveroptions.ServerRunOptions{
+				AdvertiseAddress: ipv6address,
+			},
+			wantErr: true,
+		},
+		{
+			name: "master endpoint reconciler - wrong IP families",
+			extra: Extra{
+				EndpointReconcilerType:       "master-count",
+				PrimaryServiceClusterIPRange: *ipv6cidr,
+			},
+			generic: apiserveroptions.ServerRunOptions{
+				AdvertiseAddress: ipv4address,
+			},
+			wantErr: true,
+		},
+		{
+			name: "lease endpoint reconciler - IPv4 families",
+			extra: Extra{
+				EndpointReconcilerType:       "lease",
+				PrimaryServiceClusterIPRange: *ipv4cidr,
+			},
+			generic: apiserveroptions.ServerRunOptions{
+				AdvertiseAddress: ipv4address,
+			},
+			wantErr: false,
+		},
+		{
+			name: "lease endpoint reconciler - IPv6 families",
+			extra: Extra{
+				EndpointReconcilerType:       "lease",
+				PrimaryServiceClusterIPRange: *ipv6cidr,
+			},
+			generic: apiserveroptions.ServerRunOptions{
+				AdvertiseAddress: ipv6address,
+			},
+			wantErr: false,
+		},
+		{
+			name: "lease endpoint reconciler - wrong IP families",
+			extra: Extra{
+				EndpointReconcilerType:       "lease",
+				PrimaryServiceClusterIPRange: *ipv4cidr,
+			},
+			generic: apiserveroptions.ServerRunOptions{
+				AdvertiseAddress: ipv6address,
+			},
+			wantErr: true,
+		},
+		{
+			name: "lease endpoint reconciler - wrong IP families",
+			extra: Extra{
+				EndpointReconcilerType:       "lease",
+				PrimaryServiceClusterIPRange: *ipv6cidr,
+			},
+			generic: apiserveroptions.ServerRunOptions{
+				AdvertiseAddress: ipv4address,
+			},
+			wantErr: true,
+		},
+		{
+			name: "none endpoint reconciler - wrong IP families",
+			extra: Extra{
+				EndpointReconcilerType:       "none",
+				PrimaryServiceClusterIPRange: *ipv4cidr,
+			},
+			generic: apiserveroptions.ServerRunOptions{
+				AdvertiseAddress: ipv6address,
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errs := validatePublicIPServiceClusterIPRangeIPFamilies(tt.extra, tt.generic)
+			if (len(errs) > 0) != tt.wantErr {
+				t.Fatalf("completedConfig.New() errors = %+v, wantErr %v", errs, tt.wantErr)
 			}
 		})
 	}

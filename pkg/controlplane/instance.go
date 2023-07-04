@@ -89,7 +89,6 @@ import (
 	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/utils/clock"
-	netutils "k8s.io/utils/net"
 
 	// RESTStorage installers
 	admissionregistrationrest "k8s.io/kubernetes/pkg/registry/admissionregistration/rest"
@@ -629,17 +628,6 @@ func (c completedConfig) newKubernetesServiceControllerConfig(client kubernetes.
 	_, publicServicePort, err := c.GenericConfig.SecureServing.HostPort()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get listener address: %w", err)
-	}
-
-	// The "kubernetes.default" Service is SingleStack based on the configured ServiceIPRange.
-	// If the bootstrap controller reconcile the kubernetes.default Service and Endpoints, it must
-	// guarantee that the Service ClusterIP and the associated Endpoints have the same IP family, or
-	// it will not work for clients because of the IP family mismatch.
-	// TODO: revisit for dual-stack https://github.com/kubernetes/enhancements/issues/2438
-	if c.ExtraConfig.EndpointReconcilerType != reconcilers.NoneEndpointReconcilerType {
-		if netutils.IsIPv4CIDR(&c.ExtraConfig.ServiceIPRange) != netutils.IsIPv4(c.GenericConfig.PublicAddress) {
-			return nil, fmt.Errorf("service IP family %q must match public address family %q", c.ExtraConfig.ServiceIPRange.String(), c.GenericConfig.PublicAddress.String())
-		}
 	}
 
 	return &kubernetesservice.Config{
