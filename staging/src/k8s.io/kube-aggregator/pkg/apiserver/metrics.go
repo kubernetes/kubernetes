@@ -18,7 +18,7 @@ package apiserver
 
 import (
 	"context"
-	"net/http"
+	"strconv"
 	"time"
 
 	"k8s.io/component-base/metrics"
@@ -56,11 +56,11 @@ var (
 	extensionApiserverRequestCounter = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      ExtensionApiserver,
-			Name:           "requests_total",
-			Help:           "Counter of extension apiserver request broken down by result. It can be either 'OK', 'Not Found', 'Service Unavailable' or 'Internal Server Error'.",
+			Name:           "request_total",
+			Help:           "Counter of extension apiserver request broken down by result. It can be either '200', '404', '503' or '500'.",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"result"},
+		[]string{"code"},
 	)
 
 	extensionApiserverLatency = metrics.NewHistogramVec(
@@ -71,7 +71,7 @@ var (
 			Buckets:        []float64{0.005, 0.025, 0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3, 4, 5, 6, 8, 10, 15, 20, 30, 45, 60},
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"result"},
+		[]string{"code"},
 	)
 )
 
@@ -84,6 +84,6 @@ func init() {
 
 func recordExtensionApiserverMetrics(ctx context.Context, httpStatus int, extensionApiserverStart time.Time) {
 	extensionApiserverFinish := time.Now()
-	extensionApiserverRequestCounter.WithContext(ctx).WithLabelValues(http.StatusText(httpStatus)).Inc()
-	extensionApiserverLatency.WithContext(ctx).WithLabelValues(http.StatusText(httpStatus)).Observe(extensionApiserverFinish.Sub(extensionApiserverStart).Seconds())
+	extensionApiserverRequestCounter.WithContext(ctx).WithLabelValues(strconv.Itoa(httpStatus)).Inc()
+	extensionApiserverLatency.WithContext(ctx).WithLabelValues(strconv.Itoa(httpStatus)).Observe(extensionApiserverFinish.Sub(extensionApiserverStart).Seconds())
 }

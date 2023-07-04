@@ -1114,7 +1114,7 @@ func clientCaCrt() []byte { return readTestFile("client-ca.pem") }
 
 func TestRecordExtApiserverMetricsMetrics(t *testing.T) {
 	metrics := []string{
-		"extension_apiserver_requests_total",
+		"extension_apiserver_request_total",
 	}
 
 	testCases := []struct {
@@ -1126,36 +1126,36 @@ func TestRecordExtApiserverMetricsMetrics(t *testing.T) {
 			desc: "OK",
 			err:  200,
 			want: `
-			# HELP extension_apiserver_requests_total [ALPHA] Counter of extension apiserver request broken down by result. It can be either 'OK', 'Not Found', 'Service Unavailable' or 'Internal Server Error'.
-			# TYPE extension_apiserver_requests_total counter
-			extension_apiserver_requests_total{result="OK"} 1
+			# HELP extension_apiserver_request_total [ALPHA] Counter of extension apiserver request broken down by result. It can be either '200', '404', '503' or '500'.
+			# TYPE extension_apiserver_request_total counter
+			extension_apiserver_request_total{code="200"} 1
 				`,
 		},
 		{
 			desc: "Not Found",
 			err:  404,
 			want: `
-			# HELP extension_apiserver_requests_total [ALPHA] Counter of extension apiserver request broken down by result. It can be either 'OK', 'Not Found', 'Service Unavailable' or 'Internal Server Error'.
-			# TYPE extension_apiserver_requests_total counter
-			extension_apiserver_requests_total{result="Not Found"} 1
+			# HELP extension_apiserver_request_total [ALPHA] Counter of extension apiserver request broken down by result. It can be either '200', '404', '503' or '500'.
+			# TYPE extension_apiserver_request_total counter
+			extension_apiserver_request_total{code="404"} 1
 				`,
 		},
 		{
 			desc: "Service Unavailable",
 			err:  503,
 			want: `
-			# HELP extension_apiserver_requests_total [ALPHA] Counter of extension apiserver request broken down by result. It can be either 'OK', 'Not Found', 'Service Unavailable' or 'Internal Server Error'.
-			# TYPE extension_apiserver_requests_total counter
-			extension_apiserver_requests_total{result="Service Unavailable"} 1
+			# HELP extension_apiserver_request_total [ALPHA] Counter of extension apiserver request broken down by result. It can be either '200', '404', '503' or '500'.
+			# TYPE extension_apiserver_request_total counter
+			extension_apiserver_request_total{code="503"} 1
 				`,
 		},
 		{
 			desc: "Internal Server Error",
 			err:  500,
 			want: `
-			# HELP extension_apiserver_requests_total [ALPHA] Counter of extension apiserver request broken down by result. It can be either 'OK', 'Not Found', 'Service Unavailable' or 'Internal Server Error'.
-			# TYPE extension_apiserver_requests_total counter
-            extension_apiserver_requests_total{result="Internal Server Error"} 1
+			# HELP extension_apiserver_request_total [ALPHA] Counter of extension apiserver request broken down by result. It can be either '200', '404', '503' or '500'.
+			# TYPE extension_apiserver_request_total counter
+            extension_apiserver_request_total{code="500"} 1
 				`,
 		},
 	}
