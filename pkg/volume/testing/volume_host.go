@@ -235,7 +235,7 @@ func (f *fakeVolumeHost) GetNodeName() types.NodeName {
 }
 
 func (f *fakeVolumeHost) GetEventRecorder() record.EventRecorder {
-	return nil
+	return record.NewFakeRecorder(100)
 }
 
 func (f *fakeVolumeHost) ScriptCommands(scripts []CommandScript) {

@@ -25,9 +25,14 @@ import (
 	"path/filepath"
 	"syscall"
 	"testing"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
+	kevents "k8s.io/kubernetes/pkg/kubelet/events"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 type localFakeMounter struct {
@@ -303,7 +308,7 @@ func TestSetVolumeOwnershipMode(t *testing.T) {
 			}
 
 			mounter := &localFakeMounter{path: "FAKE_DIR_DOESNT_EXIST"} // SetVolumeOwnership() must rely on tmpDir
-			err = SetVolumeOwnership(mounter, tmpDir, &expectedGid, test.fsGroupChangePolicy, nil)
+			err = SetVolumeOwnership(mounter, tmpDir, &expectedGid, test.fsGroupChangePolicy, nil, nil)
 			if err != nil {
 				t.Errorf("for %s error changing ownership with: %v", test.description, err)
 			}
@@ -439,13 +444,79 @@ func TestSetVolumeOwnershipOwner(t *testing.T) {
 
 			mounter := &localFakeMounter{path: tmpDir}
 			always := v1.FSGroupChangeAlways
-			err = SetVolumeOwnership(mounter, tmpDir, test.fsGroup, &always, nil)
+			err = SetVolumeOwnership(mounter, tmpDir, test.fsGroup, &always, nil, nil)
 			if err != nil {
 				t.Errorf("for %s error changing ownership with: %v", test.description, err)
 			}
 			err = test.assertFunc(tmpDir)
 			if err != nil {
 				t.Errorf("for %s error verifying permissions with: %v", test.description, err)
+			}
+		})
+	}
+}
+
+func TestSetVolumeOwnershipOwnerLongTime(t *testing.T) {
+	fsGroup := int64(3000)
+
+	// Change podFsGroupCheckInterval to 1s to reduce test duration
+	podFsGroupCheckInterval = 2 * time.Second
+
+	fakePod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod",
+			Namespace: "default",
+		},
+	}
+
+	fakeRecorder := record.NewFakeRecorder(100)
+	eventRecorderFunc := func(message string) {
+		fakeRecorder.Eventf(fakePod, v1.EventTypeWarning, kevents.SlowVolumeFSGroup, message, "fake-volume")
+	}
+
+	tests := []struct {
+		description      string
+		fsGroup          *int64
+		expectedEvents   int
+		mockWalkDeepFunc func(root string, walkFunc filepath.WalkFunc) error
+	}{
+		{
+			description:      "FsGroup time is less than podFsGroupCheckInterval",
+			fsGroup:          &fsGroup,
+			expectedEvents:   0,
+			mockWalkDeepFunc: func(root string, walkFunc filepath.WalkFunc) error { return nil },
+		},
+		{
+			description:    "FsGroup time is greater than podFsGroupCheckInterval",
+			fsGroup:        &fsGroup,
+			expectedEvents: 1,
+			mockWalkDeepFunc: func(root string, walkFunc filepath.WalkFunc) error {
+				timeClock.Sleep(3 * time.Second)
+				return nil
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.description, func(t *testing.T) {
+			tmpDir, err := utiltesting.MkTmpdir("volume_linux_ownership")
+			if err != nil {
+				t.Fatalf("error creating temp dir: %v", err)
+			}
+
+			defer os.RemoveAll(tmpDir)
+
+			timeClock = testingclock.NewFakeClock(time.Time{})
+			walkDeepFunc = test.mockWalkDeepFunc
+
+			mounter := &localFakeMounter{path: tmpDir}
+			always := v1.FSGroupChangeAlways
+			err = SetVolumeOwnership(mounter, tmpDir, test.fsGroup, &always, nil, eventRecorderFunc)
+			if err != nil {
+				t.Errorf("for %s error changing ownership with: %v", test.description, err)
+			}
+			if len(fakeRecorder.Events) != test.expectedEvents {
+				t.Errorf("Unexpected number of events.  Expected %d, saw %d\n", test.expectedEvents, len(fakeRecorder.Events))
 			}
 		})
 	}

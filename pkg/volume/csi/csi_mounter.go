@@ -31,8 +31,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
+	kevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -63,7 +65,9 @@ var (
 
 type csiMountMgr struct {
 	csiClientGetter
-	k8s                 kubernetes.Interface
+	k8s kubernetes.Interface
+	// recorder is used to record events in the API server
+	recorder            record.EventRecorder
 	plugin              *csiPlugin
 	driverName          csiDriverName
 	volumeLifecycleMode storage.VolumeLifecycleMode
@@ -332,8 +336,12 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 	if !driverSupportsCSIVolumeMountGroup && c.supportsFSGroup(fsType, mounterArgs.FsGroup, fsGroupPolicy) {
 		// Driver doesn't support applying FSGroup. Kubelet must apply it instead.
 
+		eventRecorderFunc := func(message string) {
+			c.recorder.Eventf(c.pod, api.EventTypeWarning, kevents.SlowVolumeFSGroup, message, c.specVolumeID)
+		}
+
 		// fullPluginName helps to distinguish different driver from csi plugin
-		err := volume.SetVolumeOwnership(c, dir, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(c.plugin, c.spec))
+		err := volume.SetVolumeOwnership(c, dir, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(c.plugin, c.spec), eventRecorderFunc)
 		if err != nil {
 			// At this point mount operation is successful:
 			//   1. Since volume can not be used by the pod because of invalid permissions, we must return error
