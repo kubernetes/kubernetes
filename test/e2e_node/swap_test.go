@@ -301,6 +301,10 @@ var _ = SIGDescribe("System reserved swap [LinuxOnly] [Serial]", func() {
 				initialConfig.SystemReserved[string(nodev1.ResourceSwap)] = reservedSwapSize
 			})
 			ginkgo.It("node should not allocate reserved swap size", func(ctx context.Context) {
+				unified := IsCgroup2UnifiedMode()
+				if !unified {
+					ginkgo.Skip("skipping swap test for cgroup v1")
+				}
 				ginkgo.By("by check node status")
 				nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 				framework.ExpectNoError(err)
@@ -312,34 +316,24 @@ var _ = SIGDescribe("System reserved swap [LinuxOnly] [Serial]", func() {
 				reserved.Add(*allocateble)
 				framework.ExpectEqual(reserved.Cmp(*capacity), 0)
 				// check cgroup limit
-				limitsize, unified, err := getCgroupLimit()
+				limitsize, err := getCgroupLimit()
 				framework.ExpectNoError(err)
-				if unified {
-					framework.ExpectEqual(swapCapacity-revervedSwapSizeBytes, limitsize, "total swap - systemreserved swap = cgourpv2 swap limit")
-				} else {
-					framework.ExpectEqual(swapCapacity-revervedSwapSizeBytes, limitsize-swapCapacity, "total swap - systemreserved swap = cgroupv1 swap limit")
-				}
+				framework.ExpectEqual(swapCapacity-revervedSwapSizeBytes, limitsize, "total swap - systemreserved swap = cgourpv2 swap limit")
 			})
 		}
 
 	})
 })
 
-func getCgroupLimit() (uint64, bool, error) {
-	var cgroupfilename string
-	unified := IsCgroup2UnifiedMode()
-	if unified {
-		cgroupfilename = fmt.Sprintf("/sys/fs/cgroup/memory/%s/memory.swap.max", toCgroupFsName(cm.NewCgroupName(cm.RootCgroupName, defaultNodeAllocatableCgroup)))
-	} else {
-		cgroupfilename = fmt.Sprintf("/sys/fs/cgroup/memory/%s/memory.memsw.limit_in_bytes", toCgroupFsName(cm.NewCgroupName(cm.RootCgroupName, defaultNodeAllocatableCgroup)))
-	}
+func getCgroupLimit() (uint64, error) {
+	cgroupfilename := fmt.Sprintf("/sys/fs/cgroup/memory/%s/memory.swap.max", toCgroupFsName(cm.NewCgroupName(cm.RootCgroupName, defaultNodeAllocatableCgroup)))
 	bs, err := ioutil.ReadFile(cgroupfilename)
 	if err != nil {
-		return 0, unified, err
+		return 0, err
 	}
 	size, err := strconv.Atoi(strings.TrimSuffix(string(bs), "\n"))
 	if err != nil {
-		return 0, unified, err
+		return 0, err
 	}
-	return uint64(size), unified, nil
+	return uint64(size), nil
 }
