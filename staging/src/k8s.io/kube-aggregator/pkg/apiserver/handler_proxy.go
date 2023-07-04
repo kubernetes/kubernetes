@@ -99,10 +99,11 @@ func proxyError(w http.ResponseWriter, req *http.Request, error string, code int
 
 func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	httpStatus := http.StatusOK
+	serviceName := ""
 	extensionApiserverStart := time.Now()
 	ctx := req.Context()
 	defer func() {
-		recordExtensionApiserverMetrics(ctx, httpStatus, extensionApiserverStart)
+		recordExtensionApiserverMetrics(ctx, httpStatus, extensionApiserverStart, serviceName)
 	}()
 	value := r.handlingInfo.Load()
 	if value == nil {
@@ -110,6 +111,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	handlingInfo := value.(proxyHandlingInfo)
+	serviceName = handlingInfo.serviceName
 	if handlingInfo.local {
 		if r.localDelegate == nil {
 			http.Error(w, "", http.StatusNotFound)

@@ -60,7 +60,7 @@ var (
 			Help:           "Counter of extension apiserver request broken down by result. It can be either '200', '404', '503' or '500'.",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"code"},
+		[]string{"resource", "code"},
 	)
 
 	extensionApiserverLatency = metrics.NewHistogramVec(
@@ -71,7 +71,7 @@ var (
 			Buckets:        []float64{0.005, 0.025, 0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3, 4, 5, 6, 8, 10, 15, 20, 30, 45, 60},
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"code"},
+		[]string{"resource", "code"},
 	)
 )
 
@@ -82,8 +82,8 @@ func init() {
 	legacyregistry.MustRegister(extensionApiserverLatency)
 }
 
-func recordExtensionApiserverMetrics(ctx context.Context, httpStatus int, extensionApiserverStart time.Time) {
+func recordExtensionApiserverMetrics(ctx context.Context, httpStatus int, extensionApiserverStart time.Time, resource string) {
 	extensionApiserverFinish := time.Now()
-	extensionApiserverRequestCounter.WithContext(ctx).WithLabelValues(strconv.Itoa(httpStatus)).Inc()
-	extensionApiserverLatency.WithContext(ctx).WithLabelValues(strconv.Itoa(httpStatus)).Observe(extensionApiserverFinish.Sub(extensionApiserverStart).Seconds())
+	extensionApiserverRequestCounter.WithContext(ctx).WithLabelValues(resource, strconv.Itoa(httpStatus)).Inc()
+	extensionApiserverLatency.WithContext(ctx).WithLabelValues(resource, strconv.Itoa(httpStatus)).Observe(extensionApiserverFinish.Sub(extensionApiserverStart).Seconds())
 }
