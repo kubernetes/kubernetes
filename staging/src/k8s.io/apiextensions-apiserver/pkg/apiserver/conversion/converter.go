@@ -162,8 +162,7 @@ func (c *crConverter) ConvertToVersion(in runtime.Object, target runtime.GroupVe
 	fromGVK := in.GetObjectKind().GroupVersionKind()
 	toGVK, ok := target.KindForGroupVersionKinds([]schema.GroupVersionKind{fromGVK})
 	if !ok {
-		// TODO: should this be a typed error?
-		return nil, fmt.Errorf("%v is unstructured and is not suitable for converting to %q", fromGVK.String(), target)
+		return nil, runtime.NewNotRegisteredGVKErrForTargetWithContext("", fromGVK, toGVK.GroupVersion())
 	}
 	// Special-case typed scale conversion if this custom resource supports a scale endpoint
 	if c.convertScale {
@@ -173,20 +172,21 @@ func (c *crConverter) ConvertToVersion(in runtime.Object, target runtime.GroupVe
 	}
 
 	if !c.validVersions[toGVK.GroupVersion()] {
-		return nil, fmt.Errorf("request to convert CR to an invalid group/version: %s", toGVK.GroupVersion().String())
+		return nil, runtime.NewNotRegisteredGVKErrForTargetWithContext("invalid target version", fromGVK, toGVK.GroupVersion())
 	}
 	// Note that even if the request is for a list, the GV of the request UnstructuredList is what
 	// is expected to convert to. As mentioned in the function's document, it is not expected to
 	// get a v1.List.
 	if !c.validVersions[fromGVK.GroupVersion()] {
-		return nil, fmt.Errorf("request to convert CR from an invalid group/version: %s", fromGVK.GroupVersion().String())
+		return nil, runtime.NewNotRegisteredGVKErrForTargetWithContext("invalid source version", fromGVK, toGVK.GroupVersion())
 	}
 	// Check list item's apiVersion
 	if list, ok := in.(*unstructured.UnstructuredList); ok {
 		for i := range list.Items {
-			expectedGV := list.Items[i].GroupVersionKind().GroupVersion()
+			expectedGVK := list.Items[i].GroupVersionKind()
+			expectedGV := expectedGVK.GroupVersion()
 			if !c.validVersions[expectedGV] {
-				return nil, fmt.Errorf("request to convert CR list failed, list index %d has invalid group/version: %s", i, expectedGV.String())
+				return nil, runtime.NewNotRegisteredGVKErrForTargetWithContext(fmt.Sprintf("in list item %d", i), expectedGVK, toGVK.GroupVersion())
 			}
 		}
 	}

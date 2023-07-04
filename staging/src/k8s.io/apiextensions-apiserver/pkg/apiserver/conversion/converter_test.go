@@ -18,7 +18,6 @@ package conversion
 
 import (
 	"reflect"
-	"strings"
 	"testing"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -70,7 +69,7 @@ func TestConversion(t *testing.T) {
 					"other":      "data",
 				},
 			},
-			ExpectedFailure: "invalid group/version: example.com/v3",
+			ExpectedFailure: `"example.com/v1" is not suitable for converting to "example.com/v3" invalid target version`,
 		},
 		{
 			Name:          "simple_list_conversion",
@@ -150,7 +149,7 @@ func TestConversion(t *testing.T) {
 					},
 				},
 			},
-			ExpectedFailure: "invalid group/version: example.com/v3",
+			ExpectedFailure: `"example.com/v3" is not suitable for converting to "example.com/v2" in list item 1`,
 		},
 	}
 
@@ -180,7 +179,7 @@ func TestConversion(t *testing.T) {
 		toVersions := schema.GroupVersions{toVersion}
 		actual, err := safeConverter.ConvertToVersion(o, toVersions)
 		if test.ExpectedFailure != "" {
-			if err == nil || !strings.Contains(err.Error(), test.ExpectedFailure) {
+			if err == nil || err.Error() != test.ExpectedFailure {
 				t.Fatalf("%s: Expected the call to fail with error message `%s` but err=%v", test.Name, test.ExpectedFailure, err)
 			}
 		} else {

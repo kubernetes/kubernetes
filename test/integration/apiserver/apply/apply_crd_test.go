@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -731,5 +732,208 @@ spec:
 	}
 	if len(status.Status().Details.Causes) != 1 {
 		t.Fatalf("Expecting to get one conflict when a different applier updates existing list item, got: %v", status.Status().Details.Causes)
+	}
+}
+
+// This tests for cases when conversion logic is called on managed field objects
+// in a CR: if a CR exists with a managedFields entry whose API Version is a version
+// that no longer exists, if a SSA operation is now done on this CR, the API Server
+// tries to perform conversion and fails. This should *not* hinder workflows and
+// updates should still be possible.
+//
+// The steps taken by this test on a high level are as follows:
+//  1. Create a CR with version = storage version, using SSA.
+//  2. Migrate away from the current storage version:
+//     a. Change storage to another version, update CRD.
+//     b. Migrate existing CR to this version by applying an empty patch.
+//     (i) This will create the scenario of API Version being different
+//     in managedFields entry and the API Version of the CR.
+//     c. Patch CRD to remove version from status.storedVersions.
+//     d. Remove version from CRD and update the CRD.
+//  3. Attempt creating same CR with API Version = new storage version.
+//  4. Verify no error.
+func TestApplyCRDManagedFieldConversionTypedError(t *testing.T) {
+	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.TearDownFn()
+	config := server.ClientConfig
+
+	apiExtensionClient, err := clientset.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	noxuDefinition := fixtures.NewMultipleVersionNoxuCRD(apiextensionsv1.ClusterScoped)
+
+	var c apiextensionsv1.CustomResourceValidation
+	err = json.Unmarshal([]byte(`{
+			"openAPIV3Schema": {
+				"type": "object",
+				"properties": {
+					"spec": {
+						"type": "object",
+						"x-kubernetes-preserve-unknown-fields": true,
+						"properties": {
+							"cronSpec": {
+								"type": "string",
+								"pattern": "^(\\d+|\\*)(/\\d+)?(\\s+(\\d+|\\*)(/\\d+)?){4}$"
+							},
+							"ports": {
+								"type": "array",
+								"x-kubernetes-list-map-keys": [
+									"containerPort",
+									"protocol"
+								],
+								"x-kubernetes-list-type": "map",
+								"items": {
+									"properties": {
+										"containerPort": {
+											"format": "int32",
+											"type": "integer"
+										},
+										"hostIP": {
+											"type": "string"
+										},
+										"hostPort": {
+											"format": "int32",
+											"type": "integer"
+										},
+										"name": {
+											"type": "string"
+										},
+										"protocol": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"containerPort",
+										"protocol"
+									],
+									"type": "object"
+								}
+							}
+						}
+					}
+				}
+			}
+		}`), &c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range noxuDefinition.Spec.Versions {
+		noxuDefinition.Spec.Versions[i].Schema = &c
+	}
+
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kind := noxuDefinition.Spec.Names.Kind
+	// Create a CR in the current stored version, i.e. v1beta2.
+	apiVersion := noxuDefinition.Spec.Group + "/" + noxuDefinition.Spec.Versions[1].Name
+	name := "mytest"
+
+	rest := apiExtensionClient.Discovery().RESTClient()
+	yamlBody := []byte(fmt.Sprintf(`
+apiVersion: %s
+kind: %s
+metadata:
+  name: %s
+spec:
+  cronSpec: "* * * * */5"
+  replicas: 1
+  ports:
+  - name: x
+    containerPort: 80
+    protocol: TCP`, apiVersion, kind, name))
+	result, err := rest.Patch(types.ApplyPatchType).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[1].Name, noxuDefinition.Spec.Names.Plural).
+		Name(name).
+		Param("fieldManager", "apply_test").
+		Body(yamlBody).
+		DoRaw(context.TODO())
+	if err != nil {
+		t.Fatalf("failed to create custom resource with apply: %v:\n%v", err, string(result))
+	}
+
+	crdClient := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions()
+	// Migrate away from current storage version of v1beta2 to v1beta1.
+	crd, err := crdClient.Get(context.TODO(), noxuDefinition.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("failed to get CRD: %v", err)
+	}
+	crd.Spec.Versions[1].Storage = false
+	crd.Spec.Versions[0].Storage = true
+
+	newCRD, err := crdClient.Update(context.TODO(), crd, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("failed to update CRD: %v", err)
+	}
+
+	gvr := schema.GroupVersionResource{
+		Group:    newCRD.Spec.Group,
+		Version:  newCRD.Spec.Versions[1].Name,
+		Resource: newCRD.Spec.Names.Plural,
+	}
+	// Migrate existing CR to new storage version by applying an
+	// empty merge patch.
+	_, err = dynamicClient.Resource(gvr).
+		Patch(context.TODO(), name, types.MergePatchType, []byte("{}"), metav1.PatchOptions{})
+	if err != nil {
+		t.Fatalf("failed to patch CR: %v", err)
+	}
+
+	// Remove old storage version from status
+	patchedCRD, err := crdClient.Patch(context.TODO(),
+		newCRD.Name,
+		types.MergePatchType,
+		[]byte(`{"status":{"storedVersions":["`+newCRD.Spec.Versions[0].Name+`"]}}`),
+		metav1.PatchOptions{}, "status",
+	)
+	if err != nil {
+		t.Fatalf("failed to patch CRD: %v", err)
+	}
+	crd, err = crdClient.Get(context.TODO(), patchedCRD.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("failed to get CRD: %v", err)
+	}
+
+	// Remove the old version from spec.versions
+	crd.Spec.Versions = append(crd.Spec.Versions[:1], crd.Spec.Versions[2:]...)
+	_, err = crdClient.Update(context.TODO(), crd, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("failed to update CRD: %v", err)
+	}
+
+	apiVersion = noxuDefinition.Spec.Group + "/" + noxuDefinition.Spec.Versions[0].Name
+	yamlBody = []byte(fmt.Sprintf(`
+apiVersion: %s
+kind: %s
+metadata:
+  name: %s
+spec:
+  cronSpec: "* * * * */5"
+  replicas: 1
+  ports:
+  - name: x
+    containerPort: 80
+    protocol: TCP`, apiVersion, kind, name))
+	new := rest.Patch(types.ApplyPatchType).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
+		Name(name).
+		Param("fieldManager", "apply_test").
+		Body(yamlBody).
+		Do(context.TODO())
+
+	resp, _ := new.Raw()
+	if new.Error() != nil {
+		t.Fatalf("failed to create custom resource with apply: %v:\n%v", new.Error().Error(), string(resp))
 	}
 }
