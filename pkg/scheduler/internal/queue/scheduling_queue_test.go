@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -230,8 +229,8 @@ func TestPriorityQueue_AddUnschedulableIfNotPresent_Backoff(t *testing.T) {
 	// Pop all pods except for the first one
 	for i := totalNum - 1; i > 0; i-- {
 		p, _ := q.Pop()
-		if !reflect.DeepEqual(&expectedPods[i], p.Pod) {
-			t.Errorf("Unexpected pod. Expected: %v, got: %v", &expectedPods[i], p)
+		if diff := cmp.Diff(&expectedPods[i], p.Pod); diff != "" {
+			t.Errorf("Unexpected pod (-want, +got):\n%s", diff)
 		}
 	}
 
@@ -240,8 +239,8 @@ func TestPriorityQueue_AddUnschedulableIfNotPresent_Backoff(t *testing.T) {
 	oldCycle := q.SchedulingCycle()
 
 	firstPod, _ := q.Pop()
-	if !reflect.DeepEqual(&expectedPods[0], firstPod.Pod) {
-		t.Errorf("Unexpected pod. Expected: %v, got: %v", &expectedPods[0], firstPod)
+	if diff := cmp.Diff(&expectedPods[0], firstPod.Pod); diff != "" {
+		t.Errorf("Unexpected pod (-want, +got):\n%s", diff)
 	}
 
 	// mark pods[1] ~ pods[totalNum-1] as unschedulable and add them back
@@ -962,8 +961,8 @@ func TestPriorityQueue_PendingPods(t *testing.T) {
 
 	expectedSet := makeSet([]*v1.Pod{medPriorityPodInfo.Pod, unschedulablePodInfo.Pod, highPriorityPodInfo.Pod})
 	gotPods, gotSummary := q.PendingPods()
-	if !reflect.DeepEqual(expectedSet, makeSet(gotPods)) {
-		t.Error("Unexpected list of pending Pods.")
+	if diff := cmp.Diff(expectedSet, makeSet(gotPods)); diff != "" {
+		t.Errorf("Unexpected list of pending Pods (-want, +got):\n%s", diff)
 	}
 	if wantSummary := fmt.Sprintf(pendingPodsSummary, 1, 0, 2); wantSummary != gotSummary {
 		t.Errorf("Unexpected pending pods summary: want %v, but got %v.", wantSummary, gotSummary)
@@ -971,8 +970,8 @@ func TestPriorityQueue_PendingPods(t *testing.T) {
 	// Move all to active queue. We should still see the same set of pods.
 	q.MoveAllToActiveOrBackoffQueue(logger, TestEvent, nil, nil, nil)
 	gotPods, gotSummary = q.PendingPods()
-	if !reflect.DeepEqual(expectedSet, makeSet(gotPods)) {
-		t.Error("Unexpected list of pending Pods.")
+	if diff := cmp.Diff(expectedSet, makeSet(gotPods)); diff != "" {
+		t.Errorf("Unexpected list of pending Pods (-want, +got):\n%s", diff)
 	}
 	if wantSummary := fmt.Sprintf(pendingPodsSummary, 1, 2, 0); wantSummary != gotSummary {
 		t.Errorf("Unexpected pending pods summary: want %v, but got %v.", wantSummary, gotSummary)
@@ -1170,26 +1169,23 @@ func TestUnschedulablePodsMap(t *testing.T) {
 			for _, p := range test.podsToAdd {
 				upm.addOrUpdate(newQueuedPodInfoForLookup(p))
 			}
-			if !reflect.DeepEqual(upm.podInfoMap, test.expectedMapAfterAdd) {
-				t.Errorf("Unexpected map after adding pods. Expected: %v, got: %v",
-					test.expectedMapAfterAdd, upm.podInfoMap)
+			if diff := cmp.Diff(test.expectedMapAfterAdd, upm.podInfoMap); diff != "" {
+				t.Errorf("Unexpected map after adding pods(-want, +got):\n%s", diff)
 			}
 
 			if len(test.podsToUpdate) > 0 {
 				for _, p := range test.podsToUpdate {
 					upm.addOrUpdate(newQueuedPodInfoForLookup(p))
 				}
-				if !reflect.DeepEqual(upm.podInfoMap, test.expectedMapAfterUpdate) {
-					t.Errorf("Unexpected map after updating pods. Expected: %v, got: %v",
-						test.expectedMapAfterUpdate, upm.podInfoMap)
+				if diff := cmp.Diff(test.expectedMapAfterUpdate, upm.podInfoMap); diff != "" {
+					t.Errorf("Unexpected map after updating pods (-want, +got):\n%s", diff)
 				}
 			}
 			for _, p := range test.podsToDelete {
 				upm.delete(p, false)
 			}
-			if !reflect.DeepEqual(upm.podInfoMap, test.expectedMapAfterDelete) {
-				t.Errorf("Unexpected map after deleting pods. Expected: %v, got: %v",
-					test.expectedMapAfterDelete, upm.podInfoMap)
+			if diff := cmp.Diff(test.expectedMapAfterDelete, upm.podInfoMap); diff != "" {
+				t.Errorf("Unexpected map after deleting pods (-want, +got):\n%s", diff)
 			}
 			upm.clear()
 			if len(upm.podInfoMap) != 0 {
@@ -1658,9 +1654,8 @@ func TestPodTimestamp(t *testing.T) {
 				}
 			}
 
-			if !reflect.DeepEqual(test.expected, podInfoList) {
-				t.Errorf("Unexpected QueuedPodInfo list. Expected: %v, got: %v",
-					test.expected, podInfoList)
+			if diff := cmp.Diff(test.expected, podInfoList); diff != "" {
+				t.Errorf("Unexpected QueuedPodInfo list (-want, +got):\n%s", diff)
 			}
 		})
 	}
