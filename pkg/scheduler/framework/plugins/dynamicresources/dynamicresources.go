@@ -169,7 +169,7 @@ func (d *stateData) publishPodSchedulingContexts(ctx context.Context, clientset 
 	}
 	if loggerV := logger.V(6); loggerV.Enabled() {
 		// At a high enough log level, dump the entire object.
-		loggerV.Info(msg, "podSchedulingCtxDump", schedulingCtx)
+		loggerV.Info(msg, "podSchedulingCtxDump", klog.Format(schedulingCtx))
 	} else {
 		logger.V(5).Info(msg, "podSchedulingCtx", klog.KObj(schedulingCtx))
 	}
@@ -577,7 +577,7 @@ func (pl *dynamicResources) PreScore(ctx context.Context, cs *framework.CycleSta
 		sort.Strings(schedulingCtx.Spec.PotentialNodes)
 		state.storePodSchedulingContexts(schedulingCtx)
 	}
-	logger.V(5).Info("all potential nodes already set", "pod", klog.KObj(pod), "potentialnodes", nodes)
+	logger.V(5).Info("all potential nodes already set", "pod", klog.KObj(pod), "potentialnodes", klog.KObjSlice(nodes))
 	return nil
 }
 
