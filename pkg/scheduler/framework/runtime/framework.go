@@ -551,17 +551,7 @@ func (p *defaultEnqueueExtension) EventsToRegister() []framework.ClusterEventWit
 	// because the returning values are used to register event handlers.
 	// If we return the wildcard here, it won't affect the event handlers registered by the plugin
 	// and some events may not be registered in the event handlers.
-	return []framework.ClusterEventWithHint{
-		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.All}},
-		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.All}},
-		{Event: framework.ClusterEvent{Resource: framework.CSINode, ActionType: framework.All}},
-		{Event: framework.ClusterEvent{Resource: framework.CSIDriver, ActionType: framework.All}},
-		{Event: framework.ClusterEvent{Resource: framework.CSIStorageCapacity, ActionType: framework.All}},
-		{Event: framework.ClusterEvent{Resource: framework.PersistentVolume, ActionType: framework.All}},
-		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.All}},
-		{Event: framework.ClusterEvent{Resource: framework.StorageClass, ActionType: framework.All}},
-		{Event: framework.ClusterEvent{Resource: framework.PodSchedulingContext, ActionType: framework.All}},
-	}
+	return framework.UnrollWildCardResource()
 }
 
 func updatePluginList(pluginList interface{}, pluginSet config.PluginSet, pluginsMap map[string]framework.Plugin) error {

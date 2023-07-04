@@ -389,18 +389,17 @@ func (p *PriorityQueue) isPodWorthRequeuing(logger klog.Logger, pInfo *framework
 				continue
 			}
 
-			h := hintfn.QueueingHintFn(pod, oldObj, newObj)
-			if h == framework.QueueSkip {
+			switch h := hintfn.QueueingHintFn(pod, oldObj, newObj); h {
+			case framework.QueueSkip:
 				continue
-			}
-
-			if h == framework.QueueImmediately {
+			case framework.QueueImmediately:
 				return h
+			case framework.QueueAfterBackoff:
+				// replace queueHint with the returned value,
+				// but continue to other queueHintFn to check because other plugins may want to return QueueImmediately.
+				queueHint = h
 			}
 
-			// replace queueHint with the returned value,
-			// but continue to other queueHintFn to check because other plugins may want to return QueueImmediately.
-			queueHint = h
 		}
 	}
 
@@ -855,7 +854,7 @@ func (p *PriorityQueue) requeuePodViaQueueingHint(logger klog.Logger, pInfo *fra
 	}
 
 	pod := pInfo.Pod
-	if p.isPodBackingoff(pInfo) && schedulingHint == framework.QueueAfterBackoff {
+	if schedulingHint == framework.QueueAfterBackoff && p.isPodBackingoff(pInfo) {
 		if err := p.podBackoffQ.Add(pInfo); err != nil {
 			logger.Error(err, "Error adding pod to the backoff queue, queue this Pod to unschedulable pod pool", "pod", klog.KObj(pod))
 			p.unschedulablePods.addOrUpdate(pInfo)
@@ -866,9 +865,19 @@ func (p *PriorityQueue) requeuePodViaQueueingHint(logger klog.Logger, pInfo *fra
 		return backoffQ
 	}
 
-	if added, _ := p.addToActiveQ(logger, pInfo); added {
+	// Reach here if schedulingHint is QueueImmediately, or schedulingHint is QueueAfterBackoff but the pod is not backing off.
+
+	added, err := p.addToActiveQ(logger, pInfo)
+	if err != nil {
+		logger.Error(err, "Error adding pod to the active queue, queue this Pod to unschedulable pod pool", "pod", klog.KObj(pod))
+	}
+	if added {
 		metrics.SchedulerQueueIncomingPods.WithLabelValues("active", event).Inc()
 		return activeQ
+	}
+	if pInfo.Gated {
+		// In case the pod is gated, the Pod is pushed back to unschedulable Pods pool in addToActiveQ.
+		return unschedulablePods
 	}
 
 	p.unschedulablePods.addOrUpdate(pInfo)
