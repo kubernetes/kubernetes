@@ -632,3 +632,302 @@ func Test_detectNodeIPs(t *testing.T) {
 		})
 	}
 }
+
+func Test_checkIPConfig(t *testing.T) {
+	cases := []struct {
+		name  string
+		proxy *ProxyServer
+		ssErr bool
+		dsErr bool
+		fatal bool
+	}{
+		{
+			name: "empty config",
+			proxy: &ProxyServer{
+				Config:          &kubeproxyconfig.KubeProxyConfiguration{},
+				PrimaryIPFamily: v1.IPv4Protocol,
+			},
+			ssErr: false,
+			dsErr: false,
+		},
+
+		{
+			name: "ok single-stack clusterCIDR",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					ClusterCIDR: "10.0.0.0/8",
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+			},
+			ssErr: false,
+			dsErr: false,
+		},
+		{
+			name: "ok dual-stack clusterCIDR",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					ClusterCIDR: "10.0.0.0/8,fd01:2345::/64",
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+			},
+			ssErr: false,
+			dsErr: false,
+		},
+		{
+			name: "ok reversed dual-stack clusterCIDR",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					ClusterCIDR: "fd01:2345::/64,10.0.0.0/8",
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+			},
+			ssErr: false,
+			dsErr: false,
+		},
+		{
+			name: "wrong-family clusterCIDR",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					ClusterCIDR: "fd01:2345::/64",
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+			},
+			ssErr: true,
+			dsErr: true,
+			fatal: false,
+		},
+		{
+			name: "wrong-family clusterCIDR when using ClusterCIDR LocalDetector",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					ClusterCIDR:     "fd01:2345::/64",
+					DetectLocalMode: kubeproxyconfig.LocalModeClusterCIDR,
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+			},
+			ssErr: true,
+			dsErr: true,
+			fatal: true,
+		},
+
+		{
+			name: "ok single-stack nodePortAddresses",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					NodePortAddresses: []string{"10.0.0.0/8", "192.168.0.0/24"},
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+			},
+			ssErr: false,
+			dsErr: false,
+		},
+		{
+			name: "ok dual-stack nodePortAddresses",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					NodePortAddresses: []string{"10.0.0.0/8", "fd01:2345::/64", "fd01:abcd::/64"},
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+			},
+			ssErr: false,
+			dsErr: false,
+		},
+		{
+			name: "ok reversed dual-stack nodePortAddresses",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					NodePortAddresses: []string{"fd01:2345::/64", "fd01:abcd::/64", "10.0.0.0/8"},
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+			},
+			ssErr: false,
+			dsErr: false,
+		},
+		{
+			name: "wrong-family nodePortAddresses",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					NodePortAddresses: []string{"10.0.0.0/8"},
+				},
+				PrimaryIPFamily: v1.IPv6Protocol,
+			},
+			ssErr: true,
+			dsErr: true,
+			fatal: false,
+		},
+
+		{
+			name: "ok single-stack node.spec.podCIDRs",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					DetectLocalMode: kubeproxyconfig.LocalModeNodeCIDR,
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+				podCIDRs:        []string{"10.0.0.0/8"},
+			},
+			ssErr: false,
+			dsErr: false,
+		},
+		{
+			name: "ok dual-stack node.spec.podCIDRs",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					DetectLocalMode: kubeproxyconfig.LocalModeNodeCIDR,
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+				podCIDRs:        []string{"10.0.0.0/8", "fd01:2345::/64"},
+			},
+			ssErr: false,
+			dsErr: false,
+		},
+		{
+			name: "ok reversed dual-stack node.spec.podCIDRs",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					DetectLocalMode: kubeproxyconfig.LocalModeNodeCIDR,
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+				podCIDRs:        []string{"fd01:2345::/64", "10.0.0.0/8"},
+			},
+			ssErr: false,
+			dsErr: false,
+		},
+		{
+			name: "wrong-family node.spec.podCIDRs",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					DetectLocalMode: kubeproxyconfig.LocalModeNodeCIDR,
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+				podCIDRs:        []string{"fd01:2345::/64"},
+			},
+			ssErr: true,
+			dsErr: true,
+			fatal: true,
+		},
+
+		{
+			name: "ok winkernel.sourceVip",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					Winkernel: kubeproxyconfig.KubeProxyWinkernelConfiguration{
+						SourceVip: "10.0.0.1",
+					},
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+			},
+			ssErr: false,
+			dsErr: false,
+		},
+		{
+			name: "wrong family winkernel.sourceVip",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					Winkernel: kubeproxyconfig.KubeProxyWinkernelConfiguration{
+						SourceVip: "fd01:2345::1",
+					},
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+			},
+			ssErr: true,
+			dsErr: true,
+			fatal: false,
+		},
+
+		{
+			name: "ok IPv4 metricsBindAddress",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					MetricsBindAddress: "10.0.0.1:9999",
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+			},
+			ssErr: false,
+			dsErr: false,
+		},
+		{
+			name: "ok IPv6 metricsBindAddress",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					MetricsBindAddress: "[fd01:2345::1]:9999",
+				},
+				PrimaryIPFamily: v1.IPv6Protocol,
+			},
+			ssErr: false,
+			dsErr: false,
+		},
+		{
+			name: "ok unspecified wrong-family metricsBindAddress",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					MetricsBindAddress: "0.0.0.0:9999",
+				},
+				PrimaryIPFamily: v1.IPv6Protocol,
+			},
+			ssErr: false,
+			dsErr: false,
+		},
+		{
+			name: "wrong family metricsBindAddress",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					MetricsBindAddress: "10.0.0.1:9999",
+				},
+				PrimaryIPFamily: v1.IPv6Protocol,
+			},
+			ssErr: true,
+			dsErr: false,
+			fatal: false,
+		},
+
+		{
+			name: "ok ipvs.excludeCIDRs",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
+						ExcludeCIDRs: []string{"10.0.0.0/8"},
+					},
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+			},
+			ssErr: false,
+			dsErr: false,
+		},
+		{
+			name: "wrong family ipvs.excludeCIDRs",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
+						ExcludeCIDRs: []string{"10.0.0.0/8", "192.168.0.0/24"},
+					},
+				},
+				PrimaryIPFamily: v1.IPv6Protocol,
+			},
+			ssErr: true,
+			dsErr: false,
+			fatal: false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			err, fatal := checkIPConfig(c.proxy, false)
+			if err != nil && !c.ssErr {
+				t.Errorf("unexpected error in single-stack case: %v", err)
+			} else if err == nil && c.ssErr {
+				t.Errorf("unexpected lack of error in single-stack case")
+			} else if fatal != c.fatal {
+				t.Errorf("expected fatal=%v, got %v", c.fatal, fatal)
+			}
+
+			err, fatal = checkIPConfig(c.proxy, true)
+			if err != nil && !c.dsErr {
+				t.Errorf("unexpected error in dual-stack case: %v", err)
+			} else if err == nil && c.dsErr {
+				t.Errorf("unexpected lack of error in dual-stack case")
+			} else if fatal != c.fatal {
+				t.Errorf("expected fatal=%v, got %v", c.fatal, fatal)
+			}
+		})
+	}
+}
