@@ -295,7 +295,10 @@ var _ = SIGDescribe("Swap [LinuxOnly] [Serial]", func() {
 				if !unified {
 					ginkgo.Skip("skipping swap test for cgroup v1")
 				}
+<<<<<<< HEAD
 
+=======
+>>>>>>> c812f8274fc (drop swap support for cgroup v1)
 				ginkgo.By("by check node status")
 				nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 				framework.ExpectNoError(err)
@@ -317,6 +320,7 @@ var _ = SIGDescribe("Swap [LinuxOnly] [Serial]", func() {
 })
 
 func getCgroupLimit() (uint64, error) {
+<<<<<<< HEAD
 	cgroupfilename := fmt.Sprintf("/sys/fs/cgroup/memory/%s/memory.swap.max", toCgroupFsName(cm.NewCgroupName(cm.RootCgroupName, strings.ToLower(string(v1.PodQOSBurstable)))))
 	bs, err := ioutil.ReadFile(cgroupfilename)
 	if err != nil {

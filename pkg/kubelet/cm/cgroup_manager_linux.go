@@ -772,11 +772,11 @@ var (
 	swapControllerAvailabilityOnce sync.Once
 )
 
+// swap controller is available only if cgroup v2 swap file is accessible.
 func swapControllerAvailable() bool {
 	swapControllerAvailabilityOnce.Do(func() {
-		const warn = "Failed to detect the availability of the swap controller, assuming not available"
-		p := "/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes"
 		if libcontainercgroups.IsCgroup2UnifiedMode() {
+			const warn = "Failed to detect the availability of the swap controller, assuming not available"
 			// memory.swap.max does not exist in the cgroup root, so we check /sys/fs/cgroup/<SELF>/memory.swap.max
 			unified, err := parseCgroupFileUnified("/proc/self/cgroup")
 			if err != nil {
@@ -784,15 +784,15 @@ func swapControllerAvailable() bool {
 				klog.V(5).ErrorS(err, warn)
 				return
 			}
-			p = filepath.Join("/sys/fs/cgroup", unified, "memory.swap.max")
-		}
-		if _, err := os.Stat(p); err != nil {
-			if !errors.Is(err, os.ErrNotExist) {
-				klog.V(5).ErrorS(err, warn)
+			p := filepath.Join("/sys/fs/cgroup", unified, "memory.swap.max")
+			if _, err := os.Stat(p); err != nil {
+				if !errors.Is(err, os.ErrNotExist) {
+					klog.V(5).ErrorS(err, warn)
+				}
+				return
 			}
-			return
+			swapControllerAvailability = true
 		}
-		swapControllerAvailability = true
 	})
 	return swapControllerAvailability
 }
