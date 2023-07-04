@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -47,6 +48,9 @@ type Controller struct {
 	Config
 
 	client kubernetes.Interface
+
+	lock   sync.Mutex
+	stopCh chan struct{} // closed by Stop()
 }
 
 type Config struct {
@@ -67,6 +71,7 @@ func New(config Config, client kubernetes.Interface) *Controller {
 	return &Controller{
 		Config: config,
 		client: client,
+		stopCh: make(chan struct{}),
 	}
 }
 
@@ -81,11 +86,30 @@ func (c *Controller) Start(stopCh <-chan struct{}) {
 		klog.Errorf("Error removing old endpoints from kubernetes service: %v", err)
 	}
 
-	go c.Run(stopCh)
+	localStopCh := make(chan struct{})
+	go func() {
+		defer close(localStopCh)
+		select {
+		case <-stopCh: // from Start
+		case <-c.stopCh: // from Stop
+		}
+	}()
+
+	go c.Run(localStopCh)
 }
 
 // Stop cleans up this API Servers endpoint reconciliation leases so another master can take over more quickly.
 func (c *Controller) Stop() {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	select {
+	case <-c.stopCh:
+		return // only close once
+	default:
+		close(c.stopCh)
+	}
+
 	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https")
 	finishedReconciling := make(chan struct{})
 	go func() {

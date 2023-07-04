@@ -403,6 +403,28 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	// TODO: update to a version that caches success but will recheck on failure, unlike memcache discovery
 	discoveryClientForAdmissionRegistration := clientset.Discovery()
 
+	legacyRESTStorageProvider, err := corerest.New(corerest.Config{
+		GenericConfig: corerest.GenericConfig{
+			StorageFactory:              c.ExtraConfig.StorageFactory,
+			EventTTL:                    c.ExtraConfig.EventTTL,
+			LoopbackClientConfig:        c.GenericConfig.LoopbackClientConfig,
+			ServiceAccountIssuer:        c.ExtraConfig.ServiceAccountIssuer,
+			ExtendExpiration:            c.ExtraConfig.ExtendExpiration,
+			ServiceAccountMaxExpiration: c.ExtraConfig.ServiceAccountMaxExpiration,
+			APIAudiences:                c.GenericConfig.Authentication.APIAudiences,
+			Informers:                   c.ExtraConfig.VersionedInformers,
+		},
+		ProxyTransport:          c.ExtraConfig.ProxyTransport,
+		KubeletClientConfig:     c.ExtraConfig.KubeletClientConfig,
+		ServiceIPRange:          c.ExtraConfig.ServiceIPRange,
+		ServiceSecondaryIPRange: c.ExtraConfig.SecondaryServiceIPRange,
+		ServiceNodePortRange:    c.ExtraConfig.ServiceNodePortRange,
+		ServiceIPRepairInterval: c.ExtraConfig.RepairServicesInterval,
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	// The order here is preserved in discovery.
 	// If resources with identical names exist in more than one of these groups (e.g. "deployments.apps"" and "deployments.extensions"),
 	// the order of this list determines which group an unqualified resource name (e.g. "deployments") should prefer.
@@ -411,23 +433,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	// TODO: describe the priority all the way down in the RESTStorageProviders and plumb it back through the various discovery
 	// handlers that we have.
 	restStorageProviders := []RESTStorageProvider{
-		corerest.LegacyRESTStorageProvider{
-			GenericLegacyRESTStorageProvider: corerest.GenericLegacyRESTStorageProvider{
-				StorageFactory:              c.ExtraConfig.StorageFactory,
-				EventTTL:                    c.ExtraConfig.EventTTL,
-				LoopbackClientConfig:        c.GenericConfig.LoopbackClientConfig,
-				ServiceAccountIssuer:        c.ExtraConfig.ServiceAccountIssuer,
-				ExtendExpiration:            c.ExtraConfig.ExtendExpiration,
-				ServiceAccountMaxExpiration: c.ExtraConfig.ServiceAccountMaxExpiration,
-				APIAudiences:                c.GenericConfig.Authentication.APIAudiences,
-				Informers:                   c.ExtraConfig.VersionedInformers,
-			},
-			ProxyTransport:          c.ExtraConfig.ProxyTransport,
-			KubeletClientConfig:     c.ExtraConfig.KubeletClientConfig,
-			ServiceIPRange:          c.ExtraConfig.ServiceIPRange,
-			SecondaryServiceIPRange: c.ExtraConfig.SecondaryServiceIPRange,
-			ServiceNodePortRange:    c.ExtraConfig.ServiceNodePortRange,
-		},
+		legacyRESTStorageProvider,
 		apiserverinternalrest.StorageProvider{},
 		authenticationrest.RESTStorageProvider{Authenticator: c.GenericConfig.Authentication.Authenticator, APIAudiences: c.GenericConfig.Authentication.APIAudiences},
 		authorizationrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorization.Authorizer, RuleResolver: c.GenericConfig.RuleResolver},
@@ -456,6 +462,30 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 
 	m.GenericAPIServer.AddPostStartHookOrDie("start-system-namespaces-controller", func(hookContext genericapiserver.PostStartHookContext) error {
 		go systemnamespaces.NewController(clientset, c.ExtraConfig.VersionedInformers.Core().V1().Namespaces()).Run(hookContext.StopCh)
+		return nil
+	})
+
+	_, publicServicePort, err := c.GenericConfig.SecureServing.HostPort()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get listener address: %w", err)
+	}
+	kubernetesServiceCtrl := kubernetesservice.New(kubernetesservice.Config{
+		PublicIP: c.GenericConfig.PublicAddress,
+
+		EndpointReconciler: c.ExtraConfig.EndpointReconcilerConfig.Reconciler,
+		EndpointInterval:   c.ExtraConfig.EndpointReconcilerConfig.Interval,
+
+		ServiceIP:                 c.ExtraConfig.APIServerServiceIP,
+		ServicePort:               c.ExtraConfig.APIServerServicePort,
+		PublicServicePort:         publicServicePort,
+		KubernetesServiceNodePort: c.ExtraConfig.KubernetesServiceNodePort,
+	}, clientset)
+	m.GenericAPIServer.AddPostStartHookOrDie("bootstrap-controller", func(hookContext genericapiserver.PostStartHookContext) error {
+		kubernetesServiceCtrl.Start(hookContext.StopCh)
+		return nil
+	})
+	m.GenericAPIServer.AddPreShutdownHookOrDie("stop-kubernetes-service-controller", func() error {
+		kubernetesServiceCtrl.Stop()
 		return nil
 	})
 
@@ -584,40 +614,6 @@ func labelAPIServerHeartbeatFunc(identity string) lease.ProcessLeaseFunc {
 	}
 }
 
-// newKubernetesServiceControllerConfig returns a configuration for the kubernetes service controller.
-func (c completedConfig) newKubernetesServiceControllerConfig(client kubernetes.Interface) (*kubernetesservice.Config, error) {
-	_, publicServicePort, err := c.GenericConfig.SecureServing.HostPort()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get listener address: %w", err)
-	}
-
-	return &kubernetesservice.Config{
-		Client:    client,
-		Informers: c.ExtraConfig.VersionedInformers,
-		KubernetesService: kubernetesservice.KubernetesService{
-			PublicIP: c.GenericConfig.PublicAddress,
-
-			EndpointReconciler: c.ExtraConfig.EndpointReconcilerConfig.Reconciler,
-			EndpointInterval:   c.ExtraConfig.EndpointReconcilerConfig.Interval,
-
-			ServiceIP:                 c.ExtraConfig.APIServerServiceIP,
-			ServicePort:               c.ExtraConfig.APIServerServicePort,
-			PublicServicePort:         publicServicePort,
-			KubernetesServiceNodePort: c.ExtraConfig.KubernetesServiceNodePort,
-		},
-		ClusterIP: kubernetesservice.ClusterIP{
-			ServiceClusterIPRange:          c.ExtraConfig.ServiceIPRange,
-			SecondaryServiceClusterIPRange: c.ExtraConfig.SecondaryServiceIPRange,
-
-			ServiceClusterIPInterval: c.ExtraConfig.RepairServicesInterval,
-		},
-		NodePort: kubernetesservice.NodePort{
-			ServiceNodePortRange:    c.ExtraConfig.ServiceNodePortRange,
-			ServiceNodePortInterval: c.ExtraConfig.RepairServicesInterval,
-		},
-	}, nil
-}
-
 // RESTStorageProvider is a factory type for REST storage.
 type RESTStorageProvider interface {
 	GroupName() string
@@ -667,10 +663,12 @@ func (m *Instance) InstallAPIs(apiResourceConfigSource serverstorage.APIResource
 		}
 
 		if len(groupName) == 0 {
+			// the legacy group for core APIs is special that it is installed into /api via this special install method.
 			if err := m.GenericAPIServer.InstallLegacyAPIGroup(genericapiserver.DefaultLegacyAPIPrefix, &apiGroupInfo); err != nil {
 				return fmt.Errorf("error in registering legacy API: %w", err)
 			}
 		} else {
+			// everything else goes to /apis
 			nonLegacy = append(nonLegacy, &apiGroupInfo)
 		}
 	}
