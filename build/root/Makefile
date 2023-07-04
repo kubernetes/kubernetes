@@ -228,7 +228,7 @@ define TEST_E2E_NODE_HELP_INFO
 #  CONTAINER_RUNTIME_ENDPOINT: remote container endpoint to connect to.
 #    Defaults to "/run/containerd/containerd.sock".
 #  IMAGE_SERVICE_ENDPOINT: remote image endpoint to connect to, to prepull images.
-#    Used when RUNTIME is set to "remote".
+#    Defaults to CONTAINER_RUNTIME_ENDPOINT.
 #  IMAGE_CONFIG_FILE: path to a file containing image configuration.
 #  IMAGE_CONFIG_DIR: path to image config files.
 #  SYSTEM_SPEC_NAME: The name of the system spec to be used for validating the
