@@ -22,9 +22,13 @@ import (
 	"net"
 	"strings"
 
+	genericoptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
+
+	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver/options"
+	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // TODO: Longer term we should read this from some config store, rather than a flag.
@@ -102,6 +106,25 @@ func validateServiceNodePort(options Extra) []error {
 	return errs
 }
 
+func validatePublicIPServiceClusterIPRangeIPFamilies(extra Extra, generic genericoptions.ServerRunOptions) []error {
+	// The "kubernetes.default" Service is SingleStack based on the configured ServiceIPRange.
+	// If the bootstrap controller reconcile the kubernetes.default Service and Endpoints, it must
+	// guarantee that the Service ClusterIPRepairConfig and the associated Endpoints have the same IP family, or
+	// it will not work for clients because of the IP family mismatch.
+	// TODO: revisit for dual-stack https://github.com/kubernetes/enhancements/issues/2438
+	if reconcilers.Type(extra.EndpointReconcilerType) != reconcilers.NoneEndpointReconcilerType {
+		serviceIPRange, _, err := controlplaneapiserver.ServiceIPRange(extra.PrimaryServiceClusterIPRange)
+		if err != nil {
+			return []error{fmt.Errorf("error determining service IP ranges: %w", err)}
+		}
+		if netutils.IsIPv4CIDR(&serviceIPRange) != netutils.IsIPv4(generic.AdvertiseAddress) {
+			return []error{fmt.Errorf("service IP family %q must match public address family %q", extra.PrimaryServiceClusterIPRange.String(), generic.AdvertiseAddress.String())}
+		}
+	}
+
+	return nil
+}
+
 // Validate checks ServerRunOptions and return a slice of found errs.
 func (s CompletedOptions) Validate() []error {
 	var errs []error
@@ -109,6 +132,7 @@ func (s CompletedOptions) Validate() []error {
 	errs = append(errs, s.CompletedOptions.Validate()...)
 	errs = append(errs, validateClusterIPFlags(s.Extra)...)
 	errs = append(errs, validateServiceNodePort(s.Extra)...)
+	errs = append(errs, validatePublicIPServiceClusterIPRangeIPFamilies(s.Extra, *s.GenericServerRunOptions)...)
 
 	return errs
 }
