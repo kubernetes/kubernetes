@@ -141,3 +141,18 @@ func GetClientSet(file string, dryRun bool) (clientset.Interface, error) {
 	}
 	return kubeconfigutil.ClientSetFromFile(file)
 }
+
+// IsPathASymlinkPointingToDir returns true if path is a symlink and it's pointing to dir, false otherwise
+func IsPathASymlinkPointingToDir(path string, targetDir string) bool {
+	fileInfo, err := os.Lstat(path)
+	// return false if path isn't a symlink
+	if err != nil || fileInfo.Mode()&os.ModeSymlink == 0 {
+		return false
+	}
+
+	linkTarget, err := os.Readlink(path)
+	if err != nil {
+		return false
+	}
+	return linkTarget == targetDir
+}

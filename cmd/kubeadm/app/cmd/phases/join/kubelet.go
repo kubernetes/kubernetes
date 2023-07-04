@@ -36,6 +36,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
@@ -173,6 +174,28 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 		kubeletphase.TryStopKubelet()
 	} else {
 		fmt.Println("[kubelet-start] Would stop the kubelet")
+	}
+
+	// Check if the user has added the kubelet --root-dir flag.
+	// If yes, symlink default kubelet directory to that path.
+	val, ok := cfg.NodeRegistration.KubeletExtraArgs["root-dir"]
+	if ok && val != data.KubeletDir() {
+		_, err := os.Stat(val)
+		if os.IsNotExist(err) {
+			if err := os.MkdirAll(val, 0700); err != nil {
+				return errors.Wrapf(err, "error creating kubelet root-dir: %s", val)
+			}
+		}
+
+		if cmdutil.IsPathASymlinkPointingToDir(data.KubeletDir(), val) {
+			fmt.Printf("[kubelet-start] %v is already a symlink to  %v\n", data.KubeletDir(), val)
+		} else {
+			os.Remove(data.KubeletDir())
+			fmt.Printf("[kubelet-start] --root-dir is set, creating a symlink from %v to %v\n", data.KubeletDir(), val)
+			if err := os.Symlink(val, data.KubeletDir()); err != nil {
+				return errors.Wrapf(err, "error creating a symlink from %s to %s\n", data.KubeletDir(), val)
+			}
+		}
 	}
 
 	// Write the configuration for the kubelet (using the bootstrap token credentials) to disk so the kubelet can start

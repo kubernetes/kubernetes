@@ -18,6 +18,7 @@ package phases
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/pkg/errors"
 
@@ -66,6 +67,29 @@ func runKubeletStart(c workflow.RunData) error {
 	if !data.DryRun() {
 		klog.V(1).Infoln("Stopping the kubelet")
 		kubeletphase.TryStopKubelet()
+	}
+
+	// Check if the user has added the kubelet --root-dir flag.
+	// If yes, symlink default kubelet directory to --root-dir.
+	cfg := data.Cfg()
+	val, ok := cfg.NodeRegistration.KubeletExtraArgs["root-dir"]
+	if ok && val != data.KubeletDir() {
+		_, err := os.Stat(val)
+		if os.IsNotExist(err) {
+			if err := os.MkdirAll(val, 0700); err != nil {
+				return errors.Wrapf(err, "error creating kubelet root-dir: %s", val)
+			}
+		}
+
+		if cmdutil.IsPathASymlinkPointingToDir(data.KubeletDir(), val) {
+			fmt.Printf("[kubelet-start] %v is already a symlink to %v\n", data.KubeletDir(), val)
+		} else {
+			os.Remove(data.KubeletDir())
+			fmt.Printf("[kubelet-start] --root-dir is set, creating a symlink from %v to %v\n", data.KubeletDir(), val)
+			if err := os.Symlink(val, data.KubeletDir()); err != nil {
+				return errors.Wrapf(err, "error creating a symlink from %s to %s\n", data.KubeletDir(), val)
+			}
+		}
 	}
 
 	// Write env file with flags for the kubelet to use. We do not need to write the --register-with-taints for the control-plane,

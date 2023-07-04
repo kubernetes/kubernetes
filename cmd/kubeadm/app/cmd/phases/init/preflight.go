@@ -65,6 +65,14 @@ func runPreflight(c workflow.RunData) error {
 		return err
 	}
 
+	val, ok := data.Cfg().NodeRegistration.KubeletExtraArgs["root-dir"]
+	if ok && val != data.KubeletDir() {
+		fmt.Println("[preflight] KubeletRunDirectory is user-specified, checking files info")
+		if err := preflight.RunKubeletDirCheck(utilsexec.New(), data.KubeletDir(), val, data.IgnorePreflightErrors()); err != nil {
+			return err
+		}
+	}
+
 	if data.DryRun() {
 		fmt.Println("[preflight] Would pull the required images (like 'kubeadm config images pull')")
 		return nil

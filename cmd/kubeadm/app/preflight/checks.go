@@ -893,6 +893,56 @@ func (MemCheck) Name() string {
 	return "Mem"
 }
 
+// KubeletDirCheck checks if default kubelet dir and user-specified dir is usable
+type KubeletDirCheck struct {
+	DefaultKubeletDir string
+	UserSpecifiedDir  string
+}
+
+// Name returns the label for KubeletDirCheck
+func (KubeletDirCheck) Name() string {
+	return "KubeletDir"
+}
+
+// Check fileinfos of default kubelet directory and user-specified directory
+func (kdc KubeletDirCheck) Check() (warnings, errorList []error) {
+	// check fileinfo of default kubelet directory
+	defaultKubeletDirInfo, err := os.Lstat(kdc.DefaultKubeletDir)
+	if err != nil && !os.IsNotExist(err) {
+		errorList = append(errorList, errors.Wrapf(err, "failed to lstat default kubelet directory %s", kdc.DefaultKubeletDir))
+		return warnings, errorList
+	}
+	// default kubelet directory should not exist, or be a symlink, or an empty directory
+	if !(os.IsNotExist(err) || defaultKubeletDirInfo.Mode()&os.ModeSymlink != 0 || defaultKubeletDirInfo.Mode().IsDir()) {
+		isEmpty, err := IsDirEmpty(kdc.DefaultKubeletDir)
+		if err != nil {
+			errorList = append(errorList, fmt.Errorf("failed to check if default kubelet directory %s is empty: %w", kdc.DefaultKubeletDir, err))
+			return warnings, errorList
+		}
+		if !isEmpty {
+			errorList = append(errorList, errors.Errorf("default kubelet directory %s exists, and is not symlink or empty dir", kdc.DefaultKubeletDir))
+		}
+		return warnings, errorList
+	}
+
+	// check fileinfo of user-specified kubelet directory
+	userSpecifiedDirInfo, err := os.Stat(kdc.UserSpecifiedDir)
+	if err != nil && !os.IsNotExist(err) {
+		errorList = append(errorList, errors.Wrapf(err, "failed to Stat user-specified kubelet directory %s", kdc.UserSpecifiedDir))
+		return warnings, errorList
+	}
+	// user-specified kubelet directory should not exist or be a directory
+	if !(os.IsNotExist(err) || userSpecifiedDirInfo.Mode().IsDir()) {
+		errorList = append(errorList, errors.Errorf("user-specified kubelet directory %s exists, and is not dir", kdc.UserSpecifiedDir))
+		return warnings, errorList
+	}
+	if isEmpty, _ := IsDirEmpty(kdc.UserSpecifiedDir); !isEmpty {
+		warnings = append(warnings, errors.Errorf("user-specified kubelet directory %s is not empty, and will be cleared by kubeadm reset", kdc.UserSpecifiedDir))
+	}
+
+	return warnings, errorList
+}
+
 func InitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.Set[string], isSecondaryControlPlane bool, downloadCerts bool) ([]Checker, error) {
 	if !isSecondaryControlPlane {
 		// First, check if we're root separately from the other preflight checks and fail fast
@@ -1105,6 +1155,16 @@ func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigur
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
 }
 
+func RunKubeletDirCheck(execer utilsexec.Interface, defaultKubeletDir, userSpecifiedDir string, ignorePreflightErrors sets.Set[string]) error {
+	checks := []Checker{
+		KubeletDirCheck{
+			DefaultKubeletDir: defaultKubeletDir,
+			UserSpecifiedDir:  userSpecifiedDir,
+		},
+	}
+	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
+}
+
 // RunChecks runs each check, displays its warnings/errors, and once all
 // are processed will exit if any errors occurred.
 func RunChecks(checks []Checker, ww io.Writer, ignorePreflightErrors sets.Set[string]) error {
@@ -1152,4 +1212,17 @@ func normalizeURLString(s string) (string, error) {
 		u.Path = strings.ReplaceAll(u.Path, "//", "/")
 	}
 	return u.String(), nil
+}
+
+func IsDirEmpty(dir string) (bool, error) {
+	d, err := os.Open(dir)
+	if err != nil {
+		return false, err
+	}
+	defer d.Close()
+	_, err = d.Readdirnames(1)
+	if err == io.EOF {
+		return true, nil
+	}
+	return false, nil
 }

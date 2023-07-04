@@ -95,6 +95,14 @@ func runPreflight(c workflow.RunData) error {
 		return err
 	}
 
+	val, ok := j.Cfg().NodeRegistration.KubeletExtraArgs["root-dir"]
+	if ok && val != j.KubeletDir() {
+		fmt.Println("[preflight] KubeletRunDirectory is user-specified, checking files info")
+		if err := preflight.RunKubeletDirCheck(utilsexec.New(), j.KubeletDir(), val, j.IgnorePreflightErrors()); err != nil {
+			return err
+		}
+	}
+
 	initCfg, err := j.InitCfg()
 	if err != nil {
 		return err
