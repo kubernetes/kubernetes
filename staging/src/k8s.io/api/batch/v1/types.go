@@ -27,8 +27,8 @@ const (
 	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#label-selector-and-annotation-conventions
 	labelPrefix = "batch.kubernetes.io/"
 
-	// CronJobScheduledTimestampAnnotation is a creation timestamp annotation for the Job.
-	// It records the original/expected creation timestamp for the running job.It is represented in RFC3339. Using
+	// CronJobScheduledTimestampAnnotation is the scheduled timestamp annotation for the Job.
+	// It records the original/expected scheduled timestamp for the running job.It is represented in RFC3339. Using
 	//	the annotation requires the CronJobsScheduledAnnotation feature gate to be	enabled, which is beta.
 	CronJobScheduledTimestampAnnotation = labelPrefix + "cronjob-scheduled-timestamp"
 

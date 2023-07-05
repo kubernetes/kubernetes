@@ -40,12 +40,9 @@ func TestGetJobFromTemplate2(t *testing.T) {
 	// getJobFromTemplate2() needs to take the job template and copy the labels and annotations
 	// and other fields, and add a created-by reference.
 	var (
-		one                 int64 = 1
-		no                  bool
-		timeZoneUTC         = "UTC"
-		timeZoneUnsupported = "Unsupported"
-		timeZoneCorrect     = "Europe/Rome"
-		scheduledTime       = *topOfTheHour()
+		one           int64 = 1
+		no            bool
+		scheduledTime = *topOfTheHour()
 	)
 
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CronJobsScheduledAnnotation, true)()
@@ -56,17 +53,17 @@ func TestGetJobFromTemplate2(t *testing.T) {
 
 	cj := batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:              "mycronjob",
-			Namespace:         "snazzycats",
-			UID:               types.UID("1a2b3c"),
-			CreationTimestamp: metav1.Time{Time: scheduledTime},
+			Name:      "mycronjob",
+			Namespace: "snazzycats",
+			UID:       types.UID("1a2b3c"),
 		},
 		Spec: batchv1.CronJobSpec{
 			Schedule:          "* * * * ?",
 			ConcurrencyPolicy: batchv1.AllowConcurrent,
 			JobTemplate: batchv1.JobTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"a": "b"},
+					CreationTimestamp: metav1.Time{Time: scheduledTime},
+					Labels:            map[string]string{"a": "b"},
 				},
 				Spec: batchv1.JobSpec{
 					ActiveDeadlineSeconds: &one,
@@ -90,46 +87,27 @@ func TestGetJobFromTemplate2(t *testing.T) {
 
 	testCases := []struct {
 		name                        string
-		timeZone                    *string
 		inputAnnotations            map[string]string
-		expectedScheduledTime       func() time.Time
 		expectedNumberOfAnnotations int
 	}{
 		{
-			name:             "UTC timezone and one annotation",
-			timeZone:         &timeZoneUTC,
-			inputAnnotations: map[string]string{"x": "y"},
-			expectedScheduledTime: func() time.Time {
-				return scheduledTime
-			},
+			name:                        "UTC timezone and one annotation",
+			inputAnnotations:            map[string]string{"x": "y"},
 			expectedNumberOfAnnotations: 2,
 		},
 		{
-			name:             "nil timezone and one annotation",
-			timeZone:         nil,
-			inputAnnotations: map[string]string{"x": "y"},
-			expectedScheduledTime: func() time.Time {
-				return scheduledTime
-			},
+			name:                        "nil timezone and one annotation",
+			inputAnnotations:            map[string]string{"x": "y"},
 			expectedNumberOfAnnotations: 2,
 		},
 		{
-			name:             "unsupported timezone and one annotation",
-			timeZone:         &timeZoneUnsupported,
-			inputAnnotations: map[string]string{"x": "y"},
-			expectedScheduledTime: func() time.Time {
-				return scheduledTime
-			},
+			name:                        "unsupported timezone and one annotation",
+			inputAnnotations:            map[string]string{"x": "y"},
 			expectedNumberOfAnnotations: 2,
 		},
 		{
-			name:             "correct timezone and multiple annotation",
-			timeZone:         &timeZoneCorrect,
-			inputAnnotations: map[string]string{"x": "y", "z": "x"},
-			expectedScheduledTime: func() time.Time {
-				location, _ := time.LoadLocation(timeZoneCorrect)
-				return scheduledTime.In(location)
-			},
+			name:                        "correct timezone and multiple annotation",
+			inputAnnotations:            map[string]string{"x": "y", "z": "x"},
 			expectedNumberOfAnnotations: 3,
 		},
 	}
@@ -137,10 +115,9 @@ func TestGetJobFromTemplate2(t *testing.T) {
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
 			cj.Spec.JobTemplate.Annotations = tt.inputAnnotations
-			cj.Spec.TimeZone = tt.timeZone
 
 			var job *batchv1.Job
-			job, err := getJobFromTemplate2(ctx, &cj, scheduledTime)
+			job, err := getJobFromTemplate2(&cj, scheduledTime)
 			if err != nil {
 				t.Errorf("Did not expect error: %s", err)
 			}
@@ -155,8 +132,8 @@ func TestGetJobFromTemplate2(t *testing.T) {
 			}
 
 			scheduledAnnotation := job.ObjectMeta.Annotations[batchv1.CronJobScheduledTimestampAnnotation]
-			if len(job.ObjectMeta.Annotations) != 0 && scheduledAnnotation != tt.expectedScheduledTime().Format(time.RFC3339) {
-				t.Errorf("Wrong cronJob scheduled timestamp annotation, expexted %s, got %s.", tt.expectedScheduledTime().Format(time.RFC3339), scheduledAnnotation)
+			if len(job.ObjectMeta.Annotations) != 0 && scheduledAnnotation != scheduledTime.Format(time.RFC3339) {
+				t.Errorf("Wrong cronJob scheduled timestamp annotation, expexted %s, got %s.", scheduledTime.Format(time.RFC3339), scheduledAnnotation)
 			}
 		})
 	}

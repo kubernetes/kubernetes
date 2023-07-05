@@ -1163,9 +1163,6 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 		tc := tc
 
 		t.Run(name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
 			cj := cronJob()
 			cj.Spec.ConcurrencyPolicy = tc.concurrencyPolicy
 			cj.Spec.Suspend = &tc.suspend
@@ -1190,7 +1187,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 				if !tc.lastScheduleTime.IsZero() {
 					cj.Status.LastScheduleTime = &metav1.Time{Time: tc.lastScheduleTime}
 				}
-				job, err = getJobFromTemplate2(ctx, &cj, tc.jobCreationTime)
+				job, err = getJobFromTemplate2(&cj, tc.jobCreationTime)
 				if err != nil {
 					t.Fatalf("%s: unexpected error creating a job from template: %v", name, err)
 				}
