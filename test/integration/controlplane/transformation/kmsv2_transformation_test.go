@@ -647,7 +647,6 @@ resources:
 // 4. when feature flag is re-enabled, loading a encryptionConfig with the same KMSv2 plugin from 2 should work,
 // decryption of data encrypted with v2 should work
 func TestKMSv2FeatureFlag(t *testing.T) {
-
 	encryptionConfig := `
 kind: EncryptionConfiguration
 apiVersion: apiserver.config.k8s.io/v1
@@ -677,19 +676,15 @@ resources:
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
-	restarted := 0
-	defer func() {
-		if restarted == 0 {
-			test.cleanUp()
-		}
-	}()
+
+	defer test.cleanUp()
 
 	test.secret, err = test.createSecret(testSecret, testNamespace)
 	if err != nil {
 		t.Fatalf("Failed to create test secret, error: %v", err)
 	}
 
-	// Since Data Encryption Key (DEK) is randomly generated (per encryption operation), we need to ask KMS Mock for it.
+	// Since Data Encryption Key (DEK) is randomly generated, we need to ask KMS Mock for it.
 	plainTextDEK := pluginMock.LastEncryptRequest()
 
 	secretETCDPath := test.getETCDPathForResource(test.storageConfig.Prefix, "", "secrets", test.secret.Name, test.secret.Namespace)
@@ -762,12 +757,6 @@ resources:
 	if err = test.restartAPIServer(t, encryptionConfig1, false); err != nil {
 		t.Fatalf("Failed to restart api server, error: %v", err)
 	}
-	restarted = 1
-	defer func() {
-		if restarted == 1 {
-			test.cleanUp()
-		}
-	}()
 
 	_, err = test.createSecret("test2", testNamespace)
 	if err != nil {
@@ -783,7 +772,7 @@ resources:
 		t.Fatalf("using a new provider, get Secret %s from %s should return err containing: no matching prefix found. Got err: %v", testSecret, testNamespace, err)
 	}
 	// List all cluster wide secrets should fail
-	_, err = test.restClient.CoreV1().Secrets("").List(context.TODO(), metav1.ListOptions{})
+	_, err = test.restClient.CoreV1().Secrets("").List(ctx, metav1.ListOptions{})
 	if err == nil || !strings.Contains(err.Error(), "no matching prefix found") {
 		t.Fatalf("using a new provider, LIST all Secrets should return err containing: no matching prefix found. Got err: %v", err)
 	}
@@ -794,16 +783,10 @@ resources:
 	if err = test.restartAPIServer(t, encryptionConfig, false); err != nil {
 		t.Fatalf("Failed to restart api server, error: %v", err)
 	}
-	restarted = 2
-	defer func() {
-		if restarted == 2 {
-			test.cleanUp()
-		}
-	}()
 
 	// Getting an old secret that was encrypted by the same plugin should not fail.
 	s, err = test.restClient.CoreV1().Secrets(testNamespace).Get(
-		context.TODO(),
+		ctx,
 		testSecret,
 		metav1.GetOptions{},
 	)

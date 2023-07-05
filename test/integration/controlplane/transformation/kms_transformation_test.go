@@ -46,7 +46,6 @@ import (
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-
 	kmsapi "k8s.io/kms/apis/v1beta1"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/etcd"
@@ -295,7 +294,6 @@ resources:
 // 10. confirm that cluster wide secret read still works
 // 11. confirm that api server can restart with last applied encryption config
 func TestEncryptionConfigHotReload(t *testing.T) {
-
 	encryptionConfig := `
 kind: EncryptionConfiguration
 apiVersion: apiserver.config.k8s.io/v1
@@ -376,10 +374,13 @@ resources:
 	// wait for config to be observed
 	verifyIfKMSTransformersSwapped(t, wantPrefixForSecrets, test)
 
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	t.Cleanup(cancel)
+
 	// run storage migration
 	// get secrets
 	secretsList, err := test.restClient.CoreV1().Secrets("").List(
-		context.TODO(),
+		ctx,
 		metav1.ListOptions{},
 	)
 	if err != nil {
@@ -389,7 +390,7 @@ resources:
 	for _, secret := range secretsList.Items {
 		// update secret
 		_, err = test.restClient.CoreV1().Secrets(secret.Namespace).Update(
-			context.TODO(),
+			ctx,
 			&secret,
 			metav1.UpdateOptions{},
 		)
@@ -400,7 +401,7 @@ resources:
 
 	// get configmaps
 	configmapsList, err := test.restClient.CoreV1().ConfigMaps("").List(
-		context.TODO(),
+		ctx,
 		metav1.ListOptions{},
 	)
 	if err != nil {
@@ -410,7 +411,7 @@ resources:
 	for _, configmap := range configmapsList.Items {
 		// update configmap
 		_, err = test.restClient.CoreV1().ConfigMaps(configmap.Namespace).Update(
-			context.TODO(),
+			ctx,
 			&configmap,
 			metav1.UpdateOptions{},
 		)
@@ -473,7 +474,7 @@ resources:
 
 	// confirm that reading secrets still works
 	_, err = test.restClient.CoreV1().Secrets(testNamespace).Get(
-		context.TODO(),
+		ctx,
 		testSecret,
 		metav1.GetOptions{},
 	)
@@ -482,13 +483,13 @@ resources:
 	}
 
 	// make sure cluster wide secrets read still works
-	_, err = test.restClient.CoreV1().Secrets("").List(context.TODO(), metav1.ListOptions{})
+	_, err = test.restClient.CoreV1().Secrets("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("failed to list secrets, err: %v", err)
 	}
 
 	// make sure cluster wide configmaps read still works
-	_, err = test.restClient.CoreV1().ConfigMaps("").List(context.TODO(), metav1.ListOptions{})
+	_, err = test.restClient.CoreV1().ConfigMaps("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("failed to list configmaps, err: %v", err)
 	}
@@ -500,14 +501,23 @@ resources:
 	restarted = true
 	defer test.cleanUp()
 
-	// confirm that reading secrets still works
+	// confirm that reading a secret still works
 	_, err = test.restClient.CoreV1().Secrets(testNamespace).Get(
-		context.TODO(),
+		ctx,
 		testSecret,
 		metav1.GetOptions{},
 	)
 	if err != nil {
 		t.Fatalf("failed to read secret, err: %v", err)
+	}
+	// confirm that reading cluster wide secrets still works after restart
+	if _, err = test.restClient.CoreV1().Secrets("").List(ctx, metav1.ListOptions{}); err != nil {
+		t.Fatalf("failed to list secrets, err: %v", err)
+	}
+
+	// make sure cluster wide configmaps read still works
+	if _, err = test.restClient.CoreV1().ConfigMaps("").List(ctx, metav1.ListOptions{}); err != nil {
+		t.Fatalf("failed to list configmaps, err: %v", err)
 	}
 }
 

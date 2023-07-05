@@ -102,7 +102,7 @@ func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML strin
 	t := l.(*testing.T)
 	e.apiServer, err = etcd.StartRealAPIServerOrDieForKMS(t, e.getEncryptionOptions(reload))
 	if err != nil {
-		return &e, fmt.Errorf("error while starting KubeAPIServer: %v", err)
+		return &e, fmt.Errorf("error while starting KubeAPIServer: %w", err)
 	}
 	klog.Infof("Started kube-apiserver %v", e.apiServer.Config.Host)
 	e.storageConfig = &e.apiServer.ServerOpts.Etcd.StorageConfig
@@ -133,12 +133,11 @@ func (e *transformTest) cleanUp() {
 }
 
 func (e *transformTest) shutdownAPIServer() {
-	klog.Infof("shutdownAPIServer")
 	e.restClient.CoreV1().Namespaces().Delete(context.TODO(), e.ns.Name, *metav1.NewDeleteOptions(0))
 	e.apiServer.Cleanup()
 }
 
-func (e *transformTest) restartAPIServer(l kubeapiservertesting.Logger, transformerConfigYAML string, reload bool) (err error) {
+func (e *transformTest) restartAPIServer(l kubeapiservertesting.Logger, transformerConfigYAML string, reload bool) error {
 	if transformerConfigYAML != "" {
 		e.transformerConfig = transformerConfigYAML
 		configDir, err := e.createEncryptionConfig()
@@ -148,7 +147,7 @@ func (e *transformTest) restartAPIServer(l kubeapiservertesting.Logger, transfor
 		e.configDir = configDir
 	}
 	t := l.(*testing.T)
-	err = etcd.Restart(t, e.getEncryptionOptions(reload), e.apiServer)
+	err := etcd.Restart(t, e.getEncryptionOptions(reload), e.apiServer)
 	if err != nil {
 		return fmt.Errorf("error while restarting KubeAPIServer: %v", err)
 	}
