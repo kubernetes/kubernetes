@@ -31,7 +31,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.4.0 // indirect
 	github.com/onsi/gomega v1.23.0 // indirect
 	github.com/stretchr/testify v1.8.0 // indirect
-	golang.org/x/mod v0.8.0 // indirect
+	golang.org/x/mod v0.9.0 // indirect
 	golang.org/x/net v0.8.0 // indirect
 	golang.org/x/sys v0.6.0 // indirect
 	golang.org/x/tools v0.6.0 // indirect
