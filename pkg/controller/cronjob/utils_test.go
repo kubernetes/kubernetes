@@ -17,7 +17,6 @@ limitations under the License.
 package cronjob
 
 import (
-	"context"
 	"reflect"
 	"sort"
 	"strings"
@@ -46,10 +45,6 @@ func TestGetJobFromTemplate2(t *testing.T) {
 	)
 
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CronJobsScheduledAnnotation, true)()
-
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
 
 	cj := batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
