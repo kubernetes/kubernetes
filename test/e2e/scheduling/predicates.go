@@ -271,7 +271,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			}
 
 			// remove RuntimeClass
-			_ = cs.NodeV1beta1().RuntimeClasses().Delete(ctx, e2eruntimeclass.PreconfiguredRuntimeClassHandler, metav1.DeleteOptions{})
+			_ = cs.NodeV1().RuntimeClasses().Delete(ctx, e2eruntimeclass.PreconfiguredRuntimeClassHandler, metav1.DeleteOptions{})
 		})
 
 		ginkgo.It("verify pod overhead is accounted for", func(ctx context.Context) {
