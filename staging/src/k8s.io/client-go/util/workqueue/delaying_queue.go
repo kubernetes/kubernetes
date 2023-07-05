@@ -33,15 +33,10 @@ import (
 type DelayingInterface interface {
 	Interface
 	// AddAfter adds an item to the workqueue after the indicated duration has passed
+	// This corresponds to the newer AddWithOptions(item, DelayingOptions{PermitActiveAndWaiting: true, WhenWaiting: TakeShorter, duration: duration})
 	AddAfter(item interface{}, duration time.Duration)
-}
-
-// ExpandedDelayingInterface provides additional control over the behaviour of the delaying behaviour and allows
-// us to keep the original interface intact for legacy clients.
-type ExpandedDelayingInterface interface {
-	DelayingInterface
-	// AddWithOptions allows full control over the delaying queue features.
-	AddWithOptions(item interface{}, opts ExpandedDelayingOptions)
+	// AddWithOptions is newer than AddAfter and allows fuller control over the delaying queue features.
+	AddWithOptions(item interface{}, opts DelayingOptions)
 	// DoneWaiting will remove an item from the 'waiting' queue.
 	// If you want to cancel 'active' queued items you need to call Done().
 	DoneWaiting(item interface{})
@@ -52,8 +47,8 @@ type ExpandedDelayingInterface interface {
 	LenWaiting() int
 }
 
-// ExpandedDelayingOptions toggle implementation specific options for use with ExpandedDelayingInterface
-type ExpandedDelayingOptions struct {
+// DelayingOptions toggle implementation specific options for use with AddWithOptions
+type DelayingOptions struct {
 	// Duration specifies for how long this item should be delayed before being added back into the 'active' queue.
 	Duration time.Duration
 	// Waiting specifies how you want the waitingLoop to treat items that are already present in the 'waiting' queue.
@@ -202,7 +197,6 @@ type delayingType struct {
 }
 
 var _ DelayingInterface = &delayingType{}
-var _ ExpandedDelayingInterface = &delayingType{}
 var _ Interface = &delayingType{}
 
 // waitForAction defines what we are asking the queue to do (which is usually queue an item but can be other things)
@@ -232,7 +226,7 @@ type waitFor struct {
 	// index in the priority queue (heap)
 	index int
 	// options defines how the caller would like the item to behave.
-	options ExpandedDelayingOptions
+	options DelayingOptions
 	// returnCh allows the caller to block pending the processing and to also return
 	// a response value which can represent a stat such as existence or 'waiting' queue length.
 	returnCh chan waitingLoopResponse
@@ -314,28 +308,31 @@ func (q *delayingType) AddAfter(item interface{}, duration time.Duration) {
 	case q.waitingForAddCh <- &waitFor{
 		data:    item,
 		readyAt: q.clock.Now().Add(duration),
-		options: ExpandedDelayingOptions{
+		options: DelayingOptions{
+			// Always take the shorter waiting value to maintain backwards compatibility for existing clients.
+			WhenWaiting: TakeShorter,
+			// Set PermitActiveAndWaiting to true so that the "active" and "waiting" queues act in isolation from each other.
+			// This is the original behaviour of waiting queue and we are keeping it for backwards compatibility
 			PermitActiveAndWaiting: true,
 		}}:
-		// set PermitActiveAndWaiting to true so that the "active" and "waiting" queues act in isolation from each other.
 	}
 }
 
 // AddWithOptions gives callers more control over the queueing behaviour.
 // Calls are asynchronous unless option Synchronous is set.
-func (q *delayingType) AddWithOptions(item interface{}, opts ExpandedDelayingOptions) {
+func (q *delayingType) AddWithOptions(item interface{}, opts DelayingOptions) {
 	q.sendItemToWaitingLoop(item, opts, waitForActionQueue)
 }
 
 // DoneWaiting removes an item from the delayed queue, effectively cancelling its future processing.
 func (q *delayingType) DoneWaiting(item interface{}) {
-	q.sendItemToWaitingLoop(item, ExpandedDelayingOptions{}, waitForActionDoneWaiting)
+	q.sendItemToWaitingLoop(item, DelayingOptions{}, waitForActionDoneWaiting)
 }
 
 // IsWaiting returns a bool indicating whether the given item is queued in the 'waiting' queue.
 // The client can call IsQueued() in order to determine whether an item is queued in the 'active' queue.
 func (q *delayingType) IsWaiting(item interface{}) (bool, time.Duration) {
-	result := q.sendItemToWaitingLoop(item, ExpandedDelayingOptions{Synchronous: true}, waitForActionIsWaiting)
+	result := q.sendItemToWaitingLoop(item, DelayingOptions{Synchronous: true}, waitForActionIsWaiting)
 	if result.exists != nil && result.nextReady != nil {
 		return *result.exists, *result.nextReady
 	}
@@ -345,7 +342,7 @@ func (q *delayingType) IsWaiting(item interface{}) (bool, time.Duration) {
 // LenWaiting returns an int representing the number of items queued in the 'waiting' queue.
 // The client can call Len() in order to determine the number of items in the 'active' queue.
 func (q *delayingType) LenWaiting() int {
-	result := q.sendItemToWaitingLoop(nil, ExpandedDelayingOptions{Synchronous: true}, waitForActionLenWaiting)
+	result := q.sendItemToWaitingLoop(nil, DelayingOptions{Synchronous: true}, waitForActionLenWaiting)
 	if result.length != nil {
 		return *result.length
 	}
@@ -354,7 +351,7 @@ func (q *delayingType) LenWaiting() int {
 
 // nextReady returns the item at the head of the 'waiting' queue and how long it has left to wait.
 func (q *delayingType) nextReady() (interface{}, time.Duration) {
-	result := q.sendItemToWaitingLoop(nil, ExpandedDelayingOptions{Synchronous: true}, waitForActionNextReady)
+	result := q.sendItemToWaitingLoop(nil, DelayingOptions{Synchronous: true}, waitForActionNextReady)
 	if result.nextReady != nil {
 		return result.item, *result.nextReady
 	}
@@ -364,12 +361,12 @@ func (q *delayingType) nextReady() (interface{}, time.Duration) {
 // syncFill blocks until the delaying queue has drained all items from its feeder channel, processed
 // them into their appropriate queue and updated the nextReadyAt time as necessary.
 func (q *delayingType) syncFill() {
-	q.sendItemToWaitingLoop(nil, ExpandedDelayingOptions{Synchronous: true}, waitForActionSyncFill)
+	q.sendItemToWaitingLoop(nil, DelayingOptions{Synchronous: true}, waitForActionSyncFill)
 }
 
 // sendItemToWaitingLoop facilitates the different interface methods and performs the actual add, sending,
 // forgetting an item, by sending an appropriate message through to the waitingLoop.
-func (q *delayingType) sendItemToWaitingLoop(item interface{}, opts ExpandedDelayingOptions, action waitForAction) waitingLoopResponse {
+func (q *delayingType) sendItemToWaitingLoop(item interface{}, opts DelayingOptions, action waitForAction) waitingLoopResponse {
 	var result waitingLoopResponse
 
 	// don't add if we're already shutting down
@@ -450,6 +447,15 @@ func (q *delayingType) waitingLoop() {
 		// Set up a wait for the first item's readyAt (if one exists)
 		q.calculateNextReadyAt(waitingForQueue)
 		q.handleReportingAndSync(waitingForQueue, waitingEntryByData)
+
+		// This check is to ensure that we are always waiting a positive non-zero duration for the nextReady
+		// signal, otherwise ticking a clock to the ready time before hitting the select would cause the
+		// select nextReadyAtTimerCh not to fire.  This check is as close to the select as we can make it.
+		if waitingForQueue.Len() > 0 {
+			if q.headReadyTime.Equal(q.clock.Now()) || q.headReadyTime.Before(q.clock.Now()) {
+				continue
+			}
+		}
 
 		select {
 		case <-q.stopCh:

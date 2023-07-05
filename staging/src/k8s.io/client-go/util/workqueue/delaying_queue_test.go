@@ -102,7 +102,7 @@ func TestImmediateAdd(t *testing.T) {
 	})
 
 	// Add an immediate add with AddWithOptions will remove the waiting item
-	q.AddWithOptions(second, ExpandedDelayingOptions{})
+	q.AddWithOptions(second, DelayingOptions{})
 	q.syncFill()
 	assertDelayedQueueState(t, q, QueueState{
 		active: []interface{}{first},
@@ -120,7 +120,7 @@ func TestImmediateAdd(t *testing.T) {
 	q.Done(item)
 
 	// Show that AddWithOptions with the PermitActiveAndWaiting option gives us the original behaviour again
-	q.AddWithOptions(second, ExpandedDelayingOptions{PermitActiveAndWaiting: true})
+	q.AddWithOptions(second, DelayingOptions{PermitActiveAndWaiting: true})
 	q.syncFill()
 	assertDelayedQueueState(t, q, QueueState{
 		active:  []interface{}{second},
@@ -145,19 +145,19 @@ func TestOptionsTakeLongerTakeExisting(t *testing.T) {
 	q.AddAfter(first, 2*time.Second)
 
 	// attempt to immediately add an item using TakeLonger option
-	q.AddWithOptions(second, ExpandedDelayingOptions{WhenWaiting: TakeLonger})
+	q.AddWithOptions(second, DelayingOptions{WhenWaiting: TakeLonger})
 	assertDelayedQueueState(t, q, QueueState{
 		waiting: []interface{}{first},
 	})
 
 	// attempt to immediately add an item using TakeExisting option
-	q.AddWithOptions(second, ExpandedDelayingOptions{WhenWaiting: TakeExisting})
+	q.AddWithOptions(second, DelayingOptions{WhenWaiting: TakeExisting})
 	assertDelayedQueueState(t, q, QueueState{
 		waiting: []interface{}{first},
 	})
 
 	// attempt to add an item not queued should queue successfully...
-	q.AddWithOptions(third, ExpandedDelayingOptions{WhenWaiting: TakeExisting})
+	q.AddWithOptions(third, DelayingOptions{WhenWaiting: TakeExisting})
 	assertDelayedQueueState(t, q, QueueState{
 		active:  []interface{}{third},
 		waiting: []interface{}{first},
@@ -178,7 +178,7 @@ func TestOptionsTakeLongerTakeExisting(t *testing.T) {
 	q.Done(item)
 
 	// add the second item again with DropIfWaiting which should now succeed
-	q.AddWithOptions(second, ExpandedDelayingOptions{WhenWaiting: TakeExisting})
+	q.AddWithOptions(second, DelayingOptions{WhenWaiting: TakeExisting})
 	assertDelayedQueueState(t, q, QueueState{
 		active: []interface{}{second},
 	})
@@ -197,7 +197,7 @@ func TestDelayedInsertTakeShorter(t *testing.T) {
 	q.AddAfter(first, 10*time.Second)
 	q.AddAfter(second, 10*time.Second)
 	// attempt add delayed again with a shorter time time out and TakeShorter option.
-	q.AddWithOptions(third, ExpandedDelayingOptions{Duration: 1 * time.Second, WhenWaiting: TakeShorter})
+	q.AddWithOptions(third, DelayingOptions{Duration: 1 * time.Second, WhenWaiting: TakeShorter})
 	q.syncFill()
 	// step past the shorter item and confirm that it got queued.
 	fakeClock.Step(2 * time.Second)
@@ -225,7 +225,7 @@ func TestDelayedInsertTakeLonger(t *testing.T) {
 	q.AddAfter(first, 60*time.Second)
 	q.AddAfter(second, 5*time.Second)
 	// attempt add delayed again with a shorter time time out and TakeLonger option.
-	q.AddWithOptions(third, ExpandedDelayingOptions{Duration: 1 * time.Second, WhenWaiting: TakeLonger})
+	q.AddWithOptions(third, DelayingOptions{Duration: 1 * time.Second, WhenWaiting: TakeLonger})
 	q.syncFill()
 	// step past the shorter item and confirm that it didn't get queued
 	fakeClock.Step(2 * time.Second)
@@ -233,7 +233,7 @@ func TestDelayedInsertTakeLonger(t *testing.T) {
 		t.Fatalf("expected timeout, got: %v", err)
 	}
 	// Add a longer delay with the expectation of pushing the ready later...
-	q.AddWithOptions(fourth, ExpandedDelayingOptions{Duration: 20 * time.Second, WhenWaiting: TakeLonger})
+	q.AddWithOptions(fourth, DelayingOptions{Duration: 20 * time.Second, WhenWaiting: TakeLonger})
 	q.syncFill()
 	// step past the original delayed item and check it queues.
 	fakeClock.Step(4 * time.Second)
@@ -267,7 +267,7 @@ func TestDelayedInsertTakeIncoming(t *testing.T) {
 	// Shorter case...
 	q.AddAfter(second, 5*time.Second)
 	// attempt add delayed again with a shorter time time out and TakeShorter option.
-	q.AddWithOptions(third, ExpandedDelayingOptions{Duration: 1 * time.Second, WhenWaiting: TakeIncoming})
+	q.AddWithOptions(third, DelayingOptions{Duration: 1 * time.Second, WhenWaiting: TakeIncoming})
 	q.syncFill()
 	// step past the shorter item and confirm that it got queued
 	fakeClock.Step(2 * time.Second)
@@ -284,7 +284,7 @@ func TestDelayedInsertTakeIncoming(t *testing.T) {
 	// Longer case...
 	q.AddAfter(fourth, 5*time.Second)
 	// attempt add delayed again with a shorter time time out and TakeIncoming option.
-	q.AddWithOptions(fifth, ExpandedDelayingOptions{Duration: 20 * time.Second, WhenWaiting: TakeIncoming})
+	q.AddWithOptions(fifth, DelayingOptions{Duration: 20 * time.Second, WhenWaiting: TakeIncoming})
 	q.syncFill()
 	// step past the first waiting time... and prove the original delay got increased by the incoming.
 	fakeClock.Step(10 * time.Second)
@@ -330,7 +330,6 @@ func TestRemoveWaiting(t *testing.T) {
 	})
 
 	fakeClock.Step(2 * time.Second)
-
 	if err := waitForActiveQueueDepth(q, 2); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -505,10 +504,10 @@ func TestReportQueueState(t *testing.T) {
 	}
 
 	// Add some items to the 'waiting' queue
-	q.AddWithOptions(first, ExpandedDelayingOptions{Duration: 5 * time.Second})
-	q.AddWithOptions(second, ExpandedDelayingOptions{Duration: 10 * time.Second})
-	q.AddWithOptions(third, ExpandedDelayingOptions{Duration: 10 * time.Second})
-	q.AddWithOptions(fourth, ExpandedDelayingOptions{Duration: 15 * time.Second})
+	q.AddWithOptions(first, DelayingOptions{Duration: 5 * time.Second})
+	q.AddWithOptions(second, DelayingOptions{Duration: 10 * time.Second})
+	q.AddWithOptions(third, DelayingOptions{Duration: 10 * time.Second})
+	q.AddWithOptions(fourth, DelayingOptions{Duration: 15 * time.Second})
 	if q.LenWaiting() != 4 {
 		t.Fatal("there should be 4 items in the waiting queue")
 	}
@@ -555,7 +554,7 @@ func TestCalculatenextReadyAt(t *testing.T) {
 	}
 
 	// the next ready at should take on the value of the first item queued
-	q.AddWithOptions(first, ExpandedDelayingOptions{Duration: 5 * time.Second})
+	q.AddWithOptions(first, DelayingOptions{Duration: 5 * time.Second})
 	item, ready = q.nextReady()
 	if item != first {
 		t.Fatal("the next ready item should be the item when there is only one queued")
@@ -574,7 +573,7 @@ func TestCalculatenextReadyAt(t *testing.T) {
 	}
 
 	// the next ready at should update when a new shortest item is added
-	q.AddWithOptions(second, ExpandedDelayingOptions{Duration: 30 * time.Second})
+	q.AddWithOptions(second, DelayingOptions{Duration: 30 * time.Second})
 	item, ready = q.nextReady()
 	if item != second {
 		t.Fatal("the next ready item should be the item when there is only one queued")
@@ -584,7 +583,7 @@ func TestCalculatenextReadyAt(t *testing.T) {
 	}
 
 	// the next ready at time should not change unless the head changes
-	q.AddWithOptions(third, ExpandedDelayingOptions{Duration: 40 * time.Second})
+	q.AddWithOptions(third, DelayingOptions{Duration: 40 * time.Second})
 	item, ready = q.nextReady()
 	if item != second {
 		t.Fatal("the second item should still be the next ready")
@@ -594,7 +593,7 @@ func TestCalculatenextReadyAt(t *testing.T) {
 	}
 
 	// and it should updated when the head changes...
-	q.AddWithOptions(fourth, ExpandedDelayingOptions{Duration: 20 * time.Second})
+	q.AddWithOptions(fourth, DelayingOptions{Duration: 20 * time.Second})
 	item, ready = q.nextReady()
 	if item != fourth {
 		t.Fatal("the forth item should be the next ready")
@@ -630,8 +629,8 @@ func TestCalculatenextReadyAt(t *testing.T) {
 	}
 
 	// the next ready at time should change when an immediate item pre-empts the 'waiting' item
-	q.AddWithOptions(fifth, ExpandedDelayingOptions{Duration: 30 * time.Second})
-	q.AddWithOptions(third, ExpandedDelayingOptions{})
+	q.AddWithOptions(fifth, DelayingOptions{Duration: 30 * time.Second})
+	q.AddWithOptions(third, DelayingOptions{})
 	item, ready = q.nextReady()
 	if item != fifth {
 		t.Fatal("the fifth item should be the next ready")
