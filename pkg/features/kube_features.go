@@ -431,17 +431,6 @@ const (
 	// Track the number of pods with Ready condition in the Job status.
 	JobReadyPods featuregate.Feature = "JobReadyPods"
 
-	// owner: @alculquicondor
-	// alpha: v1.22
-	// beta: v1.23
-	// stable: v1.26
-	//
-	// Track Job completion without relying on Pod remaining in the cluster
-	// indefinitely. Pod finalizers, in addition to a field in the Job status
-	// allow the Job controller to keep track of Pods that it didn't account for
-	// yet.
-	JobTrackingWithFinalizers featuregate.Feature = "JobTrackingWithFinalizers"
-
 	// owner: @marquiz
 	// kep: http://kep.k8s.io/4033
 	// alpha: v1.28
@@ -1069,8 +1058,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	JobPodReplacementPolicy: {Default: false, PreRelease: featuregate.Alpha},
 
 	JobReadyPods: {Default: true, PreRelease: featuregate.Beta},
-
-	JobTrackingWithFinalizers: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 
 	KubeletCgroupDriverFromCRI: {Default: false, PreRelease: featuregate.Alpha},
 
