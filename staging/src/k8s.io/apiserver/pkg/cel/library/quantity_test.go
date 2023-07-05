@@ -170,6 +170,21 @@ func TestQuantity(t *testing.T) {
 			name: "quantity_greater",
 			expr: `quantity("50Mi").isGreaterThan(quantity("50M"))`,
 		},
+		{
+			name:        "compare_inquality",
+			expr:        `quantity("200M").compareTo(quantity("0.3G"))`,
+			expectValue: -1,
+		},
+		{
+			name:        "compare_less",
+			expr:        `quantity("50M").compareTo(quantity("50Mi"))`,
+			expectValue: -1,
+		},
+		{
+			name:        "compare_greater",
+			expr:        `quantity("50Mi").compareTo(quantity("50M"))`,
+			expectValue: 1,
+		},
 	}
 
 	for _, c := range cases {

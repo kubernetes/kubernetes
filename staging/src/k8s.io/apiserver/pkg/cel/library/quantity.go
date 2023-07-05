@@ -29,6 +29,9 @@ var quantityLibraryDecls = map[string][]cel.FunctionOpt{
 	"isLessThan": {
 		cel.MemberOverload("quantity_is_less_than", []*cel.Type{apiservercel.QuantityType, apiservercel.QuantityType}, cel.BoolType, cel.BinaryBinding(quantityIsLessThan)),
 	},
+	"compareTo": {
+		cel.MemberOverload("quantity_compare_to", []*cel.Type{apiservercel.QuantityType, apiservercel.QuantityType}, cel.IntType, cel.BinaryBinding(quantityCompareTo)),
+	},
 	"asApproximateFloat": {
 		cel.MemberOverload("quantity_get_float", []*cel.Type{apiservercel.QuantityType}, cel.DoubleType, cel.UnaryBinding(quantityGetApproximateFloat)),
 	},
@@ -119,4 +122,18 @@ func quantityIsLessThan(arg ref.Val, other ref.Val) ref.Val {
 	}
 
 	return types.Bool(q.Cmp(*q2) == 1)
+}
+
+func quantityCompareTo(arg ref.Val, other ref.Val) ref.Val {
+	q, ok := arg.Value().(*resource.Quantity)
+	if !ok {
+		return types.MaybeNoSuchOverloadErr(arg)
+	}
+
+	q2, ok := other.Value().(*resource.Quantity)
+	if !ok {
+		return types.MaybeNoSuchOverloadErr(arg)
+	}
+
+	return types.Int(q.Cmp(*q2))
 }
