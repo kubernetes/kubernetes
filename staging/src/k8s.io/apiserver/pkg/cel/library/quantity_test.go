@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common"
+	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/ext"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -184,6 +185,25 @@ func TestQuantity(t *testing.T) {
 			name:        "compare_greater",
 			expr:        `quantity("50Mi").compareTo(quantity("50M"))`,
 			expectValue: 1,
+		},
+		{
+			name: "add_int",
+			expr: `quantity("50k").add(20) == quantity("50020")`,
+		},
+		{
+			name:        "arith_chain",
+			expr:        `quantity("50k").add(20).sub(quantity("100k")).sub(-50000).asInteger()`,
+			expectValue: 20,
+		},
+		{
+			name:        "as_integer",
+			expr:        `quantity("50k").asInteger()`,
+			expectValue: 50000,
+		},
+		{
+			name:        "as_float",
+			expr:        `quantity("50.703k").asApproximateFloat()`,
+			expectValue: types.Double(50703),
 		},
 	}
 
