@@ -185,6 +185,9 @@ func WithBuiltinTemplateFuncs(tmpl *template.Template) *template.Template {
 
 			return copyDict, nil
 		},
+		"list": func(values ...any) ([]any, error) {
+			return values, nil
+		},
 		"add": func(value, operand int) int {
 			return value + operand
 		},
