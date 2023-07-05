@@ -517,6 +517,7 @@ func AfterReadingAllFlags(t *TestContextType) {
 
 	// ginkgo.PreviewSpecs will expand all nodes and thus may find new bugs.
 	report := ginkgo.PreviewSpecs("Kubernetes e2e test statistics")
+	validateSpecs(report.SpecReports)
 	if err := FormatBugs(); CheckForBugs && err != nil {
 		// Refuse to do anything if the E2E suite is buggy.
 		fmt.Fprint(Output, "ERROR: E2E suite initialization was faulty, these errors must be fixed:")
