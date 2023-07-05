@@ -267,7 +267,7 @@ func (m *cgroupManagerImpl) Validate(name CgroupName) error {
 	// in https://github.com/opencontainers/runc/issues/1440
 	// once resolved, we can remove this code.
 	allowlistControllers := sets.NewString("cpu", "cpuacct", "cpuset", "memory", "systemd", "pids")
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeSwap) && swapControllerAvailable() {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeSwap) && swapControllerV2Available() {
 		allowlistControllers.Insert(string(nodev1.ResourceSwap))
 	}
 
@@ -371,7 +371,7 @@ func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcont
 	}
 	if resourceConfig.Memory != nil {
 		resources.Memory = *resourceConfig.Memory
-		if resourceConfig.Swap != nil && swapControllerAvailable() {
+		if resourceConfig.Swap != nil && swapControllerV2Available() {
 			if libcontainercgroups.IsCgroup2UnifiedMode() {
 				if resources.Unified == nil {
 					resources.Unified = make(map[string]string)
@@ -774,7 +774,7 @@ var (
 )
 
 // swap controller is available only if cgroup v2 swap file is accessible.
-func swapControllerAvailable() bool {
+func swapControllerV2Available() bool {
 	swapControllerAvailabilityOnce.Do(func() {
 		if libcontainercgroups.IsCgroup2UnifiedMode() {
 			const warn = "Failed to detect the availability of the swap controller, assuming not available"

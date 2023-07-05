@@ -23,7 +23,6 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -31,25 +30,20 @@ import (
 	"github.com/google/cadvisor/machine"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
+	nodev1 "k8s.io/api/node/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/kubernetes/pkg/features"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
-
-	"github.com/onsi/ginkgo/v2"
-	nodev1 "k8s.io/api/node/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	"k8s.io/kubernetes/pkg/kubelet/cm"
-	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 const (
@@ -288,9 +282,9 @@ var _ = SIGDescribe("System reserved swap [LinuxOnly] [Serial]", func() {
 		if swapCapacity > revervedSwapSizeBytes {
 			tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 				initialConfig.FailSwapOn = false
-				initialConfig.FeatureGates[string(kubefeatures.NodeSwap)] = true
+				initialConfig.FeatureGates[string(features.NodeSwap)] = true
 				// to test
-				initialConfig.FeatureGates[string(kubefeatures.PDBUnhealthyPodEvictionPolicy)] = true
+				initialConfig.FeatureGates[string(features.PDBUnhealthyPodEvictionPolicy)] = true
 				initialConfig.MemorySwap = kubeletconfig.MemorySwapConfiguration{
 					SwapBehavior: "LimitedSwap",
 				}
@@ -305,6 +299,7 @@ var _ = SIGDescribe("System reserved swap [LinuxOnly] [Serial]", func() {
 				if !unified {
 					ginkgo.Skip("skipping swap test for cgroup v1")
 				}
+
 				ginkgo.By("by check node status")
 				nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 				framework.ExpectNoError(err)
@@ -326,7 +321,7 @@ var _ = SIGDescribe("System reserved swap [LinuxOnly] [Serial]", func() {
 })
 
 func getCgroupLimit() (uint64, error) {
-	cgroupfilename := fmt.Sprintf("/sys/fs/cgroup/memory/%s/memory.swap.max", toCgroupFsName(cm.NewCgroupName(cm.RootCgroupName, defaultNodeAllocatableCgroup)))
+	cgroupfilename := fmt.Sprintf("/sys/fs/cgroup/memory/%s/memory.swap.max", toCgroupFsName(cm.NewCgroupName(cm.RootCgroupName, strings.ToLower(string(v1.PodQOSBurstable)))))
 	bs, err := ioutil.ReadFile(cgroupfilename)
 	if err != nil {
 		return 0, err
