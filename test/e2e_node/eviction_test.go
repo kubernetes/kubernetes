@@ -477,42 +477,52 @@ var _ = SIGDescribe("PriorityPidEvictionOrdering", framework.WithSlow(), framewo
 	highPriority := int32(999999999)
 	processes := 30000
 
-	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
-		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			pidsConsumed := int64(10000)
-			summary := eventuallyGetSummary(ctx)
-			availablePids := *(summary.Node.Rlimit.MaxPID) - *(summary.Node.Rlimit.NumOfRunningProcesses)
-			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalPIDAvailable): fmt.Sprintf("%d", availablePids-pidsConsumed)}
-			initialConfig.EvictionMinimumReclaim = map[string]string{}
-		})
-		ginkgo.BeforeEach(func(ctx context.Context) {
-			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(ctx, &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName}, Value: highPriority}, metav1.CreateOptions{})
-			if err != nil && !apierrors.IsAlreadyExists(err) {
-				framework.ExpectNoError(err, "failed to create priority class")
+	// if criStats is true, PodAndContainerStatsFromCRI will use data from cri instead of cadvisor for kubelet to get pid count of pods
+	for _, criStats := range []bool{true, false} {
+		ginkgo.Context(fmt.Sprintf("when we run containers with PodAndContainerStatsFromCRI=%v that should cause %s", criStats, expectedNodeCondition), func() {
+			tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+				pidsConsumed := int64(10000)
+				summary := eventuallyGetSummary(ctx)
+				availablePids := *(summary.Node.Rlimit.MaxPID) - *(summary.Node.Rlimit.NumOfRunningProcesses)
+				initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalPIDAvailable): fmt.Sprintf("%d", availablePids-pidsConsumed)}
+				initialConfig.EvictionMinimumReclaim = map[string]string{}
+				if initialConfig.FeatureGates == nil {
+					initialConfig.FeatureGates = make(map[string]bool)
+				}
+				if criStats {
+					initialConfig.FeatureGates["PodAndContainerStatsFromCRI"] = true
+				}
+
+			})
+			ginkgo.BeforeEach(func(ctx context.Context) {
+				_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(ctx, &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName}, Value: highPriority}, metav1.CreateOptions{})
+				if err != nil && !apierrors.IsAlreadyExists(err) {
+					framework.ExpectNoError(err, "failed to create priority class")
+				}
+			})
+			ginkgo.AfterEach(func(ctx context.Context) {
+				err := f.ClientSet.SchedulingV1().PriorityClasses().Delete(ctx, highPriorityClassName, metav1.DeleteOptions{})
+				framework.ExpectNoError(err)
+			})
+			specs := []podEvictSpec{
+				{
+					evictionPriority: 2,
+					pod:              pidConsumingPod("fork-bomb-container-with-low-priority", processes),
+				},
+				{
+					evictionPriority: 0,
+					pod:              innocentPod(),
+				},
+				{
+					evictionPriority: 1,
+					pod:              pidConsumingPod("fork-bomb-container-with-high-priority", processes),
+				},
 			}
+			specs[1].pod.Spec.PriorityClassName = highPriorityClassName
+			specs[2].pod.Spec.PriorityClassName = highPriorityClassName
+			runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logPidMetrics, specs)
 		})
-		ginkgo.AfterEach(func(ctx context.Context) {
-			err := f.ClientSet.SchedulingV1().PriorityClasses().Delete(ctx, highPriorityClassName, metav1.DeleteOptions{})
-			framework.ExpectNoError(err)
-		})
-		specs := []podEvictSpec{
-			{
-				evictionPriority: 2,
-				pod:              pidConsumingPod("fork-bomb-container-with-low-priority", processes),
-			},
-			{
-				evictionPriority: 0,
-				pod:              innocentPod(),
-			},
-			{
-				evictionPriority: 1,
-				pod:              pidConsumingPod("fork-bomb-container-with-high-priority", processes),
-			},
-		}
-		specs[1].pod.Spec.PriorityClassName = highPriorityClassName
-		specs[2].pod.Spec.PriorityClassName = highPriorityClassName
-		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logPidMetrics, specs)
-	})
+	}
 
 	f.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition)+"; baseline scenario to verify DisruptionTarget is added", func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
