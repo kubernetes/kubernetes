@@ -643,7 +643,7 @@ func (b *builder) parameters(kv ...string) *v1.ConfigMap {
 // makePod returns a simple pod with no resource claims.
 // The pod prints its env and waits.
 func (b *builder) pod() *v1.Pod {
-	pod := e2epod.MakePod(b.f.Namespace.Name, nil, nil, false, "env && sleep 100000")
+	pod := e2epod.MakePod(b.f.Namespace.Name, nil, nil, b.f.NamespacePodSecurityLevel, "env && sleep 100000")
 	pod.Labels = make(map[string]string)
 	pod.Spec.RestartPolicy = v1.RestartPolicyNever
 	// Let kubelet kill the pods quickly. Setting

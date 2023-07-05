@@ -489,7 +489,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		actualPVSize := c.Status.Capacity.Storage().Value()
 
 		createdClaims := []*v1.PersistentVolumeClaim{c}
-		pod, err := e2epod.CreatePod(ctx, l.testCase.Client, f.Namespace.Name, nil, createdClaims, true, "")
+		pod, err := e2epod.CreatePod(ctx, l.testCase.Client, f.Namespace.Name, nil, createdClaims, f.NamespacePodSecurityLevel, "")
 		framework.ExpectNoError(err, "Failed to create pod: %v", err)
 
 		// Mount path should not be empty.
@@ -514,7 +514,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		c2, err := l.testCase.Client.CoreV1().PersistentVolumeClaims(pvc2.Namespace).Create(ctx, pvc2, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Failed to create pvc: %v", err)
 		createdClaims2 := []*v1.PersistentVolumeClaim{c2}
-		pod2, err := e2epod.CreatePod(ctx, l.testCase.Client, f.Namespace.Name, nil, createdClaims2, true, "")
+		pod2, err := e2epod.CreatePod(ctx, l.testCase.Client, f.Namespace.Name, nil, createdClaims2, f.NamespacePodSecurityLevel, "")
 		framework.ExpectNoError(err, "Failed to create pod: %v", err)
 
 		// Mount path should not be empty.
@@ -1010,9 +1010,9 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(ctx context.Co
 	// Create a pod referring to the claim and wait for it to get to running
 	var pod *v1.Pod
 	if expectUnschedulable {
-		pod, err = e2epod.CreateUnschedulablePod(ctx, t.Client, namespace, nodeSelector, createdClaims, true /* isPrivileged */, "" /* command */)
+		pod, err = e2epod.CreateUnschedulablePod(ctx, t.Client, namespace, nodeSelector, createdClaims, admissionapi.LevelPrivileged, "" /* command */)
 	} else {
-		pod, err = e2epod.CreatePod(ctx, t.Client, namespace, nil /* nodeSelector */, createdClaims, true /* isPrivileged */, "" /* command */)
+		pod, err = e2epod.CreatePod(ctx, t.Client, namespace, nil /* nodeSelector */, createdClaims, admissionapi.LevelPrivileged, "" /* command */)
 	}
 	framework.ExpectNoError(err)
 	ginkgo.DeferCleanup(func(ctx context.Context) error {
