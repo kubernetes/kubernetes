@@ -23,15 +23,15 @@ import (
 	"sync"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/klog/v2"
-
-	"k8s.io/apimachinery/pkg/util/wait"
-
 	units "github.com/docker/go-units"
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
+	v1 "k8s.io/api/core/v1"
+	nodev1 "k8s.io/api/node/v1"
+	resourceapi "k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -58,6 +58,7 @@ type qosContainerManagerImpl struct {
 	getNodeAllocatable func() v1.ResourceList
 	cgroupRoot         CgroupName
 	qosReserved        map[v1.ResourceName]int64
+	systemReserved     v1.ResourceList
 }
 
 func NewQOSContainerManager(subsystems *CgroupSubsystems, cgroupRoot CgroupName, nodeConfig NodeConfig, cgroupManager CgroupManager) (QOSContainerManager, error) {
@@ -68,10 +69,11 @@ func NewQOSContainerManager(subsystems *CgroupSubsystems, cgroupRoot CgroupName,
 	}
 
 	return &qosContainerManagerImpl{
-		subsystems:    subsystems,
-		cgroupManager: cgroupManager,
-		cgroupRoot:    cgroupRoot,
-		qosReserved:   nodeConfig.QOSReserved,
+		subsystems:     subsystems,
+		cgroupManager:  cgroupManager,
+		cgroupRoot:     cgroupRoot,
+		qosReserved:    nodeConfig.QOSReserved,
+		systemReserved: nodeConfig.SystemReserved,
 	}, nil
 }
 
@@ -94,7 +96,7 @@ func (m *qosContainerManagerImpl) Start(getNodeAllocatable func() v1.ResourceLis
 	}
 
 	// Create containers for both qos classes
-	for qosClass, containerName := range qosClasses {
+	for qosClass, cgroupName := range qosClasses {
 		resourceParameters := &ResourceConfig{}
 		// the BestEffort QoS class has a statically configured minShares value
 		if qosClass == v1.PodQOSBestEffort {
@@ -104,7 +106,7 @@ func (m *qosContainerManagerImpl) Start(getNodeAllocatable func() v1.ResourceLis
 
 		// containerConfig object stores the cgroup specifications
 		containerConfig := &CgroupConfig{
-			Name:               containerName,
+			Name:               cgroupName,
 			ResourceParameters: resourceParameters,
 		}
 
@@ -112,7 +114,7 @@ func (m *qosContainerManagerImpl) Start(getNodeAllocatable func() v1.ResourceLis
 		m.setHugePagesUnbounded(containerConfig)
 
 		// check if it exists
-		if !cm.Exists(containerName) {
+		if !cm.Exists(cgroupName) {
 			if err := cm.Create(containerConfig); err != nil {
 				return fmt.Errorf("failed to create top level %v QOS cgroup : %v", qosClass, err)
 			}
@@ -251,6 +253,30 @@ func (m *qosContainerManagerImpl) setMemoryReserve(configs map[v1.PodQOSClass]*C
 	configs[v1.PodQOSBestEffort].ResourceParameters.Memory = &bestEffortLimit
 }
 
+func (m *qosContainerManagerImpl) setSwapReserve(configs map[v1.PodQOSClass]*CgroupConfig) {
+	// resourceConfig := m.cgroupManager.
+	resources := m.getNodeAllocatable()
+	allocatableSwap, ok := resources[nodev1.ResourceSwap]
+	if !ok {
+		klog.V(2).InfoS("Allocatable swap value could not be determined")
+		return
+	}
+	reservedSwap, ok := m.systemReserved[nodev1.ResourceSwap]
+	if !ok {
+		reservedSwap = resourceapi.Quantity{}
+	}
+	if allocatableSwap.Value() > 0 && swapCgroupV2FileAvailable() {
+		// Enable Swap Support for Cgroup v2 Only
+		// kep: https://kep.k8s.io/2400
+		if libcontainercgroups.IsCgroup2UnifiedMode() {
+			if configs[v1.PodQOSBurstable].ResourceParameters.Unified == nil {
+				configs[v1.PodQOSBurstable].ResourceParameters.Unified = make(map[string]string)
+			}
+			configs[v1.PodQOSBurstable].ResourceParameters.Unified[Cgroup2MaxSwapFilename] = strconv.FormatInt(allocatableSwap.Value()-reservedSwap.Value(), 10)
+		}
+	}
+}
+
 // retrySetMemoryReserve checks for any QoS cgroups over the limit
 // that was attempted to be set in the first Update() and adjusts
 // their memory limit to the usage to prevent further growth.
@@ -338,6 +364,12 @@ func (m *qosContainerManagerImpl) UpdateCgroups() error {
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) &&
 		libcontainercgroups.IsCgroup2UnifiedMode() {
 		m.setMemoryQoS(qosConfigs)
+	}
+
+	// update the swap for burstable pods for cgroup v2 if feature gate enabled
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeSwap) &&
+		libcontainercgroups.IsCgroup2UnifiedMode() {
+		m.setSwapReserve(qosConfigs)
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.QOSReserved) {

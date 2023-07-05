@@ -141,21 +141,22 @@ func enforceExistingCgroup(cgroupManager CgroupManager, cName CgroupName, rl v1.
 		return fmt.Errorf("%q cgroup is not configured properly", cName)
 	}
 
+	if rp.Unified == nil {
+		rp.Unified = make(map[string]string)
+	}
 	// Enforce MemoryQoS for cgroups of kube-reserved/system-reserved. For more information,
 	// see https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2570-memory-qos
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) {
-		if rp.Unified == nil {
-			rp.Unified = make(map[string]string)
-		}
+
 		if rp.Memory != nil {
 			if rp.Unified == nil {
 				rp.Unified = make(map[string]string)
 			}
 			rp.Unified[Cgroup2MemoryMin] = strconv.FormatInt(*rp.Memory, 10)
 		}
-		if rp.Swap != nil && swapControllerAvailable() {
-			rp.Unified[Cgroup2MaxSwapFilename] = strconv.FormatInt(*rp.Swap, 10)
-		}
+	}
+	if rp.Swap != nil && utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeSwap) {
+		rp.Unified[Cgroup2MaxSwapFilename] = strconv.FormatInt(*rp.Swap, 10)
 	}
 
 	cgroupConfig := &CgroupConfig{

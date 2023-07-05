@@ -23,11 +23,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"k8s.io/kubernetes/cmd/kubelet/app/options"
-	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/features"
+	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
 
 func TestValueOfAllocatableResources(t *testing.T) {

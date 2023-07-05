@@ -237,7 +237,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		return nil, err
 	}
 	capacity := cadvisor.CapacityFromMachineInfo(machineInfo)
-	// if swap are enabled, we report them as a schedulable resource on the node
+	// if swap is enabled, we report it as a schedulable resource on the node
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeSwap) {
 		swapCapacity, err := machine.GetMachineSwapCapacity()
 		if err != nil {
