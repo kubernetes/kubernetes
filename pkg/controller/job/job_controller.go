@@ -893,7 +893,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 		}
 	}
 
-	needsStatusUpdate := suspendCondChanged || active != job.Status.Active || !equalReady(ready, job.Status.Ready)
+	needsStatusUpdate := suspendCondChanged || active != job.Status.Active || !pointer.Int32Equal(ready, job.Status.Ready)
 	job.Status.Active = active
 	job.Status.Ready = ready
 	err = jm.trackJobStatusAndRemoveFinalizers(ctx, &job, pods, prevSucceededIndexes, *uncounted, expectedRmFinalizers, finishedCondition, needsStatusUpdate, newBackoffRecord)
@@ -1743,11 +1743,4 @@ func countReadyPods(pods []*v1.Pod) int32 {
 		}
 	}
 	return cnt
-}
-
-func equalReady(a, b *int32) bool {
-	if a != nil && b != nil {
-		return *a == *b
-	}
-	return a == b
 }
