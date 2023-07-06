@@ -36,7 +36,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	utilipset "k8s.io/kubernetes/pkg/proxy/ipvs/ipset"
@@ -5832,6 +5835,126 @@ func TestDismissLocalhostRuleExist(t *testing.T) {
 			}
 			if !rules[0].Jump.Matches("RETURN") || !rules[0].SourceAddress.Matches(test.src) {
 				t.Errorf("rules not match, expect jump: %s, got: %s; expect source address: %s, got: %s", "RETURN", rules[0].Jump.String(), test.src, rules[0].SourceAddress.String())
+			}
+		})
+	}
+}
+
+func TestLoadBalancerIngressRouteTypeProxy(t *testing.T) {
+	ipModeProxy := v1.LoadBalancerIPModeProxy
+	ipModeVIP := v1.LoadBalancerIPModeVIP
+
+	testCases := []struct {
+		name             string
+		ipModeEnabled    bool
+		svcIP            string
+		svcLBIP          string
+		ipMode           *v1.LoadBalancerIPMode
+		expectedServices int
+	}{
+		/* LoadBalancerIPMode disabled */
+		{
+			name:             "LoadBalancerIPMode disabled, ipMode Proxy",
+			ipModeEnabled:    false,
+			svcIP:            "10.20.30.41",
+			svcLBIP:          "1.2.3.4",
+			ipMode:           &ipModeProxy,
+			expectedServices: 2,
+		},
+		{
+			name:             "LoadBalancerIPMode disabled, ipMode VIP",
+			ipModeEnabled:    false,
+			svcIP:            "10.20.30.42",
+			svcLBIP:          "1.2.3.5",
+			ipMode:           &ipModeVIP,
+			expectedServices: 2,
+		},
+		{
+			name:             "LoadBalancerIPMode disabled, ipMode nil",
+			ipModeEnabled:    false,
+			svcIP:            "10.20.30.43",
+			svcLBIP:          "1.2.3.6",
+			ipMode:           nil,
+			expectedServices: 2,
+		},
+		/* LoadBalancerIPMode enabled */
+		{
+			name:             "LoadBalancerIPMode enabled, ipMode Proxy",
+			ipModeEnabled:    true,
+			svcIP:            "10.20.30.41",
+			svcLBIP:          "1.2.3.4",
+			ipMode:           &ipModeProxy,
+			expectedServices: 1,
+		},
+		{
+			name:             "LoadBalancerIPMode enabled, ipMode VIP",
+			ipModeEnabled:    true,
+			svcIP:            "10.20.30.42",
+			svcLBIP:          "1.2.3.5",
+			ipMode:           &ipModeVIP,
+			expectedServices: 2,
+		},
+		{
+			name:             "LoadBalancerIPMode enabled, ipMode nil",
+			ipModeEnabled:    true,
+			svcIP:            "10.20.30.43",
+			svcLBIP:          "1.2.3.6",
+			ipMode:           nil,
+			expectedServices: 2,
+		},
+	}
+
+	svcPort := 80
+	svcNodePort := 3001
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, testCase.ipModeEnabled)()
+			_, fp := buildFakeProxier()
+			makeServiceMap(fp,
+				makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+					svc.Spec.Type = "LoadBalancer"
+					svc.Spec.ClusterIP = testCase.svcIP
+					svc.Spec.Ports = []v1.ServicePort{{
+						Name:     svcPortName.Port,
+						Port:     int32(svcPort),
+						Protocol: v1.ProtocolTCP,
+						NodePort: int32(svcNodePort),
+					}}
+					svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
+						IP:     testCase.svcLBIP,
+						IPMode: testCase.ipMode,
+					}}
+				}),
+			)
+
+			tcpProtocol := v1.ProtocolTCP
+			makeEndpointSliceMap(fp,
+				makeTestEndpointSlice("ns1", "svc1", 1, func(eps *discovery.EndpointSlice) {
+					eps.AddressType = discovery.AddressTypeIPv4
+					eps.Endpoints = []discovery.Endpoint{{
+						Addresses: []string{"10.180.0.1"},
+					}}
+					eps.Ports = []discovery.EndpointPort{{
+						Name:     pointer.String("p80"),
+						Port:     pointer.Int32(80),
+						Protocol: &tcpProtocol,
+					}}
+				}),
+			)
+
+			fp.syncProxyRules()
+
+			services, err := fp.ipvs.GetVirtualServers()
+			if err != nil {
+				t.Errorf("Failed to get ipvs services, err: %v", err)
+			}
+			if len(services) != testCase.expectedServices {
+				t.Errorf("Expected %d ipvs services, got %d", testCase.expectedServices, len(services))
 			}
 		})
 	}
