@@ -167,7 +167,7 @@ type PriorityQueue struct {
 	// processed.
 	inFlightPods map[types.UID]inFlightPod
 	// receivedEvents holds the events received by the scheduling queue.
-	receivedEvents list.List
+	receivedEvents *list.List
 
 	// activeQ is heap structure that scheduler actively looks at to find pods to
 	// schedule. Head of heap is the highest priority pod.
@@ -204,7 +204,8 @@ type QueueingHintFunction struct {
 }
 
 type inFlightPod struct {
-	startedCycle int64
+	// lastEventBefore is the latest observed event when the pod is popped.
+	lastEventBefore *list.Element
 }
 
 // clusterEvent has the event and involved objects.
@@ -356,6 +357,7 @@ func NewPriorityQueue(
 		activeQ:                           heap.NewWithRecorder(podInfoKeyFunc, comp, metrics.NewActivePodsRecorder()),
 		unschedulablePods:                 newUnschedulablePods(metrics.NewUnschedulablePodsRecorder(), metrics.NewGatedPodsRecorder()),
 		inFlightPods:                      make(map[types.UID]inFlightPod),
+		receivedEvents:                    list.New(),
 		preEnqueuePluginMap:               options.preEnqueuePluginMap,
 		queueingHintMap:                   options.queueingHintMap,
 		metricsRecorder:                   options.metricsRecorder,
@@ -594,6 +596,58 @@ func (p *PriorityQueue) SchedulingCycle() int64 {
 	return p.schedulingCycle
 }
 
+func (p *PriorityQueue) determineSchedulingHintForInFlightPod(logger klog.Logger, pInfo *framework.QueuedPodInfo, podSchedulingCycle int64) (framework.QueueingHint, int64) {
+	if len(pInfo.UnschedulablePlugins) == 0 {
+		// When there is no unschedulable plugin, we cannot have a guess which event makes this Pod schedulable.
+		// Here, we uses the latest requestCycle so that this Pod won't stuck in the unschedulable pod pool for a long time.
+		if p.receivedEvents.Len() != 0 {
+			return framework.QueueAfterBackoff, p.receivedEvents.Back().Value.(*clusterEvent).requestCycle
+		}
+		return framework.QueueSkip, 0
+	}
+	inFlightPod, ok := p.inFlightPods[pInfo.Pod.UID]
+	if !ok {
+		// It shouldn't reach here unless there is a bug somewhere.
+		// But, set podSchedulingCycle to moveRequestCycle
+		// so that this Pod won't stuck in the unschedulable pod pool.
+		logger.Error(nil, "In flight Pod isn't found in the scheduling queue. If you see this error log, it's likely a bug in the scheduler.", "pod", klog.KObj(pInfo.Pod))
+		return framework.QueueAfterBackoff, podSchedulingCycle
+	}
+
+	// AddUnschedulableIfNotPresent is called with the Pod at the end of scheduling or binding.
+	// So, given pInfo should have been Pop()ed before,
+	// we can assume pInfo must be recorded in inFlightPods.
+	// check if there is an event that makes this Pod schedulable based on pInfo.UnschedulablePlugins.
+	event := p.receivedEvents.Front()
+	if inFlightPod.lastEventBefore != nil {
+		// only check events that happened after the Pod is popped.
+		event = inFlightPod.lastEventBefore.Next()
+	}
+	var moveRequestCycle int64
+	schedulingHint := framework.QueueSkip
+	for ; event != nil; event = event.Next() {
+		e := event.Value.(*clusterEvent)
+
+		hint := p.isPodWorthRequeuing(logger, pInfo, e.event, e.oldObj, e.newObj)
+		if hint == framework.QueueSkip {
+			continue
+		}
+
+		moveRequestCycle = e.requestCycle
+		if hint == framework.QueueImmediately {
+			// QueueImmediately is the strongest opinion, we don't need to check other events.
+			schedulingHint = framework.QueueImmediately
+			break
+		}
+		if hint == framework.QueueAfterBackoff {
+			// replace schedulingHint with QueueAfterBackoff,
+			// but continue to check other events because we may find it QueueImmediately with other events.
+			schedulingHint = framework.QueueAfterBackoff
+		}
+	}
+	return schedulingHint, moveRequestCycle
+}
+
 // AddUnschedulableIfNotPresent inserts a pod that cannot be scheduled into
 // the queue, unless it is already in the queue. Normally, PriorityQueue puts
 // unschedulable pods in `unschedulablePods`. But if there has been a recent move
@@ -626,59 +680,11 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *
 	}
 
 	// Based on isPodWorthRequeuing(), we check whether this Pod may change its scheduling result by any of events that happened during scheduling.
-	schedulingHint := framework.QueueSkip
-	var moveRequestCycle int64
-	if len(pInfo.UnschedulablePlugins) == 0 {
-		// When there is no unschedulable plugin, we cannot have a guess which event makes this Pod schedulable.
-		// Here, we uses the latest requestCycle so that this Pod won't stuck in the unschedulable pod pool for a long time.
-		if p.receivedEvents.Len() != 0 {
-			moveRequestCycle = p.receivedEvents.Back().Value.(clusterEvent).requestCycle
-			schedulingHint = framework.QueueAfterBackoff
-		}
-	} else {
-		// AddUnschedulableIfNotPresent is called with the Pod at the end of scheduling or binding.
-		// So, given pInfo should have been Pop()ed before,
-		// we can assume pInfo must be recorded in inFlightPods.
-		if inFlightPod, ok := p.inFlightPods[pInfo.Pod.UID]; ok {
-			// check if there is an event that makes this Pod schedulable based on pInfo.UnschedulablePlugins.
-			for event := p.receivedEvents.Front(); event != nil; event = event.Next() {
-				e := event.Value.(clusterEvent)
-				if e.requestCycle < inFlightPod.startedCycle {
-					// This event is recorded before the Pod is popped.
-					continue
-				}
-
-				hint := p.isPodWorthRequeuing(logger, pInfo, e.event, e.oldObj, e.newObj)
-				if hint == framework.QueueSkip {
-					continue
-				}
-
-				moveRequestCycle = e.requestCycle
-				if hint == framework.QueueImmediately {
-					// QueueImmediately is the strongest opinion, we don't need to check other events.
-					schedulingHint = framework.QueueImmediately
-					break
-				}
-				if hint == framework.QueueAfterBackoff {
-					// replace schedulingHint with QueueAfterBackoff,
-					// but continue to check other events because we may find it QueueImmediately with other events.
-					schedulingHint = framework.QueueAfterBackoff
-				}
-			}
-		} else {
-			// It shouldn't reach here unless there is a bug somewhere.
-			// But, set podSchedulingCycle to moveRequestCycle
-			// so that this Pod won't stuck in the unschedulable pod pool.
-			logger.Error(nil, "In flight Pod isn't found in the scheduling queue. If you see this error log, it's likely a bug in the scheduler.", "pod", klog.KObj(pod))
-			moveRequestCycle = podSchedulingCycle
-			schedulingHint = framework.QueueAfterBackoff
-		}
-	}
+	schedulingHint, moveRequestCycle := p.determineSchedulingHintForInFlightPod(logger, pInfo, podSchedulingCycle)
 
 	if moveRequestCycle >= podSchedulingCycle {
 		// In this case, we try to requeue this Pod to activeQ/backoffQ.
-		var queue string
-		queue = p.requeuePodViaQueueingHint(logger, pInfo, schedulingHint, ScheduleAttemptFailure)
+		queue := p.requeuePodViaQueueingHint(logger, pInfo, schedulingHint, ScheduleAttemptFailure)
 		if klogV := klog.V(6); klogV.Enabled() {
 			// Log more information about the cycle counters.
 			logger.V(6).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pod), "event", ScheduleAttemptFailure, "queue", queue, "schedulingCycle", podSchedulingCycle)
@@ -773,7 +779,7 @@ func (p *PriorityQueue) Pop() (*framework.QueuedPodInfo, error) {
 	p.schedulingCycle++
 	// In flight, no move request yet.
 	p.inFlightPods[pInfo.Pod.UID] = inFlightPod{
-		startedCycle: p.schedulingCycle,
+		lastEventBefore: p.receivedEvents.Back(),
 	}
 
 	for plugin := range pInfo.UnschedulablePlugins {
@@ -793,7 +799,8 @@ func (p *PriorityQueue) Done(pod types.UID) {
 }
 
 func (p *PriorityQueue) done(pod types.UID) {
-	if _, ok := p.inFlightPods[pod]; !ok {
+	inFlightPod, ok := p.inFlightPods[pod]
+	if !ok {
 		// This Pod is already done()ed.
 		return
 	}
@@ -801,11 +808,26 @@ func (p *PriorityQueue) done(pod types.UID) {
 
 	// remove events which is only referred from this Pod
 	// so that the receivedEvents map doesn't grow infinitely.
-	for event := p.receivedEvents.Front(); event != nil; event = event.Next() {
-		e := event.Value.(clusterEvent)
+	event := p.receivedEvents.Front()
+	if inFlightPod.lastEventBefore != nil {
+		event = inFlightPod.lastEventBefore.Next()
+	}
+	for ; event != nil; event = event.Next() {
+		e := event.Value.(*clusterEvent)
+		// decrement inFlightPodsNum on events that happened after the Pod is popped.
 		e.inFlightPodsNum--
 		if e.inFlightPodsNum == 0 {
-			p.receivedEvents.Remove(event)
+			// remove the event from the list if no Pod refers to it.
+			// In this case, we need to change `event` to the previous element
+			// because the current element will be removed.
+			eventToDelete := event
+			event = event.Prev()
+			p.receivedEvents.Remove(eventToDelete)
+
+			if event == nil {
+				// No events in p.receivedEvents.
+				break
+			}
 		}
 	}
 }
@@ -1030,18 +1052,13 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(logger klog.Logger, podIn
 		}
 	}
 
-	inflightPods := sets.New[types.UID]()
-	for uid := range p.inFlightPods {
-		inflightPods.Insert(uid)
-	}
-
 	// AddUnschedulableIfNotPresent might get called for in-flight Pods later, and in
 	// AddUnschedulableIfNotPresent we need to know whether events were
 	// observed while scheduling them.
-	p.receivedEvents.PushBack(clusterEvent{
+	p.receivedEvents.PushBack(&clusterEvent{
 		event:           event,
 		requestCycle:    p.schedulingCycle,
-		inFlightPodsNum: inflightPods.Len(),
+		inFlightPodsNum: len(p.inFlightPods),
 	})
 
 	if activated {
