@@ -47,6 +47,9 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.OOMScoreAdj = pointer.Int32(c.Int31())
 			obj.ClientConnection.ContentType = "bar"
 			obj.NodePortAddresses = []string{"1.2.3.0/24"}
+			if obj.Logging.Format == "" {
+				obj.Logging.Format = "text"
+			}
 		},
 	}
 }

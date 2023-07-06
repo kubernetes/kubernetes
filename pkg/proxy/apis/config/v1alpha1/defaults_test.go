@@ -24,6 +24,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	componentbaseconfig "k8s.io/component-base/config/v1alpha1"
+	logsapi "k8s.io/component-base/logs/api/v1"
 	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
 )
 
@@ -67,6 +68,10 @@ func TestDefaultsKubeProxyConfiguration(t *testing.T) {
 					TCPCloseWaitTimeout:   &metav1.Duration{Duration: 1 * time.Hour},
 				},
 				ConfigSyncPeriod: metav1.Duration{Duration: 15 * time.Minute},
+				Logging: logsapi.LoggingConfiguration{
+					Format:         "text",
+					FlushFrequency: logsapi.TimeOrMetaDuration{Duration: 5 * time.Second},
+				},
 			},
 		},
 		{
@@ -103,6 +108,10 @@ func TestDefaultsKubeProxyConfiguration(t *testing.T) {
 					TCPCloseWaitTimeout:   &metav1.Duration{Duration: 1 * time.Hour},
 				},
 				ConfigSyncPeriod: metav1.Duration{Duration: 15 * time.Minute},
+				Logging: logsapi.LoggingConfiguration{
+					Format:         "text",
+					FlushFrequency: logsapi.TimeOrMetaDuration{Duration: 5 * time.Second},
+				},
 			},
 		},
 	}
