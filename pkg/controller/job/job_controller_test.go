@@ -882,7 +882,7 @@ func TestControllerSyncJob(t *testing.T) {
 				t.Errorf("Unexpected number of creates.  Expected %d, saw %d\n", tc.expectedCreations, len(fakePodControl.Templates))
 			}
 			if tc.completionMode == batch.IndexedCompletion {
-				checkIndexedJobPods(t, &fakePodControl, tc.expectedCreatedIndexes, job.Name)
+				checkIndexedJobPods(t, &fakePodControl, tc.expectedCreatedIndexes, job.Name, tc.podIndexLabelDisabled)
 			} else {
 				for _, p := range fakePodControl.Templates {
 					// Fake pod control doesn't add generate name from the owner reference.
@@ -969,12 +969,12 @@ func TestControllerSyncJob(t *testing.T) {
 	}
 }
 
-func checkIndexedJobPods(t *testing.T, control *controller.FakePodControl, wantIndexes sets.Set[int], jobName string) {
+func checkIndexedJobPods(t *testing.T, control *controller.FakePodControl, wantIndexes sets.Set[int], jobName string, podIndexLabelDisabled bool) {
 	t.Helper()
 	gotIndexes := sets.New[int]()
 	for _, p := range control.Templates {
 		checkJobCompletionEnvVariable(t, &p.Spec)
-		if feature.DefaultFeatureGate.Enabled(features.PodIndexLabel) {
+		if !podIndexLabelDisabled {
 			checkJobCompletionLabel(t, &p)
 		}
 		ix := getCompletionIndex(p.Annotations)
