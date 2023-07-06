@@ -195,6 +195,8 @@ type Config struct {
 	ResourceTransformers storagevalue.ResourceTransformers
 	// RESTOptionsGetter is used to construct RESTStorage types via the generic registry.
 	RESTOptionsGetter genericregistry.RESTOptionsGetter
+	// StorageCompactorRunner is used to run compaction on storage.
+	StorageCompactorRunner genericregistry.StorageCompactorRunner
 
 	// If specified, all requests except those which match the LongRunningFunc predicate will timeout
 	// after this duration.
@@ -848,6 +850,22 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		if !s.isPostStartHookRegistered(storageObjectCountTrackerHookName) {
 			if err := s.AddPostStartHook(storageObjectCountTrackerHookName, func(context PostStartHookContext) error {
 				go c.StorageObjectCountTracker.RunUntil(context.StopCh)
+				return nil
+			}); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	// Add PostStartHook for compacting storage.
+	if c.StorageCompactorRunner != nil {
+		const storageCompactorHookName = "storage-compactor-hook"
+		if !s.isPostStartHookRegistered(storageCompactorHookName) {
+			if err := s.AddPostStartHook(storageCompactorHookName, func(context PostStartHookContext) error {
+				err := c.Config.StorageCompactorRunner(context.StopCh)
+				if err != nil {
+					return err
+				}
 				return nil
 			}); err != nil {
 				return nil, err

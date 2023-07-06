@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package etcd3
+package factory
 
 import (
 	"context"
@@ -23,6 +23,8 @@ import (
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/klog/v2"
 )
 
@@ -30,46 +32,53 @@ const (
 	compactRevKey = "compact_rev_key"
 )
 
-var (
-	endpointsMapMu sync.Mutex
-	endpointsMap   map[string]struct{}
-)
-
-func init() {
-	endpointsMap = make(map[string]struct{})
+func runETCD3Compaction(cfg storagebackend.Config, stopCh <-chan struct{}) error {
+	client, err := newETCD3Client(cfg.Transport)
+	if err != nil {
+		return err
+	}
+	c := &etcd3Compactor{
+		interval: cfg.CompactionInterval,
+		client:   client,
+	}
+	c.wg.StartWithChannel(stopCh, c.run)
+	return nil
 }
 
-// StartCompactor starts a compactor in the background to compact old version of keys that's not needed.
+// etcd3Compactor runs compactor in the background to compact old version of keys that's not needed.
 // By default, we save the most recent 5 minutes data and compact versions > 5minutes ago.
 // It should be enough for slow watchers and to tolerate burst.
 // TODO: We might keep a longer history (12h) in the future once storage API can take advantage of past version of keys.
-func StartCompactor(ctx context.Context, client *clientv3.Client, compactInterval time.Duration) {
-	endpointsMapMu.Lock()
-	defer endpointsMapMu.Unlock()
+type etcd3Compactor struct {
+	interval time.Duration
+	client   *clientv3.Client
 
-	// In one process, we can have only one compactor for one cluster.
-	// Currently we rely on endpoints to differentiate clusters.
-	for _, ep := range client.Endpoints() {
-		if _, ok := endpointsMap[ep]; ok {
-			klog.V(4).Infof("compactor already exists for endpoints %v", client.Endpoints())
-			return
-		}
-	}
-	for _, ep := range client.Endpoints() {
-		endpointsMap[ep] = struct{}{}
-	}
-
-	if compactInterval != 0 {
-		go compactor(ctx, client, compactInterval)
-	}
+	wg       wait.Group
+	stop     context.CancelFunc
+	stopLock sync.Mutex
+	stopped  bool
 }
 
-// compactor periodically compacts historical versions of keys in etcd.
+func (c *etcd3Compactor) Stop() {
+	c.stopLock.Lock()
+	if c.stopped {
+		// avoid stopping twice (note: cachers are shared with subresources)
+		c.stopLock.Unlock()
+		return
+	}
+	c.stopped = true
+	c.stop()
+	c.wg.Wait()
+	c.client.Close()
+	c.stopLock.Unlock()
+}
+
+// RunCompaction periodically compacts historical versions of keys in etcd.
 // It will compact keys with versions older than given interval.
 // In other words, after compaction, it will only contain keys set during last interval.
 // Any API call for the older versions of keys will return error.
 // Interval is the time interval between each compaction. The first compaction happens after "interval".
-func compactor(ctx context.Context, client *clientv3.Client, interval time.Duration) {
+func (c *etcd3Compactor) run(stopCh <-chan struct{}) {
 	// Technical definitions:
 	// We have a special key in etcd defined as *compactRevKey*.
 	// compactRevKey's value will be set to the string of last compacted revision.
@@ -112,16 +121,24 @@ func compactor(ctx context.Context, client *clientv3.Client, interval time.Durat
 	var compactTime int64
 	var rev int64
 	var err error
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		select {
+		case <-stopCh:
+			cancel()
+		}
+	}()
+
 	for {
 		select {
-		case <-time.After(interval):
+		case <-time.After(c.interval):
 		case <-ctx.Done():
 			return
 		}
 
-		compactTime, rev, err = compact(ctx, client, compactTime, rev)
+		compactTime, rev, err = c.compact(ctx, compactTime, rev)
 		if err != nil {
-			klog.Errorf("etcd: endpoint (%v) compact failed: %v", client.Endpoints(), err)
+			klog.Errorf("etcd: compact failed: %v", err)
 			continue
 		}
 	}
@@ -130,8 +147,8 @@ func compactor(ctx context.Context, client *clientv3.Client, interval time.Durat
 // compact compacts etcd store and returns current rev.
 // It will return the current compact time and global revision if no error occurred.
 // Note that CAS fail will not incur any error.
-func compact(ctx context.Context, client *clientv3.Client, t, rev int64) (int64, int64, error) {
-	resp, err := client.KV.Txn(ctx).If(
+func (c *etcd3Compactor) compact(ctx context.Context, t, rev int64) (int64, int64, error) {
+	resp, err := c.client.KV.Txn(ctx).If(
 		clientv3.Compare(clientv3.Version(compactRevKey), "=", t),
 	).Then(
 		clientv3.OpPut(compactRevKey, strconv.FormatInt(rev, 10)), // Expect side effect: increment Version
@@ -154,9 +171,9 @@ func compact(ctx context.Context, client *clientv3.Client, t, rev int64) (int64,
 		// We don't compact on bootstrap.
 		return curTime, curRev, nil
 	}
-	if _, err = client.Compact(ctx, rev); err != nil {
+	if _, err = c.client.Compact(ctx, rev); err != nil {
 		return curTime, curRev, err
 	}
-	klog.V(4).Infof("etcd: compacted rev (%d), endpoints (%v)", rev, client.Endpoints())
+	klog.V(4).Infof("etcd: compacted rev (%d)", rev)
 	return curTime, curRev, nil
 }

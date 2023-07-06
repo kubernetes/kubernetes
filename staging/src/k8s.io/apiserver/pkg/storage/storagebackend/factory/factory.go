@@ -79,3 +79,14 @@ type Prober interface {
 	Probe(ctx context.Context) error
 	Close() error
 }
+
+func RunCompaction(c storagebackend.Config, stopCh <-chan struct{}) error {
+	switch c.Type {
+	case storagebackend.StorageTypeETCD2:
+		return fmt.Errorf("%s is no longer a supported storage backend", c.Type)
+	case storagebackend.StorageTypeUnset, storagebackend.StorageTypeETCD3:
+		return runETCD3Compaction(c, stopCh)
+	default:
+		return fmt.Errorf("unknown storage type: %s", c.Type)
+	}
+}

@@ -344,72 +344,14 @@ type runningCompactor struct {
 }
 
 var (
-	// compactorsMu guards access to compactors map
-	compactorsMu sync.Mutex
-	compactors   = map[string]*runningCompactor{}
 	// dbMetricsMonitorsMu guards access to dbMetricsMonitors map
 	dbMetricsMonitorsMu sync.Mutex
 	dbMetricsMonitors   map[string]struct{}
 )
 
-// startCompactorOnce start one compactor per transport. If the interval get smaller on repeated calls, the
-// compactor is replaced. A destroy func is returned. If all destroy funcs with the same transport are called,
-// the compactor is stopped.
-func startCompactorOnce(c storagebackend.TransportConfig, interval time.Duration) (func(), error) {
-	compactorsMu.Lock()
-	defer compactorsMu.Unlock()
-
-	key := fmt.Sprintf("%v", c) // gives: {[server1 server2] keyFile certFile caFile}
-	if compactor, foundBefore := compactors[key]; !foundBefore || compactor.interval > interval {
-		compactorClient, err := newETCD3Client(c)
-		if err != nil {
-			return nil, err
-		}
-
-		if foundBefore {
-			// replace compactor
-			compactor.cancel()
-			compactor.client.Close()
-		} else {
-			// start new compactor
-			compactor = &runningCompactor{}
-			compactors[key] = compactor
-		}
-
-		ctx, cancel := context.WithCancel(context.Background())
-
-		compactor.interval = interval
-		compactor.cancel = cancel
-		compactor.client = compactorClient
-
-		etcd3.StartCompactor(ctx, compactorClient, interval)
-	}
-
-	compactors[key].refs++
-
-	return func() {
-		compactorsMu.Lock()
-		defer compactorsMu.Unlock()
-
-		compactor := compactors[key]
-		compactor.refs--
-		if compactor.refs == 0 {
-			compactor.cancel()
-			compactor.client.Close()
-			delete(compactors, key)
-		}
-	}, nil
-}
-
 func newETCD3Storage(c storagebackend.ConfigForResource, newFunc func() runtime.Object) (storage.Interface, DestroyFunc, error) {
-	stopCompactor, err := startCompactorOnce(c.Transport, c.CompactionInterval)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	client, err := newETCD3Client(c.Transport)
 	if err != nil {
-		stopCompactor()
 		return nil, nil, err
 	}
 
@@ -427,7 +369,6 @@ func newETCD3Storage(c storagebackend.ConfigForResource, newFunc func() runtime.
 		// Hence, we only destroy once.
 		// TODO: fix duplicated storage destroy calls higher level
 		once.Do(func() {
-			stopCompactor()
 			stopDBSizeMonitor()
 			client.Close()
 		})

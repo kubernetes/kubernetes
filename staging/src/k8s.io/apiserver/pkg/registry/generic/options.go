@@ -54,3 +54,5 @@ type StoreOptions struct {
 	AttrFunc    storage.AttrFunc
 	Indexers    *cache.Indexers
 }
+
+type StorageCompactorRunner func(stopCh <-chan struct{}) error

@@ -232,6 +232,15 @@ func (s *EtcdOptions) ApplyWithStorageFactoryTo(factory serverstorage.StorageFac
 			return err
 		}
 	}
+	c.StorageCompactorRunner = func(stopCh <-chan struct{}) error {
+		for _, config := range factory.Configs() {
+			err := storagefactory.RunCompaction(config, stopCh)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 
 	// setup encryption
 	if err := s.maybeApplyResourceTransformers(c); err != nil {
