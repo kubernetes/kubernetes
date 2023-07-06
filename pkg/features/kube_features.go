@@ -610,7 +610,7 @@ const (
 	// kep: https://kep.k8s.io/4017
 	// beta: v1.28
 	//
-	// Set pod completion index as a pod label for Indexed Jobs and StatefulSets.
+	// Set pod completion index as a pod label for Indexed Jobs.
 	PodIndexLabel featuregate.Feature = "PodIndexLabel"
 
 	// owner: @ddebroy
