@@ -187,6 +187,11 @@ const (
 	// Normalize HttpGet URL and Header passing for lifecycle handlers with probers.
 	ConsistentHTTPGetHandlers featuregate.Feature = "ConsistentHTTPGetHandlers"
 
+	// owner: @helayoty
+	// beta: v1.28
+	// Set the scheduled time as an annotation in the job.
+	CronJobsScheduledAnnotation featuregate.Feature = "CronJobsScheduledAnnotation"
+
 	// owner: @deejross, @soltysh
 	// kep: https://kep.k8s.io/3140
 	// alpha: v1.24
@@ -737,11 +742,6 @@ const (
 	//
 	// Enables a StatefulSet to start from an arbitrary non zero ordinal
 	StatefulSetStartOrdinal featuregate.Feature = "StatefulSetStartOrdinal"
-
-	// owner: @helayoty
-	// beta: v1.28
-	// Set the scheduled time as an annotation in the job.
-	CronJobsScheduledAnnotation featuregate.Feature = "CronJobsScheduledAnnotation"
 
 	// owner: @robscott
 	// kep: https://kep.k8s.io/2433

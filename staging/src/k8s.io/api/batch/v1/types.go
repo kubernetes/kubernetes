@@ -28,8 +28,8 @@ const (
 	labelPrefix = "batch.kubernetes.io/"
 
 	// CronJobScheduledTimestampAnnotation is the scheduled timestamp annotation for the Job.
-	// It records the original/expected scheduled timestamp for the running job.It is represented in RFC3339. Using
-	//	the annotation requires the CronJobsScheduledAnnotation feature gate to be	enabled, which is beta.
+	// It records the original/expected scheduled timestamp for the running job, represented in RFC3339.
+	// The CronJob controller adds this annotation if the CronJobsScheduledAnnotation feature gate (beta in 1.28) is enabled.
 	CronJobScheduledTimestampAnnotation = labelPrefix + "cronjob-scheduled-timestamp"
 
 	JobCompletionIndexAnnotation = labelPrefix + "job-completion-index"
