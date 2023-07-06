@@ -33,15 +33,18 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/pointer"
 )
 
 func TestGetJobFromTemplate2(t *testing.T) {
 	// getJobFromTemplate2() needs to take the job template and copy the labels and annotations
 	// and other fields, and add a created-by reference.
 	var (
-		one           int64 = 1
-		no            bool
-		scheduledTime = *topOfTheHour()
+		one             int64 = 1
+		no              bool
+		timeZoneUTC     = "UTC"
+		timeZoneCorrect = "Europe/Rome"
+		scheduledTime   = *topOfTheHour()
 	)
 
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CronJobsScheduledAnnotation, true)()
@@ -82,27 +85,37 @@ func TestGetJobFromTemplate2(t *testing.T) {
 
 	testCases := []struct {
 		name                        string
+		timeZone                    *string
 		inputAnnotations            map[string]string
+		expectedScheduledTime       func() time.Time
 		expectedNumberOfAnnotations int
 	}{
 		{
-			name:                        "UTC timezone and one annotation",
-			inputAnnotations:            map[string]string{"x": "y"},
+			name:             "UTC timezone and one annotation",
+			timeZone:         &timeZoneUTC,
+			inputAnnotations: map[string]string{"x": "y"},
+			expectedScheduledTime: func() time.Time {
+				return scheduledTime
+			},
 			expectedNumberOfAnnotations: 2,
 		},
 		{
-			name:                        "nil timezone and one annotation",
-			inputAnnotations:            map[string]string{"x": "y"},
+			name:             "nil timezone and one annotation",
+			timeZone:         nil,
+			inputAnnotations: map[string]string{"x": "y"},
+			expectedScheduledTime: func() time.Time {
+				return scheduledTime
+			},
 			expectedNumberOfAnnotations: 2,
 		},
 		{
-			name:                        "unsupported timezone and one annotation",
-			inputAnnotations:            map[string]string{"x": "y"},
-			expectedNumberOfAnnotations: 2,
-		},
-		{
-			name:                        "correct timezone and multiple annotation",
-			inputAnnotations:            map[string]string{"x": "y", "z": "x"},
+			name:             "correct timezone and multiple annotation",
+			timeZone:         &timeZoneCorrect,
+			inputAnnotations: map[string]string{"x": "y", "z": "x"},
+			expectedScheduledTime: func() time.Time {
+				location, _ := time.LoadLocation(timeZoneCorrect)
+				return scheduledTime.In(location)
+			},
 			expectedNumberOfAnnotations: 3,
 		},
 	}
@@ -110,6 +123,7 @@ func TestGetJobFromTemplate2(t *testing.T) {
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
 			cj.Spec.JobTemplate.Annotations = tt.inputAnnotations
+			cj.Spec.TimeZone = tt.timeZone
 
 			var job *batchv1.Job
 			job, err := getJobFromTemplate2(&cj, scheduledTime)
@@ -127,8 +141,12 @@ func TestGetJobFromTemplate2(t *testing.T) {
 			}
 
 			scheduledAnnotation := job.ObjectMeta.Annotations[batchv1.CronJobScheduledTimestampAnnotation]
-			if len(job.ObjectMeta.Annotations) != 0 && scheduledAnnotation != scheduledTime.Format(time.RFC3339) {
-				t.Errorf("Wrong cronJob scheduled timestamp annotation, expexted %s, got %s.", scheduledTime.Format(time.RFC3339), scheduledAnnotation)
+			timeZoneLocation, err := time.LoadLocation(pointer.StringDeref(tt.timeZone, ""))
+			if err != nil {
+				t.Errorf("Wrong timezone location")
+			}
+			if len(job.ObjectMeta.Annotations) != 0 && scheduledAnnotation != tt.expectedScheduledTime().Format(time.RFC3339) {
+				t.Errorf("Wrong cronJob scheduled timestamp annotation, expexted %s, got %s.", tt.expectedScheduledTime().In(timeZoneLocation).Format(time.RFC3339), scheduledAnnotation)
 			}
 		})
 	}

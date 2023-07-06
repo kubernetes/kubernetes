@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/robfig/cron/v3"
+	"k8s.io/utils/pointer"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -215,8 +216,12 @@ func getJobFromTemplate2(cj *batchv1.CronJob, scheduledTime time.Time) (*batchv1
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CronJobsScheduledAnnotation) {
 
+		timeZoneLocation, err := time.LoadLocation(pointer.StringDeref(cj.Spec.TimeZone, ""))
+		if err != nil {
+			return nil, err
+		}
 		// Append job creation timestamp to the cronJob annotations. The time will be in RFC3339 form.
-		annotations[batchv1.CronJobScheduledTimestampAnnotation] = cj.Spec.JobTemplate.CreationTimestamp.Time.Format(time.RFC3339)
+		annotations[batchv1.CronJobScheduledTimestampAnnotation] = scheduledTime.In(timeZoneLocation).Format(time.RFC3339)
 	}
 
 	job := &batchv1.Job{
