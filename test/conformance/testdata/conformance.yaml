@@ -2580,13 +2580,6 @@
     patch, and delete operations.
   release: v1.26
   file: test/e2e/storage/csi_inline.go
-- testname: CSIInlineVolumes should support ephemeral CSIDrivers
-  codename: '[sig-storage] CSIInlineVolumes should support ephemeral VolumeLifecycleMode
-    in CSIDriver API [Conformance]'
-  description: CSIDriver resources with ephemeral VolumeLifecycleMode should support
-    create, get, list, and delete operations.
-  release: v1.26
-  file: test/e2e/storage/csi_inline.go
 - testname: CSIStorageCapacity API
   codename: '[sig-storage] CSIStorageCapacity  should support CSIStorageCapacities
     API operations [Conformance]'
