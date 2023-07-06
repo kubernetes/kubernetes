@@ -187,6 +187,11 @@ const (
 	// Normalize HttpGet URL and Header passing for lifecycle handlers with probers.
 	ConsistentHTTPGetHandlers featuregate.Feature = "ConsistentHTTPGetHandlers"
 
+	// owner: @helayoty
+	// beta: v1.28
+	// Set the scheduled time as an annotation in the job.
+	CronJobsScheduledAnnotation featuregate.Feature = "CronJobsScheduledAnnotation"
+
 	// owner: @deejross, @soltysh
 	// kep: https://kep.k8s.io/3140
 	// alpha: v1.24
@@ -891,6 +896,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ContainerCheckpoint: {Default: false, PreRelease: featuregate.Alpha},
 
 	ConsistentHTTPGetHandlers: {Default: true, PreRelease: featuregate.GA},
+
+	CronJobsScheduledAnnotation: {Default: true, PreRelease: featuregate.Beta},
 
 	CronJobTimeZone: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 
