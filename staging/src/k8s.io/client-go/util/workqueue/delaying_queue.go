@@ -199,23 +199,23 @@ type delayingType struct {
 var _ DelayingInterface = &delayingType{}
 var _ Interface = &delayingType{}
 
-// waitForAction defines what we are asking the queue to do (which is usually queue an item but can be other things)
-type waitForAction int
+// msgAction defines what we are asking the queue to do (which is usually queue an item but can be other things)
+type msgAction int
 
 const (
-	// waitForActionQueue - queue the item in the delaying queue
-	waitForActionQueue waitForAction = iota
-	// waitForActionDoneWaiting - forget the item provided if 'waiting'
-	waitForActionDoneWaiting
-	// waitForActionIsWaiting - report back on an item existing in the 'waiting' queue.
-	waitForActionIsWaiting
-	// waitForActionLenWaiting - report back on the waiting queue length
-	waitForActionLenWaiting
-	// waitForActionNextReady - report back on the next item to be ready.
-	waitForActionNextReady
-	// waitForActionSyncFill - close return channel when the 'waiting' queue is filled
+	// msgActionQueue - queue the item in the delaying queue
+	msgActionQueue msgAction = iota
+	// msgActionDoneWaiting - forget the item provided if 'waiting'
+	msgActionDoneWaiting
+	// msgActionIsWaiting - report back on an item existing in the 'waiting' queue.
+	msgActionIsWaiting
+	// msgActionLenWaiting - report back on the waiting queue length
+	msgActionLenWaiting
+	// msgActionNextReady - report back on the next item to be ready.
+	msgActionNextReady
+	// msgActionSyncFill - close return channel when the 'waiting' queue is filled
 	// and the nextReadyAt timer has been updated.
-	waitForActionSyncFill
+	msgActionSyncFill
 )
 
 // waitFor holds the data to add and the time it should be added
@@ -229,7 +229,7 @@ type waitFor struct {
 // waitLoopMessage hold a communication made between client and waitLoop.
 type waitLoopMessage struct {
 	// action defines what we want to do
-	action waitForAction
+	action msgAction
 	// item defines an item to act upon, e.g. queue, forget etc.
 	item *waitFor
 	// options defines how the caller would like the item to behave.
@@ -322,7 +322,7 @@ func (q *delayingType) AddAfter(item interface{}, duration time.Duration) {
 	case <-q.stopCh:
 		// unblock if ShutDown() is called
 	case q.waitingForAddCh <- &waitLoopMessage{
-		action: waitForActionQueue,
+		action: msgActionQueue,
 		item: &waitFor{
 			data:    item,
 			readyAt: q.clock.Now().Add(duration),
@@ -340,18 +340,18 @@ func (q *delayingType) AddAfter(item interface{}, duration time.Duration) {
 // AddWithOptions gives callers more control over the queueing behaviour.
 // Calls are asynchronous unless option Synchronous is set.
 func (q *delayingType) AddWithOptions(item interface{}, opts DelayingOptions) {
-	q.sendItemToWaitingLoop(item, opts, waitForActionQueue)
+	q.sendItemToWaitingLoop(item, opts, msgActionQueue)
 }
 
 // DoneWaiting removes an item from the delayed queue, effectively cancelling its future processing.
 func (q *delayingType) DoneWaiting(item interface{}) {
-	q.sendItemToWaitingLoop(item, DelayingOptions{}, waitForActionDoneWaiting)
+	q.sendItemToWaitingLoop(item, DelayingOptions{}, msgActionDoneWaiting)
 }
 
 // IsWaiting returns a bool indicating whether the given item is queued in the 'waiting' queue.
 // The client can call IsQueued() in order to determine whether an item is queued in the 'active' queue.
 func (q *delayingType) IsWaiting(item interface{}) (bool, time.Duration) {
-	result := q.sendItemToWaitingLoop(item, DelayingOptions{Synchronous: true}, waitForActionIsWaiting)
+	result := q.sendItemToWaitingLoop(item, DelayingOptions{Synchronous: true}, msgActionIsWaiting)
 	if result.exists != nil && result.nextReady != nil {
 		return *result.exists, *result.nextReady
 	}
@@ -361,7 +361,7 @@ func (q *delayingType) IsWaiting(item interface{}) (bool, time.Duration) {
 // LenWaiting returns an int representing the number of items queued in the 'waiting' queue.
 // The client can call Len() in order to determine the number of items in the 'active' queue.
 func (q *delayingType) LenWaiting() int {
-	result := q.sendItemToWaitingLoop(nil, DelayingOptions{Synchronous: true}, waitForActionLenWaiting)
+	result := q.sendItemToWaitingLoop(nil, DelayingOptions{Synchronous: true}, msgActionLenWaiting)
 	if result.length != nil {
 		return *result.length
 	}
@@ -370,7 +370,7 @@ func (q *delayingType) LenWaiting() int {
 
 // nextReady returns the item at the head of the 'waiting' queue and how long it has left to wait.
 func (q *delayingType) nextReady() (interface{}, time.Duration) {
-	result := q.sendItemToWaitingLoop(nil, DelayingOptions{Synchronous: true}, waitForActionNextReady)
+	result := q.sendItemToWaitingLoop(nil, DelayingOptions{Synchronous: true}, msgActionNextReady)
 	if result.nextReady != nil {
 		return result.item, *result.nextReady
 	}
@@ -380,12 +380,12 @@ func (q *delayingType) nextReady() (interface{}, time.Duration) {
 // syncFill blocks until the delaying queue has drained all items from its feeder channel, processed
 // them into their appropriate queue and updated the nextReadyAt time as necessary.
 func (q *delayingType) syncFill() {
-	q.sendItemToWaitingLoop(nil, DelayingOptions{Synchronous: true}, waitForActionSyncFill)
+	q.sendItemToWaitingLoop(nil, DelayingOptions{Synchronous: true}, msgActionSyncFill)
 }
 
 // sendItemToWaitingLoop facilitates the different interface methods and performs the actual add, sending,
 // forgetting an item, by sending an appropriate message through to the waitingLoop.
-func (q *delayingType) sendItemToWaitingLoop(item interface{}, opts DelayingOptions, action waitForAction) waitingLoopResponse {
+func (q *delayingType) sendItemToWaitingLoop(item interface{}, opts DelayingOptions, action msgAction) waitingLoopResponse {
 	var result waitingLoopResponse
 
 	// don't add if we're already shutting down
@@ -563,23 +563,23 @@ func (q *delayingType) handleReportingAndSync(w *waitForPriorityQueue, knownEntr
 	for _, req := range q.afterFill {
 		r := waitingLoopResponse{}
 		switch req.action {
-		case waitForActionIsWaiting:
+		case msgActionIsWaiting:
 			item, exists := knownEntries[req.item.data]
 			r.exists = &exists
 			if item != nil {
 				nr := item.readyAt.Sub(q.clock.Now())
 				r.nextReady = &nr
 			}
-		case waitForActionLenWaiting:
+		case msgActionLenWaiting:
 			l := w.Len()
 			r.length = &l
-		case waitForActionNextReady:
+		case msgActionNextReady:
 			if w.Len() > 0 {
 				r.item = w.Peek().(*waitFor).data
 				nr := q.headReadyTime.Sub(q.clock.Now())
 				r.nextReady = &nr
 			}
-		case waitForActionSyncFill:
+		case msgActionSyncFill:
 		}
 		req.returnCh <- r
 		close(req.returnCh)
@@ -589,7 +589,7 @@ func (q *delayingType) handleReportingAndSync(w *waitForPriorityQueue, knownEntr
 
 // processArrivingWaitForEntry receives messages received from clients a takes the appropriate queuing based
 // upon the entry.action requested.
-// When performing the waitForActionQueue action it behaves as follows:
+// When performing the msgActionQueue action it behaves as follows:
 //   - An entry is dropped if it is already actively queued (much like Add() on the Interface)
 //   - Delayed items are inserted into the 'waiting' queue according to their Waiting option (TakeShorter by default)
 //   - Immediate items will be dropped when the TakeLonger Waiting option is set and they are already present in 'waiting'.
@@ -597,14 +597,14 @@ func (q *delayingType) handleReportingAndSync(w *waitForPriorityQueue, knownEntr
 func (q *delayingType) processArrivingWaitForEntry(w *waitForPriorityQueue, knownEntries map[t]*waitFor, msg *waitLoopMessage) {
 	// handle the different message actions
 	switch msg.action {
-	case waitForActionIsWaiting, waitForActionLenWaiting, waitForActionNextReady, waitForActionSyncFill:
+	case msgActionIsWaiting, msgActionLenWaiting, msgActionNextReady, msgActionSyncFill:
 		// all of these actions are processed in the call handleReportingAndSync()
 		if msg.returnCh == nil {
 			return
 		}
 		q.afterFill = append(q.afterFill, msg)
 		return
-	case waitForActionDoneWaiting:
+	case msgActionDoneWaiting:
 		// remove entry from the 'waiting' queue
 		existing, exists := knownEntries[msg.item.data]
 		if exists {
@@ -613,7 +613,7 @@ func (q *delayingType) processArrivingWaitForEntry(w *waitForPriorityQueue, know
 			delete(knownEntries, msg.item.data)
 		}
 		return
-	case waitForActionQueue:
+	case msgActionQueue:
 		// add entry to either 'active' or 'waiting' queues (dependent on delay and settings)
 		if msg.returnCh != nil {
 			defer close(msg.returnCh)
