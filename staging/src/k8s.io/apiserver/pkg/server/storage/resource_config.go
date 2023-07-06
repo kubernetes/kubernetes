@@ -105,7 +105,11 @@ func (o *ResourceConfig) EnableVersions(versions ...schema.GroupVersion) {
 
 // TODO this must be removed and we enable/disable individual resources.
 func (o *ResourceConfig) versionEnabled(version schema.GroupVersion) bool {
-	enabled, _ := o.GroupVersionConfigs[version]
+	enabled, ok := o.GroupVersionConfigs[version]
+	if !ok {
+		// enabled by default
+		return true
+	}
 	return enabled
 }
 
