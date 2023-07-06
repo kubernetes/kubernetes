@@ -288,10 +288,10 @@ func NewProxier(ipFamily v1.IPFamily,
 		precomputedProbabilities: make([]string, 0, 1001),
 		iptablesData:             bytes.NewBuffer(nil),
 		existingFilterChainsData: bytes.NewBuffer(nil),
-		filterChains:             proxyutil.LineBuffer{},
-		filterRules:              proxyutil.LineBuffer{},
-		natChains:                proxyutil.LineBuffer{},
-		natRules:                 proxyutil.LineBuffer{},
+		filterChains:             proxyutil.NewLineBuffer(),
+		filterRules:              proxyutil.NewLineBuffer(),
+		natChains:                proxyutil.NewLineBuffer(),
+		natRules:                 proxyutil.NewLineBuffer(),
 		localhostNodePorts:       localhostNodePorts,
 		nodePortAddresses:        nodePortAddresses,
 		networkInterfacer:        proxyutil.RealNetwork{},
@@ -411,8 +411,8 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 		encounteredError = true
 	} else {
 		existingNATChains := utiliptables.GetChainsFromTable(iptablesData.Bytes())
-		natChains := &proxyutil.LineBuffer{}
-		natRules := &proxyutil.LineBuffer{}
+		natChains := proxyutil.NewLineBuffer()
+		natRules := proxyutil.NewLineBuffer()
 		natChains.Write("*nat")
 		// Start with chains we know we need to remove.
 		for _, chain := range []utiliptables.Chain{kubeServicesChain, kubeNodePortsChain, kubePostroutingChain} {
@@ -448,8 +448,8 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 		encounteredError = true
 	} else {
 		existingFilterChains := utiliptables.GetChainsFromTable(iptablesData.Bytes())
-		filterChains := &proxyutil.LineBuffer{}
-		filterRules := &proxyutil.LineBuffer{}
+		filterChains := proxyutil.NewLineBuffer()
+		filterRules := proxyutil.NewLineBuffer()
 		filterChains.Write("*filter")
 		for _, chain := range []utiliptables.Chain{kubeServicesChain, kubeExternalServicesChain, kubeForwardChain, kubeNodePortsChain} {
 			if _, found := existingFilterChains[chain]; found {
@@ -852,8 +852,8 @@ func (proxier *Proxier) syncProxyRules() {
 	proxier.natChains.Reset()
 	proxier.natRules.Reset()
 
-	skippedNatChains := &proxyutil.LineBuffer{}
-	skippedNatRules := &proxyutil.LineBuffer{}
+	skippedNatChains := proxyutil.NewDiscardLineBuffer()
+	skippedNatRules := proxyutil.NewDiscardLineBuffer()
 
 	// Write chain lines for all the "top-level" chains we'll be filling in
 	for _, chainName := range []utiliptables.Chain{kubeServicesChain, kubeExternalServicesChain, kubeForwardChain, kubeNodePortsChain, kubeProxyFirewallChain} {
@@ -1069,9 +1069,9 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 		}
 
-		filterRules := &proxier.filterRules
-		natChains := &proxier.natChains
-		natRules := &proxier.natRules
+		filterRules := proxier.filterRules
+		natChains := proxier.natChains
+		natRules := proxier.natRules
 
 		// Capture the clusterIP.
 		if hasInternalEndpoints {
@@ -1562,7 +1562,7 @@ func (proxier *Proxier) syncProxyRules() {
 	conntrack.CleanStaleEntries(proxier.iptables.IsIPv6(), proxier.exec, proxier.svcPortMap, serviceUpdateResult, endpointUpdateResult)
 }
 
-func (proxier *Proxier) writeServiceToEndpointRules(natRules *proxyutil.LineBuffer, svcPortNameString string, svcInfo proxy.ServicePort, svcChain utiliptables.Chain, endpoints []proxy.Endpoint, args []string) {
+func (proxier *Proxier) writeServiceToEndpointRules(natRules proxyutil.LineBuffer, svcPortNameString string, svcInfo proxy.ServicePort, svcChain utiliptables.Chain, endpoints []proxy.Endpoint, args []string) {
 	// First write session affinity rules, if applicable.
 	if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
 		for _, ep := range endpoints {
