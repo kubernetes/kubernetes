@@ -34,8 +34,16 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/klog/v2"
 )
+
+func init() {
+	// If instantiated more than once or together with other servers, the
+	// servers would try to modify the global logging state. This must get
+	// ignored during testing.
+	logsapi.ReapplyHandling = logsapi.ReapplyHandlingIgnoreUnchanged
+}
 
 // TearDownFunc is to be called to tear down a test server.
 type TearDownFunc func()

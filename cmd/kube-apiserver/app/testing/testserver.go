@@ -42,6 +42,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/cert"
+	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-aggregator/pkg/apiserver"
 
@@ -50,6 +51,13 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	testutil "k8s.io/kubernetes/test/utils"
 )
+
+func init() {
+	// If instantiated more than once or together with other servers, the
+	// servers would try to modify the global logging state. This must get
+	// ignored during testing.
+	logsapi.ReapplyHandling = logsapi.ReapplyHandlingIgnoreUnchanged
+}
 
 // This key is for testing purposes only and is not considered secure.
 const ecdsaPrivateKey = `-----BEGIN EC PRIVATE KEY-----
