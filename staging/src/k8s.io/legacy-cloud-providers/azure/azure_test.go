@@ -3313,7 +3313,7 @@ func TestUpdateNodeCacheExcludeLoadBalancer(t *testing.T) {
 	az.updateNodeCaches(&prevNode, &newNode)
 	assert.Equal(t, 1, len(az.excludeLoadBalancerNodes))
 
-	// a non-ready node should be excluded
+	// a non-ready node should be included
 	az.unmanagedNodes = sets.NewString()
 	az.excludeLoadBalancerNodes = sets.NewString()
 	az.nodeNames = sets.NewString()
@@ -3334,9 +3334,9 @@ func TestUpdateNodeCacheExcludeLoadBalancer(t *testing.T) {
 		},
 	}
 	az.updateNodeCaches(nil, &nonReadyNode)
-	assert.Equal(t, 1, len(az.excludeLoadBalancerNodes))
+	assert.Equal(t, 0, len(az.excludeLoadBalancerNodes))
 
-	// node becomes ready, it should be removed from az.excludeLoadBalancerNodes
+	// node becomes ready => no impact on az.excludeLoadBalancerNodes
 	readyNode := v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
