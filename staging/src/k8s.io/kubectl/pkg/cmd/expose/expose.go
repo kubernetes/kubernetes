@@ -38,7 +38,6 @@ import (
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	"k8s.io/kubectl/pkg/generate"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"
@@ -123,7 +122,7 @@ type ExposeServiceOptions struct {
 	CanBeExposed              polymorphichelpers.CanBeExposedFunc
 	MapBasedSelectorForObject func(runtime.Object) (string, error)
 	PortsForObject            polymorphichelpers.PortsForObjectFunc
-	ProtocolsForObject        func(runtime.Object) (map[string]string, error)
+	ProtocolsForObject        polymorphichelpers.MultiProtocolsWithForObjectFunc
 
 	Namespace string
 	Mapper    meta.RESTMapper
@@ -276,7 +275,7 @@ func (o *ExposeServiceOptions) Complete(f cmdutil.Factory) error {
 	o.ClientForMapping = f.ClientForMapping
 	o.CanBeExposed = polymorphichelpers.CanBeExposedFn
 	o.MapBasedSelectorForObject = polymorphichelpers.MapBasedSelectorForObjectFn
-	o.ProtocolsForObject = polymorphichelpers.ProtocolsForObjectFn
+	o.ProtocolsForObject = polymorphichelpers.MultiProtocolsForObjectFn
 	o.PortsForObject = polymorphichelpers.PortsForObjectFn
 
 	o.Mapper, err = f.ToRESTMapper()
@@ -361,7 +360,7 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 		if err != nil {
 			return fmt.Errorf("couldn't find protocol via introspection: %v", err)
 		}
-		if protocols := generate.MakeProtocols(protocolsMap); !generate.IsZero(protocols) {
+		if protocols := makeProtocols(protocolsMap); len(protocols) > 0 {
 			o.Protocols = protocols
 		}
 
@@ -375,13 +374,11 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 
 		// Generate new object
 		service, err := o.createService()
-
 		if err != nil {
 			return err
 		}
 
 		overrideService, err := o.NewOverrider(&corev1.Service{}).Apply(service)
-
 		if err != nil {
 			return err
 		}
@@ -455,7 +452,7 @@ func (o *ExposeServiceOptions) createService() (*corev1.Service, error) {
 		}
 	}
 
-	var portProtocolMap map[string]string
+	var portProtocolMap map[string][]string
 	if o.Protocols != "" {
 		portProtocolMap, err = parseProtocols(o.Protocols)
 		if err != nil {
@@ -499,8 +496,20 @@ func (o *ExposeServiceOptions) createService() (*corev1.Service, error) {
 			case len(protocol) == 0 && len(portProtocolMap) > 0:
 				// no --protocol and we expose a multiprotocol resource
 				protocol = "TCP" // have the default so we can stay sane
-				if exposeProtocol, found := portProtocolMap[stillPortString]; found {
-					protocol = exposeProtocol
+				if exposeProtocols, found := portProtocolMap[stillPortString]; found {
+					if len(exposeProtocols) == 1 {
+						protocol = exposeProtocols[0]
+						break
+					}
+					for _, exposeProtocol := range exposeProtocols {
+						name := fmt.Sprintf("port-%d-%s", i+1, strings.ToLower(exposeProtocol))
+						ports = append(ports, corev1.ServicePort{
+							Name:     name,
+							Port:     int32(port),
+							Protocol: corev1.Protocol(exposeProtocol),
+						})
+					}
+					continue
 				}
 			}
 			ports = append(ports, corev1.ServicePort{
@@ -590,12 +599,22 @@ func parseLabels(labelSpec string) (map[string]string, error) {
 	return labels, nil
 }
 
+func makeProtocols(protocols map[string][]string) string {
+	var out []string
+	for key, value := range protocols {
+		for _, s := range value {
+			out = append(out, fmt.Sprintf("%s/%s", key, s))
+		}
+	}
+	return strings.Join(out, ",")
+}
+
 // parseProtocols turns a string representation of a protocols set into a map[string]string
-func parseProtocols(protocols string) (map[string]string, error) {
+func parseProtocols(protocols string) (map[string][]string, error) {
 	if len(protocols) == 0 {
 		return nil, fmt.Errorf("no protocols passed")
 	}
-	portProtocolMap := map[string]string{}
+	portProtocolMap := map[string][]string{}
 	protocolsSlice := strings.Split(protocols, ",")
 	for ix := range protocolsSlice {
 		portProtocol := strings.Split(protocolsSlice[ix], "/")
@@ -608,7 +627,8 @@ func parseProtocols(protocols string) (map[string]string, error) {
 		if len(portProtocol[1]) == 0 {
 			return nil, fmt.Errorf("unexpected empty protocol")
 		}
-		portProtocolMap[portProtocol[0]] = portProtocol[1]
+		port := portProtocol[0]
+		portProtocolMap[port] = append(portProtocolMap[port], portProtocol[1])
 	}
 	return portProtocolMap, nil
 }
