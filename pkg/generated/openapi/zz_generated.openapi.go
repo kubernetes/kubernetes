@@ -3743,6 +3743,26 @@ func schema_k8sio_api_apiserverinternal_v1alpha1_ServerStorageVersion(ref common
 							},
 						},
 					},
+					"servedVersions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "set",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "The API server can serve these versions. DecodableVersions must include all ServedVersions.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},

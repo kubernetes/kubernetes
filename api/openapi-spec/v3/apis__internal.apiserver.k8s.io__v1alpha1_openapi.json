@@ -20,6 +20,15 @@
           "encodingVersion": {
             "description": "The API server encodes the object to this version when persisting it in the backend (e.g., etcd).",
             "type": "string"
+          },
+          "servedVersions": {
+            "description": "The API server can serve these versions. DecodableVersions must include all ServedVersions.",
+            "items": {
+              "default": "",
+              "type": "string"
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "set"
           }
         },
         "type": "object"

@@ -98,6 +98,22 @@ func validateServerStorageVersion(ssv apiserverinternal.ServerStorageVersion, fl
 	if !found {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("decodableVersions"), ssv.DecodableVersions, fmt.Sprintf("decodableVersions must include encodingVersion %s", ssv.EncodingVersion)))
 	}
+
+	for i, sv := range ssv.ServedVersions {
+		if errs := isValidAPIVersion(sv); len(errs) > 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("servedVersions").Index(i), sv, strings.Join(errs, ",")))
+		}
+		foundDecodableVersion := false
+		for _, dv := range ssv.DecodableVersions {
+			if sv == dv {
+				foundDecodableVersion = true
+				break
+			}
+		}
+		if !foundDecodableVersion {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("servedVersions").Index(i), sv, fmt.Sprintf("individual served version : %s must be included in decodableVersions : %s", sv, ssv.DecodableVersions)))
+		}
+	}
 	return allErrs
 }
 

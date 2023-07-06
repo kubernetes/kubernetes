@@ -33,6 +33,7 @@ func TestValidateServerStorageVersion(t *testing.T) {
 			APIServerID:       "-fea",
 			EncodingVersion:   "v1alpha1",
 			DecodableVersions: []string{"v1alpha1", "v1"},
+			ServedVersions:    []string{"v1alpha1", "v1"},
 		},
 		expectedErr: "apiServerID: Invalid value",
 	}, {
@@ -40,6 +41,7 @@ func TestValidateServerStorageVersion(t *testing.T) {
 			APIServerID:       "fea",
 			EncodingVersion:   "v1alpha1",
 			DecodableVersions: []string{"v1beta1", "v1"},
+			ServedVersions:    []string{"v1beta1", "v1"},
 		},
 		expectedErr: "decodableVersions must include encodingVersion",
 	}, {
@@ -47,6 +49,7 @@ func TestValidateServerStorageVersion(t *testing.T) {
 			APIServerID:       "fea",
 			EncodingVersion:   "v1alpha1",
 			DecodableVersions: []string{"v1alpha1", "v1", "-fea"},
+			ServedVersions:    []string{"v1alpha1", "v1", "-fea"},
 		},
 		expectedErr: "decodableVersions[2]: Invalid value",
 	}, {
@@ -54,6 +57,15 @@ func TestValidateServerStorageVersion(t *testing.T) {
 			APIServerID:       "fea",
 			EncodingVersion:   "v1alpha1",
 			DecodableVersions: []string{"v1alpha1", "v1"},
+			ServedVersions:    []string{"v1alpha1", "v1"},
+		},
+		expectedErr: "",
+	}, {
+		ssv: apiserverinternal.ServerStorageVersion{
+			APIServerID:       "fea",
+			EncodingVersion:   "v1alpha1",
+			DecodableVersions: []string{"v1alpha1", "v1"},
+			ServedVersions:    []string{"v1alpha1", "v1"},
 		},
 		expectedErr: "",
 	}, {
@@ -61,20 +73,39 @@ func TestValidateServerStorageVersion(t *testing.T) {
 			APIServerID:       "fea",
 			EncodingVersion:   "mygroup.com/v2",
 			DecodableVersions: []string{"v1alpha1", "v1", "mygroup.com/v2"},
+			ServedVersions:    []string{"v1alpha1", "v1", "mygroup.com/v2"},
 		},
 		expectedErr: "",
 	}, {
 		ssv: apiserverinternal.ServerStorageVersion{
 			APIServerID:       "fea",
+			EncodingVersion:   "v1alpha1",
+			DecodableVersions: []string{"v1alpha1", "v1"},
+			ServedVersions:    []string{"/v3"},
+		},
+		expectedErr: `[].servedVersions[0]: Invalid value: "/v3": group part: must be non-empty`,
+	}, {
+		ssv: apiserverinternal.ServerStorageVersion{
+			APIServerID:       "fea",
 			EncodingVersion:   "mygroup.com/v2",
 			DecodableVersions: []string{"mygroup.com/v2", "/v3"},
+			ServedVersions:    []string{"mygroup.com/v2", "/v3"},
 		},
 		expectedErr: `[].decodableVersions[1]: Invalid value: "/v3": group part: must be non-empty`,
 	}, {
 		ssv: apiserverinternal.ServerStorageVersion{
 			APIServerID:       "fea",
 			EncodingVersion:   "mygroup.com/v2",
+			DecodableVersions: []string{"mygroup.com/v2", "/v3"},
+			ServedVersions:    []string{"mygroup.com/"},
+		},
+		expectedErr: `[].servedVersions[0]: Invalid value: "mygroup.com/": version part: must be non-empty`,
+	}, {
+		ssv: apiserverinternal.ServerStorageVersion{
+			APIServerID:       "fea",
+			EncodingVersion:   "mygroup.com/v2",
 			DecodableVersions: []string{"mygroup.com/v2", "mygroup.com/"},
+			ServedVersions:    []string{"mygroup.com/v2", "mygroup.com/"},
 		},
 		expectedErr: `[].decodableVersions[1]: Invalid value: "mygroup.com/": version part: must be non-empty`,
 	}, {
@@ -82,6 +113,7 @@ func TestValidateServerStorageVersion(t *testing.T) {
 			APIServerID:       "fea",
 			EncodingVersion:   "/v3",
 			DecodableVersions: []string{"mygroup.com/v2", "/v3"},
+			ServedVersions:    []string{"mygroup.com/v2", "/v3"},
 		},
 		expectedErr: `[].encodingVersion: Invalid value: "/v3": group part: must be non-empty`,
 	}, {
@@ -89,22 +121,57 @@ func TestValidateServerStorageVersion(t *testing.T) {
 			APIServerID:       "fea",
 			EncodingVersion:   "v1",
 			DecodableVersions: []string{"v1", "mygroup_com/v2"},
+			ServedVersions:    []string{"v1", "mygroup_com/v2"},
 		},
 		expectedErr: `[].decodableVersions[1]: Invalid value: "mygroup_com/v2": group part: a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')`,
 	}, {
 		ssv: apiserverinternal.ServerStorageVersion{
 			APIServerID:       "fea",
 			EncodingVersion:   "v1",
+			DecodableVersions: []string{"v1", "mygroup.com/v2"},
+			ServedVersions:    []string{"v1", "mygroup_com/v2"},
+		},
+		expectedErr: `[].servedVersions[1]: Invalid value: "mygroup_com/v2": group part: a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')`,
+	}, {
+		ssv: apiserverinternal.ServerStorageVersion{
+			APIServerID:       "fea",
+			EncodingVersion:   "v1",
 			DecodableVersions: []string{"v1", "mygroup.com/v2_"},
+			ServedVersions:    []string{"v1", "mygroup.com/v2_"},
 		},
 		expectedErr: `[].decodableVersions[1]: Invalid value: "mygroup.com/v2_": version part: a DNS-1035 label must consist of lower case alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character (e.g. 'my-name',  or 'abc-123', regex used for validation is '[a-z]([-a-z0-9]*[a-z0-9])?')`,
 	}, {
 		ssv: apiserverinternal.ServerStorageVersion{
 			APIServerID:       "fea",
 			EncodingVersion:   "v1",
+			DecodableVersions: []string{"v1", "mygroup.com/v2"},
+			ServedVersions:    []string{"v1", "mygroup.com/v2_"},
+		},
+		expectedErr: `[].servedVersions[1]: Invalid value: "mygroup.com/v2_": version part: a DNS-1035 label must consist of lower case alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character (e.g. 'my-name',  or 'abc-123', regex used for validation is '[a-z]([-a-z0-9]*[a-z0-9])?')`,
+	}, {
+		ssv: apiserverinternal.ServerStorageVersion{
+			APIServerID:       "fea",
+			EncodingVersion:   "v1",
 			DecodableVersions: []string{"v1", "mygroup.com/v2/myresource"},
+			ServedVersions:    []string{"v1", "mygroup.com/v2/myresource"},
 		},
 		expectedErr: `[].decodableVersions[1]: Invalid value: "mygroup.com/v2/myresource": an apiVersion is a DNS-1035 label, which must consist of lower case alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character (e.g. 'my-name',  or 'abc-123', regex used for validation is '[a-z]([-a-z0-9]*[a-z0-9])?') with an optional DNS subdomain prefix and '/' (e.g. 'example.com/MyVersion')`,
+	}, {
+		ssv: apiserverinternal.ServerStorageVersion{
+			APIServerID:       "fea",
+			EncodingVersion:   "v1",
+			DecodableVersions: []string{"v1", "mygroup.com/v2"},
+			ServedVersions:    []string{"v1", "mygroup.com/v2/myresource"},
+		},
+		expectedErr: `[].servedVersions[1]: Invalid value: "mygroup.com/v2/myresource": an apiVersion is a DNS-1035 label, which must consist of lower case alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character (e.g. 'my-name',  or 'abc-123', regex used for validation is '[a-z]([-a-z0-9]*[a-z0-9])?') with an optional DNS subdomain prefix and '/' (e.g. 'example.com/MyVersion')`,
+	}, {
+		ssv: apiserverinternal.ServerStorageVersion{
+			APIServerID:       "fea",
+			EncodingVersion:   "v1alpha1",
+			DecodableVersions: []string{"v1alpha1", "v1"},
+			ServedVersions:    []string{"v2"},
+		},
+		expectedErr: `[].servedVersions[0]: Invalid value: "v2": individual served version : v2 must be included in decodableVersions : [v1alpha1 v1]`,
 	}}
 
 	for _, tc := range cases {
