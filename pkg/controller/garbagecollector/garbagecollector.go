@@ -187,7 +187,7 @@ func (gc *GarbageCollector) Sync(ctx context.Context, discoveryClient discovery.
 		logger := klog.FromContext(ctx)
 
 		// Get the current resource list from discovery.
-		newResources := GetDeletableResources(discoveryClient)
+		newResources := GetDeletableResources(logger, discoveryClient)
 
 		// This can occur if there is an internal error in GetDeletableResources.
 		if len(newResources) == 0 {
@@ -214,7 +214,7 @@ func (gc *GarbageCollector) Sync(ctx context.Context, discoveryClient discovery.
 
 			// On a reattempt, check if available resources have changed
 			if attempt > 1 {
-				newResources = GetDeletableResources(discoveryClient)
+				newResources = GetDeletableResources(logger, discoveryClient)
 				if len(newResources) == 0 {
 					logger.V(2).Info("no resources reported by discovery", "attempt", attempt)
 					metrics.GarbageCollectorResourcesSyncError.Inc()
@@ -809,13 +809,13 @@ func (gc *GarbageCollector) GraphHasUID(u types.UID) bool {
 // All discovery errors are considered temporary. Upon encountering any error,
 // GetDeletableResources will log and return any discovered resources it was
 // able to process (which may be none).
-func GetDeletableResources(discoveryClient discovery.ServerResourcesInterface) map[schema.GroupVersionResource]struct{} {
+func GetDeletableResources(logger klog.Logger, discoveryClient discovery.ServerResourcesInterface) map[schema.GroupVersionResource]struct{} {
 	preferredResources, err := discoveryClient.ServerPreferredResources()
 	if err != nil {
 		if discovery.IsGroupDiscoveryFailedError(err) {
-			klog.Warningf("failed to discover some groups: %v", err.(*discovery.ErrGroupDiscoveryFailed).Groups)
+			logger.Info("failed to discover some groups", "groups", err.(*discovery.ErrGroupDiscoveryFailed).Groups)
 		} else {
-			klog.Warningf("failed to discover preferred resources: %v", err)
+			logger.Info("failed to discover preferred resources", "error", err)
 		}
 	}
 	if preferredResources == nil {
@@ -829,7 +829,7 @@ func GetDeletableResources(discoveryClient discovery.ServerResourcesInterface) m
 	for _, rl := range deletableResources {
 		gv, err := schema.ParseGroupVersion(rl.GroupVersion)
 		if err != nil {
-			klog.Warningf("ignoring invalid discovered resource %q: %v", rl.GroupVersion, err)
+			logger.Info("ignoring invalid discovered resource", "groupversion", rl.GroupVersion, "error", err)
 			continue
 		}
 		for i := range rl.APIResources {

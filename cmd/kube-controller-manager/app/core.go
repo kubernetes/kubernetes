@@ -377,6 +377,7 @@ func startEndpointController(ctx context.Context, controllerCtx ControllerContex
 
 func startReplicationController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	go replicationcontroller.NewReplicationManager(
+		klog.FromContext(ctx),
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Core().V1().ReplicationControllers(),
 		controllerContext.ClientBuilder.ClientOrDie("replication-controller"),
