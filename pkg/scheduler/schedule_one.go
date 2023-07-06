@@ -124,7 +124,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 		}
 		// Usually, DonePod is called inside the scheduling queue,
 		// but in this case, we need to call it here because this Pod won't go back to the scheduling queue.
-		sched.DonePod(assumedPodInfo.Pod.UID)
+		sched.SchedulingQueue.Done(assumedPodInfo.Pod.UID)
 	}()
 }
 
@@ -935,7 +935,7 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 	// Basically, AddUnschedulableIfNotPresent calls DonePod internally.
 	// But, AddUnschedulableIfNotPresent isn't called in some corner cases.
 	// Here, we call DonePod explicitly to avoid leaking the pod.
-	defer sched.DonePod(podInfo.Pod.UID)
+	defer sched.SchedulingQueue.Done(podInfo.Pod.UID)
 
 	logger := klog.FromContext(ctx)
 	reason := v1.PodReasonSchedulerError

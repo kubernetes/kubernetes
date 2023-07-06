@@ -768,7 +768,6 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				NextPod: func() (*framework.QueuedPodInfo, error) {
 					return &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, item.sendPod)}, nil
 				},
-				DonePod:         func(types.UID) {},
 				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
 				Profiles:        profile.Map{testSchedulerName: fwk},
 			}
@@ -3232,7 +3231,6 @@ func setupTestScheduler(ctx context.Context, t *testing.T, queuedPodStore *clien
 		NextPod: func() (*framework.QueuedPodInfo, error) {
 			return &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, clientcache.Pop(queuedPodStore).(*v1.Pod))}, nil
 		},
-		DonePod:         func(pod types.UID) {},
 		SchedulingQueue: schedulingQueue,
 		Profiles:        profile.Map{testSchedulerName: fwk},
 	}

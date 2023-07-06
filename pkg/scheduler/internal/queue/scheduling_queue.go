@@ -596,6 +596,8 @@ func (p *PriorityQueue) SchedulingCycle() int64 {
 	return p.schedulingCycle
 }
 
+// determineSchedulingHintForInFlightPod looks at the unschedulable plugins of the given Pod
+// and determines the scheduling hint for this Pod while checking the events that happened during in-flight.
 func (p *PriorityQueue) determineSchedulingHintForInFlightPod(logger klog.Logger, pInfo *framework.QueuedPodInfo, podSchedulingCycle int64) (framework.QueueingHint, int64) {
 	if len(pInfo.UnschedulablePlugins) == 0 {
 		// When there is no unschedulable plugin, we cannot have a guess which event makes this Pod schedulable.
@@ -816,7 +818,7 @@ func (p *PriorityQueue) done(pod types.UID) {
 		e := event.Value.(*clusterEvent)
 		// decrement inFlightPodsNum on events that happened after the Pod is popped.
 		e.inFlightPodsNum--
-		if e.inFlightPodsNum == 0 {
+		if e.inFlightPodsNum <= 0 {
 			// remove the event from the list if no Pod refers to it.
 			// In this case, we need to change `event` to the previous element
 			// because the current element will be removed.
