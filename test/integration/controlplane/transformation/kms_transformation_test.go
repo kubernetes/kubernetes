@@ -307,16 +307,11 @@ resources:
        endpoint: unix:///@kms-provider.sock
 `
 	_ = mock.NewBase64Plugin(t, "@kms-provider.sock")
-	var restarted bool
 	test, err := newTransformTest(t, encryptionConfig, true, "")
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
-	defer func() {
-		if !restarted {
-			test.cleanUp()
-		}
-	}()
+	defer test.cleanUp()
 
 	test.secret, err = test.createSecret(testSecret, testNamespace)
 	if err != nil {
@@ -498,8 +493,6 @@ resources:
 	if err = test.restartAPIServer(t, "", true); err != nil {
 		t.Fatalf("Failed to restart api server, error: %v", err)
 	}
-	restarted = true
-	defer test.cleanUp()
 
 	// confirm that reading a secret still works
 	_, err = test.restClient.CoreV1().Secrets(testNamespace).Get(

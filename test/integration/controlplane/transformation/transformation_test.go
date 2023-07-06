@@ -133,8 +133,15 @@ func (e *transformTest) cleanUp() {
 }
 
 func (e *transformTest) shutdownAPIServer() {
-	e.restClient.CoreV1().Namespaces().Delete(context.TODO(), e.ns.Name, *metav1.NewDeleteOptions(0))
-	e.apiServer.Cleanup()
+	if e.restClient != nil {
+		e.restClient.CoreV1().Namespaces().Delete(context.TODO(), e.ns.Name, *metav1.NewDeleteOptions(0))
+	}
+	if e.apiServer.EtcdClient != nil {
+		e.apiServer.EtcdClient.Close()
+	}
+	if e.apiServer.Cleanup != nil {
+		e.apiServer.Cleanup()
+	}
 }
 
 func (e *transformTest) restartAPIServer(l kubeapiservertesting.Logger, transformerConfigYAML string, reload bool) error {
