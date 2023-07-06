@@ -32,19 +32,19 @@ func TestRateLimitingQueue(t *testing.T) {
 		clock:           fakeClock,
 		heartbeat:       fakeClock.NewTicker(maxWait),
 		stopCh:          make(chan struct{}),
-		waitingForAddCh: make(chan *waitFor, 1000),
+		waitingForAddCh: make(chan *waitLoopMessage, 1000),
 		metrics:         newRetryMetrics("", nil),
 	}
 	queue.DelayingInterface = delayingQueue
 
 	queue.AddRateLimited("one")
 	waitEntry := <-delayingQueue.waitingForAddCh
-	if e, a := 1*time.Millisecond, waitEntry.readyAt.Sub(fakeClock.Now()); e != a {
+	if e, a := 1*time.Millisecond, waitEntry.item.readyAt.Sub(fakeClock.Now()); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	queue.AddRateLimited("one")
 	waitEntry = <-delayingQueue.waitingForAddCh
-	if e, a := 2*time.Millisecond, waitEntry.readyAt.Sub(fakeClock.Now()); e != a {
+	if e, a := 2*time.Millisecond, waitEntry.item.readyAt.Sub(fakeClock.Now()); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := 2, queue.NumRequeues("one"); e != a {
@@ -53,12 +53,12 @@ func TestRateLimitingQueue(t *testing.T) {
 
 	queue.AddRateLimited("two")
 	waitEntry = <-delayingQueue.waitingForAddCh
-	if e, a := 1*time.Millisecond, waitEntry.readyAt.Sub(fakeClock.Now()); e != a {
+	if e, a := 1*time.Millisecond, waitEntry.item.readyAt.Sub(fakeClock.Now()); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	queue.AddRateLimited("two")
 	waitEntry = <-delayingQueue.waitingForAddCh
-	if e, a := 2*time.Millisecond, waitEntry.readyAt.Sub(fakeClock.Now()); e != a {
+	if e, a := 2*time.Millisecond, waitEntry.item.readyAt.Sub(fakeClock.Now()); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
@@ -68,7 +68,7 @@ func TestRateLimitingQueue(t *testing.T) {
 	}
 	queue.AddRateLimited("one")
 	waitEntry = <-delayingQueue.waitingForAddCh
-	if e, a := 1*time.Millisecond, waitEntry.readyAt.Sub(fakeClock.Now()); e != a {
+	if e, a := 1*time.Millisecond, waitEntry.item.readyAt.Sub(fakeClock.Now()); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 

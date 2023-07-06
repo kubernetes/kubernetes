@@ -151,7 +151,7 @@ func newDelayingQueue(clock clock.WithTicker, q Interface, name string, provider
 		nextReadyAtTimerCh: make(<-chan time.Time),
 		heartbeat:          clock.NewTicker(maxWait),
 		stopCh:             make(chan struct{}),
-		waitingForAddCh:    make(chan *waitFor, 1000),
+		waitingForAddCh:    make(chan *waitLoopMessage, 1000),
 		metrics:            newRetryMetrics(name, provider),
 	}
 
@@ -165,7 +165,7 @@ type delayingType struct {
 
 	// afterFill - a list of waitFor that require processing after the queue has filled and nextReadyAt
 	// has been re-calculated.
-	afterFill []*waitFor
+	afterFill []*waitLoopMessage
 
 	// clock tracks time for delayed firing
 	clock clock.Clock
@@ -193,7 +193,7 @@ type delayingType struct {
 	stopOnce sync.Once
 
 	// waitingForAddCh is a buffered channel that feeds waitingForAdd
-	waitingForAddCh chan *waitFor
+	waitingForAddCh chan *waitLoopMessage
 }
 
 var _ DelayingInterface = &delayingType{}
@@ -220,16 +220,32 @@ const (
 
 // waitFor holds the data to add and the time it should be added
 type waitFor struct {
-	action  waitForAction
 	data    t
 	readyAt time.Time
 	// index in the priority queue (heap)
 	index int
+}
+
+// waitLoopMessage hold a communication made between client and waitLoop.
+type waitLoopMessage struct {
+	// action defines what we want to do
+	action waitForAction
+	// item defines an item to act upon, e.g. queue, forget etc.
+	item *waitFor
 	// options defines how the caller would like the item to behave.
 	options DelayingOptions
 	// returnCh allows the caller to block pending the processing and to also return
 	// a response value which can represent a stat such as existence or 'waiting' queue length.
 	returnCh chan waitingLoopResponse
+}
+
+// waitingLoopResponse describes the message that is returned from the waiting loop when a response
+// is requested/required.  It contains the different answer types that may be in the response.
+type waitingLoopResponse struct {
+	item      interface{}
+	exists    *bool
+	length    *int
+	nextReady *time.Duration
 }
 
 // waitForPriorityQueue implements a priority queue for waitFor items.
@@ -305,9 +321,12 @@ func (q *delayingType) AddAfter(item interface{}, duration time.Duration) {
 	select {
 	case <-q.stopCh:
 		// unblock if ShutDown() is called
-	case q.waitingForAddCh <- &waitFor{
-		data:    item,
-		readyAt: q.clock.Now().Add(duration),
+	case q.waitingForAddCh <- &waitLoopMessage{
+		action: waitForActionQueue,
+		item: &waitFor{
+			data:    item,
+			readyAt: q.clock.Now().Add(duration),
+		},
 		options: DelayingOptions{
 			// Always take the shorter waiting value to maintain backwards compatibility for existing clients.
 			WhenWaiting: TakeShorter,
@@ -375,10 +394,12 @@ func (q *delayingType) sendItemToWaitingLoop(item interface{}, opts DelayingOpti
 	}
 
 	// Add the item into the delaying queue (either the 'active' or 'waiting' queue)
-	waitEntry := &waitFor{
-		action:  action,
-		data:    item,
-		readyAt: q.clock.Now().Add(opts.Duration),
+	waitEntry := &waitLoopMessage{
+		action: action,
+		item: &waitFor{
+			data:    item,
+			readyAt: q.clock.Now().Add(opts.Duration),
+		},
 		options: opts,
 	}
 
@@ -403,15 +424,6 @@ func (q *delayingType) sendItemToWaitingLoop(item interface{}, opts DelayingOpti
 		}
 	}
 	return result
-}
-
-// waitingLoopResponse describes the message that is returned from the waiting loop when a response
-// is requested/required.  It contains the different answer types that may be in the response.
-type waitingLoopResponse struct {
-	item      interface{}
-	exists    *bool
-	length    *int
-	nextReady *time.Duration
 }
 
 // maxWait keeps a max bound on the wait time. It's just insurance against weird things happening.
@@ -467,14 +479,14 @@ func (q *delayingType) waitingLoop() {
 		case <-q.nextReadyAtTimerCh:
 			// continue the loop, which will add ready items
 
-		case waitEntry := <-q.waitingForAddCh:
-			q.processArrivingWaitForEntry(waitingForQueue, waitingEntryByData, waitEntry)
+		case msg := <-q.waitingForAddCh:
+			q.processArrivingWaitForEntry(waitingForQueue, waitingEntryByData, msg)
 
 			drained := false
 			for !drained {
 				select {
-				case waitEntry := <-q.waitingForAddCh:
-					q.processArrivingWaitForEntry(waitingForQueue, waitingEntryByData, waitEntry)
+				case msg := <-q.waitingForAddCh:
+					q.processArrivingWaitForEntry(waitingForQueue, waitingEntryByData, msg)
 				default:
 					drained = true
 				}
@@ -485,29 +497,28 @@ func (q *delayingType) waitingLoop() {
 
 // insert adds the entry to the 'waiting' queue, or updates the readyAt if it already exists in the queue
 // It returns a boolean to indicate that the entry was inserted or not.
-func insert(q *waitForPriorityQueue, knownEntries map[t]*waitFor, entry *waitFor) {
+func insert(q *waitForPriorityQueue, knownEntries map[t]*waitFor, msg *waitLoopMessage) {
 	// if the entry already exists, update the time according to the entry.options.WhenWaiting
-	existing, exists := knownEntries[entry.data]
+	existing, exists := knownEntries[msg.item.data]
 	if exists {
 		var replace bool
-		switch entry.options.WhenWaiting {
+		switch msg.options.WhenWaiting {
 		case TakeShorter:
-			replace = existing.readyAt.After(entry.readyAt)
+			replace = existing.readyAt.After(msg.item.readyAt)
 		case TakeLonger:
-			replace = existing.readyAt.Before(entry.readyAt)
+			replace = existing.readyAt.Before(msg.item.readyAt)
 		case TakeIncoming:
-			replace = !existing.readyAt.Equal(entry.readyAt)
+			replace = !existing.readyAt.Equal(msg.item.readyAt)
 		}
 		if replace {
-			existing.readyAt = entry.readyAt
-			existing.options = entry.options
+			existing.readyAt = msg.item.readyAt
 			heap.Fix(q, existing.index)
 		}
 		return
 	}
 
-	heap.Push(q, entry)
-	knownEntries[entry.data] = entry
+	heap.Push(q, msg.item)
+	knownEntries[msg.item.data] = msg.item
 }
 
 // calculateNextReadyAt recalculates the nextReadyAtTime as follows:
@@ -553,7 +564,7 @@ func (q *delayingType) handleReportingAndSync(w *waitForPriorityQueue, knownEntr
 		r := waitingLoopResponse{}
 		switch req.action {
 		case waitForActionIsWaiting:
-			item, exists := knownEntries[req.data]
+			item, exists := knownEntries[req.item.data]
 			r.exists = &exists
 			if item != nil {
 				nr := item.readyAt.Sub(q.clock.Now())
@@ -583,68 +594,68 @@ func (q *delayingType) handleReportingAndSync(w *waitForPriorityQueue, knownEntr
 //   - Delayed items are inserted into the 'waiting' queue according to their Waiting option (TakeShorter by default)
 //   - Immediate items will be dropped when the TakeLonger Waiting option is set and they are already present in 'waiting'.
 //   - Immediate items will pre-empt/remove items in the 'waiting' queue unless the PermitActiveAndWaiting option is set.
-func (q *delayingType) processArrivingWaitForEntry(w *waitForPriorityQueue, knownEntries map[t]*waitFor, entry *waitFor) {
+func (q *delayingType) processArrivingWaitForEntry(w *waitForPriorityQueue, knownEntries map[t]*waitFor, msg *waitLoopMessage) {
 	// handle the different message actions
-	switch entry.action {
+	switch msg.action {
 	case waitForActionIsWaiting, waitForActionLenWaiting, waitForActionNextReady, waitForActionSyncFill:
 		// all of these actions are processed in the call handleReportingAndSync()
-		if entry.returnCh == nil {
+		if msg.returnCh == nil {
 			return
 		}
-		q.afterFill = append(q.afterFill, entry)
+		q.afterFill = append(q.afterFill, msg)
 		return
 	case waitForActionDoneWaiting:
 		// remove entry from the 'waiting' queue
-		existing, exists := knownEntries[entry.data]
+		existing, exists := knownEntries[msg.item.data]
 		if exists {
 			// remove the item from the 'waiting' queue
 			heap.Remove(w, existing.index)
-			delete(knownEntries, entry.data)
+			delete(knownEntries, msg.item.data)
 		}
 		return
 	case waitForActionQueue:
 		// add entry to either 'active' or 'waiting' queues (dependent on delay and settings)
-		if entry.returnCh != nil {
-			defer close(entry.returnCh)
+		if msg.returnCh != nil {
+			defer close(msg.returnCh)
 		}
 
 		// Perform de-duplication between the 'waiting' queue against items in the 'active' queue unless
 		// disabled by PermitActiveAndWaiting.
-		if !entry.options.PermitActiveAndWaiting && q.Interface.IsQueued(entry.data) {
+		if !msg.options.PermitActiveAndWaiting && q.Interface.IsQueued(msg.item.data) {
 			return
 		}
 
 		// drop if the incoming item if the caller wishes to keep the existing item if it exists.
-		existing, exists := knownEntries[entry.data]
-		if exists && entry.options.WhenWaiting == TakeExisting {
+		existing, exists := knownEntries[msg.item.data]
+		if exists && msg.options.WhenWaiting == TakeExisting {
 			return
 		}
 
 		// delayed add (to 'waiting' queue)
-		if entry.readyAt.After(q.clock.Now()) {
+		if msg.item.readyAt.After(q.clock.Now()) {
 			// inform the metrics of the retry (moved from AddAfter())
 			q.metrics.retry()
 
 			// insert the entry into the 'waiting' queue with appropriate insertion strategy defined by options.Waiting
-			insert(w, knownEntries, entry)
+			insert(w, knownEntries, msg)
 			return
 		}
 
 		// immediate add (to 'active' queue)
 		if exists {
 			// items in the 'waiting' queue must be longer than an immediate add, if we TakeLonger we must drop this add.
-			if entry.options.WhenWaiting == TakeLonger {
+			if msg.options.WhenWaiting == TakeLonger {
 				return
 			}
 			// This covers both the TakeShorter and TakeIncoming cases because this is incoming and must be the shortest
 			// right now too.  We will remove/pre-empt the item in the 'waiting' queue unless disabled.
-			if !entry.options.PermitActiveAndWaiting {
+			if !msg.options.PermitActiveAndWaiting {
 				heap.Remove(w, existing.index)
-				delete(knownEntries, entry.data)
+				delete(knownEntries, existing.data)
 			}
 		}
 
 		// Perform the immediate add to the 'active' queue.
-		q.Interface.Add(entry.data)
+		q.Interface.Add(msg.item.data)
 	}
 }
