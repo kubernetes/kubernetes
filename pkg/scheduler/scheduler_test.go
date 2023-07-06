@@ -657,10 +657,9 @@ const (
 
 func Test_buildQueueingHintMap(t *testing.T) {
 	tests := []struct {
-		name     string
-		plugins  []framework.Plugin
-		want     map[framework.ClusterEvent][]*internalqueue.QueueingHintFunction
-		assertFn func(t *testing.T, got map[framework.ClusterEvent][]*internalqueue.QueueingHintFunction) bool
+		name    string
+		plugins []framework.Plugin
+		want    map[framework.ClusterEvent][]*internalqueue.QueueingHintFunction
 	}{
 		{
 			name:    "no-op plugin",

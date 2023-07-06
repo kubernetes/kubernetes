@@ -107,7 +107,7 @@ const (
 	QueueSkip QueueingHint = iota
 
 	// QueueAfterBackoff implies that the Pod may be schedulable by the event,
-	// and worth retring the scheduling again after backoff.
+	// and worth retrying the scheduling again after backoff.
 	QueueAfterBackoff
 
 	// QueueImmediately is returned only when it is highly possible that the Pod gets scheduled in the next scheduling.
@@ -145,6 +145,20 @@ type ClusterEvent struct {
 // IsWildCard returns true if ClusterEvent follows WildCard semantics
 func (ce ClusterEvent) IsWildCard() bool {
 	return ce.Resource == WildCard && ce.ActionType == All
+}
+
+func UnrollWildCardResource() []ClusterEventWithHint {
+	return []ClusterEventWithHint{
+		{Event: ClusterEvent{Resource: Pod, ActionType: All}},
+		{Event: ClusterEvent{Resource: Node, ActionType: All}},
+		{Event: ClusterEvent{Resource: CSINode, ActionType: All}},
+		{Event: ClusterEvent{Resource: CSIDriver, ActionType: All}},
+		{Event: ClusterEvent{Resource: CSIStorageCapacity, ActionType: All}},
+		{Event: ClusterEvent{Resource: PersistentVolume, ActionType: All}},
+		{Event: ClusterEvent{Resource: PersistentVolumeClaim, ActionType: All}},
+		{Event: ClusterEvent{Resource: StorageClass, ActionType: All}},
+		{Event: ClusterEvent{Resource: PodSchedulingContext, ActionType: All}},
+	}
 }
 
 // QueuedPodInfo is a Pod wrapper with additional information related to

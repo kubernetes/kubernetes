@@ -366,9 +366,15 @@ var defaultQueueingHintFn = func(_ *v1.Pod, _, _ interface{}) framework.Queueing
 }
 
 func buildQueueingHintMap(es []framework.EnqueueExtensions) internalqueue.QueueingHintMap {
-	queueingHintMap := make(map[framework.ClusterEvent][]*internalqueue.QueueingHintFunction)
+	queueingHintMap := make(internalqueue.QueueingHintMap)
 	for _, e := range es {
 		events := e.EventsToRegister()
+
+		// Note: Rarely, a plugin implements EnqueueExtensions but returns nil.
+		// We treat it as: the plugin is not interested in any event, and hence pod failed by that plugin
+		// cannot be moved by any regular cluster event.
+		// So, we can just ignore such EventsToRegister here.
+
 		for _, event := range events {
 			fn := event.QueueingHintFn
 			if fn == nil {
