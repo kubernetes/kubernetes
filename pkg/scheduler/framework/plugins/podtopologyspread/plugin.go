@@ -62,6 +62,7 @@ type PodTopologySpread struct {
 	replicationCtrls                             corelisters.ReplicationControllerLister
 	replicaSets                                  appslisters.ReplicaSetLister
 	statefulSets                                 appslisters.StatefulSetLister
+	pvcs                                         corelisters.PersistentVolumeClaimLister
 	enableMinDomainsInPodTopologySpread          bool
 	enableNodeInclusionPolicyInPodTopologySpread bool
 	enableMatchLabelKeysInPodTopologySpread      bool
@@ -127,6 +128,7 @@ func (pl *PodTopologySpread) setListers(factory informers.SharedInformerFactory)
 	pl.replicationCtrls = factory.Core().V1().ReplicationControllers().Lister()
 	pl.replicaSets = factory.Apps().V1().ReplicaSets().Lister()
 	pl.statefulSets = factory.Apps().V1().StatefulSets().Lister()
+	pl.pvcs = factory.Core().V1().PersistentVolumeClaims().Lister()
 }
 
 // EventsToRegister returns the possible events that may make a Pod

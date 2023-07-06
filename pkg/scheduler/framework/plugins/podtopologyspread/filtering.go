@@ -19,11 +19,13 @@ package podtopologyspread
 import (
 	"context"
 	"fmt"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"math"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
+	"k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
@@ -262,6 +264,61 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod)
 		return &preFilterState{}, nil
 	}
 
+	allPvcs, err := pl.pvcs.PersistentVolumeClaims(pod.Namespace).List(labels.Everything())
+	if err != nil {
+		return nil, fmt.Errorf("listing PersistentVolumeClaims: %w", err)
+	}
+	podNotExist := map[string][]*framework.PodInfo{}
+	processPVC := func(i int) {
+		pvc := allPvcs[i]
+		var nodeName string
+		if _, ok := pvc.Annotations[volume.AnnSelectedNode]; !ok {
+			return
+		}
+		nodeName = pvc.Annotations[volume.AnnSelectedNode]
+		var statefulSetReference metav1.OwnerReference
+		var podReference metav1.OwnerReference
+		for _, reference := range pvc.OwnerReferences {
+			if reference.Kind == "StatefulSet" {
+				statefulSetReference = reference
+			}
+			if reference.Kind == "Pod" {
+				podReference = reference
+			}
+		}
+		node, err := pl.sharedLister.NodeInfos().Get(nodeName)
+		if err != nil {
+			return
+		}
+		var podExist bool
+		for _, podItem := range node.Pods {
+			if podItem.Pod.Namespace == pod.Namespace && podItem.Pod.Name == podReference.Name {
+				podExist = true
+				break
+			}
+		}
+		if podExist {
+			return
+		}
+		sts, err := pl.statefulSets.StatefulSets(pod.Namespace).Get(statefulSetReference.Name)
+		if err != nil {
+			return
+		}
+		podItem := &v1.Pod{
+			Spec: sts.Spec.Template.Spec,
+		}
+		podInfo := &framework.PodInfo{
+			Pod: podItem,
+		}
+		podInfo.Update(podItem)
+		if _, ok := podNotExist[nodeName]; !ok {
+			podNotExist[nodeName] = []*framework.PodInfo{podInfo}
+		} else {
+			podNotExist[nodeName] = append(podNotExist[nodeName], podInfo)
+		}
+	}
+	pl.parallelizer.Until(ctx, len(allPvcs), processPVC, pl.Name())
+
 	allNodes, err := pl.sharedLister.NodeInfos().List()
 	if err != nil {
 		return nil, fmt.Errorf("listing NodeInfos: %w", err)
@@ -300,7 +357,11 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod)
 			}
 
 			pair := topologyPair{key: c.TopologyKey, value: node.Labels[c.TopologyKey]}
-			count := countPodsMatchSelector(nodeInfo.Pods, c.Selector, pod.Namespace)
+			pods := nodeInfo.Pods
+			if podItems, ok := podNotExist[node.Name]; ok {
+				pods = append(pods, podItems...)
+			}
+			count := countPodsMatchSelector(pods, c.Selector, pod.Namespace)
 			tpCounts[pair] = count
 		}
 		tpCountsByNode[i] = tpCounts
