@@ -50,6 +50,9 @@ type preFilterState struct {
 	TpKeyToDomainsNum map[string]int
 	// TpPairToMatchNum is keyed with topologyPair, and valued with the number of matching pods.
 	TpPairToMatchNum map[topologyPair]int
+	// PodNotExist is keyed with node name, and valued with pods that doesn't exist due to some reason
+	// but use volume that affinity node
+	PodNotExist map[string][]*framework.PodInfo
 }
 
 // minMatchNum returns the global minimum for the calculation of skew while taking MinDomains into account.
@@ -76,6 +79,18 @@ func (s *preFilterState) minMatchNum(tpKey string, minDomains int32, enableMinDo
 	}
 
 	return minMatchNum, nil
+}
+
+// podIsNotExist judge preempt pod is already in PodNotExist.
+func (s *preFilterState) podIsNotExist(pod *v1.Pod) bool {
+	for _, pods := range s.PodNotExist {
+		for _, podItem := range pods {
+			if podItem.Pod.Name == pod.Name {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // Clone makes a copy of the given state.
@@ -196,7 +211,9 @@ func (pl *PodTopologySpread) updateWithPod(s *preFilterState, updatedPod, preemp
 	if !nodeLabelsMatchSpreadConstraints(node.Labels, s.Constraints) {
 		return
 	}
-
+	if s.podIsNotExist(updatedPod) {
+		return
+	}
 	requiredSchedulingTerm := nodeaffinity.GetRequiredNodeAffinity(preemptorPod)
 	if !pl.enableNodeInclusionPolicyInPodTopologySpread {
 		// spreading is applied to nodes that pass those filters.
@@ -263,62 +280,10 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod)
 	if len(constraints) == 0 {
 		return &preFilterState{}, nil
 	}
-
-	allPvcs, err := pl.pvcs.PersistentVolumeClaims(pod.Namespace).List(labels.Everything())
+	podNotExist, err := pl.calPodNotExistWithVolume(ctx, pod)
 	if err != nil {
-		return nil, fmt.Errorf("listing PersistentVolumeClaims: %w", err)
+		return nil, fmt.Errorf("caculate not exist pod failed: %w", err)
 	}
-	podNotExist := map[string][]*framework.PodInfo{}
-	processPVC := func(i int) {
-		pvc := allPvcs[i]
-		var nodeName string
-		if _, ok := pvc.Annotations[volume.AnnSelectedNode]; !ok {
-			return
-		}
-		nodeName = pvc.Annotations[volume.AnnSelectedNode]
-		var statefulSetReference metav1.OwnerReference
-		var podReference metav1.OwnerReference
-		for _, reference := range pvc.OwnerReferences {
-			if reference.Kind == "StatefulSet" {
-				statefulSetReference = reference
-			}
-			if reference.Kind == "Pod" {
-				podReference = reference
-			}
-		}
-		node, err := pl.sharedLister.NodeInfos().Get(nodeName)
-		if err != nil {
-			return
-		}
-		var podExist bool
-		for _, podItem := range node.Pods {
-			if podItem.Pod.Namespace == pod.Namespace && podItem.Pod.Name == podReference.Name {
-				podExist = true
-				break
-			}
-		}
-		if podExist {
-			return
-		}
-		sts, err := pl.statefulSets.StatefulSets(pod.Namespace).Get(statefulSetReference.Name)
-		if err != nil {
-			return
-		}
-		podItem := &v1.Pod{
-			Spec: sts.Spec.Template.Spec,
-		}
-		podInfo := &framework.PodInfo{
-			Pod: podItem,
-		}
-		podInfo.Update(podItem)
-		if _, ok := podNotExist[nodeName]; !ok {
-			podNotExist[nodeName] = []*framework.PodInfo{podInfo}
-		} else {
-			podNotExist[nodeName] = append(podNotExist[nodeName], podInfo)
-		}
-	}
-	pl.parallelizer.Until(ctx, len(allPvcs), processPVC, pl.Name())
-
 	allNodes, err := pl.sharedLister.NodeInfos().List()
 	if err != nil {
 		return nil, fmt.Errorf("listing NodeInfos: %w", err)
@@ -328,6 +293,7 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod)
 		Constraints:          constraints,
 		TpKeyToCriticalPaths: make(map[string]*criticalPaths, len(constraints)),
 		TpPairToMatchNum:     make(map[topologyPair]int, sizeHeuristic(len(allNodes), constraints)),
+		PodNotExist:          podNotExist,
 	}
 
 	tpCountsByNode := make([]map[topologyPair]int, len(allNodes))
@@ -390,6 +356,60 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod)
 	}
 
 	return &s, nil
+}
+
+func (pl *PodTopologySpread) calPodNotExistWithVolume(ctx context.Context,
+	pod *v1.Pod) (map[string][]*framework.PodInfo, error) {
+	allPvcs, err := pl.pvcs.PersistentVolumeClaims(pod.Namespace).List(labels.Everything())
+	if err != nil {
+		return nil, fmt.Errorf("listing PersistentVolumeClaims: %w", err)
+	}
+	podNotExist := map[string][]*framework.PodInfo{}
+	processPVC := func(i int) {
+		pvc := allPvcs[i]
+		var nodeName string
+		if _, ok := pvc.Annotations[volume.AnnSelectedNode]; !ok {
+			return
+		}
+		nodeName = pvc.Annotations[volume.AnnSelectedNode]
+		var statefulSetReference metav1.OwnerReference
+		var podReference metav1.OwnerReference
+		for _, reference := range pvc.OwnerReferences {
+			if reference.Kind == "StatefulSet" {
+				statefulSetReference = reference
+			}
+			if reference.Kind == "Pod" {
+				podReference = reference
+			}
+		}
+		node, err := pl.sharedLister.NodeInfos().Get(nodeName)
+		if err != nil {
+			return
+		}
+		for _, podItem := range node.Pods {
+			if podItem.Pod.Namespace == pod.Namespace && podItem.Pod.Name == podReference.Name {
+				return
+			}
+		}
+		sts, err := pl.statefulSets.StatefulSets(pod.Namespace).Get(statefulSetReference.Name)
+		if err != nil {
+			return
+		}
+		podItem := &v1.Pod{
+			Spec: sts.Spec.Template.Spec,
+		}
+		podInfo := &framework.PodInfo{
+			Pod: podItem,
+		}
+		podInfo.Update(podItem)
+		if _, ok := podNotExist[nodeName]; !ok {
+			podNotExist[nodeName] = []*framework.PodInfo{podInfo}
+		} else {
+			podNotExist[nodeName] = append(podNotExist[nodeName], podInfo)
+		}
+	}
+	pl.parallelizer.Until(ctx, len(allPvcs), processPVC, pl.Name())
+	return podNotExist, nil
 }
 
 // Filter invoked at the filter extension point.

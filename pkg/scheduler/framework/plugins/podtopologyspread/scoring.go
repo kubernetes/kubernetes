@@ -43,6 +43,9 @@ type preScoreState struct {
 	// This allows the pod counts of smaller topologies to not be watered down by
 	// bigger ones.
 	TopologyNormalizingWeight []float64
+	// PodNotExist is keyed with node name, and valued with pods that doesn't exist due to some reason
+	// but use volume that affinity node
+	PodNotExist map[string][]*framework.PodInfo
 }
 
 // Clone implements the mandatory Clone interface. We don't really copy the data since
@@ -138,6 +141,11 @@ func (pl *PodTopologySpread) PreScore(
 		return framework.AsStatus(fmt.Errorf("calculating preScoreState: %w", err))
 	}
 
+	podNotExist, err := pl.calPodNotExistWithVolume(ctx, pod)
+	if err != nil {
+		return framework.AsStatus(fmt.Errorf("caculate not exist pod failed: %w", err))
+	}
+	state.PodNotExist = podNotExist
 	// return Skip if incoming pod doesn't have soft topology spread Constraints.
 	if len(state.Constraints) == 0 {
 		return framework.NewStatus(framework.Skip)
@@ -175,7 +183,11 @@ func (pl *PodTopologySpread) PreScore(
 			if tpCount == nil {
 				continue
 			}
-			count := countPodsMatchSelector(nodeInfo.Pods, c.Selector, pod.Namespace)
+			pods := nodeInfo.Pods
+			if podItems, ok := podNotExist[node.Name]; ok {
+				pods = append(pods, podItems...)
+			}
+			count := countPodsMatchSelector(pods, c.Selector, pod.Namespace)
 			atomic.AddInt64(tpCount, int64(count))
 		}
 	}
@@ -212,7 +224,11 @@ func (pl *PodTopologySpread) Score(ctx context.Context, cycleState *framework.Cy
 		if tpVal, ok := node.Labels[c.TopologyKey]; ok {
 			var cnt int64
 			if c.TopologyKey == v1.LabelHostname {
-				cnt = int64(countPodsMatchSelector(nodeInfo.Pods, c.Selector, pod.Namespace))
+				pods := nodeInfo.Pods
+				if podItems, ok := s.PodNotExist[node.Name]; ok {
+					pods = append(pods, podItems...)
+				}
+				cnt = int64(countPodsMatchSelector(pods, c.Selector, pod.Namespace))
 			} else {
 				pair := topologyPair{key: c.TopologyKey, value: tpVal}
 				cnt = *s.TopologyPairToPodCounts[pair]
