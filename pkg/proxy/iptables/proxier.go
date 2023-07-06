@@ -1381,6 +1381,7 @@ func (proxier *Proxier) syncProxyRules() {
 	// to run on hosts with lots of iptables rules, we don't bother to do this on
 	// every sync in large clusters. (Stale chains will not be referenced by any
 	// active rules, so they're harmless other than taking up memory.)
+	deletedChains := 0
 	if !proxier.largeClusterMode || time.Since(proxier.lastIPTablesCleanup) > proxier.syncPeriod {
 		var existingNATChains map[utiliptables.Chain]struct{}
 
@@ -1400,6 +1401,7 @@ func (proxier *Proxier) syncProxyRules() {
 					// the chain. Then we can remove the chain.
 					proxier.natChains.Write(utiliptables.MakeChainLine(chain))
 					proxier.natRules.Write("-X", chainString)
+					deletedChains++
 				}
 			}
 			proxier.lastIPTablesCleanup = time.Now()
@@ -1481,7 +1483,7 @@ func (proxier *Proxier) syncProxyRules() {
 	)
 
 	metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableFilter)).Set(float64(proxier.filterRules.Lines()))
-	metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableNAT)).Set(float64(proxier.natRules.Lines()))
+	metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableNAT)).Set(float64(proxier.natRules.Lines() - deletedChains))
 
 	// Sync rules.
 	proxier.iptablesData.Reset()

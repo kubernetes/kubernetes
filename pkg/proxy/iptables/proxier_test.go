@@ -604,6 +604,15 @@ func countRules(tableName utiliptables.Table, ruleData string) int {
 	return rules
 }
 
+func countRulesFromMetric(tableName utiliptables.Table) int {
+	numRulesFloat, err := testutil.GetGaugeMetricValue(metrics.IptablesRulesTotal.WithLabelValues(string(tableName)))
+	if err != nil {
+		klog.ErrorS(err, "metrics are not registered?")
+		return -1
+	}
+	return int(numRulesFloat)
+}
+
 // findAllMatches takes an array of lines and a pattern with one parenthesized group, and
 // returns a sorted array of all of the unique matches of the parenthesized group.
 func findAllMatches(lines []string, pattern string) []string {
@@ -1962,12 +1971,7 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 
 	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
-	natRulesMetric, err := testutil.GetGaugeMetricValue(metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableNAT)))
-	if err != nil {
-		t.Errorf("failed to get %s value, err: %v", metrics.IptablesRulesTotal.Name, err)
-	}
-	nNatRules := int(natRulesMetric)
-
+	nNatRules := countRulesFromMetric(utiliptables.TableNAT)
 	expectedNatRules := countRules(utiliptables.TableNAT, fp.iptablesData.String())
 
 	if nNatRules != expectedNatRules {
@@ -5461,22 +5465,14 @@ func TestProxierMetricsIptablesTotalRules(t *testing.T) {
 	fp.syncProxyRules()
 	iptablesData := fp.iptablesData.String()
 
-	nFilterRulesMetric, err := testutil.GetGaugeMetricValue(metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableFilter)))
-	if err != nil {
-		t.Errorf("failed to get %s value, err: %v", metrics.IptablesRulesTotal.Name, err)
-	}
-	nFilterRules := int(nFilterRulesMetric)
+	nFilterRules := countRulesFromMetric(utiliptables.TableFilter)
 	expectedFilterRules := countRules(utiliptables.TableFilter, iptablesData)
 
 	if nFilterRules != expectedFilterRules {
 		t.Fatalf("Wrong number of filter rule: expected %d got %d\n%s", expectedFilterRules, nFilterRules, iptablesData)
 	}
 
-	nNatRulesMetric, err := testutil.GetGaugeMetricValue(metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableNAT)))
-	if err != nil {
-		t.Errorf("failed to get %s value, err: %v", metrics.IptablesRulesTotal.Name, err)
-	}
-	nNatRules := int(nNatRulesMetric)
+	nNatRules := countRulesFromMetric(utiliptables.TableNAT)
 	expectedNatRules := countRules(utiliptables.TableNAT, iptablesData)
 
 	if nNatRules != expectedNatRules {
@@ -5502,22 +5498,14 @@ func TestProxierMetricsIptablesTotalRules(t *testing.T) {
 	fp.syncProxyRules()
 	iptablesData = fp.iptablesData.String()
 
-	nFilterRulesMetric, err = testutil.GetGaugeMetricValue(metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableFilter)))
-	if err != nil {
-		t.Errorf("failed to get %s value, err: %v", metrics.IptablesRulesTotal.Name, err)
-	}
-	nFilterRules = int(nFilterRulesMetric)
+	nFilterRules = countRulesFromMetric(utiliptables.TableFilter)
 	expectedFilterRules = countRules(utiliptables.TableFilter, iptablesData)
 
 	if nFilterRules != expectedFilterRules {
 		t.Fatalf("Wrong number of filter rule: expected %d got %d\n%s", expectedFilterRules, nFilterRules, iptablesData)
 	}
 
-	nNatRulesMetric, err = testutil.GetGaugeMetricValue(metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableNAT)))
-	if err != nil {
-		t.Errorf("failed to get %s value, err: %v", metrics.IptablesRulesTotal.Name, err)
-	}
-	nNatRules = int(nNatRulesMetric)
+	nNatRules = countRulesFromMetric(utiliptables.TableNAT)
 	expectedNatRules = countRules(utiliptables.TableNAT, iptablesData)
 
 	if nNatRules != expectedNatRules {
@@ -7705,6 +7693,12 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		`)
 	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
+	rulesSynced := countRules(utiliptables.TableNAT, expected)
+	rulesSyncedMetric := countRulesFromMetric(utiliptables.TableNAT)
+	if rulesSyncedMetric != rulesSynced {
+		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
+	}
+
 	// Add a new service and its endpoints. (This will only sync the SVC and SEP rules
 	// for the new service, not the existing ones.)
 	makeServiceMap(fp,
@@ -7771,6 +7765,12 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		`)
 	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
 
+	rulesSynced = countRules(utiliptables.TableNAT, expected)
+	rulesSyncedMetric = countRulesFromMetric(utiliptables.TableNAT)
+	if rulesSyncedMetric != rulesSynced {
+		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
+	}
+
 	// Delete a service. (Won't update the other services.)
 	fp.OnServiceDelete(svc2)
 	fp.syncProxyRules()
@@ -7807,6 +7807,12 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		COMMIT
 		`)
 	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
+
+	rulesSynced = countRules(utiliptables.TableNAT, expected)
+	rulesSyncedMetric = countRulesFromMetric(utiliptables.TableNAT)
+	if rulesSyncedMetric != rulesSynced {
+		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
+	}
 
 	// Add a service, sync, then add its endpoints. (The first sync will be a no-op other
 	// than adding the REJECT rule. The second sync will create the new service.)
@@ -7853,6 +7859,12 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		COMMIT
 		`)
 	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
+
+	rulesSynced = countRules(utiliptables.TableNAT, expected)
+	rulesSyncedMetric = countRulesFromMetric(utiliptables.TableNAT)
+	if rulesSyncedMetric != rulesSynced {
+		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
+	}
 
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice("ns4", "svc4", 1, func(eps *discovery.EndpointSlice) {
@@ -7904,6 +7916,12 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		`)
 	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
 
+	rulesSynced = countRules(utiliptables.TableNAT, expected)
+	rulesSyncedMetric = countRulesFromMetric(utiliptables.TableNAT)
+	if rulesSyncedMetric != rulesSynced {
+		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
+	}
+
 	// Change an endpoint of an existing service. This will cause its SVC and SEP
 	// chains to be rewritten.
 	eps3update := eps3.DeepCopy()
@@ -7948,6 +7966,12 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		COMMIT
 		`)
 	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
+
+	rulesSynced = countRules(utiliptables.TableNAT, expected)
+	rulesSyncedMetric = countRulesFromMetric(utiliptables.TableNAT)
+	if rulesSyncedMetric != rulesSynced {
+		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
+	}
 
 	// Add an endpoint to a service. This will cause its SVC and SEP chains to be rewritten.
 	eps3update2 := eps3update.DeepCopy()
@@ -7995,6 +8019,12 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		`)
 	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
 
+	rulesSynced = countRules(utiliptables.TableNAT, expected)
+	rulesSyncedMetric = countRulesFromMetric(utiliptables.TableNAT)
+	if rulesSyncedMetric != rulesSynced {
+		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
+	}
+
 	// Sync with no new changes... This will not rewrite any SVC or SEP chains
 	fp.syncProxyRules()
 
@@ -8027,6 +8057,12 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		COMMIT
 		`)
 	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
+
+	rulesSynced = countRules(utiliptables.TableNAT, expected)
+	rulesSyncedMetric = countRulesFromMetric(utiliptables.TableNAT)
+	if rulesSyncedMetric != rulesSynced {
+		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
+	}
 
 	// Now force a partial resync error and ensure that it recovers correctly
 	if fp.needFullSync {
@@ -8125,6 +8161,12 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		COMMIT
 		`)
 	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
+
+	rulesSynced = countRules(utiliptables.TableNAT, expected)
+	rulesSyncedMetric = countRulesFromMetric(utiliptables.TableNAT)
+	if rulesSyncedMetric != rulesSynced {
+		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
+	}
 }
 
 func TestNoEndpointsMetric(t *testing.T) {
