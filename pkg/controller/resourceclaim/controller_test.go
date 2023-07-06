@@ -188,11 +188,44 @@ func TestSyncHandler(t *testing.T) {
 			expectedMetrics: expectedMetrics{0, 0},
 		},
 		{
+			name: "clear-reserved-when-done",
+			pods: func() []*v1.Pod {
+				pods := []*v1.Pod{testPodWithResource.DeepCopy()}
+				pods[0].Status.Phase = v1.PodSucceeded
+				return pods
+			}(),
+			key: claimKey(testClaimReserved),
+			claims: func() []*resourcev1alpha2.ResourceClaim {
+				claims := []*resourcev1alpha2.ResourceClaim{testClaimReserved.DeepCopy()}
+				claims[0].OwnerReferences = nil
+				return claims
+			}(),
+			expectedClaims: func() []resourcev1alpha2.ResourceClaim {
+				claims := []resourcev1alpha2.ResourceClaim{*testClaimReserved.DeepCopy()}
+				claims[0].OwnerReferences = nil
+				claims[0].Status.ReservedFor = nil
+				return claims
+			}(),
+			expectedMetrics: expectedMetrics{0, 0},
+		},
+		{
 			name:            "remove-reserved",
 			pods:            []*v1.Pod{testPod},
 			key:             claimKey(testClaimReservedTwice),
 			claims:          []*resourcev1alpha2.ResourceClaim{testClaimReservedTwice},
 			expectedClaims:  []resourcev1alpha2.ResourceClaim{*testClaimReserved},
+			expectedMetrics: expectedMetrics{0, 0},
+		},
+		{
+			name: "delete-claim-when-done",
+			pods: func() []*v1.Pod {
+				pods := []*v1.Pod{testPodWithResource.DeepCopy()}
+				pods[0].Status.Phase = v1.PodSucceeded
+				return pods
+			}(),
+			key:             claimKey(testClaimReserved),
+			claims:          []*resourcev1alpha2.ResourceClaim{testClaimReserved},
+			expectedClaims:  nil,
 			expectedMetrics: expectedMetrics{0, 0},
 		},
 	}
@@ -226,7 +259,7 @@ func TestSyncHandler(t *testing.T) {
 			claimInformer := informerFactory.Resource().V1alpha2().ResourceClaims()
 			templateInformer := informerFactory.Resource().V1alpha2().ResourceClaimTemplates()
 
-			ec, err := NewController(fakeKubeClient, podInformer, claimInformer, templateInformer)
+			ec, err := NewController(klog.TODO(), fakeKubeClient, podInformer, claimInformer, templateInformer)
 			if err != nil {
 				t.Fatalf("error creating ephemeral controller : %v", err)
 			}
