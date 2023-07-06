@@ -4705,6 +4705,26 @@ func (f *fakeRateLimitingQueue) AddAfter(item interface{}, duration time.Duratio
 	f.item = item
 	f.duration = duration
 }
+func (f *fakeRateLimitingQueue) AddWithOptions(item interface{}, opts workqueue.DelayingOptions) {
+	f.item = item
+	f.duration = opts.Duration
+}
+func (f *fakeRateLimitingQueue) DoneWaiting(item interface{}) {
+	f.item = nil
+	f.duration = time.Duration(0)
+}
+func (f *fakeRateLimitingQueue) IsWaiting(item interface{}) (bool, time.Duration) {
+	if f.item == nil {
+		return false, time.Duration(0)
+	}
+	return true, f.duration
+}
+func (f *fakeRateLimitingQueue) LenWaiting() int {
+	if f.item == nil {
+		return 0
+	}
+	return 1
+}
 
 func TestJobBackoff(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)

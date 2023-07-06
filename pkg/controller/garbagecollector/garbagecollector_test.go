@@ -2846,6 +2846,18 @@ func (t *trackingWorkqueue) ShutDownWithDrain() {
 func (t *trackingWorkqueue) ShuttingDown() bool {
 	return t.limiter.ShuttingDown()
 }
+func (t *trackingWorkqueue) AddWithOptions(item interface{}, opts workqueue.DelayingOptions) {
+	t.limiter.AddWithOptions(item, opts)
+}
+func (t *trackingWorkqueue) DoneWaiting(item interface{}) {
+	t.limiter.DoneWaiting(item)
+}
+func (t *trackingWorkqueue) IsWaiting(item interface{}) (bool, time.Duration) {
+	return t.limiter.IsWaiting(item)
+}
+func (t *trackingWorkqueue) LenWaiting() int {
+	return t.limiter.LenWaiting()
+}
 
 func (t *trackingWorkqueue) queue(item interface{}) {
 	if _, queued := t.pendingMap[item]; queued {
