@@ -68,8 +68,8 @@ type Driver interface {
 	// The caller will wrap the error to include the parameter reference.
 	GetClaimParameters(ctx context.Context, claim *resourcev1alpha2.ResourceClaim, class *resourcev1alpha2.ResourceClass, classParameters interface{}) (interface{}, error)
 
-	// Allocate gets called when a ResourceClaim is ready to be allocated.
-	// The selectedNode is empty for ResourceClaims with immediate
+	// Allocate gets called when all same-driver ResourceClaims for Pod are ready
+	// to be allocated. The selectedNode is empty for ResourceClaims with immediate
 	// allocation, in which case the resource driver decides itself where
 	// to allocate. If there is already an on-going allocation, the driver
 	// may finish it and ignore the new parameters or abort the on-going
@@ -77,15 +77,21 @@ type Driver interface {
 	//
 	// Parameters have been retrieved earlier.
 	//
+	// Driver must set the result of allocation for every claim in "claims"
+	// parameter items. In case if there was no error encountered and allocation
+	// was successful - claims[i].Allocation field should be set. In case of
+	// particular claim allocation fail - respective item's claims[i].Error field
+	// should be set, in this case claims[i].Allocation will be ignored.
+	//
 	// If selectedNode is set, the driver must attempt to allocate for that
 	// node. If that is not possible, it must return an error. The
 	// controller will call UnsuitableNodes and pass the new information to
 	// the scheduler, which then will lead to selecting a diffent node
 	// if the current one is not suitable.
 	//
-	// The objects are read-only and must not be modified. This call
-	// must be idempotent.
-	Allocate(ctx context.Context, claim *resourcev1alpha2.ResourceClaim, claimParameters interface{}, class *resourcev1alpha2.ResourceClass, classParameters interface{}, selectedNode string) (*resourcev1alpha2.AllocationResult, error)
+	// The Claim, ClaimParameters, Class, ClassParameters fields of "claims" parameter
+	// items are read-only and must not be modified. This call must be idempotent.
+	Allocate(ctx context.Context, claims []*ClaimAllocation, selectedNode string)
 
 	// Deallocate gets called when a ResourceClaim is ready to be
 	// freed.
@@ -125,6 +131,13 @@ type ClaimAllocation struct {
 	// UnsuitableNodes needs to be filled in by the driver when
 	// Driver.UnsuitableNodes gets called.
 	UnsuitableNodes []string
+
+	// Driver must populate this field with resources that were
+	// allocated for the claim in case of successful allocation.
+	Allocation *resourcev1alpha2.AllocationResult
+	// In case of error allocating particular claim, driver must
+	// populate this field.
+	Error error
 }
 
 type controller struct {
@@ -500,7 +513,20 @@ func (ctrl *controller) syncClaim(ctx context.Context, claim *resourcev1alpha2.R
 		return err
 	}
 
-	return ctrl.allocateClaim(ctx, claim, claimParameters, class, classParameters, "", nil)
+	claimAllocations := claimAllocations{&ClaimAllocation{
+		Claim:           claim,
+		ClaimParameters: claimParameters,
+		Class:           class,
+		ClassParameters: classParameters,
+	}}
+
+	ctrl.allocateClaims(ctx, claimAllocations, "", nil)
+
+	if claimAllocations[0].Error != nil {
+		return fmt.Errorf("allocate: %v", claimAllocations[0].Error)
+	}
+
+	return nil
 }
 
 func (ctrl *controller) getParameters(ctx context.Context, claim *resourcev1alpha2.ResourceClaim, class *resourcev1alpha2.ResourceClass) (claimParameters, classParameters interface{}, err error) {
@@ -517,51 +543,85 @@ func (ctrl *controller) getParameters(ctx context.Context, claim *resourcev1alph
 	return
 }
 
-func (ctrl *controller) allocateClaim(ctx context.Context,
-	claim *resourcev1alpha2.ResourceClaim, claimParameters interface{},
-	class *resourcev1alpha2.ResourceClass, classParameters interface{},
-	selectedNode string,
-	selectedUser *resourcev1alpha2.ResourceClaimConsumerReference) error {
+// allocateClaims filters list of claims, keeps those needing allocation and asks driver to do the allocations.
+// Driver is supposed to write the AllocationResult and Error field into argument claims slice.
+func (ctrl *controller) allocateClaims(ctx context.Context, claims []*ClaimAllocation, selectedNode string, selectedUser *resourcev1alpha2.ResourceClaimConsumerReference) {
 	logger := klog.FromContext(ctx)
 
-	if claim.Status.Allocation != nil {
-		// This can happen when two PodSchedulingContext objects trigger
-		// allocation attempts (first one wins) or when we see the
-		// update of the PodSchedulingContext object.
-		logger.V(5).Info("Claim already allocated, nothing to do")
-		return nil
+	needAllocation := make([]*ClaimAllocation, 0, len(claims))
+	for _, claim := range claims {
+		if claim.Claim.Status.Allocation != nil {
+			// This can happen when two PodSchedulingContext objects trigger
+			// allocation attempts (first one wins) or when we see the
+			// update of the PodSchedulingContext object.
+			logger.V(5).Info("Claim is already allocated, skipping allocation", "claim", claim.PodClaimName)
+			continue
+		}
+		needAllocation = append(needAllocation, claim)
 	}
 
-	claim = claim.DeepCopy()
-	if !ctrl.hasFinalizer(claim) {
-		// Set finalizer before doing anything. We continue with the updated claim.
-		logger.V(5).Info("Adding finalizer")
-		claim.Finalizers = append(claim.Finalizers, ctrl.finalizer)
-		var err error
-		claim, err = ctrl.kubeClient.ResourceV1alpha2().ResourceClaims(claim.Namespace).Update(ctx, claim, metav1.UpdateOptions{})
-		if err != nil {
-			return fmt.Errorf("add finalizer: %v", err)
-		}
-		ctrl.claimCache.Mutation(claim)
+	if len(needAllocation) == 0 {
+		logger.V(5).Info("No claims need allocation, nothing to do")
+		return
 	}
+
+	// Keep separately claims that succeeded adding finalizers,
+	// they will be sent for Allocate to the driver.
+	claimsWithFinalizers := make([]*ClaimAllocation, 0, len(needAllocation))
+	for _, claimAllocation := range needAllocation {
+		if !ctrl.hasFinalizer(claimAllocation.Claim) {
+			claim := claimAllocation.Claim.DeepCopy()
+			// Set finalizer before doing anything. We continue with the updated claim.
+			logger.V(5).Info("Adding finalizer", "claim", claim.Name)
+			claim.Finalizers = append(claim.Finalizers, ctrl.finalizer)
+			var err error
+			claim, err = ctrl.kubeClient.ResourceV1alpha2().ResourceClaims(claim.Namespace).Update(ctx, claim, metav1.UpdateOptions{})
+			if err != nil {
+				logger.Error(err, "add finalizer", "claim", claim.Name)
+				claimAllocation.Error = fmt.Errorf("add finalizer: %v", err)
+				// Do not save claim to ask for Allocate from Driver.
+				continue
+			}
+			ctrl.claimCache.Mutation(claim)
+			claimAllocation.Claim = claim
+		}
+		claimsWithFinalizers = append(claimsWithFinalizers, claimAllocation)
+	}
+
+	// Beyond here we only operate with claimsWithFinalizers because those are ready for allocation.
 
 	logger.V(5).Info("Allocating")
-	allocation, err := ctrl.driver.Allocate(ctx, claim, claimParameters, class, classParameters, selectedNode)
-	if err != nil {
-		return fmt.Errorf("allocate: %v", err)
+	ctrl.driver.Allocate(ctx, claimsWithFinalizers, selectedNode)
+
+	// Update successfully allocated claims' status with allocation info.
+	for _, claimAllocation := range claimsWithFinalizers {
+		if claimAllocation.Error != nil {
+			logger.Error(claimAllocation.Error, "allocating claim", "claim", claimAllocation.Claim.Name)
+			continue
+		}
+		if claimAllocation.Allocation == nil {
+			logger.Error(nil, "allocating claim: missing allocation from driver", "claim", claimAllocation.Claim.Name)
+			claimAllocation.Error = fmt.Errorf("allocating claim: missing allocation from driver")
+			// Do not update this claim with allocation, it might succeed next time.
+			continue
+		}
+		logger.V(5).Info("successfully allocated", "claim", klog.KObj(claimAllocation.Claim))
+		claim := claimAllocation.Claim.DeepCopy()
+		claim.Status.Allocation = claimAllocation.Allocation
+		claim.Status.DriverName = ctrl.name
+		if selectedUser != nil {
+			claim.Status.ReservedFor = append(claim.Status.ReservedFor, *selectedUser)
+		}
+		logger.V(6).Info("Updating claim after allocation", "claim", claim)
+		claim, err := ctrl.kubeClient.ResourceV1alpha2().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
+		if err != nil {
+			claimAllocation.Error = fmt.Errorf("add allocation: %v", err)
+			continue
+		}
+
+		ctrl.claimCache.Mutation(claim)
 	}
-	claim.Status.Allocation = allocation
-	claim.Status.DriverName = ctrl.name
-	if selectedUser != nil {
-		claim.Status.ReservedFor = append(claim.Status.ReservedFor, *selectedUser)
-	}
-	logger.V(6).Info("Updating claim after allocation", "claim", claim)
-	claim, err = ctrl.kubeClient.ResourceV1alpha2().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
-	if err != nil {
-		return fmt.Errorf("add allocation: %v", err)
-	}
-	ctrl.claimCache.Mutation(claim)
-	return nil
+	return
 }
 
 func (ctrl *controller) checkPodClaim(ctx context.Context, pod *v1.Pod, podClaim v1.PodResourceClaim) (*ClaimAllocation, error) {
@@ -690,10 +750,19 @@ func (ctrl *controller) syncPodSchedulingContexts(ctx context.Context, schedulin
 				Name:     pod.Name,
 				UID:      pod.UID,
 			}
+
+			ctrl.allocateClaims(ctx, claims, selectedNode, selectedUser)
+
+			allErrorsStr := "allocation of one or more pod claims failed."
+			allocationFailed := false
 			for _, delayed := range claims {
-				if err := ctrl.allocateClaim(ctx, delayed.Claim, delayed.ClaimParameters, delayed.Class, delayed.ClassParameters, selectedNode, selectedUser); err != nil {
-					return fmt.Errorf("allocation of pod claim %s failed: %v", delayed.PodClaimName, err)
+				if delayed.Error != nil {
+					allErrorsStr = fmt.Sprintf("%s Claim %s: %s.", allErrorsStr, delayed.Claim.Name, delayed.Error)
+					allocationFailed = true
 				}
+			}
+			if allocationFailed {
+				return fmt.Errorf(allErrorsStr)
 			}
 		}
 	}
