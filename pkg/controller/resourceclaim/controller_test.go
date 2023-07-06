@@ -92,6 +92,7 @@ func TestSyncHandler(t *testing.T) {
 		name             string
 		key              string
 		claims           []*resourcev1alpha2.ResourceClaim
+		claimsInCache    []*resourcev1alpha2.ResourceClaim
 		pods             []*v1.Pod
 		podsLater        []*v1.Pod
 		templates        []*resourcev1alpha2.ResourceClaimTemplate
@@ -181,6 +182,18 @@ func TestSyncHandler(t *testing.T) {
 			expectedStatuses: map[string][]v1.PodResourceClaimStatus{
 				testPodWithResource.Name: {
 					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &testClaim.Name},
+				},
+			},
+			expectedMetrics: expectedMetrics{0, 0},
+		},
+		{
+			name:          "find-created-claim-in-cache",
+			pods:          []*v1.Pod{testPodWithResource},
+			key:           podKey(testPodWithResource),
+			claimsInCache: []*resourcev1alpha2.ResourceClaim{generatedTestClaim},
+			expectedStatuses: map[string][]v1.PodResourceClaimStatus{
+				testPodWithResource.Name: {
+					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &generatedTestClaim.Name},
 				},
 			},
 			expectedMetrics: expectedMetrics{0, 0},
@@ -344,6 +357,11 @@ func TestSyncHandler(t *testing.T) {
 			defer stopInformers()
 			informerFactory.WaitForCacheSync(ctx.Done())
 			cache.WaitForCacheSync(ctx.Done(), podInformer.Informer().HasSynced, claimInformer.Informer().HasSynced, templateInformer.Informer().HasSynced)
+
+			// Add claims that only exist in the mutation cache.
+			for _, claim := range tc.claimsInCache {
+				ec.claimCache.Mutation(claim)
+			}
 
 			// Simulate race: stop informers, add more pods that the controller doesn't know about.
 			stopInformers()
