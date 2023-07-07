@@ -1240,6 +1240,34 @@ func TestPreFilterPlugins(t *testing.T) {
 	})
 }
 
+func TestRunPreFilterPluginsStatus(t *testing.T) {
+	preFilter := &TestPlugin{
+		name: preFilterPluginName,
+		inj:  injectedResult{PreFilterStatus: int(framework.Error)},
+	}
+	r := make(Registry)
+	r.Register(preFilterPluginName,
+		func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+			return preFilter, nil
+		})
+
+	plugins := &config.Plugins{PreFilter: config.PluginSet{Enabled: []config.Plugin{{Name: preFilterPluginName}}}}
+
+	profile := config.KubeSchedulerProfile{Plugins: plugins}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	f, err := newFrameworkWithQueueSortAndBind(r, profile, ctx.Done())
+	if err != nil {
+		t.Fatalf("Failed to create framework for testing: %v", err)
+	}
+	_, status := f.RunPreFilterPlugins(ctx, nil, nil)
+	wantStatus := framework.AsStatus(fmt.Errorf("running PreFilter plugin %q: %w", preFilter.Name(), errInjectedStatus)).WithFailedPlugin(preFilter.Name())
+	if !reflect.DeepEqual(status, wantStatus) {
+		t.Errorf("wrong status. got: %v, want:%v", status, wantStatus)
+	}
+}
+
 func TestFilterPlugins(t *testing.T) {
 	tests := []struct {
 		name          string
