@@ -2081,84 +2081,111 @@ func TestClusterIPReject(t *testing.T) {
 	})
 }
 
-func TestClusterIPEndpointsMore(t *testing.T) {
+// TestClusterIPGeneral tests various basic features of a ClusterIP service
+func TestClusterIPGeneral(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
-	svcIP := "172.30.0.41"
-	svcPort := 80
-	svcPortName := proxy.ServicePortName{
-		NamespacedName: makeNSN("ns1", "svc1"),
-		Port:           "p80",
-		Protocol:       v1.ProtocolSCTP,
-	}
 
 	makeServiceMap(fp,
-		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
-			svc.Spec.ClusterIP = svcIP
+		makeTestService("ns1", "svc1", func(svc *v1.Service) {
+			svc.Spec.ClusterIP = "172.30.0.41"
 			svc.Spec.Ports = []v1.ServicePort{{
-				Name:     svcPortName.Port,
-				Port:     int32(svcPort),
-				Protocol: v1.ProtocolSCTP,
+				Name:     "http",
+				Port:     80,
+				Protocol: v1.ProtocolTCP,
 			}}
+		}),
+		makeTestService("ns2", "svc2", func(svc *v1.Service) {
+			svc.Spec.ClusterIP = "172.30.0.42"
+			svc.Spec.Ports = []v1.ServicePort{
+				{
+					Name:     "http",
+					Port:     80,
+					Protocol: v1.ProtocolTCP,
+				},
+				{
+					Name:       "https",
+					Port:       443,
+					Protocol:   v1.ProtocolTCP,
+					TargetPort: intstr.FromInt32(8443),
+				},
+				{
+					// Of course this should really be UDP, but if we
+					// create a service with UDP ports, the Proxier will
+					// try to do conntrack cleanup and we'd have to set
+					// the FakeExec up to be able to deal with that...
+					Name:     "dns-sctp",
+					Port:     53,
+					Protocol: v1.ProtocolSCTP,
+				},
+				{
+					Name:     "dns-tcp",
+					Port:     53,
+					Protocol: v1.ProtocolTCP,
+					// We use TargetPort on TCP but not SCTP to help
+					// disambiguate the output.
+					TargetPort: intstr.FromInt32(5353),
+				},
+			}
 		}),
 	)
 
-	epIP := "10.180.0.1"
 	populateEndpointSlices(fp,
-		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+		makeTestEndpointSlice("ns1", "svc1", 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
 			eps.Endpoints = []discovery.Endpoint{{
-				Addresses: []string{epIP},
+				Addresses: []string{"10.180.0.1"},
+				NodeName:  pointer.String(testHostname),
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     pointer.String(svcPortName.Port),
-				Port:     pointer.Int32(int32(svcPort)),
-				Protocol: &sctpProtocol,
+				Name:     pointer.String("http"),
+				Port:     pointer.Int32(80),
+				Protocol: &tcpProtocol,
 			}}
+		}),
+		makeTestEndpointSlice("ns2", "svc2", 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{
+				{
+					Addresses: []string{"10.180.0.1"},
+					NodeName:  pointer.String(testHostname),
+				},
+				{
+					Addresses: []string{"10.180.2.1"},
+					NodeName:  pointer.String("host2"),
+				},
+			}
+			eps.Ports = []discovery.EndpointPort{
+				{
+					Name:     pointer.String("http"),
+					Port:     pointer.Int32(80),
+					Protocol: &tcpProtocol,
+				},
+				{
+					Name:     pointer.String("https"),
+					Port:     pointer.Int32(8443),
+					Protocol: &tcpProtocol,
+				},
+				{
+					Name:     pointer.String("dns-sctp"),
+					Port:     pointer.Int32(53),
+					Protocol: &sctpProtocol,
+				},
+				{
+					Name:     pointer.String("dns-tcp"),
+					Port:     pointer.Int32(5353),
+					Protocol: &tcpProtocol,
+				},
+			}
 		}),
 	)
 
 	fp.syncProxyRules()
 
-	expected := dedent.Dedent(`
-		*filter
-		:KUBE-NODEPORTS - [0:0]
-		:KUBE-SERVICES - [0:0]
-		:KUBE-EXTERNAL-SERVICES - [0:0]
-		:KUBE-FIREWALL - [0:0]
-		:KUBE-FORWARD - [0:0]
-		:KUBE-PROXY-FIREWALL - [0:0]
-		-A KUBE-FIREWALL -m comment --comment "block incoming localnet connections" -d 127.0.0.0/8 ! -s 127.0.0.0/8 -m conntrack ! --ctstate RELATED,ESTABLISHED,DNAT -j DROP
-		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
-		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
-		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-		COMMIT
-		*nat
-		:KUBE-NODEPORTS - [0:0]
-		:KUBE-SERVICES - [0:0]
-		:KUBE-MARK-MASQ - [0:0]
-		:KUBE-POSTROUTING - [0:0]
-		:KUBE-SEP-RFW33Y6OHVBQ4W3M - [0:0]
-		:KUBE-SVC-GFCIFIA5VTFSTMSM - [0:0]
-		-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m sctp -p sctp -d 172.30.0.41 --dport 80 -j KUBE-SVC-GFCIFIA5VTFSTMSM
-		-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
-		-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
-		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
-		-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
-		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
-		-A KUBE-SEP-RFW33Y6OHVBQ4W3M -m comment --comment ns1/svc1:p80 -s 10.180.0.1 -j KUBE-MARK-MASQ
-		-A KUBE-SEP-RFW33Y6OHVBQ4W3M -m comment --comment ns1/svc1:p80 -m sctp -p sctp -j DNAT --to-destination 10.180.0.1:80
-		-A KUBE-SVC-GFCIFIA5VTFSTMSM -m comment --comment "ns1/svc1:p80 cluster IP" -m sctp -p sctp -d 172.30.0.41 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
-		-A KUBE-SVC-GFCIFIA5VTFSTMSM -m comment --comment "ns1/svc1:p80 -> 10.180.0.1:80" -j KUBE-SEP-RFW33Y6OHVBQ4W3M
-		COMMIT
-		`)
-	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
-
 	runPacketFlowTests(t, getLine(), ipt, testNodeIPs, []packetFlowTest{
 		{
-			name:     "cluster IP accepted",
+			name:     "simple clusterIP",
 			sourceIP: "10.180.0.2",
-			protocol: v1.ProtocolSCTP,
 			destIP:   "172.30.0.41",
 			destPort: 80,
 			output:   "10.180.0.1:80",
@@ -2167,11 +2194,59 @@ func TestClusterIPEndpointsMore(t *testing.T) {
 		{
 			name:     "hairpin to cluster IP",
 			sourceIP: "10.180.0.1",
-			protocol: v1.ProtocolSCTP,
 			destIP:   "172.30.0.41",
 			destPort: 80,
 			output:   "10.180.0.1:80",
 			masq:     true,
+		},
+		{
+			name:     "clusterIP with multiple endpoints",
+			sourceIP: "10.180.0.2",
+			destIP:   "172.30.0.42",
+			destPort: 80,
+			output:   "10.180.0.1:80, 10.180.2.1:80",
+			masq:     false,
+		},
+		{
+			name:     "clusterIP with TargetPort",
+			sourceIP: "10.180.0.2",
+			destIP:   "172.30.0.42",
+			destPort: 443,
+			output:   "10.180.0.1:8443, 10.180.2.1:8443",
+			masq:     false,
+		},
+		{
+			name:     "clusterIP with TCP and SCTP on same port (TCP)",
+			sourceIP: "10.180.0.2",
+			protocol: v1.ProtocolTCP,
+			destIP:   "172.30.0.42",
+			destPort: 53,
+			output:   "10.180.0.1:5353, 10.180.2.1:5353",
+			masq:     false,
+		},
+		{
+			name:     "clusterIP with TCP and SCTP on same port (SCTP)",
+			sourceIP: "10.180.0.2",
+			protocol: v1.ProtocolSCTP,
+			destIP:   "172.30.0.42",
+			destPort: 53,
+			output:   "10.180.0.1:53, 10.180.2.1:53",
+			masq:     false,
+		},
+		{
+			name:     "TCP-only port does not match UDP traffic",
+			sourceIP: "10.180.0.2",
+			protocol: v1.ProtocolUDP,
+			destIP:   "172.30.0.42",
+			destPort: 80,
+			output:   "",
+		},
+		{
+			name:     "svc1 does not accept svc2's ports",
+			sourceIP: "10.180.0.2",
+			destIP:   "172.30.0.41",
+			destPort: 443,
+			output:   "",
 		},
 	})
 }
