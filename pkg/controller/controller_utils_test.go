@@ -54,6 +54,7 @@ import (
 	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/pointer"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -397,10 +398,9 @@ func TestActivePodFiltering(t *testing.T) {
 		gotNames.Insert(pod.Name)
 	}
 
-	assert.Equal(t, 0, expectedNames.Difference(gotNames).Len(),
-		"expected %v, got %v", expectedNames.List(), gotNames.List())
-	assert.Equal(t, 0, gotNames.Difference(expectedNames).Len(),
-		"expected %v, got %v", expectedNames.List(), gotNames.List())
+	if diff := cmp.Diff(expectedNames.List(), gotNames.List()); diff != "" {
+		t.Errorf("Active pod names (-want,+got):\n%s", diff)
+	}
 }
 
 func TestSortingActivePods(t *testing.T) {
@@ -618,10 +618,9 @@ func TestActiveReplicaSetsFiltering(t *testing.T) {
 		gotNames.Insert(rs.Name)
 	}
 
-	assert.Equal(t, 0, expectedNames.Difference(gotNames).Len(),
-		"expected %v, got %v", expectedNames.List(), gotNames.List())
-	assert.Equal(t, 0, gotNames.Difference(expectedNames).Len(),
-		"expected %v, got %v", expectedNames.List(), gotNames.List())
+	if diff := cmp.Diff(expectedNames.List(), gotNames.List()); diff != "" {
+		t.Errorf("Active replica set names (-want,+got):\n%s", diff)
+	}
 }
 
 func TestComputeHash(t *testing.T) {
