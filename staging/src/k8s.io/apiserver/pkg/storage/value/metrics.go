@@ -61,7 +61,7 @@ var (
 			Namespace:      namespace,
 			Subsystem:      subsystem,
 			Name:           "transformation_operations_total",
-			Help:           "Total number of transformations.",
+			Help:           "Total number of transformations. Successful transformation will have a status 'OK' and a varied status string when the transformation fails. This status and transformation_type fields may be used for alerting on encryption/decryption failure using transformation_type from_storage for decryption and to_storage for encryption",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"transformation_type", "transformer_prefix", "status"},
