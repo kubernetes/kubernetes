@@ -171,11 +171,8 @@ func hostCheck() (int, int) {
 }
 
 func checkMetricValueGreaterThan(value interface{}) types.GomegaMatcher {
-	return gstruct.PointTo(gstruct.MatchAllFields(gstruct.Fields{
+	return gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 		// We already check Metric when matching the Id
-		"Metric":    gstruct.Ignore(),
-		"Value":     gomega.BeNumerically(">", value),
-		"Timestamp": gstruct.Ignore(),
-		"Histogram": gstruct.Ignore(),
+		"Value": gomega.BeNumerically(">", value),
 	}))
 }
