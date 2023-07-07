@@ -57,6 +57,12 @@ import (
 	"k8s.io/utils/pointer"
 )
 
+// (Note that we don't use UDP ports in most of the tests here, because if you create UDP
+// services you have to deal with setting up the FakeExec correctly for the conntrack
+// cleanup calls.)
+var tcpProtocol = v1.ProtocolTCP
+var sctpProtocol = v1.ProtocolSCTP
+
 func TestDeleteEndpointConnections(t *testing.T) {
 	const (
 		UDP  = v1.ProtocolUDP
@@ -1714,7 +1720,6 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
 	metrics.RegisterMetrics()
-	tcpProtocol := v1.ProtocolTCP
 
 	makeServiceMap(fp,
 		// create ClusterIP service
@@ -2060,7 +2065,6 @@ func TestClusterIPEndpointsMore(t *testing.T) {
 	)
 
 	epIP := "10.180.0.1"
-	sctpProtocol := v1.ProtocolSCTP
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
@@ -2169,7 +2173,6 @@ func TestLoadBalancer(t *testing.T) {
 	)
 
 	epIP := "10.180.0.1"
-	tcpProtocol := v1.ProtocolTCP
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
@@ -2370,7 +2373,6 @@ func TestNodePort(t *testing.T) {
 	)
 
 	epIP := "10.180.0.1"
-	tcpProtocol := v1.ProtocolTCP
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
@@ -2689,7 +2691,6 @@ func TestOnlyLocalExternalIPs(t *testing.T) {
 	)
 	epIP1 := "10.180.0.1"
 	epIP2 := "10.180.2.1"
-	tcpProtocol := v1.ProtocolTCP
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
@@ -2802,7 +2803,6 @@ func TestNonLocalExternalIPs(t *testing.T) {
 	)
 	epIP1 := "10.180.0.1"
 	epIP2 := "10.180.2.1"
-	tcpProtocol := v1.ProtocolTCP
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
@@ -3098,7 +3098,6 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 
 	epIP1 := "10.180.0.1"
 	epIP2 := "10.180.2.1"
-	tcpProtocol := v1.ProtocolTCP
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
@@ -3270,7 +3269,6 @@ func TestEnableLocalhostNodePortsIPv4(t *testing.T) {
 
 	epIP1 := "10.244.0.1"
 	epIP2 := "10.244.2.1"
-	tcpProtocol := v1.ProtocolTCP
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
@@ -3364,7 +3362,6 @@ func TestDisableLocalhostNodePortsIPv4(t *testing.T) {
 
 	epIP1 := "10.244.0.1"
 	epIP2 := "10.244.2.1"
-	tcpProtocol := v1.ProtocolTCP
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
@@ -3459,7 +3456,6 @@ func TestDisableLocalhostNodePortsIPv4WithNodeAddress(t *testing.T) {
 
 	epIP1 := "10.244.0.1"
 	epIP2 := "10.244.2.1"
-	tcpProtocol := v1.ProtocolTCP
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
@@ -3553,7 +3549,6 @@ func TestEnableLocalhostNodePortsIPv6(t *testing.T) {
 
 	epIP1 := "ff06::c1"
 	epIP2 := "ff06::c2"
-	tcpProtocol := v1.ProtocolTCP
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv6
@@ -3647,7 +3642,6 @@ func TestDisableLocalhostNodePortsIPv6(t *testing.T) {
 
 	epIP1 := "ff06::c1"
 	epIP2 := "ff06::c2"
-	tcpProtocol := v1.ProtocolTCP
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv6
@@ -3797,7 +3791,6 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 
 	epIP1 := "10.180.0.1"
 	epIP2 := "10.180.2.1"
-	tcpProtocol := v1.ProtocolTCP
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
@@ -5099,7 +5092,6 @@ func TestHealthCheckNodePortWhenTerminating(t *testing.T) {
 		},
 	})
 
-	tcpProtocol := v1.ProtocolTCP
 	endpointSlice := &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-1", serviceName),
@@ -5331,7 +5323,6 @@ func TestProxierDeleteNodePortStaleUDP(t *testing.T) {
 func TestProxierMetricsIptablesTotalRules(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
-	tcpProtocol := v1.ProtocolTCP
 
 	metrics.RegisterMetrics()
 
@@ -5632,7 +5623,6 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 
 			fp.OnServiceAdd(svc)
 
-			tcpProtocol := v1.ProtocolTCP
 			endpointSlice := &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("%s-1", serviceName),
@@ -5682,7 +5672,6 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 // TestTerminatingEndpointsTrafficPolicyLocal tests that when there are local ready and
 // ready + terminating endpoints, only the ready endpoints are used.
 func TestTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
-	tcpProtocol := v1.ProtocolTCP
 	timeout := v1.DefaultClientIPServiceAffinitySeconds
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "svc1", Namespace: "ns1"},
@@ -6209,7 +6198,6 @@ func TestTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 // TestTerminatingEndpointsTrafficPolicyCluster tests that when there are cluster-wide
 // ready and ready + terminating endpoints, only the ready endpoints are used.
 func TestTerminatingEndpointsTrafficPolicyCluster(t *testing.T) {
-	tcpProtocol := v1.ProtocolTCP
 	timeout := v1.DefaultClientIPServiceAffinitySeconds
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "svc1", Namespace: "ns1"},
@@ -6722,7 +6710,6 @@ func TestInternalExternalMasquerade(t *testing.T) {
 	// top, before the test cases that will be run against it.)
 	setupTest := func(fp *Proxier) {
 		local := v1.ServiceInternalTrafficPolicyLocal
-		tcpProtocol := v1.ProtocolTCP
 
 		makeServiceMap(fp,
 			makeTestService("ns1", "svc1", func(svc *v1.Service) {
@@ -7343,7 +7330,6 @@ func TestSyncProxyRulesLargeClusterMode(t *testing.T) {
 		}),
 	)
 
-	tcpProtocol := v1.ProtocolTCP
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice("ns1", "svc1", 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
@@ -7524,7 +7510,6 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		}),
 	)
 
-	tcpProtocol := v1.ProtocolTCP
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice("ns1", "svc1", 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
@@ -8131,7 +8116,6 @@ func TestNoEndpointsMetric(t *testing.T) {
 
 			fp.OnServiceAdd(svc)
 
-			tcpProtocol := v1.ProtocolTCP
 			endpointSlice := &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("%s-1", serviceName),
