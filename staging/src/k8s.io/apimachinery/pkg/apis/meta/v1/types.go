@@ -995,6 +995,24 @@ const (
 	// CauseTypeFieldValueNotSupported is used to report valid (as per formatting rules)
 	// values that can not be handled (e.g. an enumerated string).
 	CauseTypeFieldValueNotSupported CauseType = "FieldValueNotSupported"
+	// CauseTypeForbidden is used to report valid (as per formatting rules)
+	// values which would be accepted under some conditions, but which are not
+	// permitted by the current conditions (such as security policy).  See
+	// Forbidden().
+	CauseTypeForbidden CauseType = "FieldValueForbidden"
+	// CauseTypeTooLong is used to report that the given value is too long.
+	// This is similar to ErrorTypeInvalid, but the error will not include the
+	// too-long value.  See TooLong().
+	CauseTypeTooLong CauseType = "FieldValueTooLong"
+	// CauseTypeTooMany is used to report "too many". This is used to
+	// report that a given list has too many items. This is similar to FieldValueTooLong,
+	// but the error indicates quantity instead of length.
+	CauseTypeTooMany CauseType = "FieldValueTooMany"
+	// CauseTypeInternal is used to report other errors that are not related
+	// to user input.  See InternalError().
+	CauseTypeInternal CauseType = "InternalError"
+	// CauseTypeTypeInvalid is for the value did not match the schema type for that field
+	CauseTypeTypeInvalid CauseType = "FieldValueTypeInvalid"
 	// CauseTypeUnexpectedServerResponse is used to report when the server responded to the client
 	// without the expected return type. The presence of this cause indicates the error may be
 	// due to an intervening proxy or the server software malfunctioning.
