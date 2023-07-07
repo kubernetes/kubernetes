@@ -28,7 +28,6 @@ import (
 	storage "k8s.io/api/storage/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
@@ -78,8 +77,13 @@ func newTestPluginWithVolumeHost(t *testing.T, client *fakeclient.Clientset, hos
 	volumeAttachmentInformer := factory.Storage().V1().VolumeAttachments()
 	volumeAttachmentLister := volumeAttachmentInformer.Lister()
 
-	factory.Start(wait.NeverStop)
-	syncedTypes := factory.WaitForCacheSync(wait.NeverStop)
+	stopCh := make(chan struct{})
+	t.Cleanup(func() {
+		close(stopCh)
+	})
+
+	factory.Start(stopCh)
+	syncedTypes := factory.WaitForCacheSync(stopCh)
 	if len(syncedTypes) != 2 {
 		t.Fatalf("informers are not synced")
 	}

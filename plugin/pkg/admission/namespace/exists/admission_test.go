@@ -25,7 +25,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	informers "k8s.io/client-go/informers"
@@ -86,7 +85,9 @@ func TestAdmissionNamespaceExists(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error initializing handler: %v", err)
 	}
-	informerFactory.Start(wait.NeverStop)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informerFactory.Start(stopCh)
 
 	pod := newPod(namespace)
 	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
@@ -106,7 +107,9 @@ func TestAdmissionNamespaceDoesNotExist(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error initializing handler: %v", err)
 	}
-	informerFactory.Start(wait.NeverStop)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informerFactory.Start(stopCh)
 
 	pod := newPod(namespace)
 	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)

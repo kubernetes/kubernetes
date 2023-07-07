@@ -29,7 +29,6 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
@@ -254,8 +253,11 @@ func TestCSI_VolumeAll(t *testing.T) {
 				csiDriverInformer.Informer().GetStore().Add(driverInfo)
 			}
 
-			factory.Start(wait.NeverStop)
-			factory.WaitForCacheSync(wait.NeverStop)
+			stopCh := make(chan struct{})
+			defer close(stopCh)
+
+			factory.Start(stopCh)
+			factory.WaitForCacheSync(stopCh)
 
 			attachDetachVolumeHost := volumetest.NewFakeAttachDetachVolumeHostWithCSINodeName(t,
 				tmpDir,

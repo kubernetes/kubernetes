@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
@@ -706,7 +705,9 @@ func TestLimitRangerIgnoresSubresource(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error initializing handler: %v", err)
 	}
-	informerFactory.Start(wait.NeverStop)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informerFactory.Start(stopCh)
 
 	testPod := validPod("testPod", 1, api.ResourceRequirements{})
 	err = admissiontesting.WithReinvocationTesting(t, handler).Admit(context.TODO(), admission.NewAttributesRecord(&testPod, nil, api.Kind("Pod").WithVersion("version"), limitRange.Namespace, "testPod", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
@@ -736,7 +737,9 @@ func TestLimitRangerAdmitPod(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error initializing handler: %v", err)
 	}
-	informerFactory.Start(wait.NeverStop)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informerFactory.Start(stopCh)
 
 	testPod := validPod("testPod", 1, api.ResourceRequirements{})
 	err = admissiontesting.WithReinvocationTesting(t, handler).Admit(context.TODO(), admission.NewAttributesRecord(&testPod, nil, api.Kind("Pod").WithVersion("version"), limitRange.Namespace, "testPod", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)

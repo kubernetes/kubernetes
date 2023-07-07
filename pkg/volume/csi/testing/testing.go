@@ -21,7 +21,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
@@ -53,8 +52,13 @@ func NewTestPlugin(t *testing.T, client *fakeclient.Clientset) (*volume.VolumePl
 	csiDriverInformer := factory.Storage().V1().CSIDrivers()
 	csiDriverLister := csiDriverInformer.Lister()
 
-	factory.Start(wait.NeverStop)
-	syncedTypes := factory.WaitForCacheSync(wait.NeverStop)
+	stopCh := make(chan struct{})
+	t.Cleanup(func() {
+		close(stopCh)
+	})
+
+	factory.Start(stopCh)
+	syncedTypes := factory.WaitForCacheSync(stopCh)
 	if len(syncedTypes) != 1 {
 		t.Fatalf("informers are not synced")
 	}

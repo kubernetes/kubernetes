@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
@@ -98,7 +97,9 @@ func TestAdmission(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error initializing handler: %v", err)
 	}
-	informerFactory.Start(wait.NeverStop)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informerFactory.Start(stopCh)
 
 	pod := newPod(namespace)
 	err = admissiontesting.WithReinvocationTesting(t, handler).Admit(context.TODO(), admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
@@ -118,7 +119,9 @@ func TestAdmissionNamespaceExists(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error initializing handler: %v", err)
 	}
-	informerFactory.Start(wait.NeverStop)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informerFactory.Start(stopCh)
 
 	pod := newPod(namespace)
 	err = admissiontesting.WithReinvocationTesting(t, handler).Admit(context.TODO(), admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
@@ -138,7 +141,9 @@ func TestAdmissionDryRun(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error initializing handler: %v", err)
 	}
-	informerFactory.Start(wait.NeverStop)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informerFactory.Start(stopCh)
 
 	pod := newPod(namespace)
 	err = admissiontesting.WithReinvocationTesting(t, handler).Admit(context.TODO(), admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, true, nil), nil)
@@ -158,7 +163,9 @@ func TestIgnoreAdmission(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error initializing handler: %v", err)
 	}
-	informerFactory.Start(wait.NeverStop)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informerFactory.Start(stopCh)
 	chainHandler := admissiontesting.WithReinvocationTesting(t, admission.NewChainHandler(handler))
 
 	pod := newPod(namespace)
@@ -181,7 +188,9 @@ func TestAdmissionWithLatentCache(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error initializing handler: %v", err)
 	}
-	informerFactory.Start(wait.NeverStop)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informerFactory.Start(stopCh)
 
 	pod := newPod(namespace)
 	err = admissiontesting.WithReinvocationTesting(t, handler).Admit(context.TODO(), admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)

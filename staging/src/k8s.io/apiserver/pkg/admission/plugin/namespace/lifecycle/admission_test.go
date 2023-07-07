@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	kubeadmission "k8s.io/apiserver/pkg/admission/initializer"
 	informers "k8s.io/client-go/informers"
@@ -130,7 +129,9 @@ func TestAdmissionNamespaceDoesNotExist(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error initializing handler: %v", err)
 	}
-	informerFactory.Start(wait.NeverStop)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informerFactory.Start(stopCh)
 
 	pod := newPod(namespace)
 	err = handler.Admit(context.TODO(), admission.NewAttributesRecord(&pod, nil, v1.SchemeGroupVersion.WithKind("Pod").GroupKind().WithVersion("version"), pod.Namespace, pod.Name, v1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
@@ -172,7 +173,9 @@ func TestAdmissionNamespaceActive(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error initializing handler: %v", err)
 	}
-	informerFactory.Start(wait.NeverStop)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informerFactory.Start(stopCh)
 
 	pod := newPod(namespace)
 	err = handler.Admit(context.TODO(), admission.NewAttributesRecord(&pod, nil, v1.SchemeGroupVersion.WithKind("Pod").GroupKind().WithVersion("version"), pod.Namespace, pod.Name, v1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
@@ -192,7 +195,9 @@ func TestAdmissionNamespaceTerminating(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error initializing handler: %v", err)
 	}
-	informerFactory.Start(wait.NeverStop)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informerFactory.Start(stopCh)
 
 	pod := newPod(namespace)
 	// verify create operations in the namespace cause an error
@@ -251,7 +256,9 @@ func TestAdmissionNamespaceForceLiveLookup(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error initializing handler: %v", err)
 	}
-	informerFactory.Start(wait.NeverStop)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informerFactory.Start(stopCh)
 
 	pod := newPod(namespace)
 	// verify create operations in the namespace is allowed
