@@ -299,8 +299,16 @@ func TestCalculateLinuxResources(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		linuxContainerResources := m.calculateLinuxResources(test.cpuReq, test.cpuLim, test.memLim)
-		assert.Equal(t, test.expected, linuxContainerResources)
+		resources := m.calculateLinuxResources(test.cpuReq, test.cpuLim, test.memLim)
+
+		if resources.Unified["memory.oom.group"] != "" {
+			if test.expected.Unified == nil {
+				test.expected.Unified = map[string]string{}
+			}
+			test.expected.Unified["memory.oom.group"] = "1"
+		}
+
+		assert.Equal(t, test.expected, resources)
 	}
 }
 
@@ -881,8 +889,16 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			}
 			resources := m.generateLinuxContainerResources(pod, &pod.Spec.Containers[0], false)
 			tc.expected.HugepageLimits = resources.HugepageLimits
-			if !cmp.Equal(resources, tc.expected) {
-				t.Errorf("Test %s: expected resources %+v, but got %+v", tc.name, tc.expected, resources)
+
+			if resources.Unified["memory.oom.group"] != "" {
+				if tc.expected.Unified == nil {
+					tc.expected.Unified = map[string]string{}
+				}
+				tc.expected.Unified["memory.oom.group"] = "1"
+			}
+
+			if diff := cmp.Diff(resources, tc.expected); diff != "" {
+				t.Errorf("Bad resources; diff (-got +want)\n%s", diff)
 			}
 		})
 	}

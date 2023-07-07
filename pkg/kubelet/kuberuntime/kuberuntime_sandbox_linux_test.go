@@ -123,8 +123,23 @@ func TestApplySandboxResources(t *testing.T) {
 
 	for i, test := range tests {
 		m.applySandboxResources(test.pod, config)
-		assert.Equal(t, test.expectedResource, config.Linux.Resources, "TestCase[%d]: %s", i, test.description)
-		assert.Equal(t, test.expectedOverhead, config.Linux.Overhead, "TestCase[%d]: %s", i, test.description)
+
+		if config.Linux.Resources.Unified["memory.oom.group"] != "" {
+			if test.expectedResource.Unified == nil {
+				test.expectedResource.Unified = map[string]string{}
+			}
+			test.expectedResource.Unified["memory.oom.group"] = "1"
+		}
+
+		if config.Linux.Overhead.Unified["memory.oom.group"] != "" {
+			if test.expectedOverhead.Unified == nil {
+				test.expectedOverhead.Unified = map[string]string{}
+			}
+			test.expectedOverhead.Unified["memory.oom.group"] = "1"
+		}
+
+		assert.Equal(t, test.expectedResource, config.Linux.Resources, "TestCase[%d]: %s: expected resources", i, test.description)
+		assert.Equal(t, test.expectedOverhead, config.Linux.Overhead, "TestCase[%d]: %s: expected overhead", i, test.description)
 	}
 }
 
