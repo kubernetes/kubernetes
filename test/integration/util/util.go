@@ -18,6 +18,7 @@ package util
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"testing"
@@ -27,6 +28,7 @@ import (
 	policy "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
@@ -199,17 +201,33 @@ func CleanupTest(t *testing.T, testCtx *TestContext) {
 	testCtx.CloseFn()
 }
 
+func RemovePodFinalizersInNamespace(ctx context.Context, cs clientset.Interface, t *testing.T, ns string) {
+	t.Helper()
+	pods, err := cs.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		t.Fatalf("Failed obtaining list of pods: %v", err)
+	}
+	RemovePodFinalizers(ctx, cs, t, pods.Items...)
+}
+
 // RemovePodFinalizers removes pod finalizers for the pods
-func RemovePodFinalizers(cs clientset.Interface, t *testing.T, pods []*v1.Pod) {
+func RemovePodFinalizers(ctx context.Context, cs clientset.Interface, t *testing.T, pods ...v1.Pod) {
+	t.Helper()
 	for _, p := range pods {
-		pod, err := cs.CoreV1().Pods(p.Namespace).Get(context.TODO(), p.Name, metav1.GetOptions{})
+		pod, err := cs.CoreV1().Pods(p.Namespace).Get(ctx, p.Name, metav1.GetOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
-			t.Errorf("error while removing pod finalizers for %v: %v", klog.KObj(p), err)
-		} else if pod != nil {
-			pod.ObjectMeta.Finalizers = nil
-			_, err = cs.CoreV1().Pods(pod.Namespace).Update(context.TODO(), pod, metav1.UpdateOptions{})
+			t.Errorf("error while removing pod finalizers for %v: %v", klog.KObj(&p), err)
+		} else if pod != nil && len(pod.Finalizers) > 0 {
+			// Use Patch to remove finalizer, instead of Update, to avoid transient
+			// conflicts.
+			patchBytes, _ := json.Marshal(map[string]interface{}{
+				"metadata": map[string]interface{}{
+					"$deleteFromPrimitiveList/finalizers": pod.Finalizers,
+				},
+			})
+			_, err = cs.CoreV1().Pods(pod.Namespace).Patch(ctx, pod.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 			if err != nil {
-				t.Errorf("error while updating pod status for %v: %v", klog.KObj(p), err)
+				t.Errorf("error while updating pod status for %v: %v", klog.KObj(&p), err)
 			}
 		}
 	}
