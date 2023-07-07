@@ -45,6 +45,9 @@ func GenerateAnnotations(
 	driverName string,
 	cdiDevices []string,
 ) ([]kubecontainer.Annotation, error) {
+	if len(cdiDevices) == 0 {
+		return nil, nil
+	}
 	annotations, err := updateAnnotations(map[string]string{}, driverName, string(claimUID), cdiDevices)
 	if err != nil {
 		return nil, fmt.Errorf("can't generate CDI annotations: %+v", err)
