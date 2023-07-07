@@ -330,6 +330,7 @@ func (f *FitError) Error() string {
 	if postFilterMsg != "" {
 		reasonMsg += fmt.Sprintf(SeparatorFormat, postFilterMsg)
 	}
+
 	return reasonMsg
 }
 

@@ -1447,6 +1447,17 @@ func TestFitError_Error(t *testing.T) {
 			},
 			wantReasonMsg: "0/3 nodes are available: 1 Node(s) failed Filter plugin FalseFilter-2, 2 Node(s) failed Filter plugin FalseFilter-1. Error running PostFilter plugin FailedPostFilter.",
 		},
+		{
+			name:        "failed to Permit on node",
+			numAllNodes: 1,
+			diagnosis: Diagnosis{
+				NodeToStatusMap: NodeToStatusMap{
+					// There should be only one node here.
+					"node1": NewStatus(Unschedulable, "Node failed Permit plugin Permit-1"),
+				},
+			},
+			wantReasonMsg: "0/1 nodes are available: 1 Node failed Permit plugin Permit-1.",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

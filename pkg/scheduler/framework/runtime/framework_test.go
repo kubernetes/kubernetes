@@ -2669,7 +2669,6 @@ func TestPermitPlugins(t *testing.T) {
 			}
 
 			status := f.RunPermitPlugins(ctx, nil, pod, "")
-
 			if !reflect.DeepEqual(status, tt.want) {
 				t.Errorf("wrong status code. got %v, want %v", status, tt.want)
 			}
