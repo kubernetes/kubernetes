@@ -277,3 +277,6 @@ type ClusterTrustBundleList struct {
 	// Items is a collection of ClusterTrustBundle objects
 	Items []ClusterTrustBundle
 }
+
+// MaxTrustBundleSize is the maximimum size of a single trust bundle field.
+const MaxTrustBundleSize = 1 * 1024 * 1024

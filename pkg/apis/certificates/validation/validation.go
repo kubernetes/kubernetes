@@ -508,6 +508,11 @@ func ValidateClusterTrustBundleUpdate(newBundle, oldBundle *certificates.Cluster
 func validateTrustBundle(path *field.Path, in string) field.ErrorList {
 	var allErrors field.ErrorList
 
+	if len(in) > certificates.MaxTrustBundleSize {
+		allErrors = append(allErrors, field.TooLong(path, fmt.Sprintf("<value omitted, len %d>", len(in)), certificates.MaxTrustBundleSize))
+		return allErrors
+	}
+
 	blockDedupe := map[string][]int{}
 
 	rest := []byte(in)
