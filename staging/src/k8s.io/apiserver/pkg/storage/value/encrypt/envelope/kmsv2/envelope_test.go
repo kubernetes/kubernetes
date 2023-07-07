@@ -528,7 +528,9 @@ func TestTransformToStorageError(t *testing.T) {
 }
 
 func TestEncodeDecode(t *testing.T) {
-	transformer := &envelopeTransformer{}
+	transformer := &envelopeTransformer{
+		encryptedObjectDecoder: newEncryptedObjectDecoder(),
+	}
 
 	obj := &kmstypes.EncryptedObject{
 		EncryptedData:      []byte{0x01, 0x02, 0x03},
@@ -540,7 +542,10 @@ func TestEncodeDecode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("envelopeTransformer: error while encoding data: %s", err)
 	}
-	got, err := transformer.doDecode(data)
+
+	o := transformer.encryptedObjectDecoder.objectPool.Get().(*kmstypes.EncryptedObject)
+	defer transformer.encryptedObjectDecoder.objectPool.Put(o)
+	got, err := transformer.doDecode(data, o)
 	if err != nil {
 		t.Fatalf("envelopeTransformer: error while decoding data: %s", err)
 	}
@@ -548,6 +553,156 @@ func TestEncodeDecode(t *testing.T) {
 	obj.XXX_sizecache = 0
 	if !reflect.DeepEqual(got, obj) {
 		t.Fatalf("envelopeTransformer: decoded data does not match original data. Got: %v, want %v", got, obj)
+	}
+}
+
+func TestValidateEncryptedObjectInEncode(t *testing.T) {
+	obj := &kmstypes.EncryptedObject{
+		EncryptedData:      []byte{0x01, 0x02, 0x03},
+		EncryptedDEKSource: []byte{0x04, 0x05, 0x06},
+	}
+
+	transformer := &envelopeTransformer{
+		encryptedObjectDecoder: newEncryptedObjectDecoder(),
+	}
+
+	if _, err := transformer.doEncode(obj); err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestValidateEncryptedObjectInDecode(t *testing.T) {
+	obj := &kmstypes.EncryptedObject{
+		EncryptedData:      []byte{0x01, 0x02, 0x03},
+		EncryptedDEKSource: []byte{0x04, 0x05, 0x06},
+	}
+
+	transformer := &envelopeTransformer{
+		encryptedObjectDecoder: newEncryptedObjectDecoder(),
+	}
+
+	data, err := proto.Marshal(obj)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	o := transformer.encryptedObjectDecoder.objectPool.Get().(*kmstypes.EncryptedObject)
+	defer transformer.encryptedObjectDecoder.objectPool.Put(o)
+
+	if _, err := transformer.doDecode(data, o); err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+}
+
+// TestEncodeBufferReset tests that the buffer reset is working by comparing the encoded data with and without buffer.
+func TestEncodeBufferReset(t *testing.T) {
+	errCh := make(chan error, 1)
+	var wg sync.WaitGroup
+	for j := 0; j < 5; j++ {
+		wg.Add(1)
+		go func(j int) {
+			defer wg.Done()
+
+			for i := 0; i < 200; i++ {
+				transformer := &envelopeTransformer{
+					encryptedObjectDecoder: newEncryptedObjectDecoder(),
+				}
+
+				obj := &kmstypes.EncryptedObject{
+					EncryptedData:      []byte{byte(i * j), byte(i * j >> 8), byte(i * j >> 16)},
+					KeyID:              strconv.Itoa(i),
+					EncryptedDEKSource: []byte{byte(i * j), byte(i * j >> 8), byte(i * j >> 16)},
+				}
+
+				want, err := proto.Marshal(obj)
+				if err != nil {
+					errCh <- fmt.Errorf("envelopeTransformer: error while encoding data: %s", err)
+					return
+				}
+
+				got, err := transformer.doEncode(obj)
+				if err != nil {
+					errCh <- fmt.Errorf("envelopeTransformer: error while encoding data: %s", err)
+					return
+				}
+
+				if !reflect.DeepEqual(want, got) {
+					errCh <- fmt.Errorf("envelopeTransformer: encoded data with and without buffer does not match. Got: %v, want %v", got, want)
+					return
+				}
+			}
+		}(j)
+	}
+
+	go func() {
+		wg.Wait()
+		close(errCh)
+	}()
+
+	for err := range errCh {
+		t.Fatal(err)
+	}
+}
+
+// TestDecodeBufferReset tests that the buffer reset is working by comparing the decoded data with and without buffer.
+func TestDecodeBufferReset(t *testing.T) {
+	errCh := make(chan error, 1)
+	var wg sync.WaitGroup
+	for j := 0; j < 5; j++ {
+		wg.Add(1)
+		go func(j int) {
+			defer wg.Done()
+
+			for i := 0; i < 200; i++ {
+				transformer := &envelopeTransformer{
+					encryptedObjectDecoder: newEncryptedObjectDecoder(),
+				}
+
+				o := transformer.encryptedObjectDecoder.objectPool.Get().(*kmstypes.EncryptedObject)
+				defer transformer.encryptedObjectDecoder.objectPool.Put(o)
+
+				obj := &kmstypes.EncryptedObject{
+					EncryptedData:      []byte{byte(i * j), byte(i * j >> 8), byte(i * j >> 16)},
+					KeyID:              strconv.Itoa(i),
+					EncryptedDEKSource: []byte{byte(i * j), byte(i * j >> 8), byte(i * j >> 16)},
+				}
+
+				encodedData, err := transformer.doEncode(obj)
+				if err != nil {
+					errCh <- fmt.Errorf("envelopeTransformer: error while encoding data: %s", err)
+					return
+				}
+
+				want := &kmstypes.EncryptedObject{}
+				if err := proto.Unmarshal(encodedData, want); err != nil {
+					errCh <- fmt.Errorf("envelopeTransformer: error while unmarshaling data: %s", err)
+					return
+				}
+
+				got, err := transformer.doDecode(encodedData, o)
+				if err != nil {
+					errCh <- fmt.Errorf("envelopeTransformer: error while decoding data: %s", err)
+					return
+				}
+
+				// reset internal field modified by marshaling obj
+				obj.XXX_sizecache = 0
+				if !reflect.DeepEqual(want, got) {
+					errCh <- fmt.Errorf("envelopeTransformer: decoded data with and without buffer does not match. Got: %v, want %v", got, want)
+					return
+				}
+			}
+		}(j)
+	}
+
+	go func() {
+		wg.Wait()
+		close(errCh)
+	}()
+
+	for err := range errCh {
+		t.Fatal(err)
 	}
 }
 
