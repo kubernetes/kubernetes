@@ -26,6 +26,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -67,12 +68,12 @@ func NewHandlerRunner(httpDoer kubetypes.HTTPDoer, commandRunner kubecontainer.C
 	}
 }
 
-func (hr *handlerRunner) Run(ctx context.Context, containerID kubecontainer.ContainerID, pod *v1.Pod, container *v1.Container, handler *v1.LifecycleHandler) (string, error) {
+func (hr *handlerRunner) Run(ctx context.Context, containerID kubecontainer.ContainerID, pod *v1.Pod, container *v1.Container, handler *v1.LifecycleHandler, timeout time.Duration) (string, error) {
 	switch {
 	case handler.Exec != nil:
 		var msg string
 		// TODO(tallclair): Pass a proper timeout value.
-		output, err := hr.commandRunner.RunInContainer(ctx, containerID, handler.Exec.Command, 0)
+		output, err := hr.commandRunner.RunInContainer(ctx, containerID, handler.Exec.Command, timeout)
 		if err != nil {
 			msg = fmt.Sprintf("Exec lifecycle hook (%v) for Container %q in Pod %q failed - error: %v, message: %q", handler.Exec.Command, container.Name, format.Pod(pod), err, string(output))
 			klog.V(1).ErrorS(err, "Exec lifecycle hook for Container in Pod failed", "execCommand", handler.Exec.Command, "containerName", container.Name, "pod", klog.KObj(pod), "message", string(output))

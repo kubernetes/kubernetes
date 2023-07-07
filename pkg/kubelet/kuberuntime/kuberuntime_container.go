@@ -18,6 +18,7 @@ package kuberuntime
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -58,6 +59,27 @@ import (
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
+const (
+	StartingPostStartHook           = "StartingPostStartHook"
+	SucceedPostStartHook            = "SucceedPostStartHook"
+	WithOutPostStartHook            = "WithOutPostStartHook"
+	AnnotationsPostStartHookTimeOut = "containers.kubernetes.io/postStartHook-Timeout"
+)
+
+// ContainerExtraConfig contains container's extra config such as timeout.
+type ContainerExtraConfig struct {
+	ContainerConfigs map[ContainerInfo]ContainerConfig `json:"containerConfigs"`
+}
+
+// ContainerConfig records customed config of container.
+type ContainerConfig map[string]string
+
+// ContainerInfo is the information about a container.
+type ContainerInfo struct {
+	// Name is the name of a container.
+	Name string `json:"name"`
+}
+
 var (
 	// ErrCreateContainerConfig - failed to create container config
 	ErrCreateContainerConfig = errors.New("CreateContainerConfigError")
@@ -69,6 +91,9 @@ var (
 	ErrPreStartHook = errors.New("PreStartHookError")
 	// ErrPostStartHook - failed to execute PostStartHook
 	ErrPostStartHook = errors.New("PostStartHookError")
+
+	// PostStartHook timeout key in ContainerExtraConfig
+	PostStartHookTimeoutSeconds string = "PostStartHookTimeoutSeconds"
 )
 
 // recordContainerEvent should be used by the runtime manager for all container related events.
@@ -277,25 +302,91 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 
 	// Step 4: execute the post start hook.
 	if container.Lifecycle != nil && container.Lifecycle.PostStart != nil {
-		kubeContainerID := kubecontainer.ContainerID{
-			Type: m.runtimeName,
-			ID:   containerID,
+		msg, err := m.executePostStartHook(ctx, pod, container, containerID)
+		if err == nil {
+			return containerID, nil
 		}
-		msg, handlerErr := m.runner.Run(ctx, kubeContainerID, pod, container, container.Lifecycle.PostStart)
-		if handlerErr != nil {
-			klog.ErrorS(handlerErr, "Failed to execute PostStartHook", "pod", klog.KObj(pod),
-				"podUID", pod.UID, "containerName", container.Name, "containerID", kubeContainerID.String())
-			// do not record the message in the event so that secrets won't leak from the server.
-			m.recordContainerEvent(pod, container, kubeContainerID.ID, v1.EventTypeWarning, events.FailedPostStartHook, "PostStartHook failed")
-			if err := m.killContainer(ctx, pod, kubeContainerID, container.Name, "FailedPostStartHook", reasonFailedPostStartHook, nil); err != nil {
-				klog.ErrorS(err, "Failed to kill container", "pod", klog.KObj(pod),
-					"podUID", pod.UID, "containerName", container.Name, "containerID", kubeContainerID.String())
-			}
-			return msg, ErrPostStartHook
-		}
+		return msg, err
+	} else {
+		m.recordContainerEvent(pod, container, containerID, v1.EventTypeNormal, WithOutPostStartHook, fmt.Sprintf("Container %s with out poststart hook", container.Name))
 	}
 
 	return "", nil
+}
+
+func (m *kubeGenericRuntimeManager) executePostStartHook(ctx context.Context, pod *v1.Pod, container *v1.Container, containerID string) (string, error) {
+	// Default timeout value is 3min
+	defaultTimeout := 180
+	// Get postStartHook timeout from pod annotation.
+	timeout := GetTimeoutSecondsFromPodAnnotation(pod, container.Name, PostStartHookTimeoutSeconds)
+	if timeout == 0 {
+		timeout = defaultTimeout
+	}
+	kubeContainerID := kubecontainer.ContainerID{
+		Type: m.runtimeName,
+		ID:   containerID,
+	}
+
+	stopChannel := make(chan struct{})
+
+	defer func() {
+		close(stopChannel)
+		klog.Info("PostStartHook already done, posStartHook stop watch should be ended")
+	}()
+
+	m.recordContainerEvent(pod, container, containerID, v1.EventTypeNormal, StartingPostStartHook,
+		fmt.Sprintf("Starting to execute poststart hook for container %v with timeout: %d", container.Name, timeout))
+	start := time.Now()
+
+	msg, handlerErr := m.runner.Run(ctx, kubeContainerID, pod, container, container.Lifecycle.PostStart, time.Duration(timeout)*time.Second)
+	if handlerErr != nil {
+		klog.ErrorS(handlerErr, "Failed to execute PostStartHook", "pod", klog.KObj(pod),
+			"podUID", pod.UID, "containerName", container.Name, "containerID", kubeContainerID.String())
+		// do not record the message in the event so that secrets won't leak from the server.
+		m.recordContainerEvent(pod, container, kubeContainerID.ID, v1.EventTypeWarning, events.FailedPostStartHook, "PostStartHook failed")
+		if err := m.killContainer(ctx, pod, kubeContainerID, container.Name, "FailedPostStartHook", reasonFailedPostStartHook, nil); err != nil {
+			klog.ErrorS(err, "Failed to kill container", "pod", klog.KObj(pod),
+				"podUID", pod.UID, "containerName", container.Name, "containerID", kubeContainerID.String())
+		}
+		return msg, ErrPostStartHook
+	}
+
+	m.recordContainerEvent(pod, container, containerID, v1.EventTypeNormal, SucceedPostStartHook,
+		fmt.Sprintf("Successfully execute poststart hook for container %v, elapsedTime %v", container.Name, time.Since(start)))
+	return "", nil
+}
+
+// GetTimeoutSecondsFromPodAnnotation can get timeout value from pod annotation.
+// The return value unit is 'second'
+func GetTimeoutSecondsFromPodAnnotation(pod *v1.Pod, containerName string, timeoutItem string) int {
+	extraConfigStr, exists := pod.Annotations[AnnotationsPostStartHookTimeOut]
+	if !exists {
+		return 0
+	}
+	extraConfig := ContainerExtraConfig{}
+	if err := json.Unmarshal([]byte(extraConfigStr), &extraConfig); err != nil {
+		klog.Errorf("Failed to get custom config from pod %s because of invalid data", format.Pod(pod))
+		return 0
+	}
+
+	itemTimeoutSeconds := 0
+	for containerInfo, containerConfig := range extraConfig.ContainerConfigs {
+		if containerInfo.Name != containerName {
+			continue
+		}
+		timeoutSecondsStr, exists := containerConfig[timeoutItem]
+		if !exists {
+			klog.V(4).Infof("Can't get timeout value for %s, use 0 by default", timeoutItem)
+			return 0
+		}
+		timeoutSeconds, err := strconv.Atoi(timeoutSecondsStr)
+		if err != nil {
+			klog.Errorf("Failed to get %s from pod %s because of invalid data", timeoutItem, format.Pod(pod))
+			return 0
+		}
+		itemTimeoutSeconds = timeoutSeconds
+	}
+	return itemTimeoutSeconds
 }
 
 // generateContainerConfig generates container config for kubelet runtime v1.
