@@ -762,11 +762,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rEr
 	var finishedCondition *batch.JobCondition
 
 	jobHasNewFailure := failed > job.Status.Failed
-	// new failures happen when status does not reflect the failures and active
-	// is different than parallelism, otherwise the previous controller loop
-	// failed updating status so even if we pick up failure it is not a new one
-	exceedsBackoffLimit := jobHasNewFailure && (active != *job.Spec.Parallelism) &&
-		(failed > *job.Spec.BackoffLimit)
+	exceedsBackoffLimit := job.Spec.BackoffLimit != nil && failed > *job.Spec.BackoffLimit
 
 	if feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) {
 		if failureTargetCondition := findConditionByType(job.Status.Conditions, batch.AlphaNoCompatGuaranteeJobFailureTarget); failureTargetCondition != nil {
@@ -1046,6 +1042,7 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 	if cleanUncountedPodsWithoutFinalizers(&job.Status, uidsWithFinalizer) {
 		needsFlush = true
 	}
+	reachedMaxUncountedPods := false
 	for _, pod := range pods {
 		if !hasJobTrackingFinalizer(pod) || expectedRmFinalizers.Has(string(pod.UID)) {
 			continue
@@ -1096,6 +1093,7 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 			//
 			// The job will be synced again because the Job status and Pod updates
 			// will put the Job back to the work queue.
+			reachedMaxUncountedPods = true
 			break
 		}
 	}
@@ -1124,7 +1122,8 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 	if job, needsFlush, err = jm.flushUncountedAndRemoveFinalizers(ctx, job, podsToRemoveFinalizer, uidsWithFinalizer, &oldCounters, needsFlush); err != nil {
 		return err
 	}
-	if jm.enactJobFinished(job, finishedCond) {
+	jobFinished := !reachedMaxUncountedPods && jm.enactJobFinished(job, finishedCond)
+	if jobFinished {
 		needsFlush = true
 	}
 	if needsFlush {
