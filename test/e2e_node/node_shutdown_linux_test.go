@@ -23,7 +23,10 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -40,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/godbus/dbus/v5"
 	v1 "k8s.io/api/core/v1"
@@ -56,6 +60,28 @@ import (
 var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShutdown] [NodeFeature:GracefulNodeShutdownBasedOnPodPriority]", func() {
 	f := framework.NewDefaultFramework("graceful-node-shutdown")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
+	ginkgo.BeforeEach(func() {
+		if _, err := exec.LookPath("systemd-run"); err == nil {
+			if version, verr := exec.Command("systemd-run", "--version").Output(); verr == nil {
+				// sample output from $ systemd-run --version
+				// systemd 245 (245.4-4ubuntu3.13)
+				re := regexp.MustCompile(`systemd (\d+)`)
+				if match := re.FindSubmatch(version); len(match) > 1 {
+					systemdVersion, err := strconv.Atoi(string(match[1]))
+					if err != nil {
+						framework.Logf("failed to parse systemd version with error %v, 'systemd-run --version' output was [%s]", err, version)
+					} else {
+						// See comments in issue 107043, this is a known problem for a long time that this feature does not work on older systemd
+						// https://github.com/kubernetes/kubernetes/issues/107043#issuecomment-997546598
+						if systemdVersion < 245 {
+							e2eskipper.Skipf("skipping GracefulNodeShutdown tests as we are running on an old version of systemd : %d", systemdVersion)
+						}
+					}
+				}
+			}
+		}
+	})
 
 	ginkgo.Context("graceful node shutdown when PodDisruptionConditions are enabled [NodeFeature:PodDisruptionConditions]", func() {
 
