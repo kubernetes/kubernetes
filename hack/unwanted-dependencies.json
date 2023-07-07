@@ -28,7 +28,6 @@
       "github.com/gorilla/mux": "unmaintained, archive mode",
       "github.com/gorilla/rpc": "unmaintained, archive mode",
       "github.com/gorilla/schema": "unmaintained, archive mode",
-      "github.com/gorilla/websocket": "unmaintained, archive mode",
       "github.com/gregjones/httpcache": "unmaintained, archive mode",
       "github.com/grpc-ecosystem/go-grpc-prometheus": "unmaintained, archive mode",
       "github.com/grpc-ecosystem/grpc-gateway": "use github.com/grpc-ecosystem/grpc-gateway/v2",
@@ -142,11 +141,6 @@
         "cloud.google.com/go/bigquery",
         "cloud.google.com/go/compute",
         "cloud.google.com/go/storage"
-      ],
-      "github.com/gorilla/websocket": [
-        "github.com/moby/spdystream",
-        "github.com/tmc/grpc-websocket-proxy",
-        "go.etcd.io/etcd/server/v3"
       ],
       "github.com/gregjones/httpcache": [
         "k8s.io/client-go"
