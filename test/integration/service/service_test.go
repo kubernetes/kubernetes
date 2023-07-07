@@ -180,3 +180,87 @@ func Test_ConvertingToExternalNameServiceDropsInternalTrafficPolicy(t *testing.T
 		t.Errorf("service internalTrafficPolicy should be droppped but is set: %v", service.Spec.InternalTrafficPolicy)
 	}
 }
+
+// Test_RemovingExternalIPsFromClusterIPServiceDropsExternalTrafficPolicy tests that removing externalIPs from a
+// ClusterIP Service results in the externalTrafficPolicy field being dropped.
+func Test_RemovingExternalIPsFromClusterIPServiceDropsExternalTrafficPolicy(t *testing.T) {
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client, err := clientset.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatalf("Error creating clientset: %v", err)
+	}
+
+	ns := framework.CreateNamespaceOrDie(client, "test-removing-external-ips-drops-external-traffic-policy", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-123",
+		},
+		Spec: corev1.ServiceSpec{
+			Type: corev1.ServiceTypeClusterIP,
+			Ports: []corev1.ServicePort{{
+				Port: int32(80),
+			}},
+			Selector: map[string]string{
+				"foo": "bar",
+			},
+			ExternalIPs: []string{"1.1.1.1"},
+		},
+	}
+
+	service, err = client.CoreV1().Services(ns.Name).Create(context.TODO(), service, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Error creating test service: %v", err)
+	}
+
+	if service.Spec.ExternalTrafficPolicy != corev1.ServiceExternalTrafficPolicyCluster {
+		t.Error("service externalTrafficPolicy was not set for clusterIP Service with externalIPs")
+	}
+
+	// externalTrafficPolicy should be dropped after removing externalIPs.
+	newService := service.DeepCopy()
+	newService.Spec.ExternalIPs = []string{}
+
+	service, err = client.CoreV1().Services(ns.Name).Update(context.TODO(), newService, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("error updating service: %v", err)
+	}
+
+	if service.Spec.ExternalTrafficPolicy != "" {
+		t.Errorf("service externalTrafficPolicy should be droppped but is set: %v", service.Spec.ExternalTrafficPolicy)
+	}
+
+	service, err = client.CoreV1().Services(ns.Name).Get(context.TODO(), service.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("error getting service: %v", err)
+	}
+
+	if service.Spec.ExternalTrafficPolicy != "" {
+		t.Errorf("service externalTrafficPolicy should be droppped but is set: %v", service.Spec.ExternalTrafficPolicy)
+	}
+
+	// externalTrafficPolicy should be set after adding externalIPs again.
+	newService = service.DeepCopy()
+	newService.Spec.ExternalIPs = []string{"1.1.1.1"}
+
+	service, err = client.CoreV1().Services(ns.Name).Update(context.TODO(), newService, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("error updating service: %v", err)
+	}
+
+	if service.Spec.ExternalTrafficPolicy != corev1.ServiceExternalTrafficPolicyCluster {
+		t.Error("service externalTrafficPolicy was not set for clusterIP Service with externalIPs")
+	}
+
+	service, err = client.CoreV1().Services(ns.Name).Get(context.TODO(), service.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("error getting service: %v", err)
+	}
+
+	if service.Spec.ExternalTrafficPolicy != corev1.ServiceExternalTrafficPolicyCluster {
+		t.Error("service externalTrafficPolicy was not set for clusterIP Service with externalIPs")
+	}
+}

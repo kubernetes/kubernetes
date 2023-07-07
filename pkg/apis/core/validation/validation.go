@@ -5332,10 +5332,6 @@ func validateServicePort(sp *core.ServicePort, requireName, isHeadlessService bo
 	return allErrs
 }
 
-func needsExternalTrafficPolicy(svc *core.Service) bool {
-	return svc.Spec.Type == core.ServiceTypeLoadBalancer || svc.Spec.Type == core.ServiceTypeNodePort
-}
-
 var validExternalTrafficPolicies = sets.NewString(
 	string(core.ServiceExternalTrafficPolicyCluster),
 	string(core.ServiceExternalTrafficPolicyLocal))
@@ -5345,10 +5341,10 @@ func validateServiceExternalTrafficPolicy(service *core.Service) field.ErrorList
 
 	fldPath := field.NewPath("spec")
 
-	if !needsExternalTrafficPolicy(service) {
+	if !apiservice.ExternallyAccessible(service) {
 		if service.Spec.ExternalTrafficPolicy != "" {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("externalTrafficPolicy"), service.Spec.ExternalTrafficPolicy,
-				"may only be set when `type` is 'NodePort' or 'LoadBalancer'"))
+				"may only be set for externally-accessible services"))
 		}
 	} else {
 		if service.Spec.ExternalTrafficPolicy == "" {

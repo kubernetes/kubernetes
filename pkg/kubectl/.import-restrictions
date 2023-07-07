@@ -2,6 +2,7 @@ rules:
   - selectorRegexp: k8s[.]io/kubernetes/pkg
     allowedPrefixes:
       - k8s.io/kubernetes/pkg/api/legacyscheme
+      - k8s.io/kubernetes/pkg/api/v1/service
       - k8s.io/kubernetes/pkg/apis/admission
       - k8s.io/kubernetes/pkg/apis/admission/install
       - k8s.io/kubernetes/pkg/apis/admission/v1
