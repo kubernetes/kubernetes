@@ -444,6 +444,10 @@ func (s *SimpleStorageFactory) ResourcePrefix(resource schema.GroupResource) str
 	return resource.Group + "/" + resource.Resource
 }
 
+func (s *SimpleStorageFactory) Configs() []storagebackend.Config {
+	return serverstorage.Configs(s.StorageConfig)
+}
+
 func (s *SimpleStorageFactory) Backends() []serverstorage.Backend {
 	// nothing should ever call this method but we still provide a functional implementation
 	return serverstorage.Backends(s.StorageConfig)
@@ -472,6 +476,10 @@ func (t *transformerStorageFactory) NewConfig(resource schema.GroupResource) (*s
 
 func (t *transformerStorageFactory) ResourcePrefix(resource schema.GroupResource) string {
 	return t.delegate.ResourcePrefix(resource)
+}
+
+func (t *transformerStorageFactory) Configs() []storagebackend.Config {
+	return t.delegate.Configs()
 }
 
 func (t *transformerStorageFactory) Backends() []serverstorage.Backend {
