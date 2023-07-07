@@ -233,6 +233,7 @@ func (m *ManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*Conta
 				return nil, fmt.Errorf("unable to get resource for namespace: %s, claim: %s", pod.Namespace, claimName)
 			}
 
+			claimInfo.RLock()
 			klog.V(3).InfoS("Add resource annotations", "claim", claimName, "annotations", claimInfo.annotations)
 			annotations = append(annotations, claimInfo.annotations...)
 			for _, devices := range claimInfo.CDIDevices {
@@ -240,6 +241,7 @@ func (m *ManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*Conta
 					cdiDevices = append(cdiDevices, kubecontainer.CDIDevice{Name: device})
 				}
 			}
+			claimInfo.RUnlock()
 		}
 	}
 
@@ -313,8 +315,8 @@ func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
 				resourceHandle.Data)
 			if err != nil {
 				return fmt.Errorf(
-					"NodeUnprepareResource failed, pod: %s, claim UID: %s, claim name: %s, CDI devices: %s, err: %+v",
-					pod.Name, claimInfo.ClaimUID, claimInfo.ClaimName, claimInfo.CDIDevices, err)
+					"NodeUnprepareResource failed, pod: %s, claim UID: %s, claim name: %s, resource handle: %s, err: %+v",
+					pod.Name, claimInfo.ClaimUID, claimInfo.ClaimName, resourceHandle.Data, err)
 			}
 			klog.V(3).InfoS("NodeUnprepareResource succeeded", "response", response)
 		}
