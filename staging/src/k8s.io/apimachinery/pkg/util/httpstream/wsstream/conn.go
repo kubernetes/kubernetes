@@ -28,6 +28,7 @@ import (
 	"golang.org/x/net/websocket"
 	"k8s.io/klog/v2"
 
+	"k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/apimachinery/pkg/util/runtime"
 )
 
@@ -178,7 +179,11 @@ func (conn *Conn) Open(w http.ResponseWriter, req *http.Request) (string, []io.R
 	go func() {
 		defer runtime.HandleCrash()
 		defer conn.Close()
-		websocket.Server{Handshake: conn.handshake, Handler: conn.handle}.ServeHTTP(w, req)
+		handler := conn.handle
+		if _, ok := conn.protocols[remotecommand.StreamProtocolV5Name]; ok {
+			handler = conn.handleV5
+		}
+		websocket.Server{Handshake: conn.handshake, Handler: handler}.ServeHTTP(w, req)
 	}()
 	<-conn.ready
 	rwc := make([]io.ReadWriteCloser, len(conn.channels))
@@ -239,10 +244,21 @@ func (conn *Conn) Close() error {
 	return nil
 }
 
+// protocolSupportsStreamClose returns true if the passed protocol
+// supports the stream close signal (currently only V5 remotecommand);
+// false otherwise.
+func protocolSupportsStreamClose(protocol string) bool {
+	if protocol == remotecommand.StreamProtocolV5Name {
+		return true
+	}
+	return false
+}
+
 // handle implements a websocket handler.
 func (conn *Conn) handle(ws *websocket.Conn) {
 	defer conn.Close()
 	conn.initialize(ws)
+	supportsStreamClose := protocolSupportsStreamClose(conn.selectedProtocol)
 
 	for {
 		conn.resetTimeout()
@@ -254,6 +270,21 @@ func (conn *Conn) handle(ws *websocket.Conn) {
 			break
 		}
 		if len(data) == 0 {
+			continue
+		}
+		if supportsStreamClose && data[0] == remotecommand.StreamClose {
+			if len(data) != 2 {
+				klog.Errorf("Single channel byte should follow stream close signal. Got %d bytes", len(data)-1)
+				break
+			} else {
+				channel := data[1]
+				if int(channel) >= len(conn.channels) {
+					klog.Errorf("Close is targeted for a channel %d that is not valid, possible protocol error", channel)
+					break
+				}
+				klog.V(4).Infof("Received half-close signal from client; close %d stream", channel)
+				conn.channels[channel].Close() // After first Close, other closes are noop.
+			}
 			continue
 		}
 		channel := data[0]
