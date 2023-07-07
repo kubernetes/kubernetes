@@ -179,6 +179,14 @@ const (
 	// Enables kubelet to detect CSI volume condition and send the event of the abnormal volume to the corresponding pod that is using it.
 	CSIVolumeHealth featuregate.Feature = "CSIVolumeHealth"
 
+	// owner: @seans3
+	// kep: http://kep.k8s.io/4006
+	// alpha: v1.29
+	//
+	// Enables StreamTranslator proxy to handle WebSockets upgrade requests for the
+	// version of the RemoteCommand subprotocol that supports the "close" signal.
+	TranslateStreamCloseWebsocketRequests featuregate.Feature = "TranslateStreamCloseWebsocketRequests"
+
 	// owner: @nckturner
 	// kep:  http://kep.k8s.io/2699
 	// alpha: v1.27
@@ -924,6 +932,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIVolumeHealth: {Default: false, PreRelease: featuregate.Alpha},
 
 	SkipReadOnlyValidationGCE: {Default: true, PreRelease: featuregate.Deprecated}, // remove in 1.31
+
+	TranslateStreamCloseWebsocketRequests: {Default: false, PreRelease: featuregate.Alpha},
 
 	CloudControllerManagerWebhook: {Default: false, PreRelease: featuregate.Alpha},
 

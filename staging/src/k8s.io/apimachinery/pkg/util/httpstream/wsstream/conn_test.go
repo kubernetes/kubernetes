@@ -25,6 +25,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/net/websocket"
 )
 
@@ -269,5 +271,148 @@ func TestVersionedConn(t *testing.T) {
 				t.Fatalf("test %d: unexpected protocol version: got=%s expected=%s", i, got, expected)
 			}
 		}()
+	}
+}
+
+func TestIsWebSocketRequestWithStreamCloseProtocol(t *testing.T) {
+	tests := map[string]struct {
+		headers  map[string]string
+		expected bool
+	}{
+		"No headers returns false": {
+			headers:  map[string]string{},
+			expected: false,
+		},
+		"Only connection upgrade header is false": {
+			headers: map[string]string{
+				"Connection": "upgrade",
+			},
+			expected: false,
+		},
+		"Only websocket upgrade header is false": {
+			headers: map[string]string{
+				"Upgrade": "websocket",
+			},
+			expected: false,
+		},
+		"Only websocket and connection upgrade headers is false": {
+			headers: map[string]string{
+				"Connection": "upgrade",
+				"Upgrade":    "websocket",
+			},
+			expected: false,
+		},
+		"Missing connection/upgrade header is false": {
+			headers: map[string]string{
+				"Upgrade":               "websocket",
+				WebSocketProtocolHeader: "v5.channel.k8s.io",
+			},
+			expected: false,
+		},
+		"Websocket connection upgrade headers with v5 protocol is true": {
+			headers: map[string]string{
+				"Connection":            "upgrade",
+				"Upgrade":               "websocket",
+				WebSocketProtocolHeader: "v5.channel.k8s.io",
+			},
+			expected: true,
+		},
+		"Websocket connection upgrade headers with wrong case v5 protocol is false": {
+			headers: map[string]string{
+				"Connection":            "upgrade",
+				"Upgrade":               "websocket",
+				WebSocketProtocolHeader: "v5.CHANNEL.k8s.io", // header value is case-sensitive
+			},
+			expected: false,
+		},
+		"Websocket connection upgrade headers with v4 protocol is false": {
+			headers: map[string]string{
+				"Connection":            "upgrade",
+				"Upgrade":               "websocket",
+				WebSocketProtocolHeader: "v4.channel.k8s.io",
+			},
+			expected: false,
+		},
+		"Websocket connection upgrade headers with multiple protocols but missing v5 is false": {
+			headers: map[string]string{
+				"Connection":            "upgrade",
+				"Upgrade":               "websocket",
+				WebSocketProtocolHeader: "v4.channel.k8s.io,v3.channel.k8s.io,v2.channel.k8s.io",
+			},
+			expected: false,
+		},
+		"Websocket connection upgrade headers with multiple protocols including v5 and spaces is true": {
+			headers: map[string]string{
+				"Connection":            "upgrade",
+				"Upgrade":               "websocket",
+				WebSocketProtocolHeader: "v5.channel.k8s.io,  v4.channel.k8s.io",
+			},
+			expected: true,
+		},
+		"Websocket connection upgrade headers with multiple protocols out of order including v5 and spaces is true": {
+			headers: map[string]string{
+				"Connection":            "upgrade",
+				"Upgrade":               "websocket",
+				WebSocketProtocolHeader: "v4.channel.k8s.io, v5.channel.k8s.io, v3.channel.k8s.io",
+			},
+			expected: true,
+		},
+
+		"Websocket connection upgrade headers key is case-insensitive": {
+			headers: map[string]string{
+				"Connection":             "upgrade",
+				"Upgrade":                "websocket",
+				"sec-websocket-protocol": "v4.channel.k8s.io, v5.channel.k8s.io, v3.channel.k8s.io",
+			},
+			expected: true,
+		},
+	}
+
+	for name, test := range tests {
+		req, err := http.NewRequest("GET", "http://www.example.com/", nil)
+		require.NoError(t, err)
+		for key, value := range test.headers {
+			req.Header.Add(key, value)
+		}
+		actual := IsWebSocketRequestWithStreamCloseProtocol(req)
+		assert.Equal(t, test.expected, actual, "%s: expected (%t), got (%t)", name, test.expected, actual)
+	}
+}
+
+func TestProtocolSupportsStreamClose(t *testing.T) {
+	tests := map[string]struct {
+		protocol string
+		expected bool
+	}{
+		"empty protocol returns false": {
+			protocol: "",
+			expected: false,
+		},
+		"not binary protocol returns false": {
+			protocol: "base64.channel.k8s.io",
+			expected: false,
+		},
+		"V1 protocol returns false": {
+			protocol: "channel.k8s.io",
+			expected: false,
+		},
+		"V4 protocol returns false": {
+			protocol: "v4.channel.k8s.io",
+			expected: false,
+		},
+		"V5 protocol returns true": {
+			protocol: "v5.channel.k8s.io",
+			expected: true,
+		},
+		"V5 protocol wrong case returns false": {
+			protocol: "V5.channel.K8S.io",
+			expected: false,
+		},
+	}
+
+	for name, test := range tests {
+		actual := protocolSupportsStreamClose(test.protocol)
+		assert.Equal(t, test.expected, actual,
+			"%s: expected (%t), got (%t)", name, test.expected, actual)
 	}
 }
