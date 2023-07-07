@@ -195,6 +195,17 @@ func (sched *Scheduler) schedulingCycle(
 			logger.Error(forgetErr, "Scheduler cache ForgetPod failed")
 		}
 
+		if sts.IsUnschedulable() {
+			fitErr := &framework.FitError{
+				NumAllNodes: 1,
+				Pod:         pod,
+				Diagnosis: framework.Diagnosis{
+					NodeToStatusMap:      framework.NodeToStatusMap{scheduleResult.SuggestedHost: sts},
+					UnschedulablePlugins: sets.New(sts.FailedPlugin()),
+				},
+			}
+			return ScheduleResult{nominatingInfo: clearNominatedNode}, assumedPodInfo, framework.NewStatus(sts.Code()).WithError(fitErr)
+		}
 		return ScheduleResult{nominatingInfo: clearNominatedNode}, assumedPodInfo, sts
 	}
 
