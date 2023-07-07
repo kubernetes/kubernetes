@@ -130,6 +130,10 @@ func TestMain(m *testing.M) {
 
 	rand.Seed(time.Now().UnixNano())
 	pflag.Parse()
+	if pflag.CommandLine.NArg() > 0 {
+		fmt.Fprintf(os.Stderr, "unknown additional command line arguments: %s", pflag.CommandLine.Args())
+		os.Exit(1)
+	}
 	framework.AfterReadingAllFlags(&framework.TestContext)
 	if err := e2eskipper.InitFeatureGates(utilfeature.DefaultFeatureGate, featureGates); err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: initialize feature gates: %v", err)
