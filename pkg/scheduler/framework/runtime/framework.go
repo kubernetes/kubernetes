@@ -1341,8 +1341,7 @@ func (f *frameworkImpl) RunPermitPlugins(ctx context.Context, state *framework.C
 		if !status.IsSuccess() {
 			if status.IsUnschedulable() {
 				logger.V(4).Info("Pod rejected by plugin", "pod", klog.KObj(pod), "plugin", pl.Name(), "status", status.Message())
-				status.SetFailedPlugin(pl.Name())
-				return status
+				return status.WithFailedPlugin(pl.Name())
 			}
 			if status.IsWait() {
 				// Not allowed to be greater than maxTimeout.
