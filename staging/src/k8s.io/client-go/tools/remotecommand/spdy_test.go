@@ -183,6 +183,7 @@ func TestSPDYExecutorStream(t *testing.T) {
 }
 
 func newTestHTTPServer(f AttachFunc, options *StreamOptions) *httptest.Server {
+	//nolint:errcheck
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		ctx, err := createHTTPStreams(writer, request, options)
 		if err != nil {
@@ -381,7 +382,7 @@ func TestStreamRandomData(t *testing.T) {
 		}
 		defer ctx.conn.Close()
 
-		io.Copy(ctx.stdoutStream, ctx.stdinStream)
+		io.Copy(ctx.stdoutStream, ctx.stdinStream) //nolint:errcheck
 	}))
 
 	defer server.Close()
