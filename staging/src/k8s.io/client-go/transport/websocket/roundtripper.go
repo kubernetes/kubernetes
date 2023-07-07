@@ -108,10 +108,7 @@ func (rt *RoundTripper) RoundTrip(request *http.Request) (retResp *http.Response
 	}
 	wsConn, resp, err := dialer.DialContext(request.Context(), request.URL.String(), request.Header)
 	if err != nil {
-		if err != gwebsocket.ErrBadHandshake {
-			return nil, err
-		}
-		return nil, fmt.Errorf("unable to upgrade connection: %v", err)
+		return nil, &httpstream.UpgradeFailureError{Cause: err}
 	}
 
 	rt.Conn = wsConn
@@ -155,7 +152,7 @@ func Negotiate(rt http.RoundTripper, connectionInfo ConnectionHolder, req *http.
 	req.Header[httpstream.HeaderProtocolVersion] = protocols
 	resp, err := rt.RoundTrip(req)
 	if err != nil {
-		return nil, fmt.Errorf("error sending request: %v", err)
+		return nil, err
 	}
 	err = resp.Body.Close()
 	if err != nil {

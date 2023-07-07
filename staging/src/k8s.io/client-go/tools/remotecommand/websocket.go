@@ -85,22 +85,26 @@ type wsStreamExecutor struct {
 	heartbeatDeadline time.Duration
 }
 
-// NewWebSocketExecutor allows to execute commands via a WebSocket connection.
 func NewWebSocketExecutor(config *restclient.Config, method, url string) (Executor, error) {
+	// Only supports V5 protocol for correct version skew functionality.
+	// Previous api servers will proxy upgrade requests to legacy websocket
+	// servers on container runtimes which support V1-V4. These legacy
+	// websocket servers will not handle the new CLOSE signal.
+	return NewWebSocketExecutorForProtocols(config, method, url, remotecommand.StreamProtocolV5Name)
+}
+
+// NewWebSocketExecutorForProtocols allows to execute commands via a WebSocket connection.
+func NewWebSocketExecutorForProtocols(config *restclient.Config, method, url string, protocols ...string) (Executor, error) {
 	transport, upgrader, err := websocket.RoundTripperFor(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating websocket transports: %v", err)
 	}
 	return &wsStreamExecutor{
-		transport: transport,
-		upgrader:  upgrader,
-		method:    method,
-		url:       url,
-		// Only supports V5 protocol for correct version skew functionality.
-		// Previous api servers will proxy upgrade requests to legacy websocket
-		// servers on container runtimes which support V1-V4. These legacy
-		// websocket servers will not handle the new CLOSE signal.
-		protocols:         []string{remotecommand.StreamProtocolV5Name},
+		transport:         transport,
+		upgrader:          upgrader,
+		method:            method,
+		url:               url,
+		protocols:         protocols,
 		heartbeatPeriod:   pingPeriod,
 		heartbeatDeadline: pingReadDeadline,
 	}, nil
@@ -177,10 +181,12 @@ func (e *wsStreamExecutor) StreamWithContext(ctx context.Context, options Stream
 }
 
 type wsStreamCreator struct {
-	conn          *gwebsocket.Conn
+	conn *gwebsocket.Conn
+	// Protects writing to websocket connection; reading is lock-free
 	connWriteLock sync.Mutex
-	streams       map[byte]*stream
-	streamsMu     sync.Mutex
+	// map of stream id to stream; multiple streams read/write the connection
+	streams   map[byte]*stream
+	streamsMu sync.Mutex
 }
 
 func newWSStreamCreator(conn *gwebsocket.Conn) *wsStreamCreator {
@@ -226,7 +232,7 @@ func (c *wsStreamCreator) CreateStream(headers http.Header) (httpstream.Stream, 
 	return s, nil
 }
 
-// readDemuxLoop is the reading processor for this endpoint of the websocket
+// readDemuxLoop is the lock-free reading processor for this endpoint of the websocket
 // connection. This loop reads the connection, and demultiplexes the data
 // into one of the individual stream pipes (by checking the stream id). This
 // loop can *not* be run concurrently, because there can only be one websocket
