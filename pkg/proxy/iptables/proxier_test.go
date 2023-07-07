@@ -5466,7 +5466,7 @@ func TestProxierMetricsIptablesTotalRules(t *testing.T) {
 
 // This test ensures that the iptables proxier supports translating Endpoints to
 // iptables output when internalTrafficPolicy is specified
-func TestInternalTrafficPolicyE2E(t *testing.T) {
+func TestInternalTrafficPolicy(t *testing.T) {
 	type endpoint struct {
 		ip       string
 		hostname string
@@ -5475,55 +5475,12 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 	cluster := v1.ServiceInternalTrafficPolicyCluster
 	local := v1.ServiceInternalTrafficPolicyLocal
 
-	clusterExpectedIPTables := dedent.Dedent(`
-		*filter
-		:KUBE-NODEPORTS - [0:0]
-		:KUBE-SERVICES - [0:0]
-		:KUBE-EXTERNAL-SERVICES - [0:0]
-		:KUBE-FIREWALL - [0:0]
-		:KUBE-FORWARD - [0:0]
-		:KUBE-PROXY-FIREWALL - [0:0]
-		-A KUBE-FIREWALL -m comment --comment "block incoming localnet connections" -d 127.0.0.0/8 ! -s 127.0.0.0/8 -m conntrack ! --ctstate RELATED,ESTABLISHED,DNAT -j DROP
-		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
-		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
-		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-		COMMIT
-		*nat
-		:KUBE-NODEPORTS - [0:0]
-		:KUBE-SERVICES - [0:0]
-		:KUBE-MARK-MASQ - [0:0]
-		:KUBE-POSTROUTING - [0:0]
-		:KUBE-SEP-3JOIVZTXZZRGORX4 - [0:0]
-		:KUBE-SEP-IO5XOSKPAXIFQXAJ - [0:0]
-		:KUBE-SEP-XGJFVO3L2O5SRFNT - [0:0]
-		:KUBE-SVC-AQI2S6QIMU7PVVRP - [0:0]
-		-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
-		-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
-		-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
-		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
-		-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
-		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
-		-A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -s 10.0.1.1 -j KUBE-MARK-MASQ
-		-A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
-		-A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -s 10.0.1.2 -j KUBE-MARK-MASQ
-		-A KUBE-SEP-IO5XOSKPAXIFQXAJ -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
-		-A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -s 10.0.1.3 -j KUBE-MARK-MASQ
-		-A KUBE-SEP-XGJFVO3L2O5SRFNT -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
-		-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
-		-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 -> 10.0.1.1:80" -m statistic --mode random --probability 0.3333333333 -j KUBE-SEP-3JOIVZTXZZRGORX4
-		-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 -> 10.0.1.2:80" -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-IO5XOSKPAXIFQXAJ
-		-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 -> 10.0.1.3:80" -j KUBE-SEP-XGJFVO3L2O5SRFNT
-		COMMIT
-		`)
-
 	testCases := []struct {
-		name                      string
-		line                      int
-		internalTrafficPolicy     *v1.ServiceInternalTrafficPolicy
-		endpoints                 []endpoint
-		expectEndpointRule        bool
-		expectedIPTablesWithSlice string
-		flowTests                 []packetFlowTest
+		name                  string
+		line                  int
+		internalTrafficPolicy *v1.ServiceInternalTrafficPolicy
+		endpoints             []endpoint
+		flowTests             []packetFlowTest
 	}{
 		{
 			name:                  "internalTrafficPolicy is cluster",
@@ -5534,8 +5491,6 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 				{"10.0.1.2", "host1"},
 				{"10.0.1.3", "host2"},
 			},
-			expectEndpointRule:        true,
-			expectedIPTablesWithSlice: clusterExpectedIPTables,
 			flowTests: []packetFlowTest{
 				{
 					name:     "pod to ClusterIP hits all endpoints",
@@ -5548,7 +5503,7 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 			},
 		},
 		{
-			name:                  "internalTrafficPolicy is local and there are local endpoints",
+			name:                  "internalTrafficPolicy is local and there is one local endpoint",
 			line:                  getLine(),
 			internalTrafficPolicy: &local,
 			endpoints: []endpoint{
@@ -5556,39 +5511,6 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 				{"10.0.1.2", "host1"},
 				{"10.0.1.3", "host2"},
 			},
-			expectEndpointRule: true,
-			expectedIPTablesWithSlice: dedent.Dedent(`
-				*filter
-				:KUBE-NODEPORTS - [0:0]
-				:KUBE-SERVICES - [0:0]
-				:KUBE-EXTERNAL-SERVICES - [0:0]
-				:KUBE-FIREWALL - [0:0]
-				:KUBE-FORWARD - [0:0]
-				:KUBE-PROXY-FIREWALL - [0:0]
-				-A KUBE-FIREWALL -m comment --comment "block incoming localnet connections" -d 127.0.0.0/8 ! -s 127.0.0.0/8 -m conntrack ! --ctstate RELATED,ESTABLISHED,DNAT -j DROP
-				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
-				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
-				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-				COMMIT
-				*nat
-				:KUBE-NODEPORTS - [0:0]
-				:KUBE-SERVICES - [0:0]
-				:KUBE-MARK-MASQ - [0:0]
-				:KUBE-POSTROUTING - [0:0]
-				:KUBE-SEP-3JOIVZTXZZRGORX4 - [0:0]
-				:KUBE-SVL-AQI2S6QIMU7PVVRP - [0:0]
-				-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j KUBE-SVL-AQI2S6QIMU7PVVRP
-				-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
-				-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
-				-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
-				-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
-				-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
-				-A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -s 10.0.1.1 -j KUBE-MARK-MASQ
-				-A KUBE-SEP-3JOIVZTXZZRGORX4 -m comment --comment ns1/svc1 -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
-				-A KUBE-SVL-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
-				-A KUBE-SVL-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 -> 10.0.1.1:80" -j KUBE-SEP-3JOIVZTXZZRGORX4
-				COMMIT
-				`),
 			flowTests: []packetFlowTest{
 				{
 					name:     "pod to ClusterIP hits only local endpoint",
@@ -5596,6 +5518,26 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 					destIP:   "172.30.1.1",
 					destPort: 80,
 					output:   "10.0.1.1:80",
+					masq:     false,
+				},
+			},
+		},
+		{
+			name:                  "internalTrafficPolicy is local and there are multiple local endpoints",
+			line:                  getLine(),
+			internalTrafficPolicy: &local,
+			endpoints: []endpoint{
+				{"10.0.1.1", testHostname},
+				{"10.0.1.2", testHostname},
+				{"10.0.1.3", "host2"},
+			},
+			flowTests: []packetFlowTest{
+				{
+					name:     "pod to ClusterIP hits all local endpoints",
+					sourceIP: "10.0.0.2",
+					destIP:   "172.30.1.1",
+					destPort: 80,
+					output:   "10.0.1.1:80, 10.0.1.2:80",
 					masq:     false,
 				},
 			},
@@ -5609,33 +5551,6 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 				{"10.0.1.2", "host1"},
 				{"10.0.1.3", "host2"},
 			},
-			expectEndpointRule: false,
-			expectedIPTablesWithSlice: dedent.Dedent(`
-				*filter
-				:KUBE-NODEPORTS - [0:0]
-				:KUBE-SERVICES - [0:0]
-				:KUBE-EXTERNAL-SERVICES - [0:0]
-				:KUBE-FIREWALL - [0:0]
-				:KUBE-FORWARD - [0:0]
-				:KUBE-PROXY-FIREWALL - [0:0]
-				-A KUBE-SERVICES -m comment --comment "ns1/svc1 has no local endpoints" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j DROP
-				-A KUBE-FIREWALL -m comment --comment "block incoming localnet connections" -d 127.0.0.0/8 ! -s 127.0.0.0/8 -m conntrack ! --ctstate RELATED,ESTABLISHED,DNAT -j DROP
-				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
-				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
-				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-				COMMIT
-				*nat
-				:KUBE-NODEPORTS - [0:0]
-				:KUBE-SERVICES - [0:0]
-				:KUBE-MARK-MASQ - [0:0]
-				:KUBE-POSTROUTING - [0:0]
-				-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
-				-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
-				-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
-				-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
-				-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
-				COMMIT
-				`),
 			flowTests: []packetFlowTest{
 				{
 					name:     "no endpoints",
@@ -5695,16 +5610,10 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 
 			fp.OnEndpointSliceAdd(endpointSlice)
 			fp.syncProxyRules()
-			assertIPTablesRulesEqual(t, tc.line, true, tc.expectedIPTablesWithSlice, fp.iptablesData.String())
 			runPacketFlowTests(t, tc.line, ipt, testNodeIP, tc.flowTests)
 
 			fp.OnEndpointSliceDelete(endpointSlice)
 			fp.syncProxyRules()
-			if tc.expectEndpointRule {
-				fp.OnEndpointSliceDelete(endpointSlice)
-				fp.syncProxyRules()
-				assertIPTablesRulesNotEqual(t, tc.line, tc.expectedIPTablesWithSlice, fp.iptablesData.String())
-			}
 			runPacketFlowTests(t, tc.line, ipt, testNodeIP, []packetFlowTest{
 				{
 					name:     "endpoints deleted",
