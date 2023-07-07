@@ -42,7 +42,7 @@ import (
 // rollingUpdate identifies the set of old pods to delete, or additional pods to create on nodes,
 // remaining within the constraints imposed by the update strategy.
 func (dsc *DaemonSetsController) rollingUpdate(ctx context.Context, ds *apps.DaemonSet, nodeList []*v1.Node, hash string) error {
-	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ctx, ds)
+	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ctx, ds, false)
 	if err != nil {
 		return fmt.Errorf("couldn't get node to daemon pod mapping for daemon set %q: %v", ds.Name, err)
 	}
@@ -293,7 +293,8 @@ func (dsc *DaemonSetsController) constructHistory(ctx context.Context, ds *apps.
 }
 
 func (dsc *DaemonSetsController) cleanupHistory(ctx context.Context, ds *apps.DaemonSet, old []*apps.ControllerRevision) error {
-	nodesToDaemonPods, err := dsc.getNodesToDaemonPods(ctx, ds)
+	// Include deleted terminal pods when maintaining history.
+	nodesToDaemonPods, err := dsc.getNodesToDaemonPods(ctx, ds, true)
 	if err != nil {
 		return fmt.Errorf("couldn't get node to daemon pod mapping for daemon set %q: %v", ds.Name, err)
 	}
