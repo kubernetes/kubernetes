@@ -1458,6 +1458,17 @@ func TestFitError_Error(t *testing.T) {
 			},
 			wantReasonMsg: "0/1 nodes are available: 1 Node failed Permit plugin Permit-1.",
 		},
+		{
+			name:        "failed to Reserve on node",
+			numAllNodes: 1,
+			diagnosis: Diagnosis{
+				NodeToStatusMap: NodeToStatusMap{
+					// There should be only one node here.
+					"node1": NewStatus(Unschedulable, "Node failed Reserve plugin Reserve-1"),
+				},
+			},
+			wantReasonMsg: "0/1 nodes are available: 1 Node failed Reserve plugin Reserve-1.",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -1265,6 +1265,11 @@ func (f *frameworkImpl) RunReservePluginsReserve(ctx context.Context, state *fra
 		ctx := klog.NewContext(ctx, logger)
 		status = f.runReservePluginReserve(ctx, pl, state, pod, nodeName)
 		if !status.IsSuccess() {
+			if status.IsUnschedulable() {
+				logger.V(4).Info("Pod rejected by plugin", "pod", klog.KObj(pod), "plugin", pl.Name(), "status", status.Message())
+				status.SetFailedPlugin(pl.Name())
+				return status
+			}
 			err := status.AsError()
 			logger.Error(err, "Plugin failed", "plugin", pl.Name(), "pod", klog.KObj(pod))
 			return framework.AsStatus(fmt.Errorf("running Reserve plugin %q: %w", pl.Name(), err))
