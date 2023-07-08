@@ -142,7 +142,7 @@ func (s *volumeStatCalculator) calcAndStoreStats() {
 		if err != nil {
 			// Expected for Volumes that don't support Metrics
 			if !volume.IsNotSupported(err) {
-				klog.V(4).InfoS("Failed to calculate volume metrics", "pod", klog.KObj(s.pod), "podUID", s.pod.UID, "volumeName", name, "err", err)
+				klog.ErrorS(err, "Failed to calculate volume metrics", "pod", klog.KObj(s.pod), "podUID", s.pod.UID, "volumeName", name)
 			}
 			continue
 		}
