@@ -4312,6 +4312,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.core.v1.ResourceRequirements
       default: {}
+    - name: restartPolicy
+      type:
+        scalar: string
     - name: securityContext
       type:
         namedType: io.k8s.api.core.v1.SecurityContext
@@ -4729,6 +4732,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.core.v1.ResourceRequirements
       default: {}
+    - name: restartPolicy
+      type:
+        scalar: string
     - name: securityContext
       type:
         namedType: io.k8s.api.core.v1.SecurityContext

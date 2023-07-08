@@ -1450,7 +1450,16 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal bool) v1.Pod
 	spec := pod.Spec
 	pendingInitialization := 0
 	failedInitialization := 0
+
+	// regular init containers
 	for _, container := range spec.InitContainers {
+		if kubetypes.IsRestartableInitContainer(&container) {
+			// Skip the restartable init containers here to handle them separately as
+			// they are slightly different from the init containers in terms of the
+			// pod phase.
+			continue
+		}
+
 		containerStatus, ok := podutil.GetContainerStatus(info, container.Name)
 		if !ok {
 			pendingInitialization++
@@ -1477,11 +1486,48 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal bool) v1.Pod
 		}
 	}
 
+	// counters for restartable init and regular containers
 	unknown := 0
 	running := 0
 	waiting := 0
 	stopped := 0
 	succeeded := 0
+
+	// restartable init containers
+	for _, container := range spec.InitContainers {
+		if !kubetypes.IsRestartableInitContainer(&container) {
+			// Skip the regular init containers, as they have been handled above.
+			continue
+		}
+		containerStatus, ok := podutil.GetContainerStatus(info, container.Name)
+		if !ok {
+			unknown++
+			continue
+		}
+
+		switch {
+		case containerStatus.State.Running != nil:
+			if containerStatus.Started == nil || !*containerStatus.Started {
+				pendingInitialization++
+			}
+			running++
+		case containerStatus.State.Terminated != nil:
+			// Do nothing here, as terminated restartable init containers are not
+			// taken into account for the pod phase.
+		case containerStatus.State.Waiting != nil:
+			if containerStatus.LastTerminationState.Terminated != nil {
+				// Do nothing here, as terminated restartable init containers are not
+				// taken into account for the pod phase.
+			} else {
+				pendingInitialization++
+				waiting++
+			}
+		default:
+			pendingInitialization++
+			unknown++
+		}
+	}
+
 	for _, container := range spec.Containers {
 		containerStatus, ok := podutil.GetContainerStatus(info, container.Name)
 		if !ok {
@@ -1513,7 +1559,11 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal bool) v1.Pod
 	}
 
 	switch {
-	case pendingInitialization > 0:
+	case pendingInitialization > 0 &&
+		// This is needed to handle the case where the pod has been initialized but
+		// the restartable init containers are restarting and the pod should not be
+		// placed back into v1.PodPending since the regular containers have run.
+		!kubecontainer.HasAnyRegularContainerStarted(&spec, info):
 		fallthrough
 	case waiting > 0:
 		klog.V(5).InfoS("Pod waiting > 0, pending")
@@ -1529,7 +1579,8 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal bool) v1.Pod
 		if podIsTerminal {
 			// TODO(#116484): Also assign terminal phase to static pods.
 			if !kubetypes.IsStaticPod(pod) {
-				// All containers are terminated in success
+				// All regular containers are terminated in success and all restartable
+				// init containers are stopped.
 				if stopped == succeeded {
 					return v1.PodSucceeded
 				}
@@ -1543,8 +1594,8 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal bool) v1.Pod
 			return v1.PodRunning
 		}
 		if stopped == succeeded {
-			// RestartPolicy is not Always, and all
-			// containers are terminated in success
+			// RestartPolicy is not Always, all containers are terminated in success
+			// and all restartable init containers are stopped.
 			return v1.PodSucceeded
 		}
 		if spec.RestartPolicy == v1.RestartPolicyNever {
@@ -1649,7 +1700,7 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	}
 
 	// ensure the probe managers have up to date status for containers
-	kl.probeManager.UpdatePodStatus(pod.UID, s)
+	kl.probeManager.UpdatePodStatus(pod, s)
 
 	// preserve all conditions not owned by the kubelet
 	s.Conditions = make([]v1.PodCondition, 0, len(pod.Status.Conditions)+1)
@@ -1674,7 +1725,7 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodReadyToStartContainersCondition) {
 		s.Conditions = append(s.Conditions, status.GeneratePodReadyToStartContainersCondition(pod, podStatus))
 	}
-	s.Conditions = append(s.Conditions, status.GeneratePodInitializedCondition(&pod.Spec, s.InitContainerStatuses, s.Phase))
+	s.Conditions = append(s.Conditions, status.GeneratePodInitializedCondition(&pod.Spec, append(s.InitContainerStatuses, s.ContainerStatuses...), s.Phase))
 	s.Conditions = append(s.Conditions, status.GeneratePodReadyCondition(&pod.Spec, s.Conditions, s.ContainerStatuses, s.Phase))
 	s.Conditions = append(s.Conditions, status.GenerateContainersReadyCondition(&pod.Spec, s.ContainerStatuses, s.Phase))
 	s.Conditions = append(s.Conditions, v1.PodCondition{

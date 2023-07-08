@@ -492,11 +492,13 @@ type podActions struct {
 	// The attempt number of creating sandboxes for the pod.
 	Attempt uint32
 
-	// The next init container to start.
-	NextInitContainerToStart *v1.Container
+	// InitContainersToStart keeps a list of indexes for the init containers to
+	// start, where the index is the index of the specific init container in the
+	// pod spec (pod.Spec.InitContainers).
+	InitContainersToStart []int
 	// ContainersToStart keeps a list of indexes for the containers to start,
 	// where the index is the index of the specific container in the pod spec (
-	// pod.Spec.Containers.
+	// pod.Spec.Containers).
 	ContainersToStart []int
 	// ContainersToKill keeps a map of containers that need to be killed, note that
 	// the key is the container ID of the container, while
@@ -827,7 +829,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 	if createPodSandbox {
 		if !shouldRestartOnFailure(pod) && attempt != 0 && len(podStatus.ContainerStatuses) != 0 {
 			// Should not restart the pod, just return.
-			// we should not create a sandbox for a pod if it is already done.
+			// we should not create a sandbox, and just kill the pod if it is already done.
 			// if all containers are done and should not be started, there is no need to create a new sandbox.
 			// this stops confusing logs on pods whose containers all have exit codes, but we recreate a sandbox before terminating it.
 			//
@@ -846,18 +848,22 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 			}
 			containersToStart = append(containersToStart, idx)
 		}
-		// We should not create a sandbox for a Pod if initialization is done and there is no container to start.
-		if len(containersToStart) == 0 {
-			_, _, done := findNextInitContainerToRun(pod, podStatus)
-			if done {
-				changes.CreateSandbox = false
-				return changes
-			}
+
+		// If there is any regular container, it means all init containers have
+		// been initialized.
+		hasInitialized := hasAnyRegularContainerCreated(pod, podStatus)
+		// We should not create a sandbox, and just kill the pod if initialization
+		// is done and there is no container to start.
+		if hasInitialized && len(containersToStart) == 0 {
+			changes.CreateSandbox = false
+			return changes
 		}
 
+		// If we are creating a pod sandbox, we should restart from the initial
+		// state.
 		if len(pod.Spec.InitContainers) != 0 {
 			// Pod has init containers, return the first one.
-			changes.NextInitContainerToStart = &pod.Spec.InitContainers[0]
+			changes.InitContainersToStart = []int{0}
 			return changes
 		}
 		changes.ContainersToStart = containersToStart
@@ -874,27 +880,8 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		}
 	}
 
-	// Check initialization progress.
-	initLastStatus, next, done := findNextInitContainerToRun(pod, podStatus)
-	if !done {
-		if next != nil {
-			initFailed := initLastStatus != nil && isInitContainerFailed(initLastStatus)
-			if initFailed && !shouldRestartOnFailure(pod) {
-				changes.KillPod = true
-			} else {
-				// Always try to stop containers in unknown state first.
-				if initLastStatus != nil && initLastStatus.State == kubecontainer.ContainerStateUnknown {
-					changes.ContainersToKill[initLastStatus.ID] = containerToKillInfo{
-						name:      next.Name,
-						container: next,
-						message: fmt.Sprintf("Init container is in %q state, try killing it before restart",
-							initLastStatus.State),
-						reason: reasonUnknown,
-					}
-				}
-				changes.NextInitContainerToStart = next
-			}
-		}
+	hasInitialized := m.computeInitContainerActions(pod, podStatus, &changes)
+	if changes.KillPod || !hasInitialized {
 		// Initialization failed or still in progress. Skip inspecting non-init
 		// containers.
 		return changes
@@ -993,6 +980,9 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 
 	if keepCount == 0 && len(changes.ContainersToStart) == 0 {
 		changes.KillPod = true
+		// To prevent the restartable init containers to keep pod alive, we should
+		// not restart them.
+		changes.InitContainersToStart = nil
 	}
 
 	return changes
@@ -1225,10 +1215,16 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		start(ctx, "ephemeral container", metrics.EphemeralContainer, ephemeralContainerStartSpec(&pod.Spec.EphemeralContainers[idx]))
 	}
 
-	// Step 6: start the init container.
-	if container := podContainerChanges.NextInitContainerToStart; container != nil {
+	// Step 6: start init containers.
+	for _, idx := range podContainerChanges.InitContainersToStart {
+		container := &pod.Spec.InitContainers[idx]
 		// Start the next init container.
 		if err := start(ctx, "init container", metrics.InitContainer, containerStartSpec(container)); err != nil {
+			if types.IsRestartableInitContainer(container) {
+				klog.V(4).InfoS("Failed to start the restartable init container for the pod, skipping", "initContainerName", container.Name, "pod", klog.KObj(pod))
+				continue
+			}
+			klog.V(4).InfoS("Failed to initialize the pod, as the init container failed to start, aborting", "initContainerName", container.Name, "pod", klog.KObj(pod))
 			return
 		}
 

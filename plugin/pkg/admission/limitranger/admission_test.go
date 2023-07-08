@@ -38,6 +38,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+
 	api "k8s.io/kubernetes/pkg/apis/core"
 	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
@@ -626,6 +627,11 @@ func TestPodLimitFunc(t *testing.T) {
 			pod:        validPod("pod-max-local-ephemeral-storage-ratio", 3, getResourceRequirements(getLocalStorageResourceList("250Mi"), getLocalStorageResourceList("500Mi"))),
 			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getLocalStorageResourceList("2Gi"), api.ResourceList{}, api.ResourceList{}, getLocalStorageResourceList("1.5")),
 		},
+		{
+			pod: withRestartableInitContainer(getComputeResourceList("1500m", ""), api.ResourceList{},
+				validPod("ctr-max-cpu-limit-restartable-init-container", 1, getResourceRequirements(getComputeResourceList("1000m", ""), getComputeResourceList("1500m", "")))),
+			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getComputeResourceList("2", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
 	}
 	for i := range errorCases {
 		test := errorCases[i]
@@ -638,6 +644,18 @@ func TestPodLimitFunc(t *testing.T) {
 			t.Errorf("Expected error for pod: %s", test.pod.Name)
 		}
 	}
+}
+
+func withRestartableInitContainer(requests, limits api.ResourceList, pod api.Pod) api.Pod {
+	policyAlways := api.ContainerRestartPolicyAlways
+	pod.Spec.InitContainers = append(pod.Spec.InitContainers,
+		api.Container{
+			RestartPolicy: &policyAlways,
+			Image:         "foo:V" + strconv.Itoa(len(pod.Spec.InitContainers)),
+			Resources:     getResourceRequirements(requests, limits),
+			Name:          "foo-" + strconv.Itoa(len(pod.Spec.InitContainers)),
+		})
+	return pod
 }
 
 func getLocalStorageResourceList(ephemeralStorage string) api.ResourceList {

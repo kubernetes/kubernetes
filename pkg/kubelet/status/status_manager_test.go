@@ -585,6 +585,16 @@ func TestStaticPod(t *testing.T) {
 func TestTerminatePod(t *testing.T) {
 	syncer := newTestManager(&fake.Clientset{})
 	testPod := getTestPod()
+	testPod.Spec.InitContainers = []v1.Container{
+		{Name: "init-test-1"},
+		{Name: "init-test-2"},
+		{Name: "init-test-3"},
+	}
+	testPod.Spec.Containers = []v1.Container{
+		{Name: "test-1"},
+		{Name: "test-2"},
+		{Name: "test-3"},
+	}
 	t.Logf("update the pod's status to Failed.  TerminatePod should preserve this status update.")
 	firstStatus := getRandomPodStatus()
 	firstStatus.Phase = v1.PodFailed
@@ -592,6 +602,9 @@ func TestTerminatePod(t *testing.T) {
 		{Name: "init-test-1"},
 		{Name: "init-test-2", State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{Reason: "InitTest", ExitCode: 0}}},
 		{Name: "init-test-3", State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{Reason: "InitTest", ExitCode: 3}}},
+		// TODO: If the last init container had failed, the pod would not have been
+		// able to start any containers. Maybe, we have to separate this test case
+		// into two cases, one for init containers and one for containers.
 	}
 	firstStatus.ContainerStatuses = []v1.ContainerStatus{
 		{Name: "test-1"},
@@ -603,6 +616,16 @@ func TestTerminatePod(t *testing.T) {
 	t.Logf("set the testPod to a pod with Phase running, to simulate a stale pod")
 	testPod.Status = getRandomPodStatus()
 	testPod.Status.Phase = v1.PodRunning
+	testPod.Status.InitContainerStatuses = []v1.ContainerStatus{
+		{Name: "test-1"},
+		{Name: "init-test-2", State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{Reason: "InitTest", ExitCode: 0}}},
+		{Name: "init-test-3", State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{Reason: "InitTest", ExitCode: 0}}},
+	}
+	testPod.Status.ContainerStatuses = []v1.ContainerStatus{
+		{Name: "test-1", State: v1.ContainerState{Running: &v1.ContainerStateRunning{}}},
+		{Name: "test-2", State: v1.ContainerState{Running: &v1.ContainerStateRunning{}}},
+		{Name: "test-3", State: v1.ContainerState{Running: &v1.ContainerStateRunning{}}},
+	}
 
 	syncer.TerminatePod(testPod)
 
@@ -643,6 +666,16 @@ func TestTerminatePod(t *testing.T) {
 func TestTerminatePodWaiting(t *testing.T) {
 	syncer := newTestManager(&fake.Clientset{})
 	testPod := getTestPod()
+	testPod.Spec.InitContainers = []v1.Container{
+		{Name: "init-test-1"},
+		{Name: "init-test-2"},
+		{Name: "init-test-3"},
+	}
+	testPod.Spec.Containers = []v1.Container{
+		{Name: "test-1"},
+		{Name: "test-2"},
+		{Name: "test-3"},
+	}
 	t.Logf("update the pod's status to Failed.  TerminatePod should preserve this status update.")
 	firstStatus := getRandomPodStatus()
 	firstStatus.Phase = v1.PodFailed
@@ -650,6 +683,10 @@ func TestTerminatePodWaiting(t *testing.T) {
 		{Name: "init-test-1"},
 		{Name: "init-test-2", State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{Reason: "InitTest", ExitCode: 0}}},
 		{Name: "init-test-3", State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{Reason: "InitTest"}}},
+		// TODO: If the last init container had been in a waiting state, it would
+		// not have been able to start any containers. Maybe, we have to separate
+		// this test case into two cases, one for init containers and one for
+		// containers.
 	}
 	firstStatus.ContainerStatuses = []v1.ContainerStatus{
 		{Name: "test-1"},
@@ -661,6 +698,16 @@ func TestTerminatePodWaiting(t *testing.T) {
 	t.Logf("set the testPod to a pod with Phase running, to simulate a stale pod")
 	testPod.Status = getRandomPodStatus()
 	testPod.Status.Phase = v1.PodRunning
+	testPod.Status.InitContainerStatuses = []v1.ContainerStatus{
+		{Name: "test-1"},
+		{Name: "init-test-2", State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{Reason: "InitTest", ExitCode: 0}}},
+		{Name: "init-test-3", State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{Reason: "InitTest", ExitCode: 0}}},
+	}
+	testPod.Status.ContainerStatuses = []v1.ContainerStatus{
+		{Name: "test-1", State: v1.ContainerState{Running: &v1.ContainerStateRunning{}}},
+		{Name: "test-2", State: v1.ContainerState{Running: &v1.ContainerStateRunning{}}},
+		{Name: "test-3", State: v1.ContainerState{Running: &v1.ContainerStateRunning{}}},
+	}
 
 	syncer.TerminatePod(testPod)
 
@@ -809,7 +856,7 @@ func TestTerminatePod_DefaultUnknownStatus(t *testing.T) {
 			name: "uninitialized pod defaults the first init container",
 			pod: newPod(1, 1, func(pod *v1.Pod) {
 				pod.Spec.RestartPolicy = v1.RestartPolicyNever
-				pod.Status.Phase = v1.PodRunning
+				pod.Status.Phase = v1.PodPending
 				pod.Status.InitContainerStatuses = []v1.ContainerStatus{
 					{Name: "init-0", State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{}}},
 				}
@@ -826,7 +873,7 @@ func TestTerminatePod_DefaultUnknownStatus(t *testing.T) {
 			name: "uninitialized pod defaults only the first init container",
 			pod: newPod(2, 1, func(pod *v1.Pod) {
 				pod.Spec.RestartPolicy = v1.RestartPolicyNever
-				pod.Status.Phase = v1.PodRunning
+				pod.Status.Phase = v1.PodPending
 				pod.Status.InitContainerStatuses = []v1.ContainerStatus{
 					{Name: "init-0", State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{}}},
 					{Name: "init-1", State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{}}},
@@ -845,7 +892,7 @@ func TestTerminatePod_DefaultUnknownStatus(t *testing.T) {
 			name: "uninitialized pod defaults gaps",
 			pod: newPod(4, 1, func(pod *v1.Pod) {
 				pod.Spec.RestartPolicy = v1.RestartPolicyNever
-				pod.Status.Phase = v1.PodRunning
+				pod.Status.Phase = v1.PodPending
 				pod.Status.InitContainerStatuses = []v1.ContainerStatus{
 					{Name: "init-0", State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{}}},
 					{Name: "init-1", State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{}}},
@@ -868,7 +915,7 @@ func TestTerminatePod_DefaultUnknownStatus(t *testing.T) {
 			name: "failed last container is uninitialized",
 			pod: newPod(3, 1, func(pod *v1.Pod) {
 				pod.Spec.RestartPolicy = v1.RestartPolicyNever
-				pod.Status.Phase = v1.PodRunning
+				pod.Status.Phase = v1.PodPending
 				pod.Status.InitContainerStatuses = []v1.ContainerStatus{
 					{Name: "init-0", State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{}}},
 					{Name: "init-1", State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{}}},

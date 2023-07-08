@@ -651,6 +651,85 @@ func TestStorageRequests(t *testing.T) {
 
 }
 
+func TestRestartableInitContainers(t *testing.T) {
+	newPod := func() *v1.Pod {
+		return &v1.Pod{
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{Name: "regular"},
+				},
+			},
+		}
+	}
+	newPodWithRestartableInitContainers := func() *v1.Pod {
+		restartPolicyAlways := v1.ContainerRestartPolicyAlways
+		return &v1.Pod{
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{Name: "regular"},
+				},
+				InitContainers: []v1.Container{
+					{
+						Name:          "restartable-init",
+						RestartPolicy: &restartPolicyAlways,
+					},
+				},
+			},
+		}
+	}
+
+	testCases := []struct {
+		name                    string
+		pod                     *v1.Pod
+		enableSidecarContainers bool
+		wantStatus              *framework.Status
+	}{
+		{
+			name: "allow pod without restartable init containers if sidecar containers is disabled",
+			pod:  newPod(),
+		},
+		{
+			name:       "not allow pod with restartable init containers if sidecar containers is disabled",
+			pod:        newPodWithRestartableInitContainers(),
+			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, "Pod has a restartable init container and the SidecarContainers feature is disabled"),
+		},
+		{
+			name:                    "allow pod without restartable init containers if sidecar containers is enabled",
+			enableSidecarContainers: true,
+			pod:                     newPod(),
+		},
+		{
+			name:                    "allow pod with restartable init containers if sidecar containers is enabled",
+			enableSidecarContainers: true,
+			pod:                     newPodWithRestartableInitContainers(),
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			node := v1.Node{Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: makeAllocatableResources(0, 0, 1, 0, 0, 0)}}
+			nodeInfo := framework.NewNodeInfo()
+			nodeInfo.SetNode(&node)
+
+			p, err := NewFit(&config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{EnableSidecarContainers: test.enableSidecarContainers})
+			if err != nil {
+				t.Fatal(err)
+			}
+			cycleState := framework.NewCycleState()
+			_, preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), cycleState, test.pod)
+			if !preFilterStatus.IsSuccess() {
+				t.Errorf("prefilter failed with status: %v", preFilterStatus)
+			}
+
+			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), cycleState, test.pod, nodeInfo)
+			if diff := cmp.Diff(gotStatus, test.wantStatus); diff != "" {
+				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			}
+		})
+	}
+
+}
+
 func TestFitScore(t *testing.T) {
 	tests := []struct {
 		name                 string
