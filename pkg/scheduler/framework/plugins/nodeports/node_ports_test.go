@@ -24,8 +24,10 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2/ktesting"
+	_ "k8s.io/klog/v2/ktesting/init"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
@@ -295,6 +297,61 @@ func TestGetContainerPorts(t *testing.T) {
 			if diff := cmp.Diff(test.expected, result); diff != "" {
 				t.Errorf("container ports: container ports does not match (-want,+got): %s", diff)
 			}
+		})
+	}
+}
+
+func Test_isSchedulableAfterPodDeleted(t *testing.T) {
+	podWithHostPort := st.MakePod().HostPort(8080)
+
+	testcases := map[string]struct {
+		pod          *v1.Pod
+		oldObj       interface{}
+		expectedHint framework.QueueingHint
+		expectedErr  bool
+	}{
+		"backoff-wrong-old-object": {
+			pod:          podWithHostPort.Obj(),
+			oldObj:       "not-a-pod",
+			expectedHint: framework.QueueAfterBackoff,
+			expectedErr:  true,
+		},
+		"skip-queue-on-unscheduled": {
+			pod:          podWithHostPort.Obj(),
+			oldObj:       st.MakePod().Obj(),
+			expectedHint: framework.QueueSkip,
+		},
+		"skip-queue-on-non-hostport": {
+			pod:          podWithHostPort.Obj(),
+			oldObj:       st.MakePod().Node("fake-node").Obj(),
+			expectedHint: framework.QueueSkip,
+		},
+		"skip-queue-on-unrelated-hostport": {
+			pod:          podWithHostPort.Obj(),
+			oldObj:       st.MakePod().Node("fake-node").HostPort(8081).Obj(),
+			expectedHint: framework.QueueSkip,
+		},
+		"queue-on-released-hostport": {
+			pod:          podWithHostPort.Obj(),
+			oldObj:       st.MakePod().Node("fake-node").HostPort(8080).Obj(),
+			expectedHint: framework.QueueAfterBackoff,
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			p, err := New(ctx, nil, nil)
+			if err != nil {
+				t.Fatalf("Creating plugin: %v", err)
+			}
+			actualHint, err := p.(*NodePorts).isSchedulableAfterPodDeleted(logger, tc.pod, tc.oldObj, nil)
+			if tc.expectedErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedHint, actualHint)
 		})
 	}
 }
