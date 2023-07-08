@@ -364,8 +364,10 @@ func MachineInfo(nodeName string,
 			}
 			node.Status.Allocatable[k] = v
 		}
+		capacity := node.Status.Capacity.DeepCopy()
+		capacity[v1.ResourceMemory] = cm.GetAllocatableMemory(capacity)
 		// for every huge page reservation, we need to remove it from allocatable memory
-		for k, v := range node.Status.Capacity {
+		for k, v := range capacity {
 			if v1helper.IsHugePageResourceName(k) {
 				allocatableMemory := node.Status.Allocatable[v1.ResourceMemory]
 				value := v.DeepCopy()
