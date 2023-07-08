@@ -4087,6 +4087,17 @@ func TestNodeAddressUpdatesGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 				{IP: "2001:db8::2"},
 			},
 		},
+		{
+			name:    "Update secondary after new secondary address dual-stack - reverse order",
+			nodeIPs: []string{"2001:db8::2"},
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
+				{Type: v1.NodeInternalIP, Address: "2001:db8::2"},
+			},
+			expectedPodIPs: []v1.PodIP{
+				{IP: "2001:db8::2"},
+			},
+		},
 	}
 
 	for _, tc := range testcases {
