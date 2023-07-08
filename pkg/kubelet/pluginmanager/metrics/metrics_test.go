@@ -17,7 +17,6 @@ limitations under the License.
 package metrics
 
 import (
-	"fmt"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"

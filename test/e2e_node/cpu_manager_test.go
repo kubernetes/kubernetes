@@ -53,7 +53,7 @@ type ctnAttribute struct {
 func makeCPUManagerPod(podName string, ctnAttributes []ctnAttribute) *v1.Pod {
 	var containers []v1.Container
 	for _, ctnAttr := range ctnAttributes {
-		cpusetCmd := fmt.Sprintf("grep Cpus_allowed_list /proc/self/status | cut -f2 && sleep 1d")
+		cpusetCmd := "grep Cpus_allowed_list /proc/self/status | cut -f2 && sleep 1d"
 		ctn := v1.Container{
 			Name:  ctnAttr.ctnName,
 			Image: busyboxImage,

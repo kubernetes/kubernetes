@@ -17,8 +17,6 @@ limitations under the License.
 package config
 
 import (
-	"fmt"
-
 	"github.com/spf13/pflag"
 )
 
@@ -50,7 +48,7 @@ type ContainerRuntimeOptions struct {
 func (s *ContainerRuntimeOptions) AddFlags(fs *pflag.FlagSet) {
 	// General settings.
 	fs.StringVar(&s.RuntimeCgroups, "runtime-cgroups", s.RuntimeCgroups, "Optional absolute name of cgroups to create and run the runtime in.")
-	fs.StringVar(&s.PodSandboxImage, "pod-infra-container-image", s.PodSandboxImage, fmt.Sprintf("Specified image will not be pruned by the image garbage collector. CRI implementations have their own configuration to set this image."))
+	fs.StringVar(&s.PodSandboxImage, "pod-infra-container-image", s.PodSandboxImage, "Specified image will not be pruned by the image garbage collector. CRI implementations have their own configuration to set this image.")
 	fs.MarkDeprecated("pod-infra-container-image", "will be removed in a future release. Image garbage collector will get sandbox image information from CRI.")
 
 	// Image credential provider settings.

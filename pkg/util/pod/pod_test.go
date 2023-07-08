@@ -18,7 +18,6 @@ package pod
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"reflect"

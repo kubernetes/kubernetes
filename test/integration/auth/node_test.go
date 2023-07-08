@@ -450,7 +450,7 @@ func TestNodeAuthorizer(t *testing.T) {
 	}
 	patchNode1CSINode := func(client clientset.Interface) func() error {
 		return func() error {
-			bs := []byte(fmt.Sprintf(`{"csiDrivers": [ { "driver": "net.example.storage.driver2", "nodeID": "net.example.storage/node1", "topologyKeys": [ "net.example.storage/region" ] } ] }`))
+			bs := []byte(`{"csiDrivers": [ { "driver": "net.example.storage.driver2", "nodeID": "net.example.storage/node1", "topologyKeys": [ "net.example.storage/region" ] } ] }`)
 			// StrategicMergePatch is unsupported by CRs. Falling back to MergePatch
 			_, err := client.StorageV1().CSINodes().Patch(context.TODO(), "node1", types.MergePatchType, bs, metav1.PatchOptions{})
 			return err
