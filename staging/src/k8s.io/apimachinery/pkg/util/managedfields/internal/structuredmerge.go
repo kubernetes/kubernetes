@@ -141,7 +141,9 @@ func (f *structuredMergeManager) Apply(liveObj, patchObj runtime.Object, managed
 
 	patchObjTyped, err := f.typeConverter.ObjectToTyped(patchObj)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create typed patch object (%v): %v", objectGVKNN(patchObj), err)
+		return nil, nil, errors.NewBadRequest(
+			fmt.Sprintf("failed to create typed patch object (%v): %v", objectGVKNN(patchObj), err))
+
 	}
 	liveObjTyped, err := f.typeConverter.ObjectToTyped(liveObjVersioned)
 	if err != nil {
