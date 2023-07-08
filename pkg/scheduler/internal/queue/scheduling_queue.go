@@ -204,8 +204,8 @@ type QueueingHintFunction struct {
 }
 
 type inFlightPod struct {
-	// lastEventBefore is the latest observed event when the pod is popped.
-	lastEventBefore *list.Element
+	// previousEvent is the latest observed event when the pod is popped.
+	previousEvent *list.Element
 }
 
 // clusterEvent has the event and involved objects.
@@ -621,9 +621,9 @@ func (p *PriorityQueue) determineSchedulingHintForInFlightPod(logger klog.Logger
 	// we can assume pInfo must be recorded in inFlightPods.
 	// check if there is an event that makes this Pod schedulable based on pInfo.UnschedulablePlugins.
 	event := p.receivedEvents.Front()
-	if inFlightPod.lastEventBefore != nil {
+	if inFlightPod.previousEvent != nil {
 		// only check events that happened after the Pod is popped.
-		event = inFlightPod.lastEventBefore.Next()
+		event = inFlightPod.previousEvent.Next()
 	}
 	var moveRequestCycle int64
 	schedulingHint := framework.QueueSkip
@@ -781,7 +781,7 @@ func (p *PriorityQueue) Pop() (*framework.QueuedPodInfo, error) {
 	p.schedulingCycle++
 	// In flight, no move request yet.
 	p.inFlightPods[pInfo.Pod.UID] = inFlightPod{
-		lastEventBefore: p.receivedEvents.Back(),
+		previousEvent: p.receivedEvents.Back(),
 	}
 
 	for plugin := range pInfo.UnschedulablePlugins {
@@ -811,8 +811,8 @@ func (p *PriorityQueue) done(pod types.UID) {
 	// remove events which is only referred from this Pod
 	// so that the receivedEvents map doesn't grow infinitely.
 	event := p.receivedEvents.Front()
-	if inFlightPod.lastEventBefore != nil {
-		event = inFlightPod.lastEventBefore.Next()
+	if inFlightPod.previousEvent != nil {
+		event = inFlightPod.previousEvent.Next()
 	}
 	for ; event != nil; event = event.Next() {
 		e := event.Value.(*clusterEvent)

@@ -226,7 +226,7 @@ func TestDone(t *testing.T) {
 			wantReceivedEvents: list.New(),
 		},
 		{
-			name:         "pod is in inFlightPods, but with empty lastEventBefore",
+			name:         "pod is in inFlightPods, but with empty previousEvent",
 			podUID:       "pod1",
 			inFlightPods: map[types.UID]inFlightPod{"pod1": {}},
 			receivedEvents: clusterEventsToList([]*clusterEvent{
@@ -241,10 +241,10 @@ func TestDone(t *testing.T) {
 			}),
 		},
 		{
-			name:   "pod is in inFlightPods with lastEventBefore",
+			name:   "pod is in inFlightPods with previousEvent",
 			podUID: "pod1",
 			inFlightPods: map[types.UID]inFlightPod{"pod1": {
-				lastEventBefore: receivedEventsList.Front().Next(),
+				previousEvent: receivedEventsList.Front().Next(),
 			}},
 			receivedEvents:   receivedEventsList,
 			wantInFlightPods: map[types.UID]inFlightPod{},
