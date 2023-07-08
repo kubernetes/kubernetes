@@ -74,6 +74,7 @@ network_closure.sh
 # User cluster configs
 .kubeconfig
 
+# Ignore files starting with .tags
 .tags*
 
 # Version file for dockerized build
