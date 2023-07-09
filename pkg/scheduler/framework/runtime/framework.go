@@ -652,13 +652,17 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 			skipPlugins.Insert(pl.Name())
 			continue
 		}
+
 		if !s.IsSuccess() {
-			s.SetFailedPlugin(pl.Name())
 			if s.IsUnschedulable() {
-				return nil, s
+				logger.V(4).Info("Plugin rejected", "pod", klog.KObj(pod), "plugin", pl.Name(), "status", s.Message())
+				return nil, s.WithFailedPlugin(pl.Name())
 			}
-			return nil, framework.AsStatus(fmt.Errorf("running PreFilter plugin %q: %w", pl.Name(), s.AsError())).WithFailedPlugin(pl.Name())
+			err := s.AsError()
+			logger.Error(err, "Plugin failed", "pod", klog.KObj(pod), "plugin", pl.Name())
+			return nil, framework.AsStatus(fmt.Errorf("running PreFilter plugin %q: %w", pl.Name(), err))
 		}
+
 		if !r.AllNodes() {
 			pluginsWithNodes = append(pluginsWithNodes, pl.Name())
 		}
@@ -792,16 +796,19 @@ func (f *frameworkImpl) RunFilterPlugins(
 		logger := klog.LoggerWithName(logger, pl.Name())
 		ctx := klog.NewContext(ctx, logger)
 		if state.SkipFilterPlugins.Has(pl.Name()) {
+			logger.V(4).Info("Plugin skipped", "pod", klog.KObj(pod), "plugin", pl.Name())
 			continue
 		}
 		if status := f.runFilterPlugin(ctx, pl, state, pod, nodeInfo); !status.IsSuccess() {
 			if !status.IsUnschedulable() {
 				// Filter plugins are not supposed to return any status other than
 				// Success or Unschedulable.
-				status = framework.AsStatus(fmt.Errorf("running %q filter plugin: %w", pl.Name(), status.AsError()))
+				err := status.AsError()
+				logger.Error(err, "Plugin failed", "pod", klog.KObj(pod), "plugin", pl.Name(), "node", klog.KObj(nodeInfo.Node()))
+				return framework.AsStatus(fmt.Errorf("running %q filter plugin: %w", pl.Name(), err))
 			}
-			status.SetFailedPlugin(pl.Name())
-			return status
+			logger.V(4).Info("Plugin rejected", "pod", klog.KObj(pod), "plugin", pl.Name(), "node", klog.KObj(nodeInfo.Node()), "status", status.Message())
+			return status.WithFailedPlugin(pl.Name())
 		}
 	}
 
@@ -836,31 +843,30 @@ func (f *frameworkImpl) RunPostFilterPlugins(ctx context.Context, state *framewo
 	// `result` records the last meaningful(non-noop) PostFilterResult.
 	var result *framework.PostFilterResult
 	var reasons []string
-	var failedPlugin string
 	for _, pl := range f.postFilterPlugins {
 		logger := klog.LoggerWithName(logger, pl.Name())
 		ctx := klog.NewContext(ctx, logger)
 		r, s := f.runPostFilterPlugin(ctx, pl, state, pod, filteredNodeStatusMap)
 		if s.IsSuccess() {
+			logger.V(4).Info("Plugin succeeded", "pod", klog.KObj(pod), "plugin", pl.Name())
 			return r, s
 		} else if s.Code() == framework.UnschedulableAndUnresolvable {
-			return r, s.WithFailedPlugin(pl.Name())
+			logger.V(4).Info("Plugin rejected and unresolved", "pod", klog.KObj(pod), "plugin", pl.Name(), "status", s.Message())
+			return r, s
 		} else if !s.IsUnschedulable() {
 			// Any status other than Success, Unschedulable or UnschedulableAndUnresolvable is Error.
-			return nil, framework.AsStatus(s.AsError()).WithFailedPlugin(pl.Name())
+			err := s.AsError()
+			logger.Error(err, "Plugin failed", "pod", klog.KObj(pod), "plugin", pl.Name())
+			return nil, framework.AsStatus(err)
 		} else if r != nil && r.Mode() != framework.ModeNoop {
 			result = r
 		}
-
 		reasons = append(reasons, s.Reasons()...)
-		// Record the first failed plugin unless we proved that
-		// the latter is more relevant.
-		if len(failedPlugin) == 0 {
-			failedPlugin = pl.Name()
-		}
 	}
 
-	return result, framework.NewStatus(framework.Unschedulable, reasons...).WithFailedPlugin(failedPlugin)
+	status = framework.NewStatus(framework.Unschedulable, reasons...)
+	logger.V(4).Info("Plugin rejected", "pod", klog.KObj(pod), "status", status.Message())
+	return result, status
 }
 
 func (f *frameworkImpl) runPostFilterPlugin(ctx context.Context, pl framework.PostFilterPlugin, state *framework.CycleState, pod *v1.Pod, filteredNodeStatusMap framework.NodeToStatusMap) (*framework.PostFilterResult, *framework.Status) {
@@ -988,7 +994,9 @@ func (f *frameworkImpl) RunPreScorePlugins(
 			continue
 		}
 		if !status.IsSuccess() {
-			return framework.AsStatus(fmt.Errorf("running PreScore plugin %q: %w", pl.Name(), status.AsError()))
+			err := status.AsError()
+			logger.Error(err, "Plugin failed", "pod", klog.KObj(pod), "plugin", pl.Name())
+			return framework.AsStatus(fmt.Errorf("running PreScore plugin %q: %w", pl.Name(), err))
 		}
 	}
 	state.SkipScorePlugins = skipPlugins
@@ -1018,8 +1026,17 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 	numPlugins := len(f.scorePlugins) - state.SkipScorePlugins.Len()
 	plugins := make([]framework.ScorePlugin, 0, numPlugins)
 	pluginToNodeScores := make([]framework.NodeScoreList, numPlugins)
+
+	logger := klog.FromContext(ctx)
+	logger = klog.LoggerWithName(logger, "Score")
+	// TODO(knelasevero): Remove duplicated keys from log entry calls
+	// When contextualized logging hits GA
+	// https://github.com/kubernetes/kubernetes/issues/111672
+	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod))
+
 	for _, pl := range f.scorePlugins {
 		if state.SkipScorePlugins.Has(pl.Name()) {
+			logger.V(4).Info("Plugin skipped", "pod", klog.KObj(pod), "plugin", pl.Name())
 			continue
 		}
 		plugins = append(plugins, pl)
@@ -1028,12 +1045,6 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 	defer cancel()
 	errCh := parallelize.NewErrorChannel()
 
-	logger := klog.FromContext(ctx)
-	logger = klog.LoggerWithName(logger, "Score")
-	// TODO(knelasevero): Remove duplicated keys from log entry calls
-	// When contextualized logging hits GA
-	// https://github.com/kubernetes/kubernetes/issues/111672
-	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod))
 	// Run Score method for each node in parallel.
 	f.Parallelizer().Until(ctx, len(plugins), func(i int) {
 		pl := plugins[i]
@@ -1045,8 +1056,9 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 			ctx := klog.NewContext(ctx, logger)
 			s, status := f.runScorePlugin(ctx, pl, state, pod, nodeName)
 			if !status.IsSuccess() {
-				err := fmt.Errorf("plugin %q failed with: %w", pl.Name(), status.AsError())
-				errCh.SendErrorWithCancel(err, cancel)
+				err := status.AsError()
+				logger.Error(err, "Plugin failed", "pod", klog.KObj(pod), "plugin", pl.Name())
+				errCh.SendErrorWithCancel(fmt.Errorf("plugin %q failed with: %w", pl.Name(), err), cancel)
 				return
 			}
 			nodeScores[index] = framework.NodeScore{
@@ -1146,9 +1158,8 @@ func (f *frameworkImpl) RunPreBindPlugins(ctx context.Context, state *framework.
 		status = f.runPreBindPlugin(ctx, pl, state, pod, nodeName)
 		if !status.IsSuccess() {
 			if status.IsUnschedulable() {
-				logger.V(4).Info("Pod rejected by PreBind plugin", "pod", klog.KObj(pod), "node", nodeName, "plugin", pl.Name(), "status", status.Message())
-				status.SetFailedPlugin(pl.Name())
-				return status
+				logger.V(4).Info("Plugin rejected", "pod", klog.KObj(pod), "node", nodeName, "plugin", pl.Name(), "status", status.Message())
+				return status.WithFailedPlugin(pl.Name())
 			}
 			err := status.AsError()
 			logger.Error(err, "Plugin failed", "plugin", pl.Name(), "pod", klog.KObj(pod), "node", nodeName)
@@ -1188,13 +1199,13 @@ func (f *frameworkImpl) RunBindPlugins(ctx context.Context, state *framework.Cyc
 		ctx := klog.NewContext(ctx, logger)
 		status = f.runBindPlugin(ctx, pl, state, pod, nodeName)
 		if status.IsSkip() {
+			logger.V(4).Info("Plugin skipped", "pod", klog.KObj(pod), "plugin", pl.Name())
 			continue
 		}
 		if !status.IsSuccess() {
 			if status.IsUnschedulable() {
-				logger.V(4).Info("Pod rejected by Bind plugin", "pod", klog.KObj(pod), "node", nodeName, "plugin", pl.Name(), "status", status.Message())
-				status.SetFailedPlugin(pl.Name())
-				return status
+				logger.V(4).Info("Plugin rejected", "pod", klog.KObj(pod), "node", nodeName, "plugin", pl.Name(), "status", status.Message())
+				return status.WithFailedPlugin(pl.Name())
 			}
 			err := status.AsError()
 			logger.Error(err, "Plugin Failed", "plugin", pl.Name(), "pod", klog.KObj(pod), "node", nodeName)
@@ -1266,9 +1277,8 @@ func (f *frameworkImpl) RunReservePluginsReserve(ctx context.Context, state *fra
 		status = f.runReservePluginReserve(ctx, pl, state, pod, nodeName)
 		if !status.IsSuccess() {
 			if status.IsUnschedulable() {
-				logger.V(4).Info("Pod rejected by plugin", "pod", klog.KObj(pod), "plugin", pl.Name(), "status", status.Message())
-				status.SetFailedPlugin(pl.Name())
-				return status
+				logger.V(4).Info("Plugin rejected", "pod", klog.KObj(pod), "plugin", pl.Name(), "status", status.Message())
+				return status.WithFailedPlugin(pl.Name())
 			}
 			err := status.AsError()
 			logger.Error(err, "Plugin failed", "plugin", pl.Name(), "pod", klog.KObj(pod))
@@ -1345,7 +1355,7 @@ func (f *frameworkImpl) RunPermitPlugins(ctx context.Context, state *framework.C
 		status, timeout := f.runPermitPlugin(ctx, pl, state, pod, nodeName)
 		if !status.IsSuccess() {
 			if status.IsUnschedulable() {
-				logger.V(4).Info("Pod rejected by plugin", "pod", klog.KObj(pod), "plugin", pl.Name(), "status", status.Message())
+				logger.V(4).Info("Plugin rejected", "pod", klog.KObj(pod), "plugin", pl.Name(), "status", status.Message())
 				return status.WithFailedPlugin(pl.Name())
 			}
 			if status.IsWait() {
@@ -1358,7 +1368,7 @@ func (f *frameworkImpl) RunPermitPlugins(ctx context.Context, state *framework.C
 			} else {
 				err := status.AsError()
 				logger.Error(err, "Plugin failed", "plugin", pl.Name(), "pod", klog.KObj(pod))
-				return framework.AsStatus(fmt.Errorf("running Permit plugin %q: %w", pl.Name(), err)).WithFailedPlugin(pl.Name())
+				return framework.AsStatus(fmt.Errorf("running Permit plugin %q: %w", pl.Name(), err))
 			}
 		}
 	}
