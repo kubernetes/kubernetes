@@ -196,6 +196,27 @@ func makeBasePod() *v1.Pod {
 }
 
 func dataItems2JSONFile(dataItems DataItems, namePrefix string) error {
+	// perfdash expects all data items to have the same set of labels.  It
+	// then renders drop-down buttons for each label with all values found
+	// for each label. If we were to store data items that don't have a
+	// certain label, then perfdash will never show those data items
+	// because it will only show data items that have the currently
+	// selected label value. To avoid that, we collect all labels used
+	// anywhere and then add missing labels with "not applicable" as value.
+	labels := sets.New[string]()
+	for _, item := range dataItems.DataItems {
+		for label := range item.Labels {
+			labels.Insert(label)
+		}
+	}
+	for _, item := range dataItems.DataItems {
+		for label := range labels {
+			if _, ok := item.Labels[label]; !ok {
+				item.Labels[label] = "not applicable"
+			}
+		}
+	}
+
 	b, err := json.Marshal(dataItems)
 	if err != nil {
 		return err

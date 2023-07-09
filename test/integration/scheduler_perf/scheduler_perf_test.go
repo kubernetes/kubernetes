@@ -996,7 +996,10 @@ func runWorkload(ctx context.Context, tb testing.TB, tc *testCase, w *workload, 
 			if concreteOp.CollectMetrics {
 				collectorCtx, collectorCancel = context.WithCancel(ctx)
 				defer collectorCancel()
-				collectors = getTestDataCollectors(tb, podInformer, fmt.Sprintf("%s/%s", tb.Name(), namespace), namespace, tc.MetricsCollectorConfig, throughputErrorMargin)
+				name := tb.Name()
+				// The first part is the same for each work load, therefore we can strip it.
+				name = name[strings.Index(name, "/")+1:]
+				collectors = getTestDataCollectors(tb, podInformer, fmt.Sprintf("%s/%s", name, namespace), namespace, tc.MetricsCollectorConfig, throughputErrorMargin)
 				for _, collector := range collectors {
 					// Need loop-local variable for function below.
 					collector := collector
