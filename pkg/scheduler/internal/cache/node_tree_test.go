@@ -17,8 +17,9 @@ limitations under the License.
 package cache
 
 import (
-	"reflect"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -142,8 +143,8 @@ func verifyNodeTree(t *testing.T, nt *nodeTree, expectedTree map[string][]string
 	if numNodes := nt.numNodes; numNodes != expectedNumNodes {
 		t.Errorf("unexpected nodeTree.numNodes. Expected: %v, Got: %v", expectedNumNodes, numNodes)
 	}
-	if !reflect.DeepEqual(nt.tree, expectedTree) {
-		t.Errorf("The node tree is not the same as expected. Expected: %v, Got: %v", expectedTree, nt.tree)
+	if diff := cmp.Diff(expectedTree, nt.tree); diff != "" {
+		t.Errorf("Unexpected node tree (-want, +got):\n%s", diff)
 	}
 	if len(nt.zones) != len(expectedTree) {
 		t.Errorf("Number of zones in nodeTree.zones is not expected. Expected: %v, Got: %v", len(expectedTree), len(nt.zones))
@@ -395,8 +396,8 @@ func TestNodeTree_List(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !reflect.DeepEqual(output, test.expectedOutput) {
-				t.Errorf("unexpected output. Expected: %v, Got: %v", test.expectedOutput, output)
+			if diff := cmp.Diff(test.expectedOutput, output); diff != "" {
+				t.Errorf("Unexpected output (-want, +got):\n%s", diff)
 			}
 		})
 	}
@@ -487,8 +488,8 @@ func TestNodeTreeMultiOperations(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !reflect.DeepEqual(output, test.expectedOutput) {
-				t.Errorf("unexpected output. Expected: %v, Got: %v", test.expectedOutput, output)
+			if diff := cmp.Diff(test.expectedOutput, output); diff != "" {
+				t.Errorf("Unexpected output (-want, +got):\n%s", diff)
 			}
 		})
 	}
