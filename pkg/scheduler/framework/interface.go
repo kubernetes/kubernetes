@@ -176,15 +176,10 @@ func (s *Status) Message() string {
 	return strings.Join(s.Reasons(), ", ")
 }
 
-// SetFailedPlugin sets the given plugin name to s.failedPlugin.
-func (s *Status) SetFailedPlugin(plugin string) {
-	s.failedPlugin = plugin
-}
-
 // WithFailedPlugin sets the given plugin name to s.failedPlugin,
 // and returns the given status object.
 func (s *Status) WithFailedPlugin(plugin string) *Status {
-	s.SetFailedPlugin(plugin)
+	s.failedPlugin = plugin
 	return s
 }
 
