@@ -1673,13 +1673,18 @@ func printValidatingAdmissionPolicyBinding(obj *admissionregistration.Validating
 		Object: runtime.RawExtension{Object: obj},
 	}
 	paramName := "<unset>"
-	if obj.Spec.ParamRef != nil {
-		if obj.Spec.ParamRef.Namespace != "" {
-			paramName = obj.Spec.ParamRef.Namespace + "/" + obj.Spec.ParamRef.Name
-		} else {
-			paramName = obj.Spec.ParamRef.Name
+	if pr := obj.Spec.ParamRef; pr != nil {
+		if len(pr.Name) > 0 {
+			if pr.Namespace != "" {
+				paramName = pr.Namespace + "/" + pr.Name
+			} else {
+				// Can't tell from here if param is cluster-scoped, so all
+				// params without names get * namespace
+				paramName = "*/" + pr.Name
+			}
+		} else if pr.Selector != nil {
+			paramName = pr.Selector.String()
 		}
-
 	}
 	row.Cells = append(row.Cells, obj.Name, obj.Spec.PolicyName, paramName, translateTimestampSince(obj.CreationTimestamp))
 	return []metav1.TableRow{row}, nil
