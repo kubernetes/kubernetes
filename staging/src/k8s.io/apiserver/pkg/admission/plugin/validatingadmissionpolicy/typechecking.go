@@ -208,7 +208,7 @@ func (c *TypeChecker) checkExpression(expression string, hasParams bool, types t
 // the result is sorted in the order of Group, Version, and Kind
 func (c *TypeChecker) typesToCheck(p *v1alpha1.ValidatingAdmissionPolicy) []schema.GroupVersionKind {
 	gvks := sets.New[schema.GroupVersionKind]()
-	if p.Spec.MatchConstraints == nil || len(p.Spec.MatchConstraints.ResourceRules) == 0 {
+	if len(p.Spec.MatchConstraints.ResourceRules) == 0 {
 		return nil
 	}
 

@@ -732,14 +732,11 @@ func validateValidatingAdmissionPolicySpec(meta metav1.ObjectMeta, spec *admissi
 		opts.allowParamsInMatchConditions = true
 		allErrors = append(allErrors, validateParamKind(*spec.ParamKind, fldPath.Child("paramKind"))...)
 	}
-	if spec.MatchConstraints == nil {
-		allErrors = append(allErrors, field.Required(fldPath.Child("matchConstraints"), ""))
-	} else {
-		allErrors = append(allErrors, validateMatchResources(spec.MatchConstraints, fldPath.Child("matchConstraints"))...)
-		// at least one resourceRule must be defined to provide type information
-		if len(spec.MatchConstraints.ResourceRules) == 0 {
-			allErrors = append(allErrors, field.Required(fldPath.Child("matchConstraints", "resourceRules"), ""))
-		}
+
+	allErrors = append(allErrors, validateMatchResources(&spec.MatchConstraints, fldPath.Child("matchConstraints"))...)
+	// at least one resourceRule must be defined to provide type information
+	if len(spec.MatchConstraints.ResourceRules) == 0 {
+		allErrors = append(allErrors, field.Required(fldPath.Child("matchConstraints", "resourceRules"), ""))
 	}
 	if !opts.ignoreMatchConditions {
 		allErrors = append(allErrors, validateMatchConditions(spec.MatchConditions, opts, fldPath.Child("matchConditions"))...)

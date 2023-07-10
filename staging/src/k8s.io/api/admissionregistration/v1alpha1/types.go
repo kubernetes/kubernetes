@@ -159,7 +159,7 @@ type ValidatingAdmissionPolicySpec struct {
 	// However, in order to prevent clusters from being put into an unstable state that cannot be recovered from via the API
 	// ValidatingAdmissionPolicy cannot match ValidatingAdmissionPolicy and ValidatingAdmissionPolicyBinding.
 	// Required.
-	MatchConstraints *MatchResources `json:"matchConstraints,omitempty" protobuf:"bytes,2,rep,name=matchConstraints"`
+	MatchConstraints MatchResources `json:"matchConstraints,omitempty" protobuf:"bytes,2,rep,name=matchConstraints"`
 
 	// Validations contain CEL expressions which is used to apply the validation.
 	// Validations and AuditAnnotations may not both be empty; a minimum of one Validations or AuditAnnotations is

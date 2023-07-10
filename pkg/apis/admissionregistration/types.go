@@ -209,7 +209,7 @@ type ValidatingAdmissionPolicySpec struct {
 	// However, in order to prevent clusters from being put into an unstable state that cannot be recovered from via the API
 	// ValidatingAdmissionPolicy cannot match ValidatingAdmissionPolicy and ValidatingAdmissionPolicyBinding.
 	// Required.
-	MatchConstraints *MatchResources
+	MatchConstraints MatchResources
 
 	// validations contain CEL expressions which are used to validate admission requests.
 	// validations and auditAnnotations may not both be empty; a minimum of one validations or auditAnnotations is
