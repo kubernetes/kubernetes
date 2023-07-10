@@ -544,8 +544,10 @@ func ValidateMixedArguments(flag *pflag.FlagSet) error {
 
 	mixedInvalidFlags := []string{}
 	flag.Visit(func(f *pflag.Flag) {
+		// "--skip-*" flags or other allowed flags can be set with --config
 		if isAllowedFlag(f.Name) {
-			// "--skip-*" flags or other allowed flags can be set with --config
+			// If there is any overlapping between the flag and config file, the flag will take precedence over the config file, e.g. IgnorePreflightErrors.
+			klog.Warningf("both the flag %s and config file are set", f.Name)
 			return
 		}
 		mixedInvalidFlags = append(mixedInvalidFlags, f.Name)
