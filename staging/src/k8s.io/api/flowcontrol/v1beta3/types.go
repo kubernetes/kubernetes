@@ -77,7 +77,9 @@ const (
 	//   is a boolean false or has an invalid boolean representation
 	//   (if the cluster operator sets it to 'false' it will be stomped)
 	// - any changes to the spec made by the cluster operator will be
-	//   stomped.
+	//   stomped, except for changes to the `nominalConcurrencyShares`
+	//   and `lendablePercent` fields of the PriorityLevelConfiguration
+	//   named "exempt".
 	//
 	// The kube-apiserver will apply updates on the suggested configuration if:
 	// - the cluster operator has enabled auto-update by setting the annotation
@@ -531,7 +533,7 @@ type ExemptPriorityLevelConfiguration struct {
 	// at the expense of every other priority level.
 	// This field has a default value of zero.
 	// +optional
-	NominalConcurrencyShares int32 `json:"nominalConcurrencyShares" protobuf:"varint,1,opt,name=nominalConcurrencyShares"`
+	NominalConcurrencyShares *int32 `json:"nominalConcurrencyShares,omitempty" protobuf:"varint,1,opt,name=nominalConcurrencyShares"`
 	// `lendablePercent` prescribes the fraction of the level's NominalCL that
 	// can be borrowed by other priority levels.  This value of this
 	// field must be between 0 and 100, inclusive, and it defaults to 0.

@@ -40,6 +40,17 @@ func SetDefaults_FlowSchemaSpec(spec *v1beta3.FlowSchemaSpec) {
 	}
 }
 
+func SetDefaults_ExemptPriorityLevelConfiguration(eplc *v1beta3.ExemptPriorityLevelConfiguration) {
+	if eplc.NominalConcurrencyShares == nil {
+		eplc.NominalConcurrencyShares = new(int32)
+		*eplc.NominalConcurrencyShares = 0
+	}
+	if eplc.LendablePercent == nil {
+		eplc.LendablePercent = new(int32)
+		*eplc.LendablePercent = 0
+	}
+}
+
 func SetDefaults_LimitedPriorityLevelConfiguration(lplc *v1beta3.LimitedPriorityLevelConfiguration) {
 	if lplc.NominalConcurrencyShares == 0 {
 		lplc.NominalConcurrencyShares = PriorityLevelConfigurationDefaultNominalConcurrencyShares

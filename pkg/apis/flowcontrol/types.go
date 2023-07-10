@@ -475,7 +475,7 @@ type ExemptPriorityLevelConfiguration struct {
 	// at the expense of every other priority level.
 	// This field has a default value of zero.
 	// +optional
-	NominalConcurrencyShares int32
+	NominalConcurrencyShares *int32
 	// `lendablePercent` prescribes the fraction of the level's NominalCL that
 	// can be borrowed by other priority levels.  This value of this
 	// field must be between 0 and 100, inclusive, and it defaults to 0.
