@@ -316,6 +316,25 @@ func TestGenerateDebugContainer(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "sysadmin profile",
+			opts: &DebugOptions{
+				Image:      "busybox",
+				PullPolicy: corev1.PullIfNotPresent,
+				Profile:    ProfileSysadmin,
+			},
+			expected: &corev1.EphemeralContainer{
+				EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+					Name:                     "debugger-1",
+					Image:                    "busybox",
+					ImagePullPolicy:          corev1.PullIfNotPresent,
+					TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+					SecurityContext: &corev1.SecurityContext{
+						Privileged: pointer.Bool(true),
+					},
+				},
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.opts.IOStreams = genericiooptions.NewTestIOStreamsDiscard()
