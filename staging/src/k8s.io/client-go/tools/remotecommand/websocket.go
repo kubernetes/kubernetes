@@ -18,6 +18,7 @@ package remotecommand
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -166,6 +167,16 @@ func (e *wsStreamExecutor) StreamWithContext(ctx context.Context, options Stream
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+}
+
+// IsUpgradeFailure returns true if the passed error is (or wrapped error contains)
+// the UpgradeFailureError.
+func IsUpgradeFailure(err error) bool {
+	if err == nil {
+		return false
+	}
+	var upgradeErr *websocket.UpgradeFailureError
+	return errors.As(err, &upgradeErr)
 }
 
 type wsStreamCreator struct {

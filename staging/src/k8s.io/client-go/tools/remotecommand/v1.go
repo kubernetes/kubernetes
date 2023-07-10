@@ -56,7 +56,6 @@ func (p *streamProtocolV1) stream(conn streamCreator) error {
 		defer klog.V(6).Infof("Done copying %s", s)
 		if _, err := io.Copy(dst, src); err != nil && err != io.EOF {
 			klog.Errorf("Error copying %s: %v", s, err)
-			errorChan <- err
 		}
 		if s == v1.StreamTypeStdout || s == v1.StreamTypeStderr {
 			doneChan <- struct{}{}

@@ -28,6 +28,7 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -108,10 +109,8 @@ func (rt *RoundTripper) RoundTrip(request *http.Request) (retResp *http.Response
 	}
 	wsConn, resp, err := dialer.DialContext(request.Context(), request.URL.String(), request.Header)
 	if err != nil {
-		if err != gwebsocket.ErrBadHandshake {
-			return nil, err
-		}
-		return nil, fmt.Errorf("unable to upgrade connection: %v", err)
+		klog.V(4).Infof("error creating websocket client: %v", err)
+		return nil, &UpgradeFailureError{Cause: err}
 	}
 
 	rt.Conn = wsConn
@@ -155,7 +154,7 @@ func Negotiate(rt http.RoundTripper, connectionInfo ConnectionHolder, req *http.
 	req.Header[httpstream.HeaderProtocolVersion] = protocols
 	resp, err := rt.RoundTrip(req)
 	if err != nil {
-		return nil, fmt.Errorf("error sending request: %v", err)
+		return nil, err
 	}
 	err = resp.Body.Close()
 	if err != nil {
@@ -163,4 +162,14 @@ func Negotiate(rt http.RoundTripper, connectionInfo ConnectionHolder, req *http.
 		return nil, fmt.Errorf("error closing response body: %v", err)
 	}
 	return connectionInfo.Connection(), nil
+}
+
+// UpgradeFailureError encapsulates the cause for why the websocket
+// upgrade request failed. Implements error interface.
+type UpgradeFailureError struct {
+	Cause error
+}
+
+func (u *UpgradeFailureError) Error() string {
+	return fmt.Sprintf("unable to upgrade websocket request: %s", u.Cause)
 }

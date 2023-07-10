@@ -21,6 +21,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -36,7 +37,6 @@ import (
 	"time"
 
 	gwebsocket "github.com/gorilla/websocket"
-
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,6 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/client-go/transport/websocket"
 )
 
 // TestWebSocketClient_LoopbackStdinToStdout returns random data sent on the STDIN channel
@@ -542,10 +543,10 @@ func TestWebSocketClient_TextMessageTypeError(t *testing.T) {
 	}
 }
 
-// TestWebSocketClient_EmptyMessageHandled tests that the error of a completely empty message
+// TestWebSocketClient_MissingStreamIdHandled tests that the error of a completely empty message
 // is handled correctly. If the message is completely empty, the initial read of the stream id
 // should fail (followed by cleanup).
-func TestWebSocketClient_EmptyMessageHandled(t *testing.T) {
+func TestWebSocketClient_MissingStreamIdHandled(t *testing.T) {
 	var upgrader = gwebsocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
 			return true // Accepting all requests
@@ -600,8 +601,6 @@ func TestWebSocketClient_EmptyMessageHandled(t *testing.T) {
 		if remotecommand.StreamProtocolV5Name != streamExec.negotiated {
 			t.Fatalf("expected remote command v5 protocol, got (%s)", streamExec.negotiated)
 		}
-=======
->>>>>>> 904e8f6ebde (WebSocket Client and V5 RemoteCommand Subprotocol)
 	}
 }
 
@@ -616,6 +615,43 @@ func TestWebSocketClient_ExecutorErrors(t *testing.T) {
 		t.Errorf("expecting executor constructor error, but received none.")
 	} else if !strings.Contains(err.Error(), "error creating websocket transports") {
 		t.Errorf("expecting error creating transports, got (%s)", err.Error())
+	}
+}
+
+func TestIsUpgradeFailureError(t *testing.T) {
+	testCases := map[string]struct {
+		err      error
+		expected bool
+	}{
+		"nil error should not fallback": {
+			err:      nil,
+			expected: false,
+		},
+		"Non-upgrade error should not fallback": {
+			err:      fmt.Errorf("this is not an upgrade error"),
+			expected: false,
+		},
+		"UpgradeFailure error should fallback": {
+			err:      &websocket.UpgradeFailureError{},
+			expected: true,
+		},
+		"Wrapped Non-UpgradeFailure error should not fallback": {
+			err:      fmt.Errorf("%s: %w", "first error", errors.New("Non-upgrade error")),
+			expected: false,
+		},
+		"Wrapped UpgradeFailure error should fallback": {
+			err:      fmt.Errorf("%s: %w", "first error", &websocket.UpgradeFailureError{}),
+			expected: true,
+		},
+	}
+
+	for name, test := range testCases {
+		t.Run(name, func(t *testing.T) {
+			actual := IsUpgradeFailure(test.err)
+			if test.expected != actual {
+				t.Errorf("expected upgrade failure %t, got %t", test.expected, actual)
+			}
+		})
 	}
 }
 
@@ -854,4 +890,15 @@ func createWebSocketStreams(req *http.Request, w http.ResponseWriter, opts *opti
 	wsStreams.writeStatus = v4WriteStatusFunc(streams[remotecommand.StreamErr])
 
 	return wsStreams, nil
+}
+
+func v4WriteStatusFunc(stream io.Writer) func(status *apierrors.StatusError) error {
+	return func(status *apierrors.StatusError) error {
+		bs, err := json.Marshal(status.Status())
+		if err != nil {
+			return err
+		}
+		_, err = stream.Write(bs)
+		return err
+	}
 }

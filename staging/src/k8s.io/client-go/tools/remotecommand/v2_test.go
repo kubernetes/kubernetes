@@ -52,8 +52,6 @@ func (f *fakeStreamCreator) CreateStream(headers http.Header) (httpstream.Stream
 	return nil, f.errors[streamType]
 }
 
-func (f *fakeStreamCreator) Run() {}
-
 func TestV2CreateStreams(t *testing.T) {
 	tests := []struct {
 		name        string

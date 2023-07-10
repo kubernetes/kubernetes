@@ -157,9 +157,21 @@ type DefaultRemoteAttach struct{}
 
 // Attach executes attach to a running container
 func (*DefaultRemoteAttach) Attach(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue remotecommand.TerminalSizeQueue) error {
+	// Legacy SPDY executor is default. If feature gate enabled, fallback
+	// executor attempts websockets first--then SPDY.
 	exec, err := remotecommand.NewSPDYExecutor(config, method, url)
 	if err != nil {
 		return err
+	}
+	if cmdutil.RemoteCommandWebsockets.IsEnabled() {
+		websocketExec, err := remotecommand.NewWebSocketExecutor(config, method, url.String())
+		if err != nil {
+			return err
+		}
+		exec, err = remotecommand.NewFallbackExecutor(websocketExec, exec, remotecommand.IsUpgradeFailure)
+		if err != nil {
+			return err
+		}
 	}
 	return exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
 		Stdin:             stdin,

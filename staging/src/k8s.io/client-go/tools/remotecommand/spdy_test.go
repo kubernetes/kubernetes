@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"encoding/json"
 	"errors"
 	"io"
 	"io/ioutil"
@@ -31,29 +30,14 @@ import (
 	"testing"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/httpstream"
-	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
-	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
+	rctesting "k8s.io/client-go/tools/remotecommand/testing"
 )
 
 type AttachFunc func(in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan TerminalSize) error
-type streamContext struct {
-	conn         io.Closer
-	stdinStream  io.ReadCloser
-	stdoutStream io.WriteCloser
-	stderrStream io.WriteCloser
-	writeStatus  func(status *apierrors.StatusError) error
-}
-
-type streamAndReply struct {
-	httpstream.Stream
-	replySent <-chan struct{}
-}
 
 type fakeEmptyDataPty struct {
 }
@@ -183,20 +167,34 @@ func TestSPDYExecutorStream(t *testing.T) {
 	}
 }
 
+func convertStreamOptions(options *StreamOptions) rctesting.Options {
+	testOptions := rctesting.Options{}
+	if options.Stdin != nil {
+		testOptions.Stdin = true
+	}
+	if options.Stdout != nil {
+		testOptions.Stdout = true
+	}
+	if options.Stderr != nil {
+		testOptions.Stderr = true
+	}
+	return testOptions
+}
+
 func newTestHTTPServer(f AttachFunc, options *StreamOptions) *httptest.Server {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		ctx, err := createHTTPStreams(writer, request, options)
+		ctx, err := rctesting.CreateHTTPStreams(writer, request, convertStreamOptions(options))
 		if err != nil {
 			return
 		}
-		defer ctx.conn.Close()
+		defer ctx.Conn.Close()
 
 		// handle input output
-		err = f(ctx.stdinStream, ctx.stdoutStream, ctx.stderrStream, false, nil)
+		err = f(ctx.StdinStream, ctx.StdoutStream, ctx.StderrStream, false, nil)
 		if err != nil {
-			ctx.writeStatus(apierrors.NewInternalError(err))
+			ctx.WriteStatus(apierrors.NewInternalError(err))
 		} else {
-			ctx.writeStatus(&apierrors.StatusError{ErrStatus: metav1.Status{
+			ctx.WriteStatus(&apierrors.StatusError{ErrStatus: metav1.Status{
 				Status: metav1.StatusSuccess,
 			}})
 		}
@@ -220,81 +218,6 @@ func attach2Server(ctx context.Context, rawURL string, options StreamOptions) er
 		return err
 	case <-time.After(wait.ForeverTestTimeout):
 		return errors.New("execute timeout")
-	}
-}
-
-// simplify createHttpStreams , only support StreamProtocolV4Name
-func createHTTPStreams(w http.ResponseWriter, req *http.Request, opts *StreamOptions) (*streamContext, error) {
-	_, err := httpstream.Handshake(req, w, []string{remotecommandconsts.StreamProtocolV4Name})
-	if err != nil {
-		return nil, err
-	}
-
-	upgrader := spdy.NewResponseUpgrader()
-	streamCh := make(chan streamAndReply)
-	conn := upgrader.UpgradeResponse(w, req, func(stream httpstream.Stream, replySent <-chan struct{}) error {
-		streamCh <- streamAndReply{Stream: stream, replySent: replySent}
-		return nil
-	})
-	ctx := &streamContext{
-		conn: conn,
-	}
-
-	// wait for stream
-	replyChan := make(chan struct{}, 4)
-	defer close(replyChan)
-	receivedStreams := 0
-	expectedStreams := 1
-	if opts.Stdout != nil {
-		expectedStreams++
-	}
-	if opts.Stdin != nil {
-		expectedStreams++
-	}
-	if opts.Stderr != nil {
-		expectedStreams++
-	}
-WaitForStreams:
-	for {
-		select {
-		case stream := <-streamCh:
-			streamType := stream.Headers().Get(v1.StreamType)
-			switch streamType {
-			case v1.StreamTypeError:
-				replyChan <- struct{}{}
-				ctx.writeStatus = v4WriteStatusFunc(stream)
-			case v1.StreamTypeStdout:
-				replyChan <- struct{}{}
-				ctx.stdoutStream = stream
-			case v1.StreamTypeStdin:
-				replyChan <- struct{}{}
-				ctx.stdinStream = stream
-			case v1.StreamTypeStderr:
-				replyChan <- struct{}{}
-				ctx.stderrStream = stream
-			default:
-				// add other stream ...
-				return nil, errors.New("unimplemented stream type")
-			}
-		case <-replyChan:
-			receivedStreams++
-			if receivedStreams == expectedStreams {
-				break WaitForStreams
-			}
-		}
-	}
-
-	return ctx, nil
-}
-
-func v4WriteStatusFunc(stream io.Writer) func(status *apierrors.StatusError) error {
-	return func(status *apierrors.StatusError) error {
-		bs, err := json.Marshal(status.Status())
-		if err != nil {
-			return err
-		}
-		_, err = stream.Write(bs)
-		return err
 	}
 }
 
@@ -352,7 +275,7 @@ func TestStreamExitsAfterConnectionIsClosed(t *testing.T) {
 
 	errorChan := make(chan error)
 	go func() {
-		errorChan <- streamer.stream(spdyStreamCreator{Connection: conn})
+		errorChan <- streamer.stream(conn)
 	}()
 
 	// Wait until stream goroutine starts.
@@ -371,18 +294,17 @@ func TestStreamExitsAfterConnectionIsClosed(t *testing.T) {
 
 func TestStreamRandomData(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		var stdin, stdout bytes.Buffer
-		ctx, err := createHTTPStreams(w, req, &StreamOptions{
-			Stdin:  &stdin,
-			Stdout: &stdout,
+		ctx, err := rctesting.CreateHTTPStreams(w, req, rctesting.Options{
+			Stdin:  true,
+			Stdout: true,
 		})
 		if err != nil {
 			t.Errorf("error on createHTTPStreams: %v", err)
 			return
 		}
-		defer ctx.conn.Close()
+		defer ctx.Conn.Close()
 
-		io.Copy(ctx.stdoutStream, ctx.stdinStream)
+		io.Copy(ctx.StdoutStream, ctx.StdinStream)
 	}))
 
 	defer server.Close()
