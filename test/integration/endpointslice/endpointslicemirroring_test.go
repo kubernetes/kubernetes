@@ -509,6 +509,8 @@ func TestEndpointSliceMirroringSelectorTransition(t *testing.T) {
 
 	// Start informer and controllers
 	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	informers.Start(ctx.Done())
 	go epsmController.Run(ctx, 1)
 
