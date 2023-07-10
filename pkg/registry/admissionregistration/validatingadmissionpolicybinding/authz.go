@@ -85,26 +85,31 @@ func (v *validatingAdmissionPolicyBindingStrategy) authorize(ctx context.Context
 		}
 	}
 
-	paramRef := binding.Spec.ParamRef
+	if paramRef := binding.Spec.ParamRef; paramRef.ParamKind == admissionregistration.BindingParamKindClusterWide && paramRef.ClusterWide != nil {
+		globalParamRef := paramRef.ClusterWide
 
-	// require that the user can read (verb "get") the referred resource.
-	attrs := authorizer.AttributesRecord{
-		User:            user,
-		Verb:            "get",
-		ResourceRequest: true,
-		Name:            paramRef.Name,
-		Namespace:       paramRef.Namespace,
-		APIGroup:        apiGroup,
-		APIVersion:      apiVersion,
-		Resource:        resource,
-	}
+		//!TODO: can't perform static check on the namespaceParamRef
+		// should we copy this to the admission controller?
+		//
+		// require that the user can read (verb "get") the referred resource.
+		attrs := authorizer.AttributesRecord{
+			User:            user,
+			Verb:            "get",
+			ResourceRequest: true,
+			Name:            globalParamRef.Name,
+			Namespace:       globalParamRef.Namespace,
+			APIGroup:        apiGroup,
+			APIVersion:      apiVersion,
+			Resource:        resource,
+		}
 
-	d, _, err := v.authorizer.Authorize(ctx, attrs)
-	if err != nil {
-		return err
-	}
-	if d != authorizer.DecisionAllow {
-		return fmt.Errorf(`user %v does not have "get" permission on the object referenced by paramRef`, user)
+		d, _, err := v.authorizer.Authorize(ctx, attrs)
+		if err != nil {
+			return err
+		}
+		if d != authorizer.DecisionAllow {
+			return fmt.Errorf(`user %v does not have "get" permission on the object referenced by paramRef`, user)
+		}
 	}
 	return nil
 }

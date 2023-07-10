@@ -98,5 +98,23 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				obj.MatchPolicy = &m
 			}
 		},
+		func(obj *admissionregistration.BindingParamRef, c fuzz.Continue) {
+			if c.RandBool() {
+				obj.ParamKind = admissionregistration.BindingParamKindClusterWide
+				obj.ClusterWide = &admissionregistration.ClusterWideParamRef{}
+				c.Fuzz(obj.ClusterWide)
+			} else {
+				obj.ParamKind = admissionregistration.BindingParamKindPerNamespace
+				obj.PerNamespace = &admissionregistration.NamespaceParamRef{}
+				c.Fuzz(obj.PerNamespace)
+			}
+		},
+		func(obj *admissionregistration.NamespaceParamRef, c fuzz.Continue) {
+			c.FuzzNoCustom(obj)
+			if obj.ParameterNotFoundAction == nil {
+				a := admissionregistration.AllowAction
+				obj.ParameterNotFoundAction = &a
+			}
+		},
 	}
 }

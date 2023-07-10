@@ -39,6 +39,18 @@ const (
 	AllScopes ScopeType = v1.AllScopes
 )
 
+// ParameterNotFoundActionType specifies a failure policy that defines how a binding
+// is evaluated when the param referred by its namespaceParamRef is not found.
+// +enum
+type ParameterNotFoundActionType string
+
+const (
+	// Ignore means that an error finding params for a binding is ignored
+	AllowAction ParameterNotFoundActionType = "Allow"
+	// Fail means that an error finding params for a binding is ignored
+	DenyAction ParameterNotFoundActionType = "Deny"
+)
+
 // FailurePolicyType specifies a failure policy that defines how unrecognized errors from the admission endpoint are handled.
 // +enum
 type FailurePolicyType string
@@ -419,6 +431,59 @@ type ValidatingAdmissionPolicyBindingSpec struct {
 	// Required.
 	// +listType=set
 	ValidationActions []ValidationAction `json:"validationActions,omitempty" protobuf:"bytes,4,rep,name=validationActions"`
+
+	// NamespaceParamRef specifies the parameter resource or resources used to
+	// configure the admission control policy. It should point to a resources of
+	// the type specified in ParamKind of the bound ValidatingAdmissionPolicy.
+	//
+	// If the policy specifies a ParamKind and the resource referred to by
+	// ParamRef does not exist, this binding is considered mis-configured and
+	// the FailurePolicy of the ValidatingAdmissionPolicy is applied.
+	//
+	// if the paramKind of the policy referred to by `policyName` is cluster scoped,
+	// and namespaceParamRef set, the binding is considered mis-configured, and
+	// the failureMode applies.
+	//
+	// `namespaceParamRef` and `paramRef` are members of a union; if one of the
+	// fields is set, the other must be unset.
+	// +optional
+	NamespaceParamRef *NamespaceParamRef `json:"namespaceParamRef,omitempty" protobuf:"bytes,5,opt,name=namespaceParamRef"`
+}
+
+// NamespaceParamRef references a parameter resource scoped to the same
+// namespace as the resource being evaluated by a policy.
+type NamespaceParamRef struct {
+	// Name is the name of the namespace-scoped param to evaluate against.
+	// When evaluating the admission of a resource request, a param with the
+	// given name will be found in the same namespace as the resource and used
+	// as the `param` input to the policy's rules.
+	//
+	// Exactly one of `name` or `selector` must be specified, but not both.
+	//
+	// +optional
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+
+	// Selector can be used to match param resources based on its metadata.
+	// If multiple objects are found to match, the policy will be evaluated
+	// against ALL of them and the result will be ANDed together.
+	// If no objects match the selector, then the `failAction` applies.
+	//
+	// Exactly one of `name` or `selector` must be specified, but not both.
+	//
+	// +optional
+	Selector *metav1.LabelSelector `json:"selector" protobuf:"bytes,2,opt,name=selector"`
+
+	// ParameterNotFoundAction controls the behavior of the binding when the resource
+	// exists, and name or selector is valid, but there are no parameters
+	// matched by the binding. If the value is set to `Allow`, then no
+	// matched parameters will be treated as successful validation by the binding.
+	// If set to `Deny`, then no matched parameters will be subject to the
+	// `failurePolicy` of the policy.
+	//
+	// Allowed values are `Allow` or `Deny`
+	// Default to `Allow`
+	// +optional
+	ParameterNotFoundAction *ParameterNotFoundActionType `json:"parameterNotFoundAction" protobuf:"bytes,3,opt,name=parameterNotFoundAction,casttype=ParameterNotFoundActionType"`
 }
 
 // ParamRef references a parameter resource

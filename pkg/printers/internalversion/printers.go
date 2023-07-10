@@ -1647,10 +1647,21 @@ func printValidatingAdmissionPolicyBinding(obj *admissionregistration.Validating
 	}
 	paramName := "<unset>"
 	if obj.Spec.ParamRef != nil {
-		if obj.Spec.ParamRef.Namespace != "" {
-			paramName = obj.Spec.ParamRef.Namespace + "/" + obj.Spec.ParamRef.Name
-		} else {
-			paramName = obj.Spec.ParamRef.Name
+		if obj.Spec.ParamRef.ParamKind == admissionregistration.BindingParamKindClusterWide {
+			if obj.Spec.ParamRef.ClusterWide.Namespace != "" {
+				paramName = obj.Spec.ParamRef.ClusterWide.Namespace + "/" + obj.Spec.ParamRef.ClusterWide.Name
+			} else {
+				paramName = obj.Spec.ParamRef.ClusterWide.Name
+			}
+		} else if obj.Spec.ParamRef.ParamKind == admissionregistration.BindingParamKindPerNamespace {
+			var params []string
+			if obj.Spec.ParamRef.PerNamespace.Name != "" {
+				params = append(params, "*/"+obj.Spec.ParamRef.PerNamespace.Name)
+			} else {
+				params = append(params, obj.Spec.ParamRef.PerNamespace.Selector.String())
+			}
+
+			paramName = strings.Join(params, ", ")
 		}
 
 	}

@@ -1086,14 +1086,76 @@ func validateValidatingAdmissionPolicyBindingSpec(spec *admissionregistration.Va
 			allErrors = append(allErrors, field.Invalid(fldPath.Child("policyName"), spec.PolicyName, msg))
 		}
 	}
-	allErrors = append(allErrors, validateParamRef(spec.ParamRef, fldPath.Child("paramRef"))...)
+	allErrors = append(allErrors, validateBindingParamRef(spec.ParamRef, fldPath.Child("paramRef"))...)
 	allErrors = append(allErrors, validateMatchResources(spec.MatchResources, fldPath.Child("matchResouces"))...)
 	allErrors = append(allErrors, validateValidationActions(spec.ValidationActions, fldPath.Child("validationActions"))...)
 
 	return allErrors
 }
 
-func validateParamRef(pr *admissionregistration.ParamRef, fldPath *field.Path) field.ErrorList {
+func validateBindingParamRef(pr *admissionregistration.BindingParamRef, fldPath *field.Path) field.ErrorList {
+	var allErrors field.ErrorList
+	if pr == nil {
+		return allErrors
+	}
+
+	switch pr.ParamKind {
+	case "":
+		allErrors = append(allErrors, field.Required(fldPath.Child("kind"), ""))
+	case admissionregistration.BindingParamKindClusterWide:
+		if pr.ClusterWide == nil {
+			allErrors = append(allErrors, field.Required(fldPath.Child("clusterWide"), fmt.Sprintf("required if Kind is `%s`", admissionregistration.BindingParamKindClusterWide)))
+		} else {
+			allErrors = append(allErrors, validateClusterWideParamRef(pr.ClusterWide, fldPath.Child("clusterWide"))...)
+		}
+
+		if pr.PerNamespace != nil {
+			allErrors = append(allErrors, field.Forbidden(fldPath.Child("perNamespace"), fmt.Sprintf("must be unset when `kind` is `%s`", admissionregistration.BindingParamKindClusterWide)))
+		}
+	case admissionregistration.BindingParamKindPerNamespace:
+		if pr.PerNamespace == nil {
+			allErrors = append(allErrors, field.Required(fldPath.Child("perNamespace"), fmt.Sprintf("required if Kind is `%s`", admissionregistration.BindingParamKindPerNamespace)))
+		} else {
+			allErrors = append(allErrors, validateNamespaceParamRef(pr.PerNamespace, fldPath.Child("perNamespace"))...)
+		}
+
+		if pr.ClusterWide != nil {
+			allErrors = append(allErrors, field.Forbidden(fldPath.Child("clusterWide"), fmt.Sprintf("must be unset when `kind` is `%s`", admissionregistration.BindingParamKindPerNamespace)))
+		}
+	default:
+		allErrors = append(allErrors, field.NotSupported(fldPath.Child("kind"), pr.ParamKind, []string{string(admissionregistration.BindingParamKindClusterWide), string(admissionregistration.BindingParamKindPerNamespace)}))
+	}
+
+	return allErrors
+}
+
+func validateNamespaceParamRef(npr *admissionregistration.NamespaceParamRef, fldPath *field.Path) field.ErrorList {
+	var allErrors field.ErrorList
+	if npr == nil {
+		return allErrors
+	}
+
+	if len(npr.Name) > 0 {
+		for _, msg := range path.ValidatePathSegmentName(npr.Name, false) {
+			allErrors = append(allErrors, field.Invalid(fldPath.Child("name"), npr.Name, msg))
+		}
+	}
+
+	if npr.Selector != nil {
+		labelSelectorValidationOpts := metav1validation.LabelSelectorValidationOptions{}
+		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(npr.Selector, labelSelectorValidationOpts, fldPath.Child("selector"))...)
+	}
+
+	if npr.ParameterNotFoundAction != nil {
+		if *npr.ParameterNotFoundAction != admissionregistration.DenyAction && *npr.ParameterNotFoundAction != admissionregistration.AllowAction {
+			allErrors = append(allErrors, field.NotSupported(fldPath.Child("failAction"), *npr.ParameterNotFoundAction, []string{string(admissionregistration.DenyAction), string(admissionregistration.AllowAction)}))
+		}
+	}
+
+	return allErrors
+}
+
+func validateClusterWideParamRef(pr *admissionregistration.ClusterWideParamRef, fldPath *field.Path) field.ErrorList {
 	var allErrors field.ErrorList
 	if pr == nil {
 		return allErrors

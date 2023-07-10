@@ -76,6 +76,17 @@ const (
 	AllScopes ScopeType = "*"
 )
 
+// ParameterNotFoundActionType specifies a failure policy that defines how a binding
+// is evaluated when the param referred by its namespaceParamRef is not found.
+type ParameterNotFoundActionType string
+
+const (
+	// Ignore means that an error finding params for a binding is ignored
+	AllowAction ParameterNotFoundActionType = "Allow"
+	// Fail means that an error finding params for a binding is ignored
+	DenyAction ParameterNotFoundActionType = "Deny"
+)
+
 // FailurePolicyType specifies the type of failure policy
 type FailurePolicyType string
 
@@ -406,9 +417,9 @@ type ValidatingAdmissionPolicyBindingSpec struct {
 
 	// ParamRef specifies the parameter resource used to configure the admission control policy.
 	// It should point to a resource of the type specified in ParamKind of the bound ValidatingAdmissionPolicy.
-	// If the policy specifies a ParamKind and the resource referred to by ParamRef does not exist, this binding is considered mis-configured and the FailurePolicy of the ValidatingAdmissionPolicy applied.
+	// This field is ignored if the ParamKind if the policy is not set.
 	// +optional
-	ParamRef *ParamRef
+	ParamRef *BindingParamRef
 
 	// MatchResources declares what resources match this binding and will be validated by it.
 	// Note that this is intersected with the policy's matchConstraints, so only requests that are matched by the policy can be selected by this.
@@ -460,8 +471,102 @@ type ValidatingAdmissionPolicyBindingSpec struct {
 	ValidationActions []ValidationAction
 }
 
-// ParamRef references a parameter resource
-type ParamRef struct {
+// BindingParamRef describes how to locate the param used as input to the a
+// expression of rule applied by a policy binding.
+// +union
+type BindingParamRef struct {
+	// ParamKind indicates which one of the other fields is non-empty.
+	// Required
+	// +unionDiscriminator
+	ParamKind BindingParamKind
+
+	// ClusterWide specifies the parameter resource used to configure the
+	// admission control policy used for cluster-scoped and all namespace-scoped requests.
+	//
+	// If the policy specifies a ParamKind and the the resource referred to by ParamRef does not exist, this binding is
+	// considered mis-configured and the FailurePolicy of the
+	// ValidatingAdmissionPolicy applied.
+	//
+	// `PerNamespace` and `ClusterWide` are members of a union; if one of the
+	// fields is set, the other must be unset.
+	//
+	// +optional
+	ClusterWide *ClusterWideParamRef
+
+	// PerNamespace specifies the parameter resource or resources used to
+	// configure the admission control policy. It should point to a resources of
+	// the type specified in ParamKind of the bound ValidatingAdmissionPolicy.
+	//
+	// If the policy specifies a ParamKind and the resource referred to by
+	// ParamRef does not exist, this binding is considered mis-configured and
+	// the FailurePolicy of the ValidatingAdmissionPolicy is applied.
+	//
+	// if the paramKind of the policy referred to by `policyName` is cluster scoped,
+	// and namespaceParamRef set, the binding is considered mis-configured, and
+	// the failureMode applies.
+	//
+	// `PerNamespace` and `ClusterWide` are members of a union; if one of the
+	// fields is set, the other must be unset.
+	//
+	// +optional
+	PerNamespace *NamespaceParamRef
+}
+
+// BindingParamKind is the kind of ValidatingAdmissionPolicyBinding.
+// +enum
+type BindingParamKind string
+
+// Supported binding param kinds.
+const (
+	BindingParamKindClusterWide  BindingParamKind = "ClusterWide"
+	BindingParamKindPerNamespace BindingParamKind = "PerNamespace"
+)
+
+// NamespaceParamRef references parameters resource scoped to the same
+// namespace as the resource being evaluated by a policy. The parameters
+// must all be of the kind specified in the policy's `paramKind` field.
+//
+// If multiple objects are found to match, the policy will be evaluated
+// against ALL of them and the result will be ANDed together.
+//
+// If no objects match the selector, then the `failAction` applies.
+//
+// If all fields (other than `failAction`) are empty, then the policy will be
+// evaluated against ALL resources of the policy's `paramKind` in the request's
+// namespace.
+//
+// +structType=atomic
+type NamespaceParamRef struct {
+	// Name is the name of the namespace-scoped param to evaluate against.
+	// When evaluating the admission of a resource request, a param with the
+	// given name will be found in the same namespace as the resource and used
+	// as the `param` input to the policy's rules.
+	//
+	// +optional
+	Name string
+
+	// Selector can be used to match multiple param objects in the namespace
+	// based on metadata.
+	//
+	// +optional
+	Selector *metav1.LabelSelector
+
+	// ParameterNotFoundAction controls the behavior of the binding when the resource
+	// exists, and name or selector is valid, but there are no parameters
+	// matched by the binding. If the value is set to `Allow`, then no
+	// matched parameters will be treated as successful validation by the binding.
+	// If set to `Deny`, then no matched parameters will be subject to the
+	// `failurePolicy` of the policy.
+	//
+	// Allowed values are `Allow` or `Deny`
+	// Default to `Allow`
+	// +optional
+	ParameterNotFoundAction *ParameterNotFoundActionType
+}
+
+// ClusterWideParamRef references a parameter resource to be used as input
+// to all resource requests.
+type ClusterWideParamRef struct {
 	// Name of the resource being referenced.
 	Name string
 	// Namespace of the referenced resource.
