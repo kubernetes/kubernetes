@@ -41,12 +41,20 @@ var _ = SIGDescribe("OOMKiller [LinuxOnly] [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("oomkiller-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
-	testCases := []testCase{{
-		name:                   "single process container",
-		oomTargetContainerName: "oomkill-single-target-container",
-		podSpec: getOOMTargetPod("oomkill-target-pod", "oomkill-single-target-container",
-			getOOMTargetContainer),
-	}}
+	testCases := []testCase{
+		{
+			name:                   "single process container",
+			oomTargetContainerName: "oomkill-single-target-container",
+			podSpec: getOOMTargetPod("oomkill-target-pod", "oomkill-single-target-container",
+				getOOMTargetContainer),
+		},
+		{
+			name:                   "init container",
+			oomTargetContainerName: "oomkill-target-init-container",
+			podSpec: getInitContainerOOMTargetPod("initcontinar-oomkill-target-pod", "oomkill-target-init-container",
+				getOOMTargetContainer),
+		},
+	}
 
 	// If using cgroup v2, we set memory.oom.group=1 for the container cgroup so that any process which gets OOM killed
 	// in the process, causes all processes in the container to get OOM killed
@@ -113,6 +121,26 @@ func getOOMTargetPod(podName string, ctnName string, createContainer func(name s
 			RestartPolicy: v1.RestartPolicyNever,
 			Containers: []v1.Container{
 				createContainer(ctnName),
+			},
+		},
+	}
+}
+
+func getInitContainerOOMTargetPod(podName string, ctnName string, createContainer func(name string) v1.Container) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: podName,
+		},
+		Spec: v1.PodSpec{
+			RestartPolicy: v1.RestartPolicyNever,
+			InitContainers: []v1.Container{
+				createContainer(ctnName),
+			},
+			Containers: []v1.Container{
+				{
+					Name:  "busybox",
+					Image: busyboxImage,
+				},
 			},
 		},
 	}

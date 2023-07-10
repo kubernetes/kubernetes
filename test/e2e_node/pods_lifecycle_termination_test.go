@@ -109,13 +109,13 @@ func getSigkillTargetPod(podName string, ctnName string) *v1.Pod {
 					Image: busyboxImage,
 					// In the main container, SIGTERM was trapped and later /tmp/healthy
 					// will be created for readiness probe to verify if the trap was
-					// excucuted successfully
+					// executed successfully
 					Command: []string{
 						"sh",
 						"-c",
 						"trap \"echo SIGTERM caught\" SIGTERM SIGINT; touch /tmp/healthy; sleep 1000",
 					},
-					// Using readinessprobe to guarantee signal handler registering finished
+					// Using readiness probe to guarantee signal handler registering finished
 					ReadinessProbe: &v1.Probe{
 						InitialDelaySeconds: 1,
 						TimeoutSeconds:      2,
