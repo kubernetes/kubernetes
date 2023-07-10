@@ -32,6 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 )
 
+const WebSocketProtocolHeader = "Sec-Websocket-Protocol"
+
 // The Websocket subprotocol "channel.k8s.io" prepends each binary message with a byte indicating
 // the channel number (zero indexed) the message was sent on. Messages in both directions should
 // prefix their messages with this channel byte. When used for remote execution, the channel numbers
@@ -90,6 +92,19 @@ func IsWebSocketRequest(req *http.Request) bool {
 		return false
 	}
 	return connectionUpgradeRegex.MatchString(strings.ToLower(req.Header.Get("Connection")))
+}
+
+// IsWebSocketRequestedProtocol returns true if the passed streaming protocol is one
+// of the requested protocols for websocket upgrade in the passed http request; false otherwise.
+func IsWebSocketRequestedProtocol(req *http.Request, protocol string) bool {
+	protocol = strings.TrimSpace(strings.ToLower(protocol))
+	for _, requestedProtocol := range req.Header[WebSocketProtocolHeader] {
+		requestedProtocol = strings.TrimSpace(strings.ToLower(requestedProtocol))
+		if protocol == requestedProtocol {
+			return true
+		}
+	}
+	return false
 }
 
 // IgnoreReceives reads from a WebSocket until it is closed, then returns. If timeout is set, the
@@ -179,11 +194,7 @@ func (conn *Conn) Open(w http.ResponseWriter, req *http.Request) (string, []io.R
 	go func() {
 		defer runtime.HandleCrash()
 		defer conn.Close()
-		handler := conn.handle
-		if _, ok := conn.protocols[remotecommand.StreamProtocolV5Name]; ok {
-			handler = conn.handleV5
-		}
-		websocket.Server{Handshake: conn.handshake, Handler: handler}.ServeHTTP(w, req)
+		websocket.Server{Handshake: conn.handshake, Handler: conn.handle}.ServeHTTP(w, req)
 	}()
 	<-conn.ready
 	rwc := make([]io.ReadWriteCloser, len(conn.channels))

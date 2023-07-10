@@ -120,9 +120,17 @@ type RemoteExecutor interface {
 type DefaultRemoteExecutor struct{}
 
 func (*DefaultRemoteExecutor) Execute(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue remotecommand.TerminalSizeQueue) error {
+	// Legacy SPDY executor is default. If feature gate enabled, fallback
+	// executor attempts websockets first--then SPDY.
 	exec, err := remotecommand.NewSPDYExecutor(config, method, url)
 	if err != nil {
 		return err
+	}
+	if cmdutil.RemoteCommandWebsockets.IsEnabled() {
+		exec, err = remotecommand.NewFallbackExecutor(config, method, url)
+		if err != nil {
+			return err
+		}
 	}
 	return exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
 		Stdin:             stdin,

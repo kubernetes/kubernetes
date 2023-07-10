@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2023 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,12 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package remotecommand
-
-import apimachinery "k8s.io/apimachinery/pkg/util/remotecommand"
-
-// TODO: move all imports of these types to use the new package.
-// Deprecated: Use types in "k8s.io/apimachinery/pkg/util/remotecommand" instead.
-type TerminalSize = apimachinery.TerminalSize
-
-type TerminalSizeQueue = apimachinery.TerminalSizeQueue
+// This temporary package replicates SPDY client functionality for use in the
+// StreamTranslator proxy in the parent "proxy" package. This isolated
+// functionality is necessary to transition Kubernetes bi-directional streaming
+// protocol from SPDY to the more modern WebSockets. This effort is described
+// in the following KEP:
+//
+//	https://github.com/kubernetes/enhancements/issues/4006
+//
+// This package should not be imported anywhere except the parent "proxy" package.
+package spdy

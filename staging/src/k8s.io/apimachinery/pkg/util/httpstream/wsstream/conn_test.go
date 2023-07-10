@@ -26,6 +26,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/net/websocket"
 )
 
@@ -270,5 +272,92 @@ func TestVersionedConn(t *testing.T) {
 				t.Fatalf("test %d: unexpected protocol version: got=%s expected=%s", i, got, expected)
 			}
 		}()
+	}
+}
+
+func TestIsRequestedProtocol(t *testing.T) {
+	tests := map[string]struct {
+		requestedProtocols []string
+		protocol           string
+		expected           bool
+	}{
+		"no requested protocols means protocol not found": {
+			requestedProtocols: []string{},
+			protocol:           "v5.channel.k8s.io",
+			expected:           false,
+		},
+		"no protocol means protocol not found": {
+			requestedProtocols: []string{"v5.channel.k8s.io"},
+			protocol:           "",
+			expected:           false,
+		},
+		"simple requested protocol not found": {
+			requestedProtocols: []string{"v5.channel.k8s.io"},
+			protocol:           "v4.channel.k8s.io",
+			expected:           false,
+		},
+		"simple requested protocol found": {
+			requestedProtocols: []string{"v5.channel.k8s.io"},
+			protocol:           "v5.channel.k8s.io",
+			expected:           true,
+		},
+		"requested protocol and protocol both have uppercase and spaces--still found": {
+			requestedProtocols: []string{"  v5.channel.K8S.io"},
+			protocol:           "v5.channel.k8s.IO  ",
+			expected:           true,
+		},
+		"protocol is one of multiple requested protocols": {
+			requestedProtocols: []string{"v4.channel.k8s.io", "foo", "v5.channel.k8s.io", "bar"},
+			protocol:           "v5.channel.k8s.io",
+			expected:           true,
+		},
+		"protocol is not one of multiple requested protocols": {
+			requestedProtocols: []string{"v4.channel.k8s.io", "foo", "bar"},
+			protocol:           "v5.channel.k8s.io",
+			expected:           false,
+		},
+	}
+
+	for _, test := range tests {
+		req, err := http.NewRequest("GET", "http://www.example.com/", nil)
+		require.NoError(t, err)
+		for _, p := range test.requestedProtocols {
+			req.Header.Add(WebSocketProtocolHeader, p)
+		}
+		actual := IsWebSocketRequestedProtocol(req, test.protocol)
+		assert.Equal(t, test.expected, actual)
+	}
+}
+
+func TestProtocolSupportsStreamClose(t *testing.T) {
+	tests := map[string]struct {
+		protocol string
+		expected bool
+	}{
+		"empty protocol returns false": {
+			protocol: "",
+			expected: false,
+		},
+		"not binary protocol returns false": {
+			protocol: "base64.channel.k8s.io",
+			expected: false,
+		},
+		"V1 protocol returns false": {
+			protocol: "channel.k8s.io",
+			expected: false,
+		},
+		"V4 protocol returns false": {
+			protocol: "v4.channel.k8s.io",
+			expected: false,
+		},
+		"V5 protocol returns true": {
+			protocol: "v5.channel.k8s.io",
+			expected: true,
+		},
+	}
+
+	for _, test := range tests {
+		actual := protocolSupportsStreamClose(test.protocol)
+		assert.Equal(t, test.expected, actual)
 	}
 }

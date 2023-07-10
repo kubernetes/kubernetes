@@ -25,8 +25,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
+	"k8s.io/apiserver/pkg/features"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/kubelet/client"
@@ -113,7 +115,24 @@ func (r *AttachREST) Connect(ctx context.Context, name string, opts runtime.Obje
 	if err != nil {
 		return nil, err
 	}
-	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder), nil
+	handler := proxy.NewUpgradeAwareHandler(location, transport, false, true, proxy.NewErrorResponder(responder))
+	handler.MaxBytesPerSec = capabilities.Get().PerConnectionBandwidthLimitBytesPerSec
+	if utilfeature.DefaultFeatureGate.Enabled(features.ClientRemoteCommandWebsockets) {
+		// Wrap the upgrade aware handler to implement stream translation
+		// for WebSocket/V5 upgrade requests.
+		streamOptions := proxy.Options{
+			Stdin:  attachOpts.Stdin,
+			Stdout: attachOpts.Stdout,
+			Stderr: attachOpts.Stderr,
+			Tty:    attachOpts.TTY,
+		}
+		if err := proxy.ValidateOptions(streamOptions); err != nil {
+			return nil, err
+		}
+		translator := proxy.NewStreamTranslatorHandler(location, transport, proxy.NewErrorResponder(responder), streamOptions)
+		return proxy.NewTranslatingHandler(handler, translator), nil
+	}
+	return handler, nil
 }
 
 // NewConnectOptions returns the versioned object that represents exec parameters
@@ -156,7 +175,24 @@ func (r *ExecREST) Connect(ctx context.Context, name string, opts runtime.Object
 	if err != nil {
 		return nil, err
 	}
-	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder), nil
+	handler := proxy.NewUpgradeAwareHandler(location, transport, false, true, proxy.NewErrorResponder(responder))
+	handler.MaxBytesPerSec = capabilities.Get().PerConnectionBandwidthLimitBytesPerSec
+	if utilfeature.DefaultFeatureGate.Enabled(features.ClientRemoteCommandWebsockets) {
+		// Wrap the upgrade aware handler to implement stream translation
+		// for WebSocket/V5 upgrade requests.
+		streamOptions := proxy.Options{
+			Stdin:  execOpts.Stdin,
+			Stdout: execOpts.Stdout,
+			Stderr: execOpts.Stderr,
+			Tty:    execOpts.TTY,
+		}
+		if err := proxy.ValidateOptions(streamOptions); err != nil {
+			return nil, err
+		}
+		translator := proxy.NewStreamTranslatorHandler(location, transport, proxy.NewErrorResponder(responder), streamOptions)
+		return proxy.NewTranslatingHandler(handler, translator), nil
+	}
+	return handler, nil
 }
 
 // NewConnectOptions returns the versioned object that represents exec parameters
@@ -213,7 +249,7 @@ func (r *PortForwardREST) Connect(ctx context.Context, name string, opts runtime
 	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder), nil
 }
 
-func newThrottledUpgradeAwareProxyHandler(location *url.URL, transport http.RoundTripper, wrapTransport, upgradeRequired bool, responder rest.Responder) *proxy.UpgradeAwareHandler {
+func newThrottledUpgradeAwareProxyHandler(location *url.URL, transport http.RoundTripper, wrapTransport, upgradeRequired bool, responder rest.Responder) http.Handler {
 	handler := proxy.NewUpgradeAwareHandler(location, transport, wrapTransport, upgradeRequired, proxy.NewErrorResponder(responder))
 	handler.MaxBytesPerSec = capabilities.Get().PerConnectionBandwidthLimitBytesPerSec
 	return handler

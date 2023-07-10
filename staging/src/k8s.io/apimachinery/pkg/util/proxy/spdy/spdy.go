@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package remotecommand
+package spdy
 
 import (
 	"context"
@@ -24,14 +24,12 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/remotecommand"
-	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/transport/spdy"
 	"k8s.io/klog/v2"
 )
 
 // spdyStreamExecutor handles transporting standard shell streams over an httpstream connection.
 type spdyStreamExecutor struct {
-	upgrader  spdy.Upgrader
+	upgrader  Upgrader
 	transport http.RoundTripper
 
 	method    string
@@ -39,33 +37,22 @@ type spdyStreamExecutor struct {
 	protocols []string
 }
 
-// NewSPDYExecutor connects to the provided server and upgrades the connection to
-// multiplexed bidirectional streams.
-func NewSPDYExecutor(config *restclient.Config, method string, url *url.URL) (Executor, error) {
-	wrapper, upgradeRoundTripper, err := spdy.RoundTripperFor(config)
-	if err != nil {
-		return nil, err
-	}
-	return NewSPDYExecutorForTransports(wrapper, upgradeRoundTripper, method, url)
-}
-
 // NewSPDYExecutorForTransports connects to the provided server using the given transport,
 // upgrades the response using the given upgrader to multiplexed bidirectional streams.
-func NewSPDYExecutorForTransports(transport http.RoundTripper, upgrader spdy.Upgrader, method string, url *url.URL) (Executor, error) {
+func NewSPDYExecutorForTransports(transport http.RoundTripper, upgrader Upgrader, method string, url *url.URL) (Executor, error) {
 	return NewSPDYExecutorForProtocols(
 		transport, upgrader, method, url,
 		remotecommand.StreamProtocolV5Name,
 		remotecommand.StreamProtocolV4Name,
 		remotecommand.StreamProtocolV3Name,
 		remotecommand.StreamProtocolV2Name,
-		remotecommand.StreamProtocolV1Name,
 	)
 }
 
 // NewSPDYExecutorForProtocols connects to the provided server and upgrades the connection to
 // multiplexed bidirectional streams using only the provided protocols. Exposed for testing, most
 // callers should use NewSPDYExecutor or NewSPDYExecutorForTransports.
-func NewSPDYExecutorForProtocols(transport http.RoundTripper, upgrader spdy.Upgrader, method string, url *url.URL, protocols ...string) (Executor, error) {
+func NewSPDYExecutorForProtocols(transport http.RoundTripper, upgrader Upgrader, method string, url *url.URL, protocols ...string) (Executor, error) {
 	return &spdyStreamExecutor{
 		upgrader:  upgrader,
 		transport: transport,
@@ -88,7 +75,7 @@ func (e *spdyStreamExecutor) newConnectionAndStream(ctx context.Context, options
 		return nil, nil, fmt.Errorf("error creating request: %v", err)
 	}
 
-	conn, protocol, err := spdy.Negotiate(
+	conn, protocol, err := Negotiate(
 		e.upgrader,
 		&http.Client{Transport: e.transport},
 		req,
@@ -107,13 +94,11 @@ func (e *spdyStreamExecutor) newConnectionAndStream(ctx context.Context, options
 		streamer = newStreamProtocolV4(options)
 	case remotecommand.StreamProtocolV3Name:
 		streamer = newStreamProtocolV3(options)
-	case remotecommand.StreamProtocolV2Name:
-		streamer = newStreamProtocolV2(options)
 	case "":
 		klog.V(4).Infof("The server did not negotiate a streaming protocol version. Falling back to %s", remotecommand.StreamProtocolV1Name)
 		fallthrough
-	case remotecommand.StreamProtocolV1Name:
-		streamer = newStreamProtocolV1(options)
+	case remotecommand.StreamProtocolV2Name:
+		streamer = newStreamProtocolV2(options)
 	}
 
 	return conn, streamer, nil

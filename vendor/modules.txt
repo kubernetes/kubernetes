@@ -1399,6 +1399,7 @@ k8s.io/apimachinery/pkg/util/naming
 k8s.io/apimachinery/pkg/util/net
 k8s.io/apimachinery/pkg/util/net/testing
 k8s.io/apimachinery/pkg/util/proxy
+k8s.io/apimachinery/pkg/util/proxy/spdy
 k8s.io/apimachinery/pkg/util/rand
 k8s.io/apimachinery/pkg/util/remotecommand
 k8s.io/apimachinery/pkg/util/runtime

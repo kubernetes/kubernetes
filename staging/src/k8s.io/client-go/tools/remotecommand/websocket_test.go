@@ -36,7 +36,9 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	"k8s.io/apimachinery/pkg/util/httpstream/wsstream"
+	"k8s.io/apimachinery/pkg/util/proxy"
 	"k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
@@ -387,6 +389,164 @@ func TestWebSocketClient_BadHandshake(t *testing.T) {
 		if !strings.Contains(err.Error(), "bad handshake") {
 			t.Errorf("expected bad handshake error, got (%s)", err)
 		}
+	}
+}
+
+// TestWebSocketStreamTranslator_LoopbackStdinToStdout implements a "fuzz" test by sending random
+// data through the WebSocket client to the StreamTranslator proxy on the STDIN stream, returning
+// the data on the STDOUT stream. Verifies the WebSocket streams are correctly forwarded to the
+// SPDY client within the StreamTranslator proxy.
+func TestWebSocketStreamTranslator_LoopbackStdinToStdout(t *testing.T) {
+	// Final upstream server is SPDY server. This server only copies the STDIN to the STDOUT, so
+	// the same data sent upstream on STDIN, will be returned on STDOUT.
+	spdyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		var stdin, stdout bytes.Buffer
+		ctx, err := createHTTPStreams(w, req, &StreamOptions{
+			Stdin:  &stdin,
+			Stdout: &stdout,
+		})
+		if err != nil {
+			t.Errorf("error on createHTTPStreams: %v", err)
+			return
+		}
+		defer ctx.conn.Close()
+
+		io.Copy(ctx.stdoutStream, ctx.stdinStream)
+	}))
+	defer spdyServer.Close()
+
+	// Parse a URL to the SPDY server. Used as target of the StreamTranslator proxy.
+	spdyLocation, err := url.Parse(spdyServer.URL)
+	if err != nil {
+		t.Fatalf("Unable to parse SPDY server URL: %s", spdyServer.URL)
+	}
+	spdyRoundTripper := spdy.NewRoundTripper(nil)
+	// Create the StreamTranslator proxy pointing upstream to the SPDY server, and have
+	// it handle requests of the "proxyServer". NOTE: nil ErrorResponder not needed.
+	proxy := proxy.NewStreamTranslatorHandler(spdyLocation, spdyRoundTripper, nil, proxy.Options{Stdin: true, Stdout: true})
+	proxyServer := httptest.NewServer(proxy)
+	proxyUri, err := url.Parse(proxyServer.URL)
+	if err != nil {
+		t.Fatalf("Unable to parse proxy server URL: %s", proxyServer.URL)
+	}
+	// Now create the WebSocket client (executor), and point it to the "proxyServer".
+	exec, err := NewWebSocketExecutor(&rest.Config{Host: proxyUri.Host}, "POST", proxyServer.URL)
+	if err != nil {
+		t.Errorf("unexpected error creating websocket executor: %v", err)
+	}
+	// Generate random data, and set it up to stream on STDIN. The data will be
+	// returned on the STDOUT buffer.
+	randomData := make([]byte, 1024*1024)
+	if _, err := rand.Read(randomData); err != nil {
+		t.Errorf("unexpected error reading random data: %v", err)
+	}
+	var stdout bytes.Buffer
+	options := &StreamOptions{
+		Stdin:  bytes.NewReader(randomData),
+		Stdout: &stdout,
+	}
+	errorChan := make(chan error)
+	go func() {
+		// Start the streaming on the WebSocket "exec" client.
+		errorChan <- exec.StreamWithContext(context.Background(), *options)
+	}()
+
+	select {
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatalf("expect stream to be closed after connection is closed.")
+	case err := <-errorChan:
+		if err != nil {
+			t.Errorf("unexpected error")
+		}
+	}
+	data, err := ioutil.ReadAll(bytes.NewReader(stdout.Bytes()))
+	if err != nil {
+		t.Errorf("error reading the stream: %v", err)
+		return
+	}
+	// Check the data sent on STDIN was the same returned on STDOUT.
+	if !bytes.Equal(randomData, data) {
+		t.Errorf("unexpected data received: %d sent: %d", len(data), len(randomData))
+	}
+
+}
+
+// TestWebSocketStreamTranslator_LoopbackStdinToStdout implements a "fuzz" test by sending random
+// data through the WebSocket client to the StreamTranslator proxy on the STDIN stream, returning
+// the data on the STDERR stream. Verifies the WebSocket streams are correctly forwarded to the
+// SPDY client within the StreamTranslator proxy.
+func TestWebSocketStreamTranslator_LoopbackStdinToStderr(t *testing.T) {
+	// Final upstream server is SPDY server. This server only copies the STDIN to the STDERR, so
+	// the same data sent upstream on STDIN, will be returned on STDERR.
+	spdyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		var stdin, stderr bytes.Buffer
+		ctx, err := createHTTPStreams(w, req, &StreamOptions{
+			Stdin:  &stdin,
+			Stderr: &stderr,
+		})
+		if err != nil {
+			t.Errorf("error on createHTTPStreams: %v", err)
+			return
+		}
+		defer ctx.conn.Close()
+
+		io.Copy(ctx.stderrStream, ctx.stdinStream)
+	}))
+	defer spdyServer.Close()
+
+	// Parse a URL to the SPDY server. Used as target of the StreamTranslator proxy.
+	spdyLocation, err := url.Parse(spdyServer.URL)
+	if err != nil {
+		t.Fatalf("Unable to parse SPDY server URL: %s", spdyServer.URL)
+	}
+	spdyRoundTripper := spdy.NewRoundTripper(nil)
+	// Create the StreamTranslator proxy pointing upstream to the SPDY server, and have
+	// it handle requests of the "proxyServer". NOTE: nil ErrorResponder not needed.
+	proxy := proxy.NewStreamTranslatorHandler(spdyLocation, spdyRoundTripper, nil, proxy.Options{Stdin: true, Stderr: true})
+	proxyServer := httptest.NewServer(proxy)
+	proxyUri, err := url.Parse(proxyServer.URL)
+	if err != nil {
+		t.Fatalf("Unable to parse proxy server URL: %s", proxyServer.URL)
+	}
+	// Now create the WebSocket client (executor), and point it to the "proxyServer".
+	// Must add STDIN and STDERR query params for the WebSocket client request.
+	exec, err := NewWebSocketExecutor(&rest.Config{Host: proxyUri.Host}, "POST", proxyServer.URL)
+	if err != nil {
+		t.Errorf("unexpected error creating websocket executor: %v", err)
+	}
+	// Generate random data, and set it up to stream on STDIN. The data will be
+	// returned on the STDERR buffer.
+	randomData := make([]byte, 1024*1024)
+	if _, err := rand.Read(randomData); err != nil {
+		t.Errorf("unexpected error reading random data: %v", err)
+	}
+	var stderr bytes.Buffer
+	options := &StreamOptions{
+		Stdin:  bytes.NewReader(randomData),
+		Stderr: &stderr,
+	}
+	errorChan := make(chan error)
+	go func() {
+		// Start the streaming on the WebSocket "exec" client.
+		errorChan <- exec.StreamWithContext(context.Background(), *options)
+	}()
+
+	select {
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatalf("expect stream to be closed after connection is closed.")
+	case err := <-errorChan:
+		if err != nil {
+			t.Errorf("unexpected error")
+		}
+	}
+	data, err := ioutil.ReadAll(bytes.NewReader(stderr.Bytes()))
+	if err != nil {
+		t.Errorf("error reading the stream: %v", err)
+		return
+	}
+	// Check the data sent on STDIN was the same returned on STDERR.
+	if !bytes.Equal(randomData, data) {
+		t.Errorf("unexpected data received: %d sent: %d", len(data), len(randomData))
 	}
 }
 

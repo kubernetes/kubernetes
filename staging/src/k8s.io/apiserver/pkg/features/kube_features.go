@@ -88,6 +88,14 @@ const (
 	// Add support for distributed tracing in the API Server
 	APIServerTracing featuregate.Feature = "APIServerTracing"
 
+	// owner: @seans3
+	// kep: http://kep.k8s.io/4006
+	// alpha: v1.28
+	//
+	// Enables StreamTranslator proxy to handle WebSockets RemoteCommand/V5
+	// upgrade requests.
+	ClientRemoteCommandWebsockets featuregate.Feature = "ClientRemoteCommandWebsockets"
+
 	// owner: @cici37 @jpbetz
 	// kep: http://kep.k8s.io/3488
 	// alpha: v1.26
@@ -240,6 +248,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	APIServerIdentity: {Default: true, PreRelease: featuregate.Beta},
 
 	APIServerTracing: {Default: true, PreRelease: featuregate.Beta},
+
+	ClientRemoteCommandWebsockets: {Default: false, PreRelease: featuregate.Alpha},
 
 	ValidatingAdmissionPolicy: {Default: false, PreRelease: featuregate.Alpha},
 
