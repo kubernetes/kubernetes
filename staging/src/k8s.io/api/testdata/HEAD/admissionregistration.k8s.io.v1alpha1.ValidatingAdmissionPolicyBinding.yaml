@@ -75,6 +75,17 @@ spec:
       resources:
       - resourcesValue
       scope: scopeValue
+  namespaceParamRef:
+    name: nameValue
+    parameterNotFoundAction: parameterNotFoundActionValue
+    selector:
+      matchExpressions:
+      - key: keyValue
+        operator: operatorValue
+        values:
+        - valuesValue
+      matchLabels:
+        matchLabelsKey: matchLabelsValue
   paramRef:
     name: nameValue
     namespace: namespaceValue

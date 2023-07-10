@@ -347,6 +347,19 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
     elementRelationship: atomic
+- name: io.k8s.api.admissionregistration.v1alpha1.NamespaceParamRef
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: parameterNotFoundAction
+      type:
+        scalar: string
+    - name: selector
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
 - name: io.k8s.api.admissionregistration.v1alpha1.ParamKind
   map:
     fields:
@@ -420,6 +433,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: matchResources
       type:
         namedType: io.k8s.api.admissionregistration.v1alpha1.MatchResources
+    - name: namespaceParamRef
+      type:
+        namedType: io.k8s.api.admissionregistration.v1alpha1.NamespaceParamRef
     - name: paramRef
       type:
         namedType: io.k8s.api.admissionregistration.v1alpha1.ParamRef
@@ -455,6 +471,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: matchConstraints
       type:
         namedType: io.k8s.api.admissionregistration.v1alpha1.MatchResources
+      default: {}
     - name: paramKind
       type:
         namedType: io.k8s.api.admissionregistration.v1alpha1.ParamKind

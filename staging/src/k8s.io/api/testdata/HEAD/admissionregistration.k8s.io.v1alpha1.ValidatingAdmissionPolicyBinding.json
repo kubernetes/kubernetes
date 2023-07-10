@@ -122,6 +122,24 @@
     },
     "validationActions": [
       "validationActionsValue"
-    ]
+    ],
+    "namespaceParamRef": {
+      "name": "nameValue",
+      "selector": {
+        "matchLabels": {
+          "matchLabelsKey": "matchLabelsValue"
+        },
+        "matchExpressions": [
+          {
+            "key": "keyValue",
+            "operator": "operatorValue",
+            "values": [
+              "valuesValue"
+            ]
+          }
+        ]
+      },
+      "parameterNotFoundAction": "parameterNotFoundActionValue"
+    }
   }
 }

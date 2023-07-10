@@ -153,6 +153,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &admissionregistrationv1alpha1.MatchResourcesApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("NamedRuleWithOperations"):
 		return &admissionregistrationv1alpha1.NamedRuleWithOperationsApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("NamespaceParamRef"):
+		return &admissionregistrationv1alpha1.NamespaceParamRefApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ParamKind"):
 		return &admissionregistrationv1alpha1.ParamKindApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ParamRef"):

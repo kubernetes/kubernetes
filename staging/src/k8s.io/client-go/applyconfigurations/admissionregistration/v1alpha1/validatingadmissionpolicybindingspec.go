@@ -29,6 +29,7 @@ type ValidatingAdmissionPolicyBindingSpecApplyConfiguration struct {
 	ParamRef          *ParamRefApplyConfiguration                      `json:"paramRef,omitempty"`
 	MatchResources    *MatchResourcesApplyConfiguration                `json:"matchResources,omitempty"`
 	ValidationActions []admissionregistrationv1alpha1.ValidationAction `json:"validationActions,omitempty"`
+	NamespaceParamRef *NamespaceParamRefApplyConfiguration             `json:"namespaceParamRef,omitempty"`
 }
 
 // ValidatingAdmissionPolicyBindingSpecApplyConfiguration constructs an declarative configuration of the ValidatingAdmissionPolicyBindingSpec type for use with
@@ -68,5 +69,13 @@ func (b *ValidatingAdmissionPolicyBindingSpecApplyConfiguration) WithValidationA
 	for i := range values {
 		b.ValidationActions = append(b.ValidationActions, values[i])
 	}
+	return b
+}
+
+// WithNamespaceParamRef sets the NamespaceParamRef field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the NamespaceParamRef field is set to the value of the last call.
+func (b *ValidatingAdmissionPolicyBindingSpecApplyConfiguration) WithNamespaceParamRef(value *NamespaceParamRefApplyConfiguration) *ValidatingAdmissionPolicyBindingSpecApplyConfiguration {
+	b.NamespaceParamRef = value
 	return b
 }

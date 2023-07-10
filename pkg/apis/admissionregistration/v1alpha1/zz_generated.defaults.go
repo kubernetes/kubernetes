@@ -48,16 +48,14 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 
 func SetObjectDefaults_ValidatingAdmissionPolicy(in *v1alpha1.ValidatingAdmissionPolicy) {
 	SetDefaults_ValidatingAdmissionPolicySpec(&in.Spec)
-	if in.Spec.MatchConstraints != nil {
-		SetDefaults_MatchResources(in.Spec.MatchConstraints)
-		for i := range in.Spec.MatchConstraints.ResourceRules {
-			a := &in.Spec.MatchConstraints.ResourceRules[i]
-			v1.SetDefaults_Rule(&a.RuleWithOperations.Rule)
-		}
-		for i := range in.Spec.MatchConstraints.ExcludeResourceRules {
-			a := &in.Spec.MatchConstraints.ExcludeResourceRules[i]
-			v1.SetDefaults_Rule(&a.RuleWithOperations.Rule)
-		}
+	SetDefaults_MatchResources(&in.Spec.MatchConstraints)
+	for i := range in.Spec.MatchConstraints.ResourceRules {
+		a := &in.Spec.MatchConstraints.ResourceRules[i]
+		v1.SetDefaults_Rule(&a.RuleWithOperations.Rule)
+	}
+	for i := range in.Spec.MatchConstraints.ExcludeResourceRules {
+		a := &in.Spec.MatchConstraints.ExcludeResourceRules[i]
+		v1.SetDefaults_Rule(&a.RuleWithOperations.Rule)
 	}
 }
 
