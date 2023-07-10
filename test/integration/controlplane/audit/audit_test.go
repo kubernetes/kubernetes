@@ -480,7 +480,7 @@ func getExpectedEvents(level auditinternal.Level, enableMutatingWebhook bool, na
 	if level.GreaterOrEqual(auditinternal.LevelRequest) {
 		// expect actual patch annotation
 		webhookPatchAnnotations = map[string]string{}
-		webhookPatchAnnotations[mutating.PatchAuditAnnotationPrefix+"round_0_index_0"] = strings.Replace(fmt.Sprintf(`{"configuration": "%s", "webhook": "%s", "patch": %s, "patchType": "JSONPatch"}`, testWebhookConfigurationName, testWebhookName, `[{"op":"add","path":"/data","value":{"test":"dummy"}}]`), " ", "", -1)
+		webhookPatchAnnotations[mutating.PatchAuditAnnotationPrefix+"round_0_index_0"] = strings.ReplaceAll(fmt.Sprintf(`{"configuration": "%s", "webhook": "%s", "patch": %s, "patchType": "JSONPatch"}`, testWebhookConfigurationName, testWebhookName, `[{"op":"add","path":"/data","value":{"test":"dummy"}}]`), " ", "")
 		// expect request object in audit log
 		requestObject = true
 	}

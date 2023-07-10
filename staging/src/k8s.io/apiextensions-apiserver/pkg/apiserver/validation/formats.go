@@ -56,7 +56,7 @@ func StripUnsupportedFormatsPostProcess(s *spec.Schema) error {
 		return nil
 	}
 
-	normalized := strings.Replace(s.Format, "-", "", -1) // go-openapi default format name normalization
+	normalized := strings.ReplaceAll(s.Format, "-", "") // go-openapi default format name normalization
 	if !supportedFormats.Has(normalized) {
 		s.Format = ""
 	}

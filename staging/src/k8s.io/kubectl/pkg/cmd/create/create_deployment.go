@@ -267,8 +267,8 @@ func (o *CreateDeploymentOptions) buildPodSpec() corev1.PodSpec {
 // Then add random suffix to make it uniquified.
 func sanitizeAndUniquify(name string) string {
 	if strings.ContainsAny(name, "_.") {
-		name = strings.Replace(name, "_", "-", -1)
-		name = strings.Replace(name, ".", "-", -1)
+		name = strings.ReplaceAll(name, "_", "-")
+		name = strings.ReplaceAll(name, ".", "-")
 		name = fmt.Sprintf("%s-%s", name, utilrand.String(5))
 	}
 	return name

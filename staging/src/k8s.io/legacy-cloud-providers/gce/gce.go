@@ -43,7 +43,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
@@ -438,12 +438,12 @@ func CreateGCECloud(config *CloudConfig) (*Cloud, error) {
 	if config.APIEndpoint != "" {
 		if strings.HasSuffix(service.BasePath, "/projects/") {
 			service.BasePath = getProjectsBasePath(config.APIEndpoint)
-			serviceBeta.BasePath = getProjectsBasePath(strings.Replace(config.APIEndpoint, "v1", "beta", -1))
-			serviceAlpha.BasePath = getProjectsBasePath(strings.Replace(config.APIEndpoint, "v1", "alpha", -1))
+			serviceBeta.BasePath = getProjectsBasePath(strings.ReplaceAll(config.APIEndpoint, "v1", "beta"))
+			serviceAlpha.BasePath = getProjectsBasePath(strings.ReplaceAll(config.APIEndpoint, "v1", "alpha"))
 		} else {
 			service.BasePath = config.APIEndpoint
-			serviceBeta.BasePath = strings.Replace(config.APIEndpoint, "v1", "beta", -1)
-			serviceAlpha.BasePath = strings.Replace(config.APIEndpoint, "v1", "alpha", -1)
+			serviceBeta.BasePath = strings.ReplaceAll(config.APIEndpoint, "v1", "beta")
+			serviceAlpha.BasePath = strings.ReplaceAll(config.APIEndpoint, "v1", "alpha")
 		}
 	}
 

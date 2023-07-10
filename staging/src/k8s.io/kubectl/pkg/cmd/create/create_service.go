@@ -158,7 +158,7 @@ func (o *ServiceOptions) createService() (*corev1.Service, error) {
 			return nil, err
 		}
 
-		portName := strings.Replace(tcpString, ":", "-", -1)
+		portName := strings.ReplaceAll(tcpString, ":", "-")
 		ports = append(ports, corev1.ServicePort{
 			Name:       portName,
 			Port:       port,

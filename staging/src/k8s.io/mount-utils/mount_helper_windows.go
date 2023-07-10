@@ -76,7 +76,7 @@ func IsCorruptedMnt(err error) bool {
 // systems by making sure all instances of `/` are replaced with `\\`, and the
 // path beings with `c:`
 func NormalizeWindowsPath(path string) string {
-	normalizedPath := strings.Replace(path, "/", "\\", -1)
+	normalizedPath := strings.ReplaceAll(path, "/", "\\")
 	if strings.HasPrefix(normalizedPath, "\\") {
 		normalizedPath = "c:" + normalizedPath
 	}

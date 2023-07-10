@@ -91,7 +91,7 @@ func (m *kubeGenericRuntimeManager) recordContainerEvent(pod *v1.Pod, container 
 	// which kills our ability to deduplicate events.  this protection makes a huge
 	// difference in the number of unique events
 	if containerID != "" {
-		eventMessage = strings.Replace(eventMessage, containerID, container.Name, -1)
+		eventMessage = strings.ReplaceAll(eventMessage, containerID, container.Name)
 	}
 	m.recorder.Event(ref, eventType, reason, eventMessage)
 }

@@ -125,7 +125,7 @@ func WithBuiltinTemplateFuncs(tmpl *template.Template) *template.Template {
 		},
 		"indent": func(amount int, str string) string {
 			pad := strings.Repeat(" ", amount)
-			return pad + strings.Replace(str, "\n", "\n"+pad, -1)
+			return pad + strings.ReplaceAll(str, "\n", "\n"+pad)
 		},
 		"dict": func(keysAndValues ...any) (map[string]any, error) {
 			if len(keysAndValues)%2 != 0 {

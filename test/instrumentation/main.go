@@ -225,7 +225,7 @@ func localImportPath(importExpr string) (string, error) {
 		pathPrefix = strings.Join([]string{GOROOT, "src"}, string(os.PathSeparator))
 	} // ToDo: support non go mod
 
-	crossPlatformImportExpr := strings.Replace(importExpr, "/", string(os.PathSeparator), -1)
+	crossPlatformImportExpr := strings.ReplaceAll(importExpr, "/", string(os.PathSeparator))
 	importDirectory := strings.Join([]string{pathPrefix, strings.Trim(crossPlatformImportExpr, "\"")}, string(os.PathSeparator))
 
 	return importDirectory, nil

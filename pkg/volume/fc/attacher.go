@@ -219,7 +219,7 @@ func volumeSpecToMounter(spec *volume.Spec, host volume.VolumeHost) (*fcDiskMoun
 		lun = strconv.Itoa(int(*fc.Lun))
 	} else if len(fc.WWIDs) != 0 {
 		for _, wwid := range fc.WWIDs {
-			wwids = append(wwids, strings.Replace(wwid, " ", "_", -1))
+			wwids = append(wwids, strings.ReplaceAll(wwid, " ", "_"))
 		}
 	} else {
 		return nil, fmt.Errorf("fc: no fc disk information found. failed to make a new mounter")

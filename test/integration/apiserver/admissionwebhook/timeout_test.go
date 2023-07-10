@@ -196,7 +196,7 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 
 			mutatingWebhooks := []admissionregistrationv1.MutatingWebhook{}
 			for j, webhook := range tt.mutatingWebhooks {
-				name := fmt.Sprintf("admission.integration.test.%d.%s", j, strings.Replace(strings.TrimPrefix(webhook.path, "/"), "/", "-", -1))
+				name := fmt.Sprintf("admission.integration.test.%d.%s", j, strings.ReplaceAll(strings.TrimPrefix(webhook.path, "/"), "/", "-"))
 				endpoint := webhookServer.URL + webhook.path
 				mutatingWebhooks = append(mutatingWebhooks, admissionregistrationv1.MutatingWebhook{
 					Name: name,
@@ -231,7 +231,7 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 
 			validatingWebhooks := []admissionregistrationv1.ValidatingWebhook{}
 			for j, webhook := range tt.validatingWebhooks {
-				name := fmt.Sprintf("admission.integration.test.%d.%s", j, strings.Replace(strings.TrimPrefix(webhook.path, "/"), "/", "-", -1))
+				name := fmt.Sprintf("admission.integration.test.%d.%s", j, strings.ReplaceAll(strings.TrimPrefix(webhook.path, "/"), "/", "-"))
 				endpoint := webhookServer.URL + webhook.path
 				validatingWebhooks = append(validatingWebhooks, admissionregistrationv1.ValidatingWebhook{
 					Name: name,

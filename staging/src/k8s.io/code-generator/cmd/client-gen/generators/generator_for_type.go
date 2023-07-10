@@ -345,7 +345,7 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 // TODO: Make the verbs in templates parametrized so the strings.Replace() is
 // not needed.
 func adjustTemplate(name, verbType, template string) string {
-	return strings.Replace(template, " "+strings.Title(verbType), " "+name, -1)
+	return strings.ReplaceAll(template, " "+strings.Title(verbType), " "+name)
 }
 
 func generateInterface(defaultVerbTemplates map[string]string, tags util.Tags) string {

@@ -579,7 +579,7 @@ func protobufTagToField(tag string, field *protoField, m types.Member, t *types.
 			name = types.Name{
 				Name:    parts[0][last+1:],
 				Package: prefix,
-				Path:    strings.Replace(prefix, ".", "/", -1),
+				Path:    strings.ReplaceAll(prefix, ".", "/"),
 			}
 		} else {
 			name = types.Name{

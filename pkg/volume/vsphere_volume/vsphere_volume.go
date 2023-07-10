@@ -165,7 +165,7 @@ func (plugin *vsphereVolumePlugin) ConstructVolumeSpec(volumeName, mountPath str
 	if err != nil {
 		return volume.ReconstructedVolume{}, err
 	}
-	volumePath = strings.Replace(volumePath, "\\040", " ", -1)
+	volumePath = strings.ReplaceAll(volumePath, "\\040", " ")
 	klog.V(5).Infof("vSphere volume path is %q", volumePath)
 	vsphereVolume := &v1.Volume{
 		Name: volumeName,

@@ -56,7 +56,7 @@ func (bts *BootstrapTokenString) UnmarshalJSON(b []byte) error {
 	}
 
 	// Remove unnecessary " characters coming from the JSON parser
-	token := strings.Replace(string(b), `"`, ``, -1)
+	token := strings.ReplaceAll(string(b), `"`, ``)
 	// Convert the string Token to a BootstrapTokenString object
 	newbts, err := NewBootstrapTokenString(token)
 	if err != nil {

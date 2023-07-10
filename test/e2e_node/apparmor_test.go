@@ -210,7 +210,7 @@ func runAppArmorTest(ctx context.Context, f *framework.Framework, shouldRun bool
 func createPodWithAppArmor(ctx context.Context, f *framework.Framework, profile string) *v1.Pod {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: fmt.Sprintf("test-apparmor-%s", strings.Replace(profile, "/", "-", -1)),
+			Name: fmt.Sprintf("test-apparmor-%s", strings.ReplaceAll(profile, "/", "-")),
 			Annotations: map[string]string{
 				v1.AppArmorBetaContainerAnnotationKeyPrefix + "test": profile,
 			},

@@ -54,8 +54,8 @@ func getFinder(dc *Datacenter) *find.Finder {
 // formatVirtualDiskUUID removes any spaces and hyphens in UUID
 // Example UUID input is 42375390-71f9-43a3-a770-56803bcd7baa and output after format is 4237539071f943a3a77056803bcd7baa
 func formatVirtualDiskUUID(uuid string) string {
-	uuidwithNoSpace := strings.Replace(uuid, " ", "", -1)
-	uuidWithNoHypens := strings.Replace(uuidwithNoSpace, "-", "", -1)
+	uuidwithNoSpace := strings.ReplaceAll(uuid, " ", "")
+	uuidWithNoHypens := strings.ReplaceAll(uuidwithNoSpace, "-", "")
 	return strings.ToLower(uuidWithNoHypens)
 }
 

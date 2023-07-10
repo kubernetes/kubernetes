@@ -199,7 +199,7 @@ func getIntOrPercentValue(intOrStr *IntOrString) (int, bool, error) {
 	case Int:
 		return intOrStr.IntValue(), false, nil
 	case String:
-		s := strings.Replace(intOrStr.StrVal, "%", "", -1)
+		s := strings.ReplaceAll(intOrStr.StrVal, "%", "")
 		v, err := strconv.Atoi(s)
 		if err != nil {
 			return 0, false, fmt.Errorf("invalid value %q: %v", intOrStr.StrVal, err)

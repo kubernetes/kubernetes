@@ -101,7 +101,7 @@ func addPluginCommands(cmd *cobra.Command) {
 		for _, arg := range strings.Split(plugin, "-")[1:] {
 			// Underscores (_) in plugin's filename are replaced with dashes(-)
 			// e.g. foo_bar -> foo-bar
-			args = append(args, strings.Replace(arg, "_", "-", -1))
+			args = append(args, strings.ReplaceAll(arg, "_", "-"))
 		}
 
 		// In order to avoid that the same plugin command is added more than once,
@@ -161,7 +161,7 @@ func addPluginCommands(cmd *cobra.Command) {
 // executable must have executable permissions set on it and must be on $PATH.
 func pluginCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	// Recreate the plugin name from the commandPath
-	pluginName := strings.Replace(strings.Replace(cmd.CommandPath(), "-", "_", -1), " ", "-", -1)
+	pluginName := strings.ReplaceAll(strings.Replace(cmd.CommandPath(), "-", "_", -1), " ", "-")
 
 	path, found := lookupCompletionExec(pluginName)
 	if !found {

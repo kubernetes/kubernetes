@@ -578,7 +578,7 @@ func CoreDump(dir string) {
 
 // parseSystemdServices converts services separator from comma to space.
 func parseSystemdServices(services string) string {
-	return strings.TrimSpace(strings.Replace(services, ",", " ", -1))
+	return strings.TrimSpace(strings.ReplaceAll(services, ",", " "))
 }
 
 // RunCmd runs cmd using args and returns its stdout and stderr. It also outputs

@@ -29,7 +29,7 @@ var underscoreWarnings = make(map[string]bool)
 // WordSepNormalizeFunc changes all flags that contain "_" separators
 func WordSepNormalizeFunc(f *pflag.FlagSet, name string) pflag.NormalizedName {
 	if strings.Contains(name, "_") {
-		return pflag.NormalizedName(strings.Replace(name, "_", "-", -1))
+		return pflag.NormalizedName(strings.ReplaceAll(name, "_", "-"))
 	}
 	return pflag.NormalizedName(name)
 }
@@ -37,7 +37,7 @@ func WordSepNormalizeFunc(f *pflag.FlagSet, name string) pflag.NormalizedName {
 // WarnWordSepNormalizeFunc changes and warns for flags that contain "_" separators
 func WarnWordSepNormalizeFunc(f *pflag.FlagSet, name string) pflag.NormalizedName {
 	if strings.Contains(name, "_") {
-		nname := strings.Replace(name, "_", "-", -1)
+		nname := strings.ReplaceAll(name, "_", "-")
 		if _, alreadyWarned := underscoreWarnings[name]; !alreadyWarned {
 			klog.Warningf("using an underscore in a flag name is not supported. %s has been converted to %s.", name, nname)
 			underscoreWarnings[name] = true

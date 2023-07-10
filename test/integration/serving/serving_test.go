@@ -238,7 +238,7 @@ func testComponentWithSecureServing(t *testing.T, tester componentTester, kubeco
 				t.Errorf("SecureServing enabled: expected=%v got=%v", want, got)
 			} else if want {
 				url := fmt.Sprintf("https://%s%s", secureInfo.Listener.Addr().String(), tt.path)
-				url = strings.Replace(url, "[::]", "127.0.0.1", -1) // switch to IPv4 because the self-signed cert does not support [::]
+				url = strings.ReplaceAll(url, "[::]", "127.0.0.1") // switch to IPv4 because the self-signed cert does not support [::]
 
 				// read self-signed server cert disk
 				pool := x509.NewCertPool()

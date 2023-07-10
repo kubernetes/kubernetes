@@ -276,8 +276,8 @@ func TestProxyTransport(t *testing.T) {
 		// Replace source URL with our test server address.
 		sourceURL := parseURLOrDie(item.sourceURL)
 		serverURL := parseURLOrDie(server.URL)
-		item.input = strings.Replace(item.input, sourceURL.Host, serverURL.Host, -1)
-		item.redirect = strings.Replace(item.redirect, sourceURL.Host, serverURL.Host, -1)
+		item.input = strings.ReplaceAll(item.input, sourceURL.Host, serverURL.Host)
+		item.redirect = strings.ReplaceAll(item.redirect, sourceURL.Host, serverURL.Host)
 		sourceURL.Host = serverURL.Host
 
 		req, err := http.NewRequest("GET", sourceURL.String(), nil)

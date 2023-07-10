@@ -208,7 +208,7 @@ func TestServerRunWithSNI(t *testing.T) {
 
 	specToName := func(spec TestCertSpec) string {
 		name := spec.host + "_" + strings.Join(spec.names, ",") + "_" + strings.Join(spec.ips, ",")
-		return strings.Replace(name, "*", "star", -1)
+		return strings.ReplaceAll(name, "*", "star")
 	}
 
 	for title := range tests {

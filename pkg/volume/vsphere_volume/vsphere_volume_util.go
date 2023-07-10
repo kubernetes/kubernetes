@@ -196,7 +196,7 @@ func getVolPathfromVolumeName(deviceMountPath string) string {
 	// space between datastore and vmdk name in volumePath is encoded as '\040' when returned by GetMountRefs().
 	// volumePath eg: "[local] xxx.vmdk" provided to attach/mount
 	// replacing \040 with space to match the actual volumePath
-	return strings.Replace(volPath, "\\040", " ", -1)
+	return strings.ReplaceAll(volPath, "\\040", " ")
 }
 
 func getCloudProvider(cloud cloudprovider.Interface) (*vsphere.VSphere, error) {

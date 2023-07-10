@@ -65,8 +65,8 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				o.APIVersion = "v1beta1"
 			default:
 				// use random value, but without / as it is used as separator
-				o.APIGroup = strings.Replace(o.APIGroup, "/", "-", -1)
-				o.APIVersion = strings.Replace(o.APIVersion, "/", "-", -1)
+				o.APIGroup = strings.ReplaceAll(o.APIGroup, "/", "-")
+				o.APIVersion = strings.ReplaceAll(o.APIVersion, "/", "-")
 			}
 		},
 	}

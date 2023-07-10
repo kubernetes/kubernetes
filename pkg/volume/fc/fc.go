@@ -520,7 +520,7 @@ func getWwnsLunWwids(fc *v1.FCVolumeSource) ([]string, string, []string, error) 
 	}
 	if len(fc.WWIDs) != 0 {
 		for _, wwid := range fc.WWIDs {
-			wwids = append(wwids, strings.Replace(wwid, " ", "_", -1))
+			wwids = append(wwids, strings.ReplaceAll(wwid, " ", "_"))
 		}
 		return fc.TargetWWNs, lun, wwids, nil
 	}

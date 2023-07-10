@@ -70,11 +70,11 @@ func NewCgroupName(base CgroupName, components ...string) CgroupName {
 }
 
 func escapeSystemdCgroupName(part string) string {
-	return strings.Replace(part, "-", "_", -1)
+	return strings.ReplaceAll(part, "-", "_")
 }
 
 func unescapeSystemdCgroupName(part string) string {
-	return strings.Replace(part, "_", "-", -1)
+	return strings.ReplaceAll(part, "_", "-")
 }
 
 // cgroupName.ToSystemd converts the internal cgroup name to a systemd name.

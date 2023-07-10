@@ -426,7 +426,7 @@ func createKubeconfigCWD() (string, error) {
 // may try to do auto expansion without escaping.
 func adjustArgsForSystemd(args []string) {
 	for i := range args {
-		args[i] = strings.Replace(args[i], "%", "%%", -1)
-		args[i] = strings.Replace(args[i], "$", "$$", -1)
+		args[i] = strings.ReplaceAll(args[i], "%", "%%")
+		args[i] = strings.ReplaceAll(args[i], "$", "$$")
 	}
 }

@@ -799,7 +799,7 @@ func mutationAnnotationValue(configuration, webhook string, mutated bool) string
 }
 
 func patchAnnotationValue(configuration, webhook string, patch string) string {
-	return strings.Replace(fmt.Sprintf(`{"configuration": "%s", "webhook": "%s", "patch": %s, "patchType": "JSONPatch"}`, configuration, webhook, patch), " ", "", -1)
+	return strings.ReplaceAll(fmt.Sprintf(`{"configuration": "%s", "webhook": "%s", "patch": %s, "patchType": "JSONPatch"}`, configuration, webhook, patch), " ", "")
 }
 
 // NewMutatingTestCases returns test cases with a given base url.

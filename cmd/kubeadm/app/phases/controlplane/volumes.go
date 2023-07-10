@@ -87,7 +87,7 @@ func getHostPathVolumesForTheControlPlane(cfg *kubeadmapi.ClusterConfiguration) 
 	// This is needed due to symlinks pointing from files in /etc/ssl/certs to these directories.
 	for _, caCertsExtraVolumePath := range caCertsExtraVolumePaths {
 		if isExtraVolumeMountNeeded(caCertsExtraVolumePath) {
-			caCertsExtraVolumeName := strings.Replace(caCertsExtraVolumePath, "/", "-", -1)[1:]
+			caCertsExtraVolumeName := strings.ReplaceAll(caCertsExtraVolumePath, "/", "-")[1:]
 			mounts.NewHostPathMount(kubeadmconstants.KubeAPIServer, caCertsExtraVolumeName, caCertsExtraVolumePath, caCertsExtraVolumePath, true, &hostPathDirectoryOrCreate)
 			mounts.NewHostPathMount(kubeadmconstants.KubeControllerManager, caCertsExtraVolumeName, caCertsExtraVolumePath, caCertsExtraVolumePath, true, &hostPathDirectoryOrCreate)
 		}

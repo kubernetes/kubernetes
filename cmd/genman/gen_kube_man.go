@@ -164,7 +164,7 @@ func printOptions(out *bytes.Buffer, command *cobra.Command) {
 }
 
 func genMarkdown(command *cobra.Command, parent, docsDir string) {
-	dparent := strings.Replace(parent, " ", "-", -1)
+	dparent := strings.ReplaceAll(parent, " ", "-")
 	name := command.Name()
 	dname := name
 	if len(parent) > 0 {

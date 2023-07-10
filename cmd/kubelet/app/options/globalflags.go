@@ -46,7 +46,7 @@ func AddGlobalFlags(fs *pflag.FlagSet) {
 // normalize replaces underscores with hyphens
 // we should always use hyphens instead of underscores when registering kubelet flags
 func normalize(s string) string {
-	return strings.Replace(s, "_", "-", -1)
+	return strings.ReplaceAll(s, "_", "-")
 }
 
 // register adds a flag to local that targets the Value associated with the Flag named globalName in global

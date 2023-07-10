@@ -194,7 +194,7 @@ func verifyInternalAPIVersionFunc(_ *runtime.Scheme, pkginfo *ComponentConfigPac
 }
 
 func lowercaseWithoutDashes(str string) string {
-	return strings.Replace(strings.ToLower(str), "-", "", -1)
+	return strings.ReplaceAll(strings.ToLower(str), "-", "")
 }
 
 func dashesToCapitalCase(str string) string {

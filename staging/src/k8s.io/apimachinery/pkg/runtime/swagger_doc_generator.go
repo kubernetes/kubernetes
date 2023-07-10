@@ -84,10 +84,10 @@ func fmtRawDoc(rawDoc string) string {
 	}
 
 	postDoc := strings.TrimRight(buffer.String(), "\n")
-	postDoc = strings.Replace(postDoc, "\\\"", "\"", -1) // replace user's \" to "
-	postDoc = strings.Replace(postDoc, "\"", "\\\"", -1) // Escape "
-	postDoc = strings.Replace(postDoc, "\n", "\\n", -1)
-	postDoc = strings.Replace(postDoc, "\t", "\\t", -1)
+	postDoc = strings.ReplaceAll(postDoc, "\\\"", "\"") // replace user's \" to "
+	postDoc = strings.ReplaceAll(postDoc, "\"", "\\\"") // Escape "
+	postDoc = strings.ReplaceAll(postDoc, "\n", "\\n")
+	postDoc = strings.ReplaceAll(postDoc, "\t", "\\t")
 
 	return postDoc
 }

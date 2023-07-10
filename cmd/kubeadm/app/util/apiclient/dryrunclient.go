@@ -255,7 +255,7 @@ func logDryRunAction(action core.Action, w io.Writer, marshalFunc MarshalFunc) {
 	patchAction, ok := action.(core.PatchAction)
 	if ok {
 		// Replace all occurrences of \" with a simple " when printing
-		fmt.Fprintf(w, "[dryrun] Attached patch:\n\t%s\n", strings.Replace(string(patchAction.GetPatch()), `\"`, `"`, -1))
+		fmt.Fprintf(w, "[dryrun] Attached patch:\n\t%s\n", strings.ReplaceAll(string(patchAction.GetPatch()), `\"`, `"`))
 	}
 }
 

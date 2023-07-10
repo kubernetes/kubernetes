@@ -429,7 +429,7 @@ func (p *Parser) parseField(cur *ListNode) error {
 	if value == "*" {
 		cur.append(newWildcard())
 	} else {
-		cur.append(newField(strings.Replace(value, "\\", "", -1)))
+		cur.append(newField(strings.ReplaceAll(value, "\\", "")))
 	}
 	return p.parseInsideAction(cur)
 }

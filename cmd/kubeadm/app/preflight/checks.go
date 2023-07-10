@@ -235,7 +235,7 @@ func (dac DirAvailableCheck) Name() string {
 	if dac.Label != "" {
 		return dac.Label
 	}
-	return fmt.Sprintf("DirAvailable-%s", strings.Replace(dac.Path, "/", "-", -1))
+	return fmt.Sprintf("DirAvailable-%s", strings.ReplaceAll(dac.Path, "/", "-"))
 }
 
 // Check validates if a directory does not exist or empty.
@@ -272,7 +272,7 @@ func (fac FileAvailableCheck) Name() string {
 	if fac.Label != "" {
 		return fac.Label
 	}
-	return fmt.Sprintf("FileAvailable-%s", strings.Replace(fac.Path, "/", "-", -1))
+	return fmt.Sprintf("FileAvailable-%s", strings.ReplaceAll(fac.Path, "/", "-"))
 }
 
 // Check validates if the given file does not already exist.
@@ -296,7 +296,7 @@ func (fac FileExistingCheck) Name() string {
 	if fac.Label != "" {
 		return fac.Label
 	}
-	return fmt.Sprintf("FileExisting-%s", strings.Replace(fac.Path, "/", "-", -1))
+	return fmt.Sprintf("FileExisting-%s", strings.ReplaceAll(fac.Path, "/", "-"))
 }
 
 // Check validates if the given file already exists.
@@ -321,7 +321,7 @@ func (fcc FileContentCheck) Name() string {
 	if fcc.Label != "" {
 		return fcc.Label
 	}
-	return fmt.Sprintf("FileContent-%s", strings.Replace(fcc.Path, "/", "-", -1))
+	return fmt.Sprintf("FileContent-%s", strings.ReplaceAll(fcc.Path, "/", "-"))
 }
 
 // Check validates if the given file contains the given content.
@@ -362,7 +362,7 @@ func (ipc InPathCheck) Name() string {
 	if ipc.label != "" {
 		return ipc.label
 	}
-	return fmt.Sprintf("FileExisting-%s", strings.Replace(ipc.executable, "/", "-", -1))
+	return fmt.Sprintf("FileExisting-%s", strings.ReplaceAll(ipc.executable, "/", "-"))
 }
 
 // Check validates if the given executable is present in the path.

@@ -93,7 +93,7 @@ func npipeDial(ctx context.Context, addr string) (net.Conn, error) {
 
 func parseEndpoint(endpoint string) (string, string, error) {
 	// url.Parse doesn't recognize \, so replace with / first.
-	endpoint = strings.Replace(endpoint, "\\", "/", -1)
+	endpoint = strings.ReplaceAll(endpoint, "\\", "/")
 	u, err := url.Parse(endpoint)
 	if err != nil {
 		return "", "", err

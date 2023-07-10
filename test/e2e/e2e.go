@@ -309,8 +309,8 @@ func lookupClusterImageSources() (string, string, error) {
 			args = append(args, "--zone", framework.TestContext.CloudConfig.Zone)
 		}
 		outputBytes, err := exec.Command("gcloud", args...).CombinedOutput()
-		str := strings.Replace(string(outputBytes), ",", "\n", -1)
-		str = strings.Replace(str, ";", "\n", -1)
+		str := strings.ReplaceAll(string(outputBytes), ",", "\n")
+		str = strings.ReplaceAll(str, ";", "\n")
 		lines := strings.Split(str, "\n")
 		if err != nil {
 			framework.Logf("lookupDiskImageSources: gcloud error with [%#v]; err:%v", argv, err)

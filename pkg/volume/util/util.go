@@ -299,7 +299,7 @@ func ContainsAllAccessModes(indexedModes []v1.PersistentVolumeAccessMode, reques
 
 // GetWindowsPath get a windows path
 func GetWindowsPath(path string) string {
-	windowsPath := strings.Replace(path, "/", "\\", -1)
+	windowsPath := strings.ReplaceAll(path, "/", "\\")
 	if strings.HasPrefix(windowsPath, "\\") {
 		windowsPath = "c:" + windowsPath
 	}

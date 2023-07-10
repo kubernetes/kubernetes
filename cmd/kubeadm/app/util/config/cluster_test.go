@@ -240,7 +240,7 @@ func TestGetNodeNameFromKubeletConfig(t *testing.T) {
 					t.Errorf("Couldn't create pem file: %v", err)
 					return
 				}
-				rt.kubeconfigContent = []byte(strings.Replace(string(rt.kubeconfigContent), "kubelet.pem", pemPath, -1))
+				rt.kubeconfigContent = []byte(strings.ReplaceAll(string(rt.kubeconfigContent), "kubelet.pem", pemPath))
 			}
 
 			kubeconfigPath := filepath.Join(tmpdir, kubeadmconstants.KubeletKubeConfigFileName)

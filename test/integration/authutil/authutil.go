@@ -75,7 +75,7 @@ func grantAuthorization(t *testing.T, ctx context.Context, adminClient clientset
 	t.Helper()
 
 	cr, err := adminClient.RbacV1().ClusterRoles().Create(ctx, &rbacv1.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{GenerateName: strings.Replace(t.Name(), "/", "--", -1)},
+		ObjectMeta: metav1.ObjectMeta{GenerateName: strings.ReplaceAll(t.Name(), "/", "--")},
 		Rules: []rbacv1.PolicyRule{
 			rule,
 		},
@@ -88,7 +88,7 @@ func grantAuthorization(t *testing.T, ctx context.Context, adminClient clientset
 	})
 
 	crb, err := adminClient.RbacV1().ClusterRoleBindings().Create(ctx, &rbacv1.ClusterRoleBinding{
-		ObjectMeta: metav1.ObjectMeta{GenerateName: strings.Replace(t.Name(), "/", "--", -1)},
+		ObjectMeta: metav1.ObjectMeta{GenerateName: strings.ReplaceAll(t.Name(), "/", "--")},
 		Subjects: []rbacv1.Subject{
 			{
 				Kind: accountKind,

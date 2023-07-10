@@ -60,7 +60,7 @@ func getVolumeSpecFromGlobalMapPath(volumeName, globalMapPath string) (*volume.S
 	//   plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumeID}
 	//   plugins/kubernetes.io/vsphere-volume/volumeDevices/[datastore1]\\040volumes/myDisk
 	volPath := filepath.Base(globalMapPath)
-	volPath = strings.Replace(volPath, "\\040", "", -1)
+	volPath = strings.ReplaceAll(volPath, "\\040", "")
 	if len(volPath) <= 1 {
 		return nil, fmt.Errorf("failed to get volume path from global path=%s", globalMapPath)
 	}

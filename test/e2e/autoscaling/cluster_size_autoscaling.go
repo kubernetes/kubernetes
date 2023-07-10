@@ -1068,7 +1068,7 @@ func getGkeAPIEndpoint() string {
 func getGKEURL(apiVersion string, suffix string) string {
 	out, err := execCmd("gcloud", "auth", "print-access-token").Output()
 	framework.ExpectNoError(err)
-	token := strings.Replace(string(out), "\n", "", -1)
+	token := strings.ReplaceAll(string(out), "\n", "")
 
 	return fmt.Sprintf("%s/%s/%s?access_token=%s",
 		getGkeAPIEndpoint(),

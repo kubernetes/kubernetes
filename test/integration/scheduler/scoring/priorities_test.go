@@ -419,7 +419,7 @@ func makeContainersWithImages(images []string) []v1.Container {
 	for _, image := range images {
 		if _, ok := usedImages[image]; !ok {
 			containers = append(containers, v1.Container{
-				Name:  strings.Replace(image, ":", "-", -1) + "-container",
+				Name:  strings.ReplaceAll(image, ":", "-") + "-container",
 				Image: image,
 			})
 			usedImages[image] = struct{}{}

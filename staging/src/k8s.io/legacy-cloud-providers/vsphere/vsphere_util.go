@@ -809,8 +809,8 @@ func GetVMUUID() (string, error) {
 		return "", fmt.Errorf("failed to match Prefix, UUID read from the file is %v", uuidFromFile)
 	}
 	// Strip the prefix and white spaces and -
-	uuid = strings.Replace(uuid[len(UUIDPrefix):(len(uuid))], " ", "", -1)
-	uuid = strings.Replace(uuid, "-", "", -1)
+	uuid = strings.ReplaceAll(uuid[len(UUIDPrefix):(len(uuid))], " ", "")
+	uuid = strings.ReplaceAll(uuid, "-", "")
 	if len(uuid) != 32 {
 		return "", fmt.Errorf("length check failed, UUID read from the file is %v", uuidFromFile)
 	}

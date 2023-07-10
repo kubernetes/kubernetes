@@ -211,7 +211,7 @@ func setMockLBs(az *Cloud, ctrl *gomock.Controller, expectedLBs *[]network.LoadB
 		expectedLBName += "-internal"
 	}
 
-	fullServiceName := strings.Replace(svcName, "-", "", -1)
+	fullServiceName := strings.ReplaceAll(svcName, "-", "")
 
 	if lbIndex >= len(*expectedLBs) {
 		lb := network.LoadBalancer{

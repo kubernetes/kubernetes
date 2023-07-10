@@ -8935,7 +8935,7 @@ func TestSchemaHasDefaults(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		expected := strings.Contains(strings.Replace(string(bs), `"default":null`, `"deleted":null`, -1), `"default":`)
+		expected := strings.Contains(strings.ReplaceAll(string(bs), `"default":null`, `"deleted":null`), `"default":`)
 		if got := schemaHasDefaults(schema); got != expected {
 			t.Errorf("expected %v, got %v for: %s", expected, got, string(bs))
 		}

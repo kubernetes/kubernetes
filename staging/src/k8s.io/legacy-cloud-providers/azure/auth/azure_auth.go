@@ -262,9 +262,9 @@ func decodePkcs12(pkcs []byte, password string) (*x509.Certificate, *rsa.Private
 
 // azureStackOverrides ensures that the Environment matches what AKSe currently generates for Azure Stack
 func azureStackOverrides(env *azure.Environment, resourceManagerEndpoint, identitySystem string) {
-	env.ManagementPortalURL = strings.Replace(resourceManagerEndpoint, "https://management.", "https://portal.", -1)
+	env.ManagementPortalURL = strings.ReplaceAll(resourceManagerEndpoint, "https://management.", "https://portal.")
 	env.ServiceManagementEndpoint = env.TokenAudience
-	env.ResourceManagerVMDNSSuffix = strings.Replace(resourceManagerEndpoint, "https://management.", "cloudapp.", -1)
+	env.ResourceManagerVMDNSSuffix = strings.ReplaceAll(resourceManagerEndpoint, "https://management.", "cloudapp.")
 	env.ResourceManagerVMDNSSuffix = strings.TrimSuffix(env.ResourceManagerVMDNSSuffix, "/")
 	if strings.EqualFold(identitySystem, ADFSIdentitySystem) {
 		env.ActiveDirectoryEndpoint = strings.TrimSuffix(env.ActiveDirectoryEndpoint, "/")

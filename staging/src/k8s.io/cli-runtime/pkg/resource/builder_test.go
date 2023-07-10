@@ -496,11 +496,11 @@ func TestPathBuilderWithMultiple(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// create test files
-	writeTestFile(t, fmt.Sprintf("%s/recursive/pod/busybox.json", tmpDir), strings.Replace(aPod, "{id}", "0", -1))
-	writeTestFile(t, fmt.Sprintf("%s/recursive/pod/pod_1/busybox.json", tmpDir), strings.Replace(aPod, "{id}", "1", -1))
-	writeTestFile(t, fmt.Sprintf("%s/recursive/rc/busybox.json", tmpDir), strings.Replace(aRC, "{id}", "0", -1))
-	writeTestFile(t, fmt.Sprintf("%s/recursive/rc/rc_1/busybox.json", tmpDir), strings.Replace(aRC, "{id}", "1", -1))
-	writeTestFile(t, fmt.Sprintf("%s/inode/hardlink/busybox.json", tmpDir), strings.Replace(aPod, "{id}", "0", -1))
+	writeTestFile(t, fmt.Sprintf("%s/recursive/pod/busybox.json", tmpDir), strings.ReplaceAll(aPod, "{id}", "0"))
+	writeTestFile(t, fmt.Sprintf("%s/recursive/pod/pod_1/busybox.json", tmpDir), strings.ReplaceAll(aPod, "{id}", "1"))
+	writeTestFile(t, fmt.Sprintf("%s/recursive/rc/busybox.json", tmpDir), strings.ReplaceAll(aRC, "{id}", "0"))
+	writeTestFile(t, fmt.Sprintf("%s/recursive/rc/rc_1/busybox.json", tmpDir), strings.ReplaceAll(aRC, "{id}", "1"))
+	writeTestFile(t, fmt.Sprintf("%s/inode/hardlink/busybox.json", tmpDir), strings.ReplaceAll(aPod, "{id}", "0"))
 	if err := os.Link(fmt.Sprintf("%s/inode/hardlink/busybox.json", tmpDir), fmt.Sprintf("%s/inode/hardlink/busybox-link.json", tmpDir)); err != nil {
 		t.Fatalf("error creating test file: %v", err)
 	}
@@ -563,7 +563,7 @@ func TestPathBuilderWithMultipleInvalid(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// create test files
-	writeTestFile(t, fmt.Sprintf("%s/inode/symlink/pod/busybox.json", tmpDir), strings.Replace(aPod, "{id}", "0", -1))
+	writeTestFile(t, fmt.Sprintf("%s/inode/symlink/pod/busybox.json", tmpDir), strings.ReplaceAll(aPod, "{id}", "0"))
 	if err := os.Symlink(fmt.Sprintf("%s/inode/symlink/pod", tmpDir), fmt.Sprintf("%s/inode/symlink/pod-link", tmpDir)); err != nil {
 		t.Fatalf("error creating test file: %v", err)
 	}

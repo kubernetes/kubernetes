@@ -306,10 +306,10 @@ func (az *Cloud) getLoadBalancerRuleName(service *v1.Service, protocol v1.Protoc
 
 func (az *Cloud) getSecurityRuleName(service *v1.Service, port v1.ServicePort, sourceAddrPrefix string) string {
 	if useSharedSecurityRule(service) {
-		safePrefix := strings.Replace(sourceAddrPrefix, "/", "_", -1)
+		safePrefix := strings.ReplaceAll(sourceAddrPrefix, "/", "_")
 		return fmt.Sprintf("shared-%s-%d-%s", port.Protocol, port.Port, safePrefix)
 	}
-	safePrefix := strings.Replace(sourceAddrPrefix, "/", "_", -1)
+	safePrefix := strings.ReplaceAll(sourceAddrPrefix, "/", "_")
 	rulePrefix := az.getRulePrefix(service)
 	return fmt.Sprintf("%s-%s-%d-%s", rulePrefix, port.Protocol, port.Port, safePrefix)
 }
@@ -1072,7 +1072,7 @@ func getAvailabilitySetNameByID(asID string) (string, error) {
 
 // get a storage account by UUID
 func generateStorageAccountName(accountNamePrefix string) string {
-	uniqueID := strings.Replace(string(uuid.NewUUID()), "-", "", -1)
+	uniqueID := strings.ReplaceAll(string(uuid.NewUUID()), "-", "")
 	accountName := strings.ToLower(accountNamePrefix + uniqueID)
 	if len(accountName) > storageAccountNameMaxLength {
 		return accountName[:storageAccountNameMaxLength-1]

@@ -101,8 +101,8 @@ func (c *ManagedDiskController) CreateManagedDisk(options *ManagedDiskOptions) (
 	if options.Tags != nil {
 		for k, v := range options.Tags {
 			// Azure won't allow / (forward slash) in tags
-			newKey := strings.Replace(k, "/", "-", -1)
-			newValue := strings.Replace(v, "/", "-", -1)
+			newKey := strings.ReplaceAll(k, "/", "-")
+			newValue := strings.ReplaceAll(v, "/", "-")
 			newTags[newKey] = &newValue
 		}
 	}
