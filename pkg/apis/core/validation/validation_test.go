@@ -6754,119 +6754,118 @@ func TestValidateResizePolicy(t *testing.T) {
 		Errors           field.ErrorList
 		PodRestartPolicy core.RestartPolicy
 	}
-	// var PodRestartPolicy core.RestartPolicy
-	// PodRestartPolicy = "Never"
+
 	testCases := map[string]T{
 		"ValidCPUandMemoryPolicies": {
-			[]core.ContainerResizePolicy{
+			PolicyList: []core.ContainerResizePolicy{
 				{ResourceName: "cpu", RestartPolicy: "NotRequired"},
 				{ResourceName: "memory", RestartPolicy: "RestartContainer"},
 			},
-			false,
-			nil,
-			"Always",
+			ExpectError:      false,
+			Errors:           nil,
+			PodRestartPolicy: "Always",
 		},
 		"ValidCPUPolicy": {
-			[]core.ContainerResizePolicy{
+			PolicyList: []core.ContainerResizePolicy{
 				{ResourceName: "cpu", RestartPolicy: "RestartContainer"},
 			},
-			false,
-			nil,
-			"Always",
+			ExpectError:      false,
+			Errors:           nil,
+			PodRestartPolicy: "Always",
 		},
 		"ValidMemoryPolicy": {
-			[]core.ContainerResizePolicy{
+			PolicyList: []core.ContainerResizePolicy{
 				{ResourceName: "memory", RestartPolicy: "NotRequired"},
 			},
-			false,
-			nil,
-			"Always",
+			ExpectError:      false,
+			Errors:           nil,
+			PodRestartPolicy: "Always",
 		},
 		"NoPolicy": {
-			[]core.ContainerResizePolicy{},
-			false,
-			nil,
-			"Always",
+			PolicyList:       []core.ContainerResizePolicy{},
+			ExpectError:      false,
+			Errors:           nil,
+			PodRestartPolicy: "Always",
 		},
 		"ValidCPUandInvalidMemoryPolicy": {
-			[]core.ContainerResizePolicy{
+			PolicyList: []core.ContainerResizePolicy{
 				{ResourceName: "cpu", RestartPolicy: "NotRequired"},
 				{ResourceName: "memory", RestartPolicy: "Restarrrt"},
 			},
-			true,
-			field.ErrorList{field.NotSupported(field.NewPath("field"), core.ResourceResizeRestartPolicy("Restarrrt"), tSupportedResizePolicies.List())},
-			"Always",
+			ExpectError:      true,
+			Errors:           field.ErrorList{field.NotSupported(field.NewPath("field"), core.ResourceResizeRestartPolicy("Restarrrt"), tSupportedResizePolicies.List())},
+			PodRestartPolicy: "Always",
 		},
 		"ValidMemoryandInvalidCPUPolicy": {
-			[]core.ContainerResizePolicy{
+			PolicyList: []core.ContainerResizePolicy{
 				{ResourceName: "cpu", RestartPolicy: "RestartNotRequirrred"},
 				{ResourceName: "memory", RestartPolicy: "RestartContainer"},
 			},
-			true,
-			field.ErrorList{field.NotSupported(field.NewPath("field"), core.ResourceResizeRestartPolicy("RestartNotRequirrred"), tSupportedResizePolicies.List())},
-			"Always",
+			ExpectError:      true,
+			Errors:           field.ErrorList{field.NotSupported(field.NewPath("field"), core.ResourceResizeRestartPolicy("RestartNotRequirrred"), tSupportedResizePolicies.List())},
+			PodRestartPolicy: "Always",
 		},
 		"InvalidResourceNameValidPolicy": {
-			[]core.ContainerResizePolicy{
+			PolicyList: []core.ContainerResizePolicy{
 				{ResourceName: "cpuuu", RestartPolicy: "NotRequired"},
 			},
-			true,
-			field.ErrorList{field.NotSupported(field.NewPath("field"), core.ResourceName("cpuuu"), tSupportedResizeResources.List())},
-			"Always",
+			ExpectError:      true,
+			Errors:           field.ErrorList{field.NotSupported(field.NewPath("field"), core.ResourceName("cpuuu"), tSupportedResizeResources.List())},
+			PodRestartPolicy: "Always",
 		},
 		"ValidResourceNameMissingPolicy": {
-			[]core.ContainerResizePolicy{
+			PolicyList: []core.ContainerResizePolicy{
 				{ResourceName: "memory", RestartPolicy: ""},
 			},
-			true,
-			field.ErrorList{field.Required(field.NewPath("field"), "")},
-			"Always",
+			ExpectError:      true,
+			Errors:           field.ErrorList{field.Required(field.NewPath("field"), "")},
+			PodRestartPolicy: "Always",
 		},
 		"RepeatedPolicies": {
-			[]core.ContainerResizePolicy{
+			PolicyList: []core.ContainerResizePolicy{
 				{ResourceName: "cpu", RestartPolicy: "NotRequired"},
 				{ResourceName: "memory", RestartPolicy: "RestartContainer"},
 				{ResourceName: "cpu", RestartPolicy: "RestartContainer"},
 			},
-			true,
-			field.ErrorList{field.Duplicate(field.NewPath("field").Index(2), core.ResourceCPU)},
-			"Always",
+			ExpectError:      true,
+			Errors:           field.ErrorList{field.Duplicate(field.NewPath("field").Index(2), core.ResourceCPU)},
+			PodRestartPolicy: "Always",
 		},
 		"InvalidCPUPolicyWithPodRestartPolicy": {
-			[]core.ContainerResizePolicy{
+			PolicyList: []core.ContainerResizePolicy{
 				{ResourceName: "cpu", RestartPolicy: "NotRequired"},
 				{ResourceName: "memory", RestartPolicy: "RestartContainer"},
 			},
-			true,
-			field.ErrorList{field.Invalid(field.NewPath("field"), core.ResourceResizeRestartPolicy("RestartContainer"), "Only NotRequired is allowed, if pod restartPolicy is Never")},
-			"Never",
+			ExpectError:      true,
+			Errors:           field.ErrorList{field.Invalid(field.NewPath("field"), core.ResourceResizeRestartPolicy("RestartContainer"), "must be 'NotRequired' when `restartPolicy` is 'Never'")},
+			PodRestartPolicy: "Never",
 		},
 		"InvalidMemoryPolicyWithPodRestartPolicy": {
-			[]core.ContainerResizePolicy{
+			PolicyList: []core.ContainerResizePolicy{
 				{ResourceName: "cpu", RestartPolicy: "RestartContainer"},
 				{ResourceName: "memory", RestartPolicy: "NotRequired"},
 			},
-			true,
-			field.ErrorList{field.Invalid(field.NewPath("field"), core.ResourceResizeRestartPolicy("RestartContainer"), "Only NotRequired is allowed, if pod restartPolicy is Never")},
-			"Never",
+			ExpectError:      true,
+			Errors:           field.ErrorList{field.Invalid(field.NewPath("field"), core.ResourceResizeRestartPolicy("RestartContainer"), "must be 'NotRequired' when `restartPolicy` is 'Never'")},
+			PodRestartPolicy: "Never",
 		},
 		"InvalidMemoryCPUPolicyWithPodRestartPolicy": {
-			[]core.ContainerResizePolicy{
+			PolicyList: []core.ContainerResizePolicy{
 				{ResourceName: "cpu", RestartPolicy: "RestartContainer"},
 				{ResourceName: "memory", RestartPolicy: "RestartContainer"},
 			},
-			true,
-			field.ErrorList{field.Invalid(field.NewPath("field"), core.ResourceResizeRestartPolicy("RestartContainer"), "Only NotRequired is allowed, if pod restartPolicy is Never"), field.Invalid(field.NewPath("field"), core.ResourceResizeRestartPolicy("RestartContainer"), "Only NotRequired is allowed, if pod restartPolicy is Never")},
-			"Never",
+			ExpectError:      true,
+			Errors:           field.ErrorList{field.Invalid(field.NewPath("field"), core.ResourceResizeRestartPolicy("RestartContainer"), "must be 'NotRequired' when `restartPolicy` is 'Never'"), field.Invalid(field.NewPath("field"), core.ResourceResizeRestartPolicy("RestartContainer"), "must be 'NotRequired' when `restartPolicy` is 'Never'")},
+			PodRestartPolicy: "Never",
 		},
 		"ValidMemoryCPUPolicyWithPodRestartPolicy": {
-			[]core.ContainerResizePolicy{
+			PolicyList: []core.ContainerResizePolicy{
 				{ResourceName: "cpu", RestartPolicy: "NotRequired"},
 				{ResourceName: "memory", RestartPolicy: "NotRequired"},
 			},
-			false,
-			nil,
-			"Never",
+			ExpectError:      false,
+			Errors:           nil,
+			PodRestartPolicy: "Never",
 		},
 	}
 	for k, v := range testCases {
@@ -6968,6 +6967,16 @@ func TestValidateEphemeralContainers(t *testing.T) {
 	} {
 		var PodRestartPolicy core.RestartPolicy
 		PodRestartPolicy = "Never"
+		if errs := validateEphemeralContainers(ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy); len(errs) != 0 {
+			t.Errorf("expected success for '%s' but got errors: %v", title, errs)
+		}
+
+		PodRestartPolicy = "Always"
+		if errs := validateEphemeralContainers(ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy); len(errs) != 0 {
+			t.Errorf("expected success for '%s' but got errors: %v", title, errs)
+		}
+
+		PodRestartPolicy = "OnFailure"
 		if errs := validateEphemeralContainers(ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy); len(errs) != 0 {
 			t.Errorf("expected success for '%s' but got errors: %v", title, errs)
 		}
@@ -7223,10 +7232,24 @@ func TestValidateEphemeralContainers(t *testing.T) {
 	}
 
 	var PodRestartPolicy core.RestartPolicy
-	PodRestartPolicy = "Never"
+
 	for _, tc := range tcs {
 		t.Run(tc.title+"__@L"+tc.line, func(t *testing.T) {
+
+			PodRestartPolicy = "Never"
 			errs := validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy)
+			if len(errs) == 0 {
+				t.Fatal("expected error but received none")
+			}
+
+			PodRestartPolicy = "Always"
+			errs = validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy)
+			if len(errs) == 0 {
+				t.Fatal("expected error but received none")
+			}
+
+			PodRestartPolicy = "OnFailure"
+			errs = validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy)
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}

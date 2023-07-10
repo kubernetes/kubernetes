@@ -3070,7 +3070,7 @@ func validateResizePolicy(policyList []core.ContainerResizePolicy, fldPath *fiel
 		}
 
 		if *podRestartPolicy == core.RestartPolicyNever && p.RestartPolicy != core.NotRequired {
-			allErrors = append(allErrors, field.Invalid(fldPath, p.RestartPolicy, "Only NotRequired is allowed, if pod restartPolicy is Never"))
+			allErrors = append(allErrors, field.Invalid(fldPath, p.RestartPolicy, "must be 'NotRequired' when `restartPolicy` is 'Never'"))
 		}
 	}
 	return allErrors
