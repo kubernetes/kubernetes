@@ -92,8 +92,8 @@ func FormatLabels(labelMap map[string]string) string {
 	return l
 }
 
-// Conflicts takes 2 maps and returns true if there a key match between
-// the maps but the value doesn't match, and returns false in other cases
+// Conflicts take 2 maps and return true if there is a key match between
+// the maps but the values don't match, and return false in other cases.
 func Conflicts(labels1, labels2 Set) bool {
 	small := labels1
 	big := labels2
