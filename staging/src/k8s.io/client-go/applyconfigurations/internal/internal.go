@@ -6075,7 +6075,7 @@ var schemaYAML = typed.YAMLObject(`types:
         namedType: io.k8s.api.core.v1.TypedObjectReference
     - name: resources
       type:
-        namedType: io.k8s.api.core.v1.ResourceRequirements
+        namedType: io.k8s.api.core.v1.VolumeResourceRequirements
       default: {}
     - name: selector
       type:
@@ -7894,6 +7894,19 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: serviceAccountToken
       type:
         namedType: io.k8s.api.core.v1.ServiceAccountTokenProjection
+- name: io.k8s.api.core.v1.VolumeResourceRequirements
+  map:
+    fields:
+    - name: limits
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: requests
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
 - name: io.k8s.api.core.v1.VsphereVirtualDiskVolumeSource
   map:
     fields:
