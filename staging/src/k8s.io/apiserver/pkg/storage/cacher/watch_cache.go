@@ -196,6 +196,10 @@ type watchCache struct {
 
 	// For testing cache interval invalidation.
 	indexValidator indexValidator
+
+	// Requests progress notification if there are requests waiting for watch
+	// to be fresh
+	waitingUntilFresh *conditionalProgressRequester
 }
 
 func newWatchCache(
@@ -204,8 +208,9 @@ func newWatchCache(
 	getAttrsFunc func(runtime.Object) (labels.Set, fields.Set, error),
 	versioner storage.Versioner,
 	indexers *cache.Indexers,
-	clock clock.Clock,
-	groupResource schema.GroupResource) *watchCache {
+	clock clock.WithTicker,
+	groupResource schema.GroupResource,
+	progressRequester *conditionalProgressRequester) *watchCache {
 	wc := &watchCache{
 		capacity:            defaultLowerBoundCapacity,
 		keyFunc:             keyFunc,
@@ -222,6 +227,7 @@ func newWatchCache(
 		clock:               clock,
 		versioner:           versioner,
 		groupResource:       groupResource,
+		waitingUntilFresh:   progressRequester,
 	}
 	metrics.WatchCacheCapacity.WithLabelValues(groupResource.String()).Set(float64(wc.capacity))
 	wc.cond = sync.NewCond(wc.RLocker())

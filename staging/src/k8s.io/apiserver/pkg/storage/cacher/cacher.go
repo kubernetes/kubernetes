@@ -104,7 +104,7 @@ type Config struct {
 
 	Codec runtime.Codec
 
-	Clock clock.Clock
+	Clock clock.WithTicker
 }
 
 type watchersMap map[int]*cacheWatcher
@@ -329,6 +329,10 @@ type Cacher struct {
 	expiredBookmarkWatchers []*cacheWatcher
 }
 
+func (c *Cacher) RequestWatchProgress(ctx context.Context) error {
+	return c.storage.RequestWatchProgress(ctx)
+}
+
 // NewCacherFromConfig creates a new Cacher responsible for servicing WATCH and LIST requests from
 // its internal cache and updating its cache in the background based on the
 // given configuration.
@@ -397,9 +401,9 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		// so that future reuse does not get a spurious timeout.
 		<-cacher.timer.C
 	}
-
+	progressRequester := newConditionalProgressRequester(config.Storage.RequestWatchProgress, config.Clock)
 	watchCache := newWatchCache(
-		config.KeyFunc, cacher.processEvent, config.GetAttrsFunc, config.Versioner, config.Indexers, config.Clock, config.GroupResource)
+		config.KeyFunc, cacher.processEvent, config.GetAttrsFunc, config.Versioner, config.Indexers, config.Clock, config.GroupResource, progressRequester)
 	listerWatcher := NewListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
 	reflectorName := "storage/cacher.go:" + config.ResourcePrefix
 
@@ -419,6 +423,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	cacher.reflector = reflector
 
 	go cacher.dispatchEvents()
+	go progressRequester.Run(stopCh)
 
 	cacher.stopWg.Add(1)
 	go func() {

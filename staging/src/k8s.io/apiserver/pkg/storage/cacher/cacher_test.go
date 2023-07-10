@@ -328,7 +328,7 @@ type setupOptions struct {
 	keyFunc        func(runtime.Object) (string, error)
 	indexerFuncs   map[string]storage.IndexerFunc
 	pagingEnabled  bool
-	clock          clock.Clock
+	clock          clock.WithTicker
 }
 
 type setupOption func(*setupOptions)

@@ -90,6 +90,10 @@ type dummyStorage struct {
 	watchFn   func(_ context.Context, _ string, _ storage.ListOptions) (watch.Interface, error)
 }
 
+func (d *dummyStorage) RequestWatchProgress(ctx context.Context) error {
+	return nil
+}
+
 type dummyWatch struct {
 	ch chan watch.Event
 }

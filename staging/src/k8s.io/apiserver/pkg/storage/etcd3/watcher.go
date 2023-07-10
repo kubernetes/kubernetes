@@ -215,6 +215,10 @@ func (wc *watchChan) ResultChan() <-chan watch.Event {
 	return wc.resultChan
 }
 
+func (wc *watchChan) RequestWatchProgress() error {
+	return wc.watcher.client.RequestProgress(wc.ctx)
+}
+
 // sync tries to retrieve existing data and send them to process.
 // The revision to watch will be set to the revision in response.
 // All events sent will have isCreated=true
