@@ -253,12 +253,13 @@ leaderElection:
 	}
 
 	testcases := []struct {
-		name               string
-		flags              []string
-		registryOptions    []Option
-		restoreFeatures    map[featuregate.Feature]bool
-		wantPlugins        map[string]*config.Plugins
-		wantLeaderElection *componentbaseconfig.LeaderElectionConfiguration
+		name                 string
+		flags                []string
+		registryOptions      []Option
+		restoreFeatures      map[featuregate.Feature]bool
+		wantPlugins          map[string]*config.Plugins
+		wantLeaderElection   *componentbaseconfig.LeaderElectionConfiguration
+		wantClientConnection *componentbaseconfig.ClientConnectionConfiguration
 	}{
 		{
 			name: "default config with an alpha feature enabled",
@@ -396,7 +397,7 @@ leaderElection:
 			flags: []string{
 				"--leader-elect=false",
 				"--leader-elect-lease-duration=2h", // CLI args are favored over the fields in ComponentConfig
-				"--lock-object-namespace=default",  // deprecated CLI arg will be ignored if --config is specified
+				"--kubeconfig=foo",                 // deprecated CLI arg will be ignored if --config is specified
 				"--config", emptyLeaderElectionConfig,
 			},
 			wantLeaderElection: &componentbaseconfig.LeaderElectionConfiguration{
@@ -408,14 +409,20 @@ leaderElection:
 				ResourceName:      v1beta3.SchedulerDefaultLockObjectName,
 				ResourceNamespace: v1beta3.SchedulerDefaultLockObjectNamespace,
 			},
+			wantClientConnection: &componentbaseconfig.ClientConnectionConfiguration{
+				Kubeconfig:  configKubeconfig,
+				ContentType: "application/vnd.kubernetes.protobuf",
+				QPS:         50,
+				Burst:       100,
+			},
 		},
 		{
 			name: "leader election CLI args, without --config arg",
 			flags: []string{
 				"--leader-elect=false",
 				"--leader-elect-lease-duration=2h",
-				"--lock-object-namespace=default", // deprecated CLI arg is honored if --config is not specified
-				"--kubeconfig", configKubeconfig,
+				"--leader-elect-resource-namespace=default",
+				"--kubeconfig", configKubeconfig, // deprecated CLI arg is honored if --config is not specified
 			},
 			wantLeaderElection: &componentbaseconfig.LeaderElectionConfiguration{
 				LeaderElect:       false,                                    // from CLI args
@@ -424,7 +431,13 @@ leaderElection:
 				RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
 				ResourceLock:      "leases",
 				ResourceName:      v1beta3.SchedulerDefaultLockObjectName,
-				ResourceNamespace: "default", // from deprecated CLI args
+				ResourceNamespace: "default", // from CLI args
+			},
+			wantClientConnection: &componentbaseconfig.ClientConnectionConfiguration{
+				Kubeconfig:  configKubeconfig, // from deprecated CLI args
+				ContentType: "application/vnd.kubernetes.protobuf",
+				QPS:         50,
+				Burst:       100,
 			},
 		},
 		{
@@ -518,6 +531,13 @@ leaderElection:
 				gotLeaderElection := opts.ComponentConfig.LeaderElection
 				if diff := cmp.Diff(*tc.wantLeaderElection, gotLeaderElection); diff != "" {
 					t.Errorf("Unexpected leaderElection diff (-want, +got): %s", diff)
+				}
+			}
+
+			if tc.wantClientConnection != nil {
+				gotClientConnection := opts.ComponentConfig.ClientConnection
+				if diff := cmp.Diff(*tc.wantClientConnection, gotClientConnection); diff != "" {
+					t.Errorf("Unexpected clientConnection diff (-want, +got): %s", diff)
 				}
 			}
 		})
