@@ -583,7 +583,9 @@ func TestOrphanPodsFinalizersClearedWithGC(t *testing.T) {
 
 func TestFinalizersClearedWhenBackoffLimitExceeded(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobTrackingWithFinalizers, true)()
-
+	// Set a maximum number of uncounted pods below parallelism, to ensure it
+	// doesn't affect the termination of pods.
+	t.Cleanup(setDuringTest(&jobcontroller.MaxUncountedPods, 50))
 	closeFn, restConfig, clientSet, ns := setup(t, "simple")
 	defer closeFn()
 	ctx, cancel := startJobControllerAndWaitForCaches(restConfig)
