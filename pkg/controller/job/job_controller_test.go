@@ -4413,8 +4413,8 @@ func TestFinalizersRemovedExpectations(t *testing.T) {
 func checkJobCompletionLabel(t *testing.T, p *v1.PodTemplateSpec) {
 	t.Helper()
 	labels := p.GetLabels()
-	if labels == nil || labels[batch.JobCompletionIndexAnnotation] == "" {
-		t.Errorf("missing expected pod label %s", batch.JobCompletionIndexAnnotation)
+	if labels == nil || labels[batch.JobCompletionIndexLabel] == "" {
+		t.Errorf("missing expected pod label %s", batch.JobCompletionIndexLabel)
 	}
 }
 
