@@ -2294,12 +2294,29 @@ func validateStorageClassUpgradeFromNil(oldAnnotations map[string]string, oldScN
 		(!oldAnnotationExist || *newScName == oldAnnotation) /* condition 3 */
 }
 
-var resizeStatusSet = sets.NewString(string(core.PersistentVolumeClaimNoExpansionInProgress),
-	string(core.PersistentVolumeClaimControllerExpansionInProgress),
-	string(core.PersistentVolumeClaimControllerExpansionFailed),
-	string(core.PersistentVolumeClaimNodeExpansionPending),
-	string(core.PersistentVolumeClaimNodeExpansionInProgress),
-	string(core.PersistentVolumeClaimNodeExpansionFailed))
+func validatePersistentVolumeClaimResourceKey(value string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for _, msg := range validation.IsQualifiedName(value) {
+		allErrs = append(allErrs, field.Invalid(fldPath, value, msg))
+	}
+	if len(allErrs) != 0 {
+		return allErrs
+	}
+	// For native resource names such as - either unprefixed names or with kubernetes.io prefix,
+	// only allowed value is storage
+	if helper.IsNativeResource(core.ResourceName(value)) {
+		if core.ResourceName(value) != core.ResourceStorage {
+			return append(allErrs, field.NotSupported(fldPath, value, []string{string(core.ResourceStorage)}))
+		}
+	}
+	return allErrs
+}
+
+var resizeStatusSet = sets.NewString(string(core.PersistentVolumeClaimControllerResizeInProgress),
+	string(core.PersistentVolumeClaimControllerResizeFailed),
+	string(core.PersistentVolumeClaimNodeResizePending),
+	string(core.PersistentVolumeClaimNodeResizeInProgress),
+	string(core.PersistentVolumeClaimNodeResizeFailed))
 
 // ValidatePersistentVolumeClaimStatusUpdate validates an update to status of a PersistentVolumeClaim
 func ValidatePersistentVolumeClaimStatusUpdate(newPvc, oldPvc *core.PersistentVolumeClaim, validationOpts PersistentVolumeClaimSpecValidationOptions) field.ErrorList {
@@ -2316,19 +2333,26 @@ func ValidatePersistentVolumeClaimStatusUpdate(newPvc, oldPvc *core.PersistentVo
 		allErrs = append(allErrs, validateBasicResource(qty, capPath.Key(string(r)))...)
 	}
 	if validationOpts.EnableRecoverFromExpansionFailure {
-		resizeStatusPath := field.NewPath("status", "resizeStatus")
-		if newPvc.Status.ResizeStatus != nil {
-			resizeStatus := *newPvc.Status.ResizeStatus
-			if !resizeStatusSet.Has(string(resizeStatus)) {
-				allErrs = append(allErrs, field.NotSupported(resizeStatusPath, resizeStatus, resizeStatusSet.List()))
+		resizeStatusPath := field.NewPath("status", "allocatedResourceStatus")
+		if newPvc.Status.AllocatedResourceStatuses != nil {
+			resizeStatus := newPvc.Status.AllocatedResourceStatuses
+			for k, v := range resizeStatus {
+				if errs := validatePersistentVolumeClaimResourceKey(k.String(), resizeStatusPath); len(errs) > 0 {
+					allErrs = append(allErrs, errs...)
+				}
+				if !resizeStatusSet.Has(string(v)) {
+					allErrs = append(allErrs, field.NotSupported(resizeStatusPath, k, resizeStatusSet.List()))
+					continue
+				}
 			}
 		}
 		allocPath := field.NewPath("status", "allocatedResources")
 		for r, qty := range newPvc.Status.AllocatedResources {
-			if r != core.ResourceStorage {
-				allErrs = append(allErrs, field.NotSupported(allocPath, r, []string{string(core.ResourceStorage)}))
+			if errs := validatePersistentVolumeClaimResourceKey(r.String(), allocPath); len(errs) > 0 {
+				allErrs = append(allErrs, errs...)
 				continue
 			}
+
 			if errs := validateBasicResource(qty, allocPath.Key(string(r))); len(errs) > 0 {
 				allErrs = append(allErrs, errs...)
 			} else {

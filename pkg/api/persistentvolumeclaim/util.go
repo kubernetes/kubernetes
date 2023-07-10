@@ -99,7 +99,7 @@ func DropDisabledFieldsFromStatus(pvc, oldPVC *core.PersistentVolumeClaim) {
 			pvc.Status.AllocatedResources = nil
 		}
 		if !resizeStatusInUse(oldPVC) {
-			pvc.Status.ResizeStatus = nil
+			pvc.Status.AllocatedResourceStatuses = nil
 		}
 	}
 }
@@ -179,7 +179,7 @@ func resizeStatusInUse(oldPVC *core.PersistentVolumeClaim) bool {
 	if oldPVC == nil {
 		return false
 	}
-	if oldPVC.Status.ResizeStatus != nil {
+	if oldPVC.Status.AllocatedResourceStatuses != nil {
 		return true
 	}
 	return false

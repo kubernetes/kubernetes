@@ -436,30 +436,30 @@ func TestDropDisabledFieldsFromStatus(t *testing.T) {
 		{
 			name:     "for:newPVC=hasResizeStatus,oldPVC=nil, featuregate=false should drop field",
 			feature:  false,
-			pvc:      withResizeStatus(core.PersistentVolumeClaimNodeExpansionFailed),
+			pvc:      withResizeStatus(core.PersistentVolumeClaimNodeResizeFailed),
 			oldPVC:   nil,
 			expected: getPVC(),
 		},
 		{
 			name:     "for:newPVC=hasResizeStatus,oldPVC=doesnot,featuregate=true; should keep field",
 			feature:  true,
-			pvc:      withResizeStatus(core.PersistentVolumeClaimNodeExpansionFailed),
+			pvc:      withResizeStatus(core.PersistentVolumeClaimNodeResizeFailed),
 			oldPVC:   getPVC(),
-			expected: withResizeStatus(core.PersistentVolumeClaimNodeExpansionFailed),
+			expected: withResizeStatus(core.PersistentVolumeClaimNodeResizeFailed),
 		},
 		{
 			name:     "for:newPVC=hasResizeStatus,oldPVC=hasResizeStatus,featuregate=true; should keep field",
 			feature:  true,
-			pvc:      withResizeStatus(core.PersistentVolumeClaimNodeExpansionFailed),
-			oldPVC:   withResizeStatus(core.PersistentVolumeClaimNodeExpansionFailed),
-			expected: withResizeStatus(core.PersistentVolumeClaimNodeExpansionFailed),
+			pvc:      withResizeStatus(core.PersistentVolumeClaimNodeResizeFailed),
+			oldPVC:   withResizeStatus(core.PersistentVolumeClaimNodeResizeFailed),
+			expected: withResizeStatus(core.PersistentVolumeClaimNodeResizeFailed),
 		},
 		{
 			name:     "for:newPVC=hasResizeStatus,oldPVC=hasResizeStatus,featuregate=false; should keep field",
 			feature:  false,
-			pvc:      withResizeStatus(core.PersistentVolumeClaimNodeExpansionFailed),
-			oldPVC:   withResizeStatus(core.PersistentVolumeClaimNodeExpansionFailed),
-			expected: withResizeStatus(core.PersistentVolumeClaimNodeExpansionFailed),
+			pvc:      withResizeStatus(core.PersistentVolumeClaimNodeResizeFailed),
+			oldPVC:   withResizeStatus(core.PersistentVolumeClaimNodeResizeFailed),
+			expected: withResizeStatus(core.PersistentVolumeClaimNodeResizeFailed),
 		},
 	}
 
@@ -490,10 +490,12 @@ func withAllocatedResource(q string) *core.PersistentVolumeClaim {
 	}
 }
 
-func withResizeStatus(status core.PersistentVolumeClaimResizeStatus) *core.PersistentVolumeClaim {
+func withResizeStatus(status core.ClaimResourceStatus) *core.PersistentVolumeClaim {
 	return &core.PersistentVolumeClaim{
 		Status: core.PersistentVolumeClaimStatus{
-			ResizeStatus: &status,
+			AllocatedResourceStatuses: map[core.ResourceName]core.ClaimResourceStatus{
+				core.ResourceStorage: status,
+			},
 		},
 	}
 }

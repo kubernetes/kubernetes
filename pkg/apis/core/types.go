@@ -515,23 +515,26 @@ const (
 )
 
 // +enum
-type PersistentVolumeClaimResizeStatus string
+// When a controller receives persistentvolume claim update with ClaimResourceStatus for a resource
+// that it does not recognizes, then it should ignore that update and let other controllers
+// handle it.
+type ClaimResourceStatus string
 
 const (
-	// When expansion is complete, the empty string is set by resize controller or kubelet.
-	PersistentVolumeClaimNoExpansionInProgress PersistentVolumeClaimResizeStatus = ""
 	// State set when resize controller starts expanding the volume in control-plane
-	PersistentVolumeClaimControllerExpansionInProgress PersistentVolumeClaimResizeStatus = "ControllerExpansionInProgress"
+	PersistentVolumeClaimControllerResizeInProgress ClaimResourceStatus = "ControllerResizeInProgress"
+
 	// State set when expansion has failed in resize controller with a terminal error.
-	// Transient errors such as timeout should not set this status and should leave ResizeStatus
+	// Transient errors such as timeout should not set this status and should leave allocatedResourceStatus
 	// unmodified, so as resize controller can resume the volume expansion.
-	PersistentVolumeClaimControllerExpansionFailed PersistentVolumeClaimResizeStatus = "ControllerExpansionFailed"
+	PersistentVolumeClaimControllerResizeFailed ClaimResourceStatus = "ControllerResizeFailed"
+
 	// State set when resize controller has finished expanding the volume but further expansion is needed on the node.
-	PersistentVolumeClaimNodeExpansionPending PersistentVolumeClaimResizeStatus = "NodeExpansionPending"
+	PersistentVolumeClaimNodeResizePending ClaimResourceStatus = "NodeResizePending"
 	// State set when kubelet starts expanding the volume.
-	PersistentVolumeClaimNodeExpansionInProgress PersistentVolumeClaimResizeStatus = "NodeExpansionInProgress"
+	PersistentVolumeClaimNodeResizeInProgress ClaimResourceStatus = "NodeResizeInProgress"
 	// State set when expansion has failed in kubelet with a terminal error. Transient errors don't set NodeExpansionFailed.
-	PersistentVolumeClaimNodeExpansionFailed PersistentVolumeClaimResizeStatus = "NodeExpansionFailed"
+	PersistentVolumeClaimNodeResizeFailed ClaimResourceStatus = "NodeResizeFailed"
 )
 
 // PersistentVolumeClaimCondition represents the current condition of PV claim
@@ -572,13 +575,19 @@ type PersistentVolumeClaimStatus struct {
 	// +featureGate=RecoverVolumeExpansionFailure
 	// +optional
 	AllocatedResources ResourceList
-	// ResizeStatus stores status of resize operation.
-	// ResizeStatus is not set by default but when expansion is complete resizeStatus is set to empty
-	// string by resize controller or kubelet.
+	// allocatedResourceStatuses stores status of resource being resized for the given PVC.
+	// If Expanding a PVC for more capacity - this field can be one of the following states:
+	// 	- pvc.status.allocatedResourceStatus['storage'] = "ControllerResizeInProgress"
+	//      - pvc.status.allocatedResourceStatus['storage'] = "ControllerResizeFailed"
+	//      - pvc.status.allocatedResourceStatus['storage'] = "NodeResizePending"
+	//      - pvc.status.allocatedResourceStatus['storage'] = "NodeResizeInProgress"
+	//      - pvc.status.allocatedResourceStatus['storage'] = "NodeResizeFailed"
+	// When this field is not set, it means that no resize operation is in progress for the given PVC.
 	// This is an alpha field and requires enabling RecoverVolumeExpansionFailure feature.
 	// +featureGate=RecoverVolumeExpansionFailure
+	// +mapType=granular
 	// +optional
-	ResizeStatus *PersistentVolumeClaimResizeStatus
+	AllocatedResourceStatuses map[ResourceName]ClaimResourceStatus
 }
 
 // PersistentVolumeAccessMode defines various access modes for PV.

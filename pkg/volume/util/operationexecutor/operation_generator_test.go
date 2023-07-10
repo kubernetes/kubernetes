@@ -93,6 +93,8 @@ func TestOperationGenerator_GenerateUnmapVolumeFunc_PluginName(t *testing.T) {
 }
 
 func TestOperationGenerator_GenerateExpandAndRecoverVolumeFunc(t *testing.T) {
+	nodeResizePending := v1.PersistentVolumeClaimNodeResizePending
+	nodeResizeFailed := v1.PersistentVolumeClaimNodeResizeFailed
 	var tests = []struct {
 		name                 string
 		pvc                  *v1.PersistentVolumeClaim
@@ -100,53 +102,53 @@ func TestOperationGenerator_GenerateExpandAndRecoverVolumeFunc(t *testing.T) {
 		recoverFeatureGate   bool
 		disableNodeExpansion bool
 		// expectations of test
-		expectedResizeStatus  v1.PersistentVolumeClaimResizeStatus
+		expectedResizeStatus  v1.ClaimResourceStatus
 		expectedAllocatedSize resource.Quantity
 		expectResizeCall      bool
 	}{
 		{
 			name:                  "pvc.spec.size > pv.spec.size, recover_expansion=on",
-			pvc:                   getTestPVC("test-vol0", "2G", "1G", "", v1.PersistentVolumeClaimNoExpansionInProgress),
+			pvc:                   getTestPVC("test-vol0", "2G", "1G", "", nil),
 			pv:                    getTestPV("test-vol0", "1G"),
 			recoverFeatureGate:    true,
-			expectedResizeStatus:  v1.PersistentVolumeClaimNodeExpansionPending,
+			expectedResizeStatus:  v1.PersistentVolumeClaimNodeResizePending,
 			expectedAllocatedSize: resource.MustParse("2G"),
 			expectResizeCall:      true,
 		},
 		{
 			name:                  "pvc.spec.size = pv.spec.size, recover_expansion=on",
-			pvc:                   getTestPVC("test-vol0", "1G", "1G", "", v1.PersistentVolumeClaimNoExpansionInProgress),
+			pvc:                   getTestPVC("test-vol0", "1G", "1G", "", nil),
 			pv:                    getTestPV("test-vol0", "1G"),
 			recoverFeatureGate:    true,
-			expectedResizeStatus:  v1.PersistentVolumeClaimNodeExpansionPending,
+			expectedResizeStatus:  v1.PersistentVolumeClaimNodeResizePending,
 			expectedAllocatedSize: resource.MustParse("1G"),
 			expectResizeCall:      true,
 		},
 		{
 			name:                  "pvc.spec.size = pv.spec.size, recover_expansion=on",
-			pvc:                   getTestPVC("test-vol0", "1G", "1G", "1G", v1.PersistentVolumeClaimNodeExpansionPending),
+			pvc:                   getTestPVC("test-vol0", "1G", "1G", "1G", &nodeResizePending),
 			pv:                    getTestPV("test-vol0", "1G"),
 			recoverFeatureGate:    true,
-			expectedResizeStatus:  v1.PersistentVolumeClaimNodeExpansionPending,
+			expectedResizeStatus:  v1.PersistentVolumeClaimNodeResizePending,
 			expectedAllocatedSize: resource.MustParse("1G"),
 			expectResizeCall:      false,
 		},
 		{
 			name:                  "pvc.spec.size > pv.spec.size, recover_expansion=on, disable_node_expansion=true",
-			pvc:                   getTestPVC("test-vol0", "2G", "1G", "", v1.PersistentVolumeClaimNoExpansionInProgress),
+			pvc:                   getTestPVC("test-vol0", "2G", "1G", "", nil),
 			pv:                    getTestPV("test-vol0", "1G"),
 			disableNodeExpansion:  true,
 			recoverFeatureGate:    true,
-			expectedResizeStatus:  v1.PersistentVolumeClaimNoExpansionInProgress,
+			expectedResizeStatus:  "",
 			expectedAllocatedSize: resource.MustParse("2G"),
 			expectResizeCall:      true,
 		},
 		{
 			name:                  "pv.spec.size >= pvc.spec.size, recover_expansion=on, resize_status=node_expansion_failed",
-			pvc:                   getTestPVC("test-vol0", "2G", "1G", "2G", v1.PersistentVolumeClaimNodeExpansionFailed),
+			pvc:                   getTestPVC("test-vol0", "2G", "1G", "2G", &nodeResizeFailed),
 			pv:                    getTestPV("test-vol0", "2G"),
 			recoverFeatureGate:    true,
-			expectedResizeStatus:  v1.PersistentVolumeClaimNodeExpansionPending,
+			expectedResizeStatus:  v1.PersistentVolumeClaimNodeResizePending,
 			expectedAllocatedSize: resource.MustParse("2G"),
 			expectResizeCall:      false,
 		},
@@ -173,7 +175,8 @@ func TestOperationGenerator_GenerateExpandAndRecoverVolumeFunc(t *testing.T) {
 				t.Fatalf("GenerateExpandAndRecoverVolumeFunc failed: %v", expansionResponse.err)
 			}
 			updatedPVC := expansionResponse.pvc
-			assert.Equal(t, *updatedPVC.Status.ResizeStatus, test.expectedResizeStatus)
+			actualResizeStatus := updatedPVC.Status.AllocatedResourceStatuses[v1.ResourceStorage]
+			assert.Equal(t, actualResizeStatus, test.expectedResizeStatus)
 			actualAllocatedSize := updatedPVC.Status.AllocatedResources.Storage()
 			if test.expectedAllocatedSize.Cmp(*actualAllocatedSize) != 0 {
 				t.Fatalf("GenerateExpandAndRecoverVolumeFunc failed: expected allocated size %s, got %s", test.expectedAllocatedSize.String(), actualAllocatedSize.String())
@@ -191,6 +194,8 @@ func TestOperationGenerator_nodeExpandVolume(t *testing.T) {
 		return &x
 	}
 
+	nodeResizeFailed := v1.PersistentVolumeClaimNodeResizeFailed
+	nodeResizePending := v1.PersistentVolumeClaimNodeResizePending
 	var tests = []struct {
 		name string
 		pvc  *v1.PersistentVolumeClaim
@@ -202,65 +207,65 @@ func TestOperationGenerator_nodeExpandVolume(t *testing.T) {
 		actualSize *resource.Quantity
 
 		// expectations of test
-		expectedResizeStatus v1.PersistentVolumeClaimResizeStatus
+		expectedResizeStatus v1.ClaimResourceStatus
 		expectedStatusSize   resource.Quantity
 		resizeCallCount      int
 		expectError          bool
 	}{
 		{
 			name: "pv.spec.cap > pvc.status.cap, resizeStatus=node_expansion_failed",
-			pvc:  getTestPVC("test-vol0", "2G", "1G", "", v1.PersistentVolumeClaimNodeExpansionFailed),
+			pvc:  getTestPVC("test-vol0", "2G", "1G", "", &nodeResizeFailed),
 			pv:   getTestPV("test-vol0", "2G"),
 
-			expectedResizeStatus: v1.PersistentVolumeClaimNodeExpansionFailed,
+			expectedResizeStatus: v1.PersistentVolumeClaimNodeResizeFailed,
 			resizeCallCount:      0,
 			expectedStatusSize:   resource.MustParse("1G"),
 		},
 		{
 			name:                 "pv.spec.cap > pvc.status.cap, resizeStatus=node_expansion_pending",
-			pvc:                  getTestPVC("test-vol0", "2G", "1G", "2G", v1.PersistentVolumeClaimNodeExpansionPending),
+			pvc:                  getTestPVC("test-vol0", "2G", "1G", "2G", &nodeResizePending),
 			pv:                   getTestPV("test-vol0", "2G"),
-			expectedResizeStatus: v1.PersistentVolumeClaimNoExpansionInProgress,
+			expectedResizeStatus: "",
 			resizeCallCount:      1,
 			expectedStatusSize:   resource.MustParse("2G"),
 		},
 		{
 			name:                 "pv.spec.cap > pvc.status.cap, resizeStatus=node_expansion_pending, reize_op=failing",
-			pvc:                  getTestPVC(volumetesting.AlwaysFailNodeExpansion, "2G", "1G", "2G", v1.PersistentVolumeClaimNodeExpansionPending),
+			pvc:                  getTestPVC(volumetesting.AlwaysFailNodeExpansion, "2G", "1G", "2G", &nodeResizePending),
 			pv:                   getTestPV(volumetesting.AlwaysFailNodeExpansion, "2G"),
 			expectError:          true,
-			expectedResizeStatus: v1.PersistentVolumeClaimNodeExpansionFailed,
+			expectedResizeStatus: v1.PersistentVolumeClaimNodeResizeFailed,
 			resizeCallCount:      1,
 			expectedStatusSize:   resource.MustParse("1G"),
 		},
 		{
 			name: "pv.spec.cap = pvc.status.cap, resizeStatus='', desiredSize = actualSize",
-			pvc:  getTestPVC("test-vol0", "2G", "2G", "2G", v1.PersistentVolumeClaimNoExpansionInProgress),
+			pvc:  getTestPVC("test-vol0", "2G", "2G", "2G", nil),
 			pv:   getTestPV("test-vol0", "2G"),
 
-			expectedResizeStatus: v1.PersistentVolumeClaimNoExpansionInProgress,
+			expectedResizeStatus: "",
 			resizeCallCount:      0,
 			expectedStatusSize:   resource.MustParse("2G"),
 		},
 		{
 			name:        "pv.spec.cap = pvc.status.cap, resizeStatus='', desiredSize > actualSize",
-			pvc:         getTestPVC("test-vol0", "2G", "2G", "2G", v1.PersistentVolumeClaimNoExpansionInProgress),
+			pvc:         getTestPVC("test-vol0", "2G", "2G", "2G", nil),
 			pv:          getTestPV("test-vol0", "2G"),
 			desiredSize: getSizeFunc("2G"),
 			actualSize:  getSizeFunc("1G"),
 
-			expectedResizeStatus: v1.PersistentVolumeClaimNoExpansionInProgress,
+			expectedResizeStatus: "",
 			resizeCallCount:      1,
 			expectedStatusSize:   resource.MustParse("2G"),
 		},
 		{
 			name:        "pv.spec.cap = pvc.status.cap, resizeStatus=node-expansion-failed, desiredSize > actualSize",
-			pvc:         getTestPVC("test-vol0", "2G", "2G", "2G", v1.PersistentVolumeClaimNodeExpansionFailed),
+			pvc:         getTestPVC("test-vol0", "2G", "2G", "2G", &nodeResizeFailed),
 			pv:          getTestPV("test-vol0", "2G"),
 			desiredSize: getSizeFunc("2G"),
 			actualSize:  getSizeFunc("1G"),
 
-			expectedResizeStatus: v1.PersistentVolumeClaimNodeExpansionFailed,
+			expectedResizeStatus: v1.PersistentVolumeClaimNodeResizeFailed,
 			resizeCallCount:      0,
 			expectedStatusSize:   resource.MustParse("2G"),
 		},
@@ -336,7 +341,7 @@ func getTestPod(podName, pvcName string) *v1.Pod {
 	}
 }
 
-func getTestPVC(volumeName string, specSize, statusSize, allocatedSize string, resizeStatus v1.PersistentVolumeClaimResizeStatus) *v1.PersistentVolumeClaim {
+func getTestPVC(volumeName string, specSize, statusSize, allocatedSize string, resizeStatus *v1.ClaimResourceStatus) *v1.PersistentVolumeClaim {
 	pvc := &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "claim01",
@@ -358,7 +363,11 @@ func getTestPVC(volumeName string, specSize, statusSize, allocatedSize string, r
 	if len(allocatedSize) > 0 {
 		pvc.Status.AllocatedResources = v1.ResourceList{v1.ResourceStorage: resource.MustParse(allocatedSize)}
 	}
-	pvc.Status.ResizeStatus = &resizeStatus
+	if resizeStatus != nil {
+		pvc.Status.AllocatedResourceStatuses = map[v1.ResourceName]v1.ClaimResourceStatus{
+			v1.ResourceStorage: *resizeStatus,
+		}
+	}
 	return pvc
 }
 

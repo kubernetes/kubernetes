@@ -18305,15 +18305,60 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 			core.ResourceName(core.ResourceCPU): resource.MustParse("10G"),
 		},
 	})
-	progressResizeStatus := core.PersistentVolumeClaimControllerExpansionInProgress
-	invalidResizeStatus := core.PersistentVolumeClaimResizeStatus("foo")
+	progressResizeStatus := core.PersistentVolumeClaimControllerResizeInProgress
+
+	invalidResizeStatus := core.ClaimResourceStatus("foo")
+	validResizeKeyCustom := core.ResourceName("example.com/foo")
+	invalidNativeResizeKey := core.ResourceName("kubernetes.io/foo")
 
 	validResizeStatusPVC := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadWriteOnce,
 		},
 	}, core.PersistentVolumeClaimStatus{
-		ResizeStatus: &progressResizeStatus,
+		AllocatedResourceStatuses: map[core.ResourceName]core.ClaimResourceStatus{
+			core.ResourceStorage: progressResizeStatus,
+		},
+	})
+
+	validResizeStatusControllerResizeFailed := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+		},
+	}, core.PersistentVolumeClaimStatus{
+		AllocatedResourceStatuses: map[core.ResourceName]core.ClaimResourceStatus{
+			core.ResourceStorage: core.PersistentVolumeClaimControllerResizeFailed,
+		},
+	})
+
+	validNodeResizePending := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+		},
+	}, core.PersistentVolumeClaimStatus{
+		AllocatedResourceStatuses: map[core.ResourceName]core.ClaimResourceStatus{
+			core.ResourceStorage: core.PersistentVolumeClaimNodeResizePending,
+		},
+	})
+
+	validNodeResizeInProgress := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+		},
+	}, core.PersistentVolumeClaimStatus{
+		AllocatedResourceStatuses: map[core.ResourceName]core.ClaimResourceStatus{
+			core.ResourceStorage: core.PersistentVolumeClaimNodeResizeInProgress,
+		},
+	})
+
+	validNodeResizeFailed := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+		},
+	}, core.PersistentVolumeClaimStatus{
+		AllocatedResourceStatuses: map[core.ResourceName]core.ClaimResourceStatus{
+			core.ResourceStorage: core.PersistentVolumeClaimNodeResizeFailed,
+		},
 	})
 
 	invalidResizeStatusPVC := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
@@ -18321,7 +18366,69 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 			core.ReadWriteOnce,
 		},
 	}, core.PersistentVolumeClaimStatus{
-		ResizeStatus: &invalidResizeStatus,
+		AllocatedResourceStatuses: map[core.ResourceName]core.ClaimResourceStatus{
+			core.ResourceStorage: invalidResizeStatus,
+		},
+	})
+
+	invalidNativeResizeStatusPVC := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+		},
+	}, core.PersistentVolumeClaimStatus{
+		AllocatedResourceStatuses: map[core.ResourceName]core.ClaimResourceStatus{
+			invalidNativeResizeKey: core.PersistentVolumeClaimNodeResizePending,
+		},
+	})
+
+	validExternalResizeStatusPVC := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+		},
+	}, core.PersistentVolumeClaimStatus{
+		AllocatedResourceStatuses: map[core.ResourceName]core.ClaimResourceStatus{
+			validResizeKeyCustom: core.PersistentVolumeClaimNodeResizePending,
+		},
+	})
+
+	invalidNativeResourceAllocatedKey := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+			core.ReadOnlyMany,
+		},
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+	}, core.PersistentVolumeClaimStatus{
+		Phase: core.ClaimPending,
+		Conditions: []core.PersistentVolumeClaimCondition{
+			{Type: core.PersistentVolumeClaimResizing, Status: core.ConditionTrue},
+		},
+		AllocatedResources: core.ResourceList{
+			invalidNativeResizeKey: resource.MustParse("14G"),
+		},
+	})
+
+	validExternalAllocatedResource := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+			core.ReadOnlyMany,
+		},
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+	}, core.PersistentVolumeClaimStatus{
+		Phase: core.ClaimPending,
+		Conditions: []core.PersistentVolumeClaimCondition{
+			{Type: core.PersistentVolumeClaimResizing, Status: core.ConditionTrue},
+		},
+		AllocatedResources: core.ResourceList{
+			validResizeKeyCustom: resource.MustParse("14G"),
+		},
 	})
 
 	scenarios := map[string]struct {
@@ -18344,6 +18451,21 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 			enableResize:               true,
 			enableRecoverFromExpansion: true,
 		},
+		"status-update-with-invalid-allocatedResources-native-key-feature-enabled": {
+			isExpectedFailure:          true,
+			oldClaim:                   validClaim,
+			newClaim:                   invalidNativeResourceAllocatedKey,
+			enableResize:               true,
+			enableRecoverFromExpansion: true,
+		},
+		"status-update-with-valid-allocatedResources-external-key-feature-enabled": {
+			isExpectedFailure:          false,
+			oldClaim:                   validClaim,
+			newClaim:                   validExternalAllocatedResource,
+			enableResize:               true,
+			enableRecoverFromExpansion: true,
+		},
+
 		"status-update-with-invalid-allocatedResources-feature-enabled": {
 			isExpectedFailure:          true,
 			oldClaim:                   validClaim,
@@ -18355,6 +18477,48 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 			isExpectedFailure:          true,
 			oldClaim:                   validClaim,
 			newClaim:                   noStoraegeClaimStatus,
+			enableResize:               true,
+			enableRecoverFromExpansion: true,
+		},
+		"staus-update-with-controller-resize-failed": {
+			isExpectedFailure:          false,
+			oldClaim:                   validClaim,
+			newClaim:                   validResizeStatusControllerResizeFailed,
+			enableResize:               true,
+			enableRecoverFromExpansion: true,
+		},
+		"staus-update-with-node-resize-pending": {
+			isExpectedFailure:          false,
+			oldClaim:                   validClaim,
+			newClaim:                   validNodeResizePending,
+			enableResize:               true,
+			enableRecoverFromExpansion: true,
+		},
+		"staus-update-with-node-resize-inprogress": {
+			isExpectedFailure:          false,
+			oldClaim:                   validClaim,
+			newClaim:                   validNodeResizeInProgress,
+			enableResize:               true,
+			enableRecoverFromExpansion: true,
+		},
+		"staus-update-with-node-resize-failed": {
+			isExpectedFailure:          false,
+			oldClaim:                   validClaim,
+			newClaim:                   validNodeResizeFailed,
+			enableResize:               true,
+			enableRecoverFromExpansion: true,
+		},
+		"staus-update-with-invalid-native-resource-status-key": {
+			isExpectedFailure:          true,
+			oldClaim:                   validClaim,
+			newClaim:                   invalidNativeResizeStatusPVC,
+			enableResize:               true,
+			enableRecoverFromExpansion: true,
+		},
+		"staus-update-with-valid-external-resource-status-key": {
+			isExpectedFailure:          false,
+			oldClaim:                   validClaim,
+			newClaim:                   validExternalResizeStatusPVC,
 			enableResize:               true,
 			enableRecoverFromExpansion: true,
 		},
