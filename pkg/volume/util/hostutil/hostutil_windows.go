@@ -88,7 +88,7 @@ func (hu *HostUtil) MakeRShared(path string) error {
 }
 
 // GetFileType checks for sockets/block/character devices
-func (hu *(HostUtil)) GetFileType(pathname string) (FileType, error) {
+func (hu *HostUtil) GetFileType(pathname string) (FileType, error) {
 	return getFileType(pathname)
 }
 
