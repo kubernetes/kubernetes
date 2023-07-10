@@ -47,7 +47,22 @@
     "policyName": "policyNameValue",
     "paramRef": {
       "name": "nameValue",
-      "namespace": "namespaceValue"
+      "namespace": "namespaceValue",
+      "selector": {
+        "matchLabels": {
+          "matchLabelsKey": "matchLabelsValue"
+        },
+        "matchExpressions": [
+          {
+            "key": "keyValue",
+            "operator": "operatorValue",
+            "values": [
+              "valuesValue"
+            ]
+          }
+        ]
+      },
+      "parameterNotFoundAction": "parameterNotFoundActionValue"
     },
     "matchResources": {
       "namespaceSelector": {

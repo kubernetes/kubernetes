@@ -397,6 +397,8 @@ func Convert_admissionregistration_ParamKind_To_v1alpha1_ParamKind(in *admission
 func autoConvert_v1alpha1_ParamRef_To_admissionregistration_ParamRef(in *v1alpha1.ParamRef, out *admissionregistration.ParamRef, s conversion.Scope) error {
 	out.Name = in.Name
 	out.Namespace = in.Namespace
+	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
+	out.ParameterNotFoundAction = (*admissionregistration.ParameterNotFoundActionType)(unsafe.Pointer(in.ParameterNotFoundAction))
 	return nil
 }
 
@@ -408,6 +410,8 @@ func Convert_v1alpha1_ParamRef_To_admissionregistration_ParamRef(in *v1alpha1.Pa
 func autoConvert_admissionregistration_ParamRef_To_v1alpha1_ParamRef(in *admissionregistration.ParamRef, out *v1alpha1.ParamRef, s conversion.Scope) error {
 	out.Name = in.Name
 	out.Namespace = in.Namespace
+	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
+	out.ParameterNotFoundAction = (*v1alpha1.ParameterNotFoundActionType)(unsafe.Pointer(in.ParameterNotFoundAction))
 	return nil
 }
 

@@ -78,6 +78,15 @@ spec:
   paramRef:
     name: nameValue
     namespace: namespaceValue
+    parameterNotFoundAction: parameterNotFoundActionValue
+    selector:
+      matchExpressions:
+      - key: keyValue
+        operator: operatorValue
+        values:
+        - valuesValue
+      matchLabels:
+        matchLabelsKey: matchLabelsValue
   policyName: policyNameValue
   validationActions:
   - validationActionsValue
