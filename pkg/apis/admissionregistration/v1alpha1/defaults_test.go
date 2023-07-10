@@ -42,13 +42,10 @@ func TestDefaultAdmissionPolicy(t *testing.T) {
 		{
 			name: "ValidatingAdmissionPolicy",
 			original: &v1alpha1.ValidatingAdmissionPolicy{
-				Spec: v1alpha1.ValidatingAdmissionPolicySpec{
-					MatchConstraints: &v1alpha1.MatchResources{},
-				},
-			},
+				Spec: v1alpha1.ValidatingAdmissionPolicySpec{}},
 			expected: &v1alpha1.ValidatingAdmissionPolicy{
 				Spec: v1alpha1.ValidatingAdmissionPolicySpec{
-					MatchConstraints: &v1alpha1.MatchResources{
+					MatchConstraints: v1alpha1.MatchResources{
 						MatchPolicy:       &equivalent,
 						NamespaceSelector: &metav1.LabelSelector{},
 						ObjectSelector:    &metav1.LabelSelector{},
@@ -78,14 +75,14 @@ func TestDefaultAdmissionPolicy(t *testing.T) {
 			name: "scope=*",
 			original: &v1alpha1.ValidatingAdmissionPolicy{
 				Spec: v1alpha1.ValidatingAdmissionPolicySpec{
-					MatchConstraints: &v1alpha1.MatchResources{
+					MatchConstraints: v1alpha1.MatchResources{
 						ResourceRules: []v1alpha1.NamedRuleWithOperations{{}},
 					},
 				},
 			},
 			expected: &v1alpha1.ValidatingAdmissionPolicy{
 				Spec: v1alpha1.ValidatingAdmissionPolicySpec{
-					MatchConstraints: &v1alpha1.MatchResources{
+					MatchConstraints: v1alpha1.MatchResources{
 						MatchPolicy:       &equivalent,
 						NamespaceSelector: &metav1.LabelSelector{},
 						ObjectSelector:    &metav1.LabelSelector{},

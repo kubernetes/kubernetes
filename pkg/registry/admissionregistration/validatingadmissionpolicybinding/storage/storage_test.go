@@ -125,8 +125,11 @@ func validPolicyBinding() *admissionregistration.ValidatingAdmissionPolicyBindin
 		},
 		Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
 			PolicyName: "replicalimit-policy.example.com",
-			ParamRef: &admissionregistration.ParamRef{
-				Name: "param-test",
+			ParamRef: &admissionregistration.BindingParamRef{
+				ParamKind: admissionregistration.BindingParamKindClusterWide,
+				ClusterWide: &admissionregistration.ClusterWideParamRef{
+					Name: "param-test",
+				},
 			},
 			ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 			MatchResources: &admissionregistration.MatchResources{
@@ -165,8 +168,11 @@ func newPolicyBinding(name string) *admissionregistration.ValidatingAdmissionPol
 		},
 		Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
 			PolicyName: "replicalimit-policy.example.com",
-			ParamRef: &admissionregistration.ParamRef{
-				Name: "param-test",
+			ParamRef: &admissionregistration.BindingParamRef{
+				ParamKind: admissionregistration.BindingParamKindClusterWide,
+				ClusterWide: &admissionregistration.ClusterWideParamRef{
+					Name: "param-test",
+				},
 			},
 			ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 			MatchResources:    &admissionregistration.MatchResources{},

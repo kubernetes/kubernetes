@@ -201,9 +201,6 @@ func newValidatingAdmissionPolicyBuilder(policyName string) *validatingAdmission
 }
 
 func (b *validatingAdmissionPolicyBuilder) MatchUniqueNamespace(uniqueLabel string) *validatingAdmissionPolicyBuilder {
-	if b.policy.Spec.MatchConstraints == nil {
-		b.policy.Spec.MatchConstraints = &admissionregistrationv1alpha1.MatchResources{}
-	}
 	b.policy.Spec.MatchConstraints.NamespaceSelector = &metav1.LabelSelector{
 		MatchLabels: map[string]string{
 			uniqueLabel: "true",
@@ -244,9 +241,6 @@ func (rb *resourceRuleBuilder) MatchResource(groups []string, versions []string,
 
 func (rb *resourceRuleBuilder) EndResourceRule() *validatingAdmissionPolicyBuilder {
 	b := rb.policyBuilder
-	if b.policy.Spec.MatchConstraints == nil {
-		b.policy.Spec.MatchConstraints = &admissionregistrationv1alpha1.MatchResources{}
-	}
 	b.policy.Spec.MatchConstraints.ResourceRules = append(b.policy.Spec.MatchConstraints.ResourceRules, *rb.resourceRule)
 	return b
 }

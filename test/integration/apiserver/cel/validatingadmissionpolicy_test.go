@@ -712,7 +712,7 @@ func Test_PolicyExemption(t *testing.T) {
 	}
 
 	policy := makePolicy("test-policy")
-	policy.Spec.MatchConstraints = &admissionregistrationv1alpha1.MatchResources{
+	policy.Spec.MatchConstraints = admissionregistrationv1alpha1.MatchResources{
 		ResourceRules: []admissionregistrationv1alpha1.NamedRuleWithOperations{
 			{
 				RuleWithOperations: admissionregistrationv1alpha1.RuleWithOperations{
@@ -1516,7 +1516,7 @@ func Test_ValidatingAdmissionPolicy_MatchWithMatchPolicyEquivalent(t *testing.T)
 			Message:    "matched by equivalent match policy!",
 		},
 	}, withFailurePolicy(admissionregistrationv1alpha1.Fail, makePolicy("match-by-match-policy-equivalent")))
-	policy.Spec.MatchConstraints = &admissionregistrationv1alpha1.MatchResources{
+	policy.Spec.MatchConstraints = admissionregistrationv1alpha1.MatchResources{
 		ResourceRules: []admissionregistrationv1alpha1.NamedRuleWithOperations{
 			{
 				RuleWithOperations: admissionregistrationv1alpha1.RuleWithOperations{
@@ -1609,7 +1609,7 @@ func Test_ValidatingAdmissionPolicy_MatchWithMatchPolicyExact(t *testing.T) {
 		},
 	}, withFailurePolicy(admissionregistrationv1alpha1.Fail, makePolicy("match-by-match-policy-exact")))
 	matchPolicyExact := admissionregistrationv1alpha1.Exact
-	policy.Spec.MatchConstraints = &admissionregistrationv1alpha1.MatchResources{
+	policy.Spec.MatchConstraints = admissionregistrationv1alpha1.MatchResources{
 		MatchPolicy: &matchPolicyExact,
 		ResourceRules: []admissionregistrationv1alpha1.NamedRuleWithOperations{
 			{
@@ -2557,7 +2557,7 @@ func withNamespaceSelector(labelSelector *metav1.LabelSelector, policy *admissio
 }
 
 func withPolicyMatch(resource string, policy *admissionregistrationv1alpha1.ValidatingAdmissionPolicy) *admissionregistrationv1alpha1.ValidatingAdmissionPolicy {
-	policy.Spec.MatchConstraints = &admissionregistrationv1alpha1.MatchResources{
+	policy.Spec.MatchConstraints = admissionregistrationv1alpha1.MatchResources{
 		ResourceRules: []admissionregistrationv1alpha1.NamedRuleWithOperations{
 			{
 				RuleWithOperations: admissionregistrationv1alpha1.RuleWithOperations{
@@ -2607,9 +2607,6 @@ func withExcludePolicyMatch(resource string, policy *admissionregistrationv1alph
 }
 
 func withPolicyExistsLabels(labels []string, policy *admissionregistrationv1alpha1.ValidatingAdmissionPolicy) *admissionregistrationv1alpha1.ValidatingAdmissionPolicy {
-	if policy.Spec.MatchConstraints == nil {
-		policy.Spec.MatchConstraints = &admissionregistrationv1alpha1.MatchResources{}
-	}
 	matchExprs := buildExistsSelector(labels)
 	policy.Spec.MatchConstraints.ObjectSelector = &metav1.LabelSelector{
 		MatchExpressions: matchExprs,
@@ -2618,7 +2615,7 @@ func withPolicyExistsLabels(labels []string, policy *admissionregistrationv1alph
 }
 
 func withGVRMatch(groups []string, versions []string, resources []string, policy *admissionregistrationv1alpha1.ValidatingAdmissionPolicy) *admissionregistrationv1alpha1.ValidatingAdmissionPolicy {
-	policy.Spec.MatchConstraints = &admissionregistrationv1alpha1.MatchResources{
+	policy.Spec.MatchConstraints = admissionregistrationv1alpha1.MatchResources{
 		ResourceRules: []admissionregistrationv1alpha1.NamedRuleWithOperations{
 			{
 				RuleWithOperations: admissionregistrationv1alpha1.RuleWithOperations{
@@ -2673,7 +2670,7 @@ func withValidationActions(validationActions []admissionregistrationv1alpha1.Val
 func withBindingExistsLabels(labels []string, policy *admissionregistrationv1alpha1.ValidatingAdmissionPolicy, binding *admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding) *admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding {
 	if policy != nil {
 		// shallow copy
-		constraintsCopy := *policy.Spec.MatchConstraints
+		constraintsCopy := policy.Spec.MatchConstraints
 		binding.Spec.MatchResources = &constraintsCopy
 	}
 	matchExprs := buildExistsSelector(labels)

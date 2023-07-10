@@ -45,7 +45,7 @@ func TestExtractTypeNames(t *testing.T) {
 		{
 			name: "specific",
 			policy: &v1alpha1.ValidatingAdmissionPolicy{Spec: v1alpha1.ValidatingAdmissionPolicySpec{
-				MatchConstraints: &v1alpha1.MatchResources{ResourceRules: []v1alpha1.NamedRuleWithOperations{
+				MatchConstraints: v1alpha1.MatchResources{ResourceRules: []v1alpha1.NamedRuleWithOperations{
 					{
 						RuleWithOperations: v1alpha1.RuleWithOperations{
 							Rule: v1alpha1.Rule{
@@ -66,7 +66,7 @@ func TestExtractTypeNames(t *testing.T) {
 		{
 			name: "multiple",
 			policy: &v1alpha1.ValidatingAdmissionPolicy{Spec: v1alpha1.ValidatingAdmissionPolicySpec{
-				MatchConstraints: &v1alpha1.MatchResources{ResourceRules: []v1alpha1.NamedRuleWithOperations{
+				MatchConstraints: v1alpha1.MatchResources{ResourceRules: []v1alpha1.NamedRuleWithOperations{
 					{
 						RuleWithOperations: v1alpha1.RuleWithOperations{
 							Rule: v1alpha1.Rule{
@@ -99,7 +99,7 @@ func TestExtractTypeNames(t *testing.T) {
 		{
 			name: "all resources",
 			policy: &v1alpha1.ValidatingAdmissionPolicy{Spec: v1alpha1.ValidatingAdmissionPolicySpec{
-				MatchConstraints: &v1alpha1.MatchResources{ResourceRules: []v1alpha1.NamedRuleWithOperations{
+				MatchConstraints: v1alpha1.MatchResources{ResourceRules: []v1alpha1.NamedRuleWithOperations{
 					{
 						RuleWithOperations: v1alpha1.RuleWithOperations{
 							Rule: v1alpha1.Rule{
@@ -116,7 +116,7 @@ func TestExtractTypeNames(t *testing.T) {
 		{
 			name: "sub resources",
 			policy: &v1alpha1.ValidatingAdmissionPolicy{Spec: v1alpha1.ValidatingAdmissionPolicySpec{
-				MatchConstraints: &v1alpha1.MatchResources{ResourceRules: []v1alpha1.NamedRuleWithOperations{
+				MatchConstraints: v1alpha1.MatchResources{ResourceRules: []v1alpha1.NamedRuleWithOperations{
 					{
 						RuleWithOperations: v1alpha1.RuleWithOperations{
 							Rule: v1alpha1.Rule{
@@ -133,7 +133,7 @@ func TestExtractTypeNames(t *testing.T) {
 		{
 			name: "mixtures",
 			policy: &v1alpha1.ValidatingAdmissionPolicy{Spec: v1alpha1.ValidatingAdmissionPolicySpec{
-				MatchConstraints: &v1alpha1.MatchResources{ResourceRules: []v1alpha1.NamedRuleWithOperations{
+				MatchConstraints: v1alpha1.MatchResources{ResourceRules: []v1alpha1.NamedRuleWithOperations{
 					{
 						RuleWithOperations: v1alpha1.RuleWithOperations{
 							Rule: v1alpha1.Rule{
@@ -178,7 +178,7 @@ func TestTypeCheck(t *testing.T) {
 				Expression: "object.foo == 'bar'",
 			},
 		},
-		MatchConstraints: &v1alpha1.MatchResources{ResourceRules: []v1alpha1.NamedRuleWithOperations{
+		MatchConstraints: v1alpha1.MatchResources{ResourceRules: []v1alpha1.NamedRuleWithOperations{
 			{
 				RuleWithOperations: v1alpha1.RuleWithOperations{
 					Rule: v1alpha1.Rule{
@@ -199,7 +199,7 @@ func TestTypeCheck(t *testing.T) {
 				Expression: "object.bar == 'foo'",
 			},
 		},
-		MatchConstraints: &v1alpha1.MatchResources{ResourceRules: []v1alpha1.NamedRuleWithOperations{
+		MatchConstraints: v1alpha1.MatchResources{ResourceRules: []v1alpha1.NamedRuleWithOperations{
 			{
 				RuleWithOperations: v1alpha1.RuleWithOperations{
 					Rule: v1alpha1.Rule{
@@ -221,7 +221,7 @@ func TestTypeCheck(t *testing.T) {
 				Expression: "object.foo == params.bar",
 			},
 		},
-		MatchConstraints: &v1alpha1.MatchResources{ResourceRules: []v1alpha1.NamedRuleWithOperations{
+		MatchConstraints: v1alpha1.MatchResources{ResourceRules: []v1alpha1.NamedRuleWithOperations{
 			{
 				RuleWithOperations: v1alpha1.RuleWithOperations{
 					Rule: v1alpha1.Rule{

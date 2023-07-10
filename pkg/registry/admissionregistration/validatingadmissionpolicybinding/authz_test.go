@@ -112,7 +112,7 @@ func TestAuthorization(t *testing.T) {
 				ctx := request.WithUser(context.Background(), tc.userInfo)
 				obj := validPolicyBinding()
 				objWithChangedParamRef := obj.DeepCopy()
-				objWithChangedParamRef.Spec.ParamRef.Name = "changed"
+				objWithChangedParamRef.Spec.ParamRef.ClusterWide.Name = "changed"
 				errs := strategy.ValidateUpdate(ctx, obj, objWithChangedParamRef)
 				if len(errs) > 0 != tc.expectErr {
 					t.Errorf("expected error: %v but got error: %v", tc.expectErr, errs)

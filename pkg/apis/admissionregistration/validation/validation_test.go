@@ -2161,20 +2161,6 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 
 		expectedError: `spec.validations[0].reason: Unsupported value: "other"`,
 	}, {
-		name: "MatchConstraints is required",
-		config: &admissionregistration.ValidatingAdmissionPolicy{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "config",
-			},
-			Spec: admissionregistration.ValidatingAdmissionPolicySpec{
-				Validations: []admissionregistration.Validation{{
-					Expression: "object.x < 100",
-				}},
-			},
-		},
-
-		expectedError: `spec.matchConstraints: Required value`,
-	}, {
 		name: "matchConstraints.resourceRules is required",
 		config: &admissionregistration.ValidatingAdmissionPolicy{
 			ObjectMeta: metav1.ObjectMeta{
@@ -2184,7 +2170,7 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 				Validations: []admissionregistration.Validation{{
 					Expression: "object.x < 100",
 				}},
-				MatchConstraints: &admissionregistration.MatchResources{},
+				MatchConstraints: admissionregistration.MatchResources{},
 			},
 		},
 		expectedError: `spec.matchConstraints.resourceRules: Required value`,
@@ -2198,7 +2184,7 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 				Validations: []admissionregistration.Validation{{
 					Expression: "object.x < 100",
 				}},
-				MatchConstraints: &admissionregistration.MatchResources{
+				MatchConstraints: admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
 						RuleWithOperations: admissionregistration.RuleWithOperations{
 							Rule: admissionregistration.Rule{},
@@ -2231,7 +2217,7 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 				Validations: []admissionregistration.Validation{{
 					Expression: "object.x < 100",
 				}},
-				MatchConstraints: &admissionregistration.MatchResources{
+				MatchConstraints: admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
 						ResourceNames: []string{"/./."},
 					}},
@@ -2249,7 +2235,7 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 				Validations: []admissionregistration.Validation{{
 					Expression: "object.x < 100",
 				}},
-				MatchConstraints: &admissionregistration.MatchResources{
+				MatchConstraints: admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
 						ResourceNames: []string{"test", "test"},
 					}},
@@ -2267,7 +2253,7 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 				Validations: []admissionregistration.Validation{{
 					Expression: "object.x < 100",
 				}},
-				MatchConstraints: &admissionregistration.MatchResources{
+				MatchConstraints: admissionregistration.MatchResources{
 					MatchPolicy: func() *admissionregistration.MatchPolicyType {
 						r := admissionregistration.MatchPolicyType("other")
 						return &r
@@ -2290,7 +2276,7 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 					r := admissionregistration.FailurePolicyType("Fail")
 					return &r
 				}(),
-				MatchConstraints: &admissionregistration.MatchResources{
+				MatchConstraints: admissionregistration.MatchResources{
 					NamespaceSelector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"a": "b"},
 					},
@@ -2353,7 +2339,7 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 				Validations: []admissionregistration.Validation{{
 					Expression: "object.x < 100",
 				}},
-				MatchConstraints: &admissionregistration.MatchResources{
+				MatchConstraints: admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
 						RuleWithOperations: admissionregistration.RuleWithOperations{
 							Operations: []admissionregistration.OperationType{"CREATE", ""},
@@ -2378,7 +2364,7 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 				Validations: []admissionregistration.Validation{{
 					Expression: "object.x < 100",
 				}},
-				MatchConstraints: &admissionregistration.MatchResources{
+				MatchConstraints: admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
 						RuleWithOperations: admissionregistration.RuleWithOperations{
 							Operations: []admissionregistration.OperationType{"PATCH"},
@@ -2403,7 +2389,7 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 				Validations: []admissionregistration.Validation{{
 					Expression: "object.x < 100",
 				}},
-				MatchConstraints: &admissionregistration.MatchResources{
+				MatchConstraints: admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
 						RuleWithOperations: admissionregistration.RuleWithOperations{
 							Operations: []admissionregistration.OperationType{"CREATE", "*"},
@@ -2432,7 +2418,7 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 				Validations: []admissionregistration.Validation{{
 					Expression: "object.x < 100",
 				}},
-				MatchConstraints: &admissionregistration.MatchResources{
+				MatchConstraints: admissionregistration.MatchResources{
 					MatchPolicy: func() *admissionregistration.MatchPolicyType {
 						r := admissionregistration.MatchPolicyType("Exact")
 						return &r
@@ -2466,7 +2452,7 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 				Validations: []admissionregistration.Validation{{
 					Expression: "object.x < 100",
 				}},
-				MatchConstraints: &admissionregistration.MatchResources{
+				MatchConstraints: admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
 						RuleWithOperations: admissionregistration.RuleWithOperations{
 							Operations: []admissionregistration.OperationType{"CREATE"},
@@ -2491,7 +2477,7 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 				Validations: []admissionregistration.Validation{{
 					Expression: "object.x < 100",
 				}},
-				MatchConstraints: &admissionregistration.MatchResources{
+				MatchConstraints: admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
 						RuleWithOperations: admissionregistration.RuleWithOperations{
 							Operations: []admissionregistration.OperationType{"CREATE"},
@@ -2520,7 +2506,7 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 				Validations: []admissionregistration.Validation{{
 					Expression: "object.x < 100",
 				}},
-				MatchConstraints: &admissionregistration.MatchResources{
+				MatchConstraints: admissionregistration.MatchResources{
 					MatchPolicy: func() *admissionregistration.MatchPolicyType {
 						r := admissionregistration.MatchPolicyType("Exact")
 						return &r
@@ -2554,7 +2540,7 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 				Validations: []admissionregistration.Validation{{
 					Expression: "object.x < 100",
 				}},
-				MatchConstraints: &admissionregistration.MatchResources{
+				MatchConstraints: admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
 						RuleWithOperations: admissionregistration.RuleWithOperations{
 							Operations: []admissionregistration.OperationType{"CREATE"},
@@ -2579,7 +2565,7 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 				Validations: []admissionregistration.Validation{{
 					Expression: "object.x < 100",
 				}},
-				MatchConstraints: &admissionregistration.MatchResources{
+				MatchConstraints: admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
 						RuleWithOperations: admissionregistration.RuleWithOperations{
 							Operations: []admissionregistration.OperationType{"CREATE"},
@@ -2604,7 +2590,7 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 				Validations: []admissionregistration.Validation{{
 					Expression: "object.x in [1, 2, ",
 				}},
-				MatchConstraints: &admissionregistration.MatchResources{
+				MatchConstraints: admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
 						RuleWithOperations: admissionregistration.RuleWithOperations{
 							Operations: []admissionregistration.OperationType{"CREATE"},
@@ -2630,7 +2616,7 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 					Expression:        "true",
 					MessageExpression: "object.x in [1, 2, ",
 				}},
-				MatchConstraints: &admissionregistration.MatchResources{
+				MatchConstraints: admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
 						RuleWithOperations: admissionregistration.RuleWithOperations{
 							Operations: []admissionregistration.OperationType{"CREATE"},
@@ -2656,7 +2642,7 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 					Expression:        "true",
 					MessageExpression: "0 == 0",
 				}},
-				MatchConstraints: &admissionregistration.MatchResources{
+				MatchConstraints: admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
 						RuleWithOperations: admissionregistration.RuleWithOperations{
 							Operations: []admissionregistration.OperationType{"CREATE"},
@@ -2785,7 +2771,7 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 					Kind:       "Foo",
 					APIVersion: "foobar/v1alpha1",
 				},
-				MatchConstraints: &admissionregistration.MatchResources{
+				MatchConstraints: admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
 						RuleWithOperations: admissionregistration.RuleWithOperations{
 							Operations: []admissionregistration.OperationType{"*"},
@@ -2828,7 +2814,7 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 				Name: "config",
 			},
 			Spec: admissionregistration.ValidatingAdmissionPolicySpec{
-				MatchConstraints: &admissionregistration.MatchResources{
+				MatchConstraints: admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
 						RuleWithOperations: admissionregistration.RuleWithOperations{
 							Operations: []admissionregistration.OperationType{"*"},
@@ -2902,7 +2888,7 @@ func TestValidateValidatingAdmissionPolicyUpdate(t *testing.T) {
 				Validations: []admissionregistration.Validation{{
 					Expression: "object.x < 100",
 				}},
-				MatchConstraints: &admissionregistration.MatchResources{
+				MatchConstraints: admissionregistration.MatchResources{
 					NamespaceSelector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"a": "b"},
 					},
@@ -2934,7 +2920,7 @@ func TestValidateValidatingAdmissionPolicyUpdate(t *testing.T) {
 				Validations: []admissionregistration.Validation{{
 					Expression: "object.x < 100",
 				}},
-				MatchConstraints: &admissionregistration.MatchResources{
+				MatchConstraints: admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
 						RuleWithOperations: admissionregistration.RuleWithOperations{
 							Operations: []admissionregistration.OperationType{"CREATE"},
@@ -2962,7 +2948,7 @@ func TestValidateValidatingAdmissionPolicyUpdate(t *testing.T) {
 				Validations: []admissionregistration.Validation{{
 					Expression: "object.x < 100",
 				}},
-				MatchConstraints: &admissionregistration.MatchResources{
+				MatchConstraints: admissionregistration.MatchResources{
 					NamespaceSelector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"a": "b"},
 					},
@@ -3003,7 +2989,7 @@ func TestValidateValidatingAdmissionPolicyUpdate(t *testing.T) {
 					Kind:       "Foo",
 					APIVersion: "foobar/v1alpha1",
 				},
-				MatchConstraints: &admissionregistration.MatchResources{
+				MatchConstraints: admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
 						RuleWithOperations: admissionregistration.RuleWithOperations{
 							Operations: []admissionregistration.OperationType{"*"},
@@ -3043,7 +3029,7 @@ func TestValidateValidatingAdmissionPolicyUpdate(t *testing.T) {
 				Name: "config",
 			},
 			Spec: admissionregistration.ValidatingAdmissionPolicySpec{
-				MatchConstraints: &admissionregistration.MatchResources{
+				MatchConstraints: admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
 						RuleWithOperations: admissionregistration.RuleWithOperations{
 							Operations: []admissionregistration.OperationType{"*"},
@@ -3086,7 +3072,7 @@ func TestValidateValidatingAdmissionPolicyUpdate(t *testing.T) {
 				Name: "config",
 			},
 			Spec: admissionregistration.ValidatingAdmissionPolicySpec{
-				MatchConstraints: &admissionregistration.MatchResources{
+				MatchConstraints: admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
 						RuleWithOperations: admissionregistration.RuleWithOperations{
 							Operations: []admissionregistration.OperationType{"*"},
@@ -3126,7 +3112,7 @@ func TestValidateValidatingAdmissionPolicyUpdate(t *testing.T) {
 				Name: "config",
 			},
 			Spec: admissionregistration.ValidatingAdmissionPolicySpec{
-				MatchConstraints: &admissionregistration.MatchResources{
+				MatchConstraints: admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
 						RuleWithOperations: admissionregistration.RuleWithOperations{
 							Operations: []admissionregistration.OperationType{"*"},
@@ -3330,7 +3316,7 @@ func validatingAdmissionPolicyWithExpressions(
 			Name: "config",
 		},
 		Spec: admissionregistration.ValidatingAdmissionPolicySpec{
-			MatchConstraints: &admissionregistration.MatchResources{
+			MatchConstraints: admissionregistration.MatchResources{
 				ResourceRules: []admissionregistration.NamedRuleWithOperations{
 					{
 						RuleWithOperations: admissionregistration.RuleWithOperations{
@@ -3395,8 +3381,11 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 			},
 			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
 				PolicyName: "xyzlimit-scale.example.com",
-				ParamRef: &admissionregistration.ParamRef{
-					Name: "xyzlimit-scale-setting.example.com",
+				ParamRef: &admissionregistration.BindingParamRef{
+					ParamKind: admissionregistration.BindingParamKindClusterWide,
+					ClusterWide: &admissionregistration.ClusterWideParamRef{
+						Name: "xyzlimit-scale-setting.example.com",
+					},
 				},
 				MatchResources: &admissionregistration.MatchResources{
 					MatchPolicy: func() *admissionregistration.MatchPolicyType {
@@ -3415,8 +3404,11 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 			},
 			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
 				PolicyName: "xyzlimit-scale.example.com",
-				ParamRef: &admissionregistration.ParamRef{
-					Name: "xyzlimit-scale-setting.example.com",
+				ParamRef: &admissionregistration.BindingParamRef{
+					ParamKind: admissionregistration.BindingParamKindClusterWide,
+					ClusterWide: &admissionregistration.ClusterWideParamRef{
+						Name: "xyzlimit-scale-setting.example.com",
+					},
 				},
 				MatchResources: &admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
@@ -3469,8 +3461,11 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 			},
 			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
 				PolicyName: "xyzlimit-scale.example.com",
-				ParamRef: &admissionregistration.ParamRef{
-					Name: "xyzlimit-scale-setting.example.com",
+				ParamRef: &admissionregistration.BindingParamRef{
+					ParamKind: admissionregistration.BindingParamKindClusterWide,
+					ClusterWide: &admissionregistration.ClusterWideParamRef{
+						Name: "xyzlimit-scale-setting.example.com",
+					},
 				}, MatchResources: &admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
 						RuleWithOperations: admissionregistration.RuleWithOperations{
@@ -3494,8 +3489,11 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 			},
 			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
 				PolicyName: "xyzlimit-scale.example.com",
-				ParamRef: &admissionregistration.ParamRef{
-					Name: "xyzlimit-scale-setting.example.com",
+				ParamRef: &admissionregistration.BindingParamRef{
+					ParamKind: admissionregistration.BindingParamKindClusterWide,
+					ClusterWide: &admissionregistration.ClusterWideParamRef{
+						Name: "xyzlimit-scale-setting.example.com",
+					},
 				}, MatchResources: &admissionregistration.MatchResources{
 					ResourceRules: []admissionregistration.NamedRuleWithOperations{{
 						RuleWithOperations: admissionregistration.RuleWithOperations{
@@ -3519,8 +3517,11 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 			},
 			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
 				PolicyName: "xyzlimit-scale.example.com",
-				ParamRef: &admissionregistration.ParamRef{
-					Name: "xyzlimit-scale-setting.example.com",
+				ParamRef: &admissionregistration.BindingParamRef{
+					ParamKind: admissionregistration.BindingParamKindClusterWide,
+					ClusterWide: &admissionregistration.ClusterWideParamRef{
+						Name: "xyzlimit-scale-setting.example.com",
+					},
 				},
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 				MatchResources: &admissionregistration.MatchResources{
@@ -3546,8 +3547,11 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 			},
 			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
 				PolicyName: "xyzlimit-scale.example.com",
-				ParamRef: &admissionregistration.ParamRef{
-					Name: "xyzlimit-scale-setting.example.com",
+				ParamRef: &admissionregistration.BindingParamRef{
+					ParamKind: admissionregistration.BindingParamKindClusterWide,
+					ClusterWide: &admissionregistration.ClusterWideParamRef{
+						Name: "xyzlimit-scale-setting.example.com",
+					},
 				},
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 				MatchResources: &admissionregistration.MatchResources{
@@ -3582,8 +3586,11 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 			},
 			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
 				PolicyName: "xyzlimit-scale.example.com",
-				ParamRef: &admissionregistration.ParamRef{
-					Name: "xyzlimit-scale-setting.example.com",
+				ParamRef: &admissionregistration.BindingParamRef{
+					ParamKind: admissionregistration.BindingParamKindClusterWide,
+					ClusterWide: &admissionregistration.ClusterWideParamRef{
+						Name: "xyzlimit-scale-setting.example.com",
+					},
 				},
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 				MatchResources: &admissionregistration.MatchResources{
@@ -3609,8 +3616,11 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 			},
 			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
 				PolicyName: "xyzlimit-scale.example.com",
-				ParamRef: &admissionregistration.ParamRef{
-					Name: "xyzlimit-scale-setting.example.com",
+				ParamRef: &admissionregistration.BindingParamRef{
+					ParamKind: admissionregistration.BindingParamKindClusterWide,
+					ClusterWide: &admissionregistration.ClusterWideParamRef{
+						Name: "xyzlimit-scale-setting.example.com",
+					},
 				},
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 				MatchResources: &admissionregistration.MatchResources{
@@ -3636,8 +3646,11 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 			},
 			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
 				PolicyName: "xyzlimit-scale.example.com",
-				ParamRef: &admissionregistration.ParamRef{
-					Name: "xyzlimit-scale-setting.example.com",
+				ParamRef: &admissionregistration.BindingParamRef{
+					ParamKind: admissionregistration.BindingParamKindClusterWide,
+					ClusterWide: &admissionregistration.ClusterWideParamRef{
+						Name: "xyzlimit-scale-setting.example.com",
+					},
 				},
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 				MatchResources: &admissionregistration.MatchResources{
@@ -3672,8 +3685,11 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 			},
 			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
 				PolicyName: "xyzlimit-scale.example.com",
-				ParamRef: &admissionregistration.ParamRef{
-					Name: "xyzlimit-scale-setting.example.com",
+				ParamRef: &admissionregistration.BindingParamRef{
+					ParamKind: admissionregistration.BindingParamKindClusterWide,
+					ClusterWide: &admissionregistration.ClusterWideParamRef{
+						Name: "xyzlimit-scale-setting.example.com",
+					},
 				},
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 				MatchResources: &admissionregistration.MatchResources{
@@ -3699,8 +3715,11 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 			},
 			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
 				PolicyName: "xyzlimit-scale.example.com",
-				ParamRef: &admissionregistration.ParamRef{
-					Name: "xyzlimit-scale-setting.example.com",
+				ParamRef: &admissionregistration.BindingParamRef{
+					ParamKind: admissionregistration.BindingParamKindClusterWide,
+					ClusterWide: &admissionregistration.ClusterWideParamRef{
+						Name: "xyzlimit-scale-setting.example.com",
+					},
 				},
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 				MatchResources: &admissionregistration.MatchResources{
@@ -3726,8 +3745,11 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 			},
 			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
 				PolicyName: "xyzlimit-scale.example.com",
-				ParamRef: &admissionregistration.ParamRef{
-					Name: "xyzlimit-scale-setting.example.com",
+				ParamRef: &admissionregistration.BindingParamRef{
+					ParamKind: admissionregistration.BindingParamKindClusterWide,
+					ClusterWide: &admissionregistration.ClusterWideParamRef{
+						Name: "xyzlimit-scale-setting.example.com",
+					},
 				},
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny, admissionregistration.Deny},
 			},
@@ -3741,8 +3763,11 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 			},
 			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
 				PolicyName: "xyzlimit-scale.example.com",
-				ParamRef: &admissionregistration.ParamRef{
-					Name: "xyzlimit-scale-setting.example.com",
+				ParamRef: &admissionregistration.BindingParamRef{
+					ParamKind: admissionregistration.BindingParamKindClusterWide,
+					ClusterWide: &admissionregistration.ClusterWideParamRef{
+						Name: "xyzlimit-scale-setting.example.com",
+					},
 				},
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.ValidationAction("illegal")},
 			},
@@ -3781,8 +3806,11 @@ func TestValidateValidatingAdmissionPolicyBindingUpdate(t *testing.T) {
 			},
 			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
 				PolicyName: "xyzlimit-scale.example.com",
-				ParamRef: &admissionregistration.ParamRef{
-					Name: "xyzlimit-scale-setting.example.com",
+				ParamRef: &admissionregistration.BindingParamRef{
+					ParamKind: admissionregistration.BindingParamKindClusterWide,
+					ClusterWide: &admissionregistration.ClusterWideParamRef{
+						Name: "xyzlimit-scale-setting.example.com",
+					},
 				},
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 				MatchResources: &admissionregistration.MatchResources{
@@ -3815,8 +3843,11 @@ func TestValidateValidatingAdmissionPolicyBindingUpdate(t *testing.T) {
 			},
 			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
 				PolicyName: "xyzlimit-scale.example.com",
-				ParamRef: &admissionregistration.ParamRef{
-					Name: "xyzlimit-scale-setting.example.com",
+				ParamRef: &admissionregistration.BindingParamRef{
+					ParamKind: admissionregistration.BindingParamKindClusterWide,
+					ClusterWide: &admissionregistration.ClusterWideParamRef{
+						Name: "xyzlimit-scale-setting.example.com",
+					},
 				},
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 				MatchResources: &admissionregistration.MatchResources{
@@ -3851,8 +3882,11 @@ func TestValidateValidatingAdmissionPolicyBindingUpdate(t *testing.T) {
 			},
 			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
 				PolicyName: "xyzlimit-scale.example.com",
-				ParamRef: &admissionregistration.ParamRef{
-					Name: "xyzlimit-scale-setting.example.com",
+				ParamRef: &admissionregistration.BindingParamRef{
+					ParamKind: admissionregistration.BindingParamKindClusterWide,
+					ClusterWide: &admissionregistration.ClusterWideParamRef{
+						Name: "xyzlimit-scale-setting.example.com",
+					},
 				},
 				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 				MatchResources: &admissionregistration.MatchResources{

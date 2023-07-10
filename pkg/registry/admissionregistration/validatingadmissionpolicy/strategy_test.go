@@ -65,7 +65,7 @@ func validValidatingAdmissionPolicy() *admissionregistration.ValidatingAdmission
 					Expression: "object.spec.replicas <= params.maxReplicas",
 				},
 			},
-			MatchConstraints: &admissionregistration.MatchResources{
+			MatchConstraints: admissionregistration.MatchResources{
 				MatchPolicy: func() *admissionregistration.MatchPolicyType {
 					r := admissionregistration.MatchPolicyType("Exact")
 					return &r

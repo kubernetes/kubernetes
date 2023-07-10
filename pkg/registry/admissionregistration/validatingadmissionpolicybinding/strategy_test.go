@@ -57,8 +57,11 @@ func validPolicyBinding() *admissionregistration.ValidatingAdmissionPolicyBindin
 		},
 		Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
 			PolicyName: "replicalimit-policy.example.com",
-			ParamRef: &admissionregistration.ParamRef{
-				Name: "replica-limit-test.example.com",
+			ParamRef: &admissionregistration.BindingParamRef{
+				ParamKind: admissionregistration.BindingParamKindClusterWide,
+				ClusterWide: &admissionregistration.ClusterWideParamRef{
+					Name: "replica-limit-test.example.com",
+				},
 			},
 			ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
 		},
