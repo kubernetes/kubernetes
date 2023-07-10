@@ -28,6 +28,7 @@ func (clientConfigFn ClientConfigFunc) clientForGroupVersion(gv schema.GroupVers
 	if err != nil {
 		return nil, err
 	}
+	cfg = rest.CopyConfig(cfg)
 	if negotiatedSerializer != nil {
 		cfg.ContentConfig.NegotiatedSerializer = negotiatedSerializer
 	}
@@ -46,6 +47,7 @@ func (clientConfigFn ClientConfigFunc) unstructuredClientForGroupVersion(gv sche
 	if err != nil {
 		return nil, err
 	}
+	cfg = rest.CopyConfig(cfg)
 	cfg.ContentConfig = UnstructuredPlusDefaultContentConfig()
 	cfg.GroupVersion = &gv
 	if len(gv.Group) == 0 {
