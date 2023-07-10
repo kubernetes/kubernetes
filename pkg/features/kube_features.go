@@ -729,6 +729,13 @@ const (
 	// https://github.com/kubernetes/kubernetes/issues/111516
 	SecurityContextDeny featuregate.Feature = "SecurityContextDeny"
 
+	// owner: @atosatto @yuanchen8911
+	// kep: http://kep.k8s.io/3902
+	// beta: v1.29
+	//
+	// Decouples Taint Eviction Controller, performing taint-based Pod eviction, from Node Lifecycle Controller.
+	SeparateTaintEvictionController featuregate.Feature = "SeparateTaintEvictionController"
+
 	// owner: @xuzhenglun
 	// kep: http://kep.k8s.io/3682
 	// alpha: v1.27
@@ -1092,6 +1099,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	SchedulerQueueingHints: {Default: true, PreRelease: featuregate.Beta},
 
 	SecurityContextDeny: {Default: false, PreRelease: featuregate.Alpha},
+
+	SeparateTaintEvictionController: {Default: true, PreRelease: featuregate.Beta},
 
 	ServiceNodePortStaticSubrange: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.29; remove in 1.31
 

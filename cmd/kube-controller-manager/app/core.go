@@ -59,6 +59,7 @@ import (
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/controller/storageversiongc"
+	"k8s.io/kubernetes/pkg/controller/tainteviction"
 	ttlcontroller "k8s.io/kubernetes/pkg/controller/ttl"
 	"k8s.io/kubernetes/pkg/controller/ttlafterfinished"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach"
@@ -216,6 +217,32 @@ func startNodeLifecycleController(ctx context.Context, controllerContext Control
 		return nil, true, err
 	}
 	go lifecycleController.Run(ctx)
+	return nil, true, nil
+}
+
+func newTaintEvictionControllerDescriptor() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:     names.TaintEvictionController,
+		initFunc: startTaintEvictionController,
+		requiredFeatureGates: []featuregate.Feature{
+			features.SeparateTaintEvictionController,
+		},
+	}
+}
+
+func startTaintEvictionController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
+	taintEvictionController, err := tainteviction.New(
+		ctx,
+		// taint-manager uses existing cluster role from node-controller
+		controllerContext.ClientBuilder.ClientOrDie("node-controller"),
+		controllerContext.InformerFactory.Core().V1().Pods(),
+		controllerContext.InformerFactory.Core().V1().Nodes(),
+		controllerName,
+	)
+	if err != nil {
+		return nil, false, err
+	}
+	go taintEvictionController.Run(ctx)
 	return nil, true, nil
 }
 
