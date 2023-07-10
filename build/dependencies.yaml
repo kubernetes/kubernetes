@@ -88,7 +88,7 @@ dependencies:
 
   # Golang
   - name: "golang: upstream version"
-    version: 1.19.10
+    version: 1.20.5
     refPaths:
     - path: .go-version
     - path: build/build-image/cross/VERSION
@@ -103,14 +103,16 @@ dependencies:
   # This entry is a stub of the major version to allow dependency checks to
   # pass when building Kubernetes using a pre-release of Golang.
   - name: "golang: 1.<major>"
-    version: 1.19
+    version: 1.20
     refPaths:
     - path: build/build-image/cross/VERSION
-    - path: hack/lib/golang.sh
-      match: minimum_go_version=go([0-9]+\.[0-9]+)
+    # we continue to test in the original go version which was go1.19
+    # https://github.com/kubernetes/enhancements/tree/master/keps/sig-release/3744-stay-on-supported-go-versions#proposal
+    #- path: hack/lib/golang.sh
+    #  match: minimum_go_version=go([0-9]+\.[0-9]+)
 
   - name: "registry.k8s.io/kube-cross: dependents"
-    version: v1.25.0-go1.19.10-bullseye.0
+    version: v1.25.0-go1.20.5-bullseye.0
     refPaths:
     - path: build/build-image/cross/VERSION
 
@@ -140,7 +142,7 @@ dependencies:
       match: configs\[DistrolessIptables\] = Config{list\.BuildImageRegistry, "distroless-iptables", "v([0-9]+)\.([0-9]+)\.([0-9]+)"}
 
   - name: "registry.k8s.io/go-runner: dependents"
-    version: v2.3.1-go1.19.10-bullseye.0
+    version: v2.3.1-go1.20.5-bullseye.0
     refPaths:
     - path: build/common.sh
       match: __default_go_runner_version=
