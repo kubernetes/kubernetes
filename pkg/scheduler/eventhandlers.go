@@ -246,7 +246,9 @@ func (sched *Scheduler) deletePodFromCache(obj interface{}) {
 		logger.Error(err, "Scheduler cache RemovePod failed", "pod", klog.KObj(pod))
 	}
 
-	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, queue.AssignedPodDelete, pod, nil, nil)
+	if assignedPod(pod) {
+		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, queue.AssignedPodDelete, pod, nil, nil)
+	}
 }
 
 // assignedPod selects pods that are assigned (scheduled and running).
