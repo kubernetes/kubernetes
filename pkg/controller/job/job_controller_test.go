@@ -1079,7 +1079,8 @@ func TestGetNewFinshedPods(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			uncounted := newUncountedTerminatedPods(*tc.job.Status.UncountedTerminatedPods)
-			succeededPods, failedPods := getNewFinishedPods(&tc.job, tc.pods, uncounted, tc.expectedRmFinalizers)
+			syncJobContext := &syncJobContext{job: &tc.job, pods: tc.pods, uncounted: uncounted, expectedRmFinalizers: tc.expectedRmFinalizers}
+			succeededPods, failedPods := getNewFinishedPods(syncJobContext)
 			succeeded := int32(len(succeededPods)) + tc.job.Status.Succeeded + int32(len(uncounted.succeeded))
 			failed := int32(len(failedPods)) + tc.job.Status.Failed + int32(len(uncounted.failed))
 			if succeeded != tc.wantSucceeded {
@@ -1654,7 +1655,16 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 			if isIndexedJob(job) {
 				succeededIndexes = succeededIndexesFromString(logger, job.Status.CompletedIndexes, int(*job.Spec.Completions))
 			}
-			err := manager.trackJobStatusAndRemoveFinalizers(context.TODO(), job, tc.pods, succeededIndexes, *uncounted, tc.expectedRmFinalizers, tc.finishedCond, tc.needsFlush, backoffRecord{})
+			syncJobContext := &syncJobContext{
+				job:                  job,
+				pods:                 tc.pods,
+				succeededIndexes:     succeededIndexes,
+				uncounted:            uncounted,
+				expectedRmFinalizers: tc.expectedRmFinalizers,
+				finishedCondition:    tc.finishedCond,
+				newBackoffRecord:     backoffRecord{},
+			}
+			err := manager.trackJobStatusAndRemoveFinalizers(context.TODO(), syncJobContext, tc.needsFlush)
 			if !errors.Is(err, tc.wantErr) {
 				t.Errorf("Got error %v, want %v", err, tc.wantErr)
 			}
