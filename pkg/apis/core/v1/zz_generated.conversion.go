@@ -5364,7 +5364,7 @@ func autoConvert_v1_PersistentVolumeClaimStatus_To_core_PersistentVolumeClaimSta
 	out.Capacity = *(*core.ResourceList)(unsafe.Pointer(&in.Capacity))
 	out.Conditions = *(*[]core.PersistentVolumeClaimCondition)(unsafe.Pointer(&in.Conditions))
 	out.AllocatedResources = *(*core.ResourceList)(unsafe.Pointer(&in.AllocatedResources))
-	out.ResizeStatus = (*core.PersistentVolumeClaimResizeStatus)(unsafe.Pointer(in.ResizeStatus))
+	out.AllocatedResourceStatuses = *(*map[core.ResourceName]core.ClaimResourceStatus)(unsafe.Pointer(&in.AllocatedResourceStatuses))
 	return nil
 }
 
@@ -5379,7 +5379,7 @@ func autoConvert_core_PersistentVolumeClaimStatus_To_v1_PersistentVolumeClaimSta
 	out.Capacity = *(*v1.ResourceList)(unsafe.Pointer(&in.Capacity))
 	out.Conditions = *(*[]v1.PersistentVolumeClaimCondition)(unsafe.Pointer(&in.Conditions))
 	out.AllocatedResources = *(*v1.ResourceList)(unsafe.Pointer(&in.AllocatedResources))
-	out.ResizeStatus = (*v1.PersistentVolumeClaimResizeStatus)(unsafe.Pointer(in.ResizeStatus))
+	out.AllocatedResourceStatuses = *(*map[v1.ResourceName]v1.ClaimResourceStatus)(unsafe.Pointer(&in.AllocatedResourceStatuses))
 	return nil
 }
 

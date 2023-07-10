@@ -1797,7 +1797,9 @@
           "allocatedResources": {
             "allocatedResourcesKey": "0"
           },
-          "resizeStatus": "resizeStatusValue"
+          "allocatedResourceStatuses": {
+            "allocatedResourceStatusesKey": "allocatedResourceStatusesValue"
+          }
         }
       }
     ],

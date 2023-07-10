@@ -2913,13 +2913,19 @@ message PersistentVolumeClaimStatus {
   // +optional
   map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> allocatedResources = 5;
 
-  // resizeStatus stores status of resize operation.
-  // ResizeStatus is not set by default but when expansion is complete resizeStatus is set to empty
-  // string by resize controller or kubelet.
+  // allocatedResourceStatuses stores status of resource being resized for the given PVC.
+  // If Expanding a PVC for more capacity - this field can be one of the following states:
+  // 	- pvc.status.allocatedResourceStatus['storage'] = "ControllerResizeInProgress"
+  //      - pvc.status.allocatedResourceStatus['storage'] = "ControllerResizeFailed"
+  //      - pvc.status.allocatedResourceStatus['storage'] = "NodeResizePending"
+  //      - pvc.status.allocatedResourceStatus['storage'] = "NodeResizeInProgress"
+  //      - pvc.status.allocatedResourceStatus['storage'] = "NodeResizeFailed"
+  // When this field is not set, it means that no resize operation is in progress for the given PVC.
   // This is an alpha field and requires enabling RecoverVolumeExpansionFailure feature.
   // +featureGate=RecoverVolumeExpansionFailure
+  // +mapType=granular
   // +optional
-  optional string resizeStatus = 6;
+  map<string, string> allocatedResourceStatuses = 7;
 }
 
 // PersistentVolumeClaimTemplate is used to produce

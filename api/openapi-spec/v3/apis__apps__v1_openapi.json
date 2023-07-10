@@ -3094,6 +3094,15 @@
             },
             "type": "array"
           },
+          "allocatedResourceStatuses": {
+            "additionalProperties": {
+              "default": "",
+              "type": "string"
+            },
+            "description": "allocatedResourceStatuses stores status of resource being resized for the given PVC. If Expanding a PVC for more capacity - this field can be one of the following states:\n\t- pvc.status.allocatedResourceStatus['storage'] = \"ControllerResizeInProgress\"\n     - pvc.status.allocatedResourceStatus['storage'] = \"ControllerResizeFailed\"\n     - pvc.status.allocatedResourceStatus['storage'] = \"NodeResizePending\"\n     - pvc.status.allocatedResourceStatus['storage'] = \"NodeResizeInProgress\"\n     - pvc.status.allocatedResourceStatus['storage'] = \"NodeResizeFailed\"\nWhen this field is not set, it means that no resize operation is in progress for the given PVC. This is an alpha field and requires enabling RecoverVolumeExpansionFailure feature.",
+            "type": "object",
+            "x-kubernetes-map-type": "granular"
+          },
           "allocatedResources": {
             "additionalProperties": {
               "allOf": [
@@ -3134,10 +3143,6 @@
           },
           "phase": {
             "description": "phase represents the current phase of PersistentVolumeClaim.",
-            "type": "string"
-          },
-          "resizeStatus": {
-            "description": "resizeStatus stores status of resize operation. ResizeStatus is not set by default but when expansion is complete resizeStatus is set to empty string by resize controller or kubelet. This is an alpha field and requires enabling RecoverVolumeExpansionFailure feature.",
             "type": "string"
           }
         },
