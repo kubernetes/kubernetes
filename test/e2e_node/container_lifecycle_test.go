@@ -33,6 +33,7 @@ import (
 
 const (
 	PostStartPrefix = "PostStart"
+	PreStopPrefix   = "PreStop"
 )
 
 var containerRestartPolicyAlways = v1.ContainerRestartPolicyAlways
@@ -595,6 +596,138 @@ var _ = SIGDescribe("[NodeConformance] Containers Lifecycle ", func() {
 			err = e2epod.WaitForPodNotFoundInNamespace(context.TODO(), f.ClientSet, pod.Name, pod.Namespace, time.Duration(gracePeriod+bufferSeconds)*time.Second)
 			framework.ExpectNoError(err)
 		})
+	})
+
+	ginkgo.It("should call the container's preStop hook and terminate it if its startup probe fails", func() {
+		regular1 := "regular-1"
+
+		podSpec := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-pod",
+			},
+			Spec: v1.PodSpec{
+				RestartPolicy: v1.RestartPolicyNever,
+				Containers: []v1.Container{
+					{
+						Name:  regular1,
+						Image: busyboxImage,
+						Command: ExecCommand(regular1, execCommand{
+							Delay:              100,
+							TerminationSeconds: 15,
+							ExitCode:           0,
+						}),
+						StartupProbe: &v1.Probe{
+							ProbeHandler: v1.ProbeHandler{
+								Exec: &v1.ExecAction{
+									Command: []string{
+										"sh",
+										"-c",
+										"exit 1",
+									},
+								},
+							},
+							InitialDelaySeconds: 10,
+							FailureThreshold:    1,
+						},
+						Lifecycle: &v1.Lifecycle{
+							PreStop: &v1.LifecycleHandler{
+								Exec: &v1.ExecAction{
+									Command: ExecCommand(prefixedName(PreStopPrefix, regular1), execCommand{
+										Delay:    1,
+										ExitCode: 0,
+									}),
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		preparePod(podSpec)
+
+		client := e2epod.NewPodClient(f)
+		podSpec = client.Create(context.TODO(), podSpec)
+
+		ginkgo.By("Waiting for the pod to complete")
+		err := e2epod.WaitForPodNoLongerRunningInNamespace(context.TODO(), f.ClientSet, podSpec.Name, podSpec.Namespace)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Parsing results")
+		podSpec, err = client.Get(context.TODO(), podSpec.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		results := parseOutput(podSpec)
+
+		ginkgo.By("Analyzing results")
+		framework.ExpectNoError(results.RunTogether(regular1, prefixedName(PreStopPrefix, regular1)))
+		framework.ExpectNoError(results.Starts(prefixedName(PreStopPrefix, regular1)))
+		framework.ExpectNoError(results.Exits(regular1))
+	})
+
+	ginkgo.It("should call the container's preStop hook and terminate it if its liveness probe fails", func() {
+		regular1 := "regular-1"
+
+		podSpec := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-pod",
+			},
+			Spec: v1.PodSpec{
+				RestartPolicy: v1.RestartPolicyNever,
+				Containers: []v1.Container{
+					{
+						Name:  regular1,
+						Image: busyboxImage,
+						Command: ExecCommand(regular1, execCommand{
+							Delay:              100,
+							TerminationSeconds: 15,
+							ExitCode:           0,
+						}),
+						LivenessProbe: &v1.Probe{
+							ProbeHandler: v1.ProbeHandler{
+								Exec: &v1.ExecAction{
+									Command: []string{
+										"sh",
+										"-c",
+										"exit 1",
+									},
+								},
+							},
+							InitialDelaySeconds: 10,
+							FailureThreshold:    1,
+						},
+						Lifecycle: &v1.Lifecycle{
+							PreStop: &v1.LifecycleHandler{
+								Exec: &v1.ExecAction{
+									Command: ExecCommand(prefixedName(PreStopPrefix, regular1), execCommand{
+										Delay:    1,
+										ExitCode: 0,
+									}),
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		preparePod(podSpec)
+
+		client := e2epod.NewPodClient(f)
+		podSpec = client.Create(context.TODO(), podSpec)
+
+		ginkgo.By("Waiting for the pod to complete")
+		err := e2epod.WaitForPodNoLongerRunningInNamespace(context.TODO(), f.ClientSet, podSpec.Name, podSpec.Namespace)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Parsing results")
+		podSpec, err = client.Get(context.TODO(), podSpec.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		results := parseOutput(podSpec)
+
+		ginkgo.By("Analyzing results")
+		framework.ExpectNoError(results.RunTogether(regular1, prefixedName(PreStopPrefix, regular1)))
+		framework.ExpectNoError(results.Starts(prefixedName(PreStopPrefix, regular1)))
+		framework.ExpectNoError(results.Exits(regular1))
 	})
 })
 
