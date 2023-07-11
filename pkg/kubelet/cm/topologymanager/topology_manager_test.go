@@ -98,9 +98,14 @@ func TestNewManager(t *testing.T) {
 			}
 		} else {
 			rawMgr := mngr.(*manager)
-			rawScope := rawMgr.scope.(*containerScope)
-			if rawScope.policy.Name() != tc.expectedPolicy {
-				t.Errorf("Unexpected policy name. Have: %q wants %q", rawScope.policy.Name(), tc.expectedPolicy)
+			var policyName string
+			if rawScope, ok := rawMgr.scope.(*containerScope); ok {
+				policyName = rawScope.policy.Name()
+			} else if rawScope, ok := rawMgr.scope.(*noneScope); ok {
+				policyName = rawScope.policy.Name()
+			}
+			if policyName != tc.expectedPolicy {
+				t.Errorf("Unexpected policy name. Have: %q wants %q", policyName, tc.expectedPolicy)
 			}
 		}
 	}
