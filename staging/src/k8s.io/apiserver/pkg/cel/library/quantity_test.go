@@ -168,13 +168,31 @@ func TestQuantity(t *testing.T) {
 			expr: `quantity("50M").isLessThan(quantity("50Mi"))`,
 		},
 		{
+			name: "quantity_less_obvious",
+			expr: `quantity("50M").isLessThan(quantity("100M"))`,
+		},
+		{
+			name:        "quantity_less_false",
+			expr:        `quantity("100M").isLessThan(quantity("50M"))`,
+			expectValue: false,
+		},
+		{
 			name: "quantity_greater",
 			expr: `quantity("50Mi").isGreaterThan(quantity("50M"))`,
 		},
 		{
-			name:        "compare_inquality",
-			expr:        `quantity("200M").compareTo(quantity("0.3G"))`,
-			expectValue: -1,
+			name: "quantity_greater_obvious",
+			expr: `quantity("50Mi").isGreaterThan(quantity("100Mi"))`,
+		},
+		{
+			name:        "quantity_greater_false",
+			expr:        `quantity("50M").isGreaterThan(quantity("100M"))`,
+			expectValue: false,
+		},
+		{
+			name:        "compare_equal",
+			expr:        `quantity("200M").compareTo(quantity("0.2G"))`,
+			expectValue: 0,
 		},
 		{
 			name:        "compare_less",
@@ -187,8 +205,25 @@ func TestQuantity(t *testing.T) {
 			expectValue: 1,
 		},
 		{
+			name: "add_quantity",
+			expr: `quantity("50k").add(quantity("20")) == quantity("50.02k")`,
+		},
+		{
 			name: "add_int",
-			expr: `quantity("50k").add(20) == quantity("50020")`,
+			expr: `quantity("50k").add(20).isLessThan(quantity("50020"))`,
+		},
+		{
+			name: "sub_quantity",
+			expr: `quantity("50k").sub(quantity("20")) == quantity("49.98k")`,
+		},
+		{
+			name: "sub_int",
+			expr: `quantity("50k").sub(20) == quantity("49980")`,
+		},
+		{
+			name:        "arith_chain_1",
+			expr:        `quantity("50k").add(20).sub(quantity("100k")).asInteger()`,
+			expectValue: -49980,
 		},
 		{
 			name:        "arith_chain",
