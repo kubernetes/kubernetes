@@ -369,7 +369,7 @@ EOF
   fi
 
   echo "Downloading crictl"
-  local -r crictl_path="https://console.cloud.google.com/storage/browser/k8s-artifacts-cri-tools/release/${crictl_version}/crictl-${crictl_version}-linux-amd64.tar.gz"
+  local -r crictl_path="https://storage.googleapis.com/k8s-artifacts-cri-tools/release/${crictl_version}"
   download-or-bust "${crictl_hash}" "${crictl_path}/${crictl}"
   tar xf "${crictl}"
   mv crictl "${KUBE_BIN}/crictl"
