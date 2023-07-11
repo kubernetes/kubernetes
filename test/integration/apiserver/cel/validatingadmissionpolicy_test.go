@@ -2026,7 +2026,7 @@ func Test_ValidatingAdmissionPolicy_ParamResourceDeletedThenRecreated(t *testing
 			return false, nil
 		}
 
-		if !strings.Contains(err.Error(), "failed to configure binding: test not found") {
+		if !strings.Contains(err.Error(), "failed to configure binding: no params found for policy binding with `Deny` parameterNotFoundAction") {
 			return false, err
 		}
 
@@ -2049,7 +2049,7 @@ func Test_ValidatingAdmissionPolicy_ParamResourceDeletedThenRecreated(t *testing
 
 		_, err = client.CoreV1().Namespaces().Create(context.TODO(), disallowedNamespace, metav1.CreateOptions{})
 		// cache not synced with new object yet, try again
-		if strings.Contains(err.Error(), "failed to configure binding: test not found") {
+		if strings.Contains(err.Error(), "failed to configure binding: no params found for policy binding with `Deny` parameterNotFoundAction") {
 			return false, nil
 		}
 

@@ -464,20 +464,17 @@ func (c *policyController) latestPolicyData() []policyData {
 			bindingInfos = append(bindingInfos, *bindingInfo)
 		}
 
-		var paramController generic.Controller[runtime.Object]
-		var paramScope meta.RESTScope
+		var pInfo paramInfo
 		if paramKind := definitionInfo.lastReconciledValue.Spec.ParamKind; paramKind != nil {
 			if info, ok := c.paramsCRDControllers[*paramKind]; ok {
-				paramController = info.controller
-				paramScope = info.scope
+				pInfo = *info
 			}
 		}
 
 		res = append(res, policyData{
-			definitionInfo:  *definitionInfo,
-			paramController: paramController,
-			paramScope:      paramScope,
-			bindings:        bindingInfos,
+			definitionInfo: *definitionInfo,
+			paramInfo:      pInfo,
+			bindings:       bindingInfos,
 		})
 	}
 
