@@ -3550,20 +3550,32 @@ type ClaimSource struct {
 	//
 	// The template will be used to create a new ResourceClaim, which will
 	// be bound to this pod. When this pod is deleted, the ResourceClaim
-	// will also be deleted. The name of the ResourceClaim will be <pod
-	// name>-<resource name>, where <resource name> is the
-	// PodResourceClaim.Name. Pod validation will reject the pod if the
-	// concatenated name is not valid for a ResourceClaim (e.g. too long).
-	//
-	// An existing ResourceClaim with that name that is not owned by the
-	// pod will not be used for the pod to avoid using an unrelated
-	// resource by mistake. Scheduling and pod startup are then blocked
-	// until the unrelated ResourceClaim is removed.
+	// will also be deleted. The pod name and resource name, along with a
+	// generated component, will be used to form a unique name for the
+	// ResourceClaim, which will be recorded in pod.status.resourceClaimStatuses.
 	//
 	// This field is immutable and no changes will be made to the
 	// corresponding ResourceClaim by the control plane after creating the
 	// ResourceClaim.
 	ResourceClaimTemplateName *string `json:"resourceClaimTemplateName,omitempty" protobuf:"bytes,2,opt,name=resourceClaimTemplateName"`
+}
+
+// PodResourceClaimStatus is stored in the PodStatus for each PodResourceClaim
+// which references a ResourceClaimTemplate. It stores the generated name for
+// the corresponding ResourceClaim.
+type PodResourceClaimStatus struct {
+	// Name uniquely identifies this resource claim inside the pod.
+	// This must match the name of an entry in pod.spec.resourceClaims,
+	// which implies that the string must be a DNS_LABEL.
+	Name string `json:"name" protobuf:"bytes,1,name=name"`
+
+	// ResourceClaimName is the name of the ResourceClaim that was
+	// generated for the Pod in the namespace of the Pod. It this is
+	// unset, then generating a ResourceClaim was not necessary. The
+	// pod.spec.resourceClaims entry can be ignored in this case.
+	//
+	// +optional
+	ResourceClaimName *string `json:"resourceClaimName,omitempty" protobuf:"bytes,2,opt,name=resourceClaimName"`
 }
 
 // OSName is the set of OS'es that can be used in OS.
@@ -4207,6 +4219,15 @@ type PodStatus struct {
 	// +featureGate=InPlacePodVerticalScaling
 	// +optional
 	Resize PodResizeStatus `json:"resize,omitempty" protobuf:"bytes,14,opt,name=resize,casttype=PodResizeStatus"`
+
+	// Status of resource claims.
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +featureGate=DynamicResourceAllocation
+	// +optional
+	ResourceClaimStatuses []PodResourceClaimStatus `json:"resourceClaimStatuses,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name" protobuf:"bytes,15,rep,name=resourceClaimStatuses"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

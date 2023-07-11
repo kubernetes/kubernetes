@@ -414,15 +414,9 @@ message ClaimSource {
   //
   // The template will be used to create a new ResourceClaim, which will
   // be bound to this pod. When this pod is deleted, the ResourceClaim
-  // will also be deleted. The name of the ResourceClaim will be <pod
-  // name>-<resource name>, where <resource name> is the
-  // PodResourceClaim.Name. Pod validation will reject the pod if the
-  // concatenated name is not valid for a ResourceClaim (e.g. too long).
-  //
-  // An existing ResourceClaim with that name that is not owned by the
-  // pod will not be used for the pod to avoid using an unrelated
-  // resource by mistake. Scheduling and pod startup are then blocked
-  // until the unrelated ResourceClaim is removed.
+  // will also be deleted. The pod name and resource name, along with a
+  // generated component, will be used to form a unique name for the
+  // ResourceClaim, which will be recorded in pod.status.resourceClaimStatuses.
   //
   // This field is immutable and no changes will be made to the
   // corresponding ResourceClaim by the control plane after creating the
@@ -3496,6 +3490,24 @@ message PodResourceClaim {
   optional ClaimSource source = 2;
 }
 
+// PodResourceClaimStatus is stored in the PodStatus for each PodResourceClaim
+// which references a ResourceClaimTemplate. It stores the generated name for
+// the corresponding ResourceClaim.
+message PodResourceClaimStatus {
+  // Name uniquely identifies this resource claim inside the pod.
+  // This must match the name of an entry in pod.spec.resourceClaims,
+  // which implies that the string must be a DNS_LABEL.
+  optional string name = 1;
+
+  // ResourceClaimName is the name of the ResourceClaim that was
+  // generated for the Pod in the namespace of the Pod. It this is
+  // unset, then generating a ResourceClaim was not necessary. The
+  // pod.spec.resourceClaims entry can be ignored in this case.
+  //
+  // +optional
+  optional string resourceClaimName = 2;
+}
+
 // PodSchedulingGate is associated to a Pod to guard its scheduling.
 message PodSchedulingGate {
   // Name of the scheduling gate.
@@ -4036,6 +4048,15 @@ message PodStatus {
   // +featureGate=InPlacePodVerticalScaling
   // +optional
   optional string resize = 14;
+
+  // Status of resource claims.
+  // +patchMergeKey=name
+  // +patchStrategy=merge,retainKeys
+  // +listType=map
+  // +listMapKey=name
+  // +featureGate=DynamicResourceAllocation
+  // +optional
+  repeated PodResourceClaimStatus resourceClaimStatuses = 15;
 }
 
 // PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded

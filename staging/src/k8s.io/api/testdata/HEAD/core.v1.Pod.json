@@ -1839,6 +1839,12 @@
         }
       }
     ],
-    "resize": "resizeValue"
+    "resize": "resizeValue",
+    "resourceClaimStatuses": [
+      {
+        "name": "nameValue",
+        "resourceClaimName": "resourceClaimNameValue"
+      }
+    ]
   }
 }

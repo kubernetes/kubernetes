@@ -268,16 +268,18 @@ func (pl *dynamicResources) EventsToRegister() []framework.ClusterEventWithHint 
 func (pl *dynamicResources) podResourceClaims(pod *v1.Pod) ([]*resourcev1alpha2.ResourceClaim, error) {
 	claims := make([]*resourcev1alpha2.ResourceClaim, 0, len(pod.Spec.ResourceClaims))
 	for _, resource := range pod.Spec.ResourceClaims {
-		claimName := resourceclaim.Name(pod, &resource)
-		isEphemeral := resource.Source.ResourceClaimTemplateName != nil
-		claim, err := pl.claimLister.ResourceClaims(pod.Namespace).Get(claimName)
+		claimName, mustCheckOwner, err := resourceclaim.Name(pod, &resource)
 		if err != nil {
-			// The error usually has already enough context ("resourcevolumeclaim "myclaim" not found"),
-			// but we can do better for generic ephemeral inline volumes where that situation
-			// is normal directly after creating a pod.
-			if isEphemeral && apierrors.IsNotFound(err) {
-				err = fmt.Errorf("waiting for dynamic resource controller to create the resourceclaim %q", claimName)
-			}
+			return nil, err
+		}
+		// The claim name might be nil if no underlying resource claim
+		// was generated for the referenced claim. There are valid use
+		// cases when this might happen, so we simply skip it.
+		if claimName == nil {
+			continue
+		}
+		claim, err := pl.claimLister.ResourceClaims(pod.Namespace).Get(*claimName)
+		if err != nil {
 			return nil, err
 		}
 
@@ -285,7 +287,7 @@ func (pl *dynamicResources) podResourceClaims(pod *v1.Pod) ([]*resourcev1alpha2.
 			return nil, fmt.Errorf("resourceclaim %q is being deleted", claim.Name)
 		}
 
-		if isEphemeral {
+		if mustCheckOwner {
 			if err := resourceclaim.IsForPod(pod, claim); err != nil {
 				return nil, err
 			}

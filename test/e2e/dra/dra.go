@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -36,6 +37,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 const (
@@ -179,6 +181,35 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 		nodes := NewNodes(f, 1, 4)
 		driver := NewDriver(f, nodes, networkResources)
 		b := newBuilder(f, driver)
+
+		ginkgo.It("truncates the name of a generated resource claim", func(ctx context.Context) {
+			parameters := b.parameters()
+			pod, template := b.podInline(resourcev1alpha2.AllocationModeWaitForFirstConsumer)
+			pod.Name = strings.Repeat("p", 63)
+			pod.Spec.ResourceClaims[0].Name = strings.Repeat("c", 63)
+			pod.Spec.Containers[0].Resources.Claims[0].Name = pod.Spec.ResourceClaims[0].Name
+			b.create(ctx, parameters, template, pod)
+
+			b.testPod(ctx, f.ClientSet, pod)
+		})
+
+		ginkgo.It("runs a pod without a generated resource claim", func(ctx context.Context) {
+			pod, _ /* template */ := b.podInline(resourcev1alpha2.AllocationModeWaitForFirstConsumer)
+			created := b.create(ctx, pod)
+			pod = created[0].(*v1.Pod)
+
+			// Normally, this pod would be stuck because the
+			// ResourceClaim cannot be created without the
+			// template. We allow it to run by communicating
+			// through the status that the ResourceClaim is not
+			// needed.
+			pod.Status.ResourceClaimStatuses = []v1.PodResourceClaimStatus{
+				{Name: pod.Spec.ResourceClaims[0].Name, ResourceClaimName: nil},
+			}
+			_, err := f.ClientSet.CoreV1().Pods(pod.Namespace).UpdateStatus(ctx, pod, metav1.UpdateOptions{})
+			framework.ExpectNoError(err)
+			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
+		})
 
 		// claimTests tries out several different combinations of pods with
 		// claims, both inline and external.
@@ -759,7 +790,7 @@ func (b *builder) podInline(allocationMode resourcev1alpha2.AllocationMode) (*v1
 		{
 			Name: podClaimName,
 			Source: v1.ClaimSource{
-				ResourceClaimTemplateName: &pod.Name,
+				ResourceClaimTemplateName: utilpointer.String(pod.Name),
 			},
 		},
 	}
@@ -819,27 +850,31 @@ func (b *builder) podExternalMultiple() *v1.Pod {
 }
 
 // create takes a bunch of objects and calls their Create function.
-func (b *builder) create(ctx context.Context, objs ...klog.KMetadata) {
+func (b *builder) create(ctx context.Context, objs ...klog.KMetadata) []klog.KMetadata {
+	var createdObjs []klog.KMetadata
 	for _, obj := range objs {
 		ginkgo.By(fmt.Sprintf("creating %T %s", obj, obj.GetName()), func() {
 			var err error
+			var createdObj klog.KMetadata
 			switch obj := obj.(type) {
 			case *resourcev1alpha2.ResourceClass:
-				_, err = b.f.ClientSet.ResourceV1alpha2().ResourceClasses().Create(ctx, obj, metav1.CreateOptions{})
+				createdObj, err = b.f.ClientSet.ResourceV1alpha2().ResourceClasses().Create(ctx, obj, metav1.CreateOptions{})
 			case *v1.Pod:
-				_, err = b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+				createdObj, err = b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
 			case *v1.ConfigMap:
 				_, err = b.f.ClientSet.CoreV1().ConfigMaps(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
 			case *resourcev1alpha2.ResourceClaim:
-				_, err = b.f.ClientSet.ResourceV1alpha2().ResourceClaims(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+				createdObj, err = b.f.ClientSet.ResourceV1alpha2().ResourceClaims(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
 			case *resourcev1alpha2.ResourceClaimTemplate:
-				_, err = b.f.ClientSet.ResourceV1alpha2().ResourceClaimTemplates(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+				createdObj, err = b.f.ClientSet.ResourceV1alpha2().ResourceClaimTemplates(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
 			default:
 				framework.Fail(fmt.Sprintf("internal error, unsupported type %T", obj), 1)
 			}
 			framework.ExpectNoErrorWithOffset(1, err, "create %T", obj)
+			createdObjs = append(createdObjs, createdObj)
 		})
 	}
+	return createdObjs
 }
 
 // testPod runs pod and checks if container logs contain expected environment variables

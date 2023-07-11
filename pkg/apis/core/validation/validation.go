@@ -4845,6 +4845,7 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions
 	allErrs = append(allErrs, ValidateContainerStateTransition(newPod.Status.InitContainerStatuses, oldPod.Status.InitContainerStatuses, fldPath.Child("initContainerStatuses"), oldPod.Spec.RestartPolicy)...)
 	// The kubelet will never restart ephemeral containers, so treat them like they have an implicit RestartPolicyNever.
 	allErrs = append(allErrs, ValidateContainerStateTransition(newPod.Status.EphemeralContainerStatuses, oldPod.Status.EphemeralContainerStatuses, fldPath.Child("ephemeralContainerStatuses"), core.RestartPolicyNever)...)
+	allErrs = append(allErrs, validatePodResourceClaimStatuses(newPod.Status.ResourceClaimStatuses, newPod.Spec.ResourceClaims, fldPath.Child("resourceClaimStatuses"))...)
 
 	if newIPErrs := validatePodIPs(newPod); len(newIPErrs) > 0 {
 		allErrs = append(allErrs, newIPErrs...)
@@ -4864,6 +4865,36 @@ func validatePodConditions(conditions []core.PodCondition, fldPath *field.Path) 
 		allErrs = append(allErrs, ValidateQualifiedName(string(condition.Type), fldPath.Index(i).Child("Type"))...)
 	}
 	return allErrs
+}
+
+// validatePodResourceClaimStatuses validates the ResourceClaimStatuses slice in a pod status.
+func validatePodResourceClaimStatuses(statuses []core.PodResourceClaimStatus, podClaims []core.PodResourceClaim, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	for i, status := range statuses {
+		idxPath := fldPath.Index(i)
+		// There's no need to check the content of the name. If it matches an entry,
+		// then it is valid, otherwise we reject it here.
+		if !havePodClaim(podClaims, status.Name) {
+			allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), status.Name, "must match the name of an entry in `spec.resourceClaims`"))
+		}
+		if status.ResourceClaimName != nil {
+			for _, detail := range ValidateResourceClaimName(*status.ResourceClaimName, false) {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), status.ResourceClaimName, detail))
+			}
+		}
+	}
+
+	return allErrs
+}
+
+func havePodClaim(podClaims []core.PodResourceClaim, name string) bool {
+	for _, podClaim := range podClaims {
+		if podClaim.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 // ValidatePodEphemeralContainersUpdate tests that a user update to EphemeralContainers is valid.
