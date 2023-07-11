@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	discovery "k8s.io/api/discovery/v1"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/pointer"
 )
 
@@ -73,7 +74,8 @@ func Test_redistributeHints(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			actualRedistributions := redistributeHints(tc.slices, tc.givingZones, tc.receivingZones)
+			logger, _ := ktesting.NewTestContext(t)
+			actualRedistributions := redistributeHints(logger, tc.slices, tc.givingZones, tc.receivingZones)
 
 			if len(actualRedistributions) != len(tc.expectedRedistributions) {
 				t.Fatalf("Expected redistributions for %d zones, got %d (%+v)", len(tc.expectedRedistributions), len(actualRedistributions), actualRedistributions)

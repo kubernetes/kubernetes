@@ -17,6 +17,7 @@ limitations under the License.
 package endpointslicemirroring
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -198,7 +199,7 @@ type Controller struct {
 }
 
 // Run will not return until stopCh is closed.
-func (c *Controller) Run(workers int, stopCh <-chan struct{}) {
+func (c *Controller) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 
 	// Start events processing pipeline.
@@ -208,69 +209,70 @@ func (c *Controller) Run(workers int, stopCh <-chan struct{}) {
 
 	defer c.queue.ShutDown()
 
-	klog.Infof("Starting EndpointSliceMirroring controller")
-	defer klog.Infof("Shutting down EndpointSliceMirroring controller")
+	logger := klog.FromContext(ctx)
+	logger.Info("Starting EndpointSliceMirroring controller")
+	defer logger.Info("Shutting down EndpointSliceMirroring controller")
 
-	if !cache.WaitForNamedCacheSync("endpoint_slice_mirroring", stopCh, c.endpointsSynced, c.endpointSlicesSynced, c.servicesSynced) {
+	if !cache.WaitForNamedCacheSync("endpoint_slice_mirroring", ctx.Done(), c.endpointsSynced, c.endpointSlicesSynced, c.servicesSynced) {
 		return
 	}
 
-	klog.V(2).Infof("Starting %d worker threads", workers)
+	logger.V(2).Info("Starting worker threads", "total", workers)
 	for i := 0; i < workers; i++ {
-		go wait.Until(c.worker, c.workerLoopPeriod, stopCh)
+		go wait.Until(func() { c.worker(logger) }, c.workerLoopPeriod, ctx.Done())
 	}
 
-	<-stopCh
+	<-ctx.Done()
 }
 
 // worker runs a worker thread that just dequeues items, processes them, and
 // marks them done. You may run as many of these in parallel as you wish; the
 // workqueue guarantees that they will not end up processing the same service
 // at the same time
-func (c *Controller) worker() {
-	for c.processNextWorkItem() {
+func (c *Controller) worker(logger klog.Logger) {
+	for c.processNextWorkItem(logger) {
 	}
 }
 
-func (c *Controller) processNextWorkItem() bool {
+func (c *Controller) processNextWorkItem(logger klog.Logger) bool {
 	cKey, quit := c.queue.Get()
 	if quit {
 		return false
 	}
 	defer c.queue.Done(cKey)
 
-	err := c.syncEndpoints(cKey.(string))
-	c.handleErr(err, cKey)
+	err := c.syncEndpoints(logger, cKey.(string))
+	c.handleErr(logger, err, cKey)
 
 	return true
 }
 
-func (c *Controller) handleErr(err error, key interface{}) {
+func (c *Controller) handleErr(logger klog.Logger, err error, key interface{}) {
 	if err == nil {
 		c.queue.Forget(key)
 		return
 	}
 
 	if c.queue.NumRequeues(key) < maxRetries {
-		klog.Warningf("Error mirroring EndpointSlices for %q Endpoints, retrying. Error: %v", key, err)
+		logger.Info("Error mirroring EndpointSlices for Endpoints, retrying", "key", key, "err", err)
 		c.queue.AddRateLimited(key)
 		return
 	}
 
-	klog.Warningf("Retry budget exceeded, dropping %q Endpoints out of the queue: %v", key, err)
+	logger.Info("Retry budget exceeded, dropping Endpoints out of the queue", "key", key, "err", err)
 	c.queue.Forget(key)
 	utilruntime.HandleError(err)
 }
 
-func (c *Controller) syncEndpoints(key string) error {
+func (c *Controller) syncEndpoints(logger klog.Logger, key string) error {
 	startTime := time.Now()
 	defer func() {
 		syncDuration := float64(time.Since(startTime).Milliseconds()) / 1000
 		metrics.EndpointsSyncDuration.WithLabelValues().Observe(syncDuration)
-		klog.V(4).Infof("Finished syncing EndpointSlices for %q Endpoints. (%v)", key, time.Since(startTime))
+		logger.V(4).Info("Finished syncing EndpointSlices for Endpoints", "key", key, "elapsedTime", time.Since(startTime))
 	}()
 
-	klog.V(4).Infof("syncEndpoints(%q)", key)
+	logger.V(4).Info("syncEndpoints", "key", key)
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
@@ -280,7 +282,7 @@ func (c *Controller) syncEndpoints(key string) error {
 	endpoints, err := c.endpointsLister.Endpoints(namespace).Get(name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			klog.V(4).Infof("%s/%s Endpoints not found, cleaning up any mirrored EndpointSlices", namespace, name)
+			logger.V(4).Info("Endpoints not found, cleaning up any mirrored EndpointSlices", "endpoints", klog.KRef(namespace, name))
 			c.endpointSliceTracker.DeleteService(namespace, name)
 			return c.deleteMirroredSlices(namespace, name)
 		}
@@ -288,7 +290,7 @@ func (c *Controller) syncEndpoints(key string) error {
 	}
 
 	if !c.shouldMirror(endpoints) {
-		klog.V(4).Infof("%s/%s Endpoints should not be mirrored, cleaning up any mirrored EndpointSlices", namespace, name)
+		logger.V(4).Info("Endpoints should not be mirrored, cleaning up any mirrored EndpointSlices", "endpoints", klog.KRef(namespace, name))
 		c.endpointSliceTracker.DeleteService(namespace, name)
 		return c.deleteMirroredSlices(namespace, name)
 	}
@@ -296,7 +298,7 @@ func (c *Controller) syncEndpoints(key string) error {
 	svc, err := c.serviceLister.Services(namespace).Get(name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			klog.V(4).Infof("%s/%s Service not found, cleaning up any mirrored EndpointSlices", namespace, name)
+			logger.V(4).Info("Service not found, cleaning up any mirrored EndpointSlices", "service", klog.KRef(namespace, name))
 			c.endpointSliceTracker.DeleteService(namespace, name)
 			return c.deleteMirroredSlices(namespace, name)
 		}
@@ -305,7 +307,7 @@ func (c *Controller) syncEndpoints(key string) error {
 
 	// If a selector is specified, clean up any mirrored slices.
 	if svc.Spec.Selector != nil {
-		klog.V(4).Infof("%s/%s Service now has selector, cleaning up any mirrored EndpointSlices", namespace, name)
+		logger.V(4).Info("Service now has selector, cleaning up any mirrored EndpointSlices", "service", klog.KRef(namespace, name))
 		c.endpointSliceTracker.DeleteService(namespace, name)
 		return c.deleteMirroredSlices(namespace, name)
 	}
@@ -319,7 +321,7 @@ func (c *Controller) syncEndpoints(key string) error {
 		return endpointsliceutil.NewStaleInformerCache("EndpointSlice informer cache is out of date")
 	}
 
-	err = c.reconciler.reconcile(endpoints, endpointSlices)
+	err = c.reconciler.reconcile(logger, endpoints, endpointSlices)
 	if err != nil {
 		return err
 	}

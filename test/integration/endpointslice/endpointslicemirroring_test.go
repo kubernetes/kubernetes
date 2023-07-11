@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/endpointslice"
@@ -47,6 +48,7 @@ func TestEndpointSliceMirroring(t *testing.T) {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
 	resyncPeriod := 12 * time.Hour
 	informers := informers.NewSharedInformerFactory(client, resyncPeriod)
 
@@ -58,6 +60,7 @@ func TestEndpointSliceMirroring(t *testing.T) {
 		1*time.Second)
 
 	epsController := endpointslice.NewController(
+		ctx,
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Services(),
 		informers.Core().V1().Nodes(),
@@ -75,12 +78,11 @@ func TestEndpointSliceMirroring(t *testing.T) {
 		1*time.Second)
 
 	// Start informer and controllers
-	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	informers.Start(ctx.Done())
 	go epController.Run(ctx, 5)
-	go epsController.Run(5, ctx.Done())
-	go epsmController.Run(5, ctx.Done())
+	go epsController.Run(ctx, 5)
+	go epsmController.Run(ctx, 5)
 
 	testCases := []struct {
 		testName                     string
@@ -330,10 +332,11 @@ func TestEndpointSliceMirroringUpdates(t *testing.T) {
 		1*time.Second)
 
 	// Start informer and controllers
-	ctx, cancel := context.WithCancel(context.Background())
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	informers.Start(ctx.Done())
-	go epsmController.Run(1, ctx.Done())
+	go epsmController.Run(ctx, 1)
 
 	testCases := []struct {
 		testName      string
@@ -505,10 +508,11 @@ func TestEndpointSliceMirroringSelectorTransition(t *testing.T) {
 		1*time.Second)
 
 	// Start informer and controllers
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	informers.Start(stopCh)
-	go epsmController.Run(1, stopCh)
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	informers.Start(ctx.Done())
+	go epsmController.Run(ctx, 1)
 
 	testCases := []struct {
 		testName               string

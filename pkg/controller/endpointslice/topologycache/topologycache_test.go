@@ -27,6 +27,7 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/pointer"
 )
 
@@ -382,7 +383,8 @@ func TestAddHints(t *testing.T) {
 			cache := NewTopologyCache()
 			cache.cpuRatiosByZone = tc.cpuRatiosByZone
 
-			slicesToCreate, slicesToUpdate, events := cache.AddHints(tc.sliceInfo)
+			logger, _ := ktesting.NewTestContext(t)
+			slicesToCreate, slicesToUpdate, events := cache.AddHints(logger, tc.sliceInfo)
 
 			expectEquivalentSlices(t, slicesToCreate, tc.expectedSlicesToCreate)
 			expectEquivalentSlices(t, slicesToUpdate, tc.expectedSlicesToUpdate)
@@ -580,7 +582,8 @@ func TestSetNodes(t *testing.T) {
 				})
 			}
 
-			cache.SetNodes(nodes)
+			logger, _ := ktesting.NewTestContext(t)
+			cache.SetNodes(logger, nodes)
 
 			if cache.sufficientNodeInfo != tc.expectSufficientNodeInfo {
 				t.Errorf("Expected sufficientNodeInfo to be %t, got %t", tc.expectSufficientNodeInfo, cache.sufficientNodeInfo)
@@ -680,11 +683,12 @@ func TestTopologyCacheRace(t *testing.T) {
 		})
 	}
 
+	logger, _ := ktesting.NewTestContext(t)
 	go func() {
-		cache.SetNodes(nodes)
+		cache.SetNodes(logger, nodes)
 	}()
 	go func() {
-		cache.AddHints(sliceInfo)
+		cache.AddHints(logger, sliceInfo)
 	}()
 }
 
