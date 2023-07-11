@@ -226,6 +226,7 @@ func (m *ManagerImpl) PluginConnected(resourceName string, p plugin.DevicePlugin
 	defer m.mutex.Unlock()
 	m.endpoints[resourceName] = endpointInfo{e, options}
 
+	klog.V(2).InfoS("Device plugin connected", "resourceName", resourceName)
 	return nil
 }
 
@@ -256,6 +257,7 @@ func (m *ManagerImpl) PluginListAndWatchReceiver(resourceName string, resp *plug
 }
 
 func (m *ManagerImpl) genericDeviceUpdateCallback(resourceName string, devices []pluginapi.Device) {
+	healthyCount := 0
 	m.mutex.Lock()
 	m.healthyDevices[resourceName] = sets.NewString()
 	m.unhealthyDevices[resourceName] = sets.NewString()
@@ -264,6 +266,7 @@ func (m *ManagerImpl) genericDeviceUpdateCallback(resourceName string, devices [
 		m.allDevices[resourceName][dev.ID] = dev
 		if dev.Health == pluginapi.Healthy {
 			m.healthyDevices[resourceName].Insert(dev.ID)
+			healthyCount++
 		} else {
 			m.unhealthyDevices[resourceName].Insert(dev.ID)
 		}
@@ -272,6 +275,7 @@ func (m *ManagerImpl) genericDeviceUpdateCallback(resourceName string, devices [
 	if err := m.writeCheckpoint(); err != nil {
 		klog.ErrorS(err, "Writing checkpoint encountered")
 	}
+	klog.V(2).InfoS("Processed device updates for resource", "resourceName", resourceName, "totalCount", len(devices), "healthyCount", healthyCount)
 }
 
 // GetWatcherHandler returns the plugin handler
