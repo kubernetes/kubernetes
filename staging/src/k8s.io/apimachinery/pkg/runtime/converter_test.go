@@ -91,6 +91,7 @@ type F struct {
 	G []int             `json:"fg"`
 	H []bool            `json:"fh"`
 	I []float32         `json:"fi"`
+	J []byte            `json:"fj"`
 }
 
 type G struct {
@@ -749,6 +750,10 @@ func TestUnrecognized(t *testing.T) {
 		},
 		{
 			data: "{\"ff\":[\"abc\"],\"fg\":[123],\"fh\":[true,false]}",
+			obj:  &F{},
+		},
+		{
+			data: "{\"fj\":\"\"}",
 			obj:  &F{},
 		},
 		{
