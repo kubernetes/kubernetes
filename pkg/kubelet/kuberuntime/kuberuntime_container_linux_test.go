@@ -22,13 +22,14 @@ package kuberuntime
 import (
 	"context"
 	"fmt"
-	"k8s.io/kubernetes/pkg/kubelet/cm"
-	"k8s.io/kubernetes/pkg/kubelet/types"
 	"math"
 	"os"
 	"reflect"
 	"strconv"
 	"testing"
+
+	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 
 	"github.com/google/go-cmp/cmp"
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
@@ -262,6 +263,7 @@ func TestCalculateLinuxResources(t *testing.T) {
 				CpuPeriod:          100000,
 				CpuQuota:           200000,
 				CpuShares:          1024,
+				Unified:            generateUnified(),
 				MemoryLimitInBytes: 134217728,
 			},
 			cgroupVersion: cgroupV1,
@@ -275,6 +277,7 @@ func TestCalculateLinuxResources(t *testing.T) {
 				CpuPeriod:          100000,
 				CpuQuota:           800000,
 				CpuShares:          2048,
+				Unified:            generateUnified(),
 				MemoryLimitInBytes: 0,
 			},
 			cgroupVersion: cgroupV1,
@@ -287,6 +290,7 @@ func TestCalculateLinuxResources(t *testing.T) {
 				CpuPeriod:          100000,
 				CpuQuota:           200000,
 				CpuShares:          2048,
+				Unified:            generateUnified(),
 				MemoryLimitInBytes: 0,
 			},
 			cgroupVersion: cgroupV1,
@@ -300,6 +304,7 @@ func TestCalculateLinuxResources(t *testing.T) {
 				CpuPeriod:          100000,
 				CpuQuota:           200000,
 				CpuShares:          2,
+				Unified:            generateUnified(),
 				MemoryLimitInBytes: 0,
 			},
 			cgroupVersion: cgroupV1,
@@ -733,7 +738,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			[]v1.ContainerStatus{},
-			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 524288000, OomScoreAdj: -997},
+			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 524288000, OomScoreAdj: -997, Unified: generateUnified()},
 		},
 		{
 			"requests & limits, cpu & memory, burstable qos - no container status",
@@ -741,7 +746,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m"), v1.ResourceMemory: resource.MustParse("750Mi")},
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			[]v1.ContainerStatus{},
-			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 786432000, OomScoreAdj: 970},
+			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 786432000, OomScoreAdj: 970, Unified: generateUnified()},
 		},
 		{
 			"best-effort qos - no container status",
@@ -749,7 +754,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			nil,
 			nil,
 			[]v1.ContainerStatus{},
-			&runtimeapi.LinuxContainerResources{CpuShares: 2, OomScoreAdj: 1000},
+			&runtimeapi.LinuxContainerResources{CpuShares: 2, OomScoreAdj: 1000, Unified: generateUnified()},
 		},
 		{
 			"requests & limits, cpu & memory, guaranteed qos - empty resources container status",
@@ -757,7 +762,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			[]v1.ContainerStatus{{Name: "c1"}},
-			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 524288000, OomScoreAdj: -997},
+			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 524288000, OomScoreAdj: -997, Unified: generateUnified()},
 		},
 		{
 			"requests & limits, cpu & memory, burstable qos - empty resources container status",
@@ -765,7 +770,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m"), v1.ResourceMemory: resource.MustParse("750Mi")},
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			[]v1.ContainerStatus{{Name: "c1"}},
-			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 786432000, OomScoreAdj: 999},
+			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 786432000, OomScoreAdj: 999, Unified: generateUnified()},
 		},
 		{
 			"best-effort qos - empty resources container status",
@@ -773,7 +778,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			nil,
 			nil,
 			[]v1.ContainerStatus{{Name: "c1"}},
-			&runtimeapi.LinuxContainerResources{CpuShares: 2, OomScoreAdj: 1000},
+			&runtimeapi.LinuxContainerResources{CpuShares: 2, OomScoreAdj: 1000, Unified: generateUnified()},
 		},
 		{
 			"requests & limits, cpu & memory, guaranteed qos - container status with allocatedResources",
@@ -786,7 +791,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 					AllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 				},
 			},
-			&runtimeapi.LinuxContainerResources{CpuShares: 204, MemoryLimitInBytes: 524288000, OomScoreAdj: -997},
+			&runtimeapi.LinuxContainerResources{CpuShares: 204, MemoryLimitInBytes: 524288000, OomScoreAdj: -997, Unified: generateUnified()},
 		},
 		{
 			"requests & limits, cpu & memory, burstable qos - container status with allocatedResources",
@@ -799,7 +804,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 					AllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 				},
 			},
-			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 786432000, OomScoreAdj: 970},
+			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 786432000, OomScoreAdj: 970, Unified: generateUnified()},
 		},
 		{
 			"requests & limits, cpu & memory, guaranteed qos - no container status",
@@ -807,7 +812,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			[]v1.ContainerStatus{},
-			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 524288000, OomScoreAdj: -997},
+			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 524288000, OomScoreAdj: -997, Unified: generateUnified()},
 		},
 		{
 			"requests & limits, cpu & memory, burstable qos - container status with allocatedResources",
@@ -820,7 +825,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 					AllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 				},
 			},
-			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 786432000, OomScoreAdj: 970},
+			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 786432000, OomScoreAdj: 970, Unified: generateUnified()},
 		},
 		{
 			"requests & limits, cpu & memory, guaranteed qos - container status with allocatedResources",
@@ -833,7 +838,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 					AllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 				},
 			},
-			&runtimeapi.LinuxContainerResources{CpuShares: 204, MemoryLimitInBytes: 524288000, OomScoreAdj: -997},
+			&runtimeapi.LinuxContainerResources{CpuShares: 204, MemoryLimitInBytes: 524288000, OomScoreAdj: -997, Unified: generateUnified()},
 		},
 		{
 			"best-effort qos - no container status",
@@ -841,7 +846,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			nil,
 			nil,
 			[]v1.ContainerStatus{},
-			&runtimeapi.LinuxContainerResources{CpuShares: 2, OomScoreAdj: 1000},
+			&runtimeapi.LinuxContainerResources{CpuShares: 2, OomScoreAdj: 1000, Unified: generateUnified()},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1150,4 +1155,11 @@ func setCgroupVersionDuringTest(version CgroupVersion) {
 	isCgroup2UnifiedMode = func() bool {
 		return version == cgroupV2
 	}
+}
+
+func generateUnified() map[string]string {
+	if libcontainercgroups.IsCgroup2UnifiedMode() {
+		return map[string]string{"memory.oom.group": "1"}
+	}
+	return nil
 }
