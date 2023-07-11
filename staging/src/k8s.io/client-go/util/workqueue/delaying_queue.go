@@ -480,13 +480,13 @@ func (q *delayingType) waitingLoop() {
 			// continue the loop, which will add ready items
 
 		case msg := <-q.waitingForAddCh:
-			q.processArrivingWaitForEntry(waitingForQueue, waitingEntryByData, msg)
+			q.processArrivingWaitLoopMessage(waitingForQueue, waitingEntryByData, msg)
 
 			drained := false
 			for !drained {
 				select {
 				case msg := <-q.waitingForAddCh:
-					q.processArrivingWaitForEntry(waitingForQueue, waitingEntryByData, msg)
+					q.processArrivingWaitLoopMessage(waitingForQueue, waitingEntryByData, msg)
 				default:
 					drained = true
 				}
@@ -587,14 +587,14 @@ func (q *delayingType) handleReportingAndSync(w *waitForPriorityQueue, knownEntr
 	q.afterFill = nil
 }
 
-// processArrivingWaitForEntry receives messages received from clients a takes the appropriate queuing based
+// processArrivingWaitLoopMessage receives messages received from clients a takes the appropriate queuing based
 // upon the entry.action requested.
 // When performing the msgActionQueue action it behaves as follows:
 //   - An entry is dropped if it is already actively queued (much like Add() on the Interface)
 //   - Delayed items are inserted into the 'waiting' queue according to their Waiting option (TakeShorter by default)
 //   - Immediate items will be dropped when the TakeLonger Waiting option is set and they are already present in 'waiting'.
 //   - Immediate items will pre-empt/remove items in the 'waiting' queue unless the PermitActiveAndWaiting option is set.
-func (q *delayingType) processArrivingWaitForEntry(w *waitForPriorityQueue, knownEntries map[t]*waitFor, msg *waitLoopMessage) {
+func (q *delayingType) processArrivingWaitLoopMessage(w *waitForPriorityQueue, knownEntries map[t]*waitFor, msg *waitLoopMessage) {
 	// handle the different message actions
 	switch msg.action {
 	case msgActionIsWaiting, msgActionLenWaiting, msgActionNextReady, msgActionSyncFill:
