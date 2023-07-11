@@ -68,6 +68,9 @@ func makeTestStoreElement(pod *v1.Pod) *storeElement {
 
 type testWatchCache struct {
 	*watchCache
+
+	bookmarkRevision chan int64
+	stopCh           chan struct{}
 }
 
 func (w *testWatchCache) getAllEventsSince(resourceVersion uint64) ([]*watchCacheEvent, error) {
@@ -112,7 +115,13 @@ func newTestWatchCache(capacity int, indexers *cache.Indexers) *testWatchCache {
 	}
 	versioner := storage.APIObjectVersioner{}
 	mockHandler := func(*watchCacheEvent) {}
-	wc := newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, testingclock.NewFakeClock(time.Now()), schema.GroupResource{Resource: "pods"})
+	wc := &testWatchCache{}
+	wc.bookmarkRevision = make(chan int64, 1)
+	wc.stopCh = make(chan struct{})
+	clock := testingclock.NewFakeClock(time.Now())
+	pr := newConditionalProgressRequester(wc.RequestWatchProgress, clock)
+	go pr.Run(wc.stopCh)
+	wc.watchCache = newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, clock, schema.GroupResource{Resource: "pods"}, pr)
 	// To preserve behavior of tests that assume a given capacity,
 	// resize it to th expected size.
 	wc.capacity = capacity
@@ -120,11 +129,28 @@ func newTestWatchCache(capacity int, indexers *cache.Indexers) *testWatchCache {
 	wc.lowerBoundCapacity = min(capacity, defaultLowerBoundCapacity)
 	wc.upperBoundCapacity = max(capacity, defaultUpperBoundCapacity)
 
-	return &testWatchCache{watchCache: wc}
+	return wc
+}
+
+func (w *testWatchCache) RequestWatchProgress(ctx context.Context) error {
+	go func() {
+		select {
+		case rev := <-w.bookmarkRevision:
+			w.UpdateResourceVersion(fmt.Sprintf("%d", rev))
+		case <-ctx.Done():
+			return
+		}
+	}()
+	return nil
+}
+
+func (w *testWatchCache) Stop() {
+	close(w.stopCh)
 }
 
 func TestWatchCacheBasic(t *testing.T) {
 	store := newTestWatchCache(2, &cache.Indexers{})
+	defer store.Stop()
 
 	// Test Add/Update/Delete.
 	pod1 := makeTestPod("pod", 1)
@@ -202,6 +228,7 @@ func TestWatchCacheBasic(t *testing.T) {
 
 func TestEvents(t *testing.T) {
 	store := newTestWatchCache(5, &cache.Indexers{})
+	defer store.Stop()
 
 	// no dynamic-size cache to fit old tests.
 	store.lowerBoundCapacity = 5
@@ -326,6 +353,7 @@ func TestEvents(t *testing.T) {
 
 func TestMarker(t *testing.T) {
 	store := newTestWatchCache(3, &cache.Indexers{})
+	defer store.Stop()
 
 	// First thing that is called when propagated from storage is Replace.
 	store.Replace([]interface{}{
@@ -380,7 +408,7 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 			return []string{pod.Spec.NodeName}, nil
 		},
 	})
-
+	defer store.Stop()
 	// In background, update the store.
 	go func() {
 		store.Add(makeTestPodDetails("pod1", 2, "node1", map[string]string{"label": "value1"}))
@@ -463,6 +491,7 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 func TestWaitUntilFreshAndGet(t *testing.T) {
 	ctx := context.Background()
 	store := newTestWatchCache(3, &cache.Indexers{})
+	defer store.Stop()
 
 	// In background, update the store.
 	go func() {
@@ -489,6 +518,7 @@ func TestWaitUntilFreshAndGet(t *testing.T) {
 func TestWaitUntilFreshAndListTimeout(t *testing.T) {
 	ctx := context.Background()
 	store := newTestWatchCache(3, &cache.Indexers{})
+	defer store.Stop()
 	fc := store.clock.(*testingclock.FakeClock)
 
 	// In background, step clock after the below call starts the timer.
@@ -529,6 +559,7 @@ func (t *testLW) Watch(options metav1.ListOptions) (watch.Interface, error) {
 func TestReflectorForWatchCache(t *testing.T) {
 	ctx := context.Background()
 	store := newTestWatchCache(5, &cache.Indexers{})
+	defer store.Stop()
 
 	{
 		_, version, _, err := store.WaitUntilFreshAndList(ctx, 0, nil)
@@ -792,6 +823,7 @@ func TestDynamicCache(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			store := newTestWatchCache(test.cacheCapacity, &cache.Indexers{})
+			defer store.Stop()
 			store.cache = make([]*watchCacheEvent, test.cacheCapacity)
 			store.startIndex = test.startIndex
 			store.lowerBoundCapacity = test.lowerBoundCapacity
@@ -840,6 +872,7 @@ func checkCacheElements(cache *testWatchCache) bool {
 
 func TestCacheIncreaseDoesNotBreakWatch(t *testing.T) {
 	store := newTestWatchCache(2, &cache.Indexers{})
+	defer store.Stop()
 
 	now := store.clock.Now()
 	addEvent := func(key string, rv uint64, t time.Time) {
@@ -988,6 +1021,7 @@ func TestSuggestedWatchChannelSize(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			store := newTestWatchCache(test.capacity, &cache.Indexers{})
+			defer store.Stop()
 			got := store.suggestedWatchChannelSize(test.indexExists, test.triggerUsed)
 			if got != test.expected {
 				t.Errorf("unexpected channel size got: %v, expected: %v", got, test.expected)
@@ -998,6 +1032,7 @@ func TestSuggestedWatchChannelSize(t *testing.T) {
 
 func BenchmarkWatchCache_updateCache(b *testing.B) {
 	store := newTestWatchCache(defaultUpperBoundCapacity, &cache.Indexers{})
+	defer store.Stop()
 	store.cache = store.cache[:0]
 	store.upperBoundCapacity = defaultUpperBoundCapacity
 	loadEventWithDuration(store, defaultUpperBoundCapacity, 0)
