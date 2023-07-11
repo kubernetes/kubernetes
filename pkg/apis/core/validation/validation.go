@@ -2024,6 +2024,8 @@ type PersistentVolumeClaimSpecValidationOptions struct {
 	AllowInvalidLabelValueInSelector bool
 	// Allow to validate the API group of the data source and data source reference
 	AllowInvalidAPIGroupInDataSourceOrRef bool
+	// Allow users to modify the class of volume attributes
+	EnableVolumeAttributesClass bool
 }
 
 func ValidationOptionsForPersistentVolumeClaim(pvc, oldPvc *core.PersistentVolumeClaim) PersistentVolumeClaimSpecValidationOptions {
@@ -2031,6 +2033,7 @@ func ValidationOptionsForPersistentVolumeClaim(pvc, oldPvc *core.PersistentVolum
 		AllowReadWriteOncePod:             utilfeature.DefaultFeatureGate.Enabled(features.ReadWriteOncePod),
 		EnableRecoverFromExpansionFailure: utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure),
 		AllowInvalidLabelValueInSelector:  false,
+		EnableVolumeAttributesClass:       utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass),
 	}
 	if oldPvc == nil {
 		// If there's no old PVC, use the options based solely on feature enablement
@@ -2064,6 +2067,7 @@ func ValidationOptionsForPersistentVolumeClaimTemplate(claimTemplate, oldClaimTe
 	opts := PersistentVolumeClaimSpecValidationOptions{
 		AllowReadWriteOncePod:            utilfeature.DefaultFeatureGate.Enabled(features.ReadWriteOncePod),
 		AllowInvalidLabelValueInSelector: false,
+		EnableVolumeAttributesClass:      utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass),
 	}
 	if oldClaimTemplate == nil {
 		// If there's no old PVC template, use the options based solely on feature enablement
@@ -2228,6 +2232,17 @@ func ValidatePersistentVolumeClaimSpec(spec *core.PersistentVolumeClaimSpec, fld
 				"must match dataSourceRef"))
 		}
 	}
+	if spec.VolumeAttributesClassName != nil {
+		if opts.EnableVolumeAttributesClass {
+			if len(*spec.VolumeAttributesClassName) == 0 {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("volumeAttributesClassName"), "an empty string is disallowed"))
+			} else {
+				for _, msg := range ValidateClassName(*spec.VolumeAttributesClassName, false) {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("volumeAttributesClassName"), *spec.VolumeAttributesClassName, msg))
+				}
+			}
+		}
+	}
 
 	return allErrs
 }
@@ -2271,6 +2286,8 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *core.PersistentVolumeCl
 	if newPvc.Status.Phase == core.ClaimBound && newPvcClone.Spec.Resources.Requests != nil {
 		newPvcClone.Spec.Resources.Requests["storage"] = oldPvc.Spec.Resources.Requests["storage"] // +k8s:verify-mutation:reason=clone
 	}
+	// lets make sure volume attributes class name is same.
+	newPvcClone.Spec.VolumeAttributesClassName = oldPvcClone.Spec.VolumeAttributesClassName // +k8s:verify-mutation:reason=clone
 
 	oldSize := oldPvc.Spec.Resources.Requests["storage"]
 	newSize := newPvc.Spec.Resources.Requests["storage"]
@@ -2278,7 +2295,7 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *core.PersistentVolumeCl
 
 	if !apiequality.Semantic.DeepEqual(newPvcClone.Spec, oldPvcClone.Spec) {
 		specDiff := cmp.Diff(oldPvcClone.Spec, newPvcClone.Spec)
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), fmt.Sprintf("spec is immutable after creation except resources.requests for bound claims\n%v", specDiff)))
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), fmt.Sprintf("spec is immutable after creation except resources.requests and volumeAttributesClassName for bound claims\n%v", specDiff)))
 	}
 	if newSize.Cmp(oldSize) < 0 {
 		if !opts.EnableRecoverFromExpansionFailure {
@@ -2294,6 +2311,14 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *core.PersistentVolumeCl
 	}
 
 	allErrs = append(allErrs, ValidateImmutableField(newPvc.Spec.VolumeMode, oldPvc.Spec.VolumeMode, field.NewPath("volumeMode"))...)
+
+	if !apiequality.Semantic.DeepEqual(oldPvc.Spec.VolumeAttributesClassName, newPvc.Spec.VolumeAttributesClassName) {
+		if opts.EnableVolumeAttributesClass {
+			if oldPvc.Spec.VolumeAttributesClassName != nil && newPvc.Spec.VolumeAttributesClassName == nil {
+				allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "volumeAttributesClassName"), "update from non-nil value to nil is forbidden"))
+			}
+		}
+	}
 
 	return allErrs
 }

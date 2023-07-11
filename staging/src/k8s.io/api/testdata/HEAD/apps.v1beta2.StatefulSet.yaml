@@ -1011,6 +1011,7 @@ spec:
                 matchLabels:
                   matchLabelsKey: matchLabelsValue
               storageClassName: storageClassNameValue
+              volumeAttributesClassName: volumeAttributesClassNameValue
               volumeMode: volumeModeValue
               volumeName: volumeNameValue
         fc:
@@ -1223,6 +1224,7 @@ spec:
         matchLabels:
           matchLabelsKey: matchLabelsValue
       storageClassName: storageClassNameValue
+      volumeAttributesClassName: volumeAttributesClassNameValue
       volumeMode: volumeModeValue
       volumeName: volumeNameValue
     status:
@@ -1241,7 +1243,9 @@ spec:
         reason: reasonValue
         status: statusValue
         type: typeValue
+      modifyVolumeStatus: modifyVolumeStatusValue
       phase: phaseValue
+      volumeAttributesClassName: volumeAttributesClassNameValue
 status:
   availableReplicas: 11
   collisionCount: 9

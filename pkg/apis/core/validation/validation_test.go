@@ -988,6 +988,14 @@ func pvcWithAccessModes(accessModes []core.PersistentVolumeAccessMode) *core.Per
 	}
 }
 
+func pvcWithVolumeAttributesClassName(vacName *string) *core.PersistentVolumeClaim {
+	return &core.PersistentVolumeClaim{
+		Spec: core.PersistentVolumeClaimSpec{
+			VolumeAttributesClassName: vacName,
+		},
+	}
+}
+
 func pvcTemplateWithAccessModes(accessModes []core.PersistentVolumeAccessMode) *core.PersistentVolumeClaimTemplate {
 	return &core.PersistentVolumeClaimTemplate{
 		Spec: core.PersistentVolumeClaimSpec{
@@ -1007,6 +1015,14 @@ func pvcWithDataSourceRef(ref *core.TypedObjectReference) *core.PersistentVolume
 	return &core.PersistentVolumeClaim{
 		Spec: core.PersistentVolumeClaimSpec{
 			DataSourceRef: ref,
+		},
+	}
+}
+
+func pvcTemplateWithVolumeAttributesClassName(vacName *string) *core.PersistentVolumeClaimTemplate {
+	return &core.PersistentVolumeClaimTemplate{
+		Spec: core.PersistentVolumeClaimSpec{
+			VolumeAttributesClassName: vacName,
 		},
 	}
 }
@@ -1586,16 +1602,18 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
 			},
 		},
-		StorageClassName: &validClassName,
-		VolumeMode:       &validMode,
+		StorageClassName:          &validClassName,
+		VolumeAttributesClassName: &validClassName,
+		VolumeMode:                &validMode,
 	}
 	now := metav1.Now()
 	ten := int64(10)
 
 	scenarios := map[string]struct {
-		isExpectedFailure      bool
-		enableReadWriteOncePod bool
-		claim                  *core.PersistentVolumeClaim
+		isExpectedFailure          bool
+		enableReadWriteOncePod     bool
+		enableVolumeArributesClass bool
+		claim                      *core.PersistentVolumeClaim
 	}{
 		"good-claim": {
 			isExpectedFailure: false,
@@ -1986,11 +2004,34 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 				},
 			}),
 		},
+		"invalid-volume-attributes-class-name": {
+			isExpectedFailure:          true,
+			enableVolumeArributesClass: true,
+			claim: testVolumeClaim(goodName, goodNS, core.PersistentVolumeClaimSpec{
+				Selector: &metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{{
+						Key:      "key2",
+						Operator: "Exists",
+					}},
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{
+					core.ReadWriteOnce,
+					core.ReadOnlyMany,
+				},
+				Resources: core.VolumeResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+					},
+				},
+				VolumeAttributesClassName: &invalidClassName,
+			}),
+		},
 	}
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReadWriteOncePod, scenario.enableReadWriteOncePod)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, scenario.enableVolumeArributesClass)()
 
 			var errs field.ErrorList
 			if ephemeral {
@@ -2516,11 +2557,54 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		},
 	})
 
+	validClaimNilVolumeAttributesClass := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+			core.ReadOnlyMany,
+		},
+		Resources: core.VolumeResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+	}, core.PersistentVolumeClaimStatus{
+		Phase: core.ClaimBound,
+	})
+	validClaimVolumeAttributesClass1 := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		VolumeAttributesClassName: utilpointer.String("vac1"),
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+			core.ReadOnlyMany,
+		},
+		Resources: core.VolumeResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+	}, core.PersistentVolumeClaimStatus{
+		Phase: core.ClaimBound,
+	})
+	validClaimVolumeAttributesClass2 := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		VolumeAttributesClassName: utilpointer.String("vac2"),
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+			core.ReadOnlyMany,
+		},
+		Resources: core.VolumeResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+	}, core.PersistentVolumeClaimStatus{
+		Phase: core.ClaimBound,
+	})
+
 	scenarios := map[string]struct {
 		isExpectedFailure          bool
 		oldClaim                   *core.PersistentVolumeClaim
 		newClaim                   *core.PersistentVolumeClaim
 		enableRecoverFromExpansion bool
+		enableVolumeArributesClass bool
 	}{
 		"valid-update-volumeName-only": {
 			isExpectedFailure: false,
@@ -2730,11 +2814,31 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			newClaim:          invalidClaimDataSourceRefAPIGroup,
 			isExpectedFailure: false,
 		},
+		"valid-update-volume-attributes-class-from-nil": {
+			oldClaim:                   validClaimNilVolumeAttributesClass,
+			newClaim:                   validClaimVolumeAttributesClass1,
+			enableVolumeArributesClass: true,
+			isExpectedFailure:          false,
+		},
+		"valid-update-volume-attributes-class": {
+			oldClaim:                   validClaimVolumeAttributesClass1,
+			newClaim:                   validClaimVolumeAttributesClass2,
+			enableVolumeArributesClass: true,
+			isExpectedFailure:          false,
+		},
+		"invalid-update-volume-attributes-class": {
+			oldClaim:                   validClaimVolumeAttributesClass1,
+			newClaim:                   validClaimNilVolumeAttributesClass,
+			enableVolumeArributesClass: true,
+			isExpectedFailure:          true,
+		},
 	}
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, scenario.enableRecoverFromExpansion)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, scenario.enableVolumeArributesClass)()
+
 			scenario.oldClaim.ResourceVersion = "1"
 			scenario.newClaim.ResourceVersion = "1"
 			opts := ValidationOptionsForPersistentVolumeClaim(scenario.newClaim, scenario.oldClaim)
@@ -2753,9 +2857,10 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 	invaildAPIGroup := "^invalid"
 
 	tests := map[string]struct {
-		oldPvc                 *core.PersistentVolumeClaim
-		enableReadWriteOncePod bool
-		expectValidationOpts   PersistentVolumeClaimSpecValidationOptions
+		oldPvc                      *core.PersistentVolumeClaim
+		enableReadWriteOncePod      bool
+		enableVolumeAttributesClass bool
+		expectValidationOpts        PersistentVolumeClaimSpecValidationOptions
 	}{
 		"nil pv": {
 			oldPvc:                 nil,
@@ -2763,6 +2868,7 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
 				AllowReadWriteOncePod:             true,
 				EnableRecoverFromExpansionFailure: false,
+				EnableVolumeAttributesClass:       false,
 			},
 		},
 		"rwop allowed because feature enabled": {
@@ -2771,6 +2877,7 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
 				AllowReadWriteOncePod:             true,
 				EnableRecoverFromExpansionFailure: false,
+				EnableVolumeAttributesClass:       false,
 			},
 		},
 		"rwop not allowed because not used and feature disabled": {
@@ -2779,6 +2886,7 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
 				AllowReadWriteOncePod:             false,
 				EnableRecoverFromExpansionFailure: false,
+				EnableVolumeAttributesClass:       false,
 			},
 		},
 		"rwop allowed because used and feature enabled": {
@@ -2787,6 +2895,7 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
 				AllowReadWriteOncePod:             true,
 				EnableRecoverFromExpansionFailure: false,
+				EnableVolumeAttributesClass:       false,
 			},
 		},
 		"rwop allowed because used and feature disabled": {
@@ -2809,11 +2918,21 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 				AllowInvalidAPIGroupInDataSourceOrRef: true,
 			},
 		},
+		"volume attributes class allowed because feature enable": {
+			oldPvc:                      pvcWithVolumeAttributesClassName(utilpointer.String("foo")),
+			enableVolumeAttributesClass: true,
+			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
+				AllowReadWriteOncePod:             false,
+				EnableRecoverFromExpansionFailure: false,
+				EnableVolumeAttributesClass:       true,
+			},
+		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReadWriteOncePod, tc.enableReadWriteOncePod)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, tc.enableVolumeAttributesClass)()
 
 			opts := ValidationOptionsForPersistentVolumeClaim(nil, tc.oldPvc)
 			if opts != tc.expectValidationOpts {
@@ -2825,9 +2944,10 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 
 func TestValidationOptionsForPersistentVolumeClaimTemplate(t *testing.T) {
 	tests := map[string]struct {
-		oldPvcTemplate         *core.PersistentVolumeClaimTemplate
-		enableReadWriteOncePod bool
-		expectValidationOpts   PersistentVolumeClaimSpecValidationOptions
+		oldPvcTemplate              *core.PersistentVolumeClaimTemplate
+		enableReadWriteOncePod      bool
+		enableVolumeAttributesClass bool
+		expectValidationOpts        PersistentVolumeClaimSpecValidationOptions
 	}{
 		"nil pv": {
 			oldPvcTemplate:         nil,
@@ -2864,11 +2984,20 @@ func TestValidationOptionsForPersistentVolumeClaimTemplate(t *testing.T) {
 				AllowReadWriteOncePod: true,
 			},
 		},
+		"volume attributes class allowed because feature enable": {
+			oldPvcTemplate:              pvcTemplateWithVolumeAttributesClassName(utilpointer.String("foo")),
+			enableVolumeAttributesClass: true,
+			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
+				AllowReadWriteOncePod:       false,
+				EnableVolumeAttributesClass: true,
+			},
+		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReadWriteOncePod, tc.enableReadWriteOncePod)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, tc.enableVolumeAttributesClass)()
 
 			opts := ValidationOptionsForPersistentVolumeClaimTemplate(nil, tc.oldPvcTemplate)
 			if opts != tc.expectValidationOpts {
@@ -21488,6 +21617,61 @@ func TestCrossNamespaceSource(t *testing.T) {
 		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AnyVolumeDataSource, true)()
 		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CrossNamespaceVolumeDataSource, true)()
 		opts := PersistentVolumeClaimSpecValidationOptions{}
+		if tc.expectedFail {
+			if errs := ValidatePersistentVolumeClaimSpec(tc.claimSpec, field.NewPath("spec"), opts); len(errs) == 0 {
+				t.Errorf("%s: expected failure: %v", tc.testName, errs)
+			}
+		} else {
+			if errs := ValidatePersistentVolumeClaimSpec(tc.claimSpec, field.NewPath("spec"), opts); len(errs) != 0 {
+				t.Errorf("%s: expected success: %v", tc.testName, errs)
+			}
+		}
+	}
+}
+
+func pvcSpecWithVolumeAttributesClassName(vacName *string) *core.PersistentVolumeClaimSpec {
+	scName := "csi-plugin"
+	spec := core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadOnlyMany,
+		},
+		Resources: core.VolumeResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+		StorageClassName:          &scName,
+		VolumeAttributesClassName: vacName,
+	}
+	return &spec
+}
+
+func TestVolumeAttributesClass(t *testing.T) {
+	testCases := []struct {
+		testName     string
+		expectedFail bool
+		claimSpec    *core.PersistentVolumeClaimSpec
+	}{
+		{
+			testName:     "Feature gate enabled and valid no volumeAttributesClassName specified",
+			expectedFail: false,
+			claimSpec:    pvcSpecWithVolumeAttributesClassName(nil),
+		},
+		{
+			testName:     "Feature gate enabled and valid volumeAttributesClassName specified",
+			expectedFail: false,
+			claimSpec:    pvcSpecWithVolumeAttributesClassName(utilpointer.String("foo")),
+		},
+		{
+			testName:     "Feature gate enabled and invalid volumeAttributesClassName specified",
+			expectedFail: true,
+			claimSpec:    pvcSpecWithVolumeAttributesClassName(utilpointer.String("")),
+		},
+	}
+	for _, tc := range testCases {
+		opts := PersistentVolumeClaimSpecValidationOptions{
+			EnableVolumeAttributesClass: true,
+		}
 		if tc.expectedFail {
 			if errs := ValidatePersistentVolumeClaimSpec(tc.claimSpec, field.NewPath("spec"), opts); len(errs) == 0 {
 				t.Errorf("%s: expected failure: %v", tc.testName, errs)

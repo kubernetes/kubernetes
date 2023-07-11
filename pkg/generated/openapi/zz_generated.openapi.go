@@ -23307,6 +23307,13 @@ func schema_k8sio_api_core_v1_PersistentVolumeClaimSpec(ref common.ReferenceCall
 							Ref:         ref("k8s.io/api/core/v1.TypedObjectReference"),
 						},
 					},
+					"volumeAttributesClassName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "volumeAttributesClassName is the name of the VolumeAttributesClass required by the claim. If specified, the provisioner will create or update the volume with the attributes defined in the corresponding VolumeAttributesClass. Different with storageClassName, it can be changed after the claim is created but an empty string value is disallowed. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass (Alpha) Using this field requires the VolumeAttributesClass feature gate to be enabled.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
@@ -23414,6 +23421,21 @@ func schema_k8sio_api_core_v1_PersistentVolumeClaimStatus(ref common.ReferenceCa
 									},
 								},
 							},
+						},
+					},
+					"volumeAttributesClassName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "volumeAttributesClassName is the name of VolumeAttributesClass which is latest applied by the external-provisioner or external-resizer. This field is not set by default but when modification is complete, it's set same as VolumeAttributesClassName in spec. This is an alpha field and requires enabling VolumeAttributesClass feature.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"modifyVolumeStatus": {
+						SchemaProps: spec.SchemaProps{
+							Description: "modifyVolumeStatus stores status of modification operation. ModifyVolumeStatus is not set by default but when modification is complete, modifyVolumeStatus is set to empty string by the modify volume controller. This is an alpha field and requires enabling VolumeAttributesClass feature.\n\nPossible enum values:\n - `\"\"` When volume modification is complete, the empty string is set by modify volume controller.\n - `\"ControllerModifyVolumeFailed\"` State set when modify volume has failed in modify volume controller with a terminal error. Transient errors such as timeout should not set this status and should leave ModifyVolumeStatus unmodified, so as modify volume controller can resume the volume modification.\n - `\"ControllerModifyVolumeInProgress\"` State set when modify volume controller starts modifying the volume in control-plane\n - `\"ControllerModifyVolumePending\"` State set when modify volume controller finds that volumeAttributesClassName is specified but the corresponding VolumeAttributesClass is not found.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"", "ControllerModifyVolumeFailed", "ControllerModifyVolumeInProgress", "ControllerModifyVolumePending"},
 						},
 					},
 				},

@@ -488,6 +488,15 @@ type PersistentVolumeClaimSpec struct {
 	// (Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.
 	// +optional
 	DataSourceRef *TypedObjectReference
+	// volumeAttributesClassName is the name of the VolumeAttributesClass required by the claim.
+	// If specified, the provisioner will create or update the volume with the attributes defined
+	// in the corresponding VolumeAttributesClass. Different with storageClassName, it can be
+	// changed after the claim is created but an empty string value is disallowed.
+	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass
+	// (Alpha) Using this field requires the VolumeAttributesClass feature gate to be enabled.
+	// +featureGate=VolumeAttributesClass
+	// +optional
+	VolumeAttributesClassName *string
 }
 
 type TypedObjectReference struct {
@@ -542,6 +551,23 @@ const (
 	PersistentVolumeClaimNodeResizeInProgress ClaimResourceStatus = "NodeResizeInProgress"
 	// State set when resizing has failed in kubelet with a terminal error. Transient errors don't set NodeResizeFailed
 	PersistentVolumeClaimNodeResizeFailed ClaimResourceStatus = "NodeResizeFailed"
+)
+
+// +enum
+type VolumeAttributesClassStatus string
+
+const (
+	// When volume modification is complete, the empty string is set by modify volume controller.
+	PersistentVolumeClaimNoModifyVolumeInProgress VolumeAttributesClassStatus = ""
+	// State set when modify volume controller finds that volumeAttributesClassName is specified
+	// but the corresponding VolumeAttributesClass is not found.
+	PersistentVolumeClaimControllerModifyVolumePending VolumeAttributesClassStatus = "ControllerModifyVolumePending"
+	// State set when modify volume controller starts modifying the volume in control-plane
+	PersistentVolumeClaimControllerModifyVolumeInProgress VolumeAttributesClassStatus = "ControllerModifyVolumeInProgress"
+	// State set when modify volume has failed in modify volume controller with a terminal error.
+	// Transient errors such as timeout should not set this status and should leave ModifyVolumeStatus
+	// unmodified, so as modify volume controller can resume the volume modification.
+	PersistentVolumeClaimControllerModifyVolumeFailed VolumeAttributesClassStatus = "ControllerModifyVolumeFailed"
 )
 
 // PersistentVolumeClaimCondition represents the current condition of PV claim
@@ -635,6 +661,20 @@ type PersistentVolumeClaimStatus struct {
 	// +mapType=granular
 	// +optional
 	AllocatedResourceStatuses map[ResourceName]ClaimResourceStatus
+	// volumeAttributesClassName is the name of VolumeAttributesClass which is latest applied by
+	// the external-provisioner or external-resizer. This field is not set by default but when
+	// modification is complete, it's set same as VolumeAttributesClassName in spec.
+	// This is an alpha field and requires enabling VolumeAttributesClass feature.
+	// +featureGate=VolumeAttributesClassName
+	// +optional
+	VolumeAttributesClassName string
+	// modifyVolumeStatus stores status of modification operation.
+	// ModifyVolumeStatus is not set by default but when modification is complete, modifyVolumeStatus
+	// is set to empty string by the modify volume controller.
+	// This is an alpha field and requires enabling VolumeAttributesClass feature.
+	// +featureGate=VolumeAttributesClass
+	// +optional
+	ModifyVolumeStatus *VolumeAttributesClassStatus
 }
 
 // PersistentVolumeAccessMode defines various access modes for PV.

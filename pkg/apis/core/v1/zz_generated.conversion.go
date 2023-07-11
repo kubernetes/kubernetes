@@ -5341,6 +5341,7 @@ func autoConvert_v1_PersistentVolumeClaimSpec_To_core_PersistentVolumeClaimSpec(
 	out.VolumeMode = (*core.PersistentVolumeMode)(unsafe.Pointer(in.VolumeMode))
 	out.DataSource = (*core.TypedLocalObjectReference)(unsafe.Pointer(in.DataSource))
 	out.DataSourceRef = (*core.TypedObjectReference)(unsafe.Pointer(in.DataSourceRef))
+	out.VolumeAttributesClassName = (*string)(unsafe.Pointer(in.VolumeAttributesClassName))
 	return nil
 }
 
@@ -5360,6 +5361,7 @@ func autoConvert_core_PersistentVolumeClaimSpec_To_v1_PersistentVolumeClaimSpec(
 	out.VolumeMode = (*v1.PersistentVolumeMode)(unsafe.Pointer(in.VolumeMode))
 	out.DataSource = (*v1.TypedLocalObjectReference)(unsafe.Pointer(in.DataSource))
 	out.DataSourceRef = (*v1.TypedObjectReference)(unsafe.Pointer(in.DataSourceRef))
+	out.VolumeAttributesClassName = (*string)(unsafe.Pointer(in.VolumeAttributesClassName))
 	return nil
 }
 
@@ -5375,6 +5377,8 @@ func autoConvert_v1_PersistentVolumeClaimStatus_To_core_PersistentVolumeClaimSta
 	out.Conditions = *(*[]core.PersistentVolumeClaimCondition)(unsafe.Pointer(&in.Conditions))
 	out.AllocatedResources = *(*core.ResourceList)(unsafe.Pointer(&in.AllocatedResources))
 	out.AllocatedResourceStatuses = *(*map[core.ResourceName]core.ClaimResourceStatus)(unsafe.Pointer(&in.AllocatedResourceStatuses))
+	out.VolumeAttributesClassName = in.VolumeAttributesClassName
+	out.ModifyVolumeStatus = (*core.VolumeAttributesClassStatus)(unsafe.Pointer(in.ModifyVolumeStatus))
 	return nil
 }
 
@@ -5390,6 +5394,8 @@ func autoConvert_core_PersistentVolumeClaimStatus_To_v1_PersistentVolumeClaimSta
 	out.Conditions = *(*[]v1.PersistentVolumeClaimCondition)(unsafe.Pointer(&in.Conditions))
 	out.AllocatedResources = *(*v1.ResourceList)(unsafe.Pointer(&in.AllocatedResources))
 	out.AllocatedResourceStatuses = *(*map[v1.ResourceName]v1.ClaimResourceStatus)(unsafe.Pointer(&in.AllocatedResourceStatuses))
+	out.VolumeAttributesClassName = in.VolumeAttributesClassName
+	out.ModifyVolumeStatus = (*v1.VolumeAttributesClassStatus)(unsafe.Pointer(in.ModifyVolumeStatus))
 	return nil
 }
 

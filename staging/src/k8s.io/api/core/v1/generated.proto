@@ -2877,6 +2877,16 @@ message PersistentVolumeClaimSpec {
   // (Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.
   // +optional
   optional TypedObjectReference dataSourceRef = 8;
+
+  // volumeAttributesClassName is the name of the VolumeAttributesClass required by the claim.
+  // If specified, the provisioner will create or update the volume with the attributes defined
+  // in the corresponding VolumeAttributesClass. Different with storageClassName, it can be
+  // changed after the claim is created but an empty string value is disallowed.
+  // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass
+  // (Alpha) Using this field requires the VolumeAttributesClass feature gate to be enabled.
+  // +featureGate=VolumeAttributesClass
+  // +optional
+  optional string volumeAttributesClassName = 9;
 }
 
 // PersistentVolumeClaimStatus is the current status of a persistent volume claim.
@@ -2966,6 +2976,22 @@ message PersistentVolumeClaimStatus {
   // +mapType=granular
   // +optional
   map<string, string> allocatedResourceStatuses = 7;
+
+  // volumeAttributesClassName is the name of VolumeAttributesClass which is latest applied by
+  // the external-provisioner or external-resizer. This field is not set by default but when
+  // modification is complete, it's set same as VolumeAttributesClassName in spec.
+  // This is an alpha field and requires enabling VolumeAttributesClass feature.
+  // +featureGate=VolumeAttributesClassName
+  // +optional
+  optional string volumeAttributesClassName = 8;
+
+  // modifyVolumeStatus stores status of modification operation.
+  // ModifyVolumeStatus is not set by default but when modification is complete, modifyVolumeStatus
+  // is set to empty string by the modify volume controller.
+  // This is an alpha field and requires enabling VolumeAttributesClass feature.
+  // +featureGate=VolumeAttributesClass
+  // +optional
+  optional string modifyVolumeStatus = 9;
 }
 
 // PersistentVolumeClaimTemplate is used to produce

@@ -6083,6 +6083,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: storageClassName
       type:
         scalar: string
+    - name: volumeAttributesClassName
+      type:
+        scalar: string
     - name: volumeMode
       type:
         scalar: string
@@ -6122,7 +6125,13 @@ var schemaYAML = typed.YAMLObject(`types:
           elementRelationship: associative
           keys:
           - type
+    - name: modifyVolumeStatus
+      type:
+        scalar: string
     - name: phase
+      type:
+        scalar: string
+    - name: volumeAttributesClassName
       type:
         scalar: string
 - name: io.k8s.api.core.v1.PersistentVolumeClaimTemplate

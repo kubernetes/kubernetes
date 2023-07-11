@@ -468,7 +468,8 @@
                     "kind": "kindValue",
                     "name": "nameValue",
                     "namespace": "namespaceValue"
-                  }
+                  },
+                  "volumeAttributesClassName": "volumeAttributesClassNameValue"
                 }
               }
             }
@@ -1764,7 +1765,8 @@
             "kind": "kindValue",
             "name": "nameValue",
             "namespace": "namespaceValue"
-          }
+          },
+          "volumeAttributesClassName": "volumeAttributesClassNameValue"
         },
         "status": {
           "phase": "phaseValue",
@@ -1789,7 +1791,9 @@
           },
           "allocatedResourceStatuses": {
             "allocatedResourceStatusesKey": "allocatedResourceStatusesValue"
-          }
+          },
+          "volumeAttributesClassName": "volumeAttributesClassNameValue",
+          "modifyVolumeStatus": "modifyVolumeStatusValue"
         }
       }
     ],

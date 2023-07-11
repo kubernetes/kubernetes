@@ -3063,6 +3063,11 @@ func (in *PersistentVolumeClaimSpec) DeepCopyInto(out *PersistentVolumeClaimSpec
 		*out = new(TypedObjectReference)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.VolumeAttributesClassName != nil {
+		in, out := &in.VolumeAttributesClassName, &out.VolumeAttributesClassName
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 
@@ -3111,6 +3116,11 @@ func (in *PersistentVolumeClaimStatus) DeepCopyInto(out *PersistentVolumeClaimSt
 		for key, val := range *in {
 			(*out)[key] = val
 		}
+	}
+	if in.ModifyVolumeStatus != nil {
+		in, out := &in.ModifyVolumeStatus, &out.ModifyVolumeStatus
+		*out = new(VolumeAttributesClassStatus)
+		**out = **in
 	}
 	return
 }

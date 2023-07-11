@@ -997,6 +997,7 @@ spec:
                 matchLabels:
                   matchLabelsKey: matchLabelsValue
               storageClassName: storageClassNameValue
+              volumeAttributesClassName: volumeAttributesClassNameValue
               volumeMode: volumeModeValue
               volumeName: volumeNameValue
         fc:
