@@ -73,6 +73,7 @@ type celAdmissionController struct {
 type policyData struct {
 	definitionInfo
 	paramController generic.Controller[runtime.Object]
+	paramScope      meta.RESTScope
 	bindings        []bindingInfo
 }
 
@@ -115,6 +116,9 @@ type paramInfo struct {
 
 	// Function to call to stop the informer and clean up the controller
 	stop func()
+
+	// Whether this param is cluster or namespace scoped
+	scope meta.RESTScope
 
 	// Policy Definitions which refer to this param CRD
 	dependentDefinitions sets.Set[namespacedName]

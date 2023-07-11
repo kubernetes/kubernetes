@@ -258,7 +258,7 @@ func (c *policyController) reconcilePolicyDefinitionSpec(namespace, name string,
 		return info.configurationError
 	}
 
-	paramInfo := c.ensureParamInfo(paramSource, paramsGVR.Resource)
+	paramInfo := c.ensureParamInfo(paramSource, paramsGVR)
 	paramInfo.dependentDefinitions.Insert(nn)
 
 	return nil
@@ -266,7 +266,7 @@ func (c *policyController) reconcilePolicyDefinitionSpec(namespace, name string,
 
 // Ensures that there is an informer started for the given GVK to be used as a
 // param
-func (c *policyController) ensureParamInfo(paramSource *v1alpha1.ParamKind, paramsGVR schema.GroupVersionResource) *paramInfo {
+func (c *policyController) ensureParamInfo(paramSource *v1alpha1.ParamKind, mapping *meta.RESTMapping) *paramInfo {
 	if info, ok := c.paramsCRDControllers[*paramSource]; ok {
 		return info
 	}
@@ -279,7 +279,7 @@ func (c *policyController) ensureParamInfo(paramSource *v1alpha1.ParamKind, para
 	// Try to see if our provided informer factory has an informer for this type.
 	// We assume the informer is already started, and starts all types associated
 	// with it.
-	if genericInformer, err := c.informerFactory.ForResource(paramsGVR); err == nil {
+	if genericInformer, err := c.informerFactory.ForResource(mapping.Resource); err == nil {
 		informer = genericInformer.Informer()
 
 		// Ensure the informer is started
@@ -296,7 +296,7 @@ func (c *policyController) ensureParamInfo(paramSource *v1alpha1.ParamKind, para
 		// (cannot start ahead of time, and cannot track dependencies via stopCh)
 		informer = dynamicinformer.NewFilteredDynamicInformer(
 			c.dynamicClient,
-			paramsGVR,
+			mapping.Resource,
 			corev1.NamespaceAll,
 			// Use same interval as is used for k8s typed sharedInformerFactory
 			// https://github.com/kubernetes/kubernetes/blob/7e0923899fed622efbc8679cca6b000d43633e38/cmd/kube-apiserver/app/server.go#L430
@@ -319,6 +319,7 @@ func (c *policyController) ensureParamInfo(paramSource *v1alpha1.ParamKind, para
 	ret := &paramInfo{
 		controller:           controller,
 		stop:                 instanceCancel,
+		scope:                mapping.Scope,
 		dependentDefinitions: sets.New[namespacedName](),
 	}
 	c.paramsCRDControllers[*paramSource] = ret
@@ -464,15 +465,18 @@ func (c *policyController) latestPolicyData() []policyData {
 		}
 
 		var paramController generic.Controller[runtime.Object]
+		var paramScope meta.RESTScope
 		if paramKind := definitionInfo.lastReconciledValue.Spec.ParamKind; paramKind != nil {
 			if info, ok := c.paramsCRDControllers[*paramKind]; ok {
 				paramController = info.controller
+				paramScope = info.scope
 			}
 		}
 
 		res = append(res, policyData{
 			definitionInfo:  *definitionInfo,
 			paramController: paramController,
+			paramScope:      paramScope,
 			bindings:        bindingInfos,
 		})
 	}
