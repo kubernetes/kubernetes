@@ -324,6 +324,7 @@ func (allowList *MetricLabelAllowList) ConstrainToAllowedList(labelNameList, lab
 		if allowValues, ok := allowList.labelToAllowList[name]; ok {
 			if !allowValues.Has(value) {
 				labelValueList[index] = "unexpected"
+				cardinalityEnforcementUnexpectedCategorizationsTotal.Inc()
 			}
 		}
 	}
@@ -334,6 +335,7 @@ func (allowList *MetricLabelAllowList) ConstrainLabelMap(labels map[string]strin
 		if allowValues, ok := allowList.labelToAllowList[name]; ok {
 			if !allowValues.Has(value) {
 				labels[name] = "unexpected"
+				cardinalityEnforcementUnexpectedCategorizationsTotal.Inc()
 			}
 		}
 	}

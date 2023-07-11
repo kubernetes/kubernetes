@@ -37,7 +37,7 @@ var (
 	registriesLock      sync.RWMutex
 	disabledMetrics     = map[string]struct{}{}
 
-	registeredMetrics = NewCounterVec(
+	registeredMetricsTotal = NewCounterVec(
 		&CounterOpts{
 			Name:           "registered_metric_total",
 			Help:           "The count of registered metrics broken by stability level and deprecation version.",
@@ -58,6 +58,14 @@ var (
 		&CounterOpts{
 			Name:           "hidden_metric_total",
 			Help:           "The count of hidden metrics.",
+			StabilityLevel: ALPHA,
+		},
+	)
+
+	cardinalityEnforcementUnexpectedCategorizationsTotal = NewCounter(
+		&CounterOpts{
+			Name:           "cardinality_enforcement_unexpected_categorizations_total",
+			Help:           "The count of unexpected categorizations during cardinality enforcement.",
 			StabilityLevel: ALPHA,
 		},
 	)
@@ -379,7 +387,8 @@ func NewKubeRegistry() KubeRegistry {
 }
 
 func (r *kubeRegistry) RegisterMetaMetrics() {
-	r.MustRegister(registeredMetrics)
+	r.MustRegister(registeredMetricsTotal)
 	r.MustRegister(disabledMetricsTotal)
 	r.MustRegister(hiddenMetricsTotal)
+	r.MustRegister(cardinalityEnforcementUnexpectedCategorizationsTotal)
 }
