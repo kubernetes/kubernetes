@@ -68,8 +68,9 @@ func newVolumeStatCalculator(statsProvider Provider, jitterPeriod time.Duration,
 // StartOnce starts pod volume calc that will occur periodically in the background until s.StopOnce is called
 func (s *volumeStatCalculator) StartOnce() *volumeStatCalculator {
 	s.startO.Do(func() {
+		errors := make(map[string]error)
 		go wait.JitterUntil(func() {
-			s.calcAndStoreStats()
+			s.calcAndStoreStats(errors)
 		}, s.jitterPeriod, 1.0, true, s.stopChannel)
 	})
 	return s
@@ -95,7 +96,7 @@ func (s *volumeStatCalculator) GetLatest() (PodVolumeStats, bool) {
 
 // calcAndStoreStats calculates PodVolumeStats for a given pod and writes the result to the s.latest cache.
 // If the pod references PVCs, the prometheus metrics for those are updated with the result.
-func (s *volumeStatCalculator) calcAndStoreStats() {
+func (s *volumeStatCalculator) calcAndStoreStats(errors map[string]error) {
 	// Find all Volumes for the Pod
 	volumes, found := s.statsProvider.ListVolumesForPod(s.pod.UID)
 	blockVolumes, bvFound := s.statsProvider.ListBlockVolumesForPod(s.pod.UID)
@@ -142,7 +143,10 @@ func (s *volumeStatCalculator) calcAndStoreStats() {
 		if err != nil {
 			// Expected for Volumes that don't support Metrics
 			if !volume.IsNotSupported(err) {
-				klog.ErrorS(err, "Failed to calculate volume metrics", "pod", klog.KObj(s.pod), "podUID", s.pod.UID, "volumeName", name)
+				if oldErr, found := errors[name]; !found || oldErr.Error() != err.Error() {
+					klog.InfoS("Failed to calculate volume metrics", "pod", klog.KObj(s.pod), "podUID", s.pod.UID, "volumeName", name, "err", err)
+					errors[name] = err
+				}
 			}
 			continue
 		}
