@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utiljson "k8s.io/apimachinery/pkg/util/json"
@@ -558,7 +559,14 @@ func (c *celAdmissionController) getCurrentObject(obj runtime.Object) (runtime.O
 		}
 
 		// Param type. Just check informer for its GVK
-		item, err := paramInformer.Get(accessor.GetName())
+		var item runtime.Object
+		var err error
+		if namespace := accessor.GetNamespace(); len(namespace) > 0 {
+			item, err = paramInformer.Namespaced(namespace).Get(accessor.GetName())
+		} else {
+			item, err = paramInformer.Get(accessor.GetName())
+		}
+
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
 				return nil, nil
@@ -1801,6 +1809,748 @@ func TestAllValidationActions(t *testing.T) {
 	require.Equal(t, expected, value)
 
 	require.ErrorContains(t, err, "I'm sorry Dave")
+}
+
+func TestNamespaceParamRefName(t *testing.T) {
+	reset()
+	testContext, testContextCancel := context.WithCancel(context.Background())
+	defer testContextCancel()
+
+	compiler := &fakeCompiler{}
+	validator := &fakeValidator{}
+	matcher := &fakeMatcher{
+		DefaultMatch: true,
+	}
+	handler, _, tracker, controller := setupFakeTest(t, compiler, matcher)
+
+	compiles := atomic.Int64{}
+	evaluations := atomic.Int64{}
+
+	// Use ConfigMap native-typed param
+	nativeTypeParamPolicy := *denyPolicy
+	nativeTypeParamPolicy.Spec.ParamKind = &v1alpha1.ParamKind{
+		APIVersion: "v1",
+		Kind:       "ConfigMap",
+	}
+
+	namespaceParamBinding := *denyBinding
+	namespaceParamBinding.Spec.ParamRef = nil
+	namespaceParamBinding.Spec.NamespaceParamRef = &v1alpha1.NamespaceParamRef{
+		Name: "replicas-test.example.com",
+	}
+
+	compiler.RegisterDefinition(&nativeTypeParamPolicy, func([]cel.ExpressionAccessor, cel.OptionalVariableDeclarations) cel.Filter {
+		compiles.Add(1)
+
+		return &fakeFilter{
+			keyId: nativeTypeParamPolicy.Spec.Validations[0].Expression,
+		}
+	})
+
+	lock := sync.Mutex{}
+	observedParamNamespaces := []string{}
+	validator.RegisterDefinition(&nativeTypeParamPolicy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+		lock.Lock()
+		defer lock.Unlock()
+
+		evaluations.Add(1)
+		if p, ok := versionedParams.(*v1.ConfigMap); ok {
+			observedParamNamespaces = append(observedParamNamespaces, p.Namespace)
+			return ValidateResult{
+				Decisions: []PolicyDecision{
+					{
+						Action:  ActionDeny,
+						Message: "correct type",
+					},
+				},
+			}
+		}
+		return ValidateResult{
+			Decisions: []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Message: "Incorrect param type",
+				},
+			},
+		}
+	})
+
+	configMapParam := &v1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "replicas-test.example.com",
+			Namespace:       "default",
+			ResourceVersion: "1",
+		},
+		Data: map[string]string{
+			"coolkey": "default",
+		},
+	}
+	configMapParam2 := &v1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "replicas-test.example.com",
+			Namespace:       "mynamespace",
+			ResourceVersion: "1",
+		},
+		Data: map[string]string{
+			"coolkey": "mynamespace",
+		},
+	}
+	configMapParam3 := &v1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "replicas-test.example.com",
+			Namespace:       "othernamespace",
+			ResourceVersion: "1",
+		},
+		Data: map[string]string{
+			"coolkey": "othernamespace",
+		},
+	}
+	require.NoError(t, tracker.Create(definitionsGVR, &nativeTypeParamPolicy, nativeTypeParamPolicy.Namespace))
+	require.NoError(t, tracker.Create(bindingsGVR, &namespaceParamBinding, namespaceParamBinding.Namespace))
+	require.NoError(t, tracker.Add(configMapParam))
+	require.NoError(t, tracker.Add(configMapParam2))
+	require.NoError(t, tracker.Add(configMapParam3))
+
+	// Wait for controller to reconcile given objects
+	require.NoError(t,
+		waitForReconcile(
+			testContext, controller,
+			&namespaceParamBinding, &nativeTypeParamPolicy, configMapParam, configMapParam2, configMapParam3))
+
+	// Object is irrelevant/unchecked for this test. Just test that
+	// the evaluator is executed with correct namespace, and returns admit
+	// meaning the params passed was a configmap
+	err := handler.Validate(
+		testContext,
+		attributeRecord(nil, configMapParam, admission.Create),
+		&admission.RuntimeObjectInterfaces{},
+	)
+
+	func() {
+		lock.Lock()
+		defer lock.Unlock()
+		require.ErrorContains(t, err, "correct type")
+		require.EqualValues(t, 1, compiles.Load())
+		require.EqualValues(t, 1, evaluations.Load())
+	}()
+
+	err = handler.Validate(
+		testContext,
+		attributeRecord(nil, configMapParam2, admission.Create),
+		&admission.RuntimeObjectInterfaces{},
+	)
+
+	func() {
+		lock.Lock()
+		defer lock.Unlock()
+		require.ErrorContains(t, err, "correct type")
+		require.EqualValues(t, 1, compiles.Load())
+		require.EqualValues(t, 2, evaluations.Load())
+	}()
+
+	err = handler.Validate(
+		testContext,
+		attributeRecord(nil, configMapParam3, admission.Create),
+		&admission.RuntimeObjectInterfaces{},
+	)
+
+	func() {
+		lock.Lock()
+		defer lock.Unlock()
+		require.ErrorContains(t, err, "correct type")
+		require.EqualValues(t, 1, compiles.Load())
+		require.EqualValues(t, 3, evaluations.Load())
+	}()
+
+	err = handler.Validate(
+		testContext,
+		attributeRecord(nil, configMapParam, admission.Create),
+		&admission.RuntimeObjectInterfaces{},
+	)
+
+	func() {
+		lock.Lock()
+		defer lock.Unlock()
+		require.ErrorContains(t, err, "correct type")
+		require.EqualValues(t, []string{"default", "mynamespace", "othernamespace", "default"}, observedParamNamespaces)
+		require.EqualValues(t, 1, compiles.Load())
+		require.EqualValues(t, 4, evaluations.Load())
+	}()
+}
+
+func TestNamespaceParamRefNameSelector(t *testing.T) {
+	reset()
+	testContext, testContextCancel := context.WithCancel(context.Background())
+	defer testContextCancel()
+
+	compiler := &fakeCompiler{}
+	validator := &fakeValidator{}
+	matcher := &fakeMatcher{
+		DefaultMatch: true,
+	}
+	handler, _, tracker, controller := setupFakeTest(t, compiler, matcher)
+
+	compiles := atomic.Int64{}
+	evaluations := atomic.Int64{}
+
+	// Use ConfigMap native-typed param
+	nativeTypeParamPolicy := *denyPolicy
+	nativeTypeParamPolicy.Spec.ParamKind = &v1alpha1.ParamKind{
+		APIVersion: "v1",
+		Kind:       "ConfigMap",
+	}
+
+	namespaceParamBinding := *denyBinding
+	namespaceParamBinding.Spec.ParamRef = nil
+	namespaceParamBinding.Spec.NamespaceParamRef = &v1alpha1.NamespaceParamRef{
+		Selector: metav1.SetAsLabelSelector(labels.Set{
+			"coolLabel": "myvalue",
+		}),
+	}
+
+	compiler.RegisterDefinition(&nativeTypeParamPolicy, func([]cel.ExpressionAccessor, cel.OptionalVariableDeclarations) cel.Filter {
+		compiles.Add(1)
+
+		return &fakeFilter{
+			keyId: nativeTypeParamPolicy.Spec.Validations[0].Expression,
+		}
+	})
+
+	lock := sync.Mutex{}
+	observedParamNames := []namespacedName{}
+	validator.RegisterDefinition(&nativeTypeParamPolicy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+		lock.Lock()
+		defer lock.Unlock()
+		evaluations.Add(1)
+		if p, ok := versionedParams.(*v1.ConfigMap); ok {
+			observedParamNames = append(observedParamNames, namespacedName{p.Name, p.Namespace})
+
+			if strings.Contains(p.GetName(), "deny") {
+				return ValidateResult{
+					Decisions: []PolicyDecision{
+						{
+							Action:  ActionDeny,
+							Message: "denied by param",
+						},
+					},
+				}
+			}
+
+			return ValidateResult{
+				Decisions: []PolicyDecision{
+					{
+						Action:  ActionAdmit,
+						Message: "correct type",
+					},
+				},
+			}
+		}
+		return ValidateResult{
+			Decisions: []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Message: "Incorrect param type",
+				},
+			},
+		}
+	})
+
+	configMapParam := &v1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "replicas-test.example.com",
+			Namespace:       "default",
+			ResourceVersion: "1",
+			Labels: map[string]string{
+				"coolLabel": "myvalue",
+			},
+		},
+		Data: map[string]string{
+			"coolkey": "default",
+		},
+	}
+	configMapParam2 := configMapParam.DeepCopy()
+	configMapParam2.SetName("other-param-to-use.example.com")
+
+	configMapParamDeny := configMapParam.DeepCopy()
+	configMapParamDeny.SetName("deny-param")
+
+	configMapParamNoLabel := configMapParam.DeepCopy()
+	configMapParamNoLabel.SetName("other-param-to-use-with-no-label.example.com")
+	configMapParamNoLabel.SetLabels(nil)
+
+	mynamespaceParam := configMapParam.DeepCopy()
+	mynamespaceParam.SetNamespace("mynamespace")
+
+	otherNamespaceParam := configMapParam.DeepCopy()
+	otherNamespaceParam.SetNamespace("othernamespace")
+
+	otherNamespaceParam2 := otherNamespaceParam.DeepCopy()
+	otherNamespaceParam2.SetName("other-param-to-use.example.com")
+
+	otherNamespaceParamNoLabel := otherNamespaceParam.DeepCopy()
+	otherNamespaceParamNoLabel.SetName("other-param-without-label")
+	otherNamespaceParamNoLabel.SetLabels(nil)
+
+	require.NoError(t, tracker.Create(definitionsGVR, &nativeTypeParamPolicy, nativeTypeParamPolicy.Namespace))
+	require.NoError(t, tracker.Create(bindingsGVR, &namespaceParamBinding, namespaceParamBinding.Namespace))
+	require.NoError(t, tracker.Add(configMapParam))
+	require.NoError(t, tracker.Add(configMapParam2))
+	require.NoError(t, tracker.Add(configMapParamNoLabel))
+	require.NoError(t, tracker.Add(mynamespaceParam))
+	require.NoError(t, tracker.Add(otherNamespaceParam))
+	require.NoError(t, tracker.Add(otherNamespaceParam2))
+	require.NoError(t, tracker.Add(otherNamespaceParamNoLabel))
+
+	// Wait for controller to reconcile given objects
+	require.NoError(t,
+		waitForReconcile(
+			testContext, controller,
+			&namespaceParamBinding, &nativeTypeParamPolicy, configMapParam, configMapParam2, configMapParamNoLabel, mynamespaceParam, otherNamespaceParam, otherNamespaceParam2, otherNamespaceParamNoLabel))
+
+	// Object is irrelevant/unchecked for this test. Just test that
+	// the evaluator is executed with correct namespace, and returns admit
+	// meaning the params passed was a configmap
+	err := handler.Validate(
+		testContext,
+		attributeRecord(nil, configMapParam, admission.Create),
+		&admission.RuntimeObjectInterfaces{},
+	)
+
+	func() {
+		lock.Lock()
+		defer lock.Unlock()
+		require.NoError(t, err)
+		require.EqualValues(t, 1, compiles.Load())
+		require.EqualValues(t, 2, evaluations.Load())
+		require.ElementsMatch(t, []namespacedName{
+			{configMapParam.Name, configMapParam.Namespace},
+			{configMapParam2.Name, configMapParam2.Namespace},
+		}, observedParamNames)
+
+		observedParamNames = nil
+	}()
+
+	err = handler.Validate(
+		testContext,
+		attributeRecord(nil, mynamespaceParam, admission.Create),
+		&admission.RuntimeObjectInterfaces{},
+	)
+
+	func() {
+		lock.Lock()
+		defer lock.Unlock()
+		require.NoError(t, err)
+		require.EqualValues(t, 1, compiles.Load())
+		require.EqualValues(t, 3, evaluations.Load())
+		require.ElementsMatch(t, []namespacedName{
+			{mynamespaceParam.Name, mynamespaceParam.Namespace},
+		}, observedParamNames)
+
+		observedParamNames = nil
+	}()
+
+	err = handler.Validate(
+		testContext,
+		attributeRecord(nil, otherNamespaceParam, admission.Create),
+		&admission.RuntimeObjectInterfaces{},
+	)
+
+	func() {
+		lock.Lock()
+		defer lock.Unlock()
+		require.NoError(t, err)
+		require.EqualValues(t, 1, compiles.Load())
+		require.EqualValues(t, 5, evaluations.Load())
+		require.ElementsMatch(t, []namespacedName{
+			{otherNamespaceParam.Name, otherNamespaceParam.Namespace},
+			{otherNamespaceParam2.Name, otherNamespaceParam2.Namespace},
+		}, observedParamNames)
+		observedParamNames = nil
+	}()
+
+	// Now add a param that will cause the policy to be denied since it is
+	// ANDED together
+	require.NoError(t, tracker.Add(configMapParamDeny))
+
+	// Wait for controller to reconcile given objects
+	require.NoError(t,
+		waitForReconcile(
+			testContext, controller,
+			configMapParamDeny))
+
+	// Object is irrelevant/unchecked for this test. Just test that
+	// the evaluator is executed with correct namespace, and returns admit
+	// meaning the params passed was a configmap
+	err = handler.Validate(
+		testContext,
+		attributeRecord(nil, configMapParam, admission.Create),
+		&admission.RuntimeObjectInterfaces{},
+	)
+
+	func() {
+		lock.Lock()
+		defer lock.Unlock()
+		require.EqualValues(t, 1, compiles.Load())
+		require.EqualValues(t, 8, evaluations.Load())
+		require.ElementsMatch(t, []namespacedName{
+			{configMapParam.Name, configMapParam.Namespace},
+			{configMapParam2.Name, configMapParam2.Namespace},
+			{configMapParamDeny.Name, configMapParamDeny.Namespace},
+		}, observedParamNames)
+		require.ErrorContains(t, err, "denied by param")
+
+		observedParamNames = nil
+	}()
+}
+
+func TestNamespaceParamRefNameAndSelector(t *testing.T) {
+	reset()
+	testContext, testContextCancel := context.WithCancel(context.Background())
+	defer testContextCancel()
+
+	compiler := &fakeCompiler{}
+	validator := &fakeValidator{}
+	matcher := &fakeMatcher{
+		DefaultMatch: true,
+	}
+	handler, _, tracker, controller := setupFakeTest(t, compiler, matcher)
+
+	compiles := atomic.Int64{}
+	evaluations := atomic.Int64{}
+
+	// Use ConfigMap native-typed param
+	nativeTypeParamPolicy := *denyPolicy
+	nativeTypeParamPolicy.Spec.ParamKind = &v1alpha1.ParamKind{
+		APIVersion: "v1",
+		Kind:       "ConfigMap",
+	}
+
+	namespaceParamBinding := *denyBinding
+	namespaceParamBinding.Spec.ParamRef = nil
+	namespaceParamBinding.Spec.NamespaceParamRef = &v1alpha1.NamespaceParamRef{
+		Name: "other-param-to-use-with-no-label.example.com",
+		Selector: metav1.SetAsLabelSelector(labels.Set{
+			"coolLabel": "myvalue",
+		}),
+	}
+
+	compiler.RegisterDefinition(&nativeTypeParamPolicy, func([]cel.ExpressionAccessor, cel.OptionalVariableDeclarations) cel.Filter {
+		compiles.Add(1)
+
+		return &fakeFilter{
+			keyId: nativeTypeParamPolicy.Spec.Validations[0].Expression,
+		}
+	})
+
+	lock := sync.Mutex{}
+	observedParamNames := []namespacedName{}
+	validator.RegisterDefinition(&nativeTypeParamPolicy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+		lock.Lock()
+		defer lock.Unlock()
+		evaluations.Add(1)
+		if p, ok := versionedParams.(*v1.ConfigMap); ok {
+			observedParamNames = append(observedParamNames, namespacedName{p.Name, p.Namespace})
+
+			if strings.Contains(p.GetName(), "deny") {
+				return ValidateResult{
+					Decisions: []PolicyDecision{
+						{
+							Action:  ActionDeny,
+							Message: "denied by param",
+						},
+					},
+				}
+			}
+
+			return ValidateResult{
+				Decisions: []PolicyDecision{
+					{
+						Action:  ActionAdmit,
+						Message: "correct type",
+					},
+				},
+			}
+		}
+		return ValidateResult{
+			Decisions: []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Message: "Incorrect param type",
+				},
+			},
+		}
+	})
+
+	configMapParam := &v1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "replicas-test.example.com",
+			Namespace:       "default",
+			ResourceVersion: "1",
+			Labels: map[string]string{
+				"coolLabel": "myvalue",
+			},
+		},
+		Data: map[string]string{
+			"coolkey": "default",
+		},
+	}
+	configMapParam2 := configMapParam.DeepCopy()
+	configMapParam2.SetName("other-param-to-use.example.com")
+
+	configMapParamDeny := configMapParam.DeepCopy()
+	configMapParamDeny.SetName("deny-param")
+
+	configMapParamNoLabel := configMapParam.DeepCopy()
+	configMapParamNoLabel.SetName("other-param-to-use-with-no-label.example.com")
+	configMapParamNoLabel.SetLabels(nil)
+
+	require.NoError(t, tracker.Create(definitionsGVR, &nativeTypeParamPolicy, nativeTypeParamPolicy.Namespace))
+	require.NoError(t, tracker.Create(bindingsGVR, &namespaceParamBinding, namespaceParamBinding.Namespace))
+	require.NoError(t, tracker.Add(configMapParam))
+	require.NoError(t, tracker.Add(configMapParam2))
+	require.NoError(t, tracker.Add(configMapParamNoLabel))
+	// Wait for controller to reconcile given objects
+	require.NoError(t,
+		waitForReconcile(
+			testContext, controller,
+			&namespaceParamBinding, &nativeTypeParamPolicy, configMapParam, configMapParam2, configMapParamNoLabel))
+
+	// Object is irrelevant/unchecked for this test. Just test that
+	// the evaluator is executed with correct namespace, and returns admit
+	// meaning the params passed was a configmap
+	err := handler.Validate(
+		testContext,
+		attributeRecord(nil, configMapParam, admission.Create),
+		&admission.RuntimeObjectInterfaces{},
+	)
+
+	func() {
+		lock.Lock()
+		defer lock.Unlock()
+		require.NoError(t, err)
+		require.EqualValues(t, 1, compiles.Load())
+		require.EqualValues(t, 3, evaluations.Load())
+		require.ElementsMatch(t, []namespacedName{
+			{configMapParam.Name, configMapParam.Namespace},
+			{configMapParam2.Name, configMapParam2.Namespace},
+			{configMapParamNoLabel.Name, configMapParamNoLabel.Namespace},
+		}, observedParamNames)
+
+		observedParamNames = nil
+	}()
+	// Now add a param that will cause the policy to be denied since it is
+	// ANDED together
+	require.NoError(t, tracker.Add(configMapParamDeny))
+
+	// Wait for controller to reconcile given objects
+	require.NoError(t,
+		waitForReconcile(
+			testContext, controller,
+			configMapParamDeny))
+
+	// Object is irrelevant/unchecked for this test. Just test that
+	// the evaluator is executed with correct namespace, and returns admit
+	// meaning the params passed was a configmap
+	err = handler.Validate(
+		testContext,
+		attributeRecord(nil, configMapParam, admission.Create),
+		&admission.RuntimeObjectInterfaces{},
+	)
+
+	func() {
+		lock.Lock()
+		defer lock.Unlock()
+		require.EqualValues(t, 1, compiles.Load())
+		require.EqualValues(t, 7, evaluations.Load())
+		require.ElementsMatch(t, []namespacedName{
+			{configMapParam.Name, configMapParam.Namespace},
+			{configMapParam2.Name, configMapParam2.Namespace},
+			{configMapParamNoLabel.Name, configMapParamNoLabel.Namespace},
+			{configMapParamDeny.Name, configMapParamDeny.Namespace},
+		}, observedParamNames)
+		require.ErrorContains(t, err, "denied by param")
+
+		observedParamNames = nil
+	}()
+}
+
+// Test what happens when no params are found using namespaceParamRef
+func TestNamespaceParamRefFailAction(t *testing.T) {
+	reset()
+	testContext, testContextCancel := context.WithCancel(context.Background())
+	defer testContextCancel()
+
+	compiler := &fakeCompiler{}
+	validator := &fakeValidator{}
+	matcher := &fakeMatcher{
+		DefaultMatch: true,
+	}
+	handler, _, tracker, controller := setupFakeTest(t, compiler, matcher)
+
+	compiles := atomic.Int64{}
+	evaluations := atomic.Int64{}
+
+	// Use ConfigMap native-typed param
+	nativeTypeParamPolicy := *denyPolicy
+	nativeTypeParamPolicy.Spec.ParamKind = &v1alpha1.ParamKind{
+		APIVersion: "v1",
+		Kind:       "ConfigMap",
+	}
+
+	namespaceParamBinding := *denyBinding
+	namespaceParamBinding.Spec.ParamRef = nil
+	namespaceParamBinding.Spec.NamespaceParamRef = &v1alpha1.NamespaceParamRef{
+		Name: "other-param-to-use-with-no-label.example.com",
+		Selector: metav1.SetAsLabelSelector(labels.Set{
+			"coolLabel": "myvalue",
+		}),
+		ParameterNotFoundAction: ptrTo(v1alpha1.DenyAction),
+	}
+
+	compiler.RegisterDefinition(&nativeTypeParamPolicy, func([]cel.ExpressionAccessor, cel.OptionalVariableDeclarations) cel.Filter {
+		compiles.Add(1)
+
+		return &fakeFilter{
+			keyId: nativeTypeParamPolicy.Spec.Validations[0].Expression,
+		}
+	})
+
+	validator.RegisterDefinition(&nativeTypeParamPolicy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+		return ValidateResult{
+			Decisions: []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Message: "Did not expect param",
+				},
+			},
+		}
+	})
+
+	require.NoError(t, tracker.Create(definitionsGVR, &nativeTypeParamPolicy, nativeTypeParamPolicy.Namespace))
+	require.NoError(t, tracker.Create(bindingsGVR, &namespaceParamBinding, namespaceParamBinding.Namespace))
+	// Wait for controller to reconcile given objects
+	require.NoError(t,
+		waitForReconcile(
+			testContext, controller,
+			&namespaceParamBinding, &nativeTypeParamPolicy))
+
+	// Object is irrelevant/unchecked for this test. Just test that
+	// the evaluator is executed with correct namespace, and returns admit
+	// meaning the params passed was a configmap
+	err := handler.Validate(
+		testContext,
+		attributeRecord(nil, fakeParams, admission.Create),
+		&admission.RuntimeObjectInterfaces{},
+	)
+
+	require.ErrorContains(t, err, "no params found for policy binding with `Deny` failureAction")
+	require.EqualValues(t, 1, compiles.Load())
+	require.EqualValues(t, 0, evaluations.Load())
+}
+
+// If the ParamKind is ClusterScoped, and namespace param is used.
+// This is a Configuration Error of the policy
+func TestNamespaceParamRefClusterScopedParamError(t *testing.T) {
+	reset()
+	testContext, testContextCancel := context.WithCancel(context.Background())
+	defer testContextCancel()
+
+	compiler := &fakeCompiler{}
+	validator := &fakeValidator{}
+	matcher := &fakeMatcher{
+		DefaultMatch: true,
+	}
+	handler, _, tracker, controller := setupFakeTest(t, compiler, matcher)
+
+	compiles := atomic.Int64{}
+	evaluations := atomic.Int64{}
+
+	// Use ValidatingAdmissionPolicy for param type since it is cluster-scoped
+	nativeTypeParamPolicy := *denyPolicy
+	nativeTypeParamPolicy.Spec.ParamKind = &v1alpha1.ParamKind{
+		APIVersion: "admissionregistration.k8s.io/v1alpha1",
+		Kind:       "ValidatingAdmissionPolicy",
+	}
+
+	namespaceParamBinding := *denyBinding
+	namespaceParamBinding.Spec.ParamRef = nil
+	namespaceParamBinding.Spec.NamespaceParamRef = &v1alpha1.NamespaceParamRef{
+		Name: "other-param-to-use-with-no-label.example.com",
+		Selector: metav1.SetAsLabelSelector(labels.Set{
+			"coolLabel": "myvalue",
+		}),
+	}
+
+	compiler.RegisterDefinition(&nativeTypeParamPolicy, func([]cel.ExpressionAccessor, cel.OptionalVariableDeclarations) cel.Filter {
+		compiles.Add(1)
+
+		return &fakeFilter{
+			keyId: nativeTypeParamPolicy.Spec.Validations[0].Expression,
+		}
+	})
+
+	validator.RegisterDefinition(&nativeTypeParamPolicy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+		evaluations.Add(1)
+		if _, ok := versionedParams.(*v1alpha1.ValidatingAdmissionPolicy); ok {
+			return ValidateResult{
+				Decisions: []PolicyDecision{
+					{
+						Action:  ActionAdmit,
+						Message: "correct type",
+					},
+				},
+			}
+		}
+		return ValidateResult{
+			Decisions: []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Message: fmt.Sprintf("Incorrect param type %T", versionedParams),
+				},
+			},
+		}
+	})
+
+	require.NoError(t, tracker.Create(definitionsGVR, &nativeTypeParamPolicy, nativeTypeParamPolicy.Namespace))
+	require.NoError(t, tracker.Create(bindingsGVR, &namespaceParamBinding, namespaceParamBinding.Namespace))
+	// Wait for controller to reconcile given objects
+	require.NoError(t,
+		waitForReconcile(
+			testContext, controller,
+			&namespaceParamBinding, &nativeTypeParamPolicy))
+
+	// Object is irrelevant/unchecked for this test. Just test that
+	// the evaluator is executed with correct namespace, and returns admit
+	// meaning the params passed was a configmap
+	err := handler.Validate(
+		testContext,
+		attributeRecord(nil, fakeParams, admission.Create),
+		&admission.RuntimeObjectInterfaces{},
+	)
+
+	require.ErrorContains(t, err, "NamespaceParamRef may only be used on binding whose ParamKind is namespace-scoped")
+	require.EqualValues(t, 1, compiles.Load())
+	require.EqualValues(t, 0, evaluations.Load())
 }
 
 func TestAuditAnnotations(t *testing.T) {
