@@ -1710,10 +1710,12 @@ message WindowsMemoryUsage {
     int64 timestamp = 1;
     // The amount of working set memory in bytes.
     UInt64Value working_set_bytes = 2;
-    // Available memory for use. This is defined as the memory limit - workingSetBytes.
+    // Available memory for use. This is defined as the memory limit - commit_memory_bytes.
     UInt64Value available_bytes = 3;
     // Cumulative number of page faults.
     UInt64Value page_faults = 4;
+    // Total commit memory in use. Commit memory is total of physical and virtual memory in use.
+    UInt64Value commit_memory_bytes = 5;
 }
 
 message ReopenContainerLogRequest {
