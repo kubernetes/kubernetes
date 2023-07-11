@@ -190,6 +190,10 @@ func TestTypeCheck(t *testing.T) {
 			},
 		}},
 	}}
+
+	deploymentPolicyWithBadMessageExpression := deploymentPolicy.DeepCopy()
+	deploymentPolicyWithBadMessageExpression.Spec.Validations[0].MessageExpression = "object.foo + 114514" // confusion
+
 	multiExpressionPolicy := &v1alpha1.ValidatingAdmissionPolicy{Spec: v1alpha1.ValidatingAdmissionPolicySpec{
 		Validations: []v1alpha1.Validation{
 			{
@@ -360,6 +364,22 @@ func TestTypeCheck(t *testing.T) {
 			},
 			assertions: []assertionFunc{
 				toHaveFieldRef("spec.validations[1].expression"), // expressions[0] is okay, [1] is wrong
+				toHaveLengthOf(1),
+			},
+		},
+		{
+			name:   "message expressions",
+			policy: deploymentPolicyWithBadMessageExpression,
+			schemaToReturn: &spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Type: []string{"object"},
+					Properties: map[string]spec.Schema{
+						"foo": *spec.StringProperty(),
+					},
+				},
+			},
+			assertions: []assertionFunc{
+				toHaveFieldRef("spec.validations[0].messageExpression"),
 				toHaveLengthOf(1),
 			},
 		},

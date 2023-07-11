@@ -48,18 +48,54 @@ type TypeChecker struct {
 	restMapper     meta.RESTMapper
 }
 
+// TypeCheckingContext holds information about the policy being type-checked.
+// The struct is opaque to the caller.
+type TypeCheckingContext struct {
+	gvks          []schema.GroupVersionKind
+	declTypes     []*apiservercel.DeclType
+	paramGVK      schema.GroupVersionKind
+	paramDeclType *apiservercel.DeclType
+}
+
 type typeOverwrite struct {
 	object *apiservercel.DeclType
 	params *apiservercel.DeclType
 }
 
-// typeCheckingResult holds the issues found during type checking, any returned
+// TypeCheckingResult holds the issues found during type checking, any returned
 // error, and the gvk that the type checking is performed against.
-type typeCheckingResult struct {
-	gvk schema.GroupVersionKind
+type TypeCheckingResult struct {
+	// GVK is the associated GVK
+	GVK schema.GroupVersionKind
+	// Issues contain machine-readable information about the typechecking result.
+	Issues *cel.Issues
+	// Err is the possible error that was encounter during type checking.
+	Err error
+}
 
-	issues *cel.Issues
-	err    error
+// TypeCheckingResults is a collection of TypeCheckingResult
+type TypeCheckingResults []*TypeCheckingResult
+
+func (rs TypeCheckingResults) String() string {
+	var messages []string
+	for _, r := range rs {
+		message := r.String()
+		if message != "" {
+			messages = append(messages, message)
+		}
+	}
+	return strings.Join(messages, "\n")
+}
+
+// String converts the result to human-readable form as a string.
+func (r *TypeCheckingResult) String() string {
+	if r.Issues == nil && r.Err == nil {
+		return ""
+	}
+	if r.Err != nil {
+		return fmt.Sprintf("%v: type checking error: %v\n", r.GVK, r.Err)
+	}
+	return fmt.Sprintf("%v: %s\n", r.GVK, r.Issues)
 }
 
 // Check preforms the type check against the given policy, and format the result
@@ -67,104 +103,93 @@ type typeCheckingResult struct {
 // The result is nil if type checking returns no warning.
 // The policy object is NOT mutated. The caller should update Status accordingly
 func (c *TypeChecker) Check(policy *v1alpha1.ValidatingAdmissionPolicy) []v1alpha1.ExpressionWarning {
-	exps := make([]string, 0, len(policy.Spec.Validations))
-	// check main validation expressions, located in spec.validations[*]
+	ctx := c.CreateContext(policy)
+
+	// warnings to return, note that the capacity is optimistically set to zero
+	var warnings []v1alpha1.ExpressionWarning // intentionally not setting capacity
+
+	// check main validation expressions and their message expressions, located in spec.validations[*]
 	fieldRef := field.NewPath("spec", "validations")
-	for _, v := range policy.Spec.Validations {
-		exps = append(exps, v.Expression)
-	}
-	// TODO(jiahuif) hasAuthorizer always true for now, will change after expending type checking to all fields.
-	msgs := c.CheckExpressions(exps, policy.Spec.ParamKind != nil, true, policy)
-	var results []v1alpha1.ExpressionWarning // intentionally not setting capacity
-	for i, msg := range msgs {
-		if msg != "" {
-			results = append(results, v1alpha1.ExpressionWarning{
+	for i, v := range policy.Spec.Validations {
+		results := c.CheckExpression(ctx, v.Expression)
+		if len(results) != 0 {
+			warnings = append(warnings, v1alpha1.ExpressionWarning{
 				FieldRef: fieldRef.Index(i).Child("expression").String(),
-				Warning:  msg,
+				Warning:  results.String(),
+			})
+		}
+		// Note that MessageExpression is optional
+		if v.MessageExpression == "" {
+			continue
+		}
+		results = c.CheckExpression(ctx, v.MessageExpression)
+		if len(results) != 0 {
+			warnings = append(warnings, v1alpha1.ExpressionWarning{
+				FieldRef: fieldRef.Index(i).Child("messageExpression").String(),
+				Warning:  results.String(),
 			})
 		}
 	}
-	return results
+
+	return warnings
 }
 
-// CheckExpressions checks a set of compiled CEL programs against the GVKs defined in
-// policy.Spec.MatchConstraints
-// The result is a human-readable form that describe which expressions
-// violate what types at what place. The indexes of the return []string
-// matches these of the input expressions.
-// TODO: It is much more useful to have machine-readable output and let the
-// client format it. That requires an update to the KEP, probably in coming
-// releases.
-func (c *TypeChecker) CheckExpressions(expressions []string, hasParams, hasAuthorizer bool, policy *v1alpha1.ValidatingAdmissionPolicy) []string {
-	var allWarnings []string
+// CreateContext resolves all types and their schemas from a policy definition and creates the context.
+func (c *TypeChecker) CreateContext(policy *v1alpha1.ValidatingAdmissionPolicy) *TypeCheckingContext {
+	ctx := new(TypeCheckingContext)
 	allGvks := c.typesToCheck(policy)
 	gvks := make([]schema.GroupVersionKind, 0, len(allGvks))
-	schemas := make([]common.Schema, 0, len(allGvks))
+	declTypes := make([]*apiservercel.DeclType, 0, len(allGvks))
 	for _, gvk := range allGvks {
-		s, err := c.schemaResolver.ResolveSchema(gvk)
+		declType, err := c.declType(gvk)
 		if err != nil {
 			// type checking errors MUST NOT alter the behavior of the policy
 			// even if an error occurs.
 			if !errors.Is(err, resolver.ErrSchemaNotFound) {
 				// Anything except ErrSchemaNotFound is an internal error
-				klog.ErrorS(err, "internal error: schema resolution failure", "gvk", gvk)
+				klog.V(2).ErrorS(err, "internal error: schema resolution failure", "gvk", gvk)
 			}
-			// skip if an unrecoverable error occurs.
+			// skip for not found or internal error
 			continue
 		}
 		gvks = append(gvks, gvk)
-		schemas = append(schemas, &openapi.Schema{Schema: s})
+		declTypes = append(declTypes, declType)
 	}
+	ctx.gvks = gvks
+	ctx.declTypes = declTypes
 
-	paramsType := c.paramsType(policy)
-	paramsDeclType, err := c.declType(paramsType)
+	paramsGVK := c.paramsGVK(policy) // maybe empty, correctly handled
+	paramsDeclType, err := c.declType(paramsGVK)
 	if err != nil {
 		if !errors.Is(err, resolver.ErrSchemaNotFound) {
-			klog.V(2).ErrorS(err, "cannot resolve schema for params", "gvk", paramsType)
+			klog.V(2).ErrorS(err, "internal error: cannot resolve schema for params", "gvk", paramsGVK)
 		}
 		paramsDeclType = nil
 	}
+	ctx.paramGVK = paramsGVK
+	ctx.paramDeclType = paramsDeclType
+	return ctx
+}
 
-	for _, exp := range expressions {
-		var results []typeCheckingResult
-		for i, gvk := range gvks {
-			s := schemas[i]
-			issues, err := c.checkExpression(exp, hasParams, hasAuthorizer, typeOverwrite{
-				object: common.SchemaDeclType(s, true).MaybeAssignTypeName(generateUniqueTypeName(gvk.Kind)),
-				params: paramsDeclType,
-			})
-			// save even if no issues are found, for the sake of formatting.
-			results = append(results, typeCheckingResult{
-				gvk:    gvk,
-				issues: issues,
-				err:    err,
-			})
+// CheckExpression type checks a single expression, given the context
+func (c *TypeChecker) CheckExpression(ctx *TypeCheckingContext, expression string) TypeCheckingResults {
+	var results TypeCheckingResults
+	for i, gvk := range ctx.gvks {
+		declType := ctx.declTypes[i]
+		// TODO(jiahuif) hasAuthorizer always true for now, will change after expending type checking to all fields.
+		issues, err := c.checkExpression(expression, ctx.paramDeclType != nil, true, typeOverwrite{
+			object: declType,
+			params: ctx.paramDeclType,
+		})
+		if issues != nil || err != nil {
+			results = append(results, &TypeCheckingResult{Issues: issues, Err: err, GVK: gvk})
 		}
-		allWarnings = append(allWarnings, c.formatWarning(results))
 	}
-
-	return allWarnings
+	return results
 }
 
 func generateUniqueTypeName(kind string) string {
 	return fmt.Sprintf("%s%d", kind, time.Now().Nanosecond())
-}
-
-// formatWarning converts the resulting issues and possible error during
-// type checking into a human-readable string
-func (c *TypeChecker) formatWarning(results []typeCheckingResult) string {
-	var sb strings.Builder
-	for _, result := range results {
-		if result.issues == nil && result.err == nil {
-			continue
-		}
-		if result.err != nil {
-			sb.WriteString(fmt.Sprintf("%v: type checking error: %v\n", result.gvk, result.err))
-		} else {
-			sb.WriteString(fmt.Sprintf("%v: %s\n", result.gvk, result.issues))
-		}
-	}
-	return strings.TrimSuffix(sb.String(), "\n")
 }
 
 func (c *TypeChecker) declType(gvk schema.GroupVersionKind) (*apiservercel.DeclType, error) {
@@ -178,7 +203,7 @@ func (c *TypeChecker) declType(gvk schema.GroupVersionKind) (*apiservercel.DeclT
 	return common.SchemaDeclType(&openapi.Schema{Schema: s}, true).MaybeAssignTypeName(generateUniqueTypeName(gvk.Kind)), nil
 }
 
-func (c *TypeChecker) paramsType(policy *v1alpha1.ValidatingAdmissionPolicy) schema.GroupVersionKind {
+func (c *TypeChecker) paramsGVK(policy *v1alpha1.ValidatingAdmissionPolicy) schema.GroupVersionKind {
 	if policy.Spec.ParamKind == nil {
 		return schema.GroupVersionKind{}
 	}
