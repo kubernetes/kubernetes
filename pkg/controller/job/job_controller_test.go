@@ -1581,7 +1581,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 			wantSucceededPodsMetric: 499,
 			wantFailedPodsMetric:    1,
 		},
-		"too many indexed finished": {
+		"succeeded indexes exceeds MaxUncountedPods": {
 			job: batch.Job{
 				Spec: batch.JobSpec{
 					CompletionMode: &indexedCompletion,
@@ -1595,15 +1595,15 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 				}
 				return pods
 			}(),
-			wantRmFinalizers: 500,
+			wantRmFinalizers: 501,
 			wantStatusUpdates: []batch.JobStatus{
 				{
 					UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
-					CompletedIndexes:        "0-499",
-					Succeeded:               500,
+					CompletedIndexes:        "0-500",
+					Succeeded:               501,
 				},
 			},
-			wantSucceededPodsMetric: 500,
+			wantSucceededPodsMetric: 501,
 		},
 		"pod flips from failed to succeeded": {
 			job: batch.Job{
@@ -1652,7 +1652,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 			uncounted := newUncountedTerminatedPods(*job.Status.UncountedTerminatedPods)
 			var succeededIndexes orderedIntervals
 			if isIndexedJob(job) {
-				succeededIndexes = succeededIndexesFromString(logger, job.Status.CompletedIndexes, int(*job.Spec.Completions))
+				succeededIndexes = calculateSucceededIndexes(logger, job, tc.pods)
 			}
 			err := manager.trackJobStatusAndRemoveFinalizers(context.TODO(), job, tc.pods, succeededIndexes, *uncounted, tc.expectedRmFinalizers, tc.finishedCond, tc.needsFlush, backoffRecord{})
 			if !errors.Is(err, tc.wantErr) {

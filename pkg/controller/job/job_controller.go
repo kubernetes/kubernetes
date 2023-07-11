@@ -816,9 +816,9 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 		}
 	}
 
-	var prevSucceededIndexes, succeededIndexes orderedIntervals
+	var succeededIndexes orderedIntervals
 	if isIndexedJob(&job) {
-		prevSucceededIndexes, succeededIndexes = calculateSucceededIndexes(logger, &job, pods)
+		succeededIndexes = calculateSucceededIndexes(logger, &job, pods)
 		succeeded = int32(succeededIndexes.total())
 	}
 	suspendCondChanged := false
@@ -891,7 +891,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 	needsStatusUpdate := suspendCondChanged || active != job.Status.Active || !pointer.Int32Equal(ready, job.Status.Ready)
 	job.Status.Active = active
 	job.Status.Ready = ready
-	err = jm.trackJobStatusAndRemoveFinalizers(ctx, &job, pods, prevSucceededIndexes, *uncounted, expectedRmFinalizers, finishedCondition, needsStatusUpdate, newBackoffRecord)
+	err = jm.trackJobStatusAndRemoveFinalizers(ctx, &job, pods, succeededIndexes, *uncounted, expectedRmFinalizers, finishedCondition, needsStatusUpdate, newBackoffRecord)
 	if err != nil {
 		return fmt.Errorf("tracking status: %w", err)
 	}
@@ -975,7 +975,6 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 	isIndexed := isIndexedJob(job)
 	var podsToRemoveFinalizer []*v1.Pod
 	uncountedStatus := job.Status.UncountedTerminatedPods
-	var newSucceededIndexes []int
 	if isIndexed {
 		// Sort to introduce completed Indexes in order.
 		sort.Sort(byCompletionIndex(pods))
@@ -1008,11 +1007,6 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 			if isIndexed {
 				// The completion index is enough to avoid recounting succeeded pods.
 				// No need to track UIDs.
-				ix := getCompletionIndex(pod.Annotations)
-				if ix != unknownCompletionIndex && ix < int(*job.Spec.Completions) && !succeededIndexes.has(ix) {
-					newSucceededIndexes = append(newSucceededIndexes, ix)
-					needsFlush = true
-				}
 			} else if !uncounted.succeeded.Has(string(pod.UID)) {
 				needsFlush = true
 				uncountedStatus.Succeeded = append(uncountedStatus.Succeeded, pod.UID)
@@ -1036,7 +1030,7 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 				}
 			}
 		}
-		if len(newSucceededIndexes)+len(uncountedStatus.Succeeded)+len(uncountedStatus.Failed) >= MaxUncountedPods {
+		if len(uncountedStatus.Succeeded)+len(uncountedStatus.Failed) >= MaxUncountedPods {
 			// The controller added enough Pods already to .status.uncountedTerminatedPods
 			// We stop counting pods and removing finalizers here to:
 			// 1. Ensure that the UIDs representation are under 20 KB.
@@ -1050,7 +1044,6 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 		}
 	}
 	if isIndexed {
-		succeededIndexes = succeededIndexes.withOrderedIndexes(newSucceededIndexes)
 		succeededIndexesStr := succeededIndexes.String()
 		if succeededIndexesStr != job.Status.CompletedIndexes {
 			needsFlush = true

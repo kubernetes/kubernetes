@@ -31,11 +31,10 @@ const noIndex = "-"
 func TestCalculateSucceededIndexes(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	cases := map[string]struct {
-		prevSucceeded       string
-		pods                []indexPhase
-		completions         int32
-		wantStatusIntervals orderedIntervals
-		wantIntervals       orderedIntervals
+		prevSucceeded string
+		pods          []indexPhase
+		completions   int32
+		wantIntervals orderedIntervals
 	}{
 		"one index": {
 			pods:          []indexPhase{{"1", v1.PodSucceeded}},
@@ -95,16 +94,14 @@ func TestCalculateSucceededIndexes(t *testing.T) {
 			wantIntervals: []interval{{0, 2}, {4, 4}},
 		},
 		"prev interval out of range": {
-			prevSucceeded:       "0-5,8-10",
-			completions:         8,
-			wantStatusIntervals: []interval{{0, 5}},
-			wantIntervals:       []interval{{0, 5}},
+			prevSucceeded: "0-5,8-10",
+			completions:   8,
+			wantIntervals: []interval{{0, 5}},
 		},
 		"prev interval partially out of range": {
-			prevSucceeded:       "0-5,8-10",
-			completions:         10,
-			wantStatusIntervals: []interval{{0, 5}, {8, 9}},
-			wantIntervals:       []interval{{0, 5}, {8, 9}},
+			prevSucceeded: "0-5,8-10",
+			completions:   10,
+			wantIntervals: []interval{{0, 5}, {8, 9}},
 		},
 		"prev and new separate": {
 			prevSucceeded: "0,4,5,10-12",
@@ -114,11 +111,6 @@ func TestCalculateSucceededIndexes(t *testing.T) {
 				{"8", v1.PodSucceeded},
 			},
 			completions: 13,
-			wantStatusIntervals: []interval{
-				{0, 0},
-				{4, 5},
-				{10, 12},
-			},
 			wantIntervals: []interval{
 				{0, 0},
 				{2, 2},
@@ -135,10 +127,6 @@ func TestCalculateSucceededIndexes(t *testing.T) {
 				{"8", v1.PodSucceeded},
 			},
 			completions: 9,
-			wantStatusIntervals: []interval{
-				{3, 4},
-				{6, 6},
-			},
 			wantIntervals: []interval{
 				{2, 4},
 				{6, 8},
@@ -152,10 +140,6 @@ func TestCalculateSucceededIndexes(t *testing.T) {
 				{"6", v1.PodSucceeded},
 			},
 			completions: 9,
-			wantStatusIntervals: []interval{
-				{2, 2},
-				{7, 8},
-			},
 			wantIntervals: []interval{
 				{2, 4},
 				{6, 8},
@@ -170,9 +154,6 @@ func TestCalculateSucceededIndexes(t *testing.T) {
 				{"9", v1.PodSucceeded},
 			},
 			completions: 10,
-			wantStatusIntervals: []interval{
-				{2, 7},
-			},
 			wantIntervals: []interval{
 				{0, 0},
 				{2, 7},
@@ -185,9 +166,6 @@ func TestCalculateSucceededIndexes(t *testing.T) {
 				{"3", v1.PodSucceeded},
 			},
 			completions: 4,
-			wantStatusIntervals: []interval{
-				{0, 0},
-			},
 			wantIntervals: []interval{
 				{0, 0},
 				{3, 3},
@@ -208,10 +186,7 @@ func TestCalculateSucceededIndexes(t *testing.T) {
 			for _, p := range pods {
 				p.Finalizers = append(p.Finalizers, batch.JobTrackingFinalizer)
 			}
-			gotStatusIntervals, gotIntervals := calculateSucceededIndexes(logger, job, pods)
-			if diff := cmp.Diff(tc.wantStatusIntervals, gotStatusIntervals); diff != "" {
-				t.Errorf("Unexpected completed indexes from status (-want,+got):\n%s", diff)
-			}
+			gotIntervals := calculateSucceededIndexes(logger, job, pods)
 			if diff := cmp.Diff(tc.wantIntervals, gotIntervals); diff != "" {
 				t.Errorf("Unexpected completed indexes (-want,+got):\n%s", diff)
 			}

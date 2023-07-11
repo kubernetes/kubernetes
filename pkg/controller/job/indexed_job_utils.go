@@ -46,12 +46,11 @@ type interval struct {
 
 type orderedIntervals []interval
 
-// calculateSucceededIndexes returns the old and new list of succeeded indexes
-// in compressed format (intervals).
-// The old list is solely based off .status.completedIndexes, but returns an
-// empty list if this Job is not tracked with finalizers. The new list includes
-// the indexes that succeeded since the last sync.
-func calculateSucceededIndexes(logger klog.Logger, job *batch.Job, pods []*v1.Pod) (orderedIntervals, orderedIntervals) {
+// calculateSucceededIndexes returns the new list of succeeded indexes
+// in compressed format (intervals). The new list includes the indexes in the
+// previous Job's CompletedIndexes field, merged with the indexes that succeeded
+// since the last sync.
+func calculateSucceededIndexes(logger klog.Logger, job *batch.Job, pods []*v1.Pod) orderedIntervals {
 	prevIntervals := succeededIndexesFromString(logger, job.Status.CompletedIndexes, int(*job.Spec.Completions))
 	newSucceeded := sets.New[int]()
 	for _, p := range pods {
@@ -63,8 +62,7 @@ func calculateSucceededIndexes(logger klog.Logger, job *batch.Job, pods []*v1.Po
 		}
 	}
 	// List returns the items of the set in order.
-	result := prevIntervals.withOrderedIndexes(sets.List(newSucceeded))
-	return prevIntervals, result
+	return prevIntervals.withOrderedIndexes(sets.List(newSucceeded))
 }
 
 // withOrderedIndexes returns a new list of ordered intervals that contains
