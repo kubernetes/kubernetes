@@ -53,13 +53,12 @@ var _ Matcher = &matcher{}
 // matcher evaluates compiled cel expressions and determines if they match the given request or not
 type matcher struct {
 	filter      celplugin.Filter
-	authorizer  authorizer.Authorizer
 	failPolicy  v1.FailurePolicyType
 	matcherType string
 	objectName  string
 }
 
-func NewMatcher(filter celplugin.Filter, authorizer authorizer.Authorizer, failPolicy *v1.FailurePolicyType, matcherType, objectName string) Matcher {
+func NewMatcher(filter celplugin.Filter, failPolicy *v1.FailurePolicyType, matcherType, objectName string) Matcher {
 	var f v1.FailurePolicyType
 	if failPolicy == nil {
 		f = v1.Fail
@@ -68,17 +67,16 @@ func NewMatcher(filter celplugin.Filter, authorizer authorizer.Authorizer, failP
 	}
 	return &matcher{
 		filter:      filter,
-		authorizer:  authorizer,
 		failPolicy:  f,
 		matcherType: matcherType,
 		objectName:  objectName,
 	}
 }
 
-func (m *matcher) Match(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object) MatchResult {
+func (m *matcher) Match(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, authz authorizer.Authorizer) MatchResult {
 	evalResults, _, err := m.filter.ForInput(ctx, versionedAttr, celplugin.CreateAdmissionRequest(versionedAttr.Attributes), celplugin.OptionalVariableBindings{
 		VersionedParams: versionedParams,
-		Authorizer:      m.authorizer,
+		Authorizer:      authz,
 	}, celconfig.RuntimeCELCostBudgetMatchConditions)
 
 	if err != nil {

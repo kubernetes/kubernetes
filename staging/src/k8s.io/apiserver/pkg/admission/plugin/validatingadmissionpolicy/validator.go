@@ -42,17 +42,15 @@ type validator struct {
 	auditAnnotationFilter cel.Filter
 	messageFilter         cel.Filter
 	failPolicy            *v1.FailurePolicyType
-	authorizer            authorizer.Authorizer
 }
 
-func NewValidator(validationFilter cel.Filter, celMatcher matchconditions.Matcher, auditAnnotationFilter, messageFilter cel.Filter, failPolicy *v1.FailurePolicyType, authorizer authorizer.Authorizer) Validator {
+func NewValidator(validationFilter cel.Filter, celMatcher matchconditions.Matcher, auditAnnotationFilter, messageFilter cel.Filter, failPolicy *v1.FailurePolicyType) Validator {
 	return &validator{
 		celMatcher:            celMatcher,
 		validationFilter:      validationFilter,
 		auditAnnotationFilter: auditAnnotationFilter,
 		messageFilter:         messageFilter,
 		failPolicy:            failPolicy,
-		authorizer:            authorizer,
 	}
 }
 
@@ -72,7 +70,7 @@ func auditAnnotationEvaluationForError(f v1.FailurePolicyType) PolicyAuditAnnota
 
 // Validate takes a list of Evaluation and a failure policy and converts them into actionable PolicyDecisions
 // runtimeCELCostBudget was added for testing purpose only. Callers should always use const RuntimeCELCostBudget from k8s.io/apiserver/pkg/apis/cel/config.go as input.
-func (v *validator) Validate(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64) ValidateResult {
+func (v *validator) Validate(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
 	var f v1.FailurePolicyType
 	if v.failPolicy == nil {
 		f = v1.Fail
@@ -81,7 +79,7 @@ func (v *validator) Validate(ctx context.Context, versionedAttr *admission.Versi
 	}
 
 	if v.celMatcher != nil {
-		matchResults := v.celMatcher.Match(ctx, versionedAttr, versionedParams)
+		matchResults := v.celMatcher.Match(ctx, versionedAttr, versionedParams, authz)
 		if matchResults.Error != nil {
 			return ValidateResult{
 				Decisions: []PolicyDecision{
@@ -100,7 +98,7 @@ func (v *validator) Validate(ctx context.Context, versionedAttr *admission.Versi
 		}
 	}
 
-	optionalVars := cel.OptionalVariableBindings{VersionedParams: versionedParams, Authorizer: v.authorizer}
+	optionalVars := cel.OptionalVariableBindings{VersionedParams: versionedParams, Authorizer: authz}
 	expressionOptionalVars := cel.OptionalVariableBindings{VersionedParams: versionedParams}
 	admissionRequest := cel.CreateAdmissionRequest(versionedAttr.Attributes)
 	evalResults, remainingBudget, err := v.validationFilter.ForInput(ctx, versionedAttr, admissionRequest, optionalVars, runtimeCELCostBudget)

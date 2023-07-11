@@ -35,6 +35,7 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/matchconditions"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
 )
@@ -70,7 +71,7 @@ type fakeCELMatcher struct {
 	matches bool
 }
 
-func (f *fakeCELMatcher) Match(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object) matchconditions.MatchResult {
+func (f *fakeCELMatcher) Match(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, authz authorizer.Authorizer) matchconditions.MatchResult {
 	return matchconditions.MatchResult{Matches: f.matches, FailedConditionName: "placeholder", Error: f.error}
 }
 
@@ -891,7 +892,7 @@ func TestValidate(t *testing.T) {
 			if tc.costBudget != 0 {
 				budget = tc.costBudget
 			}
-			validateResult := v.Validate(ctx, fakeVersionedAttr, nil, budget)
+			validateResult := v.Validate(ctx, fakeVersionedAttr, nil, budget, nil)
 
 			require.Equal(t, len(validateResult.Decisions), len(tc.policyDecision))
 
@@ -943,7 +944,7 @@ func TestContextCanceled(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.TODO())
 	cancel()
-	validationResult := v.Validate(ctx, fakeVersionedAttr, nil, celconfig.RuntimeCELCostBudget)
+	validationResult := v.Validate(ctx, fakeVersionedAttr, nil, celconfig.RuntimeCELCostBudget, nil)
 	if len(validationResult.Decisions) != 1 || !strings.Contains(validationResult.Decisions[0].Message, "operation interrupted") {
 		t.Errorf("Expected 'operation interrupted' but got %v", validationResult.Decisions)
 	}

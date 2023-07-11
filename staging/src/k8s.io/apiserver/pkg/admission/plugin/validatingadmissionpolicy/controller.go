@@ -67,6 +67,8 @@ type celAdmissionController struct {
 	// A snapshot of the current policy configuration is synced with this field
 	// asynchronously
 	definitions atomic.Value
+
+	authz authorizer.Authorizer
 }
 
 // Everything someone might need to validate a single ValidatingPolicyDefinition
@@ -147,8 +149,8 @@ func NewAdmissionController(
 				informerFactory.Admissionregistration().V1alpha1().ValidatingAdmissionPolicies().Informer()),
 			generic.NewInformer[*v1alpha1.ValidatingAdmissionPolicyBinding](
 				informerFactory.Admissionregistration().V1alpha1().ValidatingAdmissionPolicyBindings().Informer()),
-			authz,
 		),
+		authz: authz,
 	}
 }
 
@@ -235,6 +237,8 @@ func (c *celAdmissionController) Validate(
 		}
 	}
 	policyDatas := c.definitions.Load().([]policyData)
+
+	authz := newCachingAuthorizer(c.authz)
 
 	for _, definitionInfo := range policyDatas {
 		definition := definitionInfo.lastReconciledValue
@@ -336,7 +340,7 @@ func (c *celAdmissionController) Validate(
 				versionedAttr = va
 			}
 
-			validationResult := bindingInfo.validator.Validate(ctx, versionedAttr, param, celconfig.RuntimeCELCostBudget)
+			validationResult := bindingInfo.validator.Validate(ctx, versionedAttr, param, celconfig.RuntimeCELCostBudget, authz)
 
 			for i, decision := range validationResult.Decisions {
 				switch decision.Action {

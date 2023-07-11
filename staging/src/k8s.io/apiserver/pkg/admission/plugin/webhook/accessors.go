@@ -26,7 +26,6 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/matchconditions"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/namespace"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/object"
-	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/cel/environment"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/rest"
@@ -49,7 +48,7 @@ type WebhookAccessor interface {
 	GetRESTClient(clientManager *webhookutil.ClientManager) (*rest.RESTClient, error)
 
 	// GetCompiledMatcher gets the compiled matcher object
-	GetCompiledMatcher(compiler cel.FilterCompiler, authorizer authorizer.Authorizer) matchconditions.Matcher
+	GetCompiledMatcher(compiler cel.FilterCompiler) matchconditions.Matcher
 
 	// GetName gets the webhook Name field. Note that the name is scoped to the webhook
 	// configuration and does not provide a globally unique identity, if a unique identity is
@@ -125,7 +124,7 @@ func (m *mutatingWebhookAccessor) GetRESTClient(clientManager *webhookutil.Clien
 }
 
 // TODO: graduation to beta: resolve the fact that we rebuild ALL items whenever ANY config changes in NewMutatingWebhookConfigurationManager and NewValidatingWebhookConfigurationManager ... now that we're doing CEL compilation, we probably want to avoid that
-func (m *mutatingWebhookAccessor) GetCompiledMatcher(compiler cel.FilterCompiler, authorizer authorizer.Authorizer) matchconditions.Matcher {
+func (m *mutatingWebhookAccessor) GetCompiledMatcher(compiler cel.FilterCompiler) matchconditions.Matcher {
 	m.compileMatcher.Do(func() {
 		expressions := make([]cel.ExpressionAccessor, len(m.MutatingWebhook.MatchConditions))
 		for i, matchCondition := range m.MutatingWebhook.MatchConditions {
@@ -141,7 +140,7 @@ func (m *mutatingWebhookAccessor) GetCompiledMatcher(compiler cel.FilterCompiler
 				HasAuthorizer: true,
 			},
 			environment.StoredExpressions,
-		), authorizer, m.FailurePolicy, "validating", m.Name)
+		), m.FailurePolicy, "validating", m.Name)
 	})
 	return m.compiledMatcher
 }
@@ -253,7 +252,7 @@ func (v *validatingWebhookAccessor) GetRESTClient(clientManager *webhookutil.Cli
 	return v.client, v.clientErr
 }
 
-func (v *validatingWebhookAccessor) GetCompiledMatcher(compiler cel.FilterCompiler, authorizer authorizer.Authorizer) matchconditions.Matcher {
+func (v *validatingWebhookAccessor) GetCompiledMatcher(compiler cel.FilterCompiler) matchconditions.Matcher {
 	v.compileMatcher.Do(func() {
 		expressions := make([]cel.ExpressionAccessor, len(v.ValidatingWebhook.MatchConditions))
 		for i, matchCondition := range v.ValidatingWebhook.MatchConditions {
@@ -269,7 +268,7 @@ func (v *validatingWebhookAccessor) GetCompiledMatcher(compiler cel.FilterCompil
 				HasAuthorizer: true,
 			},
 			environment.StoredExpressions,
-		), authorizer, v.FailurePolicy, "validating", v.Name)
+		), v.FailurePolicy, "validating", v.Name)
 	})
 	return v.compiledMatcher
 }
