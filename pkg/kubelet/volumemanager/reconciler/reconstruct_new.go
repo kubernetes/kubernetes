@@ -173,10 +173,10 @@ func (rc *reconciler) cleanOrphanVolumes() {
 	rc.volumesFailedReconstruction = make([]podVolume, 0)
 }
 
-// updateReconstructedFromAPIServer tries to file devicePaths of reconstructed volumes from
+// updateReconstructedFromNodeStatus tries to file devicePaths of reconstructed volumes from
 // node.Status.VolumesAttached. This can be done only after connection to the API
 // server is established, i.e. it can't be part of reconstructVolumes().
-func (rc *reconciler) updateReconstructedFromAPIServer() {
+func (rc *reconciler) updateReconstructedFromNodeStatus() {
 	klog.V(4).InfoS("Updating reconstructed devicePaths")
 
 	if rc.kubeClient == nil {

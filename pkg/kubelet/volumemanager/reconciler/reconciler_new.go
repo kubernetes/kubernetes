@@ -57,7 +57,7 @@ func (rc *reconciler) reconcileNew() {
 	}
 
 	if len(rc.volumesNeedUpdateFromNodeStatus) != 0 {
-		rc.updateReconstructedFromAPIServer()
+		rc.updateReconstructedFromNodeStatus()
 	}
 	if len(rc.volumesNeedUpdateFromNodeStatus) == 0 {
 		// ASW is fully populated only after both devicePaths and uncertain volume attach-ability
