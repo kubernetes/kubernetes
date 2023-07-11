@@ -233,6 +233,42 @@ func TestTypeCheck(t *testing.T) {
 			},
 		}},
 	}}
+	authorizerPolicy := &v1alpha1.ValidatingAdmissionPolicy{Spec: v1alpha1.ValidatingAdmissionPolicySpec{
+		Validations: []v1alpha1.Validation{
+			{
+				Expression: "authorizer.group('').resource('endpoints').check('create').allowed()",
+			},
+		},
+		MatchConstraints: &v1alpha1.MatchResources{ResourceRules: []v1alpha1.NamedRuleWithOperations{
+			{
+				RuleWithOperations: v1alpha1.RuleWithOperations{
+					Rule: v1alpha1.Rule{
+						APIGroups:   []string{"apps"},
+						APIVersions: []string{"v1"},
+						Resources:   []string{"deployments"},
+					},
+				},
+			},
+		}},
+	}}
+	authorizerInvalidPolicy := &v1alpha1.ValidatingAdmissionPolicy{Spec: v1alpha1.ValidatingAdmissionPolicySpec{
+		Validations: []v1alpha1.Validation{
+			{
+				Expression: "authorizer.allowed()",
+			},
+		},
+		MatchConstraints: &v1alpha1.MatchResources{ResourceRules: []v1alpha1.NamedRuleWithOperations{
+			{
+				RuleWithOperations: v1alpha1.RuleWithOperations{
+					Rule: v1alpha1.Rule{
+						APIGroups:   []string{"apps"},
+						APIVersions: []string{"v1"},
+						Resources:   []string{"deployments"},
+					},
+				},
+			},
+		}},
+	}}
 	for _, tc := range []struct {
 		name           string
 		schemaToReturn *spec.Schema
@@ -325,6 +361,36 @@ func TestTypeCheck(t *testing.T) {
 			assertions: []assertionFunc{
 				toHaveFieldRef("spec.validations[1].expression"), // expressions[0] is okay, [1] is wrong
 				toHaveLengthOf(1),
+			},
+		},
+		{
+			name:   "authorizer",
+			policy: authorizerPolicy,
+			schemaToReturn: &spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Type: []string{"object"},
+					Properties: map[string]spec.Schema{
+						"foo": *spec.StringProperty(),
+					},
+				},
+			},
+			assertions: []assertionFunc{toBeEmpty},
+		},
+		{
+			name:   "authorizer invalid",
+			policy: authorizerInvalidPolicy,
+			schemaToReturn: &spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Type: []string{"object"},
+					Properties: map[string]spec.Schema{
+						"foo": *spec.StringProperty(),
+					},
+				},
+			},
+			assertions: []assertionFunc{
+				toHaveFieldRef("spec.validations[0].expression"),
+				toHaveLengthOf(1),
+				toContain("found no matching overload for 'allowed' applied to 'kubernetes.authorization.Authorizer"),
 			},
 		},
 	} {
