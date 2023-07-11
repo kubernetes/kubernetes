@@ -1294,18 +1294,41 @@ func newTracerProvider(s *options.KubeletServer) (oteltrace.TracerProvider, erro
 
 func getCgroupDriverFromCRI(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Dependencies) error {
 	klog.V(4).InfoS("Getting CRI runtime configuration information")
-	runtimeConfig, err := kubeDeps.RemoteRuntimeService.RuntimeConfig(ctx)
-	if err != nil {
-		s, ok := status.FromError(err)
-		if !ok || s.Code() != codes.Unimplemented {
-			return err
+
+	var (
+		runtimeConfig *runtimeapi.RuntimeConfigResponse
+		err           error
+	)
+	// Retry a couple of times, hoping that any errors are transient.
+	// Fail quickly on known, non transient errors.
+	for i := 0; i < 3; i++ {
+		runtimeConfig, err = kubeDeps.RemoteRuntimeService.RuntimeConfig(ctx)
+		if err != nil {
+			s, ok := status.FromError(err)
+			if !ok || s.Code() != codes.Unimplemented {
+				// We could introduce a backoff delay or jitter, but this is largely catching cases
+				// where the runtime is still starting up and we request too early.
+				// Give it a little more time.
+				time.Sleep(time.Second * 2)
+				continue
+			}
+			// CRI implementation doesn't support RuntimeConfig, fallback
+			klog.InfoS("CRI implementation should be updated to support RuntimeConfig when KubeletCgroupDriverFromCRI feature gate has been enabled. Falling back to using cgroupDriver from kubelet config.")
+			return nil
 		}
-		// CRI implementation doesn't support RuntimeConfig, fallback
-		klog.InfoS("CRI implementation should be updated to support RuntimeConfig when KubeletCgroupDriverFromCRI feature gate has been enabled. Falling back to using cgroupDriver from kubelet config.")
+	}
+	if err != nil {
+		return err
+	}
+
+	// Calling GetLinux().GetCgroupDriver() won't segfault, but it will always default to systemd
+	// which is not intended by the fields not being populated
+	linuxConfig := runtimeConfig.GetLinux()
+	if linuxConfig == nil {
 		return nil
 	}
 
-	switch d := runtimeConfig.GetLinux().GetCgroupDriver(); d {
+	switch d := linuxConfig.GetCgroupDriver(); d {
 	case runtimeapi.CgroupDriver_SYSTEMD:
 		s.CgroupDriver = "systemd"
 	case runtimeapi.CgroupDriver_CGROUPFS:
