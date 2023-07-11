@@ -22,6 +22,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -137,19 +138,23 @@ func (s *defaultManager) UpdateStorageVersions(kubeAPIServerClientConfig *rest.C
 	// per GroupResource) will migrate these resources twice, since both
 	// StorageVersion objects have CommonEncodingVersion (each with one server registered).
 	sortResourceInfosByGroupResource(resources)
+	_, resourceMap, err := clientset.Discovery().ServerGroupsAndResources()
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("failed to get supported resources from server: %v", err))
+		return
+	}
 	for _, r := range dedupResourceInfos(resources) {
 		decodableVersions := decodableVersions(r.DirectlyDecodableVersions, r.EquivalentResourceMapper, r.GroupResource)
 		gr := r.GroupResource
+		servedVersions, err := servedVersions(gr, resourceMap)
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("failed to get supported served versions from server: %v", err))
+			return
+		}
+
 		// Group must be a valid subdomain in DNS (RFC 1123)
 		if len(gr.Group) == 0 {
 			gr.Group = "core"
-		}
-
-		servedVersions := []string{}
-		for _, dv := range decodableVersions {
-			if apiResourceConfigSource.ResourceEnabled(gr.WithVersion(dv)) {
-				servedVersions = append(servedVersions, dv)
-			}
 		}
 		if err := updateStorageVersionFor(sc, serverID, gr, r.EncodingVersion, decodableVersions, servedVersions); err != nil {
 			utilruntime.HandleError(fmt.Errorf("failed to update storage version for %v: %v", r.GroupResource, err))
@@ -165,6 +170,27 @@ func (s *defaultManager) UpdateStorageVersions(kubeAPIServerClientConfig *rest.C
 	}
 	klog.V(2).Infof("storage version updates complete")
 	s.setComplete()
+}
+
+func servedVersions(gr schema.GroupResource, resourceMap []*v1.APIResourceList) ([]string, error) {
+	servedVersions := []string{}
+	for _, apiResourceList := range resourceMap {
+		gv, err := schema.ParseGroupVersion(apiResourceList.GroupVersion)
+		if err != nil {
+			return nil, err
+		}
+		for _, apiResource := range apiResourceList.APIResources {
+			if gv.Group == gr.Group && apiResource.Name == gr.Resource {
+				if gv.Group != "" {
+					servedVersions = append(servedVersions, fmt.Sprintf("%s/%s", gv.Group, gv.Version))
+				} else {
+					servedVersions = append(servedVersions, gv.Version)
+				}
+			}
+
+		}
+	}
+	return servedVersions, nil
 }
 
 // dedupResourceInfos dedups ResourceInfos with the same underlying storage.

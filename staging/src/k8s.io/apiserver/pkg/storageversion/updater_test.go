@@ -26,8 +26,8 @@ import (
 )
 
 var (
-	v1   = "v1"
-	v2   = "v2"
+	v_1  = "v1"
+	v_2  = "v2"
 	ssv1 = v1alpha1.ServerStorageVersion{
 		APIServerID:       "1",
 		EncodingVersion:   "v1",
@@ -73,7 +73,7 @@ func TestLocalUpdateStorageVersion(t *testing.T) {
 			newSSV: ssv1,
 			expected: v1alpha1.StorageVersionStatus{
 				StorageVersions:       []v1alpha1.ServerStorageVersion{ssv1},
-				CommonEncodingVersion: &v1,
+				CommonEncodingVersion: &v_1,
 				Conditions:            commonVersionTrueCondition(),
 			},
 			expectLastTransitionTimeUpdate: true,
@@ -81,7 +81,7 @@ func TestLocalUpdateStorageVersion(t *testing.T) {
 		{
 			old: v1alpha1.StorageVersionStatus{
 				StorageVersions:       []v1alpha1.ServerStorageVersion{ssv1, ssv2},
-				CommonEncodingVersion: &v1,
+				CommonEncodingVersion: &v_1,
 				Conditions:            commonVersionTrueCondition(),
 			},
 			newSSV: ssv3,
@@ -94,13 +94,13 @@ func TestLocalUpdateStorageVersion(t *testing.T) {
 		{
 			old: v1alpha1.StorageVersionStatus{
 				StorageVersions:       []v1alpha1.ServerStorageVersion{ssv1, ssv2},
-				CommonEncodingVersion: &v1,
+				CommonEncodingVersion: &v_1,
 				Conditions:            commonVersionTrueCondition(),
 			},
 			newSSV: ssv4,
 			expected: v1alpha1.StorageVersionStatus{
 				StorageVersions:       []v1alpha1.ServerStorageVersion{ssv1, ssv2, ssv4},
-				CommonEncodingVersion: &v1,
+				CommonEncodingVersion: &v_1,
 				Conditions:            commonVersionTrueCondition(),
 			},
 		},
@@ -170,7 +170,7 @@ func TestSetCommonEncodingVersion(t *testing.T) {
 			name: "no-common_transition",
 			old: v1alpha1.StorageVersionStatus{
 				StorageVersions:       []v1alpha1.ServerStorageVersion{ssv1, ssv2, ssv3},
-				CommonEncodingVersion: &v1,
+				CommonEncodingVersion: &v_1,
 				Conditions:            commonVersionTrueCondition(),
 			},
 			expected: v1alpha1.StorageVersionStatus{
@@ -197,7 +197,7 @@ func TestSetCommonEncodingVersion(t *testing.T) {
 			},
 			expected: v1alpha1.StorageVersionStatus{
 				StorageVersions:       []v1alpha1.ServerStorageVersion{ssv1, ssv2},
-				CommonEncodingVersion: &v1,
+				CommonEncodingVersion: &v_1,
 				Conditions:            commonVersionTrueCondition(),
 			},
 			expectLastTransitionTimeUpdate: true,
@@ -206,12 +206,12 @@ func TestSetCommonEncodingVersion(t *testing.T) {
 			name: "common_no-transition",
 			old: v1alpha1.StorageVersionStatus{
 				StorageVersions:       []v1alpha1.ServerStorageVersion{ssv1, ssv2},
-				CommonEncodingVersion: &v1,
+				CommonEncodingVersion: &v_1,
 				Conditions:            commonVersionTrueCondition(),
 			},
 			expected: v1alpha1.StorageVersionStatus{
 				StorageVersions:       []v1alpha1.ServerStorageVersion{ssv1, ssv2},
-				CommonEncodingVersion: &v1,
+				CommonEncodingVersion: &v_1,
 				Conditions:            commonVersionTrueCondition(),
 			},
 		},
@@ -223,7 +223,7 @@ func TestSetCommonEncodingVersion(t *testing.T) {
 			},
 			expected: v1alpha1.StorageVersionStatus{
 				StorageVersions:       []v1alpha1.ServerStorageVersion{ssv1, ssv2},
-				CommonEncodingVersion: &v1,
+				CommonEncodingVersion: &v_1,
 				Conditions:            commonVersionTrueCondition(),
 			},
 			expectLastTransitionTimeUpdate: true,
@@ -232,12 +232,12 @@ func TestSetCommonEncodingVersion(t *testing.T) {
 			name: "common_version-changed",
 			old: v1alpha1.StorageVersionStatus{
 				StorageVersions:       []v1alpha1.ServerStorageVersion{ssv3, ssv5},
-				CommonEncodingVersion: &v1,
+				CommonEncodingVersion: &v_1,
 				Conditions:            commonVersionTrueCondition(),
 			},
 			expected: v1alpha1.StorageVersionStatus{
 				StorageVersions:       []v1alpha1.ServerStorageVersion{ssv3, ssv5},
-				CommonEncodingVersion: &v2,
+				CommonEncodingVersion: &v_2,
 				Conditions:            commonVersionTrueCondition(),
 			},
 			expectLastTransitionTimeUpdate: true,
