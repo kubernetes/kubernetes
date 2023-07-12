@@ -36,6 +36,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	metricstestutil "k8s.io/component-base/metrics/testutil"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/features"
@@ -45,11 +46,11 @@ import (
 
 func alwaysReady() bool { return true }
 
-func NewFromClient(kubeClient clientset.Interface, terminatedPodThreshold int) (*PodGCController, coreinformers.PodInformer, coreinformers.NodeInformer) {
+func NewFromClient(ctx context.Context, kubeClient clientset.Interface, terminatedPodThreshold int) (*PodGCController, coreinformers.PodInformer, coreinformers.NodeInformer) {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	podInformer := informerFactory.Core().V1().Pods()
 	nodeInformer := informerFactory.Core().V1().Nodes()
-	controller := NewPodGC(context.TODO(), kubeClient, podInformer, nodeInformer, terminatedPodThreshold)
+	controller := NewPodGC(ctx, kubeClient, podInformer, nodeInformer, terminatedPodThreshold)
 	controller.podListerSynced = alwaysReady
 	return controller, podInformer, nodeInformer
 }
@@ -148,9 +149,9 @@ func TestGCTerminated(t *testing.T) {
 			deletedPodNames: sets.NewString("c"),
 		},
 	}
-
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
 			creationTime := time.Unix(0, 0)
 			nodes := []*v1.Node{testutil.NewNode("node")}
@@ -165,12 +166,12 @@ func TestGCTerminated(t *testing.T) {
 				})
 			}
 			client := setupNewSimpleClient(nodes, pods)
-			gcc, podInformer, _ := NewFromClient(client, test.threshold)
+			gcc, podInformer, _ := NewFromClient(ctx, client, test.threshold)
 			for _, pod := range pods {
 				podInformer.Informer().GetStore().Add(pod)
 			}
 
-			gcc.gc(context.TODO())
+			gcc.gc(ctx)
 
 			verifyDeletedAndPatchedPods(t, client, test.deletedPodNames, test.patchedPodNames)
 		})
@@ -346,6 +347,7 @@ func TestGCOrphaned(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
 			nodes := make([]*v1.Node, 0, len(test.initialClientNodes))
 			for _, node := range test.initialClientNodes {
@@ -356,7 +358,7 @@ func TestGCOrphaned(t *testing.T) {
 				pods = append(pods, pod)
 			}
 			client := setupNewSimpleClient(nodes, pods)
-			gcc, podInformer, nodeInformer := NewFromClient(client, -1)
+			gcc, podInformer, nodeInformer := NewFromClient(ctx, client, -1)
 			for _, node := range test.initialInformerNodes {
 				nodeInformer.Informer().GetStore().Add(node)
 			}
@@ -369,7 +371,7 @@ func TestGCOrphaned(t *testing.T) {
 			gcc.nodeQueue = workqueue.NewDelayingQueueWithCustomClock(fakeClock, "podgc_test_queue")
 
 			// First GC of orphaned pods
-			gcc.gc(context.TODO())
+			gcc.gc(ctx)
 			deletedPodNames := getDeletedPodNames(client)
 
 			if len(deletedPodNames) > 0 {
@@ -456,6 +458,7 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
 			creationTime := time.Unix(0, 0)
 
@@ -471,7 +474,7 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 			}
 			nodes := []*v1.Node{}
 			client := setupNewSimpleClient(nodes, pods)
-			gcc, podInformer, _ := NewFromClient(client, -1)
+			gcc, podInformer, _ := NewFromClient(ctx, client, -1)
 
 			for _, pod := range pods {
 				podInformer.Informer().GetStore().Add(pod)
@@ -482,7 +485,7 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 				t.Errorf("Error while listing all Pods: %v", err)
 				return
 			}
-			gcc.gcUnscheduledTerminating(context.TODO(), pods)
+			gcc.gcUnscheduledTerminating(ctx, pods)
 			verifyDeletedAndPatchedPods(t, client, test.deletedPodNames, test.patchedPodNames)
 		})
 	}
@@ -608,6 +611,7 @@ func TestGCTerminating(t *testing.T) {
 	}
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
 
 			creationTime := time.Unix(0, 0)
@@ -640,7 +644,7 @@ func TestGCTerminating(t *testing.T) {
 				})
 			}
 			client := setupNewSimpleClient(nodes, pods)
-			gcc, podInformer, nodeInformer := NewFromClient(client, -1)
+			gcc, podInformer, nodeInformer := NewFromClient(ctx, client, -1)
 
 			for _, pod := range pods {
 				podInformer.Informer().GetStore().Add(pod)
@@ -649,7 +653,7 @@ func TestGCTerminating(t *testing.T) {
 				nodeInformer.Informer().GetStore().Add(node)
 			}
 
-			gcc.gc(context.TODO())
+			gcc.gc(ctx)
 			verifyDeletedAndPatchedPods(t, client, test.deletedPodNames, test.patchedPodNames)
 		})
 	}
