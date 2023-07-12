@@ -166,7 +166,7 @@ var quantityLibraryDecls = map[string][]cel.FunctionOpt{
 		cel.MemberOverload("quantity_get_int", []*cel.Type{apiservercel.QuantityType}, cel.IntType, cel.UnaryBinding(quantityGetValue)),
 	},
 	"isInteger": {
-		cel.MemberOverload("quantity_is_integer", []*cel.Type{apiservercel.QuantityType}, cel.IntType, cel.UnaryBinding(quantityCanValue)),
+		cel.MemberOverload("quantity_is_integer", []*cel.Type{apiservercel.QuantityType}, cel.BoolType, cel.UnaryBinding(quantityCanValue)),
 	},
 	"add": {
 		cel.MemberOverload("quantity_add", []*cel.Type{apiservercel.QuantityType, apiservercel.QuantityType}, apiservercel.QuantityType, cel.BinaryBinding(quantityAdd)),
