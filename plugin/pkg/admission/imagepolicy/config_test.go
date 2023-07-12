@@ -37,8 +37,8 @@ func TestConfigNormalization(t *testing.T) {
 				RetryBackoff: ((minRetryBackoff + maxRetryBackoff) / 2) / time.Millisecond,
 			},
 			normalizedConfig: imagePolicyWebhookConfig{
-				AllowTTL:     ((minAllowTTL + maxAllowTTL) / 2) / time.Second * time.Second,
-				DenyTTL:      ((minDenyTTL + maxDenyTTL) / 2) / time.Second * time.Second,
+				AllowTTL:     ((minAllowTTL + maxAllowTTL) / 2) / time.Second,
+				DenyTTL:      ((minDenyTTL + maxDenyTTL) / 2) / time.Second,
 				RetryBackoff: (minRetryBackoff + maxRetryBackoff) / 2,
 			},
 			wantErr: false,

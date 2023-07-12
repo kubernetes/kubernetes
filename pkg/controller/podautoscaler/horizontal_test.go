@@ -3958,12 +3958,12 @@ func generateScalingRules(pods, podsPeriod, percent, percentPeriod, stabilizatio
 //   - 120s (guaranteed to have all events)
 func generateEventsUniformDistribution(rawEvents []int, periodSeconds int) []timestampedScaleEvent {
 	events := make([]timestampedScaleEvent, len(rawEvents))
-	segmentDuration := float64(periodSeconds) / float64(len(rawEvents))
+	segmentDuration := time.Duration(float64(periodSeconds) / float64(len(rawEvents)))
 	for idx, event := range rawEvents {
-		segmentBoundary := time.Duration(float64(periodSeconds) - segmentDuration*float64(idx+1) + segmentDuration/float64(2))
+		segmentBoundary := time.Duration(float64(periodSeconds) - float64(idx+1)*float64(segmentDuration) + float64(segmentDuration)/2)
 		events[idx] = timestampedScaleEvent{
 			replicaChange: int32(event),
-			timestamp:     time.Now().Add(-time.Second * segmentBoundary),
+			timestamp:     time.Now().Add(-segmentBoundary),
 		}
 	}
 	return events
