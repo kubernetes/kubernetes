@@ -659,9 +659,7 @@ func TestWarnings(t *testing.T) {
 					},
 				}},
 			}},
-			expected: []string{
-				`spec.containers[0].ports[1]: duplicate container port 80/TCP, conflicts with spec.containers[0]`,
-			},
+			expected: []string{},
 		},
 		{
 			name: "one container, two ports, same protocol, port and hostPort, different hostIP",
@@ -725,9 +723,7 @@ func TestWarnings(t *testing.T) {
 					},
 				}},
 			}},
-			expected: []string{
-				`spec.containers[1].ports[0]: duplicate container port 80/TCP, conflicts with spec.containers[0]`,
-			},
+			expected: []string{},
 		},
 		{
 			name: "two containers, one port each, same protocol, port and hostPort, different hostIP",
@@ -758,7 +754,7 @@ func TestWarnings(t *testing.T) {
 				}},
 			}},
 			expected: []string{
-				`spec.containers[0].ports[1]: duplicate container port 80/UDP, conflicts with spec.containers[0]`,
+				`spec.containers[0].ports[1]: duplicate port definition with spec.containers[0].ports[0]`,
 			},
 		},
 		{
@@ -773,7 +769,7 @@ func TestWarnings(t *testing.T) {
 				}},
 			}},
 			expected: []string{
-				`spec.containers[0].ports[1]: duplicate container port 80/UDP, conflicts with spec.containers[0]`,
+				`spec.containers[0].ports[1]: duplicate port definition with spec.containers[0].ports[0]`,
 			},
 		},
 		{
@@ -788,7 +784,21 @@ func TestWarnings(t *testing.T) {
 				}},
 			}},
 			expected: []string{
-				`spec.containers[0].ports[1]: duplicate container port 80/UDP, conflicts with spec.containers[0]`,
+				`spec.containers[0].ports[1]: duplicate port definition with spec.containers[0].ports[0]`,
+			},
+		},
+		{
+			name: "one container port hostIP set without host port set",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, Protocol: api.ProtocolUDP, HostIP: "10.0.0.1"},
+					},
+				}},
+			}},
+			expected: []string{
+				`spec.containers[0].ports[0]: hostIP set without hostPort: {Name: HostPort:0 ContainerPort:80 Protocol:UDP HostIP:10.0.0.1}`,
 			},
 		},
 		{
@@ -803,22 +813,25 @@ func TestWarnings(t *testing.T) {
 				}},
 			}},
 			expected: []string{
-				`spec.containers[0].ports[1]: duplicate container port 80/UDP, conflicts with spec.containers[0]`,
+				`spec.containers[0].ports[1]: overlapping port definition with spec.containers[0].ports[0]`,
+				`spec.containers[0].ports[1]: hostIP set without hostPort: {Name: HostPort:0 ContainerPort:80 Protocol:UDP HostIP:10.0.0.1}`,
 			},
 		},
 		{
-			name: "duplicate container ports without one host IP set and one with",
+			name: "duplicate container ports without one host IP set and two with",
 			template: &api.PodTemplateSpec{Spec: api.PodSpec{
 				Containers: []api.Container{{
 					Name: "foo",
 					Ports: []api.ContainerPort{
-						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP},
 						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP, HostIP: "10.0.0.1"},
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP},
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP, HostIP: "10.0.0.2"},
 					},
 				}},
 			}},
 			expected: []string{
-				`spec.containers[0].ports[1]: duplicate container port 80/UDP, conflicts with spec.containers[0]`,
+				`spec.containers[0].ports[1]: dangerously ambiguous port definition with spec.containers[0].ports[0]`,
+				`spec.containers[0].ports[2]: dangerously ambiguous port definition with spec.containers[0].ports[1]`,
 			},
 		},
 		{
@@ -833,7 +846,7 @@ func TestWarnings(t *testing.T) {
 				}},
 			}},
 			expected: []string{
-				`spec.containers[0].ports[1]: duplicate container port 80/UDP, conflicts with spec.containers[0]`,
+				`spec.containers[0].ports[1]: dangerously ambiguous port definition with spec.containers[0].ports[0]`,
 			},
 		},
 		{
@@ -852,7 +865,7 @@ func TestWarnings(t *testing.T) {
 				}},
 			}},
 			expected: []string{
-				`spec.containers[1].ports[0]: duplicate container port 80/UDP, conflicts with spec.containers[0]`,
+				`spec.containers[1].ports[0]: duplicate port definition with spec.containers[0].ports[0]`,
 			},
 		},
 		{
@@ -871,7 +884,7 @@ func TestWarnings(t *testing.T) {
 				}},
 			}},
 			expected: []string{
-				`spec.containers[1].ports[0]: duplicate container port 80/UDP, conflicts with spec.containers[0]`,
+				`spec.containers[1].ports[0]: duplicate port definition with spec.containers[0].ports[0]`,
 			},
 		},
 		{
@@ -890,7 +903,7 @@ func TestWarnings(t *testing.T) {
 				}},
 			}},
 			expected: []string{
-				`spec.containers[1].ports[0]: duplicate container port 80/UDP, conflicts with spec.containers[0]`,
+				`spec.containers[1].ports[0]: duplicate port definition with spec.containers[0].ports[0]`,
 			},
 		},
 		{
@@ -909,7 +922,8 @@ func TestWarnings(t *testing.T) {
 				}},
 			}},
 			expected: []string{
-				`spec.containers[1].ports[0]: duplicate container port 80/UDP, conflicts with spec.containers[0]`,
+				`spec.containers[1].ports[0]: overlapping port definition with spec.containers[0].ports[0]`,
+				`spec.containers[1].ports[0]: hostIP set without hostPort: {Name: HostPort:0 ContainerPort:80 Protocol:UDP HostIP:10.0.0.1}`,
 			},
 		},
 		{
@@ -928,7 +942,7 @@ func TestWarnings(t *testing.T) {
 				}},
 			}},
 			expected: []string{
-				`spec.containers[1].ports[0]: duplicate container port 80/UDP, conflicts with spec.containers[0]`,
+				`spec.containers[1].ports[0]: dangerously ambiguous port definition with spec.containers[0].ports[0]`,
 			},
 		},
 		{
@@ -947,7 +961,7 @@ func TestWarnings(t *testing.T) {
 				}},
 			}},
 			expected: []string{
-				`spec.containers[1].ports[0]: duplicate container port 80/UDP, conflicts with spec.containers[0]`,
+				`spec.containers[1].ports[0]: dangerously ambiguous port definition with spec.containers[0].ports[0]`,
 			},
 		},
 		{
@@ -971,9 +985,12 @@ func TestWarnings(t *testing.T) {
 					}},
 			}},
 			expected: []string{
-				`spec.containers[0].ports[2]: duplicate container port 80/UDP, conflicts with spec.containers[0]`,
-				`spec.containers[1].ports[0]: duplicate container port 80/UDP, conflicts with spec.containers[0]`,
-				`spec.containers[1].ports[1]: duplicate container port 80/UDP, conflicts with spec.containers[0]`,
+				`spec.containers[0].ports[2]: duplicate port definition with spec.containers[0].ports[0]`,
+				`spec.containers[1].ports[0]: duplicate port definition with spec.containers[0].ports[0]`,
+				`spec.containers[1].ports[0]: duplicate port definition with spec.containers[0].ports[2]`,
+				`spec.containers[1].ports[1]: duplicate port definition with spec.containers[0].ports[0]`,
+				`spec.containers[1].ports[1]: duplicate port definition with spec.containers[0].ports[2]`,
+				`spec.containers[1].ports[1]: duplicate port definition with spec.containers[1].ports[0]`,
 			},
 		},
 		{
@@ -1015,9 +1032,12 @@ func TestWarnings(t *testing.T) {
 					}},
 			}},
 			expected: []string{
-				`spec.containers[0].ports[2]: duplicate container port 80/TCP, conflicts with spec.containers[0]`,
-				`spec.containers[1].ports[0]: duplicate container port 80/TCP, conflicts with spec.containers[0]`,
-				`spec.containers[1].ports[1]: duplicate container port 80/TCP, conflicts with spec.containers[0]`,
+				`spec.containers[0].ports[2]: duplicate port definition with spec.containers[0].ports[0]`,
+				`spec.containers[1].ports[0]: duplicate port definition with spec.containers[0].ports[0]`,
+				`spec.containers[1].ports[0]: duplicate port definition with spec.containers[0].ports[2]`,
+				`spec.containers[1].ports[1]: duplicate port definition with spec.containers[0].ports[0]`,
+				`spec.containers[1].ports[1]: duplicate port definition with spec.containers[0].ports[2]`,
+				`spec.containers[1].ports[1]: duplicate port definition with spec.containers[1].ports[0]`,
 			},
 		},
 	}

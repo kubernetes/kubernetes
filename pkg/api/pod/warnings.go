@@ -255,30 +255,38 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 		return true
 	})
 
+	type portBlock struct {
+		field *field.Path
+		port  api.ContainerPort
+	}
+
 	// Accumulate ports across all containers
-	allPorts := map[string]portBlock{}
+	allPorts := map[string][]portBlock{}
 	pods.VisitContainersWithPath(podSpec, fieldPath.Child("spec"), func(c *api.Container, fldPath *field.Path) bool {
 		for i, port := range c.Ports {
-			k := fmt.Sprintf("%d/%s", port.ContainerPort, port.Protocol)
-			if other, found := allPorts[k]; found {
-				// Someone else has this protcol+port, but it still might not be a conflict.
-				conflict := false
-
-				// Exact matches are obvious.
-				if port.HostIP == other.port.HostIP && port.HostPort == other.port.HostPort {
-					conflict = true
-				}
-				// Unspecified fields are more subtle.
-				if port.HostPort == 0 || other.port.HostPort == 0 || port.HostIP == "" || other.port.HostIP == "" {
-					conflict = true
-				}
-				if conflict {
-					warnings = append(warnings, fmt.Sprintf("%s: duplicate container port %d/%s, conflicts with %s",
-						fldPath.Child("ports").Index(i), port.ContainerPort, port.Protocol, other.field))
-					continue
-				}
+			if port.HostIP != "" && port.HostPort == 0 {
+				warnings = append(warnings, fmt.Sprintf("%s: hostIP set without hostPort: %+v",
+					fldPath.Child("ports").Index(i), port))
 			}
-			allPorts[k] = portBlock{field: fldPath, port: port}
+			k := fmt.Sprintf("%d/%s", port.ContainerPort, port.Protocol)
+			if others, found := allPorts[k]; found {
+				// Someone else has this protcol+port, but it still might not be a conflict.
+				for _, other := range others {
+					if port.HostIP == other.port.HostIP && port.HostPort == other.port.HostPort {
+						// Exactly-equal is obvious. Validation should already filter for this except when these are unspecified.
+						warnings = append(warnings, fmt.Sprintf("%s: duplicate port definition with %s", fldPath.Child("ports").Index(i), other.field))
+					} else if port.HostPort == 0 || other.port.HostPort == 0 {
+						// HostPort = 0 is redundant with any other value, which is odd but not really dangerous.  HostIP doesn't matter here.
+						warnings = append(warnings, fmt.Sprintf("%s: overlapping port definition with %s", fldPath.Child("ports").Index(i), other.field))
+					} else if a, b := port.HostIP == "", other.port.HostIP == ""; port.HostPort == other.port.HostPort && ((a || b) && !(a && b)) {
+						// If the HostPorts are the same and either HostIP is not specified while the other is not, the behavior is undefined.
+						warnings = append(warnings, fmt.Sprintf("%s: dangerously ambiguous port definition with %s", fldPath.Child("ports").Index(i), other.field))
+					}
+				}
+				allPorts[k] = append(allPorts[k], portBlock{field: fldPath.Child("ports").Index(i), port: port})
+			} else {
+				allPorts[k] = []portBlock{{field: fldPath.Child("ports").Index(i), port: port}}
+			}
 		}
 		return true
 	})
@@ -300,11 +308,6 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 	}
 
 	return warnings
-}
-
-type portBlock struct {
-	field *field.Path
-	port  api.ContainerPort
 }
 
 func warningsForPodAffinityTerms(terms []api.PodAffinityTerm, fieldPath *field.Path) []string {
