@@ -224,6 +224,8 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 				return nil, fmt.Errorf("running with swap on is not supported, please disable swap! or set --fail-swap-on flag to false. /proc/swaps contained: %v", swapLines)
 			}
 		}
+	} else if !cgroups.IsCgroup2UnifiedMode() {
+		return nil, fmt.Errorf("failSwapOn is %v but running swap with cgroups v1 is not supported", failSwapOn)
 	}
 
 	var internalCapacity = v1.ResourceList{}
