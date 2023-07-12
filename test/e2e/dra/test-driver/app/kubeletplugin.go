@@ -28,7 +28,8 @@ import (
 
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/klog/v2"
-	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1alpha2"
+	drapbv1alpha2 "k8s.io/kubelet/pkg/apis/dra/v1alpha2"
+	drapbv1alpha3 "k8s.io/kubelet/pkg/apis/dra/v1alpha3"
 )
 
 type ExamplePlugin struct {
@@ -69,7 +70,7 @@ type ClaimID struct {
 	UID  string
 }
 
-var _ drapbv1.NodeServer = &ExamplePlugin{}
+var _ drapbv1alpha2.NodeServer = &ExamplePlugin{}
 
 // getJSONFilePath returns the absolute path where CDI file is/should be.
 func (ex *ExamplePlugin) getJSONFilePath(claimUID string) string {
@@ -147,7 +148,7 @@ func (ex *ExamplePlugin) Block() {
 // a deterministic name to simplify NodeUnprepareResource (no need to remember
 // or discover the name) and idempotency (when called again, the file simply
 // gets written again).
-func (ex *ExamplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1.NodePrepareResourceRequest) (*drapbv1.NodePrepareResourceResponse, error) {
+func (ex *ExamplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1alpha2.NodePrepareResourceRequest) (*drapbv1alpha2.NodePrepareResourceResponse, error) {
 	logger := klog.FromContext(ctx)
 
 	// Block to emulate plugin stuckness or slowness.
@@ -201,7 +202,7 @@ func (ex *ExamplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1.N
 	}
 
 	dev := vendor + "/" + class + "=" + deviceName
-	resp := &drapbv1.NodePrepareResourceResponse{CdiDevices: []string{dev}}
+	resp := &drapbv1alpha2.NodePrepareResourceResponse{CdiDevices: []string{dev}}
 
 	ex.mutex.Lock()
 	defer ex.mutex.Unlock()
@@ -211,10 +212,34 @@ func (ex *ExamplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1.N
 	return resp, nil
 }
 
+func (ex *ExamplePlugin) NodePrepareResources(ctx context.Context, req *drapbv1alpha3.NodePrepareResourcesRequest) (*drapbv1alpha3.NodePrepareResourcesResponse, error) {
+	resp := &drapbv1alpha3.NodePrepareResourcesResponse{
+		Claims: make(map[string]*drapbv1alpha3.NodePrepareResourceResponse),
+	}
+	for _, claimReq := range req.Claims {
+		claimResp, err := ex.NodePrepareResource(ctx, &drapbv1alpha2.NodePrepareResourceRequest{
+			Namespace:      claimReq.Namespace,
+			ClaimName:      claimReq.Name,
+			ClaimUid:       claimReq.Uid,
+			ResourceHandle: claimReq.ResourceHandle,
+		})
+		if err != nil {
+			resp.Claims[claimReq.Uid] = &drapbv1alpha3.NodePrepareResourceResponse{
+				Error: err.Error(),
+			}
+		} else {
+			resp.Claims[claimReq.Uid] = &drapbv1alpha3.NodePrepareResourceResponse{
+				CDIDevices: claimResp.CdiDevices,
+			}
+		}
+	}
+	return resp, nil
+}
+
 // NodeUnprepareResource removes the CDI file created by
 // NodePrepareResource. It's idempotent, therefore it is not an error when that
 // file is already gone.
-func (ex *ExamplePlugin) NodeUnprepareResource(ctx context.Context, req *drapbv1.NodeUnprepareResourceRequest) (*drapbv1.NodeUnprepareResourceResponse, error) {
+func (ex *ExamplePlugin) NodeUnprepareResource(ctx context.Context, req *drapbv1alpha2.NodeUnprepareResourceRequest) (*drapbv1alpha2.NodeUnprepareResourceResponse, error) {
 	logger := klog.FromContext(ctx)
 
 	// Block to emulate plugin stuckness or slowness.
@@ -234,7 +259,29 @@ func (ex *ExamplePlugin) NodeUnprepareResource(ctx context.Context, req *drapbv1
 	defer ex.mutex.Unlock()
 	delete(ex.prepared, ClaimID{Name: req.ClaimName, UID: req.ClaimUid})
 
-	return &drapbv1.NodeUnprepareResourceResponse{}, nil
+	return &drapbv1alpha2.NodeUnprepareResourceResponse{}, nil
+}
+
+func (ex *ExamplePlugin) NodeUnprepareResources(ctx context.Context, req *drapbv1alpha3.NodeUnprepareResourcesRequest) (*drapbv1alpha3.NodeUnprepareResourcesResponse, error) {
+	resp := &drapbv1alpha3.NodeUnprepareResourcesResponse{
+		Claims: make(map[string]*drapbv1alpha3.NodeUnprepareResourceResponse),
+	}
+	for _, claimReq := range req.Claims {
+		_, err := ex.NodeUnprepareResource(ctx, &drapbv1alpha2.NodeUnprepareResourceRequest{
+			Namespace:      claimReq.Namespace,
+			ClaimName:      claimReq.Name,
+			ClaimUid:       claimReq.Uid,
+			ResourceHandle: claimReq.ResourceHandle,
+		})
+		if err != nil {
+			resp.Claims[claimReq.Uid] = &drapbv1alpha3.NodeUnprepareResourceResponse{
+				Error: err.Error(),
+			}
+		} else {
+			resp.Claims[claimReq.Uid] = &drapbv1alpha3.NodeUnprepareResourceResponse{}
+		}
+	}
+	return resp, nil
 }
 
 func (ex *ExamplePlugin) GetPreparedResources() []ClaimID {
