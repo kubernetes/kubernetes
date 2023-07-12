@@ -47,6 +47,11 @@ func TestConditionalProgressRequester(t *testing.T) {
 	var wantRequestsSent int32
 	var requestsSent int32
 
+	logger.Info("Wait for ticker to be created")
+	for !clock.HasWaiters() {
+		time.Sleep(pollPeriod)
+	}
+
 	logger.Info("No progress requests if no-one is waiting")
 	clock.Step(progressRequestPeriod * 2)
 
@@ -54,11 +59,20 @@ func TestConditionalProgressRequester(t *testing.T) {
 		requestsSent = pr.progressRequestsSentCount.Load()
 		return requestsSent == wantRequestsSent
 	}); err != nil {
-		t.Errorf("Failed to wait progress requests, err: %s, want: %d , got %d", err, wantRequestsSent, requestsSent)
+		t.Fatalf("Failed to wait progress requests, err: %s, want: %d , got %d", err, wantRequestsSent, requestsSent)
 	}
 
-	logger.Info("Adding allows progress request to be sent every period")
+	logger.Info("Adding waiters allows progress request to be sent")
 	pr.Add()
+	wantRequestsSent++
+	if err := pollConditionNoChange(pollPeriod, minimalNoChange, pollTimeout, func() bool {
+		requestsSent = pr.progressRequestsSentCount.Load()
+		return requestsSent == wantRequestsSent
+	}); err != nil {
+		t.Fatalf("Failed to wait progress requests, err: %s, want: %d , got %d", err, wantRequestsSent, requestsSent)
+	}
+
+	logger.Info("Periodically request progress to be sent every period")
 	for wantRequestsSent < 10 {
 		clock.Step(progressRequestPeriod)
 		wantRequestsSent++
@@ -67,7 +81,7 @@ func TestConditionalProgressRequester(t *testing.T) {
 			requestsSent = pr.progressRequestsSentCount.Load()
 			return requestsSent == wantRequestsSent
 		}); err != nil {
-			t.Errorf("Failed to wait progress requests, err: %s, want: %d , got %d", err, wantRequestsSent, requestsSent)
+			t.Fatalf("Failed to wait progress requests, err: %s, want: %d , got %d", err, wantRequestsSent, requestsSent)
 		}
 	}
 	pr.Remove()
@@ -78,7 +92,7 @@ func TestConditionalProgressRequester(t *testing.T) {
 		requestsSent = pr.progressRequestsSentCount.Load()
 		return requestsSent == wantRequestsSent
 	}); err != nil {
-		t.Errorf("Failed to wait progress requests, err: %s, want: %d , got %d", err, wantRequestsSent, requestsSent)
+		t.Fatalf("Failed to wait progress requests, err: %s, want: %d , got %d", err, wantRequestsSent, requestsSent)
 	}
 
 	logger.Info("No progress after stopping")
@@ -87,7 +101,7 @@ func TestConditionalProgressRequester(t *testing.T) {
 		requestsSent = pr.progressRequestsSentCount.Load()
 		return requestsSent == wantRequestsSent
 	}); err != nil {
-		t.Errorf("Failed to wait progress requests, err: %s, want: %d , got %d", err, wantRequestsSent, requestsSent)
+		t.Fatalf("Failed to wait progress requests, err: %s, want: %d , got %d", err, wantRequestsSent, requestsSent)
 	}
 	pr.Add()
 	clock.Step(progressRequestPeriod * 2)
@@ -95,7 +109,7 @@ func TestConditionalProgressRequester(t *testing.T) {
 		requestsSent = pr.progressRequestsSentCount.Load()
 		return requestsSent == wantRequestsSent
 	}); err != nil {
-		t.Errorf("Failed to wait progress requests, err: %s, want: %d , got %d", err, wantRequestsSent, requestsSent)
+		t.Fatalf("Failed to wait progress requests, err: %s, want: %d , got %d", err, wantRequestsSent, requestsSent)
 	}
 }
 
