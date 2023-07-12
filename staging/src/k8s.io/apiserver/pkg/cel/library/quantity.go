@@ -65,7 +65,7 @@ import (
 //
 // Conversion to Scalars:
 //
-//   - isInteger: returns true iff asInteger is safe to call without an error
+//   - isInteger: returns true if and only if asInteger is safe to call without an error
 //
 //   - asInteger: returns a representation of the current value as an int64 if
 //     possible or results in an error if conversion would result in overflow
@@ -112,9 +112,9 @@ import (
 //
 // Comparisons
 //
-//   - isGreaterThan: Returns true iff the receiver is greater than the operand
+//   - isGreaterThan: Returns true if and only if the receiver is greater than the operand
 //
-//   - isLessThan: Returns true iff the receiver is less than the operand
+//   - isLessThan: Returns true if and only if the receiver is less than the operand
 //
 //   - compareTo: Compares receiver to operand and returns 0 if they are equal, 1 if the receiver is greater, or -1 if the receiver is less than the operand
 //
