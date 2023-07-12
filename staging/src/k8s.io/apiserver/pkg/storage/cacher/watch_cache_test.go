@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -118,10 +119,9 @@ func newTestWatchCache(capacity int, indexers *cache.Indexers) *testWatchCache {
 	wc := &testWatchCache{}
 	wc.bookmarkRevision = make(chan int64, 1)
 	wc.stopCh = make(chan struct{})
-	clock := testingclock.NewFakeClock(time.Now())
-	pr := newConditionalProgressRequester(wc.RequestWatchProgress, clock)
+	pr := newConditionalProgressRequester(wc.RequestWatchProgress, &immediateTickerFactory{})
 	go pr.Run(wc.stopCh)
-	wc.watchCache = newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, clock, schema.GroupResource{Resource: "pods"}, pr)
+	wc.watchCache = newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, testingclock.NewFakeClock(time.Now()), schema.GroupResource{Resource: "pods"}, pr)
 	// To preserve behavior of tests that assume a given capacity,
 	// resize it to th expected size.
 	wc.capacity = capacity
@@ -130,6 +130,34 @@ func newTestWatchCache(capacity int, indexers *cache.Indexers) *testWatchCache {
 	wc.upperBoundCapacity = max(capacity, defaultUpperBoundCapacity)
 
 	return wc
+}
+
+type immediateTickerFactory struct{}
+
+func (t *immediateTickerFactory) NewTicker(d time.Duration) clock.Ticker {
+	return &immediateTicker{stopCh: make(chan struct{})}
+}
+
+type immediateTicker struct {
+	stopCh chan struct{}
+}
+
+func (t *immediateTicker) C() <-chan time.Time {
+	ch := make(chan time.Time)
+	go func() {
+		for {
+			select {
+			case ch <- time.Now():
+			case <-t.stopCh:
+				return
+			}
+		}
+	}()
+	return ch
+}
+
+func (t *immediateTicker) Stop() {
+	close(t.stopCh)
 }
 
 func (w *testWatchCache) RequestWatchProgress(ctx context.Context) error {

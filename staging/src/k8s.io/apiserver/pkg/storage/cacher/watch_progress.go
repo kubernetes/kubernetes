@@ -34,7 +34,7 @@ const (
 	progressRequestPeriod = 100 * time.Millisecond
 )
 
-func newConditionalProgressRequester(requestWatchProgress WatchProgressRequester, clock clock.WithTicker) *conditionalProgressRequester {
+func newConditionalProgressRequester(requestWatchProgress WatchProgressRequester, clock TickerFactory) *conditionalProgressRequester {
 	pr := &conditionalProgressRequester{
 		clock:                clock,
 		requestWatchProgress: requestWatchProgress,
@@ -45,10 +45,14 @@ func newConditionalProgressRequester(requestWatchProgress WatchProgressRequester
 
 type WatchProgressRequester func(ctx context.Context) error
 
+type TickerFactory interface {
+	NewTicker(time.Duration) clock.Ticker
+}
+
 // conditionalProgressRequester will request progress notification if there
 // is a request waiting for watch cache to be fresh.
 type conditionalProgressRequester struct {
-	clock                clock.WithTicker
+	clock                TickerFactory
 	requestWatchProgress WatchProgressRequester
 
 	mux     sync.RWMutex
