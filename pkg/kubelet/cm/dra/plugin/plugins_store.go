@@ -18,8 +18,10 @@ package plugin
 
 import (
 	"context"
+	"errors"
 	"net"
 	"sync"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
@@ -37,12 +39,16 @@ type Plugin struct {
 	highestSupportedVersion *utilversion.Version
 }
 
-func (p *Plugin) CreateGRPCConn() error {
-	network := "unix"
-	klog.V(4).InfoS(log("creating new gRPC connection"), "protocol", network, "endpoint", p.endpoint)
-
+func (p *Plugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
 	p.Lock()
 	defer p.Unlock()
+
+	if p.conn != nil {
+		return p.conn, nil
+	}
+
+	network := "unix"
+	klog.V(4).InfoS(log("creating new gRPC connection"), "protocol", network, "endpoint", p.endpoint)
 	conn, err := grpc.Dial(
 		p.endpoint,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -51,23 +57,18 @@ func (p *Plugin) CreateGRPCConn() error {
 		}),
 	)
 	if err != nil {
-		return err
+		return nil, err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	if ok := conn.WaitForStateChange(ctx, connectivity.Connecting); !ok {
+		return nil, errors.New("timed out waiting for gRPC connection to be ready")
 	}
 
 	p.conn = conn
-	return nil
-}
-
-func (p *Plugin) GetGRPCConn() *grpc.ClientConn {
-	p.RLock()
-	defer p.RUnlock()
-	return p.conn
-}
-
-func (p *Plugin) IsConnReady() bool {
-	p.RLock()
-	defer p.RUnlock()
-	return p.conn != nil && p.conn.GetState() == connectivity.Ready
+	return p.conn, nil
 }
 
 // PluginsStore holds a list of DRA Plugins.

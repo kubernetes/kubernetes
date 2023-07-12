@@ -63,7 +63,7 @@ func (r *draPluginClient) NodePrepareResources(
 	logger.V(4).Info(log("calling NodePrepareResources rpc"), "request", req)
 	defer logger.V(4).Info(log("done calling NodePrepareResources rpc"), "response", resp, "err", err)
 
-	conn, err := r.plugin.GetOrCreateGRPCConn()
+	conn, err := r.plugin.getOrCreateGRPCConn()
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +113,7 @@ func (r *draPluginClient) NodeUnprepareResources(
 	logger.V(4).Info(log("calling NodeUnprepareResource rpc"), "request", req)
 	defer logger.V(4).Info(log("done calling NodeUnprepareResources rpc"), "response", resp, "err", err)
 
-	conn, err := r.plugin.GetOrCreateGRPCConn()
+	conn, err := r.plugin.getOrCreateGRPCConn()
 	if err != nil {
 		return nil, err
 	}
