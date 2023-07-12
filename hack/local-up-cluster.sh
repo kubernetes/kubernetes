@@ -1062,8 +1062,13 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
   fi
   cat <<EOF
 
+  Set your kubectl to use this KUBECONFIG.
   export KUBECONFIG=${CERT_DIR}/admin.kubeconfig
-  cluster/kubectl.sh
+  You then should be able to use your kubectl cli to point
+  to the development kubernetes cluster.
+
+cluster/kubectl.sh is deprecated but will leave the following guide 
+in case it is necessary to use.
 
 Alternatively, you can write to the default kubeconfig:
 
