@@ -17,20 +17,22 @@ limitations under the License.
 package library_test
 
 import (
-	"reflect"
 	"regexp"
 	"testing"
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common"
 	"github.com/google/cel-go/common/types"
+	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/ext"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
+	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/library"
 )
 
-func testQuantity(t *testing.T, expr string, expectResult any, expectRuntimeErrPattern string, expectCompileErrs []string) {
+func testQuantity(t *testing.T, expr string, expectResult ref.Val, expectRuntimeErrPattern string, expectCompileErrs []string) {
 	env, err := cel.NewEnv(
 		ext.Strings(),
 		library.URLs(),
@@ -95,28 +97,31 @@ func testQuantity(t *testing.T, expr string, expectResult any, expectRuntimeErrP
 		}
 	} else if err != nil {
 		t.Fatalf("%v", err)
+	} else if expectResult != nil {
+		converted := res.Equal(expectResult).Value().(bool)
+		require.True(t, converted, "expectation not equal to output")
+	} else {
+		t.Fatal("expected result must not be nil")
 	}
 
-	if expectResult != nil {
-		converted, err := res.ConvertToNative(reflect.TypeOf(expectResult))
-		if err != nil {
-			t.Fatalf("cannot convert evaluation result to expected result type %T", expectResult)
-		}
-		require.Equal(t, expectResult, converted, "expected result")
-	}
 }
 
 func TestQuantity(t *testing.T) {
+	twelveMi := resource.MustParse("12Mi")
+	trueVal := types.Bool(true)
+	falseVal := types.Bool(false)
+
 	cases := []struct {
 		name               string
 		expr               string
-		expectValue        interface{}
+		expectValue        ref.Val
 		expectedCompileErr []string
 		expectedRuntimeErr string
 	}{
 		{
-			name: "parse",
-			expr: `quantity("12Mi")`,
+			name:        "parse",
+			expr:        `quantity("12Mi")`,
+			expectValue: apiservercel.Quantity{Quantity: &twelveMi},
 		},
 		{
 			name:               "parseInvalidSuffix",
@@ -133,26 +138,26 @@ func TestQuantity(t *testing.T) {
 		{
 			name:        "isQuantity",
 			expr:        `isQuantity("20")`,
-			expectValue: true,
+			expectValue: trueVal,
 		},
 		{
 			name:        "isQuantity_megabytes",
 			expr:        `isQuantity("20M")`,
-			expectValue: true},
+			expectValue: trueVal},
 		{
 			name:        "isQuantity_mebibytes",
 			expr:        `isQuantity("20Mi")`,
-			expectValue: true,
+			expectValue: trueVal,
 		},
 		{
 			name:        "isQuantity_invalidSuffix",
 			expr:        `isQuantity("20Mo")`,
-			expectValue: false,
+			expectValue: falseVal,
 		},
 		{
 			name:        "isQuantity_passingRegex",
 			expr:        `isQuantity("10Mm")`,
-			expectValue: false,
+			expectValue: falseVal,
 		},
 		{
 			name:               "isQuantity_noOverload",
@@ -162,94 +167,102 @@ func TestQuantity(t *testing.T) {
 		{
 			name:        "equality_reflexivity",
 			expr:        `quantity("200M") == quantity("200M")`,
-			expectValue: true,
+			expectValue: trueVal,
 		},
 		{
 			name:        "equality_symmetry",
 			expr:        `quantity("200M") == quantity("0.2G") && quantity("0.2G") == quantity("200M")`,
-			expectValue: true,
+			expectValue: trueVal,
 		},
 		{
 			name:        "equality_transitivity",
 			expr:        `quantity("2M") == quantity("0.002G") && quantity("2000k") == quantity("2M") && quantity("0.002G") == quantity("2000k")`,
-			expectValue: true,
+			expectValue: trueVal,
 		},
 		{
 			name:        "inequality",
 			expr:        `quantity("200M") == quantity("0.3G")`,
-			expectValue: false,
+			expectValue: falseVal,
 		},
 		{
-			name: "quantity_less",
-			expr: `quantity("50M").isLessThan(quantity("50Mi"))`,
+			name:        "quantity_less",
+			expr:        `quantity("50M").isLessThan(quantity("50Mi"))`,
+			expectValue: trueVal,
 		},
 		{
-			name: "quantity_less_obvious",
-			expr: `quantity("50M").isLessThan(quantity("100M"))`,
+			name:        "quantity_less_obvious",
+			expr:        `quantity("50M").isLessThan(quantity("100M"))`,
+			expectValue: trueVal,
 		},
 		{
 			name:        "quantity_less_false",
 			expr:        `quantity("100M").isLessThan(quantity("50M"))`,
-			expectValue: false,
+			expectValue: falseVal,
 		},
 		{
-			name: "quantity_greater",
-			expr: `quantity("50Mi").isGreaterThan(quantity("50M"))`,
+			name:        "quantity_greater",
+			expr:        `quantity("50Mi").isGreaterThan(quantity("50M"))`,
+			expectValue: trueVal,
 		},
 		{
-			name: "quantity_greater_obvious",
-			expr: `quantity("50Mi").isGreaterThan(quantity("100Mi"))`,
+			name:        "quantity_greater_obvious",
+			expr:        `quantity("150Mi").isGreaterThan(quantity("100Mi"))`,
+			expectValue: trueVal,
 		},
 		{
 			name:        "quantity_greater_false",
 			expr:        `quantity("50M").isGreaterThan(quantity("100M"))`,
-			expectValue: false,
+			expectValue: falseVal,
 		},
 		{
 			name:        "compare_equal",
 			expr:        `quantity("200M").compareTo(quantity("0.2G"))`,
-			expectValue: 0,
+			expectValue: types.Int(0),
 		},
 		{
 			name:        "compare_less",
 			expr:        `quantity("50M").compareTo(quantity("50Mi"))`,
-			expectValue: -1,
+			expectValue: types.Int(-1),
 		},
 		{
 			name:        "compare_greater",
 			expr:        `quantity("50Mi").compareTo(quantity("50M"))`,
-			expectValue: 1,
+			expectValue: types.Int(1),
 		},
 		{
-			name: "add_quantity",
-			expr: `quantity("50k").add(quantity("20")) == quantity("50.02k")`,
+			name:        "add_quantity",
+			expr:        `quantity("50k").add(quantity("20")) == quantity("50.02k")`,
+			expectValue: trueVal,
 		},
 		{
-			name: "add_int",
-			expr: `quantity("50k").add(20).isLessThan(quantity("50020"))`,
+			name:        "add_int",
+			expr:        `quantity("50k").add(20).isLessThan(quantity("50020"))`,
+			expectValue: falseVal,
 		},
 		{
-			name: "sub_quantity",
-			expr: `quantity("50k").sub(quantity("20")) == quantity("49.98k")`,
+			name:        "sub_quantity",
+			expr:        `quantity("50k").sub(quantity("20")) == quantity("49.98k")`,
+			expectValue: trueVal,
 		},
 		{
-			name: "sub_int",
-			expr: `quantity("50k").sub(20) == quantity("49980")`,
+			name:        "sub_int",
+			expr:        `quantity("50k").sub(20) == quantity("49980")`,
+			expectValue: trueVal,
 		},
 		{
 			name:        "arith_chain_1",
 			expr:        `quantity("50k").add(20).sub(quantity("100k")).asInteger()`,
-			expectValue: -49980,
+			expectValue: types.Int(-49980),
 		},
 		{
 			name:        "arith_chain",
 			expr:        `quantity("50k").add(20).sub(quantity("100k")).sub(-50000).asInteger()`,
-			expectValue: 20,
+			expectValue: types.Int(20),
 		},
 		{
 			name:        "as_integer",
 			expr:        `quantity("50k").asInteger()`,
-			expectValue: 50000,
+			expectValue: types.Int(50000),
 		},
 		{
 			name:               "as_integer_error",
@@ -259,7 +272,7 @@ func TestQuantity(t *testing.T) {
 		{
 			name:        "is_integer",
 			expr:        `quantity("9999999999999999999999999999999999999G").isInteger()`,
-			expectValue: false,
+			expectValue: falseVal,
 		},
 		{
 			name:        "as_float",
