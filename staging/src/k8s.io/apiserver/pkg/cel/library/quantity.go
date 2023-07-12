@@ -1,6 +1,8 @@
 package library
 
 import (
+	"errors"
+
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
@@ -146,6 +148,9 @@ var quantityLibraryDecls = map[string][]cel.FunctionOpt{
 	"asInteger": {
 		cel.MemberOverload("quantity_get_int", []*cel.Type{apiservercel.QuantityType}, cel.IntType, cel.UnaryBinding(quantityGetValue)),
 	},
+	"isInteger": {
+		cel.MemberOverload("quantity_is_integer", []*cel.Type{apiservercel.QuantityType}, cel.IntType, cel.UnaryBinding(quantityCanValue)),
+	},
 	"add": {
 		cel.MemberOverload("quantity_add", []*cel.Type{apiservercel.QuantityType, apiservercel.QuantityType}, apiservercel.QuantityType, cel.BinaryBinding(quantityAdd)),
 		cel.MemberOverload("quantity_add_int", []*cel.Type{apiservercel.QuantityType, cel.IntType}, apiservercel.QuantityType, cel.BinaryBinding(quantityAddInt)),
@@ -204,12 +209,25 @@ func quantityGetApproximateFloat(arg ref.Val) ref.Val {
 	return types.Double(q.AsApproximateFloat64())
 }
 
+func quantityCanValue(arg ref.Val) ref.Val {
+	q, ok := arg.Value().(*resource.Quantity)
+	if !ok {
+		return types.MaybeNoSuchOverloadErr(arg)
+	}
+	_, success := q.AsInt64()
+	return types.Bool(success)
+}
+
 func quantityGetValue(arg ref.Val) ref.Val {
 	q, ok := arg.Value().(*resource.Quantity)
 	if !ok {
 		return types.MaybeNoSuchOverloadErr(arg)
 	}
-	return types.Int(q.Value())
+	v, success := q.AsInt64()
+	if !success {
+		return types.WrapErr(errors.New("cannot convert value to integer"))
+	}
+	return types.Int(v)
 }
 
 func quantityGetSign(arg ref.Val) ref.Val {
