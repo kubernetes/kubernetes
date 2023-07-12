@@ -208,6 +208,13 @@ const (
 	//
 	// Allow the API server to stream individual items instead of chunking
 	WatchList featuregate.Feature = "WatchList"
+
+	// owner: @serathius
+	// kep: http://kep.k8s.io/2340
+	// alpha: v1.28
+	//
+	// Allow the API server to serve consistent lists from cache
+	ConsistentListFromCache featuregate.Feature = "ConsistentListFromCache"
 )
 
 func init() {
@@ -264,4 +271,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	InPlacePodVerticalScaling: {Default: false, PreRelease: featuregate.Alpha},
 
 	WatchList: {Default: false, PreRelease: featuregate.Alpha},
+
+	ConsistentListFromCache: {Default: false, PreRelease: featuregate.Alpha},
 }

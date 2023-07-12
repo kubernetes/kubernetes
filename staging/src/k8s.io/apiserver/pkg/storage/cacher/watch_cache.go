@@ -30,8 +30,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
@@ -412,6 +414,7 @@ func (w *watchCache) UpdateResourceVersion(resourceVersion string) {
 		w.Lock()
 		defer w.Unlock()
 		w.resourceVersion = rv
+		w.cond.Broadcast()
 	}()
 
 	// Avoid calling event handler under lock.
@@ -490,7 +493,14 @@ func (s sortableStoreElements) Swap(i, j int) {
 // WaitUntilFreshAndList returns list of pointers to `storeElement` objects along
 // with their ResourceVersion and the name of the index, if any, that was used.
 func (w *watchCache) WaitUntilFreshAndList(ctx context.Context, resourceVersion uint64, matchValues []storage.MatchValue) ([]interface{}, uint64, string, error) {
-	err := w.waitUntilFreshAndBlock(ctx, resourceVersion)
+	var err error
+	if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) && w.notFresh(resourceVersion) {
+		w.waitingUntilFresh.Add()
+		err = w.waitUntilFreshAndBlock(ctx, resourceVersion)
+		w.waitingUntilFresh.Remove()
+	} else {
+		err = w.waitUntilFreshAndBlock(ctx, resourceVersion)
+	}
 	defer w.RUnlock()
 	if err != nil {
 		return nil, 0, "", err
@@ -511,6 +521,12 @@ func (w *watchCache) WaitUntilFreshAndList(ctx context.Context, resourceVersion 
 
 	sort.Sort(sortableStoreElements(result))
 	return result, rv, index, err
+}
+
+func (w *watchCache) notFresh(resourceVersion uint64) bool {
+	w.RLock()
+	defer w.RUnlock()
+	return resourceVersion > w.resourceVersion
 }
 
 // WaitUntilFreshAndGet returns a pointers to <storeElement> object.

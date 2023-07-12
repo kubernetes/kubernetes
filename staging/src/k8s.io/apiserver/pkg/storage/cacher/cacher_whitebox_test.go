@@ -162,8 +162,7 @@ func TestGetListCacheBypass(t *testing.T) {
 		opts         storage.ListOptions
 		expectBypass bool
 	}
-	testCases := []testCase{
-		{opts: storage.ListOptions{ResourceVersion: ""}, expectBypass: true},
+	commonTestCases := []testCase{
 		{opts: storage.ListOptions{ResourceVersion: "0"}, expectBypass: false},
 		{opts: storage.ListOptions{ResourceVersion: "1"}, expectBypass: false},
 
@@ -180,9 +179,25 @@ func TestGetListCacheBypass(t *testing.T) {
 		{opts: storage.ListOptions{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchExact}, expectBypass: true},
 	}
 
-	for _, tc := range testCases {
-		testGetListCacheBypass(t, tc.opts, tc.expectBypass)
-	}
+	t.Run("ConsistentListFromStorage", func(t *testing.T) {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)()
+		testCases := append(commonTestCases,
+			testCase{opts: storage.ListOptions{ResourceVersion: ""}, expectBypass: true},
+		)
+		for _, tc := range testCases {
+			testGetListCacheBypass(t, tc.opts, tc.expectBypass)
+		}
+
+	})
+	t.Run("ConsistentListFromCache", func(t *testing.T) {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)()
+		testCases := append(commonTestCases,
+			testCase{opts: storage.ListOptions{ResourceVersion: ""}, expectBypass: false},
+		)
+		for _, tc := range testCases {
+			testGetListCacheBypass(t, tc.opts, tc.expectBypass)
+		}
+	})
 }
 
 func testGetListCacheBypass(t *testing.T, options storage.ListOptions, expectBypass bool) {
@@ -200,7 +215,23 @@ func testGetListCacheBypass(t *testing.T, options storage.ListOptions, expectByp
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 	// Inject error to underlying layer and check if cacher is not bypassed.
-	backingStorage.injectError(errDummy)
+	backingStorage.getListFn = func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+		currentResourceVersion := "42"
+		switch {
+		// request made by getCurrentResourceVersionFromStorage by checking Limit
+		case key == cacher.resourcePrefix:
+			podList := listObj.(*example.PodList)
+			podList.ResourceVersion = currentResourceVersion
+			return nil
+		// request made by storage.GetList with revision from original request or
+		// returned by getCurrentResourceVersionFromStorage
+		case opts.ResourceVersion == options.ResourceVersion || opts.ResourceVersion == currentResourceVersion:
+			return errDummy
+		default:
+			t.Fatalf("Unexpected request %+v", opts)
+			return nil
+		}
+	}
 	err = cacher.GetList(context.TODO(), "pods/ns", options, result)
 	if err != nil && err != errDummy {
 		t.Fatalf("Unexpected error for List request with options: %v, err: %v", options, err)
