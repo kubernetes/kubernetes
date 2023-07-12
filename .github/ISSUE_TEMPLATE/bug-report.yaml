@@ -5,24 +5,23 @@ body:
   - type: textarea
     id: problem
     attributes:
-      label: What happened?
+      label: 7 high vulnerabilities flagged this csi sidecar image  "external-attacher:v4.3.0"
       description: |
-        Please provide as much info as possible. Not doing so may result in your bug not being addressed in a timely manner.
-        If this matter is security related, please disclose it privately via https://kubernetes.io/security
+          7 high severity CVEs, which are listed in the prisma cloud's container image scan report and they were just released along with CSI powerflex version 2.7.0. Are there any solutions for these vulnerabilities flagged against  "external-attacher:v4.3.0" sidecar image ?  If anyone encounters these vulnerabilities , Please provide advice on how to address these vulnerabilities
     validations:
       required: true
 
   - type: textarea
     id: expected
     attributes:
-      label: What did you expect to happen?
+      label: Please provide advice on how to address these vulnerabilities flagged for external-attacher:v4.3.0 CVE-2023-29400 ,CVE-2023-29405,CVE-2023-24540,CVE-2023-29404,CVE-2023-24539,CVE-2023-29403,CVE-2023-29402
     validations:
       required: true
 
   - type: textarea
     id: repro
     attributes:
-      label: How can we reproduce it (as minimally and precisely as possible)?
+      label: would like to know how to remediate these CVEs CVE-2023-29400 ,CVE-2023-29405,CVE-2023-24540,CVE-2023-29404,CVE-2023-24539,CVE-2023-29403,CVE-2023-29402
     validations:
       required: true
 
@@ -40,10 +39,14 @@ body:
 
         ```console
         $ kubectl version
-        # paste output here
-        ```
+        WARNING: This version information is deprecated and will be replaced with the output from kubectl version --short.  Use --output=yaml|json to get the full version.
+        Client Version: version.Info{Major:"1", Minor:"27", GitVersion:"v1.27.0", GitCommit:"1b4df30b3cdfeaba6024e81e559a6cd09a089d65", GitTreeState:"clean", BuildDate:"2023-04-11T17:04:23Z", GoVersion:"go1.20.3", Compiler:"gc", Platform:"darwin/amd64"}
+         Kustomize Version: v5.0.1
+         Server Version: version.Info{Major:"1", Minor:"24+", GitVersion:"v1.24.6-mirantis-1", GitCommit:"2fe0af94e03afce4b799db63fd34271f97e4f9e9", GitTreeState:"clean", BuildDate:"2022-09-22T00:34:29Z", GoVersion:"go1.18.6", Compiler:"gc", Platform:"linux/amd64"}
+         WARNING: version difference between client (1.27) and server (1.24) exceeds the supported minor version skew of +/-1
+         ```
 
-        </details>
+      
     validations:
       required: true
 
@@ -52,9 +55,7 @@ body:
     attributes:
       label: Cloud provider
       value: |
-        <details>
-
-        </details>
+        its on perm K8 infra.
     validations:
       required: true
 
