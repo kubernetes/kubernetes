@@ -115,7 +115,7 @@ type ActualStateOfWorld interface {
 	// the specified node reflecting which volumes are/or might be attached to that node
 	// based on the current actual state of the world. This function is currently used by
 	// attach_detach_controller to process VolumeInUse
-	GetAttachedVolumesForNode(nodeName types.NodeName) []AttachedVolume
+	GetAttachedVolumesForNode(nodeName types.NodeName) map[v1.UniqueVolumeName]AttachedVolume
 
 	// GetAttachedVolumesPerNode generates and returns a map of nodes and volumes that added to
 	// the specified node reflecting which volumes are attached to that node
@@ -192,6 +192,7 @@ func NewActualStateOfWorld(volumePluginMgr *volume.VolumePluginMgr) ActualStateO
 	return &actualStateOfWorld{
 		attachedVolumes:        make(map[v1.UniqueVolumeName]attachedVolume),
 		nodesToUpdateStatusFor: make(map[types.NodeName]nodeToUpdateStatusFor),
+		nodesAttachedVolumes:   make(map[types.NodeName]map[v1.UniqueVolumeName]AttachedVolume),
 		volumePluginMgr:        volumePluginMgr,
 	}
 }
@@ -208,6 +209,11 @@ type actualStateOfWorld struct {
 	// of the node and the value is an object containing more information about
 	// the node (including the list of volumes to report attached).
 	nodesToUpdateStatusFor map[types.NodeName]nodeToUpdateStatusFor
+
+	// nodesAttachedVolumes is map containing the set for volumes for each node and
+	// in sync with attachedVolumes. The key in this map is the name of the node
+	// and the value is all volumes the node have attached.
+	nodesAttachedVolumes map[types.NodeName]map[v1.UniqueVolumeName]AttachedVolume
 
 	// volumePluginMgr is the volume plugin manager used to create volume
 	// plugin objects.
@@ -385,6 +391,14 @@ func (asw *actualStateOfWorld) AddVolumeNode(
 	if isAttached {
 		asw.addVolumeToReportAsAttached(logger, volumeName, nodeName)
 	}
+
+	nodeVolumes, nodeVolumesExists := asw.nodesAttachedVolumes[nodeName]
+	if !nodeVolumesExists {
+		nodeVolumes = make(map[v1.UniqueVolumeName]AttachedVolume)
+	}
+	nodeVolumes[volumeObj.volumeName] = getAttachedVolume(&volumeObj, &node)
+	asw.nodesAttachedVolumes[nodeName] = nodeVolumes
+
 	return volumeName, nil
 }
 
@@ -569,6 +583,16 @@ func (asw *actualStateOfWorld) DeleteVolumeNode(
 
 	// Remove volume from volumes to report as attached
 	asw.removeVolumeFromReportAsAttached(volumeName, nodeName)
+
+	nodeVolumes, nodeVolumesExists := asw.nodesAttachedVolumes[nodeName]
+	if !nodeVolumesExists {
+		return
+	}
+	delete(nodeVolumes, volumeName)
+	// Clean up node
+	if len(nodeVolumes) == 0 {
+		delete(asw.nodesAttachedVolumes, nodeName)
+	}
 }
 
 func (asw *actualStateOfWorld) GetAttachState(
@@ -616,21 +640,16 @@ func (asw *actualStateOfWorld) GetAttachedVolumes() []AttachedVolume {
 }
 
 func (asw *actualStateOfWorld) GetAttachedVolumesForNode(
-	nodeName types.NodeName) []AttachedVolume {
+	nodeName types.NodeName) map[v1.UniqueVolumeName]AttachedVolume {
 	asw.RLock()
 	defer asw.RUnlock()
 
-	attachedVolumes := make(
-		[]AttachedVolume, 0 /* len */, len(asw.attachedVolumes) /* cap */)
-	for _, volumeObj := range asw.attachedVolumes {
-		if nodeObj, nodeExists := volumeObj.nodesAttachedTo[nodeName]; nodeExists {
-			attachedVolumes = append(
-				attachedVolumes,
-				getAttachedVolume(&volumeObj, &nodeObj))
-		}
+	nodeAttachedVolumes, exists := asw.nodesAttachedVolumes[nodeName]
+	if !exists {
+		nodeAttachedVolumes = make(map[v1.UniqueVolumeName]AttachedVolume)
 	}
 
-	return attachedVolumes
+	return nodeAttachedVolumes
 }
 
 func (asw *actualStateOfWorld) GetAttachedVolumesPerNode() map[types.NodeName][]operationexecutor.AttachedVolume {

@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -676,20 +677,16 @@ func (adc *attachDetachController) syncPVCByKey(logger klog.Logger, key string) 
 func (adc *attachDetachController) processVolumesInUse(
 	logger klog.Logger, nodeName types.NodeName, volumesInUse []v1.UniqueVolumeName) {
 	logger.V(4).Info("processVolumesInUse for node", "node", klog.KRef("", string(nodeName)))
-	for _, attachedVolume := range adc.actualStateOfWorld.GetAttachedVolumesForNode(nodeName) {
-		mounted := false
-		for _, volumeInUse := range volumesInUse {
-			if attachedVolume.VolumeName == volumeInUse {
-				mounted = true
-				break
-			}
-		}
-		err := adc.actualStateOfWorld.SetVolumeMountedByNode(logger, attachedVolume.VolumeName, nodeName, mounted)
+	volumesInUseSet := sets.New(volumesInUse...)
+	for attachedVolume := range adc.actualStateOfWorld.GetAttachedVolumesForNode(nodeName) {
+		logger.V(4).Info("processVolumesInUse for node with volume", "node", klog.KRef("", string(nodeName)), "volume", attachedVolume)
+		mounted := volumesInUseSet.Has(attachedVolume)
+		err := adc.actualStateOfWorld.SetVolumeMountedByNode(logger, attachedVolume, nodeName, mounted)
 		if err != nil {
 			logger.Info(
 				"SetVolumeMountedByNode returned an error",
 				"node", klog.KRef("", string(nodeName)),
-				"volumeName", attachedVolume.VolumeName,
+				"volumeName", attachedVolume,
 				"mounted", mounted,
 				"err", err)
 		}

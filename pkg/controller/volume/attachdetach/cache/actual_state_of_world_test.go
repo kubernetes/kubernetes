@@ -102,7 +102,11 @@ func Test_AddVolumeNode_Positive_NewVolumeNewNodeWithFalseAttached(t *testing.T)
 		t.Fatalf("AddVolumeNode_Positive_NewVolumeNewNodeWithFalseAttached failed. Actual: <node %q exist> Expect: <node does not exist in the reportedAsAttached map", nodeName)
 	}
 
-	volumesForNode := asw.GetAttachedVolumesForNode(nodeName)
+	volumesForNodeMap := asw.GetAttachedVolumesForNode(nodeName)
+	volumesForNode := make([]AttachedVolume, 0, len(volumesForNodeMap))
+	for _, volume := range volumesForNodeMap {
+		volumesForNode = append(volumesForNode, volume)
+	}
 	if len(volumesForNode) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(volumesForNode))
 	}
@@ -217,7 +221,11 @@ func Test_AddVolumeNode_Positive_NewVolumeTwoNodesWithFalseAttached(t *testing.T
 	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), node1Name, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
 	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), node2Name, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
 
-	volumesForNode := asw.GetAttachedVolumesForNode(node2Name)
+	volumesForNodeMap := asw.GetAttachedVolumesForNode(node2Name)
+	volumesForNode := make([]AttachedVolume, 0, len(volumesForNodeMap))
+	for _, volume := range volumesForNodeMap {
+		volumesForNode = append(volumesForNode, volume)
+	}
 	if len(volumesForNode) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <2> Actual: <%v>", len(volumesForNode))
 	}
@@ -1200,8 +1208,11 @@ func Test_GetAttachedVolumesForNode_Positive_OneVolumeOneNode(t *testing.T) {
 	}
 
 	// Act
-	attachedVolumes := asw.GetAttachedVolumesForNode(nodeName)
-
+	attachedVolumesMap := asw.GetAttachedVolumesForNode(nodeName)
+	attachedVolumes := make([]AttachedVolume, 0, len(attachedVolumesMap))
+	for _, volume := range attachedVolumesMap {
+		attachedVolumes = append(attachedVolumes, volume)
+	}
 	// Assert
 	if len(attachedVolumes) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
@@ -1232,8 +1243,11 @@ func Test_GetAttachedVolumesForNode_Positive_TwoVolumeTwoNodes(t *testing.T) {
 	}
 
 	// Act
-	attachedVolumes := asw.GetAttachedVolumesForNode(node2Name)
-
+	attachedVolumesMap := asw.GetAttachedVolumesForNode(node2Name)
+	attachedVolumes := make([]AttachedVolume, 0, len(attachedVolumesMap))
+	for _, volume := range attachedVolumesMap {
+		attachedVolumes = append(attachedVolumes, volume)
+	}
 	// Assert
 	if len(attachedVolumes) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
@@ -1277,8 +1291,11 @@ func Test_GetAttachedVolumesForNode_Positive_OneVolumeTwoNodes(t *testing.T) {
 	}
 
 	// Act
-	attachedVolumes := asw.GetAttachedVolumesForNode(node1Name)
-
+	attachedVolumesMap := asw.GetAttachedVolumesForNode(node1Name)
+	attachedVolumes := make([]AttachedVolume, 0, len(attachedVolumesMap))
+	for _, volume := range attachedVolumesMap {
+		attachedVolumes = append(attachedVolumes, volume)
+	}
 	// Assert
 	if len(attachedVolumes) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
@@ -1323,8 +1340,11 @@ func Test_OneVolumeTwoNodes_TwoDevicePaths(t *testing.T) {
 	}
 
 	// Act
-	attachedVolumes := asw.GetAttachedVolumesForNode(node2Name)
-
+	attachedVolumesMap := asw.GetAttachedVolumesForNode(node2Name)
+	attachedVolumes := make([]AttachedVolume, 0, len(attachedVolumesMap))
+	for _, volume := range attachedVolumesMap {
+		attachedVolumes = append(attachedVolumes, volume)
+	}
 	// Assert
 	if len(attachedVolumes) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
