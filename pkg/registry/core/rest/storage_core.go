@@ -28,29 +28,22 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	networkingv1alpha1client "k8s.io/client-go/kubernetes/typed/networking/v1alpha1"
 	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1"
-	restclient "k8s.io/client-go/rest"
-
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/registry/core/componentstatus"
-	configmapstore "k8s.io/kubernetes/pkg/registry/core/configmap/storage"
 	endpointsstore "k8s.io/kubernetes/pkg/registry/core/endpoint/storage"
-	eventstore "k8s.io/kubernetes/pkg/registry/core/event/storage"
 	limitrangestore "k8s.io/kubernetes/pkg/registry/core/limitrange/storage"
-	namespacestore "k8s.io/kubernetes/pkg/registry/core/namespace/storage"
 	nodestore "k8s.io/kubernetes/pkg/registry/core/node/storage"
 	pvstore "k8s.io/kubernetes/pkg/registry/core/persistentvolume/storage"
 	pvcstore "k8s.io/kubernetes/pkg/registry/core/persistentvolumeclaim/storage"
@@ -58,8 +51,6 @@ import (
 	podtemplatestore "k8s.io/kubernetes/pkg/registry/core/podtemplate/storage"
 	"k8s.io/kubernetes/pkg/registry/core/rangeallocation"
 	controllerstore "k8s.io/kubernetes/pkg/registry/core/replicationcontroller/storage"
-	resourcequotastore "k8s.io/kubernetes/pkg/registry/core/resourcequota/storage"
-	secretstore "k8s.io/kubernetes/pkg/registry/core/secret/storage"
 	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
 	serviceallocator "k8s.io/kubernetes/pkg/registry/core/service/allocator/storage"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
@@ -69,25 +60,8 @@ import (
 	servicestore "k8s.io/kubernetes/pkg/registry/core/service/storage"
 	serviceaccountstore "k8s.io/kubernetes/pkg/registry/core/serviceaccount/storage"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/util/async"
 )
-
-// GenericConfig provides information needed to build RESTStorage
-// for generic resources in core. It implements the "normal" RESTStorageProvider interface.
-type GenericConfig struct {
-	StorageFactory serverstorage.StorageFactory
-	EventTTL       time.Duration
-
-	ServiceAccountIssuer        serviceaccount.TokenGenerator
-	ServiceAccountMaxExpiration time.Duration
-	ExtendExpiration            bool
-
-	APIAudiences authenticator.Audiences
-
-	LoopbackClientConfig *restclient.Config
-	Informers            informers.SharedInformerFactory
-}
 
 // Config provides information needed to build RESTStorage for core.
 type Config struct {
@@ -171,91 +145,6 @@ func New(c Config) (*legacyProvider, error) {
 	}
 
 	return p, nil
-}
-
-func (c *GenericConfig) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {
-	apiGroupInfo := genericapiserver.APIGroupInfo{
-		PrioritizedVersions:          legacyscheme.Scheme.PrioritizedVersionsForGroup(""),
-		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{},
-		Scheme:                       legacyscheme.Scheme,
-		ParameterCodec:               legacyscheme.ParameterCodec,
-		NegotiatedSerializer:         legacyscheme.Codecs,
-	}
-
-	eventStorage, err := eventstore.NewREST(restOptionsGetter, uint64(c.EventTTL.Seconds()))
-	if err != nil {
-		return genericapiserver.APIGroupInfo{}, err
-	}
-
-	resourceQuotaStorage, resourceQuotaStatusStorage, err := resourcequotastore.NewREST(restOptionsGetter)
-	if err != nil {
-		return genericapiserver.APIGroupInfo{}, err
-	}
-	secretStorage, err := secretstore.NewREST(restOptionsGetter)
-	if err != nil {
-		return genericapiserver.APIGroupInfo{}, err
-	}
-
-	configMapStorage, err := configmapstore.NewREST(restOptionsGetter)
-	if err != nil {
-		return genericapiserver.APIGroupInfo{}, err
-	}
-
-	namespaceStorage, namespaceStatusStorage, namespaceFinalizeStorage, err := namespacestore.NewREST(restOptionsGetter)
-	if err != nil {
-		return genericapiserver.APIGroupInfo{}, err
-	}
-
-	var serviceAccountStorage *serviceaccountstore.REST
-	if c.ServiceAccountIssuer != nil {
-		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, c.ServiceAccountIssuer, c.APIAudiences, c.ServiceAccountMaxExpiration, nil, secretStorage.Store, c.ExtendExpiration)
-	} else {
-		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, nil, nil, 0, nil, nil, false)
-	}
-	if err != nil {
-		return genericapiserver.APIGroupInfo{}, err
-	}
-
-	storage := map[string]rest.Storage{}
-	if resource := "events"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
-		storage[resource] = eventStorage
-	}
-
-	if resource := "resourcequotas"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
-		storage[resource] = resourceQuotaStorage
-		storage[resource+"/status"] = resourceQuotaStatusStorage
-	}
-
-	if resource := "namespaces"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
-		storage[resource] = namespaceStorage
-		storage[resource+"/status"] = namespaceStatusStorage
-		storage[resource+"/finalize"] = namespaceFinalizeStorage
-	}
-
-	if resource := "secrets"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
-		storage[resource] = secretStorage
-	}
-
-	if resource := "serviceaccounts"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
-		storage[resource] = serviceAccountStorage
-		if serviceAccountStorage.Token != nil {
-			storage[resource+"/token"] = serviceAccountStorage.Token
-		}
-	}
-
-	if resource := "configmaps"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
-		storage[resource] = configMapStorage
-	}
-
-	if len(storage) > 0 {
-		apiGroupInfo.VersionedResourcesStorageMap["v1"] = storage
-	}
-
-	return apiGroupInfo, nil
-}
-
-func (c *GenericConfig) GroupName() string {
-	return api.GroupName
 }
 
 func (c *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {
