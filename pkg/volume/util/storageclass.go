@@ -20,9 +20,11 @@ import (
 	"sort"
 
 	storagev1 "k8s.io/api/storage/v1"
+	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	storagev1listers "k8s.io/client-go/listers/storage/v1"
+	storagev1alpha1listers "k8s.io/client-go/listers/storage/v1alpha1"
 	"k8s.io/klog/v2"
 )
 
@@ -34,6 +36,9 @@ const (
 	// betaIsDefaultStorageClassAnnotation is the beta version of IsDefaultStorageClassAnnotation.
 	// TODO: remove Beta when no longer used
 	BetaIsDefaultStorageClassAnnotation = "storageclass.beta.kubernetes.io/is-default-class"
+
+	// AlphaIsDefaultVolumeAttributesClassAnnotation is the alpha version of IsDefaultVolumeAttributesClassAnnotation.
+	AlphaIsDefaultVolumeAttributesClassAnnotation = "volumeattributesclass.alpha.kubernetes.io/is-default-class"
 )
 
 // GetDefaultClass returns the default StorageClass from the store, or nil.
@@ -70,6 +75,40 @@ func GetDefaultClass(lister storagev1listers.StorageClassLister) (*storagev1.Sto
 	return defaultClasses[0], nil
 }
 
+// GetDefaultVolumeAttributesClass returns the default VolumeAttributesClass from the store, or nil.
+func GetDefaultVolumeAttributesClass(lister storagev1alpha1listers.VolumeAttributesClassLister) (*storagev1alpha1.VolumeAttributesClass, error) {
+	list, err := lister.List(labels.Everything())
+	if err != nil {
+		return nil, err
+	}
+
+	defaultClasses := []*storagev1alpha1.VolumeAttributesClass{}
+	for _, class := range list {
+		if IsDefaultVolumeAttributesClassAnnotation(class.ObjectMeta) {
+			defaultClasses = append(defaultClasses, class)
+			klog.V(4).Infof("GetDefaultVolumeAttributesClass added: %s", class.Name)
+		}
+	}
+
+	if len(defaultClasses) == 0 {
+		return nil, nil
+	}
+
+	// Primary sort by creation timestamp, newest first
+	// Secondary sort by class name, ascending order
+	sort.Slice(defaultClasses, func(i, j int) bool {
+		if defaultClasses[i].CreationTimestamp.UnixNano() == defaultClasses[j].CreationTimestamp.UnixNano() {
+			return defaultClasses[i].Name < defaultClasses[j].Name
+		}
+		return defaultClasses[i].CreationTimestamp.UnixNano() > defaultClasses[j].CreationTimestamp.UnixNano()
+	})
+	if len(defaultClasses) > 1 {
+		klog.V(4).Infof("%d default VolumeAttributesClass were found, choosing: %s", len(defaultClasses), defaultClasses[0].Name)
+	}
+
+	return defaultClasses[0], nil
+}
+
 // IsDefaultAnnotation returns a boolean if the default storage class
 // annotation is set
 // TODO: remove Beta when no longer needed
@@ -82,4 +121,10 @@ func IsDefaultAnnotation(obj metav1.ObjectMeta) bool {
 	}
 
 	return false
+}
+
+// IsDefaultVolumeAttributesClassAnnotation returns a boolean if the default
+// volume attributes class annotation is set
+func IsDefaultVolumeAttributesClassAnnotation(obj metav1.ObjectMeta) bool {
+	return obj.Annotations[AlphaIsDefaultVolumeAttributesClassAnnotation] == "true"
 }

@@ -53,6 +53,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/storage/persistentvolume/resize"
 	"k8s.io/kubernetes/plugin/pkg/admission/storage/storageclass/setdefault"
 	"k8s.io/kubernetes/plugin/pkg/admission/storage/storageobjectinuseprotection"
+	vacsetdefault "k8s.io/kubernetes/plugin/pkg/admission/storage/volumeattributesclass/setdefault"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
@@ -86,6 +87,7 @@ var AllOrderedPlugins = []string{
 	label.PluginName,                        // PersistentVolumeLabel
 	setdefault.PluginName,                   // DefaultStorageClass
 	storageobjectinuseprotection.PluginName, // StorageObjectInUseProtection
+	vacsetdefault.PluginName,                // DefaultVolumeAttributesClass
 	gc.PluginName,                           // OwnerReferencesPermissionEnforcement
 	resize.PluginName,                       // PersistentVolumeClaimResize
 	runtimeclass.PluginName,                 // RuntimeClass
@@ -141,6 +143,7 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	certsigning.Register(plugins)
 	ctbattest.Register(plugins)
 	certsubjectrestriction.Register(plugins)
+	vacsetdefault.Register(plugins)
 }
 
 // DefaultOffAdmissionPlugins get admission plugins off by default for kube-apiserver.
