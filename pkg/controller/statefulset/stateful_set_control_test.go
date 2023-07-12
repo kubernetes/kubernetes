@@ -2332,6 +2332,15 @@ func (om *fakeObjectManager) SetDeleteStatefulPodError(err error, after int) {
 	om.deletePodTracker.after = after
 }
 
+func findPodByOrdinal(pods []*v1.Pod, ordinal int) *v1.Pod {
+	for _, pod := range pods {
+		if getOrdinal(pod) == ordinal {
+			return pod.DeepCopy()
+		}
+	}
+	return nil
+}
+
 func (om *fakeObjectManager) setPodPending(set *apps.StatefulSet, ordinal int) ([]*v1.Pod, error) {
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
@@ -2341,11 +2350,10 @@ func (om *fakeObjectManager) setPodPending(set *apps.StatefulSet, ordinal int) (
 	if err != nil {
 		return nil, err
 	}
-	if 0 > ordinal || ordinal >= len(pods) {
-		return nil, fmt.Errorf("ordinal %d out of range [0,%d)", ordinal, len(pods))
+	pod := findPodByOrdinal(pods, ordinal)
+	if pod == nil {
+		return nil, fmt.Errorf("setPodPending: pod ordinal %d not found", ordinal)
 	}
-	sort.Sort(ascendingOrdinal(pods))
-	pod := pods[ordinal].DeepCopy()
 	pod.Status.Phase = v1.PodPending
 	fakeResourceVersion(pod)
 	om.podsIndexer.Update(pod)
@@ -2361,11 +2369,10 @@ func (om *fakeObjectManager) setPodRunning(set *apps.StatefulSet, ordinal int) (
 	if err != nil {
 		return nil, err
 	}
-	if 0 > ordinal || ordinal >= len(pods) {
-		return nil, fmt.Errorf("ordinal %d out of range [0,%d)", ordinal, len(pods))
+	pod := findPodByOrdinal(pods, ordinal)
+	if pod == nil {
+		return nil, fmt.Errorf("setPodRunning: pod ordinal %d not found", ordinal)
 	}
-	sort.Sort(ascendingOrdinal(pods))
-	pod := pods[ordinal].DeepCopy()
 	pod.Status.Phase = v1.PodRunning
 	fakeResourceVersion(pod)
 	om.podsIndexer.Update(pod)
@@ -2381,11 +2388,10 @@ func (om *fakeObjectManager) setPodReady(set *apps.StatefulSet, ordinal int) ([]
 	if err != nil {
 		return nil, err
 	}
-	if 0 > ordinal || ordinal >= len(pods) {
-		return nil, fmt.Errorf("ordinal %d out of range [0,%d)", ordinal, len(pods))
+	pod := findPodByOrdinal(pods, ordinal)
+	if pod == nil {
+		return nil, fmt.Errorf("setPodReady: pod ordinal %d not found", ordinal)
 	}
-	sort.Sort(ascendingOrdinal(pods))
-	pod := pods[ordinal].DeepCopy()
 	condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
 	podutil.UpdatePodCondition(&pod.Status, &condition)
 	fakeResourceVersion(pod)
@@ -2402,11 +2408,10 @@ func (om *fakeObjectManager) setPodAvailable(set *apps.StatefulSet, ordinal int,
 	if err != nil {
 		return nil, err
 	}
-	if 0 > ordinal || ordinal >= len(pods) {
-		return nil, fmt.Errorf("ordinal %d out of range [0,%d)", ordinal, len(pods))
+	pod := findPodByOrdinal(pods, ordinal)
+	if pod == nil {
+		return nil, fmt.Errorf("setPodAvailable: pod ordinal %d not found", ordinal)
 	}
-	sort.Sort(ascendingOrdinal(pods))
-	pod := pods[ordinal].DeepCopy()
 	condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: metav1.Time{Time: lastTransitionTime}}
 	_, existingCondition := podutil.GetPodCondition(&pod.Status, condition.Type)
 	if existingCondition != nil {
@@ -2875,9 +2880,9 @@ func scaleUpStatefulSetControl(set *apps.StatefulSet,
 		sort.Sort(ascendingOrdinal(pods))
 
 		// ensure all pods are valid (have a phase)
-		for ord, pod := range pods {
+		for _, pod := range pods {
 			if pod.Status.Phase == "" {
-				if pods, err = om.setPodPending(set, ord); err != nil {
+				if pods, err = om.setPodPending(set, getOrdinal(pod)); err != nil {
 					return err
 				}
 				break
@@ -2886,15 +2891,15 @@ func scaleUpStatefulSetControl(set *apps.StatefulSet,
 
 		// select one of the pods and move it forward in status
 		if len(pods) > 0 {
-			ord := int(rand.Int63n(int64(len(pods))))
-			pod := pods[ord]
+			idx := int(rand.Int63n(int64(len(pods))))
+			pod := pods[idx]
 			switch pod.Status.Phase {
 			case v1.PodPending:
-				if pods, err = om.setPodRunning(set, ord); err != nil {
+				if pods, err = om.setPodRunning(set, getOrdinal(pod)); err != nil {
 					return err
 				}
 			case v1.PodRunning:
-				if pods, err = om.setPodReady(set, ord); err != nil {
+				if pods, err = om.setPodReady(set, getOrdinal(pod)); err != nil {
 					return err
 				}
 			default:
@@ -3082,15 +3087,15 @@ func updateStatefulSetControl(set *apps.StatefulSet,
 		}
 
 		if len(pods) > 0 {
-			ord := int(rand.Int63n(int64(len(pods))))
-			pod := pods[ord]
+			idx := int(rand.Int63n(int64(len(pods))))
+			pod := pods[idx]
 			switch pod.Status.Phase {
 			case v1.PodPending:
-				if pods, err = om.setPodRunning(set, ord); err != nil {
+				if pods, err = om.setPodRunning(set, getOrdinal(pod)); err != nil {
 					return err
 				}
 			case v1.PodRunning:
-				if pods, err = om.setPodReady(set, ord); err != nil {
+				if pods, err = om.setPodReady(set, getOrdinal(pod)); err != nil {
 					return err
 				}
 			default:
