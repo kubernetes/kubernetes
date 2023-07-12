@@ -29,7 +29,7 @@ import (
 // Quantity provides a CEL function library extension of Kubernetes
 // resource.Quantity parsing functions. See `resource.Quantity`
 // documentation for more detailed information about the format itself:
-// https://kubernetes.io/docs/reference/kubernetes-api/common-definitions/quantity/
+// https://pkg.go.dev/k8s.io/apimachinery/pkg/api/resource#Quantity
 //
 // quantity
 //
