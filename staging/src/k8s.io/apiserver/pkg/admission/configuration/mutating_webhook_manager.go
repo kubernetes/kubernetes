@@ -21,7 +21,7 @@ import (
 	"sort"
 	"sync"
 
-	"k8s.io/api/admissionregistration/v1"
+	v1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook"
@@ -106,10 +106,15 @@ func (m *mutatingWebhookConfigurationManager) getConfiguration() ([]webhook.Webh
 	if err != nil {
 		return []webhook.WebhookAccessor{}, err
 	}
-	return m.smartReloadMutatingWebhookConfigurations(configurations), nil
+	return m.getMutatingWebhookConfigurations(configurations), nil
 }
 
-func (m *mutatingWebhookConfigurationManager) smartReloadMutatingWebhookConfigurations(configurations []*v1.MutatingWebhookConfiguration) []webhook.WebhookAccessor {
+// getMutatingWebhookConfigurations returns the webhook accessors for a given list of
+// mutating webhook configurations.
+//
+// This function will, first, try to load the webhook accessors from the cache and avoid
+// recreating them, which can be expessive (requiring CEL expression recompilation).
+func (m *mutatingWebhookConfigurationManager) getMutatingWebhookConfigurations(configurations []*v1.MutatingWebhookConfiguration) []webhook.WebhookAccessor {
 	// The internal order of webhooks for each configuration is provided by the user
 	// but configurations themselves can be in any order. As we are going to run these
 	// webhooks in serial, they are sorted here to have a deterministic order.

@@ -106,10 +106,15 @@ func (v *validatingWebhookConfigurationManager) getConfiguration() ([]webhook.We
 	if err != nil {
 		return []webhook.WebhookAccessor{}, err
 	}
-	return v.smartReloadValidatingWebhookConfigurations(configurations), nil
+	return v.getValidatingWebhookConfigurations(configurations), nil
 }
 
-func (v *validatingWebhookConfigurationManager) smartReloadValidatingWebhookConfigurations(configurations []*v1.ValidatingWebhookConfiguration) []webhook.WebhookAccessor {
+// getMutatingWebhookConfigurations returns the webhook accessors for a given list of
+// mutating webhook configurations.
+//
+// This function will, first, try to load the webhook accessors from the cache and avoid
+// recreating them, which can be expessive (requiring CEL expression recompilation).
+func (v *validatingWebhookConfigurationManager) getValidatingWebhookConfigurations(configurations []*v1.ValidatingWebhookConfiguration) []webhook.WebhookAccessor {
 	sort.SliceStable(configurations, ValidatingWebhookConfigurationSorter(configurations).ByName)
 	accessors := []webhook.WebhookAccessor{}
 	for _, c := range configurations {
