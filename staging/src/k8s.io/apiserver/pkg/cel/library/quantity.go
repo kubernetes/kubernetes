@@ -291,7 +291,7 @@ func quantityAddInt(arg ref.Val, other ref.Val) ref.Val {
 		return types.MaybeNoSuchOverloadErr(arg)
 	}
 
-	q2Converted := *resource.NewQuantity(int64(q2), resource.DecimalExponent)
+	q2Converted := *resource.NewQuantity(q2, resource.DecimalExponent)
 
 	copy := *q
 	copy.Add(q2Converted)
@@ -329,7 +329,7 @@ func quantitySubInt(arg ref.Val, other ref.Val) ref.Val {
 		return types.MaybeNoSuchOverloadErr(arg)
 	}
 
-	q2Converted := *resource.NewQuantity(int64(q2), resource.DecimalExponent)
+	q2Converted := *resource.NewQuantity(q2, resource.DecimalExponent)
 
 	copy := *q
 	copy.Sub(q2Converted)
