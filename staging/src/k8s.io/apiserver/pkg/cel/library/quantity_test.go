@@ -236,6 +236,16 @@ func TestQuantity(t *testing.T) {
 			expectValue: 50000,
 		},
 		{
+			name:               "as_integer_error",
+			expr:               `quantity("9999999999999999999999999999999999999G").asInteger()`,
+			expectedRuntimeErr: `cannot convert value to integer`,
+		},
+		{
+			name:        "is_integer",
+			expr:        `quantity("9999999999999999999999999999999999999G").isInteger()`,
+			expectValue: false,
+		},
+		{
 			name:        "as_float",
 			expr:        `quantity("50.703k").asApproximateFloat()`,
 			expectValue: types.Double(50703),
