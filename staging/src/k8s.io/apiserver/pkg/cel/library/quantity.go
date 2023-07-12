@@ -127,7 +127,8 @@ import (
 // quantity("200M").compareTo(quantity("0.2G")) // returns 0
 // quantity("50M").compareTo(quantity("50Mi")) // returns -1
 // quantity("50Mi").compareTo(quantity("50M")) // returns 1
-// quantity("50Mi").isGreaterThan(quantity("100Mi")) // returns true
+// quantity("150Mi").isGreaterThan(quantity("100Mi")) // returns true
+// quantity("50Mi").isGreaterThan(quantity("100Mi")) // returns false
 // quantity("50M").isLessThan(quantity("100M")) // returns true
 // quantity("100M").isLessThan(quantity("50M")) // returns false
 
