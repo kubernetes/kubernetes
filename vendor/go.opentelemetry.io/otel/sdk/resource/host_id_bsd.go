@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package unit // import "go.opentelemetry.io/otel/metric/unit"
+//go:build dragonfly || freebsd || netbsd || openbsd || solaris
+// +build dragonfly freebsd netbsd openbsd solaris
 
-// Unit is a determinate standard quantity of measurement.
-type Unit string
+package resource // import "go.opentelemetry.io/otel/sdk/resource"
 
-// Units defined by OpenTelemetry.
-const (
-	Dimensionless Unit = "1"
-	Bytes         Unit = "By"
-	Milliseconds  Unit = "ms"
-)
+var platformHostIDReader hostIDReader = &hostIDReaderBSD{
+	execCommand: execCommand,
+	readFile:    readFile,
+}

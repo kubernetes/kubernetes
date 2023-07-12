@@ -2,23 +2,27 @@
 
 ## Semantic Convention Generation
 
-New versions of the [OpenTelemetry specification] mean new versions of the `semconv` package need to be generated.
+New versions of the [OpenTelemetry Specification] mean new versions of the `semconv` package need to be generated.
 The `semconv-generate` make target is used for this.
 
-1. Checkout a local copy of the [OpenTelemetry specification] to the desired release tag.
-2. Run the `make semconv-generate ...` target from this repository.
+1. Checkout a local copy of the [OpenTelemetry Specification] to the desired release tag.
+2. Pull the latest `otel/semconvgen` image: `docker pull otel/semconvgen:latest`
+3. Run the `make semconv-generate ...` target from this repository.
 
 For example,
 
 ```sh
-export TAG="v1.7.0" # Change to the release version you are generating.
+export TAG="v1.13.0" # Change to the release version you are generating.
 export OTEL_SPEC_REPO="/absolute/path/to/opentelemetry-specification"
-git -C "$OTEL_SPEC_REPO" checkout "tags/$TAG"
+docker pull otel/semconvgen:latest
 make semconv-generate # Uses the exported TAG and OTEL_SPEC_REPO.
 ```
 
 This should create a new sub-package of [`semconv`](./semconv).
 Ensure things look correct before submitting a pull request to include the addition.
+
+**Note**, the generation code was changed to generate versions >= 1.13.
+To generate versions prior to this, checkout the old release of this repository (i.e. [2fe8861](https://github.com/open-telemetry/opentelemetry-go/commit/2fe8861a24e20088c065b116089862caf9e3cd8b)).
 
 ## Pre-Release
 
@@ -119,4 +123,4 @@ Once verified be sure to [make a release for the `contrib` repository](https://g
 Update [the documentation](./website_docs) for [the OpenTelemetry website](https://opentelemetry.io/docs/go/).
 Importantly, bump any package versions referenced to be the latest one you just released and ensure all code examples still compile and are accurate.
 
-[OpenTelemetry specification]: https://github.com/open-telemetry/opentelemetry-specification
+[OpenTelemetry Specification]: https://github.com/open-telemetry/opentelemetry-specification

@@ -1,0 +1,10 @@
+# https://github.com/codespell-project/codespell
+[codespell]
+builtin = clear,rare,informal
+check-filenames =
+check-hidden =
+ignore-words = .codespellignore
+interactive = 1
+skip = .git,go.mod,go.sum,semconv,venv,.tools
+uri-ignore-words-list = *
+write =

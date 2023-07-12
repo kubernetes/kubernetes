@@ -12,19 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package instrument // import "go.opentelemetry.io/otel/metric/instrument"
+//go:build darwin || dragonfly || freebsd || netbsd || openbsd || solaris
 
-// Asynchronous instruments are instruments that are updated within a Callback.
-// If an instrument is observed outside of it's callback it should be an error.
-//
-// This interface is used as a grouping mechanism.
-type Asynchronous interface {
-	asynchronous()
-}
+package resource // import "go.opentelemetry.io/otel/sdk/resource"
 
-// Synchronous instruments are updated in line with application code.
-//
-// This interface is used as a grouping mechanism.
-type Synchronous interface {
-	synchronous()
+import "os/exec"
+
+func execCommand(name string, arg ...string) (string, error) {
+	cmd := exec.Command(name, arg...)
+	b, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+
+	return string(b), nil
 }
