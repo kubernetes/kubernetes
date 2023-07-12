@@ -83,13 +83,13 @@ var (
 		cmpopts.IgnoreFields(nominator{}, "podLister", "lock"),
 	}
 
-	queueHintReturnQueueAfterBackoff = func(pod *v1.Pod, oldObj, newObj interface{}) framework.QueueingHint {
+	queueHintReturnQueueAfterBackoff = func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) framework.QueueingHint {
 		return framework.QueueAfterBackoff
 	}
-	queueHintReturnQueueImmediately = func(pod *v1.Pod, oldObj, newObj interface{}) framework.QueueingHint {
+	queueHintReturnQueueImmediately = func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) framework.QueueingHint {
 		return framework.QueueImmediately
 	}
-	queueHintReturnQueueSkip = func(pod *v1.Pod, oldObj, newObj interface{}) framework.QueueingHint {
+	queueHintReturnQueueSkip = func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) framework.QueueingHint {
 		return framework.QueueSkip
 	}
 )
@@ -2364,15 +2364,15 @@ func mustNewPodInfo(pod *v1.Pod) *framework.PodInfo {
 // Test_isPodWorthRequeuing tests isPodWorthRequeuing function.
 func Test_isPodWorthRequeuing(t *testing.T) {
 	count := 0
-	queueHintReturnQueueImmediately := func(pod *v1.Pod, oldObj, newObj interface{}) framework.QueueingHint {
+	queueHintReturnQueueImmediately := func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) framework.QueueingHint {
 		count++
 		return framework.QueueImmediately
 	}
-	queueHintReturnQueueSkip := func(pod *v1.Pod, oldObj, newObj interface{}) framework.QueueingHint {
+	queueHintReturnQueueSkip := func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) framework.QueueingHint {
 		count++
 		return framework.QueueSkip
 	}
-	queueHintReturnQueueAfterBackoff := func(pod *v1.Pod, oldObj, newObj interface{}) framework.QueueingHint {
+	queueHintReturnQueueAfterBackoff := func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) framework.QueueingHint {
 		count++
 		return framework.QueueAfterBackoff
 	}

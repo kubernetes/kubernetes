@@ -389,7 +389,7 @@ func (p *PriorityQueue) isPodWorthRequeuing(logger klog.Logger, pInfo *framework
 				continue
 			}
 
-			switch h := hintfn.QueueingHintFn(pod, oldObj, newObj); h {
+			switch h := hintfn.QueueingHintFn(logger, pod, oldObj, newObj); h {
 			case framework.QueueSkip:
 				continue
 			case framework.QueueImmediately:

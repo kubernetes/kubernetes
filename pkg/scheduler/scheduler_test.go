@@ -764,6 +764,7 @@ func Test_buildQueueingHintMap(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
 			registry := frameworkruntime.Registry{}
 			cfgPls := &schedulerapi.Plugins{}
 			plugins := append(tt.plugins, &fakebindPlugin{}, &fakeQueueSortPlugin{})
@@ -808,8 +809,8 @@ func Test_buildQueueingHintMap(t *testing.T) {
 						t.Errorf("got plugin name %v, want %v", fn.PluginName, wantfns[i].PluginName)
 						continue
 					}
-					if fn.QueueingHintFn(nil, nil, nil) != wantfns[i].QueueingHintFn(nil, nil, nil) {
-						t.Errorf("got queueing hint function (%v) returning %v, expect it to return %v", fn.PluginName, fn.QueueingHintFn(nil, nil, nil), wantfns[i].QueueingHintFn(nil, nil, nil))
+					if fn.QueueingHintFn(logger, nil, nil, nil) != wantfns[i].QueueingHintFn(logger, nil, nil, nil) {
+						t.Errorf("got queueing hint function (%v) returning %v, expect it to return %v", fn.PluginName, fn.QueueingHintFn(logger, nil, nil, nil), wantfns[i].QueueingHintFn(logger, nil, nil, nil))
 						continue
 					}
 				}
@@ -1033,7 +1034,7 @@ var hintFromFakeNode = framework.QueueingHint(100)
 
 type fakeNodePlugin struct{}
 
-var fakeNodePluginQueueingFn = func(_ *v1.Pod, _, _ interface{}) framework.QueueingHint {
+var fakeNodePluginQueueingFn = func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) framework.QueueingHint {
 	return hintFromFakeNode
 }
 
@@ -1053,7 +1054,7 @@ var hintFromFakePod = framework.QueueingHint(101)
 
 type fakePodPlugin struct{}
 
-var fakePodPluginQueueingFn = func(_ *v1.Pod, _, _ interface{}) framework.QueueingHint {
+var fakePodPluginQueueingFn = func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) framework.QueueingHint {
 	return hintFromFakePod
 }
 
