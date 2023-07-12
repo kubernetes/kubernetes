@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	_ "k8s.io/component-base/metrics/prometheus/workqueue" // for workqueue metric registration
@@ -45,6 +44,10 @@ type ResourceInfo struct {
 	// DirectlyDecodableVersions is a list of versions that the converter for REST storage knows how to convert.  This
 	// contains items like apiextensions.k8s.io/v1beta1 even if we don't serve that version.
 	DirectlyDecodableVersions []schema.GroupVersion
+
+	// ServedVersions holds a list of all versions of GroupResource that are served.  Note that a server may be able to
+	// decode a particular version, but still not serve it.
+	ServedVersions []string
 }
 
 // Manager records the resources whose StorageVersions need updates, and provides a method to update those StorageVersions.
@@ -52,7 +55,7 @@ type Manager interface {
 	// AddResourceInfo records resources whose StorageVersions need updates
 	AddResourceInfo(resources ...*ResourceInfo)
 	// UpdateStorageVersions tries to update the StorageVersions of the recorded resources
-	UpdateStorageVersions(kubeAPIServerClientConfig *rest.Config, apiserverID string, apiResourceConfigSource serverstorage.APIResourceConfigSource)
+	UpdateStorageVersions(kubeAPIServerClientConfig *rest.Config, apiserverID string)
 	// PendingUpdate returns true if the StorageVersion of the given resource is still pending update.
 	PendingUpdate(gr schema.GroupResource) bool
 	// LastUpdateError returns the last error hit when updating the storage version of the given resource.
@@ -112,7 +115,7 @@ func (s *defaultManager) addPendingManagedStatusLocked(r *ResourceInfo) {
 }
 
 // UpdateStorageVersions tries to update the StorageVersions of the recorded resources
-func (s *defaultManager) UpdateStorageVersions(kubeAPIServerClientConfig *rest.Config, serverID string, apiResourceConfigSource serverstorage.APIResourceConfigSource) {
+func (s *defaultManager) UpdateStorageVersions(kubeAPIServerClientConfig *rest.Config, serverID string) {
 	clientset, err := kubernetes.NewForConfig(kubeAPIServerClientConfig)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("failed to get clientset: %v", err))
@@ -145,12 +148,8 @@ func (s *defaultManager) UpdateStorageVersions(kubeAPIServerClientConfig *rest.C
 			gr.Group = "core"
 		}
 
-		servedVersions := []string{}
-		for _, dv := range decodableVersions {
-			if apiResourceConfigSource.ResourceEnabled(gr.WithVersion(dv)) {
-				servedVersions = append(servedVersions, dv)
-			}
-		}
+		servedVersions := r.ServedVersions
+
 		if err := updateStorageVersionFor(sc, serverID, gr, r.EncodingVersion, decodableVersions, servedVersions); err != nil {
 			utilruntime.HandleError(fmt.Errorf("failed to update storage version for %v: %v", r.GroupResource, err))
 			s.recordStatusFailure(&r, err)
