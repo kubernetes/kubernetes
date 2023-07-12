@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 )
 
@@ -68,7 +69,18 @@ func CreateProber(c storagebackend.Config) (Prober, error) {
 	case storagebackend.StorageTypeETCD2:
 		return nil, fmt.Errorf("%s is no longer a supported storage backend", c.Type)
 	case storagebackend.StorageTypeUnset, storagebackend.StorageTypeETCD3:
-		return newETCD3Prober(c)
+		return newETCD3ProberMonitor(c)
+	default:
+		return nil, fmt.Errorf("unknown storage type: %s", c.Type)
+	}
+}
+
+func CreateMonitor(c storagebackend.Config) (metrics.Monitor, error) {
+	switch c.Type {
+	case storagebackend.StorageTypeETCD2:
+		return nil, fmt.Errorf("%s is no longer a supported storage backend", c.Type)
+	case storagebackend.StorageTypeUnset, storagebackend.StorageTypeETCD3:
+		return newETCD3ProberMonitor(c)
 	default:
 		return nil, fmt.Errorf("unknown storage type: %s", c.Type)
 	}
