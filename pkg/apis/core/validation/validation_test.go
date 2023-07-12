@@ -18775,6 +18775,10 @@ func TestValidateSecretUpdate(t *testing.T) {
 	immutableSecret.Immutable = &trueVal
 	mutableSecret := validSecret()
 	mutableSecret.Immutable = &falseVal
+	emptyValueSecret := validSecret()
+	emptyValueSecret.Data["data-3"] = nil
+	immutableSecretWithChangedEmptyValueData := validSecret()
+	immutableSecretWithChangedEmptyValueData.Data["data-3"] = []byte{}
 
 	secretWithData := validSecret()
 	secretWithData.Data["data-2"] = []byte("baz")
@@ -18828,8 +18832,12 @@ func TestValidateSecretUpdate(t *testing.T) {
 		oldSecret: immutableSecret,
 		newSecret: immutableSecretWithChangedData,
 		valid:     false,
-	},
-	}
+	}, {
+		name:      "change value is empty data is immutable secret",
+		oldSecret: emptyValueSecret,
+		newSecret: immutableSecretWithChangedEmptyValueData,
+		valid:     true,
+	}}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
