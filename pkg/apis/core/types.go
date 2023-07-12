@@ -524,16 +524,17 @@ const (
 	// State set when resize controller starts expanding the volume in control-plane
 	PersistentVolumeClaimControllerResizeInProgress ClaimResourceStatus = "ControllerResizeInProgress"
 
-	// State set when expansion has failed in resize controller with a terminal error.
+	// State set when resize has failed in resize controller with a terminal error.
 	// Transient errors such as timeout should not set this status and should leave allocatedResourceStatus
 	// unmodified, so as resize controller can resume the volume expansion.
 	PersistentVolumeClaimControllerResizeFailed ClaimResourceStatus = "ControllerResizeFailed"
 
-	// State set when resize controller has finished expanding the volume but further expansion is needed on the node.
+	// State set when resize controller has finished resizing the volume but further resizing of volume
+	// is needed on the node.
 	PersistentVolumeClaimNodeResizePending ClaimResourceStatus = "NodeResizePending"
-	// State set when kubelet starts expanding the volume.
+	// State set when kubelet starts resizing the volume.
 	PersistentVolumeClaimNodeResizeInProgress ClaimResourceStatus = "NodeResizeInProgress"
-	// State set when expansion has failed in kubelet with a terminal error. Transient errors don't set NodeExpansionFailed.
+	// State set when resizing has failed in kubelet with a terminal error. Transient errors don't set NodeResizeFailed
 	PersistentVolumeClaimNodeResizeFailed ClaimResourceStatus = "NodeResizeFailed"
 )
 
@@ -564,8 +565,14 @@ type PersistentVolumeClaimStatus struct {
 	Capacity ResourceList
 	// +optional
 	Conditions []PersistentVolumeClaimCondition
-	// The storage resource within AllocatedResources tracks the capacity allocated to a PVC. It may
-	// be larger than the actual capacity when a volume expansion operation is requested.
+	// AllocatedResources tracks the resources allocated to a PVC including its capacity.
+	// Following are valid key names for allocatedResources:
+	// 	- storage
+	//	- example.com/foobar
+	// Apart from above values - keys that are unprefixed or have kubernetes.io prefix are considered
+	// reserved and hence may not be used.
+	// Capacity reported here may be larger than the actual capacity when a volume expansion operation
+	// is requested.
 	// For storage quota, the larger value from allocatedResources and PVC.spec.resources is used.
 	// If allocatedResources is not set, PVC.spec.resources alone is used for quota calculation.
 	// If a volume expansion capacity request is lowered, allocatedResources is only
@@ -575,14 +582,36 @@ type PersistentVolumeClaimStatus struct {
 	// +featureGate=RecoverVolumeExpansionFailure
 	// +optional
 	AllocatedResources ResourceList
-	// allocatedResourceStatuses stores status of resource being resized for the given PVC.
-	// If Expanding a PVC for more capacity - this field can be one of the following states:
+	// AllocatedResourceStatuses stores status of resource being resized for the given PVC.
+	// Following are valid key names for allocatedResourceStatuses:
+	// 	- storage
+	//	- example.com/foobar
+	// Apart from above values - keys that are unprefixed or have kubernetes.io prefix are considered
+	// reserved and hence may not be used.
+	// ClaimResourceStatus can be in any of following states:
+	//	- ControllerResizeInProgress:
+	//		State set when resize controller starts expanding the volume in control-plane.
+	// 	- ControllerResizeFailed:
+	//		State set when resize has failed in resize controller with a terminal error.
+	//	- NodeResizePending:
+	//		State set when resize controller has finished resizing the volume but further resizing of
+	//		volume is needed on the node.
+	//	- NodeResizeInProgress:
+	//		State set when kubelet starts resizing the volume.
+	//	- NodeResizeFailed:
+	//		State set when resizing has failed in kubelet with a terminal error. Transient errors don't set
+	//		NodeResizeFailed.
+	// For example: if expanding a PVC for more capacity - this field can be one of the following states:
 	// 	- pvc.status.allocatedResourceStatus['storage'] = "ControllerResizeInProgress"
 	//      - pvc.status.allocatedResourceStatus['storage'] = "ControllerResizeFailed"
 	//      - pvc.status.allocatedResourceStatus['storage'] = "NodeResizePending"
 	//      - pvc.status.allocatedResourceStatus['storage'] = "NodeResizeInProgress"
 	//      - pvc.status.allocatedResourceStatus['storage'] = "NodeResizeFailed"
 	// When this field is not set, it means that no resize operation is in progress for the given PVC.
+	// A controller that receives PVC update with previously unknown resourceName or ClaimResourceStatus
+	// should ignore the update for the purpose it was designed. For example - a controller that
+	// only is responsible for resizing capacity of the volume, should ignore pvc updates that change other valid
+	// resources associated with PVC.
 	// This is an alpha field and requires enabling RecoverVolumeExpansionFailure feature.
 	// +featureGate=RecoverVolumeExpansionFailure
 	// +mapType=granular

@@ -18391,6 +18391,21 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 		},
 	})
 
+	multipleResourceStatusPVC := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+		},
+	}, core.PersistentVolumeClaimStatus{
+		AllocatedResources: core.ResourceList{
+			core.ResourceStorage: resource.MustParse("5Gi"),
+			validResizeKeyCustom: resource.MustParse("10Gi"),
+		},
+		AllocatedResourceStatuses: map[core.ResourceName]core.ClaimResourceStatus{
+			core.ResourceStorage: core.PersistentVolumeClaimControllerResizeFailed,
+			validResizeKeyCustom: core.PersistentVolumeClaimControllerResizeInProgress,
+		},
+	})
+
 	invalidNativeResourceAllocatedKey := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadWriteOnce,
@@ -18519,6 +18534,13 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 			isExpectedFailure:          false,
 			oldClaim:                   validClaim,
 			newClaim:                   validExternalResizeStatusPVC,
+			enableResize:               true,
+			enableRecoverFromExpansion: true,
+		},
+		"status-update-with-multiple-resources-key": {
+			isExpectedFailure:          false,
+			oldClaim:                   validClaim,
+			newClaim:                   multipleResourceStatusPVC,
 			enableResize:               true,
 			enableRecoverFromExpansion: true,
 		},
