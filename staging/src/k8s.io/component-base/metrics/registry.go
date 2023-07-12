@@ -41,7 +41,7 @@ var (
 		&CounterOpts{
 			Name:           "registered_metric_total",
 			Help:           "The count of registered metrics broken by stability level and deprecation version.",
-			StabilityLevel: ALPHA,
+			StabilityLevel: BETA,
 		},
 		[]string{"stability_level", "deprecated_version"},
 	)
@@ -50,7 +50,7 @@ var (
 		&CounterOpts{
 			Name:           "disabled_metric_total",
 			Help:           "The count of disabled metrics.",
-			StabilityLevel: ALPHA,
+			StabilityLevel: BETA,
 		},
 	)
 
@@ -58,7 +58,7 @@ var (
 		&CounterOpts{
 			Name:           "hidden_metric_total",
 			Help:           "The count of hidden metrics.",
-			StabilityLevel: ALPHA,
+			StabilityLevel: BETA,
 		},
 	)
 )
