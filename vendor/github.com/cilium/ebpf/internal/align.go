@@ -1,6 +1,8 @@
 package internal
 
+import "golang.org/x/exp/constraints"
+
 // Align returns 'n' updated to 'alignment' boundary.
-func Align(n, alignment int) int {
-	return (int(n) + alignment - 1) / alignment * alignment
+func Align[I constraints.Integer](n, alignment I) I {
+	return (n + alignment - 1) / alignment * alignment
 }

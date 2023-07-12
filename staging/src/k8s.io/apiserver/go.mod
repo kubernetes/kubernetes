@@ -112,7 +112,7 @@ require (
 	go.opentelemetry.io/proto/otlp v0.19.0 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e // indirect
+	golang.org/x/exp v0.0.0-20230224173230-c95f2b4c22f2 // indirect
 	golang.org/x/oauth2 v0.6.0 // indirect
 	golang.org/x/term v0.7.0 // indirect
 	golang.org/x/text v0.9.0 // indirect

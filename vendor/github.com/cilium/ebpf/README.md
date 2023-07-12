@@ -4,33 +4,37 @@
 
 ![HoneyGopher](.github/images/cilium-ebpf.png)
 
-eBPF is a pure Go library that provides utilities for loading, compiling, and
+ebpf-go is a pure Go library that provides utilities for loading, compiling, and
 debugging eBPF programs. It has minimal external dependencies and is intended to
 be used in long running processes.
 
-The library is maintained by [Cloudflare](https://www.cloudflare.com) and
-[Cilium](https://www.cilium.io).
-
-See [ebpf.io](https://ebpf.io) for other projects from the eBPF ecosystem.
+See [ebpf.io](https://ebpf.io) for complementary projects from the wider eBPF
+ecosystem.
 
 ## Getting Started
 
 A small collection of Go and eBPF programs that serve as examples for building
 your own tools can be found under [examples/](examples/).
 
-Contributions are highly encouraged, as they highlight certain use cases of
+[Contributions](CONTRIBUTING.md) are highly encouraged, as they highlight certain use cases of
 eBPF and the library, and help shape the future of the project.
 
 ## Getting Help
 
-Please
-[join](https://ebpf.io/slack) the
+The community actively monitors our [GitHub Discussions](https://github.com/cilium/ebpf/discussions) page.
+Please search for existing threads before starting a new one. Refrain from
+opening issues on the bug tracker if you're just starting out or if you're not
+sure if something is a bug in the library code.
+
+Alternatively, [join](https://ebpf.io/slack) the
 [#ebpf-go](https://cilium.slack.com/messages/ebpf-go) channel on Slack if you
-have questions regarding the library.
+have other questions regarding the project. Note that this channel is ephemeral
+and has its history erased past a certain point, which is less helpful for
+others running into the same problem later.
 
 ## Packages
 
-This library includes the following packages: 
+This library includes the following packages:
 
 * [asm](https://pkg.go.dev/github.com/cilium/ebpf/asm) contains a basic
   assembler, allowing you to write eBPF assembly instructions directly
@@ -38,7 +42,7 @@ This library includes the following packages:
 * [cmd/bpf2go](https://pkg.go.dev/github.com/cilium/ebpf/cmd/bpf2go) allows
   compiling and embedding eBPF programs written in C within Go code. As well as
   compiling the C code, it auto-generates Go code for loading and manipulating
-  the eBPF program and map objects. 
+  the eBPF program and map objects.
 * [link](https://pkg.go.dev/github.com/cilium/ebpf/link) allows attaching eBPF
   to various hooks
 * [perf](https://pkg.go.dev/github.com/cilium/ebpf/perf) allows reading from a
@@ -49,6 +53,7 @@ This library includes the following packages:
   of `bpftool feature probe` for discovering BPF-related kernel features using native Go.
 * [rlimit](https://pkg.go.dev/github.com/cilium/ebpf/rlimit) provides a convenient API to lift
   the `RLIMIT_MEMLOCK` constraint on kernels before 5.11.
+* [btf](https://pkg.go.dev/github.com/cilium/ebpf/btf) allows reading the BPF Type Format.
 
 ## Requirements
 

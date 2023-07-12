@@ -1,5 +1,4 @@
 //go:build 386 || amd64p32 || arm || mipsle || mips64p32le
-// +build 386 amd64p32 arm mipsle mips64p32le
 
 package sys
 

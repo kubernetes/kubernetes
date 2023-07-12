@@ -131,13 +131,15 @@ github.com/chai2010/gettext-go/po
 ## explicit; go 1.13
 github.com/checkpoint-restore/go-criu/v5
 github.com/checkpoint-restore/go-criu/v5/rpc
-# github.com/cilium/ebpf v0.9.1
-## explicit; go 1.17
+# github.com/cilium/ebpf v0.11.0
+## explicit; go 1.19
 github.com/cilium/ebpf
 github.com/cilium/ebpf/asm
 github.com/cilium/ebpf/btf
 github.com/cilium/ebpf/internal
+github.com/cilium/ebpf/internal/kconfig
 github.com/cilium/ebpf/internal/sys
+github.com/cilium/ebpf/internal/tracefs
 github.com/cilium/ebpf/internal/unix
 github.com/cilium/ebpf/link
 # github.com/container-storage-interface/spec v1.8.0
@@ -958,9 +960,10 @@ golang.org/x/crypto/pkcs12/internal/rc2
 golang.org/x/crypto/salsa20/salsa
 golang.org/x/crypto/ssh
 golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
-# golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e
+# golang.org/x/exp v0.0.0-20230224173230-c95f2b4c22f2
 ## explicit; go 1.18
 golang.org/x/exp/constraints
+golang.org/x/exp/maps
 golang.org/x/exp/slices
 # golang.org/x/mod v0.10.0
 ## explicit; go 1.17

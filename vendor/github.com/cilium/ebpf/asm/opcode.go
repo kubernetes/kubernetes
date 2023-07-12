@@ -9,10 +9,10 @@ import (
 
 // Class of operations
 //
-//    msb      lsb
-//    +---+--+---+
-//    |  ??  |CLS|
-//    +---+--+---+
+//	msb      lsb
+//	+---+--+---+
+//	|  ??  |CLS|
+//	+---+--+---+
 type Class uint8
 
 const classMask OpCode = 0x07
@@ -70,10 +70,10 @@ func (cls Class) isJumpOrALU() bool {
 //
 // Its encoding is defined by a Class value:
 //
-//    msb      lsb
-//    +----+-+---+
-//    | ???? |CLS|
-//    +----+-+---+
+//	msb      lsb
+//	+----+-+---+
+//	| ???? |CLS|
+//	+----+-+---+
 type OpCode uint8
 
 // InvalidOpCode is returned by setters on OpCode

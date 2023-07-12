@@ -15,7 +15,7 @@ func AttachSocketFilter(conn syscall.Conn, program *ebpf.Program) error {
 	}
 	var ssoErr error
 	err = rawConn.Control(func(fd uintptr) {
-		ssoErr = syscall.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_ATTACH_BPF, program.FD())
+		ssoErr = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_ATTACH_BPF, program.FD())
 	})
 	if ssoErr != nil {
 		return ssoErr
@@ -31,7 +31,7 @@ func DetachSocketFilter(conn syscall.Conn) error {
 	}
 	var ssoErr error
 	err = rawConn.Control(func(fd uintptr) {
-		ssoErr = syscall.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_DETACH_BPF, 0)
+		ssoErr = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_DETACH_BPF, 0)
 	})
 	if ssoErr != nil {
 		return ssoErr

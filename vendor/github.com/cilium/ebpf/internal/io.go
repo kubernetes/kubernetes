@@ -2,10 +2,14 @@ package internal
 
 import (
 	"bufio"
+	"bytes"
 	"compress/gzip"
 	"errors"
+	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"sync"
 )
 
 // NewBufferedSectionReader wraps an io.ReaderAt in an appropriately-sized
@@ -59,4 +63,66 @@ func ReadAllCompressed(file string) ([]byte, error) {
 	defer gz.Close()
 
 	return io.ReadAll(gz)
+}
+
+// ReadUint64FromFile reads a uint64 from a file.
+//
+// format specifies the contents of the file in fmt.Scanf syntax.
+func ReadUint64FromFile(format string, path ...string) (uint64, error) {
+	filename := filepath.Join(path...)
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		return 0, fmt.Errorf("reading file %q: %w", filename, err)
+	}
+
+	var value uint64
+	n, err := fmt.Fscanf(bytes.NewReader(data), format, &value)
+	if err != nil {
+		return 0, fmt.Errorf("parsing file %q: %w", filename, err)
+	}
+	if n != 1 {
+		return 0, fmt.Errorf("parsing file %q: expected 1 item, got %d", filename, n)
+	}
+
+	return value, nil
+}
+
+type uint64FromFileKey struct {
+	format, path string
+}
+
+var uint64FromFileCache = struct {
+	sync.RWMutex
+	values map[uint64FromFileKey]uint64
+}{
+	values: map[uint64FromFileKey]uint64{},
+}
+
+// ReadUint64FromFileOnce is like readUint64FromFile but memoizes the result.
+func ReadUint64FromFileOnce(format string, path ...string) (uint64, error) {
+	filename := filepath.Join(path...)
+	key := uint64FromFileKey{format, filename}
+
+	uint64FromFileCache.RLock()
+	if value, ok := uint64FromFileCache.values[key]; ok {
+		uint64FromFileCache.RUnlock()
+		return value, nil
+	}
+	uint64FromFileCache.RUnlock()
+
+	value, err := ReadUint64FromFile(format, filename)
+	if err != nil {
+		return 0, err
+	}
+
+	uint64FromFileCache.Lock()
+	defer uint64FromFileCache.Unlock()
+
+	if value, ok := uint64FromFileCache.values[key]; ok {
+		// Someone else got here before us, use what is cached.
+		return value, nil
+	}
+
+	uint64FromFileCache.values[key] = value
+	return value, nil
 }

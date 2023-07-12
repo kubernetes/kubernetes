@@ -8,10 +8,22 @@ import (
 	"github.com/cilium/ebpf/internal/unix"
 )
 
+// ENOTSUPP is a Linux internal error code that has leaked into UAPI.
+//
+// It is not the same as ENOTSUP or EOPNOTSUPP.
+var ENOTSUPP = syscall.Errno(524)
+
 // BPF wraps SYS_BPF.
 //
 // Any pointers contained in attr must use the Pointer type from this package.
 func BPF(cmd Cmd, attr unsafe.Pointer, size uintptr) (uintptr, error) {
+	// Prevent the Go profiler from repeatedly interrupting the verifier,
+	// which could otherwise lead to a livelock due to receiving EAGAIN.
+	if cmd == BPF_PROG_LOAD || cmd == BPF_PROG_RUN {
+		maskProfilerSignal()
+		defer unmaskProfilerSignal()
+	}
+
 	for {
 		r1, _, errNo := unix.Syscall(unix.SYS_BPF, uintptr(cmd), uintptr(attr), size)
 		runtime.KeepAlive(attr)
@@ -33,10 +45,10 @@ func BPF(cmd Cmd, attr unsafe.Pointer, size uintptr) (uintptr, error) {
 
 // Info is implemented by all structs that can be passed to the ObjInfo syscall.
 //
-//    MapInfo
-//    ProgInfo
-//    LinkInfo
-//    BtfInfo
+//	MapInfo
+//	ProgInfo
+//	LinkInfo
+//	BtfInfo
 type Info interface {
 	info() (unsafe.Pointer, uint32)
 }
@@ -90,11 +102,44 @@ func NewObjName(name string) ObjName {
 	return result
 }
 
+// LogLevel controls the verbosity of the kernel's eBPF program verifier.
+type LogLevel uint32
+
+const (
+	BPF_LOG_LEVEL1 LogLevel = 1 << iota
+	BPF_LOG_LEVEL2
+	BPF_LOG_STATS
+)
+
 // LinkID uniquely identifies a bpf_link.
 type LinkID uint32
 
 // BTFID uniquely identifies a BTF blob loaded into the kernel.
 type BTFID uint32
+
+// TypeID identifies a type in a BTF blob.
+type TypeID uint32
+
+// MapFlags control map behaviour.
+type MapFlags uint32
+
+//go:generate stringer -type MapFlags
+
+const (
+	BPF_F_NO_PREALLOC MapFlags = 1 << iota
+	BPF_F_NO_COMMON_LRU
+	BPF_F_NUMA_NODE
+	BPF_F_RDONLY
+	BPF_F_WRONLY
+	BPF_F_STACK_BUILD_ID
+	BPF_F_ZERO_SEED
+	BPF_F_RDONLY_PROG
+	BPF_F_WRONLY_PROG
+	BPF_F_CLONE
+	BPF_F_MMAPABLE
+	BPF_F_PRESERVE_ELEMS
+	BPF_F_INNER_MAP
+)
 
 // wrappedErrno wraps syscall.Errno to prevent direct comparisons with
 // syscall.E* or unix.E* constants.
@@ -106,6 +151,13 @@ type wrappedErrno struct {
 
 func (we wrappedErrno) Unwrap() error {
 	return we.Errno
+}
+
+func (we wrappedErrno) Error() string {
+	if we.Errno == ENOTSUPP {
+		return "operation not supported"
+	}
+	return we.Errno.Error()
 }
 
 type syscallError struct {

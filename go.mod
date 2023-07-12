@@ -148,7 +148,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/chai2010/gettext-go v1.0.2 // indirect
 	github.com/checkpoint-restore/go-criu/v5 v5.3.0 // indirect
-	github.com/cilium/ebpf v0.9.1 // indirect
+	github.com/cilium/ebpf v0.11.0 // indirect
 	github.com/containerd/cgroups v1.1.0 // indirect
 	github.com/containerd/console v1.0.3 // indirect
 	github.com/containerd/ttrpc v1.2.2 // indirect
@@ -230,7 +230,7 @@ require (
 	go.starlark.net v0.0.0-20230525235612-a134d8f9ddca // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e // indirect
+	golang.org/x/exp v0.0.0-20230224173230-c95f2b4c22f2 // indirect
 	golang.org/x/mod v0.10.0 // indirect
 	golang.org/x/text v0.9.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
