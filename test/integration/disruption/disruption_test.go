@@ -50,13 +50,14 @@ import (
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/integration/util"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/clock"
 	"k8s.io/utils/pointer"
 )
 
 const stalePodDisruptionTimeout = 3 * time.Second
 
-func setup(t *testing.T) (*kubeapiservertesting.TestServer, *disruption.DisruptionController, informers.SharedInformerFactory, clientset.Interface, *apiextensionsclientset.Clientset, dynamic.Interface) {
+func setup(ctx context.Context, t *testing.T) (*kubeapiservertesting.TestServer, *disruption.DisruptionController, informers.SharedInformerFactory, clientset.Interface, *apiextensionsclientset.Clientset, dynamic.Interface) {
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins", "ServiceAccount"}, framework.SharedEtcd())
 
 	clientSet, err := clientset.NewForConfig(server.ClientConfig)
@@ -88,6 +89,7 @@ func setup(t *testing.T) (*kubeapiservertesting.TestServer, *disruption.Disrupti
 	}
 
 	pdbc := disruption.NewDisruptionControllerInternal(
+		ctx,
 		informers.Core().V1().Pods(),
 		informers.Policy().V1().PodDisruptionBudgets(),
 		informers.Core().V1().ReplicationControllers(),
@@ -105,11 +107,13 @@ func setup(t *testing.T) (*kubeapiservertesting.TestServer, *disruption.Disrupti
 }
 
 func TestPDBWithScaleSubresource(t *testing.T) {
-	s, pdbc, informers, clientSet, apiExtensionClient, dynamicClient := setup(t)
-	defer s.TearDownFn()
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	s, pdbc, informers, clientSet, apiExtensionClient, dynamicClient := setup(ctx, t)
+	defer s.TearDownFn()
 	defer cancel()
+
 	nsName := "pdb-scale-subresource"
 	createNs(ctx, t, nsName, clientSet)
 
@@ -238,10 +242,11 @@ func TestEmptySelector(t *testing.T) {
 
 	for i, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			s, pdbc, informers, clientSet, _, _ := setup(t)
-			defer s.TearDownFn()
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 
-			ctx, cancel := context.WithCancel(context.Background())
+			s, pdbc, informers, clientSet, _, _ := setup(ctx, t)
+			defer s.TearDownFn()
 			defer cancel()
 
 			nsName := fmt.Sprintf("pdb-empty-selector-%d", i)
@@ -354,10 +359,11 @@ func TestSelectorsForPodsWithoutLabels(t *testing.T) {
 
 	for i, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			s, pdbc, informers, clientSet, _, _ := setup(t)
-			defer s.TearDownFn()
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 
-			ctx, cancel := context.WithCancel(context.Background())
+			s, pdbc, informers, clientSet, _, _ := setup(ctx, t)
+			defer s.TearDownFn()
 			defer cancel()
 
 			nsName := fmt.Sprintf("pdb-selectors-%d", i)
@@ -508,12 +514,12 @@ func waitToObservePods(t *testing.T, podInformer cache.SharedIndexInformer, podN
 }
 
 func TestPatchCompatibility(t *testing.T) {
-	s, pdbc, _, clientSet, _, _ := setup(t)
-	defer s.TearDownFn()
+	ctx, cancel := context.WithCancel(context.Background())
 
+	s, pdbc, _, clientSet, _, _ := setup(ctx, t)
+	defer s.TearDownFn()
 	// Even though pdbc isn't used in this test, its creation is already
 	// spawning some goroutines. So we need to run it to ensure they won't leak.
-	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	pdbc.Run(ctx)
 
@@ -653,10 +659,11 @@ func TestPatchCompatibility(t *testing.T) {
 }
 
 func TestStalePodDisruption(t *testing.T) {
-	s, pdbc, informers, clientSet, _, _ := setup(t)
-	defer s.TearDownFn()
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	s, pdbc, informers, clientSet, _, _ := setup(ctx, t)
+	defer s.TearDownFn()
 	defer cancel()
 
 	nsName := "pdb-stale-pod-disruption"
