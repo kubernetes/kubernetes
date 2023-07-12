@@ -224,6 +224,8 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 				return nil, fmt.Errorf("running with swap on is not supported, please disable swap! or set --fail-swap-on flag to false. /proc/swaps contained: %v", swapLines)
 			}
 		}
+	} else if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeSwap) && !cgroups.IsCgroup2UnifiedMode() {
+		return nil, fmt.Errorf("running swap with cgroups v1 is not supported. please either disable %s feature gate", kubefeatures.NodeSwap)
 	}
 
 	var internalCapacity = v1.ResourceList{}
