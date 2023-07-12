@@ -275,6 +275,11 @@ func TestQuantity(t *testing.T) {
 			expectValue: falseVal,
 		},
 		{
+			name:        "is_integer",
+			expr:        `quantity("50").isInteger()`,
+			expectValue: trueVal,
+		},
+		{
 			name:        "as_float",
 			expr:        `quantity("50.703k").asApproximateFloat()`,
 			expectValue: types.Double(50703),
