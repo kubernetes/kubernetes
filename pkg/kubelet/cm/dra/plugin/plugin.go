@@ -54,6 +54,7 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 	// Storing endpoint of newly registered DRA Plugin into the map, where plugin name will be the key
 	// all other DRA components will be able to get the actual socket of DRA plugins by its name.
 	draPlugins.Set(pluginName, &Plugin{
+		conn:                    nil,
 		endpoint:                endpoint,
 		highestSupportedVersion: highestSupportedVersion,
 	})
