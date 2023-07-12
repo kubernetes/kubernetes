@@ -43,6 +43,7 @@ func startEndpointSliceController(ctx context.Context, controllerContext Control
 
 func startEndpointSliceMirroringController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	go endpointslicemirroringcontroller.NewController(
+		ctx,
 		controllerContext.InformerFactory.Core().V1().Endpoints(),
 		controllerContext.InformerFactory.Discovery().V1().EndpointSlices(),
 		controllerContext.InformerFactory.Core().V1().Services(),

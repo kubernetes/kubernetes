@@ -44,6 +44,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -275,7 +276,7 @@ func (f *fakePodControl) CreatePods(ctx context.Context, namespace string, templ
 
 	ds := object.(*apps.DaemonSet)
 	dsKey, _ := controller.KeyFunc(ds)
-	f.expectations.CreationObserved(dsKey)
+	f.expectations.CreationObserved(klog.FromContext(ctx), dsKey)
 
 	return nil
 }
@@ -295,7 +296,7 @@ func (f *fakePodControl) DeletePod(ctx context.Context, namespace string, podID 
 
 	ds := object.(*apps.DaemonSet)
 	dsKey, _ := controller.KeyFunc(ds)
-	f.expectations.DeletionObserved(dsKey)
+	f.expectations.DeletionObserved(klog.FromContext(ctx), dsKey)
 
 	return nil
 }
@@ -424,7 +425,7 @@ func clearExpectations(t *testing.T, manager *daemonSetsController, ds *apps.Dae
 		t.Errorf("Could not get key for daemon.")
 		return
 	}
-	manager.expectations.DeleteExpectations(key)
+	manager.expectations.DeleteExpectations(logger, key)
 
 	now := manager.failedPodsBackoff.Clock.Now()
 	hash, _ := currentDSHash(manager, ds)
@@ -836,6 +837,7 @@ func TestSimpleDaemonSetPodCreateErrors(t *testing.T) {
 }
 
 func TestDaemonSetPodCreateExpectationsError(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	strategies := updateStrategies()
 	for _, strategy := range strategies {
 		ds := newDaemonSet("foo")
@@ -860,7 +862,7 @@ func TestDaemonSetPodCreateExpectationsError(t *testing.T) {
 			t.Fatalf("error get DaemonSets controller key: %v", err)
 		}
 
-		if !manager.expectations.SatisfiedExpectations(dsKey) {
+		if !manager.expectations.SatisfiedExpectations(logger, dsKey) {
 			t.Errorf("Unsatisfied pod creation expectations. Expected %d", creationExpectations)
 		}
 	}

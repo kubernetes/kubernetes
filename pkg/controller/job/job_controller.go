@@ -296,7 +296,7 @@ func (jm *Controller) addPod(logger klog.Logger, obj interface{}) {
 		if err != nil {
 			return
 		}
-		jm.expectations.CreationObserved(jobKey)
+		jm.expectations.CreationObserved(logger, jobKey)
 		jm.enqueueSyncJobBatched(logger, job)
 		return
 	}
@@ -436,7 +436,7 @@ func (jm *Controller) deletePod(logger klog.Logger, obj interface{}, final bool)
 	if err != nil {
 		return
 	}
-	jm.expectations.DeletionObserved(jobKey)
+	jm.expectations.DeletionObserved(logger, jobKey)
 
 	// Consider the finalizer removed if this is the final delete. Otherwise,
 	// it's an update for the deletion timestamp, then check finalizer.
@@ -725,7 +725,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			logger.V(4).Info("Job has been deleted", "key", key)
-			jm.expectations.DeleteExpectations(key)
+			jm.expectations.DeleteExpectations(logger, key)
 			jm.finalizerExpectations.deleteExpectations(logger, key)
 
 			err := jm.podBackoffStore.removeBackoffRecord(key)
@@ -775,7 +775,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 	// Check the expectations of the job before counting active pods, otherwise a new pod can sneak in
 	// and update the expectations after we've retrieved active pods from the store. If a new pod enters
 	// the store after we've checked the expectation, the job sync is just deferred till the next relist.
-	satisfiedExpectations := jm.expectations.SatisfiedExpectations(key)
+	satisfiedExpectations := jm.expectations.SatisfiedExpectations(logger, key)
 
 	pods, err := jm.getPodsForJob(ctx, &job)
 	if err != nil {
@@ -785,7 +785,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 	jobCtx := &syncJobCtx{
 		job:                  &job,
 		pods:                 pods,
-		activePods:           controller.FilterActivePods(pods),
+		activePods:           controller.FilterActivePods(logger, pods),
 		uncounted:            newUncountedTerminatedPods(*job.Status.UncountedTerminatedPods),
 		expectedRmFinalizers: jm.finalizerExpectations.getExpectedUIDs(key),
 	}
@@ -947,7 +947,7 @@ func (jm *Controller) deleteJobPods(ctx context.Context, job *batch.Job, jobKey 
 
 	failDelete := func(pod *v1.Pod, err error) {
 		// Decrement the expected number of deletes because the informer won't observe this deletion
-		jm.expectations.DeletionObserved(jobKey)
+		jm.expectations.DeletionObserved(logger, jobKey)
 		if !apierrors.IsNotFound(err) {
 			logger.V(2).Info("Failed to delete Pod", "job", klog.KObj(job), "pod", klog.KObj(pod), "err", err)
 			atomic.AddInt32(&successfulDeletes, -1)
@@ -1394,7 +1394,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 	if jobSuspended(job) {
 		logger.V(4).Info("Deleting all active pods in suspended job", "job", klog.KObj(job), "active", active)
 		podsToDelete := activePodsForRemoval(job, jobCtx.activePods, int(active))
-		jm.expectations.ExpectDeletions(jobKey, len(podsToDelete))
+		jm.expectations.ExpectDeletions(logger, jobKey, len(podsToDelete))
 		removed, err := jm.deleteJobPods(ctx, job, jobKey, podsToDelete)
 		active -= removed
 		return active, metrics.JobSyncActionPodsDeleted, err
@@ -1431,7 +1431,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 		podsToDelete = podsToDelete[:MaxPodCreateDeletePerSync]
 	}
 	if len(podsToDelete) > 0 {
-		jm.expectations.ExpectDeletions(jobKey, len(podsToDelete))
+		jm.expectations.ExpectDeletions(logger, jobKey, len(podsToDelete))
 		logger.V(4).Info("Too many pods running for job", "job", klog.KObj(job), "deleted", len(podsToDelete), "target", wantActive)
 		removed, err := jm.deleteJobPods(ctx, job, jobKey, podsToDelete)
 		active -= removed
@@ -1453,7 +1453,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 			diff = int32(MaxPodCreateDeletePerSync)
 		}
 
-		jm.expectations.ExpectCreations(jobKey, int(diff))
+		jm.expectations.ExpectCreations(logger, jobKey, int(diff))
 		errCh := make(chan error, diff)
 		logger.V(4).Info("Too few pods running", "key", jobKey, "need", wantActive, "creating", diff)
 
@@ -1511,7 +1511,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 						defer utilruntime.HandleError(err)
 						// Decrement the expected number of creates because the informer won't observe this pod
 						logger.V(2).Info("Failed creation, decrementing expectations", "job", klog.KObj(job))
-						jm.expectations.CreationObserved(jobKey)
+						jm.expectations.CreationObserved(logger, jobKey)
 						atomic.AddInt32(&active, -1)
 						errCh <- err
 					}
@@ -1525,7 +1525,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 				active -= skippedPods
 				for i := int32(0); i < skippedPods; i++ {
 					// Decrement the expected number of creates because the informer won't observe this pod
-					jm.expectations.CreationObserved(jobKey)
+					jm.expectations.CreationObserved(logger, jobKey)
 				}
 				// The skipped pods will be retried later. The next controller resync will
 				// retry the slow start process.

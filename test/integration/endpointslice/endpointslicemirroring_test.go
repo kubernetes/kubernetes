@@ -70,6 +70,7 @@ func TestEndpointSliceMirroring(t *testing.T) {
 		1*time.Second)
 
 	epsmController := endpointslicemirroring.NewController(
+		ctx,
 		informers.Core().V1().Endpoints(),
 		informers.Discovery().V1().EndpointSlices(),
 		informers.Core().V1().Services(),
@@ -311,6 +312,7 @@ func TestEndpointSliceMirroring(t *testing.T) {
 }
 
 func TestEndpointSliceMirroringUpdates(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
 	defer server.TearDownFn()
@@ -324,6 +326,7 @@ func TestEndpointSliceMirroringUpdates(t *testing.T) {
 	informers := informers.NewSharedInformerFactory(client, resyncPeriod)
 
 	epsmController := endpointslicemirroring.NewController(
+		ctx,
 		informers.Core().V1().Endpoints(),
 		informers.Discovery().V1().EndpointSlices(),
 		informers.Core().V1().Services(),
@@ -332,7 +335,6 @@ func TestEndpointSliceMirroringUpdates(t *testing.T) {
 		1*time.Second)
 
 	// Start informer and controllers
-	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	informers.Start(ctx.Done())
@@ -487,6 +489,7 @@ func TestEndpointSliceMirroringUpdates(t *testing.T) {
 }
 
 func TestEndpointSliceMirroringSelectorTransition(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
 	defer server.TearDownFn()
@@ -500,6 +503,7 @@ func TestEndpointSliceMirroringSelectorTransition(t *testing.T) {
 	informers := informers.NewSharedInformerFactory(client, resyncPeriod)
 
 	epsmController := endpointslicemirroring.NewController(
+		ctx,
 		informers.Core().V1().Endpoints(),
 		informers.Discovery().V1().EndpointSlices(),
 		informers.Core().V1().Services(),
@@ -508,7 +512,6 @@ func TestEndpointSliceMirroringSelectorTransition(t *testing.T) {
 		1*time.Second)
 
 	// Start informer and controllers
-	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	informers.Start(ctx.Done())
