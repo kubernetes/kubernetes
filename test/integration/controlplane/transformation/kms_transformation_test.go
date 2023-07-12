@@ -163,8 +163,7 @@ resources:
 		t.Fatalf("expected secret to be prefixed with %s, but got %s", wantPrefix, rawEnvelope)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	ctx := testContext(t)
 	decryptResponse, err := pluginMock.Decrypt(ctx, &kmsapi.DecryptRequest{Version: kmsAPIVersion, Cipher: envelopeData.cipherTextDEK()})
 	if err != nil {
 		t.Fatalf("failed to decrypt DEK, %v", err)
@@ -369,8 +368,7 @@ resources:
 	// wait for config to be observed
 	verifyIfKMSTransformersSwapped(t, wantPrefixForSecrets, test)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	t.Cleanup(cancel)
+	ctx := testContext(t)
 
 	// run storage migration
 	// get secrets
@@ -494,7 +492,7 @@ resources:
 		t.Fatalf("Failed to restart api server, error: %v", err)
 	}
 
-	// confirm that reading a secret still works
+	// confirms that reading a secret still works and confirms that data persists across restarts
 	_, err = test.restClient.CoreV1().Secrets(testNamespace).Get(
 		ctx,
 		testSecret,

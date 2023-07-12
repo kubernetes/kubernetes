@@ -47,6 +47,7 @@ import (
 	"k8s.io/klog/v2"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration"
+	"k8s.io/kubernetes/test/integration/controlplane/transformation/testutil"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/yaml"
@@ -80,7 +81,7 @@ type transformTest struct {
 	restClient        *kubernetes.Clientset
 	ns                *corev1.Namespace
 	secret            *corev1.Secret
-	apiServer         *etcd.APIServer
+	apiServer         *testutil.APIServer
 }
 
 func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML string, reload bool, configDir string) (*transformTest, error) {
@@ -100,7 +101,7 @@ func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML strin
 		e.configDir = configDir
 	}
 	t := l.(*testing.T)
-	e.apiServer, err = etcd.StartRealAPIServerOrDieForKMS(t, e.getEncryptionOptions(reload))
+	e.apiServer, err = testutil.StartRealAPIServerOrDieForKMS(t, e.getEncryptionOptions(reload))
 	if err != nil {
 		return &e, fmt.Errorf("error while starting KubeAPIServer: %w", err)
 	}
@@ -154,7 +155,7 @@ func (e *transformTest) restartAPIServer(l kubeapiservertesting.Logger, transfor
 		e.configDir = configDir
 	}
 	t := l.(*testing.T)
-	err := etcd.Restart(t, e.getEncryptionOptions(reload), e.apiServer)
+	err := testutil.Restart(t, e.getEncryptionOptions(reload), e.apiServer)
 	if err != nil {
 		return fmt.Errorf("error while restarting KubeAPIServer: %v", err)
 	}

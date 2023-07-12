@@ -170,8 +170,8 @@ resources:
 		t.Fatalf("expected secret to be prefixed with %s, but got %s", wantPrefix, rawEnvelope)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	ctx := testContext(t)
+
 	ciphertext, err := envelopeData.cipherTextDEK()
 	if err != nil {
 		t.Fatalf("failed to get ciphertext DEK from KMSv2 Plugin: %v", err)
@@ -397,8 +397,7 @@ resources:
 func TestKMSv2ProviderDEKReuse(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2, true)()
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	t.Cleanup(cancel)
+	ctx := testContext(t)
 
 	encryptionConfig := `
 kind: EncryptionConfiguration
@@ -614,8 +613,7 @@ resources:
 
 	// the CRDs have already been created as part of etcd.StartRealAPIServerOrDieForKMS()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	t.Cleanup(cancel)
+	ctx := testContext(t)
 
 	gvr := schema.GroupVersionResource{Group: "awesome.bears.com", Version: "v1", Resource: "pandas"}
 	stub := etcd.GetEtcdStorageData()[gvr].Stub
@@ -704,8 +702,7 @@ resources:
 		t.Fatalf("expected secret to be prefixed with %s, but got %s", wantPrefix, rawEnvelope)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	ctx := testContext(t)
 	ciphertext, err := envelopeData.cipherTextDEK()
 	if err != nil {
 		t.Fatalf("failed to get ciphertext DEK from KMSv2 Plugin: %v", err)

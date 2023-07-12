@@ -17,9 +17,7 @@ limitations under the License.
 package transformation
 
 import (
-	"context"
 	"testing"
-	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,8 +46,7 @@ func createResources(t *testing.T, test *transformTest,
 			t.Fatalf("Failed to create test configmap, error: %v, name: %s, ns: %s", err, name, namespace)
 		}
 	default:
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		t.Cleanup(cancel)
+		ctx := testContext(t)
 
 		gvr := schema.GroupVersionResource{Group: group, Version: version, Resource: resource}
 		data := etcd.GetEtcdStorageData()[gvr]
@@ -108,6 +105,7 @@ resources:
 		namespace string
 	}{
 		{"", "v1", "ConfigMap", "configmaps", "cm1", testNamespace},
+		// the storage registry for CRs is dynamic so create one to exercise the wiring
 		{"apiextensions.k8s.io", "v1", "CustomResourceDefinition", "customresourcedefinitions", "pandas.awesome.bears.com", ""},
 		{"awesome.bears.com", "v1", "Panda", "pandas", "cr3panda", ""},
 		{"apiregistration.k8s.io", "v1", "APIService", "apiservices", "as2.foo.com", ""},

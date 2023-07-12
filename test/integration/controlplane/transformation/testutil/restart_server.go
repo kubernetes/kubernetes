@@ -21,7 +21,7 @@ one of every type of resource. If a test requires the restart of an API server,
 then StartRealAPIServerOrDieForKMS and Restart can be used. It can restart the API server
 without impacting the ETCD data or affecting client connections.
 */
-package etcd
+package testutil
 
 import (
 	"bytes"
@@ -59,12 +59,37 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	_ "k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/test/integration"
+	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils"
 	netutils "k8s.io/utils/net"
 )
 
-func createLocalhostListenerOnFreePort(t *testing.T, port int, errCh chan error) (net.Listener, int, error) {
+// This key is for testing purposes only and is not considered secure.
+const ecdsaPrivateKey = `-----BEGIN EC PRIVATE KEY-----
+MHcCAQEEIEZmTmUhuanLjPA2CLquXivuwBDHTt5XYwgIr/kA1LtRoAoGCCqGSM49
+AwEHoUQDQgAEH6cuzP8XuD5wal6wf9M6xDljTOPLX2i8uIp/C/ASqiIGUeeKQtX0
+/IR3qCXyThP/dbCiHrF3v1cuhBOHY8CLVg==
+-----END EC PRIVATE KEY-----`
+
+// APIServer represents a running API server that is ready for use
+// The Cleanup func must be deferred to prevent resource leaks
+type APIServer struct {
+	Client           clientset.Interface
+	Dynamic          dynamic.Interface
+	Config           *restclient.Config
+	KV               clientv3.KV
+	Cleanup          func()
+	ServerOpts       *options.ServerRunOptions
+	EtcdClient       *clientv3.Client
+	StopCh           chan struct{}
+	ErrCh            chan error
+	SaSigningKeyFile *os.File
+	CertDir          string
+}
+
+func createLocalhostListenerOnFreePort(t *testing.T, port int, errCh chan error) (net.Listener, int) {
+	t.Helper()
 	address := fmt.Sprintf("127.0.0.1:%d", port)
 	var listener net.Listener
 	if err := wait.PollImmediate(time.Second, 2*time.Minute, func() (done bool, err error) {
@@ -86,21 +111,22 @@ func createLocalhostListenerOnFreePort(t *testing.T, port int, errCh chan error)
 		}
 		return false, nil
 	}); err != nil {
-		t.Log(err)
+		t.Fatal(err)
 	}
 
 	if port == 0 {
 		tcpAddr, ok := listener.Addr().(*net.TCPAddr)
 		if !ok {
 			listener.Close()
-			return nil, 0, fmt.Errorf("invalid listen address: %q", listener.Addr().String())
+			t.Fatalf("invalid listen address: %q", listener.Addr().String())
 		}
 		port = tcpAddr.Port
 	}
 
-	return listener, port, nil
+	return listener, port
 }
 func writeCACertFiles(t *testing.T, certDir string) ([]byte, string, *x509.Certificate, *rsa.PrivateKey) {
+	t.Helper()
 	caKey, err := utils.NewPrivateKey()
 	if err != nil {
 		t.Fatal(err)
@@ -122,6 +148,7 @@ func writeCACertFiles(t *testing.T, certDir string) ([]byte, string, *x509.Certi
 }
 
 func writeClientCerts(t *testing.T, caCert *x509.Certificate, caKey *rsa.PrivateKey, certDir string, duration time.Duration) ([]byte, []byte) {
+	t.Helper()
 	key, err := utils.NewPrivateKey()
 	if err != nil {
 		t.Fatal(err)
@@ -137,10 +164,6 @@ func writeClientCerts(t *testing.T, caCert *x509.Certificate, caKey *rsa.Private
 		Bytes: keyBytes,
 	})
 	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := os.WriteFile(filepath.Join(certDir, "client.key"), pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyBytes}), 0666); err != nil {
 		t.Fatal(err)
 	}
 
@@ -177,14 +200,11 @@ func writeClientCerts(t *testing.T, caCert *x509.Certificate, caKey *rsa.Private
 		t.Fatal(err)
 	}
 
-	if err := os.WriteFile(filepath.Join(certDir, "client.crt"), pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDERBytes}), 0666); err != nil {
-		t.Fatal(err)
-	}
-
 	return certPEM.Bytes(), keyPEM.Bytes()
 }
 
 func writeServingCerts(t *testing.T, caCert *x509.Certificate, caKey *rsa.PrivateKey, certDir string, duration time.Duration) (string, string) {
+	t.Helper()
 	key, err := utils.NewPrivateKey()
 	if err != nil {
 		t.Fatal(err)
@@ -249,6 +269,7 @@ func writeServingCerts(t *testing.T, caCert *x509.Certificate, caKey *rsa.Privat
 // StartRealAPIServerOrDieForKMS starts an API server that is appropriate for use in tests that require one of every resource
 // and it creates all the test CRDs
 func StartRealAPIServerOrDieForKMS(t *testing.T, customFlags []string) (*APIServer, error) {
+	t.Helper()
 	certDir := t.TempDir()
 	_, defaultServiceClusterIPRange, err := netutils.ParseCIDRSloppy("10.0.0.0/24")
 	if err != nil {
@@ -325,7 +346,7 @@ func StartRealAPIServerOrDieForKMS(t *testing.T, customFlags []string) (*APIServ
 	}
 
 	// create CRDs so we can make sure that custom resources do not get lost
-	CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(kubeClientConfig), false, GetCustomResourceDefinitionData()...)
+	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(kubeClientConfig), false, etcd.GetCustomResourceDefinitionData()...)
 
 	return &APIServer{
 		Client:           kubeClient,
@@ -343,6 +364,7 @@ func StartRealAPIServerOrDieForKMS(t *testing.T, customFlags []string) (*APIServ
 }
 
 func healthCheck(t *testing.T, kubeClient *clientset.Clientset, errCh chan error) error {
+	t.Helper()
 	lastHealth := ""
 	attempt := 0
 	if err := wait.PollImmediate(time.Second, time.Minute, func() (done bool, err error) {
@@ -377,6 +399,7 @@ func healthCheck(t *testing.T, kubeClient *clientset.Clientset, errCh chan error
 
 // Restart restarts an API server
 func Restart(t *testing.T, customFlags []string, oldServer *APIServer) error {
+	t.Helper()
 	klog.Infof("Restart() customFlags: %v", customFlags)
 	close(oldServer.StopCh)
 	stopCh := make(chan struct{})
@@ -398,6 +421,7 @@ func Restart(t *testing.T, customFlags []string, oldServer *APIServer) error {
 
 }
 func start(t *testing.T, stopCh chan struct{}, errCh chan error, kubeAPIServerOptions *options.ServerRunOptions, storageConfig *storagebackend.Config, customFlags []string, saSigningKeyFile *os.File, certDir string, etcdClient *clientv3.Client) (cleanupFunc func()) {
+	t.Helper()
 	cleanup := func() {
 		close(stopCh)
 		if errCh != nil {
@@ -407,9 +431,6 @@ func start(t *testing.T, stopCh chan struct{}, errCh chan error, kubeAPIServerOp
 			}
 		}
 		utiltesting.CloseAndRemove(t, saSigningKeyFile)
-		if err := os.RemoveAll(certDir); err != nil {
-			t.Log(err)
-		}
 	}
 	defer func() {
 		// failed before we can set APIServer.Cleanup function
@@ -428,10 +449,7 @@ func start(t *testing.T, stopCh chan struct{}, errCh chan error, kubeAPIServerOp
 		kubeAPIServerOptions.Etcd.StorageConfig = *storageConfig
 	}
 
-	listener, port, err := createLocalhostListenerOnFreePort(t, kubeAPIServerOptions.SecureServing.BindPort, errCh)
-	if err != nil {
-		t.Fatalf("could not create listener: %v", err)
-	}
+	listener, port := createLocalhostListenerOnFreePort(t, kubeAPIServerOptions.SecureServing.BindPort, errCh)
 	kubeAPIServerOptions.SecureServing.Listener = listener
 	kubeAPIServerOptions.SecureServing.BindPort = port
 
