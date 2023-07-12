@@ -491,6 +491,22 @@
   - 10
   - 15
   - 30
+- name: disabled_metrics_total
+  help: The count of disabled metrics.
+  type: Counter
+  stabilityLevel: BETA
+- name: hidden_metrics_total
+  help: The count of hidden metrics.
+  type: Counter
+  stabilityLevel: BETA
+- name: feature_enabled
+  namespace: kubernetes
+  help: This metric records the data about the stage and enablement of a k8s feature.
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - name
+  - stage
 - name: healthcheck
   namespace: kubernetes
   help: This metric records the result of a single healthcheck.
@@ -508,3 +524,11 @@
   - name
   - status
   - type
+- name: registered_metrics_total
+  help: The count of registered metrics broken by stability level and deprecation
+    version.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - deprecated_version
+  - stability_level

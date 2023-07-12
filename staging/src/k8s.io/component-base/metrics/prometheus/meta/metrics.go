@@ -23,7 +23,7 @@ import (
 var (
 	RegisteredMetrics = k8smetrics.NewCounterVec(
 		&k8smetrics.CounterOpts{
-			Name:           "registered_metric_total",
+			Name:           "registered_metrics_total",
 			Help:           "The count of registered metrics broken by stability level and deprecation version.",
 			StabilityLevel: k8smetrics.BETA,
 		},
@@ -32,7 +32,7 @@ var (
 
 	DisabledMetricsTotal = k8smetrics.NewCounter(
 		&k8smetrics.CounterOpts{
-			Name:           "disabled_metric_total",
+			Name:           "disabled_metrics_total",
 			Help:           "The count of disabled metrics.",
 			StabilityLevel: k8smetrics.BETA,
 		},
@@ -40,7 +40,7 @@ var (
 
 	HiddenMetricsTotal = k8smetrics.NewCounter(
 		&k8smetrics.CounterOpts{
-			Name:           "hidden_metric_total",
+			Name:           "hidden_metrics_total",
 			Help:           "The count of hidden metrics.",
 			StabilityLevel: k8smetrics.BETA,
 		},
