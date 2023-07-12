@@ -149,12 +149,10 @@ var quantityLibraryDecls = map[string][]cel.FunctionOpt{
 	"add": {
 		cel.MemberOverload("quantity_add", []*cel.Type{apiservercel.QuantityType, apiservercel.QuantityType}, apiservercel.QuantityType, cel.BinaryBinding(quantityAdd)),
 		cel.MemberOverload("quantity_add_int", []*cel.Type{apiservercel.QuantityType, cel.IntType}, apiservercel.QuantityType, cel.BinaryBinding(quantityAddInt)),
-		// cel.MemberOverload("quantity_add_float", []*cel.Type{apiservercel.QuantityType, cel.DoubleType}, apiservercel.QuantityType, cel.UnaryBinding(quantityAddFloat)),
 	},
 	"sub": {
 		cel.MemberOverload("quantity_sub", []*cel.Type{apiservercel.QuantityType, apiservercel.QuantityType}, apiservercel.QuantityType, cel.BinaryBinding(quantitySub)),
 		cel.MemberOverload("quantity_sub_int", []*cel.Type{apiservercel.QuantityType, cel.IntType}, apiservercel.QuantityType, cel.BinaryBinding(quantitySubInt)),
-		// cel.MemberOverload("quantity_sub_float", []*cel.Type{apiservercel.QuantityType, cel.DoubleType}, apiservercel.QuantityType, cel.UnaryBinding(quantitySubFloat)),
 	},
 }
 
