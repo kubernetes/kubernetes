@@ -19,12 +19,16 @@ package kubernetesservice
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	v1informers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
+	v1listers "k8s.io/client-go/listers/core/v1"
 	core "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
 	netutils "k8s.io/utils/net"
 )
 
@@ -65,29 +69,33 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 		},
 	}
 	for _, test := range createTests {
-		master := Controller{}
-		fakeClient := fake.NewSimpleClientset()
-		master.client = fakeClient
-		master.CreateOrUpdateMasterServiceIfNeeded(test.serviceName, netutils.ParseIPSloppy("1.2.3.4"), test.servicePorts, test.serviceType, false)
-		creates := []core.CreateAction{}
-		for _, action := range fakeClient.Actions() {
-			if action.GetVerb() == "create" {
-				creates = append(creates, action.(core.CreateAction))
-			}
-		}
-		if test.expectCreate != nil {
-			if len(creates) != 1 {
-				t.Errorf("case %q: unexpected creations: %v", test.testName, creates)
-			} else {
-				obj := creates[0].GetObject()
-				if e, a := test.expectCreate.Spec, obj.(*corev1.Service).Spec; !reflect.DeepEqual(e, a) {
-					t.Errorf("case %q: expected create:\n%#v\ngot:\n%#v\n", test.testName, e, a)
+		t.Run(test.testName, func(t *testing.T) {
+			master := Controller{}
+			fakeClient := fake.NewSimpleClientset()
+			serviceStore := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+			master.serviceLister = v1listers.NewServiceLister(serviceStore)
+			master.client = fakeClient
+			master.CreateOrUpdateMasterServiceIfNeeded(test.serviceName, netutils.ParseIPSloppy("1.2.3.4"), test.servicePorts, test.serviceType, false)
+			creates := []core.CreateAction{}
+			for _, action := range fakeClient.Actions() {
+				if action.GetVerb() == "create" {
+					creates = append(creates, action.(core.CreateAction))
 				}
 			}
-		}
-		if test.expectCreate == nil && len(creates) > 1 {
-			t.Errorf("case %q: no create expected, yet saw: %v", test.testName, creates)
-		}
+			if test.expectCreate != nil {
+				if len(creates) != 1 {
+					t.Errorf("case %q: unexpected creations: %v", test.testName, creates)
+				} else {
+					obj := creates[0].GetObject()
+					if e, a := test.expectCreate.Spec, obj.(*corev1.Service).Spec; !reflect.DeepEqual(e, a) {
+						t.Errorf("case %q: expected create:\n%#v\ngot:\n%#v\n", test.testName, e, a)
+					}
+				}
+			}
+			if test.expectCreate == nil && len(creates) > 1 {
+				t.Errorf("case %q: no create expected, yet saw: %v", test.testName, creates)
+			}
+		})
 	}
 
 	reconcileTests := []struct {
@@ -347,32 +355,41 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 		},
 	}
 	for _, test := range reconcileTests {
-		master := Controller{}
-		fakeClient := fake.NewSimpleClientset(test.service)
-		master.client = fakeClient
-		err := master.CreateOrUpdateMasterServiceIfNeeded(test.serviceName, netutils.ParseIPSloppy("1.2.3.4"), test.servicePorts, test.serviceType, true)
-		if err != nil {
-			t.Errorf("case %q: unexpected error: %v", test.testName, err)
-		}
-		updates := []core.UpdateAction{}
-		for _, action := range fakeClient.Actions() {
-			if action.GetVerb() == "update" {
-				updates = append(updates, action.(core.UpdateAction))
+		t.Run(test.testName, func(t *testing.T) {
+			master := Controller{}
+			fakeClient := fake.NewSimpleClientset(test.service)
+			serviceInformer := v1informers.NewServiceInformer(fakeClient, metav1.NamespaceDefault, 12*time.Hour, cache.Indexers{})
+			serviceStore := serviceInformer.GetIndexer()
+			err := serviceStore.Add(test.service)
+			if err != nil {
+				t.Fatalf("unexpected error adding service %v to the store: %v", test.service, err)
 			}
-		}
-		if test.expectUpdate != nil {
-			if len(updates) != 1 {
-				t.Errorf("case %q: unexpected updates: %v", test.testName, updates)
-			} else {
-				obj := updates[0].GetObject()
-				if e, a := test.expectUpdate.Spec, obj.(*corev1.Service).Spec; !reflect.DeepEqual(e, a) {
-					t.Errorf("case %q: expected update:\n%#v\ngot:\n%#v\n", test.testName, e, a)
+			master.serviceLister = v1listers.NewServiceLister(serviceStore)
+			master.client = fakeClient
+			err = master.CreateOrUpdateMasterServiceIfNeeded(test.serviceName, netutils.ParseIPSloppy("1.2.3.4"), test.servicePorts, test.serviceType, true)
+			if err != nil {
+				t.Errorf("case %q: unexpected error: %v", test.testName, err)
+			}
+			updates := []core.UpdateAction{}
+			for _, action := range fakeClient.Actions() {
+				if action.GetVerb() == "update" {
+					updates = append(updates, action.(core.UpdateAction))
 				}
 			}
-		}
-		if test.expectUpdate == nil && len(updates) > 0 {
-			t.Errorf("case %q: no update expected, yet saw: %v", test.testName, updates)
-		}
+			if test.expectUpdate != nil {
+				if len(updates) != 1 {
+					t.Errorf("case %q: unexpected updates: %v", test.testName, updates)
+				} else {
+					obj := updates[0].GetObject()
+					if e, a := test.expectUpdate.Spec, obj.(*corev1.Service).Spec; !reflect.DeepEqual(e, a) {
+						t.Errorf("case %q: expected update:\n%#v\ngot:\n%#v\n", test.testName, e, a)
+					}
+				}
+			}
+			if test.expectUpdate == nil && len(updates) > 0 {
+				t.Errorf("case %q: no update expected, yet saw: %v", test.testName, updates)
+			}
+		})
 	}
 
 	nonReconcileTests := []struct {
@@ -406,31 +423,41 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 		},
 	}
 	for _, test := range nonReconcileTests {
-		master := Controller{}
-		fakeClient := fake.NewSimpleClientset(test.service)
-		master.client = fakeClient
-		err := master.CreateOrUpdateMasterServiceIfNeeded(test.serviceName, netutils.ParseIPSloppy("1.2.3.4"), test.servicePorts, test.serviceType, false)
-		if err != nil {
-			t.Errorf("case %q: unexpected error: %v", test.testName, err)
-		}
-		updates := []core.UpdateAction{}
-		for _, action := range fakeClient.Actions() {
-			if action.GetVerb() == "update" {
-				updates = append(updates, action.(core.UpdateAction))
+		t.Run(test.testName, func(t *testing.T) {
+			master := Controller{}
+			fakeClient := fake.NewSimpleClientset(test.service)
+			master.client = fakeClient
+			serviceInformer := v1informers.NewServiceInformer(fakeClient, metav1.NamespaceDefault, 12*time.Hour, cache.Indexers{})
+			serviceStore := serviceInformer.GetIndexer()
+			err := serviceStore.Add(test.service)
+			if err != nil {
+				t.Fatalf("unexpected error adding service %v to the store: %v", test.service, err)
 			}
-		}
-		if test.expectUpdate != nil {
-			if len(updates) != 1 {
-				t.Errorf("case %q: unexpected updates: %v", test.testName, updates)
-			} else {
-				obj := updates[0].GetObject()
-				if e, a := test.expectUpdate.Spec, obj.(*corev1.Service).Spec; !reflect.DeepEqual(e, a) {
-					t.Errorf("case %q: expected update:\n%#v\ngot:\n%#v\n", test.testName, e, a)
+			master.serviceLister = v1listers.NewServiceLister(serviceStore)
+
+			err = master.CreateOrUpdateMasterServiceIfNeeded(test.serviceName, netutils.ParseIPSloppy("1.2.3.4"), test.servicePorts, test.serviceType, false)
+			if err != nil {
+				t.Errorf("case %q: unexpected error: %v", test.testName, err)
+			}
+			updates := []core.UpdateAction{}
+			for _, action := range fakeClient.Actions() {
+				if action.GetVerb() == "update" {
+					updates = append(updates, action.(core.UpdateAction))
 				}
 			}
-		}
-		if test.expectUpdate == nil && len(updates) > 0 {
-			t.Errorf("case %q: no update expected, yet saw: %v", test.testName, updates)
-		}
+			if test.expectUpdate != nil {
+				if len(updates) != 1 {
+					t.Errorf("case %q: unexpected updates: %v", test.testName, updates)
+				} else {
+					obj := updates[0].GetObject()
+					if e, a := test.expectUpdate.Spec, obj.(*corev1.Service).Spec; !reflect.DeepEqual(e, a) {
+						t.Errorf("case %q: expected update:\n%#v\ngot:\n%#v\n", test.testName, e, a)
+					}
+				}
+			}
+			if test.expectUpdate == nil && len(updates) > 0 {
+				t.Errorf("case %q: no update expected, yet saw: %v", test.testName, updates)
+			}
+		})
 	}
 }

@@ -31,7 +31,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/storage"
+	v1informers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
+	v1listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
@@ -47,7 +50,9 @@ const (
 type Controller struct {
 	Config
 
-	client kubernetes.Interface
+	client        kubernetes.Interface
+	serviceLister v1listers.ServiceLister
+	serviceSynced cache.InformerSynced
 
 	lock   sync.Mutex
 	stopCh chan struct{} // closed by Stop()
@@ -67,17 +72,23 @@ type Config struct {
 }
 
 // New returns a controller for watching the kubernetes service endpoints.
-func New(config Config, client kubernetes.Interface) *Controller {
+func New(config Config, client kubernetes.Interface, serviceInformer v1informers.ServiceInformer) *Controller {
 	return &Controller{
-		Config: config,
-		client: client,
-		stopCh: make(chan struct{}),
+		Config:        config,
+		client:        client,
+		serviceLister: serviceInformer.Lister(),
+		serviceSynced: serviceInformer.Informer().HasSynced,
+		stopCh:        make(chan struct{}),
 	}
 }
 
 // Start begins the core controller loops that must exist for bootstrapping
 // a cluster.
 func (c *Controller) Start(stopCh <-chan struct{}) {
+	if !cache.WaitForCacheSync(stopCh, c.serviceSynced) {
+		runtime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+		return
+	}
 	// Reconcile during first run removing itself until server is ready.
 	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https")
 	if err := c.EndpointReconciler.RemoveEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts); err == nil {
@@ -153,20 +164,6 @@ func (c *Controller) Run(ch <-chan struct{}) {
 // UpdateKubernetesService attempts to update the default Kube service.
 func (c *Controller) UpdateKubernetesService(reconcile bool) error {
 	// Update service & endpoint records.
-	// TODO: when it becomes possible to change this stuff,
-	// stop polling and start watching.
-	// TODO: add endpoints of all replicas, not just the elected master.
-	if _, err := c.client.CoreV1().Namespaces().Get(context.TODO(), metav1.NamespaceDefault, metav1.GetOptions{}); err != nil {
-		if _, err := c.client.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      metav1.NamespaceDefault,
-				Namespace: "",
-			},
-		}, metav1.CreateOptions{}); err != nil && !errors.IsAlreadyExists(err) {
-			return err
-		}
-	}
-
 	servicePorts, serviceType := createPortAndServiceSpec(c.ServicePort, c.PublicServicePort, c.KubernetesServiceNodePort, "https")
 	if err := c.CreateOrUpdateMasterServiceIfNeeded(kubernetesServiceName, c.ServiceIP, servicePorts, serviceType, reconcile); err != nil {
 		return err
@@ -209,8 +206,9 @@ func createEndpointPortSpec(endpointPort int, endpointPortName string) []corev1.
 // CreateOrUpdateMasterServiceIfNeeded will create the specified service if it
 // doesn't already exist.
 func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, serviceIP net.IP, servicePorts []corev1.ServicePort, serviceType corev1.ServiceType, reconcile bool) error {
-	if s, err := c.client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), serviceName, metav1.GetOptions{}); err == nil {
+	if s, err := c.serviceLister.Services(metav1.NamespaceDefault).Get(serviceName); err == nil {
 		// The service already exists.
+		// This path is no executed since 1.17 2a9a9fa, keeping it in case it needs to be revisited
 		if reconcile {
 			if svc, updated := getMasterServiceUpdateIfNeeded(s, servicePorts, serviceType); updated {
 				klog.Warningf("Resetting master service %q to %#v", serviceName, svc)

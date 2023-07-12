@@ -483,7 +483,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		ServicePort:               c.ExtraConfig.APIServerServicePort,
 		PublicServicePort:         publicServicePort,
 		KubernetesServiceNodePort: c.ExtraConfig.KubernetesServiceNodePort,
-	}, clientset)
+	}, clientset, c.ExtraConfig.VersionedInformers.Core().V1().Services())
 	m.GenericAPIServer.AddPostStartHookOrDie("bootstrap-controller", func(hookContext genericapiserver.PostStartHookContext) error {
 		kubernetesServiceCtrl.Start(hookContext.StopCh)
 		return nil
