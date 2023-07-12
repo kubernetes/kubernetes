@@ -14,8 +14,8 @@ import (
 //
 // quantity
 //
-// Converts a string to a URL or results in an error if the string is not a valid URL. The URL must be an absolute URI
-// or an absolute path.
+// Converts a string to a Quantity or results in an error if the string is not a valid Quantity. Refer
+// to resource.Quantity documentation for information on accepted patterns.
 //
 //	quantity(<string>) <Quantity>
 //
@@ -44,44 +44,68 @@ import (
 //	isQuantity('Three') // returns false
 //	isQuantity('Mi') // returns false
 //
-// asApproximateFloat / asInteger
+// Conversion to Scalars:
 //
-// Return the parsed components of a URL.
+//   - isInteger: returns true iff asInteger is safe to call without an error
 //
-//   - asInteger: returns a representation of the current value as an int64 if a fast conversion
-//     is possible. If false is returned, callers must use the inf.Dec form of this quantity.
+//   - asInteger: returns a representation of the current value as an int64 if
+//     possible or results in an error if conversion would result in overflow
+//	   or loss of precision.
 //
 //   - asApproximateFloat: returns a float64 representation of the quantity which may
 //     lose precision. If the value of the quantity is outside the range of a float64
 //     +Inf/-Inf will be returned.
 //
+//     <Quantity>.isInteger() <bool>
+//     <Quantity>.asInteger() <int>
+//     <Quantity>.asApproximateFloat() <float>
+//
+// Examples:
+//
+// quantity("50000000G").isInteger() // returns true
+// quantity("50k").isInteger() // returns true
+// quantity("9999999999999999999999999999999999999G").asInteger() // error: cannot convert value to integer
+// quantity("9999999999999999999999999999999999999G").isInteger() // returns false
+// quantity("50k").asInteger() == 50000 // returns true
+// quantity("50k").sub(20000).asApproximateFloat() == 30000 // returns true
+//
+// Arithmetic
+//
 //   - sign: Returns `1` if the quantity is positive, `-1` if it is negative. `0` if it is zero
 //
 //   - add: Returns sum of two quantities or a quantity and an integer
-
+//
 //   - sub: Returns difference between two quantities or a quantity and an integer
 //
-//   - isGreaterThan: Returns true iff the receiver is greater than the operand
-//
-//   - isLessThan: Returns true iff the receiver is less than the operand
-//
-//   - compareTo: Compres receiver to operand and returns 0 if they are equal, 1 if the receiver is greater, or -1 if the receiver is less than the operand
-//
-//     <Quantity>.asInteger() <int>
-//     <Quantity>.asApproximateFloat() <float>
 //     <Quantity>.sign() <int>
 //     <Quantity>.add(<quantity>) <quantity>
 //     <Quantity>.add(<integer>) <quantity>
 //     <Quantity>.sub(<quantity>) <quantity>
 //     <Quantity>.sub(<integer>) <quantity>
+//
+// Examples:
+//
+// quantity("50k").add("20k") == quantity("70k") // returns true
+// quantity("50k").add(20) == quantity("50020") // returns true
+// quantity("50k").sub("20k") == quantity("30k") // returns true
+// quantity("50k").sub(20000) == quantity("30k") // returns true
+// quantity("50k").add(20).sub(quantity("100k")).sub(-50000) == quantity("20") // returns true
+//
+// Comparisons
+//
+//   - isGreaterThan: Returns true iff the receiver is greater than the operand
+//
+//   - isLessThan: Returns true iff the receiver is less than the operand
+//
+//   - compareTo: Compares receiver to operand and returns 0 if they are equal, 1 if the receiver is greater, or -1 if the receiver is less than the operand
+//
+//
 //     <Quantity>.isLessThan(<quantity>) <bool>
 //     <Quantity>.isGreaterThan(<quantity>) <bool>
 //     <Quantity>.compareTo(<quantity>) <int>
 //
 // Examples:
-// quantity("50k").add(20).sub(quantity("100k")).sub(-50000) == quantity("20") // returns true
-// quantity("50k").asInteger() == 50000 // returns true
-// quantity("50k").sub(20000).asApproximateFloat() == 30000 // returns true
+//
 // quantity("200M").compareTo(quantity("0.2G")) // returns 0
 // quantity("50M").compareTo(quantity("50Mi")) // returns -1
 // quantity("50Mi").compareTo(quantity("50M")) // returns 1
