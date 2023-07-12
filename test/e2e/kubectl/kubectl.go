@@ -1676,7 +1676,12 @@ metadata:
 			// we expect following values for: Major -> digit, Minor -> numeric followed by an optional '+',  GitCommit -> alphanumeric
 			requiredItems := []string{"Client Version: ", "Server Version: "}
 			for _, item := range requiredItems {
-				if matched, _ := regexp.MatchString(item+`v\d\.\d+\.[\d\w\-\.\+]+`, versionString); !matched {
+				// prior to 1.28 we printed long version information
+				oldMatched, _ := regexp.MatchString(item+`version.Info\{Major:"\d", Minor:"\d+\+?", GitVersion:"v\d\.\d+\.[\d\w\-\.\+]+", GitCommit:"[0-9a-f]+"`, versionString)
+				// 1.28+ prints short information
+				newMatched, _ := regexp.MatchString(item+`v\d\.\d+\.[\d\w\-\.\+]+`, versionString)
+				// due to backwards compatibility we need to match both until 1.30 most likely
+				if !oldMatched && !newMatched {
 					framework.Failf("Item %s value is not valid in %s\n", item, versionString)
 				}
 			}
