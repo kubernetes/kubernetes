@@ -13690,6 +13690,37 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				ResourceClaimStatuses: []core.PodResourceClaimStatus{
 					{Name: "my-claim", ResourceClaimName: utilpointer.String("foo-my-claim-12345")},
 					{Name: "my-other-claim", ResourceClaimName: nil},
+					{Name: "my-other-claim", ResourceClaimName: nil},
+				},
+			},
+		},
+		core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: core.PodSpec{
+				ResourceClaims: []core.PodResourceClaim{
+					{Name: "my-claim"},
+				},
+			},
+		},
+		`status.resourceClaimStatuses[2].name: Duplicate value: "my-other-claim"`,
+		"Duplicate ResourceClaimStatuses.Name",
+	}, {
+		core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: core.PodSpec{
+				ResourceClaims: []core.PodResourceClaim{
+					{Name: "my-claim"},
+					{Name: "my-other-claim"},
+				},
+			},
+			Status: core.PodStatus{
+				ResourceClaimStatuses: []core.PodResourceClaimStatus{
+					{Name: "my-claim", ResourceClaimName: utilpointer.String("foo-my-claim-12345")},
+					{Name: "my-other-claim", ResourceClaimName: nil},
 				},
 			},
 		},
