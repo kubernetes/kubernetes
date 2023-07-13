@@ -591,7 +591,7 @@ func takeByTopologyNUMADistributed(topo *topology.CPUTopology, availableCPUs cpu
 		acc.iterateCombinations(numas, k, func(combo []int) LoopControl {
 			// If we've already found a combo with a balance of 0 in a
 			// different iteration, then don't bother checking any others.
-			if bestBalance == 0 {
+			if bestBalance == 0 && bestBalanceInOneSocket {
 				return Break
 			}
 
@@ -601,7 +601,6 @@ func takeByTopologyNUMADistributed(topo *topology.CPUTopology, availableCPUs cpu
 			if cpus.Size() < numCPUs {
 				return Continue
 			}
-
 			// Check that CPUs can be handed out in groups of size
 			// 'cpuGroupSize' across the NUMA nodes in this combo.
 			numCPUGroups := 0
@@ -612,14 +611,14 @@ func takeByTopologyNUMADistributed(topo *topology.CPUTopology, availableCPUs cpu
 				return Continue
 			}
 
-			// Check that each NUMA node in this combination can allocate an
-			// even distribution of CPUs in groups of size 'cpuGroupSize',
-			// modulo some remainder.
+			//  Calculate an even distribution of CPUs in groups of size
+			// 'cpuGroupSize'.
 			distribution := (numCPUs / len(combo) / cpuGroupSize) * cpuGroupSize
 			for _, numa := range combo {
-				cpus := acc.details.CPUsInNUMANodes(numa)
-				if cpus.Size() < distribution {
-					return Continue
+				// distribution should not be more than available CPUs in each NUMA node in combo.
+				availableCPUsInNUMA := acc.details.CPUsInNUMANodes(numa).Size() / cpuGroupSize * cpuGroupSize
+				if distribution > availableCPUsInNUMA {
+					distribution = availableCPUsInNUMA
 				}
 			}
 
@@ -721,17 +720,22 @@ func takeByTopologyNUMADistributed(topo *topology.CPUTopology, availableCPUs cpu
 			// lowest "balance score" of all previous combos, then update this
 			// combo (and remainder set) to be the best one found so far.
 			if alignBySocket {
-				if topo.CPUDetails.IsNUMANodesInSameSocket(combo) && !bestBalanceInOneSocket {
+				if topo.CPUDetails.AreNUMANodesInSameSocket(combo) && !bestBalanceInOneSocket {
 					bestBalance = bestLocalBalance
 					bestRemainder = bestLocalRemainder
 					bestCombo = combo
 					bestBalanceInOneSocket = true
-				} else if topo.CPUDetails.IsNUMANodesInSameSocket(combo) == bestBalanceInOneSocket && bestLocalBalance < bestBalance {
+					return Continue
+				}
+				if topo.CPUDetails.AreNUMANodesInSameSocket(combo) == bestBalanceInOneSocket && bestLocalBalance < bestBalance {
 					bestBalance = bestLocalBalance
 					bestRemainder = bestLocalRemainder
 					bestCombo = combo
 				}
-			} else if bestLocalBalance < bestBalance {
+				return Continue
+			}
+
+			if bestLocalBalance < bestBalance {
 				bestBalance = bestLocalBalance
 				bestRemainder = bestLocalRemainder
 				bestCombo = combo
@@ -751,6 +755,12 @@ func takeByTopologyNUMADistributed(topo *topology.CPUTopology, availableCPUs cpu
 		// chosen. First allocate an even distribution of CPUs in groups of
 		// size 'cpuGroupSize' from 'bestCombo'.
 		distribution := (numCPUs / len(bestCombo) / cpuGroupSize) * cpuGroupSize
+		for _, numa := range bestCombo {
+			availableCPUsInNUMA := acc.details.CPUsInNUMANodes(numa).Size() / cpuGroupSize * cpuGroupSize
+			if distribution > availableCPUsInNUMA {
+				distribution = availableCPUsInNUMA
+			}
+		}
 		for _, numa := range bestCombo {
 			cpus, _ := takeByTopologyNUMAPacked(acc.topo, acc.details.CPUsInNUMANodes(numa), distribution)
 			acc.take(cpus)
