@@ -315,7 +315,8 @@ func addCompletionIndexLabel(template *v1.PodTemplateSpec, index int) {
 	if template.Labels == nil {
 		template.Labels = make(map[string]string, 1)
 	}
-	template.Labels[batch.JobCompletionIndexLabel] = strconv.Itoa(index)
+	// For consistency, we use the annotation batch.kubernetes.io/job-completion-index for the corresponding label as well.
+	template.Labels[batch.JobCompletionIndexAnnotation] = strconv.Itoa(index)
 }
 
 func podGenerateNameWithIndex(jobName string, index int) string {
