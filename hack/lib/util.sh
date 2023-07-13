@@ -423,6 +423,40 @@ kube::util::base_ref() {
   echo "${full_branch}"
 }
 
+# Checks whether there are any files in path $2 with a pattern $1
+# repeated between current branch and upstream branch.
+# Returns 0 (false) if there are no occurrences.
+#         1 (true) if there are occurrences detected.
+kube::util::contains_key() {
+  local pattern=$1
+  local folder_path=$2
+  local git_branch=$3
+
+  local base_ref
+  base_ref=$(kube::util::base_ref "${git_branch}")
+
+  files_with_word=$(git diff --name-only --diff-filter=dM "$base_ref"..HEAD -- "$folder_path" | xargs grep -il "$pattern")
+
+  if [[ -n "$files_with_word" ]]; then
+    echo "Use of '$pattern' is not allowed in $files_with_word"
+    return 1
+  fi
+  return 0
+}
+
+# Checks whether there are any files in path $2 with a pattern $1
+# repeated between current branch and upstream branch.
+kube::util::contains_blocklisted_words() {
+  local blacklisted_words=$1
+  local folder_path=$2
+  local git_branch=$3
+
+  for word in "${blacklisted_words[@]}"; do
+    kube::util::contains_key "${word}" "staging/src/k8s.io/kubectl/" "${git_branch}"
+  done
+}
+
+
 # Checks whether there are any files matching pattern $2 changed between the
 # current branch and upstream branch named by $1.
 # Returns 1 (false) if there are no changes

@@ -81,6 +81,7 @@ QUICK_PATTERNS+=(
   "verify-staging-meta-files.sh"
   "verify-test-featuregates.sh"
   "verify-test-images.sh"
+  "verify-blocklisted-occurrences.sh"
 )
 
 while IFS='' read -r line; do EXCLUDED_CHECKS+=("$line"); done < <(ls "${EXCLUDED_PATTERNS[@]/#/${KUBE_ROOT}/hack/}" 2>/dev/null || true)
