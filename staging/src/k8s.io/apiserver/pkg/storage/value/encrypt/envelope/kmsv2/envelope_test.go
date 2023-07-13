@@ -484,7 +484,9 @@ func TestTransformToStorageError(t *testing.T) {
 }
 
 func TestEncodeDecode(t *testing.T) {
-	transformer := &envelopeTransformer{}
+	transformer := &envelopeTransformer{
+		encryptedObjectDecoder: newEncryptedObjectDecoder(),
+	}
 
 	obj := &kmstypes.EncryptedObject{
 		EncryptedData: []byte{0x01, 0x02, 0x03},
@@ -496,7 +498,10 @@ func TestEncodeDecode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("envelopeTransformer: error while encoding data: %s", err)
 	}
-	got, err := transformer.doDecode(data)
+
+	o := transformer.encryptedObjectDecoder.objectPool.Get().(*kmstypes.EncryptedObject)
+	defer transformer.encryptedObjectDecoder.objectPool.Put(o)
+	got, err := transformer.doDecode(data, o)
 	if err != nil {
 		t.Fatalf("envelopeTransformer: error while decoding data: %s", err)
 	}

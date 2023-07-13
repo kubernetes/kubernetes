@@ -22,6 +22,7 @@ import (
 	"crypto/aes"
 	"fmt"
 	"sort"
+	"sync"
 	"time"
 	"unsafe"
 
@@ -103,13 +104,18 @@ func (s *State) ValidateEncryptCapability() error {
 	return nil
 }
 
+type encryptedObjectDecoder struct {
+	objectPool *sync.Pool
+}
+
 type envelopeTransformer struct {
 	envelopeService kmsservice.Service
 	providerName    string
 	stateFunc       StateFunc
 
 	// cache is a thread-safe expiring lru cache which caches decrypted DEKs indexed by their encrypted form.
-	cache *simpleCache
+	cache                  *simpleCache
+	encryptedObjectDecoder *encryptedObjectDecoder
 }
 
 // NewEnvelopeTransformer returns a transformer which implements a KEK-DEK based envelope encryption scheme.
@@ -121,17 +127,31 @@ func NewEnvelopeTransformer(envelopeService kmsservice.Service, providerName str
 
 func newEnvelopeTransformerWithClock(envelopeService kmsservice.Service, providerName string, stateFunc StateFunc, cacheTTL time.Duration, clock clock.Clock) value.Transformer {
 	return &envelopeTransformer{
-		envelopeService: envelopeService,
-		providerName:    providerName,
-		stateFunc:       stateFunc,
-		cache:           newSimpleCache(clock, cacheTTL),
+		envelopeService:        envelopeService,
+		providerName:           providerName,
+		stateFunc:              stateFunc,
+		cache:                  newSimpleCache(clock, cacheTTL),
+		encryptedObjectDecoder: newEncryptedObjectDecoder(),
+	}
+}
+
+func newEncryptedObjectDecoder() *encryptedObjectDecoder {
+	return &encryptedObjectDecoder{
+		objectPool: &sync.Pool{
+			New: func() interface{} {
+				return &kmstypes.EncryptedObject{}
+			},
+		},
 	}
 }
 
 // TransformFromStorage decrypts data encrypted by this transformer using envelope encryption.
 func (t *envelopeTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
+	o := t.encryptedObjectDecoder.objectPool.Get().(*kmstypes.EncryptedObject)
+	defer t.encryptedObjectDecoder.objectPool.Put(o)
+
 	// Deserialize the EncryptedObject from the data.
-	encryptedObject, err := t.doDecode(data)
+	encryptedObject, err := t.doDecode(data, o)
 	if err != nil {
 		return nil, false, err
 	}
@@ -252,17 +272,30 @@ func (t *envelopeTransformer) doEncode(request *kmstypes.EncryptedObject) ([]byt
 }
 
 // doDecode decodes the byte array to an EncryptedObject.
-func (t *envelopeTransformer) doDecode(originalData []byte) (*kmstypes.EncryptedObject, error) {
-	o := &kmstypes.EncryptedObject{}
-	if err := proto.Unmarshal(originalData, o); err != nil {
+func (t *envelopeTransformer) doDecode(originalData []byte, o *kmstypes.EncryptedObject) (*kmstypes.EncryptedObject, error) {
+	buffer := proto.NewBuffer(originalData)
+
+	resetKMSv2EncryptedObject(o)
+	if err := buffer.Unmarshal(o); err != nil {
 		return nil, err
 	}
+
 	// validate the EncryptedObject
 	if err := validateEncryptedObject(o); err != nil {
 		return nil, err
 	}
 
 	return o, nil
+}
+
+func resetKMSv2EncryptedObject(o *kmstypes.EncryptedObject) {
+	o.EncryptedData = o.EncryptedDEK[0:0]
+	o.EncryptedDEK = o.EncryptedDEK[0:0]
+	o.KeyID = ""
+
+	for k := range o.Annotations {
+		delete(o.Annotations, k)
+	}
 }
 
 // GenerateTransformer generates a new transformer and encrypts the DEK using the envelope service.
