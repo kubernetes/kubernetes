@@ -3381,8 +3381,17 @@ func TestPreFilterDisabled(t *testing.T) {
 	cycleState := framework.NewCycleState()
 	gotStatus := p.(*PodTopologySpread).Filter(context.Background(), cycleState, pod, nodeInfo)
 	wantStatus := framework.AsStatus(fmt.Errorf(`reading "PreFilterPodTopologySpread" from cycleState: %w`, framework.ErrNotFound))
-	if !reflect.DeepEqual(gotStatus, wantStatus) {
-		t.Errorf("status does not match: %v, want: %v", gotStatus, wantStatus)
+
+	statusCmpOpts := []cmp.Option{
+		cmp.Comparer(func(s1 *framework.Status, s2 *framework.Status) bool {
+			if s1 == nil || s2 == nil {
+				return s1.IsSuccess() && s2.IsSuccess()
+			}
+			return s1.Code() == s2.Code() && s1.FailedPlugin() == s2.FailedPlugin() && s1.Message() == s2.Message()
+		}),
+	}
+	if diff := cmp.Diff(wantStatus, gotStatus, statusCmpOpts...); diff != "" {
+		t.Errorf("Unexpected status (-want, +got):\n%s", diff)
 	}
 }
 

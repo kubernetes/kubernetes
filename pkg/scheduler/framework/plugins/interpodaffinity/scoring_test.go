@@ -18,7 +18,6 @@ package interpodaffinity
 
 import (
 	"context"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -974,8 +973,8 @@ func TestPreferredAffinityWithHardPodAffinitySymmetricWeight(t *testing.T) {
 				t.Errorf("unexpected error: %v", status)
 			}
 
-			if !reflect.DeepEqual(test.expectedList, gotList) {
-				t.Errorf("expected:\n\t%+v,\ngot:\n\t%+v", test.expectedList, gotList)
+			if diff := cmp.Diff(test.expectedList, gotList); diff != "" {
+				t.Errorf("Unexpected NodeScoreList (-want, +got):\n%s", diff)
 			}
 		})
 	}

@@ -30,6 +30,15 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
+var cmpOpts = []cmp.Option{
+	cmp.Comparer(func(s1 *framework.Status, s2 *framework.Status) bool {
+		if s1 == nil || s2 == nil {
+			return s1.IsSuccess() && s2.IsSuccess()
+		}
+		return s1.Code() == s2.Code() && s1.FailedPlugin() == s2.FailedPlugin() && s1.Message() == s2.Message()
+	}),
+}
+
 func newPod(host string, hostPortInfos ...string) *v1.Pod {
 	networkPorts := []v1.ContainerPort{}
 	for _, portInfo := range hostPortInfos {
@@ -174,6 +183,9 @@ func TestPreFilterDisabled(t *testing.T) {
 	wantStatus := framework.AsStatus(fmt.Errorf(`reading "PreFilterNodePorts" from cycleState: %w`, framework.ErrNotFound))
 	if !reflect.DeepEqual(gotStatus, wantStatus) {
 		t.Errorf("status does not match: %v, want: %v", gotStatus, wantStatus)
+	}
+	if diff := cmp.Diff(wantStatus, gotStatus, cmpOpts...); diff != "" {
+		t.Errorf("Unexpected status (-want, +got):\n%s", diff)
 	}
 }
 

@@ -18,7 +18,6 @@ package framework
 
 import (
 	"fmt"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -67,8 +66,8 @@ func TestNewResource(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			r := NewResource(test.resourceList)
-			if !reflect.DeepEqual(test.expected, r) {
-				t.Errorf("expected: %#v, got: %#v", test.expected, r)
+			if diff := cmp.Diff(test.expected, r); diff != "" {
+				t.Errorf("Unexpected resource (-want, +got):\n%s", diff)
 			}
 		})
 	}
@@ -106,8 +105,8 @@ func TestResourceClone(t *testing.T) {
 			r := test.resource.Clone()
 			// Modify the field to check if the result is a clone of the origin one.
 			test.resource.MilliCPU += 1000
-			if !reflect.DeepEqual(test.expected, r) {
-				t.Errorf("expected: %#v, got: %#v", test.expected, r)
+			if diff := cmp.Diff(test.expected, r); diff != "" {
+				t.Errorf("Unexpected resource (-want, +got):\n%s", diff)
 			}
 		})
 	}
@@ -151,8 +150,8 @@ func TestResourceAddScalar(t *testing.T) {
 	for _, test := range tests {
 		t.Run(string(test.scalarName), func(t *testing.T) {
 			test.resource.AddScalar(test.scalarName, test.scalarQuantity)
-			if !reflect.DeepEqual(test.expected, test.resource) {
-				t.Errorf("expected: %#v, got: %#v", test.expected, test.resource)
+			if diff := cmp.Diff(test.expected, test.resource); diff != "" {
+				t.Errorf("Unexpected resource (-want, +got):\n%s", diff)
 			}
 		})
 	}
@@ -203,8 +202,8 @@ func TestSetMaxResource(t *testing.T) {
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
 			test.resource.SetMaxResource(test.resourceList)
-			if !reflect.DeepEqual(test.expected, test.resource) {
-				t.Errorf("expected: %#v, got: %#v", test.expected, test.resource)
+			if diff := cmp.Diff(test.expected, test.resource); diff != "" {
+				t.Errorf("Unexpected resource (-want, +got):\n%s", diff)
 			}
 		})
 	}
@@ -348,8 +347,8 @@ func TestNewNodeInfo(t *testing.T) {
 		t.Errorf("Generation is not incremented. previous: %v, current: %v", gen, ni.Generation)
 	}
 	expected.Generation = ni.Generation
-	if !reflect.DeepEqual(expected, ni) {
-		t.Errorf("expected: %#v, got: %#v", expected, ni)
+	if diff := cmp.Diff(expected, ni, cmp.AllowUnexported(NodeInfo{})); diff != "" {
+		t.Errorf("Unexpected node info (-want, +got):\n%s", diff)
 	}
 }
 
@@ -517,8 +516,8 @@ func TestNodeInfoClone(t *testing.T) {
 			// Modify the field to check if the result is a clone of the origin one.
 			test.nodeInfo.Generation += 10
 			test.nodeInfo.UsedPorts.Remove("127.0.0.1", "TCP", 80)
-			if !reflect.DeepEqual(test.expected, ni) {
-				t.Errorf("expected: %#v, got: %#v", test.expected, ni)
+			if diff := cmp.Diff(test.expected, ni, cmp.AllowUnexported(NodeInfo{})); diff != "" {
+				t.Errorf("Unexpected node info (-want, +got):\n%s", diff)
 			}
 		})
 	}
@@ -833,8 +832,8 @@ func TestNodeInfoAddPod(t *testing.T) {
 	}
 
 	expected.Generation = ni.Generation
-	if !reflect.DeepEqual(expected, ni) {
-		t.Errorf("expected: %#v, got: %#v", expected, ni)
+	if diff := cmp.Diff(expected, ni, cmp.AllowUnexported(NodeInfo{})); diff != "" {
+		t.Errorf("Unexpected node info (-want, +got):\n%s", diff)
 	}
 }
 
@@ -1104,8 +1103,8 @@ func TestNodeInfoRemovePod(t *testing.T) {
 			}
 
 			test.expectedNodeInfo.Generation = ni.Generation
-			if !reflect.DeepEqual(test.expectedNodeInfo, ni) {
-				t.Errorf("expected: %#v, got: %#v", test.expectedNodeInfo, ni)
+			if diff := cmp.Diff(test.expectedNodeInfo, ni, cmp.AllowUnexported(NodeInfo{})); diff != "" {
+				t.Errorf("Unexpected node info (-want, +got):\n%s", diff)
 			}
 		})
 	}
@@ -1571,8 +1570,8 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 			pod.Status.Resize = tt.resizeStatus
 
 			res, non0CPU, non0Mem := calculateResource(pod)
-			if !reflect.DeepEqual(tt.expectedResource, res) {
-				t.Errorf("Test: %s expected resource: %+v, got: %+v", tt.name, tt.expectedResource, res)
+			if diff := cmp.Diff(tt.expectedResource, res); diff != "" {
+				t.Errorf("Unexpected resource (-want, +got):\n%s", diff)
 			}
 			if non0CPU != tt.expectedNon0CPU {
 				t.Errorf("Test: %s expected non0CPU: %d, got: %d", tt.name, tt.expectedNon0CPU, non0CPU)

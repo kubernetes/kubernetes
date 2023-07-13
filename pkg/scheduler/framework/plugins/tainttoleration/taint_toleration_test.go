@@ -18,9 +18,9 @@ package tainttoleration
 
 import (
 	"context"
-	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2/ktesting"
@@ -257,8 +257,8 @@ func TestTaintTolerationScore(t *testing.T) {
 				t.Errorf("unexpected error: %v", status)
 			}
 
-			if !reflect.DeepEqual(test.expectedList, gotList) {
-				t.Errorf("expected:\n\t%+v,\ngot:\n\t%+v", test.expectedList, gotList)
+			if diff := cmp.Diff(test.expectedList, gotList); diff != "" {
+				t.Errorf("Unexpected NodeScoreList (-want, +got):\n%s", diff)
 			}
 		})
 	}
@@ -339,8 +339,8 @@ func TestTaintTolerationFilter(t *testing.T) {
 			nodeInfo.SetNode(test.node)
 			p, _ := New(nil, nil)
 			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), nil, test.pod, nodeInfo)
-			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
+				t.Errorf("Unexpected status (-want, +got):\n%s", diff)
 			}
 		})
 	}

@@ -19,7 +19,6 @@ package noderesources
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -42,6 +41,15 @@ var (
 	kubernetesIOResourceB = v1.ResourceName("subdomain.kubernetes.io/something")
 	hugePageResourceA     = v1.ResourceName(v1.ResourceHugePagesPrefix + "2Mi")
 )
+
+var cmpOpts = []cmp.Option{
+	cmp.Comparer(func(s1 *framework.Status, s2 *framework.Status) bool {
+		if s1 == nil || s2 == nil {
+			return s1.IsSuccess() && s2.IsSuccess()
+		}
+		return s1.Code() == s2.Code() && s1.FailedPlugin() == s2.FailedPlugin() && s1.Message() == s2.Message()
+	}),
+}
 
 func makeResources(milliCPU, memory, pods, extendedA, storage, hugePageA int64) v1.NodeResources {
 	return v1.NodeResources{
@@ -507,13 +515,13 @@ func TestEnoughRequests(t *testing.T) {
 			}
 
 			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), cycleState, test.pod, test.nodeInfo)
-			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			if diff := cmp.Diff(test.wantStatus, gotStatus, cmpOpts...); diff != "" {
+				t.Errorf("Unexpected status (-want, +got):\n%s", diff)
 			}
 
 			gotInsufficientResources := fitsRequest(computePodResourceRequest(test.pod), test.nodeInfo, p.(*Fit).ignoredResources, p.(*Fit).ignoredResourceGroups)
-			if !reflect.DeepEqual(gotInsufficientResources, test.wantInsufficientResources) {
-				t.Errorf("insufficient resources do not match: %+v, want: %v", gotInsufficientResources, test.wantInsufficientResources)
+			if diff := cmp.Diff(test.wantInsufficientResources, gotInsufficientResources); diff != "" {
+				t.Errorf("Unexpected InsufficientResource diff (-want, +got):\n%s", diff)
 			}
 		})
 	}
@@ -531,8 +539,8 @@ func TestPreFilterDisabled(t *testing.T) {
 	cycleState := framework.NewCycleState()
 	gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), cycleState, pod, nodeInfo)
 	wantStatus := framework.AsStatus(fmt.Errorf(`error reading "PreFilterNodeResourcesFit" from cycleState: %w`, framework.ErrNotFound))
-	if !reflect.DeepEqual(gotStatus, wantStatus) {
-		t.Errorf("status does not match: %v, want: %v", gotStatus, wantStatus)
+	if diff := cmp.Diff(wantStatus, gotStatus, cmpOpts...); diff != "" {
+		t.Errorf("Unexpected status (-want, +got):\n%s", diff)
 	}
 }
 
@@ -585,8 +593,8 @@ func TestNotEnoughRequests(t *testing.T) {
 			}
 
 			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), cycleState, test.pod, test.nodeInfo)
-			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			if diff := cmp.Diff(test.wantStatus, gotStatus, cmpOpts...); diff != "" {
+				t.Errorf("Unexpected status (-want, +got):\n%s", diff)
 			}
 		})
 	}
@@ -643,8 +651,8 @@ func TestStorageRequests(t *testing.T) {
 			}
 
 			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), cycleState, test.pod, test.nodeInfo)
-			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			if diff := cmp.Diff(test.wantStatus, gotStatus, cmpOpts...); diff != "" {
+				t.Errorf("Unexpected status (-want, +got):\n%s", diff)
 			}
 		})
 	}
@@ -943,9 +951,8 @@ func TestFitScore(t *testing.T) {
 				}
 				gotPriorities = append(gotPriorities, framework.NodeScore{Name: n.Name, Score: score})
 			}
-
-			if !reflect.DeepEqual(test.expectedPriorities, gotPriorities) {
-				t.Errorf("expected:\n\t%+v,\ngot:\n\t%+v", test.expectedPriorities, gotPriorities)
+			if diff := cmp.Diff(test.expectedPriorities, gotPriorities); diff != "" {
+				t.Errorf("Unexpected priorities (-want, +got):\n%s", diff)
 			}
 		})
 	}

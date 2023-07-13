@@ -19,10 +19,10 @@ package selectorspread
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"sort"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -435,9 +435,8 @@ func TestSelectorSpreadScore(t *testing.T) {
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)
 			}
-
-			if !reflect.DeepEqual(test.expectedList, gotList) {
-				t.Errorf("expected:\n\t%+v,\ngot:\n\t%+v", test.expectedList, gotList)
+			if diff := cmp.Diff(test.expectedList, gotList); diff != "" {
+				t.Errorf("Unexpected NodeScoreList (-want, +got):\n%s", diff)
 			}
 		})
 	}
@@ -697,8 +696,8 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 
 			sortNodeScoreList(test.expectedList)
 			sortNodeScoreList(gotList)
-			if !reflect.DeepEqual(test.expectedList, gotList) {
-				t.Errorf("expected:\n\t%+v,\ngot:\n\t%+v", test.expectedList, gotList)
+			if diff := cmp.Diff(test.expectedList, gotList); diff != "" {
+				t.Errorf("Unexpected NodeScoreList (-want, +got):\n%s", diff)
 			}
 		})
 	}

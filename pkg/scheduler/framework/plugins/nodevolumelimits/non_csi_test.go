@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -191,8 +190,8 @@ func TestEphemeralLimits(t *testing.T) {
 
 			if gotPreFilterStatus.Code() != framework.Skip {
 				gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
-				if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-					t.Errorf("Filter status does not match: %v, want: %v", gotStatus, test.wantStatus)
+				if diff := cmp.Diff(test.wantStatus, gotStatus, cmpOpts...); diff != "" {
+					t.Errorf("Unexpected Filter status (-want, +got):\n%s", diff)
 				}
 			}
 		})
@@ -421,8 +420,8 @@ func TestAzureDiskLimits(t *testing.T) {
 
 			if gotPreFilterStatus.Code() != framework.Skip {
 				gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
-				if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-					t.Errorf("Filter status does not match: %v, want: %v", gotStatus, test.wantStatus)
+				if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
+					t.Errorf("Unexpected Filter status (-want, +got):\n%s", diff)
 				}
 			}
 		})
@@ -702,8 +701,8 @@ func TestEBSLimits(t *testing.T) {
 
 			if gotPreFilterStatus.Code() != framework.Skip {
 				gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
-				if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-					t.Errorf("Filter status does not match: %v, want: %v", gotStatus, test.wantStatus)
+				if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
+					t.Errorf("Unexpected Filter status (-want, +got):\n%s", diff)
 				}
 			}
 		})
@@ -932,8 +931,8 @@ func TestGCEPDLimits(t *testing.T) {
 
 			if gotPreFilterStatus.Code() != framework.Skip {
 				gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
-				if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-					t.Errorf("Filter status does not match: %v, want: %v", gotStatus, test.wantStatus)
+				if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
+					t.Errorf("Unexpected Filter status (-want, +got):\n%s", diff)
 				}
 			}
 		})
