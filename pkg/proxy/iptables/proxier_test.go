@@ -5480,7 +5480,6 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 		name                      string
 		line                      int
 		internalTrafficPolicy     *v1.ServiceInternalTrafficPolicy
-		featureGateOn             bool
 		endpoints                 []endpoint
 		expectEndpointRule        bool
 		expectedIPTablesWithSlice string
@@ -5490,7 +5489,6 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 			name:                  "internalTrafficPolicy is cluster",
 			line:                  getLine(),
 			internalTrafficPolicy: &cluster,
-			featureGateOn:         true,
 			endpoints: []endpoint{
 				{"10.0.1.1", testHostname},
 				{"10.0.1.2", "host1"},
@@ -5513,7 +5511,6 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 			name:                  "internalTrafficPolicy is local and there are local endpoints",
 			line:                  getLine(),
 			internalTrafficPolicy: &local,
-			featureGateOn:         true,
 			endpoints: []endpoint{
 				{"10.0.1.1", testHostname},
 				{"10.0.1.2", "host1"},
@@ -5567,7 +5564,6 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 			name:                  "internalTrafficPolicy is local and there are no local endpoints",
 			line:                  getLine(),
 			internalTrafficPolicy: &local,
-			featureGateOn:         true,
 			endpoints: []endpoint{
 				{"10.0.1.1", "host0"},
 				{"10.0.1.2", "host1"},
@@ -5721,18 +5717,16 @@ func TestTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 	}
 
 	testcases := []struct {
-		name                   string
-		line                   int
-		terminatingFeatureGate bool
-		endpointslice          *discovery.EndpointSlice
-		expectedIPTables       string
-		noUsableEndpoints      bool
-		flowTests              []packetFlowTest
+		name              string
+		line              int
+		endpointslice     *discovery.EndpointSlice
+		expectedIPTables  string
+		noUsableEndpoints bool
+		flowTests         []packetFlowTest
 	}{
 		{
-			name:                   "ready endpoints exist",
-			line:                   getLine(),
-			terminatingFeatureGate: true,
+			name: "ready endpoints exist",
+			line: getLine(),
 			endpointslice: &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("%s-1", "svc1"),
@@ -5871,9 +5865,8 @@ func TestTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 			},
 		},
 		{
-			name:                   "only terminating endpoints exist",
-			line:                   getLine(),
-			terminatingFeatureGate: true,
+			name: "only terminating endpoints exist",
+			line: getLine(),
 			endpointslice: &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("%s-1", "svc1"),
@@ -6000,9 +5993,8 @@ func TestTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 			},
 		},
 		{
-			name:                   "terminating endpoints on remote node",
-			line:                   getLine(),
-			terminatingFeatureGate: true,
+			name: "terminating endpoints on remote node",
+			line: getLine(),
 			endpointslice: &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("%s-1", "svc1"),
@@ -6087,9 +6079,8 @@ func TestTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 			},
 		},
 		{
-			name:                   "no usable endpoints on any node",
-			line:                   getLine(),
-			terminatingFeatureGate: true,
+			name: "no usable endpoints on any node",
+			line: getLine(),
 			endpointslice: &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("%s-1", "svc1"),
@@ -6253,18 +6244,16 @@ func TestTerminatingEndpointsTrafficPolicyCluster(t *testing.T) {
 	}
 
 	testcases := []struct {
-		name                   string
-		line                   int
-		terminatingFeatureGate bool
-		endpointslice          *discovery.EndpointSlice
-		expectedIPTables       string
-		noUsableEndpoints      bool
-		flowTests              []packetFlowTest
+		name              string
+		line              int
+		endpointslice     *discovery.EndpointSlice
+		expectedIPTables  string
+		noUsableEndpoints bool
+		flowTests         []packetFlowTest
 	}{
 		{
-			name:                   "ready endpoints exist",
-			line:                   getLine(),
-			terminatingFeatureGate: true,
+			name: "ready endpoints exist",
+			line: getLine(),
 			endpointslice: &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("%s-1", "svc1"),
@@ -6394,9 +6383,8 @@ func TestTerminatingEndpointsTrafficPolicyCluster(t *testing.T) {
 			},
 		},
 		{
-			name:                   "only terminating endpoints exist",
-			line:                   getLine(),
-			terminatingFeatureGate: true,
+			name: "only terminating endpoints exist",
+			line: getLine(),
 			endpointslice: &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("%s-1", "svc1"),
@@ -6519,9 +6507,8 @@ func TestTerminatingEndpointsTrafficPolicyCluster(t *testing.T) {
 			},
 		},
 		{
-			name:                   "terminating endpoints on remote node",
-			line:                   getLine(),
-			terminatingFeatureGate: true,
+			name: "terminating endpoints on remote node",
+			line: getLine(),
 			endpointslice: &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("%s-1", "svc1"),
@@ -6603,9 +6590,8 @@ func TestTerminatingEndpointsTrafficPolicyCluster(t *testing.T) {
 			},
 		},
 		{
-			name:                   "no usable endpoints on any node",
-			line:                   getLine(),
-			terminatingFeatureGate: true,
+			name: "no usable endpoints on any node",
+			line: getLine(),
 			endpointslice: &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("%s-1", "svc1"),
