@@ -30,7 +30,7 @@ import (
 	_ "k8s.io/component-base/metrics/prometheus/version"  // for version metric registration
 	"k8s.io/kubernetes/cmd/kubelet/app"
 )
-
+// for test only
 func main() {
 	command := app.NewKubeletCommand()
 	code := cli.Run(command)
