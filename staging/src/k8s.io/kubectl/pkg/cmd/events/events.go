@@ -121,7 +121,7 @@ func NewCmdEvents(restClientGetter genericclioptions.RESTClientGetter, streams g
 	flags := NewEventsFlags(restClientGetter, streams)
 
 	cmd := &cobra.Command{
-		Use:                   fmt.Sprintf("events [(-o|--output=)%s] [--for TYPE/NAME] [--watch] [--event=Normal,Warning]", strings.Join(flags.PrintFlags.AllowedFormats(), "|")),
+		Use:                   fmt.Sprintf("events [(-o|--output=)%s] [--for TYPE/NAME] [--watch] [--types=Normal,Warning]", strings.Join(flags.PrintFlags.AllowedFormats(), "|")),
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("List events"),
 		Long:                  eventsLong,
