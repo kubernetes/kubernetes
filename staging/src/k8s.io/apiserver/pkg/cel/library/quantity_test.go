@@ -143,7 +143,8 @@ func TestQuantity(t *testing.T) {
 		{
 			name:        "isQuantity_megabytes",
 			expr:        `isQuantity("20M")`,
-			expectValue: trueVal},
+			expectValue: trueVal,
+		},
 		{
 			name:        "isQuantity_mebibytes",
 			expr:        `isQuantity("20Mi")`,
