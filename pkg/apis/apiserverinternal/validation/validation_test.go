@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/apiserverinternal"
+	"k8s.io/utils/pointer"
 )
 
 func TestValidateServerStorageVersion(t *testing.T) {
@@ -176,6 +177,59 @@ func TestValidateServerStorageVersion(t *testing.T) {
 
 	for _, tc := range cases {
 		err := validateServerStorageVersion(tc.ssv, field.NewPath("")).ToAggregate()
+		if err == nil && len(tc.expectedErr) == 0 {
+			continue
+		}
+		if err != nil && len(tc.expectedErr) == 0 {
+			t.Errorf("unexpected error %v", err)
+			continue
+		}
+		if err == nil && len(tc.expectedErr) != 0 {
+			t.Errorf("unexpected empty error")
+			continue
+		}
+		if !strings.Contains(err.Error(), tc.expectedErr) {
+			t.Errorf("expected error to contain %s, got %s", tc.expectedErr, err)
+		}
+	}
+}
+
+func TestValidateStorageVersionStatus(t *testing.T) {
+	cases := []struct {
+		svs         apiserverinternal.StorageVersionStatus
+		expectedErr string
+	}{{
+		svs: apiserverinternal.StorageVersionStatus{
+			StorageVersions: []apiserverinternal.ServerStorageVersion{{
+				APIServerID:       "1",
+				EncodingVersion:   "v1alpha1",
+				DecodableVersions: []string{"v1alpha1", "v1"},
+			}, {
+				APIServerID:       "2",
+				EncodingVersion:   "v1alpha1",
+				DecodableVersions: []string{"v1alpha1", "v1"},
+			}},
+			CommonEncodingVersion: pointer.String("v1alpha1"),
+		},
+		expectedErr: "",
+	}, {
+		svs: apiserverinternal.StorageVersionStatus{
+			StorageVersions: []apiserverinternal.ServerStorageVersion{{
+				APIServerID:       "1",
+				EncodingVersion:   "v1alpha1",
+				DecodableVersions: []string{"v1alpha1", "v1"},
+			}, {
+				APIServerID:       "1",
+				EncodingVersion:   "v1beta1",
+				DecodableVersions: []string{"v1alpha1", "v1"},
+			}},
+			CommonEncodingVersion: pointer.String("v1alpha1"),
+		},
+		expectedErr: "storageVersions[1].apiServerID: Duplicate value: \"1\"",
+	}}
+
+	for _, tc := range cases {
+		err := validateStorageVersionStatus(tc.svs, field.NewPath("")).ToAggregate()
 		if err == nil && len(tc.expectedErr) == 0 {
 			continue
 		}
