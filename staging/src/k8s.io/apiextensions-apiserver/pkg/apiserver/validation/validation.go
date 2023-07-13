@@ -29,8 +29,25 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/validate"
 )
 
+type SchemaValidator interface {
+	SchemaCreateValidator
+	ValidateUpdate(old, new interface{}) *validate.Result
+}
+
+type SchemaCreateValidator interface {
+	Validate(value interface{}) *validate.Result
+}
+
+type schemaValidator struct {
+	*validate.SchemaValidator
+}
+
+func (s schemaValidator) ValidateUpdate(old, new interface{}) *validate.Result {
+	return s.Validate(new)
+}
+
 // NewSchemaValidator creates an openapi schema validator for the given CRD validation.
-func NewSchemaValidator(customResourceValidation *apiextensions.JSONSchemaProps) (*validate.SchemaValidator, *spec.Schema, error) {
+func NewSchemaValidator(customResourceValidation *apiextensions.JSONSchemaProps) (SchemaValidator, *spec.Schema, error) {
 	// Convert CRD schema to openapi schema
 	openapiSchema := &spec.Schema{}
 	if customResourceValidation != nil {
@@ -39,12 +56,32 @@ func NewSchemaValidator(customResourceValidation *apiextensions.JSONSchemaProps)
 			return nil, nil, err
 		}
 	}
-	return validate.NewSchemaValidator(openapiSchema, nil, "", strfmt.Default), openapiSchema, nil
+
+	return schemaValidator{validate.NewSchemaValidator(openapiSchema, nil, "", strfmt.Default)}, openapiSchema, nil
+}
+
+// ValidateCustomResourceUodate validates the transition of Custom Resource from
+// `old` to `new` against the schema in the CustomResourceDefinition.
+// Both customResource and old represent a JSON data structures.
+//
+// If feature `CRDValidationRatcheting` is disabled, this behaves identically to
+// ValidateCustomResource(nil, customResource).
+func ValidateCustomResourceUpdate(fldPath *field.Path, old, customResource interface{}, validator SchemaValidator) field.ErrorList {
+	if validator == nil {
+		return nil
+	}
+
+	result := validator.ValidateUpdate(old, customResource)
+	if result.IsValid() {
+		return nil
+	}
+
+	return kubeOpenAPIResultToFieldErrors(fldPath, result)
 }
 
 // ValidateCustomResource validates the Custom Resource against the schema in the CustomResourceDefinition.
 // CustomResource is a JSON data structure.
-func ValidateCustomResource(fldPath *field.Path, customResource interface{}, validator *validate.SchemaValidator) field.ErrorList {
+func ValidateCustomResource(fldPath *field.Path, customResource interface{}, validator SchemaCreateValidator) field.ErrorList {
 	if validator == nil {
 		return nil
 	}
@@ -53,6 +90,11 @@ func ValidateCustomResource(fldPath *field.Path, customResource interface{}, val
 	if result.IsValid() {
 		return nil
 	}
+
+	return kubeOpenAPIResultToFieldErrors(fldPath, result)
+}
+
+func kubeOpenAPIResultToFieldErrors(fldPath *field.Path, result *validate.Result) field.ErrorList {
 	var allErrs field.ErrorList
 	for _, err := range result.Errors {
 		switch err := err.(type) {
