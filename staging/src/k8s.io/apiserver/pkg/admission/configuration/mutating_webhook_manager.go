@@ -119,7 +119,12 @@ func (m *mutatingWebhookConfigurationManager) getMutatingWebhookConfigurations(c
 	// but configurations themselves can be in any order. As we are going to run these
 	// webhooks in serial, they are sorted here to have a deterministic order.
 	sort.SliceStable(configurations, MutatingWebhookConfigurationSorter(configurations).ByName)
-	accessors := []webhook.WebhookAccessor{}
+	size := 0
+	for _, cfg := range configurations {
+		size += len(cfg.Webhooks)
+	}
+	accessors := make([]webhook.WebhookAccessor, 0, size)
+
 	for _, c := range configurations {
 		cachedConfigurationAccessors, ok := m.configurationsCache.Load(c.Name)
 		if ok {
@@ -131,7 +136,7 @@ func (m *mutatingWebhookConfigurationManager) getMutatingWebhookConfigurations(c
 		// webhook names are not validated for uniqueness, so we check for duplicates and
 		// add a int suffix to distinguish between them
 		names := map[string]int{}
-		configurationAccessors := []webhook.WebhookAccessor{}
+		configurationAccessors := make([]webhook.WebhookAccessor, 0, len(c.Webhooks))
 		for i := range c.Webhooks {
 			n := c.Webhooks[i].Name
 			uid := fmt.Sprintf("%s/%s/%d", c.Name, n, names[n])
