@@ -2897,21 +2897,32 @@ rules:
 `
 )
 
-func TestAuthorizationDecisionCaching(t *testing.T) {
+func TestSecondaryAuthorization(t *testing.T) {
+	reasonIsRequestCount := func() func(*authorizationv1.SubjectAccessReview) {
+		var nChecks int
+		return func(sar *authorizationv1.SubjectAccessReview) {
+			nChecks++
+			sar.Status.Allowed = true
+			sar.Status.Reason = fmt.Sprintf("%d", nChecks)
+		}
+	}
+
 	for _, tc := range []struct {
 		name        string
 		validations []admissionregistrationv1alpha1.Validation
+		review      func(*authorizationv1.SubjectAccessReview)
 	}{
 		{
-			name: "hit",
+			name: "cache hit",
 			validations: []admissionregistrationv1alpha1.Validation{
 				{
 					Expression: "authorizer.requestResource.check('test').reason() == authorizer.requestResource.check('test').reason()",
 				},
 			},
+			review: reasonIsRequestCount(),
 		},
 		{
-			name: "miss",
+			name: "cache miss",
 			validations: []admissionregistrationv1alpha1.Validation{
 				{
 					Expression: "authorizer.requestResource.subresource('a').check('test').reason() == '1'",
@@ -2923,6 +2934,35 @@ func TestAuthorizationDecisionCaching(t *testing.T) {
 					Expression: "authorizer.requestResource.subresource('c').check('test').reason() == '3'",
 				},
 			},
+			review: reasonIsRequestCount(),
+		},
+		{
+			name: "error occurred",
+			validations: []admissionregistrationv1alpha1.Validation{
+				{
+					Expression: "authorizer.requestResource.check('test').errored()",
+				},
+				{
+					Expression: "authorizer.requestResource.check('test').error() != ''",
+				},
+			},
+			review: func(sar *authorizationv1.SubjectAccessReview) {
+				panic("")
+			},
+		},
+		{
+			name: "no error occurred",
+			validations: []admissionregistrationv1alpha1.Validation{
+				{
+					Expression: "!authorizer.requestResource.check('test').errored()",
+				},
+				{
+					Expression: "authorizer.requestResource.check('test').error() == ''",
+				},
+			},
+			review: func(sar *authorizationv1.SubjectAccessReview) {
+				sar.Status.Allowed = true
+			},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -2931,17 +2971,18 @@ func TestAuthorizationDecisionCaching(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.TODO())
 			defer cancel()
 
-			var nChecks int
+			var primaryAuthzDone bool
 			webhook := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				var review authorizationv1.SubjectAccessReview
 				if err := json.NewDecoder(r.Body).Decode(&review); err != nil {
 					http.Error(w, err.Error(), http.StatusBadRequest)
 				}
 
-				review.Status.Allowed = true
-				if review.Spec.ResourceAttributes.Verb == "test" {
-					nChecks++
-					review.Status.Reason = fmt.Sprintf("%d", nChecks)
+				if review.Spec.User == "test-user" && primaryAuthzDone {
+					tc.review(&review)
+				} else {
+					primaryAuthzDone = true
+					review.Status.Allowed = true
 				}
 
 				w.Header().Set("Content-Type", "application/json")
@@ -3038,8 +3079,7 @@ contexts:
 
 			config = rest.CopyConfig(config)
 			config.Impersonate = rest.ImpersonationConfig{
-				UserName: "alice",
-				UID:      "1234",
+				UserName: "test-user",
 			}
 			client, err = clientset.NewForConfig(config)
 			if err != nil {
