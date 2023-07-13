@@ -1461,7 +1461,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 
 		var indexesToAdd []int
 		if isIndexedJob(job) {
-			indexesToAdd = firstPendingIndexes(jobCtx.activePods, jobCtx.succeededIndexes, int(diff), int(*job.Spec.Completions))
+			indexesToAdd = firstPendingIndexes(jobCtx, int(diff), int(*job.Spec.Completions))
 			diff = int32(len(indexesToAdd))
 		}
 		active += diff

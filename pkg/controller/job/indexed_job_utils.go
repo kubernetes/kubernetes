@@ -190,19 +190,19 @@ func succeededIndexesFromString(logger klog.Logger, completedIndexes string, com
 
 // firstPendingIndexes returns `count` indexes less than `completions` that are
 // not covered by `activePods` or `succeededIndexes`.
-func firstPendingIndexes(activePods []*v1.Pod, succeededIndexes orderedIntervals, count, completions int) []int {
+func firstPendingIndexes(jobCtx *syncJobCtx, count, completions int) []int {
 	if count == 0 {
 		return nil
 	}
 	active := sets.New[int]()
-	for _, p := range activePods {
+	for _, p := range jobCtx.activePods {
 		ix := getCompletionIndex(p.Annotations)
 		if ix != unknownCompletionIndex {
 			active.Insert(ix)
 		}
 	}
 	result := make([]int, 0, count)
-	nonPending := succeededIndexes.withOrderedIndexes(sets.List(active))
+	nonPending := jobCtx.succeededIndexes.withOrderedIndexes(sets.List(active))
 	// The following algorithm is bounded by len(nonPending) and count.
 	candidate := 0
 	for _, sInterval := range nonPending {
