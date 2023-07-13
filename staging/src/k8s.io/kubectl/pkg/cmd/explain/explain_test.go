@@ -185,9 +185,7 @@ func TestExplainOpenAPIV3(t *testing.T) {
 	}
 	cases = append(cases, explainV2Cases...)
 
-	cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ExplainOpenapiV3}, t, func(t *testing.T) {
-		runExplainTestCases(t, cases)
-	})
+	runExplainTestCases(t, cases)
 }
 
 func runExplainTestCases(t *testing.T, cases []explainTestCase) {
