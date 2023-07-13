@@ -561,6 +561,7 @@ const (
 	// kep: https://kep.k8s.io/2268
 	// alpha: v1.24
 	// beta: v1.26
+	// GA: v1.28
 	//
 	// Allow pods to failover to a different node in case of non graceful node shutdown
 	NodeOutOfServiceVolumeDetach featuregate.Feature = "NodeOutOfServiceVolumeDetach"
@@ -1007,7 +1008,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	NodeLogQuery: {Default: false, PreRelease: featuregate.Alpha},
 
-	NodeOutOfServiceVolumeDetach: {Default: true, PreRelease: featuregate.Beta},
+	NodeOutOfServiceVolumeDetach: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
 
 	NodeSwap: {Default: false, PreRelease: featuregate.Alpha},
 

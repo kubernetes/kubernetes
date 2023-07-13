@@ -503,7 +503,6 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 }
 
 func TestGCTerminating(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeOutOfServiceVolumeDetach, true)()
 	type node struct {
 		name           string
 		readyCondition v1.ConditionStatus
