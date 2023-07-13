@@ -973,7 +973,7 @@ func checkIndexedJobPods(t *testing.T, control *controller.FakePodControl, wantI
 	t.Helper()
 	gotIndexes := sets.New[int]()
 	for _, p := range control.Templates {
-		checkJobCompletionEnvVariable(t, &p.Spec)
+		checkJobCompletionEnvVariable(t, &p.Spec, podIndexLabelDisabled)
 		if !podIndexLabelDisabled {
 			checkJobCompletionLabel(t, &p)
 		}
@@ -4418,14 +4418,20 @@ func checkJobCompletionLabel(t *testing.T, p *v1.PodTemplateSpec) {
 	}
 }
 
-func checkJobCompletionEnvVariable(t *testing.T, spec *v1.PodSpec) {
+func checkJobCompletionEnvVariable(t *testing.T, spec *v1.PodSpec, podIndexLabelDisabled bool) {
 	t.Helper()
+	var fieldPath string
+	if podIndexLabelDisabled {
+		fieldPath = fmt.Sprintf("metadata.annotations['%s']", batch.JobCompletionIndexAnnotation)
+	} else {
+		fieldPath = fmt.Sprintf("metadata.labels['%s']", batch.JobCompletionIndexAnnotation)
+	}
 	want := []v1.EnvVar{
 		{
 			Name: "JOB_COMPLETION_INDEX",
 			ValueFrom: &v1.EnvVarSource{
 				FieldRef: &v1.ObjectFieldSelector{
-					FieldPath: fmt.Sprintf("metadata.annotations['%s']", batch.JobCompletionIndexAnnotation),
+					FieldPath: fieldPath,
 				},
 			},
 		},
