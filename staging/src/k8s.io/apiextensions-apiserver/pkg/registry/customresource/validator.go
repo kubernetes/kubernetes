@@ -31,7 +31,7 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/validate"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
+	apiextensionsvalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 )
 
 type customResourceValidator struct {
@@ -58,7 +58,7 @@ func (a customResourceValidator) Validate(ctx context.Context, obj runtime.Objec
 	var allErrs field.ErrorList
 
 	allErrs = append(allErrs, validation.ValidateObjectMetaAccessor(accessor, a.namespaceScoped, validation.NameIsDNSSubdomain, field.NewPath("metadata"))...)
-	allErrs = append(allErrs, apiservervalidation.ValidateCustomResource(nil, u.UnstructuredContent(), a.schemaValidator)...)
+	allErrs = append(allErrs, apiextensionsvalidation.ValidateCustomResource(nil, u.UnstructuredContent(), a.schemaValidator)...)
 	allErrs = append(allErrs, a.ValidateScaleSpec(ctx, u, scale)...)
 	allErrs = append(allErrs, a.ValidateScaleStatus(ctx, u, scale)...)
 
@@ -86,7 +86,7 @@ func (a customResourceValidator) ValidateUpdate(ctx context.Context, obj, old ru
 	var allErrs field.ErrorList
 
 	allErrs = append(allErrs, validation.ValidateObjectMetaAccessorUpdate(objAccessor, oldAccessor, field.NewPath("metadata"))...)
-	allErrs = append(allErrs, apiservervalidation.ValidateCustomResource(nil, u.UnstructuredContent(), a.schemaValidator)...)
+	allErrs = append(allErrs, apiextensionsvalidation.ValidateCustomResource(nil, u.UnstructuredContent(), a.schemaValidator)...)
 	allErrs = append(allErrs, a.ValidateScaleSpec(ctx, u, scale)...)
 	allErrs = append(allErrs, a.ValidateScaleStatus(ctx, u, scale)...)
 
@@ -119,7 +119,7 @@ func (a customResourceValidator) ValidateStatusUpdate(ctx context.Context, obj, 
 	var allErrs field.ErrorList
 
 	allErrs = append(allErrs, validation.ValidateObjectMetaAccessorUpdate(objAccessor, oldAccessor, field.NewPath("metadata"))...)
-	allErrs = append(allErrs, apiservervalidation.ValidateCustomResource(nil, u.UnstructuredContent(), a.schemaValidator)...)
+	allErrs = append(allErrs, apiextensionsvalidation.ValidateCustomResource(nil, u.UnstructuredContent(), a.schemaValidator)...)
 	allErrs = append(allErrs, a.ValidateScaleStatus(ctx, u, scale)...)
 
 	return allErrs
