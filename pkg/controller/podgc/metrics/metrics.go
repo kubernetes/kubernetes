@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package podgc
+package metrics
 
 import (
 	"sync"
@@ -28,24 +28,39 @@ const (
 )
 
 var (
-	deletingPodsTotal = metrics.NewCounterVec(
+	DeletingPodsTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      podGCController,
 			Name:           "force_delete_pods_total",
 			Help:           "Number of pods that are being forcefully deleted since the Pod GC Controller started.",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{},
+		[]string{"namespace", "reason"},
 	)
-	deletingPodsErrorTotal = metrics.NewCounterVec(
+	DeletingPodsErrorTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      podGCController,
 			Name:           "force_delete_pod_errors_total",
 			Help:           "Number of errors encountered when forcefully deleting the pods since the Pod GC Controller started.",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{},
+		[]string{"namespace", "reason"},
 	)
+)
+
+const (
+	// Possible values for the "reason" label in the above metrics.
+
+	// PodGCReasonTerminated is used when the pod is terminated.
+	PodGCReasonTerminated = "terminated"
+	// PodGCReasonCompleted is used when the pod is terminating and the corresponding node
+	// is not ready and has `node.kubernetes.io/out-of-service` taint.
+	PodGCReasonTerminatingOutOfService = "out-of-service"
+	// PodGCReasonOrphaned is used when the pod is orphaned which means the corresponding node
+	// has been deleted.
+	PodGCReasonOrphaned = "orphaned"
+	// PodGCReasonUnscheduled is used when the pod is terminating and unscheduled.
+	PodGCReasonTerminatingUnscheduled = "unscheduled"
 )
 
 var registerMetrics sync.Once
@@ -53,7 +68,7 @@ var registerMetrics sync.Once
 // Register the metrics that are to be monitored.
 func RegisterMetrics() {
 	registerMetrics.Do(func() {
-		legacyregistry.MustRegister(deletingPodsTotal)
-		legacyregistry.MustRegister(deletingPodsErrorTotal)
+		legacyregistry.MustRegister(DeletingPodsTotal)
+		legacyregistry.MustRegister(DeletingPodsErrorTotal)
 	})
 }

@@ -37,6 +37,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/controller/podgc/metrics"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
@@ -69,11 +70,6 @@ type PodGCController struct {
 	quarantineTime         time.Duration
 }
 
-func init() {
-	// Register prometheus metrics
-	RegisterMetrics()
-}
-
 func NewPodGC(ctx context.Context, kubeClient clientset.Interface, podInformer coreinformers.PodInformer,
 	nodeInformer coreinformers.NodeInformer, terminatedPodThreshold int) *PodGCController {
 	return NewPodGCInternal(ctx, kubeClient, podInformer, nodeInformer, terminatedPodThreshold, gcCheckPeriod, quarantineTime)
@@ -94,6 +90,8 @@ func NewPodGCInternal(ctx context.Context, kubeClient clientset.Interface, podIn
 		quarantineTime:         quarantineTime,
 	}
 
+	// Register prometheus metrics
+	metrics.RegisterMetrics()
 	return gcc
 }
 
@@ -182,11 +180,11 @@ func (gcc *PodGCController) gcTerminating(ctx context.Context, pods []*v1.Pod) {
 		wait.Add(1)
 		go func(pod *v1.Pod) {
 			defer wait.Done()
-			deletingPodsTotal.WithLabelValues().Inc()
+			metrics.DeletingPodsTotal.WithLabelValues(pod.Namespace, metrics.PodGCReasonTerminatingOutOfService).Inc()
 			if err := gcc.markFailedAndDeletePod(ctx, pod); err != nil {
 				// ignore not founds
 				utilruntime.HandleError(err)
-				deletingPodsErrorTotal.WithLabelValues().Inc()
+				metrics.DeletingPodsErrorTotal.WithLabelValues(pod.Namespace, metrics.PodGCReasonTerminatingOutOfService).Inc()
 			}
 		}(terminatingPods[i])
 	}
@@ -220,7 +218,9 @@ func (gcc *PodGCController) gcTerminated(ctx context.Context, pods []*v1.Pod) {
 			if err := gcc.markFailedAndDeletePod(ctx, pod); err != nil {
 				// ignore not founds
 				defer utilruntime.HandleError(err)
+				metrics.DeletingPodsErrorTotal.WithLabelValues(pod.Namespace, metrics.PodGCReasonTerminated).Inc()
 			}
+			metrics.DeletingPodsTotal.WithLabelValues(pod.Namespace, metrics.PodGCReasonTerminated).Inc()
 		}(terminatedPods[i])
 	}
 	wait.Wait()
@@ -259,9 +259,11 @@ func (gcc *PodGCController) gcOrphaned(ctx context.Context, pods []*v1.Pod, node
 			WithLastTransitionTime(metav1.Now())
 		if err := gcc.markFailedAndDeletePodWithCondition(ctx, pod, condition); err != nil {
 			utilruntime.HandleError(err)
+			metrics.DeletingPodsErrorTotal.WithLabelValues(pod.Namespace, metrics.PodGCReasonOrphaned).Inc()
 		} else {
 			logger.Info("Forced deletion of orphaned Pod succeeded", "pod", klog.KObj(pod))
 		}
+		metrics.DeletingPodsTotal.WithLabelValues(pod.Namespace, metrics.PodGCReasonOrphaned).Inc()
 	}
 }
 
@@ -309,9 +311,11 @@ func (gcc *PodGCController) gcUnscheduledTerminating(ctx context.Context, pods [
 		logger.V(2).Info("Found unscheduled terminating Pod not assigned to any Node, deleting", "pod", klog.KObj(pod))
 		if err := gcc.markFailedAndDeletePod(ctx, pod); err != nil {
 			utilruntime.HandleError(err)
+			metrics.DeletingPodsErrorTotal.WithLabelValues(pod.Namespace, metrics.PodGCReasonTerminatingUnscheduled).Inc()
 		} else {
 			logger.Info("Forced deletion of unscheduled terminating Pod succeeded", "pod", klog.KObj(pod))
 		}
+		metrics.DeletingPodsTotal.WithLabelValues(pod.Namespace, metrics.PodGCReasonTerminatingUnscheduled).Inc()
 	}
 }
 
