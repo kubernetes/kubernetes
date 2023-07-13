@@ -712,7 +712,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		properly stored in the api-server.  Update the validating webhook configuraiton and retreive it; the
 		retrieved object must contain the newly update matchConditions fields.
 	*/
-	framework.ConformanceIt("should be able to create and update webhook match conditions", func(ctx context.Context) {
+	framework.ConformanceIt("should be able to create and update validating webhook configurations with match conditions", func(ctx context.Context) {
 		initalMatchConditions := []admissionregistrationv1.MatchCondition{
 			admissionregistrationv1.MatchCondition{
 				Name:       "expression-1",
@@ -758,7 +758,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		properly stored in the api-server.  Update the mutating webhook configuraiton and retreive it; the
 		retrieved object must contain the newly update matchConditions fields.
 	*/
-	framework.ConformanceIt("should be able to create and update webhook match conditions", func(ctx context.Context) {
+	framework.ConformanceIt("should be able to create and update mutating webhook configurations with match conditions", func(ctx context.Context) {
 		initalMatchConditions := []admissionregistrationv1.MatchCondition{
 			admissionregistrationv1.MatchCondition{
 				Name:       "expression-1",
@@ -804,7 +804,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		matchConditions field. The api-server server should reject the create request with a "compilation
 		failed" error message.
 	*/
-	framework.ConformanceIt("should reject validatingwebhookconfigurations with invalid matchconditions", func(ctx context.Context) {
+	framework.ConformanceIt("should reject validating webhook configurations with invalid match conditions", func(ctx context.Context) {
 		initalMatchConditions := []admissionregistrationv1.MatchCondition{
 			admissionregistrationv1.MatchCondition{
 				Name:       "invalid-expression-1",
@@ -830,7 +830,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		matchConditions field. The api-server server should reject the create request with a "compilation
 		failed" error message.
 	*/
-	framework.ConformanceIt("should reject mutatingwebhookconfigurations with invalid matchconditions", func(ctx context.Context) {
+	framework.ConformanceIt("should reject mutating webhookc onfigurations with invalid match conditions", func(ctx context.Context) {
 		initalMatchConditions := []admissionregistrationv1.MatchCondition{
 			admissionregistrationv1.MatchCondition{
 				Name:       "invalid-expression-1",
@@ -851,7 +851,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 
 	/*
 		Release: v1.27
-		Testname: Admission webhook, exclude leases using match conditions field.
+		Testname: Admission webhook, validating webhook exclude leases using match conditions field.
 		Description: Create a validating webhook configuration with matchConditions field that
 		will reject all resources except the coordination.k8s.io/lease ones. Try to create pods
 		until the webhook is ready and rejecting the pods with "denied" error message. Create
