@@ -282,7 +282,7 @@ type Validation struct {
 	//'request' - Attributes of the API request([ref](/pkg/apis/admission/types.go#AdmissionRequest)).
 	//'params' - Parameter resource referred to by the policy binding being evaluated. Only populated if the policy has a ParamKind.
 	//'variables' - Map of composited variables, from its name to its lazily evaluated value.
-	//  For example, a variable named 'foo' can be access as 'variables.foo'
+	//  For example, a variable named 'foo' can be accessed as 'variables.foo'
 	// - 'authorizer' - A CEL Authorizer. May be used to perform authorization checks for the principal (user or service account) of the request.
 	//   See https://pkg.go.dev/k8s.io/apiserver/pkg/cel/library#Authz
 	// - 'authorizer.requestResource' - A CEL ResourceCheck constructed from the 'authorizer' and configured with the
