@@ -267,6 +267,16 @@ func (in *JobSpec) DeepCopyInto(out *JobSpec) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.BackoffLimitPerIndex != nil {
+		in, out := &in.BackoffLimitPerIndex, &out.BackoffLimitPerIndex
+		*out = new(int32)
+		**out = **in
+	}
+	if in.MaxFailedIndexes != nil {
+		in, out := &in.MaxFailedIndexes, &out.MaxFailedIndexes
+		*out = new(int32)
+		**out = **in
+	}
 	if in.Selector != nil {
 		in, out := &in.Selector, &out.Selector
 		*out = new(metav1.LabelSelector)
@@ -323,6 +333,11 @@ func (in *JobStatus) DeepCopyInto(out *JobStatus) {
 	if in.CompletionTime != nil {
 		in, out := &in.CompletionTime, &out.CompletionTime
 		*out = (*in).DeepCopy()
+	}
+	if in.FailedIndexes != nil {
+		in, out := &in.FailedIndexes, &out.FailedIndexes
+		*out = new(string)
+		**out = **in
 	}
 	if in.UncountedTerminatedPods != nil {
 		in, out := &in.UncountedTerminatedPods, &out.UncountedTerminatedPods

@@ -68,6 +68,8 @@
       ]
     },
     "backoffLimit": 7,
+    "backoffLimitPerIndex": 12,
+    "maxFailedIndexes": 13,
     "selector": {
       "matchLabels": {
         "matchLabelsKey": "matchLabelsValue"
@@ -1731,6 +1733,7 @@
     "succeeded": 5,
     "failed": 6,
     "completedIndexes": "completedIndexesValue",
+    "failedIndexes": "failedIndexesValue",
     "uncountedTerminatedPods": {
       "succeeded": [
         "succeededValue"

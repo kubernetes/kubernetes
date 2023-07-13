@@ -35,9 +35,11 @@ metadata:
 spec:
   activeDeadlineSeconds: 3
   backoffLimit: 7
+  backoffLimitPerIndex: 12
   completionMode: completionModeValue
   completions: 2
   manualSelector: true
+  maxFailedIndexes: 13
   parallelism: 1
   podFailurePolicy:
     rules:
@@ -1182,6 +1184,7 @@ status:
     status: statusValue
     type: typeValue
   failed: 6
+  failedIndexes: failedIndexesValue
   ready: 9
   startTime: "2002-01-01T01:01:01Z"
   succeeded: 5

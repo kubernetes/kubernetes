@@ -17,6 +17,7 @@ limitations under the License.
 package v1_test
 
 import (
+	"math"
 	"reflect"
 	"testing"
 
@@ -35,6 +36,9 @@ import (
 
 func TestSetDefaultJob(t *testing.T) {
 	defaultLabels := map[string]string{"default": "default"}
+	validPodTemplateSpec := v1.PodTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
+	}
 	tests := map[string]struct {
 		original     *batchv1.Job
 		expected     *batchv1.Job
@@ -335,6 +339,55 @@ func TestSetDefaultJob(t *testing.T) {
 					BackoffLimit:   pointer.Int32(9),
 					CompletionMode: completionModePtr(batchv1.IndexedCompletion),
 					Suspend:        pointer.Bool(true),
+				},
+			},
+			expectLabels: true,
+		},
+		"BackoffLimitPerIndex specified, but no BackoffLimit -> default BackoffLimit to max int32": {
+			original: &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Completions:          pointer.Int32(11),
+					Parallelism:          pointer.Int32(10),
+					BackoffLimitPerIndex: pointer.Int32(1),
+					CompletionMode:       completionModePtr(batchv1.IndexedCompletion),
+					Template:             validPodTemplateSpec,
+					Suspend:              pointer.Bool(true),
+				},
+			},
+			expected: &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Completions:          pointer.Int32(11),
+					Parallelism:          pointer.Int32(10),
+					BackoffLimit:         pointer.Int32(math.MaxInt32),
+					BackoffLimitPerIndex: pointer.Int32(1),
+					CompletionMode:       completionModePtr(batchv1.IndexedCompletion),
+					Template:             validPodTemplateSpec,
+					Suspend:              pointer.Bool(true),
+				},
+			},
+			expectLabels: true,
+		},
+		"BackoffLimitPerIndex and BackoffLimit specified -> no change": {
+			original: &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Completions:          pointer.Int32(11),
+					Parallelism:          pointer.Int32(10),
+					BackoffLimit:         pointer.Int32(3),
+					BackoffLimitPerIndex: pointer.Int32(1),
+					CompletionMode:       completionModePtr(batchv1.IndexedCompletion),
+					Template:             validPodTemplateSpec,
+					Suspend:              pointer.Bool(true),
+				},
+			},
+			expected: &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Completions:          pointer.Int32(11),
+					Parallelism:          pointer.Int32(10),
+					BackoffLimit:         pointer.Int32(3),
+					BackoffLimitPerIndex: pointer.Int32(1),
+					CompletionMode:       completionModePtr(batchv1.IndexedCompletion),
+					Template:             validPodTemplateSpec,
+					Suspend:              pointer.Bool(true),
 				},
 			},
 			expectLabels: true,
