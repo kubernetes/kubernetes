@@ -158,6 +158,7 @@ func autoConvert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguratio
 	if err := Convert_v1alpha1_DetectLocalConfiguration_To_config_DetectLocalConfiguration(&in.DetectLocal, &out.DetectLocal, s); err != nil {
 		return err
 	}
+	out.Logging = in.Logging
 	return nil
 }
 
@@ -200,6 +201,7 @@ func autoConvert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguratio
 	if err := Convert_config_DetectLocalConfiguration_To_v1alpha1_DetectLocalConfiguration(&in.DetectLocal, &out.DetectLocal, s); err != nil {
 		return err
 	}
+	out.Logging = in.Logging
 	return nil
 }
 

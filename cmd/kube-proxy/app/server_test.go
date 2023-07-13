@@ -19,7 +19,6 @@ package app
 import (
 	"errors"
 	"fmt"
-	"reflect"
 	"testing"
 	"time"
 
@@ -30,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	componentbaseconfig "k8s.io/component-base/config"
+	logsapi "k8s.io/component-base/logs/api/v1"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/utils/pointer"
 )
@@ -220,6 +220,10 @@ nodePortAddresses:
 				BridgeInterface:     string("cbr0"),
 				InterfaceNamePrefix: string("veth"),
 			},
+			Logging: logsapi.LoggingConfiguration{
+				Format:         "text",
+				FlushFrequency: logsapi.TimeOrMetaDuration{Duration: 5 * time.Second},
+			},
 		}
 
 		options := NewOptions()
@@ -235,8 +239,8 @@ nodePortAddresses:
 
 		assert.NoError(t, err, "unexpected error for %s: %v", tc.name, err)
 
-		if !reflect.DeepEqual(expected, config) {
-			t.Fatalf("unexpected config for %s, diff = %s", tc.name, cmp.Diff(config, expected))
+		if diff := cmp.Diff(config, expected); diff != "" {
+			t.Fatalf("unexpected config for %s, diff = %s", tc.name, diff)
 		}
 	}
 }

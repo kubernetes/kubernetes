@@ -51,7 +51,7 @@ kubeAPIBurst: 100
 kubeAPIQPS: 50
 localStorageCapacityIsolation: true
 logging:
-  flushFrequency: 5000000000
+  flushFrequency: 5s
   format: text
   options:
     json:

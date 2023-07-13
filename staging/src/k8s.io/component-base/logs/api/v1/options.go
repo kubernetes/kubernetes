@@ -262,7 +262,7 @@ func apply(c *LoggingConfiguration, options *LoggingOptions, featureGate feature
 	if err := loggingFlags.Lookup("vmodule").Value.Set(VModuleConfigurationPflag(&c.VModule).String()); err != nil {
 		return fmt.Errorf("internal error while setting klog vmodule: %v", err)
 	}
-	klog.StartFlushDaemon(c.FlushFrequency)
+	klog.StartFlushDaemon(c.FlushFrequency.Duration)
 	klog.EnableContextualLogging(p.ContextualLoggingEnabled)
 	return nil
 }
@@ -342,7 +342,7 @@ func addFlags(c *LoggingConfiguration, fs flagSet) {
 	// No new log formats should be added after generation is of flag options
 	logRegistry.freeze()
 
-	fs.DurationVar(&c.FlushFrequency, LogFlushFreqFlagName, c.FlushFrequency, "Maximum number of seconds between log flushes")
+	fs.DurationVar(&c.FlushFrequency.Duration, LogFlushFreqFlagName, c.FlushFrequency.Duration, "Maximum number of seconds between log flushes")
 	fs.VarP(VerbosityLevelPflag(&c.Verbosity), "v", "v", "number for the log level verbosity")
 	fs.Var(VModuleConfigurationPflag(&c.VModule), "vmodule", "comma-separated list of pattern=N settings for file-filtered logging (only works for text log format)")
 
@@ -364,8 +364,8 @@ func SetRecommendedLoggingConfiguration(c *LoggingConfiguration) {
 	if c.Format == "" {
 		c.Format = "text"
 	}
-	if c.FlushFrequency == 0 {
-		c.FlushFrequency = LogFlushFreqDefault
+	if c.FlushFrequency.Duration == 0 {
+		c.FlushFrequency.Duration = LogFlushFreqDefault
 	}
 	var empty resource.QuantityValue
 	if c.Options.JSON.InfoBufferSize == empty {

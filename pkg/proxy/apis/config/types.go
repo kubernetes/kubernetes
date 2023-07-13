@@ -23,6 +23,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	componentbaseconfig "k8s.io/component-base/config"
+	logsapi "k8s.io/component-base/logs/api/v1"
 )
 
 // KubeProxyIPTablesConfiguration contains iptables-related configuration
@@ -188,6 +189,9 @@ type KubeProxyConfiguration struct {
 	DetectLocalMode LocalMode
 	// DetectLocal contains optional configuration settings related to DetectLocalMode.
 	DetectLocal DetectLocalConfiguration
+	// Logging specifies the options of logging.
+	// Refer to [Logs Options](https://github.com/kubernetes/component-base/blob/master/logs/options.go) for more information.
+	Logging logsapi.LoggingConfiguration
 }
 
 // ProxyMode represents modes used by the Kubernetes proxy server.
