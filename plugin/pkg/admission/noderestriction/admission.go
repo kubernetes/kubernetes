@@ -288,11 +288,37 @@ func (p *Plugin) admitPodStatus(nodeName string, a admission.Attributes) error {
 		if !labels.Equals(oldPod.Labels, newPod.Labels) {
 			return admission.NewForbidden(a, fmt.Errorf("node %q cannot update labels through pod status", nodeName))
 		}
+		if !resourceClaimStatusesEqual(oldPod.Status.ResourceClaimStatuses, newPod.Status.ResourceClaimStatuses) {
+			return admission.NewForbidden(a, fmt.Errorf("node %q cannot update resource claim statues", nodeName))
+		}
 		return nil
 
 	default:
 		return admission.NewForbidden(a, fmt.Errorf("unexpected operation %q", a.GetOperation()))
 	}
+}
+
+func resourceClaimStatusesEqual(statusA, statusB []api.PodResourceClaimStatus) bool {
+	if len(statusA) != len(statusB) {
+		return false
+	}
+	// In most cases, status entries only get added once and not modified.
+	// But this cannot be guaranteed, so for the sake of correctness in all
+	// cases this code here has to check.
+	for i := range statusA {
+		if statusA[i].Name != statusB[i].Name {
+			return false
+		}
+		claimNameA := statusA[i].ResourceClaimName
+		claimNameB := statusB[i].ResourceClaimName
+		if (claimNameA == nil) != (claimNameB == nil) {
+			return false
+		}
+		if claimNameA != nil && *claimNameA != *claimNameB {
+			return false
+		}
+	}
+	return true
 }
 
 // admitPodEviction allows to evict a pod if it is assigned to the current node.
