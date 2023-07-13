@@ -171,6 +171,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &admissionregistrationv1alpha1.ValidatingAdmissionPolicyStatusApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Validation"):
 		return &admissionregistrationv1alpha1.ValidationApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("Variable"):
+		return &admissionregistrationv1alpha1.VariableApplyConfiguration{}
 
 		// Group=admissionregistration.k8s.io, Version=v1beta1
 	case v1beta1.SchemeGroupVersion.WithKind("MatchCondition"):
