@@ -313,8 +313,11 @@ func TestFirstPendingIndexes(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			pods := hollowPodsWithIndexPhase(tc.activePods)
-			got := firstPendingIndexes(pods, tc.succeededIndexes, tc.cnt, tc.completions)
+			jobCtx := &syncJobCtx{
+				activePods:       hollowPodsWithIndexPhase(tc.activePods),
+				succeededIndexes: tc.succeededIndexes,
+			}
+			got := firstPendingIndexes(jobCtx, tc.cnt, tc.completions)
 			if diff := cmp.Diff(tc.want, got); diff != "" {
 				t.Errorf("Wrong first pending indexes (-want,+got):\n%s", diff)
 			}
