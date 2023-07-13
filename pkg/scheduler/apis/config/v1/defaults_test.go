@@ -145,9 +145,10 @@ func TestSchedulerDefaults(t *testing.T) {
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				PercentageOfNodesToScore: pointer.Int32(config.DefaultPercentageOfNodesToScore),
-				PodInitialBackoffSeconds: pointer.Int64(1),
-				PodMaxBackoffSeconds:     pointer.Int64(10),
+				PercentageOfNodesToScore:          pointer.Int32(config.DefaultPercentageOfNodesToScore),
+				PodInitialBackoffSeconds:          pointer.Int64(1),
+				PodMaxBackoffSeconds:              pointer.Int64(10),
+				PodMaxInUnschedulablePodsDuration: defaultPodMaxInUnschedulablePodsDuration,
 				Profiles: []configv1.KubeSchedulerProfile{
 					{
 						Plugins:       getDefaultPlugins(),
@@ -182,9 +183,10 @@ func TestSchedulerDefaults(t *testing.T) {
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				PercentageOfNodesToScore: pointer.Int32(config.DefaultPercentageOfNodesToScore),
-				PodInitialBackoffSeconds: pointer.Int64(1),
-				PodMaxBackoffSeconds:     pointer.Int64(10),
+				PercentageOfNodesToScore:          pointer.Int32(config.DefaultPercentageOfNodesToScore),
+				PodInitialBackoffSeconds:          pointer.Int64(1),
+				PodMaxBackoffSeconds:              pointer.Int64(10),
+				PodMaxInUnschedulablePodsDuration: defaultPodMaxInUnschedulablePodsDuration,
 				Profiles: []configv1.KubeSchedulerProfile{
 					{
 						SchedulerName: pointer.String("default-scheduler"),
@@ -238,9 +240,10 @@ func TestSchedulerDefaults(t *testing.T) {
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				PercentageOfNodesToScore: pointer.Int32(config.DefaultPercentageOfNodesToScore),
-				PodInitialBackoffSeconds: pointer.Int64(1),
-				PodMaxBackoffSeconds:     pointer.Int64(10),
+				PercentageOfNodesToScore:          pointer.Int32(config.DefaultPercentageOfNodesToScore),
+				PodInitialBackoffSeconds:          pointer.Int64(1),
+				PodMaxBackoffSeconds:              pointer.Int64(10),
+				PodMaxInUnschedulablePodsDuration: defaultPodMaxInUnschedulablePodsDuration,
 				Profiles: []configv1.KubeSchedulerProfile{
 					{
 						Plugins: getDefaultPlugins(),
@@ -390,9 +393,10 @@ func TestSchedulerDefaults(t *testing.T) {
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				PercentageOfNodesToScore: pointer.Int32(config.DefaultPercentageOfNodesToScore),
-				PodInitialBackoffSeconds: pointer.Int64(1),
-				PodMaxBackoffSeconds:     pointer.Int64(10),
+				PercentageOfNodesToScore:          pointer.Int32(config.DefaultPercentageOfNodesToScore),
+				PodInitialBackoffSeconds:          pointer.Int64(1),
+				PodMaxBackoffSeconds:              pointer.Int64(10),
+				PodMaxInUnschedulablePodsDuration: defaultPodMaxInUnschedulablePodsDuration,
 				Profiles: []configv1.KubeSchedulerProfile{
 					{
 						Plugins:       getDefaultPlugins(),
@@ -427,9 +431,10 @@ func TestSchedulerDefaults(t *testing.T) {
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				PercentageOfNodesToScore: pointer.Int32(config.DefaultPercentageOfNodesToScore),
-				PodInitialBackoffSeconds: pointer.Int64(1),
-				PodMaxBackoffSeconds:     pointer.Int64(10),
+				PercentageOfNodesToScore:          pointer.Int32(config.DefaultPercentageOfNodesToScore),
+				PodInitialBackoffSeconds:          pointer.Int64(1),
+				PodMaxBackoffSeconds:              pointer.Int64(10),
+				PodMaxInUnschedulablePodsDuration: defaultPodMaxInUnschedulablePodsDuration,
 				Profiles: []configv1.KubeSchedulerProfile{
 					{
 						Plugins:       getDefaultPlugins(),
@@ -465,9 +470,10 @@ func TestSchedulerDefaults(t *testing.T) {
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				PercentageOfNodesToScore: pointer.Int32(config.DefaultPercentageOfNodesToScore),
-				PodInitialBackoffSeconds: pointer.Int64(1),
-				PodMaxBackoffSeconds:     pointer.Int64(10),
+				PercentageOfNodesToScore:          pointer.Int32(config.DefaultPercentageOfNodesToScore),
+				PodInitialBackoffSeconds:          pointer.Int64(1),
+				PodMaxBackoffSeconds:              pointer.Int64(10),
+				PodMaxInUnschedulablePodsDuration: defaultPodMaxInUnschedulablePodsDuration,
 				Profiles: []configv1.KubeSchedulerProfile{
 					{
 						Plugins:       getDefaultPlugins(),
@@ -502,9 +508,10 @@ func TestSchedulerDefaults(t *testing.T) {
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				PercentageOfNodesToScore: pointer.Int32(50),
-				PodInitialBackoffSeconds: pointer.Int64(1),
-				PodMaxBackoffSeconds:     pointer.Int64(10),
+				PercentageOfNodesToScore:          pointer.Int32(50),
+				PodInitialBackoffSeconds:          pointer.Int64(1),
+				PodMaxBackoffSeconds:              pointer.Int64(10),
+				PodMaxInUnschedulablePodsDuration: defaultPodMaxInUnschedulablePodsDuration,
 				Profiles: []configv1.KubeSchedulerProfile{
 					{
 						Plugins:       getDefaultPlugins(),
@@ -543,9 +550,10 @@ func TestSchedulerDefaults(t *testing.T) {
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				PercentageOfNodesToScore: pointer.Int32(config.DefaultPercentageOfNodesToScore),
-				PodInitialBackoffSeconds: pointer.Int64(1),
-				PodMaxBackoffSeconds:     pointer.Int64(10),
+				PercentageOfNodesToScore:          pointer.Int32(config.DefaultPercentageOfNodesToScore),
+				PodInitialBackoffSeconds:          pointer.Int64(1),
+				PodMaxBackoffSeconds:              pointer.Int64(10),
+				PodMaxInUnschedulablePodsDuration: defaultPodMaxInUnschedulablePodsDuration,
 				Profiles: []configv1.KubeSchedulerProfile{
 					{
 						Plugins:                  getDefaultPlugins(),
@@ -586,9 +594,10 @@ func TestSchedulerDefaults(t *testing.T) {
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				PercentageOfNodesToScore: pointer.Int32(10),
-				PodInitialBackoffSeconds: pointer.Int64(1),
-				PodMaxBackoffSeconds:     pointer.Int64(10),
+				PercentageOfNodesToScore:          pointer.Int32(10),
+				PodInitialBackoffSeconds:          pointer.Int64(1),
+				PodMaxBackoffSeconds:              pointer.Int64(10),
+				PodMaxInUnschedulablePodsDuration: defaultPodMaxInUnschedulablePodsDuration,
 				Profiles: []configv1.KubeSchedulerProfile{
 					{
 						Plugins:                  getDefaultPlugins(),

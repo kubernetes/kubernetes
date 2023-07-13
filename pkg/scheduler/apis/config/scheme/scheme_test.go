@@ -1060,6 +1060,7 @@ leaderElection:
 parallelism: 8
 podInitialBackoffSeconds: 0
 podMaxBackoffSeconds: 0
+podMaxInUnschedulablePodsDuration: 0s
 profiles:
 - pluginConfig:
   - args:
@@ -1282,6 +1283,7 @@ leaderElection:
 parallelism: 8
 podInitialBackoffSeconds: 0
 podMaxBackoffSeconds: 0
+podMaxInUnschedulablePodsDuration: 0s
 profiles:
 - pluginConfig:
   - args:
@@ -1356,6 +1358,7 @@ leaderElection:
 parallelism: 8
 podInitialBackoffSeconds: 0
 podMaxBackoffSeconds: 0
+podMaxInUnschedulablePodsDuration: 0s
 profiles:
 - pluginConfig:
   - args:

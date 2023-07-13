@@ -23,6 +23,7 @@ package v1
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -190,6 +191,11 @@ func (in *KubeSchedulerConfiguration) DeepCopyInto(out *KubeSchedulerConfigurati
 	if in.PodMaxBackoffSeconds != nil {
 		in, out := &in.PodMaxBackoffSeconds, &out.PodMaxBackoffSeconds
 		*out = new(int64)
+		**out = **in
+	}
+	if in.PodMaxInUnschedulablePodsDuration != nil {
+		in, out := &in.PodMaxInUnschedulablePodsDuration, &out.PodMaxInUnschedulablePodsDuration
+		*out = new(metav1.Duration)
 		**out = **in
 	}
 	if in.Profiles != nil {

@@ -17,7 +17,10 @@ limitations under the License.
 package v1
 
 import (
+	"time"
+
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/util/feature"
@@ -29,10 +32,15 @@ import (
 	"k8s.io/utils/pointer"
 )
 
-var defaultResourceSpec = []configv1.ResourceSpec{
-	{Name: string(v1.ResourceCPU), Weight: 1},
-	{Name: string(v1.ResourceMemory), Weight: 1},
-}
+var (
+	defaultResourceSpec = []configv1.ResourceSpec{
+		{Name: string(v1.ResourceCPU), Weight: 1},
+		{Name: string(v1.ResourceMemory), Weight: 1},
+	}
+	defaultPodMaxInUnschedulablePodsDuration = &metav1.Duration{
+		Duration: 24 * time.Hour,
+	}
+)
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
@@ -160,6 +168,10 @@ func SetDefaults_KubeSchedulerConfiguration(obj *configv1.KubeSchedulerConfigura
 
 	if obj.PodMaxBackoffSeconds == nil {
 		obj.PodMaxBackoffSeconds = pointer.Int64(10)
+	}
+
+	if obj.PodMaxInUnschedulablePodsDuration == nil {
+		obj.PodMaxInUnschedulablePodsDuration = defaultPodMaxInUnschedulablePodsDuration
 	}
 
 	// Enable profiling by default in the scheduler

@@ -31,7 +31,7 @@ type DeprecatedOptions struct {
 	// PodMaxInUnschedulablePodsDuration is the maximum time a pod can stay in
 	// unschedulablePods. If a pod stays in unschedulablePods for longer than this
 	// value, the pod will be moved from unschedulablePods to backoffQ or activeQ.
-	// If this value is empty, the default value (5min) will be used.
+	// If this value is empty, the default value (24h) will be used.
 	PodMaxInUnschedulablePodsDuration time.Duration
 }
 
@@ -47,5 +47,5 @@ func (o *DeprecatedOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.ContentType, "kube-api-content-type", "application/vnd.kubernetes.protobuf", "DEPRECATED: content type of requests sent to apiserver. This parameter is ignored if a config file is specified in --config.")
 	fs.Float32Var(&o.QPS, "kube-api-qps", 50.0, "DEPRECATED: QPS to use while talking with kubernetes apiserver. This parameter is ignored if a config file is specified in --config.")
 	fs.Int32Var(&o.Burst, "kube-api-burst", 100, "DEPRECATED: burst to use while talking with kubernetes apiserver. This parameter is ignored if a config file is specified in --config.")
-	fs.DurationVar(&o.PodMaxInUnschedulablePodsDuration, "pod-max-in-unschedulable-pods-duration", 5*time.Minute, "DEPRECATED: the maximum time a pod can stay in unschedulablePods. If a pod stays in unschedulablePods for longer than this value, the pod will be moved from unschedulablePods to backoffQ or activeQ. This flag is deprecated and will be removed in 1.26")
+	fs.DurationVar(&o.PodMaxInUnschedulablePodsDuration, "pod-max-in-unschedulable-pods-duration", 24*time.Hour, "DEPRECATED: the maximum time a pod can stay in unschedulablePods. If a pod stays in unschedulablePods for longer than this value, the pod will be moved from unschedulablePods to backoffQ or activeQ. This parameter is ignored if a config file is specified in --config. This flag is deprecated and will be removed in 1.29")
 }

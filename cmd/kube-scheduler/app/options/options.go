@@ -137,6 +137,11 @@ func (o *Options) ApplyDeprecated() {
 	if deprecated.Changed("kube-api-burst") {
 		o.ComponentConfig.ClientConnection.Burst = o.Deprecated.Burst
 	}
+	if deprecated.Changed("pod-max-in-unschedulable-pods-duration") {
+		o.ComponentConfig.PodMaxInUnschedulablePodsDuration = metav1.Duration{
+			Duration: o.Deprecated.PodMaxInUnschedulablePodsDuration,
+		}
+	}
 }
 
 // ApplyLeaderElectionTo obtains the CLI args related with leaderelection, and override the values in `cfg`.
@@ -239,11 +244,6 @@ func (o *Options) ApplyTo(logger klog.Logger, c *schedulerappconfig.Config) erro
 		}
 	}
 	o.Metrics.Apply()
-
-	// Apply value independently instead of using ApplyDeprecated() because it can't be configured via ComponentConfig.
-	if o.Deprecated != nil {
-		c.PodMaxInUnschedulablePodsDuration = o.Deprecated.PodMaxInUnschedulablePodsDuration
-	}
 
 	return nil
 }

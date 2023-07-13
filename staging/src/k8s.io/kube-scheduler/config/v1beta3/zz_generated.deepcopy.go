@@ -22,7 +22,8 @@ limitations under the License.
 package v1beta3
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -192,6 +193,11 @@ func (in *KubeSchedulerConfiguration) DeepCopyInto(out *KubeSchedulerConfigurati
 		*out = new(int64)
 		**out = **in
 	}
+	if in.PodMaxInUnschedulablePodsDuration != nil {
+		in, out := &in.PodMaxInUnschedulablePodsDuration, &out.PodMaxInUnschedulablePodsDuration
+		*out = new(v1.Duration)
+		**out = **in
+	}
 	if in.Profiles != nil {
 		in, out := &in.Profiles, &out.Profiles
 		*out = make([]KubeSchedulerProfile, len(*in))
@@ -266,7 +272,7 @@ func (in *NodeAffinityArgs) DeepCopyInto(out *NodeAffinityArgs) {
 	out.TypeMeta = in.TypeMeta
 	if in.AddedAffinity != nil {
 		in, out := &in.AddedAffinity, &out.AddedAffinity
-		*out = new(v1.NodeAffinity)
+		*out = new(corev1.NodeAffinity)
 		(*in).DeepCopyInto(*out)
 	}
 	return
@@ -463,7 +469,7 @@ func (in *PodTopologySpreadArgs) DeepCopyInto(out *PodTopologySpreadArgs) {
 	out.TypeMeta = in.TypeMeta
 	if in.DefaultConstraints != nil {
 		in, out := &in.DefaultConstraints, &out.DefaultConstraints
-		*out = make([]v1.TopologySpreadConstraint, len(*in))
+		*out = make([]corev1.TopologySpreadConstraint, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

@@ -87,6 +87,12 @@ type KubeSchedulerConfiguration struct {
 	// the default value (10s) will be used.
 	PodMaxBackoffSeconds int64
 
+	// PodMaxInUnschedulablePodsDuration is the maximum time a pod can stay in
+	// unschedulablePods. If a pod stays in unschedulablePods for longer than this
+	// value, the pod will be moved from unschedulablePods to backoffQ or activeQ.
+	// If this value is empty, the default value (24h) will be used.
+	PodMaxInUnschedulablePodsDuration metav1.Duration
+
 	// Profiles are scheduling profiles that kube-scheduler supports. Pods can
 	// choose to be scheduled under a particular profile by setting its associated
 	// scheduler name. Pods that don't specify any scheduler name are scheduled
