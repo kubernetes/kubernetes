@@ -6931,10 +6931,12 @@ func TestInternalExternalMasquerade(t *testing.T) {
 			destIP:   testNodeIP,
 			destPort: 3002,
 
-			// FIXME: The short-circuit rule means we potentially send to a remote
-			// endpoint without masquerading, which is inconsistent with the
-			// eTP:Cluster case. We should either be masquerading here, or NOT
-			// masquerading in the "pod to NodePort" case above.
+			// See the comment below in the "pod to LB with eTP:Local" case.
+			// It doesn't actually make sense to short-circuit here, since if
+			// you connect directly to a NodePort from outside the cluster,
+			// you only get the local endpoints. But it's simpler for us and
+			// slightly more convenient for users to have this case get
+			// short-circuited too.
 			output: "10.180.0.2:80, 10.180.1.2:80",
 			masq:   false,
 		},
@@ -6944,10 +6946,13 @@ func TestInternalExternalMasquerade(t *testing.T) {
 			destIP:   "5.6.7.8",
 			destPort: 80,
 
-			// FIXME: The short-circuit rule means we potentially send to a remote
-			// endpoint without masquerading, which is inconsistent with the
-			// eTP:Cluster case. We should either be masquerading here, or NOT
-			// masquerading in the "pod to LB" case above.
+			// The short-circuit rule is supposed to make this behave the same
+			// way it would if the packet actually went out to the LB and then
+			// came back into the cluster. So it gets routed to all endpoints,
+			// not just local ones. In reality, if the packet actually left
+			// the cluster, it would have to get masqueraded, but since we can
+			// avoid doing that in the short-circuit case, and not masquerading
+			// is more useful, we avoid masquerading.
 			output: "10.180.0.2:80, 10.180.1.2:80",
 			masq:   false,
 		},
