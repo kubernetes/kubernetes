@@ -25,7 +25,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/net"
@@ -167,7 +166,7 @@ func IsScalarResourceName(name v1.ResourceName) bool {
 // nil objects are allowed and will be converted to nil.
 // For oldObj, cache.DeletedFinalStateUnknown is handled and the
 // object stored in it will be converted instead.
-func As[T runtime.Object](oldObj, newobj interface{}) (T, T, error) {
+func As[T any](oldObj, newobj interface{}) (T, T, error) {
 	var oldTyped T
 	var newTyped T
 	var ok bool

@@ -864,8 +864,10 @@ func Test_buildQueueingHintMap(t *testing.T) {
 						t.Errorf("got plugin name %v, want %v", fn.PluginName, wantfns[i].PluginName)
 						continue
 					}
-					if fn.QueueingHintFn(logger, nil, nil, nil) != wantfns[i].QueueingHintFn(logger, nil, nil, nil) {
-						t.Errorf("got queueing hint function (%v) returning %v, expect it to return %v", fn.PluginName, fn.QueueingHintFn(logger, nil, nil, nil), wantfns[i].QueueingHintFn(logger, nil, nil, nil))
+					got, gotErr := fn.QueueingHintFn(logger, nil, nil, nil)
+					want, wantErr := wantfns[i].QueueingHintFn(logger, nil, nil, nil)
+					if got != want || gotErr != wantErr {
+						t.Errorf("got queueing hint function (%v) returning (%v, %v), expect it to return (%v, %v)", fn.PluginName, got, gotErr, want, wantErr)
 						continue
 					}
 				}
@@ -1089,8 +1091,8 @@ var hintFromFakeNode = framework.QueueingHint(100)
 
 type fakeNodePlugin struct{}
 
-var fakeNodePluginQueueingFn = func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) framework.QueueingHint {
-	return hintFromFakeNode
+var fakeNodePluginQueueingFn = func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) (framework.QueueingHint, error) {
+	return hintFromFakeNode, nil
 }
 
 func (*fakeNodePlugin) Name() string { return fakeNode }
@@ -1099,7 +1101,7 @@ func (*fakeNodePlugin) Filter(_ context.Context, _ *framework.CycleState, _ *v1.
 	return nil
 }
 
-func (*fakeNodePlugin) EventsToRegister() []framework.ClusterEventWithHint {
+func (pl *fakeNodePlugin) EventsToRegister() []framework.ClusterEventWithHint {
 	return []framework.ClusterEventWithHint{
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add}, QueueingHintFn: fakeNodePluginQueueingFn},
 	}
@@ -1109,8 +1111,8 @@ var hintFromFakePod = framework.QueueingHint(101)
 
 type fakePodPlugin struct{}
 
-var fakePodPluginQueueingFn = func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) framework.QueueingHint {
-	return hintFromFakePod
+var fakePodPluginQueueingFn = func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) (framework.QueueingHint, error) {
+	return hintFromFakePod, nil
 }
 
 func (*fakePodPlugin) Name() string { return fakePod }
@@ -1119,7 +1121,7 @@ func (*fakePodPlugin) Filter(_ context.Context, _ *framework.CycleState, _ *v1.P
 	return nil
 }
 
-func (*fakePodPlugin) EventsToRegister() []framework.ClusterEventWithHint {
+func (pl *fakePodPlugin) EventsToRegister() []framework.ClusterEventWithHint {
 	return []framework.ClusterEventWithHint{
 		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Add}, QueueingHintFn: fakePodPluginQueueingFn},
 	}

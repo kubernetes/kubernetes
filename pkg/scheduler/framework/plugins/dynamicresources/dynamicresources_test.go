@@ -889,6 +889,7 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 		claims         []*resourcev1alpha2.ResourceClaim
 		oldObj, newObj interface{}
 		expectedHint   framework.QueueingHint
+		expectedErr    bool
 	}{
 		"skip-deletes": {
 			pod:          podWithClaimTemplate,
@@ -897,9 +898,9 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 			expectedHint: framework.QueueSkip,
 		},
 		"backoff-wrong-new-object": {
-			pod:          podWithClaimTemplate,
-			newObj:       "not-a-claim",
-			expectedHint: framework.QueueAfterBackoff,
+			pod:         podWithClaimTemplate,
+			newObj:      "not-a-claim",
+			expectedErr: true,
 		},
 		"skip-wrong-claim": {
 			pod: podWithClaimTemplate,
@@ -927,10 +928,10 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 			expectedHint: framework.QueueImmediately,
 		},
 		"backoff-wrong-old-object": {
-			pod:          podWithClaimName,
-			oldObj:       "not-a-claim",
-			newObj:       pendingImmediateClaim,
-			expectedHint: framework.QueueAfterBackoff,
+			pod:         podWithClaimName,
+			oldObj:      "not-a-claim",
+			newObj:      pendingImmediateClaim,
+			expectedErr: true,
 		},
 		"skip-adding-finalizer": {
 			pod:    podWithClaimName,
@@ -969,7 +970,13 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 					require.NoError(t, store.Update(claim))
 				}
 			}
-			actualHint := testCtx.p.isSchedulableAfterClaimChange(logger, tc.pod, tc.oldObj, tc.newObj)
+			actualHint, err := testCtx.p.isSchedulableAfterClaimChange(logger, tc.pod, tc.oldObj, tc.newObj)
+			if tc.expectedErr {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
 			require.Equal(t, tc.expectedHint, actualHint)
 		})
 	}
@@ -982,6 +989,7 @@ func Test_isSchedulableAfterPodSchedulingContextChange(t *testing.T) {
 		claims         []*resourcev1alpha2.ResourceClaim
 		oldObj, newObj interface{}
 		expectedHint   framework.QueueingHint
+		expectedErr    bool
 	}{
 		"skip-deleted": {
 			pod:          podWithClaimTemplate,
@@ -996,18 +1004,18 @@ func Test_isSchedulableAfterPodSchedulingContextChange(t *testing.T) {
 			expectedHint: framework.QueueSkip,
 		},
 		"backoff-wrong-old-object": {
-			pod:          podWithClaimTemplate,
-			oldObj:       "not-a-scheduling-context",
-			newObj:       scheduling,
-			expectedHint: framework.QueueAfterBackoff,
+			pod:         podWithClaimTemplate,
+			oldObj:      "not-a-scheduling-context",
+			newObj:      scheduling,
+			expectedErr: true,
 		},
 		"backoff-missed-wrong-old-object": {
 			pod: podWithClaimTemplate,
 			oldObj: cache.DeletedFinalStateUnknown{
 				Obj: "not-a-scheduling-context",
 			},
-			newObj:       scheduling,
-			expectedHint: framework.QueueAfterBackoff,
+			newObj:      scheduling,
+			expectedErr: true,
 		},
 		"skip-unrelated-object": {
 			pod:    podWithClaimTemplate,
@@ -1020,10 +1028,10 @@ func Test_isSchedulableAfterPodSchedulingContextChange(t *testing.T) {
 			expectedHint: framework.QueueSkip,
 		},
 		"backoff-wrong-new-object": {
-			pod:          podWithClaimTemplate,
-			oldObj:       scheduling,
-			newObj:       "not-a-scheduling-context",
-			expectedHint: framework.QueueAfterBackoff,
+			pod:         podWithClaimTemplate,
+			oldObj:      scheduling,
+			newObj:      "not-a-scheduling-context",
+			expectedErr: true,
 		},
 		"skip-missing-claim": {
 			pod:          podWithClaimTemplate,
@@ -1091,7 +1099,13 @@ func Test_isSchedulableAfterPodSchedulingContextChange(t *testing.T) {
 			t.Parallel()
 			logger, _ := ktesting.NewTestContext(t)
 			testCtx := setup(t, nil, tc.claims, nil, tc.schedulings)
-			actualHint := testCtx.p.isSchedulableAfterPodSchedulingContextChange(logger, tc.pod, tc.oldObj, tc.newObj)
+			actualHint, err := testCtx.p.isSchedulableAfterPodSchedulingContextChange(logger, tc.pod, tc.oldObj, tc.newObj)
+			if tc.expectedErr {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
 			require.Equal(t, tc.expectedHint, actualHint)
 		})
 	}
