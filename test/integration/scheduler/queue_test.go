@@ -542,9 +542,9 @@ func TestRequeueByPermitRejection(t *testing.T) {
 		fakePermitPluginName: func(ctx context.Context, o runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 			fakePermit = &fakePermitPlugin{
 				frameworkHandler: fh,
-				schedulingHint: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) framework.QueueingHint {
+				schedulingHint: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
 					queueingHintCalledCounter++
-					return framework.QueueImmediately
+					return framework.QueueImmediately, nil
 				},
 			}
 			return fakePermit, nil

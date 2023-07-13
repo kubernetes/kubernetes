@@ -92,13 +92,15 @@ type ClusterEventWithHint struct {
 // QueueingHintFn returns a hint that signals whether the event can make a Pod,
 // which was rejected by this plugin in the past scheduling cycle, schedulable or not.
 // It's called before a Pod gets moved from unschedulableQ to backoffQ or activeQ.
+// If it returns an error, we'll take the returned QueueingHint as `QueueAfterBackoff` at the caller whatever we returned here so that
+// we can prevent the Pod from stucking in the unschedulable pod pool.
 //
 // - `pod`: the Pod to be enqueued, which is rejected by this plugin in the past.
 // - `oldObj` `newObj`: the object involved in that event.
 //   - For example, the given event is "Node deleted", the `oldObj` will be that deleted Node.
 //   - `oldObj` is nil if the event is add event.
 //   - `newObj` is nil if the event is delete event.
-type QueueingHintFn func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) QueueingHint
+type QueueingHintFn func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (QueueingHint, error)
 
 type QueueingHint int
 
