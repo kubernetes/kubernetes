@@ -396,7 +396,7 @@ func ValidatePriorityLevelConfigurationSpec(spec *flowcontrol.PriorityLevelConfi
 		}
 	case flowcontrol.PriorityLevelEnablementLimited:
 		if spec.Exempt != nil {
-			allErrs = append(allErrs, field.Required(fldPath.Child("exempt"), "must be nil if the type is Limited"))
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("exempt"), "must be nil if the type is Limited"))
 		}
 
 		if spec.Limited == nil {

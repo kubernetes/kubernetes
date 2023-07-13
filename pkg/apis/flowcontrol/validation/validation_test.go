@@ -829,24 +829,6 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 			field.Invalid(field.NewPath("spec"), badSpec, "spec of 'exempt' except the 'spec.exempt' field must equal the fixed value"),
 		},
 	}, {
-		name: "limited must not set exempt priority level configuration for borrowing",
-		priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "broken-limited",
-			},
-			Spec: flowcontrol.PriorityLevelConfigurationSpec{
-				Type: flowcontrol.PriorityLevelEnablementLimited,
-				Exempt: &flowcontrol.ExemptPriorityLevelConfiguration{
-					NominalConcurrencyShares: pointer.Int32(10),
-					LendablePercent:          pointer.Int32(20),
-				},
-			},
-		},
-		expectedErrors: field.ErrorList{
-			field.Required(field.NewPath("spec").Child("exempt"), "must be nil if the type is Limited"),
-			field.Required(field.NewPath("spec").Child("limited"), "must not be empty when type is Limited"),
-		},
-	}, {
 		name: "exempt priority level should have appropriate values for Exempt field",
 		priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
 			ObjectMeta: metav1.ObjectMeta{
@@ -875,7 +857,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 		priorityLevelConfiguration: exemptTypeRepurposed,
 		expectedErrors: field.ErrorList{
 			field.Invalid(field.NewPath("spec").Child("type"), flowcontrol.PriorityLevelEnablementLimited, "type must be 'Exempt' if and only if name is 'exempt'"),
-			field.Required(field.NewPath("spec").Child("exempt"), "must be nil if the type is Limited"),
+			field.Forbidden(field.NewPath("spec").Child("exempt"), "must be nil if the type is Limited"),
 			field.Invalid(field.NewPath("spec"), exemptTypeRepurposed.Spec, "spec of 'exempt' except the 'spec.exempt' field must equal the fixed value"),
 		},
 	}, {
@@ -911,7 +893,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 			},
 		},
 		expectedErrors: field.ErrorList{
-			field.Required(field.NewPath("spec").Child("exempt"), "must be nil if the type is Limited"),
+			field.Forbidden(field.NewPath("spec").Child("exempt"), "must be nil if the type is Limited"),
 			field.Required(field.NewPath("spec").Child("limited"), "must not be empty when type is Limited"),
 		},
 	}, {
