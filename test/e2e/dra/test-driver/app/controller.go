@@ -38,10 +38,11 @@ import (
 )
 
 type Resources struct {
-	NodeLocal      bool
-	Nodes          []string
-	MaxAllocations int
-	Shareable      bool
+	DontSetReservedFor bool
+	NodeLocal          bool
+	Nodes              []string
+	MaxAllocations     int
+	Shareable          bool
 
 	// AllocateWrapper, if set, gets called for each Allocate call.
 	AllocateWrapper AllocateWrapperType
@@ -80,6 +81,7 @@ func NewController(clientset kubernetes.Interface, driverName string, resources 
 func (c *ExampleController) Run(ctx context.Context, workers int) {
 	informerFactory := informers.NewSharedInformerFactory(c.clientset, 0 /* resync period */)
 	ctrl := controller.New(ctx, c.driverName, c, c.clientset, informerFactory)
+	ctrl.SetReservedFor(!c.resources.DontSetReservedFor)
 	informerFactory.Start(ctx.Done())
 	ctrl.Run(workers)
 	// If we get here, the context was canceled and we can wait for informer factory goroutines.
