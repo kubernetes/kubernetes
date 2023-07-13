@@ -932,10 +932,15 @@ func getAttemptsLabel(p *framework.QueuedPodInfo) string {
 // handleSchedulingFailure records an event for the pod that indicates the
 // pod has failed to schedule. Also, update the pod condition and nominated node name if set.
 func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framework.Framework, podInfo *framework.QueuedPodInfo, status *framework.Status, nominatingInfo *framework.NominatingInfo, start time.Time) {
-	// Basically, AddUnschedulableIfNotPresent calls DonePod internally.
-	// But, AddUnschedulableIfNotPresent isn't called in some corner cases.
-	// Here, we call DonePod explicitly to avoid leaking the pod.
-	defer sched.SchedulingQueue.Done(podInfo.Pod.UID)
+	calledDone := false
+	defer func() {
+		if !calledDone {
+			// Basically, AddUnschedulableIfNotPresent calls DonePod internally.
+			// But, AddUnschedulableIfNotPresent isn't called in some corner cases.
+			// Here, we call DonePod explicitly to avoid leaking the pod.
+			sched.SchedulingQueue.Done(podInfo.Pod.UID)
+		}
+	}()
 
 	logger := klog.FromContext(ctx)
 	reason := v1.PodReasonSchedulerError
@@ -997,6 +1002,7 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 			if err := sched.SchedulingQueue.AddUnschedulableIfNotPresent(logger, podInfo, sched.SchedulingQueue.SchedulingCycle()); err != nil {
 				logger.Error(err, "Error occurred")
 			}
+			calledDone = true
 		}
 	}
 

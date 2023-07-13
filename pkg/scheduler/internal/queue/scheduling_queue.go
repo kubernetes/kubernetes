@@ -687,12 +687,7 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *
 	if moveRequestCycle >= podSchedulingCycle {
 		// In this case, we try to requeue this Pod to activeQ/backoffQ.
 		queue := p.requeuePodViaQueueingHint(logger, pInfo, schedulingHint, ScheduleAttemptFailure)
-		if klogV := klog.V(6); klogV.Enabled() {
-			// Log more information about the cycle counters.
-			logger.V(6).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pod), "event", ScheduleAttemptFailure, "queue", queue, "schedulingCycle", podSchedulingCycle)
-		} else {
-			logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pod), "event", ScheduleAttemptFailure, "queue", queue)
-		}
+		logger.V(6).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pod), "event", ScheduleAttemptFailure, "queue", queue, "schedulingCycle", podSchedulingCycle)
 	} else {
 		// need to put this Pod back to p.unschedulablePods.
 		p.unschedulablePods.addOrUpdate(pInfo)
@@ -811,26 +806,22 @@ func (p *PriorityQueue) done(pod types.UID) {
 	// remove events which is only referred from this Pod
 	// so that the receivedEvents map doesn't grow infinitely.
 	event := p.receivedEvents.Front()
-	if inFlightPod.previousEvent != nil {
+	if inFlightPod.previousEvent != nil && inFlightPod.previousEvent.Next() != nil {
 		event = inFlightPod.previousEvent.Next()
 	}
-	for ; event != nil; event = event.Next() {
+	for event != nil {
 		e := event.Value.(*clusterEvent)
 		// decrement inFlightPodsNum on events that happened after the Pod is popped.
 		e.inFlightPodsNum--
 		if e.inFlightPodsNum <= 0 {
 			// remove the event from the list if no Pod refers to it.
-			// In this case, we need to change `event` to the previous element
-			// because the current element will be removed.
 			eventToDelete := event
-			event = event.Prev()
+			// we need to take next event before removal.
+			event = event.Next()
 			p.receivedEvents.Remove(eventToDelete)
-
-			if event == nil {
-				// No events in p.receivedEvents.
-				break
-			}
+			continue
 		}
+		event = event.Next()
 	}
 }
 
@@ -1054,14 +1045,18 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(logger klog.Logger, podIn
 		}
 	}
 
-	// AddUnschedulableIfNotPresent might get called for in-flight Pods later, and in
-	// AddUnschedulableIfNotPresent we need to know whether events were
-	// observed while scheduling them.
-	p.receivedEvents.PushBack(&clusterEvent{
-		event:           event,
-		requestCycle:    p.schedulingCycle,
-		inFlightPodsNum: len(p.inFlightPods),
-	})
+	if len(p.inFlightPods) != 0 {
+		// AddUnschedulableIfNotPresent might get called for in-flight Pods later, and in
+		// AddUnschedulableIfNotPresent we need to know whether events were
+		// observed while scheduling them.
+		p.receivedEvents.PushBack(&clusterEvent{
+			event:           event,
+			requestCycle:    p.schedulingCycle,
+			inFlightPodsNum: len(p.inFlightPods),
+			oldObj:          oldObj,
+			newObj:          newObj,
+		})
+	}
 
 	if activated {
 		p.cond.Broadcast()
