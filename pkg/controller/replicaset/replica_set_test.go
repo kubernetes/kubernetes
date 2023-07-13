@@ -49,6 +49,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	. "k8s.io/kubernetes/pkg/controller/testutil"
@@ -305,7 +306,7 @@ func TestSyncReplicaSetCreateFailures(t *testing.T) {
 
 func TestSyncReplicaSetDormancy(t *testing.T) {
 	// Setup a test server so we can lie about the current state of pods
-	_, ctx := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:    200,
 		ResponseBody:  "{}",
@@ -357,7 +358,7 @@ func TestSyncReplicaSetDormancy(t *testing.T) {
 
 	// Lowering expectations should lead to a sync that creates a replica, however the
 	// fakePodControl error will prevent this, leaving expectations at 0, 0
-	manager.expectations.CreationObserved(rsKey)
+	manager.expectations.CreationObserved(logger, rsKey)
 	rsSpec.Status.Replicas = 1
 	rsSpec.Status.ReadyReplicas = 1
 	rsSpec.Status.AvailableReplicas = 1
@@ -1094,7 +1095,7 @@ type FakeRSExpectations struct {
 	expSatisfied func()
 }
 
-func (fe FakeRSExpectations) SatisfiedExpectations(controllerKey string) bool {
+func (fe FakeRSExpectations) SatisfiedExpectations(logger klog.Logger, controllerKey string) bool {
 	fe.expSatisfied()
 	return fe.satisfied
 }
@@ -1410,7 +1411,7 @@ func TestDeletionTimestamp(t *testing.T) {
 	pod := newPodList(nil, 1, v1.PodPending, labelMap, rs, "pod").Items[0]
 	pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 	pod.ResourceVersion = "1"
-	manager.expectations.ExpectDeletions(rsKey, []string{controller.PodKey(&pod)})
+	manager.expectations.ExpectDeletions(logger, rsKey, []string{controller.PodKey(&pod)})
 
 	// A pod added with a deletion timestamp should decrement deletions, not creations.
 	manager.addPod(logger, &pod)
@@ -1430,7 +1431,7 @@ func TestDeletionTimestamp(t *testing.T) {
 	// as a deletion.
 	oldPod := newPodList(nil, 1, v1.PodPending, labelMap, rs, "pod").Items[0]
 	oldPod.ResourceVersion = "2"
-	manager.expectations.ExpectDeletions(rsKey, []string{controller.PodKey(&pod)})
+	manager.expectations.ExpectDeletions(logger, rsKey, []string{controller.PodKey(&pod)})
 	manager.updatePod(logger, &oldPod, &pod)
 
 	queueRS, _ = manager.queue.Get()
@@ -1457,7 +1458,7 @@ func TestDeletionTimestamp(t *testing.T) {
 			},
 		},
 	}
-	manager.expectations.ExpectDeletions(rsKey, []string{controller.PodKey(secondPod)})
+	manager.expectations.ExpectDeletions(logger, rsKey, []string{controller.PodKey(secondPod)})
 	oldPod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 	oldPod.ResourceVersion = "2"
 	manager.updatePod(logger, &oldPod, &pod)

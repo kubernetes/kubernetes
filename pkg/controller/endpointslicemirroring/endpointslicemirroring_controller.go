@@ -67,13 +67,14 @@ const (
 )
 
 // NewController creates and initializes a new Controller
-func NewController(endpointsInformer coreinformers.EndpointsInformer,
+func NewController(ctx context.Context, endpointsInformer coreinformers.EndpointsInformer,
 	endpointSliceInformer discoveryinformers.EndpointSliceInformer,
 	serviceInformer coreinformers.ServiceInformer,
 	maxEndpointsPerSubset int32,
 	client clientset.Interface,
 	endpointUpdatesBatchPeriod time.Duration,
 ) *Controller {
+	logger := klog.FromContext(ctx)
 	broadcaster := record.NewBroadcaster()
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "endpoint-slice-mirroring-controller"})
 
@@ -96,16 +97,24 @@ func NewController(endpointsInformer coreinformers.EndpointsInformer,
 	}
 
 	endpointsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    c.onEndpointsAdd,
-		UpdateFunc: c.onEndpointsUpdate,
-		DeleteFunc: c.onEndpointsDelete,
+		AddFunc: func(obj interface{}) {
+			c.onEndpointsAdd(logger, obj)
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			c.onEndpointsUpdate(logger, oldObj, newObj)
+		},
+		DeleteFunc: func(obj interface{}) {
+			c.onEndpointsDelete(logger, obj)
+		},
 	})
 	c.endpointsLister = endpointsInformer.Lister()
 	c.endpointsSynced = endpointsInformer.Informer().HasSynced
 
 	endpointSliceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    c.onEndpointSliceAdd,
-		UpdateFunc: c.onEndpointSliceUpdate,
+		AddFunc: c.onEndpointSliceAdd,
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			c.onEndpointSliceUpdate(logger, oldObj, newObj)
+		},
 		DeleteFunc: c.onEndpointSliceDelete,
 	})
 
@@ -393,21 +402,21 @@ func (c *Controller) onServiceDelete(obj interface{}) {
 }
 
 // onEndpointsAdd queues a sync for the relevant Endpoints resource.
-func (c *Controller) onEndpointsAdd(obj interface{}) {
+func (c *Controller) onEndpointsAdd(logger klog.Logger, obj interface{}) {
 	endpoints := obj.(*v1.Endpoints)
 	if endpoints == nil {
 		utilruntime.HandleError(fmt.Errorf("onEndpointsAdd() expected type v1.Endpoints, got %T", obj))
 		return
 	}
 	if !c.shouldMirror(endpoints) {
-		klog.V(5).Infof("Skipping mirroring for %s/%s", endpoints.Namespace, endpoints.Name)
+		logger.V(5).Info("Skipping mirroring", "endpoints", klog.KObj(endpoints))
 		return
 	}
 	c.queueEndpoints(obj)
 }
 
 // onEndpointsUpdate queues a sync for the relevant Endpoints resource.
-func (c *Controller) onEndpointsUpdate(prevObj, obj interface{}) {
+func (c *Controller) onEndpointsUpdate(logger klog.Logger, prevObj, obj interface{}) {
 	endpoints := obj.(*v1.Endpoints)
 	prevEndpoints := prevObj.(*v1.Endpoints)
 	if endpoints == nil || prevEndpoints == nil {
@@ -415,21 +424,21 @@ func (c *Controller) onEndpointsUpdate(prevObj, obj interface{}) {
 		return
 	}
 	if !c.shouldMirror(endpoints) && !c.shouldMirror(prevEndpoints) {
-		klog.V(5).Infof("Skipping mirroring for %s/%s", endpoints.Namespace, endpoints.Name)
+		logger.V(5).Info("Skipping mirroring", "endpoints", klog.KObj(endpoints))
 		return
 	}
 	c.queueEndpoints(obj)
 }
 
 // onEndpointsDelete queues a sync for the relevant Endpoints resource.
-func (c *Controller) onEndpointsDelete(obj interface{}) {
+func (c *Controller) onEndpointsDelete(logger klog.Logger, obj interface{}) {
 	endpoints := getEndpointsFromDeleteAction(obj)
 	if endpoints == nil {
 		utilruntime.HandleError(fmt.Errorf("onEndpointsDelete() expected type v1.Endpoints, got %T", obj))
 		return
 	}
 	if !c.shouldMirror(endpoints) {
-		klog.V(5).Infof("Skipping mirroring for %s/%s", endpoints.Namespace, endpoints.Name)
+		logger.V(5).Info("Skipping mirroring", "endpoints", klog.KObj(endpoints))
 		return
 	}
 	c.queueEndpoints(obj)
@@ -453,7 +462,7 @@ func (c *Controller) onEndpointSliceAdd(obj interface{}) {
 // sync if the EndpointSlice resource version does not match the expected
 // version in the endpointSliceTracker or the managed-by value of the
 // EndpointSlice has changed from or to this controller.
-func (c *Controller) onEndpointSliceUpdate(prevObj, obj interface{}) {
+func (c *Controller) onEndpointSliceUpdate(logger klog.Logger, prevObj, obj interface{}) {
 	prevEndpointSlice := obj.(*discovery.EndpointSlice)
 	endpointSlice := prevObj.(*discovery.EndpointSlice)
 	if endpointSlice == nil || prevEndpointSlice == nil {
@@ -466,7 +475,7 @@ func (c *Controller) onEndpointSliceUpdate(prevObj, obj interface{}) {
 	svcName := endpointSlice.Labels[discovery.LabelServiceName]
 	prevSvcName := prevEndpointSlice.Labels[discovery.LabelServiceName]
 	if svcName != prevSvcName {
-		klog.Warningf("%s label changed from %s  to %s for %s", discovery.LabelServiceName, prevSvcName, svcName, endpointSlice.Name)
+		logger.Info("LabelServiceName changed", "labelServiceName", discovery.LabelServiceName, "oldName", prevSvcName, "newName", svcName, "endpointSlice", klog.KObj(endpointSlice))
 		c.queueEndpointsForEndpointSlice(endpointSlice)
 		c.queueEndpointsForEndpointSlice(prevEndpointSlice)
 		return

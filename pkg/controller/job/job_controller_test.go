@@ -785,6 +785,7 @@ func TestControllerSyncJob(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
 			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobReadyPods, tc.jobReadyPodsEnabled)()
 
 			// job manager setup
@@ -828,9 +829,9 @@ func TestControllerSyncJob(t *testing.T) {
 				manager.podBackoffStore.updateBackoffRecord(*tc.backoffRecord)
 			}
 			if tc.fakeExpectationAtCreation < 0 {
-				manager.expectations.ExpectDeletions(key, int(-tc.fakeExpectationAtCreation))
+				manager.expectations.ExpectDeletions(logger, key, int(-tc.fakeExpectationAtCreation))
 			} else if tc.fakeExpectationAtCreation > 0 {
-				manager.expectations.ExpectCreations(key, int(tc.fakeExpectationAtCreation))
+				manager.expectations.ExpectCreations(logger, key, int(tc.fakeExpectationAtCreation))
 			}
 			if tc.wasSuspended {
 				job.Status.Conditions = append(job.Status.Conditions, *newCondition(batch.JobSuspended, v1.ConditionTrue, "JobSuspended", "Job suspended", realClock.Now()))
@@ -3673,7 +3674,7 @@ type FakeJobExpectations struct {
 	expSatisfied func()
 }
 
-func (fe FakeJobExpectations) SatisfiedExpectations(controllerKey string) bool {
+func (fe FakeJobExpectations) SatisfiedExpectations(logger klog.Logger, controllerKey string) bool {
 	fe.expSatisfied()
 	return fe.satisfied
 }

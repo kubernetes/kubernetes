@@ -210,8 +210,9 @@ func (rsc *ReplicaSetController) Run(ctx context.Context, workers int) {
 	defer rsc.queue.ShutDown()
 
 	controllerName := strings.ToLower(rsc.Kind)
-	klog.FromContext(ctx).Info("Starting controller", "name", controllerName)
-	defer klog.FromContext(ctx).Info("Shutting down controller", "name", controllerName)
+	logger := klog.FromContext(ctx)
+	logger.Info("Starting controller", "name", controllerName)
+	defer logger.Info("Shutting down controller", "name", controllerName)
 
 	if !cache.WaitForNamedCacheSync(rsc.Kind, ctx.Done(), rsc.podListerSynced, rsc.rsListerSynced) {
 		return
@@ -371,7 +372,7 @@ func (rsc *ReplicaSetController) deleteRS(logger klog.Logger, obj interface{}) {
 	logger.V(4).Info("Deleting", "replicaSet", klog.KObj(rs))
 
 	// Delete expectations for the ReplicaSet so if we create a new one with the same name it starts clean
-	rsc.expectations.DeleteExpectations(key)
+	rsc.expectations.DeleteExpectations(logger, key)
 
 	rsc.queue.Add(key)
 }
@@ -398,7 +399,7 @@ func (rsc *ReplicaSetController) addPod(logger klog.Logger, obj interface{}) {
 			return
 		}
 		logger.V(4).Info("Pod created", "pod", klog.KObj(pod), "detail", pod)
-		rsc.expectations.CreationObserved(rsKey)
+		rsc.expectations.CreationObserved(logger, rsKey)
 		rsc.queue.Add(rsKey)
 		return
 	}
@@ -529,7 +530,7 @@ func (rsc *ReplicaSetController) deletePod(logger klog.Logger, obj interface{}) 
 		return
 	}
 	logger.V(4).Info("Pod deleted", "delete_by", utilruntime.GetCaller(), "deletion_timestamp", pod.DeletionTimestamp, "pod", klog.KObj(pod))
-	rsc.expectations.DeletionObserved(rsKey, controller.PodKey(pod))
+	rsc.expectations.DeletionObserved(logger, rsKey, controller.PodKey(pod))
 	rsc.queue.Add(rsKey)
 }
 
@@ -569,6 +570,7 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPod
 		utilruntime.HandleError(fmt.Errorf("couldn't get key for %v %#v: %v", rsc.Kind, rs, err))
 		return nil
 	}
+	logger := klog.FromContext(ctx)
 	if diff < 0 {
 		diff *= -1
 		if diff > rsc.burstReplicas {
@@ -579,8 +581,8 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPod
 		// UID, which would require locking *across* the create, which will turn
 		// into a performance bottleneck. We should generate a UID for the pod
 		// beforehand and store it via ExpectCreations.
-		rsc.expectations.ExpectCreations(rsKey, diff)
-		klog.FromContext(ctx).V(2).Info("Too few replicas", "replicaSet", klog.KObj(rs), "need", *(rs.Spec.Replicas), "creating", diff)
+		rsc.expectations.ExpectCreations(logger, rsKey, diff)
+		logger.V(2).Info("Too few replicas", "replicaSet", klog.KObj(rs), "need", *(rs.Spec.Replicas), "creating", diff)
 		// Batch the pod creates. Batch sizes start at SlowStartInitialBatchSize
 		// and double with each successful iteration in a kind of "slow start".
 		// This handles attempts to start large numbers of pods that would
@@ -605,10 +607,10 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPod
 		// The skipped pods will be retried later. The next controller resync will
 		// retry the slow start process.
 		if skippedPods := diff - successfulCreations; skippedPods > 0 {
-			klog.FromContext(ctx).V(2).Info("Slow-start failure. Skipping creation of pods, decrementing expectations", "podsSkipped", skippedPods, "kind", rsc.Kind, "replicaSet", klog.KObj(rs))
+			logger.V(2).Info("Slow-start failure. Skipping creation of pods, decrementing expectations", "podsSkipped", skippedPods, "kind", rsc.Kind, "replicaSet", klog.KObj(rs))
 			for i := 0; i < skippedPods; i++ {
 				// Decrement the expected number of creates because the informer won't observe this pod
-				rsc.expectations.CreationObserved(rsKey)
+				rsc.expectations.CreationObserved(logger, rsKey)
 			}
 		}
 		return err
@@ -616,9 +618,9 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPod
 		if diff > rsc.burstReplicas {
 			diff = rsc.burstReplicas
 		}
-		klog.FromContext(ctx).V(2).Info("Too many replicas", "replicaSet", klog.KObj(rs), "need", *(rs.Spec.Replicas), "deleting", diff)
+		logger.V(2).Info("Too many replicas", "replicaSet", klog.KObj(rs), "need", *(rs.Spec.Replicas), "deleting", diff)
 
-		relatedPods, err := rsc.getIndirectlyRelatedPods(klog.FromContext(ctx), rs)
+		relatedPods, err := rsc.getIndirectlyRelatedPods(logger, rs)
 		utilruntime.HandleError(err)
 
 		// Choose which Pods to delete, preferring those in earlier phases of startup.
@@ -630,7 +632,7 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPod
 		// Note that if the labels on a pod/rs change in a way that the pod gets
 		// orphaned, the rs will only wake up after the expectations have
 		// expired even if other pods are deleted.
-		rsc.expectations.ExpectDeletions(rsKey, getPodKeys(podsToDelete))
+		rsc.expectations.ExpectDeletions(logger, rsKey, getPodKeys(podsToDelete))
 
 		errCh := make(chan error, diff)
 		var wg sync.WaitGroup
@@ -641,9 +643,9 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPod
 				if err := rsc.podControl.DeletePod(ctx, rs.Namespace, targetPod.Name, rs); err != nil {
 					// Decrement the expected number of deletes because the informer won't observe this deletion
 					podKey := controller.PodKey(targetPod)
-					rsc.expectations.DeletionObserved(rsKey, podKey)
+					rsc.expectations.DeletionObserved(logger, rsKey, podKey)
 					if !apierrors.IsNotFound(err) {
-						klog.FromContext(ctx).V(2).Info("Failed to delete pod, decremented expectations", "pod", podKey, "kind", rsc.Kind, "replicaSet", klog.KObj(rs))
+						logger.V(2).Info("Failed to delete pod, decremented expectations", "pod", podKey, "kind", rsc.Kind, "replicaSet", klog.KObj(rs))
 						errCh <- err
 					}
 				}
@@ -668,9 +670,10 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPod
 // meaning it did not expect to see any more of its pods created or deleted. This function is not meant to be
 // invoked concurrently with the same key.
 func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string) error {
+	logger := klog.FromContext(ctx)
 	startTime := time.Now()
 	defer func() {
-		klog.FromContext(ctx).V(4).Info("Finished syncing", "kind", rsc.Kind, "key", key, "duration", time.Since(startTime))
+		logger.Info("Finished syncing", "kind", rsc.Kind, "key", key, "duration", time.Since(startTime))
 	}()
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
@@ -679,15 +682,15 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 	}
 	rs, err := rsc.rsLister.ReplicaSets(namespace).Get(name)
 	if apierrors.IsNotFound(err) {
-		klog.FromContext(ctx).V(4).Info("deleted", "kind", rsc.Kind, "key", key)
-		rsc.expectations.DeleteExpectations(key)
+		logger.V(4).Info("deleted", "kind", rsc.Kind, "key", key)
+		rsc.expectations.DeleteExpectations(logger, key)
 		return nil
 	}
 	if err != nil {
 		return err
 	}
 
-	rsNeedsSync := rsc.expectations.SatisfiedExpectations(key)
+	rsNeedsSync := rsc.expectations.SatisfiedExpectations(logger, key)
 	selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("error converting pod selector to selector for rs %v/%v: %v", namespace, name, err))
@@ -702,7 +705,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 		return err
 	}
 	// Ignore inactive pods.
-	filteredPods := controller.FilterActivePods(allPods)
+	filteredPods := controller.FilterActivePods(logger, allPods)
 
 	// NOTE: filteredPods are pointing to objects from cache - if you need to
 	// modify them, you need to copy it first.
@@ -719,7 +722,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 	newStatus := calculateStatus(rs, filteredPods, manageReplicasErr)
 
 	// Always updates status as pods come up or die.
-	updatedRS, err := updateReplicaSetStatus(klog.FromContext(ctx), rsc.kubeClient.AppsV1().ReplicaSets(rs.Namespace), rs, newStatus)
+	updatedRS, err := updateReplicaSetStatus(logger, rsc.kubeClient.AppsV1().ReplicaSets(rs.Namespace), rs, newStatus)
 	if err != nil {
 		// Multiple things could lead to this update failing. Requeuing the replica set ensures
 		// Returning an error causes a requeue without forcing a hotloop
