@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
@@ -110,6 +111,81 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin][Alpha][
 			replicaSet, err := client.AppsV1().ReplicaSets(f.Namespace.Name).Create(ctx, replicaSet, metav1.CreateOptions{})
 			defer client.AppsV1().ReplicaSets(f.Namespace.Name).Delete(ctx, replicaSet.Name, metav1.DeleteOptions{})
 			framework.ExpectNoError(err, "create non-replicated ReplicaSet")
+		})
+	})
+
+	ginkgo.It("should type check validation expressions", func(ctx context.Context) {
+		var policy *admissionregistrationv1alpha1.ValidatingAdmissionPolicy
+		ginkgo.By("creating the policy with correct types", func() {
+			policy = newValidatingAdmissionPolicyBuilder(f.UniqueName+".correct-policy.example.com").
+				MatchUniqueNamespace(f.UniqueName).
+				StartResourceRule().
+				MatchResource([]string{"apps"}, []string{"v1"}, []string{"deployments"}).
+				EndResourceRule().
+				WithValidation(admissionregistrationv1alpha1.Validation{
+					Expression: "object.spec.replicas > 1",
+				}).
+				Build()
+			var err error
+			policy, err = client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Create(ctx, policy, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "create policy")
+			ginkgo.DeferCleanup(func(ctx context.Context, name string) error {
+				return client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Delete(ctx, name, metav1.DeleteOptions{})
+			}, policy.Name)
+		})
+		ginkgo.By("waiting for the type check to finish without any warnings", func() {
+			err := wait.PollUntilContextCancel(ctx, 100*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
+				policy, err = client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Get(ctx, policy.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				if policy.Status.TypeChecking != nil { // non-nil TypeChecking indicates its completion
+					return true, nil
+				}
+				return false, nil
+			})
+			framework.ExpectNoError(err, "wait for type checking")
+			gomega.Expect(policy.Status.TypeChecking.ExpressionWarnings).To(gomega.BeEmpty())
+		})
+		ginkgo.By("creating the policy with type confusion", func() {
+			policy = newValidatingAdmissionPolicyBuilder(f.UniqueName+".confused-policy.example.com").
+				MatchUniqueNamespace(f.UniqueName).
+				StartResourceRule().
+				MatchResource([]string{"apps"}, []string{"v1"}, []string{"deployments"}).
+				EndResourceRule().
+				WithValidation(admissionregistrationv1alpha1.Validation{
+					Expression:        "object.spec.replicas > '1'",                        // confusion: int > string
+					MessageExpression: "'wants replicas > 1, got ' + object.spec.replicas", // confusion: string + int
+				}).
+				Build()
+			var err error
+			policy, err = client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Create(ctx, policy, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "create policy")
+			ginkgo.DeferCleanup(func(ctx context.Context, name string) error {
+				return client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Delete(ctx, name, metav1.DeleteOptions{})
+			}, policy.Name)
+		})
+		ginkgo.By("waiting for the type check to finish with warnings", func() {
+			err := wait.PollUntilContextCancel(ctx, 100*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
+				policy, err = client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Get(ctx, policy.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				if policy.Status.TypeChecking != nil { // non-nil TypeChecking indicates its completion
+					return true, nil
+				}
+				return false, nil
+			})
+			framework.ExpectNoError(err, "wait for type checking")
+
+			// assert it to contain 2 warnings, first for expression and second for messageExpression
+			gomega.Expect(policy.Status.TypeChecking.ExpressionWarnings).To(gomega.HaveLen(2))
+			warning := policy.Status.TypeChecking.ExpressionWarnings[0]
+			gomega.Expect(warning.FieldRef).To(gomega.Equal("spec.validations[0].expression"))
+			gomega.Expect(warning.Warning).To(gomega.ContainSubstring("found no matching overload for '_>_' applied to '(int, string)'"))
+			warning = policy.Status.TypeChecking.ExpressionWarnings[1]
+			gomega.Expect(warning.FieldRef).To(gomega.Equal("spec.validations[0].messageExpression"))
+			gomega.Expect(warning.Warning).To(gomega.ContainSubstring("found no matching overload for '_+_' applied to '(string, int)'"))
 		})
 	})
 })

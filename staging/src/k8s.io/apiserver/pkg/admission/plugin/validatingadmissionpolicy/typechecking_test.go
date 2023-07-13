@@ -435,8 +435,8 @@ func buildTypeChecker(schemaToReturn *spec.Schema) *TypeChecker {
 	restMapper.Add(must3(scheme.ObjectKinds(&appsv1.Deployment{}))[0], meta.RESTScopeRoot)
 
 	return &TypeChecker{
-		schemaResolver: &fakeSchemaResolver{schemaToReturn: schemaToReturn},
-		restMapper:     restMapper,
+		SchemaResolver: &fakeSchemaResolver{schemaToReturn: schemaToReturn},
+		RestMapper:     restMapper,
 	}
 }
 

@@ -25,8 +25,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"k8s.io/klog/v2"
-
 	"k8s.io/api/admissionregistration/v1alpha1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -44,12 +42,12 @@ import (
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/cel/environment"
-	"k8s.io/apiserver/pkg/cel/openapi/resolver"
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2"
 )
 
 var _ CELPolicyEvaluator = &celAdmissionController{}
@@ -128,21 +126,15 @@ func NewAdmissionController(
 	informerFactory informers.SharedInformerFactory,
 	client kubernetes.Interface,
 	restMapper meta.RESTMapper,
-	schemaResolver resolver.SchemaResolver,
 	dynamicClient dynamic.Interface,
 	authz authorizer.Authorizer,
 ) CELPolicyEvaluator {
-	var typeChecker *TypeChecker
-	if schemaResolver != nil {
-		typeChecker = &TypeChecker{schemaResolver: schemaResolver, restMapper: restMapper}
-	}
 	return &celAdmissionController{
 		definitions: atomic.Value{},
 		policyController: newPolicyController(
 			restMapper,
 			client,
 			dynamicClient,
-			typeChecker,
 			cel.NewFilterCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())),
 			NewMatcher(matching.NewMatcher(informerFactory.Core().V1().Namespaces().Lister(), client)),
 			generic.NewInformer[*v1alpha1.ValidatingAdmissionPolicy](

@@ -27,10 +27,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	celmetrics "k8s.io/apiserver/pkg/admission/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
@@ -60,11 +58,6 @@ type policyController struct {
 	matcher Matcher
 
 	newValidator
-
-	// The TypeCheck checks the policy's expressions for type errors.
-	// Type of params is defined in policy.Spec.ParamsKind
-	// Types of object are calculated from policy.Spec.MatchingConstraints
-	typeChecker *TypeChecker
 
 	// Lock which protects:
 	//  - cachedPolicies
@@ -103,7 +96,6 @@ func newPolicyController(
 	restMapper meta.RESTMapper,
 	client kubernetes.Interface,
 	dynamicClient dynamic.Interface,
-	typeChecker *TypeChecker,
 	filterCompiler cel.FilterCompiler,
 	matcher Matcher,
 	policiesInformer generic.Informer[*v1alpha1.ValidatingAdmissionPolicy],
@@ -112,7 +104,6 @@ func newPolicyController(
 	res := &policyController{}
 	*res = policyController{
 		filterCompiler:        filterCompiler,
-		typeChecker:           typeChecker,
 		definitionInfo:        make(map[namespacedName]*definitionInfo),
 		bindingInfos:          make(map[namespacedName]*bindingInfo),
 		paramsCRDControllers:  make(map[v1alpha1.ParamKind]*paramInfo),
@@ -174,12 +165,6 @@ func (c *policyController) reconcilePolicyDefinition(namespace, name string, def
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	err := c.reconcilePolicyDefinitionSpec(namespace, name, definition)
-	if err != nil {
-		return err
-	}
-	if c.typeChecker != nil {
-		err = c.reconcilePolicyStatus(namespace, name, definition)
-	}
 	return err
 }
 
@@ -436,30 +421,6 @@ func (c *policyController) reconcilePolicyBinding(namespace, name string, bindin
 	info.validator = nil
 	info.lastReconciledValue = binding
 	return nil
-}
-
-func (c *policyController) reconcilePolicyStatus(namespace, name string, definition *v1alpha1.ValidatingAdmissionPolicy) error {
-	if definition != nil && definition.Status.ObservedGeneration < definition.Generation {
-		st := c.calculatePolicyStatus(definition)
-		newDefinition := definition.DeepCopy()
-		newDefinition.Status = *st
-		_, err := c.client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().UpdateStatus(c.context, newDefinition, metav1.UpdateOptions{})
-		if err != nil {
-			// ignore error when the controller is not able to
-			// mutate the definition, and to avoid infinite requeue.
-			utilruntime.HandleError(err)
-		}
-	}
-	return nil
-}
-
-func (c *policyController) calculatePolicyStatus(definition *v1alpha1.ValidatingAdmissionPolicy) *v1alpha1.ValidatingAdmissionPolicyStatus {
-	expressionWarnings := c.typeChecker.Check(definition)
-	// modifying a deepcopy of the original status, preserving unrelated existing data
-	status := definition.Status.DeepCopy()
-	status.ObservedGeneration = definition.Generation
-	status.TypeChecking = &v1alpha1.TypeChecking{ExpressionWarnings: expressionWarnings}
-	return status
 }
 
 func (c *policyController) reconcileParams(namespace, name string, params runtime.Object) error {
