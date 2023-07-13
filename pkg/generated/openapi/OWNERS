@@ -2,6 +2,8 @@ approvers:
   - sttts
   - roycaihw
   - liggitt
+  # APIs frequently hit this directory for zz_generate.openapi.go
+  - api-approvers
 reviewers:
   - sttts
   - roycaihw
