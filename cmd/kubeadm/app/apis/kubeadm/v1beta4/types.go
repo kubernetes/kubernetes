@@ -39,6 +39,10 @@ type InitConfiguration struct {
 	// +optional
 	BootstrapTokens []bootstraptokenv1.BootstrapToken `json:"bootstrapTokens,omitempty"`
 
+	// DryRun tells if the dry run mode is enabled, don't apply any change if it is and just output what would be done.
+	// +optional
+	DryRun bool `json:"dryRun,omitempty"`
+
 	// NodeRegistration holds fields that relate to registering the new control-plane node to the cluster
 	// +optional
 	NodeRegistration NodeRegistrationOptions `json:"nodeRegistration,omitempty"`

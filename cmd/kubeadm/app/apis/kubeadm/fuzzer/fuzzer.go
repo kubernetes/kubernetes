@@ -64,6 +64,7 @@ func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 	obj.SkipPhases = nil
 	obj.NodeRegistration.ImagePullPolicy = corev1.PullIfNotPresent
 	obj.Patches = nil
+	obj.DryRun = false
 }
 
 func fuzzNodeRegistration(obj *kubeadm.NodeRegistrationOptions, c fuzz.Continue) {

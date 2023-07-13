@@ -44,6 +44,9 @@ type InitConfiguration struct {
 	// BootstrapTokens is respected at `kubeadm init` time and describes a set of Bootstrap Tokens to create.
 	BootstrapTokens []bootstraptokenv1.BootstrapToken
 
+	// DryRun tells if the dry run mode is enabled, don't apply any change if it is and just output what would be done.
+	DryRun bool
+
 	// NodeRegistration holds fields that relate to registering the new control-plane node to the cluster
 	NodeRegistration NodeRegistrationOptions
 

@@ -591,6 +591,7 @@ func autoConvert_v1beta3_InitConfiguration_To_kubeadm_InitConfiguration(in *Init
 func autoConvert_kubeadm_InitConfiguration_To_v1beta3_InitConfiguration(in *kubeadm.InitConfiguration, out *InitConfiguration, s conversion.Scope) error {
 	// WARNING: in.ClusterConfiguration requires manual conversion: does not exist in peer-type
 	out.BootstrapTokens = *(*[]bootstraptokenv1.BootstrapToken)(unsafe.Pointer(&in.BootstrapTokens))
+	// WARNING: in.DryRun requires manual conversion: does not exist in peer-type
 	if err := Convert_kubeadm_NodeRegistrationOptions_To_v1beta3_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
 		return err
 	}
