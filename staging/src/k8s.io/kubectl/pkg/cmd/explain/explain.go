@@ -76,8 +76,7 @@ type ExplainOptions struct {
 	Mapper meta.RESTMapper
 	Schema openapi.Resources
 
-	// Name of the template to use with the openapiv3 template renderer. If
-	// `EnableOpenAPIV3` is disabled, this does nothing
+	// Name of the template to use with the openapiv3 template renderer.
 	OutputFormat string
 
 	// Client capable of fetching openapi documents from the user's cluster
