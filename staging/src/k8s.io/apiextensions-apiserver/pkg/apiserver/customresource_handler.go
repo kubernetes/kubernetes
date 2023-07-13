@@ -739,14 +739,15 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 			utilruntime.HandleError(err)
 			return nil, fmt.Errorf("the server could not properly serve the CR schema")
 		}
-		var internalValidationSchema *apiextensionsinternal.CustomResourceValidation
+		var internalSchemaProps *apiextensionsinternal.JSONSchemaProps
 		if validationSchema != nil {
-			internalValidationSchema = &apiextensionsinternal.CustomResourceValidation{}
+			internalValidationSchema := &apiextensionsinternal.CustomResourceValidation{}
 			if err := apiextensionsv1.Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(validationSchema, internalValidationSchema, nil); err != nil {
 				return nil, fmt.Errorf("failed to convert CRD validation to internal version: %v", err)
 			}
+			internalSchemaProps = internalValidationSchema.OpenAPIV3Schema
 		}
-		validator, _, err := apiservervalidation.NewSchemaValidator(internalValidationSchema)
+		validator, _, err := apiservervalidation.NewSchemaValidator(internalSchemaProps)
 		if err != nil {
 			return nil, err
 		}

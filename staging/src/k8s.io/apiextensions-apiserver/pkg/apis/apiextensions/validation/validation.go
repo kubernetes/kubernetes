@@ -825,7 +825,7 @@ func validateCustomResourceDefinitionValidation(ctx context.Context, customResou
 
 	// if validation passed otherwise, make sure we can actually construct a schema validator from this custom resource validation.
 	if len(allErrs) == 0 {
-		if _, _, err := apiservervalidation.NewSchemaValidator(customResourceValidation); err != nil {
+		if _, _, err := apiservervalidation.NewSchemaValidator(customResourceValidation.OpenAPIV3Schema); err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath, "", fmt.Sprintf("error building validator: %v", err)))
 		}
 	}
