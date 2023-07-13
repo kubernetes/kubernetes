@@ -1242,7 +1242,7 @@ func TestCPUDetailsCPUsInCores(t *testing.T) {
 	}
 }
 
-func TestCPUDetailsIsNUMANodesInSameSocket(t *testing.T) {
+func TestCPUDetailsAreNUMANodesInSameSocket(t *testing.T) {
 
 	details := CPUDetails{
 		0: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
@@ -1298,9 +1298,9 @@ func TestCPUDetailsIsNUMANodesInSameSocket(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := details.IsNUMANodesInSameSocket(tt.NUMANodes)
+			got := details.AreNUMANodesInSameSocket(tt.NUMANodes)
 			if got != tt.want {
-				t.Errorf("IsNUMANodesInSameSocket() = %v, want %v", got, tt.want)
+				t.Errorf("AreNUMANodesInSameSocket() = %v, want %v", got, tt.want)
 			}
 		})
 	}
