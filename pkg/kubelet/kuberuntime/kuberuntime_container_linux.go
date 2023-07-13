@@ -41,6 +41,8 @@ import (
 
 var defaultPageSize = int64(os.Getpagesize())
 
+var isCgroup2UnifiedMode = libcontainercgroups.IsCgroup2UnifiedMode
+
 // applyPlatformSpecificContainerConfig applies platform specific configurations to runtimeapi.ContainerConfig.
 func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(config *runtimeapi.ContainerConfig, container *v1.Container, pod *v1.Pod, uid *int64, username string, nsTarget *kubecontainer.ContainerID) error {
 	enforceMemoryQoS := false
@@ -171,7 +173,7 @@ func (m *kubeGenericRuntimeManager) generateContainerResources(pod *v1.Pod, cont
 	enforceMemoryQoS := false
 	// Set memory.min and memory.high if MemoryQoS enabled with cgroups v2
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) &&
-		libcontainercgroups.IsCgroup2UnifiedMode() {
+		isCgroup2UnifiedMode() {
 		enforceMemoryQoS = true
 	}
 	return &runtimeapi.ContainerResources{
@@ -216,7 +218,7 @@ func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit
 	}
 
 	// runc requires cgroupv2 for unified mode
-	if libcontainercgroups.IsCgroup2UnifiedMode() {
+	if isCgroup2UnifiedMode() {
 		resources.Unified = map[string]string{
 			// Ask the kernel to kill all processes in the container cgroup in case of OOM.
 			// See memory.oom.group in https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html for

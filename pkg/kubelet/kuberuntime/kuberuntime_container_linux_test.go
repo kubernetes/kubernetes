@@ -244,17 +244,19 @@ func TestCalculateLinuxResources(t *testing.T) {
 	}
 
 	tests := []struct {
-		name     string
-		cpuReq   *resource.Quantity
-		cpuLim   *resource.Quantity
-		memLim   *resource.Quantity
-		expected *runtimeapi.LinuxContainerResources
+		name               string
+		cpuReq             *resource.Quantity
+		cpuLim             *resource.Quantity
+		memLim             *resource.Quantity
+		cgroup2UnifiedMode bool
+		expected           *runtimeapi.LinuxContainerResources
 	}{
 		{
-			name:   "Request128MBLimit256MB",
-			cpuReq: generateResourceQuantity("1"),
-			cpuLim: generateResourceQuantity("2"),
-			memLim: generateResourceQuantity("128Mi"),
+			name:               "Request128MBLimit256MB",
+			cpuReq:             generateResourceQuantity("1"),
+			cpuLim:             generateResourceQuantity("2"),
+			memLim:             generateResourceQuantity("128Mi"),
+			cgroup2UnifiedMode: false,
 			expected: &runtimeapi.LinuxContainerResources{
 				CpuPeriod:          100000,
 				CpuQuota:           200000,
@@ -263,10 +265,11 @@ func TestCalculateLinuxResources(t *testing.T) {
 			},
 		},
 		{
-			name:   "RequestNoMemory",
-			cpuReq: generateResourceQuantity("2"),
-			cpuLim: generateResourceQuantity("8"),
-			memLim: generateResourceQuantity("0"),
+			name:               "RequestNoMemory",
+			cpuReq:             generateResourceQuantity("2"),
+			cpuLim:             generateResourceQuantity("8"),
+			memLim:             generateResourceQuantity("0"),
+			cgroup2UnifiedMode: false,
 			expected: &runtimeapi.LinuxContainerResources{
 				CpuPeriod:          100000,
 				CpuQuota:           800000,
@@ -275,9 +278,10 @@ func TestCalculateLinuxResources(t *testing.T) {
 			},
 		},
 		{
-			name:   "RequestNilCPU",
-			cpuLim: generateResourceQuantity("2"),
-			memLim: generateResourceQuantity("0"),
+			name:               "RequestNilCPU",
+			cpuLim:             generateResourceQuantity("2"),
+			memLim:             generateResourceQuantity("0"),
+			cgroup2UnifiedMode: false,
 			expected: &runtimeapi.LinuxContainerResources{
 				CpuPeriod:          100000,
 				CpuQuota:           200000,
@@ -286,10 +290,11 @@ func TestCalculateLinuxResources(t *testing.T) {
 			},
 		},
 		{
-			name:   "RequestZeroCPU",
-			cpuReq: generateResourceQuantity("0"),
-			cpuLim: generateResourceQuantity("2"),
-			memLim: generateResourceQuantity("0"),
+			name:               "RequestZeroCPU",
+			cpuReq:             generateResourceQuantity("0"),
+			cpuLim:             generateResourceQuantity("2"),
+			memLim:             generateResourceQuantity("0"),
+			cgroup2UnifiedMode: false,
 			expected: &runtimeapi.LinuxContainerResources{
 				CpuPeriod:          100000,
 				CpuQuota:           200000,
@@ -297,8 +302,23 @@ func TestCalculateLinuxResources(t *testing.T) {
 				MemoryLimitInBytes: 0,
 			},
 		},
+		{
+			name:               "Request128MBLimit256MBCgroup2",
+			cpuReq:             generateResourceQuantity("1"),
+			cpuLim:             generateResourceQuantity("2"),
+			memLim:             generateResourceQuantity("128Mi"),
+			cgroup2UnifiedMode: true,
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod:          100000,
+				CpuQuota:           200000,
+				CpuShares:          1024,
+				MemoryLimitInBytes: 134217728,
+				Unified:            map[string]string{"memory.oom.group": "1"},
+			},
+		},
 	}
 	for _, test := range tests {
+		isCgroup2UnifiedMode = func() bool { return test.cgroup2UnifiedMode }
 		linuxContainerResources := m.calculateLinuxResources(test.cpuReq, test.cpuLim, test.memLim)
 		assert.Equal(t, test.expected, linuxContainerResources)
 	}
@@ -875,6 +895,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			if tc.scalingFg {
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
 			}
+			isCgroup2UnifiedMode = func() bool { return false }
 			pod.Spec.Containers[0].Resources = v1.ResourceRequirements{Limits: tc.limits, Requests: tc.requests}
 			if len(tc.cStatus) > 0 {
 				pod.Status.ContainerStatuses = tc.cStatus

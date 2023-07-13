@@ -41,13 +41,15 @@ func TestApplySandboxResources(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := []struct {
-		description      string
-		pod              *v1.Pod
-		expectedResource *runtimeapi.LinuxContainerResources
-		expectedOverhead *runtimeapi.LinuxContainerResources
+		description        string
+		cgroup2UnifiedMode bool
+		pod                *v1.Pod
+		expectedResource   *runtimeapi.LinuxContainerResources
+		expectedOverhead   *runtimeapi.LinuxContainerResources
 	}{
 		{
-			description: "pod with overhead defined",
+			description:        "pod with overhead defined",
+			cgroup2UnifiedMode: false,
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					UID:       "12345678",
@@ -89,7 +91,8 @@ func TestApplySandboxResources(t *testing.T) {
 			},
 		},
 		{
-			description: "pod without overhead defined",
+			description:        "pod without overhead defined",
+			cgroup2UnifiedMode: false,
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					UID:       "12345678",
@@ -119,9 +122,55 @@ func TestApplySandboxResources(t *testing.T) {
 			},
 			expectedOverhead: &runtimeapi.LinuxContainerResources{},
 		},
+		{
+			description:        "pod with overhead defined and cgroup 2 unified mode",
+			cgroup2UnifiedMode: true,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "12345678",
+					Name:      "bar",
+					Namespace: "new",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceMemory: resource.MustParse("128Mi"),
+									v1.ResourceCPU:    resource.MustParse("2"),
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+									v1.ResourceCPU:    resource.MustParse("4"),
+								},
+							},
+						},
+					},
+					Overhead: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("128Mi"),
+						v1.ResourceCPU:    resource.MustParse("1"),
+					},
+				},
+			},
+			expectedResource: &runtimeapi.LinuxContainerResources{
+				MemoryLimitInBytes: 268435456,
+				CpuPeriod:          100000,
+				CpuQuota:           400000,
+				CpuShares:          2048,
+				Unified:            map[string]string{"memory.oom.group": "1"},
+			},
+			expectedOverhead: &runtimeapi.LinuxContainerResources{
+				MemoryLimitInBytes: 134217728,
+				CpuPeriod:          100000,
+				CpuQuota:           100000,
+				CpuShares:          1024,
+				Unified:            map[string]string{"memory.oom.group": "1"},
+			},
+		},
 	}
 
 	for i, test := range tests {
+		isCgroup2UnifiedMode = func() bool { return test.cgroup2UnifiedMode }
 		m.applySandboxResources(test.pod, config)
 		assert.Equal(t, test.expectedResource, config.Linux.Resources, "TestCase[%d]: %s", i, test.description)
 		assert.Equal(t, test.expectedOverhead, config.Linux.Overhead, "TestCase[%d]: %s", i, test.description)
