@@ -438,11 +438,17 @@ func TestFilter(t *testing.T) {
 				&condition{
 					Expression: "authorizer.group('').resource('endpoints').check('create').allowed()",
 				},
+				&condition{
+					Expression: "authorizer.group('').resource('endpoints').check('create').errored()",
+				},
 			},
 			attributes: newValidAttribute(&podObject, false),
 			results: []EvaluationResult{
 				{
 					EvalResult: celtypes.True,
+				},
+				{
+					EvalResult: celtypes.False,
 				},
 			},
 			authorizer: newAuthzAllowMatch(authorizer.AttributesRecord{
@@ -515,6 +521,33 @@ func TestFilter(t *testing.T) {
 				},
 			},
 			authorizer: denyAll,
+		},
+		{
+			name: "test authorizer error",
+			validations: []ExpressionAccessor{
+				&condition{
+					Expression: "authorizer.group('').resource('endpoints').check('create').errored()",
+				},
+				&condition{
+					Expression: "authorizer.group('').resource('endpoints').check('create').error() == 'fake authz error'",
+				},
+				&condition{
+					Expression: "authorizer.group('').resource('endpoints').check('create').allowed()",
+				},
+			},
+			attributes: newValidAttribute(&podObject, false),
+			results: []EvaluationResult{
+				{
+					EvalResult: celtypes.True,
+				},
+				{
+					EvalResult: celtypes.True,
+				},
+				{
+					EvalResult: celtypes.False,
+				},
+			},
+			authorizer: errorAll,
 		},
 		{
 			name: "test authorizer allow path check",
@@ -974,6 +1007,7 @@ func TestCompilationErrors(t *testing.T) {
 }
 
 var denyAll = fakeAuthorizer{defaultResult: authorizerResult{decision: authorizer.DecisionDeny, reason: "fake reason", err: nil}}
+var errorAll = fakeAuthorizer{defaultResult: authorizerResult{decision: authorizer.DecisionNoOpinion, reason: "", err: fmt.Errorf("fake authz error")}}
 
 func newAuthzAllowMatch(match authorizer.AttributesRecord) fakeAuthorizer {
 	return fakeAuthorizer{
