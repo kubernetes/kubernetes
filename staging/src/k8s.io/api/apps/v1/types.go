@@ -29,7 +29,6 @@ const (
 	DeprecatedRollbackTo           = "deprecated.deployment.rollback.to"
 	DeprecatedTemplateGeneration   = "deprecated.daemonset.template.generation"
 	StatefulSetPodNameLabel        = "statefulset.kubernetes.io/pod-name"
-	StatefulSetPodIndexLabel       = "statefulset.kubernetes.io/pod-index"
 )
 
 // +genclient

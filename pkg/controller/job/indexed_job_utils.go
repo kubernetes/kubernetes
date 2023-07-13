@@ -298,7 +298,7 @@ func addCompletionIndexEnvVariable(container *v1.Container) {
 		Name: completionIndexEnvName,
 		ValueFrom: &v1.EnvVarSource{
 			FieldRef: &v1.ObjectFieldSelector{
-				FieldPath: fmt.Sprintf("metadata.annotations['%s']", batch.JobCompletionIndexAnnotation),
+				FieldPath: fmt.Sprintf("metadata.labels['%s']", batch.JobCompletionIndexAnnotation),
 			},
 		},
 	})
