@@ -177,7 +177,7 @@ func (c *Controller) UpdateKubernetesService(reconcile bool) error {
 
 // createPortAndServiceSpec creates an array of service ports.
 // If the NodePort value is 0, just the servicePort is used, otherwise, a node port is exposed.
-func createPortAndServiceSpec(servicePort int, targetServicePort int, nodePort int, servicePortName string) ([]corev1.ServicePort, corev1.ServiceType) {
+func createPortAndServiceSpec(servicePort int, targetServicePort int32, nodePort int, servicePortName string) ([]corev1.ServicePort, corev1.ServiceType) {
 	// Use the Cluster IP type for the service port if NodePort isn't provided.
 	// Otherwise, we will be binding the master service to a NodePort.
 	servicePorts := []corev1.ServicePort{{

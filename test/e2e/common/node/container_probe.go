@@ -898,7 +898,7 @@ func execHandler(cmd []string) v1.ProbeHandler {
 	}
 }
 
-func httpGetHandler(path string, port int) v1.ProbeHandler {
+func httpGetHandler(path string, port int32) v1.ProbeHandler {
 	return v1.ProbeHandler{
 		HTTPGet: &v1.HTTPGetAction{
 			Path: path,
@@ -907,7 +907,7 @@ func httpGetHandler(path string, port int) v1.ProbeHandler {
 	}
 }
 
-func tcpSocketHandler(port int) v1.ProbeHandler {
+func tcpSocketHandler(port int32) v1.ProbeHandler {
 	return v1.ProbeHandler{
 		TCPSocket: &v1.TCPSocketAction{
 			Port: intstr.FromInt(port),

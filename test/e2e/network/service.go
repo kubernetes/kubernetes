@@ -1764,7 +1764,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 		t.Name = "slow-terminating-unready-pod"
 		t.Image = imageutils.GetE2EImage(imageutils.Agnhost)
-		port := 80
+		port := int32(80)
 		terminateSeconds := int64(100)
 
 		service := &v1.Service{
@@ -1776,7 +1776,7 @@ var _ = common.SIGDescribe("Services", func() {
 				Selector: t.Labels,
 				Ports: []v1.ServicePort{{
 					Name:       "http",
-					Port:       int32(port),
+					Port:       port,
 					TargetPort: intstr.FromInt(port),
 				}},
 				PublishNotReadyAddresses: true,
@@ -1786,7 +1786,7 @@ var _ = common.SIGDescribe("Services", func() {
 			Args:  []string{"netexec", fmt.Sprintf("--http-port=%d", port)},
 			Name:  t.Name,
 			Image: t.Image,
-			Ports: []v1.ContainerPort{{ContainerPort: int32(port), Protocol: v1.ProtocolTCP}},
+			Ports: []v1.ContainerPort{{ContainerPort: port, Protocol: v1.ProtocolTCP}},
 			ReadinessProbe: &v1.Probe{
 				ProbeHandler: v1.ProbeHandler{
 					Exec: &v1.ExecAction{
@@ -2629,7 +2629,7 @@ var _ = common.SIGDescribe("Services", func() {
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 		svc, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(endpointPort)},
+				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(int32(endpointPort))},
 			}
 			svc.Spec.InternalTrafficPolicy = &local
 		})
@@ -3354,7 +3354,7 @@ var _ = common.SIGDescribe("Services", func() {
 				Ports: []v1.ServicePort{{
 					Name:       "http",
 					Protocol:   v1.ProtocolTCP,
-					Port:       int32(80),
+					Port:       80,
 					TargetPort: intstr.FromInt(80),
 				}},
 			},
@@ -3564,7 +3564,7 @@ var _ = common.SIGDescribe("Services", func() {
 		testServices := []struct {
 			name  string
 			label map[string]string
-			port  int
+			port  int32
 		}{
 			{
 				name:  "e2e-svc-a-" + utilrand.String(5),
@@ -3627,7 +3627,7 @@ var _ = common.SIGDescribe("Services", func() {
 		serviceName := "multiprotocol-test"
 		testLabels := map[string]string{"app": "multiport"}
 		ns := f.Namespace.Name
-		containerPort := 80
+		containerPort := int32(80)
 
 		svcTCPport := v1.ServicePort{
 			Name:       "tcp-port",
@@ -3660,16 +3660,16 @@ var _ = common.SIGDescribe("Services", func() {
 
 		containerPorts := []v1.ContainerPort{{
 			Name:          svcTCPport.Name,
-			ContainerPort: int32(containerPort),
+			ContainerPort: containerPort,
 			Protocol:      v1.ProtocolTCP,
 		}, {
 			Name:          svcUDPport.Name,
-			ContainerPort: int32(containerPort),
+			ContainerPort: containerPort,
 			Protocol:      v1.ProtocolUDP,
 		}}
 		podname1 := "pod1"
 		ginkgo.By("creating pod " + podname1 + " in namespace " + ns)
-		createPodOrFail(ctx, f, ns, podname1, testLabels, containerPorts, "netexec", "--http-port", strconv.Itoa(containerPort), "--udp-port", strconv.Itoa(containerPort))
+		createPodOrFail(ctx, f, ns, podname1, testLabels, containerPorts, "netexec", "--http-port", strconv.Itoa(int(containerPort)), "--udp-port", strconv.Itoa(int(containerPort)))
 		validateEndpointsPortsWithProtocolsOrFail(cs, ns, serviceName, fullPortsByPodName{podname1: containerPorts})
 
 		ginkgo.By("Checking if the Service forwards traffic to the TCP and UDP port")

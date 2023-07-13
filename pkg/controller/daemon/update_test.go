@@ -40,7 +40,7 @@ func TestDaemonSetUpdatesPods(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error creating DaemonSets controller: %v", err)
 	}
-	maxUnavailable := 2
+	maxUnavailable := int32(2)
 	addNodes(manager.nodeStore, 0, 5, nil)
 	manager.dsStore.Add(ds)
 	expectSyncDaemonSets(t, manager, ds, podControl, 5, 0, 0)
@@ -88,7 +88,7 @@ func TestDaemonSetUpdatesPodsWithMaxSurge(t *testing.T) {
 	markPodsReady(podControl.podStore)
 
 	// surge is thhe controlling amount
-	maxSurge := 2
+	maxSurge := int32(2)
 	ds.Spec.Template.Spec.Containers[0].Image = "foo2/bar2"
 	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt(maxSurge))
 	manager.dsStore.Update(ds)
@@ -124,7 +124,7 @@ func TestDaemonSetUpdatesWhenNewPosIsNotReady(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error creating DaemonSets controller: %v", err)
 	}
-	maxUnavailable := 3
+	maxUnavailable := int32(3)
 	addNodes(manager.nodeStore, 0, 5, nil)
 	err = manager.dsStore.Add(ds)
 	if err != nil {
@@ -161,7 +161,7 @@ func TestDaemonSetUpdatesAllOldPodsNotReady(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error creating DaemonSets controller: %v", err)
 	}
-	maxUnavailable := 3
+	maxUnavailable := int32(3)
 	addNodes(manager.nodeStore, 0, 5, nil)
 	err = manager.dsStore.Add(ds)
 	if err != nil {
@@ -201,7 +201,7 @@ func TestDaemonSetUpdatesAllOldPodsNotReadyMaxSurge(t *testing.T) {
 	manager.dsStore.Add(ds)
 	expectSyncDaemonSets(t, manager, ds, podControl, 5, 0, 0)
 
-	maxSurge := 3
+	maxSurge := int32(3)
 	ds.Spec.Template.Spec.Containers[0].Image = "foo2/bar2"
 	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt(maxSurge))
 	manager.dsStore.Update(ds)
@@ -341,7 +341,7 @@ func TestDaemonSetUpdatesNoTemplateChanged(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error creating DaemonSets controller: %v", err)
 	}
-	maxUnavailable := 3
+	maxUnavailable := int32(3)
 	addNodes(manager.nodeStore, 0, 5, nil)
 	manager.dsStore.Add(ds)
 	expectSyncDaemonSets(t, manager, ds, podControl, 5, 0, 0)

@@ -240,7 +240,7 @@ func TestCleanupLeftovers(t *testing.T) {
 	ipset := ipsettest.NewFake(testIPSetVersion)
 	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
 	svcIP := "10.20.30.41"
-	svcPort := 80
+	svcPort := int32(80)
 	svcNodePort := 3001
 	svcPortName := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
@@ -253,7 +253,7 @@ func TestCleanupLeftovers(t *testing.T) {
 			svc.Spec.ClusterIP = svcIP
 			svc.Spec.Ports = []v1.ServicePort{{
 				Name:     svcPortName.Port,
-				Port:     int32(svcPort),
+				Port:     svcPort,
 				Protocol: v1.ProtocolTCP,
 				NodePort: int32(svcNodePort),
 			}}
@@ -269,7 +269,7 @@ func TestCleanupLeftovers(t *testing.T) {
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     pointer.String(svcPortName.Port),
-				Port:     pointer.Int32(int32(svcPort)),
+				Port:     pointer.Int32(svcPort),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -1727,7 +1727,7 @@ func TestExternalIPsNoEndpoint(t *testing.T) {
 	ipset := ipsettest.NewFake(testIPSetVersion)
 	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
 	svcIP := "10.20.30.41"
-	svcPort := 80
+	svcPort := int32(80)
 	svcExternalIPs := "50.60.70.81"
 	svcPortName := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
@@ -1741,7 +1741,7 @@ func TestExternalIPsNoEndpoint(t *testing.T) {
 			svc.Spec.ExternalIPs = []string{svcExternalIPs}
 			svc.Spec.Ports = []v1.ServicePort{{
 				Name:       svcPortName.Port,
-				Port:       int32(svcPort),
+				Port:       svcPort,
 				Protocol:   v1.ProtocolTCP,
 				TargetPort: intstr.FromInt(svcPort),
 			}}
@@ -1779,7 +1779,7 @@ func TestExternalIPs(t *testing.T) {
 	ipset := ipsettest.NewFake(testIPSetVersion)
 	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
 	svcIP := "10.20.30.41"
-	svcPort := 80
+	svcPort := int32(80)
 	svcExternalIPs := sets.New[string]("50.60.70.81", "2012::51", "127.0.0.1")
 	svcPortName := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
@@ -1793,7 +1793,7 @@ func TestExternalIPs(t *testing.T) {
 			svc.Spec.ExternalIPs = svcExternalIPs.UnsortedList()
 			svc.Spec.Ports = []v1.ServicePort{{
 				Name:       svcPortName.Port,
-				Port:       int32(svcPort),
+				Port:       svcPort,
 				Protocol:   v1.ProtocolTCP,
 				TargetPort: intstr.FromInt(svcPort),
 			}}
@@ -1810,7 +1810,7 @@ func TestExternalIPs(t *testing.T) {
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     pointer.String(svcPortName.Port),
-				Port:     pointer.Int32(int32(svcPort)),
+				Port:     pointer.Int32(svcPort),
 				Protocol: &udpProtocol,
 			}}
 		}),
@@ -1850,7 +1850,7 @@ func TestOnlyLocalExternalIPs(t *testing.T) {
 	ipset := ipsettest.NewFake(testIPSetVersion)
 	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
 	svcIP := "10.20.30.41"
-	svcPort := 80
+	svcPort := int32(80)
 	svcExternalIPs := sets.New[string]("50.60.70.81", "2012::51", "127.0.0.1")
 	svcPortName := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
@@ -1864,7 +1864,7 @@ func TestOnlyLocalExternalIPs(t *testing.T) {
 			svc.Spec.ExternalIPs = svcExternalIPs.UnsortedList()
 			svc.Spec.Ports = []v1.ServicePort{{
 				Name:       svcPortName.Port,
-				Port:       int32(svcPort),
+				Port:       svcPort,
 				Protocol:   v1.ProtocolTCP,
 				TargetPort: intstr.FromInt(svcPort),
 			}}
@@ -1889,7 +1889,7 @@ func TestOnlyLocalExternalIPs(t *testing.T) {
 				}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     pointer.String(svcPortName.Port),
-				Port:     pointer.Int32(int32(svcPort)),
+				Port:     pointer.Int32(svcPort),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -1929,7 +1929,7 @@ func TestOnlyLocalExternalIPs(t *testing.T) {
 func TestLoadBalancer(t *testing.T) {
 	ipt, fp := buildFakeProxier()
 	svcIP := "10.20.30.41"
-	svcPort := 80
+	svcPort := int32(80)
 	svcNodePort := 3001
 	svcLBIP := "1.2.3.4"
 	svcPortName := proxy.ServicePortName{
@@ -1943,7 +1943,7 @@ func TestLoadBalancer(t *testing.T) {
 			svc.Spec.ClusterIP = svcIP
 			svc.Spec.Ports = []v1.ServicePort{{
 				Name:     svcPortName.Port,
-				Port:     int32(svcPort),
+				Port:     svcPort,
 				Protocol: v1.ProtocolTCP,
 				NodePort: int32(svcNodePort),
 			}}
@@ -1963,7 +1963,7 @@ func TestLoadBalancer(t *testing.T) {
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     pointer.String(svcPortName.Port),
-				Port:     pointer.Int32(int32(svcPort)),
+				Port:     pointer.Int32(svcPort),
 				Protocol: &udpProtocol,
 			}}
 		}),
@@ -1983,7 +1983,7 @@ func TestLoadBalancer(t *testing.T) {
 	epIPSet := netlinktest.ExpectedIPSet{
 		kubeLoadBalancerSet: {{
 			IP:       svcLBIP,
-			Port:     svcPort,
+			Port:     int(svcPort),
 			Protocol: strings.ToLower(string(v1.ProtocolTCP)),
 			SetType:  utilipset.HashIPPort,
 		}},
@@ -2017,7 +2017,7 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 	ipt, fp := buildFakeProxier()
 
 	svcIP := "10.20.30.41"
-	svcPort := 80
+	svcPort := int32(80)
 	svcNodePort := 3001
 	svcPortName := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
@@ -2030,7 +2030,7 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 			svc.Spec.ClusterIP = svcIP
 			svc.Spec.Ports = []v1.ServicePort{{
 				Name:     svcPortName.Port,
-				Port:     int32(svcPort),
+				Port:     svcPort,
 				Protocol: v1.ProtocolTCP,
 				NodePort: int32(svcNodePort),
 			}}
@@ -2056,7 +2056,7 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     pointer.String(svcPortName.Port),
-				Port:     pointer.Int32(int32(svcPort)),
+				Port:     pointer.Int32(svcPort),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -2118,7 +2118,7 @@ func TestHealthCheckNodePort(t *testing.T) {
 	ipt, fp := buildFakeProxier()
 
 	svcIP := "10.20.30.41"
-	svcPort := 80
+	svcPort := int32(80)
 	svcNodePort := 3000
 	svcPortName := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
@@ -2130,7 +2130,7 @@ func TestHealthCheckNodePort(t *testing.T) {
 		svc.Spec.ClusterIP = svcIP
 		svc.Spec.Ports = []v1.ServicePort{{
 			Name:     svcPortName.Port,
-			Port:     int32(svcPort),
+			Port:     svcPort,
 			Protocol: v1.ProtocolTCP,
 			NodePort: int32(svcNodePort),
 		}}
@@ -2191,7 +2191,7 @@ func TestLoadBalancerSourceRanges(t *testing.T) {
 	ipt, fp := buildFakeProxier()
 
 	svcIP := "10.20.30.41"
-	svcPort := 80
+	svcPort := int32(80)
 	svcLBIP := "1.2.3.4"
 	svcLBSource := "10.0.0.0/8"
 	svcPortName := proxy.ServicePortName{
@@ -2207,7 +2207,7 @@ func TestLoadBalancerSourceRanges(t *testing.T) {
 			svc.Spec.ClusterIP = svcIP
 			svc.Spec.Ports = []v1.ServicePort{{
 				Name:     svcPortName.Port,
-				Port:     int32(svcPort),
+				Port:     svcPort,
 				Protocol: v1.ProtocolTCP,
 			}}
 			svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
@@ -2226,7 +2226,7 @@ func TestLoadBalancerSourceRanges(t *testing.T) {
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     pointer.String(svcPortName.Port),
-				Port:     pointer.Int32(int32(svcPort)),
+				Port:     pointer.Int32(svcPort),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -2246,19 +2246,19 @@ func TestLoadBalancerSourceRanges(t *testing.T) {
 	epIPSet := netlinktest.ExpectedIPSet{
 		kubeLoadBalancerSet: {{
 			IP:       svcLBIP,
-			Port:     svcPort,
+			Port:     int(svcPort),
 			Protocol: strings.ToLower(string(v1.ProtocolTCP)),
 			SetType:  utilipset.HashIPPort,
 		}},
 		kubeLoadBalancerFWSet: {{
 			IP:       svcLBIP,
-			Port:     svcPort,
+			Port:     int(svcPort),
 			Protocol: strings.ToLower(string(v1.ProtocolTCP)),
 			SetType:  utilipset.HashIPPort,
 		}},
 		kubeLoadBalancerSourceCIDRSet: {{
 			IP:       svcLBIP,
-			Port:     svcPort,
+			Port:     int(svcPort),
 			Protocol: strings.ToLower(string(v1.ProtocolTCP)),
 			Net:      svcLBSource,
 			SetType:  utilipset.HashIPPortNet,
@@ -2368,7 +2368,7 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 	ipt, fp := buildFakeProxier()
 
 	svcIP := "10.20.30.41"
-	svcPort := 80
+	svcPort := int32(80)
 	svcNodePort := 3001
 	svcLBIP := "1.2.3.4"
 	svcPortName := proxy.ServicePortName{
@@ -2382,7 +2382,7 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 			svc.Spec.ClusterIP = svcIP
 			svc.Spec.Ports = []v1.ServicePort{{
 				Name:     svcPortName.Port,
-				Port:     int32(svcPort),
+				Port:     svcPort,
 				Protocol: v1.ProtocolTCP,
 				NodePort: int32(svcNodePort),
 			}}
@@ -2413,7 +2413,7 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 				}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     pointer.String(svcPortName.Port),
-				Port:     pointer.Int32(int32(svcPort)),
+				Port:     pointer.Int32(svcPort),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -2433,13 +2433,13 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 	epIPSet := netlinktest.ExpectedIPSet{
 		kubeLoadBalancerSet: {{
 			IP:       svcLBIP,
-			Port:     svcPort,
+			Port:     int(svcPort),
 			Protocol: strings.ToLower(string(v1.ProtocolTCP)),
 			SetType:  utilipset.HashIPPort,
 		}},
 		kubeLoadBalancerLocalSet: {{
 			IP:       svcLBIP,
-			Port:     svcPort,
+			Port:     int(svcPort),
 			Protocol: strings.ToLower(string(v1.ProtocolTCP)),
 			SetType:  utilipset.HashIPPort,
 		}},
@@ -2470,7 +2470,7 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 	checkIptables(t, ipt, epIpt)
 }
 
-func addTestPort(array []v1.ServicePort, name string, protocol v1.Protocol, port, nodeport int32, targetPort int) []v1.ServicePort {
+func addTestPort(array []v1.ServicePort, name string, protocol v1.Protocol, port, nodeport, targetPort int32) []v1.ServicePort {
 	svcPort := v1.ServicePort{
 		Name:       name,
 		Protocol:   protocol,
@@ -2761,7 +2761,7 @@ func TestSessionAffinity(t *testing.T) {
 	nodeIP := "100.101.102.103"
 	fp := NewFakeProxier(ipt, ipvs, ipset, []string{nodeIP}, nil, v1.IPv4Protocol)
 	svcIP := "10.20.30.41"
-	svcPort := 80
+	svcPort := int32(80)
 	svcNodePort := 3001
 	svcExternalIPs := "50.60.70.81"
 	svcPortName := proxy.ServicePortName{
@@ -2783,7 +2783,7 @@ func TestSessionAffinity(t *testing.T) {
 			}
 			svc.Spec.Ports = []v1.ServicePort{{
 				Name:     svcPortName.Port,
-				Port:     int32(svcPort),
+				Port:     svcPort,
 				Protocol: v1.ProtocolTCP,
 				NodePort: int32(svcNodePort),
 			}}

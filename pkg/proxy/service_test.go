@@ -61,7 +61,7 @@ func makeTestService(namespace, name string, svcFunc func(*v1.Service)) *v1.Serv
 	return svc
 }
 
-func addTestPort(array []v1.ServicePort, name string, protocol v1.Protocol, port, nodeport int32, targetPort int) []v1.ServicePort {
+func addTestPort(array []v1.ServicePort, name string, protocol v1.Protocol, port, nodeport, targetPort int32) []v1.ServicePort {
 	svcPort := v1.ServicePort{
 		Name:       name,
 		Protocol:   protocol,

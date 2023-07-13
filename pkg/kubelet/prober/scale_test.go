@@ -251,7 +251,7 @@ type fakePod struct {
 }
 
 func (f *fakePod) probeHandler() v1.ProbeHandler {
-	port := f.ln.Addr().(*net.TCPAddr).Port
+	port := int32(f.ln.Addr().(*net.TCPAddr).Port)
 	var handler v1.ProbeHandler
 	if f.http {
 		handler = v1.ProbeHandler{

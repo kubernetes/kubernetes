@@ -670,7 +670,7 @@ func failureTrap(ctx context.Context, c clientset.Interface, ns string) {
 	}
 }
 
-func intOrStrP(num int) *intstr.IntOrString {
+func intOrStrP(num int32) *intstr.IntOrString {
 	intstr := intstr.FromInt(num)
 	return &intstr
 }

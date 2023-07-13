@@ -120,7 +120,7 @@ func SubstituteImageName(content string) string {
 	return contentWithImageName.String()
 }
 
-func svcByName(name string, port int) *v1.Service {
+func svcByName(name string, port int32) *v1.Service {
 	return &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -131,7 +131,7 @@ func svcByName(name string, port int) *v1.Service {
 				"name": name,
 			},
 			Ports: []v1.ServicePort{{
-				Port:       int32(port),
+				Port:       port,
 				TargetPort: intstr.FromInt(port),
 			}},
 		},

@@ -196,7 +196,7 @@ func (t *dnsTestCommon) restoreDNSConfigMap(ctx context.Context, configMapData m
 
 func (t *dnsTestCommon) createUtilPodLabel(ctx context.Context, baseName string) {
 	// Actual port # doesn't matter, just needs to exist.
-	const servicePort = 10101
+	const servicePort = int32(10101)
 	podName := fmt.Sprintf("%s-%s", baseName, string(uuid.NewUUID()))
 	ports := []v1.ContainerPort{{ContainerPort: servicePort, Protocol: v1.ProtocolTCP}}
 	t.utilPod = e2epod.NewAgnhostPod(t.f.Namespace.Name, podName, nil, nil, ports)

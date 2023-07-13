@@ -359,7 +359,7 @@ func generateServiceEndpoints(nServices, nEndpoints int, epsFunc func(eps *disco
 
 	// generate a base endpoint slice object
 	baseEp := netutils.BigForIP(netutils.ParseIPSloppy("172.16.0.1"))
-	epPort := 8080
+	epPort := int32(8080)
 
 	tcpProtocol := v1.ProtocolTCP
 
@@ -372,7 +372,7 @@ func generateServiceEndpoints(nServices, nEndpoints int, epsFunc func(eps *disco
 		Endpoints:   []discovery.Endpoint{},
 		Ports: []discovery.EndpointPort{{
 			Name:     pointer.String(fmt.Sprintf("%d", epPort)),
-			Port:     pointer.Int32(int32(epPort)),
+			Port:     pointer.Int32(epPort),
 			Protocol: &tcpProtocol,
 		}},
 	}

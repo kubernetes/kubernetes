@@ -120,7 +120,7 @@ func GetServiceLoadBalancerPropagationTimeout(ctx context.Context, cs clientset.
 }
 
 // CreateServiceForSimpleAppWithPods is a convenience wrapper to create a service and its matching pods all at once.
-func CreateServiceForSimpleAppWithPods(ctx context.Context, c clientset.Interface, contPort int, svcPort int, namespace, appName string, podSpec func(n v1.Node) v1.PodSpec, count int, block bool) (*v1.Service, error) {
+func CreateServiceForSimpleAppWithPods(ctx context.Context, c clientset.Interface, contPort, svcPort int32, namespace, appName string, podSpec func(n v1.Node) v1.PodSpec, count int, block bool) (*v1.Service, error) {
 	var err error
 	theService := CreateServiceForSimpleApp(ctx, c, contPort, svcPort, namespace, appName)
 	e2enode.CreatePodsPerNodeForSimpleApp(ctx, c, namespace, appName, podSpec, count)
@@ -131,7 +131,7 @@ func CreateServiceForSimpleAppWithPods(ctx context.Context, c clientset.Interfac
 }
 
 // CreateServiceForSimpleApp returns a service that selects/exposes pods (send -1 ports if no exposure needed) with an app label.
-func CreateServiceForSimpleApp(ctx context.Context, c clientset.Interface, contPort, svcPort int, namespace, appName string) *v1.Service {
+func CreateServiceForSimpleApp(ctx context.Context, c clientset.Interface, contPort, svcPort int32, namespace, appName string) *v1.Service {
 	if appName == "" {
 		panic(fmt.Sprintf("no app name provided"))
 	}
@@ -147,7 +147,7 @@ func CreateServiceForSimpleApp(ctx context.Context, c clientset.Interface, contP
 		}
 		return []v1.ServicePort{{
 			Protocol:   v1.ProtocolTCP,
-			Port:       int32(svcPort),
+			Port:       svcPort,
 			TargetPort: intstr.FromInt(contPort),
 		}}
 	}

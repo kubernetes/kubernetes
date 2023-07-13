@@ -1529,7 +1529,7 @@ type packetFlowTest struct {
 	name     string
 	sourceIP string
 	destIP   string
-	destPort int
+	destPort int32
 	output   string
 	masq     bool
 }
@@ -2152,8 +2152,8 @@ func TestLoadBalancer(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
 	svcIP := "172.30.0.41"
-	svcPort := 80
-	svcNodePort := 3001
+	svcPort := int32(80)
+	svcNodePort := int32(3001)
 	svcLBIP1 := "1.2.3.4"
 	svcLBIP2 := "5.6.7.8"
 	svcPortName := proxy.ServicePortName{
@@ -2364,8 +2364,8 @@ func TestNodePort(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
 	svcIP := "172.30.0.41"
-	svcPort := 80
-	svcNodePort := 3001
+	svcPort := int32(80)
+	svcNodePort := int32(3001)
 	svcPortName := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
 		Port:           "p80",
@@ -2482,9 +2482,9 @@ func TestHealthCheckNodePort(t *testing.T) {
 	fp.nodePortAddresses = proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{"127.0.0.0/8"})
 
 	svcIP := "172.30.0.42"
-	svcPort := 80
-	svcNodePort := 3001
-	svcHealthCheckNodePort := 30000
+	svcPort := int32(80)
+	svcNodePort := int32(3001)
+	svcHealthCheckNodePort := int32(30000)
 	svcPortName := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
 		Port:           "p80",
@@ -2607,7 +2607,7 @@ func TestExternalIPsReject(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
 	svcIP := "172.30.0.41"
-	svcPort := 80
+	svcPort := int32(80)
 	svcExternalIPs := "192.168.99.11"
 	svcPortName := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
@@ -2621,7 +2621,7 @@ func TestExternalIPsReject(t *testing.T) {
 			svc.Spec.ExternalIPs = []string{svcExternalIPs}
 			svc.Spec.Ports = []v1.ServicePort{{
 				Name:       svcPortName.Port,
-				Port:       int32(svcPort),
+				Port:       svcPort,
 				Protocol:   v1.ProtocolTCP,
 				TargetPort: intstr.FromInt(svcPort),
 			}}
@@ -2681,7 +2681,7 @@ func TestOnlyLocalExternalIPs(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
 	svcIP := "172.30.0.41"
-	svcPort := 80
+	svcPort := int32(80)
 	svcExternalIPs := "192.168.99.11"
 	svcPortName := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
@@ -2795,7 +2795,7 @@ func TestNonLocalExternalIPs(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
 	svcIP := "172.30.0.41"
-	svcPort := 80
+	svcPort := int32(80)
 	svcExternalIPs := "192.168.99.11"
 	svcPortName := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
@@ -2902,8 +2902,8 @@ func TestNodePortReject(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
 	svcIP := "172.30.0.41"
-	svcPort := 80
-	svcNodePort := 3001
+	svcPort := int32(80)
+	svcNodePort := int32(3001)
 	svcPortName := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
 		Port:           "p80",
@@ -2982,9 +2982,9 @@ func TestLoadBalancerReject(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
 	svcIP := "172.30.0.41"
-	svcPort := 80
-	svcNodePort := 3001
-	svcHealthCheckNodePort := 30000
+	svcPort := int32(80)
+	svcNodePort := int32(3001)
+	svcHealthCheckNodePort := int32(30000)
 	svcLBIP := "1.2.3.4"
 	svcPortName := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
@@ -3076,9 +3076,9 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
 	svcIP := "172.30.0.41"
-	svcPort := 80
-	svcNodePort := 3001
-	svcHealthCheckNodePort := 30000
+	svcPort := int32(80)
+	svcNodePort := int32(3001)
+	svcHealthCheckNodePort := int32(30000)
 	svcLBIP := "1.2.3.4"
 	svcPortName := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
@@ -3780,8 +3780,8 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 
 func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTables, expected string, line int) {
 	svcIP := "172.30.0.41"
-	svcPort := 80
-	svcNodePort := 3001
+	svcPort := int32(80)
+	svcNodePort := int32(3001)
 	svcPortName := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
 		Port:           "p80",
@@ -3926,7 +3926,7 @@ func makeTestService(namespace, name string, svcFunc func(*v1.Service)) *v1.Serv
 	return svc
 }
 
-func addTestPort(array []v1.ServicePort, name string, protocol v1.Protocol, port, nodeport int32, targetPort int) []v1.ServicePort {
+func addTestPort(array []v1.ServicePort, name string, protocol v1.Protocol, port, nodeport, targetPort int32) []v1.ServicePort {
 	svcPort := v1.ServicePort{
 		Name:       name,
 		Protocol:   protocol,

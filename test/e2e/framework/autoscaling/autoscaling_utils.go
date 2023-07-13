@@ -576,7 +576,7 @@ func (rc *ResourceConsumer) CleanUp(ctx context.Context) {
 	}
 }
 
-func createService(ctx context.Context, c clientset.Interface, name, ns string, annotations, selectors map[string]string, port int32, targetPort int) (*v1.Service, error) {
+func createService(ctx context.Context, c clientset.Interface, name, ns string, annotations, selectors map[string]string, port, targetPort int32) (*v1.Service, error) {
 	return c.CoreV1().Services(ns).Create(ctx, &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,

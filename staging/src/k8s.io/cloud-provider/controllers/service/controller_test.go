@@ -97,7 +97,7 @@ func tweakAddLBIngress(ip string) serviceTweak {
 	}
 }
 
-func makeServicePort(protocol v1.Protocol, targetPort int) []v1.ServicePort {
+func makeServicePort(protocol v1.Protocol, targetPort int32) []v1.ServicePort {
 	sp := v1.ServicePort{Port: 80, Protocol: protocol}
 	if targetPort > 0 {
 		sp.TargetPort = intstr.FromInt(targetPort)
@@ -105,7 +105,7 @@ func makeServicePort(protocol v1.Protocol, targetPort int) []v1.ServicePort {
 	return []v1.ServicePort{sp}
 }
 
-func tweakAddPorts(protocol v1.Protocol, targetPort int) serviceTweak {
+func tweakAddPorts(protocol v1.Protocol, targetPort int32) serviceTweak {
 	return func(s *v1.Service) {
 		s.Spec.Ports = makeServicePort(protocol, targetPort)
 	}

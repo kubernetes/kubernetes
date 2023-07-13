@@ -161,7 +161,7 @@ func newNode(name string, label map[string]string) *v1.Node {
 	}
 }
 
-func addNodes(nodeStore cache.Store, startIndex, numNodes int, label map[string]string) {
+func addNodes(nodeStore cache.Store, startIndex, numNodes int32, label map[string]string) {
 	for i := startIndex; i < startIndex+numNodes; i++ {
 		nodeStore.Add(newNode(fmt.Sprintf("node-%d", i), label))
 	}
@@ -209,15 +209,15 @@ func newPod(podName string, nodeName string, label map[string]string, ds *apps.D
 	return pod
 }
 
-func addPods(podStore cache.Store, nodeName string, label map[string]string, ds *apps.DaemonSet, number int) {
-	for i := 0; i < number; i++ {
+func addPods(podStore cache.Store, nodeName string, label map[string]string, ds *apps.DaemonSet, number int32) {
+	for i := int32(0); i < number; i++ {
 		pod := newPod(fmt.Sprintf("%s-", nodeName), nodeName, label, ds)
 		podStore.Add(pod)
 	}
 }
 
-func addFailedPods(podStore cache.Store, nodeName string, label map[string]string, ds *apps.DaemonSet, number int) {
-	for i := 0; i < number; i++ {
+func addFailedPods(podStore cache.Store, nodeName string, label map[string]string, ds *apps.DaemonSet, number int32) {
+	for i := int32(0); i < number; i++ {
 		pod := newPod(fmt.Sprintf("%s-", nodeName), nodeName, label, ds)
 		pod.Status = v1.PodStatus{Phase: v1.PodFailed}
 		podStore.Add(pod)
@@ -360,18 +360,18 @@ func resetCounters(manager *daemonSetsController) {
 	manager.fakeRecorder = fakeRecorder
 }
 
-func validateSyncDaemonSets(manager *daemonSetsController, fakePodControl *fakePodControl, expectedCreates, expectedDeletes int, expectedEvents int) error {
-	if len(fakePodControl.Templates) != expectedCreates {
+func validateSyncDaemonSets(manager *daemonSetsController, fakePodControl *fakePodControl, expectedCreates, expectedDeletes, expectedEvents int32) error {
+	if len(fakePodControl.Templates) != int(expectedCreates) {
 		return fmt.Errorf("Unexpected number of creates.  Expected %d, saw %d\n", expectedCreates, len(fakePodControl.Templates))
 	}
-	if len(fakePodControl.DeletePodName) != expectedDeletes {
+	if len(fakePodControl.DeletePodName) != int(expectedDeletes) {
 		return fmt.Errorf("Unexpected number of deletes.  Expected %d, got %v\n", expectedDeletes, fakePodControl.DeletePodName)
 	}
-	if len(manager.fakeRecorder.Events) != expectedEvents {
+	if len(manager.fakeRecorder.Events) != int(expectedEvents) {
 		return fmt.Errorf("Unexpected number of events.  Expected %d, saw %d\n", expectedEvents, len(manager.fakeRecorder.Events))
 	}
 	// Every Pod created should have a ControllerRef.
-	if got, want := len(fakePodControl.ControllerRefs), expectedCreates; got != want {
+	if got, want := len(fakePodControl.ControllerRefs), int(expectedCreates); got != want {
 		return fmt.Errorf("len(ControllerRefs) = %v, want %v", got, want)
 	}
 	// Make sure the ControllerRefs are correct.
@@ -389,12 +389,12 @@ func validateSyncDaemonSets(manager *daemonSetsController, fakePodControl *fakeP
 	return nil
 }
 
-func expectSyncDaemonSets(t *testing.T, manager *daemonSetsController, ds *apps.DaemonSet, podControl *fakePodControl, expectedCreates, expectedDeletes int, expectedEvents int) {
+func expectSyncDaemonSets(t *testing.T, manager *daemonSetsController, ds *apps.DaemonSet, podControl *fakePodControl, expectedCreates, expectedDeletes, expectedEvents int32) {
 	t.Helper()
 	expectSyncDaemonSetsWithError(t, manager, ds, podControl, expectedCreates, expectedDeletes, expectedEvents, nil)
 }
 
-func expectSyncDaemonSetsWithError(t *testing.T, manager *daemonSetsController, ds *apps.DaemonSet, podControl *fakePodControl, expectedCreates, expectedDeletes int, expectedEvents int, expectedError error) {
+func expectSyncDaemonSetsWithError(t *testing.T, manager *daemonSetsController, ds *apps.DaemonSet, podControl *fakePodControl, expectedCreates, expectedDeletes, expectedEvents int32, expectedError error) {
 	t.Helper()
 	key, err := controller.KeyFunc(ds)
 	if err != nil {
@@ -708,7 +708,7 @@ func TestSimpleDaemonSetLaunchesPods(t *testing.T) {
 
 // DaemonSets without node selectors should launch pods on every node by NodeAffinity.
 func TestSimpleDaemonSetScheduleDaemonSetPodsLaunchesPods(t *testing.T) {
-	nodeNum := 5
+	nodeNum := int32(5)
 	for _, strategy := range updateStrategies() {
 		ds := newDaemonSet("foo")
 		ds.Spec.UpdateStrategy = *strategy
@@ -725,7 +725,7 @@ func TestSimpleDaemonSetScheduleDaemonSetPodsLaunchesPods(t *testing.T) {
 
 		expectSyncDaemonSets(t, manager, ds, podControl, nodeNum, 0, 0)
 
-		if len(podControl.podIDMap) != nodeNum {
+		if len(podControl.podIDMap) != int(nodeNum) {
 			t.Fatalf("failed to create pods for DaemonSet")
 		}
 
@@ -734,7 +734,7 @@ func TestSimpleDaemonSetScheduleDaemonSetPodsLaunchesPods(t *testing.T) {
 			n := node.(*v1.Node)
 			nodeMap[n.Name] = n
 		}
-		if len(nodeMap) != nodeNum {
+		if len(nodeMap) != int(nodeNum) {
 			t.Fatalf("not enough nodes in the store, expected: %v, got: %v",
 				nodeNum, len(nodeMap))
 		}
@@ -795,7 +795,7 @@ func TestSimpleDaemonSetPodCreateErrors(t *testing.T) {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
 		podControl.FakePodControl.CreateLimit = 10
-		addNodes(manager.nodeStore, 0, podControl.FakePodControl.CreateLimit*10, nil)
+		addNodes(manager.nodeStore, 0, int32(podControl.FakePodControl.CreateLimit*10), nil)
 		err = manager.dsStore.Add(ds)
 		if err != nil {
 			t.Fatal(err)
@@ -812,7 +812,7 @@ func TestSimpleDaemonSetPodCreateErrors(t *testing.T) {
 			return false, nil, nil
 		})
 
-		expectSyncDaemonSets(t, manager, ds, podControl, podControl.FakePodControl.CreateLimit, 0, 0)
+		expectSyncDaemonSets(t, manager, ds, podControl, int32(podControl.FakePodControl.CreateLimit), 0, 0)
 
 		expectedLimit := 0
 		for pass := uint8(0); expectedLimit <= podControl.FakePodControl.CreateLimit; pass++ {
@@ -855,7 +855,7 @@ func TestDaemonSetPodCreateExpectationsError(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		expectSyncDaemonSets(t, manager, ds, podControl, podControl.FakePodControl.CreateLimit, 0, 0)
+		expectSyncDaemonSets(t, manager, ds, podControl, int32(podControl.FakePodControl.CreateLimit), 0, 0)
 
 		dsKey, err := controller.KeyFunc(ds)
 		if err != nil {
@@ -1724,7 +1724,7 @@ func TestObservedGeneration(t *testing.T) {
 // DaemonSet controller should kill all failed pods and create at most 1 pod on every node.
 func TestDaemonKillFailedPods(t *testing.T) {
 	tests := []struct {
-		numFailedPods, numNormalPods, expectedCreates, expectedDeletes, expectedEvents int
+		numFailedPods, numNormalPods, expectedCreates, expectedDeletes, expectedEvents int32
 		test                                                                           string
 	}{
 		{numFailedPods: 0, numNormalPods: 1, expectedCreates: 0, expectedDeletes: 0, expectedEvents: 0, test: "normal (do nothing)"},
@@ -2407,9 +2407,9 @@ func TestUpdateNode(t *testing.T) {
 		newNode            *v1.Node
 		oldNode            *v1.Node
 		ds                 *apps.DaemonSet
-		expectedEventsFunc func(strategyType apps.DaemonSetUpdateStrategyType) int
+		expectedEventsFunc func(strategyType apps.DaemonSetUpdateStrategyType) int32
 		shouldEnqueue      bool
-		expectedCreates    func() int
+		expectedCreates    func() int32
 	}{
 		{
 			test:    "Nothing changed, should not enqueue",
@@ -2421,7 +2421,7 @@ func TestUpdateNode(t *testing.T) {
 				return ds
 			}(),
 			shouldEnqueue:   false,
-			expectedCreates: func() int { return 0 },
+			expectedCreates: func() int32 { return 0 },
 		},
 		{
 			test:    "Node labels changed",
@@ -2433,7 +2433,7 @@ func TestUpdateNode(t *testing.T) {
 				return ds
 			}(),
 			shouldEnqueue:   true,
-			expectedCreates: func() int { return 0 },
+			expectedCreates: func() int32 { return 0 },
 		},
 		{
 			test: "Node taints changed",
@@ -2445,7 +2445,7 @@ func TestUpdateNode(t *testing.T) {
 			newNode:         newNode("node1", nil),
 			ds:              newDaemonSet("ds"),
 			shouldEnqueue:   true,
-			expectedCreates: func() int { return 0 },
+			expectedCreates: func() int32 { return 0 },
 		},
 		{
 			test:    "Node Allocatable changed",
@@ -2460,7 +2460,7 @@ func TestUpdateNode(t *testing.T) {
 				ds.Spec.Template.Spec = resourcePodSpecWithoutNodeName("200M", "200m")
 				return ds
 			}(),
-			expectedEventsFunc: func(strategyType apps.DaemonSetUpdateStrategyType) int {
+			expectedEventsFunc: func(strategyType apps.DaemonSetUpdateStrategyType) int32 {
 				switch strategyType {
 				case apps.OnDeleteDaemonSetStrategyType:
 					return 0
@@ -2472,7 +2472,7 @@ func TestUpdateNode(t *testing.T) {
 				return 0
 			},
 			shouldEnqueue: false,
-			expectedCreates: func() int {
+			expectedCreates: func() int32 {
 				return 1
 			},
 		},
@@ -2494,11 +2494,11 @@ func TestUpdateNode(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			expectedEvents := 0
+			expectedEvents := int32(0)
 			if c.expectedEventsFunc != nil {
 				expectedEvents = c.expectedEventsFunc(strategy.Type)
 			}
-			expectedCreates := 0
+			expectedCreates := int32(0)
 			if c.expectedCreates != nil {
 				expectedCreates = c.expectedCreates()
 			}
