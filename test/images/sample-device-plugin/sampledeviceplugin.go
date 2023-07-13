@@ -66,6 +66,12 @@ func stubAllocFunc(r *pluginapi.AllocateRequest, devs map[string]pluginapi.Devic
 				ContainerPath: fpath,
 				HostPath:      fpath,
 			})
+
+			// add the CDI device ID to the response.
+			cdiDevice := &pluginapi.CDIDevice{
+				Name: fmt.Sprintf("cdi.%s=%s", resourceName, dev.ID),
+			}
+			response.CDIDevices = append(response.CDIDevices, cdiDevice)
 		}
 		responses.ContainerResponses = append(responses.ContainerResponses, response)
 	}
