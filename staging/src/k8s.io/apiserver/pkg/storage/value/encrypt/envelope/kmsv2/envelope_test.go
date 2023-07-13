@@ -401,7 +401,7 @@ func TestEnvelopeTransformerStateFunc(t *testing.T) {
 
 	t.Run("writes fail when the plugin is down and the state is invalid", func(t *testing.T) {
 		_, err := transformer.TransformToStorage(ctx, originalText, dataCtx)
-		if !strings.Contains(errString(err), `EDEK with keyID "1" expired at`) {
+		if !strings.Contains(errString(err), `EDEK with keyID hash "sha256:6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b" expired at`) {
 			t.Fatalf("expected expiration error, got: %v", err)
 		}
 	})

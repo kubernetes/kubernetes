@@ -380,18 +380,21 @@ func (h *kmsv2PluginProbe) rotateDEKOnKeyIDChange(ctx context.Context, statusKey
 		// it should be logically impossible for the new state to be invalid but check just in case
 		_, errGen = h.getCurrentState()
 		if errGen == nil {
-			klog.V(6).InfoS("successfully rotated DEK",
-				"uid", uid,
-				"newKeyID", resp.KeyID,
-				"oldKeyID", state.KeyID,
-				"expirationTimestamp", expirationTimestamp.Format(time.RFC3339),
-			)
+			klogV6 := klog.V(6)
+			if klogV6.Enabled() {
+				klogV6.InfoS("successfully rotated DEK",
+					"uid", uid,
+					"newKeyIDHash", envelopekmsv2.GetHashIfNotEmpty(resp.KeyID),
+					"oldKeyIDHash", envelopekmsv2.GetHashIfNotEmpty(state.KeyID),
+					"expirationTimestamp", expirationTimestamp.Format(time.RFC3339),
+				)
+			}
 			return nil
 		}
 	}
 
-	return fmt.Errorf("failed to rotate DEK uid=%q, errState=%v, errGen=%v, statusKeyID=%q, encryptKeyID=%q, stateKeyID=%q, expirationTimestamp=%s",
-		uid, errState, errGen, statusKeyID, resp.KeyID, state.KeyID, state.ExpirationTimestamp.Format(time.RFC3339))
+	return fmt.Errorf("failed to rotate DEK uid=%q, errState=%v, errGen=%v, statusKeyIDHash=%q, encryptKeyIDHash=%q, stateKeyIDHash=%q, expirationTimestamp=%s",
+		uid, errState, errGen, envelopekmsv2.GetHashIfNotEmpty(statusKeyID), envelopekmsv2.GetHashIfNotEmpty(resp.KeyID), envelopekmsv2.GetHashIfNotEmpty(state.KeyID), state.ExpirationTimestamp.Format(time.RFC3339))
 }
 
 // getCurrentState returns the latest state from the last status and encrypt calls.
@@ -434,7 +437,7 @@ func (h *kmsv2PluginProbe) isKMSv2ProviderHealthyAndMaybeRotateDEK(ctx context.C
 
 	if errCode, err := envelopekmsv2.ValidateKeyID(response.KeyID); err != nil {
 		metrics.RecordInvalidKeyIDFromStatus(h.name, string(errCode))
-		errs = append(errs, fmt.Errorf("got invalid KMSv2 KeyID %q: %w", response.KeyID, err))
+		errs = append(errs, fmt.Errorf("got invalid KMSv2 KeyID hash %q: %w", envelopekmsv2.GetHashIfNotEmpty(response.KeyID), err))
 	} else {
 		metrics.RecordKeyIDFromStatus(h.name, response.KeyID)
 		// unconditionally append as we filter out nil errors below

@@ -20,6 +20,7 @@ package kmsv2
 import (
 	"context"
 	"crypto/aes"
+	"crypto/sha256"
 	"fmt"
 	"sort"
 	"time"
@@ -97,8 +98,8 @@ type State struct {
 
 func (s *State) ValidateEncryptCapability() error {
 	if now := NowFunc(); now.After(s.ExpirationTimestamp) {
-		return fmt.Errorf("EDEK with keyID %q expired at %s (current time is %s)",
-			s.KeyID, s.ExpirationTimestamp.Format(time.RFC3339), now.Format(time.RFC3339))
+		return fmt.Errorf("EDEK with keyID hash %q expired at %s (current time is %s)",
+			GetHashIfNotEmpty(s.KeyID), s.ExpirationTimestamp.Format(time.RFC3339), now.Format(time.RFC3339))
 	}
 	return nil
 }
@@ -421,4 +422,12 @@ func toBytes(s string) []byte {
 	// Copied from go 1.20.1 os.File.WriteString
 	// https://github.com/golang/go/blob/202a1a57064127c3f19d96df57b9f9586145e21c/src/os/file.go#L246
 	return unsafe.Slice(unsafe.StringData(s), len(s))
+}
+
+// GetHashIfNotEmpty returns the sha256 hash of the data if it is not empty.
+func GetHashIfNotEmpty(data string) string {
+	if len(data) > 0 {
+		return fmt.Sprintf("sha256:%x", sha256.Sum256([]byte(data)))
+	}
+	return ""
 }
