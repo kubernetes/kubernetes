@@ -22,6 +22,7 @@ import (
 	"crypto/aes"
 	"fmt"
 	"sort"
+	"sync"
 	"time"
 	"unsafe"
 
@@ -103,13 +104,18 @@ func (s *State) ValidateEncryptCapability() error {
 	return nil
 }
 
+type encryptedObjectDecoder struct {
+	bufferPool *sync.Pool
+}
+
 type envelopeTransformer struct {
 	envelopeService kmsservice.Service
 	providerName    string
 	stateFunc       StateFunc
 
 	// cache is a thread-safe expiring lru cache which caches decrypted DEKs indexed by their encrypted form.
-	cache *simpleCache
+	cache                  *simpleCache
+	encryptedObjectDecoder *encryptedObjectDecoder
 }
 
 // NewEnvelopeTransformer returns a transformer which implements a KEK-DEK based envelope encryption scheme.
@@ -121,10 +127,21 @@ func NewEnvelopeTransformer(envelopeService kmsservice.Service, providerName str
 
 func newEnvelopeTransformerWithClock(envelopeService kmsservice.Service, providerName string, stateFunc StateFunc, cacheTTL time.Duration, clock clock.Clock) value.Transformer {
 	return &envelopeTransformer{
-		envelopeService: envelopeService,
-		providerName:    providerName,
-		stateFunc:       stateFunc,
-		cache:           newSimpleCache(clock, cacheTTL),
+		envelopeService:        envelopeService,
+		providerName:           providerName,
+		stateFunc:              stateFunc,
+		cache:                  newSimpleCache(clock, cacheTTL),
+		encryptedObjectDecoder: newEncryptedObjectDecoder(),
+	}
+}
+
+func newEncryptedObjectDecoder() *encryptedObjectDecoder {
+	return &encryptedObjectDecoder{
+		bufferPool: &sync.Pool{
+			New: func() interface{} {
+				return proto.NewBuffer(nil)
+			},
+		},
 	}
 }
 
@@ -248,7 +265,16 @@ func (t *envelopeTransformer) doEncode(request *kmstypes.EncryptedObject) ([]byt
 	if err := validateEncryptedObject(request); err != nil {
 		return nil, err
 	}
-	return proto.Marshal(request)
+
+	encodingBuffer := t.encryptedObjectDecoder.bufferPool.Get().(*proto.Buffer)
+	defer t.encryptedObjectDecoder.bufferPool.Put(encodingBuffer)
+
+	encodingBuffer.Reset()
+	if err := encodingBuffer.Marshal(request); err != nil {
+		return nil, err
+	}
+
+	return encodingBuffer.Bytes(), nil
 }
 
 // doDecode decodes the byte array to an EncryptedObject.

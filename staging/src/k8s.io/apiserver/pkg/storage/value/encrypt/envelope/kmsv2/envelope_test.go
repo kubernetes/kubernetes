@@ -484,7 +484,9 @@ func TestTransformToStorageError(t *testing.T) {
 }
 
 func TestEncodeDecode(t *testing.T) {
-	transformer := &envelopeTransformer{}
+	transformer := &envelopeTransformer{
+		encryptedObjectDecoder: newEncryptedObjectDecoder(),
+	}
 
 	obj := &kmstypes.EncryptedObject{
 		EncryptedData: []byte{0x01, 0x02, 0x03},
