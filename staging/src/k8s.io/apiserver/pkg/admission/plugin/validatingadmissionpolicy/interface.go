@@ -92,6 +92,8 @@ type Matcher interface {
 	// resource request
 	BindingMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1alpha1.ValidatingAdmissionPolicyBinding) (bool, error)
 
+	// GetNamespace retrieves the Namespace resource by the given name. The name may be empty, in which case
+	// GetNamespace must return nil, nil
 	GetNamespace(name string) (*corev1.Namespace, error)
 }
 

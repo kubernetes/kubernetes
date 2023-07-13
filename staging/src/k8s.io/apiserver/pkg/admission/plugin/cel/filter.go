@@ -315,11 +315,12 @@ func CreateAdmissionRequest(attr admission.Attributes) *admissionv1.AdmissionReq
 	}
 }
 
+// CreateNamespaceObject creates a Namespace object that is suitable for the CEL evaluation.
+// If the namespace is nil, CreateNamespaceObject returns nil
 func CreateNamespaceObject(namespace *v1.Namespace) *v1.Namespace {
 	if namespace == nil {
 		return nil
 	}
-	//md := namespace.GetObjectMeta()
 
 	return &v1.Namespace{
 		Status: namespace.Status,

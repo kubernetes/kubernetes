@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"k8s.io/api/admissionregistration/v1alpha1"
+	v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -319,11 +320,15 @@ func (c *celAdmissionController) Validate(
 					continue
 				}
 			}
-
-			namespace, err := c.policyController.matcher.GetNamespace(a.GetNamespace())
-			// if it is cluster scoped, namespace will be null
-			if err != nil {
-				namespace = nil
+			var namespace *v1.Namespace
+			namespaceName := a.GetNamespace()
+			// if it is cluster scoped, namespaceName will be empty
+			// Otherwise, get the Namespace resource.
+			if namespaceName != "" {
+				namespace, err = c.policyController.matcher.GetNamespace(namespaceName)
+				if err != nil {
+					return err
+				}
 			}
 
 			if versionedAttr == nil {
