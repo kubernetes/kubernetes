@@ -198,6 +198,10 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 		}
 
 		if callErr, ok := err.(*webhookutil.ErrCallingWebhook); ok {
+			if ctx.Err() == context.Canceled {
+				klog.Warningf("Context Canceled when calling webhook %v", hook.Name)
+				return err
+			}
 			if ignoreClientCallFailures {
 				klog.Warningf("Failed calling webhook, failing open %v: %v", hook.Name, callErr)
 				admissionmetrics.Metrics.ObserveWebhookFailOpen(ctx, hook.Name, "admit")
