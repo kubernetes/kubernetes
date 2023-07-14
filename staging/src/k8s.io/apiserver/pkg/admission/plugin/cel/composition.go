@@ -25,6 +25,7 @@ import (
 	"github.com/google/cel-go/common/types/ref"
 
 	v1 "k8s.io/api/admission/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/admission"
 	apiservercel "k8s.io/apiserver/pkg/cel"
@@ -149,9 +150,9 @@ func (c *compositionContext) Variables(activation any) ref.Val {
 	return lazyMap
 }
 
-func (f *CompositedFilter) ForInput(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *v1.AdmissionRequest, optionalVars OptionalVariableBindings, runtimeCELCostBudget int64) ([]EvaluationResult, int64, error) {
+func (f *CompositedFilter) ForInput(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *v1.AdmissionRequest, optionalVars OptionalVariableBindings, namespace *corev1.Namespace, runtimeCELCostBudget int64) ([]EvaluationResult, int64, error) {
 	ctx = f.compositionEnv.CreateContext(ctx)
-	return f.Filter.ForInput(ctx, versionedAttr, request, optionalVars, runtimeCELCostBudget)
+	return f.Filter.ForInput(ctx, versionedAttr, request, optionalVars, namespace, runtimeCELCostBudget)
 }
 
 func (c *compositionContext) reportCost(cost int64) {
