@@ -322,6 +322,13 @@ func (c *celAdmissionController) Validate(
 			}
 			var namespace *v1.Namespace
 			namespaceName := a.GetNamespace()
+
+			// Special case, the namespace object has the namespace of itself (maybe a bug).
+			// unset it if the incoming object is a namespace
+			if gvk := a.GetKind(); gvk.Kind == "Namespace" && gvk.Version == "v1" && gvk.Group == "" {
+				namespaceName = ""
+			}
+
 			// if it is cluster scoped, namespaceName will be empty
 			// Otherwise, get the Namespace resource.
 			if namespaceName != "" {
