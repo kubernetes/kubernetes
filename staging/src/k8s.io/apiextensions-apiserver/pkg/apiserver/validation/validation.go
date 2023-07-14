@@ -341,7 +341,7 @@ func ConvertJSONSchemaPropsWithPostProcess(in *apiextensions.JSONSchemaProps, ou
 		out.VendorExtensible.AddExtension("x-kubernetes-embedded-resource", true)
 	}
 	if len(in.XListMapKeys) != 0 {
-		out.VendorExtensible.AddExtension("x-kubernetes-list-map-keys", in.XListMapKeys)
+		out.VendorExtensible.AddExtension("x-kubernetes-list-map-keys", convertSliceToInterfaceSlice(in.XListMapKeys))
 	}
 	if in.XListType != nil {
 		out.VendorExtensible.AddExtension("x-kubernetes-list-type", *in.XListType)
@@ -354,9 +354,17 @@ func ConvertJSONSchemaPropsWithPostProcess(in *apiextensions.JSONSchemaProps, ou
 		if err := apiextensionsv1.Convert_apiextensions_ValidationRules_To_v1_ValidationRules(&in.XValidations, &serializationValidationRules, nil); err != nil {
 			return err
 		}
-		out.VendorExtensible.AddExtension("x-kubernetes-validations", serializationValidationRules)
+		out.VendorExtensible.AddExtension("x-kubernetes-validations", convertSliceToInterfaceSlice(serializationValidationRules))
 	}
 	return nil
+}
+
+func convertSliceToInterfaceSlice[T any](in []T) []interface{} {
+	var res []interface{}
+	for _, v := range in {
+		res = append(res, v)
+	}
+	return res
 }
 
 func convertSliceOfJSONSchemaProps(in *[]apiextensions.JSONSchemaProps, out *[]spec.Schema, postProcess PostProcessFunc) error {
