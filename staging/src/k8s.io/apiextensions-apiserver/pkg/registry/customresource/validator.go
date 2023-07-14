@@ -126,7 +126,9 @@ func (a customResourceValidator) ValidateStatusUpdate(ctx context.Context, obj, 
 	var allErrs field.ErrorList
 
 	allErrs = append(allErrs, validation.ValidateObjectMetaAccessorUpdate(objAccessor, oldAccessor, field.NewPath("metadata"))...)
-	allErrs = append(allErrs, apiextensionsvalidation.ValidateCustomResourceUpdate(nil, u.UnstructuredContent(), oldU, a.schemaValidator)...)
+	if status, hasStatus := u.UnstructuredContent()["status"]; hasStatus {
+		allErrs = append(allErrs, apiextensionsvalidation.ValidateCustomResourceUpdate(nil, status, oldU.UnstructuredContent()["status"], a.statusSchemaValidator)...)
+	}
 	allErrs = append(allErrs, a.ValidateScaleStatus(ctx, u, scale)...)
 
 	return allErrs
