@@ -63,18 +63,30 @@ type LoggingConfiguration struct {
 
 // TimeOrMetaDuration is present only for backwards compatibility for the
 // flushFrequency field, and new fields should use metav1.Duration.
-type TimeOrMetaDuration metav1.Duration
+type TimeOrMetaDuration struct {
+	// Duration holds the duration
+	Duration metav1.Duration
+	// SerializeAsString controls whether the value is serialized as a string or an integer
+	SerializeAsString bool `json:"-"`
+}
 
 func (t TimeOrMetaDuration) MarshalJSON() ([]byte, error) {
-	return (metav1.Duration(t)).MarshalJSON()
+	if t.SerializeAsString {
+		return t.Duration.MarshalJSON()
+	} else {
+		// Marshal as integer for backwards compatibility
+		return json.Marshal(t.Duration.Duration)
+	}
 }
 
 func (t *TimeOrMetaDuration) UnmarshalJSON(b []byte) error {
 	if len(b) > 0 && b[0] == '"' {
 		// string values unmarshal as metav1.Duration
-		return json.Unmarshal(b, (*metav1.Duration)(t))
+		t.SerializeAsString = true
+		return json.Unmarshal(b, &t.Duration)
 	}
-	if err := json.Unmarshal(b, &t.Duration); err != nil {
+	t.SerializeAsString = false
+	if err := json.Unmarshal(b, &t.Duration.Duration); err != nil {
 		return fmt.Errorf("invalid duration %q: %w", string(b), err)
 	}
 	return nil
