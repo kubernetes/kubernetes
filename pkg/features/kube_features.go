@@ -689,6 +689,14 @@ const (
 	// equals to spec.parallelism before and after the update.
 	ElasticIndexedJob featuregate.Feature = "ElasticIndexedJob"
 
+	// owner: @sanposhiho
+	// kep: http://kep.k8s.io/3063
+	// beta: v1.28
+	//
+	// Enables the scheduler's enhancement called QueueingHints,
+	// which benefits to reduce the useless requeueing.
+	SchedulerQueueingHints featuregate.Feature = "SchedulerQueueingHints"
+
 	// owner: @saschagrunert
 	// kep: https://kep.k8s.io/2413
 	// alpha: v1.22
@@ -1039,6 +1047,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	RotateKubeletServerCertificate: {Default: true, PreRelease: featuregate.Beta},
 
 	ElasticIndexedJob: {Default: true, PreRelease: featuregate.Beta},
+
+	SchedulerQueueingHints: {Default: true, PreRelease: featuregate.Beta},
 
 	SeccompDefault: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 
