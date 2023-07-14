@@ -264,6 +264,21 @@ func Test_ValidateNamespace_NoParams(t *testing.T) {
 			},
 			err: "",
 		},
+		{
+			name: "with check against namespaceObject",
+			policy: withValidations([]admissionregistrationv1alpha1.Validation{
+				{
+					Expression: "namespaceObject == null", // because namespace itself is cluster-scoped.
+				},
+			}, withParams(configParamKind(), withFailurePolicy(admissionregistrationv1alpha1.Fail, withNamespaceMatch(makePolicy("validate-namespace-suffix"))))),
+			policyBinding: makeBinding("validate-namespace-suffix-binding", "validate-namespace-suffix", ""),
+			namespace: &v1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-k8s",
+				},
+			},
+			err: "",
+		},
 	}
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
