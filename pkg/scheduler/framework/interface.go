@@ -331,7 +331,7 @@ type EnqueueExtensions interface {
 	// and leveraged to build event handlers dynamically.
 	// Note: the returned list needs to be static (not depend on configuration parameters);
 	// otherwise it would lead to undefined behavior.
-	EventsToRegister() []ClusterEventWithHint
+	EventsToRegister(context.Context) ([]ClusterEventWithHint, error)
 }
 
 // PreFilterExtensions is an interface that is included in plugins that allow specifying
