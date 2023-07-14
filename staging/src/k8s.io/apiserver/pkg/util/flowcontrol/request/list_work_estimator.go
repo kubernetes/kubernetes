@@ -68,7 +68,16 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 		// return maximumSeats for this request to be consistent.
 		return WorkEstimate{InitialSeats: e.config.MaximumSeats}
 	}
-	isListFromCache := !shouldListFromStorage(query, &listOptions)
+
+	// For watch requests, we want to adjust the cost only if they explicitly request
+	// sending initial events.
+	if requestInfo.Verb == "watch" {
+		if listOptions.SendInitialEvents == nil || !*listOptions.SendInitialEvents {
+			return WorkEstimate{InitialSeats: e.config.MinimumSeats}
+		}
+	}
+
+	isListFromCache := requestInfo.Verb == "watch" || !shouldListFromStorage(query, &listOptions)
 
 	numStored, err := e.countGetterFn(key(requestInfo))
 	switch {
