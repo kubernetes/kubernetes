@@ -425,6 +425,31 @@ func TestMigrateOldConfig(t *testing.T) {
 			allowExperimental: false,
 			expectErr:         true,
 		},
+		{
+			name: "ResetConfiguration gets migrated from experimental API",
+			oldCfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
+			kind: ResetConfiguration
+			force: true
+			cleanupTmpDir: true
+			criSocket: unix:///var/run/containerd/containerd.sock
+			certificatesDir: /etc/kubernetes/pki
+			`, gvExperimental)),
+			expectedKinds: []string{
+				constants.ResetConfigurationKind,
+			},
+			allowExperimental: true,
+			expectErr:         false,
+		},
+		{
+			name: "ResetConfiguration from experimental API cannot be migrated",
+			oldCfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
+			kind: ResetConfiguration
+			`, gvExperimental)),
+			allowExperimental: false,
+			expectErr:         true,
+		},
 	}
 
 	for _, test := range tests {
