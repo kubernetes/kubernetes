@@ -233,6 +233,10 @@ func TestGenerateLinuxContainerConfigResources(t *testing.T) {
 }
 
 func TestCalculateLinuxResources(t *testing.T) {
+	if libcontainercgroups.IsCgroup2UnifiedMode() {
+		t.Skip("This test is skipped when running on systems using cgroup v2 unified mode")
+	}
+
 	_, _, m, err := createTestRuntimeManager()
 	m.cpuCFSQuota = true
 
@@ -725,6 +729,10 @@ func TestGenerateLinuxContainerConfigSwap(t *testing.T) {
 }
 
 func TestGenerateLinuxContainerResources(t *testing.T) {
+	if libcontainercgroups.IsCgroup2UnifiedMode() {
+		t.Skip("This test is skipped when running on systems using cgroup v2 unified mode")
+	}
+
 	_, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 	m.machineInfo.MemoryCapacity = 17179860387 // 16GB

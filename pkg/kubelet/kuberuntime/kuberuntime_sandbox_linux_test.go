@@ -22,6 +22,7 @@ package kuberuntime
 import (
 	"testing"
 
+	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
@@ -31,6 +32,10 @@ import (
 )
 
 func TestApplySandboxResources(t *testing.T) {
+	if libcontainercgroups.IsCgroup2UnifiedMode() {
+		t.Skip("This test is skipped when running on systems using cgroup v2 unified mode")
+	}
+
 	_, _, m, err := createTestRuntimeManager()
 	m.cpuCFSQuota = true
 
