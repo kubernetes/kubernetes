@@ -204,7 +204,7 @@ func (o *Options) ApplyTo(logger klog.Logger, c *schedulerappconfig.Config) erro
 		o.ApplyLeaderElectionTo(o.ComponentConfig)
 		c.ComponentConfig = *o.ComponentConfig
 	} else {
-		cfg, err := loadConfigFromFile(logger, o.ConfigFile)
+		cfg, err := LoadConfigFromFile(logger, o.ConfigFile)
 		if err != nil {
 			return err
 		}
