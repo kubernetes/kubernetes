@@ -1116,7 +1116,7 @@ func TestUnderTemporaryNetworkFailure(ctx context.Context, c clientset.Interface
 
 // BlockNetwork blocks network between the given from value and the given to value.
 // The following helper functions can block/unblock network from source
-// host to destination host by manipulating iptable rules.
+// host to destination host by manipulating nftables or iptable rules.
 // This function assumes it can ssh to the source host.
 //
 // Caution:
@@ -1134,19 +1134,39 @@ func TestUnderTemporaryNetworkFailure(ctx context.Context, c clientset.Interface
 //	}
 func BlockNetwork(ctx context.Context, from string, to string) {
 	framework.Logf("block network traffic from %s to %s", from, to)
-	iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump REJECT", to)
-	dropCmd := fmt.Sprintf("sudo iptables --insert %s", iptablesRule)
-	if result, err := e2essh.SSH(ctx, dropCmd, from, framework.TestContext.Provider); result.Code != 0 || err != nil {
-		e2essh.LogResult(result)
-		framework.Failf("Unexpected error: %v", err)
+	nftablesRule := fmt.Sprintf("OUTPUT ip daddr %s reject", to)
+	dropCmdNftablesRule := fmt.Sprintf("sudo nft add rule ip nat %s", nftablesRule)
+	if result, err := e2essh.SSH(ctx, dropCmdNftablesRule, from, framework.TestContext.Provider); result.Code != 0 || err != nil {
+		framework.Logf("Nft table rule failed. Blocking traffic using iptables rule")
+
+		iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump REJECT", to)
+		dropCmdIptablesRule := fmt.Sprintf("sudo iptables --insert %s", iptablesRule)
+
+		if result, err := e2essh.SSH(ctx, dropCmdIptablesRule, from, framework.TestContext.Provider); result.Code != 0 || err != nil {
+			e2essh.LogResult(result)
+			framework.Failf("Unexpected error: %v", err)
+		}
 	}
 }
 
 // UnblockNetwork unblocks network between the given from value and the given to value.
 func UnblockNetwork(ctx context.Context, from string, to string) {
 	framework.Logf("Unblock network traffic from %s to %s", from, to)
-	iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump REJECT", to)
-	undropCmd := fmt.Sprintf("sudo iptables --delete %s", iptablesRule)
+
+	var undropCmd string
+
+	fetchHandleCmd := fmt.Sprintf("sudo nft -a list ruleset | grep 'ip daddr %s reject' | awk -F'# handle' '{print $2}'", to)
+	result, fetchHandleCmderr := e2essh.SSH(ctx, fetchHandleCmd, from, framework.TestContext.Provider)
+	if result.Code == 0 && fetchHandleCmderr == nil {
+		handle := result.Stdout
+		nftablesRule := fmt.Sprintf("OUTPUT handle %s", handle)
+		undropCmd = fmt.Sprintf("sudo nft delete rule ip nat %s", nftablesRule)
+	} else {
+		framework.Logf("Nft table rule not found. Unblocking traffic using iptables rule")
+		iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump REJECT", to)
+		undropCmd = fmt.Sprintf("sudo iptables --delete %s", iptablesRule)
+	}
+
 	// Undrop command may fail if the rule has never been created.
 	// In such case we just lose 30 seconds, but the cluster is healthy.
 	// But if the rule had been created and removing it failed, the node is broken and
@@ -1165,8 +1185,8 @@ func UnblockNetwork(ctx context.Context, from string, to string) {
 		return false, nil
 	})
 	if err != nil {
-		framework.Failf("Failed to remove the iptable REJECT rule. Manual intervention is "+
-			"required on host %s: remove rule %s, if exists", from, iptablesRule)
+		framework.Failf("Failed to remove the REJECT rule. Manual intervention is "+
+			"required on host %s: remove rule using command %s, if exists", from, undropCmd)
 	}
 }
 
