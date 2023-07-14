@@ -1021,7 +1021,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	MultiCIDRServiceAllocator: {Default: false, PreRelease: featuregate.Alpha},
 
-	NewVolumeManagerReconstruction: {Default: false, PreRelease: featuregate.Beta}, // disabled for https://github.com/kubernetes/kubernetes/issues/117745
+	NewVolumeManagerReconstruction: {Default: true, PreRelease: featuregate.Beta},
 
 	NodeLogQuery: {Default: false, PreRelease: featuregate.Alpha},
 
@@ -1099,7 +1099,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	NodeInclusionPolicyInPodTopologySpread: {Default: true, PreRelease: featuregate.Beta},
 
-	SELinuxMountReadWriteOncePod: {Default: false, PreRelease: featuregate.Beta}, // disabled for https://github.com/kubernetes/kubernetes/issues/117745
+	SELinuxMountReadWriteOncePod: {Default: true, PreRelease: featuregate.Beta},
 
 	InPlacePodVerticalScaling: {Default: false, PreRelease: featuregate.Alpha},
 
