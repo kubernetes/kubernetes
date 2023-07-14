@@ -209,7 +209,7 @@ func TestNewEndpointSlice(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
 			svc := tc.updateSvc(service)
-			generatedSlice := newEndpointSlice(logger, &svc, &endpointMeta)
+			generatedSlice := newEndpointSlice(logger, &svc, &endpointMeta, controllerName)
 			assert.EqualValues(t, tc.expectedSlice, generatedSlice)
 		})
 	}
@@ -479,7 +479,7 @@ func TestServiceControllerKey(t *testing.T) {
 		"nil EndpointSlice": {
 			endpointSlice: nil,
 			expectedKey:   "",
-			expectedErr:   fmt.Errorf("nil EndpointSlice passed to serviceControllerKey()"),
+			expectedErr:   fmt.Errorf("nil EndpointSlice passed to ServiceControllerKey()"),
 		},
 		"empty EndpointSlice": {
 			endpointSlice: &discovery.EndpointSlice{},
@@ -502,7 +502,7 @@ func TestServiceControllerKey(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			actualKey, actualErr := serviceControllerKey(tc.endpointSlice)
+			actualKey, actualErr := ServiceControllerKey(tc.endpointSlice)
 			if !reflect.DeepEqual(actualErr, tc.expectedErr) {
 				t.Errorf("Expected %s, got %s", tc.expectedErr, actualErr)
 			}
@@ -880,7 +880,7 @@ func TestSetEndpointSliceLabels(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
 			svc := tc.updateSvc(service)
-			labels, updated := setEndpointSliceLabels(logger, tc.epSlice, &svc)
+			labels, updated := setEndpointSliceLabels(logger, tc.epSlice, &svc, controllerName)
 			assert.EqualValues(t, updated, tc.expectedUpdate)
 			assert.EqualValues(t, tc.expectedLabels, labels)
 		})

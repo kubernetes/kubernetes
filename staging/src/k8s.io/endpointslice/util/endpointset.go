@@ -14,13 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package endpointslice
+package util
 
 import (
 	"sort"
 
 	discovery "k8s.io/api/discovery/v1"
-	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
 )
 
 // endpointHash is used to uniquely identify endpoints. Only including addresses
@@ -45,7 +44,7 @@ func hashEndpoint(endpoint *discovery.Endpoint) endpointHash {
 		hashObj.Name = endpoint.TargetRef.Name
 	}
 
-	return endpointHash(endpointutil.DeepHashObjectToString(hashObj))
+	return endpointHash(deepHashObjectToString(hashObj))
 }
 
 // EndpointSet provides simple methods for comparing sets of Endpoints.

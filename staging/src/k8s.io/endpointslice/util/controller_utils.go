@@ -14,15 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package endpoint
+package util
 
 import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+	"hash"
 	"reflect"
 	"sort"
 
+	"github.com/davecgh/go-spew/spew"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/conversion"
@@ -31,9 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/util/hash"
 )
 
 // semanticIgnoreResourceVersion does semantic deep equality checks for objects
@@ -62,7 +61,7 @@ func GetPodServiceMemberships(serviceLister v1listers.ServiceLister, pod *v1.Pod
 			// if the service has a nil selector this means selectors match nothing, not everything.
 			continue
 		}
-		key, err := controller.KeyFunc(service)
+		key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(service)
 		if err != nil {
 			return nil, err
 		}
@@ -79,13 +78,13 @@ type PortMapKey string
 // NewPortMapKey generates a PortMapKey from endpoint ports.
 func NewPortMapKey(endpointPorts []discovery.EndpointPort) PortMapKey {
 	sort.Sort(portsInOrder(endpointPorts))
-	return PortMapKey(DeepHashObjectToString(endpointPorts))
+	return PortMapKey(deepHashObjectToString(endpointPorts))
 }
 
-// DeepHashObjectToString creates a unique hash string from a go object.
-func DeepHashObjectToString(objectToWrite interface{}) string {
+// deepHashObjectToString creates a unique hash string from a go object.
+func deepHashObjectToString(objectToWrite interface{}) string {
 	hasher := md5.New()
-	hash.DeepHashObject(hasher, objectToWrite)
+	deepHashObject(hasher, objectToWrite)
 	return hex.EncodeToString(hasher.Sum(nil)[0:])
 }
 
@@ -96,7 +95,7 @@ func ShouldPodBeInEndpoints(pod *v1.Pod, includeTerminating bool) bool {
 	// "Terminal" describes when a Pod is complete (in a succeeded or failed phase).
 	// This is distinct from the "Terminating" condition which represents when a Pod
 	// is being terminated (metadata.deletionTimestamp is non nil).
-	if podutil.IsPodTerminal(pod) {
+	if isPodTerminal(pod) {
 		return false
 	}
 
@@ -137,7 +136,7 @@ func podEndpointsChanged(oldPod, newPod *v1.Pod) (bool, bool) {
 	// will move from the unready endpoints set to the ready endpoints.
 	// So for the purposes of an endpoint, a readiness change on a pod
 	// means we have a changed pod.
-	if podutil.IsPodReady(oldPod) != podutil.IsPodReady(newPod) {
+	if IsPodReady(oldPod) != IsPodReady(newPod) {
 		return true, labelsChanged
 	}
 
@@ -238,8 +237,8 @@ type portsInOrder []discovery.EndpointPort
 func (sl portsInOrder) Len() int      { return len(sl) }
 func (sl portsInOrder) Swap(i, j int) { sl[i], sl[j] = sl[j], sl[i] }
 func (sl portsInOrder) Less(i, j int) bool {
-	h1 := DeepHashObjectToString(sl[i])
-	h2 := DeepHashObjectToString(sl[j])
+	h1 := deepHashObjectToString(sl[i])
+	h2 := deepHashObjectToString(sl[j])
 	return h1 < h2
 }
 
@@ -297,8 +296,58 @@ func stringPtrChanged(ptr1, ptr2 *string) bool {
 	return false
 }
 
-// EndpointSubsetsEqualIgnoreResourceVersion returns true if EndpointSubsets
-// have equal attributes but excludes ResourceVersion of Pod.
-func EndpointSubsetsEqualIgnoreResourceVersion(subsets1, subsets2 []v1.EndpointSubset) bool {
-	return semanticIgnoreResourceVersion.DeepEqual(subsets1, subsets2)
+// DeepHashObject writes specified object to hash using the spew library
+// which follows pointers and prints actual values of the nested objects
+// ensuring the hash does not change when a pointer changes.
+// copied from k8s.io/kubernetes/pkg/util/hash
+func deepHashObject(hasher hash.Hash, objectToWrite interface{}) {
+	hasher.Reset()
+	printer := spew.ConfigState{
+		Indent:         " ",
+		SortKeys:       true,
+		DisableMethods: true,
+		SpewKeys:       true,
+	}
+	printer.Fprintf(hasher, "%#v", objectToWrite)
+}
+
+// IsPodReady returns true if Pods Ready condition is true
+// copied from k8s.io/kubernetes/pkg/api/v1/pod
+func IsPodReady(pod *v1.Pod) bool {
+	return isPodReadyConditionTrue(pod.Status)
+}
+
+// IsPodTerminal returns true if a pod is terminal, all containers are stopped and cannot ever regress.
+// copied from k8s.io/kubernetes/pkg/api/v1/pod
+func isPodTerminal(pod *v1.Pod) bool {
+	return isPodPhaseTerminal(pod.Status.Phase)
+}
+
+// IsPodPhaseTerminal returns true if the pod's phase is terminal.
+// copied from k8s.io/kubernetes/pkg/api/v1/pod
+func isPodPhaseTerminal(phase v1.PodPhase) bool {
+	return phase == v1.PodFailed || phase == v1.PodSucceeded
+}
+
+// IsPodReadyConditionTrue returns true if a pod is ready; false otherwise.
+// copied from k8s.io/kubernetes/pkg/api/v1/pod
+func isPodReadyConditionTrue(status v1.PodStatus) bool {
+	condition := getPodReadyCondition(&status)
+	return condition != nil && condition.Status == v1.ConditionTrue
+}
+
+// getPodReadyCondition extracts the pod ready condition from the given status and returns that.
+// Returns nil if the condition is not present.
+// copied from k8s.io/kubernetes/pkg/api/v1/pod
+func getPodReadyCondition(status *v1.PodStatus) *v1.PodCondition {
+	if status == nil || status.Conditions == nil {
+		return nil
+	}
+
+	for i := range status.Conditions {
+		if status.Conditions[i].Type == v1.PodReady {
+			return &status.Conditions[i]
+		}
+	}
+	return nil
 }

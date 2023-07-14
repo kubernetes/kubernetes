@@ -30,6 +30,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/informers"
@@ -38,13 +39,74 @@ import (
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/endpointslice/metrics"
+	"k8s.io/endpointslice/topologycache"
+	endpointsliceutil "k8s.io/endpointslice/util"
 	"k8s.io/klog/v2/ktesting"
-	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/endpointslice/metrics"
-	"k8s.io/kubernetes/pkg/controller/endpointslice/topologycache"
-	endpointsliceutil "k8s.io/kubernetes/pkg/controller/util/endpointslice"
 	"k8s.io/utils/pointer"
 )
+
+const (
+	controllerName = "endpointslice-controller.k8s.io"
+)
+
+func expectAction(t *testing.T, actions []k8stesting.Action, index int, verb, resource string) {
+	t.Helper()
+	if len(actions) <= index {
+		t.Fatalf("Expected at least %d actions, got %d", index+1, len(actions))
+	}
+
+	action := actions[index]
+	if action.GetVerb() != verb {
+		t.Errorf("Expected action %d verb to be %s, got %s", index, verb, action.GetVerb())
+	}
+
+	if action.GetResource().Resource != resource {
+		t.Errorf("Expected action %d resource to be %s, got %s", index, resource, action.GetResource().Resource)
+	}
+}
+
+// cacheMutationCheck helps ensure that cached objects have not been changed
+// in any way throughout a test run.
+type cacheMutationCheck struct {
+	objects []cacheObject
+}
+
+// cacheObject stores a reference to an original object as well as a deep copy
+// of that object to track any mutations in the original object.
+type cacheObject struct {
+	original runtime.Object
+	deepCopy runtime.Object
+}
+
+// newCacheMutationCheck initializes a cacheMutationCheck with EndpointSlices.
+func newCacheMutationCheck(endpointSlices []*discovery.EndpointSlice) cacheMutationCheck {
+	cmc := cacheMutationCheck{}
+	for _, endpointSlice := range endpointSlices {
+		cmc.Add(endpointSlice)
+	}
+	return cmc
+}
+
+// Add appends a runtime.Object and a deep copy of that object into the
+// cacheMutationCheck.
+func (cmc *cacheMutationCheck) Add(o runtime.Object) {
+	cmc.objects = append(cmc.objects, cacheObject{
+		original: o,
+		deepCopy: o.DeepCopyObject(),
+	})
+}
+
+// Check verifies that no objects in the cacheMutationCheck have been mutated.
+func (cmc *cacheMutationCheck) Check(t *testing.T) {
+	for _, o := range cmc.objects {
+		if !reflect.DeepEqual(o.original, o.deepCopy) {
+			// Cached objects can't be safely mutated and instead should be deep
+			// copied before changed in any way.
+			t.Errorf("Cached object was unexpectedly mutated. Original: %+v, Mutated: %+v", o.deepCopy, o.original)
+		}
+	}
+}
 
 var defaultMaxEndpointsPerSlice = int32(100)
 
@@ -497,7 +559,7 @@ func TestReconcile1EndpointSlice(t *testing.T) {
 		},
 		{
 			desc:        "Existing placeholder that's the same",
-			existing:    newEndpointSlice(logger, &svc, &endpointMeta{ports: []discovery.EndpointPort{}, addressType: discovery.AddressTypeIPv4}),
+			existing:    newEndpointSlice(logger, &svc, &endpointMeta{ports: []discovery.EndpointPort{}, addressType: discovery.AddressTypeIPv4}, controllerName),
 			wantMetrics: expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 0, addedPerSync: 0, removedPerSync: 0, numCreated: 0, numUpdated: 0, numDeleted: 0, slicesChangedPerSync: 0},
 		},
 		{
@@ -652,7 +714,7 @@ func TestReconcile1EndpointSlicePublishNotReadyAddresses(t *testing.T) {
 	endpointSlices := fetchEndpointSlices(t, client, namespace)
 	for _, endpointSlice := range endpointSlices {
 		for i, endpoint := range endpointSlice.Endpoints {
-			if !endpointsliceutil.EndpointReady(endpoint) {
+			if !topologycache.EndpointReady(endpoint) {
 				t.Errorf("Expected endpoints[%d] to be ready", i)
 			}
 		}
@@ -1623,7 +1685,7 @@ func TestReconcilerPodMissingNode(t *testing.T) {
 					t.Errorf("Expected no error creating endpoint slice")
 				}
 			}
-			err := r.reconcile(logger, svc, pods, existingSlices, time.Now())
+			err := r.Reconcile(logger, svc, pods, existingSlices, time.Now())
 			if err == nil && tc.expectError {
 				t.Errorf("Expected error but no error received")
 			}
@@ -1849,7 +1911,7 @@ func TestReconcileTopology(t *testing.T) {
 			service.Annotations = map[string]string{
 				corev1.DeprecatedAnnotationTopologyAwareHints: tc.hintsAnnotation,
 			}
-			r.reconcile(logger, service, tc.pods, tc.existingSlices, time.Now())
+			r.Reconcile(logger, service, tc.pods, tc.existingSlices, time.Now())
 
 			cmc.Check(t)
 			expectMetrics(t, tc.expectedMetrics)
@@ -1912,23 +1974,24 @@ func TestReconcileTopology(t *testing.T) {
 
 // Test Helpers
 
-func newReconciler(client *fake.Clientset, nodes []*corev1.Node, maxEndpointsPerSlice int32) *reconciler {
+func newReconciler(client *fake.Clientset, nodes []*corev1.Node, maxEndpointsPerSlice int32) *Reconciler {
 	eventRecorder := record.NewFakeRecorder(10)
-	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	nodeInformer := informerFactory.Core().V1().Nodes()
 	indexer := nodeInformer.Informer().GetIndexer()
 	for _, node := range nodes {
 		indexer.Add(node)
 	}
 
-	return &reconciler{
-		client:               client,
-		nodeLister:           corelisters.NewNodeLister(indexer),
-		maxEndpointsPerSlice: maxEndpointsPerSlice,
-		endpointSliceTracker: endpointsliceutil.NewEndpointSliceTracker(),
-		metricsCache:         metrics.NewCache(maxEndpointsPerSlice),
-		eventRecorder:        eventRecorder,
-	}
+	return NewReconciler(
+		client,
+		corelisters.NewNodeLister(indexer),
+		maxEndpointsPerSlice,
+		endpointsliceutil.NewEndpointSliceTracker(),
+		nil,
+		eventRecorder,
+		controllerName,
+	)
 }
 
 // ensures endpoint slices exist with the desired set of lengths
@@ -2037,10 +2100,10 @@ func fetchEndpointSlices(t *testing.T, client *fake.Clientset, namespace string)
 	return fetchedSlices.Items
 }
 
-func reconcileHelper(t *testing.T, r *reconciler, service *corev1.Service, pods []*corev1.Pod, existingSlices []*discovery.EndpointSlice, triggerTime time.Time) {
+func reconcileHelper(t *testing.T, r *Reconciler, service *corev1.Service, pods []*corev1.Pod, existingSlices []*discovery.EndpointSlice, triggerTime time.Time) {
 	logger, _ := ktesting.NewTestContext(t)
 	t.Helper()
-	err := r.reconcile(logger, service, pods, existingSlices, triggerTime)
+	err := r.Reconcile(logger, service, pods, existingSlices, triggerTime)
 	if err != nil {
 		t.Fatalf("Expected no error reconciling Endpoint Slices, got: %v", err)
 	}
