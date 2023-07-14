@@ -606,6 +606,13 @@ const (
 	// the pod is being deleted due to a disruption.
 	PodDisruptionConditions featuregate.Feature = "PodDisruptionConditions"
 
+	// owner: @danielvegamyhre
+	// kep: https://kep.k8s.io/4017
+	// beta: v1.28
+	//
+	// Set pod completion index as a pod label for Indexed Jobs.
+	PodIndexLabel featuregate.Feature = "PodIndexLabel"
+
 	// owner: @ddebroy
 	// alpha: v1.25
 	//
@@ -1085,6 +1092,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	SELinuxMountReadWriteOncePod: {Default: false, PreRelease: featuregate.Beta}, // disabled for https://github.com/kubernetes/kubernetes/issues/117745
 
 	InPlacePodVerticalScaling: {Default: false, PreRelease: featuregate.Alpha},
+
+	PodIndexLabel: {Default: true, PreRelease: featuregate.Beta},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
