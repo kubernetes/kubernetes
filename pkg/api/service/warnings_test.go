@@ -50,6 +50,13 @@ func TestGetWarningsForService(t *testing.T) {
 			s.Spec.ExternalIPs = []string{"1.2.3.4"}
 		},
 		numWarnings: 1,
+	}, {
+		name: "externalName set when type is not ExternalName",
+		tweakSvc: func(s *api.Service) {
+			s.Spec.Type = api.ServiceTypeClusterIP
+			s.Spec.ExternalName = "example.com"
+		},
+		numWarnings: 1,
 	}}
 
 	for _, tc := range testCases {
@@ -57,8 +64,8 @@ func TestGetWarningsForService(t *testing.T) {
 			svc := &api.Service{}
 			tc.tweakSvc(svc)
 			warnings := GetWarningsForService(svc, svc)
-			if len(warnings) != tc.numWarnings {
-				t.Errorf("Unexpected warning list: %v", warnings)
+			if want, got := tc.numWarnings, len(warnings); got != want {
+				t.Errorf("Unexpected warning list: expected %d, got %d\n%q", want, got, warnings)
 			}
 		})
 	}
