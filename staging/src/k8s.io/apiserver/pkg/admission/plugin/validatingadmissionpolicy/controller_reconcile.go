@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	celmetrics "k8s.io/apiserver/pkg/admission/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
@@ -53,6 +54,7 @@ type policyController struct {
 
 	// Provided to the policy's Compile function as an injected dependency to
 	// assist with compiling its expressions to CEL
+	// pass nil to create filter compiler in demand
 	filterCompiler cel.FilterCompiler
 
 	matcher Matcher
@@ -463,18 +465,29 @@ func (c *policyController) latestPolicyData() []policyData {
 				failurePolicy := convertv1alpha1FailurePolicyTypeTov1FailurePolicyType(definitionInfo.lastReconciledValue.Spec.FailurePolicy)
 				var matcher matchconditions.Matcher = nil
 				matchConditions := definitionInfo.lastReconciledValue.Spec.MatchConditions
+
+				filterCompiler := c.filterCompiler
+				if filterCompiler == nil {
+					compositedCompiler, err := cel.NewCompositedCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
+					if err == nil {
+						filterCompiler = compositedCompiler
+						compositedCompiler.CompileAndStoreVariables(convertV1alpha1Variables(definitionInfo.lastReconciledValue.Spec.Variables), optionalVars, environment.StoredExpressions)
+					} else {
+						utilruntime.HandleError(err)
+					}
+				}
 				if len(matchConditions) > 0 {
 					matchExpressionAccessors := make([]cel.ExpressionAccessor, len(matchConditions))
 					for i := range matchConditions {
 						matchExpressionAccessors[i] = (*matchconditions.MatchCondition)(&matchConditions[i])
 					}
-					matcher = matchconditions.NewMatcher(c.filterCompiler.Compile(matchExpressionAccessors, optionalVars, environment.StoredExpressions), failurePolicy, "validatingadmissionpolicy", definitionInfo.lastReconciledValue.Name)
+					matcher = matchconditions.NewMatcher(filterCompiler.Compile(matchExpressionAccessors, optionalVars, environment.StoredExpressions), failurePolicy, "validatingadmissionpolicy", definitionInfo.lastReconciledValue.Name)
 				}
 				bindingInfo.validator = c.newValidator(
-					c.filterCompiler.Compile(convertv1alpha1Validations(definitionInfo.lastReconciledValue.Spec.Validations), optionalVars, environment.StoredExpressions),
+					filterCompiler.Compile(convertv1alpha1Validations(definitionInfo.lastReconciledValue.Spec.Validations), optionalVars, environment.StoredExpressions),
 					matcher,
-					c.filterCompiler.Compile(convertv1alpha1AuditAnnotations(definitionInfo.lastReconciledValue.Spec.AuditAnnotations), optionalVars, environment.StoredExpressions),
-					c.filterCompiler.Compile(convertV1Alpha1MessageExpressions(definitionInfo.lastReconciledValue.Spec.Validations), expressionOptionalVars, environment.StoredExpressions),
+					filterCompiler.Compile(convertv1alpha1AuditAnnotations(definitionInfo.lastReconciledValue.Spec.AuditAnnotations), optionalVars, environment.StoredExpressions),
+					filterCompiler.Compile(convertV1Alpha1MessageExpressions(definitionInfo.lastReconciledValue.Spec.Validations), expressionOptionalVars, environment.StoredExpressions),
 					failurePolicy,
 				)
 			}
@@ -549,6 +562,14 @@ func convertv1alpha1AuditAnnotations(inputValidations []v1alpha1.AuditAnnotation
 		celExpressionAccessor[i] = &validation
 	}
 	return celExpressionAccessor
+}
+
+func convertV1alpha1Variables(variables []v1alpha1.Variable) []cel.NamedExpressionAccessor {
+	namedExpressions := make([]cel.NamedExpressionAccessor, len(variables))
+	for i, variable := range variables {
+		namedExpressions[i] = &Variable{Name: variable.Name, Expression: variable.Expression}
+	}
+	return namedExpressions
 }
 
 func getNamespaceName(namespace, name string) namespacedName {

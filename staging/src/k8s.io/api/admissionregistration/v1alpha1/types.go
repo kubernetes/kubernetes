@@ -201,6 +201,20 @@ type ValidatingAdmissionPolicySpec struct {
 	// +listMapKey=name
 	// +optional
 	MatchConditions []MatchCondition `json:"matchConditions,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,6,rep,name=matchConditions"`
+
+	// Variables contain definitions of variables that can be used in composition of other expressions.
+	// Each variable is defined as a named CEL expression.
+	// The variables defined here will be available under `variables` in other expressions of the policy
+	// except MatchConditions because MatchConditions are evaluated before the rest of the policy.
+	//
+	// The expression of a variable can refer to other variables defined earlier in the list but not those after.
+	// Thus, Variables must be sorted by the order of first appearance and acyclic.
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	Variables []Variable `json:"variables" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,7,rep,name=variables"`
 }
 
 type MatchCondition v1.MatchCondition
@@ -228,6 +242,8 @@ type Validation struct {
 	// - 'oldObject' - The existing object. The value is null for CREATE requests.
 	// - 'request' - Attributes of the API request([ref](/pkg/apis/admission/types.go#AdmissionRequest)).
 	// - 'params' - Parameter resource referred to by the policy binding being evaluated. Only populated if the policy has a ParamKind.
+	// - 'variables' - Map of composited variables, from its name to its lazily evaluated value.
+	//   For example, a variable named 'foo' can be accessed as 'variables.foo'.
 	// - 'authorizer' - A CEL Authorizer. May be used to perform authorization checks for the principal (user or service account) of the request.
 	//   See https://pkg.go.dev/k8s.io/apiserver/pkg/cel/library#Authz
 	// - 'authorizer.requestResource' - A CEL ResourceCheck constructed from the 'authorizer' and configured with the
@@ -288,6 +304,18 @@ type Validation struct {
 	// "object.x must be less than max ("+string(params.max)+")"
 	// +optional
 	MessageExpression string `json:"messageExpression,omitempty" protobuf:"bytes,4,opt,name=messageExpression"`
+}
+
+// Variable is the definition of a variable that is used for composition.
+type Variable struct {
+	// Name is the name of the variable. The name must be a valid CEL identifier and unique among all variables.
+	// The variable can be accessed in other expressions through `variables`
+	// For example, if name is "foo", the variable will be available as `variables.foo`
+	Name string `json:"name" protobuf:"bytes,1,opt,name=Name"`
+
+	// Expression is the expression that will be evaluated as the value of the variable.
+	// The CEL expression has access to the same identifiers as the CEL expressions in Validation.
+	Expression string `json:"expression" protobuf:"bytes,2,opt,name=Expression"`
 }
 
 // AuditAnnotation describes how to produce an audit annotation for an API request.

@@ -90,6 +90,9 @@ spec:
     message: messageValue
     messageExpression: messageExpressionValue
     reason: reasonValue
+  variables:
+  - expression: expressionValue
+    name: nameValue
 status:
   conditions:
   - lastTransitionTime: "2004-01-01T01:01:01Z"

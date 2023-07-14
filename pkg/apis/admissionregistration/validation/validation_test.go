@@ -2864,7 +2864,128 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 			},
 		},
 		expectedError: `undeclared reference to 'params'`,
-	}}
+	}, {
+		name: "variable composition empty name",
+		config: &admissionregistration.ValidatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.ValidatingAdmissionPolicySpec{
+				Variables: []admissionregistration.Variable{
+					{
+						Name:       "    ",
+						Expression: "true",
+					},
+				},
+				Validations: []admissionregistration.Validation{
+					{
+						Expression: "true",
+					},
+				},
+			},
+		},
+		expectedError: `spec.variables[0].name: Required value: name is not specified`,
+	}, {
+		name: "variable composition name is not a valid identifier",
+		config: &admissionregistration.ValidatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.ValidatingAdmissionPolicySpec{
+				Variables: []admissionregistration.Variable{
+					{
+						Name:       "4ever",
+						Expression: "true",
+					},
+				},
+				Validations: []admissionregistration.Validation{
+					{
+						Expression: "true",
+					},
+				},
+			},
+		},
+		expectedError: `spec.variables[0].name: Invalid value: "4ever": name is not a valid CEL identifier`,
+	}, {
+		name: "variable composition cannot compile",
+		config: &admissionregistration.ValidatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.ValidatingAdmissionPolicySpec{
+				Variables: []admissionregistration.Variable{
+					{
+						Name:       "foo",
+						Expression: "114 + '514'", // compile error: type confusion
+					},
+				},
+				Validations: []admissionregistration.Validation{
+					{
+						Expression: "true",
+					},
+				},
+			},
+		},
+		expectedError: `spec.variables[0].expression: Invalid value: "114 + '514'": compilation failed: ERROR: <input>:1:5: found no matching overload for '_+_' applied to '(int, string)`,
+	}, {
+		name: "validation referred to non-existing variable",
+		config: &admissionregistration.ValidatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.ValidatingAdmissionPolicySpec{
+				Variables: []admissionregistration.Variable{
+					{
+						Name:       "foo",
+						Expression: "1 + 1",
+					},
+					{
+						Name:       "bar",
+						Expression: "variables.foo + 1",
+					},
+				},
+				Validations: []admissionregistration.Validation{
+					{
+						Expression: "variables.foo > 1", // correct
+					},
+					{
+						Expression: "variables.replicas == 2", // replicas undefined
+					},
+				},
+			},
+		},
+		expectedError: `spec.validations[1].expression: Invalid value: "variables.replicas == 2": compilation failed: ERROR: <input>:1:10: undefined field 'replicas'`,
+	}, {
+		name: "variables wrong order",
+		config: &admissionregistration.ValidatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: admissionregistration.ValidatingAdmissionPolicySpec{
+				Variables: []admissionregistration.Variable{
+					{
+						Name:       "correct",
+						Expression: "object",
+					},
+					{
+						Name:       "bar", // should go below foo
+						Expression: "variables.foo + 1",
+					},
+					{
+						Name:       "foo",
+						Expression: "1 + 1",
+					},
+				},
+				Validations: []admissionregistration.Validation{
+					{
+						Expression: "variables.foo > 1", // correct
+					},
+				},
+			},
+		},
+		expectedError: `spec.variables[1].expression: Invalid value: "variables.foo + 1": compilation failed: ERROR: <input>:1:10: undefined field 'foo'`,
+	},
+	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			errs := ValidateValidatingAdmissionPolicy(test.config)
@@ -3298,9 +3419,9 @@ func TestValidateValidatingAdmissionPolicyUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	compiler = plugincel.NewCompiler(extended)
+	statelessCELCompiler = plugincel.NewCompiler(extended)
 	defer func() {
-		compiler = plugincel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
+		statelessCELCompiler = plugincel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
 	}()
 
 	for _, test := range tests {

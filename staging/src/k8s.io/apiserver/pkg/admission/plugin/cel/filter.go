@@ -46,7 +46,7 @@ func NewFilterCompiler(env *environment.EnvSet) FilterCompiler {
 }
 
 type evaluationActivation struct {
-	object, oldObject, params, request, authorizer, requestResourceAuthorizer interface{}
+	object, oldObject, params, request, authorizer, requestResourceAuthorizer, variables interface{}
 }
 
 // ResolveName returns a value from the activation by qualified name, or false if the name
@@ -65,6 +65,8 @@ func (a *evaluationActivation) ResolveName(name string) (interface{}, bool) {
 		return a.authorizer, a.authorizer != nil
 	case RequestResourceAuthorizerVarName:
 		return a.requestResourceAuthorizer, a.requestResourceAuthorizer != nil
+	case VariableVarName: // variables always present
+		return a.variables, true
 	default:
 		return nil, false
 	}
@@ -163,6 +165,14 @@ func (f *filter) ForInput(ctx context.Context, versionedAttr *admission.Versione
 		requestResourceAuthorizer: requestResourceAuthorizerVal,
 	}
 
+	// composition is an optional feature that only applies for ValidatingAdmissionPolicy.
+	// check if the context allows composition
+	var compositionCtx CompositionContext
+	var ok bool
+	if compositionCtx, ok = ctx.(CompositionContext); ok {
+		va.variables = compositionCtx.Variables(va)
+	}
+
 	remainingBudget := runtimeCELCostBudget
 	for i, compilationResult := range f.compilationResults {
 		var evaluation = &evaluations[i]
@@ -186,6 +196,17 @@ func (f *filter) ForInput(ctx context.Context, versionedAttr *admission.Versione
 		}
 		t1 := time.Now()
 		evalResult, evalDetails, err := compilationResult.Program.ContextEval(ctx, va)
+		// budget may be spent due to lazy evaluation of composited variables
+		if compositionCtx != nil {
+			compositionCost := compositionCtx.GetAndResetCost()
+			if compositionCost > remainingBudget {
+				return nil, -1, &cel.Error{
+					Type:   cel.ErrorTypeInvalid,
+					Detail: fmt.Sprintf("validation failed due to running out of cost budget, no further validation rules will be run"),
+				}
+			}
+			remainingBudget -= compositionCost
+		}
 		elapsed := time.Since(t1)
 		evaluation.Elapsed = elapsed
 		if evalDetails == nil {

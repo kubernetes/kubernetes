@@ -247,6 +247,16 @@ type ValidatingAdmissionPolicySpec struct {
 	// A maximum of 20 auditAnnotation are allowed per ValidatingAdmissionPolicy.
 	// +optional
 	AuditAnnotations []AuditAnnotation
+
+	// Variables contain definitions of variables that can be used in composition of other expressions.
+	// Each variable is defined as a named CEL expression.
+	// The variables defined here will be available under `variables` in other expressions of the policy
+	// except MatchConditions because MatchConditions are evaluated before the rest of the policy.
+	//
+	// The expression of a variable can refer to other variables defined earlier in the list but not those after.
+	// Thus, Variables must be sorted by the order of first appearance and acyclic.
+	// +optional
+	Variables []Variable
 }
 
 // ParamKind is a tuple of Group Kind and Version.
@@ -271,6 +281,8 @@ type Validation struct {
 	//'oldObject' - The existing object. The value is null for CREATE requests.
 	//'request' - Attributes of the API request([ref](/pkg/apis/admission/types.go#AdmissionRequest)).
 	//'params' - Parameter resource referred to by the policy binding being evaluated. Only populated if the policy has a ParamKind.
+	//'variables' - Map of composited variables, from its name to its lazily evaluated value.
+	//  For example, a variable named 'foo' can be accessed as 'variables.foo'
 	// - 'authorizer' - A CEL Authorizer. May be used to perform authorization checks for the principal (user or service account) of the request.
 	//   See https://pkg.go.dev/k8s.io/apiserver/pkg/cel/library#Authz
 	// - 'authorizer.requestResource' - A CEL ResourceCheck constructed from the 'authorizer' and configured with the
@@ -332,6 +344,19 @@ type Validation struct {
 	// "object.x must be less than max ("+string(params.max)+")"
 	// +optional
 	MessageExpression string
+}
+
+// Variable is the definition of a variable that is used for composition. A variable is defined as a named expression.
+// +structType=atomic
+type Variable struct {
+	// Name is the name of the variable. The name must be a valid CEL identifier and unique among all variables.
+	// The variable can be accessed in other expressions through `variables`
+	// For example, if name is "foo", the variable will be available as `variables.foo`
+	Name string
+
+	// Expression is the expression that will be evaluated as the value of the variable.
+	// The CEL expression has access to the same identifiers as the CEL expressions in Validation.
+	Expression string
 }
 
 // AuditAnnotation describes how to produce an audit annotation for an API request.
@@ -1065,6 +1090,8 @@ type MatchCondition struct {
 	//   See https://pkg.go.dev/k8s.io/apiserver/pkg/cel/library#Authz
 	// 'authorizer.requestResource' - A CEL ResourceCheck constructed from the 'authorizer' and configured with the
 	//   request resource.
+	// 'variables' - Map of composited variables, from its name to its lazily evaluated value.
+	//   For example, a variable named 'foo' can be access as 'variables.foo'
 	// Documentation on CEL: https://kubernetes.io/docs/reference/using-api/cel/
 	//
 	// Required.

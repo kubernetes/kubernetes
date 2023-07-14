@@ -61,6 +61,24 @@ func (v *AuditAnnotationCondition) ReturnTypes() []*celgo.Type {
 	return []*celgo.Type{celgo.StringType, celgo.NullType}
 }
 
+// Variable is a named expression for composition.
+type Variable struct {
+	Name       string
+	Expression string
+}
+
+func (v *Variable) GetExpression() string {
+	return v.Expression
+}
+
+func (v *Variable) ReturnTypes() []*celgo.Type {
+	return []*celgo.Type{celgo.AnyType, celgo.DynType}
+}
+
+func (v *Variable) GetName() string {
+	return v.Name
+}
+
 // Matcher is used for matching ValidatingAdmissionPolicy and ValidatingAdmissionPolicyBinding to attributes
 type Matcher interface {
 	admission.InitializationValidator

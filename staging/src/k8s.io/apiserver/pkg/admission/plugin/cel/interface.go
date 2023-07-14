@@ -35,6 +35,13 @@ type ExpressionAccessor interface {
 	ReturnTypes() []*cel.Type
 }
 
+// NamedExpressionAccessor extends NamedExpressionAccessor with a name.
+type NamedExpressionAccessor interface {
+	ExpressionAccessor
+
+	GetName() string // follows the naming convention of ExpressionAccessor
+}
+
 // EvaluationResult contains the minimal required fields and metadata of a cel evaluation
 type EvaluationResult struct {
 	EvalResult         ref.Val

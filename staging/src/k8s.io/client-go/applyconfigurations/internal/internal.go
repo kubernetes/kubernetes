@@ -464,6 +464,14 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.admissionregistration.v1alpha1.Validation
           elementRelationship: atomic
+    - name: variables
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.admissionregistration.v1alpha1.Variable
+          elementRelationship: associative
+          keys:
+          - name
 - name: io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyStatus
   map:
     fields:
@@ -497,6 +505,17 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: reason
       type:
         scalar: string
+- name: io.k8s.api.admissionregistration.v1alpha1.Variable
+  map:
+    fields:
+    - name: expression
+      type:
+        scalar: string
+      default: ""
+    - name: name
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.admissionregistration.v1beta1.MatchCondition
   map:
     fields:
