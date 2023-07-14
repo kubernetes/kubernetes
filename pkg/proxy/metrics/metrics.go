@@ -160,12 +160,25 @@ var (
 		},
 	)
 
-	// IptablesRulesTotal is the number of iptables rules that the iptables proxy installs.
+	// IptablesRulesTotal is the total number of iptables rules that the iptables
+	// proxy has installed.
 	IptablesRulesTotal = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      kubeProxySubsystem,
 			Name:           "sync_proxy_rules_iptables_total",
-			Help:           "Number of proxy iptables rules programmed",
+			Help:           "Total number of iptables rules owned by kube-proxy",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"table"},
+	)
+
+	// IptablesRulesLastSync is the number of iptables rules that the iptables proxy
+	// updated in the last sync.
+	IptablesRulesLastSync = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "sync_proxy_rules_iptables_last",
+			Help:           "Number of iptables rules written by kube-proxy in last sync",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"table"},
@@ -212,6 +225,7 @@ func RegisterMetrics() {
 		legacyregistry.MustRegister(ServiceChangesPending)
 		legacyregistry.MustRegister(ServiceChangesTotal)
 		legacyregistry.MustRegister(IptablesRulesTotal)
+		legacyregistry.MustRegister(IptablesRulesLastSync)
 		legacyregistry.MustRegister(IptablesRestoreFailuresTotal)
 		legacyregistry.MustRegister(IptablesPartialRestoreFailuresTotal)
 		legacyregistry.MustRegister(SyncProxyRulesLastQueuedTimestamp)
