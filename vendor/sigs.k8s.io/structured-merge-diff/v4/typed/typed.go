@@ -45,6 +45,10 @@ func AsTyped(v value.Value, s *schema.Schema, typeRef schema.TypeRef) (*TypedVal
 // conforms to the schema, for cases where that has already been checked or
 // where you're going to call a method that validates as a side-effect (like
 // ToFieldSet).
+//
+// Deprecated: This function was initially created because validation
+// was expensive. Now that this has been solved, objects should always
+// be created as validated, using `AsTyped`.
 func AsTypedUnvalidated(v value.Value, s *schema.Schema, typeRef schema.TypeRef) *TypedValue {
 	tv := &TypedValue{
 		value:   v,
@@ -125,12 +129,13 @@ func (tv TypedValue) Compare(rhs *TypedValue) (c *Comparison, err error) {
 		Modified: fieldpath.NewSet(),
 		Added:    fieldpath.NewSet(),
 	}
+	a := value.NewFreelistAllocator()
 	_, err = merge(&tv, rhs, func(w *mergingWalker) {
 		if w.lhs == nil {
 			c.Added.Insert(w.path)
 		} else if w.rhs == nil {
 			c.Removed.Insert(w.path)
-		} else if !value.Equals(w.rhs, w.lhs) {
+		} else if !value.EqualsUsing(a, w.rhs, w.lhs) {
 			// TODO: Equality is not sufficient for this.
 			// Need to implement equality check on the value type.
 			c.Modified.Insert(w.path)
