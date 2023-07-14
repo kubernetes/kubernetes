@@ -132,7 +132,10 @@ func (d *textDecoder) Decode(v *dto.MetricFamily) error {
 	}
 	// Pick off one MetricFamily per Decode until there's nothing left.
 	for key, fam := range d.fams {
-		*v = *fam
+		v.Name = fam.Name
+		v.Help = fam.Help
+		v.Type = fam.Type
+		v.Metric = fam.Metric
 		delete(d.fams, key)
 		return nil
 	}
