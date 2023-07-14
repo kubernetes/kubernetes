@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"io"
 
+	admissionmetrics "k8s.io/apiserver/pkg/admission/metrics"
+
 	admissionv1 "k8s.io/api/admission/v1"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	v1 "k8s.io/api/admissionregistration/v1"
@@ -217,7 +219,7 @@ func (a *Webhook) ShouldCallHook(ctx context.Context, h webhook.WebhookAccessor,
 	if matchObjErr != nil {
 		return nil, matchObjErr
 	}
-
+	//TODO: maybe this sould be before the invocations are created
 	matchConditions := h.GetMatchConditions()
 	if len(matchConditions) > 0 {
 		versionedAttr, err := v.VersionedAttribute(invocation.Kind)
@@ -232,6 +234,7 @@ func (a *Webhook) ShouldCallHook(ctx context.Context, h webhook.WebhookAccessor,
 			klog.Warningf("Failed evaluating match conditions, failing closed %v: %v", h.GetName(), matchResult.Error)
 			return nil, apierrors.NewForbidden(attr.GetResource().GroupResource(), attr.GetName(), matchResult.Error)
 		} else if !matchResult.Matches {
+			admissionmetrics.Metrics.ObserveMatchConditionExclusion(ctx, h.GetName(), "webhook", h.GetType(), string(attr.GetOperation()))
 			// if no match, always skip webhook
 			return nil, nil
 		}

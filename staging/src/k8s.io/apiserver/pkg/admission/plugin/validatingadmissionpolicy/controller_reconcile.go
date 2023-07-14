@@ -481,7 +481,7 @@ func (c *policyController) latestPolicyData() []policyData {
 					for i := range matchConditions {
 						matchExpressionAccessors[i] = (*matchconditions.MatchCondition)(&matchConditions[i])
 					}
-					matcher = matchconditions.NewMatcher(filterCompiler.Compile(matchExpressionAccessors, optionalVars, environment.StoredExpressions), failurePolicy, "validatingadmissionpolicy", definitionInfo.lastReconciledValue.Name)
+					matcher = matchconditions.NewMatcher(filterCompiler.Compile(matchExpressionAccessors, optionalVars, environment.StoredExpressions), failurePolicy, "policy", "validate", definitionInfo.lastReconciledValue.Name)
 				}
 				bindingInfo.validator = c.newValidator(
 					filterCompiler.Compile(convertv1alpha1Validations(definitionInfo.lastReconciledValue.Spec.Validations), optionalVars, environment.StoredExpressions),
