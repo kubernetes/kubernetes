@@ -80,6 +80,9 @@ type WebhookAccessor interface {
 	GetMutatingWebhook() (*v1.MutatingWebhook, bool)
 	// GetValidatingWebhook if the accessor contains a ValidatingWebhook, returns it and true, else returns false.
 	GetValidatingWebhook() (*v1.ValidatingWebhook, bool)
+
+	// GetType returns the type of the accessor (validate or admit)
+	GetType() string
 }
 
 // NewMutatingWebhookAccessor creates an accessor for a MutatingWebhook.
@@ -123,6 +126,10 @@ func (m *mutatingWebhookAccessor) GetRESTClient(clientManager *webhookutil.Clien
 	return m.client, m.clientErr
 }
 
+func (m *mutatingWebhookAccessor) GetType() string {
+	return "admit"
+}
+
 func (m *mutatingWebhookAccessor) GetCompiledMatcher(compiler cel.FilterCompiler) matchconditions.Matcher {
 	m.compileMatcher.Do(func() {
 		expressions := make([]cel.ExpressionAccessor, len(m.MutatingWebhook.MatchConditions))
@@ -139,7 +146,7 @@ func (m *mutatingWebhookAccessor) GetCompiledMatcher(compiler cel.FilterCompiler
 				HasAuthorizer: true,
 			},
 			environment.StoredExpressions,
-		), m.FailurePolicy, "validating", m.Name)
+		), m.FailurePolicy, "webhook", "admit", m.Name)
 	})
 	return m.compiledMatcher
 }
@@ -267,7 +274,7 @@ func (v *validatingWebhookAccessor) GetCompiledMatcher(compiler cel.FilterCompil
 				HasAuthorizer: true,
 			},
 			environment.StoredExpressions,
-		), v.FailurePolicy, "validating", v.Name)
+		), v.FailurePolicy, "webhook", "validating", v.Name)
 	})
 	return v.compiledMatcher
 }
@@ -284,6 +291,10 @@ func (v *validatingWebhookAccessor) GetParsedObjectSelector() (labels.Selector, 
 		v.objectSelector, v.objectSelectorErr = metav1.LabelSelectorAsSelector(v.ObjectSelector)
 	})
 	return v.objectSelector, v.objectSelectorErr
+}
+
+func (m *validatingWebhookAccessor) GetType() string {
+	return "validate"
 }
 
 func (v *validatingWebhookAccessor) GetName() string {
