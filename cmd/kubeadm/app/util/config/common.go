@@ -291,7 +291,7 @@ func MigrateOldConfig(oldConfig []byte, allowExperimental bool) ([]byte, error) 
 
 	// Migrate ResetConfiguration if there is any
 	if kubeadmutil.GroupVersionKindsHasResetConfiguration(gvks...) {
-		o, err := documentMapToResetConfiguration(gvkmap, true, allowExperimental)
+		o, err := documentMapToResetConfiguration(gvkmap, true, allowExperimental, true)
 		if err != nil {
 			return []byte{}, err
 		}
@@ -332,6 +332,13 @@ func ValidateConfig(config []byte, allowExperimental bool) error {
 	// Validate JoinConfiguration if there is any
 	if kubeadmutil.GroupVersionKindsHasJoinConfiguration(gvks...) {
 		if _, err := documentMapToJoinConfiguration(gvkmap, true, allowExperimental, true); err != nil {
+			return err
+		}
+	}
+
+	// Validate ResetConfiguration if there is any
+	if kubeadmutil.GroupVersionKindsHasResetConfiguration(gvks...) {
+		if _, err := documentMapToResetConfiguration(gvkmap, true, allowExperimental, true); err != nil {
 			return err
 		}
 	}

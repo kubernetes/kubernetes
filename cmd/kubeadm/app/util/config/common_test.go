@@ -575,6 +575,35 @@ func TestValidateConfig(t *testing.T) {
 			expectedError:     true,
 			allowExperimental: false,
 		},
+		{
+			name: "valid ResetConfiguration",
+			cfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
+			kind: ResetConfiguration
+			force: true
+			`, gvExperimental)),
+			expectedError:     false,
+			allowExperimental: true,
+		},
+		{
+			name: "invalid field in ResetConfiguration",
+			cfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
+			kind: ResetConfiguration
+			foo: bar
+			`, gvExperimental)),
+			expectedError:     true,
+			allowExperimental: true,
+		},
+		{
+			name: "experimental API is not allowed in ResetConfiguration",
+			cfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
+			kind: ResetConfiguration
+			`, gvExperimental)),
+			expectedError:     true,
+			allowExperimental: false,
+		},
 	}
 
 	for _, test := range tests {
