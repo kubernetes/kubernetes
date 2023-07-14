@@ -854,6 +854,9 @@ func queueSetCompleterForPL(qsf fq.QueueSetFactory, queues fq.QueueSet, pl *flow
 	if (pl.Spec.Type == flowcontrol.PriorityLevelEnablementLimited) != (pl.Spec.Limited != nil) {
 		return nil, errors.New("broken union structure at the top, for Limited")
 	}
+	if (pl.Spec.Type == flowcontrol.PriorityLevelEnablementExempt) != (pl.Spec.Exempt != nil) {
+		return nil, errors.New("broken union structure at the top, for Exempt")
+	}
 	if (pl.Spec.Type == flowcontrol.PriorityLevelEnablementExempt) != (pl.Name == flowcontrol.PriorityLevelConfigurationNameExempt) {
 		// This package does not attempt to cope with a priority level dynamically switching between exempt and not.
 		return nil, errors.New("non-alignment between name and type")
@@ -946,9 +949,8 @@ func (meal *cfgMeal) imaginePL(proto *flowcontrol.PriorityLevelConfiguration, re
 		seatDemandIntegrator:   seatDemandIntegrator,
 		seatDemandRatioedGauge: seatDemandRatioedGauge,
 	}
-	if proto.Spec.Limited != nil {
-		meal.shareSum += float64(proto.Spec.Limited.NominalConcurrencyShares)
-	}
+	nominalConcurrencyShares, _, _ := plSpecCommons(proto)
+	meal.shareSum += float64(nominalConcurrencyShares)
 }
 
 // startRequest classifies and, if appropriate, enqueues the request.
@@ -1090,6 +1092,10 @@ func plSpecCommons(pl *flowcontrol.PriorityLevelConfiguration) (int32, *int32, *
 	if limiter := pl.Spec.Limited; limiter != nil {
 		return limiter.NominalConcurrencyShares, limiter.LendablePercent, limiter.BorrowingLimitPercent
 	}
-	var zero int32
-	return 0, &zero, &zero
+	limiter := pl.Spec.Exempt
+	var nominalConcurrencyShares int32
+	if limiter.NominalConcurrencyShares != nil {
+		nominalConcurrencyShares = *limiter.NominalConcurrencyShares
+	}
+	return nominalConcurrencyShares, limiter.LendablePercent, nil
 }

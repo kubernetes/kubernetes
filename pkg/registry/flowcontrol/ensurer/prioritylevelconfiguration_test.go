@@ -35,6 +35,14 @@ import (
 )
 
 func TestEnsurePriorityLevel(t *testing.T) {
+	validExemptPL := func() *flowcontrolv1beta3.PriorityLevelConfiguration {
+		copy := bootstrap.MandatoryPriorityLevelConfigurationExempt.DeepCopy()
+		copy.Annotations[flowcontrolv1beta3.AutoUpdateAnnotationKey] = "true"
+		copy.Spec.Exempt.NominalConcurrencyShares = pointer.Int32(10)
+		copy.Spec.Exempt.LendablePercent = pointer.Int32(50)
+		return copy
+	}()
+
 	tests := []struct {
 		name      string
 		strategy  func() EnsureStrategy[*flowcontrolv1beta3.PriorityLevelConfiguration]
@@ -86,6 +94,15 @@ func TestEnsurePriorityLevel(t *testing.T) {
 			bootstrap: newPLConfiguration("pl1").WithLimited(20).Object(),
 			current:   newPLConfiguration("pl1").WithAutoUpdateAnnotation("false").WithLimited(10).Object(),
 			expected:  newPLConfiguration("pl1").WithAutoUpdateAnnotation("true").WithLimited(20).Object(),
+		},
+		{
+			name:     "admin changes the Exempt field of the exempt priority level configuration",
+			strategy: NewMandatoryEnsureStrategy[*flowcontrolv1beta3.PriorityLevelConfiguration],
+			bootstrap: func() *flowcontrolv1beta3.PriorityLevelConfiguration {
+				return bootstrap.MandatoryPriorityLevelConfigurationExempt
+			}(),
+			current:  validExemptPL,
+			expected: validExemptPL,
 		},
 	}
 
@@ -264,6 +281,41 @@ func TestPriorityLevelSpecChanged(t *testing.T) {
 			},
 		},
 	}
+	ple1 := &flowcontrolv1beta3.PriorityLevelConfiguration{
+		ObjectMeta: metav1.ObjectMeta{Name: "exempt"},
+		Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
+			Type: flowcontrolv1beta3.PriorityLevelEnablementExempt,
+			Exempt: &flowcontrolv1beta3.ExemptPriorityLevelConfiguration{
+				NominalConcurrencyShares: pointer.Int32(42),
+				LendablePercent:          pointer.Int32(33),
+			},
+		},
+	}
+	ple2 := &flowcontrolv1beta3.PriorityLevelConfiguration{
+		ObjectMeta: metav1.ObjectMeta{Name: "exempt"},
+		Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
+			Type: flowcontrolv1beta3.PriorityLevelEnablementExempt,
+			Exempt: &flowcontrolv1beta3.ExemptPriorityLevelConfiguration{
+				NominalConcurrencyShares: pointer.Int32(24),
+				LendablePercent:          pointer.Int32(86),
+			},
+		},
+	}
+	pleWrong := &flowcontrolv1beta3.PriorityLevelConfiguration{
+		ObjectMeta: metav1.ObjectMeta{Name: "exempt"},
+		Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
+			Type: flowcontrolv1beta3.PriorityLevelEnablementLimited,
+			Limited: &flowcontrolv1beta3.LimitedPriorityLevelConfiguration{
+				NominalConcurrencyShares: 1,
+			},
+		},
+	}
+	pleInvalid := &flowcontrolv1beta3.PriorityLevelConfiguration{
+		ObjectMeta: metav1.ObjectMeta{Name: "exempt"},
+		Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
+			Type: "widget",
+		},
+	}
 	testCases := []struct {
 		name        string
 		expected    *flowcontrolv1beta3.PriorityLevelConfiguration
@@ -288,10 +340,28 @@ func TestPriorityLevelSpecChanged(t *testing.T) {
 			actual:      pl2,
 			specChanged: true,
 		},
+		{
+			name:        "tweaked exempt config",
+			expected:    ple1,
+			actual:      ple2,
+			specChanged: false,
+		},
+		{
+			name:        "exempt with wrong tag",
+			expected:    ple1,
+			actual:      pleWrong,
+			specChanged: true,
+		},
+		{
+			name:        "exempt with invalid tag",
+			expected:    ple1,
+			actual:      pleInvalid,
+			specChanged: true,
+		},
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			w := !plcSpecEqual(testCase.expected, testCase.actual)
+			w := !plcSpecEqualish(testCase.expected, testCase.actual)
 			if testCase.specChanged != w {
 				t.Errorf("Expected priorityLevelSpecChanged to return %t, but got: %t - diff: %s", testCase.specChanged, w,
 					cmp.Diff(testCase.expected, testCase.actual))
