@@ -30,10 +30,10 @@ const (
 )
 
 var (
-	alphaOptions = sets.NewString(
+	alphaOptions = sets.NewString()
+	betaOptions  = sets.NewString(
 		PreferClosestNUMANodes,
 	)
-	betaOptions   = sets.NewString()
 	stableOptions = sets.NewString()
 )
 

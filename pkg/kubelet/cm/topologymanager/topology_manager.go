@@ -21,7 +21,7 @@ import (
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -133,10 +133,9 @@ var _ Manager = &manager{}
 
 // NewManager creates a new TopologyManager based on provided policy and scope
 func NewManager(topology []cadvisorapi.Node, topologyPolicyName string, topologyScopeName string, topologyPolicyOptions map[string]string) (Manager, error) {
-	klog.InfoS("Creating topology manager with policy per scope", "topologyPolicyName", topologyPolicyName, "topologyScopeName", topologyScopeName)
-
 	// When policy is none, the scope is not relevant, so we can short circuit here.
 	if topologyPolicyName == PolicyNone {
+		klog.InfoS("Creating topology manager with none policy")
 		return &manager{scope: NewNoneScope()}, nil
 	}
 
@@ -144,6 +143,8 @@ func NewManager(topology []cadvisorapi.Node, topologyPolicyName string, topology
 	if err != nil {
 		return nil, err
 	}
+
+	klog.InfoS("Creating topology manager with policy per scope", "topologyPolicyName", topologyPolicyName, "topologyScopeName", topologyScopeName, "topologyPolicyOptions", opts)
 
 	numaInfo, err := NewNUMAInfo(topology, opts)
 	if err != nil {

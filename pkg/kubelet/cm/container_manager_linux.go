@@ -292,7 +292,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		machineInfo.Topology,
 		nodeConfig.TopologyManagerPolicy,
 		nodeConfig.TopologyManagerScope,
-		nodeConfig.ExperimentalTopologyManagerPolicyOptions,
+		nodeConfig.TopologyManagerPolicyOptions,
 	)
 
 	if err != nil {

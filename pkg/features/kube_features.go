@@ -1083,9 +1083,9 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	TopologyManagerPolicyAlphaOptions: {Default: false, PreRelease: featuregate.Alpha},
 
-	TopologyManagerPolicyBetaOptions: {Default: false, PreRelease: featuregate.Beta},
+	TopologyManagerPolicyBetaOptions: {Default: true, PreRelease: featuregate.Beta},
 
-	TopologyManagerPolicyOptions: {Default: false, PreRelease: featuregate.Alpha},
+	TopologyManagerPolicyOptions: {Default: true, PreRelease: featuregate.Beta},
 
 	VolumeCapacityPriority: {Default: false, PreRelease: featuregate.Alpha},
 
