@@ -78,7 +78,7 @@ const (
 	addedLabelValue         = "yes"
 )
 
-var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin][Feature:AdmissionWebhookMatchConditions]", func() {
+var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin][Alpha][Feature:AdmissionWebhookMatchConditions]", func() {
 	var certCtx *certContext
 	f := framework.NewDefaultFramework("webhook")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
