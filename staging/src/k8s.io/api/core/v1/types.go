@@ -534,7 +534,7 @@ type PersistentVolumeClaimSpec struct {
 	// +optional
 	DataSourceRef *TypedObjectReference `json:"dataSourceRef,omitempty" protobuf:"bytes,8,opt,name=dataSourceRef"`
 	// volumeAttributesClassName is the name of the VolumeAttributesClass required by the claim.
-	// If specified, the provisioner will create or update the volume with the attributes defined
+	// If specified, the csi-driver will create or update the volume with the attributes defined
 	// in the corresponding VolumeAttributesClass. Different with storageClassName, it can be
 	// changed after the claim is created but an empty string value is disallowed.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass
@@ -725,7 +725,7 @@ type PersistentVolumeClaimStatus struct {
 	// This is an alpha field and requires enabling VolumeAttributesClass feature.
 	// +featureGate=VolumeAttributesClassName
 	// +optional
-	VolumeAttributesClassName string `json:"volumeAttributesClassName,omitempty" protobuf:"bytes,8,opt,name=volumeAttributesClassName"`
+	VolumeAttributesClassName *string `json:"volumeAttributesClassName,omitempty" protobuf:"bytes,8,opt,name=volumeAttributesClassName"`
 	// modifyVolumeStatus stores status of modification operation.
 	// ModifyVolumeStatus is not set by default but when modification is complete, modifyVolumeStatus
 	// is set to empty string by the modify volume controller.

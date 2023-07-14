@@ -2832,6 +2832,12 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			enableVolumeArributesClass: true,
 			isExpectedFailure:          true,
 		},
+		"invalid-update-volume-attributes-class-without-featuregate-enabled": {
+			oldClaim:                   validClaimVolumeAttributesClass1,
+			newClaim:                   validClaimNilVolumeAttributesClass,
+			enableVolumeArributesClass: false,
+			isExpectedFailure:          true,
+		},
 	}
 
 	for name, scenario := range scenarios {
@@ -2921,6 +2927,15 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 		"volume attributes class allowed because feature enable": {
 			oldPvc:                      pvcWithVolumeAttributesClassName(utilpointer.String("foo")),
 			enableVolumeAttributesClass: true,
+			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
+				AllowReadWriteOncePod:             false,
+				EnableRecoverFromExpansionFailure: false,
+				EnableVolumeAttributesClass:       true,
+			},
+		},
+		"volume attributes class validated because used and feature disabled": {
+			oldPvc:                      pvcWithVolumeAttributesClassName(utilpointer.String("foo")),
+			enableVolumeAttributesClass: false,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
 				AllowReadWriteOncePod:             false,
 				EnableRecoverFromExpansionFailure: false,
@@ -21648,29 +21663,39 @@ func pvcSpecWithVolumeAttributesClassName(vacName *string) *core.PersistentVolum
 
 func TestVolumeAttributesClass(t *testing.T) {
 	testCases := []struct {
-		testName     string
-		expectedFail bool
-		claimSpec    *core.PersistentVolumeClaimSpec
+		testName                    string
+		expectedFail                bool
+		enableVolumeAttributesClass bool
+		claimSpec                   *core.PersistentVolumeClaimSpec
 	}{
 		{
-			testName:     "Feature gate enabled and valid no volumeAttributesClassName specified",
-			expectedFail: false,
-			claimSpec:    pvcSpecWithVolumeAttributesClassName(nil),
+			testName:                    "Feature gate enabled and valid no volumeAttributesClassName specified",
+			expectedFail:                false,
+			enableVolumeAttributesClass: true,
+			claimSpec:                   pvcSpecWithVolumeAttributesClassName(nil),
 		},
 		{
-			testName:     "Feature gate enabled and valid volumeAttributesClassName specified",
-			expectedFail: false,
-			claimSpec:    pvcSpecWithVolumeAttributesClassName(utilpointer.String("foo")),
+			testName:                    "Feature gate enabled and valid volumeAttributesClassName specified",
+			expectedFail:                false,
+			enableVolumeAttributesClass: true,
+			claimSpec:                   pvcSpecWithVolumeAttributesClassName(utilpointer.String("foo")),
 		},
 		{
-			testName:     "Feature gate enabled and invalid volumeAttributesClassName specified",
-			expectedFail: true,
-			claimSpec:    pvcSpecWithVolumeAttributesClassName(utilpointer.String("")),
+			testName:                    "Feature gate enabled and invalid volumeAttributesClassName specified",
+			expectedFail:                true,
+			enableVolumeAttributesClass: true,
+			claimSpec:                   pvcSpecWithVolumeAttributesClassName(utilpointer.String("")),
+		},
+		{
+			testName:                    "Feature gate disabled and valid volumeAttributesClassName specified",
+			expectedFail:                false,
+			enableVolumeAttributesClass: true,
+			claimSpec:                   pvcSpecWithVolumeAttributesClassName(utilpointer.String("foo")),
 		},
 	}
 	for _, tc := range testCases {
 		opts := PersistentVolumeClaimSpecValidationOptions{
-			EnableVolumeAttributesClass: true,
+			EnableVolumeAttributesClass: tc.enableVolumeAttributesClass,
 		}
 		if tc.expectedFail {
 			if errs := ValidatePersistentVolumeClaimSpec(tc.claimSpec, field.NewPath("spec"), opts); len(errs) == 0 {

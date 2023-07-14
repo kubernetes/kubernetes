@@ -23309,7 +23309,7 @@ func schema_k8sio_api_core_v1_PersistentVolumeClaimSpec(ref common.ReferenceCall
 					},
 					"volumeAttributesClassName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "volumeAttributesClassName is the name of the VolumeAttributesClass required by the claim. If specified, the provisioner will create or update the volume with the attributes defined in the corresponding VolumeAttributesClass. Different with storageClassName, it can be changed after the claim is created but an empty string value is disallowed. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass (Alpha) Using this field requires the VolumeAttributesClass feature gate to be enabled.",
+							Description: "volumeAttributesClassName is the name of the VolumeAttributesClass required by the claim. If specified, the csi-driver will create or update the volume with the attributes defined in the corresponding VolumeAttributesClass. Different with storageClassName, it can be changed after the claim is created but an empty string value is disallowed. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass (Alpha) Using this field requires the VolumeAttributesClass feature gate to be enabled.",
 							Type:        []string{"string"},
 							Format:      "",
 						},

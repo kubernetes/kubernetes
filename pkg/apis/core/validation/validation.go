@@ -2043,6 +2043,11 @@ func ValidationOptionsForPersistentVolumeClaim(pvc, oldPvc *core.PersistentVolum
 	// If the old object had an invalid API group in the data source or data source reference, continue to allow it in the new object
 	opts.AllowInvalidAPIGroupInDataSourceOrRef = allowInvalidAPIGroupInDataSourceOrRef(&oldPvc.Spec)
 
+	if oldPvc.Spec.VolumeAttributesClassName != nil {
+		// If the old object had a volume attributes class, continue to validate it in the new object.
+		opts.EnableVolumeAttributesClass = true
+	}
+
 	labelSelectorValidationOpts := unversionedvalidation.LabelSelectorValidationOptions{
 		AllowInvalidLabelValueInSelector: opts.AllowInvalidLabelValueInSelector,
 	}

@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Kubernetes Authors.
+Copyright 2023 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,35 +19,30 @@ package util
 import (
 	"sort"
 
-	storagev1 "k8s.io/api/storage/v1"
+	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	storagev1listers "k8s.io/client-go/listers/storage/v1"
+	storagev1alpha1listers "k8s.io/client-go/listers/storage/v1alpha1"
 	"k8s.io/klog/v2"
 )
 
 const (
-	// isDefaultStorageClassAnnotation represents a StorageClass annotation that
-	// marks a class as the default StorageClass
-	IsDefaultStorageClassAnnotation = "storageclass.kubernetes.io/is-default-class"
-
-	// betaIsDefaultStorageClassAnnotation is the beta version of IsDefaultStorageClassAnnotation.
-	// TODO: remove Beta when no longer used
-	BetaIsDefaultStorageClassAnnotation = "storageclass.beta.kubernetes.io/is-default-class"
+	// AlphaIsDefaultVolumeAttributesClassAnnotation is the alpha version of IsDefaultVolumeAttributesClassAnnotation.
+	AlphaIsDefaultVolumeAttributesClassAnnotation = "volumeattributesclass.alpha.kubernetes.io/is-default-class"
 )
 
-// GetDefaultClass returns the default StorageClass from the store, or nil.
-func GetDefaultClass(lister storagev1listers.StorageClassLister) (*storagev1.StorageClass, error) {
+// GetDefaultVolumeAttributesClass returns the default VolumeAttributesClass from the store, or nil.
+func GetDefaultVolumeAttributesClass(lister storagev1alpha1listers.VolumeAttributesClassLister) (*storagev1alpha1.VolumeAttributesClass, error) {
 	list, err := lister.List(labels.Everything())
 	if err != nil {
 		return nil, err
 	}
 
-	defaultClasses := []*storagev1.StorageClass{}
+	defaultClasses := []*storagev1alpha1.VolumeAttributesClass{}
 	for _, class := range list {
-		if IsDefaultAnnotation(class.ObjectMeta) {
+		if IsDefaultVolumeAttributesClassAnnotation(class.ObjectMeta) {
 			defaultClasses = append(defaultClasses, class)
-			klog.V(4).Infof("GetDefaultClass added: %s", class.Name)
+			klog.V(4).Infof("GetDefaultVolumeAttributesClass added: %s", class.Name)
 		}
 	}
 
@@ -64,22 +59,14 @@ func GetDefaultClass(lister storagev1listers.StorageClassLister) (*storagev1.Sto
 		return defaultClasses[i].CreationTimestamp.UnixNano() > defaultClasses[j].CreationTimestamp.UnixNano()
 	})
 	if len(defaultClasses) > 1 {
-		klog.V(4).Infof("%d default StorageClasses were found, choosing: %s", len(defaultClasses), defaultClasses[0].Name)
+		klog.V(4).Infof("%d default VolumeAttributesClass were found, choosing: %s", len(defaultClasses), defaultClasses[0].Name)
 	}
 
 	return defaultClasses[0], nil
 }
 
-// IsDefaultAnnotation returns a boolean if the default storage class
-// annotation is set
-// TODO: remove Beta when no longer needed
-func IsDefaultAnnotation(obj metav1.ObjectMeta) bool {
-	if obj.Annotations[IsDefaultStorageClassAnnotation] == "true" {
-		return true
-	}
-	if obj.Annotations[BetaIsDefaultStorageClassAnnotation] == "true" {
-		return true
-	}
-
-	return false
+// IsDefaultVolumeAttributesClassAnnotation returns a boolean if the default
+// volume attributes class annotation is set
+func IsDefaultVolumeAttributesClassAnnotation(obj metav1.ObjectMeta) bool {
+	return obj.Annotations[AlphaIsDefaultVolumeAttributesClassAnnotation] == "true"
 }
