@@ -232,7 +232,7 @@ func Test_InFlightPods(t *testing.T) {
 				},
 			},
 			wantReceivedEvents: clusterEventsToList([]*clusterEvent{
-				{event: PvAdd, requestCycle: 2, inFlightPodsNum: 1},
+				{event: PvAdd, inFlightPodsNum: 1},
 			}),
 		},
 		{
@@ -252,12 +252,12 @@ func Test_InFlightPods(t *testing.T) {
 			wantInFlightPods: map[types.UID]inFlightPod{
 				"pod2": {
 					// When pod is enqueued back to queue, inFlightPodsNum in previousEvent is also updated to 0.
-					previousEvent: &list.Element{Value: &clusterEvent{event: PvAdd, requestCycle: 2, inFlightPodsNum: 0}},
+					previousEvent: &list.Element{Value: &clusterEvent{event: PvAdd, inFlightPodsNum: 0}},
 				},
 			},
 			wantReceivedEvents: clusterEventsToList([]*clusterEvent{
 				// event: PvAdd is removed when pod is enqueued back to queue.
-				{event: NodeAdd, requestCycle: 3, inFlightPodsNum: 1}, // inFlightPodsNum is updated from 2 to 1.
+				{event: NodeAdd, inFlightPodsNum: 1}, // inFlightPodsNum is updated from 2 to 1.
 			}),
 		},
 		{
@@ -307,13 +307,13 @@ func Test_InFlightPods(t *testing.T) {
 					// no previousEvent
 				},
 				"pod3": {
-					previousEvent: &list.Element{Value: &clusterEvent{event: NodeAdd, requestCycle: 3, inFlightPodsNum: 1}},
+					previousEvent: &list.Element{Value: &clusterEvent{event: NodeAdd, inFlightPodsNum: 1}},
 				},
 			},
 			wantReceivedEvents: clusterEventsToList([]*clusterEvent{
-				{event: PvAdd, requestCycle: 2, inFlightPodsNum: 1},
-				{event: NodeAdd, requestCycle: 3, inFlightPodsNum: 1},
-				{event: AssignedPodAdd, requestCycle: 4, inFlightPodsNum: 2},
+				{event: PvAdd, inFlightPodsNum: 1},
+				{event: NodeAdd, inFlightPodsNum: 1},
+				{event: AssignedPodAdd, inFlightPodsNum: 2},
 			}),
 		},
 		{
