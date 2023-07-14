@@ -30,14 +30,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
+	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/testing/defaults"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -657,9 +660,10 @@ const (
 
 func Test_buildQueueingHintMap(t *testing.T) {
 	tests := []struct {
-		name    string
-		plugins []framework.Plugin
-		want    map[framework.ClusterEvent][]*internalqueue.QueueingHintFunction
+		name                string
+		plugins             []framework.Plugin
+		want                map[framework.ClusterEvent][]*internalqueue.QueueingHintFunction
+		featuregateDisabled bool
 	}{
 		{
 			name:    "no-op plugin",
@@ -760,10 +764,60 @@ func Test_buildQueueingHintMap(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:                "node and pod plugin (featuregate is disabled)",
+			plugins:             []framework.Plugin{&fakeNodePlugin{}, &fakePodPlugin{}},
+			featuregateDisabled: true,
+			want: map[framework.ClusterEvent][]*internalqueue.QueueingHintFunction{
+				{Resource: framework.Pod, ActionType: framework.All}: {
+					{PluginName: fakeBind, QueueingHintFn: defaultQueueingHintFn},
+					{PluginName: queueSort, QueueingHintFn: defaultQueueingHintFn},
+				},
+				{Resource: framework.Pod, ActionType: framework.Add}: {
+					{PluginName: fakePod, QueueingHintFn: defaultQueueingHintFn}, // default queueing hint due to disabled feature gate.
+				},
+				{Resource: framework.Node, ActionType: framework.All}: {
+					{PluginName: fakeBind, QueueingHintFn: defaultQueueingHintFn},
+					{PluginName: queueSort, QueueingHintFn: defaultQueueingHintFn},
+				},
+				{Resource: framework.Node, ActionType: framework.Add}: {
+					{PluginName: fakeNode, QueueingHintFn: defaultQueueingHintFn}, // default queueing hint due to disabled feature gate.
+				},
+				{Resource: framework.CSINode, ActionType: framework.All}: {
+					{PluginName: fakeBind, QueueingHintFn: defaultQueueingHintFn},
+					{PluginName: queueSort, QueueingHintFn: defaultQueueingHintFn},
+				},
+				{Resource: framework.CSIDriver, ActionType: framework.All}: {
+					{PluginName: fakeBind, QueueingHintFn: defaultQueueingHintFn},
+					{PluginName: queueSort, QueueingHintFn: defaultQueueingHintFn},
+				},
+				{Resource: framework.CSIStorageCapacity, ActionType: framework.All}: {
+					{PluginName: fakeBind, QueueingHintFn: defaultQueueingHintFn},
+					{PluginName: queueSort, QueueingHintFn: defaultQueueingHintFn},
+				},
+				{Resource: framework.PersistentVolume, ActionType: framework.All}: {
+					{PluginName: fakeBind, QueueingHintFn: defaultQueueingHintFn},
+					{PluginName: queueSort, QueueingHintFn: defaultQueueingHintFn},
+				},
+				{Resource: framework.StorageClass, ActionType: framework.All}: {
+					{PluginName: fakeBind, QueueingHintFn: defaultQueueingHintFn},
+					{PluginName: queueSort, QueueingHintFn: defaultQueueingHintFn},
+				},
+				{Resource: framework.PersistentVolumeClaim, ActionType: framework.All}: {
+					{PluginName: fakeBind, QueueingHintFn: defaultQueueingHintFn},
+					{PluginName: queueSort, QueueingHintFn: defaultQueueingHintFn},
+				},
+				{Resource: framework.PodSchedulingContext, ActionType: framework.All}: {
+					{PluginName: fakeBind, QueueingHintFn: defaultQueueingHintFn},
+					{PluginName: queueSort, QueueingHintFn: defaultQueueingHintFn},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, !tt.featuregateDisabled)()
 			logger, _ := ktesting.NewTestContext(t)
 			registry := frameworkruntime.Registry{}
 			cfgPls := &schedulerapi.Plugins{}
