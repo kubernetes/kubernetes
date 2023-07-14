@@ -465,5 +465,35 @@ type ComponentConfig interface {
 	Get() interface{}
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ResetConfiguration contains a list of fields that are specifically "kubeadm reset"-only runtime information.
+type ResetConfiguration struct {
+	metav1.TypeMeta
+
+	// CertificatesDir specifies the directory where the certificates are stored. If specified, it will be cleaned during the reset process.
+	CertificatesDir string
+
+	// CleanupTmpDir specifies whether the "/etc/kubernetes/tmp" directory should be cleaned during the reset process.
+	CleanupTmpDir bool
+
+	// CRISocket is used to retrieve container runtime info and used for the removal of the containers.
+	// If CRISocket is not specified by flag or config file, kubeadm will try to detect one valid CRISocket instead.
+	CRISocket string
+
+	// DryRun tells if the dry run mode is enabled, don't apply any change if it is and just output what would be done.
+	DryRun bool
+
+	// Force flag instructs kubeadm to reset the node without prompting for confirmation.
+	Force bool
+
+	// IgnorePreflightErrors provides a slice of pre-flight errors to be ignored during the reset process, e.g. 'IsPrivilegedUser,Swap'.
+	IgnorePreflightErrors []string
+
+	// SkipPhases is a list of phases to skip during command execution.
+	// The list of phases can be obtained with the "kubeadm reset phase --help" command.
+	SkipPhases []string
+}
+
 // ComponentConfigMap is a map between a group name (as in GVK group) and a ComponentConfig
 type ComponentConfigMap map[string]ComponentConfig

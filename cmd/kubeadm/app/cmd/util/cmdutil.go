@@ -141,3 +141,12 @@ func GetClientSet(file string, dryRun bool) (clientset.Interface, error) {
 	}
 	return kubeconfigutil.ClientSetFromFile(file)
 }
+
+// ValueFromFlagsOrConfig checks if the "name" flag has been set. If yes, it returns the value of the flag, otherwise it returns the value from config.
+func ValueFromFlagsOrConfig(flagSet *pflag.FlagSet, name string, cfgValue interface{}, flagValue interface{}) interface{} {
+	if flagSet.Changed(name) {
+		return flagValue
+	}
+	// assume config has all the defaults set correctly.
+	return cfgValue
+}

@@ -91,7 +91,7 @@ func validateSupportedVersion(gv schema.GroupVersion, allowDeprecated, allowExpe
 	}
 
 	if _, present := deprecatedAPIVersions[gvString]; present && !allowDeprecated {
-		klog.Warningf("your configuration file uses a deprecated API spec: %q. Please use 'kubeadm config migrate --old-config old.yaml --new-config new.yaml', which will write the new, similar spec using a newer API version.", gv)
+		klog.Warningf("your configuration file uses a deprecated API spec: %q. Please use 'kubeadm config migrate --old-config old.yaml --new-config new.yaml', which will write the new, similar spec using a newer API version.", gv.String())
 	}
 
 	if _, present := experimentalAPIVersions[gvString]; present && !allowExperimental {

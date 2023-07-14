@@ -453,3 +453,40 @@ type Patches struct {
 	// +optional
 	Directory string `json:"directory,omitempty"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ResetConfiguration contains a list of fields that are specifically "kubeadm reset"-only runtime information.
+type ResetConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// CleanupTmpDir specifies whether the "/etc/kubernetes/tmp" directory should be cleaned during the reset process.
+	// +optional
+	CleanupTmpDir bool `json:"cleanupTmpDir,omitempty"`
+
+	// CertificatesDir specifies the directory where the certificates are stored. If specified, it will be cleaned during the reset process.
+	// +optional
+	CertificatesDir string `json:"certificatesDir,omitempty"`
+
+	// CRISocket is used to retrieve container runtime info and used for the removal of the containers.
+	// If CRISocket is not specified by flag or config file, kubeadm will try to detect one valid CRISocket instead.
+	// +optional
+	CRISocket string `json:"criSocket,omitempty"`
+
+	// DryRun tells if the dry run mode is enabled, don't apply any change if it is and just output what would be done.
+	// +optional
+	DryRun bool `json:"dryRun,omitempty"`
+
+	// Force flag instructs kubeadm to reset the node without prompting for confirmation.
+	// +optional
+	Force bool `json:"force,omitempty"`
+
+	// IgnorePreflightErrors provides a slice of pre-flight errors to be ignored during the reset process, e.g. 'IsPrivilegedUser,Swap'.
+	// +optional
+	IgnorePreflightErrors []string `json:"ignorePreflightErrors,omitempty"`
+
+	// SkipPhases is a list of phases to skip during command execution.
+	// The list of phases can be obtained with the "kubeadm reset phase --help" command.
+	// +optional
+	SkipPhases []string `json:"skipPhases,omitempty"`
+}
