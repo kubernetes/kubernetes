@@ -805,10 +805,20 @@ func (p *PriorityQueue) done(pod types.UID) {
 
 	// remove events which is only referred from this Pod
 	// so that the receivedEvents map doesn't grow infinitely.
+
+	// Find the event that we should start.
+	// case1. If the previousEvent is nil, it means no receivedEvents when this Pod's scheduling started.
+	//        We start from the first event in the receivedEvents.
+	// case2. If the previousEvent is not nil, but the inFlightPodsNum is 0,
+	//        this previousEvent is removed from the list already.
+	//        We start from the first event in the receivedEvents.
 	event := p.receivedEvents.Front()
-	if inFlightPod.previousEvent != nil && inFlightPod.previousEvent.Next() != nil {
+	if inFlightPod.previousEvent != nil && inFlightPod.previousEvent.Value.(*clusterEvent).inFlightPodsNum != 0 {
+		// case3. If the previousEvent is not nil, and the inFlightPodsNum is not 0,
+		//        we can start from the next event of the previousEvent.
 		event = inFlightPod.previousEvent.Next()
 	}
+
 	for event != nil {
 		e := event.Value.(*clusterEvent)
 		// decrement inFlightPodsNum on events that happened after the Pod is popped.

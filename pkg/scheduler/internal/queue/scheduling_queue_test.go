@@ -196,7 +196,6 @@ func Test_InFlightPods(t *testing.T) {
 	pod := st.MakePod().Name("targetpod").UID("pod1").Obj()
 	pod2 := st.MakePod().Name("targetpod2").UID("pod2").Obj()
 	pod3 := st.MakePod().Name("targetpod3").UID("pod3").Obj()
-	pod4 := st.MakePod().Name("targetpod4").UID("pod4").Obj()
 
 	type action struct {
 		// ONLY ONE of the following should be set.
@@ -218,42 +217,104 @@ func Test_InFlightPods(t *testing.T) {
 		wantReceivedEvents         *list.List
 	}{
 		{
-			name:        "Pods before enqueued back to queue should remain in inFlightPods with correct previousEvent",
-			initialPods: []*v1.Pod{pod, pod2, pod3, pod4},
+			name:        "Pod is registered in inFlightPods with no previousEvent if Pod is popped from activeQ while no receivedEvents",
+			initialPods: []*v1.Pod{pod},
 			actions: []action{
 				// This won't be added to receivedEvents because no inFlightPods at this point.
 				{eventHappens: &PvcAdd},
+				// This Pod has no previousEvent because no receivedEvents at this point.
 				{podPopped: pod},
-				// These two will be added to receivedEvents, but removed when `pod` is enqueued back to queue.
 				{eventHappens: &PvAdd},
-				{eventHappens: &NodeAdd},
-				{podPopped: pod2},
-				{podPopped: pod3},
-				// This will be added to receivedEvents, and not removed when `pod`` and `pod3` is enqueued back to queue
-				// because we need to keep it for pod2.
-				{eventHappens: &AssignedPodAdd},
-				{podEnqueued: newQueuedPodInfoForLookup(pod, "fooPlugin1")},
-				{podEnqueued: newQueuedPodInfoForLookup(pod3, "fooPlugin1")},
 			},
-			wantUnschedPodPoolPodNames: []string{"targetpod", "targetpod3"},
-			wantInFlightPods: map[types.UID]inFlightPod{"pod2": {
-				previousEvent: &list.Element{Value: &clusterEvent{event: NodeAdd, requestCycle: 2, inFlightPodsNum: 0}},
-			}},
-			wantReceivedEvents: clusterEventsToList([]*clusterEvent{
-				{event: AssignedPodAdd, requestCycle: 4, inFlightPodsNum: 1},
-			}),
-			queueingHintMap: QueueingHintMapPerProfile{
-				"": {
-					// fooPlugin1 has a queueing hint function for AssignedPodAdd,
-					// but hint fn tells that this event doesn't make a Pod scheudlable.
-					AssignedPodAdd: {
-						{
-							PluginName:     "fooPlugin1",
-							QueueingHintFn: queueHintReturnQueueSkip,
-						},
-					},
+			wantInFlightPods: map[types.UID]inFlightPod{
+				"pod1": {
+					// no previousEvent
 				},
 			},
+			wantReceivedEvents: clusterEventsToList([]*clusterEvent{
+				{event: PvAdd, requestCycle: 2, inFlightPodsNum: 1},
+			}),
+		},
+		{
+			name:        "Pod, registered in inFlightPods with no previousEvent, is enqueued back to activeQ",
+			initialPods: []*v1.Pod{pod, pod2},
+			actions: []action{
+				// This won't be added to receivedEvents because no inFlightPods at this point.
+				{eventHappens: &PvcAdd},
+				// This Pod has no previousEvent because no receivedEvents at this point.
+				{podPopped: pod},
+				{eventHappens: &PvAdd},
+				{podPopped: pod2},
+				{eventHappens: &NodeAdd},
+				{podEnqueued: newQueuedPodInfoForLookup(pod)},
+			},
+			wantBackoffQPodNames: []string{"targetpod"},
+			wantInFlightPods: map[types.UID]inFlightPod{
+				"pod2": {
+					// When pod is enqueued back to queue, inFlightPodsNum in previousEvent is also updated to 0.
+					previousEvent: &list.Element{Value: &clusterEvent{event: PvAdd, requestCycle: 2, inFlightPodsNum: 0}},
+				},
+			},
+			wantReceivedEvents: clusterEventsToList([]*clusterEvent{
+				// event: PvAdd is removed when pod is enqueued back to queue.
+				{event: NodeAdd, requestCycle: 3, inFlightPodsNum: 1}, // inFlightPodsNum is updated from 2 to 1.
+			}),
+		},
+		{
+			name:        "Pod registered in inFlightPods with previousEvent with inFlightPodsNum:0 is enqueued back to activeQ",
+			initialPods: []*v1.Pod{pod, pod2},
+			actions: []action{
+				// This won't be added to receivedEvents because no inFlightPods at this point.
+				{eventHappens: &PvcAdd},
+				// This Pod has no previousEvent because no receivedEvents at this point.
+				{podPopped: pod},
+				{eventHappens: &PvAdd},
+				{podPopped: pod2},
+				{eventHappens: &NodeAdd},
+				{podEnqueued: newQueuedPodInfoForLookup(pod)},
+				{eventHappens: &CSINodeUpdate},
+				// pod2 is registered in inFlightPods with previousEvent with inFlightPodsNum:0.
+				{podEnqueued: newQueuedPodInfoForLookup(pod2)},
+			},
+			wantBackoffQPodNames: []string{"targetpod", "targetpod2"},
+			wantInFlightPods:     map[types.UID]inFlightPod{},
+			wantReceivedEvents:   clusterEventsToList([]*clusterEvent{
+				// all events are correctly cleaned up.
+			}),
+		},
+		{
+			name:        "Pod registered in inFlightPods with previousEvent with inFlightPodsNum:non-zero is enqueued back to activeQ",
+			initialPods: []*v1.Pod{pod, pod2, pod3},
+			actions: []action{
+				// This won't be added to receivedEvents because no inFlightPods at this point.
+				{eventHappens: &PvcAdd},
+				// This Pod has no previousEvent because no receivedEvents at this point.
+				{podPopped: pod},
+				{eventHappens: &PvAdd},
+				// This Pod will get previousEvent (PvAdd).
+				{podPopped: pod2},
+				{eventHappens: &NodeAdd},
+				// This Pod will get previousEvent (NodeAdd).
+				// This Pod won't be requeued again.
+				{podPopped: pod3},
+				{eventHappens: &AssignedPodAdd},
+				// pod2 is registered in inFlightPods with previousEvent with inFlightPodsNum:non-zero.
+				{podEnqueued: newQueuedPodInfoForLookup(pod2)},
+			},
+			wantBackoffQPodNames: []string{"targetpod2"},
+			wantInFlightPods: map[types.UID]inFlightPod{
+				"pod1": {
+					// no previousEvent
+				},
+				"pod3": {
+					previousEvent: &list.Element{Value: &clusterEvent{event: NodeAdd, requestCycle: 3, inFlightPodsNum: 1}},
+				},
+			},
+			wantReceivedEvents: clusterEventsToList([]*clusterEvent{
+				{event: PvAdd, requestCycle: 2, inFlightPodsNum: 1},
+				{event: NodeAdd, requestCycle: 3, inFlightPodsNum: 1},
+				{event: AssignedPodAdd, requestCycle: 4, inFlightPodsNum: 2},
+			}),
 		},
 		{
 			name:        "events before popping Pod are ignored",
@@ -430,25 +491,24 @@ func Test_InFlightPods(t *testing.T) {
 			}
 
 			for _, action := range test.actions {
-				if action.podPopped != nil {
-					if _, err := q.Pop(); err != nil {
+				switch {
+				case action.podPopped != nil:
+					p, err := q.Pop()
+					if err != nil {
 						t.Fatalf("Pop failed: %v", err)
 					}
+					if p.Pod.UID != action.podPopped.UID {
+						t.Errorf("Unexpected popped pod: %v", p)
+					}
 					continue
-				}
-
-				if action.eventHappens != nil {
+				case action.eventHappens != nil:
 					q.MoveAllToActiveOrBackoffQueue(logger, *action.eventHappens, nil, nil, nil)
-					continue
-				}
-
-				if action.podEnqueued != nil {
+				case action.podEnqueued != nil:
 					q.AddUnschedulableIfNotPresent(logger, action.podEnqueued, q.SchedulingCycle())
-					continue
 				}
 			}
 
-			if diff := cmp.Diff(test.wantInFlightPods, q.inFlightPods, cmp.AllowUnexported(inFlightPod{}, list.Element{}, clusterEvent{})); diff != "" {
+			if diff := cmp.Diff(test.wantInFlightPods, q.inFlightPods, cmp.AllowUnexported(inFlightPod{}, list.Element{}, clusterEvent{}), cmpopts.IgnoreFields(list.Element{}, "next", "prev", "list")); diff != "" {
 				t.Errorf("Unexpected diff in inFlightPods (-want, +got):\n%s", diff)
 			}
 
