@@ -1216,4 +1216,4 @@ var formats = []Pattern{Pattern{RoundingContext: RoundingContext{MaxSignificantD
 			0x0},
 		Flags: 0x0}}
 
-// Total table size 8634 bytes (8KiB); checksum: BE6D4A33
+// Total table size 8634 bytes (8KiB); checksum: 8F23386D
