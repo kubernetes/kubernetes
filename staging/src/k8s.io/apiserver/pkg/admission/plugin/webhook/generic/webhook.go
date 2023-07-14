@@ -22,6 +22,7 @@ import (
 	"io"
 
 	admissionmetrics "k8s.io/apiserver/pkg/admission/metrics"
+	"k8s.io/klog/v2"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
@@ -41,7 +42,6 @@ import (
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
 )
 
 // Webhook is an abstract admission plugin with all the infrastructure to define Admit or Validate on-top.
@@ -219,7 +219,6 @@ func (a *Webhook) ShouldCallHook(ctx context.Context, h webhook.WebhookAccessor,
 	if matchObjErr != nil {
 		return nil, matchObjErr
 	}
-	//TODO: maybe this sould be before the invocations are created
 	matchConditions := h.GetMatchConditions()
 	if len(matchConditions) > 0 {
 		versionedAttr, err := v.VersionedAttribute(invocation.Kind)
