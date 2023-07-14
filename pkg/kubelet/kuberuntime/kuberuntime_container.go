@@ -942,10 +942,10 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(pod *v1.Pod, pod
 							// If the restartable init container failed the startup probe,
 							// restart it.
 							changes.ContainersToKill[status.ID] = containerToKillInfo{
-								name:      container.Name,
-								container: container,
-								message:   fmt.Sprintf("Init container %s failed startup probe", container.Name),
-								reason:    reasonStartupProbe,
+								Name:      container.Name,
+								Container: container,
+								Message:   fmt.Sprintf("Init container %s failed startup probe", container.Name),
+								Reason:    reasonStartupProbe,
 							}
 							changes.InitContainersToStart = append(changes.InitContainersToStart, i)
 						}
@@ -994,11 +994,11 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(pod *v1.Pod, pod
 			if types.IsRestartableInitContainer(container) {
 				// If the restartable init container is in unknown state, restart it.
 				changes.ContainersToKill[status.ID] = containerToKillInfo{
-					name:      container.Name,
-					container: container,
-					message: fmt.Sprintf("Init container is in %q state, try killing it before restart",
+					Name:      container.Name,
+					Container: container,
+					Message: fmt.Sprintf("Init container is in %q state, try killing it before restart",
 						status.State),
-					reason: reasonUnknown,
+					Reason: reasonUnknown,
 				}
 				changes.InitContainersToStart = append(changes.InitContainersToStart, i)
 			} else { // init container
@@ -1014,11 +1014,11 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(pod *v1.Pod, pod
 
 				// If the init container is in unknown state, restart it.
 				changes.ContainersToKill[status.ID] = containerToKillInfo{
-					name:      container.Name,
-					container: container,
-					message: fmt.Sprintf("Init container is in %q state, try killing it before restart",
+					Name:      container.Name,
+					Container: container,
+					Message: fmt.Sprintf("Init container is in %q state, try killing it before restart",
 						status.State),
-					reason: reasonUnknown,
+					Reason: reasonUnknown,
 				}
 				changes.InitContainersToStart = append(changes.InitContainersToStart, i)
 			}

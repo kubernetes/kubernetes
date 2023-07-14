@@ -17,7 +17,9 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"reflect"
@@ -1190,8 +1192,8 @@ func getKillMap(pod *v1.Pod, status *kubecontainer.PodStatus, cIndexes []int) ma
 	m := map[kubecontainer.ContainerID]containerToKillInfo{}
 	for _, i := range cIndexes {
 		m[status.ContainerStatuses[i].ID] = containerToKillInfo{
-			container: &pod.Spec.Containers[i],
-			name:      pod.Spec.Containers[i].Name,
+			Container: &pod.Spec.Containers[i],
+			Name:      pod.Spec.Containers[i].Name,
 		}
 	}
 	return m
@@ -1201,8 +1203,8 @@ func getKillMapWithInitContainers(pod *v1.Pod, status *kubecontainer.PodStatus, 
 	m := map[kubecontainer.ContainerID]containerToKillInfo{}
 	for _, i := range cIndexes {
 		m[status.ContainerStatuses[i].ID] = containerToKillInfo{
-			container: &pod.Spec.InitContainers[i],
-			name:      pod.Spec.InitContainers[i].Name,
+			Container: &pod.Spec.InitContainers[i],
+			Name:      pod.Spec.InitContainers[i].Name,
 		}
 	}
 	return m
@@ -1212,8 +1214,8 @@ func verifyActions(t *testing.T, expected, actual *podActions, desc string) {
 	if actual.ContainersToKill != nil {
 		// Clear the message and reason fields since we don't need to verify them.
 		for k, info := range actual.ContainersToKill {
-			info.message = ""
-			info.reason = ""
+			info.Message = ""
+			info.Reason = ""
 			actual.ContainersToKill[k] = info
 		}
 	}
@@ -2192,8 +2194,8 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 				kcs := podStatus.FindContainerStatusByName(pod.Spec.Containers[0].Name)
 				killMap := make(map[kubecontainer.ContainerID]containerToKillInfo)
 				killMap[kcs.ID] = containerToKillInfo{
-					container: &pod.Spec.Containers[0],
-					name:      pod.Spec.Containers[0].Name,
+					Container: &pod.Spec.Containers[0],
+					Name:      pod.Spec.Containers[0].Name,
 				}
 				pa := podActions{
 					SandboxID:          podStatus.SandboxStatuses[0].Id,
@@ -2223,8 +2225,8 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 				kcs := podStatus.FindContainerStatusByName(pod.Spec.Containers[2].Name)
 				killMap := make(map[kubecontainer.ContainerID]containerToKillInfo)
 				killMap[kcs.ID] = containerToKillInfo{
-					container: &pod.Spec.Containers[2],
-					name:      pod.Spec.Containers[2].Name,
+					Container: &pod.Spec.Containers[2],
+					Name:      pod.Spec.Containers[2].Name,
 				}
 				pa := podActions{
 					SandboxID:          podStatus.SandboxStatuses[0].Id,
@@ -2475,5 +2477,35 @@ func TestUpdatePodContainerResources(t *testing.T) {
 			assert.Equal(t, tc.expectedCurrentLimits[idx].Cpu().MilliValue(), containersToUpdate[idx].currentContainerResources.cpuLimit, dsc)
 			assert.Equal(t, tc.expectedCurrentRequests[idx].Cpu().MilliValue(), containersToUpdate[idx].currentContainerResources.cpuRequest, dsc)
 		}
+	}
+}
+
+func TestPodActionLogging(t *testing.T) {
+	actions := podActions{
+		KillPod:           false,
+		CreateSandbox:     false,
+		SandboxID:         "123",
+		Attempt:           1,
+		ContainersToStart: nil,
+		ContainersToKill: map[kubecontainer.ContainerID]containerToKillInfo{
+			{
+				Type: "foo",
+				ID:   "bar",
+			}: {
+				Name:    "containername",
+				Message: "some message",
+				Reason:  "some reason",
+			},
+		},
+		EphemeralContainersToStart: nil,
+		ContainersToUpdate:         nil,
+		UpdatePodResources:         false,
+	}
+
+	buf := bytes.Buffer{}
+	enc := json.NewEncoder(&buf)
+
+	if err := enc.Encode(actions); err != nil {
+		t.Fatalf("expected no errror encoding, got %s", err)
 	}
 }

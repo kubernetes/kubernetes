@@ -210,6 +210,12 @@ type ContainerID struct {
 	ID string
 }
 
+// MarshalText marshals the ContainerID into a text string and is used so it can be logged
+// with structured logging as a map key.
+func (c ContainerID) MarshalText() (text []byte, err error) {
+	return []byte(fmt.Sprintf("%s/%s", c.Type, c.ID)), nil
+}
+
 // BuildContainerID returns the ContainerID given type and id.
 func BuildContainerID(typ, ID string) ContainerID {
 	return ContainerID{Type: typ, ID: ID}

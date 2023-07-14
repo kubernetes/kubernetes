@@ -450,14 +450,14 @@ const (
 // containerToKillInfo contains necessary information to kill a container.
 type containerToKillInfo struct {
 	// The spec of the container.
-	container *v1.Container
+	Container *v1.Container
 	// The name of the container.
-	name string
+	Name string
 	// The message indicates why the container will be killed.
-	message string
+	Message string
 	// The reason is a clearer source of info on why a container will be killed
 	// TODO: replace message with reason?
-	reason containerKillReason
+	Reason containerKillReason
 }
 
 // containerResources holds the set of resources applicable to the running container
@@ -633,9 +633,9 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containe
 	if restartCPULim || restartCPUReq || restartMemLim {
 		// resize policy requires this container to restart
 		changes.ContainersToKill[kubeContainerStatus.ID] = containerToKillInfo{
-			name:      kubeContainerStatus.Name,
-			container: &pod.Spec.Containers[containerIdx],
-			message:   fmt.Sprintf("Container %s resize requires restart", container.Name),
+			Name:      kubeContainerStatus.Name,
+			Container: &pod.Spec.Containers[containerIdx],
+			Message:   fmt.Sprintf("Container %s resize requires restart", container.Name),
 		}
 		changes.ContainersToStart = append(changes.ContainersToStart, containerIdx)
 		changes.UpdatePodResources = true
@@ -922,11 +922,11 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 					// is actually running or not, always try killing it before
 					// restart to avoid having 2 running instances of the same container.
 					changes.ContainersToKill[containerStatus.ID] = containerToKillInfo{
-						name:      containerStatus.Name,
-						container: &pod.Spec.Containers[idx],
-						message: fmt.Sprintf("Container is in %q state, try killing it before restart",
+						Name:      containerStatus.Name,
+						Container: &pod.Spec.Containers[idx],
+						Message: fmt.Sprintf("Container is in %q state, try killing it before restart",
 							containerStatus.State),
-						reason: reasonUnknown,
+						Reason: reasonUnknown,
 					}
 				}
 			}
@@ -970,10 +970,10 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		}
 
 		changes.ContainersToKill[containerStatus.ID] = containerToKillInfo{
-			name:      containerStatus.Name,
-			container: &pod.Spec.Containers[idx],
-			message:   message,
-			reason:    reason,
+			Name:      containerStatus.Name,
+			Container: &pod.Spec.Containers[idx],
+			Message:   message,
+			Reason:    reason,
 		}
 		klog.V(2).InfoS("Message for Container of pod", "containerName", container.Name, "containerStatusID", containerStatus.ID, "pod", klog.KObj(pod), "containerMessage", message)
 	}
@@ -1035,12 +1035,12 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 	} else {
 		// Step 3: kill any running containers in this pod which are not to keep.
 		for containerID, containerInfo := range podContainerChanges.ContainersToKill {
-			klog.V(3).InfoS("Killing unwanted container for pod", "containerName", containerInfo.name, "containerID", containerID, "pod", klog.KObj(pod))
-			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, containerInfo.name)
+			klog.V(3).InfoS("Killing unwanted container for pod", "containerName", containerInfo.Name, "containerID", containerID, "pod", klog.KObj(pod))
+			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, containerInfo.Name)
 			result.AddSyncResult(killContainerResult)
-			if err := m.killContainer(ctx, pod, containerID, containerInfo.name, containerInfo.message, containerInfo.reason, nil); err != nil {
+			if err := m.killContainer(ctx, pod, containerID, containerInfo.Name, containerInfo.Message, containerInfo.Reason, nil); err != nil {
 				killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
-				klog.ErrorS(err, "killContainer for pod failed", "containerName", containerInfo.name, "containerID", containerID, "pod", klog.KObj(pod))
+				klog.ErrorS(err, "killContainer for pod failed", "containerName", containerInfo.Name, "containerID", containerID, "pod", klog.KObj(pod))
 				return
 			}
 		}
