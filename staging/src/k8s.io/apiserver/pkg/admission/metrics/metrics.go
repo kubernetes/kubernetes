@@ -249,7 +249,7 @@ func newAdmissionMetrics() *AdmissionMetrics {
 				Subsystem:      subsystem,
 				Name:           "match_condition_evaluation_seconds",
 				Help:           "Admission match condition evaluation time in seconds, identified by name and broken out for each kind containing matchConditions (webhook or policy), operation and type (validate or admit).",
-				Buckets:        []float64{0.005, 0.025, 0.1, 0.5, 1.0, 2.5},
+				Buckets:        []float64{0.001, 0.005, 0.01, 0.025, 0.1, 0.2, 0.25},
 				StabilityLevel: metrics.ALPHA,
 			},
 			[]string{"name", "kind", "type", "operation"},
