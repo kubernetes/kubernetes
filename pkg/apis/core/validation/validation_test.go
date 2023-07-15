@@ -5922,7 +5922,7 @@ func TestValidateEnv(t *testing.T) {
 				},
 			},
 		}},
-		expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.labels": supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP", "status.podIPs"`,
+		expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.labels": supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.hostIPs", "status.podIP", "status.podIPs"`,
 	}, {
 		name: "metadata.annotations without subscript",
 		envs: []core.EnvVar{{
@@ -5934,7 +5934,7 @@ func TestValidateEnv(t *testing.T) {
 				},
 			},
 		}},
-		expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.annotations": supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP", "status.podIPs"`,
+		expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.annotations": supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.hostIPs", "status.podIP", "status.podIPs"`,
 	}, {
 		name: "metadata.annotations with invalid key",
 		envs: []core.EnvVar{{
@@ -5970,7 +5970,7 @@ func TestValidateEnv(t *testing.T) {
 				},
 			},
 		}},
-		expectedError: `valueFrom.fieldRef.fieldPath: Unsupported value: "status.phase": supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP", "status.podIPs"`,
+		expectedError: `valueFrom.fieldRef.fieldPath: Unsupported value: "status.phase": supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.hostIPs", "status.podIP", "status.podIPs"`,
 	},
 	}
 	for _, tc := range errorCases {
@@ -21352,6 +21352,113 @@ func TestPodIPsValidation(t *testing.T) {
 	}
 }
 
+func makePodWithHostIPs(podName string, podNamespace string, hostIPs []core.HostIP) core.Pod {
+	hostIP := ""
+	if len(hostIPs) > 0 {
+		hostIP = hostIPs[0].IP
+	}
+	return core.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: podName, Namespace: podNamespace},
+		Spec: core.PodSpec{
+			Containers: []core.Container{
+				{
+					Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+				},
+			},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+		},
+		Status: core.PodStatus{
+			HostIP:  hostIP,
+			HostIPs: hostIPs,
+		},
+	}
+}
+
+func TestHostIPsValidation(t *testing.T) {
+	testCases := []struct {
+		pod         core.Pod
+		expectError bool
+	}{
+		{
+			expectError: false,
+			pod:         makePodWithHostIPs("nil-ips", "ns", nil),
+		},
+		{
+			expectError: false,
+			pod:         makePodWithHostIPs("empty-HostIPs-list", "ns", []core.HostIP{}),
+		},
+		{
+			expectError: false,
+			pod:         makePodWithHostIPs("single-ip-family-6", "ns", []core.HostIP{{IP: "::1"}}),
+		},
+		{
+			expectError: false,
+			pod:         makePodWithHostIPs("single-ip-family-4", "ns", []core.HostIP{{IP: "1.1.1.1"}}),
+		},
+		{
+			expectError: false,
+			pod:         makePodWithHostIPs("dual-stack-4-6", "ns", []core.HostIP{{IP: "1.1.1.1"}, {IP: "::1"}}),
+		},
+		{
+			expectError: false,
+			pod:         makePodWithHostIPs("dual-stack-6-4", "ns", []core.HostIP{{IP: "::1"}, {IP: "1.1.1.1"}}),
+		},
+		/* failure cases start here */
+		{
+			expectError: true,
+			pod:         makePodWithHostIPs("invalid-pod-ip", "ns", []core.HostIP{{IP: "this-is-not-an-ip"}}),
+		},
+		{
+			expectError: true,
+			pod:         makePodWithHostIPs("dualstack-same-ip-family-6", "ns", []core.HostIP{{IP: "::1"}, {IP: "::2"}}),
+		},
+		{
+			expectError: true,
+			pod:         makePodWithHostIPs("dualstack-same-ip-family-4", "ns", []core.HostIP{{IP: "1.1.1.1"}, {IP: "2.2.2.2"}}),
+		},
+		{
+			expectError: true,
+			pod:         makePodWithHostIPs("dualstack-repeated-ip-family-6", "ns", []core.HostIP{{IP: "1.1.1.1"}, {IP: "::1"}, {IP: "::2"}}),
+		},
+		{
+			expectError: true,
+			pod:         makePodWithHostIPs("dualstack-repeated-ip-family-4", "ns", []core.HostIP{{IP: "1.1.1.1"}, {IP: "::1"}, {IP: "2.2.2.2"}}),
+		},
+
+		{
+			expectError: true,
+			pod:         makePodWithHostIPs("dualstack-duplicate-ip-family-4", "ns", []core.HostIP{{IP: "1.1.1.1"}, {IP: "1.1.1.1"}, {IP: "::1"}}),
+		},
+		{
+			expectError: true,
+			pod:         makePodWithHostIPs("dualstack-duplicate-ip-family-6", "ns", []core.HostIP{{IP: "1.1.1.1"}, {IP: "::1"}, {IP: "::1"}}),
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.pod.Name, func(t *testing.T) {
+			for _, oldTestCase := range testCases {
+				newPod := testCase.pod.DeepCopy()
+				newPod.ResourceVersion = "1"
+
+				oldPod := oldTestCase.pod.DeepCopy()
+				oldPod.ResourceVersion = "1"
+				oldPod.Name = newPod.Name
+
+				errs := ValidatePodStatusUpdate(newPod, oldPod, PodValidationOptions{})
+
+				if len(errs) == 0 && testCase.expectError {
+					t.Fatalf("expected failure for %s, but there were none", testCase.pod.Name)
+				}
+				if len(errs) != 0 && !testCase.expectError {
+					t.Fatalf("expected success for %s, but there were errors: %v", testCase.pod.Name, errs)
+				}
+			}
+		})
+	}
+}
+
 // makes a node with pod cidr and a name
 func makeNode(nodeName string, podCIDRs []string) core.Node {
 	return core.Node{
@@ -22559,6 +22666,53 @@ func TestValidateAppArmorProfileFormat(t *testing.T) {
 		} else {
 			assert.Error(t, err, fmt.Sprintf("Profile %s should not be valid", test.profile))
 		}
+	}
+}
+
+func TestValidateDownwardAPIHostIPs(t *testing.T) {
+	testCases := []struct {
+		name           string
+		expectError    bool
+		featureEnabled bool
+		fieldSel       *core.ObjectFieldSelector
+	}{
+		{
+			name:           "has no hostIPs field, featuregate enabled",
+			expectError:    false,
+			featureEnabled: true,
+			fieldSel:       &core.ObjectFieldSelector{FieldPath: "status.hostIP"},
+		},
+		{
+			name:           "has hostIPs field, featuregate enabled",
+			expectError:    false,
+			featureEnabled: true,
+			fieldSel:       &core.ObjectFieldSelector{FieldPath: "status.hostIPs"},
+		},
+		{
+			name:           "has no hostIPs field, featuregate disabled",
+			expectError:    false,
+			featureEnabled: false,
+			fieldSel:       &core.ObjectFieldSelector{FieldPath: "status.hostIP"},
+		},
+		{
+			name:           "has hostIPs field, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			fieldSel:       &core.ObjectFieldSelector{FieldPath: "status.hostIPs"},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodHostIPs, testCase.featureEnabled)()
+
+			errs := validateDownwardAPIHostIPs(testCase.fieldSel, field.NewPath("fieldSel"), PodValidationOptions{AllowHostIPsField: testCase.featureEnabled})
+			if testCase.expectError && len(errs) == 0 {
+				t.Errorf("Unexpected success")
+			}
+			if !testCase.expectError && len(errs) != 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
+			}
+		})
 	}
 }
 

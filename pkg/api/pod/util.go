@@ -358,6 +358,8 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 	// default pod validation options based on feature gate
 	opts := apivalidation.PodValidationOptions{
 		AllowInvalidPodDeletionCost: !utilfeature.DefaultFeatureGate.Enabled(features.PodDeletionCost),
+		// Allow pod spec to use status.hostIPs in downward API if feature is enabled
+		AllowHostIPsField: utilfeature.DefaultFeatureGate.Enabled(features.PodHostIPs),
 		// Do not allow pod spec to use non-integer multiple of huge page unit size default
 		AllowIndivisibleHugePagesValues:                   false,
 		AllowInvalidLabelValueInSelector:                  false,
@@ -366,6 +368,9 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 	}
 
 	if oldPodSpec != nil {
+		// if old spec has status.hostIPs downwardAPI set, we must allow it
+		opts.AllowHostIPsField = opts.AllowHostIPsField || hasUsedDownwardAPIFieldPathWithPodSpec(oldPodSpec, "status.hostIPs")
+
 		// if old spec used non-integer multiple of huge page unit size, we must allow it
 		opts.AllowIndivisibleHugePagesValues = usesIndivisibleHugePagesValues(oldPodSpec)
 
@@ -380,6 +385,55 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 	}
 
 	return opts
+}
+
+func hasUsedDownwardAPIFieldPathWithPodSpec(podSpec *api.PodSpec, fieldPath string) bool {
+	if podSpec == nil {
+		return false
+	}
+	for _, vol := range podSpec.Volumes {
+		if hasUsedDownwardAPIFieldPathWithVolume(&vol, fieldPath) {
+			return true
+		}
+	}
+	for _, c := range podSpec.InitContainers {
+		if hasUsedDownwardAPIFieldPathWithContainer(&c, fieldPath) {
+			return true
+		}
+	}
+	for _, c := range podSpec.Containers {
+		if hasUsedDownwardAPIFieldPathWithContainer(&c, fieldPath) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasUsedDownwardAPIFieldPathWithVolume(volume *api.Volume, fieldPath string) bool {
+	if volume == nil || volume.DownwardAPI == nil {
+		return false
+	}
+	for _, file := range volume.DownwardAPI.Items {
+		if file.FieldRef != nil &&
+			file.FieldRef.FieldPath == fieldPath {
+			return true
+		}
+	}
+	return false
+}
+
+func hasUsedDownwardAPIFieldPathWithContainer(container *api.Container, fieldPath string) bool {
+	if container == nil {
+		return false
+	}
+	for _, env := range container.Env {
+		if env.ValueFrom != nil &&
+			env.ValueFrom.FieldRef != nil &&
+			env.ValueFrom.FieldRef.FieldPath == fieldPath {
+			return true
+		}
+	}
+	return false
 }
 
 // GetValidationOptionsFromPodTemplate will return pod validation options for specified template.
@@ -544,6 +598,18 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) && !dynamicResourceAllocationInUse(oldPodSpec) {
 		podStatus.ResourceClaimStatuses = nil
 	}
+
+	// drop HostIPs to empty (disable PodHostIPs).
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodHostIPs) && !hostIPsInUse(oldPodStatus) {
+		podStatus.HostIPs = nil
+	}
+}
+
+func hostIPsInUse(podStatus *api.PodStatus) bool {
+	if podStatus == nil {
+		return false
+	}
+	return len(podStatus.HostIPs) > 0
 }
 
 // dropDisabledDynamicResourceAllocationFields removes pod claim references from

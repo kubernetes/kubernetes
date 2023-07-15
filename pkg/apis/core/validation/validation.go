@@ -1055,6 +1055,7 @@ func validateDownwardAPIVolumeFile(file *core.DownwardAPIVolumeFile, fldPath *fi
 		if file.ResourceFieldRef != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath, "resource", "fieldRef and resourceFieldRef can not be specified simultaneously"))
 		}
+		allErrs = append(allErrs, validateDownwardAPIHostIPs(file.FieldRef, fldPath.Child("fieldRef"), opts)...)
 	} else if file.ResourceFieldRef != nil {
 		localValidContainerResourceFieldPathPrefixes := validContainerResourceFieldPathPrefixesWithDownwardAPIHugePages
 		allErrs = append(allErrs, validateContainerResourceFieldSelector(file.ResourceFieldRef, &validContainerResourceFieldPathExpressions, &localValidContainerResourceFieldPathPrefixes, fldPath.Child("resourceFieldRef"), true)...)
@@ -2403,8 +2404,10 @@ var validEnvDownwardAPIFieldPathExpressions = sets.NewString(
 	"spec.nodeName",
 	"spec.serviceAccountName",
 	"status.hostIP",
+	"status.hostIPs",
 	"status.podIP",
-	"status.podIPs")
+	"status.podIPs",
+)
 
 var validContainerResourceFieldPathExpressions = sets.NewString("limits.cpu", "limits.memory", "limits.ephemeral-storage", "requests.cpu", "requests.memory", "requests.ephemeral-storage")
 
@@ -2425,6 +2428,7 @@ func validateEnvVarValueFrom(ev core.EnvVar, fldPath *field.Path, opts PodValida
 	if ev.ValueFrom.FieldRef != nil {
 		numSources++
 		allErrs = append(allErrs, validateObjectFieldSelector(ev.ValueFrom.FieldRef, &validEnvDownwardAPIFieldPathExpressions, fldPath.Child("fieldRef"))...)
+		allErrs = append(allErrs, validateDownwardAPIHostIPs(ev.ValueFrom.FieldRef, fldPath.Child("fieldRef"), opts)...)
 	}
 	if ev.ValueFrom.ResourceFieldRef != nil {
 		numSources++
@@ -2485,6 +2489,16 @@ func validateObjectFieldSelector(fs *core.ObjectFieldSelector, expressions *sets
 		return allErrs
 	}
 
+	return allErrs
+}
+
+func validateDownwardAPIHostIPs(fieldSel *core.ObjectFieldSelector, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if !opts.AllowHostIPsField {
+		if fieldSel.FieldPath == "status.hostIPs" {
+			allErrs = append(allErrs, field.Forbidden(fldPath, "may not be set when feature gate 'PodHostIPs' is not enabled"))
+		}
+	}
 	return allErrs
 }
 
@@ -3727,6 +3741,8 @@ type PodValidationOptions struct {
 	AllowInvalidLabelValueInSelector bool
 	// Allow pod spec to use non-integer multiple of huge page unit size
 	AllowIndivisibleHugePagesValues bool
+	// Allow pod spec to use status.hostIPs in downward API if feature is enabled
+	AllowHostIPsField bool
 	// Allow invalid topologySpreadConstraint labelSelector for backward compatibility
 	AllowInvalidTopologySpreadConstraintLabelSelector bool
 	// Allow node selector additions for gated pods.
@@ -3809,6 +3825,58 @@ func validatePodIPs(pod *core.Pod) field.ErrorList {
 				allErrs = append(allErrs, field.Duplicate(podIPsField.Index(i), podIP))
 			}
 			seen.Insert(podIP.IP)
+		}
+	}
+
+	return allErrs
+}
+
+// validateHostIPs validates IPs in pod status
+func validateHostIPs(pod *core.Pod) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(pod.Status.HostIPs) == 0 {
+		return allErrs
+	}
+
+	hostIPsField := field.NewPath("status", "hostIPs")
+
+	// hostIP must be equal to hostIPs[0].IP
+	if pod.Status.HostIP != pod.Status.HostIPs[0].IP {
+		allErrs = append(allErrs, field.Invalid(hostIPsField.Index(0).Child("ip"), pod.Status.HostIPs[0].IP, "must be equal to `hostIP`"))
+	}
+
+	// all HostPs must be valid IPs
+	for i, hostIP := range pod.Status.HostIPs {
+		for _, msg := range validation.IsValidIP(hostIP.IP) {
+			allErrs = append(allErrs, field.Invalid(hostIPsField.Index(i), hostIP.IP, msg))
+		}
+	}
+
+	// if we have more than one Pod.HostIP then
+	// - validate for dual stack
+	// - validate for duplication
+	if len(pod.Status.HostIPs) > 1 {
+		seen := sets.String{}
+		hostIPs := make([]string, 0, len(pod.Status.HostIPs))
+
+		// There should be no duplicates in list of Pod.HostIPs
+		for i, hostIP := range pod.Status.HostIPs {
+			hostIPs = append(hostIPs, hostIP.IP)
+			if seen.Has(hostIP.IP) {
+				allErrs = append(allErrs, field.Duplicate(hostIPsField.Index(i), hostIP))
+			}
+			seen.Insert(hostIP.IP)
+		}
+
+		dualStack, err := netutils.IsDualStackIPStrings(hostIPs)
+		if err != nil {
+			allErrs = append(allErrs, field.InternalError(hostIPsField, fmt.Errorf("failed to check for dual stack with error:%v", err)))
+		}
+
+		// We only support one from each IP family (i.e. max two IPs in this list).
+		if !dualStack || len(hostIPs) > 2 {
+			allErrs = append(allErrs, field.Invalid(hostIPsField, pod.Status.HostIPs, "may specify no more than one IP for each IP family"))
 		}
 	}
 
@@ -4848,6 +4916,10 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions
 	allErrs = append(allErrs, validatePodResourceClaimStatuses(newPod.Status.ResourceClaimStatuses, newPod.Spec.ResourceClaims, fldPath.Child("resourceClaimStatuses"))...)
 
 	if newIPErrs := validatePodIPs(newPod); len(newIPErrs) > 0 {
+		allErrs = append(allErrs, newIPErrs...)
+	}
+
+	if newIPErrs := validateHostIPs(newPod); len(newIPErrs) > 0 {
 		allErrs = append(allErrs, newIPErrs...)
 	}
 

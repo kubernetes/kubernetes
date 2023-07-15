@@ -1165,6 +1165,112 @@ func TestDropDisabledTopologySpreadConstraintsFields(t *testing.T) {
 	}
 }
 
+func TestDropDisabledPodStatusFields(t *testing.T) {
+	podWithHostIPs := func() *api.PodStatus {
+		return &api.PodStatus{
+			HostIPs: makeHostIPs("10.0.0.1", "fd00:10::1"),
+		}
+	}
+
+	podWithoutHostIPs := func() *api.PodStatus {
+		return &api.PodStatus{
+			HostIPs: nil,
+		}
+	}
+
+	tests := []struct {
+		name           string
+		podStatus      *api.PodStatus
+		oldPodStatus   *api.PodStatus
+		wantPodStatus  *api.PodStatus
+		featureEnabled bool
+	}{
+		{
+			name:           "gate off, old=without, new=without",
+			oldPodStatus:   podWithoutHostIPs(),
+			podStatus:      podWithoutHostIPs(),
+			featureEnabled: false,
+
+			wantPodStatus: podWithoutHostIPs(),
+		},
+		{
+			name:           "gate off, old=without, new=with",
+			oldPodStatus:   podWithoutHostIPs(),
+			podStatus:      podWithHostIPs(),
+			featureEnabled: false,
+
+			wantPodStatus: podWithoutHostIPs(),
+		},
+		{
+			name:           "gate off, old=with, new=without",
+			oldPodStatus:   podWithHostIPs(),
+			podStatus:      podWithoutHostIPs(),
+			featureEnabled: false,
+
+			wantPodStatus: podWithoutHostIPs(),
+		},
+		{
+			name:           "gate off, old=with, new=with",
+			oldPodStatus:   podWithHostIPs(),
+			podStatus:      podWithHostIPs(),
+			featureEnabled: false,
+
+			wantPodStatus: podWithHostIPs(),
+		},
+		{
+			name:           "gate on, old=without, new=without",
+			oldPodStatus:   podWithoutHostIPs(),
+			podStatus:      podWithoutHostIPs(),
+			featureEnabled: true,
+
+			wantPodStatus: podWithoutHostIPs(),
+		},
+		{
+			name:           "gate on, old=without, new=with",
+			oldPodStatus:   podWithoutHostIPs(),
+			podStatus:      podWithHostIPs(),
+			featureEnabled: true,
+
+			wantPodStatus: podWithHostIPs(),
+		},
+		{
+			name:           "gate on, old=with, new=without",
+			oldPodStatus:   podWithHostIPs(),
+			podStatus:      podWithoutHostIPs(),
+			featureEnabled: true,
+
+			wantPodStatus: podWithoutHostIPs(),
+		},
+		{
+			name:           "gate on, old=with, new=with",
+			oldPodStatus:   podWithHostIPs(),
+			podStatus:      podWithHostIPs(),
+			featureEnabled: true,
+
+			wantPodStatus: podWithHostIPs(),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodHostIPs, tt.featureEnabled)()
+
+			dropDisabledPodStatusFields(tt.podStatus, tt.oldPodStatus, &api.PodSpec{}, &api.PodSpec{})
+
+			if !reflect.DeepEqual(tt.podStatus, tt.wantPodStatus) {
+				t.Errorf("dropDisabledStatusFields() = %v, want %v", tt.podStatus, tt.wantPodStatus)
+			}
+		})
+	}
+}
+
+func makeHostIPs(ips ...string) []api.HostIP {
+	ret := []api.HostIP{}
+	for _, ip := range ips {
+		ret = append(ret, api.HostIP{IP: ip})
+	}
+	return ret
+}
+
 func TestDropNodeInclusionPolicyFields(t *testing.T) {
 	ignore := api.NodeInclusionPolicyIgnore
 	honor := api.NodeInclusionPolicyHonor

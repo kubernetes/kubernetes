@@ -1208,6 +1208,8 @@ status:
         message: messageValue
         reason: reasonValue
   hostIP: hostIPValue
+  hostIPs:
+  - ip: ipValue
   initContainerStatuses:
   - allocatedResources:
       allocatedResourcesKey: "0"
