@@ -289,6 +289,19 @@ func MigrateOldConfig(oldConfig []byte, allowExperimental bool) ([]byte, error) 
 		newConfig = append(newConfig, b)
 	}
 
+	// Migrate ResetConfiguration if there is any
+	if kubeadmutil.GroupVersionKindsHasResetConfiguration(gvks...) {
+		o, err := documentMapToResetConfiguration(gvkmap, true, allowExperimental)
+		if err != nil {
+			return []byte{}, err
+		}
+		b, err := MarshalKubeadmConfigObject(o, gv)
+		if err != nil {
+			return []byte{}, err
+		}
+		newConfig = append(newConfig, b)
+	}
+
 	return bytes.Join(newConfig, []byte(constants.YAMLDocumentSeparator)), nil
 }
 
