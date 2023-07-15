@@ -180,6 +180,12 @@ type PriorityQueue struct {
 	// schedulingCycle represents sequence number of scheduling cycle and is incremented
 	// when a pod is popped.
 	schedulingCycle int64
+	// moveRequestCycle caches the sequence number of scheduling cycle when we
+	// received a move request. Unschedulable pods in and before this scheduling
+	// cycle will be put back to activeQueue if we were trying to schedule them
+	// when we received move request.
+	// TODO: this will be removed after SchedulingQueueHint goes to stable and the feature gate is removed.
+	moveRequestCycle int64
 
 	// preEnqueuePluginMap is keyed with profile name, valued with registered preEnqueue plugins.
 	preEnqueuePluginMap map[string][]framework.PreEnqueuePlugin
@@ -195,6 +201,9 @@ type PriorityQueue struct {
 	metricsRecorder metrics.MetricAsyncRecorder
 	// pluginMetricsSamplePercent is the percentage of plugin metrics to be sampled.
 	pluginMetricsSamplePercent int
+
+	// isSchedulingQueueHintEnabled indicates whether the feature gate for the scheduling queue is enabled.
+	isSchedulingQueueHintEnabled bool
 }
 
 // QueueingHintFunction is the wrapper of QueueingHintFn that has PluginName.
@@ -361,8 +370,8 @@ func NewPriorityQueue(
 		queueingHintMap:                   options.queueingHintMap,
 		metricsRecorder:                   options.metricsRecorder,
 		pluginMetricsSamplePercent:        options.pluginMetricsSamplePercent,
-		// QueuedPodInfo.MoveRequestCycle gets initialized with zero, so here we make it one higher.
-		schedulingCycle: 1,
+		moveRequestCycle:                  -1,
+		isSchedulingQueueHintEnabled:      utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints),
 	}
 	pq.cond.L = &pq.lock
 	pq.podBackoffQ = heap.NewWithRecorder(podInfoKeyFunc, pq.podsCompareBackoffCompleted, metrics.NewBackoffPodsRecorder())
@@ -648,6 +657,38 @@ func (p *PriorityQueue) determineSchedulingHintForInFlightPod(logger klog.Logger
 	return schedulingHint
 }
 
+// addUnschedulableIfNotPresentWithoutQueueingHint inserts a pod that cannot be scheduled into
+// the queue, unless it is already in the queue. Normally, PriorityQueue puts
+// unschedulable pods in `unschedulablePods`. But if there has been a recent move
+// request, then the pod is put in `podBackoffQ`.
+// TODO: This function is called only when p.isSchedulingQueueHintEnabled is false,
+// and this will be removed after SchedulingQueueHint goes to stable and the feature gate is removed.
+func (p *PriorityQueue) addUnschedulableWithoutQueueingHint(logger klog.Logger, pInfo *framework.QueuedPodInfo, podSchedulingCycle int64) error {
+	pod := pInfo.Pod
+	// Refresh the timestamp since the pod is re-added.
+	pInfo.Timestamp = p.clock.Now()
+
+	// If a move request has been received, move it to the BackoffQ, otherwise move
+	// it to unschedulablePods.
+	for plugin := range pInfo.UnschedulablePlugins {
+		metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Inc()
+	}
+	if p.moveRequestCycle >= podSchedulingCycle {
+		if err := p.podBackoffQ.Add(pInfo); err != nil {
+			return fmt.Errorf("error adding pod %v to the backoff queue: %v", klog.KObj(pod), err)
+		}
+		logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pod), "event", ScheduleAttemptFailure, "queue", backoffQ)
+		metrics.SchedulerQueueIncomingPods.WithLabelValues("backoff", ScheduleAttemptFailure).Inc()
+	} else {
+		p.unschedulablePods.addOrUpdate(pInfo)
+		logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pod), "event", ScheduleAttemptFailure, "queue", unschedulablePods)
+		metrics.SchedulerQueueIncomingPods.WithLabelValues("unschedulable", ScheduleAttemptFailure).Inc()
+	}
+
+	p.addNominatedPodUnlocked(logger, pInfo.PodInfo, nil)
+	return nil
+}
+
 // AddUnschedulableIfNotPresent inserts a pod that cannot be scheduled into
 // the queue, unless it is already in the queue. Normally, PriorityQueue puts
 // unschedulable pods in `unschedulablePods`. But if there has been a recent move
@@ -655,6 +696,7 @@ func (p *PriorityQueue) determineSchedulingHintForInFlightPod(logger klog.Logger
 func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *framework.QueuedPodInfo, podSchedulingCycle int64) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
+
 	// In any case, this Pod will be moved back to the queue and we should call Done.
 	defer p.done(pInfo.Pod.UID)
 
@@ -668,6 +710,11 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *
 	}
 	if _, exists, _ := p.podBackoffQ.Get(pInfo); exists {
 		return fmt.Errorf("Pod %v is already present in the backoff queue", klog.KObj(pod))
+	}
+
+	if !p.isSchedulingQueueHintEnabled {
+		// fall back to the old behavior which doesn't depend on the queueing hint.
+		return p.addUnschedulableWithoutQueueingHint(logger, pInfo, podSchedulingCycle)
 	}
 
 	// Refresh the timestamp since the pod is re-added.
@@ -766,8 +813,10 @@ func (p *PriorityQueue) Pop() (*framework.QueuedPodInfo, error) {
 	pInfo.Attempts++
 	p.schedulingCycle++
 	// In flight, no move request yet.
-	p.inFlightPods[pInfo.Pod.UID] = inFlightPod{
-		previousEvent: p.receivedEvents.Back(),
+	if p.isSchedulingQueueHintEnabled {
+		p.inFlightPods[pInfo.Pod.UID] = inFlightPod{
+			previousEvent: p.receivedEvents.Back(),
+		}
 	}
 
 	for plugin := range pInfo.UnschedulablePlugins {
@@ -787,6 +836,11 @@ func (p *PriorityQueue) Done(pod types.UID) {
 }
 
 func (p *PriorityQueue) done(pod types.UID) {
+	if !p.isSchedulingQueueHintEnabled {
+		// do nothing if schedulingQueueHint is disabled.
+		// In that case, we don't have inFlightPods and receivedEvents.
+		return
+	}
 	inFlightPod, ok := p.inFlightPods[pod]
 	if !ok {
 		// This Pod is already done()ed.
@@ -1046,6 +1100,9 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(logger klog.Logger, podIn
 		}
 	}
 
+	p.moveRequestCycle = p.schedulingCycle
+
+	// (no need to check the feature gate because there is always no p.inFlightPods when the feature is disabled.)
 	if len(p.inFlightPods) != 0 {
 		// AddUnschedulableIfNotPresent might get called for in-flight Pods later, and in
 		// AddUnschedulableIfNotPresent we need to know whether events were

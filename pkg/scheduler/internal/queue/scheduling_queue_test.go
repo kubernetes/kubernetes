@@ -33,12 +33,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -208,17 +211,55 @@ func Test_InFlightPods(t *testing.T) {
 		name            string
 		queueingHintMap QueueingHintMapPerProfile
 		// initialPods is the initial Pods in the activeQ.
-		initialPods                []*v1.Pod
-		actions                    []action
-		wantInFlightPods           map[types.UID]inFlightPod
-		wantActiveQPodNames        []string
-		wantBackoffQPodNames       []string
-		wantUnschedPodPoolPodNames []string
-		wantReceivedEvents         *list.List
+		initialPods                  []*v1.Pod
+		actions                      []action
+		wantInFlightPods             map[types.UID]inFlightPod
+		wantActiveQPodNames          []string
+		wantBackoffQPodNames         []string
+		wantUnschedPodPoolPodNames   []string
+		wantReceivedEvents           *list.List
+		isSchedulingQueueHintEnabled bool
 	}{
 		{
-			name:        "Pod is registered in inFlightPods with no previousEvent if Pod is popped from activeQ while no receivedEvents",
+			name:        "when SchedulingQueueHint is disabled, inFlightPods and receivedEvents should be empty",
 			initialPods: []*v1.Pod{pod},
+			actions: []action{
+				// This Pod shouldn't be added to inFlightPods because SchedulingQueueHint is disabled.
+				{podPopped: pod},
+				// This event shouldn't be added to receivedEvents because SchedulingQueueHint is disabled.
+				{eventHappens: &PvAdd},
+			},
+			wantInFlightPods:   map[types.UID]inFlightPod{},
+			wantReceivedEvents: clusterEventsToList([]*clusterEvent{}),
+		},
+		{
+			name:        "when SchedulingQueueHint is disabled, which queue to enqueue Pod should be decided without SchedulingQueueHint",
+			initialPods: []*v1.Pod{pod},
+			actions: []action{
+				{podPopped: pod},
+				{eventHappens: &AssignedPodAdd},
+				{podEnqueued: newQueuedPodInfoForLookup(pod, "fooPlugin1")},
+			},
+			wantBackoffQPodNames: []string{"targetpod"},
+			wantInFlightPods:     map[types.UID]inFlightPod{},
+			wantReceivedEvents:   list.New(),
+			queueingHintMap: QueueingHintMapPerProfile{
+				"": {
+					// This hint fn tells that this event doesn't make a Pod schedulable.
+					// However, this QueueingHintFn will be ignored actually because SchedulingQueueHint is disabled.
+					AssignedPodAdd: {
+						{
+							PluginName:     "fooPlugin1",
+							QueueingHintFn: queueHintReturnQueueSkip,
+						},
+					},
+				},
+			},
+		},
+		{
+			name:                         "Pod is registered in inFlightPods with no previousEvent if Pod is popped from activeQ while no receivedEvents",
+			isSchedulingQueueHintEnabled: true,
+			initialPods:                  []*v1.Pod{pod},
 			actions: []action{
 				// This won't be added to receivedEvents because no inFlightPods at this point.
 				{eventHappens: &PvcAdd},
@@ -236,8 +277,9 @@ func Test_InFlightPods(t *testing.T) {
 			}),
 		},
 		{
-			name:        "Pod, registered in inFlightPods with no previousEvent, is enqueued back to activeQ",
-			initialPods: []*v1.Pod{pod, pod2},
+			name:                         "Pod, registered in inFlightPods with no previousEvent, is enqueued back to activeQ",
+			isSchedulingQueueHintEnabled: true,
+			initialPods:                  []*v1.Pod{pod, pod2},
 			actions: []action{
 				// This won't be added to receivedEvents because no inFlightPods at this point.
 				{eventHappens: &PvcAdd},
@@ -261,8 +303,9 @@ func Test_InFlightPods(t *testing.T) {
 			}),
 		},
 		{
-			name:        "Pod registered in inFlightPods with previousEvent with inFlightPodsNum:0 is enqueued back to activeQ",
-			initialPods: []*v1.Pod{pod, pod2},
+			name:                         "Pod registered in inFlightPods with previousEvent with inFlightPodsNum:0 is enqueued back to activeQ",
+			isSchedulingQueueHintEnabled: true,
+			initialPods:                  []*v1.Pod{pod, pod2},
 			actions: []action{
 				// This won't be added to receivedEvents because no inFlightPods at this point.
 				{eventHappens: &PvcAdd},
@@ -283,8 +326,9 @@ func Test_InFlightPods(t *testing.T) {
 			}),
 		},
 		{
-			name:        "Pod registered in inFlightPods with previousEvent with inFlightPodsNum:non-zero is enqueued back to activeQ",
-			initialPods: []*v1.Pod{pod, pod2, pod3},
+			name:                         "Pod registered in inFlightPods with previousEvent with inFlightPodsNum:non-zero is enqueued back to activeQ",
+			isSchedulingQueueHintEnabled: true,
+			initialPods:                  []*v1.Pod{pod, pod2, pod3},
 			actions: []action{
 				// This won't be added to receivedEvents because no inFlightPods at this point.
 				{eventHappens: &PvcAdd},
@@ -317,8 +361,9 @@ func Test_InFlightPods(t *testing.T) {
 			}),
 		},
 		{
-			name:        "events before popping Pod are ignored",
-			initialPods: []*v1.Pod{pod},
+			name:                         "events before popping Pod are ignored",
+			isSchedulingQueueHintEnabled: true,
+			initialPods:                  []*v1.Pod{pod},
 			actions: []action{
 				{eventHappens: &WildCardEvent},
 				{podPopped: pod},
@@ -342,8 +387,9 @@ func Test_InFlightPods(t *testing.T) {
 			},
 		},
 		{
-			name:        "pod is enqueued to backoff if no failed plugin",
-			initialPods: []*v1.Pod{pod},
+			name:                         "pod is enqueued to backoff if no failed plugin",
+			isSchedulingQueueHintEnabled: true,
+			initialPods:                  []*v1.Pod{pod},
 			actions: []action{
 				{podPopped: pod},
 				{eventHappens: &AssignedPodAdd},
@@ -365,8 +411,9 @@ func Test_InFlightPods(t *testing.T) {
 			},
 		},
 		{
-			name:        "pod is enqueued to unschedulable pod pool if no events that can make the pod schedulable",
-			initialPods: []*v1.Pod{pod},
+			name:                         "pod is enqueued to unschedulable pod pool if no events that can make the pod schedulable",
+			isSchedulingQueueHintEnabled: true,
+			initialPods:                  []*v1.Pod{pod},
 			actions: []action{
 				{podPopped: pod},
 				{eventHappens: &NodeAdd},
@@ -389,8 +436,9 @@ func Test_InFlightPods(t *testing.T) {
 			},
 		},
 		{
-			name:        "pod is enqueued to unschedulable pod pool because the failed plugin has a hint fn but it returns QueueSkip",
-			initialPods: []*v1.Pod{pod},
+			name:                         "pod is enqueued to unschedulable pod pool because the failed plugin has a hint fn but it returns QueueSkip",
+			isSchedulingQueueHintEnabled: true,
+			initialPods:                  []*v1.Pod{pod},
 			actions: []action{
 				{podPopped: pod},
 				{eventHappens: &AssignedPodAdd},
@@ -413,8 +461,9 @@ func Test_InFlightPods(t *testing.T) {
 			},
 		},
 		{
-			name:        "pod is enqueued to activeQ because the failed plugin has a hint fn and it returns QueueImmediately",
-			initialPods: []*v1.Pod{pod},
+			name:                         "pod is enqueued to activeQ because the failed plugin has a hint fn and it returns QueueImmediately",
+			isSchedulingQueueHintEnabled: true,
+			initialPods:                  []*v1.Pod{pod},
 			actions: []action{
 				{podPopped: pod},
 				{eventHappens: &AssignedPodAdd},
@@ -446,8 +495,9 @@ func Test_InFlightPods(t *testing.T) {
 			},
 		},
 		{
-			name:        "pod is enqueued to backoffQ because the failed plugin has a hint fn and it returns QueueAfterBackoff",
-			initialPods: []*v1.Pod{pod},
+			name:                         "pod is enqueued to backoffQ because the failed plugin has a hint fn and it returns QueueAfterBackoff",
+			isSchedulingQueueHintEnabled: true,
+			initialPods:                  []*v1.Pod{pod},
 			actions: []action{
 				{podPopped: pod},
 				{eventHappens: &AssignedPodAdd},
@@ -477,6 +527,7 @@ func Test_InFlightPods(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, test.isSchedulingQueueHintEnabled)()
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
