@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"k8s.io/api/admissionregistration/v1alpha1"
+	v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -319,6 +320,23 @@ func (c *celAdmissionController) Validate(
 					continue
 				}
 			}
+			var namespace *v1.Namespace
+			namespaceName := a.GetNamespace()
+
+			// Special case, the namespace object has the namespace of itself (maybe a bug).
+			// unset it if the incoming object is a namespace
+			if gvk := a.GetKind(); gvk.Kind == "Namespace" && gvk.Version == "v1" && gvk.Group == "" {
+				namespaceName = ""
+			}
+
+			// if it is cluster scoped, namespaceName will be empty
+			// Otherwise, get the Namespace resource.
+			if namespaceName != "" {
+				namespace, err = c.policyController.matcher.GetNamespace(namespaceName)
+				if err != nil {
+					return err
+				}
+			}
 
 			if versionedAttr == nil {
 				va, err := admission.NewVersionedAttributes(a, matchKind, o)
@@ -330,7 +348,7 @@ func (c *celAdmissionController) Validate(
 				versionedAttr = va
 			}
 
-			validationResult := bindingInfo.validator.Validate(ctx, versionedAttr, param, celconfig.RuntimeCELCostBudget, authz)
+			validationResult := bindingInfo.validator.Validate(ctx, versionedAttr, param, namespace, celconfig.RuntimeCELCostBudget, authz)
 
 			for i, decision := range validationResult.Decisions {
 				switch decision.Action {

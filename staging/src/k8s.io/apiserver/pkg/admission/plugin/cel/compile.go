@@ -33,6 +33,7 @@ const (
 	OldObjectVarName                 = "oldObject"
 	ParamsVarName                    = "params"
 	RequestVarName                   = "request"
+	NamespaceVarName                 = "namespaceObject"
 	AuthorizerVarName                = "authorizer"
 	RequestResourceAuthorizerVarName = "authorizer.requestResource"
 	VariableVarName                  = "variables"
@@ -82,6 +83,56 @@ func BuildRequestType() *apiservercel.DeclType {
 		field("userInfo", userInfoType, true),
 		field("dryRun", apiservercel.BoolType, false),
 		field("options", apiservercel.DynType, false),
+	))
+}
+
+// BuildNamespaceType generates a DeclType for Namespace.
+// Certain nested fields in Namespace (e.g. managedFields, ownerReferences etc.) are omitted in the generated DeclType
+// by design.
+func BuildNamespaceType() *apiservercel.DeclType {
+	field := func(name string, declType *apiservercel.DeclType, required bool) *apiservercel.DeclField {
+		return apiservercel.NewDeclField(name, declType, required, nil, nil)
+	}
+	fields := func(fields ...*apiservercel.DeclField) map[string]*apiservercel.DeclField {
+		result := make(map[string]*apiservercel.DeclField, len(fields))
+		for _, f := range fields {
+			result[f.Name] = f
+		}
+		return result
+	}
+
+	specType := apiservercel.NewObjectType("kubernetes.NamespaceSpec", fields(
+		field("finalizers", apiservercel.NewListType(apiservercel.StringType, -1), true),
+	))
+	conditionType := apiservercel.NewObjectType("kubernetes.NamespaceCondition", fields(
+		field("status", apiservercel.StringType, true),
+		field("type", apiservercel.StringType, true),
+		field("lastTransitionTime", apiservercel.TimestampType, true),
+		field("message", apiservercel.StringType, true),
+		field("reason", apiservercel.StringType, true),
+	))
+	statusType := apiservercel.NewObjectType("kubernetes.NamespaceStatus", fields(
+		field("conditions", apiservercel.NewListType(conditionType, -1), true),
+		field("phase", apiservercel.StringType, true),
+	))
+	metadataType := apiservercel.NewObjectType("kubernetes.NamespaceMetadata", fields(
+		field("name", apiservercel.StringType, true),
+		field("generateName", apiservercel.StringType, true),
+		field("namespace", apiservercel.StringType, true),
+		field("labels", apiservercel.NewMapType(apiservercel.StringType, apiservercel.StringType, -1), true),
+		field("annotations", apiservercel.NewMapType(apiservercel.StringType, apiservercel.StringType, -1), true),
+		field("UID", apiservercel.StringType, true),
+		field("creationTimestamp", apiservercel.TimestampType, true),
+		field("deletionGracePeriodSeconds", apiservercel.IntType, true),
+		field("deletionTimestamp", apiservercel.TimestampType, true),
+		field("generation", apiservercel.IntType, true),
+		field("resourceVersion", apiservercel.StringType, true),
+		field("finalizers", apiservercel.NewListType(apiservercel.StringType, -1), true),
+	))
+	return apiservercel.NewObjectType("kubernetes.Namespace", fields(
+		field("metadata", metadataType, true),
+		field("spec", specType, true),
+		field("status", statusType, true),
 	))
 }
 
@@ -168,6 +219,7 @@ func (c compiler) CompileCELExpression(expressionAccessor ExpressionAccessor, op
 
 func mustBuildEnvs(baseEnv *environment.EnvSet) variableDeclEnvs {
 	requestType := BuildRequestType()
+	namespaceType := BuildNamespaceType()
 	envs := make(variableDeclEnvs, 4) // since the number of variable combinations is small, pre-build a environment for each
 	for _, hasParams := range []bool{false, true} {
 		for _, hasAuthorizer := range []bool{false, true} {
@@ -183,6 +235,7 @@ func mustBuildEnvs(baseEnv *environment.EnvSet) variableDeclEnvs {
 			envOpts = append(envOpts,
 				cel.Variable(ObjectVarName, cel.DynType),
 				cel.Variable(OldObjectVarName, cel.DynType),
+				cel.Variable(NamespaceVarName, namespaceType.CelType()),
 				cel.Variable(RequestVarName, requestType.CelType()))
 
 			extended, err := baseEnv.Extend(
@@ -192,6 +245,7 @@ func mustBuildEnvs(baseEnv *environment.EnvSet) variableDeclEnvs {
 					IntroducedVersion: version.MajorMinor(1, 0),
 					EnvOptions:        envOpts,
 					DeclTypes: []*apiservercel.DeclType{
+						namespaceType,
 						requestType,
 					},
 				},

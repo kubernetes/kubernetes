@@ -141,7 +141,7 @@ func TestCompositedPolicies(t *testing.T) {
 			if costBudget == 0 {
 				costBudget = celconfig.RuntimeCELCostBudget
 			}
-			result, _, err := f.ForInput(context.Background(), versionedAttr, CreateAdmissionRequest(versionedAttr.Attributes), optionalVars, costBudget)
+			result, _, err := f.ForInput(context.Background(), versionedAttr, CreateAdmissionRequest(versionedAttr.Attributes), optionalVars, nil, costBudget)
 			if !tc.expectErr && err != nil {
 				t.Fatalf("failed evaluation: %v", err)
 			}

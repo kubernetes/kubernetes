@@ -22,6 +22,7 @@ import (
 	celgo "github.com/google/cel-go/cel"
 
 	"k8s.io/api/admissionregistration/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -90,6 +91,10 @@ type Matcher interface {
 	// BindingMatches says whether this policy definition matches the provided admission
 	// resource request
 	BindingMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1alpha1.ValidatingAdmissionPolicyBinding) (bool, error)
+
+	// GetNamespace retrieves the Namespace resource by the given name. The name may be empty, in which case
+	// GetNamespace must return nil, nil
+	GetNamespace(name string) (*corev1.Namespace, error)
 }
 
 // ValidateResult defines the result of a Validator.Validate operation.
@@ -104,5 +109,5 @@ type ValidateResult struct {
 type Validator interface {
 	// Validate is used to take cel evaluations and convert into decisions
 	// runtimeCELCostBudget was added for testing purpose only. Callers should always use const RuntimeCELCostBudget from k8s.io/apiserver/pkg/apis/cel/config.go as input.
-	Validate(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult
+	Validate(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *corev1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult
 }

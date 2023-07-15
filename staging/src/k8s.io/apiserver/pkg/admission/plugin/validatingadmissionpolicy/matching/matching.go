@@ -21,6 +21,7 @@ import (
 
 	v1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/api/admissionregistration/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/client-go/kubernetes"
@@ -42,6 +43,10 @@ type MatchCriteria interface {
 type Matcher struct {
 	namespaceMatcher *namespace.Matcher
 	objectMatcher    *object.Matcher
+}
+
+func (m *Matcher) GetNamespace(name string) (*corev1.Namespace, error) {
+	return m.namespaceMatcher.GetNamespace(name)
 }
 
 // NewMatcher initialize the matcher with dependencies requires

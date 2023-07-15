@@ -347,9 +347,14 @@ func sortGVKList(list []schema.GroupVersionKind) []schema.GroupVersionKind {
 func buildEnv(hasParams bool, hasAuthorizer bool, types typeOverwrite) (*cel.Env, error) {
 	baseEnv := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())
 	requestType := plugincel.BuildRequestType()
+	namespaceType := plugincel.BuildNamespaceType()
 
 	var varOpts []cel.EnvOption
 	var declTypes []*apiservercel.DeclType
+
+	// namespace, hand-crafted type
+	declTypes = append(declTypes, namespaceType)
+	varOpts = append(varOpts, createVariableOpts(namespaceType, plugincel.NamespaceVarName)...)
 
 	// request, hand-crafted type
 	declTypes = append(declTypes, requestType)

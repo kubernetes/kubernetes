@@ -81,7 +81,7 @@ func (m *matcher) Match(ctx context.Context, versionedAttr *admission.VersionedA
 	evalResults, _, err := m.filter.ForInput(ctx, versionedAttr, celplugin.CreateAdmissionRequest(versionedAttr.Attributes), celplugin.OptionalVariableBindings{
 		VersionedParams: versionedParams,
 		Authorizer:      authz,
-	}, celconfig.RuntimeCELCostBudgetMatchConditions)
+	}, nil, celconfig.RuntimeCELCostBudgetMatchConditions)
 
 	if err != nil {
 		admissionmetrics.Metrics.ObserveMatchConditionEvaluationTime(ctx, time.Since(t), m.objectName, m.matcherKind, m.matcherType, string(versionedAttr.GetOperation()))

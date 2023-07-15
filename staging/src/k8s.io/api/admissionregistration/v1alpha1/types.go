@@ -242,6 +242,7 @@ type Validation struct {
 	// - 'oldObject' - The existing object. The value is null for CREATE requests.
 	// - 'request' - Attributes of the API request([ref](/pkg/apis/admission/types.go#AdmissionRequest)).
 	// - 'params' - Parameter resource referred to by the policy binding being evaluated. Only populated if the policy has a ParamKind.
+	// - 'namespaceObject' - The namespace object that the incoming object belongs to. The value is null for cluster-scoped resources.
 	// - 'variables' - Map of composited variables, from its name to its lazily evaluated value.
 	//   For example, a variable named 'foo' can be accessed as 'variables.foo'.
 	// - 'authorizer' - A CEL Authorizer. May be used to perform authorization checks for the principal (user or service account) of the request.

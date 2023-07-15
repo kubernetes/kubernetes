@@ -72,6 +72,10 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin][Alpha][
 					Expression:        "object.spec.replicas > 1",
 					MessageExpression: "'wants replicas > 1, got ' + object.spec.replicas",
 				}).
+				WithValidation(admissionregistrationv1alpha1.Validation{
+					Expression: "namespaceObject.metadata.name == '" + f.UniqueName + "'",
+					Message:    "Internal error! Other namespace should not be allowed.",
+				}).
 				Build()
 			policy, err := client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Create(ctx, policy, metav1.CreateOptions{})
 			framework.ExpectNoError(err, "create policy")

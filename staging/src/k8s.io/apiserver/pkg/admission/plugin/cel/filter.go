@@ -27,6 +27,7 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	authenticationv1 "k8s.io/api/authentication/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -46,7 +47,7 @@ func NewFilterCompiler(env *environment.EnvSet) FilterCompiler {
 }
 
 type evaluationActivation struct {
-	object, oldObject, params, request, authorizer, requestResourceAuthorizer, variables interface{}
+	object, oldObject, params, request, namespace, authorizer, requestResourceAuthorizer, variables interface{}
 }
 
 // ResolveName returns a value from the activation by qualified name, or false if the name
@@ -61,6 +62,8 @@ func (a *evaluationActivation) ResolveName(name string) (interface{}, bool) {
 		return a.params, true // params may be null
 	case RequestVarName:
 		return a.request, true
+	case NamespaceVarName:
+		return a.namespace, true
 	case AuthorizerVarName:
 		return a.authorizer, a.authorizer != nil
 	case RequestResourceAuthorizerVarName:
@@ -126,7 +129,7 @@ func objectToResolveVal(r runtime.Object) (interface{}, error) {
 // ForInput evaluates the compiled CEL expressions converting them into CELEvaluations
 // errors per evaluation are returned on the Evaluation object
 // runtimeCELCostBudget was added for testing purpose only. Callers should always use const RuntimeCELCostBudget from k8s.io/apiserver/pkg/apis/cel/config.go as input.
-func (f *filter) ForInput(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *admissionv1.AdmissionRequest, inputs OptionalVariableBindings, runtimeCELCostBudget int64) ([]EvaluationResult, int64, error) {
+func (f *filter) ForInput(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *admissionv1.AdmissionRequest, inputs OptionalVariableBindings, namespace *v1.Namespace, runtimeCELCostBudget int64) ([]EvaluationResult, int64, error) {
 	// TODO: replace unstructured with ref.Val for CEL variables when native type support is available
 	evaluations := make([]EvaluationResult, len(f.compilationResults))
 	var err error
@@ -156,11 +159,16 @@ func (f *filter) ForInput(ctx context.Context, versionedAttr *admission.Versione
 	if err != nil {
 		return nil, -1, err
 	}
+	namespaceVal, err := objectToResolveVal(namespace)
+	if err != nil {
+		return nil, -1, err
+	}
 	va := &evaluationActivation{
 		object:                    objectVal,
 		oldObject:                 oldObjectVal,
 		params:                    paramsVal,
 		request:                   requestVal.Object,
+		namespace:                 namespaceVal,
 		authorizer:                authorizerVal,
 		requestResourceAuthorizer: requestResourceAuthorizerVal,
 	}
@@ -303,6 +311,33 @@ func CreateAdmissionRequest(attr admission.Attributes) *admissionv1.AdmissionReq
 		DryRun: &dryRun,
 		Options: runtime.RawExtension{
 			Object: attr.GetOperationOptions(),
+		},
+	}
+}
+
+// CreateNamespaceObject creates a Namespace object that is suitable for the CEL evaluation.
+// If the namespace is nil, CreateNamespaceObject returns nil
+func CreateNamespaceObject(namespace *v1.Namespace) *v1.Namespace {
+	if namespace == nil {
+		return nil
+	}
+
+	return &v1.Namespace{
+		Status: namespace.Status,
+		Spec:   namespace.Spec,
+		ObjectMeta: metav1.ObjectMeta{
+			Name:                       namespace.Name,
+			GenerateName:               namespace.GenerateName,
+			Namespace:                  namespace.Namespace,
+			UID:                        namespace.UID,
+			ResourceVersion:            namespace.ResourceVersion,
+			Generation:                 namespace.Generation,
+			CreationTimestamp:          namespace.CreationTimestamp,
+			DeletionTimestamp:          namespace.DeletionTimestamp,
+			DeletionGracePeriodSeconds: namespace.DeletionGracePeriodSeconds,
+			Labels:                     namespace.Labels,
+			Annotations:                namespace.Annotations,
+			Finalizers:                 namespace.Finalizers,
 		},
 	}
 }
