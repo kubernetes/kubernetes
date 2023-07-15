@@ -143,9 +143,10 @@ func TestWarnings(t *testing.T) {
 		api.ResourceEphemeralStorage: resource.MustParse("4m"),
 	}
 	testcases := []struct {
-		name     string
-		template *api.PodTemplateSpec
-		expected []string
+		name        string
+		template    *api.PodTemplateSpec
+		oldTemplate *api.PodTemplateSpec
+		expected    []string
 	}{
 		{
 			name:     "null",
@@ -617,11 +618,455 @@ func TestWarnings(t *testing.T) {
 				`spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[1].podAffinityTerm.labelSelector: a null labelSelector results in matching no pod`,
 			},
 		},
+		{
+			name: "container no ports",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name:  "foo",
+					Ports: []api.ContainerPort{},
+				}},
+			}},
+			expected: []string{},
+		},
+		{
+			name: "one container, one port",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, HostPort: 80},
+					},
+				}},
+			}},
+			expected: []string{},
+		},
+		{
+			name: "one container, two ports, same protocol, different ports",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, Protocol: api.ProtocolUDP},
+						{ContainerPort: 81, Protocol: api.ProtocolUDP},
+					},
+				}},
+			}},
+			expected: []string{},
+		},
+		{
+			name: "one container, two ports, different protocols, same port",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, Protocol: api.ProtocolUDP},
+						{ContainerPort: 80, Protocol: api.ProtocolTCP},
+					},
+				}},
+			}},
+			expected: []string{},
+		},
+		{
+			name: "one container, two ports, same protocol, same port, different hostport",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, Protocol: api.ProtocolTCP, HostPort: 80},
+						{ContainerPort: 80, Protocol: api.ProtocolTCP, HostPort: 81},
+					},
+				}},
+			}},
+			expected: []string{},
+		},
+		{
+			name: "one container, two ports, same protocol, port and hostPort, different hostIP",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, Protocol: api.ProtocolTCP, HostPort: 80, HostIP: "10.0.0.1"},
+						{ContainerPort: 80, Protocol: api.ProtocolTCP, HostPort: 80, HostIP: "10.0.0.2"},
+					},
+				}},
+			}},
+			expected: []string{},
+		},
+		{
+			name: "two containers, one port each, same protocol, different ports",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, Protocol: api.ProtocolUDP},
+					},
+				}, {
+					Name: "bar",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 81, Protocol: api.ProtocolUDP},
+					},
+				}},
+			}},
+			expected: []string{},
+		},
+		{
+			name: "two containers, one port each, different protocols, same port",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, Protocol: api.ProtocolUDP},
+					},
+				}, {
+					Name: "bar",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, Protocol: api.ProtocolTCP},
+					},
+				}},
+			}},
+			expected: []string{},
+		},
+		{
+			name: "two containers, one port each, same protocol, same port, different hostport",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, Protocol: api.ProtocolTCP, HostPort: 80},
+					},
+				}, {
+					Name: "bar",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, Protocol: api.ProtocolTCP, HostPort: 81},
+					},
+				}},
+			}},
+			expected: []string{},
+		},
+		{
+			name: "two containers, one port each, same protocol, port and hostPort, different hostIP",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, Protocol: api.ProtocolTCP, HostPort: 80, HostIP: "10.0.0.1"},
+					},
+				}, {
+					Name: "bar",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, Protocol: api.ProtocolTCP, HostPort: 80, HostIP: "10.0.0.2"},
+					},
+				}},
+			}},
+			expected: []string{},
+		},
+		{
+			name: "duplicate container ports with same port and protocol",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, Protocol: api.ProtocolUDP},
+						{ContainerPort: 80, Protocol: api.ProtocolUDP},
+					},
+				}},
+			}},
+			expected: []string{
+				`spec.containers[0].ports[1]: duplicate port definition with spec.containers[0].ports[0]`,
+			},
+		},
+		{
+			name: "duplicate container ports with same port, hostPort and protocol",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP},
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP},
+					},
+				}},
+			}},
+			expected: []string{
+				`spec.containers[0].ports[1]: duplicate port definition with spec.containers[0].ports[0]`,
+			},
+		},
+		{
+			name: "duplicate container ports with same port, host port, host IP and protocol",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP, HostIP: "10.0.0.1"},
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP, HostIP: "10.0.0.1"},
+					},
+				}},
+			}},
+			expected: []string{
+				`spec.containers[0].ports[1]: duplicate port definition with spec.containers[0].ports[0]`,
+			},
+		},
+		{
+			name: "one container port hostIP set without host port set",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, Protocol: api.ProtocolUDP, HostIP: "10.0.0.1"},
+					},
+				}},
+			}},
+			expected: []string{
+				`spec.containers[0].ports[0]: hostIP set without hostPort: {Name: HostPort:0 ContainerPort:80 Protocol:UDP HostIP:10.0.0.1}`,
+			},
+		},
+		{
+			name: "duplicate container ports with one host port set and one without",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP, HostIP: "10.0.0.1"},
+						{ContainerPort: 80, Protocol: api.ProtocolUDP, HostIP: "10.0.0.1"},
+					},
+				}},
+			}},
+			expected: []string{
+				`spec.containers[0].ports[1]: overlapping port definition with spec.containers[0].ports[0]`,
+				`spec.containers[0].ports[1]: hostIP set without hostPort: {Name: HostPort:0 ContainerPort:80 Protocol:UDP HostIP:10.0.0.1}`,
+			},
+		},
+		{
+			name: "duplicate container ports without one host IP set and two with",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP, HostIP: "10.0.0.1"},
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP},
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP, HostIP: "10.0.0.2"},
+					},
+				}},
+			}},
+			expected: []string{
+				`spec.containers[0].ports[1]: dangerously ambiguous port definition with spec.containers[0].ports[0]`,
+				`spec.containers[0].ports[2]: dangerously ambiguous port definition with spec.containers[0].ports[1]`,
+			},
+		},
+		{
+			name: "duplicate container ports with one host IP set and one without",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP, HostIP: "10.0.0.1"},
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP},
+					},
+				}},
+			}},
+			expected: []string{
+				`spec.containers[0].ports[1]: dangerously ambiguous port definition with spec.containers[0].ports[0]`,
+			},
+		},
+		{
+			name: "duplicate containers with same port and protocol",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, Protocol: api.ProtocolUDP},
+					},
+				}, {
+					Name: "bar",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, Protocol: api.ProtocolUDP},
+					},
+				}},
+			}},
+			expected: []string{
+				`spec.containers[1].ports[0]: duplicate port definition with spec.containers[0].ports[0]`,
+			},
+		},
+		{
+			name: "duplicate containers with same port, hostPort and protocol",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP},
+					},
+				}, {
+					Name: "bar",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP},
+					},
+				}},
+			}},
+			expected: []string{
+				`spec.containers[1].ports[0]: duplicate port definition with spec.containers[0].ports[0]`,
+			},
+		},
+		{
+			name: "duplicate containers with same port, host port, host IP and protocol",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP, HostIP: "10.0.0.1"},
+					},
+				}, {
+					Name: "bar",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP, HostIP: "10.0.0.1"},
+					},
+				}},
+			}},
+			expected: []string{
+				`spec.containers[1].ports[0]: duplicate port definition with spec.containers[0].ports[0]`,
+			},
+		},
+		{
+			name: "duplicate containers with one host port set and one without",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP, HostIP: "10.0.0.1"},
+					},
+				}, {
+					Name: "bar",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, Protocol: api.ProtocolUDP, HostIP: "10.0.0.1"},
+					},
+				}},
+			}},
+			expected: []string{
+				`spec.containers[1].ports[0]: overlapping port definition with spec.containers[0].ports[0]`,
+				`spec.containers[1].ports[0]: hostIP set without hostPort: {Name: HostPort:0 ContainerPort:80 Protocol:UDP HostIP:10.0.0.1}`,
+			},
+		},
+		{
+			name: "duplicate container ports without one host IP set and one with",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP},
+					},
+				}, {
+					Name: "bar",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP, HostIP: "10.0.0.1"},
+					},
+				}},
+			}},
+			expected: []string{
+				`spec.containers[1].ports[0]: dangerously ambiguous port definition with spec.containers[0].ports[0]`,
+			},
+		},
+		{
+			name: "duplicate container ports with one host IP set and one without",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP, HostIP: "10.0.0.1"},
+					},
+				}, {
+					Name: "bar",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP},
+					},
+				}},
+			}},
+			expected: []string{
+				`spec.containers[1].ports[0]: dangerously ambiguous port definition with spec.containers[0].ports[0]`,
+			},
+		},
+		{
+			name: "create duplicate container ports in two containers",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "foo1",
+						Ports: []api.ContainerPort{
+							{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP},
+							{ContainerPort: 180, HostPort: 80, Protocol: api.ProtocolUDP},
+							{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP},
+						},
+					},
+					{
+						Name: "foo",
+						Ports: []api.ContainerPort{
+							{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP},
+							{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP},
+						},
+					}},
+			}},
+			expected: []string{
+				`spec.containers[0].ports[2]: duplicate port definition with spec.containers[0].ports[0]`,
+				`spec.containers[1].ports[0]: duplicate port definition with spec.containers[0].ports[0]`,
+				`spec.containers[1].ports[0]: duplicate port definition with spec.containers[0].ports[2]`,
+				`spec.containers[1].ports[1]: duplicate port definition with spec.containers[0].ports[0]`,
+				`spec.containers[1].ports[1]: duplicate port definition with spec.containers[0].ports[2]`,
+				`spec.containers[1].ports[1]: duplicate port definition with spec.containers[1].ports[0]`,
+			},
+		},
+		{
+			name: "update duplicate container ports in two containers",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "foo1",
+						Ports: []api.ContainerPort{
+							{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolTCP},
+							{ContainerPort: 180, HostPort: 80, Protocol: api.ProtocolTCP},
+							{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolTCP},
+						},
+					},
+					{
+						Name: "foo",
+						Ports: []api.ContainerPort{
+							{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolTCP},
+							{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolTCP},
+						},
+					}},
+			}},
+			oldTemplate: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "foo1",
+						Ports: []api.ContainerPort{
+							{ContainerPort: 80, HostPort: 180, Protocol: api.ProtocolTCP},
+							{ContainerPort: 180, HostPort: 80, Protocol: api.ProtocolTCP},
+							{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolTCP},
+						},
+					},
+					{
+						Name: "foo",
+						Ports: []api.ContainerPort{
+							{ContainerPort: 80, HostPort: 180, Protocol: api.ProtocolTCP},
+							{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolTCP},
+						},
+					}},
+			}},
+			expected: []string{
+				`spec.containers[0].ports[2]: duplicate port definition with spec.containers[0].ports[0]`,
+				`spec.containers[1].ports[0]: duplicate port definition with spec.containers[0].ports[0]`,
+				`spec.containers[1].ports[0]: duplicate port definition with spec.containers[0].ports[2]`,
+				`spec.containers[1].ports[1]: duplicate port definition with spec.containers[0].ports[0]`,
+				`spec.containers[1].ports[1]: duplicate port definition with spec.containers[0].ports[2]`,
+				`spec.containers[1].ports[1]: duplicate port definition with spec.containers[1].ports[0]`,
+			},
+		},
 	}
 
 	for _, tc := range testcases {
 		t.Run("podspec_"+tc.name, func(t *testing.T) {
-			actual := sets.NewString(GetWarningsForPodTemplate(context.TODO(), nil, tc.template, &api.PodTemplateSpec{})...)
+			var oldTemplate *api.PodTemplateSpec
+			if tc.oldTemplate != nil {
+				oldTemplate = tc.oldTemplate
+			}
+			actual := sets.NewString(GetWarningsForPodTemplate(context.TODO(), nil, tc.template, oldTemplate)...)
 			expected := sets.NewString(tc.expected...)
 			for _, missing := range expected.Difference(actual).List() {
 				t.Errorf("missing: %s", missing)
