@@ -451,6 +451,32 @@ func TestNewCmdConfigPrintActionDefaults(t *testing.T) {
 			componentConfigs: "KubeProxyConfiguration,KubeletConfiguration",
 			cmdProc:          newCmdConfigPrintJoinDefaults,
 		},
+		{
+			name: "ResetConfiguration: No component configs",
+			expectedKinds: []string{
+				constants.ResetConfigurationKind,
+			},
+			cmdProc: newCmdConfigPrintResetDefaults,
+		},
+		{
+			name: "JoinConfiguration: KubeProxyConfiguration",
+			expectedKinds: []string{
+				"KubeProxyConfiguration",
+				constants.ResetConfigurationKind,
+			},
+			componentConfigs: "KubeProxyConfiguration",
+			cmdProc:          newCmdConfigPrintResetDefaults,
+		},
+		{
+			name: "JoinConfiguration: KubeProxyConfiguration and KubeletConfiguration",
+			expectedKinds: []string{
+				"KubeProxyConfiguration",
+				"KubeletConfiguration",
+				constants.ResetConfigurationKind,
+			},
+			componentConfigs: "KubeProxyConfiguration,KubeletConfiguration",
+			cmdProc:          newCmdConfigPrintResetDefaults,
+		},
 	}
 
 	for _, test := range tests {
