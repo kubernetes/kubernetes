@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/kubernetes/pkg/features"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 
 	"github.com/fsnotify/fsnotify"
@@ -876,6 +877,11 @@ func (s *ProxyServer) Run() error {
 	// https://issues.k8s.io/111321
 	if s.Config.DetectLocalMode == kubeproxyconfig.LocalModeNodeCIDR {
 		nodeConfig.RegisterEventHandler(proxy.NewNodePodCIDRHandler(s.podCIDRs))
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeProxyDrainingTerminatingNodes) {
+		nodeConfig.RegisterEventHandler(&proxy.NodeEligibleHandler{
+			HealthServer: s.HealthzServer,
+		})
 	}
 	nodeConfig.RegisterEventHandler(s.Proxier)
 
