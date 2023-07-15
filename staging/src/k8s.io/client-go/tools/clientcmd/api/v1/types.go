@@ -221,6 +221,7 @@ type ExecConfig struct {
 	// This text is shown to the user when the executable doesn't seem to be
 	// present. For example, `brew install foo-cli` might be a good InstallHint for
 	// foo-cli on Mac OS systems.
+	// +optional
 	InstallHint string `json:"installHint,omitempty"`
 
 	// ProvideClusterInfo determines whether or not to provide cluster information,
@@ -228,6 +229,7 @@ type ExecConfig struct {
 	// part of the KUBERNETES_EXEC_INFO environment variable. By default, it is set
 	// to false. Package k8s.io/client-go/tools/auth/exec provides helper methods for
 	// reading this environment variable.
+	// +optional
 	ProvideClusterInfo bool `json:"provideClusterInfo"`
 
 	// InteractiveMode determines this plugin's relationship with standard input. Valid
