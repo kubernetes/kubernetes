@@ -233,7 +233,8 @@ type NodeRegistrationOptions struct {
 	// +optional
 	KubeletExtraArgs map[string]string `json:"kubeletExtraArgs,omitempty"`
 
-	// IgnorePreflightErrors provides a slice of pre-flight errors to be ignored when the current node is registered.
+	// IgnorePreflightErrors provides a slice of pre-flight errors to be ignored when the current node is registered, e.g. 'IsPrivilegedUser,Swap'.
+	// Value 'all' ignores errors from all checks.
 	// +optional
 	IgnorePreflightErrors []string `json:"ignorePreflightErrors,omitempty"`
 
@@ -482,6 +483,7 @@ type ResetConfiguration struct {
 	Force bool `json:"force,omitempty"`
 
 	// IgnorePreflightErrors provides a slice of pre-flight errors to be ignored during the reset process, e.g. 'IsPrivilegedUser,Swap'.
+	// Value 'all' ignores errors from all checks.
 	// +optional
 	IgnorePreflightErrors []string `json:"ignorePreflightErrors,omitempty"`
 

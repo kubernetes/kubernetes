@@ -605,13 +605,6 @@ func ValidateIgnorePreflightErrors(ignorePreflightErrorsFromCLI, ignorePreflight
 		ignoreErrors.Insert(strings.ToLower(item)) // parameters are case insensitive
 	}
 
-	if ignoreErrors.Has("all") {
-		// "all" is forbidden in config files. Administrators should use an
-		// explicit list of errors they want to ignore, as it can be risky to
-		// mask all errors in such a way. Hence, we return an error:
-		allErrs = append(allErrs, field.Invalid(field.NewPath("ignorePreflightErrors"), "all", "'all' cannot be used in configuration file"))
-	}
-
 	for _, item := range ignorePreflightErrorsFromCLI {
 		ignoreErrors.Insert(strings.ToLower(item)) // parameters are case insensitive
 	}
