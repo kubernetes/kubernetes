@@ -162,36 +162,40 @@ func TestStatefulSetControl(t *testing.T) {
 	largeSetFn := func() *apps.StatefulSet { return newStatefulSet(5) }
 
 	testCases := []struct {
-		fn  func(*testing.T, *apps.StatefulSet, invariantFunc)
-		obj func() *apps.StatefulSet
+		fn                   func(*testing.T, *apps.StatefulSet, invariantFunc, bool)
+		obj                  func() *apps.StatefulSet
+		podIndexLabelEnabled bool
 	}{
-		{CreatesPods, simpleSetFn},
-		{ScalesUp, simpleSetFn},
-		{ScalesDown, simpleSetFn},
-		{ReplacesPods, largeSetFn},
-		{RecreatesFailedPod, simpleSetFn},
-		{CreatePodFailure, simpleSetFn},
-		{UpdatePodFailure, simpleSetFn},
-		{UpdateSetStatusFailure, simpleSetFn},
-		{PodRecreateDeleteFailure, simpleSetFn},
-		{NewRevisionDeletePodFailure, simpleSetFn},
-		{RecreatesPVCForPendingPod, simpleSetFn},
+		{CreatesPods, simpleSetFn, true},
+		{CreatesPods, simpleSetFn, false},
+		{ScalesUp, simpleSetFn, true},
+		{ScalesDown, simpleSetFn, true},
+		{ReplacesPods, largeSetFn, true},
+		{RecreatesFailedPod, simpleSetFn, true},
+		{CreatePodFailure, simpleSetFn, true},
+		{UpdatePodFailure, simpleSetFn, true},
+		{UpdateSetStatusFailure, simpleSetFn, true},
+		{PodRecreateDeleteFailure, simpleSetFn, true},
+		{NewRevisionDeletePodFailure, simpleSetFn, true},
+		{RecreatesPVCForPendingPod, simpleSetFn, true},
 	}
 
 	for _, testCase := range testCases {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodIndexLabel, testCase.podIndexLabelEnabled)()
 		fnName := runtime.FuncForPC(reflect.ValueOf(testCase.fn).Pointer()).Name()
 		if i := strings.LastIndex(fnName, "."); i != -1 {
 			fnName = fnName[i+1:]
 		}
 		testObj := testCase.obj
 		testFn := testCase.fn
+		podIndexLabelEnabled := testCase.podIndexLabelEnabled
 		runTestOverPVCRetentionPolicies(
 			t,
 			fmt.Sprintf("%s/Monotonic", fnName),
 			func(t *testing.T, policy *apps.StatefulSetPersistentVolumeClaimRetentionPolicy) {
 				set := testObj()
 				set.Spec.PersistentVolumeClaimRetentionPolicy = policy
-				testFn(t, set, assertMonotonicInvariants)
+				testFn(t, set, assertMonotonicInvariants, podIndexLabelEnabled)
 			},
 		)
 		runTestOverPVCRetentionPolicies(
@@ -200,13 +204,13 @@ func TestStatefulSetControl(t *testing.T) {
 			func(t *testing.T, policy *apps.StatefulSetPersistentVolumeClaimRetentionPolicy) {
 				set := burst(testObj())
 				set.Spec.PersistentVolumeClaimRetentionPolicy = policy
-				testFn(t, set, assertBurstInvariants)
+				testFn(t, set, assertBurstInvariants, podIndexLabelEnabled)
 			},
 		)
 	}
 }
 
-func CreatesPods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
+func CreatesPods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc, podIndexLabelEnabled bool) {
 	client := fake.NewSimpleClientset(set)
 	om, _, ssc := setupController(client)
 
@@ -227,9 +231,31 @@ func CreatesPods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) 
 	if set.Status.UpdatedReplicas != 3 {
 		t.Error("Failed to set UpdatedReplicas correctly")
 	}
+	// Check all pods have correct pod index label.
+	if podIndexLabelEnabled {
+		selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+		if err != nil {
+			t.Error(err)
+		}
+		pods, err := om.podsLister.Pods(set.Namespace).List(selector)
+		if err != nil {
+			t.Error(err)
+		}
+		for _, pod := range pods {
+			podIndexFromLabel, exists := pod.Labels[apps.StatefulSetPodIndexLabel]
+			if !exists {
+				t.Errorf("missing pod index label: %s", apps.StatefulSetPodIndexLabel)
+				continue
+			}
+			podIndexFromName := strconv.Itoa(getOrdinal(pod))
+			if podIndexFromLabel != podIndexFromName {
+				t.Errorf("pod index label value (%s) does not match pod index in pod name (%s)", podIndexFromLabel, podIndexFromName)
+			}
+		}
+	}
 }
 
-func ScalesUp(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
+func ScalesUp(t *testing.T, set *apps.StatefulSet, invariants invariantFunc, podIndexLabelEnabled bool) {
 	client := fake.NewSimpleClientset(set)
 	om, _, ssc := setupController(client)
 
@@ -256,7 +282,7 @@ func ScalesUp(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
 	}
 }
 
-func ScalesDown(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
+func ScalesDown(t *testing.T, set *apps.StatefulSet, invariants invariantFunc, podIndexLabelEnabled bool) {
 	client := fake.NewSimpleClientset(set)
 	om, _, ssc := setupController(client)
 
@@ -289,7 +315,7 @@ func ScalesDown(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
 	}
 }
 
-func ReplacesPods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
+func ReplacesPods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc, podIndexLabelEnabled bool) {
 	client := fake.NewSimpleClientset(set)
 	om, _, ssc := setupController(client)
 
@@ -372,7 +398,7 @@ func ReplacesPods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc)
 	}
 }
 
-func RecreatesFailedPod(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
+func RecreatesFailedPod(t *testing.T, set *apps.StatefulSet, invariants invariantFunc, podIndexLabelEnabled bool) {
 	client := fake.NewSimpleClientset()
 	om, _, ssc := setupController(client)
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
@@ -410,7 +436,7 @@ func RecreatesFailedPod(t *testing.T, set *apps.StatefulSet, invariants invarian
 	}
 }
 
-func CreatePodFailure(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
+func CreatePodFailure(t *testing.T, set *apps.StatefulSet, invariants invariantFunc, podIndexLabelEnabled bool) {
 	client := fake.NewSimpleClientset(set)
 	om, _, ssc := setupController(client)
 	om.SetCreateStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 2)
@@ -442,7 +468,7 @@ func CreatePodFailure(t *testing.T, set *apps.StatefulSet, invariants invariantF
 	}
 }
 
-func UpdatePodFailure(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
+func UpdatePodFailure(t *testing.T, set *apps.StatefulSet, invariants invariantFunc, podIndexLabelEnabled bool) {
 	client := fake.NewSimpleClientset(set)
 	om, _, ssc := setupController(client)
 	om.SetUpdateStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 0)
@@ -484,7 +510,7 @@ func UpdatePodFailure(t *testing.T, set *apps.StatefulSet, invariants invariantF
 	}
 }
 
-func UpdateSetStatusFailure(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
+func UpdateSetStatusFailure(t *testing.T, set *apps.StatefulSet, invariants invariantFunc, podIndexLabelEnabled bool) {
 	client := fake.NewSimpleClientset(set)
 	om, ssu, ssc := setupController(client)
 	ssu.SetUpdateStatefulSetStatusError(apierrors.NewInternalError(errors.New("API server failed")), 2)
@@ -516,7 +542,7 @@ func UpdateSetStatusFailure(t *testing.T, set *apps.StatefulSet, invariants inva
 	}
 }
 
-func PodRecreateDeleteFailure(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
+func PodRecreateDeleteFailure(t *testing.T, set *apps.StatefulSet, invariants invariantFunc, podIndexLabelEnabled bool) {
 	client := fake.NewSimpleClientset(set)
 	om, _, ssc := setupController(client)
 
@@ -562,7 +588,7 @@ func PodRecreateDeleteFailure(t *testing.T, set *apps.StatefulSet, invariants in
 	}
 }
 
-func NewRevisionDeletePodFailure(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
+func NewRevisionDeletePodFailure(t *testing.T, set *apps.StatefulSet, invariants invariantFunc, podIndexLabelEnabled bool) {
 	client := fake.NewSimpleClientset(set)
 	om, _, ssc := setupController(client)
 	if err := scaleUpStatefulSetControl(set, ssc, om, invariants); err != nil {
@@ -637,7 +663,7 @@ func emptyInvariants(set *apps.StatefulSet, om *fakeObjectManager) error {
 
 func TestStatefulSetControlWithStartOrdinal(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, true)()
-
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodIndexLabel, true)()
 	simpleSetFn := func() *apps.StatefulSet {
 		statefulSet := newStatefulSet(3)
 		statefulSet.Spec.Ordinals = &apps.StatefulSetOrdinals{Start: int32(2)}
@@ -645,7 +671,7 @@ func TestStatefulSetControlWithStartOrdinal(t *testing.T) {
 	}
 
 	testCases := []struct {
-		fn  func(*testing.T, *apps.StatefulSet, invariantFunc)
+		fn  func(*testing.T, *apps.StatefulSet, invariantFunc, bool)
 		obj func() *apps.StatefulSet
 	}{
 		{CreatesPodsWithStartOrdinal, simpleSetFn},
@@ -656,11 +682,11 @@ func TestStatefulSetControlWithStartOrdinal(t *testing.T) {
 		testFn := testCase.fn
 
 		set := testObj()
-		testFn(t, set, emptyInvariants)
+		testFn(t, set, emptyInvariants, true)
 	}
 }
 
-func CreatesPodsWithStartOrdinal(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
+func CreatesPodsWithStartOrdinal(t *testing.T, set *apps.StatefulSet, invariants invariantFunc, podIndexLabelEnabled bool) {
 	client := fake.NewSimpleClientset(set)
 	om, _, ssc := setupController(client)
 
@@ -699,7 +725,7 @@ func CreatesPodsWithStartOrdinal(t *testing.T, set *apps.StatefulSet, invariants
 	}
 }
 
-func RecreatesPVCForPendingPod(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
+func RecreatesPVCForPendingPod(t *testing.T, set *apps.StatefulSet, invariants invariantFunc, podIndexLabelEnabled bool) {
 	client := fake.NewSimpleClientset()
 	om, _, ssc := setupController(client)
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
