@@ -193,10 +193,10 @@ func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	resp.Header().Set("Content-Type", "application/json")
 	resp.Header().Set("X-Content-Type-Options", "nosniff")
 	if !healthy {
-		metrics.ProxyHealthz503Total.Inc()
+		metrics.ProxyHealthzTotal.WithLabelValues("503").Inc()
 		resp.WriteHeader(http.StatusServiceUnavailable)
 	} else {
-		metrics.ProxyHealthz200Total.Inc()
+		metrics.ProxyHealthzTotal.WithLabelValues("200").Inc()
 		resp.WriteHeader(http.StatusOK)
 		// In older releases, the returned "lastUpdated" time indicated the last
 		// time the proxier sync loop ran, even if nothing had changed. To
@@ -217,10 +217,10 @@ func (h livezHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	resp.Header().Set("Content-Type", "application/json")
 	resp.Header().Set("X-Content-Type-Options", "nosniff")
 	if !healthy {
-		metrics.ProxyLivez503Total.Inc()
+		metrics.ProxyLivezTotal.WithLabelValues("503").Inc()
 		resp.WriteHeader(http.StatusServiceUnavailable)
 	} else {
-		metrics.ProxyLivez200Total.Inc()
+		metrics.ProxyLivezTotal.WithLabelValues("200").Inc()
 		resp.WriteHeader(http.StatusOK)
 		// In older releases, the returned "lastUpdated" time indicated the last
 		// time the proxier sync loop ran, even if nothing had changed. To
