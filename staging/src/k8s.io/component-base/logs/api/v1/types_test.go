@@ -25,8 +25,10 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/json"
+
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestVModule(t *testing.T) {
@@ -169,7 +171,7 @@ func TestCompatibility(t *testing.T) {
 			expectAllFields: true,
 			expectConfig: LoggingConfiguration{
 				Format:         JSONLogFormat,
-				FlushFrequency: TimeOrMetaDuration{Duration: time.Nanosecond},
+				FlushFrequency: TimeOrMetaDuration{Duration: metav1.Duration{Duration: time.Nanosecond}},
 				Verbosity:      VerbosityLevel(5),
 				VModule: VModuleConfiguration{
 					{
@@ -239,6 +241,10 @@ func notZeroRecursive(t *testing.T, i interface{}, path string) bool {
 				// Cannot access value.
 				continue
 			}
+			if typeOfI.Field(i).Tag.Get("json") == "-" {
+				// unserialized field
+				continue
+			}
 			if !notZeroRecursive(t, value.Field(i).Interface(), path+"."+typeOfI.Field(i).Name) {
 				valid = false
 			}
@@ -277,12 +283,12 @@ func TestTimeOrMetaDuration_UnmarshalJSON(t *testing.T) {
 			name:   "string values unmarshal as metav1.Duration",
 			tomd:   &TimeOrMetaDuration{},
 			arg:    "1s",
-			wanted: "1s",
+			wanted: `"1s"`,
 		}, {
 			name:   "int values unmarshal as metav1.Duration",
 			tomd:   &TimeOrMetaDuration{},
 			arg:    1000000000,
-			wanted: "1s",
+			wanted: `1000000000`,
 		}, {
 			name:   "invalid value return error",
 			tomd:   &TimeOrMetaDuration{},
@@ -298,8 +304,12 @@ func TestTimeOrMetaDuration_UnmarshalJSON(t *testing.T) {
 			}
 
 			if err := tt.tomd.UnmarshalJSON(b); err == nil {
-				if tt.wanted != tt.tomd.String() {
-					t.Errorf("unexpected wanted for %s, wanted: %v, got: %v", tt.name, tt.wanted, tt.tomd.String())
+				data, err := tt.tomd.MarshalJSON()
+				if err != nil {
+					t.Fatal(err)
+				}
+				if tt.wanted != string(data) {
+					t.Errorf("unexpected wanted for %s, wanted: %v, got: %v", tt.name, tt.wanted, string(data))
 				}
 			} else {
 				if err.Error() != tt.wanted {

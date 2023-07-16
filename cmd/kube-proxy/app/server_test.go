@@ -222,7 +222,7 @@ nodePortAddresses:
 			},
 			Logging: logsapi.LoggingConfiguration{
 				Format:         "text",
-				FlushFrequency: logsapi.TimeOrMetaDuration{Duration: 5 * time.Second},
+				FlushFrequency: logsapi.TimeOrMetaDuration{Duration: metav1.Duration{Duration: 5 * time.Second}, SerializeAsString: true},
 			},
 		}
 

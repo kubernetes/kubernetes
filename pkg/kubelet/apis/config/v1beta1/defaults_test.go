@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -115,7 +116,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				VolumePluginDir:                           DefaultVolumePluginDir,
 				Logging: logsapi.LoggingConfiguration{
 					Format:         "text",
-					FlushFrequency: logsapi.TimeOrMetaDuration{Duration: 5 * time.Second},
+					FlushFrequency: logsapi.TimeOrMetaDuration{Duration: metav1.Duration{Duration: 5 * time.Second}, SerializeAsString: true},
 				},
 				EnableSystemLogHandler:        utilpointer.Bool(true),
 				EnableProfilingHandler:        utilpointer.Bool(true),
@@ -239,7 +240,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				KernelMemcgNotification:     false,
 				Logging: logsapi.LoggingConfiguration{
 					Format:         "",
-					FlushFrequency: logsapi.TimeOrMetaDuration{Duration: 5 * time.Second},
+					FlushFrequency: logsapi.TimeOrMetaDuration{Duration: metav1.Duration{Duration: 5 * time.Second}, SerializeAsString: true},
 				},
 				EnableSystemLogHandler:          utilpointer.Bool(false),
 				ShutdownGracePeriod:             zeroDuration,
@@ -339,7 +340,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				VolumePluginDir:        DefaultVolumePluginDir,
 				Logging: logsapi.LoggingConfiguration{
 					Format:         "text",
-					FlushFrequency: logsapi.TimeOrMetaDuration{Duration: 5 * time.Second},
+					FlushFrequency: logsapi.TimeOrMetaDuration{Duration: metav1.Duration{Duration: 5 * time.Second}, SerializeAsString: true},
 				},
 				EnableSystemLogHandler:        utilpointer.Bool(false),
 				ReservedMemory:                []v1beta1.MemoryReservation{},
@@ -481,7 +482,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				KernelMemcgNotification:     true,
 				Logging: logsapi.LoggingConfiguration{
 					Format:         "json",
-					FlushFrequency: logsapi.TimeOrMetaDuration{Duration: 5 * time.Second},
+					FlushFrequency: logsapi.TimeOrMetaDuration{Duration: metav1.Duration{Duration: 5 * time.Second}, SerializeAsString: true},
 				},
 				EnableSystemLogHandler:          utilpointer.Bool(true),
 				ShutdownGracePeriod:             metav1.Duration{Duration: 60 * time.Second},
@@ -627,7 +628,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				KernelMemcgNotification:     true,
 				Logging: logsapi.LoggingConfiguration{
 					Format:         "json",
-					FlushFrequency: logsapi.TimeOrMetaDuration{Duration: 5 * time.Second},
+					FlushFrequency: logsapi.TimeOrMetaDuration{Duration: metav1.Duration{Duration: 5 * time.Second}, SerializeAsString: true},
 				},
 				EnableSystemLogHandler:          utilpointer.Bool(true),
 				ShutdownGracePeriod:             metav1.Duration{Duration: 60 * time.Second},
@@ -724,7 +725,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				VolumePluginDir:                           DefaultVolumePluginDir,
 				Logging: logsapi.LoggingConfiguration{
 					Format:         "text",
-					FlushFrequency: logsapi.TimeOrMetaDuration{Duration: 5 * time.Second},
+					FlushFrequency: logsapi.TimeOrMetaDuration{Duration: metav1.Duration{Duration: 5 * time.Second}, SerializeAsString: true},
 				},
 				EnableSystemLogHandler:        utilpointer.Bool(true),
 				EnableProfilingHandler:        utilpointer.Bool(true),
@@ -813,7 +814,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				VolumePluginDir:                           DefaultVolumePluginDir,
 				Logging: logsapi.LoggingConfiguration{
 					Format:         "text",
-					FlushFrequency: logsapi.TimeOrMetaDuration{Duration: 5 * time.Second},
+					FlushFrequency: logsapi.TimeOrMetaDuration{Duration: metav1.Duration{Duration: 5 * time.Second}, SerializeAsString: true},
 				},
 				EnableSystemLogHandler:        utilpointer.Bool(true),
 				EnableProfilingHandler:        utilpointer.Bool(true),
@@ -902,7 +903,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				VolumePluginDir:                           DefaultVolumePluginDir,
 				Logging: logsapi.LoggingConfiguration{
 					Format:         "text",
-					FlushFrequency: logsapi.TimeOrMetaDuration{Duration: 5 * time.Second},
+					FlushFrequency: logsapi.TimeOrMetaDuration{Duration: metav1.Duration{Duration: 5 * time.Second}, SerializeAsString: true},
 				},
 				EnableSystemLogHandler:        utilpointer.Bool(true),
 				EnableProfilingHandler:        utilpointer.Bool(true),
