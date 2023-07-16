@@ -81,7 +81,7 @@ type Controller struct {
 func NewTTLController(ctx context.Context, nodeInformer informers.NodeInformer, kubeClient clientset.Interface) *Controller {
 	ttlc := &Controller{
 		kubeClient: kubeClient,
-		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ttlcontroller"),
+		queue:      workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "ttlcontroller"}),
 	}
 	logger := klog.FromContext(ctx)
 	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{

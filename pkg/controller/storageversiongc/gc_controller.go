@@ -61,8 +61,8 @@ func NewStorageVersionGC(ctx context.Context, clientset kubernetes.Interface, le
 		leaseLister:          leaseInformer.Lister(),
 		leasesSynced:         leaseInformer.Informer().HasSynced,
 		storageVersionSynced: storageVersionInformer.Informer().HasSynced,
-		leaseQueue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "storage_version_garbage_collector_leases"),
-		storageVersionQueue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "storage_version_garbage_collector_storageversions"),
+		leaseQueue:           workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "storage_version_garbage_collector_leases"}),
+		storageVersionQueue:  workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "storage_version_garbage_collector_storageversions"}),
 	}
 	logger := klog.FromContext(ctx)
 	leaseInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{

@@ -103,7 +103,7 @@ func NewSigner(cl clientset.Interface, secrets informers.SecretInformer, configM
 		secretSynced:       secrets.Informer().HasSynced,
 		configMapLister:    configMaps.Lister(),
 		configMapSynced:    configMaps.Informer().HasSynced,
-		syncQueue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "bootstrap_signer_queue"),
+		syncQueue:          workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "bootstrap_signer_queue"}),
 	}
 
 	configMaps.Informer().AddEventHandlerWithResyncPeriod(

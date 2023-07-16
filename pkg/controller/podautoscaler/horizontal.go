@@ -151,7 +151,7 @@ func NewHorizontalController(
 		hpaNamespacer:                   hpaNamespacer,
 		downscaleStabilisationWindow:    downscaleStabilisationWindow,
 		monitor:                         monitor.New(),
-		queue:                           workqueue.NewNamedRateLimitingQueue(NewDefaultHPARateLimiter(resyncPeriod), "horizontalpodautoscaler"),
+		queue:                           workqueue.NewRateLimitingQueueWithConfig(NewDefaultHPARateLimiter(resyncPeriod), workqueue.RateLimitingQueueConfig{Name: "horizontalpodautoscaler"}),
 		mapper:                          mapper,
 		recommendations:                 map[string][]timestampedRecommendation{},
 		recommendationsLock:             sync.Mutex{},

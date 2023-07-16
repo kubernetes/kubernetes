@@ -112,7 +112,7 @@ func NewExpandController(
 		cloud:                    cloud,
 		pvcLister:                pvcInformer.Lister(),
 		pvcsSynced:               pvcInformer.Informer().HasSynced,
-		queue:                    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "volume_expand"),
+		queue:                    workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "volume_expand"}),
 		translator:               translator,
 		csiMigratedPluginManager: csiMigratedPluginManager,
 	}

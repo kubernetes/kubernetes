@@ -1556,7 +1556,7 @@ func TestControllerV2UpdateCronJob(t *testing.T) {
 				return
 			}
 			jm.now = justASecondBeforeTheHour
-			queue := &fakeQueue{RateLimitingInterface: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-update-cronjob")}
+			queue := &fakeQueue{RateLimitingInterface: workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "test-update-cronjob"})}
 			jm.queue = queue
 			jm.jobControl = &fakeJobControl{}
 			jm.cronJobControl = &fakeCJControl{}

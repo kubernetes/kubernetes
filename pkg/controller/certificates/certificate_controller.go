@@ -63,11 +63,11 @@ func NewCertificateController(
 	cc := &CertificateController{
 		name:       name,
 		kubeClient: kubeClient,
-		queue: workqueue.NewNamedRateLimitingQueue(workqueue.NewMaxOfRateLimiter(
+		queue: workqueue.NewRateLimitingQueueWithConfig(workqueue.NewMaxOfRateLimiter(
 			workqueue.NewItemExponentialFailureRateLimiter(200*time.Millisecond, 1000*time.Second),
 			// 10 qps, 100 bucket size.  This is only for retry speed and its only the overall factor (not per item)
 			&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
-		), "certificate"),
+		), workqueue.RateLimitingQueueConfig{Name: "certificate"}),
 		handler: handler,
 	}
 

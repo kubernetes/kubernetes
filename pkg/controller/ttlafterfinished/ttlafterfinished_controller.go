@@ -79,7 +79,7 @@ func New(ctx context.Context, jobInformer batchinformers.JobInformer, client cli
 	tc := &Controller{
 		client:   client,
 		recorder: eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "ttl-after-finished-controller"}),
-		queue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ttl_jobs_to_delete"),
+		queue:    workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "ttl_jobs_to_delete"}),
 	}
 
 	logger := klog.FromContext(ctx)

@@ -131,8 +131,8 @@ func NewMultiCIDRRangeAllocator(
 		nodeCIDRUpdateChannel: make(chan multiCIDRNodeReservedCIDRs, cidrUpdateQueueSize),
 		broadcaster:           eventBroadcaster,
 		recorder:              recorder,
-		cidrQueue:             workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "multi_cidr_range_allocator_cidr"),
-		nodeQueue:             workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "multi_cidr_range_allocator_node"),
+		cidrQueue:             workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "multi_cidr_range_allocator_cidr"}),
+		nodeQueue:             workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "multi_cidr_range_allocator_node"}),
 		lock:                  &sync.Mutex{},
 		cidrMap:               make(map[string][]*cidrset.ClusterCIDR, 0),
 	}

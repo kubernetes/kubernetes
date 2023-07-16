@@ -78,7 +78,7 @@ func NewTokenCleaner(cl clientset.Interface, secrets coreinformers.SecretInforme
 		secretLister:         secrets.Lister(),
 		secretSynced:         secrets.Informer().HasSynced,
 		tokenSecretNamespace: options.TokenSecretNamespace,
-		queue:                workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "token_cleaner"),
+		queue:                workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "token_cleaner"}),
 	}
 
 	secrets.Informer().AddEventHandlerWithResyncPeriod(

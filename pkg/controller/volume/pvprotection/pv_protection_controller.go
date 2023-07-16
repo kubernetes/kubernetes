@@ -52,7 +52,7 @@ type Controller struct {
 func NewPVProtectionController(logger klog.Logger, pvInformer coreinformers.PersistentVolumeInformer, cl clientset.Interface) *Controller {
 	e := &Controller{
 		client: cl,
-		queue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvprotection"),
+		queue:  workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "pvprotection"}),
 	}
 
 	e.pvLister = pvInformer.Lister()

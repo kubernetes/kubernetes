@@ -155,7 +155,7 @@ func NewDaemonSetsController(
 		},
 		burstReplicas: BurstReplicas,
 		expectations:  controller.NewControllerExpectations(),
-		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "daemonset"),
+		queue:         workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: "daemonset"}),
 	}
 
 	daemonSetInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
