@@ -294,6 +294,33 @@ func latestContainerStats(info *cadvisorapiv2.ContainerInfo) (*cadvisorapiv2.Con
 	return latest, true
 }
 
+// adjustCgroupv2NodeMemoryUsage adjusts memory usage on v2 for cadvisor.
+// runc returns `total - free` from /proc/meminfo as usage to cadvisor for v2.
+// This produces a substantially higher value for root cgroup memory usage
+// for v2 compared to v1 on machines with comparable memory usage.
+// Adjust the calculation by manually summing `rss` and `cache` to align
+// v1 + v2.
+func adjustCgroupv2NodeMemoryUsage(info *cadvisorapiv2.ContainerInfo) {
+	for idx := range info.Stats {
+		stat := info.Stats[idx]
+		oldUsage := stat.Memory.Usage
+		newUsage := stat.Memory.RSS + stat.Memory.Cache
+		diff := oldUsage - newUsage // amount to adjust working set
+		stat.Memory.Usage = newUsage
+		stat.Memory.WorkingSet -= diff
+		// cadvisor calculates swap as:
+		// `ret.Memory.Swap = s.MemoryStats.SwapUsage.Usage - s.MemoryStats.Usage.Usage`
+		// so if we adjust usage by `diff`, we need to adjust swap by `diff` as well.
+		// from cadvisor, swap = swap usage - mem usage
+		// for v2 this is (total - free swap) - (total - free mem)
+		// with 0 total and 0 free swap this reduces to swap = - (total - free mem)
+		// however, this would lead to kubelet reporting swap usage on machines
+		// with no swap, so we do not make the adjustment.
+		// cadvisor expects swap usage to include swap + all memory.
+		// this was true in v1 but runc's root v2 calculation does not combine them.
+	}
+}
+
 func isMemoryUnlimited(v uint64) bool {
 	// Size after which we consider memory to be "unlimited". This is not
 	// MaxInt64 due to rounding by the kernel.
@@ -324,6 +351,12 @@ func getCgroupInfo(cadvisor cadvisor.Interface, containerName string, updateStat
 		return nil, fmt.Errorf("unexpected number of containers: %v", len(infoMap))
 	}
 	info := infoMap[containerName]
+
+	// correct memory usage for the root container for v2
+	if shouldAdjustCgroupv2NodeMemoryUsage(containerName) {
+		adjustCgroupv2NodeMemoryUsage(&info)
+	}
+
 	return &info, nil
 }
 

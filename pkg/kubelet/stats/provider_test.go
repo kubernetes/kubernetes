@@ -49,6 +49,7 @@ const (
 	offsetMemMajorPageFaults
 	offsetMemUsageBytes
 	offsetMemRSSBytes
+	offsetMemCacheBytes
 	offsetMemWorkingSetBytes
 	offsetNetRxBytes
 	offsetNetRxErrors
@@ -517,6 +518,7 @@ func getTestContainerInfo(seed int, podName string, podNamespace string, contain
 			Usage:      uint64(seed + offsetMemUsageBytes),
 			WorkingSet: uint64(seed + offsetMemWorkingSetBytes),
 			RSS:        uint64(seed + offsetMemRSSBytes),
+			Cache:      uint64(seed + offsetMemCacheBytes),
 			ContainerData: cadvisorapiv1.MemoryStatsMemoryData{
 				Pgfault:    uint64(seed + offsetMemPageFaults),
 				Pgmajfault: uint64(seed + offsetMemMajorPageFaults),
