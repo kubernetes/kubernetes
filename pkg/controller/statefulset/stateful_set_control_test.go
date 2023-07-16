@@ -237,15 +237,18 @@ func CreatesPods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) 
 		if err != nil {
 			t.Error(err)
 		}
+		if len(pods) != 3 {
+			t.Errorf("Expected 3 pods, got %d", len(pods))
+		}
 		for _, pod := range pods {
 			podIndexFromLabel, exists := pod.Labels[apps.StatefulSetPodIndexLabel]
 			if !exists {
-				t.Errorf("missing pod index label: %s", apps.StatefulSetPodIndexLabel)
+				t.Errorf("Missing pod index label: %s", apps.StatefulSetPodIndexLabel)
 				continue
 			}
 			podIndexFromName := strconv.Itoa(getOrdinal(pod))
 			if podIndexFromLabel != podIndexFromName {
-				t.Errorf("pod index label value (%s) does not match pod index in pod name (%s)", podIndexFromLabel, podIndexFromName)
+				t.Errorf("Pod index label value (%s) does not match pod index in pod name (%s)", podIndexFromLabel, podIndexFromName)
 			}
 		}
 	}
