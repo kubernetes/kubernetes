@@ -716,7 +716,7 @@ func (j *TestJig) CreatePDB(ctx context.Context, rc *v1.ReplicationController) (
 // this j, but does not actually create the PDB.  The default PDB specifies a
 // MinAvailable of N-1 and matches the pods created by the RC.
 func (j *TestJig) newPDBTemplate(rc *v1.ReplicationController) *policyv1.PodDisruptionBudget {
-	minAvailable := intstr.FromInt(int(*rc.Spec.Replicas) - 1)
+	minAvailable := intstr.FromInt(*rc.Spec.Replicas - 1)
 
 	pdb := &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
