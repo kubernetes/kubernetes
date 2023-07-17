@@ -376,6 +376,7 @@ const (
 	// kep: https://kep.k8s.io/3178
 	// alpha: v1.25
 	// beta: v1.27
+	// stable: v1.28
 	//
 	// Causes kubelet to no longer create legacy IPTables rules
 	IPTablesOwnershipCleanup featuregate.Feature = "IPTablesOwnershipCleanup"
@@ -997,7 +998,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	InTreePluginvSphereUnregister: {Default: false, PreRelease: featuregate.Alpha},
 
-	IPTablesOwnershipCleanup: {Default: true, PreRelease: featuregate.Beta},
+	IPTablesOwnershipCleanup: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.30
 
 	JobMutableNodeSchedulingDirectives: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 
