@@ -775,29 +775,6 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 			})
 		})
 
-		ginkgo.Context("with disabled KubeletPodResourcesGetAllocatable feature gate", func() {
-			tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-				if initialConfig.FeatureGates == nil {
-					initialConfig.FeatureGates = make(map[string]bool)
-				}
-				initialConfig.FeatureGates[string(kubefeatures.KubeletPodResourcesGetAllocatable)] = false
-			})
-
-			ginkgo.It("should return the expected error with the feature gate disabled", func(ctx context.Context) {
-				endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
-				framework.ExpectNoError(err, "LocalEndpoint() failed err: %v", err)
-
-				cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-				framework.ExpectNoError(err, "GetV1Client() failed err: %v", err)
-				defer conn.Close()
-
-				ginkgo.By("checking GetAllocatableResources fail if the feature gate is not enabled")
-				allocatableRes, err := cli.GetAllocatableResources(ctx, &kubeletpodresourcesv1.AllocatableResourcesRequest{})
-				framework.Logf("GetAllocatableResources result: %v, err: %v", allocatableRes, err)
-				framework.ExpectError(err, "With feature gate disabled, the call must fail")
-			})
-		})
-
 		ginkgo.Context("with disabled KubeletPodResourcesGet feature gate", func() {
 
 			ginkgo.It("should return the expected error with the feature gate disabled", func(ctx context.Context) {

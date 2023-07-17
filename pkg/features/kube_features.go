@@ -444,9 +444,10 @@ const (
 	// Enable POD resources API with Get method
 	KubeletPodResourcesGet featuregate.Feature = "KubeletPodResourcesGet"
 
-	// owner: @fromanirh
+	// owner: @ffromani
 	// alpha: v1.21
 	// beta: v1.23
+	// GA: v1.28
 	// Enable POD resources API to return allocatable resources
 	KubeletPodResourcesGetAllocatable featuregate.Feature = "KubeletPodResourcesGetAllocatable"
 
@@ -1021,7 +1022,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	KubeletPodResourcesGet: {Default: false, PreRelease: featuregate.Alpha},
 
-	KubeletPodResourcesGetAllocatable: {Default: true, PreRelease: featuregate.Beta},
+	KubeletPodResourcesGetAllocatable: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.28, remove in 1.30
 
 	KubeletTracing: {Default: true, PreRelease: featuregate.Beta},
 
