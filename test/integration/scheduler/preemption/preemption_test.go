@@ -1477,13 +1477,13 @@ func initTestPreferNominatedNode(t *testing.T, nsPrefix string, opts ...schedule
 	testutils.SyncSchedulerInformerFactory(testCtx)
 	// wraps the NextPod() method to make it appear the preemption has been done already and the nominated node has been set.
 	f := testCtx.Scheduler.NextPod
-	testCtx.Scheduler.NextPod = func() (podInfo *framework.QueuedPodInfo) {
-		podInfo = f()
+	testCtx.Scheduler.NextPod = func() (*framework.QueuedPodInfo, error) {
+		podInfo, _ := f()
 		// Scheduler.Next() may return nil when scheduler is shutting down.
 		if podInfo != nil {
 			podInfo.Pod.Status.NominatedNodeName = "node-1"
 		}
-		return podInfo
+		return podInfo, nil
 	}
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 	return testCtx

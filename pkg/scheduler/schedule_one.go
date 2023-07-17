@@ -66,12 +66,19 @@ const (
 // scheduleOne does the entire scheduling workflow for a single pod. It is serialized on the scheduling algorithm's host fitting.
 func (sched *Scheduler) scheduleOne(ctx context.Context) {
 	logger := klog.FromContext(ctx)
-	podInfo := sched.NextPod()
+	podInfo, err := sched.NextPod()
+	if err != nil {
+		logger.Error(err, "Error while retrieving next pod from scheduling queue")
+		return
+	}
 	// pod could be nil when schedulerQueue is closed
 	if podInfo == nil || podInfo.Pod == nil {
 		return
 	}
+
 	pod := podInfo.Pod
+	logger.V(4).Info("About to try and schedule pod", "pod", klog.KObj(pod))
+
 	fwk, err := sched.frameworkForPod(pod)
 	if err != nil {
 		// This shouldn't happen, because we only accept for scheduling the pods
@@ -115,6 +122,9 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 		if !status.IsSuccess() {
 			sched.handleBindingCycleError(bindingCycleCtx, state, fwk, assumedPodInfo, start, scheduleResult, status)
 		}
+		// Usually, DonePod is called inside the scheduling queue,
+		// but in this case, we need to call it here because this Pod won't go back to the scheduling queue.
+		sched.SchedulingQueue.Done(assumedPodInfo.Pod.UID)
 	}()
 }
 
@@ -922,6 +932,16 @@ func getAttemptsLabel(p *framework.QueuedPodInfo) string {
 // handleSchedulingFailure records an event for the pod that indicates the
 // pod has failed to schedule. Also, update the pod condition and nominated node name if set.
 func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framework.Framework, podInfo *framework.QueuedPodInfo, status *framework.Status, nominatingInfo *framework.NominatingInfo, start time.Time) {
+	calledDone := false
+	defer func() {
+		if !calledDone {
+			// Basically, AddUnschedulableIfNotPresent calls DonePod internally.
+			// But, AddUnschedulableIfNotPresent isn't called in some corner cases.
+			// Here, we call DonePod explicitly to avoid leaking the pod.
+			sched.SchedulingQueue.Done(podInfo.Pod.UID)
+		}
+	}()
+
 	logger := klog.FromContext(ctx)
 	reason := v1.PodReasonSchedulerError
 	if status.IsUnschedulable() {
@@ -967,11 +987,13 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 	cachedPod, e := podLister.Pods(pod.Namespace).Get(pod.Name)
 	if e != nil {
 		logger.Info("Pod doesn't exist in informer cache", "pod", klog.KObj(pod), "err", e)
+		// We need to call DonePod here because we don't call AddUnschedulableIfNotPresent in this case.
 	} else {
 		// In the case of extender, the pod may have been bound successfully, but timed out returning its response to the scheduler.
 		// It could result in the live version to carry .spec.nodeName, and that's inconsistent with the internal-queued version.
 		if len(cachedPod.Spec.NodeName) != 0 {
 			logger.Info("Pod has been assigned to node. Abort adding it back to queue.", "pod", klog.KObj(pod), "node", cachedPod.Spec.NodeName)
+			// We need to call DonePod here because we don't call AddUnschedulableIfNotPresent in this case.
 		} else {
 			// As <cachedPod> is from SharedInformer, we need to do a DeepCopy() here.
 			// ignore this err since apiserver doesn't properly validate affinity terms
@@ -980,6 +1002,7 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 			if err := sched.SchedulingQueue.AddUnschedulableIfNotPresent(logger, podInfo, sched.SchedulingQueue.SchedulingCycle()); err != nil {
 				logger.Error(err, "Error occurred")
 			}
+			calledDone = true
 		}
 	}
 
