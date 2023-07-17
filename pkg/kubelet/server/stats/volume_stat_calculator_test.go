@@ -122,8 +122,7 @@ func TestPVCRef(t *testing.T) {
 
 	// Calculate stats for pod
 	statsCalculator := newVolumeStatCalculator(mockStats, time.Minute, fakePod, &fakeEventRecorder)
-	errors := make(map[string]error)
-	statsCalculator.calcAndStoreStats(errors)
+	statsCalculator.calcAndStoreStats(make(map[string]error))
 	vs, _ := statsCalculator.GetLatest()
 
 	assert.Len(t, append(vs.EphemeralVolumes, vs.PersistentVolumes...), 4)
@@ -182,8 +181,7 @@ func TestNormalVolumeEvent(t *testing.T) {
 
 	// Calculate stats for pod
 	statsCalculator := newVolumeStatCalculator(mockStats, time.Minute, fakePod, &fakeEventRecorder)
-	errors := make(map[string]error)
-	statsCalculator.calcAndStoreStats(errors)
+	statsCalculator.calcAndStoreStats(make(map[string]error))
 
 	event, err := WatchEvent(eventStore)
 	assert.NotNil(t, err)
@@ -213,8 +211,7 @@ func TestAbnormalVolumeEvent(t *testing.T) {
 		volumeCondition.Abnormal = true
 	}
 	statsCalculator := newVolumeStatCalculator(mockStats, time.Minute, fakePod, &fakeEventRecorder)
-	errors := make(map[string]error)
-	statsCalculator.calcAndStoreStats(errors)
+	statsCalculator.calcAndStoreStats(make(map[string]error))
 
 	event, err := WatchEvent(eventStore)
 	assert.Nil(t, err)
