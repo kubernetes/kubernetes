@@ -516,20 +516,6 @@ func dropDisabledFields(
 		}
 	}
 
-	if !probeGracePeriodInUse(oldPodSpec) {
-		// Set pod-level terminationGracePeriodSeconds to nil if the feature is disabled and it is not used
-		VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
-			if c.LivenessProbe != nil {
-				c.LivenessProbe.TerminationGracePeriodSeconds = nil
-			}
-			if c.StartupProbe != nil {
-				c.StartupProbe.TerminationGracePeriodSeconds = nil
-			}
-			// cannot be set for readiness probes
-			return true
-		})
-	}
-
 	// If the feature is disabled and not in use, drop the hostUsers field.
 	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) && !hostUsersInUse(oldPodSpec) {
 		// Drop the field in podSpec only if SecurityContext is not nil.
@@ -825,27 +811,6 @@ func appArmorInUse(podAnnotations map[string]string) bool {
 		}
 	}
 	return false
-}
-
-// probeGracePeriodInUse returns true if the pod spec is non-nil and has a probe that makes use
-// of the probe-level terminationGracePeriodSeconds feature
-func probeGracePeriodInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-
-	var inUse bool
-	VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
-		// cannot be set for readiness probes
-		if (c.LivenessProbe != nil && c.LivenessProbe.TerminationGracePeriodSeconds != nil) ||
-			(c.StartupProbe != nil && c.StartupProbe.TerminationGracePeriodSeconds != nil) {
-			inUse = true
-			return false
-		}
-		return true
-	})
-
-	return inUse
 }
 
 // schedulingGatesInUse returns true if the pod spec is non-nil and it has SchedulingGates field set.
