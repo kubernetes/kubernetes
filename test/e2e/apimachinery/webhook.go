@@ -869,7 +869,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		that it's rejected by the webhook.
 	*/
 	ginkgo.It("should reject everything except leases [Alpha][Feature:AdmissionWebhookMatchConditions]", func(ctx context.Context) {
-		onlyAllowLeaseObjectMatchConditions := []admissionregistrationv1.MatchCondition{
+		excludeLeasesMatchConditions := []admissionregistrationv1.MatchCondition{
 			{
 				Name:       "exclude-leases",
 				Expression: `!(request.resource.group == "coordination.k8s.io" && request.resource.resource == "leases")`,
@@ -877,7 +877,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		}
 
 		ginkgo.By("creating a validating webhook with match conditions")
-		validatingWebhookConfiguration := newValidatingWebhookWithMatchConditions(f, servicePort, certCtx, onlyAllowLeaseObjectMatchConditions)
+		validatingWebhookConfiguration := newValidatingWebhookWithMatchConditions(f, servicePort, certCtx, excludeLeasesMatchConditions)
 		_, err := createValidatingWebhookConfiguration(ctx, f, validatingWebhookConfiguration)
 		framework.ExpectNoError(err, "registering webhook config %s", f.UniqueName)
 		defer func() {
