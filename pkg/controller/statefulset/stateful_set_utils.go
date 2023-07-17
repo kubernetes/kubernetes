@@ -398,7 +398,7 @@ func updateIdentity(set *apps.StatefulSet, pod *v1.Pod) {
 	}
 	pod.Labels[apps.StatefulSetPodNameLabel] = pod.Name
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodIndexLabel) {
-		pod.Labels[apps.StatefulSetPodIndexLabel] = strconv.Itoa(ordinal)
+		pod.Labels[apps.PodIndexLabel] = strconv.Itoa(ordinal)
 	}
 }
 
