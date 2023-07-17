@@ -794,19 +794,37 @@ func TestValidateIgnorePreflightErrors(t *testing.T) {
 			sets.New("a", "b", "c"),
 			false,
 		},
+		{ // empty list in CLI, but 'all' present in config file
+			[]string{},
+			[]string{"all"},
+			sets.New("all"),
+			false,
+		},
+		{ // empty list in config file, but 'all' present in CLI
+			[]string{"all"},
+			[]string{},
+			sets.New("all"),
+			false,
+		},
+		{ // some duplicates, only 'all' present in CLI and config file
+			[]string{"all"},
+			[]string{"all"},
+			sets.New("all"),
+			false,
+		},
 		{ // non-duplicate, but 'all' present together with individual checks in CLI
 			[]string{"a", "b", "all"},
 			[]string{},
 			sets.New[string](),
 			true,
 		},
-		{ // empty list in CLI, but 'all' present in config file, which is forbidden
+		{ // non-duplicate, but 'all' present together with individual checks in config file
 			[]string{},
-			[]string{"all"},
+			[]string{"a", "b", "all"},
 			sets.New[string](),
 			true,
 		},
-		{ // non-duplicate, but 'all' present in config file, which is forbidden
+		{ // non-duplicate, but 'all' present in config file, while values are in CLI, which is forbidden
 			[]string{"a", "b"},
 			[]string{"all"},
 			sets.New[string](),
@@ -817,12 +835,6 @@ func TestValidateIgnorePreflightErrors(t *testing.T) {
 			[]string{"a", "b"},
 			sets.New[string](),
 			true,
-		},
-		{ // skip all checks
-			[]string{"all"},
-			[]string{},
-			sets.New("all"),
-			false,
 		},
 	}
 	for _, rt := range tests {

@@ -221,7 +221,8 @@ type NodeRegistrationOptions struct {
 	// command line except without leading dash(es).
 	KubeletExtraArgs map[string]string
 
-	// IgnorePreflightErrors provides a slice of pre-flight errors to be ignored when the current node is registered.
+	// IgnorePreflightErrors provides a slice of pre-flight errors to be ignored when the current node is registered, e.g. 'IsPrivilegedUser,Swap'.
+	// Value 'all' ignores errors from all checks.
 	IgnorePreflightErrors []string
 
 	// ImagePullPolicy specifies the policy for image pulling during kubeadm "init" and "join" operations.
@@ -488,6 +489,7 @@ type ResetConfiguration struct {
 	Force bool
 
 	// IgnorePreflightErrors provides a slice of pre-flight errors to be ignored during the reset process, e.g. 'IsPrivilegedUser,Swap'.
+	// Value 'all' ignores errors from all checks.
 	IgnorePreflightErrors []string
 
 	// SkipPhases is a list of phases to skip during command execution.
