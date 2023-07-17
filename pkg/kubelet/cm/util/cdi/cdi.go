@@ -23,7 +23,7 @@ limitations under the License.
 // Long term it would be good to avoid this duplication:
 // https://github.com/container-orchestrated-devices/container-device-interface/issues/97
 
-package dra
+package cdi
 
 import (
 	"errors"
@@ -39,12 +39,15 @@ const (
 	annotationPrefix = "cdi.k8s.io/"
 )
 
-// generate container annotations using CDI UpdateAnnotations API.
-func generateCDIAnnotations(
+// GenerateAnnotations generate container annotations using CDI UpdateAnnotations API.
+func GenerateAnnotations(
 	claimUID types.UID,
 	driverName string,
 	cdiDevices []string,
 ) ([]kubecontainer.Annotation, error) {
+	if len(cdiDevices) == 0 {
+		return nil, nil
+	}
 	annotations, err := updateAnnotations(map[string]string{}, driverName, string(claimUID), cdiDevices)
 	if err != nil {
 		return nil, fmt.Errorf("can't generate CDI annotations: %+v", err)

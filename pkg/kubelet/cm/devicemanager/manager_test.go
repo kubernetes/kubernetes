@@ -578,16 +578,66 @@ func constructDevices(devices []string) checkpoint.DevicesPerNUMA {
 	return ret
 }
 
-func constructAllocResp(devices, mounts, envs map[string]string) *pluginapi.ContainerAllocateResponse {
+// containerAllocateResponseBuilder is a helper to build a ContainerAllocateResponse
+type containerAllocateResponseBuilder struct {
+	devices    map[string]string
+	mounts     map[string]string
+	envs       map[string]string
+	cdiDevices []string
+}
+
+// containerAllocateResponseBuilderOption defines a functional option for a containerAllocateResponseBuilder
+type containerAllocateResponseBuilderOption func(*containerAllocateResponseBuilder)
+
+// withDevices sets the devices for the containerAllocateResponseBuilder
+func withDevices(devices map[string]string) containerAllocateResponseBuilderOption {
+	return func(b *containerAllocateResponseBuilder) {
+		b.devices = devices
+	}
+}
+
+// withMounts sets the mounts for the containerAllocateResponseBuilder
+func withMounts(mounts map[string]string) containerAllocateResponseBuilderOption {
+	return func(b *containerAllocateResponseBuilder) {
+		b.mounts = mounts
+	}
+}
+
+// withEnvs sets the envs for the containerAllocateResponseBuilder
+func withEnvs(envs map[string]string) containerAllocateResponseBuilderOption {
+	return func(b *containerAllocateResponseBuilder) {
+		b.envs = envs
+	}
+}
+
+// withCDIDevices sets the cdiDevices for the containerAllocateResponseBuilder
+func withCDIDevices(cdiDevices ...string) containerAllocateResponseBuilderOption {
+	return func(b *containerAllocateResponseBuilder) {
+		b.cdiDevices = cdiDevices
+	}
+}
+
+// newContainerAllocateResponse creates a ContainerAllocateResponse with the given options.
+func newContainerAllocateResponse(opts ...containerAllocateResponseBuilderOption) *pluginapi.ContainerAllocateResponse {
+	b := &containerAllocateResponseBuilder{}
+	for _, opt := range opts {
+		opt(b)
+	}
+
+	return b.Build()
+}
+
+// Build uses the configured builder to create a ContainerAllocateResponse.
+func (b *containerAllocateResponseBuilder) Build() *pluginapi.ContainerAllocateResponse {
 	resp := &pluginapi.ContainerAllocateResponse{}
-	for k, v := range devices {
+	for k, v := range b.devices {
 		resp.Devices = append(resp.Devices, &pluginapi.DeviceSpec{
 			HostPath:      k,
 			ContainerPath: v,
 			Permissions:   "mrw",
 		})
 	}
-	for k, v := range mounts {
+	for k, v := range b.mounts {
 		resp.Mounts = append(resp.Mounts, &pluginapi.Mount{
 			ContainerPath: k,
 			HostPath:      v,
@@ -595,9 +645,19 @@ func constructAllocResp(devices, mounts, envs map[string]string) *pluginapi.Cont
 		})
 	}
 	resp.Envs = make(map[string]string)
-	for k, v := range envs {
+	for k, v := range b.envs {
 		resp.Envs[k] = v
 	}
+
+	var cdiDevices []*pluginapi.CDIDevice
+	for _, dev := range b.cdiDevices {
+		cdiDevice := pluginapi.CDIDevice{
+			Name: dev,
+		}
+		cdiDevices = append(cdiDevices, &cdiDevice)
+	}
+	resp.CDIDevices = cdiDevices
+
 	return resp
 }
 
@@ -622,25 +682,41 @@ func TestCheckpoint(t *testing.T) {
 
 	testManager.podDevices.insert("pod1", "con1", resourceName1,
 		constructDevices([]string{"dev1", "dev2"}),
-		constructAllocResp(map[string]string{"/dev/r1dev1": "/dev/r1dev1", "/dev/r1dev2": "/dev/r1dev2"},
-			map[string]string{"/home/r1lib1": "/usr/r1lib1"}, map[string]string{}))
+		newContainerAllocateResponse(
+			withDevices(map[string]string{"/dev/r1dev1": "/dev/r1dev1", "/dev/r1dev2": "/dev/r1dev2"}),
+			withMounts(map[string]string{"/home/r1lib1": "/usr/r1lib1"}),
+			withCDIDevices("domain1.com/resource1=dev1", "domain1.com/resource1=dev2"),
+		),
+	)
 	testManager.podDevices.insert("pod1", "con1", resourceName2,
 		constructDevices([]string{"dev1", "dev2"}),
-		constructAllocResp(map[string]string{"/dev/r2dev1": "/dev/r2dev1", "/dev/r2dev2": "/dev/r2dev2"},
-			map[string]string{"/home/r2lib1": "/usr/r2lib1"},
-			map[string]string{"r2devices": "dev1 dev2"}))
+		newContainerAllocateResponse(
+			withDevices(map[string]string{"/dev/r2dev1": "/dev/r2dev1", "/dev/r2dev2": "/dev/r2dev2"}),
+			withMounts(map[string]string{"/home/r2lib1": "/usr/r2lib1"}),
+			withEnvs(map[string]string{"r2devices": "dev1 dev2"}),
+		),
+	)
 	testManager.podDevices.insert("pod1", "con2", resourceName1,
 		constructDevices([]string{"dev3"}),
-		constructAllocResp(map[string]string{"/dev/r1dev3": "/dev/r1dev3"},
-			map[string]string{"/home/r1lib1": "/usr/r1lib1"}, map[string]string{}))
+		newContainerAllocateResponse(
+			withDevices(map[string]string{"/dev/r1dev3": "/dev/r1dev3"}),
+			withMounts(map[string]string{"/home/r1lib1": "/usr/r1lib1"}),
+		),
+	)
 	testManager.podDevices.insert("pod2", "con1", resourceName1,
 		constructDevices([]string{"dev4"}),
-		constructAllocResp(map[string]string{"/dev/r1dev4": "/dev/r1dev4"},
-			map[string]string{"/home/r1lib1": "/usr/r1lib1"}, map[string]string{}))
+		newContainerAllocateResponse(
+			withDevices(map[string]string{"/dev/r1dev4": "/dev/r1dev4"}),
+			withMounts(map[string]string{"/home/r1lib1": "/usr/r1lib1"}),
+		),
+	)
 	testManager.podDevices.insert("pod3", "con3", resourceName3,
 		checkpoint.DevicesPerNUMA{nodeWithoutTopology: []string{"dev5"}},
-		constructAllocResp(map[string]string{"/dev/r1dev5": "/dev/r1dev5"},
-			map[string]string{"/home/r1lib1": "/usr/r1lib1"}, map[string]string{}))
+		newContainerAllocateResponse(
+			withDevices(map[string]string{"/dev/r3dev5": "/dev/r3dev5"}),
+			withMounts(map[string]string{"/home/r3lib1": "/usr/r3lib1"}),
+		),
+	)
 
 	testManager.healthyDevices[resourceName1] = sets.NewString()
 	testManager.healthyDevices[resourceName1].Insert("dev1")
@@ -1021,17 +1097,26 @@ func TestPodContainerDeviceToAllocate(t *testing.T) {
 
 	testManager.podDevices.insert("pod1", "con1", resourceName1,
 		constructDevices([]string{"dev1", "dev2"}),
-		constructAllocResp(map[string]string{"/dev/r2dev1": "/dev/r2dev1", "/dev/r2dev2": "/dev/r2dev2"},
-			map[string]string{"/home/r2lib1": "/usr/r2lib1"},
-			map[string]string{"r2devices": "dev1 dev2"}))
+		newContainerAllocateResponse(
+			withDevices(map[string]string{"/dev/r2dev1": "/dev/r2dev1", "/dev/r2dev2": "/dev/r2dev2"}),
+			withMounts(map[string]string{"/home/r2lib1": "/usr/r2lib1"}),
+			withEnvs(map[string]string{"r2devices": "dev1 dev2"}),
+		),
+	)
 	testManager.podDevices.insert("pod2", "con2", resourceName2,
 		checkpoint.DevicesPerNUMA{nodeWithoutTopology: []string{"dev5"}},
-		constructAllocResp(map[string]string{"/dev/r1dev5": "/dev/r1dev5"},
-			map[string]string{"/home/r1lib1": "/usr/r1lib1"}, map[string]string{}))
+		newContainerAllocateResponse(
+			withDevices(map[string]string{"/dev/r1dev5": "/dev/r1dev5"}),
+			withMounts(map[string]string{"/home/r1lib1": "/usr/r1lib1"}),
+		),
+	)
 	testManager.podDevices.insert("pod3", "con3", resourceName3,
 		checkpoint.DevicesPerNUMA{nodeWithoutTopology: []string{"dev5"}},
-		constructAllocResp(map[string]string{"/dev/r1dev5": "/dev/r1dev5"},
-			map[string]string{"/home/r1lib1": "/usr/r1lib1"}, map[string]string{}))
+		newContainerAllocateResponse(
+			withDevices(map[string]string{"/dev/r1dev5": "/dev/r1dev5"}),
+			withMounts(map[string]string{"/home/r1lib1": "/usr/r1lib1"}),
+		),
+	)
 
 	// no healthy devices for resourceName1 and devices corresponding to
 	// resource2 are intentionally omitted to simulate that the resource
@@ -1411,8 +1496,11 @@ func TestResetExtendedResource(t *testing.T) {
 	extendedResourceName := "domain.com/resource"
 	testManager.podDevices.insert("pod", "con", extendedResourceName,
 		constructDevices([]string{"dev1"}),
-		constructAllocResp(map[string]string{"/dev/dev1": "/dev/dev1"},
-			map[string]string{"/home/lib1": "/usr/lib1"}, map[string]string{}))
+		newContainerAllocateResponse(
+			withDevices(map[string]string{"/dev/dev1": "/dev/dev1"}),
+			withMounts(map[string]string{"/home/lib1": "/usr/lib1"}),
+		),
+	)
 
 	testManager.healthyDevices[extendedResourceName] = sets.NewString()
 	testManager.healthyDevices[extendedResourceName].Insert("dev1")

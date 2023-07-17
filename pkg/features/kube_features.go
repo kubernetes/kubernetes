@@ -211,6 +211,13 @@ const (
 	// (e.g. in a Deployment), which is the historical default.
 	DefaultHostNetworkHostPortsInPodTemplates featuregate.Feature = "DefaultHostNetworkHostPortsInPodTemplates"
 
+	// owner: @elezar
+	// kep: http://kep.k8s.io/4009
+	// alpha: v1.28
+	//
+	// Add support for CDI Device IDs in the Device Plugin API.
+	DevicePluginCDIDevices featuregate.Feature = "DevicePluginCDIDevices"
+
 	// owner: @andrewsykim
 	// alpha: v1.22
 	//
@@ -949,6 +956,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	DisableCloudProviders: {Default: false, PreRelease: featuregate.Alpha},
 
 	DisableKubeletCloudCredentialProviders: {Default: false, PreRelease: featuregate.Alpha},
+
+	DevicePluginCDIDevices: {Default: false, PreRelease: featuregate.Alpha},
 
 	DownwardAPIHugePages: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in v1.29
 

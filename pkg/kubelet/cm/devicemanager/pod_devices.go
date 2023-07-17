@@ -21,9 +21,13 @@ import (
 
 	"k8s.io/klog/v2"
 
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
+	"k8s.io/kubernetes/pkg/kubelet/cm/util/cdi"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -244,6 +248,8 @@ func (pdev *podDevices) deviceRunContainerOptions(podUID, contName string) *Devi
 	mountsMap := make(map[string]string)
 	envsMap := make(map[string]string)
 	annotationsMap := make(map[string]string)
+	// Keep track of all CDI devices requested for the container.
+	allCDIDevices := sets.New[string]()
 	// Loops through AllocationResponses of all cached device resources.
 	for _, devices := range resources {
 		resp := devices.allocResp
@@ -252,6 +258,7 @@ func (pdev *podDevices) deviceRunContainerOptions(podUID, contName string) *Devi
 		// Mount points
 		// Device files
 		// Container annotations
+		// CDI device IDs
 		// These artifacts are per resource per container.
 		// Updates RunContainerOptions.Envs.
 		for k, v := range resp.Envs {
@@ -321,8 +328,76 @@ func (pdev *podDevices) deviceRunContainerOptions(podUID, contName string) *Devi
 			annotationsMap[k] = v
 			opts.Annotations = append(opts.Annotations, kubecontainer.Annotation{Name: k, Value: v})
 		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DevicePluginCDIDevices) {
+			// Updates for CDI devices.
+			cdiDevices := getCDIDeviceInfo(resp, allCDIDevices)
+			opts.CDIDevices = append(opts.CDIDevices, cdiDevices...)
+		}
 	}
+
+	// Although the CDI devices are expected to be empty when this feature is disabled, we still
+	// guard this with a feature gate to avoid any potential issues.
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DevicePluginCDIDevices) {
+		// We construct a resource ID from the pod UID and container name.
+		// This ID has no semantic meaning, and is only used to ensure that the generated CDI annotation key is unique
+		// for a given container. Since this is only called once per pod-container combination, this should be the case.
+		resourceID := podUID + "-" + contName
+		cdiAnnotations := getCDIAnnotations(resourceID, allCDIDevices, annotationsMap)
+		opts.Annotations = append(opts.Annotations, cdiAnnotations...)
+	}
+
 	return opts
+}
+
+// getCDIAnnotations returns the cdi annotations for a given container.
+// This creates a CDI annotation with a key of the form: devicemanager_{{resourceID}}.
+// The value of the annotation is a comma separated list of sorted CDI device IDs.
+// If the annotation key is already defined in the provided annotations map, then the existing value is used.
+func getCDIAnnotations(resourceID string, cdiDevices sets.Set[string], annotationsMap map[string]string) []kubecontainer.Annotation {
+	// We sort the CDI devices to ensure that the annotation value is deterministic.
+	sortedCDIDevices := sets.List[string](cdiDevices)
+	annotations, err := cdi.GenerateAnnotations(types.UID(resourceID), "devicemanager", sortedCDIDevices)
+	if err != nil {
+		klog.ErrorS(err, "Failed to create CDI annotations")
+		return nil
+	}
+
+	var cdiAnnotations []kubecontainer.Annotation
+	for _, annotation := range annotations {
+		if e, ok := annotationsMap[annotation.Name]; ok {
+			klog.V(4).InfoS("Skip existing annotation", "annotationKey", annotation.Name, "annotationValue", annotation.Value)
+			if e != annotation.Value {
+				klog.ErrorS(nil, "Annotation has conflicting setting", "annotationKey", annotation.Name, "expected", e, "got", annotation.Value)
+			}
+			continue
+		}
+		klog.V(4).InfoS("Add annotation", "annotationKey", annotation.Name, "annotationValue", annotation.Value)
+		annotationsMap[annotation.Name] = annotation.Value
+		cdiAnnotations = append(cdiAnnotations, kubecontainer.Annotation{Name: annotation.Name, Value: annotation.Value})
+	}
+
+	return cdiAnnotations
+}
+
+// getCDIDeviceInfo returns CDI devices from an allocate response
+func getCDIDeviceInfo(resp *pluginapi.ContainerAllocateResponse, knownCDIDevices sets.Set[string]) []kubecontainer.CDIDevice {
+	var cdiDevices []kubecontainer.CDIDevice
+	for _, cdiDevice := range resp.CDIDevices {
+		if knownCDIDevices.Has(cdiDevice.Name) {
+			klog.V(4).InfoS("Skip existing CDI Device", "name", cdiDevice.Name)
+			continue
+		}
+		klog.V(4).InfoS("Add CDI device", "name", cdiDevice.Name)
+		knownCDIDevices.Insert(cdiDevice.Name)
+
+		device := kubecontainer.CDIDevice{
+			Name: cdiDevice.Name,
+		}
+		cdiDevices = append(cdiDevices, device)
+	}
+
+	return cdiDevices
 }
 
 // getContainerDevices returns the devices assigned to the provided container for all ResourceNames
