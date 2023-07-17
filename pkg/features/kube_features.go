@@ -416,6 +416,17 @@ const (
 	// yet.
 	JobTrackingWithFinalizers featuregate.Feature = "JobTrackingWithFinalizers"
 
+	// owner: @marquiz
+	// kep: http://kep.k8s.io/4033
+	// alpha: v1.28
+	//
+	// Enable detection of the kubelet cgroup driver configuration option from
+	// the CRI.  The CRI runtime also needs to support this feature in which
+	// case the kubelet will ignore the cgroupDriver (--cgroup-driver)
+	// configuration option. If runtime doesn't support it, the kubelet will
+	// fallback to using it's cgroupDriver option.
+	KubeletCgroupDriverFromCRI featuregate.Feature = "KubeletCgroupDriverFromCRI"
+
 	// owner: @AkihiroSuda
 	// alpha: v1.22
 	//
@@ -1013,6 +1024,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	JobReadyPods: {Default: true, PreRelease: featuregate.Beta},
 
 	JobTrackingWithFinalizers: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
+
+	KubeletCgroupDriverFromCRI: {Default: false, PreRelease: featuregate.Alpha},
 
 	KubeletInUserNamespace: {Default: false, PreRelease: featuregate.Alpha},
 

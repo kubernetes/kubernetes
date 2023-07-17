@@ -865,3 +865,18 @@ func (r *remoteRuntimeService) ListPodSandboxMetrics(ctx context.Context) ([]*ru
 
 	return resp.GetPodMetrics(), nil
 }
+
+// RuntimeConfig returns the configuration information of the runtime.
+func (r *remoteRuntimeService) RuntimeConfig(ctx context.Context) (*runtimeapi.RuntimeConfigResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+
+	resp, err := r.runtimeClient.RuntimeConfig(ctx, &runtimeapi.RuntimeConfigRequest{})
+	if err != nil {
+		klog.ErrorS(err, "RuntimeConfig from runtime service failed")
+		return nil, err
+	}
+	klog.V(10).InfoS("[RemoteRuntimeService] RuntimeConfigResponse", "linuxConfig", resp.GetLinux())
+
+	return resp, nil
+}

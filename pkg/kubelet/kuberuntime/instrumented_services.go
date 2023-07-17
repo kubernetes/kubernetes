@@ -361,3 +361,12 @@ func (in instrumentedRuntimeService) ListPodSandboxMetrics(ctx context.Context) 
 	recordError(operation, err)
 	return out, err
 }
+
+func (in instrumentedRuntimeService) RuntimeConfig(ctx context.Context) (*runtimeapi.RuntimeConfigResponse, error) {
+	const operation = "runtime_config"
+	defer recordOperation(operation, time.Now())
+
+	out, err := in.service.RuntimeConfig(ctx)
+	recordError(operation, err)
+	return out, err
+}
