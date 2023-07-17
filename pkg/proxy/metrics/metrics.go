@@ -184,48 +184,28 @@ var (
 		[]string{"table"},
 	)
 
-	// ProxyHealthz200Total is the number of returned HTTP Status 200 for each
+	// ProxyHealthzTotal is the number of returned HTTP Status for each
 	// healthz probe.
-	ProxyHealthz200Total = metrics.NewCounter(
+	ProxyHealthzTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      kubeProxySubsystem,
-			Name:           "proxy_healthz_200_total",
-			Help:           "Cumulative proxy healthz HTTP status 200",
+			Name:           "proxy_healthz_total",
+			Help:           "Cumulative proxy healthz HTTP status",
 			StabilityLevel: metrics.ALPHA,
 		},
+		[]string{"code"},
 	)
 
-	// ProxyHealthz503Total is the number of returned HTTP Status 503 for each
-	// healthz probe.
-	ProxyHealthz503Total = metrics.NewCounter(
-		&metrics.CounterOpts{
-			Subsystem:      kubeProxySubsystem,
-			Name:           "proxy_healthz_503_total",
-			Help:           "Cumulative proxy healthz HTTP status 503",
-			StabilityLevel: metrics.ALPHA,
-		},
-	)
-
-	// ProxyLivez200Total is the number of returned HTTP Status 200 for each
+	// ProxyLivezTotal is the number of returned HTTP Status for each
 	// livez probe.
-	ProxyLivez200Total = metrics.NewCounter(
+	ProxyLivezTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      kubeProxySubsystem,
-			Name:           "proxy_livez_200_total",
-			Help:           "Cumulative proxy livez HTTP status 200",
+			Name:           "proxy_livez_total",
+			Help:           "Cumulative proxy livez HTTP status",
 			StabilityLevel: metrics.ALPHA,
 		},
-	)
-
-	// ProxyLivez503Total is the number of returned HTTP Status 503 for each
-	// livez probe.
-	ProxyLivez503Total = metrics.NewCounter(
-		&metrics.CounterOpts{
-			Subsystem:      kubeProxySubsystem,
-			Name:           "proxy_livez_503_total",
-			Help:           "Cumulative proxy livez HTTP status 503",
-			StabilityLevel: metrics.ALPHA,
-		},
+		[]string{"code"},
 	)
 
 	// SyncProxyRulesLastQueuedTimestamp is the last time a proxy sync was
@@ -274,10 +254,8 @@ func RegisterMetrics() {
 		legacyregistry.MustRegister(IptablesPartialRestoreFailuresTotal)
 		legacyregistry.MustRegister(SyncProxyRulesLastQueuedTimestamp)
 		legacyregistry.MustRegister(SyncProxyRulesNoLocalEndpointsTotal)
-		legacyregistry.MustRegister(ProxyHealthz200Total)
-		legacyregistry.MustRegister(ProxyHealthz503Total)
-		legacyregistry.MustRegister(ProxyLivez200Total)
-		legacyregistry.MustRegister(ProxyLivez503Total)
+		legacyregistry.MustRegister(ProxyHealthzTotal)
+		legacyregistry.MustRegister(ProxyLivezTotal)
 
 	})
 }

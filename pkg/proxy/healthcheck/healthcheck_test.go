@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/component-base/metrics/testutil"
 
@@ -604,22 +604,23 @@ func testHTTPHandler(hsTest *serverTest, status int, t *testing.T) {
 		hsTest.tracking503++
 	}
 	if hsTest.url == healthzURL {
-		testMetricEquals(metrics.ProxyHealthz200Total, float64(hsTest.tracking200), t)
-		testMetricEquals(metrics.ProxyHealthz503Total, float64(hsTest.tracking503), t)
+		testMetricEquals(metrics.ProxyHealthzTotal.WithLabelValues("200"), float64(hsTest.tracking200), t)
+		testMetricEquals(metrics.ProxyHealthzTotal.WithLabelValues("503"), float64(hsTest.tracking503), t)
 	}
 	if hsTest.url == livezURL {
-		testMetricEquals(metrics.ProxyLivez200Total, float64(hsTest.tracking200), t)
-		testMetricEquals(metrics.ProxyLivez503Total, float64(hsTest.tracking503), t)
+		testMetricEquals(metrics.ProxyLivezTotal.WithLabelValues("200"), float64(hsTest.tracking200), t)
+		testMetricEquals(metrics.ProxyLivezTotal.WithLabelValues("503"), float64(hsTest.tracking503), t)
 	}
 }
 
-func testMetricEquals(metric *basemetrics.Counter, expected float64, t *testing.T) {
+func testMetricEquals(metric basemetrics.CounterMetric, expected float64, t *testing.T) {
+	t.Helper()
 	val, err := testutil.GetCounterMetricValue(metric)
 	if err != nil {
-		t.Errorf("unable to retrieve value for metric: %s, err: %v", metric.Name, err)
+		t.Errorf("unable to retrieve value for metric, err: %v", err)
 	}
 	if val != expected {
-		t.Errorf("unexpected metric: %s, expected: %v, found: %v", metric.Name, expected, val)
+		t.Errorf("expected: %v, found: %v", expected, val)
 	}
 }
 
