@@ -460,13 +460,10 @@ var _ = SIGDescribe("Probing container", func() {
 		Description: A pod with a long terminationGracePeriod is created with a shorter livenessProbe-level terminationGracePeriodSeconds. We confirm the shorter termination period is used.
 	*/
 	ginkgo.It("should override timeoutGracePeriodSeconds when LivenessProbe field is set [NodeConformance]", func(ctx context.Context) {
-		pod := e2epod.NewAgnhostPod(f.Namespace.Name, "liveness-override-"+string(uuid.NewUUID()), nil, nil, nil, "/bin/sh", "-c", "sleep 1000")
-		longGracePeriod := int64(500)
-		pod.Spec.TerminationGracePeriodSeconds = &longGracePeriod
-
+		cmd := []string{"/bin/sh", "-c", "sleep 1000"}
 		// probe will fail since pod has no http endpoints
 		shortGracePeriod := int64(5)
-		pod.Spec.Containers[0].LivenessProbe = &v1.Probe{
+		livenessProbe := &v1.Probe{
 			ProbeHandler: v1.ProbeHandler{
 				HTTPGet: &v1.HTTPGetAction{
 					Path: "/healthz",
@@ -477,10 +474,14 @@ var _ = SIGDescribe("Probing container", func() {
 			FailureThreshold:              1,
 			TerminationGracePeriodSeconds: &shortGracePeriod,
 		}
+		pod := busyBoxPodSpec(nil, livenessProbe, cmd)
+		longGracePeriod := int64(500)
+		pod.Spec.TerminationGracePeriodSeconds = &longGracePeriod
 
 		// 10s delay + 10s period + 5s grace period = 25s < 30s << pod-level timeout 500
-		// add 10s more for kubelet syncing information to apiserver
-		RunLivenessTest(ctx, f, pod, 1, time.Second*40)
+		// add defaultObservationTimeout(4min) more for kubelet syncing information
+		// to apiserver
+		RunLivenessTest(ctx, f, pod, 1, time.Second*40+defaultObservationTimeout)
 	})
 
 	/*
@@ -489,20 +490,9 @@ var _ = SIGDescribe("Probing container", func() {
 		Description: A pod with a long terminationGracePeriod is created with a shorter startupProbe-level terminationGracePeriodSeconds. We confirm the shorter termination period is used.
 	*/
 	ginkgo.It("should override timeoutGracePeriodSeconds when StartupProbe field is set [NodeConformance]", func(ctx context.Context) {
-		pod := e2epod.NewAgnhostPod(f.Namespace.Name, "startup-override-"+string(uuid.NewUUID()), nil, nil, nil, "/bin/sh", "-c", "sleep 1000")
-		longGracePeriod := int64(500)
-		pod.Spec.TerminationGracePeriodSeconds = &longGracePeriod
-
-		// startup probe will fail since pod will sleep for 1000s before becoming ready
-		shortGracePeriod := int64(5)
-		pod.Spec.Containers[0].StartupProbe = &v1.Probe{
-			ProbeHandler:                  execHandler([]string{"/bin/cat", "/tmp/startup"}),
-			InitialDelaySeconds:           10,
-			FailureThreshold:              1,
-			TerminationGracePeriodSeconds: &shortGracePeriod,
-		}
-		// liveness probe always succeeds
-		pod.Spec.Containers[0].LivenessProbe = &v1.Probe{
+		cmd := []string{"/bin/sh", "-c", "sleep 1000"}
+		// probe will fail since pod has no http endpoints
+		livenessProbe := &v1.Probe{
 			ProbeHandler: v1.ProbeHandler{
 				Exec: &v1.ExecAction{
 					Command: []string{"/bin/true"},
@@ -511,10 +501,22 @@ var _ = SIGDescribe("Probing container", func() {
 			InitialDelaySeconds: 15,
 			FailureThreshold:    1,
 		}
+		pod := busyBoxPodSpec(nil, livenessProbe, cmd)
+		longGracePeriod := int64(500)
+		pod.Spec.TerminationGracePeriodSeconds = &longGracePeriod
+
+		shortGracePeriod := int64(5)
+		pod.Spec.Containers[0].StartupProbe = &v1.Probe{
+			ProbeHandler:                  execHandler([]string{"/bin/cat", "/tmp/startup"}),
+			InitialDelaySeconds:           10,
+			FailureThreshold:              1,
+			TerminationGracePeriodSeconds: &shortGracePeriod,
+		}
 
 		// 10s delay + 10s period + 5s grace period = 25s < 30s << pod-level timeout 500
-		// add 10s more for kubelet syncing information to apiserver
-		RunLivenessTest(ctx, f, pod, 1, time.Second*40)
+		// add defaultObservationTimeout(4min) more for kubelet syncing information
+		// to apiserver
+		RunLivenessTest(ctx, f, pod, 1, time.Second*40+defaultObservationTimeout)
 	})
 
 	/*
