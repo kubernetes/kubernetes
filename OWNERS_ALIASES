@@ -496,7 +496,6 @@ aliases:
     - logicalhan
   feature-approvers:
     - andrewsykim # Cloud Provider
-    - logicalhan # Instrumentation
     - ahg-g # Scheduling
     - caseydavenport # Network
     - dcbw # Network
@@ -509,17 +508,20 @@ aliases:
     - jayunit100 # Windows
     - jsafrane # Storage
     - jsturtevant # Windows
+    - justinsb # Cluster Lifecycle
     - kow3ns # Apps
     - lavalamp # API Machinery
     - liggitt # Auth
+    - logicalhan # Instrumentation
     - luxas # Cluster Lifecycle
     - marosset # Windows
+    - mrunalp # Node
     - msau42 # Storage
     - mwielgus # Autoscaling
     - pwittrock # CLI
-    - justinsb # Cluster Lifecycle
     - saad-ali # Storage
     - seans3 # CLI
+    - sergeykanzhelev # Node
     - soltysh # Apps, CLI
     - tallclair # Auth
     - thockin # Network
