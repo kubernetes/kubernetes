@@ -87,7 +87,7 @@ var _ = utils.SIGDescribe("[Feature:NodeOutOfServiceVolumeDetach] [Scalability] 
 			framework.Logf("Failed to list node: %v", err)
 		}
 		if len(nodeListCache.Items) < MinNodeRequired {
-			ginkgo.Skip("At least 2 nodes are required to run the test")
+			ginkgo.Skip(fmt.Sprintf("At least %d nodes are required to run the test", MinNodeRequired))
 		}
 	})
 
@@ -126,6 +126,11 @@ var _ = utils.SIGDescribe("[Feature:NodeOutOfServiceVolumeDetach] [Scalability] 
 			oldNodeNameList := make([]string, 0)
 			for _, pod := range podsList {
 				oldNodeNameList = append(oldNodeNameList, pod.Spec.NodeName)
+			}
+
+			// Un taint the nodes, after the pods are running
+			for _, nodeName := range nodesToBeTainted {
+				e2enode.RemoveTaintOffNode(ctx, c, nodeName.Name, taintNew)
 			}
 
 			// stop the kubelet on nodes where the sts pods were scheduled.
@@ -171,8 +176,8 @@ var _ = utils.SIGDescribe("[Feature:NodeOutOfServiceVolumeDetach] [Scalability] 
 				e2enode.RemoveTaintOffNode(ctx, c, oldNodeName, taint)
 			}
 
-			// Verify that pods gets scheduled to the older nodes that was terminated non gracefully and now
-			// is back online
+			// Verify that pods get scheduled to the older nodes that were terminated non gracefully and now
+			// are back online
 			newSTSName := "sts-app-gcepd-new"
 			newPodLabels := map[string]string{"app": newSTSName}
 			newReplicaCount := int32(MinNodeRequired)
@@ -181,7 +186,7 @@ var _ = utils.SIGDescribe("[Feature:NodeOutOfServiceVolumeDetach] [Scalability] 
 	})
 })
 
-// createAndVerifyStatefulDeployment creates a statefulset
+// createAndVerifySTS creates a statefulset
 func createAndVerifySTS(ctx context.Context, scName *string, name, ns string, replicas *int32, podLabels map[string]string,
 	c clientset.Interface) []v1.Pod {
 	ginkgo.By("Creating a sts using the pvc")
