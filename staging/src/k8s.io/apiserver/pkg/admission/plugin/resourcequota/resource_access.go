@@ -60,14 +60,11 @@ type quotaAccessor struct {
 
 // newQuotaAccessor creates an object that conforms to the QuotaAccessor interface to be used to retrieve quota objects.
 func newQuotaAccessor() (*quotaAccessor, error) {
-	liveLookupCache := lru.New(100)
-	updatedCache := lru.New(100)
-
 	// client and lister will be set when SetInternalKubeClientSet and SetInternalKubeInformerFactory are invoked
 	return &quotaAccessor{
-		liveLookupCache: liveLookupCache,
+		liveLookupCache: lru.New(100),
 		liveTTL:         time.Duration(30 * time.Second),
-		updatedQuotas:   updatedCache,
+		updatedQuotas:   lru.New(100),
 	}, nil
 }
 
@@ -123,7 +120,10 @@ func (e *quotaAccessor) GetQuotas(namespace string) ([]corev1.ResourceQuota, err
 			if err != nil {
 				return nil, err
 			}
-			newEntry := liveLookupEntry{expiry: time.Now().Add(e.liveTTL)}
+			newEntry := liveLookupEntry{
+				expiry: time.Now().Add(e.liveTTL),
+				items:  make([]*corev1.ResourceQuota, 0, len(liveList.Items)),
+			}
 			for i := range liveList.Items {
 				newEntry.items = append(newEntry.items, &liveList.Items[i])
 			}
@@ -136,7 +136,7 @@ func (e *quotaAccessor) GetQuotas(namespace string) ([]corev1.ResourceQuota, err
 		}
 	}
 
-	resourceQuotas := []corev1.ResourceQuota{}
+	resourceQuotas := make([]corev1.ResourceQuota, 0, len(items))
 	for i := range items {
 		quota := items[i]
 		quota = e.checkCache(quota)

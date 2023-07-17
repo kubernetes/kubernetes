@@ -123,13 +123,14 @@ func (a *poller) configuration() (runtime.Object, error) {
 		retries = a.bootstrapRetries
 	}
 	for count := 0; count < retries; count++ {
+		// check if poller is boostrapped in between, if so avoid unnecessary 1 second sleep
+		if a.ready {
+			return a.mergedConfiguration, nil
+		}
 		if count > 0 {
 			a.lock.RUnlock()
 			time.Sleep(a.interval)
 			a.lock.RLock()
-		}
-		if a.ready {
-			return a.mergedConfiguration, nil
 		}
 	}
 	if a.lastErr != nil {

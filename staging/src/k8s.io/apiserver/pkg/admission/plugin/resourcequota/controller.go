@@ -697,12 +697,12 @@ func (e *quotaEvaluator) getWork() (string, []*admissionWaiter, bool) {
 // prettyPrint formats a resource list for usage in errors
 // it outputs resources sorted in increasing order
 func prettyPrint(item corev1.ResourceList) string {
-	parts := []string{}
-	keys := []string{}
+	keys := make([]string, 0, len(item))
 	for key := range item {
 		keys = append(keys, string(key))
 	}
 	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
 	for _, key := range keys {
 		value := item[corev1.ResourceName(key)]
 		constraint := key + "=" + value.String()
@@ -712,7 +712,7 @@ func prettyPrint(item corev1.ResourceList) string {
 }
 
 func prettyPrintResourceNames(a []corev1.ResourceName) string {
-	values := []string{}
+	values := make([]string, 0, len(a))
 	for _, value := range a {
 		values = append(values, string(value))
 	}

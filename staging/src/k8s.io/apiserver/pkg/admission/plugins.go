@@ -59,7 +59,7 @@ type PluginEnabledFunc func(name string, config io.Reader) bool
 func (ps *Plugins) Registered() []string {
 	ps.lock.Lock()
 	defer ps.lock.Unlock()
-	keys := []string{}
+	keys := make([]string, 0, len(ps.registry))
 	for k := range ps.registry {
 		keys = append(keys, k)
 	}

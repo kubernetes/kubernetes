@@ -159,24 +159,25 @@ func (w *watchTracker) RegisterWatch(r *http.Request) ForgetWatchFunc {
 func (w *watchTracker) updateIndexLocked(identifier *watchIdentifier, index *indexValue, incr int) {
 	if index == nil {
 		w.watchCount[*identifier] += incr
-	} else {
-		// For resources with defined index, for a given watch event we are
-		// only processing the watchers that:
-		// (a) do not specify field selector for an index field
-		// (b) do specify field selector with the value equal to the value
-		//     coming from the processed object
-		//
-		// TODO(wojtek-t): For the sake of making progress and initially
-		// simplifying the implementation, we approximate (b) for all values
-		// as the value for an empty string. The assumption we're making here
-		// is that the difference between the actual number of watchers that
-		// will be processed, i.e. (a)+(b) above and the one from our
-		// approximation i.e. (a)+[(b) for field value of ""] will be small.
-		// This seem to be true in almost all production clusters, which makes
-		// it a reasonable first step simplification to unblock progres on it.
-		if index.value == unsetValue || index.value == "" {
-			w.watchCount[*identifier] += incr
-		}
+		return
+	}
+
+	// For resources with defined index, for a given watch event we are
+	// only processing the watchers that:
+	// (a) do not specify field selector for an index field
+	// (b) do specify field selector with the value equal to the value
+	//     coming from the processed object
+	//
+	// TODO(wojtek-t): For the sake of making progress and initially
+	// simplifying the implementation, we approximate (b) for all values
+	// as the value for an empty string. The assumption we're making here
+	// is that the difference between the actual number of watchers that
+	// will be processed, i.e. (a)+(b) above and the one from our
+	// approximation i.e. (a)+[(b) for field value of ""] will be small.
+	// This seem to be true in almost all production clusters, which makes
+	// it a reasonable first step simplification to unblock progres on it.
+	if index.value == unsetValue || index.value == "" {
+		w.watchCount[*identifier] += incr
 	}
 }
 
