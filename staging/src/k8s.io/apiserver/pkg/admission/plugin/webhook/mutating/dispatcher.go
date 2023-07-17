@@ -168,6 +168,10 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 		if err != nil {
 			switch err := err.(type) {
 			case *webhookutil.ErrCallingWebhook:
+				if ctx.Err() == context.Canceled {
+					klog.Warningf("Context Canceled when calling webhook %v", hook.Name)
+					return err
+				}
 				if !ignoreClientCallFailures {
 					rejected = true
 					admissionmetrics.Metrics.ObserveWebhookRejection(ctx, hook.Name, "admit", string(versionedAttr.Attributes.GetOperation()), admissionmetrics.WebhookRejectionCallingWebhookError, int(err.Status.ErrStatus.Code))
