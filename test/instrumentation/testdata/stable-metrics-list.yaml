@@ -409,6 +409,88 @@
   stabilityLevel: STABLE
   labels:
   - resource
+- name: current_executing_requests
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Number of requests in initial (for a WATCH) or any (for a non-WATCH) execution
+    stage in the API Priority and Fairness subsystem
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - flow_schema
+  - priority_level
+- name: current_executing_seats
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Concurrency (number of seats) occupied by the currently executing (initial
+    stage for a WATCH, any stage otherwise) requests in the API Priority and Fairness
+    subsystem
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - flow_schema
+  - priority_level
+- name: current_inqueue_requests
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Number of requests currently pending in queues of the API Priority and Fairness
+    subsystem
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - flow_schema
+  - priority_level
+- name: dispatched_requests_total
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Number of requests executed by API Priority and Fairness subsystem
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - flow_schema
+  - priority_level
+- name: nominal_limit_seats
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Nominal number of execution seats configured for each priority level
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - priority_level
+- name: rejected_requests_total
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Number of requests rejected by API Priority and Fairness subsystem
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - flow_schema
+  - priority_level
+  - reason
+- name: request_wait_duration_seconds
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Length of time a request spent waiting in its queue
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - execute
+  - flow_schema
+  - priority_level
+  buckets:
+  - 0
+  - 0.005
+  - 0.02
+  - 0.05
+  - 0.1
+  - 0.2
+  - 0.5
+  - 1
+  - 2
+  - 5
+  - 10
+  - 15
+  - 30
 - name: healthcheck
   namespace: kubernetes
   help: This metric records the result of a single healthcheck.

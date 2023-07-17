@@ -379,7 +379,7 @@ func (uss *uniformScenarioState) finalReview() {
 	}
 	if uss.evalInqueueMetrics {
 		e := `
-				# HELP apiserver_flowcontrol_current_inqueue_requests [ALPHA] Number of requests currently pending in queues of the API Priority and Fairness subsystem
+				# HELP apiserver_flowcontrol_current_inqueue_requests [BETA] Number of requests currently pending in queues of the API Priority and Fairness subsystem
 				# TYPE apiserver_flowcontrol_current_inqueue_requests gauge
 ` + uss.expectedInqueue
 		err := metrics.GatherAndCompare(e, "apiserver_flowcontrol_current_inqueue_requests")
@@ -402,7 +402,7 @@ func (uss *uniformScenarioState) finalReview() {
 	}
 	if uss.evalExecutingMetrics && len(uss.expectedExecuting) > 0 {
 		e := `
-				# HELP apiserver_flowcontrol_current_executing_requests [ALPHA] Number of requests in initial (for a WATCH) or any (for a non-WATCH) execution stage in the API Priority and Fairness subsystem
+				# HELP apiserver_flowcontrol_current_executing_requests [BETA] Number of requests in initial (for a WATCH) or any (for a non-WATCH) execution stage in the API Priority and Fairness subsystem
 				# TYPE apiserver_flowcontrol_current_executing_requests gauge
 ` + uss.expectedExecuting
 		err := metrics.GatherAndCompare(e, "apiserver_flowcontrol_current_executing_requests")
@@ -426,7 +426,7 @@ func (uss *uniformScenarioState) finalReview() {
 	}
 	if uss.evalExecutingMetrics && len(expectedRejects) > 0 {
 		e := `
-				# HELP apiserver_flowcontrol_rejected_requests_total [ALPHA] Number of requests rejected by API Priority and Fairness subsystem
+				# HELP apiserver_flowcontrol_rejected_requests_total [BETA] Number of requests rejected by API Priority and Fairness subsystem
 				# TYPE apiserver_flowcontrol_rejected_requests_total counter
 ` + expectedRejects
 		err := metrics.GatherAndCompare(e, "apiserver_flowcontrol_rejected_requests_total")
