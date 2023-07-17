@@ -627,6 +627,54 @@ func TestIsSchedulableAfterPersistentVolumeClaimAdded(t *testing.T) {
 	}
 }
 
+func TestIsSchedulableAfterStorageClassAdded(t *testing.T) {
+	var modeWait = storagev1.VolumeBindingWaitForFirstConsumer
+
+	testcases := map[string]struct {
+		pod            *v1.Pod
+		oldObj, newObj interface{}
+		expectedHint   framework.QueueingHint
+		expectedErr    bool
+	}{
+		"error-wrong-new-object": {
+			pod:          createPodWithVolume("pod_1", "PVC_1"),
+			newObj:       "not-a-storageclass",
+			expectedHint: framework.Queue,
+			expectedErr:  true,
+		},
+		"sc-doesn't-have-volume-binding-mode": {
+			pod: createPodWithVolume("pod_1", "PVC_1"),
+			newObj: &storagev1.StorageClass{
+				ObjectMeta: metav1.ObjectMeta{Name: "SC_1"},
+			},
+			expectedHint: framework.QueueSkip,
+		},
+		"new-sc-is-wait-for-first-consumer-mode": {
+			pod: createPodWithVolume("pod_1", "PVC_1"),
+			newObj: &storagev1.StorageClass{
+				ObjectMeta:        metav1.ObjectMeta{Name: "SC_1"},
+				VolumeBindingMode: &modeWait,
+			},
+			expectedHint: framework.Queue,
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			p := &VolumeZone{}
+
+			got, err := p.isSchedulableAfterStorageClassAdded(logger, tc.pod, tc.oldObj, tc.newObj)
+			if err != nil && !tc.expectedErr {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if got != tc.expectedHint {
+				t.Errorf("isSchedulableAfterStorageClassAdded() = %v, want %v", got, tc.expectedHint)
+			}
+		})
+	}
+}
+
 func BenchmarkVolumeZone(b *testing.B) {
 	tests := []struct {
 		Name      string
