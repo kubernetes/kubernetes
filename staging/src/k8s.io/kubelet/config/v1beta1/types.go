@@ -548,22 +548,20 @@ type KubeletConfiguration struct {
 	// Default: false
 	// +optional
 	ProtectKernelDefaults bool `json:"protectKernelDefaults,omitempty"`
-	// makeIPTablesUtilChains, if true, causes the Kubelet ensures a set of iptables rules
-	// are present on host.
-	// These rules will serve as utility rules for various components, e.g. kube-proxy.
-	// The rules will be created based on iptablesMasqueradeBit and iptablesDropBit.
+	// makeIPTablesUtilChains, if true, causes the Kubelet to create the
+	// KUBE-IPTABLES-HINT chain in iptables as a hint to other components about the
+	// configuration of iptables on the system.
 	// Default: true
 	// +optional
 	MakeIPTablesUtilChains *bool `json:"makeIPTablesUtilChains,omitempty"`
-	// iptablesMasqueradeBit is the bit of the iptables fwmark space to mark for SNAT.
-	// Values must be within the range [0, 31]. Must be different from other mark bits.
-	// Warning: Please match the value of the corresponding parameter in kube-proxy.
-	// TODO: clean up IPTablesMasqueradeBit in kube-proxy.
+	// iptablesMasqueradeBit formerly controlled the creation of the KUBE-MARK-MASQ
+	// chain.
+	// Deprecated: no longer has any effect.
 	// Default: 14
 	// +optional
 	IPTablesMasqueradeBit *int32 `json:"iptablesMasqueradeBit,omitempty"`
-	// iptablesDropBit is the bit of the iptables fwmark space to mark for dropping packets.
-	// Values must be within the range [0, 31]. Must be different from other mark bits.
+	// iptablesDropBit formerly controlled the creation of the KUBE-MARK-DROP chain.
+	// Deprecated: no longer has any effect.
 	// Default: 15
 	// +optional
 	IPTablesDropBit *int32 `json:"iptablesDropBit,omitempty"`
