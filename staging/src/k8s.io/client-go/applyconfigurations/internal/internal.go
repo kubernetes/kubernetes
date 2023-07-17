@@ -5817,6 +5817,12 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             scalar: string
           elementRelationship: atomic
+    - name: allocatedResourceStatuses
+      type:
+        map:
+          elementType:
+            scalar: string
+          elementRelationship: separable
     - name: allocatedResources
       type:
         map:
@@ -5836,9 +5842,6 @@ var schemaYAML = typed.YAMLObject(`types:
           keys:
           - type
     - name: phase
-      type:
-        scalar: string
-    - name: resizeStatus
       type:
         scalar: string
 - name: io.k8s.api.core.v1.PersistentVolumeClaimTemplate

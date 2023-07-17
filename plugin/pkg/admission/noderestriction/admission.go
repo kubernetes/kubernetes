@@ -360,8 +360,8 @@ func (p *Plugin) admitPVCStatus(nodeName string, a admission.Attributes) error {
 		newPVC.Status.Conditions = nil
 
 		if p.expansionRecoveryEnabled {
-			oldPVC.Status.ResizeStatus = nil
-			newPVC.Status.ResizeStatus = nil
+			oldPVC.Status.AllocatedResourceStatuses = nil
+			newPVC.Status.AllocatedResourceStatuses = nil
 
 			oldPVC.Status.AllocatedResources = nil
 			newPVC.Status.AllocatedResources = nil

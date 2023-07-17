@@ -178,7 +178,7 @@ func (rc *reconciler) unmountVolumes() {
 func (rc *reconciler) mountOrAttachVolumes() {
 	// Ensure volumes that should be attached/mounted are attached/mounted.
 	for _, volumeToMount := range rc.desiredStateOfWorld.GetVolumesToMount() {
-		volMounted, devicePath, err := rc.actualStateOfWorld.PodExistsInVolume(volumeToMount.PodName, volumeToMount.VolumeName, volumeToMount.PersistentVolumeSize, volumeToMount.SELinuxLabel)
+		volMounted, devicePath, err := rc.actualStateOfWorld.PodExistsInVolume(volumeToMount.PodName, volumeToMount.VolumeName, volumeToMount.DesiredPersistentVolumeSize, volumeToMount.SELinuxLabel)
 		volumeToMount.DevicePath = devicePath
 		if cache.IsSELinuxMountMismatchError(err) {
 			// The volume is mounted, but with an unexpected SELinux context.

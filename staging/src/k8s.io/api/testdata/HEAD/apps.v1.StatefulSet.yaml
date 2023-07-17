@@ -1232,6 +1232,8 @@ spec:
     status:
       accessModes:
       - accessModesValue
+      allocatedResourceStatuses:
+        allocatedResourceStatusesKey: allocatedResourceStatusesValue
       allocatedResources:
         allocatedResourcesKey: "0"
       capacity:
@@ -1244,7 +1246,6 @@ spec:
         status: statusValue
         type: typeValue
       phase: phaseValue
-      resizeStatus: resizeStatusValue
 status:
   availableReplicas: 11
   collisionCount: 9

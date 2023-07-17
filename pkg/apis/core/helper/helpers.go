@@ -360,6 +360,28 @@ func ContainsAccessMode(modes []core.PersistentVolumeAccessMode, mode core.Persi
 	return false
 }
 
+func ClaimContainsAllocatedResources(pvc *core.PersistentVolumeClaim) bool {
+	if pvc == nil {
+		return false
+	}
+
+	if pvc.Status.AllocatedResources != nil {
+		return true
+	}
+	return false
+}
+
+func ClaimContainsAllocatedResourceStatus(pvc *core.PersistentVolumeClaim) bool {
+	if pvc == nil {
+		return false
+	}
+
+	if pvc.Status.AllocatedResourceStatuses != nil {
+		return true
+	}
+	return false
+}
+
 // GetTolerationsFromPodAnnotations gets the json serialized tolerations data from Pod.Annotations
 // and converts it to the []Toleration type in core.
 func GetTolerationsFromPodAnnotations(annotations map[string]string) ([]core.Toleration, error) {
