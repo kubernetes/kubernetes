@@ -37,6 +37,7 @@ const (
 
 	// owner: @ivelichkovich, @tallclair
 	// alpha: v1.27
+	// beta: v1.28
 	// kep: https://kep.k8s.io/3716
 	//
 	// Enables usage of MatchConditions fields to use CEL expressions for matching on admission webhooks
@@ -228,7 +229,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	AggregatedDiscoveryEndpoint: {Default: true, PreRelease: featuregate.Beta},
 
-	AdmissionWebhookMatchConditions: {Default: false, PreRelease: featuregate.Alpha},
+	AdmissionWebhookMatchConditions: {Default: true, PreRelease: featuregate.Beta},
 
 	APIListChunking: {Default: true, PreRelease: featuregate.Beta},
 
