@@ -223,11 +223,13 @@ var (
 	)
 	apiserverRequestConcurrencyLimit = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
-			Namespace:      namespace,
-			Subsystem:      subsystem,
-			Name:           "request_concurrency_limit",
-			Help:           "Shared concurrency limit in the API Priority and Fairness subsystem",
-			StabilityLevel: compbasemetrics.ALPHA,
+			Namespace: namespace,
+			Subsystem: subsystem,
+			Name:      "request_concurrency_limit",
+			Help:      "Nominal number of execution seats configured for each priority level",
+			// Remove this metric once all suppported releases have the equal nominal_limit_seats metric
+			DeprecatedVersion: "1.30.0",
+			StabilityLevel:    compbasemetrics.ALPHA,
 		},
 		[]string{priorityLevel},
 	)
@@ -253,11 +255,12 @@ var (
 	)
 	apiserverRequestConcurrencyInUse = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
-			Namespace:         namespace,
-			Subsystem:         subsystem,
-			Name:              "request_concurrency_in_use",
-			Help:              "Concurrency (number of seats) occupied by the currently executing (initial stage for a WATCH, any stage otherwise) requests in the API Priority and Fairness subsystem",
-			DeprecatedVersion: "1.28.0",
+			Namespace: namespace,
+			Subsystem: subsystem,
+			Name:      "request_concurrency_in_use",
+			Help:      "Concurrency (number of seats) occupied by the currently executing (initial stage for a WATCH, any stage otherwise) requests in the API Priority and Fairness subsystem",
+			// Remove this metric once all suppported releases have the equal current_executing_seats metric
+			DeprecatedVersion: "1.31.0",
 			StabilityLevel:    compbasemetrics.ALPHA,
 		},
 		[]string{priorityLevel, flowSchema},
