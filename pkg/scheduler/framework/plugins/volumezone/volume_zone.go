@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
+	"sort"
 
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
@@ -33,6 +35,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
+	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // VolumeZone is a plugin that checks volume zone.
@@ -105,7 +108,8 @@ func (pl *VolumeZone) Name() string {
 // Currently, this is only supported with PersistentVolumeClaims,
 // and only looks for the bound PersistentVolume.
 func (pl *VolumeZone) PreFilter(ctx context.Context, cs *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
-	podPVTopologies, status := pl.getPVbyPod(ctx, pod)
+	logger := klog.FromContext(ctx)
+	podPVTopologies, status := pl.getPVbyPod(logger, pod)
 	if !status.IsSuccess() {
 		return nil, status
 	}
@@ -116,16 +120,28 @@ func (pl *VolumeZone) PreFilter(ctx context.Context, cs *framework.CycleState, p
 	return nil, nil
 }
 
-func (pl *VolumeZone) getPVbyPod(ctx context.Context, pod *v1.Pod) ([]pvTopology, *framework.Status) {
-	logger := klog.FromContext(ctx)
+// isWaitForFirstConsumer confirms whether storageClass's volumeBindingMode is VolumeBindingWaitForFirstConsumer or not.
+func (pl *VolumeZone) isWaitForFirstConsumer(scName string) (bool, *framework.Status) {
+	class, err := pl.scLister.Get(scName)
+	if s := getErrorAsStatus(err); !s.IsSuccess() {
+		return false, s
+	}
+	if class.VolumeBindingMode == nil {
+		return false, framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("VolumeBindingMode not set for StorageClass %q", scName))
+	}
+	if *class.VolumeBindingMode == storage.VolumeBindingWaitForFirstConsumer {
+		// Return true because volumeBindingMode of storageClass is VolumeBindingWaitForFirstConsumer.
+		return true, nil
+	}
+	return false, framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolume had no name")
+}
+
+// getPVbyPod gets PVTopology from pod
+func (pl *VolumeZone) getPVbyPod(logger klog.Logger, pod *v1.Pod) ([]pvTopology, *framework.Status) {
 	podPVTopologies := make([]pvTopology, 0)
 
-	for i := range pod.Spec.Volumes {
-		volume := pod.Spec.Volumes[i]
-		if volume.PersistentVolumeClaim == nil {
-			continue
-		}
-		pvcName := volume.PersistentVolumeClaim.ClaimName
+	pvcNames := pl.getPersistentVolumeClaimNameFromPod(pod)
+	for _, pvcName := range pvcNames {
 		if pvcName == "" {
 			return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolumeClaim had no name")
 		}
@@ -140,41 +156,18 @@ func (pl *VolumeZone) getPVbyPod(ctx context.Context, pod *v1.Pod) ([]pvTopology
 			if len(scName) == 0 {
 				return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolumeClaim had no pv name and storageClass name")
 			}
-
-			class, err := pl.scLister.Get(scName)
-			if s := getErrorAsStatus(err); !s.IsSuccess() {
-				return nil, s
+			isWait, status := pl.isWaitForFirstConsumer(scName)
+			if !isWait {
+				return nil, status
 			}
-			if class.VolumeBindingMode == nil {
-				return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("VolumeBindingMode not set for StorageClass %q", scName))
-			}
-			if *class.VolumeBindingMode == storage.VolumeBindingWaitForFirstConsumer {
-				// Skip unbound volumes
-				continue
-			}
-
-			return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolume had no name")
+			continue
 		}
 
 		pv, err := pl.pvLister.Get(pvName)
 		if s := getErrorAsStatus(err); !s.IsSuccess() {
 			return nil, s
 		}
-
-		for _, key := range topologyLabels {
-			if value, ok := pv.ObjectMeta.Labels[key]; ok {
-				volumeVSet, err := volumehelpers.LabelZonesToSet(value)
-				if err != nil {
-					logger.Info("Failed to parse label, ignoring the label", "label", fmt.Sprintf("%s:%s", key, value), "err", err)
-					continue
-				}
-				podPVTopologies = append(podPVTopologies, pvTopology{
-					pvName: pv.Name,
-					key:    key,
-					values: sets.Set[string](volumeVSet),
-				})
-			}
-		}
+		podPVTopologies = append(podPVTopologies, pl.getPVTopologiesFromPV(logger, pv)...)
 	}
 	return podPVTopologies, nil
 }
@@ -212,7 +205,7 @@ func (pl *VolumeZone) Filter(ctx context.Context, cs *framework.CycleState, pod 
 	if err != nil {
 		// Fallback to calculate pv list here
 		var status *framework.Status
-		podPVTopologies, status = pl.getPVbyPod(ctx, pod)
+		podPVTopologies, status = pl.getPVbyPod(logger, pod)
 		if !status.IsSuccess() {
 			return status
 		}
@@ -221,33 +214,8 @@ func (pl *VolumeZone) Filter(ctx context.Context, cs *framework.CycleState, pod 
 	}
 
 	node := nodeInfo.Node()
-	hasAnyNodeConstraint := false
-	for _, topologyLabel := range topologyLabels {
-		if _, ok := node.Labels[topologyLabel]; ok {
-			hasAnyNodeConstraint = true
-			break
-		}
-	}
-
-	if !hasAnyNodeConstraint {
-		// The node has no zone constraints, so we're OK to schedule.
-		// This is to handle a single-zone cluster scenario where the node may not have any topology labels.
-		return nil
-	}
-
-	for _, pvTopology := range podPVTopologies {
-		v, ok := node.Labels[pvTopology.key]
-		if !ok {
-			// if we can't match the beta label, try to match pv's beta label with node's ga label
-			v, ok = node.Labels[translateToGALabel(pvTopology.key)]
-		}
-		if !ok || !pvTopology.values.Has(v) {
-			logger.V(10).Info("Won't schedule pod onto node due to volume (mismatch on label key)", "pod", klog.KObj(pod), "node", klog.KObj(node), "PV", klog.KRef("", pvTopology.pvName), "PVLabelKey", pvTopology.key)
-			return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict)
-		}
-	}
-
-	return nil
+	status, _ := pl.isSchedulableNode(logger, podPVTopologies, node, pod)
+	return status
 }
 
 func getStateData(cs *framework.CycleState) (*stateData, error) {
@@ -278,7 +246,7 @@ func (pl *VolumeZone) EventsToRegister() []framework.ClusterEventWithHint {
 	return []framework.ClusterEventWithHint{
 		// New storageClass with bind mode `VolumeBindingWaitForFirstConsumer` will make a pod schedulable.
 		// Due to immutable field `storageClass.volumeBindingMode`, storageClass update events are ignored.
-		{Event: framework.ClusterEvent{Resource: framework.StorageClass, ActionType: framework.Add}},
+		{Event: framework.ClusterEvent{Resource: framework.StorageClass, ActionType: framework.Add}, QueueingHintFn: pl.isSchedulableAfterStorageClassAdded},
 		// A new node or updating a node's volume zone labels may make a pod schedulable.
 		//
 		// A note about UpdateNodeTaint event:
@@ -289,13 +257,250 @@ func (pl *VolumeZone) EventsToRegister() []framework.ClusterEventWithHint {
 		// As a workaround, we add UpdateNodeTaint event to catch the case.
 		// We can remove UpdateNodeTaint when we remove the preCheck feature.
 		// See: https://github.com/kubernetes/kubernetes/issues/110175
-		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel | framework.UpdateNodeTaint}},
+		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel | framework.UpdateNodeTaint}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
 		// A new pvc may make a pod schedulable.
-		// Due to fields are immutable except `spec.resources`, pvc update events are ignored.
-		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add}},
+		// PVC's VolumeName is mutable if old PVC's volumeName is empty.
+		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterPersistentVolumeClaimChange},
 		// A new pv or updating a pv's volume zone labels may make a pod schedulable.
-		{Event: framework.ClusterEvent{Resource: framework.PersistentVolume, ActionType: framework.Add | framework.Update}},
+		{Event: framework.ClusterEvent{Resource: framework.PersistentVolume, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterPersistentVolumeChange},
 	}
+}
+
+// getPersistentVolumeClaimNameFromPod gets pvc names bound to a pod.
+func (pl *VolumeZone) getPersistentVolumeClaimNameFromPod(pod *v1.Pod) []string {
+	var pvcNames []string
+	for i := range pod.Spec.Volumes {
+		volume := pod.Spec.Volumes[i]
+		if volume.PersistentVolumeClaim == nil {
+			continue
+		}
+		pvcName := volume.PersistentVolumeClaim.ClaimName
+		pvcNames = append(pvcNames, pvcName)
+	}
+	return pvcNames
+}
+
+// isSchedulableAfterStorageClassAdded is invoked whenever a StorageClass is added.
+// It checks whether the addition of StorageClass has made a previously unschedulable pod schedulable.
+// Only a new StorageClass with WaitForFirstConsumer will cause a pod to become schedulable.
+func (pl *VolumeZone) isSchedulableAfterStorageClassAdded(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+	_, addedStorageClass, err := util.As[*storage.StorageClass](nil, newObj)
+	if err != nil {
+		return framework.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterStorageClassAdded: %w", err)
+	}
+
+	pvcNames := pl.getPersistentVolumeClaimNameFromPod(pod)
+	for _, pvcName := range pvcNames {
+		pvc, err := pl.pvcLister.PersistentVolumeClaims(pod.Namespace).Get(pvcName)
+		if err != nil {
+			logger.Error(err, "unexpected error during getting PVC", "Namespace", pod.Namespace, "pvc", pvcName)
+			continue
+		}
+		pvName := pvc.Spec.VolumeName
+		if pvName != "" {
+			// We can skip PersistentVolume because we only want to check storageClass
+			continue
+		}
+		scName := storagehelpers.GetPersistentVolumeClaimClass(pvc)
+		if scName == addedStorageClass.Name {
+			if (addedStorageClass.VolumeBindingMode != nil) && (*addedStorageClass.VolumeBindingMode == storage.VolumeBindingWaitForFirstConsumer) {
+				logger.V(5).Info("a new WaitForFirstConsumer storageClass for the pod's PVC is created, which might make the pod schedulable", "storageClass", klog.KObj(addedStorageClass), "pod", klog.KObj(pod))
+				return framework.Queue, nil
+			}
+		}
+	}
+
+	logger.V(5).Info("StorageClass was created but it doesn't make this pod schedulable", "pod", klog.KObj(pod), "StorageClass", klog.KObj(addedStorageClass))
+	return framework.QueueSkip, nil
+}
+
+// isSchedulableAfterNodeChange is invoked whenever a node added or updated.
+// It checks whether the change of Node has made a previously unschedulable pod schedulable.
+// If the node label related to pod's pv topology is changed, it could make the pod schedulable.
+func (pl *VolumeZone) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+	originalNode, modifiedNode, err := util.As[*v1.Node](oldObj, newObj)
+	if err != nil {
+		return framework.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterNodeChange: %w", err)
+	}
+
+	podPVTopologies, status := pl.getPVbyPod(logger, pod)
+	if !status.IsSuccess() {
+		return framework.Queue, status.AsError()
+	}
+	_, isMatched := pl.isSchedulableNode(logger, podPVTopologies, modifiedNode, pod)
+	if !isMatched {
+		logger.V(5).Info("node was created or updated but it doesn't make this pod schedulable", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+		return framework.QueueSkip, nil
+	}
+	wasMatched := false
+	if originalNode != nil {
+		_, wasMatched = pl.isSchedulableNode(logger, podPVTopologies, originalNode, pod)
+	}
+	if !wasMatched {
+		logger.V(5).Info("node was created or updated, which might make the pod schedulable", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+		return framework.Queue, nil
+	}
+	logger.V(5).Info("node was created or updated but it doesn't make this pod schedulable", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+	return framework.QueueSkip, nil
+}
+
+// isSchedulablerNode checks whether the node can schedule the pod.
+func (pl *VolumeZone) isSchedulableNode(logger klog.Logger, podPVTopologies []pvTopology, node *v1.Node, pod *v1.Pod) (*framework.Status, bool) {
+	hasAnyNodeConstraint := false
+	for _, topologyLabel := range topologyLabels {
+		if _, ok := node.Labels[topologyLabel]; ok {
+			hasAnyNodeConstraint = true
+			break
+		}
+	}
+
+	if !hasAnyNodeConstraint {
+		// The node has no zone constraints, so we're OK to schedule.
+		// This is to handle a single-zone cluster scenario where the node may not have any topology labels.
+		return nil, true
+	}
+
+	for _, pvTopology := range podPVTopologies {
+		v, ok := node.Labels[pvTopology.key]
+		if !ok {
+			// if we can't match the beta label, try to match pv's beta label with node's ga label
+			v, ok = node.Labels[translateToGALabel(pvTopology.key)]
+		}
+		if !ok || !pvTopology.values.Has(v) {
+			logger.V(10).Info("Cannot schedule pod onto node due to volume (mismatch on label key)", "pod", klog.KObj(pod), "node", klog.KObj(node), "PV", klog.KRef("", pvTopology.pvName), "PVLabelKey", pvTopology.key)
+			return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict), false
+		}
+	}
+	return nil, true
+}
+
+// isSchedulableAfterPersistentVolumeClaimChange is invoked whenever a PersistentVolumeClaim added or updated.
+// It checks whether the change of PVC has made a previously unschedulable pod schedulable.
+// A PVC becoming bound or using a WaitForFirstConsumer storageclass can cause the pod to become schedulable.
+func (pl *VolumeZone) isSchedulableAfterPersistentVolumeClaimChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+	originalPVC, modifiedPVC, err := util.As[*v1.PersistentVolumeClaim](oldObj, newObj)
+	if err != nil {
+		return framework.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterPersistentVolumeClaimChange: %w", err)
+	}
+	isMatched := pl.checkPVCBindingToPodPV(logger, modifiedPVC, pod)
+	// updated PVC is not schedulable because PVC doesn't match the pod's PVC
+	if !isMatched {
+		logger.V(5).Info("PVC was created or updated but it doesn't make this pod schedulable.", "pod", klog.KObj(pod), "PVC", klog.KObj(modifiedPVC))
+		return framework.QueueSkip, nil
+	}
+	wasMatched := pl.checkPVCBindingToPodPV(logger, originalPVC, pod)
+	// the PVC that didn't match the pod now matches the pod
+	if isMatched && !wasMatched {
+		logger.V(5).Info("PVC was created or updated, which might make the pod schedulable. The given PVC matches the pod's PVC", "pod", klog.KObj(pod), "PVC", klog.KObj(modifiedPVC))
+		return framework.Queue, nil
+	}
+	logger.V(5).Info("PVC was created or updated but it doesn't make this pod schedulable. Nothing has changed about PV bound to PVC.", "pod", klog.KObj(pod), "PVC", klog.KObj(modifiedPVC))
+	return framework.QueueSkip, nil
+}
+
+// checkPVCBindingToPodPV verifies if the PVC is bound to PV of a given Pod.
+func (pl *VolumeZone) checkPVCBindingToPodPV(logger klog.Logger, pvc *v1.PersistentVolumeClaim, pod *v1.Pod) bool {
+	if pvc == nil {
+		return false
+	}
+	pvcNames := pl.getPersistentVolumeClaimNameFromPod(pod)
+	for _, pvcName := range pvcNames {
+		if (pvc.Name != pvcName) || (pod.Namespace != pvc.Namespace) {
+			// pod's PVC doesn't match with the given PVC
+			continue
+		}
+		logger.V(5).Info("PVC matches the pod's PVC", "pod", klog.KObj(pod), "PVC", klog.KObj(pvc))
+		pvName := pvc.Spec.VolumeName
+		if pvName == "" {
+			scName := storagehelpers.GetPersistentVolumeClaimClass(pvc)
+			if len(scName) == 0 {
+				return false
+			}
+			isWait, _ := pl.isWaitForFirstConsumer(scName)
+			if !isWait {
+				logger.V(5).Info("PVC is bound to storageClass but the volumeBindingMode is not WaitForFirstConsumer", "storageClass", scName)
+				return false
+			}
+		}
+		return true
+	}
+
+	logger.V(5).Info("PVC doesn't match the pod's PVC", "pod", klog.KObj(pod), "PVC", klog.KObj(pvc))
+	return false
+}
+
+// isSchedulableAfterPersistentVolumeChange is invoked whenever a PersistentVolume added or updated.
+// It checks whether the change of PVC has made a previously unschedulable pod schedulable.
+// Changing the PV topology labels could cause the pod to become schedulable.
+func (pl *VolumeZone) isSchedulableAfterPersistentVolumeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+	originalPV, modifiedPV, err := util.As[*v1.PersistentVolume](oldObj, newObj)
+	if err != nil {
+		return framework.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterPersistentVolumeChange: %w", err)
+	}
+	originalPVTopologies := make([]pvTopology, 0)
+	if originalPV != nil {
+		originalPVTopologies, _ = pl.getPVTopologiesAndSort(logger, pod, originalPV)
+	}
+	modifiedPVTopologies, isPodBoundToPV := pl.getPVTopologiesAndSort(logger, pod, modifiedPV)
+	if isPodBoundToPV && !reflect.DeepEqual(originalPVTopologies, modifiedPVTopologies) {
+		logger.V(5).Info("PV was created or updated, which might make the pod schedulable", "pod", klog.KObj(pod), "PV", klog.KObj(modifiedPV))
+		return framework.Queue, nil
+	}
+
+	logger.V(5).Info("PV was created or updated, but it doesn't make this pod schedulable", "pod", klog.KObj(pod), "PV", klog.KObj(modifiedPV))
+	return framework.QueueSkip, nil
+}
+
+// getPVTopologiesFromPV retrieves pvTopology from a given PV and returns the array
+func (pl *VolumeZone) getPVTopologiesFromPV(logger klog.Logger, pv *v1.PersistentVolume) []pvTopology {
+	podPVTopologies := make([]pvTopology, 0)
+	for _, key := range topologyLabels {
+		if value, ok := pv.ObjectMeta.Labels[key]; ok {
+			volumeVSet, err := volumehelpers.LabelZonesToSet(value)
+			if err != nil {
+				logger.V(5).Info("Failed to parse label, ignoring the label", "label", fmt.Sprintf("%s:%s", key, value), "err", err)
+				continue
+			}
+			podPVTopologies = append(podPVTopologies, pvTopology{
+				pvName: pv.Name,
+				key:    key,
+				values: sets.Set[string](volumeVSet),
+			})
+		}
+	}
+	return podPVTopologies
+}
+
+// getPVTopologiesAndSort checks whether target PV is bound to pod's PVC.
+// If PV is bound to pod's PVC, get PVTopologies and Sort.
+func (pl *VolumeZone) getPVTopologiesAndSort(logger klog.Logger, pod *v1.Pod, pv *v1.PersistentVolume) ([]pvTopology, bool) {
+	isPodBoundToPV := false
+	podPVTopologies := make([]pvTopology, 0)
+
+	pvcNames := pl.getPersistentVolumeClaimNameFromPod(pod)
+	for _, pvcName := range pvcNames {
+		pvc, err := pl.pvcLister.PersistentVolumeClaims(pod.Namespace).Get(pvcName)
+		if err != nil {
+			logger.Error(err, "unexpected error during getting PVC", "Namespace", pod.Namespace, "pvc", pvcName)
+			continue
+		}
+
+		// If target PV is bound to pod's PVC, get PVTopologies
+		pvName := pvc.Spec.VolumeName
+		if pvName == pv.Name {
+			isPodBoundToPV = true
+			podPVTopologies = append(podPVTopologies, pl.getPVTopologiesFromPV(logger, pv)...)
+			// One PV is bound to one PVC. One PV can't be bound to more than one PVC.
+			break
+		}
+	}
+	// Sort PVTopologies based on key order
+	sort.Slice(podPVTopologies, func(i, j int) bool {
+		// One PV is bound to one PVC. One PV can't be bound to more than one PVC.
+		// That's why we don't use pvName here. We use key for sorting podPVTopologies.
+		return podPVTopologies[i].key > podPVTopologies[j].key
+	})
+	return podPVTopologies, isPodBoundToPV
 }
 
 // New initializes a new plugin and returns it.

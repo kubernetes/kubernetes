@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
+	"k8s.io/utils/ptr"
 )
 
 func createPodWithVolume(pod, pvc string) *v1.Pod {
@@ -539,6 +541,540 @@ func TestWithBinding(t *testing.T) {
 	}
 }
 
+func TestIsSchedulableAfterStorageClassAdded(t *testing.T) {
+	var modeWait = storagev1.VolumeBindingWaitForFirstConsumer
+	pvLister := tf.PersistentVolumeLister{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-a"}},
+		},
+	}
+
+	pvcLister := tf.PersistentVolumeClaimLister{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "PVC_2", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{StorageClassName: ptr.To("SC_2")},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "PVC_3", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{StorageClassName: ptr.To("SC_3")},
+		},
+	}
+
+	scLister := tf.StorageClassLister{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "SC_1", Namespace: "default"},
+		},
+	}
+
+	testcases := map[string]struct {
+		pod            *v1.Pod
+		oldObj, newObj interface{}
+		expectedHint   framework.QueueingHint
+		expectedErr    bool
+	}{
+		"backoff-wrong-new-object": {
+			pod:          createPodWithVolume("pod_1", "PVC_1"),
+			newObj:       "not-a-storageclass",
+			expectedHint: framework.Queue,
+			expectedErr:  true,
+		},
+		"pvc-was-not-bound-to-sc": {
+			pod: createPodWithVolume("pod_1", "PVC_1"),
+			newObj: &storagev1.StorageClass{
+				ObjectMeta: metav1.ObjectMeta{Name: "SC_1"},
+			},
+			expectedHint: framework.QueueSkip,
+		},
+		"pvc-was-bound-to-different-sc": {
+			pod: createPodWithVolume("pod_1", "PVC_2"),
+			newObj: &storagev1.StorageClass{
+				ObjectMeta: metav1.ObjectMeta{Name: "SC_1"},
+			},
+			expectedHint: framework.QueueSkip,
+		},
+		"pvc-was-bound-to-added-sc-but-not-wait-mode": {
+			pod: createPodWithVolume("pod_1", "PVC_3"),
+			newObj: &storagev1.StorageClass{
+				ObjectMeta: metav1.ObjectMeta{Name: "SC_3"},
+			},
+			expectedHint: framework.QueueSkip,
+		},
+		"pvc-was-bound-to-added-sc-and-wait-mode": {
+			pod: createPodWithVolume("pod_1", "PVC_3"),
+			newObj: &storagev1.StorageClass{
+				ObjectMeta:        metav1.ObjectMeta{Name: "SC_3"},
+				VolumeBindingMode: &modeWait,
+			},
+			expectedHint: framework.Queue,
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			p := &VolumeZone{
+				pvLister,
+				pvcLister,
+				scLister,
+			}
+
+			got, err := p.isSchedulableAfterStorageClassAdded(logger, tc.pod, tc.oldObj, tc.newObj)
+			if err != nil && !tc.expectedErr {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if got != tc.expectedHint {
+				t.Errorf("isSchedulableAfterStorageClassAdded() = %v, want %v", got, tc.expectedHint)
+			}
+		})
+	}
+}
+
+func TestIsSchedulableAfterNodeChange(t *testing.T) {
+	pvLister := tf.PersistentVolumeLister{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-a"}},
+		},
+	}
+
+	pvcLister := tf.PersistentVolumeClaimLister{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
+		},
+	}
+
+	testcases := map[string]struct {
+		pod            *v1.Pod
+		oldObj, newObj interface{}
+		expectedHint   framework.QueueingHint
+		expectedErr    bool
+	}{
+		"backoff-wrong-new-object": {
+			pod:          createPodWithVolume("pod_1", "PVC_1"),
+			newObj:       "not-a-node",
+			expectedHint: framework.Queue,
+			expectedErr:  true,
+		},
+		"backoff-wrong-old-object": {
+			pod:          createPodWithVolume("pod_1", "PVC_1"),
+			oldObj:       "not-a-node",
+			newObj:       st.MakeNode().Obj(),
+			expectedHint: framework.Queue,
+			expectedErr:  true,
+		},
+		"pvcName-is-null-and-getPVbyPod-return-unschedulable": {
+			pod:          createPodWithVolume("pod_1", ""),
+			oldObj:       st.MakeNode().Obj(),
+			newObj:       st.MakeNode().Obj(),
+			expectedHint: framework.Queue,
+			expectedErr:  true,
+		},
+		"new-node-was-added-and-matched-labels": {
+			pod: createPodWithVolume("pod_1", "PVC_1"),
+			newObj: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-a"},
+				},
+			},
+			expectedHint: framework.Queue,
+		},
+		"new-node-was-added-but-didn't-match-key": {
+			pod: createPodWithVolume("pod_1", "PVC_1"),
+			newObj: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-b"},
+				},
+			},
+			expectedHint: framework.QueueSkip,
+		},
+		"non-match-node-was-updated-and-matched-labels": {
+			pod: createPodWithVolume("pod_1", "PVC_1"),
+			oldObj: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-b"},
+				},
+			},
+			newObj: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-a"},
+				},
+			},
+			expectedHint: framework.Queue,
+		},
+		"non-match-node-was-updated-but-didn't-match-key": {
+			pod: createPodWithVolume("pod_1", "PVC_1"),
+			oldObj: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-b"},
+				},
+			},
+			newObj: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-c"},
+				},
+			},
+			expectedHint: framework.QueueSkip,
+		},
+		"matched-node-was-updated-and-matched-labels": {
+			pod: createPodWithVolume("pod_1", "PVC_1"),
+			oldObj: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-a"},
+				},
+			},
+			newObj: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-a"},
+				},
+			},
+			expectedHint: framework.QueueSkip,
+		},
+		"matched-node-was-updated-but-didn't-match-key": {
+			pod: createPodWithVolume("pod_1", "PVC_1"),
+			oldObj: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-a"},
+				},
+			},
+			newObj: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-b"},
+				},
+			},
+			expectedHint: framework.QueueSkip,
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			p := &VolumeZone{
+				pvLister,
+				pvcLister,
+				nil,
+			}
+
+			got, err := p.isSchedulableAfterNodeChange(logger, tc.pod, tc.oldObj, tc.newObj)
+			if err != nil && !tc.expectedErr {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if got != tc.expectedHint {
+				t.Errorf("isSchedulableAfterNodeChange() = %v, want %v", got, tc.expectedHint)
+			}
+		})
+	}
+}
+
+func TestIsSchedulableAfterPersistentVolumeClaimAdded(t *testing.T) {
+	var modeWait = storagev1.VolumeBindingWaitForFirstConsumer
+	pvLister := tf.PersistentVolumeLister{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-a"}},
+		},
+	}
+
+	pvcLister := tf.PersistentVolumeClaimLister{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "PVC_2", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{StorageClassName: ptr.To("SC_1")},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "PVC_3", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{StorageClassName: ptr.To("SC_2")},
+		},
+	}
+
+	scLister := tf.StorageClassLister{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "SC_1"},
+		},
+		{
+			ObjectMeta:        metav1.ObjectMeta{Name: "SC_2"},
+			VolumeBindingMode: &modeWait,
+		},
+	}
+
+	testcases := map[string]struct {
+		pod            *v1.Pod
+		oldObj, newObj interface{}
+		expectedHint   framework.QueueingHint
+		expectedErr    bool
+	}{
+		"backoff-wrong-new-object": {
+			pod:          createPodWithVolume("pod_1", "PVC_1"),
+			newObj:       "not-a-pvc",
+			expectedHint: framework.Queue,
+			expectedErr:  true,
+		},
+		"pvc-was-added-and-pod-was-not-bound-to-pvc": {
+			pod: st.MakePod().Name("pod_1").Namespace("default").Obj(),
+			newObj: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
+				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
+			},
+			expectedHint: framework.QueueSkip,
+		},
+		"pvc-was-added-and-pod-was-bound-to-different-pvc": {
+			pod: createPodWithVolume("pod_1", "PVC_2"),
+			newObj: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
+				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
+			},
+			expectedHint: framework.QueueSkip,
+		},
+		"pvc-was-added-and-pod-was-bound-to-pvc-but-different-ns": {
+			pod: createPodWithVolume("pod_1", "PVC_1"),
+			newObj: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "ns1"},
+				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
+			},
+			expectedHint: framework.QueueSkip,
+		},
+		"pvc-was-added-and-pod-was-bound-to-added-pvc": {
+			pod: createPodWithVolume("pod_1", "PVC_1"),
+			newObj: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
+				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
+			},
+			expectedHint: framework.Queue,
+		},
+		"pvc-was-added-and-pod-was-bound-to-added-pvc, pvc-bound-to-storage-class-with-not-wait-mode": {
+			pod: createPodWithVolume("pod_1", "PVC_2"),
+			newObj: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "PVC_2", Namespace: "default"},
+				Spec:       v1.PersistentVolumeClaimSpec{StorageClassName: ptr.To("SC_1")},
+			},
+			expectedHint: framework.QueueSkip,
+		},
+		"pvc-was-added-and-pod-was-bound-to-added-pvc, pvc-bound-to-storage-class-with-wait-mode": {
+			pod: createPodWithVolume("pod_1", "PVC_3"),
+			newObj: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "PVC_3", Namespace: "default"},
+				Spec:       v1.PersistentVolumeClaimSpec{StorageClassName: ptr.To("SC_2")},
+			},
+			expectedHint: framework.Queue,
+		},
+		"pvc-was-updated-and-pod-was-bound-to-pvc": {
+			pod: createPodWithVolume("pod_1", "PVC_1"),
+			oldObj: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
+				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: ""},
+			},
+			newObj: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
+				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
+			},
+			expectedHint: framework.Queue,
+		},
+		"pvc-was-updated-but-pv-doesn't-change": {
+			pod: createPodWithVolume("pod_1", "PVC_1"),
+			oldObj: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
+				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
+			},
+			newObj: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
+				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
+			},
+			expectedHint: framework.QueueSkip,
+		},
+		"pvc-was-updated-but-pod-was-not-bound-to-pvc": {
+			pod: createPodWithVolume("pod_1", "PVC_1"),
+			oldObj: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
+				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: ""},
+			},
+			newObj: &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
+				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: ""},
+			},
+			expectedHint: framework.QueueSkip,
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			p := &VolumeZone{
+				pvLister,
+				pvcLister,
+				scLister,
+			}
+
+			got, err := p.isSchedulableAfterPersistentVolumeClaimChange(logger, tc.pod, tc.oldObj, tc.newObj)
+			if err != nil && !tc.expectedErr {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if got != tc.expectedHint {
+				t.Errorf("isSchedulableAfterPersistentVolumeClaimChange() = %v, want %v", got, tc.expectedHint)
+			}
+		})
+	}
+}
+
+func TestIsSchedulableAfterPersistentVolumeChange(t *testing.T) {
+	pvLister := tf.PersistentVolumeLister{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_2", Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-b"}},
+		},
+	}
+
+	pvcLister := tf.PersistentVolumeClaimLister{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
+		},
+	}
+
+	testcases := map[string]struct {
+		pod            *v1.Pod
+		oldObj, newObj interface{}
+		expectedHint   framework.QueueingHint
+		expectedErr    bool
+	}{
+		"backoff-wrong-new-object": {
+			pod:          createPodWithVolume("pod_1", "PVC_1"),
+			newObj:       "not-a-pv",
+			expectedHint: framework.Queue,
+			expectedErr:  true,
+		},
+		"backoff-wrong-old-object": {
+			pod:          createPodWithVolume("pod_1", "PVC_1"),
+			oldObj:       "not-a-pv",
+			newObj:       st.MakePersistentVolume().Name("Vol_1").Obj(),
+			expectedHint: framework.Queue,
+			expectedErr:  true,
+		},
+		"pv-was-added-but-pod's-pvcName-is-null": {
+			pod: st.MakePod().Name("pod_1").Namespace("default").Obj(),
+			newObj: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "Vol_1",
+					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-b"},
+				},
+			},
+			expectedHint: framework.QueueSkip,
+		},
+		"new-pv-was-added-and-bound-to-pod's-pvc": {
+			pod: createPodWithVolume("pod_1", "PVC_1"),
+			newObj: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "Vol_1",
+					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-b"},
+				},
+			},
+			expectedHint: framework.Queue,
+		},
+		"new-pv-was-added-and-bound-to-pod's-pvc-but-doesn't-have-labels": {
+			pod: createPodWithVolume("pod_1", "PVC_1"),
+			newObj: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "Vol_1",
+				},
+			},
+			expectedHint: framework.QueueSkip,
+		},
+		"new-pv-was-added-but-not-bound-to-pod's-pvc": {
+			pod: createPodWithVolume("pod_1", "PVC_1"),
+			newObj: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "Vol_2",
+					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-b"},
+				},
+			},
+			expectedHint: framework.QueueSkip,
+		},
+		"pv-was-updated-and-changed-key": {
+			pod: createPodWithVolume("pod_1", "PVC_1"),
+			oldObj: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "Vol_1",
+					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-a"},
+				},
+			},
+			newObj: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "Vol_1",
+					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-b"},
+				},
+			},
+			expectedHint: framework.Queue,
+		},
+		"pv-was-updated-and-added-label": {
+			pod: createPodWithVolume("pod_1", "PVC_1"),
+			oldObj: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "Vol_1",
+					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-a"},
+				},
+			},
+			newObj: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "Vol_1",
+					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-a",
+						v1.LabelTopologyZone: "zone"},
+				},
+			},
+			expectedHint: framework.Queue,
+		},
+		"pv-was-updated-and-changed-labels-order": {
+			pod: createPodWithVolume("pod_1", "PVC_1"),
+			oldObj: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "Vol_1",
+					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-a",
+						v1.LabelTopologyZone: "zone"},
+				},
+			},
+			newObj: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "Vol_1",
+					Labels: map[string]string{v1.LabelTopologyZone: "zone",
+						v1.LabelFailureDomainBetaZone: "us-west1-a"},
+				},
+			},
+			expectedHint: framework.QueueSkip,
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			p := &VolumeZone{
+				pvLister,
+				pvcLister,
+				nil,
+			}
+
+			got, err := p.isSchedulableAfterPersistentVolumeChange(logger, tc.pod, tc.oldObj, tc.newObj)
+			if err != nil && !tc.expectedErr {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if got != tc.expectedHint {
+				t.Errorf("isSchedulableAfterPersistentVolumeChange() = %v, want %v", got, tc.expectedHint)
+			}
+		})
+	}
+}
+
 func BenchmarkVolumeZone(b *testing.B) {
 	tests := []struct {
 		Name      string
@@ -572,7 +1108,7 @@ func BenchmarkVolumeZone(b *testing.B) {
 			defer cancel()
 			nodes := makeNodesWithTopologyZone(tt.NumNodes)
 			pl := newPluginWithListers(ctx, b, []*v1.Pod{tt.Pod}, nodes, makePVCsWithPV(tt.NumPVC), makePVsWithZoneLabel(tt.NumPV))
-			nodeInfos := make([]*framework.NodeInfo, len(nodes), len(nodes))
+			nodeInfos := make([]*framework.NodeInfo, len(nodes))
 			for i := 0; i < len(nodes); i++ {
 				nodeInfo := &framework.NodeInfo{}
 				nodeInfo.SetNode(nodes[i])
@@ -609,7 +1145,7 @@ func newPluginWithListers(ctx context.Context, tb testing.TB, pods []*v1.Pod, no
 }
 
 func makePVsWithZoneLabel(num int) []*v1.PersistentVolume {
-	pvList := make([]*v1.PersistentVolume, num, num)
+	pvList := make([]*v1.PersistentVolume, num)
 	for i := 0; i < len(pvList); i++ {
 		pvName := fmt.Sprintf("Vol_Stable_%d", i)
 		zone := fmt.Sprintf("us-west-%d", i)
@@ -621,7 +1157,7 @@ func makePVsWithZoneLabel(num int) []*v1.PersistentVolume {
 }
 
 func makePVCsWithPV(num int) []*v1.PersistentVolumeClaim {
-	pvcList := make([]*v1.PersistentVolumeClaim, num, num)
+	pvcList := make([]*v1.PersistentVolumeClaim, num)
 	for i := 0; i < len(pvcList); i++ {
 		pvcName := fmt.Sprintf("PVC_Stable_%d", i)
 		pvName := fmt.Sprintf("Vol_Stable_%d", i)
@@ -634,10 +1170,10 @@ func makePVCsWithPV(num int) []*v1.PersistentVolumeClaim {
 }
 
 func makeNodesWithTopologyZone(num int) []*v1.Node {
-	nodeList := make([]*v1.Node, num, num)
+	nodeList := make([]*v1.Node, num)
 	for i := 0; i < len(nodeList); i++ {
 		nodeName := fmt.Sprintf("host_%d", i)
-		zone := fmt.Sprintf("us-west-0")
+		zone := "us-west-0"
 		nodeList[i] = &v1.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   nodeName,
