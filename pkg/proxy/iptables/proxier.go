@@ -370,6 +370,7 @@ var iptablesJumpChains = []iptablesJumpChain{
 	{utiliptables.TableFilter, kubeProxyFirewallChain, utiliptables.ChainForward, "kubernetes load balancer firewall", []string{"-m", "conntrack", "--ctstate", "NEW"}},
 	{utiliptables.TableNAT, kubeServicesChain, utiliptables.ChainOutput, "kubernetes service portals", nil},
 	{utiliptables.TableNAT, kubeServicesChain, utiliptables.ChainPrerouting, "kubernetes service portals", nil},
+	{utiliptables.TableNAT, kubePostroutingChain, utiliptables.ChainPostrouting, "kubernetes postrouting rules", nil},
 }
 
 // Duplicates of chains created in pkg/kubelet/kubelet_network_linux.go; we create these
@@ -377,10 +378,6 @@ var iptablesJumpChains = []iptablesJumpChain{
 var iptablesKubeletJumpChains = []iptablesJumpChain{
 	{utiliptables.TableFilter, kubeletFirewallChain, utiliptables.ChainInput, "", nil},
 	{utiliptables.TableFilter, kubeletFirewallChain, utiliptables.ChainOutput, "", nil},
-
-	// Move this to iptablesJumpChains once IPTablesOwnershipCleanup is GA and kubelet
-	// no longer creates this chain,
-	{utiliptables.TableNAT, kubePostroutingChain, utiliptables.ChainPostrouting, "kubernetes postrouting rules", nil},
 }
 
 // When chains get removed from iptablesJumpChains, add them here so they get cleaned up
@@ -867,11 +864,6 @@ func (proxier *Proxier) syncProxyRules() {
 	// Install the kubernetes-specific postrouting rules. We use a whole chain for
 	// this so that it is easier to flush and change, for example if the mark
 	// value should ever change.
-
-	// NOTE: kubelet creates identical copies of these rules. If you want to change
-	// these rules in the future, you MUST do so in a way that will interoperate
-	// correctly with skewed versions of the rules created by kubelet. (Remove this
-	// comment once IPTablesOwnershipCleanup is GA.)
 
 	proxier.natRules.Write(
 		"-A", string(kubePostroutingChain),

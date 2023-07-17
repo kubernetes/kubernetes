@@ -371,18 +371,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		return nil, fmt.Errorf("invalid sync frequency %d", kubeCfg.SyncFrequency.Duration)
 	}
 
-	if kubeCfg.MakeIPTablesUtilChains {
-		if kubeCfg.IPTablesMasqueradeBit > 31 || kubeCfg.IPTablesMasqueradeBit < 0 {
-			return nil, fmt.Errorf("iptables-masquerade-bit is not valid. Must be within [0, 31]")
-		}
-		if kubeCfg.IPTablesDropBit > 31 || kubeCfg.IPTablesDropBit < 0 {
-			return nil, fmt.Errorf("iptables-drop-bit is not valid. Must be within [0, 31]")
-		}
-		if kubeCfg.IPTablesDropBit == kubeCfg.IPTablesMasqueradeBit {
-			return nil, fmt.Errorf("iptables-masquerade-bit and iptables-drop-bit must be different")
-		}
-	}
-
 	if utilfeature.DefaultFeatureGate.Enabled(features.DisableCloudProviders) && cloudprovider.IsDeprecatedInternal(cloudProvider) {
 		cloudprovider.DisableWarningForProvider(cloudProvider)
 		return nil, fmt.Errorf("cloud provider %q was specified, but built-in cloud providers are disabled. Please set --cloud-provider=external and migrate to an external cloud provider", cloudProvider)
@@ -561,8 +549,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		clock:                          clock.RealClock{},
 		enableControllerAttachDetach:   kubeCfg.EnableControllerAttachDetach,
 		makeIPTablesUtilChains:         kubeCfg.MakeIPTablesUtilChains,
-		iptablesMasqueradeBit:          int(kubeCfg.IPTablesMasqueradeBit),
-		iptablesDropBit:                int(kubeCfg.IPTablesDropBit),
 		keepTerminatedPodVolumes:       keepTerminatedPodVolumes,
 		nodeStatusMaxImages:            nodeStatusMaxImages,
 		tracer:                         tracer,
@@ -1275,12 +1261,6 @@ type Kubelet struct {
 
 	// config iptables util rules
 	makeIPTablesUtilChains bool
-
-	// The bit of the fwmark space to mark packets for SNAT.
-	iptablesMasqueradeBit int
-
-	// The bit of the fwmark space to mark packets for dropping.
-	iptablesDropBit int
 
 	// The AppArmor validator for checking whether AppArmor is supported.
 	appArmorValidator apparmor.Validator

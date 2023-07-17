@@ -57925,21 +57925,21 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 					},
 					"makeIPTablesUtilChains": {
 						SchemaProps: spec.SchemaProps{
-							Description: "makeIPTablesUtilChains, if true, causes the Kubelet ensures a set of iptables rules are present on host. These rules will serve as utility rules for various components, e.g. kube-proxy. The rules will be created based on iptablesMasqueradeBit and iptablesDropBit. Default: true",
+							Description: "makeIPTablesUtilChains, if true, causes the Kubelet to create the KUBE-IPTABLES-HINT chain in iptables as a hint to other components about the configuration of iptables on the system. Default: true",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
 					},
 					"iptablesMasqueradeBit": {
 						SchemaProps: spec.SchemaProps{
-							Description: "iptablesMasqueradeBit is the bit of the iptables fwmark space to mark for SNAT. Values must be within the range [0, 31]. Must be different from other mark bits. Warning: Please match the value of the corresponding parameter in kube-proxy. Default: 14",
+							Description: "iptablesMasqueradeBit formerly controlled the creation of the KUBE-MARK-MASQ chain. Deprecated: no longer has any effect. Default: 14",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"iptablesDropBit": {
 						SchemaProps: spec.SchemaProps{
-							Description: "iptablesDropBit is the bit of the iptables fwmark space to mark for dropping packets. Values must be within the range [0, 31]. Must be different from other mark bits. Default: 15",
+							Description: "iptablesDropBit formerly controlled the creation of the KUBE-MARK-DROP chain. Deprecated: no longer has any effect. Default: 15",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
