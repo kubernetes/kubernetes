@@ -361,7 +361,22 @@ func ContainsAccessMode(modes []core.PersistentVolumeAccessMode, mode core.Persi
 }
 
 func ClaimContainsAllocatedResources(pvc *core.PersistentVolumeClaim) bool {
-	if pvc.Status.AllocatedResourceStatuses != nil || pvc.Status.AllocatedResources != nil {
+	if pvc == nil {
+		return false
+	}
+
+	if pvc.Status.AllocatedResources != nil {
+		return true
+	}
+	return false
+}
+
+func ClaimContainsAllocatedResourceStatus(pvc *core.PersistentVolumeClaim) bool {
+	if pvc == nil {
+		return false
+	}
+
+	if pvc.Status.AllocatedResourceStatuses != nil {
 		return true
 	}
 	return false

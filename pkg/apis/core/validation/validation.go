@@ -2047,7 +2047,8 @@ func ValidationOptionsForPersistentVolumeClaim(pvc, oldPvc *core.PersistentVolum
 		opts.AllowReadWriteOncePod = true
 	}
 
-	if helper.ClaimContainsAllocatedResources(oldPvc) {
+	if helper.ClaimContainsAllocatedResources(oldPvc) ||
+		helper.ClaimContainsAllocatedResourceStatus(oldPvc) {
 		opts.EnableRecoverFromExpansionFailure = true
 	}
 	return opts

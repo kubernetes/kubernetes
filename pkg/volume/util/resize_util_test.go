@@ -159,16 +159,16 @@ func TestResizeFunctions(t *testing.T) {
 		{
 			name:        "mark fs resize, with no other conditions",
 			pvc:         basePVC.get(),
-			expectedPVC: basePVC.modifyStorageResourceStatus(v1.PersistentVolumeClaimNodeResizePending).get(),
+			expectedPVC: basePVC.withStorageResourceStatus(v1.PersistentVolumeClaimNodeResizePending).get(),
 			testFunc: func(pvc *v1.PersistentVolumeClaim, c clientset.Interface, _ resource.Quantity) (*v1.PersistentVolumeClaim, error) {
 				return MarkForFSResize(pvc, c)
 			},
 		},
 		{
 			name: "mark fs resize, when other resource statuses are present",
-			pvc:  basePVC.modifyResourceStatus(v1.ResourceCPU, v1.PersistentVolumeClaimControllerResizeFailed).get(),
-			expectedPVC: basePVC.modifyResourceStatus(v1.ResourceCPU, v1.PersistentVolumeClaimControllerResizeFailed).
-				modifyStorageResourceStatus(v1.PersistentVolumeClaimNodeResizePending).get(),
+			pvc:  basePVC.withResourceStatus(v1.ResourceCPU, v1.PersistentVolumeClaimControllerResizeFailed).get(),
+			expectedPVC: basePVC.withResourceStatus(v1.ResourceCPU, v1.PersistentVolumeClaimControllerResizeFailed).
+				withStorageResourceStatus(v1.PersistentVolumeClaimNodeResizePending).get(),
 			testFunc: func(pvc *v1.PersistentVolumeClaim, c clientset.Interface, _ resource.Quantity) (*v1.PersistentVolumeClaim, error) {
 				return MarkForFSResize(pvc, c)
 			},
@@ -176,17 +176,17 @@ func TestResizeFunctions(t *testing.T) {
 		{
 			name:        "mark controller resize in-progress",
 			pvc:         basePVC.get(),
-			expectedPVC: basePVC.modifyStorageResourceStatus(v1.PersistentVolumeClaimControllerResizeInProgress).get(),
+			expectedPVC: basePVC.withStorageResourceStatus(v1.PersistentVolumeClaimControllerResizeInProgress).get(),
 			testFunc: func(pvc *v1.PersistentVolumeClaim, i clientset.Interface, q resource.Quantity) (*v1.PersistentVolumeClaim, error) {
 				return MarkControllerReisizeInProgress(pvc, "foobar", q, i)
 			},
 		},
 		{
 			name: "mark resize finished",
-			pvc: basePVC.modifyResourceStatus(v1.ResourceCPU, v1.PersistentVolumeClaimControllerResizeFailed).
-				modifyStorageResourceStatus(v1.PersistentVolumeClaimNodeResizePending).get(),
-			expectedPVC: basePVC.modifyResourceStatus(v1.ResourceCPU, v1.PersistentVolumeClaimControllerResizeFailed).
-				modifyStorageResourceStatus("").get(),
+			pvc: basePVC.withResourceStatus(v1.ResourceCPU, v1.PersistentVolumeClaimControllerResizeFailed).
+				withStorageResourceStatus(v1.PersistentVolumeClaimNodeResizePending).get(),
+			expectedPVC: basePVC.withResourceStatus(v1.ResourceCPU, v1.PersistentVolumeClaimControllerResizeFailed).
+				withStorageResourceStatus("").get(),
 			testFunc: func(pvc *v1.PersistentVolumeClaim, i clientset.Interface, q resource.Quantity) (*v1.PersistentVolumeClaim, error) {
 				return MarkFSResizeFinished(pvc, q, i)
 			},
@@ -281,11 +281,11 @@ func makePVC(conditions []v1.PersistentVolumeClaimCondition) pvcModifier {
 	return pvcModifier{pvc}
 }
 
-func (m pvcModifier) modifyStorageResourceStatus(status v1.ClaimResourceStatus) pvcModifier {
-	return m.modifyResourceStatus(v1.ResourceStorage, status)
+func (m pvcModifier) withStorageResourceStatus(status v1.ClaimResourceStatus) pvcModifier {
+	return m.withResourceStatus(v1.ResourceStorage, status)
 }
 
-func (m pvcModifier) modifyResourceStatus(resource v1.ResourceName, status v1.ClaimResourceStatus) pvcModifier {
+func (m pvcModifier) withResourceStatus(resource v1.ResourceName, status v1.ClaimResourceStatus) pvcModifier {
 	if m.pvc.Status.AllocatedResourceStatuses != nil && status == "" {
 		delete(m.pvc.Status.AllocatedResourceStatuses, resource)
 		return m
