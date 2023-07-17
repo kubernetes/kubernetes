@@ -83,12 +83,12 @@ func LoadResetConfigurationFromFile(cfgPath string, allowExperimental bool) (*ku
 		return nil, err
 	}
 
-	return documentMapToResetConfiguration(gvkmap, false, allowExperimental)
+	return documentMapToResetConfiguration(gvkmap, false, allowExperimental, false)
 }
 
 // documentMapToResetConfiguration takes a map between GVKs and YAML documents (as returned by SplitYAMLDocuments),
 // finds a ResetConfiguration, decodes it, dynamically defaults it and then validates it prior to return.
-func documentMapToResetConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecated, allowExperimental bool) (*kubeadmapi.ResetConfiguration, error) {
+func documentMapToResetConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecated, allowExperimental bool, strictErrors bool) (*kubeadmapi.ResetConfiguration, error) {
 	resetBytes := []byte{}
 	for gvk, bytes := range gvkmap {
 		// not interested in anything other than ResetConfiguration
@@ -103,7 +103,11 @@ func documentMapToResetConfiguration(gvkmap kubeadmapi.DocumentMap, allowDepreca
 
 		// verify the validity of the YAML
 		if err := strict.VerifyUnmarshalStrict([]*runtime.Scheme{kubeadmscheme.Scheme}, gvk, bytes); err != nil {
-			klog.Warning(err.Error())
+			if !strictErrors {
+				klog.Warning(err.Error())
+			} else {
+				return nil, err
+			}
 		}
 
 		resetBytes = bytes
