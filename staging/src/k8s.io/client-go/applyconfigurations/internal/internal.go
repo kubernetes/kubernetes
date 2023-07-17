@@ -5286,6 +5286,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: ip
       type:
         scalar: string
+    - name: ipMode
+      type:
+        scalar: string
     - name: ports
       type:
         list:

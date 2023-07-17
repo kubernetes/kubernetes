@@ -27,9 +27,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/events"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
 
 	"k8s.io/klog/v2"
@@ -182,7 +184,7 @@ func MapIPsByIPFamily(ipStrings []string) map[v1.IPFamily][]string {
 	ipFamilyMap := map[v1.IPFamily][]string{}
 	for _, ip := range ipStrings {
 		// Handle only the valid IPs
-		if ipFamily := getIPFamilyFromIP(ip); ipFamily != "" {
+		if ipFamily := GetIPFamilyFromIP(ip); ipFamily != "" {
 			ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], ip)
 		} else {
 			// this function is called in multiple places. All of which
@@ -213,29 +215,26 @@ func MapCIDRsByIPFamily(cidrStrings []string) map[v1.IPFamily][]string {
 	return ipFamilyMap
 }
 
-// Returns the IP family of ipStr, or "" if ipStr can't be parsed as an IP
-func getIPFamilyFromIP(ipStr string) v1.IPFamily {
-	netIP := netutils.ParseIPSloppy(ipStr)
-	if netIP == nil {
-		return ""
-	}
-
-	if netutils.IsIPv6(netIP) {
-		return v1.IPv6Protocol
-	}
-	return v1.IPv4Protocol
+// GetIPFamilyFromIP Returns the IP family of ipStr, or "" if ipStr can't be parsed as an IP
+func GetIPFamilyFromIP(ipStr string) v1.IPFamily {
+	return convertToV1IPFamily(netutils.IPFamilyOfString(ipStr))
 }
 
 // Returns the IP family of cidrStr, or "" if cidrStr can't be parsed as a CIDR
 func getIPFamilyFromCIDR(cidrStr string) v1.IPFamily {
-	_, netCIDR, err := netutils.ParseCIDRSloppy(cidrStr)
-	if err != nil {
-		return ""
-	}
-	if netutils.IsIPv6CIDR(netCIDR) {
+	return convertToV1IPFamily(netutils.IPFamilyOfCIDRString(cidrStr))
+}
+
+// Convert netutils.IPFamily to v1.IPFamily
+func convertToV1IPFamily(ipFamily netutils.IPFamily) v1.IPFamily {
+	switch ipFamily {
+	case netutils.IPv4:
+		return v1.IPv4Protocol
+	case netutils.IPv6:
 		return v1.IPv6Protocol
 	}
-	return v1.IPv4Protocol
+
+	return ""
 }
 
 // OtherIPFamily returns the other ip family
@@ -330,4 +329,14 @@ func RevertPorts(replacementPortsMap, originalPortsMap map[netutils.LocalPort]ne
 			v.Close()
 		}
 	}
+}
+
+func IsVIPMode(ing v1.LoadBalancerIngress) bool {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPMode) {
+		return true // backwards compat
+	}
+	if ing.IPMode == nil {
+		return true
+	}
+	return *ing.IPMode == v1.LoadBalancerIPModeVIP
 }
