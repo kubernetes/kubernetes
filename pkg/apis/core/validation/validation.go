@@ -3813,6 +3813,8 @@ type PodValidationOptions struct {
 	AllowInvalidTopologySpreadConstraintLabelSelector bool
 	// Allow node selector additions for gated pods.
 	AllowMutableNodeSelectorAndNodeAffinity bool
+	// Allow namespaced sysctls in hostNet and hostIPC pods
+	AllowNamespacedSysctlsForHostNetAndHostIPC bool
 	// The top-level resource being validated is a Pod, not just a PodSpec
 	// embedded in some other resource.
 	ResourceIsPod bool
@@ -4563,10 +4565,10 @@ func IsValidSysctlName(name string) bool {
 	return sysctlContainSlashRegexp.MatchString(name)
 }
 
-func validateSysctls(sysctls []core.Sysctl, fldPath *field.Path, hostNetwork, hostIPC bool) field.ErrorList {
+func validateSysctls(securityContext *core.PodSecurityContext, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	names := make(map[string]struct{})
-	for i, s := range sysctls {
+	for i, s := range securityContext.Sysctls {
 		if len(s.Name) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Index(i).Child("name"), ""))
 		} else if !IsValidSysctlName(s.Name) {
@@ -4574,41 +4576,27 @@ func validateSysctls(sysctls []core.Sysctl, fldPath *field.Path, hostNetwork, ho
 		} else if _, ok := names[s.Name]; ok {
 			allErrs = append(allErrs, field.Duplicate(fldPath.Index(i).Child("name"), s.Name))
 		}
-		// The parameters hostNet and hostIPC are used to forbid sysctls for pod sharing the
-		// respective namespaces with the host.
-		if !isValidSysctlWithHostNetIPC(s.Name, hostNetwork, hostIPC) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("name"), s.Name, "sysctl not allowed with host net/ipc enabled"))
+		if !opts.AllowNamespacedSysctlsForHostNetAndHostIPC {
+			err := ValidateHostSysctl(s.Name, securityContext, fldPath.Index(i).Child("name"))
+			if err != nil {
+				allErrs = append(allErrs, err)
+			}
 		}
-
 		names[s.Name] = struct{}{}
 	}
 	return allErrs
 }
 
-func isValidSysctlWithHostNetIPC(sysctl string, hostNet, hostIPC bool) bool {
-	sysctl = utilsysctl.ConvertSysctlVariableToDotsSeparator(sysctl)
-	var ns utilsysctl.Namespace
-	if strings.HasSuffix(sysctl, "*") {
-		prefix := sysctl[:len(sysctl)-1]
-		ns = utilsysctl.NamespacedBy(prefix)
-		if ns == utilsysctl.UnknownNamespace {
-			// don't handle unknown namespace here
-			return true
-		}
-	} else {
-		ns = utilsysctl.NamespacedBy(sysctl)
-		if ns == utilsysctl.UnknownNamespace {
-			// don't handle unknown namespace here
-			return true
-		}
+// ValidateHostSysctl will return error if namespaced sysctls is applied to pod sharing the respective namespaces with the host.
+func ValidateHostSysctl(sysctl string, securityContext *core.PodSecurityContext, fldPath *field.Path) *field.Error {
+	ns, _, _ := utilsysctl.GetNamespace(sysctl)
+	switch {
+	case securityContext.HostNetwork && ns == utilsysctl.NetNamespace:
+		return field.Invalid(fldPath, sysctl, "may not be specified when 'hostNetwork' is true")
+	case securityContext.HostIPC && ns == utilsysctl.IPCNamespace:
+		return field.Invalid(fldPath, sysctl, "may not be specified when 'hostIPC' is true")
 	}
-	if ns == utilsysctl.IpcNamespace && hostIPC {
-		return false
-	}
-	if ns == utilsysctl.NetNamespace && hostNet {
-		return false
-	}
-	return true
+	return nil
 }
 
 // validatePodSpecSecurityContext verifies the SecurityContext of a PodSpec,
@@ -4643,13 +4631,7 @@ func validatePodSpecSecurityContext(securityContext *core.PodSecurityContext, sp
 		}
 
 		if len(securityContext.Sysctls) != 0 {
-			var hostNetwork, hostIPC bool
-			if spec.SecurityContext != nil {
-				hostNetwork = spec.SecurityContext.HostNetwork
-				hostIPC = spec.SecurityContext.HostIPC
-			}
-
-			allErrs = append(allErrs, validateSysctls(securityContext.Sysctls, fldPath.Child("sysctls"), hostNetwork, hostIPC)...)
+			allErrs = append(allErrs, validateSysctls(securityContext, fldPath.Child("sysctls"), opts)...)
 		}
 
 		if securityContext.FSGroupChangePolicy != nil {

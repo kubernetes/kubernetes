@@ -20,16 +20,16 @@ import (
 	"testing"
 )
 
-func TestNamespacedBy(t *testing.T) {
+func TestNamespacedOf(t *testing.T) {
 	tests := map[string]Namespace{
-		"kernel.shm_rmid_forced": IpcNamespace,
+		"kernel.shm_rmid_forced": IPCNamespace,
 		"net.a.b.c":              NetNamespace,
-		"fs.mqueue.a.b.c":        IpcNamespace,
+		"fs.mqueue.a.b.c":        IPCNamespace,
 		"foo":                    UnknownNamespace,
 	}
 
 	for sysctl, ns := range tests {
-		if got := NamespacedBy(sysctl); got != ns {
+		if got := namespaceOf(sysctl); got != ns {
 			t.Errorf("wrong namespace for %q: got=%s want=%s", sysctl, got, ns)
 		}
 	}

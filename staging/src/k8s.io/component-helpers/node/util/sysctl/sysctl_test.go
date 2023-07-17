@@ -40,7 +40,7 @@ func TestConvertSysctlVariableToDotsSeparator(t *testing.T) {
 	}
 
 	for _, test := range valid {
-		convertSysctlVal := ConvertSysctlVariableToDotsSeparator(test.in)
+		convertSysctlVal := NormalizeName(test.in)
 		assert.Equalf(t, test.out, convertSysctlVal, "The sysctl variable was not converted correctly. got: %s, want: %s", convertSysctlVal, test.out)
 	}
 }

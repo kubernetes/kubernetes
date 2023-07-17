@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -17,9 +20,10 @@ limitations under the License.
 package sysctl
 
 import (
-	"k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"testing"
+
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
 func TestNewAllowlist(t *testing.T) {

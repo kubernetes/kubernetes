@@ -29,7 +29,7 @@ func ConvertPodSysctlsVariableToDotsSeparator(securityContext *v1.PodSecurityCon
 		return
 	}
 	for i, sysctl := range securityContext.Sysctls {
-		securityContext.Sysctls[i].Name = utilsysctl.ConvertSysctlVariableToDotsSeparator(sysctl.Name)
+		securityContext.Sysctls[i].Name = utilsysctl.NormalizeName(sysctl.Name)
 	}
 	return
 }

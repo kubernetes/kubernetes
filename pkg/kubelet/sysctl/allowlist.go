@@ -55,20 +55,14 @@ func NewAllowlist(patterns []string) (*patternAllowlist, error) {
 				policyvalidation.SysctlContainSlashPatternFmt,
 			)
 		}
-		s = utilsysctl.ConvertSysctlVariableToDotsSeparator(s)
-		if strings.HasSuffix(s, "*") {
-			prefix := s[:len(s)-1]
-			ns := utilsysctl.NamespacedBy(prefix)
-			if ns == utilsysctl.UnknownNamespace {
-				return nil, fmt.Errorf("the sysctls %q are not known to be namespaced", s)
-			}
-			w.prefixes[prefix] = ns
+		ns, sysctlOrPrefix, prefixed := utilsysctl.GetNamespace(s)
+		if ns == utilsysctl.UnknownNamespace {
+			return nil, fmt.Errorf("the sysctls %q are not known to be namespaced", sysctlOrPrefix)
+		}
+		if prefixed {
+			w.prefixes[sysctlOrPrefix] = ns
 		} else {
-			ns := utilsysctl.NamespacedBy(s)
-			if ns == utilsysctl.UnknownNamespace {
-				return nil, fmt.Errorf("the sysctl %q are not known to be namespaced", s)
-			}
-			w.sysctls[s] = ns
+			w.sysctls[sysctlOrPrefix] = ns
 		}
 	}
 	return w, nil
@@ -82,10 +76,10 @@ func NewAllowlist(patterns []string) (*patternAllowlist, error) {
 // respective namespaces with the host. This check is only possible for sysctls on
 // the static default allowlist, not those on the custom allowlist provided by the admin.
 func (w *patternAllowlist) validateSysctl(sysctl string, hostNet, hostIPC bool) error {
-	sysctl = utilsysctl.ConvertSysctlVariableToDotsSeparator(sysctl)
+	sysctl = utilsysctl.NormalizeName(sysctl)
 	nsErrorFmt := "%q not allowed with host %s enabled"
 	if ns, found := w.sysctls[sysctl]; found {
-		if ns == utilsysctl.IpcNamespace && hostIPC {
+		if ns == utilsysctl.IPCNamespace && hostIPC {
 			return fmt.Errorf(nsErrorFmt, sysctl, ns)
 		}
 		if ns == utilsysctl.NetNamespace && hostNet {
@@ -95,7 +89,7 @@ func (w *patternAllowlist) validateSysctl(sysctl string, hostNet, hostIPC bool) 
 	}
 	for p, ns := range w.prefixes {
 		if strings.HasPrefix(sysctl, p) {
-			if ns == utilsysctl.IpcNamespace && hostIPC {
+			if ns == utilsysctl.IPCNamespace && hostIPC {
 				return fmt.Errorf(nsErrorFmt, sysctl, ns)
 			}
 			if ns == utilsysctl.NetNamespace && hostNet {
