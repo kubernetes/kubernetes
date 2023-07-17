@@ -729,21 +729,21 @@ func TestMatchConditions_validation(t *testing.T) {
 
 func TestFeatureGateEnablement(t *testing.T) {
 	testcases := []struct {
-		name                                  string
-		matchConditionsFeatureGateInitiaState string
-		matchConditions                       []admissionregistrationv1.MatchCondition
-		expectMatchConditionsPreSwitch        bool
-		expectMatchConditionsPostSwitch       bool
+		name                                       string
+		matchConditionsFeatureGateInitiallyEnabled bool
+		matchConditions                            []admissionregistrationv1.MatchCondition
+		expectMatchConditionsPreSwitch             bool
+		expectMatchConditionsPostSwitch            bool
 	}{
 		{
-			name:                                  "start with match conditions enabled - no match conditions",
-			matchConditionsFeatureGateInitiaState: "enabled",
-			expectMatchConditionsPreSwitch:        false,
-			expectMatchConditionsPostSwitch:       false,
+			name: "start with match conditions enabled - no match conditions",
+			matchConditionsFeatureGateInitiallyEnabled: true,
+			expectMatchConditionsPreSwitch:             false,
+			expectMatchConditionsPostSwitch:            false,
 		},
 		{
-			name:                                  "start with match conditions enabled - with match conditions",
-			matchConditionsFeatureGateInitiaState: "enabled",
+			name: "start with match conditions enabled - with match conditions",
+			matchConditionsFeatureGateInitiallyEnabled: true,
 			matchConditions: []admissionregistrationv1.MatchCondition{{
 				Name:       "test-expression",
 				Expression: "true",
@@ -752,14 +752,14 @@ func TestFeatureGateEnablement(t *testing.T) {
 			expectMatchConditionsPostSwitch: true,
 		},
 		{
-			name:                                  "start with match conditions disabled - no match conditions",
-			matchConditionsFeatureGateInitiaState: "disabled",
-			expectMatchConditionsPreSwitch:        false,
-			expectMatchConditionsPostSwitch:       false,
+			name: "start with match conditions disabled - no match conditions",
+			matchConditionsFeatureGateInitiallyEnabled: false,
+			expectMatchConditionsPreSwitch:             false,
+			expectMatchConditionsPostSwitch:            false,
 		},
 		{
-			name:                                  "start with match conditions disabled - with match conditions",
-			matchConditionsFeatureGateInitiaState: "disabled",
+			name: "start with match conditions disabled - with match conditions",
+			matchConditionsFeatureGateInitiallyEnabled: false,
 			matchConditions: []admissionregistrationv1.MatchCondition{{
 				Name:       "test-expression",
 				Expression: "true",
@@ -794,7 +794,7 @@ func TestFeatureGateEnablement(t *testing.T) {
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			if testcase.matchConditionsFeatureGateInitiaState == "enabled" {
+			if testcase.matchConditionsFeatureGateInitiallyEnabled {
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AdmissionWebhookMatchConditions, true)()
 			}
 
@@ -887,7 +887,7 @@ func TestFeatureGateEnablement(t *testing.T) {
 			}
 
 			// Switch the featureGate state
-			if testcase.matchConditionsFeatureGateInitiaState == "enabled" {
+			if testcase.matchConditionsFeatureGateInitiallyEnabled {
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AdmissionWebhookMatchConditions, false)()
 			} else {
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AdmissionWebhookMatchConditions, true)()
