@@ -611,6 +611,7 @@ func autoConvert_kubeadm_InitConfiguration_To_v1beta4_InitConfiguration(in *kube
 }
 
 func autoConvert_v1beta4_JoinConfiguration_To_kubeadm_JoinConfiguration(in *JoinConfiguration, out *kubeadm.JoinConfiguration, s conversion.Scope) error {
+	out.DryRun = in.DryRun
 	if err := Convert_v1beta4_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
 		return err
 	}
@@ -630,6 +631,7 @@ func Convert_v1beta4_JoinConfiguration_To_kubeadm_JoinConfiguration(in *JoinConf
 }
 
 func autoConvert_kubeadm_JoinConfiguration_To_v1beta4_JoinConfiguration(in *kubeadm.JoinConfiguration, out *JoinConfiguration, s conversion.Scope) error {
+	out.DryRun = in.DryRun
 	if err := Convert_kubeadm_NodeRegistrationOptions_To_v1beta4_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
 		return err
 	}

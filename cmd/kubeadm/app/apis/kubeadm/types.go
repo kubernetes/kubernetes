@@ -301,6 +301,9 @@ type ExternalEtcd struct {
 type JoinConfiguration struct {
 	metav1.TypeMeta
 
+	// DryRun tells if the dry run mode is enabled, don't apply any change if it is and just output what would be done.
+	DryRun bool
+
 	// NodeRegistration holds fields that relate to registering the new control-plane node to the cluster
 	NodeRegistration NodeRegistrationOptions
 
