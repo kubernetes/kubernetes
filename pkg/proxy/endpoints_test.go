@@ -495,13 +495,13 @@ func TestUpdateEndpointsMap(t *testing.T) {
 	}
 
 	testCases := []struct {
-		// previousEndpoints and currentEndpoints are used to call appropriate
+		// previousEndpointSlices and currentEndpointSlices are used to call appropriate
 		// handlers OnEndpointSlice* (based on whether corresponding values are nil
 		// or non-nil) and must be of equal length.
 		name                           string
-		previousEndpoints              []*discovery.EndpointSlice
-		currentEndpoints               []*discovery.EndpointSlice
-		oldEndpoints                   map[ServicePortName][]*BaseEndpointInfo
+		previousEndpointSlices         []*discovery.EndpointSlice
+		currentEndpointSlices          []*discovery.EndpointSlice
+		previousEndpointsMap           map[ServicePortName][]*BaseEndpointInfo
 		expectedResult                 map[ServicePortName][]*BaseEndpointInfo
 		expectedDeletedUDPEndpoints    []ServiceEndpoint
 		expectedNewlyActiveUDPServices map[ServicePortName]bool
@@ -509,7 +509,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedChangedEndpoints       sets.Set[string]
 	}{{
 		name:                           "empty",
-		oldEndpoints:                   map[ServicePortName][]*BaseEndpointInfo{},
+		previousEndpointsMap:           map[ServicePortName][]*BaseEndpointInfo{},
 		expectedResult:                 map[ServicePortName][]*BaseEndpointInfo{},
 		expectedDeletedUDPEndpoints:    []ServiceEndpoint{},
 		expectedNewlyActiveUDPServices: map[ServicePortName]bool{},
@@ -517,13 +517,13 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedChangedEndpoints:       sets.New[string](),
 	}, {
 		name: "no change, unnamed port",
-		previousEndpoints: []*discovery.EndpointSlice{
+		previousEndpointSlices: []*discovery.EndpointSlice{
 			makeTestEndpointSlice("ns1", "ep1", 1, unnamedPort),
 		},
-		currentEndpoints: []*discovery.EndpointSlice{
+		currentEndpointSlices: []*discovery.EndpointSlice{
 			makeTestEndpointSlice("ns1", "ep1", 1, unnamedPort),
 		},
-		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
+		previousEndpointsMap: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
 			},
@@ -539,13 +539,13 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedChangedEndpoints:       sets.New[string](),
 	}, {
 		name: "no change, named port, local",
-		previousEndpoints: []*discovery.EndpointSlice{
+		previousEndpointSlices: []*discovery.EndpointSlice{
 			makeTestEndpointSlice("ns1", "ep1", 1, namedPortLocal),
 		},
-		currentEndpoints: []*discovery.EndpointSlice{
+		currentEndpointSlices: []*discovery.EndpointSlice{
 			makeTestEndpointSlice("ns1", "ep1", 1, namedPortLocal),
 		},
-		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
+		previousEndpointsMap: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false},
 			},
@@ -563,15 +563,15 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedChangedEndpoints: sets.New[string](),
 	}, {
 		name: "no change, multiple slices",
-		previousEndpoints: []*discovery.EndpointSlice{
+		previousEndpointSlices: []*discovery.EndpointSlice{
 			makeTestEndpointSlice("ns1", "ep1", 1, multipleSubsets_s1),
 			makeTestEndpointSlice("ns1", "ep1", 2, multipleSubsets_s2),
 		},
-		currentEndpoints: []*discovery.EndpointSlice{
+		currentEndpointSlices: []*discovery.EndpointSlice{
 			makeTestEndpointSlice("ns1", "ep1", 1, multipleSubsets_s1),
 			makeTestEndpointSlice("ns1", "ep1", 2, multipleSubsets_s2),
 		},
-		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
+		previousEndpointsMap: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
 			},
@@ -593,15 +593,15 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedChangedEndpoints:       sets.New[string](),
 	}, {
 		name: "no change, multiple slices, multiple ports, local",
-		previousEndpoints: []*discovery.EndpointSlice{
+		previousEndpointSlices: []*discovery.EndpointSlice{
 			makeTestEndpointSlice("ns1", "ep1", 1, multipleSubsetsMultiplePortsLocal_s1),
 			makeTestEndpointSlice("ns1", "ep1", 2, multipleSubsetsMultiplePortsLocal_s2),
 		},
-		currentEndpoints: []*discovery.EndpointSlice{
+		currentEndpointSlices: []*discovery.EndpointSlice{
 			makeTestEndpointSlice("ns1", "ep1", 1, multipleSubsetsMultiplePortsLocal_s1),
 			makeTestEndpointSlice("ns1", "ep1", 2, multipleSubsetsMultiplePortsLocal_s2),
 		},
-		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
+		previousEndpointsMap: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false},
 			},
@@ -631,17 +631,17 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedChangedEndpoints: sets.New[string](),
 	}, {
 		name: "no change, multiple services, slices, IPs, and ports",
-		previousEndpoints: []*discovery.EndpointSlice{
+		previousEndpointSlices: []*discovery.EndpointSlice{
 			makeTestEndpointSlice("ns1", "ep1", 1, multipleSubsetsIPsPorts1_s1),
 			makeTestEndpointSlice("ns1", "ep1", 2, multipleSubsetsIPsPorts1_s2),
 			makeTestEndpointSlice("ns2", "ep2", 1, multipleSubsetsIPsPorts2),
 		},
-		currentEndpoints: []*discovery.EndpointSlice{
+		currentEndpointSlices: []*discovery.EndpointSlice{
 			makeTestEndpointSlice("ns1", "ep1", 1, multipleSubsetsIPsPorts1_s1),
 			makeTestEndpointSlice("ns1", "ep1", 2, multipleSubsetsIPsPorts1_s2),
 			makeTestEndpointSlice("ns2", "ep2", 1, multipleSubsetsIPsPorts2),
 		},
-		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
+		previousEndpointsMap: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
 				{Endpoint: "1.1.1.2:11", IsLocal: true, Ready: true, Serving: true, Terminating: false},
@@ -702,13 +702,13 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedChangedEndpoints: sets.New[string](),
 	}, {
 		name: "add an EndpointSlice",
-		previousEndpoints: []*discovery.EndpointSlice{
+		previousEndpointSlices: []*discovery.EndpointSlice{
 			nil,
 		},
-		currentEndpoints: []*discovery.EndpointSlice{
+		currentEndpointSlices: []*discovery.EndpointSlice{
 			makeTestEndpointSlice("ns1", "ep1", 1, unnamedPortLocal),
 		},
-		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{},
+		previousEndpointsMap: map[ServicePortName][]*BaseEndpointInfo{},
 		expectedResult: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false},
@@ -724,13 +724,13 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedChangedEndpoints: sets.New[string]("ns1/ep1"),
 	}, {
 		name: "remove an EndpointSlice",
-		previousEndpoints: []*discovery.EndpointSlice{
+		previousEndpointSlices: []*discovery.EndpointSlice{
 			makeTestEndpointSlice("ns1", "ep1", 1, unnamedPortLocal),
 		},
-		currentEndpoints: []*discovery.EndpointSlice{
+		currentEndpointSlices: []*discovery.EndpointSlice{
 			nil,
 		},
-		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
+		previousEndpointsMap: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false},
 			},
@@ -745,13 +745,13 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedChangedEndpoints:       sets.New[string]("ns1/ep1"),
 	}, {
 		name: "add an IP and port",
-		previousEndpoints: []*discovery.EndpointSlice{
+		previousEndpointSlices: []*discovery.EndpointSlice{
 			makeTestEndpointSlice("ns1", "ep1", 1, namedPort),
 		},
-		currentEndpoints: []*discovery.EndpointSlice{
+		currentEndpointSlices: []*discovery.EndpointSlice{
 			makeTestEndpointSlice("ns1", "ep1", 1, namedPortsLocalNoLocal),
 		},
-		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
+		previousEndpointsMap: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
 			},
@@ -776,13 +776,13 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedChangedEndpoints: sets.New[string]("ns1/ep1"),
 	}, {
 		name: "remove an IP and port",
-		previousEndpoints: []*discovery.EndpointSlice{
+		previousEndpointSlices: []*discovery.EndpointSlice{
 			makeTestEndpointSlice("ns1", "ep1", 1, namedPortsLocalNoLocal),
 		},
-		currentEndpoints: []*discovery.EndpointSlice{
+		currentEndpointSlices: []*discovery.EndpointSlice{
 			makeTestEndpointSlice("ns1", "ep1", 1, namedPort),
 		},
-		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
+		previousEndpointsMap: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
 				{Endpoint: "1.1.1.2:11", IsLocal: true, Ready: true, Serving: true, Terminating: false},
@@ -812,15 +812,15 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedChangedEndpoints:       sets.New[string]("ns1/ep1"),
 	}, {
 		name: "add a slice to an endpoint",
-		previousEndpoints: []*discovery.EndpointSlice{
+		previousEndpointSlices: []*discovery.EndpointSlice{
 			makeTestEndpointSlice("ns1", "ep1", 1, namedPort),
 			nil,
 		},
-		currentEndpoints: []*discovery.EndpointSlice{
+		currentEndpointSlices: []*discovery.EndpointSlice{
 			makeTestEndpointSlice("ns1", "ep1", 1, multipleSubsetsWithLocal_s1),
 			makeTestEndpointSlice("ns1", "ep1", 2, multipleSubsetsWithLocal_s2),
 		},
-		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
+		previousEndpointsMap: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
 			},
@@ -843,15 +843,15 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedChangedEndpoints: sets.New[string]("ns1/ep1"),
 	}, {
 		name: "remove a slice from an endpoint",
-		previousEndpoints: []*discovery.EndpointSlice{
+		previousEndpointSlices: []*discovery.EndpointSlice{
 			makeTestEndpointSlice("ns1", "ep1", 1, multipleSubsets_s1),
 			makeTestEndpointSlice("ns1", "ep1", 2, multipleSubsets_s2),
 		},
-		currentEndpoints: []*discovery.EndpointSlice{
+		currentEndpointSlices: []*discovery.EndpointSlice{
 			makeTestEndpointSlice("ns1", "ep1", 1, namedPort),
 			nil,
 		},
-		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
+		previousEndpointsMap: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
 			},
@@ -873,13 +873,13 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedChangedEndpoints:       sets.New[string]("ns1/ep1"),
 	}, {
 		name: "rename a port",
-		previousEndpoints: []*discovery.EndpointSlice{
+		previousEndpointSlices: []*discovery.EndpointSlice{
 			makeTestEndpointSlice("ns1", "ep1", 1, namedPort),
 		},
-		currentEndpoints: []*discovery.EndpointSlice{
+		currentEndpointSlices: []*discovery.EndpointSlice{
 			makeTestEndpointSlice("ns1", "ep1", 1, namedPortRenamed),
 		},
-		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
+		previousEndpointsMap: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
 			},
@@ -900,13 +900,13 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedChangedEndpoints: sets.New[string]("ns1/ep1"),
 	}, {
 		name: "renumber a port",
-		previousEndpoints: []*discovery.EndpointSlice{
+		previousEndpointSlices: []*discovery.EndpointSlice{
 			makeTestEndpointSlice("ns1", "ep1", 1, namedPort),
 		},
-		currentEndpoints: []*discovery.EndpointSlice{
+		currentEndpointSlices: []*discovery.EndpointSlice{
 			makeTestEndpointSlice("ns1", "ep1", 1, namedPortRenumbered),
 		},
-		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
+		previousEndpointsMap: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
 			},
@@ -925,7 +925,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedChangedEndpoints:       sets.New[string]("ns1/ep1"),
 	}, {
 		name: "complex add and remove",
-		previousEndpoints: []*discovery.EndpointSlice{
+		previousEndpointSlices: []*discovery.EndpointSlice{
 			makeTestEndpointSlice("ns1", "ep1", 1, complexBefore1),
 			nil,
 
@@ -938,7 +938,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			makeTestEndpointSlice("ns4", "ep4", 1, complexBefore4_s1),
 			makeTestEndpointSlice("ns4", "ep4", 2, complexBefore4_s2),
 		},
-		currentEndpoints: []*discovery.EndpointSlice{
+		currentEndpointSlices: []*discovery.EndpointSlice{
 			makeTestEndpointSlice("ns1", "ep1", 1, complexAfter1_s1),
 			makeTestEndpointSlice("ns1", "ep1", 2, complexAfter1_s2),
 
@@ -951,7 +951,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			makeTestEndpointSlice("ns4", "ep4", 1, complexAfter4),
 			nil,
 		},
-		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
+		previousEndpointsMap: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
 			},
@@ -1015,13 +1015,13 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedChangedEndpoints: sets.New[string]("ns1/ep1", "ns2/ep2", "ns3/ep3", "ns4/ep4"),
 	}, {
 		name: "change from 0 endpoint address to 1 unnamed port",
-		previousEndpoints: []*discovery.EndpointSlice{
+		previousEndpointSlices: []*discovery.EndpointSlice{
 			makeTestEndpointSlice("ns1", "ep1", 1, emptyEndpoint),
 		},
-		currentEndpoints: []*discovery.EndpointSlice{
+		currentEndpointSlices: []*discovery.EndpointSlice{
 			makeTestEndpointSlice("ns1", "ep1", 1, unnamedPort),
 		},
-		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{},
+		previousEndpointsMap: map[ServicePortName][]*BaseEndpointInfo{},
 		expectedResult: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
@@ -1042,23 +1042,23 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			fp.hostname = nodeName
 
 			// First check that after adding all previous versions of endpoints,
-			// the fp.oldEndpoints is as we expect.
-			for i := range tc.previousEndpoints {
-				if tc.previousEndpoints[i] != nil {
-					fp.addEndpointSlice(tc.previousEndpoints[i])
+			// the fp.previousEndpointsMap is as we expect.
+			for i := range tc.previousEndpointSlices {
+				if tc.previousEndpointSlices[i] != nil {
+					fp.addEndpointSlice(tc.previousEndpointSlices[i])
 				}
 			}
 			fp.endpointsMap.Update(fp.endpointsChanges)
-			compareEndpointsMapsStr(t, fp.endpointsMap, tc.oldEndpoints)
+			compareEndpointsMapsStr(t, fp.endpointsMap, tc.previousEndpointsMap)
 
 			// Now let's call appropriate handlers to get to state we want to be.
-			if len(tc.previousEndpoints) != len(tc.currentEndpoints) {
+			if len(tc.previousEndpointSlices) != len(tc.currentEndpointSlices) {
 				t.Fatalf("[%d] different lengths of previous and current endpoints", tci)
 				return
 			}
 
-			for i := range tc.previousEndpoints {
-				prev, curr := tc.previousEndpoints[i], tc.currentEndpoints[i]
+			for i := range tc.previousEndpointSlices {
+				prev, curr := tc.previousEndpointSlices[i], tc.currentEndpointSlices[i]
 				switch {
 				case prev == nil && curr == nil:
 					continue
