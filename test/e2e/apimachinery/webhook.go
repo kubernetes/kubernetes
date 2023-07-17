@@ -907,7 +907,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 			},
 		}, metav1.CreateOptions{})
 		framework.ExpectError(err, "creating configmap object")
-		expectedErrMsg := "denied"
+		expectedErrMsg := "denied the request: this webhook denies all requests"
 		if !strings.Contains(err.Error(), expectedErrMsg) {
 			framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
 		}
@@ -989,8 +989,6 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 
 func newValidatingWebhookWithMatchConditions(
 	f *framework.Framework,
-	// f.namespace.name f.unique.name
-	// namespace, name string,
 	servicePort int32,
 	certCtx *certContext,
 	matchConditions []admissionregistrationv1.MatchCondition,
