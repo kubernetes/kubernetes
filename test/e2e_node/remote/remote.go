@@ -163,6 +163,7 @@ func RunRemote(cfg RunRemoteConfig) (string, bool, error) {
 		aggErrs = append(aggErrs, err)
 		collectSystemLog(cfg.Host)
 	}
+	collectSystemLog(cfg.Host)
 
 	klog.V(2).Infof("Copying test artifacts from %q", cfg.Host)
 	scpErr := getTestArtifacts(cfg.Host, workspace)
