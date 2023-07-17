@@ -287,14 +287,20 @@ func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target
 		fstype = "NTFS"
 	}
 
-	// format disk if it is unformatted(raw)
-	formatOptionsUnwrapped := ""
 	if len(formatOptions) > 0 {
-		formatOptionsUnwrapped = " " + strings.Join(formatOptions, " ")
+		return fmt.Errorf("diskMount: formatOptions are not supported on Windows")
 	}
-	cmd := fmt.Sprintf("Get-Disk -Number %s | Where partitionstyle -eq 'raw' | Initialize-Disk -PartitionStyle GPT -PassThru"+
-		" | New-Partition -UseMaximumSize | Format-Volume -FileSystem %s -Confirm:$false%s", source, fstype, formatOptionsUnwrapped)
-	if output, err := mounter.Exec.Command("powershell", "/c", cmd).CombinedOutput(); err != nil {
+
+	cmdString := "Get-Disk -Number $env:source | Where partitionstyle -eq 'raw' | Initialize-Disk -PartitionStyle GPT -PassThru" +
+		" | New-Partition -UseMaximumSize | Format-Volume -FileSystem $env:fstype -Confirm:$false"
+	cmd := mounter.Exec.Command("powershell", "/c", cmdString)
+	env := append(os.Environ(),
+		fmt.Sprintf("source=%s", source),
+		fmt.Sprintf("fstype=%s", fstype),
+	)
+	cmd.SetEnv(env)
+	klog.V(8).Infof("Executing command: %q", cmdString)
+	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("diskMount: format disk failed, error: %v, output: %q", err, string(output))
 	}
 	klog.V(4).Infof("diskMount: Disk successfully formatted, disk: %q, fstype: %q", source, fstype)
@@ -310,8 +316,10 @@ func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target
 // ListVolumesOnDisk - returns back list of volumes(volumeIDs) in the disk (requested in diskID).
 func ListVolumesOnDisk(diskID string) (volumeIDs []string, err error) {
 	// If a Disk has multiple volumes, Get-Volume may not return items in the same order.
-	cmd := fmt.Sprintf("(Get-Disk -DeviceId %s | Get-Partition | Get-Volume | Sort-Object -Property UniqueId).UniqueId", diskID)
-	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
+	cmd := exec.Command("powershell", "/c", "(Get-Disk -DeviceId $env:diskID | Get-Partition | Get-Volume | Sort-Object -Property UniqueId).UniqueId")
+	cmd.Env = append(os.Environ(), fmt.Sprintf("diskID=%s", diskID))
+	klog.V(8).Infof("Executing command: %q", cmd.String())
+	output, err := cmd.CombinedOutput()
 	klog.V(4).Infof("ListVolumesOnDisk id from %s: %s", diskID, string(output))
 	if err != nil {
 		return []string{}, fmt.Errorf("error list volumes on disk. cmd: %s, output: %s, error: %v", cmd, string(output), err)
