@@ -87,7 +87,7 @@ func TestUpdate(t *testing.T) {
 			object.Parameters = map[string]string{"foo": "bar"}
 			return object
 		},
-		//invalid update
+		// invalid update
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*storageapi.VolumeAttributesClass)
 			object.Parameters = map[string]string{"faz": "bar"}
