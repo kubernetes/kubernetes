@@ -38,6 +38,9 @@ limitations under the License.
 //   - Add `ClusterConfiguration.DNS.Disabled` and `ClusterConfiguration.Proxy.Disabled` that can be used to disable
 //     the CoreDNS and kube-proxy addons during cluster initialization. Skipping the related addons phases,
 //     during cluster creation will set the same fields to `false`.
+//   - The UpgradeConfiguration kubeadm API is now supported in v1beta4 when passing --config to "kubeadm upgrade" subcommands.
+//     Usage of component configuration for kubelet and kube-proxy, InitConfiguration and ClusterConfiguration is deprecated
+//     and will be ignored when passing --config to upgrade subcommands.
 //
 // Migration from old kubeadm config versions
 //

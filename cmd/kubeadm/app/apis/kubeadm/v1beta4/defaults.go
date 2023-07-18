@@ -23,6 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/ptr"
 
 	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -223,5 +224,24 @@ func SetDefaults_EnvVar(obj *EnvVar) {
 				obj.ValueFrom.FieldRef.APIVersion = "v1"
 			}
 		}
+	}
+}
+
+// SetDefaults_UpgradeConfiguration assigns default values for the UpgradeConfiguration
+func SetDefaults_UpgradeConfiguration(obj *UpgradeConfiguration) {
+	if obj.Node.EtcdUpgrade == nil {
+		obj.Node.EtcdUpgrade = ptr.To(true)
+	}
+
+	if obj.Node.CertificateRenewal == nil {
+		obj.Node.CertificateRenewal = ptr.To(true)
+	}
+
+	if obj.Apply.EtcdUpgrade == nil {
+		obj.Apply.EtcdUpgrade = ptr.To(true)
+	}
+
+	if obj.Apply.CertificateRenewal == nil {
+		obj.Apply.CertificateRenewal = ptr.To(true)
 	}
 }

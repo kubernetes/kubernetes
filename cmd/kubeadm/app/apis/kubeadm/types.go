@@ -547,3 +547,105 @@ const (
 	// EncryptionAlgorithmRSA defines the RSA encryption algorithm type.
 	EncryptionAlgorithmRSA EncryptionAlgorithmType = "RSA"
 )
+
+// UpgradeApplyConfiguration contains a list of configurable options which are specific to the  "kubeadm upgrade apply" command.
+type UpgradeApplyConfiguration struct {
+	// AllowExperimentalUpgrades instructs kubeadm to show unstable versions of Kubernetes as an upgrade
+	// alternative and allows upgrading to an alpha/beta/release candidate version of Kubernetes.
+	AllowExperimentalUpgrades *bool
+
+	// Enable AllowRCUpgrades will show release candidate versions of Kubernetes as an upgrade alternative and
+	// allows upgrading to a release candidate version of Kubernetes.
+	AllowRCUpgrades *bool
+
+	// CertificateRenewal instructs kubeadm to execute certificate renewal during upgrades.
+	CertificateRenewal *bool
+
+	// DryRun tells if the dry run mode is enabled, don't apply any change if it is and just output what would be done.
+	DryRun *bool
+
+	// EtcdUpgrade instructs kubeadm to execute etcd upgrade during upgrades.
+	EtcdUpgrade *bool
+
+	// ForceUpgrade flag instructs kubeadm to upgrade the cluster without prompting for confirmation.
+	ForceUpgrade *bool
+
+	// IgnorePreflightErrors provides a slice of pre-flight errors to be ignored during the upgrade process, e.g. 'IsPrivilegedUser,Swap'.
+	// Value 'all' ignores errors from all checks.
+	IgnorePreflightErrors []string
+
+	// Patches contains options related to applying patches to components deployed by kubeadm during `kubeadm upgrade`.
+	Patches *Patches
+
+	// PrintConfig specifies whether the configuration file that will be used in the upgrade should be printed or not.
+	PrintConfig *bool
+}
+
+// UpgradeDiffConfiguration contains a list of configurable options which are specific to the "kubeadm upgrade diff" command.
+type UpgradeDiffConfiguration struct {
+	// DiffContextLines is the number of lines of context in the diff.
+	DiffContextLines int
+}
+
+// UpgradeNodeConfiguration contains a list of configurable options which are specific to the "kubeadm upgrade node" command.
+type UpgradeNodeConfiguration struct {
+	// CertificateRenewal instructs kubeadm to execute certificate renewal during upgrades.
+	CertificateRenewal *bool
+
+	// DryRun tells if the dry run mode is enabled, don't apply any change if it is and just output what would be done.
+	DryRun *bool
+
+	// EtcdUpgrade instructs kubeadm to execute etcd upgrade during upgrades.
+	EtcdUpgrade *bool
+
+	// IgnorePreflightErrors provides a slice of pre-flight errors to be ignored during the upgrade process, e.g. 'IsPrivilegedUser,Swap'.
+	// Value 'all' ignores errors from all checks.
+	IgnorePreflightErrors []string
+
+	// SkipPhases is a list of phases to skip during command execution.
+	// The list of phases can be obtained with the "kubeadm upgrade node phase --help" command.
+	SkipPhases []string
+
+	// Patches contains options related to applying patches to components deployed by kubeadm during `kubeadm upgrade`.
+	Patches *Patches
+}
+
+// UpgradePlanConfiguration contains a list of configurable options which are specific to the "kubeadm upgrade plan" command.
+type UpgradePlanConfiguration struct {
+	// AllowExperimentalUpgrades instructs kubeadm to show unstable versions of Kubernetes as an upgrade
+	// alternative and allows upgrading to an alpha/beta/release candidate version of Kubernetes.
+	AllowExperimentalUpgrades *bool
+
+	// Enable AllowRCUpgrades will show release candidate versions of Kubernetes as an upgrade alternative and
+	// allows upgrading to a release candidate version of Kubernetes.
+	AllowRCUpgrades *bool
+
+	// DryRun tells if the dry run mode is enabled, don't apply any change if it is and just output what would be done.
+	DryRun *bool
+
+	// IgnorePreflightErrors provides a slice of pre-flight errors to be ignored during the upgrade process, e.g. 'IsPrivilegedUser,Swap'.
+	// Value 'all' ignores errors from all checks.
+	IgnorePreflightErrors []string
+
+	// PrintConfig specifies whether the configuration file that will be used in the upgrade should be printed or not.
+	PrintConfig *bool
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// UpgradeConfiguration contains a list of options that are specific to "kubeadm upgrade" subcommands.
+type UpgradeConfiguration struct {
+	metav1.TypeMeta
+
+	// Apply holds a list of options that are specific to the "kubeadm upgrade apply" command.
+	Apply UpgradeApplyConfiguration
+
+	// Diff holds a list of options that are specific to the "kubeadm upgrade diff" command.
+	Diff UpgradeDiffConfiguration
+
+	// Node holds a list of options that are specific to the "kubeadm upgrade node" command.
+	Node UpgradeNodeConfiguration
+
+	// Plan holds a list of options that are specific to the "kubeadm upgrade plan" command.
+	Plan UpgradePlanConfiguration
+}
