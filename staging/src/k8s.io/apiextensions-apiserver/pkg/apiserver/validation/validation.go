@@ -22,7 +22,9 @@ import (
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	openapierrors "k8s.io/kube-openapi/pkg/validation/errors"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
@@ -66,6 +68,9 @@ func NewSchemaValidator(customResourceValidation *apiextensions.JSONSchemaProps)
 		}
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.CRDValidationRatcheting) {
+		return NewRatchetingSchemaValidator(openapiSchema, nil, "", strfmt.Default), openapiSchema, nil
+	}
 	return basicSchemaValidator{validate.NewSchemaValidator(openapiSchema, nil, "", strfmt.Default)}, openapiSchema, nil
 }
 
