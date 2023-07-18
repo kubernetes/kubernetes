@@ -22,6 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/utils/ptr"
 
 	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -41,6 +42,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 		fuzzJoinConfiguration,
 		fuzzJoinControlPlane,
 		fuzzResetConfiguration,
+		fuzzUpgradeConfiguration,
 	}
 }
 
@@ -145,4 +147,14 @@ func fuzzResetConfiguration(obj *kubeadm.ResetConfiguration, c fuzz.Continue) {
 
 	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
 	obj.CertificatesDir = "/tmp"
+}
+
+func fuzzUpgradeConfiguration(obj *kubeadm.UpgradeConfiguration, c fuzz.Continue) {
+	c.FuzzNoCustom(obj)
+
+	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
+	obj.Node.EtcdUpgrade = ptr.To(true)
+	obj.Apply.EtcdUpgrade = ptr.To(true)
+	obj.Apply.CertificateRenewal = ptr.To(false)
+	obj.Node.CertificateRenewal = ptr.To(false)
 }
