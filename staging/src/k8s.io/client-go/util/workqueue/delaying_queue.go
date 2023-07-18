@@ -144,7 +144,7 @@ func NewDelayingQueueWithCustomClock(clock clock.WithTicker, name string) Delayi
 	})
 }
 
-func newDelayingQueue(clock clock.WithTicker, q Interface, name string, provider MetricsProvider) DelayingInterface {
+func newDelayingQueue(clock clock.WithTicker, q Interface, name string, provider MetricsProvider) *delayingType {
 	ret := &delayingType{
 		Interface:          q,
 		clock:              clock,
