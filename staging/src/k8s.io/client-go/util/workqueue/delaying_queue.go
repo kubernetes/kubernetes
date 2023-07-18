@@ -464,7 +464,8 @@ func (q *delayingType) waitingLoop() {
 		// signal, otherwise ticking a clock to the ready time before hitting the select would cause the
 		// select nextReadyAtTimerCh not to fire.  This check is as close to the select as we can make it.
 		if waitingForQueue.Len() > 0 {
-			if q.headReadyTime.Equal(q.clock.Now()) || q.headReadyTime.Before(q.clock.Now()) {
+			now := q.clock.Now()
+			if q.headReadyTime.Equal(now) || q.headReadyTime.Before(now) {
 				continue
 			}
 		}
