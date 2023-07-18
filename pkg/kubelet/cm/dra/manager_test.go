@@ -715,38 +715,6 @@ func TestUnprepareResouces(t *testing.T) {
 		wantResourceSkipped bool
 	}{
 		{
-			description: "failed to fetch resource claim",
-			driverName:  driverName,
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-pod",
-					Namespace: "test-namespace",
-					UID:       "test-reserved",
-				},
-				Spec: v1.PodSpec{
-					ResourceClaims: []v1.PodResourceClaim{
-						{
-							Name: "test-pod-claim-0",
-							Source: v1.ClaimSource{
-								ResourceClaimName: func() *string {
-									s := "test-pod-claim-0"
-									return &s
-								}(),
-							},
-						},
-					},
-				},
-			},
-			claimInfo: &ClaimInfo{
-				ClaimInfoState: state.ClaimInfoState{
-					DriverName: driverName,
-					ClaimName:  "test-pod-claim-0",
-					Namespace:  "test-namespace",
-				},
-			},
-			wantErr: true,
-		},
-		{
 			description: "plugin does not exist",
 			driverName:  "this-plugin-does-not-exist",
 			pod: &v1.Pod{
@@ -774,6 +742,12 @@ func TestUnprepareResouces(t *testing.T) {
 					DriverName: driverName,
 					ClaimName:  "another-claim-test",
 					Namespace:  "test-namespace",
+					ResourceHandles: []resourcev1alpha2.ResourceHandle{
+						{
+							DriverName: driverName,
+							Data:       "test data",
+						},
+					},
 				},
 			},
 			resourceClaim: &resourcev1alpha2.ResourceClaim{
@@ -899,6 +873,12 @@ func TestUnprepareResouces(t *testing.T) {
 					DriverName: driverName,
 					ClaimName:  "test-pod-claim-2",
 					Namespace:  "test-namespace",
+					ResourceHandles: []resourcev1alpha2.ResourceHandle{
+						{
+							DriverName: driverName,
+							Data:       "test data",
+						},
+					},
 				},
 			},
 			resourceClaim: &resourcev1alpha2.ResourceClaim{
@@ -962,6 +942,12 @@ func TestUnprepareResouces(t *testing.T) {
 					DriverName: driverName,
 					ClaimName:  "test-pod-claim-3",
 					Namespace:  "test-namespace",
+					ResourceHandles: []resourcev1alpha2.ResourceHandle{
+						{
+							DriverName: driverName,
+							Data:       "test data",
+						},
+					},
 				},
 			},
 			resourceClaim: &resourcev1alpha2.ResourceClaim{
@@ -1008,12 +994,6 @@ func TestUnprepareResouces(t *testing.T) {
 			manager := &ManagerImpl{
 				kubeClient: fakeKubeClient,
 				cache:      cache,
-			}
-
-			if test.resourceClaim != nil {
-				if _, err := fakeKubeClient.ResourceV1alpha2().ResourceClaims(test.pod.Namespace).Create(context.Background(), test.resourceClaim, metav1.CreateOptions{}); err != nil {
-					t.Fatalf("failed to create ResourceClaim %s: %+v", test.resourceClaim.Name, err)
-				}
 			}
 
 			if test.claimInfo != nil {
