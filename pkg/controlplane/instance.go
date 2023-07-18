@@ -47,7 +47,6 @@ import (
 	networkingapiv1alpha1 "k8s.io/api/networking/v1alpha1"
 	nodev1 "k8s.io/api/node/v1"
 	policyapiv1 "k8s.io/api/policy/v1"
-	policyapiv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	schedulingapiv1 "k8s.io/api/scheduling/v1"
@@ -719,7 +718,6 @@ var (
 	// betaAPIGroupVersionsDisabledByDefault is for all future beta groupVersions.
 	betaAPIGroupVersionsDisabledByDefault = []schema.GroupVersion{
 		authenticationv1beta1.SchemeGroupVersion,
-		policyapiv1beta1.SchemeGroupVersion,
 		storageapiv1beta1.SchemeGroupVersion,
 		flowcontrolv1beta1.SchemeGroupVersion,
 		flowcontrolv1beta2.SchemeGroupVersion,
