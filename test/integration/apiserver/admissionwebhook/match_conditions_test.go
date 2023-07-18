@@ -24,6 +24,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -649,7 +650,16 @@ func TestMatchConditions_validation(t *testing.T) {
 			Expression: "oldObject == null",
 		}},
 		expectError: true,
-	}}
+	}, {
+		name:            "less than 65 match conditions should pass",
+		matchConditions: repeatedMatchConditions(64),
+		expectError:     false,
+	}, {
+		name:            "more than 64 match conditions should error",
+		matchConditions: repeatedMatchConditions(65),
+		expectError:     true,
+	},
+	}
 
 	dryRunCreate := metav1.CreateOptions{
 		DryRun: []string{metav1.DryRunAll},
@@ -951,4 +961,15 @@ func newMarkerPod(namespace string) *corev1.Pod {
 			}},
 		},
 	}
+}
+
+func repeatedMatchConditions(size int) []admissionregistrationv1.MatchCondition {
+	matchConditions := make([]admissionregistrationv1.MatchCondition, 0, size)
+	for i := 0; i < size; i++ {
+		matchConditions = append(matchConditions, admissionregistrationv1.MatchCondition{
+			Name:       "repeated-" + strconv.Itoa(i),
+			Expression: "true",
+		})
+	}
+	return matchConditions
 }
