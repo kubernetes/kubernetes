@@ -3353,6 +3353,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: backoffLimit
       type:
         scalar: numeric
+    - name: backoffLimitPerIndex
+      type:
+        scalar: numeric
     - name: completionMode
       type:
         scalar: string
@@ -3362,6 +3365,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: manualSelector
       type:
         scalar: boolean
+    - name: maxFailedIndexes
+      type:
+        scalar: numeric
     - name: parallelism
       type:
         scalar: numeric
@@ -3402,6 +3408,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: failed
       type:
         scalar: numeric
+    - name: failedIndexes
+      type:
+        scalar: string
     - name: ready
       type:
         scalar: numeric

@@ -381,6 +381,13 @@ const (
 	// Causes kubelet to no longer create legacy IPTables rules
 	IPTablesOwnershipCleanup featuregate.Feature = "IPTablesOwnershipCleanup"
 
+	// owner: @mimowo
+	// kep: https://kep.k8s.io/3850
+	// alpha: v1.28
+	//
+	// Allows users to specify counting of failed pods per index.
+	JobBackoffLimitPerIndex featuregate.Feature = "JobBackoffLimitPerIndex"
+
 	// owner: @ahg
 	// beta: v1.23
 	// stable: v1.27
@@ -1018,6 +1025,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	InTreePluginvSphereUnregister: {Default: false, PreRelease: featuregate.Alpha},
 
 	IPTablesOwnershipCleanup: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.30
+
+	JobBackoffLimitPerIndex: {Default: false, PreRelease: featuregate.Alpha},
 
 	JobMutableNodeSchedulingDirectives: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 

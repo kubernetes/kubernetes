@@ -17,6 +17,8 @@ limitations under the License.
 package v1
 
 import (
+	"math"
+
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -38,7 +40,11 @@ func SetDefaults_Job(obj *batchv1.Job) {
 		obj.Spec.Parallelism = utilpointer.Int32(1)
 	}
 	if obj.Spec.BackoffLimit == nil {
-		obj.Spec.BackoffLimit = utilpointer.Int32(6)
+		if obj.Spec.BackoffLimitPerIndex != nil {
+			obj.Spec.BackoffLimit = utilpointer.Int32(math.MaxInt32)
+		} else {
+			obj.Spec.BackoffLimit = utilpointer.Int32(6)
+		}
 	}
 	labels := obj.Spec.Template.Labels
 	if labels != nil && len(obj.Labels) == 0 {

@@ -17,6 +17,8 @@ limitations under the License.
 package fuzzer
 
 import (
+	"math"
+
 	fuzz "github.com/google/gofuzz"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -51,6 +53,11 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			mode := batch.NonIndexedCompletion
 			if c.RandBool() {
 				mode = batch.IndexedCompletion
+				j.BackoffLimitPerIndex = pointer.Int32(c.Rand.Int31())
+				j.MaxFailedIndexes = pointer.Int32(c.Rand.Int31())
+			}
+			if c.RandBool() {
+				j.BackoffLimit = pointer.Int32(math.MaxInt32)
 			}
 			j.CompletionMode = &mode
 			// We're fuzzing the internal JobSpec type, not the v1 type, so we don't

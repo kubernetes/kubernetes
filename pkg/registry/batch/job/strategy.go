@@ -100,6 +100,23 @@ func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 		job.Spec.PodFailurePolicy = nil
 	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.JobBackoffLimitPerIndex) {
+		job.Spec.BackoffLimitPerIndex = nil
+		job.Spec.MaxFailedIndexes = nil
+		if job.Spec.PodFailurePolicy != nil {
+			// We drop the FailIndex pod failure policy rules because
+			// JobBackoffLimitPerIndex is disabled.
+			index := 0
+			for _, rule := range job.Spec.PodFailurePolicy.Rules {
+				if rule.Action != batch.PodFailurePolicyActionFailIndex {
+					job.Spec.PodFailurePolicy.Rules[index] = rule
+					index++
+				}
+			}
+			job.Spec.PodFailurePolicy.Rules = job.Spec.PodFailurePolicy.Rules[:index]
+		}
+	}
+
 	pod.DropDisabledTemplateFields(&job.Spec.Template, nil)
 }
 
@@ -111,6 +128,20 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) && oldJob.Spec.PodFailurePolicy == nil {
 		newJob.Spec.PodFailurePolicy = nil
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.JobBackoffLimitPerIndex) {
+		if oldJob.Spec.BackoffLimitPerIndex == nil {
+			newJob.Spec.BackoffLimitPerIndex = nil
+		}
+		if oldJob.Spec.MaxFailedIndexes == nil {
+			newJob.Spec.MaxFailedIndexes = nil
+		}
+		// We keep pod failure policy rules with FailIndex actions (is any),
+		// since the pod failure policy is immutable. Note that, if the old job
+		// had BackoffLimitPerIndex set, the new Job will also have it, so the
+		// validation of the pod failure policy with FailIndex rules will
+		// continue to pass.
 	}
 
 	pod.DropDisabledTemplateFields(&newJob.Spec.Template, &oldJob.Spec.Template)
