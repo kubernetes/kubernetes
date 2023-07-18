@@ -20,6 +20,7 @@ import (
 	"context"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	genericrequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/util/flowcontrol/debug"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
@@ -90,15 +91,15 @@ type completedWorkEstimate struct {
 // queue is a sequence of requests that have arrived but not yet finished
 // execution in both the real and virtual worlds.
 type queue struct {
-	// The requests not yet executing in the real world are stored in a FIFO list.
-	requests fifo
+	// The requestsWaiting not yet executing in the real world are stored in a FIFO list.
+	requestsWaiting fifo
 
 	// nextDispatchR is the R progress meter reading at
 	// which the next request will be dispatched in the virtual world.
 	nextDispatchR fcrequest.SeatSeconds
 
-	// requestsExecuting is the count in the real world.
-	requestsExecuting int
+	// requestsExecuting is the set of requests executing in the real world.
+	requestsExecuting sets.Set[*request]
 
 	// index is the position of this queue among those in its queueSet.
 	index int
@@ -145,28 +146,14 @@ func (qs *queueSet) computeFinalWork(we *fcrequest.WorkEstimate) fcrequest.SeatS
 }
 
 func (q *queue) dumpLocked(includeDetails bool) debug.QueueDump {
-	digest := make([]debug.RequestDump, q.requests.Length())
-	i := 0
-	q.requests.Walk(func(r *request) bool {
-		// dump requests.
-		digest[i].MatchedFlowSchema = r.fsName
-		digest[i].FlowDistinguisher = r.flowDistinguisher
-		digest[i].ArriveTime = r.arrivalTime
-		digest[i].StartTime = r.startTime
-		digest[i].WorkEstimate = r.workEstimate.WorkEstimate
-		if includeDetails {
-			userInfo, _ := genericrequest.UserFrom(r.ctx)
-			digest[i].UserName = userInfo.GetName()
-			requestInfo, ok := genericrequest.RequestInfoFrom(r.ctx)
-			if ok {
-				digest[i].RequestInfo = *requestInfo
-			}
-		}
-		i++
+	waitingDigest := make([]debug.RequestDump, 0, q.requestsWaiting.Length())
+	q.requestsWaiting.Walk(func(r *request) bool {
+		waitingDigest = append(waitingDigest, dumpRequest(includeDetails)(r))
 		return true
 	})
+	executingDigest := SetMapReduce(dumpRequest(includeDetails), append1[debug.RequestDump])(q.requestsExecuting)
 
-	sum := q.requests.QueueSum()
+	sum := q.requestsWaiting.QueueSum()
 	queueSum := debug.QueueSum{
 		InitialSeatsSum: sum.InitialSeatsSum,
 		MaxSeatsSum:     sum.MaxSeatsSum,
@@ -175,9 +162,57 @@ func (q *queue) dumpLocked(includeDetails bool) debug.QueueDump {
 
 	return debug.QueueDump{
 		NextDispatchR:     q.nextDispatchR.String(),
-		Requests:          digest,
-		ExecutingRequests: q.requestsExecuting,
+		Requests:          waitingDigest,
+		RequestsExecuting: executingDigest,
+		ExecutingRequests: q.requestsExecuting.Len(),
 		SeatsInUse:        q.seatsInUse,
 		QueueSum:          queueSum,
 	}
 }
+
+func dumpRequest(includeDetails bool) func(*request) debug.RequestDump {
+	return func(r *request) debug.RequestDump {
+		ans := debug.RequestDump{
+			MatchedFlowSchema: r.fsName,
+			FlowDistinguisher: r.flowDistinguisher,
+			ArriveTime:        r.arrivalTime,
+			StartTime:         r.startTime,
+			WorkEstimate:      r.workEstimate.WorkEstimate,
+		}
+		if includeDetails {
+			userInfo, _ := genericrequest.UserFrom(r.ctx)
+			ans.UserName = userInfo.GetName()
+			requestInfo, ok := genericrequest.RequestInfoFrom(r.ctx)
+			if ok {
+				ans.RequestInfo = *requestInfo
+			}
+		}
+		return ans
+	}
+}
+
+// SetMapReduce is map-reduce starting from a set type in the sets package.
+func SetMapReduce[Elt comparable, Result, Accumulator any](mapFn func(Elt) Result, reduceFn func(Accumulator, Result) Accumulator) func(map[Elt]sets.Empty) Accumulator {
+	return func(set map[Elt]sets.Empty) Accumulator {
+		var ans Accumulator
+		for elt := range set {
+			ans = reduceFn(ans, mapFn(elt))
+		}
+		return ans
+	}
+}
+
+// SliceMapReduce is map-reduce starting from a slice.
+func SliceMapReduce[Elt, Result, Accumulator any](mapFn func(Elt) Result, reduceFn func(Accumulator, Result) Accumulator) func([]Elt) Accumulator {
+	return func(slice []Elt) Accumulator {
+		var ans Accumulator
+		for _, elt := range slice {
+			ans = reduceFn(ans, mapFn(elt))
+		}
+		return ans
+	}
+}
+
+func or(x, y bool) bool { return x || y }
+
+func append1[Elt any](slice []Elt, next Elt) []Elt { return append(slice, next) }
