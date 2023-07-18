@@ -702,6 +702,27 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 					podresourcesListTests(ctx, f, cli, nil)
 					podresourcesGetAllocatableResourcesTests(ctx, cli, nil, onlineCPUs, reservedSystemCPUs)
 				})
+				ginkgo.It("should account for resources of pods in terminal phase", func(ctx context.Context) {
+					pd := podDesc{
+						cntName:    "e2e-test-cnt",
+						podName:    "e2e-test-pod",
+						cpuRequest: 1000,
+					}
+					pod := makePodResourcesTestPod(pd)
+					pod.Spec.Containers[0].Command = []string{"sh", "-c", "/bin/true"}
+					pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+					defer e2epod.NewPodClient(f).DeleteSync(ctx, pod.Name, metav1.DeleteOptions{}, time.Minute)
+					err := e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "Pod Succeeded", time.Minute*2, testutils.PodSucceeded)
+					framework.ExpectNoError(err)
+					endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
+					framework.ExpectNoError(err)
+					cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+					framework.ExpectNoError(err)
+					defer conn.Close()
+					// although the pod moved into terminal state, PodResourcesAPI still list its cpus
+					expectPodResources(ctx, 1, cli, []podDesc{pd})
+
+				})
 			})
 		})
 
