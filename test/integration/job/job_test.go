@@ -1667,6 +1667,159 @@ func TestIndexedJob(t *testing.T) {
 	validateTerminatedPodsTrackingFinalizerMetric(t, 5)
 }
 
+func TestJobPodReplacementPolicy(t *testing.T) {
+	const podCount int32 = 2
+	indexedCompletion := batchv1.IndexedCompletion
+	nonIndexedCompletion := batchv1.NonIndexedCompletion
+	var podReplacementPolicy = func(obj batchv1.PodReplacementPolicy) *batchv1.PodReplacementPolicy {
+		return &obj
+	}
+	jobSpecIndexedDefault := &batchv1.JobSpec{
+		Parallelism:    pointer.Int32Ptr(podCount),
+		Completions:    pointer.Int32Ptr(podCount),
+		CompletionMode: &indexedCompletion,
+	}
+	cases := map[string]struct {
+		podReplacementPolicyEnabled bool
+		wantTerminating             *int32
+		wantFailed                  int
+		wantActive                  int
+		jobSpec                     *batchv1.JobSpec
+	}{
+		"feature flag off, delete pods and verify no terminating status": {
+			jobSpec:    jobSpecIndexedDefault,
+			wantActive: int(podCount),
+			wantFailed: int(podCount),
+		},
+		"feature flag true, delete pods and verify terminating status": {
+			podReplacementPolicyEnabled: true,
+			jobSpec:                     jobSpecIndexedDefault,
+			wantTerminating:             pointer.Int32(podCount),
+			wantFailed:                  int(podCount),
+		},
+		"feature flag true, delete pods, verify terminating status and recreate upon terminating": {
+			podReplacementPolicyEnabled: true,
+			jobSpec: &batchv1.JobSpec{
+				Parallelism:          pointer.Int32Ptr(podCount),
+				Completions:          pointer.Int32Ptr(podCount),
+				CompletionMode:       &indexedCompletion,
+				PodReplacementPolicy: podReplacementPolicy(batchv1.TerminatingOrFailed),
+			},
+			wantTerminating: pointer.Int32(podCount),
+			wantFailed:      int(podCount),
+		},
+		"feature flag true, delete pods, verify terminating status and recreate once failed": {
+			podReplacementPolicyEnabled: true,
+			jobSpec: &batchv1.JobSpec{
+				Parallelism:          pointer.Int32Ptr(podCount),
+				Completions:          pointer.Int32Ptr(podCount),
+				CompletionMode:       &nonIndexedCompletion,
+				PodReplacementPolicy: podReplacementPolicy(batchv1.Failed),
+			},
+			wantTerminating: pointer.Int32(podCount),
+		},
+		"feature flag true with NonIndexedJob, delete pods, verify terminating status and recreate once failed": {
+			podReplacementPolicyEnabled: true,
+			jobSpec: &batchv1.JobSpec{
+				Parallelism:          pointer.Int32Ptr(podCount),
+				Completions:          pointer.Int32Ptr(podCount),
+				CompletionMode:       &nonIndexedCompletion,
+				PodReplacementPolicy: podReplacementPolicy(batchv1.Failed),
+			},
+			wantTerminating: pointer.Int32(podCount),
+		},
+		"feature flag false, podFailurePolicy enabled, delete pods, verify terminating status and recreate once failed": {
+			podReplacementPolicyEnabled: false,
+			jobSpec: &batchv1.JobSpec{
+				Parallelism:          pointer.Int32Ptr(podCount),
+				Completions:          pointer.Int32Ptr(podCount),
+				CompletionMode:       &nonIndexedCompletion,
+				PodReplacementPolicy: podReplacementPolicy(batchv1.Failed),
+				PodFailurePolicy: &batchv1.PodFailurePolicy{
+					Rules: []batchv1.PodFailurePolicyRule{
+						{
+							Action: batchv1.PodFailurePolicyActionFailJob,
+							OnExitCodes: &batchv1.PodFailurePolicyOnExitCodesRequirement{
+								Operator: batchv1.PodFailurePolicyOnExitCodesOpIn,
+								Values:   []int32{5},
+							},
+						},
+					},
+				},
+			},
+			wantActive: int(podCount),
+		},
+	}
+	for name, tc := range cases {
+		tc := tc
+		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.podReplacementPolicyEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.jobSpec.PodFailurePolicy != nil)()
+
+			closeFn, restConfig, clientSet, ns := setup(t, "pod-replacement-policy")
+			defer closeFn()
+			ctx, cancel := startJobControllerAndWaitForCaches(restConfig)
+			defer cancel()
+			resetMetrics()
+
+			jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
+				Spec: *tc.jobSpec,
+			})
+			if err != nil {
+				t.Fatalf("Failed to create Job: %v", err)
+			}
+			jobClient := clientSet.BatchV1().Jobs(jobObj.Namespace)
+
+			// Wait for pods to start up.
+			err = wait.PollImmediate(5*time.Millisecond, wait.ForeverTestTimeout, func() (done bool, err error) {
+				job, err := jobClient.Get(ctx, jobObj.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				if job.Status.Active == int32(podCount) {
+					return true, nil
+				}
+				return false, nil
+			})
+			if err != nil {
+				t.Fatalf("Error waiting for Job pods to become active: %v", err)
+			}
+			pods, errList := clientSet.CoreV1().Pods(ns.Namespace).List(ctx, metav1.ListOptions{})
+			if errList != nil {
+				t.Fatalf("Failed to list pods: %v", errList)
+			}
+			updatePod(t, clientSet, pods.Items, func(pod *v1.Pod) {
+				pod.Finalizers = append(pod.Finalizers, "fake.example.com/blockDeletion")
+			})
+			err = clientSet.CoreV1().Pods(ns.Name).DeleteCollection(ctx,
+				metav1.DeleteOptions{},
+				metav1.ListOptions{
+					Limit: 1000,
+				})
+			if err != nil {
+				t.Fatalf("Failed to cleanup Pods: %v", err)
+			}
+
+			podsDelete, errList2 := clientSet.CoreV1().Pods(ns.Namespace).List(ctx, metav1.ListOptions{})
+			if errList != nil {
+				t.Fatalf("Failed to list pods: %v", errList2)
+			}
+			for _, val := range podsDelete.Items {
+				if val.DeletionTimestamp == nil {
+					t.Fatalf("Deletion not registered.")
+				}
+			}
+
+			validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, podsByStatus{
+				Terminating: tc.wantTerminating,
+				Failed:      tc.wantFailed,
+				Active:      tc.wantActive,
+				Ready:       pointer.Int32(0),
+			})
+		})
+	}
+}
+
 func TestElasticIndexedJob(t *testing.T) {
 	const initialCompletions int32 = 3
 	type jobUpdate struct {
@@ -2360,13 +2513,14 @@ func TestNodeSelectorUpdate(t *testing.T) {
 }
 
 type podsByStatus struct {
-	Active    int
-	Ready     *int32
-	Failed    int
-	Succeeded int
+	Active      int
+	Ready       *int32
+	Failed      int
+	Succeeded   int
+	Terminating *int32
 }
 
-func validateJobPodsStatus(ctx context.Context, t *testing.T, clientSet clientset.Interface, jobObj *batchv1.Job, desired podsByStatus) {
+func validateJobsPodsStatusOnly(ctx context.Context, t *testing.T, clientSet clientset.Interface, jobObj *batchv1.Job, desired podsByStatus) {
 	t.Helper()
 	var actualCounts podsByStatus
 	if err := wait.PollImmediate(waitInterval, wait.ForeverTestTimeout, func() (bool, error) {
@@ -2375,16 +2529,21 @@ func validateJobPodsStatus(ctx context.Context, t *testing.T, clientSet clientse
 			t.Fatalf("Failed to get updated Job: %v", err)
 		}
 		actualCounts = podsByStatus{
-			Active:    int(updatedJob.Status.Active),
-			Ready:     updatedJob.Status.Ready,
-			Succeeded: int(updatedJob.Status.Succeeded),
-			Failed:    int(updatedJob.Status.Failed),
+			Active:      int(updatedJob.Status.Active),
+			Ready:       updatedJob.Status.Ready,
+			Succeeded:   int(updatedJob.Status.Succeeded),
+			Failed:      int(updatedJob.Status.Failed),
+			Terminating: updatedJob.Status.Terminating,
 		}
 		return cmp.Equal(actualCounts, desired), nil
 	}); err != nil {
 		diff := cmp.Diff(desired, actualCounts)
 		t.Errorf("Waiting for Job Status: %v\nPods (-want,+got):\n%s", err, diff)
 	}
+}
+func validateJobPodsStatus(ctx context.Context, t *testing.T, clientSet clientset.Interface, jobObj *batchv1.Job, desired podsByStatus) {
+	t.Helper()
+	validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, desired)
 	var active []*v1.Pod
 	if err := wait.PollImmediate(waitInterval, wait.ForeverTestTimeout, func() (bool, error) {
 		pods, err := clientSet.CoreV1().Pods(jobObj.Namespace).List(ctx, metav1.ListOptions{})
@@ -2625,6 +2784,22 @@ func updatePodStatuses(ctx context.Context, clientSet clientset.Interface, updat
 	default:
 	}
 	return int(updated), nil
+}
+
+func updatePod(t *testing.T, clientSet clientset.Interface, pods []v1.Pod, updateFunc func(*v1.Pod)) {
+	for _, val := range pods {
+		if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			newPod, err := clientSet.CoreV1().Pods(val.Namespace).Get(context.TODO(), val.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			updateFunc(newPod)
+			_, err = clientSet.CoreV1().Pods(val.Namespace).Update(context.TODO(), newPod, metav1.UpdateOptions{})
+			return err
+		}); err != nil {
+			t.Fatalf("Failed to update pod %s: %v", val.Name, err)
+		}
+	}
 }
 
 func setJobPhaseForIndex(ctx context.Context, clientSet clientset.Interface, jobObj *batchv1.Job, phase v1.PodPhase, ix int) error {

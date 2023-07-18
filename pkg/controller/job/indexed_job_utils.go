@@ -243,6 +243,7 @@ func parseIndexesFromString(logger klog.Logger, indexesStr string, completions i
 
 // firstPendingIndexes returns `count` indexes less than `completions` that are
 // not covered by `activePods`, `succeededIndexes` or `failedIndexes`.
+// In cases of PodReplacementPolicy as Failed we will include `terminatingPods` in this list.
 func firstPendingIndexes(jobCtx *syncJobCtx, count, completions int) []int {
 	if count == 0 {
 		return nil
@@ -250,6 +251,10 @@ func firstPendingIndexes(jobCtx *syncJobCtx, count, completions int) []int {
 	active := getIndexes(jobCtx.activePods)
 	result := make([]int, 0, count)
 	nonPending := jobCtx.succeededIndexes.withOrderedIndexes(sets.List(active))
+	if onlyReplaceFailedPods(jobCtx.job) {
+		terminating := getIndexes(controller.FilterTerminatingPods(jobCtx.pods))
+		nonPending = nonPending.withOrderedIndexes(sets.List(terminating))
+	}
 	if jobCtx.failedIndexes != nil {
 		nonPending = nonPending.merge(*jobCtx.failedIndexes)
 	}
