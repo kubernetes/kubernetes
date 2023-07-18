@@ -514,12 +514,15 @@ func ClusterRoles() []rbacv1.ClusterRole {
 	}...)
 
 	// Add the cluster role for reading the ServiceAccountIssuerDiscovery endpoints
+	// Also allow slash-ended URLs to allow clients generated from published openapi docs prior to fixing the trailing slash to work properly
 	roles = append(roles, rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: "system:service-account-issuer-discovery"},
 		Rules: []rbacv1.PolicyRule{
 			rbacv1helpers.NewRule("get").URLs(
 				"/.well-known/openid-configuration",
+				"/.well-known/openid-configuration/",
 				"/openid/v1/jwks",
+				"/openid/v1/jwks/",
 			).RuleOrDie(),
 		},
 	})
