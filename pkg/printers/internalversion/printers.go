@@ -1764,8 +1764,7 @@ func printNode(obj *api.Node, options printers.GenerateOptions) ([]metav1.TableR
 
 	conditionMap := make(map[api.NodeConditionType]*api.NodeCondition)
 	NodeAllConditions := []api.NodeConditionType{api.NodeReady}
-	for i := range obj.Status.Conditions {
-		cond := obj.Status.Conditions[i]
+	for _, cond := range obj.Status.Conditions {
 		conditionMap[cond.Type] = &cond
 	}
 	var status []string
