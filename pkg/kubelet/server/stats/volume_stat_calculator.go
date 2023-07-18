@@ -149,6 +149,8 @@ func (s *volumeStatCalculator) calcAndStoreStats(errors map[string]error) {
 				}
 			}
 			continue
+		} else {
+			delete(errors, name)
 		}
 		// Lookup the volume spec and add a 'PVCReference' for volumes that reference a PVC
 		volSpec := volumesSpec[name]
