@@ -1194,12 +1194,12 @@ func TestRatchetingFunctionality(t *testing.T) {
 					myCRDV1Beta1, myCRDInstanceName, map[string]interface{}{
 						"values": []interface{}{
 							map[string]interface{}{
-								"name": "1",
-								"key":  "value",
+								"name":  "1",
+								"field": "value",
 							},
 							map[string]interface{}{
-								"name": "2",
-								"key":  "value",
+								"name":  "2",
+								"field": "value",
 							},
 						},
 					}},
@@ -1222,12 +1222,12 @@ func TestRatchetingFunctionality(t *testing.T) {
 						myCRDV1Beta1, myCRDInstanceName, map[string]interface{}{
 							"values": []interface{}{
 								map[string]interface{}{
-									"name": "1",
-									"key":  "value",
+									"name":  "1",
+									"field": "value",
 								},
 								map[string]interface{}{
-									"name": "2",
-									"key":  "bad",
+									"name":  "2",
+									"field": "bad",
 								},
 							},
 						}}},
@@ -1236,12 +1236,12 @@ func TestRatchetingFunctionality(t *testing.T) {
 					myCRDV1Beta1, myCRDInstanceName, map[string]interface{}{
 						"values": []interface{}{
 							map[string]interface{}{
-								"name": "1",
-								"key":  "value",
+								"name":  "1",
+								"field": "value",
 							},
 							map[string]interface{}{
-								"name": "2",
-								"key":  "value",
+								"name":  "2",
+								"field": "value",
 							},
 						},
 						"otherField": "hello world",
@@ -1252,13 +1252,13 @@ func TestRatchetingFunctionality(t *testing.T) {
 					myCRDV1Beta1, myCRDInstanceName, map[string]interface{}{
 						"values": []interface{}{
 							map[string]interface{}{
-								"name": "1",
-								"key":  "value",
+								"name":  "1",
+								"field": "value",
 							},
 							map[string]interface{}{
-								"name": "2",
-								"key":  "value",
-								"key2": "valid value",
+								"name":       "2",
+								"field":      "value",
+								"otherField": "valid value",
 							},
 						},
 					}},
@@ -1268,13 +1268,13 @@ func TestRatchetingFunctionality(t *testing.T) {
 						myCRDV1Beta1, myCRDInstanceName, map[string]interface{}{
 							"values": []interface{}{
 								map[string]interface{}{
-									"name": "2",
-									"key":  "value",
-									"key2": "valid value",
+									"name":       "2",
+									"field":      "value",
+									"otherField": "valid value",
 								},
 								map[string]interface{}{
-									"name": "1",
-									"key":  "value",
+									"name":  "1",
+									"field": "value",
 								},
 							},
 						}}},
@@ -1282,19 +1282,24 @@ func TestRatchetingFunctionality(t *testing.T) {
 		},
 		// Features that should not ratchet
 		{
-			Name: "AllOf_should_not_ratchet",
+			Name:       "AllOf_should_not_ratchet",
+			Operations: []ratchetingTestOperation{},
 		},
 		{
-			Name: "OneOf_should_not_ratchet",
+			Name:       "OneOf_should_not_ratchet",
+			Operations: []ratchetingTestOperation{},
 		},
 		{
-			Name: "AnyOf_should_not_ratchet",
+			Name:       "AnyOf_should_not_ratchet",
+			Operations: []ratchetingTestOperation{},
 		},
 		{
-			Name: "Not_should_not_ratchet",
+			Name:       "Not_should_not_ratchet",
+			Operations: []ratchetingTestOperation{},
 		},
 		{
-			Name: "CEL_transition_rules_should_not_ratchet",
+			Name:       "CEL_transition_rules_should_not_ratchet",
+			Operations: []ratchetingTestOperation{},
 		},
 		// Future Functionality, disabled tests
 		{
