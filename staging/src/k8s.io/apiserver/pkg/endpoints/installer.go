@@ -714,7 +714,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			requestScope = "resource"
 			operationSuffix = operationSuffix + "WithPath"
 		}
-		if strings.Index(action.Path, "/{name}") != -1 || action.Verb == "POST" {
+		if strings.Contains(action.Path, "/{name}") || action.Verb == "POST" {
 			requestScope = "resource"
 		}
 		if action.AllNamespaces {
