@@ -707,13 +707,13 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 	})
 
 	/*
-		Release: v1.27
+		Release: v1.28
 		Testname: Admission webhook, create and update validating webhook configuration with match conditions
 		Description: Register a validating webhook configuration. Verify that the match conditions field are
 		properly stored in the api-server.  Update the validating webhook configuration and retrieve it; the
 		retrieved object must contain the newly update matchConditions fields.
 	*/
-	ginkgo.It("should be able to create and update validating webhook configurations with match conditions [Feature:AdmissionWebhookMatchConditions]", func(ctx context.Context) {
+	ginkgo.It("should be able to create and update validating webhook configurations with match conditions", func(ctx context.Context) {
 		initalMatchConditions := []admissionregistrationv1.MatchCondition{
 			{
 				Name:       "expression-1",
@@ -758,13 +758,13 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 	})
 
 	/*
-		Release: v1.27
+		Release: v1.28
 		Testname: Admission webhook, create and update mutating webhook configuration with match conditions
 		Description: Register a mutating webhook configuration. Verify that the match conditions field are
 		properly stored in the api-server.  Update the mutating webhook configuration and retrieve it; the
 		retrieved object must contain the newly update matchConditions fields.
 	*/
-	ginkgo.It("should be able to create and update mutating webhook configurations with match conditions [Feature:AdmissionWebhookMatchConditions]", func(ctx context.Context) {
+	ginkgo.It("should be able to create and update mutating webhook configurations with match conditions", func(ctx context.Context) {
 		initalMatchConditions := []admissionregistrationv1.MatchCondition{
 			{
 				Name:       "expression-1",
@@ -809,13 +809,13 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 	})
 
 	/*
-		Release: v1.27
+		Release: v1.28
 		Testname: Admission webhook, reject validating webhook configurations with invalid matchconditions
 		Description: Creates a validating webhook configuration with an invalid CEL expression in it's
 		matchConditions field. The api-server server should reject the create request with a "compilation
 		failed" error message.
 	*/
-	ginkgo.It("should reject validating webhook configurations with invalid match conditions [Feature:AdmissionWebhookMatchConditions]", func(ctx context.Context) {
+	ginkgo.It("should reject validating webhook configurations with invalid match conditions", func(ctx context.Context) {
 		initalMatchConditions := []admissionregistrationv1.MatchCondition{
 			{
 				Name:       "invalid-expression-1",
@@ -833,13 +833,13 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 	})
 
 	/*
-		Release: v1.27
+		Release: v1.28
 		Testname: Admission webhook, reject mutating webhook configurations with invalid matchconditions
 		Description: Creates a mutating webhook configuration with an invalid CEL expression in it's
 		matchConditions field. The api-server server should reject the create request with a "compilation
 		failed" error message.
 	*/
-	ginkgo.It("should reject mutating webhook configurations with invalid match conditions [Feature:AdmissionWebhookMatchConditions]", func(ctx context.Context) {
+	ginkgo.It("should reject mutating webhook configurations with invalid match conditions", func(ctx context.Context) {
 		initalMatchConditions := []admissionregistrationv1.MatchCondition{
 			{
 				Name:       "invalid-expression-1",
@@ -857,7 +857,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 	})
 
 	/*
-		Release: v1.27
+		Release: v1.28
 		Testname: Admission webhook, validating webhook exclude leases using match conditions field.
 		Description: Create a validating webhook configuration with matchConditions field that
 		will reject all resources except the coordination.k8s.io/lease ones. Try to create pods
@@ -865,7 +865,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		a Lease object and validate that it bypasses the webhook. Create a configMap and validate
 		that it's rejected by the webhook.
 	*/
-	ginkgo.It("should reject everything except leases [Feature:AdmissionWebhookMatchConditions]", func(ctx context.Context) {
+	ginkgo.It("should reject everything except leases", func(ctx context.Context) {
 		excludeLeasesMatchConditions := []admissionregistrationv1.MatchCondition{
 			{
 				Name:       "exclude-leases",
@@ -909,14 +909,14 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 	})
 
 	/*
-		Release: v1.27
+		Release: v1.28
 		Testname: Admission webhook, mutating webhook excluding object with specific name
 		Description: Create a mutating webhook configuration with matchConditions field that
 		will reject all resources except ones with a specific name 'skip-me'. Create
 		a configMap with the name 'skip-me' and verify that it's mutated. Create a
 		configMap with a different name than 'skip-me' and verify that it's mustated.
 	*/
-	ginkgo.It("should mutate everything except 'skip-me' configmaps [Feature:AdmissionWebhookMatchConditions]", func(ctx context.Context) {
+	ginkgo.It("should mutate everything except 'skip-me' configmaps", func(ctx context.Context) {
 		skipMeMatchConditions := []admissionregistrationv1.MatchCondition{
 			{
 				Name:       "skip-me",
