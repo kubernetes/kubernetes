@@ -35,6 +35,7 @@ import (
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/klog/v2"
 
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
 	outputapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
@@ -66,6 +67,9 @@ func newCmdPlan(apf *applyPlanFlags) *cobra.Command {
 				return errors.Wrap(err, "could not construct output printer")
 			}
 
+			if err := validation.ValidateMixedArguments(cmd.Flags()); err != nil {
+				return err
+			}
 			return runPlan(cmd.Flags(), flags, args, printer)
 		},
 	}

@@ -31,6 +31,7 @@ import (
 	utilsexec "k8s.io/utils/exec"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
@@ -72,6 +73,9 @@ func newCmdApply(apf *applyPlanFlags) *cobra.Command {
 		DisableFlagsInUseLine: true,
 		Short:                 "Upgrade your Kubernetes cluster to the specified version",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validation.ValidateMixedArguments(cmd.Flags()); err != nil {
+				return err
+			}
 			return runApply(cmd.Flags(), flags, args)
 		},
 	}

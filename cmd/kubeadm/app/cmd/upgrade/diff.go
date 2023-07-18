@@ -31,6 +31,7 @@ import (
 	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -74,6 +75,9 @@ func newCmdDiff(out io.Writer) *cobra.Command {
 				flags.apiServerManifestPath,
 				flags.controllerManagerManifestPath,
 				flags.schedulerManifestPath); err != nil {
+				return err
+			}
+			if err := validation.ValidateMixedArguments(cmd.Flags()); err != nil {
 				return err
 			}
 			return runDiff(cmd.Flags(), flags, args, configutil.FetchInitConfigurationFromCluster)

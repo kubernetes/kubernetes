@@ -79,6 +79,9 @@ func newCmdNode(out io.Writer) *cobra.Command {
 		Use:   "node",
 		Short: "Upgrade commands for a node in the cluster",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validation.ValidateMixedArguments(cmd.Flags()); err != nil {
+				return err
+			}
 			return nodeRunner.Run(args)
 		},
 		Args: cobra.NoArgs,
