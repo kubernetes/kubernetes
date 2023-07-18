@@ -344,7 +344,11 @@ func (gcc *PodGCController) markFailedAndDeletePod(ctx context.Context, pod *v1.
 func (gcc *PodGCController) markFailedAndDeletePodWithCondition(ctx context.Context, pod *v1.Pod, condition *corev1apply.PodConditionApplyConfiguration) error {
 	logger := klog.FromContext(ctx)
 	logger.Info("PodGC is force deleting Pod", "pod", klog.KObj(pod))
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+	// Patch the pod to make sure it is transitioned to the Failed phase before deletion.
+	// This is needed for the JobPodReplacementPolicy feature to make sure Job replacement pods are created.
+	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-apps/3939-allow-replacement-when-fully-terminated#risks-and-mitigations
+	// for more details.
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) || utilfeature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) {
 
 		// Mark the pod as failed - this is especially important in case the pod
 		// is orphaned, in which case the pod would remain in the Running phase
@@ -357,7 +361,7 @@ func (gcc *PodGCController) markFailedAndDeletePodWithCondition(ctx context.Cont
 			// PodGC it means that it is in the Failed phase, so sending the
 			// condition will not be re-attempted.
 			podApply.Status.WithPhase(v1.PodFailed)
-			if condition != nil {
+			if condition != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
 				podApply.Status.WithConditions(condition)
 			}
 			if _, err := gcc.kubeClient.CoreV1().Pods(pod.Namespace).ApplyStatus(ctx, podApply, metav1.ApplyOptions{FieldManager: fieldManager, Force: true}); err != nil {
