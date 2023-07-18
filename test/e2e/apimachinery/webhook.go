@@ -52,6 +52,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 
 	// ensure libs have a chance to initialize
 	_ "github.com/stretchr/testify/assert"
@@ -828,9 +829,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		_, err := createValidatingWebhookConfiguration(ctx, f, validatingWebhookConfiguration)
 		framework.ExpectError(err, "create validatingwebhookconfiguration should have been denied by the api-server")
 		expectedErrMsg := "compilation failed"
-		if !strings.Contains(err.Error(), expectedErrMsg) {
-			framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
-		}
+		gomega.Expect(strings.Contains(err.Error(), expectedErrMsg)).To(gomega.BeTrue())
 	})
 
 	/*
@@ -854,9 +853,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		_, err := createMutatingWebhookConfiguration(ctx, f, mutatingWebhookConfiguration)
 		framework.ExpectError(err, "create mutatingwebhookconfiguration should have been denied by the api-server")
 		expectedErrMsg := "compilation failed"
-		if !strings.Contains(err.Error(), expectedErrMsg) {
-			framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
-		}
+		gomega.Expect(strings.Contains(err.Error(), expectedErrMsg)).To(gomega.BeTrue())
 	})
 
 	/*
@@ -908,9 +905,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		}, metav1.CreateOptions{})
 		framework.ExpectError(err, "creating configmap object")
 		expectedErrMsg := "denied the request: this webhook denies all requests"
-		if !strings.Contains(err.Error(), expectedErrMsg) {
-			framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
-		}
+		gomega.Expect(strings.Contains(err.Error(), expectedErrMsg)).To(gomega.BeTrue())
 	})
 
 	/*
@@ -969,9 +964,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 			"mutation-start":   "yes",
 			"mutation-stage-1": "yes",
 		}
-		if !reflect.DeepEqual(expectedConfigMapData, mutatedCM.Data) {
-			framework.Failf("\nexpected %#v\n, got %#v\n", expectedConfigMapData, mutatedCM.Data)
-		}
+		gomega.Expect(reflect.DeepEqual(expectedConfigMapData, mutatedCM.Data)).To(gomega.BeTrue())
 
 		ginkgo.By("create the configmap with 'skip-me' name")
 
@@ -981,9 +974,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		expectedConfigMapData = map[string]string{
 			"mutation-start": "yes",
 		}
-		if !reflect.DeepEqual(expectedConfigMapData, skippedCM.Data) {
-			framework.Failf("\nexpected %#v\n, got %#v\n", expectedConfigMapData, skippedCM.Data)
-		}
+		gomega.Expect(reflect.DeepEqual(expectedConfigMapData, skippedCM.Data)).To(gomega.BeTrue())
 	})
 })
 
