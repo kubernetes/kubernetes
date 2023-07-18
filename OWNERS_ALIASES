@@ -506,11 +506,11 @@ aliases:
     - ehashman # Instrumentation
     - janetkuo # Apps
     - jayunit100 # Windows
+    - jpbetz # API Machinery
     - jsafrane # Storage
     - jsturtevant # Windows
     - justinsb # Cluster Lifecycle
     - kow3ns # Apps
-    - lavalamp # API Machinery
     - liggitt # Auth
     - logicalhan # Instrumentation
     - luxas # Cluster Lifecycle
