@@ -96,13 +96,13 @@ type DelayingQueueConfig struct {
 // NewDelayingQueue constructs a new workqueue with delayed queuing ability.
 // NewDelayingQueue does not emit metrics. For use with a MetricsProvider, please use
 // NewDelayingQueueWithConfig instead and specify a name.
-func NewDelayingQueue() *delayingType {
+func NewDelayingQueue() DelayingInterface {
 	return NewDelayingQueueWithConfig(DelayingQueueConfig{})
 }
 
 // NewDelayingQueueWithConfig constructs a new workqueue with options to
 // customize different properties.
-func NewDelayingQueueWithConfig(config DelayingQueueConfig) *delayingType {
+func NewDelayingQueueWithConfig(config DelayingQueueConfig) DelayingInterface {
 	if config.Clock == nil {
 		config.Clock = clock.RealClock{}
 	}
@@ -137,14 +137,14 @@ func NewNamedDelayingQueue(name string) DelayingInterface {
 // NewDelayingQueueWithCustomClock constructs a new named workqueue
 // with ability to inject real or fake clock for testing purposes.
 // Deprecated: Use NewDelayingQueueWithConfig instead.
-func NewDelayingQueueWithCustomClock(clock clock.WithTicker, name string) *delayingType {
+func NewDelayingQueueWithCustomClock(clock clock.WithTicker, name string) DelayingInterface {
 	return NewDelayingQueueWithConfig(DelayingQueueConfig{
 		Name:  name,
 		Clock: clock,
 	})
 }
 
-func newDelayingQueue(clock clock.WithTicker, q Interface, name string, provider MetricsProvider) *delayingType {
+func newDelayingQueue(clock clock.WithTicker, q Interface, name string, provider MetricsProvider) DelayingInterface {
 	ret := &delayingType{
 		Interface:          q,
 		clock:              clock,

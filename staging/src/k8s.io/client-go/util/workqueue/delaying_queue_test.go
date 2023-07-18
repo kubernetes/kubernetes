@@ -35,7 +35,7 @@ const (
 
 func TestSimpleQueue(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now())
-	q := NewDelayingQueueWithConfig(DelayingQueueConfig{Clock: fakeClock})
+	q := NewDelayingQueueWithConfig(DelayingQueueConfig{Clock: fakeClock}).(*delayingType)
 
 	first := "foo"
 
@@ -77,7 +77,7 @@ func TestSimpleQueue(t *testing.T) {
 // and immediately add them (via the waitingLoop)
 func TestImmediateAdd(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now().Truncate(1 * time.Second))
-	q := NewDelayingQueueWithCustomClock(fakeClock, "")
+	q := NewDelayingQueueWithCustomClock(fakeClock, "").(*delayingType)
 
 	first := "foo"
 	second := "foo"
@@ -135,7 +135,7 @@ func TestImmediateAdd(t *testing.T) {
 // method.
 func TestOptionsTakeLongerTakeExisting(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now().Truncate(1 * time.Second))
-	q := NewDelayingQueueWithCustomClock(fakeClock, "")
+	q := NewDelayingQueueWithCustomClock(fakeClock, "").(*delayingType)
 
 	first := "foo"
 	second := "foo"
@@ -187,7 +187,7 @@ func TestOptionsTakeLongerTakeExisting(t *testing.T) {
 // TestDelayedInsertTakeShorter - tests the insert behaviour with this WhenWaiting behaviour (the default)
 func TestDelayedInsertTakeShorter(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now().Truncate(1 * time.Second))
-	q := NewDelayingQueueWithCustomClock(fakeClock, "")
+	q := NewDelayingQueueWithCustomClock(fakeClock, "").(*delayingType)
 
 	first := "baz"
 	second := "foo"
@@ -214,7 +214,7 @@ func TestDelayedInsertTakeShorter(t *testing.T) {
 // TestDelayedInsertTakeLonger- tests the insert behaviour with this WhenWaiting behaviour.
 func TestDelayedInsertTakeLonger(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now().Truncate(1 * time.Second))
-	q := NewDelayingQueueWithCustomClock(fakeClock, "")
+	q := NewDelayingQueueWithCustomClock(fakeClock, "").(*delayingType)
 
 	first := "baz"
 	second := "foo"
@@ -255,7 +255,7 @@ func TestDelayedInsertTakeLonger(t *testing.T) {
 // TestDelayedInsertTakeLonger- tests the insert behaviour with this WhenWaiting behaviour.
 func TestDelayedInsertTakeIncoming(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now().Truncate(1 * time.Second))
-	q := NewDelayingQueueWithCustomClock(fakeClock, "")
+	q := NewDelayingQueueWithCustomClock(fakeClock, "").(*delayingType)
 
 	first := "baz"
 	second := "foo"
@@ -300,7 +300,7 @@ func TestDelayedInsertTakeIncoming(t *testing.T) {
 // TestRemoveWaiting
 func TestRemoveWaiting(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now().Truncate(1 * time.Second))
-	q := NewDelayingQueueWithCustomClock(fakeClock, "")
+	q := NewDelayingQueueWithCustomClock(fakeClock, "").(*delayingType)
 
 	first := "foo"
 	second := "bar"
@@ -349,7 +349,7 @@ func TestRemoveWaiting(t *testing.T) {
 
 func TestDeduping(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now())
-	q := NewDelayingQueueWithConfig(DelayingQueueConfig{Clock: fakeClock})
+	q := NewDelayingQueueWithConfig(DelayingQueueConfig{Clock: fakeClock}).(*delayingType)
 
 	first := "foo"
 
@@ -399,7 +399,7 @@ func TestDeduping(t *testing.T) {
 
 func TestAddTwoFireEarly(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now())
-	q := NewDelayingQueueWithConfig(DelayingQueueConfig{Clock: fakeClock})
+	q := NewDelayingQueueWithConfig(DelayingQueueConfig{Clock: fakeClock}).(*delayingType)
 
 	first := "foo"
 	second := "bar"
@@ -447,7 +447,7 @@ func TestAddTwoFireEarly(t *testing.T) {
 
 func TestCopyShifting(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now())
-	q := NewDelayingQueueWithConfig(DelayingQueueConfig{Clock: fakeClock})
+	q := NewDelayingQueueWithConfig(DelayingQueueConfig{Clock: fakeClock}).(*delayingType)
 
 	first := "foo"
 	second := "bar"
@@ -537,7 +537,7 @@ func TestReportQueueState(t *testing.T) {
 // 'waiting' queue changes.
 func TestCalculatenextReadyAt(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now().Truncate(1 * time.Second))
-	q := NewDelayingQueueWithCustomClock(fakeClock, "")
+	q := NewDelayingQueueWithCustomClock(fakeClock, "").(*delayingType)
 
 	first := "foo"
 	second := "bar"

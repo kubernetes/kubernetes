@@ -2847,7 +2847,7 @@ func (t *trackingWorkqueue) ShuttingDown() bool {
 	return t.limiter.ShuttingDown()
 }
 func (t *trackingWorkqueue) AddWithOptions(item interface{}, opts workqueue.DelayingOptions) {
-	t.limiter.AddWithOptions(item, opts)
+	t.Add(item)
 }
 func (t *trackingWorkqueue) DoneWaiting(item interface{}) {
 	t.limiter.DoneWaiting(item)
