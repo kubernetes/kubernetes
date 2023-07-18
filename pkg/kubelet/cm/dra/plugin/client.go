@@ -34,7 +34,7 @@ import (
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1alpha3"
 )
 
-const PluginClientTimeout = 10 * time.Second
+const PluginClientTimeout = 45 * time.Second
 
 // Strongly typed address.
 type draAddr string
