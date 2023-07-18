@@ -45,8 +45,12 @@ const (
 	// Controller UID is used for selectors and labels for jobs
 	ControllerUidLabel = labelPrefix + LegacyControllerUidLabel
 	// Annotation indicating the number of failures for the index corresponding
-	// to the pod.
+	// to the pod, which are counted towards the backoff limit.
 	JobIndexFailureCountAnnotation = labelPrefix + "job-index-failure-count"
+	// Annotation indicating the number of failures for the index corresponding
+	// to the pod, which don't count towards the backoff limit, according to the
+	// pod failure policy. When the annotation is absent zero is implied.
+	JobIndexIgnoredFailureCountAnnotation = labelPrefix + "job-index-ignored-failure-count"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
