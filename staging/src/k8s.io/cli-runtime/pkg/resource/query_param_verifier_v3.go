@@ -18,6 +18,7 @@ package resource
 
 import (
 	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
@@ -124,8 +125,18 @@ func supportsQueryParamV3(doc *spec3.OpenAPI, gvk schema.GroupVersionKind, query
 		// Now look for the query parameter among the parameters
 		// for the PATCH operation.
 		for _, param := range op.OperationProps.Parameters {
-			if param.ParameterProps.Name == string(queryParam) {
+			if param.ParameterProps.Name == string(queryParam) && param.In == "query" {
 				return nil
+			}
+
+			// lookup global parameters
+			if ref := param.Refable.Ref.Ref.String(); strings.HasPrefix(ref, "#/parameters/") && doc.Components != nil {
+				k := strings.TrimPrefix(ref, "#/parameters/")
+				if globalParam, ok := doc.Components.Parameters[k]; ok && globalParam != nil {
+					if globalParam.In == "query" && globalParam.Name == string(queryParam) {
+						return nil
+					}
+				}
 			}
 		}
 		return NewParamUnsupportedError(gvk, queryParam)
