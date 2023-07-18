@@ -1013,3 +1013,72 @@ func TestCleanANSIEscapeCodes(t *testing.T) {
 		})
 	}
 }
+
+func TestMergeRawConfigDoOverride(t *testing.T) {
+	cfg := createValidTestConfig()
+
+	overrides := &ConfigOverrides{
+		ClusterInfo: clientcmdapi.Cluster{
+			Server: "http://localhost:8081",
+		},
+		Context: clientcmdapi.Context{
+			Namespace: "foobar",
+			Cluster:   "clean",
+			AuthInfo:  "clean",
+		},
+		AuthInfo: clientcmdapi.AuthInfo{
+			Token: "modified-token",
+		},
+		CurrentContext: "clean",
+	}
+
+	cut, err := NewClientConfigWithMergedRawConfig(*cfg, overrides)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	act, err := cut.RawConfig()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if act.Clusters["clean"].Server != "http://localhost:8081" {
+		t.Errorf("Expected server %v, got %v", "http://localhost:8081", act.Clusters["clean"].Server)
+	}
+
+	if act.Contexts["clean"].Namespace != "foobar" {
+		t.Errorf("Expected namespace %v, got %v", "foobar", act.Contexts["clean"].Namespace)
+	}
+}
+
+func TestMergeRawConfigDoNotOverride(t *testing.T) {
+	cfg := createValidTestConfig()
+
+	overrides := &ConfigOverrides{
+		ClusterInfo: clientcmdapi.Cluster{
+			Server: "http://localhost:8081",
+		},
+		Context: clientcmdapi.Context{
+			Namespace: "foobar",
+			Cluster:   "clean",
+			AuthInfo:  "clean",
+		},
+		AuthInfo: clientcmdapi.AuthInfo{
+			Token: "modified-token",
+		},
+		CurrentContext: "clean",
+	}
+
+	cut := NewDefaultClientConfig(*cfg, overrides)
+	act, err := cut.RawConfig()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if act.Clusters["clean"].Server != cfg.Clusters["clean"].Server {
+		t.Errorf("Expected server %v, got %v", cfg.Clusters["clean"].Server, act.Clusters["clean"].Server)
+	}
+
+	if act.Contexts["clean"].Namespace != cfg.Contexts["clean"].Namespace {
+		t.Errorf("Expected namespace %v, got %v", cfg.Contexts["clean"].Namespace, act.Contexts["clean"].Namespace)
+	}
+}

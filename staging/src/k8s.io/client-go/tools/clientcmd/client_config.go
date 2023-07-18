@@ -115,6 +115,19 @@ func NewClientConfigFromBytes(configBytes []byte) (ClientConfig, error) {
 	return &DirectClientConfig{*config, "", &ConfigOverrides{}, nil, nil, promptedCredentials{}}, nil
 }
 
+// NewClientConfigWithMergedRawConfig acts like a NewDefaultClientConfig but merges the RawConfig with the overrides
+func NewClientConfigWithMergedRawConfig(config clientcmdapi.Config, overrides *ConfigOverrides) (ClientConfig, error) {
+	clientCfg := &DirectClientConfig{config, config.CurrentContext, overrides, nil, NewDefaultClientConfigLoadingRules(), promptedCredentials{}}
+
+	mergedRawCfg, err := clientCfg.getMergedRawConfig()
+	clientCfg.config = mergedRawCfg
+	if err != nil {
+		return nil, err
+	}
+	return clientCfg, nil
+
+}
+
 // RESTConfigFromKubeConfig is a convenience method to give back a restconfig from your kubeconfig bytes.
 // For programmatic access, this is what you want 80% of the time
 func RESTConfigFromKubeConfig(configBytes []byte) (*restclient.Config, error) {
@@ -127,6 +140,40 @@ func RESTConfigFromKubeConfig(configBytes []byte) (*restclient.Config, error) {
 
 func (config *DirectClientConfig) RawConfig() (clientcmdapi.Config, error) {
 	return config.config, nil
+}
+
+// getMergedRawConfig returns the raw kube config merged with the overrides
+func (config *DirectClientConfig) getMergedRawConfig() (clientcmdapi.Config, error) {
+	if err := config.ConfirmUsable(); err != nil {
+		return clientcmdapi.Config{}, err
+	}
+	merged := clientcmdapi.NewConfig()
+
+	// set the AuthInfo merged with overrides in the merged config
+	mergedAuthInfo, err := config.getAuthInfo()
+	if err != nil {
+		return clientcmdapi.Config{}, err
+	}
+	mergedAuthInfoName, _ := config.getAuthInfoName()
+	merged.AuthInfos[mergedAuthInfoName] = &mergedAuthInfo
+
+	// set the Context merged with overrides in the merged config
+	mergedContext, err := config.getContext()
+	if err != nil {
+		return clientcmdapi.Config{}, err
+	}
+	mergedContextName, _ := config.getContextName()
+	merged.Contexts[mergedContextName] = &mergedContext
+	merged.CurrentContext = mergedContextName
+
+	// set the Cluster merged with overrides in the merged config
+	configClusterInfo, err := config.getCluster()
+	if err != nil {
+		return clientcmdapi.Config{}, err
+	}
+	configClusterName, _ := config.getClusterName()
+	merged.Clusters[configClusterName] = &configClusterInfo
+	return *merged, nil
 }
 
 // ClientConfig implements ClientConfig
