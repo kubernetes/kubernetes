@@ -94,6 +94,8 @@ func TestValidateJob(t *testing.T) {
 		UID:       types.UID("1a2b3c"),
 	}
 	validManualSelector := getValidManualSelector()
+	failedPodReplacement := batch.Failed
+	terminatingOrFailedPodReplacement := batch.TerminatingOrFailed
 	validPodTemplateSpecForManual := getValidPodTemplateSpecForManual(validManualSelector)
 	validGeneratedSelector := getValidGeneratedSelector()
 	validPodTemplateSpecForGenerated := getValidPodTemplateSpecForGenerated(validGeneratedSelector)
@@ -209,6 +211,36 @@ func TestValidateJob(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector: validGeneratedSelector,
 					Template: validPodTemplateSpecForGenerated,
+				},
+			},
+		},
+		"valid pod replacement": {
+			opts: JobValidationOptions{RequirePrefixedLabels: true},
+			job: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "myjob",
+					Namespace: metav1.NamespaceDefault,
+					UID:       types.UID("1a2b3c"),
+				},
+				Spec: batch.JobSpec{
+					Selector:             validGeneratedSelector,
+					Template:             validPodTemplateSpecForGenerated,
+					PodReplacementPolicy: &terminatingOrFailedPodReplacement,
+				},
+			},
+		},
+		"valid pod replacement with failed": {
+			opts: JobValidationOptions{RequirePrefixedLabels: true},
+			job: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "myjob",
+					Namespace: metav1.NamespaceDefault,
+					UID:       types.UID("1a2b3c"),
+				},
+				Spec: batch.JobSpec{
+					Selector:             validGeneratedSelector,
+					Template:             validPodTemplateSpecForGenerated,
+					PodReplacementPolicy: &failedPodReplacement,
 				},
 			},
 		},
@@ -745,6 +777,38 @@ func TestValidateJob(t *testing.T) {
 							}},
 						}},
 					},
+				},
+			},
+			opts: JobValidationOptions{RequirePrefixedLabels: true},
+		},
+		`spec.podReplacementPolicy: Unsupported value: "TerminatingOrFailed": supported values: "Failed"`: {
+			job: batch.Job{
+				ObjectMeta: validJobObjectMeta,
+				Spec: batch.JobSpec{
+					Selector:             validGeneratedSelector,
+					PodReplacementPolicy: &terminatingOrFailedPodReplacement,
+					Template:             validPodTemplateSpecForGeneratedRestartPolicyNever,
+					PodFailurePolicy: &batch.PodFailurePolicy{
+						Rules: []batch.PodFailurePolicyRule{{
+							Action: batch.PodFailurePolicyActionIgnore,
+							OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{{
+								Type:   api.DisruptionTarget,
+								Status: api.ConditionTrue,
+							}},
+						},
+						},
+					},
+				},
+			},
+			opts: JobValidationOptions{RequirePrefixedLabels: true},
+		},
+		`spec.podReplacementPolicy: Unsupported value: "": supported values: "Failed", "TerminatingOrFailed"`: {
+			job: batch.Job{
+				ObjectMeta: validJobObjectMeta,
+				Spec: batch.JobSpec{
+					PodReplacementPolicy: (*batch.PodReplacementPolicy)(pointer.String("")),
+					Selector:             validGeneratedSelector,
+					Template:             validPodTemplateSpecForGeneratedRestartPolicyNever,
 				},
 			},
 			opts: JobValidationOptions{RequirePrefixedLabels: true},
@@ -1962,9 +2026,10 @@ func TestValidateJobUpdateStatus(t *testing.T) {
 					ResourceVersion: "1",
 				},
 				Status: batch.JobStatus{
-					Active:    1,
-					Succeeded: 2,
-					Failed:    3,
+					Active:      1,
+					Succeeded:   2,
+					Failed:      3,
+					Terminating: pointer.Int32(4),
 				},
 			},
 			update: batch.Job{
@@ -1974,14 +2039,15 @@ func TestValidateJobUpdateStatus(t *testing.T) {
 					ResourceVersion: "1",
 				},
 				Status: batch.JobStatus{
-					Active:    2,
-					Succeeded: 3,
-					Failed:    4,
-					Ready:     pointer.Int32(1),
+					Active:      2,
+					Succeeded:   3,
+					Failed:      4,
+					Ready:       pointer.Int32(1),
+					Terminating: pointer.Int32(4),
 				},
 			},
 		},
-		"nil ready": {
+		"nil ready and terminating": {
 			old: batch.Job{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:            "abc",
@@ -2015,9 +2081,10 @@ func TestValidateJobUpdateStatus(t *testing.T) {
 					ResourceVersion: "10",
 				},
 				Status: batch.JobStatus{
-					Active:    1,
-					Succeeded: 2,
-					Failed:    3,
+					Active:      1,
+					Succeeded:   2,
+					Failed:      3,
+					Terminating: pointer.Int32(4),
 				},
 			},
 			update: batch.Job{
@@ -2027,10 +2094,11 @@ func TestValidateJobUpdateStatus(t *testing.T) {
 					ResourceVersion: "10",
 				},
 				Status: batch.JobStatus{
-					Active:    -1,
-					Succeeded: -2,
-					Failed:    -3,
-					Ready:     pointer.Int32(-1),
+					Active:      -1,
+					Succeeded:   -2,
+					Failed:      -3,
+					Ready:       pointer.Int32(-1),
+					Terminating: pointer.Int32(-2),
 				},
 			},
 			wantErrs: field.ErrorList{
@@ -2038,6 +2106,7 @@ func TestValidateJobUpdateStatus(t *testing.T) {
 				{Type: field.ErrorTypeInvalid, Field: "status.succeeded"},
 				{Type: field.ErrorTypeInvalid, Field: "status.failed"},
 				{Type: field.ErrorTypeInvalid, Field: "status.ready"},
+				{Type: field.ErrorTypeInvalid, Field: "status.terminating"},
 			},
 		},
 		"empty and duplicated uncounted pods": {

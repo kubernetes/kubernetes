@@ -3374,6 +3374,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: podFailurePolicy
       type:
         namedType: io.k8s.api.batch.v1.PodFailurePolicy
+    - name: podReplacementPolicy
+      type:
+        scalar: string
     - name: selector
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
@@ -3418,6 +3421,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
     - name: succeeded
+      type:
+        scalar: numeric
+    - name: terminating
       type:
         scalar: numeric
     - name: uncountedTerminatedPods

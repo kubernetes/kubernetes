@@ -303,6 +303,11 @@ func (in *JobSpec) DeepCopyInto(out *JobSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.PodReplacementPolicy != nil {
+		in, out := &in.PodReplacementPolicy, &out.PodReplacementPolicy
+		*out = new(PodReplacementPolicy)
+		**out = **in
+	}
 	return
 }
 
@@ -333,6 +338,11 @@ func (in *JobStatus) DeepCopyInto(out *JobStatus) {
 	if in.CompletionTime != nil {
 		in, out := &in.CompletionTime, &out.CompletionTime
 		*out = (*in).DeepCopy()
+	}
+	if in.Terminating != nil {
+		in, out := &in.Terminating, &out.Terminating
+		*out = new(int32)
+		**out = **in
 	}
 	if in.Ready != nil {
 		in, out := &in.Ready, &out.Ready

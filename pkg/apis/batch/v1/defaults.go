@@ -22,6 +22,8 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -68,6 +70,15 @@ func SetDefaults_Job(obj *batchv1.Job) {
 			}
 		}
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) {
+		if obj.Spec.PodReplacementPolicy == nil {
+			if obj.Spec.PodFailurePolicy != nil {
+				obj.Spec.PodReplacementPolicy = podReplacementPolicyPtr(batchv1.Failed)
+			} else {
+				obj.Spec.PodReplacementPolicy = podReplacementPolicyPtr(batchv1.TerminatingOrFailed)
+			}
+		}
+	}
 }
 
 func SetDefaults_CronJob(obj *batchv1.CronJob) {
@@ -83,4 +94,8 @@ func SetDefaults_CronJob(obj *batchv1.CronJob) {
 	if obj.Spec.FailedJobsHistoryLimit == nil {
 		obj.Spec.FailedJobsHistoryLimit = utilpointer.Int32(1)
 	}
+}
+
+func podReplacementPolicyPtr(obj batchv1.PodReplacementPolicy) *batchv1.PodReplacementPolicy {
+	return &obj
 }

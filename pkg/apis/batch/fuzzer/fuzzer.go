@@ -63,6 +63,11 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			// We're fuzzing the internal JobSpec type, not the v1 type, so we don't
 			// need to fuzz the nil value.
 			j.Suspend = pointer.Bool(c.RandBool())
+			podReplacementPolicy := batch.TerminatingOrFailed
+			if c.RandBool() {
+				podReplacementPolicy = batch.Failed
+			}
+			j.PodReplacementPolicy = &podReplacementPolicy
 		},
 		func(sj *batch.CronJobSpec, c fuzz.Continue) {
 			c.FuzzNoCustom(sj)

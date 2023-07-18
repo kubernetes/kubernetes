@@ -52,6 +52,7 @@ spec:
       onPodConditions:
       - status: statusValue
         type: typeValue
+  podReplacementPolicy: podReplacementPolicyValue
   selector:
     matchExpressions:
     - key: keyValue
@@ -1188,6 +1189,7 @@ status:
   ready: 9
   startTime: "2002-01-01T01:01:01Z"
   succeeded: 5
+  terminating: 11
   uncountedTerminatedPods:
     failed:
     - failedValue

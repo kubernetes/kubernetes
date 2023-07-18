@@ -151,6 +151,19 @@ const (
 	PodFailurePolicyOnExitCodesOpNotIn PodFailurePolicyOnExitCodesOperator = "NotIn"
 )
 
+// PodReplacementPolicy specifies the policy for creating pod replacements.
+// +enum
+type PodReplacementPolicy string
+
+const (
+	// TerminatingOrFailed means that we recreate pods
+	// when they are terminating (has a metadata.deletionTimestamp) or failed.
+	TerminatingOrFailed PodReplacementPolicy = "TerminatingOrFailed"
+	//Failed means to wait until a previously created Pod is fully terminated (has phase
+	//Failed or Succeeded) before creating a replacement Pod.
+	Failed PodReplacementPolicy = "Failed"
+)
+
 // PodFailurePolicyOnExitCodesRequirement describes the requirement for handling
 // a failed pod based on its container exit codes. In particular, it lookups the
 // .state.terminated.exitCode for each app container and init container status,
@@ -381,6 +394,19 @@ type JobSpec struct {
 	//
 	// +optional
 	Suspend *bool
+
+	// podReplacementPolicy specifies when to create replacement Pods.
+	// Possible values are:
+	// - TerminatingOrFailed means that we recreate pods
+	//   when they are terminating (has a metadata.deletionTimestamp) or failed.
+	// - Failed means to wait until a previously created Pod is fully terminated (has phase
+	//   Failed or Succeeded) before creating a replacement Pod.
+	//
+	// When using podFailurePolicy, Failed is the the only allowed value.
+	// TerminatingOrFailed and Failed are allowed values when podFailurePolicy is not in use.
+	// This is an alpha field. Enable JobPodReplacementPolicy to be able to use this field.
+	// +optional
+	PodReplacementPolicy *PodReplacementPolicy
 }
 
 // JobStatus represents the current state of a Job.
@@ -412,6 +438,14 @@ type JobStatus struct {
 	// The number of pending and running pods.
 	// +optional
 	Active int32
+
+	// The number of pods which are terminating (in phase Pending or Running
+	// and have a deletionTimestamp).
+	//
+	// This field is alpha-level. The job controller populates the field when
+	// the feature gate JobPodReplacementPolicy is enabled (disabled by default).
+	// +optional
+	Terminating *int32
 
 	// The number of active pods which have a Ready condition.
 	//
