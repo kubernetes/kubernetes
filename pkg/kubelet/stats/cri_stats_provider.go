@@ -206,6 +206,7 @@ func (p *criStatsProvider) listPodStatsPartiallyFromCRI(ctx context.Context, upd
 		cs := p.makeContainerStats(stats, container, rootFsInfo, fsIDtoInfo, podSandbox.GetMetadata(), updateCPUNanoCoreUsage)
 		p.addPodNetworkStats(ps, podSandboxID, caInfos, cs, containerNetworkStats[podSandboxID])
 		p.addPodCPUMemoryStats(ps, types.UID(podSandbox.Metadata.Uid), allInfos, cs)
+		p.addSwapStats(ps, types.UID(podSandbox.Metadata.Uid), allInfos, cs)
 		p.addProcessStats(ps, types.UID(podSandbox.Metadata.Uid), allInfos, cs)
 
 		// If cadvisor stats is available for the container, use it to populate
@@ -548,6 +549,31 @@ func (p *criStatsProvider) addPodCPUMemoryStats(
 	}
 }
 
+func (p *criStatsProvider) addSwapStats(
+	ps *statsapi.PodStats,
+	podUID types.UID,
+	allInfos map[string]cadvisorapiv2.ContainerInfo,
+	cs *statsapi.ContainerStats,
+) {
+	// try get cpu and memory stats from cadvisor first.
+	podCgroupInfo := getCadvisorPodInfoFromPodUID(podUID, allInfos)
+	if podCgroupInfo != nil {
+		ps.Swap = cadvisorInfoToSwapStats(podCgroupInfo)
+		return
+	}
+
+	// Sum Pod cpu and memory stats from containers stats.
+	if cs.Swap != nil {
+		if ps.Swap == nil {
+			ps.Swap = &statsapi.SwapStats{Time: cs.Swap.Time}
+		}
+		swapAvailableBytes := getUint64Value(cs.Swap.SwapAvailableBytes) + getUint64Value(ps.Swap.SwapAvailableBytes)
+		swapUsageBytes := getUint64Value(cs.Swap.SwapUsageBytes) + getUint64Value(ps.Swap.SwapUsageBytes)
+		ps.Swap.SwapAvailableBytes = &swapAvailableBytes
+		ps.Swap.SwapUsageBytes = &swapUsageBytes
+	}
+}
+
 func (p *criStatsProvider) addProcessStats(
 	ps *statsapi.PodStats,
 	podUID types.UID,
@@ -577,6 +603,7 @@ func (p *criStatsProvider) makeContainerStats(
 		CPU:       &statsapi.CPUStats{},
 		Memory:    &statsapi.MemoryStats{},
 		Rootfs:    &statsapi.FsStats{},
+		Swap:      &statsapi.SwapStats{},
 		// UserDefinedMetrics is not supported by CRI.
 	}
 	if stats.Cpu != nil {
@@ -606,6 +633,19 @@ func (p *criStatsProvider) makeContainerStats(
 	} else {
 		result.Memory.Time = metav1.NewTime(time.Unix(0, time.Now().UnixNano()))
 		result.Memory.WorkingSetBytes = uint64Ptr(0)
+	}
+	if stats.Swap != nil {
+		result.Swap.Time = metav1.NewTime(time.Unix(0, stats.Swap.Timestamp))
+		if stats.Swap.SwapUsageBytes != nil {
+			result.Swap.SwapUsageBytes = &stats.Swap.SwapUsageBytes.Value
+		}
+		if stats.Swap.SwapAvailableBytes != nil {
+			result.Swap.SwapAvailableBytes = &stats.Swap.SwapAvailableBytes.Value
+		}
+	} else {
+		result.Swap.Time = metav1.NewTime(time.Unix(0, time.Now().UnixNano()))
+		result.Swap.SwapUsageBytes = uint64Ptr(0)
+		result.Swap.SwapAvailableBytes = uint64Ptr(0)
 	}
 	if stats.WritableLayer != nil {
 		result.Rootfs.Time = metav1.NewTime(time.Unix(0, stats.WritableLayer.Timestamp))

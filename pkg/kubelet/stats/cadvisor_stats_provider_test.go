@@ -294,11 +294,13 @@ func TestCadvisorListPodStats(t *testing.T) {
 	assert.EqualValues(t, testTime(creationTime, seedPod0Container0).Unix(), con.StartTime.Time.Unix())
 	checkCPUStats(t, "Pod0Container0", seedPod0Container0, con.CPU)
 	checkMemoryStats(t, "Pod0Conainer0", seedPod0Container0, infos["/pod0-c0"], con.Memory)
+	checkSwapStats(t, "Pod0Conainer0", seedPod0Container0, infos["/pod0-c0"], con.Swap)
 
 	con = indexCon[cName01]
 	assert.EqualValues(t, testTime(creationTime, seedPod0Container1).Unix(), con.StartTime.Time.Unix())
 	checkCPUStats(t, "Pod0Container1", seedPod0Container1, con.CPU)
 	checkMemoryStats(t, "Pod0Container1", seedPod0Container1, infos["/pod0-c1"], con.Memory)
+	checkSwapStats(t, "Pod0Container1", seedPod0Container1, infos["/pod0-c1"], con.Swap)
 
 	assert.EqualValues(t, p0Time.Unix(), ps.StartTime.Time.Unix())
 	checkNetworkStats(t, "Pod0", seedPod0Infra, ps.Network)
@@ -309,6 +311,9 @@ func TestCadvisorListPodStats(t *testing.T) {
 	if ps.Memory != nil {
 		checkMemoryStats(t, "Pod0", seedPod0Infra, infos["/pod0-i"], ps.Memory)
 	}
+	if ps.Swap != nil {
+		checkSwapStats(t, "Pod0", seedPod0Infra, infos["/pod0-i"], ps.Swap)
+	}
 
 	// Validate Pod1 Results
 	ps, found = indexPods[prf1]
@@ -318,6 +323,7 @@ func TestCadvisorListPodStats(t *testing.T) {
 	assert.Equal(t, cName10, con.Name)
 	checkCPUStats(t, "Pod1Container0", seedPod1Container, con.CPU)
 	checkMemoryStats(t, "Pod1Container0", seedPod1Container, infos["/pod1-c0"], con.Memory)
+	checkSwapStats(t, "Pod1Container0", seedPod1Container, infos["/pod1-c0"], con.Swap)
 	checkNetworkStats(t, "Pod1", seedPod1Infra, ps.Network)
 
 	// Validate Pod2 Results
@@ -328,6 +334,7 @@ func TestCadvisorListPodStats(t *testing.T) {
 	assert.Equal(t, cName20, con.Name)
 	checkCPUStats(t, "Pod2Container0", seedPod2Container, con.CPU)
 	checkMemoryStats(t, "Pod2Container0", seedPod2Container, infos["/pod2-c0"], con.Memory)
+	checkSwapStats(t, "Pod2Container0", seedPod2Container, infos["/pod2-c0"], con.Swap)
 	checkNetworkStats(t, "Pod2", seedPod2Infra, ps.Network)
 
 	// Validate Pod3 Results
@@ -344,6 +351,7 @@ func TestCadvisorListPodStats(t *testing.T) {
 	assert.Equal(t, cName31, con.Name)
 	checkCPUStats(t, "Pod3Container1", seedPod3Container1, con.CPU)
 	checkMemoryStats(t, "Pod3Container1", seedPod3Container1, infos["/pod3-c1"], con.Memory)
+	checkSwapStats(t, "Pod3Container1", seedPod3Container1, infos["/pod3-c1"], con.Swap)
 }
 
 func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {

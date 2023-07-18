@@ -95,6 +95,7 @@ func cadvisorInfoToContainerStats(name string, info *cadvisorapiv2.ContainerInfo
 	cpu, memory := cadvisorInfoToCPUandMemoryStats(info)
 	result.CPU = cpu
 	result.Memory = memory
+	result.Swap = cadvisorInfoToSwapStats(info)
 
 	// NOTE: if they can be found, log stats will be overwritten
 	// by the caller, as it knows more information about the pod,
@@ -255,6 +256,29 @@ func cadvisorInfoToUserDefinedMetrics(info *cadvisorapiv2.ContainerInfo) []stats
 		})
 	}
 	return udm
+}
+
+func cadvisorInfoToSwapStats(info *cadvisorapiv2.ContainerInfo) *statsapi.SwapStats {
+	cstat, found := latestContainerStats(info)
+	if !found {
+		return nil
+	}
+
+	var swapStats *statsapi.SwapStats
+
+	if info.Spec.HasMemory && cstat.Memory != nil {
+		swapStats = &statsapi.SwapStats{
+			Time:           metav1.NewTime(cstat.Timestamp),
+			SwapUsageBytes: &cstat.Memory.Swap,
+		}
+
+		if !isMemoryUnlimited(info.Spec.Memory.SwapLimit) {
+			swapAvailableBytes := info.Spec.Memory.SwapLimit - cstat.Memory.Swap
+			swapStats.SwapAvailableBytes = &swapAvailableBytes
+		}
+	}
+
+	return swapStats
 }
 
 // latestContainerStats returns the latest container stats from cadvisor, or nil if none exist

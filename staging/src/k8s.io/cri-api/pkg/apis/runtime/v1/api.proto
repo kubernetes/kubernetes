@@ -1639,6 +1639,8 @@ message ContainerStats {
     MemoryUsage memory = 3;
     // Usage of the writable layer.
     FilesystemUsage writable_layer = 4;
+    // Swap usage gathered from the container.
+    SwapUsage swap = 5;
 }
 
 // WindowsContainerStats provides the resource usage statistics for a container specific for Windows
@@ -1691,6 +1693,15 @@ message MemoryUsage {
     UInt64Value page_faults = 6;
     // Cumulative number of major page faults.
     UInt64Value major_page_faults = 7;
+}
+
+message SwapUsage {
+    // Timestamp in nanoseconds at which the information were collected. Must be > 0.
+    int64 timestamp = 1;
+    // Available swap for use. This is defined as the swap limit - swapUsageBytes.
+    UInt64Value swap_available_bytes = 2;
+    // Total memory in use. This includes all memory regardless of when it was accessed.
+    UInt64Value swap_usage_bytes = 3;
 }
 
 // WindowsMemoryUsage provides the memory usage information specific to Windows
