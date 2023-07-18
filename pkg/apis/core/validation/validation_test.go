@@ -8162,14 +8162,43 @@ func TestValidateInitContainers(t *testing.T) {
 		ImagePullPolicy:          "IfNotPresent",
 		TerminationMessagePolicy: "File",
 	}, {
-		Name:                     "container-3-restart-always-with-startup-probe",
+		Name:                     "container-3-restart-always-with-lifecycle-hook-and-probes",
 		Image:                    "image",
 		ImagePullPolicy:          "IfNotPresent",
 		TerminationMessagePolicy: "File",
 		RestartPolicy:            &containerRestartPolicyAlways,
+		Lifecycle: &core.Lifecycle{
+			PostStart: &core.LifecycleHandler{
+				Exec: &core.ExecAction{
+					Command: []string{"echo", "post start"},
+				},
+			},
+			PreStop: &core.LifecycleHandler{
+				Exec: &core.ExecAction{
+					Command: []string{"echo", "pre stop"},
+				},
+			},
+		},
+		LivenessProbe: &core.Probe{
+			ProbeHandler: core.ProbeHandler{
+				TCPSocket: &core.TCPSocketAction{
+					Port: intstr.FromInt32(80),
+				},
+			},
+			SuccessThreshold: 1,
+		},
+		ReadinessProbe: &core.Probe{
+			ProbeHandler: core.ProbeHandler{
+				TCPSocket: &core.TCPSocketAction{
+					Port: intstr.FromInt32(80),
+				},
+			},
+		},
 		StartupProbe: &core.Probe{
 			ProbeHandler: core.ProbeHandler{
-				TCPSocket: &core.TCPSocketAction{Port: intstr.FromInt(80)},
+				TCPSocket: &core.TCPSocketAction{
+					Port: intstr.FromInt(80),
+				},
 			},
 			SuccessThreshold: 1,
 		},
@@ -8390,6 +8419,165 @@ func TestValidateInitContainers(t *testing.T) {
 			},
 		}},
 		field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "initContainers[0].startupProbe.successThreshold", BadValue: int32(2)}},
+	}, {
+		"invalid readiness probe, terminationGracePeriodSeconds set.",
+		line(),
+		[]core.Container{{
+			Name:                     "life-123",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyAlways,
+			ReadinessProbe: &core.Probe{
+				ProbeHandler: core.ProbeHandler{
+					TCPSocket: &core.TCPSocketAction{
+						Port: intstr.FromInt32(80),
+					},
+				},
+				TerminationGracePeriodSeconds: utilpointer.Int64(10),
+			},
+		}},
+		field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "initContainers[0].readinessProbe.terminationGracePeriodSeconds", BadValue: utilpointer.Int64(10)}},
+	}, {
+		"invalid liveness probe, successThreshold != 1",
+		line(),
+		[]core.Container{{
+			Name:                     "live-123",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyAlways,
+			LivenessProbe: &core.Probe{
+				ProbeHandler: core.ProbeHandler{
+					TCPSocket: &core.TCPSocketAction{
+						Port: intstr.FromInt32(80),
+					},
+				},
+				SuccessThreshold: 2,
+			},
+		}},
+		field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "initContainers[0].livenessProbe.successThreshold", BadValue: int32(2)}},
+	}, {
+		"invalid lifecycle, no exec command.",
+		line(),
+		[]core.Container{{
+			Name:                     "life-123",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyAlways,
+			Lifecycle: &core.Lifecycle{
+				PreStop: &core.LifecycleHandler{
+					Exec: &core.ExecAction{},
+				},
+			},
+		}},
+		field.ErrorList{{Type: field.ErrorTypeRequired, Field: "initContainers[0].lifecycle.preStop.exec.command", BadValue: ""}},
+	}, {
+		"invalid lifecycle, no http path.",
+		line(),
+		[]core.Container{{
+			Name:                     "life-123",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyAlways,
+			Lifecycle: &core.Lifecycle{
+				PreStop: &core.LifecycleHandler{
+					HTTPGet: &core.HTTPGetAction{
+						Port:   intstr.FromInt32(80),
+						Scheme: "HTTP",
+					},
+				},
+			},
+		}},
+		field.ErrorList{{Type: field.ErrorTypeRequired, Field: "initContainers[0].lifecycle.preStop.httpGet.path", BadValue: ""}},
+	}, {
+		"invalid lifecycle, no http port.",
+		line(),
+		[]core.Container{{
+			Name:                     "life-123",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyAlways,
+			Lifecycle: &core.Lifecycle{
+				PreStop: &core.LifecycleHandler{
+					HTTPGet: &core.HTTPGetAction{
+						Path:   "/",
+						Scheme: "HTTP",
+					},
+				},
+			},
+		}},
+		field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "initContainers[0].lifecycle.preStop.httpGet.port", BadValue: 0}},
+	}, {
+		"invalid lifecycle, no http scheme.",
+		line(),
+		[]core.Container{{
+			Name:                     "life-123",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyAlways,
+			Lifecycle: &core.Lifecycle{
+				PreStop: &core.LifecycleHandler{
+					HTTPGet: &core.HTTPGetAction{
+						Path: "/",
+						Port: intstr.FromInt32(80),
+					},
+				},
+			},
+		}},
+		field.ErrorList{{Type: field.ErrorTypeNotSupported, Field: "initContainers[0].lifecycle.preStop.httpGet.scheme", BadValue: core.URIScheme("")}},
+	}, {
+		"invalid lifecycle, no tcp socket port.",
+		line(),
+		[]core.Container{{
+			Name:                     "life-123",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyAlways,
+			Lifecycle: &core.Lifecycle{
+				PreStop: &core.LifecycleHandler{
+					TCPSocket: &core.TCPSocketAction{},
+				},
+			},
+		}},
+		field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "initContainers[0].lifecycle.preStop.tcpSocket.port", BadValue: 0}},
+	}, {
+		"invalid lifecycle, zero tcp socket port.",
+		line(),
+		[]core.Container{{
+			Name:                     "life-123",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyAlways,
+			Lifecycle: &core.Lifecycle{
+				PreStop: &core.LifecycleHandler{
+					TCPSocket: &core.TCPSocketAction{
+						Port: intstr.FromInt32(0),
+					},
+				},
+			},
+		}},
+		field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "initContainers[0].lifecycle.preStop.tcpSocket.port", BadValue: 0}},
+	}, {
+		"invalid lifecycle, no action.",
+		line(),
+		[]core.Container{{
+			Name:                     "life-123",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyAlways,
+			Lifecycle: &core.Lifecycle{
+				PreStop: &core.LifecycleHandler{},
+			},
+		}},
+		field.ErrorList{{Type: field.ErrorTypeRequired, Field: "initContainers[0].lifecycle.preStop", BadValue: ""}},
 	},
 	}
 	for _, tc := range errorCases {

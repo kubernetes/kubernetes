@@ -55,6 +55,21 @@ func GenerateContainersReadyCondition(spec *v1.PodSpec, containerStatuses []v1.C
 	}
 	unknownContainers := []string{}
 	unreadyContainers := []string{}
+
+	for _, container := range spec.InitContainers {
+		if !kubetypes.IsRestartableInitContainer(&container) {
+			continue
+		}
+
+		if containerStatus, ok := podutil.GetContainerStatus(containerStatuses, container.Name); ok {
+			if !containerStatus.Ready {
+				unreadyContainers = append(unreadyContainers, container.Name)
+			}
+		} else {
+			unknownContainers = append(unknownContainers, container.Name)
+		}
+	}
+
 	for _, container := range spec.Containers {
 		if containerStatus, ok := podutil.GetContainerStatus(containerStatuses, container.Name); ok {
 			if !containerStatus.Ready {

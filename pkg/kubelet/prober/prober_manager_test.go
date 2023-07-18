@@ -152,8 +152,12 @@ func TestAddRemovePodsWithRestartableInitContainer(t *testing.T) {
 			enableSidecarContainers: false,
 		},
 		{
-			desc:                    "pod with sidecar (sidecar containers feature enabled)",
-			probePaths:              []probeKey{{"restartable_init_container_pod", "restartable-init", readiness}},
+			desc: "pod with sidecar (sidecar containers feature enabled)",
+			probePaths: []probeKey{
+				{"restartable_init_container_pod", "restartable-init", liveness},
+				{"restartable_init_container_pod", "restartable-init", readiness},
+				{"restartable_init_container_pod", "restartable-init", startup},
+			},
 			enableSidecarContainers: true,
 		},
 	}
@@ -179,7 +183,9 @@ func TestAddRemovePodsWithRestartableInitContainer(t *testing.T) {
 						Name: "init",
 					}, {
 						Name:           "restartable-init",
+						LivenessProbe:  defaultProbe,
 						ReadinessProbe: defaultProbe,
+						StartupProbe:   defaultProbe,
 						RestartPolicy:  containerRestartPolicy(tc.enableSidecarContainers),
 					}},
 					Containers: []v1.Container{{
