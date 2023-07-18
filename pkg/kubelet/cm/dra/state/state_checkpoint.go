@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"sync"
 
+	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
@@ -36,6 +37,35 @@ type CheckpointState interface {
 
 // ClaimInfoState is used to store claim info state in a checkpoint
 type ClaimInfoState struct {
+	// Name of the DRA driver
+	DriverName string
+
+	// ClassName is a resource class of the claim
+	ClassName string
+
+	// ClaimUID is an UID of the resource claim
+	ClaimUID types.UID
+
+	// ClaimName is a name of the resource claim
+	ClaimName string
+
+	// Namespace is a claim namespace
+	Namespace string
+
+	// PodUIDs is a set of pod UIDs that reference a resource
+	PodUIDs sets.Set[string]
+
+	// ResourceHandles is a list of opaque resource data for processing by a specific kubelet plugin
+	ResourceHandles []resourcev1alpha2.ResourceHandle
+
+	// CDIDevices is a map of DriverName --> CDI devices returned by the
+	// GRPC API call NodePrepareResource
+	CDIDevices map[string][]string
+}
+
+// ClaimInfoStateWithoutResourceHandles is an old implementation of the ClaimInfoState
+// TODO: remove in Beta
+type ClaimInfoStateWithoutResourceHandles struct {
 	// Name of the DRA driver
 	DriverName string
 

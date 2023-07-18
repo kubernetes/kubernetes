@@ -140,6 +140,7 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod) error {
 			resourceClaim.Name,
 			resourceClaim.Namespace,
 			sets.New(string(pod.UID)),
+			resourceHandles,
 		)
 
 		// Loop through all plugins and prepare for calling NodePrepareResources.
@@ -342,26 +343,8 @@ func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
 			continue
 		}
 
-		// Query claim object from the API server
-		resourceClaim, err := m.kubeClient.ResourceV1alpha2().ResourceClaims(pod.Namespace).Get(
-			context.TODO(),
-			*claimName,
-			metav1.GetOptions{})
-		if err != nil {
-			return fmt.Errorf("failed to fetch ResourceClaim %s referenced by pod %s: %+v", *claimName, pod.Name, err)
-		}
-
-		// Grab the allocation.resourceHandles. If there are no
-		// allocation.resourceHandles, create a single resourceHandle with no
-		// content. This will trigger processing of this claim by a single
-		// kubelet plugin whose name matches resourceClaim.Status.DriverName.
-		resourceHandles := resourceClaim.Status.Allocation.ResourceHandles
-		if len(resourceHandles) == 0 {
-			resourceHandles = make([]resourcev1alpha2.ResourceHandle, 1)
-		}
-
 		// Loop through all plugins and prepare for calling NodeUnprepareResources.
-		for _, resourceHandle := range resourceHandles {
+		for _, resourceHandle := range claimInfo.ResourceHandles {
 			// If no DriverName is provided in the resourceHandle, we
 			// use the DriverName from the status
 			pluginName := resourceHandle.DriverName
@@ -370,14 +353,14 @@ func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
 			}
 
 			claim := &drapb.Claim{
-				Namespace:      resourceClaim.Namespace,
-				Uid:            string(resourceClaim.UID),
-				Name:           resourceClaim.Name,
+				Namespace:      claimInfo.Namespace,
+				Uid:            string(claimInfo.ClaimUID),
+				Name:           claimInfo.ClaimName,
 				ResourceHandle: resourceHandle.Data,
 			}
 			batches[pluginName] = append(batches[pluginName], claim)
 		}
-		claimInfos[resourceClaim.UID] = claimInfo
+		claimInfos[claimInfo.ClaimUID] = claimInfo
 	}
 
 	// Call NodeUnprepareResources for all claims in each batch.
