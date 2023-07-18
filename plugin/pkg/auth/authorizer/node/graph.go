@@ -22,6 +22,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/component-helpers/storage/ephemeral"
+	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	pvutil "k8s.io/kubernetes/pkg/api/v1/persistentvolume"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph"
@@ -117,6 +118,7 @@ const (
 	podVertexType
 	pvcVertexType
 	pvVertexType
+	resourceClaimVertexType
 	secretVertexType
 	vaVertexType
 	serviceAccountVertexType
@@ -128,6 +130,7 @@ var vertexTypes = map[vertexType]string{
 	podVertexType:            "pod",
 	pvcVertexType:            "pvc",
 	pvVertexType:             "pv",
+	resourceClaimVertexType:  "resourceclaim",
 	secretVertexType:         "secret",
 	vaVertexType:             "volumeattachment",
 	serviceAccountVertexType: "serviceAccount",
@@ -389,6 +392,20 @@ func (g *Graph) AddPod(pod *corev1.Pod) {
 		if claimName != "" {
 			pvcVertex := g.getOrCreateVertex_locked(pvcVertexType, pod.Namespace, claimName)
 			e := newDestinationEdge(pvcVertex, podVertex, nodeVertex)
+			g.graph.SetEdge(e)
+			g.addEdgeToDestinationIndex_locked(e)
+		}
+	}
+
+	for _, podResourceClaim := range pod.Spec.ResourceClaims {
+		claimName, _, err := resourceclaim.Name(pod, &podResourceClaim)
+		// Do we have a valid claim name? If yes, add an edge that grants
+		// kubelet access to that claim. An error indicates that a claim
+		// still needs to be created, nil that intentionally no claim
+		// was created and never will be because it isn't needed.
+		if err == nil && claimName != nil {
+			claimVertex := g.getOrCreateVertex_locked(resourceClaimVertexType, pod.Namespace, *claimName)
+			e := newDestinationEdge(claimVertex, podVertex, nodeVertex)
 			g.graph.SetEdge(e)
 			g.addEdgeToDestinationIndex_locked(e)
 		}
