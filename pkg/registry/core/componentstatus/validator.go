@@ -117,5 +117,5 @@ func (server *EtcdServer) DoServerCheck() (probe.Result, string, error) {
 	if err != nil {
 		return probe.Failure, "", err
 	}
-	return probe.Success, "", err
+	return probe.Success, "ok", err
 }

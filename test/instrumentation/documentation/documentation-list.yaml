@@ -3760,7 +3760,7 @@
   type: Custom
   stabilityLevel: ALPHA
   labels:
-  - server
+  - cluster
 - name: transformation_duration_seconds
   subsystem: storage
   namespace: apiserver

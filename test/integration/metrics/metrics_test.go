@@ -77,7 +77,9 @@ func TestAPIServerProcessMetrics(t *testing.T) {
 }
 
 func TestAPIServerStorageMetrics(t *testing.T) {
-	s := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	config := framework.SharedEtcd()
+	config.Transport.ServerList = []string{config.Transport.ServerList[0], config.Transport.ServerList[0]}
+	s := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, config)
 	defer s.TearDownFn()
 
 	metrics, err := scrapeMetrics(s)
