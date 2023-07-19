@@ -993,7 +993,11 @@ metadata:
 			Testname: Kubectl, diff Deployment
 			Description: Create a Deployment with httpd image. Declare the same Deployment with a different image, busybox. Diff of live Deployment with declared Deployment MUST include the difference between live and declared image.
 		*/
-		framework.ConformanceIt("should check if kubectl diff finds a difference for Deployments", func(ctx context.Context) {
+		ginkgo.It("should check if kubectl diff finds a difference for Deployments", func(ctx context.Context) {
+			if _, err := exec.LookPath("diff"); err != nil {
+				ginkgo.Skip("diff binary not available in $PATH")
+			}
+
 			ginkgo.By("create deployment with httpd image")
 			deployment := commonutils.SubstituteImageName(string(readTestFileOrDie(httpdDeployment3Filename)))
 			e2ekubectl.RunKubectlOrDieInput(ns, deployment, "create", "-f", "-")
