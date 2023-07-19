@@ -794,7 +794,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 	active := int32(len(jobCtx.activePods))
 	newSucceededPods, newFailedPods := getNewFinishedPods(jobCtx)
 	jobCtx.succeeded = job.Status.Succeeded + int32(len(newSucceededPods)) + int32(len(jobCtx.uncounted.succeeded))
-	failed := job.Status.Failed + int32(len(newFailedPods)) + int32(len(jobCtx.uncounted.failed))
+	failed := job.Status.Failed + int32(nonIgnoredFailedPodsCount(jobCtx, newFailedPods)) + int32(len(jobCtx.uncounted.failed))
 	var ready *int32
 	if feature.DefaultFeatureGate.Enabled(features.JobReadyPods) {
 		ready = pointer.Int32(countReadyPods(jobCtx.activePods))
@@ -949,6 +949,19 @@ func (jm *Controller) deleteActivePods(ctx context.Context, job *batch.Job, pods
 	}
 	wg.Wait()
 	return successfulDeletes, errorFromChannel(errCh)
+}
+
+func nonIgnoredFailedPodsCount(jobCtx *syncJobCtx, failedPods []*v1.Pod) int {
+	result := len(failedPods)
+	if feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) && jobCtx.job.Spec.PodFailurePolicy != nil {
+		for _, p := range failedPods {
+			_, countFailed, _ := matchPodFailurePolicy(jobCtx.job.Spec.PodFailurePolicy, p)
+			if !countFailed {
+				result--
+			}
+		}
+	}
+	return result
 }
 
 // deleteJobPods deletes the pods, returns the number of successful removals
@@ -1406,15 +1419,7 @@ func getNewFinishedPods(jobCtx *syncJobCtx) (succeededPods, failedPods []*v1.Pod
 		return p.Status.Phase == v1.PodSucceeded
 	})
 	failedPods = getValidPodsWithFilter(jobCtx, jobCtx.uncounted.Failed(), func(p *v1.Pod) bool {
-		if feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) && jobCtx.job.Spec.PodFailurePolicy != nil {
-			if !isPodFailed(p, jobCtx.job) {
-				return false
-			}
-			_, countFailed, _ := matchPodFailurePolicy(jobCtx.job.Spec.PodFailurePolicy, p)
-			return countFailed
-		} else {
-			return isPodFailed(p, jobCtx.job)
-		}
+		return isPodFailed(p, jobCtx.job)
 	})
 	return succeededPods, failedPods
 }
