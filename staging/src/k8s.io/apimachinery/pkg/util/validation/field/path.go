@@ -69,17 +69,6 @@ func (p *Path) Root() *Path {
 	return p
 }
 
-// SetRoot returns a Path with root replaced.
-func (p *Path) SetRoot(root *Path) *Path {
-	if p == nil {
-		return root
-	}
-	if root == nil {
-		return p
-	}
-	return root.Child(p.name)
-}
-
 // Child creates a new Path that is a child of the method receiver.
 func (p *Path) Child(name string, moreNames ...string) *Path {
 	r := NewPath(name, moreNames...)

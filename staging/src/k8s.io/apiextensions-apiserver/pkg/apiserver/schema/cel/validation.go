@@ -260,10 +260,8 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 			continue
 		}
 		if evalResult != types.True {
-			if compiled.FieldPathError != nil {
-				klog.V(2).ErrorS(compiled.FieldPathError, "fieldPath check failed")
-			} else if len(rule.FieldPath) > 0 {
-				fldPath = compiled.NormalizedRuleFieldPath.SetRoot(fldPath)
+			if len(compiled.NormalizedRuleFieldPath) > 0 {
+				fldPath = fldPath.Child(compiled.NormalizedRuleFieldPath)
 			}
 			if compiled.MessageExpression != nil {
 				messageExpression, newRemainingBudget, msgErr := evalMessageExpression(ctx, compiled.MessageExpression, rule.MessageExpression, activation, remainingBudget)

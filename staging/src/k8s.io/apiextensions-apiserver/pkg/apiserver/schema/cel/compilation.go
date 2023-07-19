@@ -18,7 +18,6 @@ package cel
 
 import (
 	"fmt"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	"strings"
 	"time"
 
@@ -67,9 +66,7 @@ type CompilationResult struct {
 	// as used by cel.EstimateCost.
 	MessageExpressionMaxCost uint64
 	// NormalizedRuleFieldPath represents the relative fieldPath specified by user after normalization.
-	NormalizedRuleFieldPath *field.Path
-	// FieldPathError represents the error while validating fieldPath specified.
-	FieldPathError *apiservercel.Error
+	NormalizedRuleFieldPath string
 }
 
 // EnvLoader delegates the decision of which CEL environment to use for each expression.
@@ -252,12 +249,9 @@ func compileRule(s *schema.Structural, rule apiextensions.ValidationRule, envSet
 		compilationResult.MessageExpressionMaxCost = costEst.Max
 	}
 	if rule.FieldPath != "" {
-		fldPath := field.NewPath("")
-		validFieldPath, err := ValidFieldPath(rule.FieldPath, fldPath, s)
-		if err != nil {
-			compilationResult.FieldPathError = &apiservercel.Error{Type: apiservercel.ErrorTypeInvalid, Detail: "failed formatting fieldPath: " + err.Error()}
-		} else {
-			compilationResult.NormalizedRuleFieldPath = validFieldPath
+		validFieldPath, err := ValidFieldPath(rule.FieldPath, nil, s)
+		if err == nil {
+			compilationResult.NormalizedRuleFieldPath = validFieldPath.String()
 		}
 	}
 	return
