@@ -135,6 +135,9 @@ func (v *validatingAdmissionPolicyStrategy) GetResetFields() map[fieldpath.APIVe
 		"admissionregistration.k8s.io/v1alpha1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("status"),
 		),
+		"admissionregistration.k8s.io/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
 	}
 
 	return fields
@@ -167,6 +170,10 @@ func (s *validatingAdmissionPolicyStatusStrategy) PrepareForUpdate(ctx context.C
 func (s *validatingAdmissionPolicyStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	return map[fieldpath.APIVersion]*fieldpath.Set{
 		"admissionregistration.k8s.io/v1alpha1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+			fieldpath.MakePathOrDie("metadata"),
+		),
+		"admissionregistration.k8s.io/v1beta1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("spec"),
 			fieldpath.MakePathOrDie("metadata"),
 		),
