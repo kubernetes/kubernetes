@@ -25,6 +25,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/errors"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/klog/v2"
 )
 
 func init() {
@@ -158,6 +160,7 @@ func (t *prefixTransformers) TransformFromStorage(ctx context.Context, data []by
 		}
 	}
 	if err := errors.Reduce(errors.NewAggregate(errs)); err != nil {
+		logTransformErr(ctx, err, "failed to decrypt data")
 		return nil, false, err
 	}
 	RecordTransformation("from_storage", "unknown", time.Since(start), t.err)
@@ -171,10 +174,40 @@ func (t *prefixTransformers) TransformToStorage(ctx context.Context, data []byte
 	result, err := transformer.Transformer.TransformToStorage(ctx, data, dataCtx)
 	RecordTransformation("to_storage", string(transformer.Prefix), time.Since(start), err)
 	if err != nil {
+		logTransformErr(ctx, err, "failed to encrypt data")
 		return nil, err
 	}
 	prefixedData := make([]byte, len(transformer.Prefix), len(result)+len(transformer.Prefix))
 	copy(prefixedData, transformer.Prefix)
 	prefixedData = append(prefixedData, result...)
 	return prefixedData, nil
+}
+
+func logTransformErr(ctx context.Context, err error, message string) {
+	requestInfo := getRequestInfoFromContext(ctx)
+	if klogLevel6 := klog.V(6); klogLevel6.Enabled() {
+		klogLevel6.InfoSDepth(
+			1,
+			message,
+			"err", err,
+			"group", requestInfo.APIGroup,
+			"version", requestInfo.APIVersion,
+			"resource", requestInfo.Resource,
+			"subresource", requestInfo.Subresource,
+			"verb", requestInfo.Verb,
+			"namespace", requestInfo.Namespace,
+			"name", requestInfo.Name,
+		)
+
+		return
+	}
+
+	klog.ErrorSDepth(1, err, message)
+}
+
+func getRequestInfoFromContext(ctx context.Context) *genericapirequest.RequestInfo {
+	if reqInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
+		return reqInfo
+	}
+	return &genericapirequest.RequestInfo{}
 }
