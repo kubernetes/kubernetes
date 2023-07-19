@@ -19,7 +19,7 @@ package app
 import (
 	"context"
 
-	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
+	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	pluginvalidatingadmissionpolicy "k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy"
 	"k8s.io/apiserver/pkg/cel/openapi/resolver"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/generated/openapi"
 )
 
-var validatingAdmissionPolicyResource = admissionregistrationv1alpha1.SchemeGroupVersion.WithResource("validatingadmissionpolicies")
+var validatingAdmissionPolicyResource = admissionregistrationv1beta1.SchemeGroupVersion.WithResource("validatingadmissionpolicies")
 
 func startValidatingAdmissionPolicyStatusController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	// intended check against served resource but not feature gate.
@@ -41,8 +41,8 @@ func startValidatingAdmissionPolicyStatusController(ctx context.Context, control
 		RestMapper:     controllerContext.RESTMapper,
 	}
 	c, err := validatingadmissionpolicystatus.NewController(
-		controllerContext.InformerFactory.Admissionregistration().V1alpha1().ValidatingAdmissionPolicies(),
-		controllerContext.ClientBuilder.ClientOrDie("validatingadmissionpolicy-status-controller").AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies(),
+		controllerContext.InformerFactory.Admissionregistration().V1beta1().ValidatingAdmissionPolicies(),
+		controllerContext.ClientBuilder.ClientOrDie("validatingadmissionpolicy-status-controller").AdmissionregistrationV1beta1().ValidatingAdmissionPolicies(),
 		typeChecker,
 	)
 

@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/admissionregistration/v1"
-	"k8s.io/api/admissionregistration/v1alpha1"
+	"k8s.io/api/admissionregistration/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
@@ -36,7 +36,7 @@ type MatchCriteria interface {
 	namespace.NamespaceSelectorProvider
 	object.ObjectSelectorProvider
 
-	GetMatchResources() v1alpha1.MatchResources
+	GetMatchResources() v1beta1.MatchResources
 }
 
 // Matcher decides if a request matches against matchCriteria
@@ -119,7 +119,7 @@ func (m *Matcher) Matches(attr admission.Attributes, o admission.ObjectInterface
 	return true, matchKind, nil
 }
 
-func matchesResourceRules(namedRules []v1alpha1.NamedRuleWithOperations, matchPolicy *v1alpha1.MatchPolicyType, attr admission.Attributes, o admission.ObjectInterfaces) (bool, schema.GroupVersionKind, error) {
+func matchesResourceRules(namedRules []v1beta1.NamedRuleWithOperations, matchPolicy *v1beta1.MatchPolicyType, attr admission.Attributes, o admission.ObjectInterfaces) (bool, schema.GroupVersionKind, error) {
 	matchKind := attr.GetKind()
 	for _, namedRule := range namedRules {
 		rule := v1.RuleWithOperations(namedRule.RuleWithOperations)
@@ -146,7 +146,7 @@ func matchesResourceRules(namedRules []v1alpha1.NamedRuleWithOperations, matchPo
 
 	// if match policy is undefined or exact, don't perform fuzzy matching
 	// note that defaulting to fuzzy matching is set by the API
-	if matchPolicy == nil || *matchPolicy == v1alpha1.Exact {
+	if matchPolicy == nil || *matchPolicy == v1beta1.Exact {
 		return false, schema.GroupVersionKind{}, nil
 	}
 

@@ -23,7 +23,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/admissionregistration/v1"
-	"k8s.io/api/admissionregistration/v1alpha1"
+	"k8s.io/api/admissionregistration/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -49,8 +49,8 @@ type policyController struct {
 	dynamicClient               dynamic.Interface
 	informerFactory             informers.SharedInformerFactory
 	restMapper                  meta.RESTMapper
-	policyDefinitionsController generic.Controller[*v1alpha1.ValidatingAdmissionPolicy]
-	policyBindingController     generic.Controller[*v1alpha1.ValidatingAdmissionPolicyBinding]
+	policyDefinitionsController generic.Controller[*v1beta1.ValidatingAdmissionPolicy]
+	policyBindingController     generic.Controller[*v1beta1.ValidatingAdmissionPolicyBinding]
 
 	// Provided to the policy's Compile function as an injected dependency to
 	// assist with compiling its expressions to CEL
@@ -70,7 +70,7 @@ type policyController struct {
 	cachedPolicies []policyData
 
 	// controller and metadata
-	paramsCRDControllers map[v1alpha1.ParamKind]*paramInfo
+	paramsCRDControllers map[v1beta1.ParamKind]*paramInfo
 
 	// Index for each definition namespace/name, contains all binding
 	// namespace/names known to exist for that definition
@@ -96,15 +96,15 @@ func newPolicyController(
 	informerFactory informers.SharedInformerFactory,
 	filterCompiler cel.FilterCompiler,
 	matcher Matcher,
-	policiesInformer generic.Informer[*v1alpha1.ValidatingAdmissionPolicy],
-	bindingsInformer generic.Informer[*v1alpha1.ValidatingAdmissionPolicyBinding],
+	policiesInformer generic.Informer[*v1beta1.ValidatingAdmissionPolicy],
+	bindingsInformer generic.Informer[*v1beta1.ValidatingAdmissionPolicyBinding],
 ) *policyController {
 	res := &policyController{}
 	*res = policyController{
 		filterCompiler:        filterCompiler,
 		definitionInfo:        make(map[namespacedName]*definitionInfo),
 		bindingInfos:          make(map[namespacedName]*bindingInfo),
-		paramsCRDControllers:  make(map[v1alpha1.ParamKind]*paramInfo),
+		paramsCRDControllers:  make(map[v1beta1.ParamKind]*paramInfo),
 		definitionsToBindings: make(map[namespacedName]sets.Set[namespacedName]),
 		matcher:               matcher,
 		newValidator:          NewValidator,
@@ -160,14 +160,14 @@ func (c *policyController) HasSynced() bool {
 	return c.policyDefinitionsController.HasSynced() && c.policyBindingController.HasSynced()
 }
 
-func (c *policyController) reconcilePolicyDefinition(namespace, name string, definition *v1alpha1.ValidatingAdmissionPolicy) error {
+func (c *policyController) reconcilePolicyDefinition(namespace, name string, definition *v1beta1.ValidatingAdmissionPolicy) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	err := c.reconcilePolicyDefinitionSpec(namespace, name, definition)
 	return err
 }
 
-func (c *policyController) reconcilePolicyDefinitionSpec(namespace, name string, definition *v1alpha1.ValidatingAdmissionPolicy) error {
+func (c *policyController) reconcilePolicyDefinitionSpec(namespace, name string, definition *v1beta1.ValidatingAdmissionPolicy) error {
 	c.cachedPolicies = nil // invalidate cachedPolicies
 
 	// Namespace for policydefinition is empty.
@@ -186,7 +186,7 @@ func (c *policyController) reconcilePolicyDefinitionSpec(namespace, name string,
 		return nil
 	}
 
-	var paramSource *v1alpha1.ParamKind
+	var paramSource *v1beta1.ParamKind
 	if definition != nil {
 		paramSource = definition.Spec.ParamKind
 	}
@@ -266,7 +266,7 @@ func (c *policyController) reconcilePolicyDefinitionSpec(namespace, name string,
 
 // Ensures that there is an informer started for the given GVK to be used as a
 // param
-func (c *policyController) ensureParamInfo(paramSource *v1alpha1.ParamKind, mapping *meta.RESTMapping) *paramInfo {
+func (c *policyController) ensureParamInfo(paramSource *v1beta1.ParamKind, mapping *meta.RESTMapping) *paramInfo {
 	if info, ok := c.paramsCRDControllers[*paramSource]; ok {
 		return info
 	}
@@ -329,7 +329,7 @@ func (c *policyController) ensureParamInfo(paramSource *v1alpha1.ParamKind, mapp
 
 }
 
-func (c *policyController) reconcilePolicyBinding(namespace, name string, binding *v1alpha1.ValidatingAdmissionPolicyBinding) error {
+func (c *policyController) reconcilePolicyBinding(namespace, name string, binding *v1beta1.ValidatingAdmissionPolicyBinding) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -432,7 +432,7 @@ func (c *policyController) latestPolicyData() []policyData {
 				}
 				optionalVars := cel.OptionalVariableDeclarations{HasParams: hasParam, HasAuthorizer: true}
 				expressionOptionalVars := cel.OptionalVariableDeclarations{HasParams: hasParam, HasAuthorizer: false}
-				failurePolicy := convertv1alpha1FailurePolicyTypeTov1FailurePolicyType(definitionInfo.lastReconciledValue.Spec.FailurePolicy)
+				failurePolicy := convertv1beta1FailurePolicyTypeTov1FailurePolicyType(definitionInfo.lastReconciledValue.Spec.FailurePolicy)
 				var matcher matchconditions.Matcher = nil
 				matchConditions := definitionInfo.lastReconciledValue.Spec.MatchConditions
 
@@ -441,7 +441,7 @@ func (c *policyController) latestPolicyData() []policyData {
 					compositedCompiler, err := cel.NewCompositedCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
 					if err == nil {
 						filterCompiler = compositedCompiler
-						compositedCompiler.CompileAndStoreVariables(convertV1alpha1Variables(definitionInfo.lastReconciledValue.Spec.Variables), optionalVars, environment.StoredExpressions)
+						compositedCompiler.CompileAndStoreVariables(convertv1beta1Variables(definitionInfo.lastReconciledValue.Spec.Variables), optionalVars, environment.StoredExpressions)
 					} else {
 						utilruntime.HandleError(err)
 					}
@@ -454,10 +454,10 @@ func (c *policyController) latestPolicyData() []policyData {
 					matcher = matchconditions.NewMatcher(filterCompiler.Compile(matchExpressionAccessors, optionalVars, environment.StoredExpressions), failurePolicy, "policy", "validate", definitionInfo.lastReconciledValue.Name)
 				}
 				bindingInfo.validator = c.newValidator(
-					filterCompiler.Compile(convertv1alpha1Validations(definitionInfo.lastReconciledValue.Spec.Validations), optionalVars, environment.StoredExpressions),
+					filterCompiler.Compile(convertv1beta1Validations(definitionInfo.lastReconciledValue.Spec.Validations), optionalVars, environment.StoredExpressions),
 					matcher,
-					filterCompiler.Compile(convertv1alpha1AuditAnnotations(definitionInfo.lastReconciledValue.Spec.AuditAnnotations), optionalVars, environment.StoredExpressions),
-					filterCompiler.Compile(convertV1Alpha1MessageExpressions(definitionInfo.lastReconciledValue.Spec.Validations), expressionOptionalVars, environment.StoredExpressions),
+					filterCompiler.Compile(convertv1beta1AuditAnnotations(definitionInfo.lastReconciledValue.Spec.AuditAnnotations), optionalVars, environment.StoredExpressions),
+					filterCompiler.Compile(convertv1beta1MessageExpressions(definitionInfo.lastReconciledValue.Spec.Validations), expressionOptionalVars, environment.StoredExpressions),
 					failurePolicy,
 				)
 			}
@@ -482,21 +482,21 @@ func (c *policyController) latestPolicyData() []policyData {
 	return res
 }
 
-func convertv1alpha1FailurePolicyTypeTov1FailurePolicyType(policyType *v1alpha1.FailurePolicyType) *v1.FailurePolicyType {
+func convertv1beta1FailurePolicyTypeTov1FailurePolicyType(policyType *v1beta1.FailurePolicyType) *v1.FailurePolicyType {
 	if policyType == nil {
 		return nil
 	}
 
 	var v1FailPolicy v1.FailurePolicyType
-	if *policyType == v1alpha1.Fail {
+	if *policyType == v1beta1.Fail {
 		v1FailPolicy = v1.Fail
-	} else if *policyType == v1alpha1.Ignore {
+	} else if *policyType == v1beta1.Ignore {
 		v1FailPolicy = v1.Ignore
 	}
 	return &v1FailPolicy
 }
 
-func convertv1alpha1Validations(inputValidations []v1alpha1.Validation) []cel.ExpressionAccessor {
+func convertv1beta1Validations(inputValidations []v1beta1.Validation) []cel.ExpressionAccessor {
 	celExpressionAccessor := make([]cel.ExpressionAccessor, len(inputValidations))
 	for i, validation := range inputValidations {
 		validation := ValidationCondition{
@@ -509,7 +509,7 @@ func convertv1alpha1Validations(inputValidations []v1alpha1.Validation) []cel.Ex
 	return celExpressionAccessor
 }
 
-func convertV1Alpha1MessageExpressions(inputValidations []v1alpha1.Validation) []cel.ExpressionAccessor {
+func convertv1beta1MessageExpressions(inputValidations []v1beta1.Validation) []cel.ExpressionAccessor {
 	celExpressionAccessor := make([]cel.ExpressionAccessor, len(inputValidations))
 	for i, validation := range inputValidations {
 		if validation.MessageExpression != "" {
@@ -522,7 +522,7 @@ func convertV1Alpha1MessageExpressions(inputValidations []v1alpha1.Validation) [
 	return celExpressionAccessor
 }
 
-func convertv1alpha1AuditAnnotations(inputValidations []v1alpha1.AuditAnnotation) []cel.ExpressionAccessor {
+func convertv1beta1AuditAnnotations(inputValidations []v1beta1.AuditAnnotation) []cel.ExpressionAccessor {
 	celExpressionAccessor := make([]cel.ExpressionAccessor, len(inputValidations))
 	for i, validation := range inputValidations {
 		validation := AuditAnnotationCondition{
@@ -534,7 +534,7 @@ func convertv1alpha1AuditAnnotations(inputValidations []v1alpha1.AuditAnnotation
 	return celExpressionAccessor
 }
 
-func convertV1alpha1Variables(variables []v1alpha1.Variable) []cel.NamedExpressionAccessor {
+func convertv1beta1Variables(variables []v1beta1.Variable) []cel.NamedExpressionAccessor {
 	namedExpressions := make([]cel.NamedExpressionAccessor, len(variables))
 	for i, variable := range variables {
 		namedExpressions[i] = &Variable{Name: variable.Name, Expression: variable.Expression}
