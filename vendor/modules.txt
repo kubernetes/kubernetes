@@ -1514,6 +1514,7 @@ k8s.io/apiserver/pkg/endpoints/warning
 k8s.io/apiserver/pkg/features
 k8s.io/apiserver/pkg/quota/v1
 k8s.io/apiserver/pkg/quota/v1/generic
+k8s.io/apiserver/pkg/reconcilers
 k8s.io/apiserver/pkg/registry/generic
 k8s.io/apiserver/pkg/registry/generic/registry
 k8s.io/apiserver/pkg/registry/generic/rest
@@ -1574,6 +1575,8 @@ k8s.io/apiserver/pkg/util/flowcontrol/request
 k8s.io/apiserver/pkg/util/flushwriter
 k8s.io/apiserver/pkg/util/notfoundhandler
 k8s.io/apiserver/pkg/util/openapi
+k8s.io/apiserver/pkg/util/peerproxy
+k8s.io/apiserver/pkg/util/peerproxy/metrics
 k8s.io/apiserver/pkg/util/proxy
 k8s.io/apiserver/pkg/util/shufflesharding
 k8s.io/apiserver/pkg/util/webhook
