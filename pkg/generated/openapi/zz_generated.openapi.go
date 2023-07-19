@@ -58597,7 +58597,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 					},
 					"cgroupDriver": {
 						SchemaProps: spec.SchemaProps{
-							Description: "cgroupDriver is the driver kubelet uses to manipulate CGroups on the host (cgroupfs or systemd). Default: \"cgroupfs\"",
+							Description: "cgroupDriver is the driver kubelet uses to manipulate CGroups on the host (cgroupfs or systemd). Note: If the KubeletCgroupDriverFromCRI feature gate is enabled and a sufficiently new version of a container runtime (supporting the RuntimeConfig CRI rpc) is used, the CgroupDriver setting will be ignored and the kubelet automatically detects the correct cgroup driver from the container runtime Default: \"cgroupfs\"",
 							Type:        []string{"string"},
 							Format:      "",
 						},

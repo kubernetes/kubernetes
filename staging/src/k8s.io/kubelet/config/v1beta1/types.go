@@ -334,6 +334,11 @@ type KubeletConfiguration struct {
 	CgroupsPerQOS *bool `json:"cgroupsPerQOS,omitempty"`
 	// cgroupDriver is the driver kubelet uses to manipulate CGroups on the host (cgroupfs
 	// or systemd).
+	// Note: If the KubeletCgroupDriverFromCRI feature gate
+	// is enabled and a sufficiently new version of a container runtime
+	// (supporting the RuntimeConfig CRI rpc) is used, the CgroupDriver setting
+	// will be ignored and the kubelet automatically detects the correct cgroup
+	// driver from the container runtime
 	// Default: "cgroupfs"
 	// +optional
 	CgroupDriver string `json:"cgroupDriver,omitempty"`
