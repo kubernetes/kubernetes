@@ -2652,10 +2652,11 @@ func withAuditAnnotations(auditAnnotations []admissionregistrationv1beta1.AuditA
 func makeBinding(name, policyName, paramName string) *admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding {
 	var paramRef *admissionregistrationv1beta1.ParamRef
 	if paramName != "" {
+		denyAction := admissionregistrationv1beta1.DenyAction
 		paramRef = &admissionregistrationv1beta1.ParamRef{
 			Name:                    paramName,
 			Namespace:               "default",
-			ParameterNotFoundAction: admissionregistrationv1beta1.DenyAction,
+			ParameterNotFoundAction: &denyAction,
 		}
 	}
 	return &admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding{

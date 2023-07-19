@@ -175,18 +175,46 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &admissionregistrationv1alpha1.VariableApplyConfiguration{}
 
 		// Group=admissionregistration.k8s.io, Version=v1beta1
+	case v1beta1.SchemeGroupVersion.WithKind("AuditAnnotation"):
+		return &admissionregistrationv1beta1.AuditAnnotationApplyConfiguration{}
+	case v1beta1.SchemeGroupVersion.WithKind("ExpressionWarning"):
+		return &admissionregistrationv1beta1.ExpressionWarningApplyConfiguration{}
 	case v1beta1.SchemeGroupVersion.WithKind("MatchCondition"):
 		return &admissionregistrationv1beta1.MatchConditionApplyConfiguration{}
+	case v1beta1.SchemeGroupVersion.WithKind("MatchResources"):
+		return &admissionregistrationv1beta1.MatchResourcesApplyConfiguration{}
 	case v1beta1.SchemeGroupVersion.WithKind("MutatingWebhook"):
 		return &admissionregistrationv1beta1.MutatingWebhookApplyConfiguration{}
 	case v1beta1.SchemeGroupVersion.WithKind("MutatingWebhookConfiguration"):
 		return &admissionregistrationv1beta1.MutatingWebhookConfigurationApplyConfiguration{}
+	case v1beta1.SchemeGroupVersion.WithKind("NamedRuleWithOperations"):
+		return &admissionregistrationv1beta1.NamedRuleWithOperationsApplyConfiguration{}
+	case v1beta1.SchemeGroupVersion.WithKind("ParamKind"):
+		return &admissionregistrationv1beta1.ParamKindApplyConfiguration{}
+	case v1beta1.SchemeGroupVersion.WithKind("ParamRef"):
+		return &admissionregistrationv1beta1.ParamRefApplyConfiguration{}
 	case v1beta1.SchemeGroupVersion.WithKind("ServiceReference"):
 		return &admissionregistrationv1beta1.ServiceReferenceApplyConfiguration{}
+	case v1beta1.SchemeGroupVersion.WithKind("TypeChecking"):
+		return &admissionregistrationv1beta1.TypeCheckingApplyConfiguration{}
+	case v1beta1.SchemeGroupVersion.WithKind("ValidatingAdmissionPolicy"):
+		return &admissionregistrationv1beta1.ValidatingAdmissionPolicyApplyConfiguration{}
+	case v1beta1.SchemeGroupVersion.WithKind("ValidatingAdmissionPolicyBinding"):
+		return &admissionregistrationv1beta1.ValidatingAdmissionPolicyBindingApplyConfiguration{}
+	case v1beta1.SchemeGroupVersion.WithKind("ValidatingAdmissionPolicyBindingSpec"):
+		return &admissionregistrationv1beta1.ValidatingAdmissionPolicyBindingSpecApplyConfiguration{}
+	case v1beta1.SchemeGroupVersion.WithKind("ValidatingAdmissionPolicySpec"):
+		return &admissionregistrationv1beta1.ValidatingAdmissionPolicySpecApplyConfiguration{}
+	case v1beta1.SchemeGroupVersion.WithKind("ValidatingAdmissionPolicyStatus"):
+		return &admissionregistrationv1beta1.ValidatingAdmissionPolicyStatusApplyConfiguration{}
 	case v1beta1.SchemeGroupVersion.WithKind("ValidatingWebhook"):
 		return &admissionregistrationv1beta1.ValidatingWebhookApplyConfiguration{}
 	case v1beta1.SchemeGroupVersion.WithKind("ValidatingWebhookConfiguration"):
 		return &admissionregistrationv1beta1.ValidatingWebhookConfigurationApplyConfiguration{}
+	case v1beta1.SchemeGroupVersion.WithKind("Validation"):
+		return &admissionregistrationv1beta1.ValidationApplyConfiguration{}
+	case v1beta1.SchemeGroupVersion.WithKind("Variable"):
+		return &admissionregistrationv1beta1.VariableApplyConfiguration{}
 	case v1beta1.SchemeGroupVersion.WithKind("WebhookClientConfig"):
 		return &admissionregistrationv1beta1.WebhookClientConfigApplyConfiguration{}
 

@@ -167,7 +167,7 @@ var (
 				Name:      fakeParams.GetName(),
 				Namespace: fakeParams.GetNamespace(),
 				// fake object tracker does not populate defaults
-				ParameterNotFoundAction: v1beta1.DenyAction,
+				ParameterNotFoundAction: ptrTo(v1beta1.DenyAction),
 			},
 			ValidationActions: []v1beta1.ValidationAction{v1beta1.Deny},
 		},
@@ -1040,7 +1040,7 @@ func TestReconfigureBinding(t *testing.T) {
 			ParamRef: &v1beta1.ParamRef{
 				Name:                    fakeParams2.GetName(),
 				Namespace:               fakeParams2.GetNamespace(),
-				ParameterNotFoundAction: v1beta1.DenyAction,
+				ParameterNotFoundAction: ptrTo(v1beta1.DenyAction),
 			},
 			ValidationActions: []v1beta1.ValidationAction{v1beta1.Deny},
 		},
@@ -2232,9 +2232,9 @@ func testParamRefCase(t *testing.T, paramIsClusterScoped, nameIsSet, namespaceIs
 	}
 
 	if denyNotFound {
-		paramRef.ParameterNotFoundAction = v1beta1.DenyAction
+		paramRef.ParameterNotFoundAction = ptrTo(v1beta1.DenyAction)
 	} else {
-		paramRef.ParameterNotFoundAction = v1beta1.AllowAction
+		paramRef.ParameterNotFoundAction = ptrTo(v1beta1.AllowAction)
 	}
 
 	compiler := &fakeCompiler{}
