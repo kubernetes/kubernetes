@@ -165,3 +165,18 @@ func boundedSample(lower, upper interface{}) types.GomegaMatcher {
 		"Histogram": gstruct.Ignore(),
 	}))
 }
+
+func haveKeys(keys ...string) types.GomegaMatcher {
+	gomega.ExpectWithOffset(1, keys).ToNot(gomega.BeEmpty())
+	matcher := gomega.HaveKey(keys[0])
+
+	if len(keys) == 1 {
+		return matcher
+	}
+
+	for _, key := range keys[1:] {
+		matcher = gomega.And(matcher, gomega.HaveKey(key))
+	}
+
+	return matcher
+}
