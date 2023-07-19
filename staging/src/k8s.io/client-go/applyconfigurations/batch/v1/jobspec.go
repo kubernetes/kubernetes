@@ -40,6 +40,7 @@ type JobSpecApplyConfiguration struct {
 	TTLSecondsAfterFinished *int32                                    `json:"ttlSecondsAfterFinished,omitempty"`
 	CompletionMode          *batchv1.CompletionMode                   `json:"completionMode,omitempty"`
 	Suspend                 *bool                                     `json:"suspend,omitempty"`
+	PodReplacementPolicy    *batchv1.PodReplacementPolicy             `json:"podReplacementPolicy,omitempty"`
 }
 
 // JobSpecApplyConfiguration constructs an declarative configuration of the JobSpec type for use with
@@ -149,5 +150,13 @@ func (b *JobSpecApplyConfiguration) WithCompletionMode(value batchv1.CompletionM
 // If called multiple times, the Suspend field is set to the value of the last call.
 func (b *JobSpecApplyConfiguration) WithSuspend(value bool) *JobSpecApplyConfiguration {
 	b.Suspend = &value
+	return b
+}
+
+// WithPodReplacementPolicy sets the PodReplacementPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PodReplacementPolicy field is set to the value of the last call.
+func (b *JobSpecApplyConfiguration) WithPodReplacementPolicy(value batchv1.PodReplacementPolicy) *JobSpecApplyConfiguration {
+	b.PodReplacementPolicy = &value
 	return b
 }

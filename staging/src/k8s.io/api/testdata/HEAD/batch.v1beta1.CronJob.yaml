@@ -88,6 +88,7 @@ spec:
           onPodConditions:
           - status: statusValue
             type: typeValue
+      podReplacementPolicy: podReplacementPolicyValue
       selector:
         matchExpressions:
         - key: keyValue

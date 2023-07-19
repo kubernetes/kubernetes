@@ -77,6 +77,10 @@ var (
 		string(api.ConditionFalse),
 		string(api.ConditionTrue),
 		string(api.ConditionUnknown))
+
+	supportedPodRecreationPolicy = sets.New(
+		string(batch.Failed),
+		string(batch.TerminatingOrFailed))
 )
 
 // validateGeneratedSelector validates that the generated selector on a controller object match the controller object
@@ -244,6 +248,8 @@ func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path, opts apivalidatio
 		allErrs = append(allErrs, validatePodFailurePolicy(spec, fldPath.Child("podFailurePolicy"))...)
 	}
 
+	allErrs = append(allErrs, validatePodReplacementPolicy(spec, fldPath.Child("podReplacementPolicy"))...)
+
 	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(&spec.Template, fldPath.Child("template"), opts)...)
 
 	// spec.Template.Spec.RestartPolicy can be defaulted as RestartPolicyAlways
@@ -277,6 +283,22 @@ func validatePodFailurePolicy(spec *batch.JobSpec, fldPath *field.Path) field.Er
 	}
 	for i, rule := range spec.PodFailurePolicy.Rules {
 		allErrs = append(allErrs, validatePodFailurePolicyRule(spec, &rule, rulesPath.Index(i), containerNames)...)
+	}
+	return allErrs
+}
+
+func validatePodReplacementPolicy(spec *batch.JobSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if spec.PodReplacementPolicy != nil {
+		// If PodFailurePolicy is specified then we only allow Failed.
+		if spec.PodFailurePolicy != nil {
+			if *spec.PodReplacementPolicy != batch.Failed {
+				allErrs = append(allErrs, field.NotSupported(fldPath, *spec.PodReplacementPolicy, []string{string(batch.Failed)}))
+			}
+			// If PodFailurePolicy not specified we allow values in supportedPodRecreationPolicy.
+		} else if !supportedPodRecreationPolicy.Has(string(*spec.PodReplacementPolicy)) {
+			allErrs = append(allErrs, field.NotSupported(fldPath, *spec.PodReplacementPolicy, sets.List(supportedPodRecreationPolicy)))
+		}
 	}
 	return allErrs
 }
@@ -374,6 +396,9 @@ func validateJobStatus(status *batch.JobStatus, fldPath *field.Path) field.Error
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.Failed), fldPath.Child("failed"))...)
 	if status.Ready != nil {
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*status.Ready), fldPath.Child("ready"))...)
+	}
+	if status.Terminating != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*status.Terminating), fldPath.Child("terminating"))...)
 	}
 	if status.UncountedTerminatedPods != nil {
 		path := fldPath.Child("uncountedTerminatedPods")

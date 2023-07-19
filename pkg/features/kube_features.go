@@ -398,14 +398,6 @@ const (
 	// that have never been unsuspended before.
 	JobMutableNodeSchedulingDirectives featuregate.Feature = "JobMutableNodeSchedulingDirectives"
 
-	// owner: @kannon92
-	// kep : https://kep.k8s.io/3939
-	// alpha: v1.28
-	//
-	// Allow users to specify recreating pods of a job only when
-	// pods have fully terminated.
-	JobPodReplacementPolicy featuregate.Feature = "JobPodReplacementPolicy"
-
 	// owner: @mimowo
 	// kep: https://kep.k8s.io/3329
 	// alpha: v1.25
@@ -415,6 +407,13 @@ const (
 	// and pod conditions.
 	JobPodFailurePolicy featuregate.Feature = "JobPodFailurePolicy"
 
+	// owner: @kannon92
+	// kep : https://kep.k8s.io/3939
+	// alpha: v1.28
+	//
+	// Allow users to specify recreating pods of a job only when
+	// pods have fully terminated.
+	JobPodReplacementPolicy featuregate.Feature = "JobPodReplacementPolicy"
 	// owner: @alculquicondor
 	// alpha: v1.23
 	// beta: v1.24

@@ -1763,7 +1763,8 @@
         },
         "ttlSecondsAfterFinished": 8,
         "completionMode": "completionModeValue",
-        "suspend": true
+        "suspend": true,
+        "podReplacementPolicy": "podReplacementPolicyValue"
       }
     },
     "successfulJobsHistoryLimit": 6,

@@ -72,6 +72,7 @@ func TestJobStrategy_PrepareForUpdate(t *testing.T) {
 	cases := map[string]struct {
 		enableJobPodFailurePolicy     bool
 		enableJobBackoffLimitPerIndex bool
+		enableJobPodReplacementPolicy bool
 		job                           batch.Job
 		updatedJob                    batch.Job
 		wantJob                       batch.Job
@@ -160,6 +161,60 @@ func TestJobStrategy_PrepareForUpdate(t *testing.T) {
 					Selector:         validSelector,
 					Template:         validPodTemplateSpec,
 					PodFailurePolicy: updatedPodFailurePolicy,
+				},
+			},
+		},
+		"update job with a new field; updated when JobPodReplacementPolicy enabled": {
+			enableJobPodReplacementPolicy: true,
+			job: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector:             validSelector,
+					Template:             validPodTemplateSpec,
+					PodReplacementPolicy: nil,
+				},
+			},
+			updatedJob: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector:             validSelector,
+					Template:             validPodTemplateSpec,
+					PodReplacementPolicy: podReplacementPolicy(batch.Failed),
+				},
+			},
+			wantJob: batch.Job{
+				ObjectMeta: getValidObjectMeta(1),
+				Spec: batch.JobSpec{
+					Selector:             validSelector,
+					Template:             validPodTemplateSpec,
+					PodReplacementPolicy: podReplacementPolicy(batch.Failed),
+				},
+			},
+		},
+		"update job with a new field; not updated when JobPodReplacementPolicy disabled": {
+			enableJobPodReplacementPolicy: false,
+			job: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector:             validSelector,
+					Template:             validPodTemplateSpec,
+					PodReplacementPolicy: nil,
+				},
+			},
+			updatedJob: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector:             validSelector,
+					Template:             validPodTemplateSpec,
+					PodReplacementPolicy: podReplacementPolicy(batch.Failed),
+				},
+			},
+			wantJob: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector:             validSelector,
+					Template:             validPodTemplateSpec,
+					PodReplacementPolicy: nil,
 				},
 			},
 		},
@@ -389,6 +444,7 @@ func TestJobStrategy_PrepareForUpdate(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, tc.enableJobBackoffLimitPerIndex)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.enableJobPodReplacementPolicy)()
 			ctx := genericapirequest.NewDefaultContext()
 
 			Strategy.PrepareForUpdate(ctx, &tc.updatedJob, &tc.job)
@@ -421,6 +477,7 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 	cases := map[string]struct {
 		enableJobPodFailurePolicy     bool
 		enableJobBackoffLimitPerIndex bool
+		enableJobPodReplacementPolicy bool
 		job                           batch.Job
 		wantJob                       batch.Job
 	}{
@@ -482,6 +539,44 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 					Selector:         validSelector,
 					Template:         validPodTemplateSpec,
 					PodFailurePolicy: podFailurePolicy,
+				},
+			},
+		},
+		"create job with a new field; JobPodReplacementPolicy enabled": {
+			enableJobPodReplacementPolicy: true,
+			job: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector:             validSelector,
+					Template:             validPodTemplateSpec,
+					PodReplacementPolicy: podReplacementPolicy(batch.Failed),
+				},
+			},
+			wantJob: batch.Job{
+				ObjectMeta: getValidObjectMeta(1),
+				Spec: batch.JobSpec{
+					Selector:             validSelector,
+					Template:             validPodTemplateSpec,
+					PodReplacementPolicy: podReplacementPolicy(batch.Failed),
+				},
+			},
+		},
+		"create job with a new field; JobPodReplacementPolicy disabled": {
+			enableJobPodReplacementPolicy: false,
+			job: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector:             validSelector,
+					Template:             validPodTemplateSpec,
+					PodReplacementPolicy: podReplacementPolicy(batch.Failed),
+				},
+			},
+			wantJob: batch.Job{
+				ObjectMeta: getValidObjectMeta(1),
+				Spec: batch.JobSpec{
+					Selector:             validSelector,
+					Template:             validPodTemplateSpec,
+					PodReplacementPolicy: nil,
 				},
 			},
 		},
@@ -624,6 +719,7 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, tc.enableJobBackoffLimitPerIndex)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.enableJobPodReplacementPolicy)()
 			ctx := genericapirequest.NewDefaultContext()
 
 			Strategy.PrepareForCreate(ctx, &tc.job)
@@ -1842,6 +1938,10 @@ func TestJobToSelectiableFields(t *testing.T) {
 }
 
 func completionModePtr(m batch.CompletionMode) *batch.CompletionMode {
+	return &m
+}
+
+func podReplacementPolicy(m batch.PodReplacementPolicy) *batch.PodReplacementPolicy {
 	return &m
 }
 

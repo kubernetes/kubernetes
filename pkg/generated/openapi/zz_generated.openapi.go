@@ -14740,6 +14740,14 @@ func schema_k8sio_api_batch_v1_JobSpec(ref common.ReferenceCallback) common.Open
 							Format:      "",
 						},
 					},
+					"podReplacementPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "podReplacementPolicy specifies when to create replacement Pods. Possible values are: - TerminatingOrFailed means that we recreate pods\n  when they are terminating (has a metadata.deletionTimestamp) or failed.\n- Failed means to wait until a previously created Pod is fully terminated (has phase\n  Failed or Succeeded) before creating a replacement Pod.\n\nWhen using podFailurePolicy, Failed is the the only allowed value. TerminatingOrFailed and Failed are allowed values when podFailurePolicy is not in use. This is an alpha field. Enable JobPodReplacementPolicy to be able to use this field.\n\nPossible enum values:\n - `\"Failed\"` means to wait until a previously created Pod is fully terminated (has phase Failed or Succeeded) before creating a replacement Pod.\n - `\"TerminatingOrFailed\"` means that we recreate pods when they are terminating (has a metadata.deletionTimestamp) or failed.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"Failed", "TerminatingOrFailed"},
+						},
+					},
 				},
 				Required: []string{"template"},
 			},
@@ -14806,6 +14814,13 @@ func schema_k8sio_api_batch_v1_JobStatus(ref common.ReferenceCallback) common.Op
 					"failed": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The number of pods which reached phase Failed.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"terminating": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The number of pods which are terminating (in phase Pending or Running and have a deletionTimestamp).\n\nThis field is alpha-level. The job controller populates the field when the feature gate JobPodReplacementPolicy is enabled (disabled by default).",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},

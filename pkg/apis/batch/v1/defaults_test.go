@@ -26,9 +26,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/pointer"
 
 	. "k8s.io/kubernetes/pkg/apis/batch/v1"
@@ -40,9 +43,10 @@ func TestSetDefaultJob(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
 	}
 	tests := map[string]struct {
-		original     *batchv1.Job
-		expected     *batchv1.Job
-		expectLabels bool
+		original                   *batchv1.Job
+		expected                   *batchv1.Job
+		expectLabels               bool
+		enablePodReplacementPolicy bool
 	}{
 		"Pod failure policy with some field values unspecified -> set default values": {
 			original: &batchv1.Job{
@@ -134,6 +138,70 @@ func TestSetDefaultJob(t *testing.T) {
 				},
 			},
 			expectLabels: true,
+		},
+		"Pod failure policy and defaulting for pod replacement policy": {
+			original: &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
+					},
+					PodFailurePolicy: &batchv1.PodFailurePolicy{
+						Rules: []batchv1.PodFailurePolicyRule{
+							{
+								Action: batchv1.PodFailurePolicyActionFailJob,
+								OnExitCodes: &batchv1.PodFailurePolicyOnExitCodesRequirement{
+									Operator: batchv1.PodFailurePolicyOnExitCodesOpIn,
+									Values:   []int32{1},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Completions:          pointer.Int32(1),
+					Parallelism:          pointer.Int32(1),
+					BackoffLimit:         pointer.Int32(6),
+					CompletionMode:       completionModePtr(batchv1.NonIndexedCompletion),
+					Suspend:              pointer.Bool(false),
+					PodReplacementPolicy: podReplacementPtr(batchv1.Failed),
+					PodFailurePolicy: &batchv1.PodFailurePolicy{
+						Rules: []batchv1.PodFailurePolicyRule{
+							{
+								Action: batchv1.PodFailurePolicyActionFailJob,
+								OnExitCodes: &batchv1.PodFailurePolicyOnExitCodesRequirement{
+									Operator: batchv1.PodFailurePolicyOnExitCodesOpIn,
+									Values:   []int32{1},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectLabels:               true,
+			enablePodReplacementPolicy: true,
+		},
+		"All unspecified and podReplacementPolicyEnabled -> sets all to default values": {
+			original: &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
+					},
+				},
+			},
+			expected: &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Completions:          pointer.Int32(1),
+					Parallelism:          pointer.Int32(1),
+					BackoffLimit:         pointer.Int32(6),
+					CompletionMode:       completionModePtr(batchv1.NonIndexedCompletion),
+					Suspend:              pointer.Bool(false),
+					PodReplacementPolicy: podReplacementPtr(batchv1.TerminatingOrFailed),
+				},
+			},
+			expectLabels:               true,
+			enablePodReplacementPolicy: true,
 		},
 		"All unspecified -> sets all to default values": {
 			original: &batchv1.Job{
@@ -295,11 +363,12 @@ func TestSetDefaultJob(t *testing.T) {
 		"All set -> no change": {
 			original: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Completions:    pointer.Int32(8),
-					Parallelism:    pointer.Int32(9),
-					BackoffLimit:   pointer.Int32(10),
-					CompletionMode: completionModePtr(batchv1.NonIndexedCompletion),
-					Suspend:        pointer.Bool(false),
+					Completions:          pointer.Int32(8),
+					Parallelism:          pointer.Int32(9),
+					BackoffLimit:         pointer.Int32(10),
+					CompletionMode:       completionModePtr(batchv1.NonIndexedCompletion),
+					Suspend:              pointer.Bool(false),
+					PodReplacementPolicy: podReplacementPtr(batchv1.TerminatingOrFailed),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
 					},
@@ -307,11 +376,12 @@ func TestSetDefaultJob(t *testing.T) {
 			},
 			expected: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Completions:    pointer.Int32(8),
-					Parallelism:    pointer.Int32(9),
-					BackoffLimit:   pointer.Int32(10),
-					CompletionMode: completionModePtr(batchv1.NonIndexedCompletion),
-					Suspend:        pointer.Bool(false),
+					Completions:          pointer.Int32(8),
+					Parallelism:          pointer.Int32(9),
+					BackoffLimit:         pointer.Int32(10),
+					CompletionMode:       completionModePtr(batchv1.NonIndexedCompletion),
+					Suspend:              pointer.Bool(false),
+					PodReplacementPolicy: podReplacementPtr(batchv1.TerminatingOrFailed),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
 					},
@@ -322,11 +392,12 @@ func TestSetDefaultJob(t *testing.T) {
 		"All set, flipped -> no change": {
 			original: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Completions:    pointer.Int32(11),
-					Parallelism:    pointer.Int32(10),
-					BackoffLimit:   pointer.Int32(9),
-					CompletionMode: completionModePtr(batchv1.IndexedCompletion),
-					Suspend:        pointer.Bool(true),
+					Completions:          pointer.Int32(11),
+					Parallelism:          pointer.Int32(10),
+					BackoffLimit:         pointer.Int32(9),
+					CompletionMode:       completionModePtr(batchv1.IndexedCompletion),
+					Suspend:              pointer.Bool(true),
+					PodReplacementPolicy: podReplacementPtr(batchv1.Failed),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
 					},
@@ -334,11 +405,12 @@ func TestSetDefaultJob(t *testing.T) {
 			},
 			expected: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Completions:    pointer.Int32(11),
-					Parallelism:    pointer.Int32(10),
-					BackoffLimit:   pointer.Int32(9),
-					CompletionMode: completionModePtr(batchv1.IndexedCompletion),
-					Suspend:        pointer.Bool(true),
+					Completions:          pointer.Int32(11),
+					Parallelism:          pointer.Int32(10),
+					BackoffLimit:         pointer.Int32(9),
+					CompletionMode:       completionModePtr(batchv1.IndexedCompletion),
+					Suspend:              pointer.Bool(true),
+					PodReplacementPolicy: podReplacementPtr(batchv1.Failed),
 				},
 			},
 			expectLabels: true,
@@ -396,6 +468,7 @@ func TestSetDefaultJob(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobPodReplacementPolicy, test.enablePodReplacementPolicy)()
 			original := test.original
 			expected := test.expected
 			obj2 := roundTrip(t, runtime.Object(original))
@@ -423,6 +496,9 @@ func TestSetDefaultJob(t *testing.T) {
 			}
 			if diff := cmp.Diff(expected.Spec.CompletionMode, actual.Spec.CompletionMode); diff != "" {
 				t.Errorf("Unexpected CompletionMode (-want,+got):\n%s", diff)
+			}
+			if diff := cmp.Diff(expected.Spec.PodReplacementPolicy, actual.Spec.PodReplacementPolicy); diff != "" {
+				t.Errorf("Unexpected PodReplacementPolicy (-want,+got):\n%s", diff)
 			}
 		})
 	}
@@ -520,5 +596,9 @@ func TestSetDefaultCronJob(t *testing.T) {
 }
 
 func completionModePtr(m batchv1.CompletionMode) *batchv1.CompletionMode {
+	return &m
+}
+
+func podReplacementPtr(m batchv1.PodReplacementPolicy) *batchv1.PodReplacementPolicy {
 	return &m
 }
