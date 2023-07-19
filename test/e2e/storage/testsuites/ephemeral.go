@@ -35,6 +35,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
@@ -114,9 +115,14 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 		l       local
 	)
 
+	// The base name is used to generate a unique name for the resources created by this test.
+	// In order to avoid name collisions when we run this test in parallel with other ephemeral
+	// tests, we use a hash of the test suite as the suffix of the base name.
+	baseName := fmt.Sprintf("ephemeral-%s", utils.DeepHashObjectToString(p))
+
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
-	f := framework.NewFrameworkWithCustomTimeouts("ephemeral", storageframework.GetDriverTimeouts(driver))
+	f := framework.NewFrameworkWithCustomTimeouts(baseName, storageframework.GetDriverTimeouts(driver))
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	init := func(ctx context.Context) {
