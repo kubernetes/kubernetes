@@ -905,22 +905,22 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		ginkgo.By("Getting a ResourceQuota")
 		resourceQuotaResult, err := client.CoreV1().ResourceQuotas(ns).Get(ctx, quotaName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(resourceQuotaResult.Spec.Hard[v1.ResourceCPU], resource.MustParse("1"))
-		framework.ExpectEqual(resourceQuotaResult.Spec.Hard[v1.ResourceMemory], resource.MustParse("500Mi"))
+		gomega.Expect(resourceQuotaResult.Spec.Hard).To(gomega.HaveKeyWithValue(v1.ResourceCPU, resource.MustParse("1")))
+		gomega.Expect(resourceQuotaResult.Spec.Hard).To(gomega.HaveKeyWithValue(v1.ResourceMemory, resource.MustParse("500Mi")))
 
 		ginkgo.By("Updating a ResourceQuota")
 		resourceQuota.Spec.Hard[v1.ResourceCPU] = resource.MustParse("2")
 		resourceQuota.Spec.Hard[v1.ResourceMemory] = resource.MustParse("1Gi")
 		resourceQuotaResult, err = client.CoreV1().ResourceQuotas(ns).Update(ctx, resourceQuota, metav1.UpdateOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(resourceQuotaResult.Spec.Hard[v1.ResourceCPU], resource.MustParse("2"))
-		framework.ExpectEqual(resourceQuotaResult.Spec.Hard[v1.ResourceMemory], resource.MustParse("1Gi"))
+		gomega.Expect(resourceQuotaResult.Spec.Hard).To(gomega.HaveKeyWithValue(v1.ResourceCPU, resource.MustParse("2")))
+		gomega.Expect(resourceQuotaResult.Spec.Hard).To(gomega.HaveKeyWithValue(v1.ResourceMemory, resource.MustParse("1Gi")))
 
 		ginkgo.By("Verifying a ResourceQuota was modified")
 		resourceQuotaResult, err = client.CoreV1().ResourceQuotas(ns).Get(ctx, quotaName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(resourceQuotaResult.Spec.Hard[v1.ResourceCPU], resource.MustParse("2"))
-		framework.ExpectEqual(resourceQuotaResult.Spec.Hard[v1.ResourceMemory], resource.MustParse("1Gi"))
+		gomega.Expect(resourceQuotaResult.Spec.Hard).To(gomega.HaveKeyWithValue(v1.ResourceCPU, resource.MustParse("2")))
+		gomega.Expect(resourceQuotaResult.Spec.Hard).To(gomega.HaveKeyWithValue(v1.ResourceMemory, resource.MustParse("1Gi")))
 
 		ginkgo.By("Deleting a ResourceQuota")
 		err = deleteResourceQuota(ctx, client, ns, quotaName)
@@ -970,20 +970,20 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		ginkgo.By("Getting a ResourceQuota")
 		resourceQuotaResult, err := client.CoreV1().ResourceQuotas(ns).Get(ctx, rqName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(resourceQuotaResult.Spec.Hard[v1.ResourceCPU], resource.MustParse("1"))
-		framework.ExpectEqual(resourceQuotaResult.Spec.Hard[v1.ResourceMemory], resource.MustParse("500Mi"))
+		gomega.Expect(resourceQuotaResult.Spec.Hard[v1.ResourceCPU]).To(gomega.Equal(resource.MustParse("1")))
+		gomega.Expect(resourceQuotaResult.Spec.Hard[v1.ResourceMemory]).To(gomega.Equal(resource.MustParse("500Mi")))
 
 		ginkgo.By("Listing all ResourceQuotas with LabelSelector")
 		rq, err := client.CoreV1().ResourceQuotas("").List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
 		framework.ExpectNoError(err, "Failed to list job. %v", err)
-		framework.ExpectEqual(len(rq.Items), 1, "Failed to find ResourceQuotes %v", rqName)
+		gomega.Expect(rq.Items).To(gomega.HaveLen(1), "Failed to find ResourceQuotes %v", rqName)
 
 		ginkgo.By("Patching the ResourceQuota")
 		payload := "{\"metadata\":{\"labels\":{\"" + rqName + "\":\"patched\"}},\"spec\":{\"hard\":{ \"memory\":\"750Mi\"}}}"
 		patchedResourceQuota, err := client.CoreV1().ResourceQuotas(ns).Patch(ctx, rqName, types.StrategicMergePatchType, []byte(payload), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch ResourceQuota %s in namespace %s", rqName, ns)
-		framework.ExpectEqual(patchedResourceQuota.Labels[rqName], "patched", "Did not find the label for this ResourceQuota. Current labels: %v", patchedResourceQuota.Labels)
-		framework.ExpectEqual(*patchedResourceQuota.Spec.Hard.Memory(), resource.MustParse("750Mi"), "Hard memory value for ResourceQuota %q is %s not 750Mi.", patchedResourceQuota.ObjectMeta.Name, patchedResourceQuota.Spec.Hard.Memory().String())
+		gomega.Expect(patchedResourceQuota.Labels[rqName]).To(gomega.Equal("patched"), "Failed to find the label for this ResourceQuota. Current labels: %v", patchedResourceQuota.Labels)
+		gomega.Expect(*patchedResourceQuota.Spec.Hard.Memory()).To(gomega.Equal(resource.MustParse("750Mi")), "Hard memory value for ResourceQuota %q is %s not 750Mi.", patchedResourceQuota.ObjectMeta.Name, patchedResourceQuota.Spec.Hard.Memory().String())
 
 		ginkgo.By("Deleting a Collection of ResourceQuotas")
 		err = client.CoreV1().ResourceQuotas(ns).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: labelSelector})
@@ -1046,9 +1046,9 @@ var _ = SIGDescribe("ResourceQuota", func() {
 
 		initialResourceQuota, err := rqClient.Get(ctx, rqName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(*initialResourceQuota.Spec.Hard.Cpu(), resource.MustParse("500m"), "Hard cpu value for ResourceQuota %q is %s not 500m.", initialResourceQuota.Name, initialResourceQuota.Spec.Hard.Cpu().String())
+		gomega.Expect(*initialResourceQuota.Spec.Hard.Cpu()).To(gomega.Equal(resource.MustParse("500m")), "Hard cpu value for ResourceQuota %q is %s not 500m.", initialResourceQuota.Name, initialResourceQuota.Spec.Hard.Cpu().String())
 		framework.Logf("Resource quota %q reports spec: hard cpu limit of %s", rqName, initialResourceQuota.Spec.Hard.Cpu())
-		framework.ExpectEqual(*initialResourceQuota.Spec.Hard.Memory(), resource.MustParse("500Mi"), "Hard memory value for ResourceQuota %q is %s not 500Mi.", initialResourceQuota.Name, initialResourceQuota.Spec.Hard.Memory().String())
+		gomega.Expect(*initialResourceQuota.Spec.Hard.Memory()).To(gomega.Equal(resource.MustParse("500Mi")), "Hard memory value for ResourceQuota %q is %s not 500Mi.", initialResourceQuota.Name, initialResourceQuota.Spec.Hard.Memory().String())
 		framework.Logf("Resource quota %q reports spec: hard memory limit of %s", rqName, initialResourceQuota.Spec.Hard.Memory())
 
 		ginkgo.By(fmt.Sprintf("Updating resourceQuota %q /status", rqName))
@@ -1140,9 +1140,9 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		rq, err := unstructuredToResourceQuota(unstruct)
 		framework.ExpectNoError(err, "Getting the status of the resource quota %q", rq.Name)
 
-		framework.ExpectEqual(*rq.Status.Hard.Cpu(), resource.MustParse("1"), "Hard cpu value for ResourceQuota %q is %s not 1.", rq.Name, rq.Status.Hard.Cpu().String())
+		gomega.Expect(*rq.Status.Hard.Cpu()).To(gomega.Equal(resource.MustParse("1")), "Hard cpu value for ResourceQuota %q is %s not 1.", rq.Name, rq.Status.Hard.Cpu().String())
 		framework.Logf("Resourcequota %q reports status: hard cpu of %s", rqName, rq.Status.Hard.Cpu())
-		framework.ExpectEqual(*rq.Status.Hard.Memory(), resource.MustParse("1Gi"), "Hard memory value for ResourceQuota %q is %s not 1Gi.", rq.Name, rq.Status.Hard.Memory().String())
+		gomega.Expect(*rq.Status.Hard.Memory()).To(gomega.Equal(resource.MustParse("1Gi")), "Hard memory value for ResourceQuota %q is %s not 1Gi.", rq.Name, rq.Status.Hard.Memory().String())
 		framework.Logf("Resourcequota %q reports status: hard memory of %s", rqName, rq.Status.Hard.Memory())
 
 		// Sync resourceQuota list before repatching /status
@@ -1162,9 +1162,9 @@ var _ = SIGDescribe("ResourceQuota", func() {
 			metav1.PatchOptions{}, "status")
 		framework.ExpectNoError(err)
 
-		framework.ExpectEqual(*repatchedResourceQuota.Status.Hard.Cpu(), resource.MustParse("2"), "Hard cpu value for ResourceQuota %q is %s not 2.", repatchedResourceQuota.Name, repatchedResourceQuota.Status.Hard.Cpu().String())
+		gomega.Expect(*repatchedResourceQuota.Status.Hard.Cpu()).To(gomega.Equal(resource.MustParse("2")), "Hard cpu value for ResourceQuota %q is %s not 2.", repatchedResourceQuota.Name, repatchedResourceQuota.Status.Hard.Cpu().String())
 		framework.Logf("Resourcequota %q reports status: hard cpu of %s", repatchedResourceQuota.Name, repatchedResourceQuota.Status.Hard.Cpu())
-		framework.ExpectEqual(*repatchedResourceQuota.Status.Hard.Memory(), resource.MustParse("2Gi"), "Hard memory value for ResourceQuota %q is %s not 2Gi.", repatchedResourceQuota.Name, repatchedResourceQuota.Status.Hard.Memory().String())
+		gomega.Expect(*repatchedResourceQuota.Status.Hard.Memory()).To(gomega.Equal(resource.MustParse("2Gi")), "Hard memory value for ResourceQuota %q is %s not 2Gi.", repatchedResourceQuota.Name, repatchedResourceQuota.Status.Hard.Memory().String())
 		framework.Logf("Resourcequota %q reports status: hard memory of %s", repatchedResourceQuota.Name, repatchedResourceQuota.Status.Hard.Memory())
 
 		_, err = watchtools.Until(ctxUntil, rqList.ResourceVersion, w, func(event watch.Event) (bool, error) {
@@ -1190,8 +1190,8 @@ var _ = SIGDescribe("ResourceQuota", func() {
 			framework.ExpectNoError(err)
 
 			if apiequality.Semantic.DeepEqual(resourceQuotaResult.Spec.Hard.Cpu(), resourceQuotaResult.Status.Hard.Cpu()) {
-				framework.ExpectEqual(*resourceQuotaResult.Status.Hard.Cpu(), resource.MustParse("1"), "Hard cpu value for ResourceQuota %q is %s not 1.", repatchedResourceQuota.Name, repatchedResourceQuota.Status.Hard.Cpu().String())
-				framework.ExpectEqual(*resourceQuotaResult.Status.Hard.Memory(), resource.MustParse("1Gi"), "Hard memory value for ResourceQuota %q is %s not 1Gi.", repatchedResourceQuota.Name, repatchedResourceQuota.Status.Hard.Memory().String())
+				gomega.Expect(*resourceQuotaResult.Status.Hard.Cpu()).To(gomega.Equal(resource.MustParse("1")), "Hard cpu value for ResourceQuota %q is %s not 1.", repatchedResourceQuota.Name, repatchedResourceQuota.Status.Hard.Cpu().String())
+				gomega.Expect(*resourceQuotaResult.Status.Hard.Memory()).To(gomega.Equal(resource.MustParse("1Gi")), "Hard memory value for ResourceQuota %q is %s not 1Gi.", repatchedResourceQuota.Name, repatchedResourceQuota.Status.Hard.Memory().String())
 				framework.Logf("ResourceQuota %q Spec was unchanged and /status reset", resourceQuotaResult.Name)
 
 				return true, nil

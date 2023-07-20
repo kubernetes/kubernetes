@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	"k8s.io/kubernetes/test/utils/crd"
+	"k8s.io/kubernetes/test/utils/format"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/pointer"
@@ -460,18 +461,22 @@ func testCRListConversion(ctx context.Context, f *framework.Framework, testCrd *
 	ginkgo.By("List CRs in v1")
 	list, err := customResourceClients["v1"].List(ctx, metav1.ListOptions{})
 	framework.ExpectNoError(err)
-	gomega.Expect(len(list.Items)).To(gomega.BeIdenticalTo(2))
-	framework.ExpectEqual((list.Items[0].GetName() == name1 && list.Items[1].GetName() == name2) ||
-		(list.Items[0].GetName() == name2 && list.Items[1].GetName() == name1), true)
+	gomega.Expect(list.Items).To(gomega.HaveLen(2))
+	if !((list.Items[0].GetName() == name1 && list.Items[1].GetName() == name2) ||
+		(list.Items[0].GetName() == name2 && list.Items[1].GetName() == name1)) {
+		framework.Failf("failed to find v1 objects with names %s and %s in the list: \n%s", name1, name2, format.Object(list.Items, 1))
+	}
 	verifyV1Object(crd, &list.Items[0])
 	verifyV1Object(crd, &list.Items[1])
 
 	ginkgo.By("List CRs in v2")
 	list, err = customResourceClients["v2"].List(ctx, metav1.ListOptions{})
 	framework.ExpectNoError(err)
-	gomega.Expect(len(list.Items)).To(gomega.BeIdenticalTo(2))
-	framework.ExpectEqual((list.Items[0].GetName() == name1 && list.Items[1].GetName() == name2) ||
-		(list.Items[0].GetName() == name2 && list.Items[1].GetName() == name1), true)
+	gomega.Expect(list.Items).To(gomega.HaveLen(2))
+	if !((list.Items[0].GetName() == name1 && list.Items[1].GetName() == name2) ||
+		(list.Items[0].GetName() == name2 && list.Items[1].GetName() == name1)) {
+		framework.Failf("failed to find v2 objects with names %s and %s in the list: \n%s", name1, name2, format.Object(list.Items, 1))
+	}
 	verifyV2Object(crd, &list.Items[0])
 	verifyV2Object(crd, &list.Items[1])
 }
