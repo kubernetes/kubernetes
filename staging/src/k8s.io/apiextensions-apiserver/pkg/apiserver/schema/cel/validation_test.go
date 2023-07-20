@@ -2706,6 +2706,11 @@ func TestValidateFieldPath(t *testing.T) {
 					Type: "number",
 				},
 			},
+			"'foo'bar": {
+				Generic: schema.Generic{
+					Type: "number",
+				},
+			},
 			"a": {
 				Generic: schema.Generic{
 					Type: "object",
@@ -2798,6 +2803,20 @@ func TestValidateFieldPath(t *testing.T) {
 			pathOfFieldPath: path,
 			schema:          &sts,
 			validFieldPath:  path.Child("a"),
+		},
+		{
+			name:            "Valid 'foo'bar",
+			fieldPath:       "['\\'foo\\'bar']",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			validFieldPath:  path.Child("'foo'bar"),
+		},
+		{
+			name:            "Invalid 'foo'bar",
+			fieldPath:       ".\\'foo\\'bar",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "does not refer to a valid field",
 		},
 		{
 			name:            "Invalid with whitespace",
@@ -2987,7 +3006,7 @@ func TestValidateFieldPath(t *testing.T) {
 				t.Errorf("expected error to contain: %v, but get: %v", tc.errDetail, err)
 			}
 			if tc.validFieldPath != nil && tc.validFieldPath.String() != path.Child(validField.String()).String() {
-				t.Errorf("expected %v, got %v", tc.validFieldPath, validField)
+				t.Errorf("expected %v, got %v", tc.validFieldPath, path.Child(validField.String()))
 			}
 		})
 	}

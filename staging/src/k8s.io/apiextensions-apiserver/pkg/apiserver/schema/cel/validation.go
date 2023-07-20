@@ -325,19 +325,17 @@ func unescapeSingleQuote(s string) (string, error) {
 // ValidFieldPath validates that jsonPath is a valid JSON Path containing only field and map accessors
 // that are valid for the given schema, and returns a field.Path representation of the validated jsonPath or an error.
 func ValidFieldPath(jsonPath string, schema *schema.Structural) (validFieldPath *field.Path, err error) {
-	appendToPath := func(name string) error {
-		if schema.AdditionalProperties != nil {
+	appendToPath := func(name string, isNamed bool) error {
+		if !isNamed {
 			validFieldPath = validFieldPath.Key(name)
 			schema = schema.AdditionalProperties.Structural
-		} else if schema.Properties != nil {
+		} else {
 			validFieldPath = validFieldPath.Child(name)
 			val, ok := schema.Properties[name]
 			if !ok {
 				return fmt.Errorf("does not refer to a valid field")
 			}
 			schema = &val
-		} else {
-			return fmt.Errorf("does not refer to a valid field")
 		}
 		return nil
 	}
@@ -382,6 +380,7 @@ func ValidFieldPath(jsonPath string, schema *schema.Structural) (validFieldPath 
 	})
 
 	var tok string
+	var isNamed bool
 	for scanner.Scan() {
 		tok = scanner.Text()
 		switch tok {
@@ -397,7 +396,15 @@ func ValidFieldPath(jsonPath string, schema *schema.Structural) (validFieldPath 
 			if err != nil {
 				return nil, fmt.Errorf("invalid string literal: %v", err)
 			}
-			if err := appendToPath(unescaped); err != nil {
+
+			if schema.Properties != nil {
+				isNamed = true
+			} else if schema.AdditionalProperties != nil {
+				isNamed = false
+			} else {
+				return nil, fmt.Errorf("does not refer to a valid field")
+			}
+			if err := appendToPath(unescaped, isNamed); err != nil {
 				return nil, err
 			}
 			if !scanner.Scan() {
@@ -412,7 +419,14 @@ func ValidFieldPath(jsonPath string, schema *schema.Structural) (validFieldPath 
 				return nil, fmt.Errorf("unexpected end of JSON path")
 			}
 			tok = scanner.Text()
-			if err := appendToPath(tok); err != nil {
+			if schema.Properties != nil {
+				isNamed = true
+			} else if schema.AdditionalProperties != nil {
+				isNamed = false
+			} else {
+				return nil, fmt.Errorf("does not refer to a valid field")
+			}
+			if err := appendToPath(tok, isNamed); err != nil {
 				return nil, err
 			}
 		default:
