@@ -48,6 +48,13 @@ const uintptr_t C_FILTER_FLAG_LOG = SECCOMP_FILTER_FLAG_LOG;
 #endif
 const uintptr_t C_FILTER_FLAG_NEW_LISTENER = SECCOMP_FILTER_FLAG_NEW_LISTENER;
 
+#ifndef AUDIT_ARCH_RISCV64
+#ifndef EM_RISCV
+#define EM_RISCV		243
+#endif
+#define AUDIT_ARCH_RISCV64	(EM_RISCV|__AUDIT_ARCH_64BIT|__AUDIT_ARCH_LE)
+#endif
+
 // We use the AUDIT_ARCH_* values because those are the ones used by the kernel
 // and SCMP_ARCH_* sometimes has fake values (such as SCMP_ARCH_X32). But we
 // use <seccomp.h> so we get libseccomp's fallback definitions of AUDIT_ARCH_*.
@@ -67,6 +74,7 @@ const uint32_t C_AUDIT_ARCH_PPC64        = AUDIT_ARCH_PPC64;
 const uint32_t C_AUDIT_ARCH_PPC64LE      = AUDIT_ARCH_PPC64LE;
 const uint32_t C_AUDIT_ARCH_S390         = AUDIT_ARCH_S390;
 const uint32_t C_AUDIT_ARCH_S390X        = AUDIT_ARCH_S390X;
+const uint32_t C_AUDIT_ARCH_RISCV64      = AUDIT_ARCH_RISCV64;
 */
 import "C"
 
@@ -202,6 +210,8 @@ func archToNative(arch libseccomp.ScmpArch) (nativeArch, error) {
 		return nativeArch(C.C_AUDIT_ARCH_S390), nil
 	case libseccomp.ArchS390X:
 		return nativeArch(C.C_AUDIT_ARCH_S390X), nil
+	case libseccomp.ArchRISCV64:
+		return nativeArch(C.C_AUDIT_ARCH_RISCV64), nil
 	default:
 		return invalidArch, fmt.Errorf("unknown architecture: %v", arch)
 	}

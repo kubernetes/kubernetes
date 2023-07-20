@@ -417,6 +417,15 @@ func (m *legacyManager) Set(r *configs.Resources) error {
 		if err := m.doFreeze(configs.Frozen); err != nil {
 			// If freezer cgroup isn't supported, we just warn about it.
 			logrus.Infof("freeze container before SetUnitProperties failed: %v", err)
+			// skip update the cgroup while frozen failed. #3803
+			if !errors.Is(err, errSubsystemDoesNotExist) {
+				if needsThaw {
+					if thawErr := m.doFreeze(configs.Thawed); thawErr != nil {
+						logrus.Infof("thaw container after doFreeze failed: %v", thawErr)
+					}
+				}
+				return err
+			}
 		}
 	}
 	setErr := setUnitProperties(m.dbus, unitName, properties...)
