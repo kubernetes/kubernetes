@@ -2634,7 +2634,7 @@ func TestReasonAndFldPath(t *testing.T) {
 				},
 			},
 			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
-				"f": withReasonAndFldPath(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 2", ". m", forbiddenReason),
+				"f": withReasonAndFldPath(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 2", ".m", forbiddenReason),
 			}), "1 == 1"),
 			errorType: field.ErrorTypeForbidden,
 			errors:    []string{"root.f.m: Forbidden"},
@@ -2701,6 +2701,11 @@ func TestValidateFieldPath(t *testing.T) {
 					},
 				},
 			},
+			"white space": {
+				Generic: schema.Generic{
+					Type: "number",
+				},
+			},
 			"a": {
 				Generic: schema.Generic{
 					Type: "object",
@@ -2712,6 +2717,11 @@ func TestValidateFieldPath(t *testing.T) {
 						},
 					},
 					"test\a": {
+						Generic: schema.Generic{
+							Type: "number",
+						},
+					},
+					"bb[b": {
 						Generic: schema.Generic{
 							Type: "number",
 						},
@@ -2779,39 +2789,75 @@ func TestValidateFieldPath(t *testing.T) {
 		fieldPath       string
 		pathOfFieldPath *field.Path
 		schema          *schema.Structural
-		error           validationMatch
+		errDetail       string
 		validFieldPath  *field.Path
 	}{
 		{
 			name:            "Valid .a",
-			fieldPath:       ". a  ",
+			fieldPath:       ".a",
 			pathOfFieldPath: path,
 			schema:          &sts,
-			error:           validationMatch{},
 			validFieldPath:  path.Child("a"),
 		},
 		{
-			name:            "Valid .a.bbb",
-			fieldPath:       ". a. bbb",
+			name:            "Invalid with whitespace",
+			fieldPath:       ". a",
 			pathOfFieldPath: path,
 			schema:          &sts,
-			error:           validationMatch{},
-			validFieldPath:  path.Child("a", "bbb"),
+			errDetail:       "does not refer to a valid field",
+		},
+		{
+			name:            "Valid with whitespace inside field",
+			fieldPath:       ".white space",
+			pathOfFieldPath: path,
+			schema:          &sts,
+		},
+		{
+			name:            "Valid with whitespace inside field",
+			fieldPath:       "['white space']",
+			pathOfFieldPath: path,
+			schema:          &sts,
+		},
+		{
+			name:            "invalid dot annotation",
+			fieldPath:       ".a.bb[b",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "does not refer to a valid field",
+		},
+		{
+			name:            "valid with .",
+			fieldPath:       ".a['bbb.c']",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			validFieldPath:  path.Child("a", "bbb.c"),
+		},
+		{
+			name:            "Unclosed ]",
+			fieldPath:       ".a['bbb.c'",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "unexpected end of JSON path",
+		},
+		{
+			name:            "Unexpected end of JSON path",
+			fieldPath:       ".",
+			pathOfFieldPath: path,
+			schema:          &sts,
+			errDetail:       "unexpected end of JSON path",
 		},
 		{
 			name:            "Valid map syntax .a.bbb",
-			fieldPath:       ".a['bbb']",
+			fieldPath:       ".a['bbb.c']",
 			pathOfFieldPath: path,
 			schema:          &sts,
-			error:           validationMatch{},
-			validFieldPath:  path.Child("a").Child("bbb"),
+			validFieldPath:  path.Child("a").Child("bbb.c"),
 		},
 		{
 			name:            "Valid map key",
 			fieldPath:       ".foo.subAdd",
 			pathOfFieldPath: path,
 			schema:          &sts,
-			error:           validationMatch{},
 			validFieldPath:  path.Child("foo").Key("subAdd"),
 		},
 		{
@@ -2819,7 +2865,6 @@ func TestValidateFieldPath(t *testing.T) {
 			fieldPath:       ".foo['subAdd']",
 			pathOfFieldPath: path,
 			schema:          &sts,
-			error:           validationMatch{},
 			validFieldPath:  path.Child("foo").Key("subAdd"),
 		},
 		{
@@ -2827,14 +2872,12 @@ func TestValidateFieldPath(t *testing.T) {
 			fieldPath:       ".a.foo's",
 			pathOfFieldPath: path,
 			schema:          &sts,
-			error:           invalid(path.String()),
 		},
 		{
 			name:            "Escaping",
 			fieldPath:       ".a['foo\\'s']",
 			pathOfFieldPath: path,
 			schema:          &sts,
-			error:           validationMatch{},
 			validFieldPath:  path.Child("a").Child("foo's"),
 		},
 		{
@@ -2842,7 +2885,6 @@ func TestValidateFieldPath(t *testing.T) {
 			fieldPath:       ".a['test\\a']",
 			pathOfFieldPath: path,
 			schema:          &sts,
-			error:           validationMatch{},
 			validFieldPath:  path.Child("a").Child("test\a"),
 		},
 
@@ -2851,35 +2893,33 @@ func TestValidateFieldPath(t *testing.T) {
 			fieldPath:       ".a.foo",
 			pathOfFieldPath: path,
 			schema:          &sts,
-			error:           invalid(path.String()),
+			errDetail:       "does not refer to a valid field",
 		},
 		{
 			name:            "Malformed map key",
 			fieldPath:       ".a.bbb[0]",
 			pathOfFieldPath: path,
 			schema:          &sts,
-			error:           invalid(path.String()),
+			errDetail:       "expected single quoted string but got 0",
 		},
 		{
-			name:            "Invalid refer for special map key",
+			name:            "Valid refer for name has number",
 			fieldPath:       ".a.bbb.34",
 			pathOfFieldPath: path,
 			schema:          &sts,
-			error:           invalid(path.String()),
 		},
 		{
 			name:            "Map syntax for special field names",
 			fieldPath:       ".a.bbb['34']",
 			pathOfFieldPath: path,
 			schema:          &sts,
-			error:           validationMatch{},
+			//errDetail:       "does not refer to a valid field",
 		},
 		{
 			name:            "Valid .list",
-			fieldPath:       ". list   ",
+			fieldPath:       ".list",
 			pathOfFieldPath: path,
 			schema:          &sts,
-			error:           validationMatch{},
 			validFieldPath:  path.Child("list"),
 		},
 		{
@@ -2887,92 +2927,70 @@ func TestValidateFieldPath(t *testing.T) {
 			fieldPath:       ".list[0]",
 			pathOfFieldPath: path,
 			schema:          &sts,
-			error:           invalid(path.String()),
+			errDetail:       "expected single quoted string but got 0",
 		},
 		{
 			name:            "Invalid list reference",
 			fieldPath:       ".list. a",
 			pathOfFieldPath: path,
 			schema:          &sts,
-			error:           invalid(path.String()),
+			errDetail:       "does not refer to a valid field",
 		},
 		{
 			name:            "Invalid .list.a",
 			fieldPath:       ".list['a']",
 			pathOfFieldPath: path,
 			schema:          &sts,
-			error:           invalid(path.String()),
+			errDetail:       "does not refer to a valid field",
 		},
 		{
 			name:            "Missing leading dot",
 			fieldPath:       "a",
 			pathOfFieldPath: path,
 			schema:          &sts,
-			error:           invalid(path.String()),
+			errDetail:       "expected [ or . but got: a",
 		},
 		{
 			name:            "Nonexistent field",
 			fieldPath:       ".c",
 			pathOfFieldPath: path,
 			schema:          &sts,
-			error:           invalid(path.String()),
+			errDetail:       "does not refer to a valid field",
 		},
 		{
 			name:            "Duplicate dots",
 			fieldPath:       ".a..b",
 			pathOfFieldPath: path,
 			schema:          &sts,
-			error:           invalid(path.String()),
+			errDetail:       "does not refer to a valid field",
 		},
 		{
 			name:            "object of array",
 			fieldPath:       ".list.a-b.34",
 			pathOfFieldPath: path,
 			schema:          &sts,
-			error:           invalid(path.String()),
+			errDetail:       "does not refer to a valid field",
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			validField, err := ValidFieldPath(tc.fieldPath, tc.pathOfFieldPath, tc.schema)
+			validField, err := ValidFieldPath(tc.fieldPath, tc.schema)
 
-			if err == nil && !tc.error.empty() {
-				t.Errorf("expected %v at %v but got nil", tc.error.errorType, tc.error.path.String())
-			} else if err != nil && tc.error.empty() {
-				t.Errorf("unexpected error: %v at %v", tc.error.errorType, tc.error.path.String())
-			} else if !tc.error.matches(err) {
-				t.Errorf("expected %v at %v, got %v", tc.error.errorType, tc.error.path.String(), err)
+			if err == nil && tc.errDetail != "" {
+				t.Errorf("expected err contains: %v but get nil", tc.errDetail)
 			}
-			if tc.validFieldPath != nil && tc.validFieldPath.String() != validField.String() {
+			if err != nil && tc.errDetail == "" {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if err != nil && !strings.Contains(err.Error(), tc.errDetail) {
+				t.Errorf("expected error to contain: %v, but get: %v", tc.errDetail, err)
+			}
+			if tc.validFieldPath != nil && tc.validFieldPath.String() != path.Child(validField.String()).String() {
 				t.Errorf("expected %v, got %v", tc.validFieldPath, validField)
 			}
 		})
 	}
-}
-
-type validationMatch struct {
-	path      *field.Path
-	errorType field.ErrorType
-	contains  string
-}
-
-func invalid(path ...string) validationMatch {
-	return validationMatch{path: field.NewPath(path[0], path[1:]...), errorType: field.ErrorTypeInvalid}
-}
-
-func (v validationMatch) matches(err *field.Error) bool {
-	if err == nil && v.empty() {
-		return true
-	}
-	return err.Type == v.errorType && err.Field == v.path.String() && strings.Contains(err.Error(), v.contains)
-}
-
-func (v validationMatch) empty() bool {
-	if v.path == nil && v.errorType == "" && v.contains == "" {
-		return true
-	}
-	return false
 }
 
 func genString(n int, c rune) string {

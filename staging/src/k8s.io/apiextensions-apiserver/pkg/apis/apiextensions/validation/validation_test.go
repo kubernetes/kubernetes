@@ -76,13 +76,6 @@ func (v validationMatch) matches(err *field.Error) bool {
 	return err.Type == v.errorType && err.Field == v.path.String() && strings.Contains(err.Error(), v.contains)
 }
 
-func (v validationMatch) empty() bool {
-	if v.path == nil && v.errorType == "" && v.contains == "" {
-		return true
-	}
-	return false
-}
-
 func strPtr(s string) *string { return &s }
 
 func TestValidateCustomResourceDefinition(t *testing.T) {
@@ -4140,18 +4133,45 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							Type: "object",
 							XValidations: apiextensions.ValidationRules{
 								{
-									Rule:      "self.a.b.c > 0.0",
-									FieldPath: ".a.b.c",
+									Rule:      "true",
+									FieldPath: ".foo['b.c']['c\\a']",
+								},
+								{
+									Rule:      "true",
+									FieldPath: "['a.c']",
+								},
+								{
+									Rule:      "true",
+									FieldPath: ".a.c",
+								},
+								{
+									Rule:      "true",
+									FieldPath: ".list[0]",
+								},
+								{
+									Rule:      "true",
+									FieldPath: "   ",
+								},
+								{
+									Rule:      "true",
+									FieldPath: ".",
+								},
+								{
+									Rule:      "true",
+									FieldPath: "..",
 								},
 							},
 							Properties: map[string]apiextensions.JSONSchemaProps{
-								"a": {
+								"a.c": {
+									Type: "number",
+								},
+								"foo": {
 									Type: "object",
 									Properties: map[string]apiextensions.JSONSchemaProps{
-										"b": {
+										"b.c": {
 											Type: "object",
 											Properties: map[string]apiextensions.JSONSchemaProps{
-												"c": {
+												"c\a": {
 													Type: "number",
 												},
 											},
@@ -4179,7 +4199,14 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					StoredVersions: []string{"version"},
 				},
 			},
-			errors: []validationMatch{},
+			errors: []validationMatch{
+				invalid("spec", "validation", "openAPIV3Schema", "x-kubernetes-validations[2]", "fieldPath"),
+				invalid("spec", "validation", "openAPIV3Schema", "x-kubernetes-validations[3]", "fieldPath"),
+				invalid("spec", "validation", "openAPIV3Schema", "x-kubernetes-validations[4]", "fieldPath"),
+				invalid("spec", "validation", "openAPIV3Schema", "x-kubernetes-validations[4]", "fieldPath"),
+				invalid("spec", "validation", "openAPIV3Schema", "x-kubernetes-validations[5]", "fieldPath"),
+				invalid("spec", "validation", "openAPIV3Schema", "x-kubernetes-validations[6]", "fieldPath"),
+			},
 		},
 		{
 			name: "x-kubernetes-validations have invalid fieldPath",
@@ -4368,168 +4395,156 @@ func TestValidateFieldPath(t *testing.T) {
 		fieldPath       string
 		pathOfFieldPath *field.Path
 		schema          *apiextensions.JSONSchemaProps
-		error           validationMatch
+		errMsg          string
 	}{
 		{
 			name:            "Valid .a",
 			fieldPath:       ".a",
 			pathOfFieldPath: path,
 			schema:          &schema,
-			error:           validationMatch{},
 		},
 		{
 			name:            "Valid .a.b",
 			fieldPath:       ".a.bbb",
 			pathOfFieldPath: path,
 			schema:          &schema,
-			error:           validationMatch{},
 		},
 		{
 			name:            "Valid .foo.f1",
 			fieldPath:       ".foo.f1",
 			pathOfFieldPath: path,
 			schema:          &schema,
-			error:           validationMatch{},
 		},
 		{
 			name:            "Invalid map syntax .a.b",
 			fieldPath:       ".a['bbb']",
 			pathOfFieldPath: path,
 			schema:          &schema,
-			error:           validationMatch{},
 		},
 		{
 			name:            "Valid .a['bbb.c']",
 			fieldPath:       ".a['bbb.c']",
 			pathOfFieldPath: path,
 			schema:          &schema,
-			error:           validationMatch{},
 		},
 		{
-			name:            "Invalid .a['bbb.c'].a-b34",
+			name:            "Valid .a['bbb.c'].a-b34",
 			fieldPath:       ".a['bbb.c'].a-b34",
 			pathOfFieldPath: path,
 			schema:          &schema,
-			error:           invalid(path.String()),
 		},
 		{
 			name:            "Valid .a['bbb.c']['a-b34']",
 			fieldPath:       ".a['bbb.c']['a-b34']",
 			pathOfFieldPath: path,
 			schema:          &schema,
-			error:           validationMatch{},
 		},
 		{
 			name:            "Valid .a.bbb.c",
 			fieldPath:       ".a.bbb.c",
 			pathOfFieldPath: path,
 			schema:          &schema,
-			error:           validationMatch{},
 		},
 		{
 			name:            "Valid .a.bbb.34",
 			fieldPath:       ".a.bbb['34']",
 			pathOfFieldPath: path,
 			schema:          &schema,
-			error:           validationMatch{},
 		},
 		{
 			name:            "Invalid map key",
 			fieldPath:       ".a.foo",
 			pathOfFieldPath: path,
 			schema:          &schema,
-			error:           invalid(path.String()),
+			errMsg:          "does not refer to a valid field",
 		},
 		{
 			name:            "Malformed map key",
 			fieldPath:       ".a.bbb[0]",
 			pathOfFieldPath: path,
 			schema:          &schema,
-			error:           invalid(path.String()),
+			errMsg:          "expected single quoted string but got 0",
 		},
 		{
-			name:            "Special field names",
+			name:            "number in field names",
 			fieldPath:       ".a.bbb.34",
 			pathOfFieldPath: path,
 			schema:          &schema,
-			error:           invalid(path.String()),
 		},
 		{
 			name:            "Special field names",
 			fieldPath:       ".a.bbb['34']",
 			pathOfFieldPath: path,
 			schema:          &schema,
-			error:           validationMatch{},
 		},
 		{
 			name:            "Valid .list",
 			fieldPath:       ".list",
 			pathOfFieldPath: path,
 			schema:          &schema,
-			error:           validationMatch{},
 		},
 		{
 			name:            "Invalid .list[1]",
 			fieldPath:       ".list[1]",
 			pathOfFieldPath: path,
 			schema:          &schema,
-			error:           invalid(path.String()),
+			errMsg:          "expected single quoted string but got 1",
 		},
 		{
 			name:            "Unsopported .list.a",
 			fieldPath:       ".list.a",
 			pathOfFieldPath: path,
 			schema:          &schema,
-			error:           invalid(path.String()),
+			errMsg:          "does not refer to a valid field",
 		},
 		{
 			name:            "Unsupported .list['a-b.34']",
 			fieldPath:       ".list['a-b.34']",
 			pathOfFieldPath: path,
 			schema:          &schema,
-			error:           invalid(path.String()),
+			errMsg:          "does not refer to a valid field",
 		},
 		{
 			name:            "Invalid .list.a-b.34",
 			fieldPath:       ".list.a-b.34",
 			pathOfFieldPath: path,
 			schema:          &schema,
-			error:           invalid(path.String()),
+			errMsg:          "does not refer to a valid field",
 		},
 		{
 			name:            "Missing leading dot",
 			fieldPath:       "a",
 			pathOfFieldPath: path,
 			schema:          &schema,
-			error:           invalid(path.String()),
+			errMsg:          "expected [ or . but got: a",
 		},
 		{
 			name:            "Nonexistent field",
 			fieldPath:       ".c",
 			pathOfFieldPath: path,
 			schema:          &schema,
-			error:           invalid(path.String()),
+			errMsg:          "does not refer to a valid field",
 		},
 		{
 			name:            "Duplicate dots",
 			fieldPath:       ".a..b",
 			pathOfFieldPath: path,
 			schema:          &schema,
-			error:           invalid(path.String()),
+			errMsg:          "does not refer to a valid field",
 		},
 		{
 			name:            "Negative array index",
 			fieldPath:       ".list[-1]",
 			pathOfFieldPath: path,
 			schema:          &schema,
-			error:           invalid(path.String()),
+			errMsg:          "expected single quoted string but got -1",
 		},
 		{
 			name:            "Floating-point array index",
 			fieldPath:       ".list[1.0]",
 			pathOfFieldPath: path,
 			schema:          &schema,
-			error:           invalid(path.String()),
+			errMsg:          "expected single quoted string but got 1",
 		},
 	}
 
@@ -4539,13 +4554,15 @@ func TestValidateFieldPath(t *testing.T) {
 			if err != nil {
 				t.Fatalf("error when converting schema to structural schema: %v", err)
 			}
-			_, e := celschema.ValidFieldPath(tc.fieldPath, tc.pathOfFieldPath, ss)
-			if e == nil && !tc.error.empty() {
-				t.Errorf("expected %v at %v but got nil", tc.error.errorType, tc.error.path.String())
-			} else if e != nil && tc.error.empty() {
-				t.Errorf("unexpected error: %v at %v", tc.error.errorType, tc.error.path.String())
-			} else if !tc.error.empty() && !tc.error.matches(e) {
-				t.Errorf("expected %v at %v, got %v", tc.error.errorType, tc.error.path.String(), err)
+			_, err = celschema.ValidFieldPath(tc.fieldPath, ss)
+			if err == nil && tc.errMsg != "" {
+				t.Errorf("expected err contains: %v but get nil", tc.errMsg)
+			}
+			if err != nil && tc.errMsg == "" {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if err != nil && !strings.Contains(err.Error(), tc.errMsg) {
+				t.Errorf("expected error to contain: %v, but get: %v", tc.errMsg, err)
 			}
 		})
 	}
