@@ -55,7 +55,7 @@ func (s *SortingPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
 
 		sorter, err := NewTableSorter(table, parsedField)
 		if sorter != nil && errors.As(err, &ErrNoFieldMatch{}) {
-			klog.Warningln(err.Error())
+			klog.Warningf("WARNING: %v", err.Error())
 		} else if sorter == nil || err != nil {
 			if err == nil {
 				return fmt.Errorf("unknown sorting error")
