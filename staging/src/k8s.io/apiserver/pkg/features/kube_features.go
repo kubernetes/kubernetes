@@ -216,6 +216,12 @@ const (
 	//
 	// Allow the API server to serve consistent lists from cache
 	ConsistentListFromCache featuregate.Feature = "ConsistentListFromCache"
+
+	// owner: @ravisantoshgudimetla,@wackxu
+	// kep: http://kep.k8s.io/4129
+	// alpha: v1.28
+	// AllowPriorityClassUpdates allows user to mutate priority classes
+	AllowPriorityClassUpdates featuregate.Feature = "AllowPriorityClassUpdates"
 )
 
 func init() {
@@ -274,4 +280,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	WatchList: {Default: false, PreRelease: featuregate.Alpha},
 
 	ConsistentListFromCache: {Default: false, PreRelease: featuregate.Alpha},
+
+	AllowPriorityClassUpdates: {Default: false, PreRelease: featuregate.Alpha},
 }

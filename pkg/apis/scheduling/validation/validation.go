@@ -22,6 +22,8 @@ import (
 
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	schedulingapiv1 "k8s.io/kubernetes/pkg/apis/scheduling/v1"
@@ -53,10 +55,26 @@ func ValidatePriorityClass(pc *scheduling.PriorityClass) field.ErrorList {
 func ValidatePriorityClassUpdate(pc, oldPc *scheduling.PriorityClass) field.ErrorList {
 	// name is immutable and is checked by the ObjectMeta validator.
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&pc.ObjectMeta, &oldPc.ObjectMeta, field.NewPath("metadata"))
-	// value is immutable.
-	if pc.Value != oldPc.Value {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("value"), "may not be changed in an update."))
+
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AllowPriorityClassUpdates) {
+		// Don't allow updates to system-* priority classes
+		if strings.HasPrefix(pc.Name, scheduling.SystemPriorityClassPrefix) {
+			if is, _ := schedulingapiv1.IsKnownSystemPriorityClass(oldPc.Name, oldPc.Value, oldPc.GlobalDefault); is {
+				if oldPc.Value != pc.Value {
+					allErrs = append(allErrs, field.Forbidden(field.NewPath("Value"), "may not be changed in an update for system critical priority classes"))
+				}
+			}
+		} else if pc.Value > scheduling.HighestUserDefinablePriority {
+			// Non-system critical priority classes are not allowed to have a value larger than HighestUserDefinablePriority.
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("value"), fmt.Sprintf("maximum allowed value of a user defined priority is %v", scheduling.HighestUserDefinablePriority)))
+		}
+	} else {
+		// AllowPriorityClassUpdates feature is not enabled, value is immutable.
+		if pc.Value != oldPc.Value {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("value"), "may not be changed in an update."))
+		}
 	}
+
 	// preemptionPolicy is immutable.
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(pc.PreemptionPolicy, oldPc.PreemptionPolicy, field.NewPath("preemptionPolicy"))...)
 	return allErrs
