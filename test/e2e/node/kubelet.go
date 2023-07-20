@@ -455,7 +455,7 @@ var _ = SIGDescribe("kubelet", func() {
 	})
 
 	// Tests for NodeLogQuery feature
-	ginkgo.Describe("kubectl get --raw \"/api/v1/nodes/<insert-node-name-here>/proxy/logs/?query=/<insert-log-file-name-here> [Feature:NodeLogQuery]", func() {
+	ginkgo.Describe("kubectl get --raw \"/api/v1/nodes/<insert-node-name-here>/proxy/logs/?query=/<insert-log-file-name-here> [Feature:NodeLogQuery] [LinuxOnly]", func() {
 		var (
 			numNodes  int
 			nodeNames sets.String
