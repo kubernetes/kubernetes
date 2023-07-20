@@ -3350,7 +3350,7 @@ var _ = common.SIGDescribe("Services", func() {
 				Labels: testSvcLabels,
 			},
 			Spec: v1.ServiceSpec{
-				Type: "ClusterIP",
+				Type: "LoadBalancer",
 				Ports: []v1.ServicePort{{
 					Name:       "http",
 					Protocol:   v1.ProtocolTCP,
