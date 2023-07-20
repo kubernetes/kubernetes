@@ -117,7 +117,7 @@ func TestPodGcOrphanedPodsWithFinalizer(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Error %v, while creating pod: %v", err, klog.KObj(pod))
 			}
-			defer testutils.RemovePodFinalizers(testCtx.ClientSet, t, []*v1.Pod{pod})
+			defer testutils.RemovePodFinalizers(testCtx.Ctx, testCtx.ClientSet, t, *pod)
 
 			pod.Status.Phase = test.phase
 			if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).UpdateStatus(testCtx.Ctx, pod, metav1.UpdateOptions{}); err != nil {
@@ -160,8 +160,8 @@ func TestTerminatingOnOutOfServiceNode(t *testing.T) {
 			withFinalizer:                 true,
 			wantPhase:                     v1.PodFailed,
 		},
-		"pod has phase when PodDisruptionConditions disabled": {
-			enablePodDisruptionConditions: true,
+		"pod has phase unchanged when PodDisruptionConditions disabled": {
+			enablePodDisruptionConditions: false,
 			withFinalizer:                 true,
 			wantPhase:                     v1.PodPending,
 		},
@@ -226,7 +226,7 @@ func TestTerminatingOnOutOfServiceNode(t *testing.T) {
 				t.Fatalf("Error %v, while creating pod: %v", err, klog.KObj(pod))
 			}
 			if test.withFinalizer {
-				defer testutils.RemovePodFinalizers(testCtx.ClientSet, t, []*v1.Pod{pod})
+				defer testutils.RemovePodFinalizers(testCtx.Ctx, testCtx.ClientSet, t, *pod)
 			}
 
 			// trigger termination of the pod, but with long grace period so that it is not removed immediately
@@ -246,7 +246,7 @@ func TestTerminatingOnOutOfServiceNode(t *testing.T) {
 			}
 			if test.withFinalizer {
 				// wait until the pod phase is set as expected
-				err = wait.PollImmediate(time.Second, time.Second*15, func() (bool, error) {
+				err = wait.Poll(time.Second, time.Second*15, func() (bool, error) {
 					var e error
 					pod, e = cs.CoreV1().Pods(pod.Namespace).Get(testCtx.Ctx, pod.Name, metav1.GetOptions{})
 					if e != nil {

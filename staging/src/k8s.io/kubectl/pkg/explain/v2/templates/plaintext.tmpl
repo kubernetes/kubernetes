@@ -2,13 +2,33 @@
 {{- $prefix := (ternary "/api" (join "" "/apis/" $.GVR.Group) (not $.GVR.Group)) -}}
 
 {{- /* Search both cluster-scoped and namespaced-scoped paths for the GVR to find its GVK */ -}}
-{{- /* Looks for path /apis/<group>/<version>/<resource> or /apis/<group>/<version>/<version>/namespaces/{namespace}/<resource> */ -}}
+{{- /* Also search for paths with {name} component in case the list path is missing */ -}}
+{{- /* Looks for the following paths: */ -}}
+{{- /* /apis/<group>/<version>/<resource> */ -}}
+{{- /* /apis/<group>/<version>/<resource>/{name} */ -}}
+{{- /* /apis/<group>/<version>/namespaces/{namespace}/<resource> */ -}}
+{{- /* /apis/<group>/<version>/namespaces/{namespace}/<resource>/{name} */ -}}
+{{- /* Also search for get verb paths in case list verb is missing */ -}}
 {{- $clusterScopedSearchPath :=  join "/" $prefix $.GVR.Version $.GVR.Resource -}}
-{{- $namespaceScopedSearchPath := join "/" $prefix $.GVR.Version "namespaces" "\\{namespace\\}" $.GVR.Resource -}}
-{{- $path := or (index $.Document "paths" $clusterScopedSearchPath) (index $.Document "paths" $clusterScopedSearchPath) -}}
+{{- $clusterScopedNameSearchPath :=  join "/" $prefix $.GVR.Version $.GVR.Resource "{name}" -}}
+{{- $namespaceScopedSearchPath := join "/" $prefix $.GVR.Version "namespaces" "{namespace}" $.GVR.Resource -}}
+{{- $namespaceScopedNameSearchPath := join "/" $prefix $.GVR.Version "namespaces" "{namespace}" $.GVR.Resource "{name}" -}}
+{{- $gvk := "" -}}
 
 {{- /* Pull GVK from operation */ -}}
-{{- with $gvk := and $path (index $path "get" "x-kubernetes-group-version-kind") -}}
+{{- range $index, $searchPath := (list $clusterScopedSearchPath $clusterScopedNameSearchPath $namespaceScopedSearchPath $namespaceScopedNameSearchPath) -}}
+    {{- with $resourcePathElement := index $.Document "paths" $searchPath -}}
+        {{- range $methodIndex, $method := (list "get" "post" "put" "patch" "delete") -}}
+            {{- with $resourceMethodPathElement := index $resourcePathElement $method -}}
+                {{- with $gvk = index $resourceMethodPathElement "x-kubernetes-group-version-kind" -}}
+                    {{- break -}}
+                {{- end -}}
+            {{- end -}}
+        {{- end -}}
+    {{- end -}}
+{{- end -}}
+
+{{- with $gvk -}}
     {{- if $gvk.group -}}
         GROUP:      {{ $gvk.group }}{{"\n" -}}
     {{- end -}}
