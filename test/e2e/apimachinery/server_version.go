@@ -25,6 +25,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("server version", func() {
@@ -47,7 +48,7 @@ var _ = SIGDescribe("server version", func() {
 
 		ginkgo.By("Confirm major version")
 		re := regexp.MustCompile("[1-9]")
-		framework.ExpectEqual(re.FindString(version.Major), version.Major, "unable to find major version")
+		gomega.Expect(re.FindString(version.Major)).To(gomega.Equal(version.Major), "unable to find major version")
 		framework.Logf("Major version: %v", version.Major)
 
 		ginkgo.By("Confirm minor version")
@@ -57,7 +58,7 @@ var _ = SIGDescribe("server version", func() {
 		framework.Logf("cleanMinorVersion: %v", cleanMinorVersion)
 
 		re = regexp.MustCompile("[0-9]+")
-		framework.ExpectEqual(re.FindString(version.Minor), cleanMinorVersion, "unable to find minor version")
+		gomega.Expect(re.FindString(version.Minor)).To(gomega.Equal(cleanMinorVersion), "unable to find minor version")
 		framework.Logf("Minor version: %v", version.Minor)
 	})
 })

@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/utils/crd"
+	"k8s.io/kubernetes/test/utils/format"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
@@ -155,7 +156,9 @@ var _ = SIGDescribe("Discovery", func() {
 					break
 				}
 			}
-			framework.ExpectEqual(true, match, "failed to find a valid version for PreferredVersion")
+			if !match {
+				framework.Failf("Failed to find a valid version for PreferredVersion %s in versions:\n%s", checkGroup.PreferredVersion.GroupVersion, format.Object(checkGroup.Versions, 1))
+			}
 		}
 	})
 
