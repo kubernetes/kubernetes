@@ -26,7 +26,14 @@ import (
 	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/proxy/metrics"
 	"k8s.io/utils/clock"
+)
+
+const (
+	// ToBeDeletedTaint is a taint used by the CLuster Autoscaler before marking a node for deletion. Defined in
+	// https://github.com/kubernetes/autoscaler/blob/e80ab518340f88f364fe3ef063f8303755125971/cluster-autoscaler/utils/deletetaint/delete.go#L36
+	ToBeDeletedTaint = "ToBeDeletedByClusterAutoscaler"
 )
 
 // ProxierHealthUpdater allows callers to update healthz timestamp only.
@@ -41,6 +48,10 @@ type ProxierHealthUpdater interface {
 
 	// Run starts the healthz HTTP server and blocks until it exits.
 	Run() error
+
+	// Sync the node and determine if its eligible or not. Eligible is
+	// defined as being: not tainted by ToBeDeletedTaint and not deleted.
+	SyncNode(node *v1.Node)
 
 	proxierHealthChecker
 }
@@ -62,6 +73,7 @@ type proxierHealthServer struct {
 
 	lastUpdated         atomic.Value
 	oldestPendingQueued atomic.Value
+	nodeEligible        atomic.Bool
 }
 
 // NewProxierHealthServer returns a proxier health http server.
@@ -70,7 +82,7 @@ func NewProxierHealthServer(addr string, healthTimeout time.Duration, recorder e
 }
 
 func newProxierHealthServer(listener listener, httpServerFactory httpServerFactory, c clock.Clock, addr string, healthTimeout time.Duration, recorder events.EventRecorder, nodeRef *v1.ObjectReference) *proxierHealthServer {
-	return &proxierHealthServer{
+	hs := &proxierHealthServer{
 		listener:      listener,
 		httpFactory:   httpServerFactory,
 		clock:         c,
@@ -79,6 +91,11 @@ func newProxierHealthServer(listener listener, httpServerFactory httpServerFacto
 		recorder:      recorder,
 		nodeRef:       nodeRef,
 	}
+	// The node is eligible (and thus the proxy healthy) while it's starting up
+	// and until we've processed the first node event that indicates the
+	// contrary.
+	hs.nodeEligible.Store(true)
+	return hs
 }
 
 // Updated indicates that kube-proxy has successfully updated its backend, so it should
@@ -96,8 +113,8 @@ func (hs *proxierHealthServer) QueuedUpdate() {
 	hs.oldestPendingQueued.CompareAndSwap(zeroTime, hs.clock.Now())
 }
 
-// IsHealthy returns the proxier's health state, following the same definition
-// the HTTP server defines.
+// IsHealthy returns only the proxier's health state, following the same
+// definition the HTTP server defines, but ignoring the state of the Node.
 func (hs *proxierHealthServer) IsHealthy() bool {
 	isHealthy, _, _ := hs.isHealthy()
 	return isHealthy
@@ -123,14 +140,28 @@ func (hs *proxierHealthServer) isHealthy() (bool, time.Time, time.Time) {
 		// There's an unprocessed update queued, but it's not late yet
 		healthy = true
 	}
-
 	return healthy, lastUpdated, currentTime
+}
+
+func (hs *proxierHealthServer) SyncNode(node *v1.Node) {
+	if !node.DeletionTimestamp.IsZero() {
+		hs.nodeEligible.Store(false)
+		return
+	}
+	for _, taint := range node.Spec.Taints {
+		if taint.Key == ToBeDeletedTaint {
+			hs.nodeEligible.Store(false)
+			return
+		}
+	}
+	hs.nodeEligible.Store(true)
 }
 
 // Run starts the healthz HTTP server and blocks until it exits.
 func (hs *proxierHealthServer) Run() error {
 	serveMux := http.NewServeMux()
 	serveMux.Handle("/healthz", healthzHandler{hs: hs})
+	serveMux.Handle("/livez", livezHandler{hs: hs})
 	server := hs.httpFactory.New(hs.addr, serveMux)
 
 	listener, err := hs.listener.Listen(hs.addr)
@@ -156,12 +187,40 @@ type healthzHandler struct {
 }
 
 func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
+	nodeEligible := h.hs.nodeEligible.Load()
+	healthy, lastUpdated, currentTime := h.hs.isHealthy()
+	healthy = healthy && nodeEligible
+	resp.Header().Set("Content-Type", "application/json")
+	resp.Header().Set("X-Content-Type-Options", "nosniff")
+	if !healthy {
+		metrics.ProxyHealthzTotal.WithLabelValues("503").Inc()
+		resp.WriteHeader(http.StatusServiceUnavailable)
+	} else {
+		metrics.ProxyHealthzTotal.WithLabelValues("200").Inc()
+		resp.WriteHeader(http.StatusOK)
+		// In older releases, the returned "lastUpdated" time indicated the last
+		// time the proxier sync loop ran, even if nothing had changed. To
+		// preserve compatibility, we use the same semantics: the returned
+		// lastUpdated value is "recent" if the server is healthy. The kube-proxy
+		// metrics provide more detailed information.
+		lastUpdated = currentTime
+	}
+	fmt.Fprintf(resp, `{"lastUpdated": %q,"currentTime": %q, "nodeEligible": %v}`, lastUpdated, currentTime, nodeEligible)
+}
+
+type livezHandler struct {
+	hs *proxierHealthServer
+}
+
+func (h livezHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	healthy, lastUpdated, currentTime := h.hs.isHealthy()
 	resp.Header().Set("Content-Type", "application/json")
 	resp.Header().Set("X-Content-Type-Options", "nosniff")
 	if !healthy {
+		metrics.ProxyLivezTotal.WithLabelValues("503").Inc()
 		resp.WriteHeader(http.StatusServiceUnavailable)
 	} else {
+		metrics.ProxyLivezTotal.WithLabelValues("200").Inc()
 		resp.WriteHeader(http.StatusOK)
 		// In older releases, the returned "lastUpdated" time indicated the last
 		// time the proxier sync loop ran, even if nothing had changed. To

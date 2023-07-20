@@ -5922,7 +5922,7 @@ func TestValidateEnv(t *testing.T) {
 				},
 			},
 		}},
-		expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.labels": supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP", "status.podIPs"`,
+		expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.labels": supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.hostIPs", "status.podIP", "status.podIPs"`,
 	}, {
 		name: "metadata.annotations without subscript",
 		envs: []core.EnvVar{{
@@ -5934,7 +5934,7 @@ func TestValidateEnv(t *testing.T) {
 				},
 			},
 		}},
-		expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.annotations": supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP", "status.podIPs"`,
+		expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.annotations": supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.hostIPs", "status.podIP", "status.podIPs"`,
 	}, {
 		name: "metadata.annotations with invalid key",
 		envs: []core.EnvVar{{
@@ -5970,7 +5970,7 @@ func TestValidateEnv(t *testing.T) {
 				},
 			},
 		}},
-		expectedError: `valueFrom.fieldRef.fieldPath: Unsupported value: "status.phase": supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP", "status.podIPs"`,
+		expectedError: `valueFrom.fieldRef.fieldPath: Unsupported value: "status.phase": supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.hostIPs", "status.podIP", "status.podIPs"`,
 	},
 	}
 	for _, tc := range errorCases {
@@ -6522,8 +6522,6 @@ func TestValidateProbe(t *testing.T) {
 }
 
 func Test_validateProbe(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProbeTerminationGracePeriod, true)()
-
 	fldPath := field.NewPath("test")
 	type args struct {
 		probe   *core.Probe
@@ -8164,14 +8162,43 @@ func TestValidateInitContainers(t *testing.T) {
 		ImagePullPolicy:          "IfNotPresent",
 		TerminationMessagePolicy: "File",
 	}, {
-		Name:                     "container-3-restart-always-with-startup-probe",
+		Name:                     "container-3-restart-always-with-lifecycle-hook-and-probes",
 		Image:                    "image",
 		ImagePullPolicy:          "IfNotPresent",
 		TerminationMessagePolicy: "File",
 		RestartPolicy:            &containerRestartPolicyAlways,
+		Lifecycle: &core.Lifecycle{
+			PostStart: &core.LifecycleHandler{
+				Exec: &core.ExecAction{
+					Command: []string{"echo", "post start"},
+				},
+			},
+			PreStop: &core.LifecycleHandler{
+				Exec: &core.ExecAction{
+					Command: []string{"echo", "pre stop"},
+				},
+			},
+		},
+		LivenessProbe: &core.Probe{
+			ProbeHandler: core.ProbeHandler{
+				TCPSocket: &core.TCPSocketAction{
+					Port: intstr.FromInt32(80),
+				},
+			},
+			SuccessThreshold: 1,
+		},
+		ReadinessProbe: &core.Probe{
+			ProbeHandler: core.ProbeHandler{
+				TCPSocket: &core.TCPSocketAction{
+					Port: intstr.FromInt32(80),
+				},
+			},
+		},
 		StartupProbe: &core.Probe{
 			ProbeHandler: core.ProbeHandler{
-				TCPSocket: &core.TCPSocketAction{Port: intstr.FromInt(80)},
+				TCPSocket: &core.TCPSocketAction{
+					Port: intstr.FromInt(80),
+				},
 			},
 			SuccessThreshold: 1,
 		},
@@ -8392,6 +8419,165 @@ func TestValidateInitContainers(t *testing.T) {
 			},
 		}},
 		field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "initContainers[0].startupProbe.successThreshold", BadValue: int32(2)}},
+	}, {
+		"invalid readiness probe, terminationGracePeriodSeconds set.",
+		line(),
+		[]core.Container{{
+			Name:                     "life-123",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyAlways,
+			ReadinessProbe: &core.Probe{
+				ProbeHandler: core.ProbeHandler{
+					TCPSocket: &core.TCPSocketAction{
+						Port: intstr.FromInt32(80),
+					},
+				},
+				TerminationGracePeriodSeconds: utilpointer.Int64(10),
+			},
+		}},
+		field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "initContainers[0].readinessProbe.terminationGracePeriodSeconds", BadValue: utilpointer.Int64(10)}},
+	}, {
+		"invalid liveness probe, successThreshold != 1",
+		line(),
+		[]core.Container{{
+			Name:                     "live-123",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyAlways,
+			LivenessProbe: &core.Probe{
+				ProbeHandler: core.ProbeHandler{
+					TCPSocket: &core.TCPSocketAction{
+						Port: intstr.FromInt32(80),
+					},
+				},
+				SuccessThreshold: 2,
+			},
+		}},
+		field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "initContainers[0].livenessProbe.successThreshold", BadValue: int32(2)}},
+	}, {
+		"invalid lifecycle, no exec command.",
+		line(),
+		[]core.Container{{
+			Name:                     "life-123",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyAlways,
+			Lifecycle: &core.Lifecycle{
+				PreStop: &core.LifecycleHandler{
+					Exec: &core.ExecAction{},
+				},
+			},
+		}},
+		field.ErrorList{{Type: field.ErrorTypeRequired, Field: "initContainers[0].lifecycle.preStop.exec.command", BadValue: ""}},
+	}, {
+		"invalid lifecycle, no http path.",
+		line(),
+		[]core.Container{{
+			Name:                     "life-123",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyAlways,
+			Lifecycle: &core.Lifecycle{
+				PreStop: &core.LifecycleHandler{
+					HTTPGet: &core.HTTPGetAction{
+						Port:   intstr.FromInt32(80),
+						Scheme: "HTTP",
+					},
+				},
+			},
+		}},
+		field.ErrorList{{Type: field.ErrorTypeRequired, Field: "initContainers[0].lifecycle.preStop.httpGet.path", BadValue: ""}},
+	}, {
+		"invalid lifecycle, no http port.",
+		line(),
+		[]core.Container{{
+			Name:                     "life-123",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyAlways,
+			Lifecycle: &core.Lifecycle{
+				PreStop: &core.LifecycleHandler{
+					HTTPGet: &core.HTTPGetAction{
+						Path:   "/",
+						Scheme: "HTTP",
+					},
+				},
+			},
+		}},
+		field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "initContainers[0].lifecycle.preStop.httpGet.port", BadValue: 0}},
+	}, {
+		"invalid lifecycle, no http scheme.",
+		line(),
+		[]core.Container{{
+			Name:                     "life-123",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyAlways,
+			Lifecycle: &core.Lifecycle{
+				PreStop: &core.LifecycleHandler{
+					HTTPGet: &core.HTTPGetAction{
+						Path: "/",
+						Port: intstr.FromInt32(80),
+					},
+				},
+			},
+		}},
+		field.ErrorList{{Type: field.ErrorTypeNotSupported, Field: "initContainers[0].lifecycle.preStop.httpGet.scheme", BadValue: core.URIScheme("")}},
+	}, {
+		"invalid lifecycle, no tcp socket port.",
+		line(),
+		[]core.Container{{
+			Name:                     "life-123",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyAlways,
+			Lifecycle: &core.Lifecycle{
+				PreStop: &core.LifecycleHandler{
+					TCPSocket: &core.TCPSocketAction{},
+				},
+			},
+		}},
+		field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "initContainers[0].lifecycle.preStop.tcpSocket.port", BadValue: 0}},
+	}, {
+		"invalid lifecycle, zero tcp socket port.",
+		line(),
+		[]core.Container{{
+			Name:                     "life-123",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyAlways,
+			Lifecycle: &core.Lifecycle{
+				PreStop: &core.LifecycleHandler{
+					TCPSocket: &core.TCPSocketAction{
+						Port: intstr.FromInt32(0),
+					},
+				},
+			},
+		}},
+		field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "initContainers[0].lifecycle.preStop.tcpSocket.port", BadValue: 0}},
+	}, {
+		"invalid lifecycle, no action.",
+		line(),
+		[]core.Container{{
+			Name:                     "life-123",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			RestartPolicy:            &containerRestartPolicyAlways,
+			Lifecycle: &core.Lifecycle{
+				PreStop: &core.LifecycleHandler{},
+			},
+		}},
+		field.ErrorList{{Type: field.ErrorTypeRequired, Field: "initContainers[0].lifecycle.preStop", BadValue: ""}},
 	},
 	}
 	for _, tc := range errorCases {
@@ -13629,6 +13815,113 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		},
 		"",
 		"Container statuses all containers terminated",
+	}, {
+		core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+			Status: core.PodStatus{
+				ResourceClaimStatuses: []core.PodResourceClaimStatus{
+					{Name: "no-such-claim", ResourceClaimName: utilpointer.String("my-claim")},
+				},
+			},
+		},
+		core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+		},
+		"status.resourceClaimStatuses[0].name: Invalid value: \"no-such-claim\": must match the name of an entry in `spec.resourceClaims`",
+		"Non-existent PodResourceClaim",
+	}, {
+		core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: core.PodSpec{
+				ResourceClaims: []core.PodResourceClaim{
+					{Name: "my-claim"},
+				},
+			},
+			Status: core.PodStatus{
+				ResourceClaimStatuses: []core.PodResourceClaimStatus{
+					{Name: "my-claim", ResourceClaimName: utilpointer.String("%$!#")},
+				},
+			},
+		},
+		core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: core.PodSpec{
+				ResourceClaims: []core.PodResourceClaim{
+					{Name: "my-claim"},
+				},
+			},
+		},
+		`status.resourceClaimStatuses[0].name: Invalid value: "%$!#": a lowercase RFC 1123 subdomain must consist of`,
+		"Invalid ResourceClaim name",
+	}, {
+		core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: core.PodSpec{
+				ResourceClaims: []core.PodResourceClaim{
+					{Name: "my-claim"},
+					{Name: "my-other-claim"},
+				},
+			},
+			Status: core.PodStatus{
+				ResourceClaimStatuses: []core.PodResourceClaimStatus{
+					{Name: "my-claim", ResourceClaimName: utilpointer.String("foo-my-claim-12345")},
+					{Name: "my-other-claim", ResourceClaimName: nil},
+					{Name: "my-other-claim", ResourceClaimName: nil},
+				},
+			},
+		},
+		core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: core.PodSpec{
+				ResourceClaims: []core.PodResourceClaim{
+					{Name: "my-claim"},
+				},
+			},
+		},
+		`status.resourceClaimStatuses[2].name: Duplicate value: "my-other-claim"`,
+		"Duplicate ResourceClaimStatuses.Name",
+	}, {
+		core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: core.PodSpec{
+				ResourceClaims: []core.PodResourceClaim{
+					{Name: "my-claim"},
+					{Name: "my-other-claim"},
+				},
+			},
+			Status: core.PodStatus{
+				ResourceClaimStatuses: []core.PodResourceClaimStatus{
+					{Name: "my-claim", ResourceClaimName: utilpointer.String("foo-my-claim-12345")},
+					{Name: "my-other-claim", ResourceClaimName: nil},
+				},
+			},
+		},
+		core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: core.PodSpec{
+				ResourceClaims: []core.PodResourceClaim{
+					{Name: "my-claim"},
+				},
+			},
+		},
+		"",
+		"ResourceClaimStatuses okay",
 	},
 	}
 
@@ -18200,15 +18493,60 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 			core.ResourceName(core.ResourceCPU): resource.MustParse("10G"),
 		},
 	})
-	progressResizeStatus := core.PersistentVolumeClaimControllerExpansionInProgress
-	invalidResizeStatus := core.PersistentVolumeClaimResizeStatus("foo")
+	progressResizeStatus := core.PersistentVolumeClaimControllerResizeInProgress
+
+	invalidResizeStatus := core.ClaimResourceStatus("foo")
+	validResizeKeyCustom := core.ResourceName("example.com/foo")
+	invalidNativeResizeKey := core.ResourceName("kubernetes.io/foo")
 
 	validResizeStatusPVC := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadWriteOnce,
 		},
 	}, core.PersistentVolumeClaimStatus{
-		ResizeStatus: &progressResizeStatus,
+		AllocatedResourceStatuses: map[core.ResourceName]core.ClaimResourceStatus{
+			core.ResourceStorage: progressResizeStatus,
+		},
+	})
+
+	validResizeStatusControllerResizeFailed := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+		},
+	}, core.PersistentVolumeClaimStatus{
+		AllocatedResourceStatuses: map[core.ResourceName]core.ClaimResourceStatus{
+			core.ResourceStorage: core.PersistentVolumeClaimControllerResizeFailed,
+		},
+	})
+
+	validNodeResizePending := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+		},
+	}, core.PersistentVolumeClaimStatus{
+		AllocatedResourceStatuses: map[core.ResourceName]core.ClaimResourceStatus{
+			core.ResourceStorage: core.PersistentVolumeClaimNodeResizePending,
+		},
+	})
+
+	validNodeResizeInProgress := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+		},
+	}, core.PersistentVolumeClaimStatus{
+		AllocatedResourceStatuses: map[core.ResourceName]core.ClaimResourceStatus{
+			core.ResourceStorage: core.PersistentVolumeClaimNodeResizeInProgress,
+		},
+	})
+
+	validNodeResizeFailed := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+		},
+	}, core.PersistentVolumeClaimStatus{
+		AllocatedResourceStatuses: map[core.ResourceName]core.ClaimResourceStatus{
+			core.ResourceStorage: core.PersistentVolumeClaimNodeResizeFailed,
+		},
 	})
 
 	invalidResizeStatusPVC := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
@@ -18216,63 +18554,201 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 			core.ReadWriteOnce,
 		},
 	}, core.PersistentVolumeClaimStatus{
-		ResizeStatus: &invalidResizeStatus,
+		AllocatedResourceStatuses: map[core.ResourceName]core.ClaimResourceStatus{
+			core.ResourceStorage: invalidResizeStatus,
+		},
+	})
+
+	invalidNativeResizeStatusPVC := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+		},
+	}, core.PersistentVolumeClaimStatus{
+		AllocatedResourceStatuses: map[core.ResourceName]core.ClaimResourceStatus{
+			invalidNativeResizeKey: core.PersistentVolumeClaimNodeResizePending,
+		},
+	})
+
+	validExternalResizeStatusPVC := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+		},
+	}, core.PersistentVolumeClaimStatus{
+		AllocatedResourceStatuses: map[core.ResourceName]core.ClaimResourceStatus{
+			validResizeKeyCustom: core.PersistentVolumeClaimNodeResizePending,
+		},
+	})
+
+	multipleResourceStatusPVC := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+		},
+	}, core.PersistentVolumeClaimStatus{
+		AllocatedResources: core.ResourceList{
+			core.ResourceStorage: resource.MustParse("5Gi"),
+			validResizeKeyCustom: resource.MustParse("10Gi"),
+		},
+		AllocatedResourceStatuses: map[core.ResourceName]core.ClaimResourceStatus{
+			core.ResourceStorage: core.PersistentVolumeClaimControllerResizeFailed,
+			validResizeKeyCustom: core.PersistentVolumeClaimControllerResizeInProgress,
+		},
+	})
+
+	invalidNativeResourceAllocatedKey := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+			core.ReadOnlyMany,
+		},
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+	}, core.PersistentVolumeClaimStatus{
+		Phase: core.ClaimPending,
+		Conditions: []core.PersistentVolumeClaimCondition{
+			{Type: core.PersistentVolumeClaimResizing, Status: core.ConditionTrue},
+		},
+		AllocatedResources: core.ResourceList{
+			invalidNativeResizeKey: resource.MustParse("14G"),
+		},
+	})
+
+	validExternalAllocatedResource := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+			core.ReadOnlyMany,
+		},
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+	}, core.PersistentVolumeClaimStatus{
+		Phase: core.ClaimPending,
+		Conditions: []core.PersistentVolumeClaimCondition{
+			{Type: core.PersistentVolumeClaimResizing, Status: core.ConditionTrue},
+		},
+		AllocatedResources: core.ResourceList{
+			validResizeKeyCustom: resource.MustParse("14G"),
+		},
 	})
 
 	scenarios := map[string]struct {
 		isExpectedFailure          bool
 		oldClaim                   *core.PersistentVolumeClaim
 		newClaim                   *core.PersistentVolumeClaim
-		enableResize               bool
 		enableRecoverFromExpansion bool
 	}{
 		"condition-update-with-enabled-feature-gate": {
 			isExpectedFailure: false,
 			oldClaim:          validClaim,
 			newClaim:          validConditionUpdate,
-			enableResize:      true,
 		},
 		"status-update-with-valid-allocatedResources-feature-enabled": {
 			isExpectedFailure:          false,
 			oldClaim:                   validClaim,
 			newClaim:                   validAllocatedResources,
-			enableResize:               true,
 			enableRecoverFromExpansion: true,
 		},
+		"status-update-with-invalid-allocatedResources-native-key-feature-enabled": {
+			isExpectedFailure:          true,
+			oldClaim:                   validClaim,
+			newClaim:                   invalidNativeResourceAllocatedKey,
+			enableRecoverFromExpansion: true,
+		},
+		"status-update-with-valid-allocatedResources-external-key-feature-enabled": {
+			isExpectedFailure:          false,
+			oldClaim:                   validClaim,
+			newClaim:                   validExternalAllocatedResource,
+			enableRecoverFromExpansion: true,
+		},
+
 		"status-update-with-invalid-allocatedResources-feature-enabled": {
 			isExpectedFailure:          true,
 			oldClaim:                   validClaim,
 			newClaim:                   invalidAllocatedResources,
-			enableResize:               true,
 			enableRecoverFromExpansion: true,
 		},
 		"status-update-with-no-storage-update": {
 			isExpectedFailure:          true,
 			oldClaim:                   validClaim,
 			newClaim:                   noStoraegeClaimStatus,
-			enableResize:               true,
+			enableRecoverFromExpansion: true,
+		},
+		"staus-update-with-controller-resize-failed": {
+			isExpectedFailure:          false,
+			oldClaim:                   validClaim,
+			newClaim:                   validResizeStatusControllerResizeFailed,
+			enableRecoverFromExpansion: true,
+		},
+		"staus-update-with-node-resize-pending": {
+			isExpectedFailure:          false,
+			oldClaim:                   validClaim,
+			newClaim:                   validNodeResizePending,
+			enableRecoverFromExpansion: true,
+		},
+		"staus-update-with-node-resize-inprogress": {
+			isExpectedFailure:          false,
+			oldClaim:                   validClaim,
+			newClaim:                   validNodeResizeInProgress,
+			enableRecoverFromExpansion: true,
+		},
+		"staus-update-with-node-resize-failed": {
+			isExpectedFailure:          false,
+			oldClaim:                   validClaim,
+			newClaim:                   validNodeResizeFailed,
+			enableRecoverFromExpansion: true,
+		},
+		"staus-update-with-invalid-native-resource-status-key": {
+			isExpectedFailure:          true,
+			oldClaim:                   validClaim,
+			newClaim:                   invalidNativeResizeStatusPVC,
+			enableRecoverFromExpansion: true,
+		},
+		"staus-update-with-valid-external-resource-status-key": {
+			isExpectedFailure:          false,
+			oldClaim:                   validClaim,
+			newClaim:                   validExternalResizeStatusPVC,
+			enableRecoverFromExpansion: true,
+		},
+		"status-update-with-multiple-resources-key": {
+			isExpectedFailure:          false,
+			oldClaim:                   validClaim,
+			newClaim:                   multipleResourceStatusPVC,
 			enableRecoverFromExpansion: true,
 		},
 		"status-update-with-valid-pvc-resize-status": {
 			isExpectedFailure:          false,
 			oldClaim:                   validClaim,
 			newClaim:                   validResizeStatusPVC,
-			enableResize:               true,
 			enableRecoverFromExpansion: true,
 		},
 		"status-update-with-invalid-pvc-resize-status": {
 			isExpectedFailure:          true,
 			oldClaim:                   validClaim,
 			newClaim:                   invalidResizeStatusPVC,
-			enableResize:               true,
 			enableRecoverFromExpansion: true,
+		},
+		"status-update-with-old-pvc-valid-resourcestatus-newpvc-invalid-recovery-disabled": {
+			isExpectedFailure:          true,
+			oldClaim:                   validResizeStatusPVC,
+			newClaim:                   invalidResizeStatusPVC,
+			enableRecoverFromExpansion: false,
+		},
+		"status-update-with-old-pvc-valid-allocatedResource-newpvc-invalid-recovery-disabled": {
+			isExpectedFailure:          true,
+			oldClaim:                   validExternalAllocatedResource,
+			newClaim:                   invalidNativeResourceAllocatedKey,
+			enableRecoverFromExpansion: false,
 		},
 	}
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			validateOpts := PersistentVolumeClaimSpecValidationOptions{
-				EnableRecoverFromExpansionFailure: scenario.enableRecoverFromExpansion,
-			}
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, scenario.enableRecoverFromExpansion)()
+
+			validateOpts := ValidationOptionsForPersistentVolumeClaim(scenario.newClaim, scenario.oldClaim)
+
 			// ensure we have a resource version specified for updates
 			scenario.oldClaim.ResourceVersion = "1"
 			scenario.newClaim.ResourceVersion = "1"
@@ -21247,6 +21723,113 @@ func TestPodIPsValidation(t *testing.T) {
 	}
 }
 
+func makePodWithHostIPs(podName string, podNamespace string, hostIPs []core.HostIP) core.Pod {
+	hostIP := ""
+	if len(hostIPs) > 0 {
+		hostIP = hostIPs[0].IP
+	}
+	return core.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: podName, Namespace: podNamespace},
+		Spec: core.PodSpec{
+			Containers: []core.Container{
+				{
+					Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+				},
+			},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+		},
+		Status: core.PodStatus{
+			HostIP:  hostIP,
+			HostIPs: hostIPs,
+		},
+	}
+}
+
+func TestHostIPsValidation(t *testing.T) {
+	testCases := []struct {
+		pod         core.Pod
+		expectError bool
+	}{
+		{
+			expectError: false,
+			pod:         makePodWithHostIPs("nil-ips", "ns", nil),
+		},
+		{
+			expectError: false,
+			pod:         makePodWithHostIPs("empty-HostIPs-list", "ns", []core.HostIP{}),
+		},
+		{
+			expectError: false,
+			pod:         makePodWithHostIPs("single-ip-family-6", "ns", []core.HostIP{{IP: "::1"}}),
+		},
+		{
+			expectError: false,
+			pod:         makePodWithHostIPs("single-ip-family-4", "ns", []core.HostIP{{IP: "1.1.1.1"}}),
+		},
+		{
+			expectError: false,
+			pod:         makePodWithHostIPs("dual-stack-4-6", "ns", []core.HostIP{{IP: "1.1.1.1"}, {IP: "::1"}}),
+		},
+		{
+			expectError: false,
+			pod:         makePodWithHostIPs("dual-stack-6-4", "ns", []core.HostIP{{IP: "::1"}, {IP: "1.1.1.1"}}),
+		},
+		/* failure cases start here */
+		{
+			expectError: true,
+			pod:         makePodWithHostIPs("invalid-pod-ip", "ns", []core.HostIP{{IP: "this-is-not-an-ip"}}),
+		},
+		{
+			expectError: true,
+			pod:         makePodWithHostIPs("dualstack-same-ip-family-6", "ns", []core.HostIP{{IP: "::1"}, {IP: "::2"}}),
+		},
+		{
+			expectError: true,
+			pod:         makePodWithHostIPs("dualstack-same-ip-family-4", "ns", []core.HostIP{{IP: "1.1.1.1"}, {IP: "2.2.2.2"}}),
+		},
+		{
+			expectError: true,
+			pod:         makePodWithHostIPs("dualstack-repeated-ip-family-6", "ns", []core.HostIP{{IP: "1.1.1.1"}, {IP: "::1"}, {IP: "::2"}}),
+		},
+		{
+			expectError: true,
+			pod:         makePodWithHostIPs("dualstack-repeated-ip-family-4", "ns", []core.HostIP{{IP: "1.1.1.1"}, {IP: "::1"}, {IP: "2.2.2.2"}}),
+		},
+
+		{
+			expectError: true,
+			pod:         makePodWithHostIPs("dualstack-duplicate-ip-family-4", "ns", []core.HostIP{{IP: "1.1.1.1"}, {IP: "1.1.1.1"}, {IP: "::1"}}),
+		},
+		{
+			expectError: true,
+			pod:         makePodWithHostIPs("dualstack-duplicate-ip-family-6", "ns", []core.HostIP{{IP: "1.1.1.1"}, {IP: "::1"}, {IP: "::1"}}),
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.pod.Name, func(t *testing.T) {
+			for _, oldTestCase := range testCases {
+				newPod := testCase.pod.DeepCopy()
+				newPod.ResourceVersion = "1"
+
+				oldPod := oldTestCase.pod.DeepCopy()
+				oldPod.ResourceVersion = "1"
+				oldPod.Name = newPod.Name
+
+				errs := ValidatePodStatusUpdate(newPod, oldPod, PodValidationOptions{})
+
+				if len(errs) == 0 && testCase.expectError {
+					t.Fatalf("expected failure for %s, but there were none", testCase.pod.Name)
+				}
+				if len(errs) != 0 && !testCase.expectError {
+					t.Fatalf("expected success for %s, but there were errors: %v", testCase.pod.Name, errs)
+				}
+			}
+		})
+	}
+}
+
 // makes a node with pod cidr and a name
 func makeNode(nodeName string, podCIDRs []string) core.Node {
 	return core.Node{
@@ -22457,6 +23040,53 @@ func TestValidateAppArmorProfileFormat(t *testing.T) {
 	}
 }
 
+func TestValidateDownwardAPIHostIPs(t *testing.T) {
+	testCases := []struct {
+		name           string
+		expectError    bool
+		featureEnabled bool
+		fieldSel       *core.ObjectFieldSelector
+	}{
+		{
+			name:           "has no hostIPs field, featuregate enabled",
+			expectError:    false,
+			featureEnabled: true,
+			fieldSel:       &core.ObjectFieldSelector{FieldPath: "status.hostIP"},
+		},
+		{
+			name:           "has hostIPs field, featuregate enabled",
+			expectError:    false,
+			featureEnabled: true,
+			fieldSel:       &core.ObjectFieldSelector{FieldPath: "status.hostIPs"},
+		},
+		{
+			name:           "has no hostIPs field, featuregate disabled",
+			expectError:    false,
+			featureEnabled: false,
+			fieldSel:       &core.ObjectFieldSelector{FieldPath: "status.hostIP"},
+		},
+		{
+			name:           "has hostIPs field, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			fieldSel:       &core.ObjectFieldSelector{FieldPath: "status.hostIPs"},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodHostIPs, testCase.featureEnabled)()
+
+			errs := validateDownwardAPIHostIPs(testCase.fieldSel, field.NewPath("fieldSel"), PodValidationOptions{AllowHostIPsField: testCase.featureEnabled})
+			if testCase.expectError && len(errs) == 0 {
+				t.Errorf("Unexpected success")
+			}
+			if !testCase.expectError && len(errs) != 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
+			}
+		})
+	}
+}
+
 func TestValidatePVSecretReference(t *testing.T) {
 	rootFld := field.NewPath("name")
 	type args struct {
@@ -22737,4 +23367,88 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestValidateLoadBalancerStatus(t *testing.T) {
+	ipModeVIP := core.LoadBalancerIPModeVIP
+	ipModeProxy := core.LoadBalancerIPModeProxy
+	ipModeDummy := core.LoadBalancerIPMode("dummy")
+
+	testCases := []struct {
+		name          string
+		ipModeEnabled bool
+		tweakLBStatus func(s *core.LoadBalancerStatus)
+		numErrs       int
+	}{
+		/* LoadBalancerIPMode*/
+		{
+			name:          "valid vip ipMode",
+			ipModeEnabled: true,
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{{
+					IP:     "1.2.3.4",
+					IPMode: &ipModeVIP,
+				}}
+			},
+			numErrs: 0,
+		}, {
+			name:          "valid proxy ipMode",
+			ipModeEnabled: true,
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{{
+					IP:     "1.2.3.4",
+					IPMode: &ipModeProxy,
+				}}
+			},
+			numErrs: 0,
+		}, {
+			name:          "invalid ipMode",
+			ipModeEnabled: true,
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{{
+					IP:     "1.2.3.4",
+					IPMode: &ipModeDummy,
+				}}
+			},
+			numErrs: 1,
+		}, {
+			name:          "missing ipMode with LoadbalancerIPMode enabled",
+			ipModeEnabled: true,
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{{
+					IP: "1.2.3.4",
+				}}
+			},
+			numErrs: 1,
+		}, {
+			name:          "missing ipMode with LoadbalancerIPMode disabled",
+			ipModeEnabled: false,
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{{
+					IP: "1.2.3.4",
+				}}
+			},
+			numErrs: 0,
+		}, {
+			name:          "missing ip with ipMode present",
+			ipModeEnabled: true,
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{{
+					IPMode: &ipModeProxy,
+				}}
+			},
+			numErrs: 1,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)()
+			s := core.LoadBalancerStatus{}
+			tc.tweakLBStatus(&s)
+			errs := ValidateLoadBalancerStatus(&s, field.NewPath("status"))
+			if len(errs) != tc.numErrs {
+				t.Errorf("Unexpected error list for case %q(expected:%v got %v) - Errors:\n %v", tc.name, tc.numErrs, len(errs), errs.ToAggregate())
+			}
+		})
+	}
 }

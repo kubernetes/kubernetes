@@ -21,6 +21,9 @@ import (
 	"fmt"
 	"io"
 
+	admissionmetrics "k8s.io/apiserver/pkg/admission/metrics"
+	"k8s.io/klog/v2"
+
 	admissionv1 "k8s.io/api/admission/v1"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	v1 "k8s.io/api/admissionregistration/v1"
@@ -39,7 +42,6 @@ import (
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
 )
 
 // Webhook is an abstract admission plugin with all the infrastructure to define Admit or Validate on-top.
@@ -217,7 +219,6 @@ func (a *Webhook) ShouldCallHook(ctx context.Context, h webhook.WebhookAccessor,
 	if matchObjErr != nil {
 		return nil, matchObjErr
 	}
-
 	matchConditions := h.GetMatchConditions()
 	if len(matchConditions) > 0 {
 		versionedAttr, err := v.VersionedAttribute(invocation.Kind)
@@ -225,13 +226,14 @@ func (a *Webhook) ShouldCallHook(ctx context.Context, h webhook.WebhookAccessor,
 			return nil, apierrors.NewInternalError(err)
 		}
 
-		matcher := h.GetCompiledMatcher(a.filterCompiler, a.authorizer)
-		matchResult := matcher.Match(ctx, versionedAttr, nil)
+		matcher := h.GetCompiledMatcher(a.filterCompiler)
+		matchResult := matcher.Match(ctx, versionedAttr, nil, a.authorizer)
 
 		if matchResult.Error != nil {
 			klog.Warningf("Failed evaluating match conditions, failing closed %v: %v", h.GetName(), matchResult.Error)
 			return nil, apierrors.NewForbidden(attr.GetResource().GroupResource(), attr.GetName(), matchResult.Error)
 		} else if !matchResult.Matches {
+			admissionmetrics.Metrics.ObserveMatchConditionExclusion(ctx, h.GetName(), "webhook", h.GetType(), string(attr.GetOperation()))
 			// if no match, always skip webhook
 			return nil, nil
 		}

@@ -42,3 +42,13 @@ var NodePrepareResourceCalled = gcustom.MakeMatcher(func(actualCalls []GRPCCall)
 	}
 	return false, nil
 }).WithMessage("contain NodePrepareResource call")
+
+// NodePrepareResoucesCalled checks that NodePrepareResources API has been called
+var NodePrepareResourcesCalled = gcustom.MakeMatcher(func(actualCalls []GRPCCall) (bool, error) {
+	for _, call := range actualCalls {
+		if strings.HasSuffix(call.FullMethod, "/NodePrepareResources") && call.Err == nil {
+			return true, nil
+		}
+	}
+	return false, nil
+}).WithMessage("contain NodePrepareResources call")

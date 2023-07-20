@@ -24,8 +24,49 @@ import (
 
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/kube-openapi/pkg/cached"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
+
+// cacheableDownloader is a downloader that will always return the data
+// and the etag.
+type cacheableDownloader struct {
+	downloader *Downloader
+	handler    http.Handler
+	etag       string
+	spec       *spec.Swagger
+}
+
+// Creates a downloader that also returns the etag, making it useful to use as a cached dependency.
+func NewCacheableDownloader(downloader *Downloader, handler http.Handler) cached.Data[*spec.Swagger] {
+	return &cacheableDownloader{
+		downloader: downloader,
+		handler:    handler,
+	}
+}
+
+func (d *cacheableDownloader) Get() cached.Result[*spec.Swagger] {
+	swagger, etag, status, err := d.downloader.Download(d.handler, d.etag)
+	if err != nil {
+		return cached.NewResultErr[*spec.Swagger](err)
+	}
+	switch status {
+	case http.StatusNotModified:
+		// Nothing has changed, do nothing.
+	case http.StatusOK:
+		if swagger != nil {
+			d.etag = etag
+			d.spec = swagger
+			break
+		}
+		fallthrough
+	case http.StatusNotFound:
+		return cached.NewResultErr[*spec.Swagger](ErrAPIServiceNotFound)
+	default:
+		return cached.NewResultErr[*spec.Swagger](fmt.Errorf("invalid status code: %v", status))
+	}
+	return cached.NewResultOK(d.spec, d.etag)
+}
 
 // Downloader is the OpenAPI downloader type. It will try to download spec from /openapi/v2 or /swagger.json endpoint.
 type Downloader struct {

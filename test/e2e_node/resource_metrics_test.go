@@ -73,7 +73,7 @@ var _ = SIGDescribe("ResourceMetricsAPI [NodeFeature:ResourceMetrics]", func() {
 			memoryCapacity := node.Status.Capacity["memory"]
 			memoryLimit := memoryCapacity.Value()
 
-			matchResourceMetrics := gstruct.MatchAllKeys(gstruct.Keys{
+			matchResourceMetrics := gomega.And(gstruct.MatchKeys(gstruct.IgnoreMissing, gstruct.Keys{
 				"scrape_error": gstruct.Ignore(),
 				"node_cpu_usage_seconds_total": gstruct.MatchAllElements(nodeID, gstruct.Elements{
 					"": boundedSample(1, 1e6),
@@ -106,7 +106,15 @@ var _ = SIGDescribe("ResourceMetricsAPI [NodeFeature:ResourceMetrics]", func() {
 					fmt.Sprintf("%s::%s", f.Namespace.Name, pod0): boundedSample(10*e2evolume.Kb, 80*e2evolume.Mb),
 					fmt.Sprintf("%s::%s", f.Namespace.Name, pod1): boundedSample(10*e2evolume.Kb, 80*e2evolume.Mb),
 				}),
-			})
+
+				"pod_swap_usage_bytes": gstruct.MatchElements(podID, gstruct.IgnoreExtras, gstruct.Elements{
+					fmt.Sprintf("%s::%s", f.Namespace.Name, pod0): boundedSample(0*e2evolume.Kb, 80*e2evolume.Mb),
+					fmt.Sprintf("%s::%s", f.Namespace.Name, pod1): boundedSample(0*e2evolume.Kb, 80*e2evolume.Mb),
+				}),
+			}),
+				haveKeys("scrape_error", "node_cpu_usage_seconds_total", "node_memory_working_set_bytes", "container_cpu_usage_seconds_total",
+					"container_memory_working_set_bytes", "container_start_time_seconds", "pod_cpu_usage_seconds_total", "pod_memory_working_set_bytes"),
+			)
 			ginkgo.By("Giving pods a minute to start up and produce metrics")
 			gomega.Eventually(ctx, getResourceMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
 			ginkgo.By("Ensuring the metrics match the expectations a few more times")
@@ -164,4 +172,19 @@ func boundedSample(lower, upper interface{}) types.GomegaMatcher {
 		),
 		"Histogram": gstruct.Ignore(),
 	}))
+}
+
+func haveKeys(keys ...string) types.GomegaMatcher {
+	gomega.ExpectWithOffset(1, keys).ToNot(gomega.BeEmpty())
+	matcher := gomega.HaveKey(keys[0])
+
+	if len(keys) == 1 {
+		return matcher
+	}
+
+	for _, key := range keys[1:] {
+		matcher = gomega.And(matcher, gomega.HaveKey(key))
+	}
+
+	return matcher
 }

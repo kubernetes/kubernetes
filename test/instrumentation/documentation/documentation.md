@@ -878,7 +878,7 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_description">Total size of the storage database file physically allocated in bytes.</td>
 <td class="metric_labels_varying"><div class="metric_label">endpoint</div></td>
 <td class="metric_labels_constant"></td>
-<td class="metric_deprecated_version"></td></tr>
+<td class="metric_deprecated_version">1.28.0</td></tr>
 <tr class="metric"><td class="metric_name">apiserver_storage_decode_errors_total</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="counter">Counter</td>
@@ -926,6 +926,13 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_type" data-type="counter">Counter</td>
 <td class="metric_description">Number of LIST requests served from storage</td>
 <td class="metric_labels_varying"><div class="metric_label">resource</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">apiserver_storage_size_bytes</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="custom">Custom</td>
+<td class="metric_description">Size of the storage database file physically allocated in bytes.</td>
+<td class="metric_labels_varying"><div class="metric_label">server</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
 <tr class="metric"><td class="metric_name">apiserver_storage_transformation_duration_seconds</td>

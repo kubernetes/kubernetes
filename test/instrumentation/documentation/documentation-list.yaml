@@ -3707,6 +3707,7 @@
   subsystem: apiserver
   help: Total size of the storage database file physically allocated in bytes.
   type: Gauge
+  deprecatedVersion: "1.28.0"
   stabilityLevel: ALPHA
   labels:
   - endpoint
@@ -3754,6 +3755,12 @@
   stabilityLevel: ALPHA
   labels:
   - resource
+- name: apiserver_storage_size_bytes
+  help: Size of the storage database file physically allocated in bytes.
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - server
 - name: transformation_duration_seconds
   subsystem: storage
   namespace: apiserver

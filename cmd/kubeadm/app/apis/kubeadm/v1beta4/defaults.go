@@ -198,3 +198,10 @@ func SetDefaults_NodeRegistration(obj *NodeRegistrationOptions) {
 		obj.ImagePullPolicy = DefaultImagePullPolicy
 	}
 }
+
+// SetDefaults_ResetConfiguration assigns default values for the ResetConfiguration object
+func SetDefaults_ResetConfiguration(obj *ResetConfiguration) {
+	if obj.CertificatesDir == "" {
+		obj.CertificatesDir = DefaultCertificatesDir
+	}
+}

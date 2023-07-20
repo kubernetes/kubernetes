@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy/config"
+	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 )
 
 // NodePodCIDRHandler handles the life cycle of kube-proxy based on the node PodCIDR assigned
@@ -85,3 +86,23 @@ func (n *NodePodCIDRHandler) OnNodeDelete(node *v1.Node) {
 
 // OnNodeSynced is a handler for Node syncs.
 func (n *NodePodCIDRHandler) OnNodeSynced() {}
+
+// NodeEligibleHandler handles the life cycle of the Node's eligibility, as
+// determined by the health server for directing load balancer traffic.
+type NodeEligibleHandler struct {
+	HealthServer healthcheck.ProxierHealthUpdater
+}
+
+var _ config.NodeHandler = &NodeEligibleHandler{}
+
+// OnNodeAdd is a handler for Node creates.
+func (n *NodeEligibleHandler) OnNodeAdd(node *v1.Node) { n.HealthServer.SyncNode(node) }
+
+// OnNodeUpdate is a handler for Node updates.
+func (n *NodeEligibleHandler) OnNodeUpdate(_, node *v1.Node) { n.HealthServer.SyncNode(node) }
+
+// OnNodeDelete is a handler for Node deletes.
+func (n *NodeEligibleHandler) OnNodeDelete(node *v1.Node) { n.HealthServer.SyncNode(node) }
+
+// OnNodeSynced is a handler for Node syncs.
+func (n *NodeEligibleHandler) OnNodeSynced() {}

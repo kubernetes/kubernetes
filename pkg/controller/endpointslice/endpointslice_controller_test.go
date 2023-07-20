@@ -40,10 +40,11 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/endpointslice/topologycache"
+	endpointsliceutil "k8s.io/endpointslice/util"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/endpointslice/topologycache"
-	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
-	endpointsliceutil "k8s.io/kubernetes/pkg/controller/util/endpointslice"
+	endpointslicepkg "k8s.io/kubernetes/pkg/controller/util/endpointslice"
 	"k8s.io/utils/pointer"
 )
 
@@ -60,7 +61,7 @@ type endpointSliceController struct {
 	serviceStore       cache.Store
 }
 
-func newController(nodeNames []string, batchPeriod time.Duration) (*fake.Clientset, *endpointSliceController) {
+func newController(t *testing.T, nodeNames []string, batchPeriod time.Duration) (*fake.Clientset, *endpointSliceController) {
 	client := fake.NewSimpleClientset()
 
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
@@ -95,7 +96,9 @@ func newController(nodeNames []string, batchPeriod time.Duration) (*fake.Clients
 		return false, endpointSlice, nil
 	}))
 
+	_, ctx := ktesting.NewTestContext(t)
 	esController := NewController(
+		ctx,
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().Services(),
 		nodeInformer,
@@ -118,11 +121,70 @@ func newController(nodeNames []string, batchPeriod time.Duration) (*fake.Clients
 	}
 }
 
+func newPod(n int, namespace string, ready bool, nPorts int, terminating bool) *v1.Pod {
+	status := v1.ConditionTrue
+	if !ready {
+		status = v1.ConditionFalse
+	}
+
+	var deletionTimestamp *metav1.Time
+	if terminating {
+		deletionTimestamp = &metav1.Time{
+			Time: time.Now(),
+		}
+	}
+
+	p := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:         namespace,
+			Name:              fmt.Sprintf("pod%d", n),
+			Labels:            map[string]string{"foo": "bar"},
+			DeletionTimestamp: deletionTimestamp,
+			ResourceVersion:   fmt.Sprint(n),
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name: "container-1",
+			}},
+			NodeName: "node-1",
+		},
+		Status: v1.PodStatus{
+			PodIP: fmt.Sprintf("1.2.3.%d", 4+n),
+			PodIPs: []v1.PodIP{{
+				IP: fmt.Sprintf("1.2.3.%d", 4+n),
+			}},
+			Conditions: []v1.PodCondition{
+				{
+					Type:   v1.PodReady,
+					Status: status,
+				},
+			},
+		},
+	}
+
+	return p
+}
+
+func expectActions(t *testing.T, actions []k8stesting.Action, num int, verb, resource string) {
+	t.Helper()
+	// if actions are less the below logic will panic
+	if num > len(actions) {
+		t.Fatalf("len of actions %v is unexpected. Expected to be at least %v", len(actions), num+1)
+	}
+
+	for i := 0; i < num; i++ {
+		relativePos := len(actions) - i - 1
+		assert.Equal(t, verb, actions[relativePos].GetVerb(), "Expected action -%d verb to be %s", i, verb)
+		assert.Equal(t, resource, actions[relativePos].GetResource().Resource, "Expected action -%d resource to be %s", i, resource)
+	}
+}
+
 // Ensure SyncService for service with no selector results in no action
 func TestSyncServiceNoSelector(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	serviceName := "testing-1"
-	client, esController := newController([]string{"node-1"}, time.Duration(0))
+	client, esController := newController(t, []string{"node-1"}, time.Duration(0))
 	esController.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: ns},
 		Spec: v1.ServiceSpec{
@@ -130,7 +192,8 @@ func TestSyncServiceNoSelector(t *testing.T) {
 		},
 	})
 
-	err := esController.syncService(fmt.Sprintf("%s/%s", ns, serviceName))
+	logger, _ := ktesting.NewTestContext(t)
+	err := esController.syncService(logger, fmt.Sprintf("%s/%s", ns, serviceName))
 	assert.NoError(t, err)
 	assert.Len(t, client.Actions(), 0)
 }
@@ -187,7 +250,8 @@ func TestServiceExternalNameTypeSync(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			client, esController := newController([]string{"node-1"}, time.Duration(0))
+			client, esController := newController(t, []string{"node-1"}, time.Duration(0))
+			logger, _ := ktesting.NewTestContext(t)
 
 			pod := newPod(1, namespace, true, 0, false)
 			err := esController.podStore.Add(pod)
@@ -196,7 +260,7 @@ func TestServiceExternalNameTypeSync(t *testing.T) {
 			err = esController.serviceStore.Add(tc.service)
 			assert.NoError(t, err)
 
-			err = esController.syncService(fmt.Sprintf("%s/%s", namespace, serviceName))
+			err = esController.syncService(logger, fmt.Sprintf("%s/%s", namespace, serviceName))
 			assert.NoError(t, err)
 			assert.Len(t, client.Actions(), 0)
 
@@ -212,7 +276,7 @@ func TestSyncServicePendingDeletion(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	serviceName := "testing-1"
 	deletionTimestamp := metav1.Now()
-	client, esController := newController([]string{"node-1"}, time.Duration(0))
+	client, esController := newController(t, []string{"node-1"}, time.Duration(0))
 	esController.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: ns, DeletionTimestamp: &deletionTimestamp},
 		Spec: v1.ServiceSpec{
@@ -221,7 +285,8 @@ func TestSyncServicePendingDeletion(t *testing.T) {
 		},
 	})
 
-	err := esController.syncService(fmt.Sprintf("%s/%s", ns, serviceName))
+	logger, _ := ktesting.NewTestContext(t)
+	err := esController.syncService(logger, fmt.Sprintf("%s/%s", ns, serviceName))
 	assert.NoError(t, err)
 	assert.Len(t, client.Actions(), 0)
 }
@@ -230,7 +295,7 @@ func TestSyncServicePendingDeletion(t *testing.T) {
 func TestSyncServiceWithSelector(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	serviceName := "testing-1"
-	client, esController := newController([]string{"node-1"}, time.Duration(0))
+	client, esController := newController(t, []string{"node-1"}, time.Duration(0))
 	standardSyncService(t, esController, ns, serviceName)
 	expectActions(t, client.Actions(), 1, "create", "endpointslices")
 
@@ -250,12 +315,12 @@ func TestSyncServiceWithSelector(t *testing.T) {
 // remove too much.
 func TestSyncServiceMissing(t *testing.T) {
 	namespace := metav1.NamespaceDefault
-	client, esController := newController([]string{"node-1"}, time.Duration(0))
+	client, esController := newController(t, []string{"node-1"}, time.Duration(0))
 
 	// Build up existing service
 	existingServiceName := "stillthere"
-	existingServiceKey := endpointutil.ServiceKey{Name: existingServiceName, Namespace: namespace}
-	esController.triggerTimeTracker.ServiceStates[existingServiceKey] = endpointutil.ServiceState{}
+	existingServiceKey := endpointsliceutil.ServiceKey{Name: existingServiceName, Namespace: namespace}
+	esController.triggerTimeTracker.ServiceStates[existingServiceKey] = endpointsliceutil.ServiceState{}
 	esController.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: existingServiceName, Namespace: namespace},
 		Spec: v1.ServiceSpec{
@@ -266,10 +331,11 @@ func TestSyncServiceMissing(t *testing.T) {
 
 	// Add missing service to triggerTimeTracker to ensure the reference is cleaned up
 	missingServiceName := "notthere"
-	missingServiceKey := endpointutil.ServiceKey{Name: missingServiceName, Namespace: namespace}
-	esController.triggerTimeTracker.ServiceStates[missingServiceKey] = endpointutil.ServiceState{}
+	missingServiceKey := endpointsliceutil.ServiceKey{Name: missingServiceName, Namespace: namespace}
+	esController.triggerTimeTracker.ServiceStates[missingServiceKey] = endpointsliceutil.ServiceState{}
 
-	err := esController.syncService(fmt.Sprintf("%s/%s", namespace, missingServiceName))
+	logger, _ := ktesting.NewTestContext(t)
+	err := esController.syncService(logger, fmt.Sprintf("%s/%s", namespace, missingServiceName))
 
 	// nil should be returned when the service doesn't exist
 	assert.Nil(t, err, "Expected no error syncing service")
@@ -286,7 +352,7 @@ func TestSyncServiceMissing(t *testing.T) {
 
 // Ensure SyncService correctly selects Pods.
 func TestSyncServicePodSelection(t *testing.T) {
-	client, esController := newController([]string{"node-1"}, time.Duration(0))
+	client, esController := newController(t, []string{"node-1"}, time.Duration(0))
 	ns := metav1.NamespaceDefault
 
 	pod1 := newPod(1, ns, true, 0, false)
@@ -312,11 +378,12 @@ func TestSyncServicePodSelection(t *testing.T) {
 }
 
 func TestSyncServiceEndpointSlicePendingDeletion(t *testing.T) {
-	client, esController := newController([]string{"node-1"}, time.Duration(0))
+	client, esController := newController(t, []string{"node-1"}, time.Duration(0))
 	ns := metav1.NamespaceDefault
 	serviceName := "testing-1"
 	service := createService(t, esController, ns, serviceName)
-	err := esController.syncService(fmt.Sprintf("%s/%s", ns, serviceName))
+	logger, _ := ktesting.NewTestContext(t)
+	err := esController.syncService(logger, fmt.Sprintf("%s/%s", ns, serviceName))
 	assert.Nil(t, err, "Expected no error syncing service")
 
 	gvk := schema.GroupVersionKind{Version: "v1", Kind: "Service"}
@@ -345,8 +412,9 @@ func TestSyncServiceEndpointSlicePendingDeletion(t *testing.T) {
 		t.Fatalf("Expected no error creating EndpointSlice: %v", err)
 	}
 
+	logger, _ = ktesting.NewTestContext(t)
 	numActionsBefore := len(client.Actions())
-	err = esController.syncService(fmt.Sprintf("%s/%s", ns, serviceName))
+	err = esController.syncService(logger, fmt.Sprintf("%s/%s", ns, serviceName))
 	assert.Nil(t, err, "Expected no error syncing service")
 
 	// The EndpointSlice marked for deletion should be ignored by the controller, and thus
@@ -358,7 +426,7 @@ func TestSyncServiceEndpointSlicePendingDeletion(t *testing.T) {
 
 // Ensure SyncService correctly selects and labels EndpointSlices.
 func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
-	client, esController := newController([]string{"node-1"}, time.Duration(0))
+	client, esController := newController(t, []string{"node-1"}, time.Duration(0))
 	ns := metav1.NamespaceDefault
 	serviceName := "testing-1"
 	service := createService(t, esController, ns, serviceName)
@@ -435,7 +503,8 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 	}
 
 	numActionsBefore := len(client.Actions())
-	err := esController.syncService(fmt.Sprintf("%s/%s", ns, serviceName))
+	logger, _ := ktesting.NewTestContext(t)
+	err := esController.syncService(logger, fmt.Sprintf("%s/%s", ns, serviceName))
 	assert.Nil(t, err, "Expected no error syncing service")
 
 	if len(client.Actions()) != numActionsBefore+2 {
@@ -451,7 +520,7 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 }
 
 func TestOnEndpointSliceUpdate(t *testing.T) {
-	_, esController := newController([]string{"node-1"}, time.Duration(0))
+	_, esController := newController(t, []string{"node-1"}, time.Duration(0))
 	ns := metav1.NamespaceDefault
 	serviceName := "testing-1"
 	epSlice1 := &discovery.EndpointSlice{
@@ -466,11 +535,12 @@ func TestOnEndpointSliceUpdate(t *testing.T) {
 		AddressType: discovery.AddressTypeIPv4,
 	}
 
+	logger, _ := ktesting.NewTestContext(t)
 	epSlice2 := epSlice1.DeepCopy()
 	epSlice2.Labels[discovery.LabelManagedBy] = "something else"
 
 	assert.Equal(t, 0, esController.queue.Len())
-	esController.onEndpointSliceUpdate(epSlice1, epSlice2)
+	esController.onEndpointSliceUpdate(logger, epSlice1, epSlice2)
 	err := wait.PollImmediate(100*time.Millisecond, 3*time.Second, func() (bool, error) {
 		if esController.queue.Len() > 0 {
 			return true, nil
@@ -1214,7 +1284,7 @@ func TestSyncService(t *testing.T) {
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			client, esController := newController([]string{"node-1"}, time.Duration(0))
+			client, esController := newController(t, []string{"node-1"}, time.Duration(0))
 
 			for _, pod := range testcase.pods {
 				esController.podStore.Add(pod)
@@ -1224,7 +1294,8 @@ func TestSyncService(t *testing.T) {
 			_, err := esController.client.CoreV1().Services(testcase.service.Namespace).Create(context.TODO(), testcase.service, metav1.CreateOptions{})
 			assert.Nil(t, err, "Expected no error creating service")
 
-			err = esController.syncService(fmt.Sprintf("%s/%s", testcase.service.Namespace, testcase.service.Name))
+			logger, _ := ktesting.NewTestContext(t)
+			err = esController.syncService(logger, fmt.Sprintf("%s/%s", testcase.service.Namespace, testcase.service.Name))
 			assert.Nil(t, err)
 
 			// last action should be to create endpoint slice
@@ -1318,11 +1389,12 @@ func TestPodAddsBatching(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			ns := metav1.NamespaceDefault
-			client, esController := newController([]string{"node-1"}, tc.batchPeriod)
+			client, esController := newController(t, []string{"node-1"}, tc.batchPeriod)
 			stopCh := make(chan struct{})
 			defer close(stopCh)
 
-			go esController.Run(1, stopCh)
+			_, ctx := ktesting.NewTestContext(t)
+			go esController.Run(ctx, 1)
 
 			esController.serviceStore.Add(&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
@@ -1452,11 +1524,12 @@ func TestPodUpdatesBatching(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			ns := metav1.NamespaceDefault
-			client, esController := newController([]string{"node-1"}, tc.batchPeriod)
+			client, esController := newController(t, []string{"node-1"}, tc.batchPeriod)
 			stopCh := make(chan struct{})
 			defer close(stopCh)
 
-			go esController.Run(1, stopCh)
+			_, ctx := ktesting.NewTestContext(t)
+			go esController.Run(ctx, 1)
 
 			addPods(t, esController, ns, tc.podsCount)
 
@@ -1589,11 +1662,12 @@ func TestPodDeleteBatching(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			ns := metav1.NamespaceDefault
-			client, esController := newController([]string{"node-1"}, tc.batchPeriod)
+			client, esController := newController(t, []string{"node-1"}, tc.batchPeriod)
 			stopCh := make(chan struct{})
 			defer close(stopCh)
 
-			go esController.Run(1, stopCh)
+			_, ctx := ktesting.NewTestContext(t)
+			go esController.Run(ctx, 1)
 
 			addPods(t, esController, ns, tc.podsCount)
 
@@ -1655,7 +1729,7 @@ func TestSyncServiceStaleInformer(t *testing.T) {
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			_, esController := newController([]string{"node-1"}, time.Duration(0))
+			_, esController := newController(t, []string{"node-1"}, time.Duration(0))
 			ns := metav1.NamespaceDefault
 			serviceName := "testing-1"
 
@@ -1691,9 +1765,10 @@ func TestSyncServiceStaleInformer(t *testing.T) {
 			epSlice2.Generation = testcase.trackerGenerationNumber
 			esController.endpointSliceTracker.Update(epSlice2)
 
-			err = esController.syncService(fmt.Sprintf("%s/%s", ns, serviceName))
+			logger, _ := ktesting.NewTestContext(t)
+			err = esController.syncService(logger, fmt.Sprintf("%s/%s", ns, serviceName))
 			// Check if we got a StaleInformerCache error
-			if endpointsliceutil.IsStaleInformerCacheErr(err) != testcase.expectError {
+			if endpointslicepkg.IsStaleInformerCacheErr(err) != testcase.expectError {
 				t.Fatalf("Expected error because informer cache is outdated")
 			}
 
@@ -1835,7 +1910,7 @@ func Test_checkNodeTopologyDistribution(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, esController := newController([]string{}, time.Duration(0))
+			_, esController := newController(t, []string{}, time.Duration(0))
 
 			for i, nodeInfo := range tc.nodes {
 				node := &v1.Node{
@@ -1869,7 +1944,8 @@ func Test_checkNodeTopologyDistribution(t *testing.T) {
 				}
 			}
 
-			esController.checkNodeTopologyDistribution()
+			logger, _ := ktesting.NewTestContext(t)
+			esController.checkNodeTopologyDistribution(logger)
 
 			if esController.queue.Len() != tc.expectedQueueLen {
 				t.Errorf("Expected %d services to be queued, got %d", tc.expectedQueueLen, esController.queue.Len())
@@ -1890,7 +1966,7 @@ func TestUpdateNode(t *testing.T) {
 			},
 		},
 	}
-	_, esController := newController(nil, time.Duration(0))
+	_, esController := newController(t, nil, time.Duration(0))
 	sliceInfo := &topologycache.SliceInfo{
 		ServiceKey:  "ns/svc",
 		AddressType: discovery.AddressTypeIPv4,
@@ -1928,12 +2004,13 @@ func TestUpdateNode(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "node-2"},
 		Status:     nodeReadyStatus,
 	}
+	logger, _ := ktesting.NewTestContext(t)
 	esController.nodeStore.Add(node1)
 	esController.nodeStore.Add(node2)
-	esController.addNode(node1)
-	esController.addNode(node2)
+	esController.addNode(logger, node1)
+	esController.addNode(logger, node2)
 	// The Nodes don't have the zone label, AddHints should fail.
-	_, _, eventsBuilders := esController.topologyCache.AddHints(sliceInfo)
+	_, _, eventsBuilders := esController.topologyCache.AddHints(logger, sliceInfo)
 	require.Len(t, eventsBuilders, 1)
 	assert.Contains(t, eventsBuilders[0].Message, topologycache.InsufficientNodeInfo)
 
@@ -1945,9 +2022,9 @@ func TestUpdateNode(t *testing.T) {
 	// After adding the zone label to the Nodes and calling the event handler updateNode, AddHints should succeed.
 	esController.nodeStore.Update(updateNode1)
 	esController.nodeStore.Update(updateNode2)
-	esController.updateNode(node1, updateNode1)
-	esController.updateNode(node2, updateNode2)
-	_, _, eventsBuilders = esController.topologyCache.AddHints(sliceInfo)
+	esController.updateNode(logger, node1, updateNode1)
+	esController.updateNode(logger, node2, updateNode2)
+	_, _, eventsBuilders = esController.topologyCache.AddHints(logger, sliceInfo)
 	require.Len(t, eventsBuilders, 1)
 	assert.Contains(t, eventsBuilders[0].Message, topologycache.TopologyAwareHintsEnabled)
 }
@@ -1965,7 +2042,8 @@ func standardSyncService(t *testing.T, esController *endpointSliceController, na
 	t.Helper()
 	createService(t, esController, namespace, serviceName)
 
-	err := esController.syncService(fmt.Sprintf("%s/%s", namespace, serviceName))
+	logger, _ := ktesting.NewTestContext(t)
+	err := esController.syncService(logger, fmt.Sprintf("%s/%s", namespace, serviceName))
 	assert.Nil(t, err, "Expected no error syncing service")
 }
 

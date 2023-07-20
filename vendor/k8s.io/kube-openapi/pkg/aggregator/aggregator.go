@@ -22,10 +22,9 @@ import (
 	"sort"
 	"strings"
 
-	"k8s.io/kube-openapi/pkg/validation/spec"
-
 	"k8s.io/kube-openapi/pkg/schemamutation"
 	"k8s.io/kube-openapi/pkg/util"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 const gvkKey = "x-kubernetes-group-version-kind"
@@ -91,13 +90,9 @@ func FilterSpecByPathsWithoutSideEffects(sp *spec.Swagger, keepPathPrefixes []st
 	return &ret
 }
 
-type rename struct {
-	from, to string
-}
-
-// renameDefinition renames references, without mutating the input.
+// renameDefinitions renames definition references, without mutating the input.
 // The output might share data structures with the input.
-func renameDefinition(s *spec.Swagger, renames map[string]string) *spec.Swagger {
+func renameDefinitions(s *spec.Swagger, renames map[string]string) *spec.Swagger {
 	refRenames := make(map[string]string, len(renames))
 	foundOne := false
 	for k, v := range renames {
@@ -135,30 +130,77 @@ func renameDefinition(s *spec.Swagger, renames map[string]string) *spec.Swagger 
 	return ret
 }
 
-// MergeSpecsIgnorePathConflict is the same as MergeSpecs except it will ignore any path
-// conflicts by keeping the paths of destination. It will rename definition conflicts.
-// The source is not mutated.
-func MergeSpecsIgnorePathConflict(dest, source *spec.Swagger) error {
-	return mergeSpecs(dest, source, true, true)
+// renameParameters renames parameter references, without mutating the input.
+// The output might share data structures with the input.
+func renameParameters(s *spec.Swagger, renames map[string]string) *spec.Swagger {
+	refRenames := make(map[string]string, len(renames))
+	foundOne := false
+	for k, v := range renames {
+		refRenames[parameterPrefix+k] = parameterPrefix + v
+		if _, ok := s.Parameters[k]; ok {
+			foundOne = true
+		}
+	}
+
+	if !foundOne {
+		return s
+	}
+
+	ret := &spec.Swagger{}
+	*ret = *s
+
+	ret = schemamutation.ReplaceReferences(func(ref *spec.Ref) *spec.Ref {
+		refName := ref.String()
+		if newRef, found := refRenames[refName]; found {
+			ret := spec.MustCreateRef(newRef)
+			return &ret
+		}
+		return ref
+	}, ret)
+
+	renamed := make(map[string]spec.Parameter, len(ret.Parameters))
+	for k, v := range ret.Parameters {
+		if newRef, found := renames[k]; found {
+			k = newRef
+		}
+		renamed[k] = v
+	}
+	ret.Parameters = renamed
+
+	return ret
 }
 
-// MergeSpecsFailOnDefinitionConflict is differ from MergeSpecs as it fails if there is
-// a definition conflict.
-// The source is not mutated.
+// MergeSpecsIgnorePathConflictRenamingDefinitionsAndParameters is the same as
+// MergeSpecs except it will ignore any path conflicts by keeping the paths of
+// destination. It will rename definition and parameter conflicts.
+func MergeSpecsIgnorePathConflictRenamingDefinitionsAndParameters(dest, source *spec.Swagger) error {
+	return mergeSpecs(dest, source, true, true, true)
+}
+
+// MergeSpecsIgnorePathConflictDeprecated is the same as MergeSpecs except it will ignore any path
+// conflicts by keeping the paths of destination. It will rename definition and
+// parameter conflicts.
+func MergeSpecsIgnorePathConflictDeprecated(dest, source *spec.Swagger) error {
+	return mergeSpecs(dest, source, true, false, true)
+}
+
+// MergeSpecsFailOnDefinitionConflict is different from MergeSpecs as it fails if there is
+// a definition or parameter conflict.
 func MergeSpecsFailOnDefinitionConflict(dest, source *spec.Swagger) error {
-	return mergeSpecs(dest, source, false, false)
+	return mergeSpecs(dest, source, false, false, false)
 }
 
-// MergeSpecs copies paths and definitions from source to dest, rename definitions if needed.
-// dest will be mutated, and source will not be changed. It will fail on path conflicts.
-// The source is not mutated.
+// MergeSpecs copies paths, definitions and parameters from source to dest, rename
+// definitions if needed. It will fail on path conflicts.
+//
+// The destination is mutated, the source is not.
 func MergeSpecs(dest, source *spec.Swagger) error {
-	return mergeSpecs(dest, source, true, false)
+	return mergeSpecs(dest, source, true, true, false)
 }
 
 // mergeSpecs merges source into dest while resolving conflicts.
 // The source is not mutated.
-func mergeSpecs(dest, source *spec.Swagger, renameModelConflicts, ignorePathConflicts bool) (err error) {
+func mergeSpecs(dest, source *spec.Swagger, renameModelConflicts, renameParameterConflicts, ignorePathConflicts bool) (err error) {
 	// Paths may be empty, due to [ACL constraints](http://goo.gl/8us55a#securityFiltering).
 	if source.Paths == nil {
 		// When a source spec does not have any path, that means none of the definitions
@@ -227,19 +269,71 @@ DEFINITIONLOOP:
 		renames[k] = newName
 		usedNames[newName] = true
 	}
-	source = renameDefinition(source, renames)
+	source = renameDefinitions(source, renames)
 
-	// now without conflict (modulo different GVKs), copy definitions to dest
+	// Check for parameter conflicts and rename to make parameters conflict-free
+	usedNames = map[string]bool{}
+	for k := range dest.Parameters {
+		usedNames[k] = true
+	}
+	renames = map[string]string{}
+PARAMETERLOOP:
+	for k, p := range source.Parameters {
+		existing, found := dest.Parameters[k]
+		if !found || reflect.DeepEqual(&existing, &p) {
+			// skip for now, we copy them after the rename loop
+			continue
+		}
+
+		if !renameParameterConflicts {
+			return fmt.Errorf("parameter name conflict in merging OpenAPI spec: %s", k)
+		}
+
+		// Reuse previously renamed parameter if one exists
+		var newName string
+		i := 1
+		for found {
+			i++
+			newName = fmt.Sprintf("%s_v%d", k, i)
+			existing, found = dest.Parameters[newName]
+			if found && reflect.DeepEqual(&existing, &p) {
+				renames[k] = newName
+				continue PARAMETERLOOP
+			}
+		}
+
+		_, foundInSource := source.Parameters[newName]
+		for usedNames[newName] || foundInSource {
+			i++
+			newName = fmt.Sprintf("%s_v%d", k, i)
+			_, foundInSource = source.Parameters[newName]
+		}
+		renames[k] = newName
+		usedNames[newName] = true
+	}
+	source = renameParameters(source, renames)
+
+	// Now without conflict (modulo different GVKs), copy definitions to dest
 	for k, v := range source.Definitions {
 		if existing, found := dest.Definitions[k]; !found {
 			if dest.Definitions == nil {
-				dest.Definitions = spec.Definitions{}
+				dest.Definitions = make(spec.Definitions, len(source.Definitions))
 			}
 			dest.Definitions[k] = v
 		} else if merged, changed, err := mergedGVKs(&existing, &v); err != nil {
 			return err
 		} else if changed {
 			existing.Extensions[gvkKey] = merged
+		}
+	}
+
+	// Now without conflict, copy parameters to dest
+	for k, v := range source.Parameters {
+		if _, found := dest.Parameters[k]; !found {
+			if dest.Parameters == nil {
+				dest.Parameters = make(map[string]spec.Parameter, len(source.Parameters))
+			}
+			dest.Parameters[k] = v
 		}
 	}
 

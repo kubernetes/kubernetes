@@ -91,7 +91,7 @@ func validateSupportedVersion(gv schema.GroupVersion, allowDeprecated, allowExpe
 	}
 
 	if _, present := deprecatedAPIVersions[gvString]; present && !allowDeprecated {
-		klog.Warningf("your configuration file uses a deprecated API spec: %q. Please use 'kubeadm config migrate --old-config old.yaml --new-config new.yaml', which will write the new, similar spec using a newer API version.", gv)
+		klog.Warningf("your configuration file uses a deprecated API spec: %q. Please use 'kubeadm config migrate --old-config old.yaml --new-config new.yaml', which will write the new, similar spec using a newer API version.", gv.String())
 	}
 
 	if _, present := experimentalAPIVersions[gvString]; present && !allowExperimental {
@@ -289,6 +289,19 @@ func MigrateOldConfig(oldConfig []byte, allowExperimental bool) ([]byte, error) 
 		newConfig = append(newConfig, b)
 	}
 
+	// Migrate ResetConfiguration if there is any
+	if kubeadmutil.GroupVersionKindsHasResetConfiguration(gvks...) {
+		o, err := documentMapToResetConfiguration(gvkmap, true, allowExperimental, true)
+		if err != nil {
+			return []byte{}, err
+		}
+		b, err := MarshalKubeadmConfigObject(o, gv)
+		if err != nil {
+			return []byte{}, err
+		}
+		newConfig = append(newConfig, b)
+	}
+
 	return bytes.Join(newConfig, []byte(constants.YAMLDocumentSeparator)), nil
 }
 
@@ -319,6 +332,13 @@ func ValidateConfig(config []byte, allowExperimental bool) error {
 	// Validate JoinConfiguration if there is any
 	if kubeadmutil.GroupVersionKindsHasJoinConfiguration(gvks...) {
 		if _, err := documentMapToJoinConfiguration(gvkmap, true, allowExperimental, true); err != nil {
+			return err
+		}
+	}
+
+	// Validate ResetConfiguration if there is any
+	if kubeadmutil.GroupVersionKindsHasResetConfiguration(gvks...) {
+		if _, err := documentMapToResetConfiguration(gvkmap, true, allowExperimental, true); err != nil {
 			return err
 		}
 	}

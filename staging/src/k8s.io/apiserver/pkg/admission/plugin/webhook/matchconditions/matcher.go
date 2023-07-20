@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/cel-go/cel"
 	celtypes "github.com/google/cel-go/common/types"
@@ -53,13 +54,13 @@ var _ Matcher = &matcher{}
 // matcher evaluates compiled cel expressions and determines if they match the given request or not
 type matcher struct {
 	filter      celplugin.Filter
-	authorizer  authorizer.Authorizer
 	failPolicy  v1.FailurePolicyType
 	matcherType string
+	matcherKind string
 	objectName  string
 }
 
-func NewMatcher(filter celplugin.Filter, authorizer authorizer.Authorizer, failPolicy *v1.FailurePolicyType, matcherType, objectName string) Matcher {
+func NewMatcher(filter celplugin.Filter, failPolicy *v1.FailurePolicyType, matcherKind, matcherType, objectName string) Matcher {
 	var f v1.FailurePolicyType
 	if failPolicy == nil {
 		f = v1.Fail
@@ -68,20 +69,22 @@ func NewMatcher(filter celplugin.Filter, authorizer authorizer.Authorizer, failP
 	}
 	return &matcher{
 		filter:      filter,
-		authorizer:  authorizer,
 		failPolicy:  f,
+		matcherKind: matcherKind,
 		matcherType: matcherType,
 		objectName:  objectName,
 	}
 }
 
-func (m *matcher) Match(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object) MatchResult {
+func (m *matcher) Match(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, authz authorizer.Authorizer) MatchResult {
+	t := time.Now()
 	evalResults, _, err := m.filter.ForInput(ctx, versionedAttr, celplugin.CreateAdmissionRequest(versionedAttr.Attributes), celplugin.OptionalVariableBindings{
 		VersionedParams: versionedParams,
-		Authorizer:      m.authorizer,
-	}, celconfig.RuntimeCELCostBudgetMatchConditions)
+		Authorizer:      authz,
+	}, nil, celconfig.RuntimeCELCostBudgetMatchConditions)
 
 	if err != nil {
+		admissionmetrics.Metrics.ObserveMatchConditionEvaluationTime(ctx, time.Since(t), m.objectName, m.matcherKind, m.matcherType, string(versionedAttr.GetOperation()))
 		// filter returning error is unexpected and not an evaluation error so not incrementing metric here
 		if m.failPolicy == v1.Fail {
 			return MatchResult{
@@ -106,10 +109,10 @@ func (m *matcher) Match(ctx context.Context, versionedAttr *admission.VersionedA
 		}
 		if evalResult.Error != nil {
 			errorList = append(errorList, evalResult.Error)
-			//TODO: what's the best way to handle this metric since its reused by VAP for match conditions
-			admissionmetrics.Metrics.ObserveMatchConditionEvalError(ctx, m.objectName, m.matcherType)
+			admissionmetrics.Metrics.ObserveMatchConditionEvalError(ctx, m.objectName, m.matcherKind, m.matcherType, string(versionedAttr.GetOperation()))
 		}
 		if evalResult.EvalResult == celtypes.False {
+			admissionmetrics.Metrics.ObserveMatchConditionEvaluationTime(ctx, time.Since(t), m.objectName, m.matcherKind, m.matcherType, string(versionedAttr.GetOperation()))
 			// If any condition false, skip calling webhook always
 			return MatchResult{
 				Matches:             false,
@@ -118,6 +121,7 @@ func (m *matcher) Match(ctx context.Context, versionedAttr *admission.VersionedA
 		}
 	}
 	if len(errorList) > 0 {
+		admissionmetrics.Metrics.ObserveMatchConditionEvaluationTime(ctx, time.Since(t), m.objectName, m.matcherKind, m.matcherType, string(versionedAttr.GetOperation()))
 		// If mix of true and eval errors then resort to fail policy
 		if m.failPolicy == v1.Fail {
 			// mix of true and errors with fail policy fail should fail request without calling webhook

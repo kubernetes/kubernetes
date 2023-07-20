@@ -46,7 +46,9 @@ func (in *Extensions) DeepCopyInto(out *Extensions) {
 	if in.XValidations != nil {
 		in, out := &in.XValidations, &out.XValidations
 		*out = make(v1.ValidationRules, len(*in))
-		copy(*out, *in)
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 	return
 }

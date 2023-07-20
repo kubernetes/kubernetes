@@ -77,6 +77,10 @@ type Interface interface {
 
 	// WatchTracker provides the WatchTracker interface.
 	WatchTracker
+
+	// MaxSeatsTracker is invoked from the work estimator to track max seats
+	// that can be occupied by a request for a priority level.
+	MaxSeatsTracker
 }
 
 // This request filter implements https://github.com/kubernetes/enhancements/blob/master/keps/sig-api-machinery/1040-priority-and-fairness/README.md

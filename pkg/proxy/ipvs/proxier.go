@@ -440,10 +440,10 @@ func NewProxier(ipFamily v1.IPFamily,
 		ipvsScheduler:         scheduler,
 		iptablesData:          bytes.NewBuffer(nil),
 		filterChainsData:      bytes.NewBuffer(nil),
-		natChains:             proxyutil.LineBuffer{},
-		natRules:              proxyutil.LineBuffer{},
-		filterChains:          proxyutil.LineBuffer{},
-		filterRules:           proxyutil.LineBuffer{},
+		natChains:             proxyutil.NewLineBuffer(),
+		natRules:              proxyutil.NewLineBuffer(),
+		filterChains:          proxyutil.NewLineBuffer(),
+		filterRules:           proxyutil.NewLineBuffer(),
 		netlinkHandle:         NewNetLinkHandle(ipFamily == v1.IPv6Protocol),
 		ipset:                 ipset,
 		nodePortAddresses:     nodePortAddresses,
@@ -902,6 +902,7 @@ func (proxier *Proxier) OnNodeDelete(node *v1.Node) {
 		klog.ErrorS(nil, "Received a watch event for a node that doesn't match the current node", "eventNode", node.Name, "currentNode", proxier.hostname)
 		return
 	}
+
 	proxier.mu.Lock()
 	proxier.nodeLabels = nil
 	proxier.mu.Unlock()
@@ -1171,7 +1172,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// Capture load-balancer ingress.
-		for _, ingress := range svcInfo.LoadBalancerIPStrings() {
+		for _, ingress := range svcInfo.LoadBalancerVIPStrings() {
 			// ipset call
 			entry = &utilipset.Entry{
 				IP:       ingress,
@@ -1691,11 +1692,6 @@ func (proxier *Proxier) writeIptablesRules() {
 	// Install the kubernetes-specific postrouting rules. We use a whole chain for
 	// this so that it is easier to flush and change, for example if the mark
 	// value should ever change.
-
-	// NOTE: kubelet creates identical copies of these rules. If you want to change
-	// these rules in the future, you MUST do so in a way that will interoperate
-	// correctly with skewed versions of the rules created by kubelet. (Remove this
-	// comment once IPTablesOwnershipCleanup is GA.)
 
 	proxier.natRules.Write(
 		"-A", string(kubePostroutingChain),

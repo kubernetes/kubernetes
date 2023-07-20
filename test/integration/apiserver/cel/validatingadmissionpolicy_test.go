@@ -18,12 +18,16 @@ package cel
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"testing"
+	"text/template"
 	"time"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -36,12 +40,15 @@ import (
 	"k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 
+	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"k8s.io/kubernetes/test/integration/authutil"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -51,13 +58,11 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 
-	v1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
-
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
-
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	authorizationv1 "k8s.io/api/authorization/v1"
+	v1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 )
 
 // Test_ValidateNamespace_NoParams tests a ValidatingAdmissionPolicy that validates creation of a Namespace with no params.
@@ -249,6 +254,21 @@ func Test_ValidateNamespace_NoParams(t *testing.T) {
 			policy: withValidations([]admissionregistrationv1alpha1.Validation{
 				{
 					Expression: "(params != null && object.metadata.name.startsWith(params.metadata.name)) || object.metadata.name.endsWith('k8s')",
+				},
+			}, withParams(configParamKind(), withFailurePolicy(admissionregistrationv1alpha1.Fail, withNamespaceMatch(makePolicy("validate-namespace-suffix"))))),
+			policyBinding: makeBinding("validate-namespace-suffix-binding", "validate-namespace-suffix", ""),
+			namespace: &v1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-k8s",
+				},
+			},
+			err: "",
+		},
+		{
+			name: "with check against namespaceObject",
+			policy: withValidations([]admissionregistrationv1alpha1.Validation{
+				{
+					Expression: "namespaceObject == null", // because namespace itself is cluster-scoped.
 				},
 			}, withParams(configParamKind(), withFailurePolicy(admissionregistrationv1alpha1.Fail, withNamespaceMatch(makePolicy("validate-namespace-suffix"))))),
 			policyBinding: makeBinding("validate-namespace-suffix-binding", "validate-namespace-suffix", ""),
@@ -2451,15 +2471,15 @@ func withWaitReadyConstraintAndExpression(policy *admissionregistrationv1alpha1.
 	return policy
 }
 
-func createAndWaitReady(t *testing.T, client *clientset.Clientset, binding *admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, matchLabels map[string]string) error {
+func createAndWaitReady(t *testing.T, client clientset.Interface, binding *admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, matchLabels map[string]string) error {
 	return createAndWaitReadyNamespaced(t, client, binding, matchLabels, "default")
 }
 
-func createAndWaitReadyNamespaced(t *testing.T, client *clientset.Clientset, binding *admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, matchLabels map[string]string, ns string) error {
+func createAndWaitReadyNamespaced(t *testing.T, client clientset.Interface, binding *admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, matchLabels map[string]string, ns string) error {
 	return createAndWaitReadyNamespacedWithWarnHandler(t, client, binding, matchLabels, ns, newWarningHandler())
 }
 
-func createAndWaitReadyNamespacedWithWarnHandler(t *testing.T, client *clientset.Clientset, binding *admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, matchLabels map[string]string, ns string, handler *warningHandler) error {
+func createAndWaitReadyNamespacedWithWarnHandler(t *testing.T, client clientset.Interface, binding *admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, matchLabels map[string]string, ns string, handler *warningHandler) error {
 	marker := &v1.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: "test-marker", Namespace: ns, Labels: matchLabels}}
 	defer func() {
 		err := client.CoreV1().Endpoints(ns).Delete(context.TODO(), marker.Name, metav1.DeleteOptions{})
@@ -2613,26 +2633,6 @@ func withPolicyExistsLabels(labels []string, policy *admissionregistrationv1alph
 	matchExprs := buildExistsSelector(labels)
 	policy.Spec.MatchConstraints.ObjectSelector = &metav1.LabelSelector{
 		MatchExpressions: matchExprs,
-	}
-	return policy
-}
-
-func withGVRMatch(groups []string, versions []string, resources []string, policy *admissionregistrationv1alpha1.ValidatingAdmissionPolicy) *admissionregistrationv1alpha1.ValidatingAdmissionPolicy {
-	policy.Spec.MatchConstraints = &admissionregistrationv1alpha1.MatchResources{
-		ResourceRules: []admissionregistrationv1alpha1.NamedRuleWithOperations{
-			{
-				RuleWithOperations: admissionregistrationv1alpha1.RuleWithOperations{
-					Operations: []admissionregistrationv1.OperationType{
-						"*",
-					},
-					Rule: admissionregistrationv1.Rule{
-						APIGroups:   groups,
-						APIVersions: versions,
-						Resources:   resources,
-					},
-				},
-			},
-		},
 	}
 	return policy
 }
@@ -2912,113 +2912,166 @@ rules:
 `
 )
 
-func TestValidatingAdmissionPolicyTypeChecking(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
-	server, err := apiservertesting.StartTestServer(t, nil, []string{
-		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
-	}, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer server.TearDownFn()
-
-	config := server.ClientConfig
-
-	client, err := clientset.NewForConfig(config)
-	if err != nil {
-		t.Fatal(err)
-	}
+func TestAuthorizationDecisionCaching(t *testing.T) {
 	for _, tc := range []struct {
-		name           string
-		policy         *admissionregistrationv1alpha1.ValidatingAdmissionPolicy
-		assertFieldRef func(warnings []admissionregistrationv1alpha1.ExpressionWarning, t *testing.T) // warning.fieldRef
-		assertWarnings func(warnings []admissionregistrationv1alpha1.ExpressionWarning, t *testing.T) // warning.warning
+		name        string
+		validations []admissionregistrationv1alpha1.Validation
 	}{
 		{
-			name: "deployment with correct expression",
-			policy: withGVRMatch([]string{"apps"}, []string{"v1"}, []string{"deployments"}, withValidations([]admissionregistrationv1alpha1.Validation{
+			name: "hit",
+			validations: []admissionregistrationv1alpha1.Validation{
 				{
-					Expression: "object.spec.replicas > 1",
+					Expression: "authorizer.requestResource.check('test').reason() == authorizer.requestResource.check('test').reason()",
 				},
-			}, makePolicy("replicated-deployment"))),
-			assertFieldRef: toHasLengthOf(0),
-			assertWarnings: toHasLengthOf(0),
+			},
 		},
 		{
-			name: "deployment with type confusion",
-			policy: withGVRMatch([]string{"apps"}, []string{"v1"}, []string{"deployments"}, withValidations([]admissionregistrationv1alpha1.Validation{
+			name: "miss",
+			validations: []admissionregistrationv1alpha1.Validation{
 				{
-					Expression: "object.spec.replicas < 100", // this one passes
+					Expression: "authorizer.requestResource.subresource('a').check('test').reason() == '1'",
 				},
 				{
-					Expression: "object.spec.replicas > '1'", // '1' should be int
+					Expression: "authorizer.requestResource.subresource('b').check('test').reason() == '2'",
 				},
-			}, makePolicy("confused-deployment"))),
-			assertFieldRef: toBe("spec.validations[1].expression"),
-			assertWarnings: toHasSubstring(`found no matching overload for '_>_' applied to '(int, string)'`),
+				{
+					Expression: "authorizer.requestResource.subresource('c').check('test').reason() == '3'",
+				},
+			},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
+
+			ctx, cancel := context.WithCancel(context.TODO())
 			defer cancel()
-			policy, err := client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Create(ctx, tc.policy, metav1.CreateOptions{})
+
+			var nChecks int
+			webhook := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var review authorizationv1.SubjectAccessReview
+				if err := json.NewDecoder(r.Body).Decode(&review); err != nil {
+					http.Error(w, err.Error(), http.StatusBadRequest)
+				}
+
+				review.Status.Allowed = true
+				if review.Spec.ResourceAttributes.Verb == "test" {
+					nChecks++
+					review.Status.Reason = fmt.Sprintf("%d", nChecks)
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				if err := json.NewEncoder(w).Encode(review); err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+				}
+			}))
+			defer webhook.Close()
+
+			kcfd, err := os.CreateTemp("", "kubeconfig-")
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Delete(context.Background(), policy.Name, metav1.DeleteOptions{})
-			err = wait.PollImmediateWithContext(ctx, time.Second, time.Minute, func(ctx context.Context) (done bool, err error) {
-				name := policy.Name
-				// wait until the typeChecking is set, which means the type checking
-				// is complete.
-				updated, err := client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Get(ctx, name, metav1.GetOptions{})
+			func() {
+				defer kcfd.Close()
+				tmpl, err := template.New("kubeconfig").Parse(`
+apiVersion: v1
+kind: Config
+clusters:
+  - name: test-authz-service
+    cluster:
+      server: {{ .Server }}
+users:
+  - name: test-api-server
+current-context: webhook
+contexts:
+- context:
+    cluster: test-authz-service
+    user: test-api-server
+  name: webhook
+`)
 				if err != nil {
-					return false, err
+					t.Fatal(err)
 				}
-				if updated.Status.TypeChecking != nil {
-					policy = updated
-					return true, nil
+				err = tmpl.Execute(kcfd, struct {
+					Server string
+				}{
+					Server: webhook.URL,
+				})
+				if err != nil {
+					t.Fatal(err)
 				}
-				return false, nil
+			}()
+
+			client, config, teardown := framework.StartTestServer(ctx, t, framework.TestServerSetup{
+				ModifyServerRunOptions: func(options *options.ServerRunOptions) {
+					options.Admission.GenericAdmission.EnablePlugins = append(options.Admission.GenericAdmission.EnablePlugins, "ValidatingAdmissionPolicy")
+					options.APIEnablement.RuntimeConfig.Set("api/all=true")
+
+					options.Authorization.Modes = []string{authzmodes.ModeWebhook}
+					options.Authorization.WebhookConfigFile = kcfd.Name()
+					options.Authorization.WebhookVersion = "v1"
+					// Bypass webhook cache to observe the policy plugin's cache behavior.
+					options.Authorization.WebhookCacheAuthorizedTTL = 0
+					options.Authorization.WebhookCacheUnauthorizedTTL = 0
+				},
 			})
+			defer teardown()
+
+			policy := &admissionregistrationv1alpha1.ValidatingAdmissionPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-authorization-decision-caching-policy",
+				},
+				Spec: admissionregistrationv1alpha1.ValidatingAdmissionPolicySpec{
+					MatchConstraints: &admissionregistrationv1alpha1.MatchResources{
+						ResourceRules: []admissionregistrationv1alpha1.NamedRuleWithOperations{
+							{
+								ResourceNames: []string{"test-authorization-decision-caching-namespace"},
+								RuleWithOperations: admissionregistrationv1alpha1.RuleWithOperations{
+									Operations: []admissionregistrationv1.OperationType{
+										admissionregistrationv1.Create,
+									},
+									Rule: admissionregistrationv1.Rule{
+										APIGroups:   []string{""},
+										APIVersions: []string{"v1"},
+										Resources:   []string{"namespaces"},
+									},
+								},
+							},
+						},
+					},
+					Validations: tc.validations,
+				},
+			}
+
+			policy, err = client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Create(ctx, withWaitReadyConstraintAndExpression(policy), metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
-			tc.assertFieldRef(policy.Status.TypeChecking.ExpressionWarnings, t)
-			tc.assertWarnings(policy.Status.TypeChecking.ExpressionWarnings, t)
+
+			if err := createAndWaitReady(t, client, makeBinding(policy.Name+"-binding", policy.Name, ""), nil); err != nil {
+				t.Fatal(err)
+			}
+
+			config = rest.CopyConfig(config)
+			config.Impersonate = rest.ImpersonationConfig{
+				UserName: "alice",
+				UID:      "1234",
+			}
+			client, err = clientset.NewForConfig(config)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if _, err := client.CoreV1().Namespaces().Create(
+				ctx,
+				&v1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-authorization-decision-caching-namespace",
+					},
+				},
+				metav1.CreateOptions{},
+			); err != nil {
+				t.Fatal(err)
+			}
 		})
-	}
-}
-
-func toBe(expected ...string) func(warnings []admissionregistrationv1alpha1.ExpressionWarning, t *testing.T) {
-	return func(warnings []admissionregistrationv1alpha1.ExpressionWarning, t *testing.T) {
-		if len(expected) != len(warnings) {
-			t.Fatalf("mismatched length, expect %d, got %d", len(expected), len(warnings))
-		}
-		for i := range expected {
-			if expected[i] != warnings[i].FieldRef {
-				t.Errorf("expected %q but got %q", expected[i], warnings[i].FieldRef)
-			}
-		}
-	}
-}
-
-func toHasSubstring(substrings ...string) func(warnings []admissionregistrationv1alpha1.ExpressionWarning, t *testing.T) {
-	return func(warnings []admissionregistrationv1alpha1.ExpressionWarning, t *testing.T) {
-		if len(substrings) != len(warnings) {
-			t.Fatalf("mismatched length, expect %d, got %d", len(substrings), len(warnings))
-		}
-		for i := range substrings {
-			if !strings.Contains(warnings[i].Warning, substrings[i]) {
-				t.Errorf("missing expected substring %q in %v", substrings[i], warnings[i])
-			}
-		}
-	}
-}
-
-func toHasLengthOf(n int) func(warnings []admissionregistrationv1alpha1.ExpressionWarning, t *testing.T) {
-	return func(warnings []admissionregistrationv1alpha1.ExpressionWarning, t *testing.T) {
-		if n != len(warnings) {
-			t.Fatalf("mismatched length, expect %d, got %d", n, len(warnings))
-		}
 	}
 }

@@ -36,6 +36,7 @@ import (
 	"k8s.io/apiserver/pkg/server/options/encryptionconfig"
 	encryptionconfigcontroller "k8s.io/apiserver/pkg/server/options/encryptionconfig/controller"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
+	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	storagefactory "k8s.io/apiserver/pkg/storage/storagebackend/factory"
 	storagevalue "k8s.io/apiserver/pkg/storage/value"
@@ -238,8 +239,32 @@ func (s *EtcdOptions) ApplyWithStorageFactoryTo(factory serverstorage.StorageFac
 		return err
 	}
 
+	metrics.SetStorageMonitorGetter(monitorGetter(factory))
+
 	c.RESTOptionsGetter = s.CreateRESTOptionsGetter(factory, c.ResourceTransformers)
 	return nil
+}
+
+func monitorGetter(factory serverstorage.StorageFactory) func() (monitors []metrics.Monitor, err error) {
+	return func() (monitors []metrics.Monitor, err error) {
+		defer func() {
+			if err != nil {
+				for _, m := range monitors {
+					m.Close()
+				}
+			}
+		}()
+
+		var m metrics.Monitor
+		for _, cfg := range factory.Configs() {
+			m, err = storagefactory.CreateMonitor(cfg)
+			if err != nil {
+				return nil, err
+			}
+			monitors = append(monitors, m)
+		}
+		return monitors, nil
+	}
 }
 
 func (s *EtcdOptions) CreateRESTOptionsGetter(factory serverstorage.StorageFactory, resourceTransformers storagevalue.ResourceTransformers) generic.RESTOptionsGetter {

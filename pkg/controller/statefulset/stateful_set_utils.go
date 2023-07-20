@@ -390,12 +390,16 @@ func initIdentity(set *apps.StatefulSet, pod *v1.Pod) {
 // updateIdentity updates pod's name, hostname, and subdomain, and StatefulSetPodNameLabel to conform to set's name
 // and headless service.
 func updateIdentity(set *apps.StatefulSet, pod *v1.Pod) {
-	pod.Name = getPodName(set, getOrdinal(pod))
+	ordinal := getOrdinal(pod)
+	pod.Name = getPodName(set, ordinal)
 	pod.Namespace = set.Namespace
 	if pod.Labels == nil {
 		pod.Labels = make(map[string]string)
 	}
 	pod.Labels[apps.StatefulSetPodNameLabel] = pod.Name
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodIndexLabel) {
+		pod.Labels[apps.PodIndexLabel] = strconv.Itoa(ordinal)
+	}
 }
 
 // isRunningAndReady returns true if pod is in the PodRunning Phase, if it has a condition of PodReady.

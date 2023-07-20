@@ -47,6 +47,8 @@ CGROUP_DRIVER=${CGROUP_DRIVER:-""}
 CGROUP_ROOT=${CGROUP_ROOT:-""}
 # owner of client certs, default to current user if not specified
 USER=${USER:-$(whoami)}
+# if true, limited swap is being used instead of unlimited swap (default)
+LIMITED_SWAP=${LIMITED_SWAP:-""}
 
 # required for cni installation
 CNI_CONFIG_DIR=${CNI_CONFIG_DIR:-/etc/cni/net.d}
@@ -829,6 +831,13 @@ EOF
 tracing:
   endpoint: localhost:4317 # the default value
   samplingRatePerMillion: 1000000 # sample always
+EOF
+    fi
+
+    if [[ "$LIMITED_SWAP" == "true" ]]; then
+        cat <<EOF >> "${TMP_DIR}"/kubelet.yaml
+memorySwap:
+  swapBehavior: LimitedSwap
 EOF
     fi
 

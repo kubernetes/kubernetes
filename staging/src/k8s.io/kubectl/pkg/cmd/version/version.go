@@ -54,7 +54,6 @@ var (
 // Options is a struct to support version command
 type Options struct {
 	ClientOnly bool
-	Short      bool
 	Output     string
 
 	args []string
@@ -87,8 +86,6 @@ func NewCmdVersion(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cob
 		},
 	}
 	cmd.Flags().BoolVar(&o.ClientOnly, "client", o.ClientOnly, "If true, shows client version only (no server required).")
-	cmd.Flags().BoolVar(&o.Short, "short", o.Short, "If true, print just the version number.")
-	cmd.Flags().MarkDeprecated("short", "and will be removed in the future. The --short output will become the default.")
 	cmd.Flags().StringVarP(&o.Output, "output", "o", o.Output, "One of 'yaml' or 'json'.")
 	return cmd
 }
@@ -141,19 +138,10 @@ func (o *Options) Run() error {
 
 	switch o.Output {
 	case "":
-		if o.Short {
-			fmt.Fprintf(o.Out, "Client Version: %s\n", versionInfo.ClientVersion.GitVersion)
-			fmt.Fprintf(o.Out, "Kustomize Version: %s\n", versionInfo.KustomizeVersion)
-			if versionInfo.ServerVersion != nil {
-				fmt.Fprintf(o.Out, "Server Version: %s\n", versionInfo.ServerVersion.GitVersion)
-			}
-		} else {
-			fmt.Fprintf(o.ErrOut, "WARNING: This version information is deprecated and will be replaced with the output from kubectl version --short.  Use --output=yaml|json to get the full version.\n")
-			fmt.Fprintf(o.Out, "Client Version: %#v\n", *versionInfo.ClientVersion)
-			fmt.Fprintf(o.Out, "Kustomize Version: %s\n", versionInfo.KustomizeVersion)
-			if versionInfo.ServerVersion != nil {
-				fmt.Fprintf(o.Out, "Server Version: %#v\n", *versionInfo.ServerVersion)
-			}
+		fmt.Fprintf(o.Out, "Client Version: %s\n", versionInfo.ClientVersion.GitVersion)
+		fmt.Fprintf(o.Out, "Kustomize Version: %s\n", versionInfo.KustomizeVersion)
+		if versionInfo.ServerVersion != nil {
+			fmt.Fprintf(o.Out, "Server Version: %s\n", versionInfo.ServerVersion.GitVersion)
 		}
 	case "yaml":
 		marshalled, err := yaml.Marshal(&versionInfo)

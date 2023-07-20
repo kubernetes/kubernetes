@@ -23,6 +23,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2"
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/utils/clock"
 	"k8s.io/utils/pointer"
@@ -213,12 +214,31 @@ func getFinishTimeFromDeletionTimestamp(p *v1.Pod) *time.Time {
 }
 
 func (backoff backoffRecord) getRemainingTime(clock clock.WithTicker, defaultBackoff time.Duration, maxBackoff time.Duration) time.Duration {
-	if backoff.failuresAfterLastSuccess == 0 {
+	return getRemainingTimeForFailuresCount(clock, defaultBackoff, maxBackoff, backoff.failuresAfterLastSuccess, backoff.lastFailureTime)
+}
+
+// getRemainingTimePerIndex returns the remaining time left for a given index to
+// create the replacement pods. The number of consecutive pod failures for the
+// index is retrieved from the `job-index-failure-count` annotation of the
+// last failed pod within the index (represented by `lastFailedPod`).
+// The last failed pod is also used to determine the time of the last failure.
+func getRemainingTimePerIndex(logger klog.Logger, clock clock.WithTicker, defaultBackoff time.Duration, maxBackoff time.Duration, lastFailedPod *v1.Pod) time.Duration {
+	if lastFailedPod == nil {
+		// There is no previous failed pod for this index
+		return time.Duration(0)
+	}
+	failureCount := getIndexAbsoluteFailureCount(logger, lastFailedPod) + 1
+	lastFailureTime := getFinishedTime(lastFailedPod)
+	return getRemainingTimeForFailuresCount(clock, defaultBackoff, maxBackoff, failureCount, &lastFailureTime)
+}
+
+func getRemainingTimeForFailuresCount(clock clock.WithTicker, defaultBackoff time.Duration, maxBackoff time.Duration, failuresCount int32, lastFailureTime *time.Time) time.Duration {
+	if failuresCount == 0 {
 		return 0
 	}
 
 	backoffDuration := defaultBackoff
-	for i := 1; i < int(backoff.failuresAfterLastSuccess); i++ {
+	for i := 1; i < int(failuresCount); i++ {
 		backoffDuration = backoffDuration * 2
 		if backoffDuration >= maxBackoff {
 			backoffDuration = maxBackoff
@@ -226,7 +246,7 @@ func (backoff backoffRecord) getRemainingTime(clock clock.WithTicker, defaultBac
 		}
 	}
 
-	timeElapsedSinceLastFailure := clock.Since(*backoff.lastFailureTime)
+	timeElapsedSinceLastFailure := clock.Since(*lastFailureTime)
 
 	if backoffDuration < timeElapsedSinceLastFailure {
 		return 0

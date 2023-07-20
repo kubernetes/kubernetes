@@ -1729,7 +1729,7 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 			wantEncryptCalls: 1,
 			wantLogs: []string{
 				`"encrypting content using envelope service" uid="panda"`,
-				fmt.Sprintf(`"successfully rotated DEK" uid="panda" newKeyID="1" oldKeyID="" expirationTimestamp="%s"`,
+				fmt.Sprintf(`"successfully rotated DEK" uid="panda" newKeyIDHash="sha256:6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b" oldKeyIDHash="" expirationTimestamp="%s"`,
 					now.Add(3*time.Minute).Format(time.RFC3339)),
 			},
 			wantErr: "",
@@ -1772,7 +1772,7 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 			wantEncryptCalls: 1,
 			wantLogs: []string{
 				`"encrypting content using envelope service" uid="panda"`,
-				fmt.Sprintf(`"successfully rotated DEK" uid="panda" newKeyID="4" oldKeyID="3" expirationTimestamp="%s"`,
+				fmt.Sprintf(`"successfully rotated DEK" uid="panda" newKeyIDHash="sha256:4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a" oldKeyIDHash="sha256:4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce" expirationTimestamp="%s"`,
 					now.Add(3*time.Minute).Format(time.RFC3339)),
 			},
 			wantErr: "",
@@ -1791,8 +1791,8 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 				`"encrypting content using envelope service" uid="panda"`,
 			},
 			wantErr: `failed to rotate DEK uid="panda", ` +
-				`errState=<nil>, errGen=failed to encrypt DEK, error: broken, statusKeyID="5", ` +
-				`encryptKeyID="", stateKeyID="4", expirationTimestamp=` + now.Add(7*time.Minute).Format(time.RFC3339),
+				`errState=<nil>, errGen=failed to encrypt DEK, error: broken, statusKeyIDHash="sha256:ef2d127de37b942baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe39d", ` +
+				`encryptKeyIDHash="", stateKeyIDHash="sha256:4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a", expirationTimestamp=` + now.Add(7*time.Minute).Format(time.RFC3339),
 		},
 		{
 			name:             "invalid service response, no previous state",
@@ -1806,8 +1806,8 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 			},
 			wantErr: `failed to rotate DEK uid="panda", ` +
 				`errState=got unexpected nil transformer, errGen=failed to validate annotations: annotations: Invalid value: "panda": ` +
-				`should be a domain with at least two segments separated by dots, statusKeyID="1", ` +
-				`encryptKeyID="", stateKeyID="", expirationTimestamp=` + (time.Time{}).Format(time.RFC3339),
+				`should be a domain with at least two segments separated by dots, statusKeyIDHash="sha256:6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b", ` +
+				`encryptKeyIDHash="", stateKeyIDHash="", expirationTimestamp=` + (time.Time{}).Format(time.RFC3339),
 		},
 		{
 			name:        "invalid service response, with previous state",
@@ -1824,8 +1824,8 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 			},
 			wantErr: `failed to rotate DEK uid="panda", ` +
 				`errState=<nil>, errGen=failed to validate annotations: annotations: Invalid value: "panda": ` +
-				`should be a domain with at least two segments separated by dots, statusKeyID="3", ` +
-				`encryptKeyID="", stateKeyID="2", expirationTimestamp=` + now.Format(time.RFC3339),
+				`should be a domain with at least two segments separated by dots, statusKeyIDHash="sha256:4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce", ` +
+				`encryptKeyIDHash="", stateKeyIDHash="sha256:d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35", expirationTimestamp=` + now.Format(time.RFC3339),
 		},
 	}
 	for _, tt := range tests {

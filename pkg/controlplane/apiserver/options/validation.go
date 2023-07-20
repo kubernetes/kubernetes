@@ -25,6 +25,7 @@ import (
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
+	"k8s.io/kubernetes/pkg/features"
 
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
@@ -69,6 +70,32 @@ func validateAPIPriorityAndFairness(options *Options) []error {
 	return nil
 }
 
+func validateUnknownVersionInteroperabilityProxyFeature() []error {
+	if utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
+		if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StorageVersionAPI) {
+			return nil
+		}
+		return []error{fmt.Errorf("UnknownVersionInteroperabilityProxy feature requires StorageVersionAPI feature flag to be enabled")}
+	}
+	return nil
+}
+
+func validateUnknownVersionInteroperabilityProxyFlags(options *Options) []error {
+	err := []error{}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
+		if options.PeerCAFile != "" {
+			err = append(err, fmt.Errorf("--peer-ca-file requires UnknownVersionInteroperabilityProxy feature to be turned on"))
+		}
+		if options.PeerAdvertiseAddress.PeerAdvertiseIP != "" {
+			err = append(err, fmt.Errorf("--peer-advertise-ip requires UnknownVersionInteroperabilityProxy feature to be turned on"))
+		}
+		if options.PeerAdvertiseAddress.PeerAdvertisePort != "" {
+			err = append(err, fmt.Errorf("--peer-advertise-port requires UnknownVersionInteroperabilityProxy feature to be turned on"))
+		}
+	}
+	return err
+}
+
 // Validate checks Options and return a slice of found errs.
 func (s *Options) Validate() []error {
 	var errs []error
@@ -83,6 +110,8 @@ func (s *Options) Validate() []error {
 	errs = append(errs, s.APIEnablement.Validate(legacyscheme.Scheme, apiextensionsapiserver.Scheme, aggregatorscheme.Scheme)...)
 	errs = append(errs, validateTokenRequest(s)...)
 	errs = append(errs, s.Metrics.Validate()...)
+	errs = append(errs, validateUnknownVersionInteroperabilityProxyFeature()...)
+	errs = append(errs, validateUnknownVersionInteroperabilityProxyFlags(s)...)
 
 	return errs
 }

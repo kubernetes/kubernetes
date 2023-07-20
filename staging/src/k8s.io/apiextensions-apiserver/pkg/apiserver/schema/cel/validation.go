@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"text/scanner"
 	"time"
 
 	celgo "github.com/google/cel-go/cel"
@@ -259,6 +260,9 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 			continue
 		}
 		if evalResult != types.True {
+			if len(compiled.NormalizedRuleFieldPath) > 0 {
+				fldPath = fldPath.Child(compiled.NormalizedRuleFieldPath)
+			}
 			if compiled.MessageExpression != nil {
 				messageExpression, newRemainingBudget, msgErr := evalMessageExpression(ctx, compiled.MessageExpression, rule.MessageExpression, activation, remainingBudget)
 				if msgErr != nil {
@@ -270,19 +274,166 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 						return errs, -1
 					} else {
 						klog.V(2).ErrorS(msgErr, "messageExpression evaluation failed")
-						errs = append(errs, field.Invalid(fldPath, sts.Type, ruleMessageOrDefault(rule)))
+						errs = append(errs, fieldErrorForReason(fldPath, sts.Type, ruleMessageOrDefault(rule), rule.Reason))
 						remainingBudget = newRemainingBudget
 					}
 				} else {
-					errs = append(errs, field.Invalid(fldPath, sts.Type, messageExpression))
+					errs = append(errs, fieldErrorForReason(fldPath, sts.Type, messageExpression, rule.Reason))
 					remainingBudget = newRemainingBudget
 				}
 			} else {
-				errs = append(errs, field.Invalid(fldPath, sts.Type, ruleMessageOrDefault(rule)))
+				errs = append(errs, fieldErrorForReason(fldPath, sts.Type, ruleMessageOrDefault(rule), rule.Reason))
 			}
 		}
 	}
 	return errs, remainingBudget
+}
+
+var unescapeMatcher = regexp.MustCompile(`\\.`)
+
+func unescapeSingleQuote(s string) (string, error) {
+	var err error
+	unescaped := unescapeMatcher.ReplaceAllStringFunc(s, func(matchStr string) string {
+		directive := matchStr[1]
+		switch directive {
+		case 'a':
+			return "\a"
+		case 'b':
+			return "\b"
+		case 'f':
+			return "\f"
+		case 'n':
+			return "\n"
+		case 'r':
+			return "\r"
+		case 't':
+			return "\t"
+		case 'v':
+			return "\v"
+		case '\'':
+			return "'"
+		case '\\':
+			return "\\"
+		default:
+			err = fmt.Errorf("invalid escape char %s", matchStr)
+			return ""
+		}
+	})
+	return unescaped, err
+}
+
+// ValidFieldPath returns a valid field path.
+func ValidFieldPath(fieldPath string, pathOfFieldPath *field.Path, schema *schema.Structural) (validFieldPath *field.Path, err *field.Error) {
+	validFieldPath = pathOfFieldPath
+	if len(fieldPath) == 0 {
+		return pathOfFieldPath, field.Invalid(pathOfFieldPath, fieldPath, "must not be empty")
+	}
+
+	invalidFieldError := field.Invalid(pathOfFieldPath, fieldPath, "does not refer to an valid field")
+
+	var s scanner.Scanner
+	s.Init(strings.NewReader(fieldPath))
+	s.Filename = pathOfFieldPath.String()
+	s.Mode = scanner.ScanInts | scanner.ScanIdents | scanner.ScanChars | scanner.ScanStrings
+	s.Error = func(s *scanner.Scanner, msg string) {
+		field.Invalid(pathOfFieldPath, fieldPath, fmt.Sprintf("failed to parse JSON Path: %s", msg))
+	}
+
+	found := false
+	for true {
+		tok := s.Scan()
+		if tok == scanner.EOF {
+			found = true
+			break
+		}
+		switch schema.Type {
+		case "object":
+			isMapSyntax := false
+			if s.TokenText() == "[" {
+				isMapSyntax = true
+			} else if s.TokenText() != "." {
+				return pathOfFieldPath, field.Invalid(pathOfFieldPath, fieldPath, "expected [ or . but got: "+s.TokenText())
+			}
+
+			tok = s.Scan()
+			if tok == scanner.EOF {
+				return pathOfFieldPath, field.Invalid(pathOfFieldPath, fieldPath, "unexpected end of JSON path")
+			}
+			fieldName := s.TokenText()
+			if isMapSyntax {
+				if tok == scanner.Char {
+					newS := fieldName[1 : len(fieldName)-1]
+					newS, err := unescapeSingleQuote(newS)
+					if err != nil {
+						return pathOfFieldPath, field.Invalid(pathOfFieldPath, fieldPath, fmt.Sprintf("failed to unescape: %v", err))
+					}
+					fieldName = newS
+					if schema.AdditionalProperties != nil {
+						validFieldPath = validFieldPath.Key(fieldName)
+					} else {
+						validFieldPath = validFieldPath.Child(fieldName)
+					}
+				} else {
+					return pathOfFieldPath, field.Invalid(pathOfFieldPath, fieldPath, "unexpected format of fieldName: "+fieldName)
+				}
+			} else if tok != scanner.Ident {
+				return pathOfFieldPath, invalidFieldError
+			} else {
+				if schema.AdditionalProperties != nil {
+					validFieldPath = validFieldPath.Key(fieldName)
+				} else {
+					validFieldPath = validFieldPath.Child(fieldName)
+				}
+			}
+
+			if schema.Properties != nil {
+				propertySchema, ok := schema.Properties[fieldName]
+				if ok {
+					schema = &propertySchema
+				} else {
+					return pathOfFieldPath, invalidFieldError
+				}
+			} else if schema.AdditionalProperties != nil {
+				schema = schema.AdditionalProperties.Structural
+			} else {
+				return pathOfFieldPath, invalidFieldError
+			}
+
+			if isMapSyntax {
+				if tok == scanner.EOF {
+					return pathOfFieldPath, field.Invalid(pathOfFieldPath, fieldPath, "unexpected end of JSON path")
+				}
+				s.Scan()
+				if s.TokenText() != "]" {
+					return pathOfFieldPath, field.Invalid(pathOfFieldPath, fieldPath, "expect ] but get: "+s.TokenText())
+				}
+			}
+		default:
+			return pathOfFieldPath, invalidFieldError
+		}
+	}
+
+	if !found {
+		return pathOfFieldPath, invalidFieldError
+	}
+
+	return validFieldPath, nil
+}
+
+func fieldErrorForReason(fldPath *field.Path, value interface{}, detail string, reason *field.ErrorType) *field.Error {
+	if reason == nil {
+		return field.Invalid(fldPath, value, detail)
+	}
+	switch *reason {
+	case field.ErrorTypeForbidden:
+		return field.Forbidden(fldPath, detail)
+	case field.ErrorTypeRequired:
+		return field.Required(fldPath, detail)
+	case field.ErrorTypeDuplicate:
+		return field.Duplicate(fldPath, value)
+	default:
+		return field.Invalid(fldPath, value, detail)
+	}
 }
 
 // evalMessageExpression evaluates the given message expression and returns the evaluated string form and the remaining budget, or an error if one

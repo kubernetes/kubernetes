@@ -40,6 +40,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 		fuzzNetworking,
 		fuzzJoinConfiguration,
 		fuzzJoinControlPlane,
+		fuzzResetConfiguration,
 	}
 }
 
@@ -132,4 +133,11 @@ func fuzzJoinConfiguration(obj *kubeadm.JoinConfiguration, c fuzz.Continue) {
 
 func fuzzJoinControlPlane(obj *kubeadm.JoinControlPlane, c fuzz.Continue) {
 	c.FuzzNoCustom(obj)
+}
+
+func fuzzResetConfiguration(obj *kubeadm.ResetConfiguration, c fuzz.Continue) {
+	c.FuzzNoCustom(obj)
+
+	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
+	obj.CertificatesDir = "/tmp"
 }

@@ -26,8 +26,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -227,6 +230,251 @@ func TestDropDisabledField(t *testing.T) {
 		}()
 	}
 
+}
+
+func TestDropServiceStatusDisabledFields(t *testing.T) {
+	ipModeVIP := api.LoadBalancerIPModeVIP
+	ipModeProxy := api.LoadBalancerIPModeProxy
+
+	testCases := []struct {
+		name          string
+		ipModeEnabled bool
+		svc           *api.Service
+		oldSvc        *api.Service
+		compareSvc    *api.Service
+	}{
+		/*LoadBalancerIPMode disabled*/
+		{
+			name:          "LoadBalancerIPMode disabled, ipMode not used in old, not used in new",
+			ipModeEnabled: false,
+			svc: makeValidServiceCustom(func(svc *api.Service) {
+				svc.Spec.Type = api.ServiceTypeLoadBalancer
+				svc.Status.LoadBalancer = api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP: "1.2.3.4",
+					}},
+				}
+			}),
+			oldSvc: makeValidServiceCustom(func(svc *api.Service) {
+				svc.Spec.Type = api.ServiceTypeLoadBalancer
+				svc.Status.LoadBalancer = api.LoadBalancerStatus{}
+			}),
+			compareSvc: makeValidServiceCustom(func(svc *api.Service) {
+				svc.Spec.Type = api.ServiceTypeLoadBalancer
+				svc.Status.LoadBalancer = api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP: "1.2.3.4",
+					}},
+				}
+			}),
+		}, {
+			name:          "LoadBalancerIPMode disabled, ipMode used in old and in new",
+			ipModeEnabled: false,
+			svc: makeValidServiceCustom(func(svc *api.Service) {
+				svc.Spec.Type = api.ServiceTypeLoadBalancer
+				svc.Status.LoadBalancer = api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP:     "1.2.3.4",
+						IPMode: &ipModeProxy,
+					}},
+				}
+			}),
+			oldSvc: makeValidServiceCustom(func(svc *api.Service) {
+				svc.Spec.Type = api.ServiceTypeLoadBalancer
+				svc.Status.LoadBalancer = api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP:     "1.2.3.4",
+						IPMode: &ipModeVIP,
+					}},
+				}
+			}),
+			compareSvc: makeValidServiceCustom(func(svc *api.Service) {
+				svc.Spec.Type = api.ServiceTypeLoadBalancer
+				svc.Status.LoadBalancer = api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP:     "1.2.3.4",
+						IPMode: &ipModeProxy,
+					}},
+				}
+			}),
+		}, {
+			name:          "LoadBalancerIPMode disabled, ipMode not used in old, used in new",
+			ipModeEnabled: false,
+			svc: makeValidServiceCustom(func(svc *api.Service) {
+				svc.Spec.Type = api.ServiceTypeLoadBalancer
+				svc.Status.LoadBalancer = api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP:     "1.2.3.4",
+						IPMode: &ipModeVIP,
+					}},
+				}
+			}),
+			oldSvc: makeValidServiceCustom(func(svc *api.Service) {
+				svc.Spec.Type = api.ServiceTypeLoadBalancer
+				svc.Status.LoadBalancer = api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP: "1.2.3.4",
+					}},
+				}
+			}),
+			compareSvc: makeValidServiceCustom(func(svc *api.Service) {
+				svc.Spec.Type = api.ServiceTypeLoadBalancer
+				svc.Status.LoadBalancer = api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP: "1.2.3.4",
+					}},
+				}
+			}),
+		}, {
+			name:          "LoadBalancerIPMode disabled, ipMode used in old, not used in new",
+			ipModeEnabled: false,
+			svc: makeValidServiceCustom(func(svc *api.Service) {
+				svc.Spec.Type = api.ServiceTypeLoadBalancer
+				svc.Status.LoadBalancer = api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP: "1.2.3.4",
+					}},
+				}
+			}),
+			oldSvc: makeValidServiceCustom(func(svc *api.Service) {
+				svc.Spec.Type = api.ServiceTypeLoadBalancer
+				svc.Status.LoadBalancer = api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP:     "1.2.3.4",
+						IPMode: &ipModeProxy,
+					}},
+				}
+			}),
+			compareSvc: makeValidServiceCustom(func(svc *api.Service) {
+				svc.Spec.Type = api.ServiceTypeLoadBalancer
+				svc.Status.LoadBalancer = api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP: "1.2.3.4",
+					}},
+				}
+			}),
+		},
+		/*LoadBalancerIPMode enabled*/
+		{
+			name:          "LoadBalancerIPMode enabled, ipMode not used in old, not used in new",
+			ipModeEnabled: true,
+			svc: makeValidServiceCustom(func(svc *api.Service) {
+				svc.Spec.Type = api.ServiceTypeLoadBalancer
+				svc.Status.LoadBalancer = api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP: "1.2.3.4",
+					}},
+				}
+			}),
+			oldSvc: nil,
+			compareSvc: makeValidServiceCustom(func(svc *api.Service) {
+				svc.Spec.Type = api.ServiceTypeLoadBalancer
+				svc.Status.LoadBalancer = api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP: "1.2.3.4",
+					}},
+				}
+			}),
+		}, {
+			name:          "LoadBalancerIPMode enabled, ipMode used in old and in new",
+			ipModeEnabled: true,
+			svc: makeValidServiceCustom(func(svc *api.Service) {
+				svc.Spec.Type = api.ServiceTypeLoadBalancer
+				svc.Status.LoadBalancer = api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP:     "1.2.3.4",
+						IPMode: &ipModeProxy,
+					}},
+				}
+			}),
+			oldSvc: makeValidServiceCustom(func(svc *api.Service) {
+				svc.Spec.Type = api.ServiceTypeLoadBalancer
+				svc.Status.LoadBalancer = api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP:     "1.2.3.4",
+						IPMode: &ipModeVIP,
+					}},
+				}
+			}),
+			compareSvc: makeValidServiceCustom(func(svc *api.Service) {
+				svc.Spec.Type = api.ServiceTypeLoadBalancer
+				svc.Status.LoadBalancer = api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP:     "1.2.3.4",
+						IPMode: &ipModeProxy,
+					}},
+				}
+			}),
+		}, {
+			name:          "LoadBalancerIPMode enabled, ipMode not used in old, used in new",
+			ipModeEnabled: true,
+			svc: makeValidServiceCustom(func(svc *api.Service) {
+				svc.Spec.Type = api.ServiceTypeLoadBalancer
+				svc.Status.LoadBalancer = api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP:     "1.2.3.4",
+						IPMode: &ipModeVIP,
+					}},
+				}
+			}),
+			oldSvc: makeValidServiceCustom(func(svc *api.Service) {
+				svc.Spec.Type = api.ServiceTypeLoadBalancer
+				svc.Status.LoadBalancer = api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP: "1.2.3.4",
+					}},
+				}
+			}),
+			compareSvc: makeValidServiceCustom(func(svc *api.Service) {
+				svc.Spec.Type = api.ServiceTypeLoadBalancer
+				svc.Status.LoadBalancer = api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP:     "1.2.3.4",
+						IPMode: &ipModeVIP,
+					}},
+				}
+			}),
+		}, {
+			name:          "LoadBalancerIPMode enabled, ipMode used in old, not used in new",
+			ipModeEnabled: true,
+			svc: makeValidServiceCustom(func(svc *api.Service) {
+				svc.Spec.Type = api.ServiceTypeLoadBalancer
+				svc.Status.LoadBalancer = api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP: "1.2.3.4",
+					}},
+				}
+			}),
+			oldSvc: makeValidServiceCustom(func(svc *api.Service) {
+				svc.Spec.Type = api.ServiceTypeLoadBalancer
+				svc.Status.LoadBalancer = api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP:     "1.2.3.4",
+						IPMode: &ipModeProxy,
+					}},
+				}
+			}),
+			compareSvc: makeValidServiceCustom(func(svc *api.Service) {
+				svc.Spec.Type = api.ServiceTypeLoadBalancer
+				svc.Status.LoadBalancer = api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{{
+						IP: "1.2.3.4",
+					}},
+				}
+			}),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)()
+			dropServiceStatusDisabledFields(tc.svc, tc.oldSvc)
+
+			if !reflect.DeepEqual(tc.svc, tc.compareSvc) {
+				t.Errorf("%v: unexpected svc spec: %v", tc.name, cmp.Diff(tc.svc, tc.compareSvc))
+			}
+		})
+	}
 }
 
 func TestDropTypeDependentFields(t *testing.T) {

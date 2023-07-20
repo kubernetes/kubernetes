@@ -165,6 +165,9 @@ type KubeControllerManagerConfiguration struct {
 	// TTLAfterFinishedControllerConfiguration holds configuration for
 	// TTLAfterFinishedController related features.
 	TTLAfterFinishedController TTLAfterFinishedControllerConfiguration
+	// ValidatingAdmissionPolicyStatusControllerConfiguration holds configuration for
+	// ValidatingAdmissionPolicyStatusController related features.
+	ValidatingAdmissionPolicyStatusController ValidatingAdmissionPolicyStatusControllerConfiguration
 }
 
 // AttachDetachControllerConfiguration contains elements describing AttachDetachController.
@@ -480,4 +483,13 @@ type TTLAfterFinishedControllerConfiguration struct {
 	// concurrentTTLSyncs is the number of TTL-after-finished collector workers that are
 	// allowed to sync concurrently.
 	ConcurrentTTLSyncs int32
+}
+
+// ValidatingAdmissionPolicyStatusControllerConfiguration contains elements describing ValidatingAdmissionPolicyStatusController.
+type ValidatingAdmissionPolicyStatusControllerConfiguration struct {
+	// ConcurrentPolicySyncs is the number of policy objects that are
+	// allowed to sync concurrently. Larger number = quicker type checking,
+	// but more CPU (and network) load.
+	// The default value is 5.
+	ConcurrentPolicySyncs int32
 }

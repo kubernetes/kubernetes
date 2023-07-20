@@ -19,9 +19,6 @@ package iptables
 import (
 	"reflect"
 	"testing"
-
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
-	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
 )
 
 func TestNoOpLocalDetector(t *testing.T) {
@@ -44,52 +41,35 @@ func TestNoOpLocalDetector(t *testing.T) {
 func TestNewDetectLocalByCIDR(t *testing.T) {
 	cases := []struct {
 		cidr        string
-		ipt         utiliptables.Interface
 		errExpected bool
 	}{
 		{
 			cidr:        "10.0.0.0/14",
-			ipt:         iptablestest.NewFake(),
 			errExpected: false,
 		},
 		{
 			cidr:        "2002::1234:abcd:ffff:c0a8:101/64",
-			ipt:         iptablestest.NewIPv6Fake(),
 			errExpected: false,
-		},
-		{
-			cidr:        "10.0.0.0/14",
-			ipt:         iptablestest.NewIPv6Fake(),
-			errExpected: true,
-		},
-		{
-			cidr:        "2002::1234:abcd:ffff:c0a8:101/64",
-			ipt:         iptablestest.NewFake(),
-			errExpected: true,
 		},
 		{
 			cidr:        "10.0.0.0",
-			ipt:         iptablestest.NewFake(),
 			errExpected: true,
 		},
 		{
 			cidr:        "2002::1234:abcd:ffff:c0a8:101",
-			ipt:         iptablestest.NewIPv6Fake(),
 			errExpected: true,
 		},
 		{
 			cidr:        "",
-			ipt:         iptablestest.NewFake(),
 			errExpected: true,
 		},
 		{
 			cidr:        "",
-			ipt:         iptablestest.NewIPv6Fake(),
 			errExpected: true,
 		},
 	}
 	for i, c := range cases {
-		r, err := NewDetectLocalByCIDR(c.cidr, c.ipt)
+		r, err := NewDetectLocalByCIDR(c.cidr)
 		if c.errExpected {
 			if err == nil {
 				t.Errorf("Case[%d] expected error, but succeeded with: %q", i, r)
@@ -105,25 +85,22 @@ func TestNewDetectLocalByCIDR(t *testing.T) {
 func TestDetectLocalByCIDR(t *testing.T) {
 	cases := []struct {
 		cidr                     string
-		ipt                      utiliptables.Interface
 		expectedIfLocalOutput    []string
 		expectedIfNotLocalOutput []string
 	}{
 		{
 			cidr:                     "10.0.0.0/14",
-			ipt:                      iptablestest.NewFake(),
 			expectedIfLocalOutput:    []string{"-s", "10.0.0.0/14"},
 			expectedIfNotLocalOutput: []string{"!", "-s", "10.0.0.0/14"},
 		},
 		{
 			cidr:                     "2002::1234:abcd:ffff:c0a8:101/64",
-			ipt:                      iptablestest.NewIPv6Fake(),
 			expectedIfLocalOutput:    []string{"-s", "2002::1234:abcd:ffff:c0a8:101/64"},
 			expectedIfNotLocalOutput: []string{"!", "-s", "2002::1234:abcd:ffff:c0a8:101/64"},
 		},
 	}
 	for _, c := range cases {
-		localDetector, err := NewDetectLocalByCIDR(c.cidr, c.ipt)
+		localDetector, err := NewDetectLocalByCIDR(c.cidr)
 		if err != nil {
 			t.Errorf("Error initializing localDetector: %v", err)
 			continue

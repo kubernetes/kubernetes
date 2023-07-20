@@ -23,6 +23,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -69,7 +70,7 @@ func (rp *ReservePlugin) EventsToRegister() []framework.ClusterEventWithHint {
 	return []framework.ClusterEventWithHint{
 		{
 			Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add},
-			QueueingHintFn: func(pod *v1.Pod, oldObj, newObj interface{}) framework.QueueingHint {
+			QueueingHintFn: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) framework.QueueingHint {
 				return framework.QueueImmediately
 			},
 		},
@@ -106,7 +107,7 @@ func (pp *PermitPlugin) EventsToRegister() []framework.ClusterEventWithHint {
 	return []framework.ClusterEventWithHint{
 		{
 			Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add},
-			QueueingHintFn: func(pod *v1.Pod, oldObj, newObj interface{}) framework.QueueingHint {
+			QueueingHintFn: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) framework.QueueingHint {
 				return framework.QueueImmediately
 			},
 		},
@@ -133,7 +134,7 @@ func TestReScheduling(t *testing.T) {
 				&PermitPlugin{name: "permit", statusCode: framework.Unschedulable},
 			},
 			action: func() error {
-				_, err := createNode(testContext.ClientSet, st.MakeNode().Name("fake-node").Obj())
+				_, err := testutils.CreateNode(testContext.ClientSet, st.MakeNode().Name("fake-node").Obj())
 				return err
 			},
 			wantScheduled: true,
@@ -144,8 +145,8 @@ func TestReScheduling(t *testing.T) {
 				&PermitPlugin{name: "permit", statusCode: framework.Unschedulable},
 			},
 			action: func() error {
-				_, err := createPausePod(testContext.ClientSet,
-					initPausePod(&testutils.PausePodConfig{Name: "test-pod-2", Namespace: testContext.NS.Name}))
+				_, err := testutils.CreatePausePod(testContext.ClientSet,
+					testutils.InitPausePod(&testutils.PausePodConfig{Name: "test-pod-2", Namespace: testContext.NS.Name}))
 				return err
 			},
 			wantScheduled: false,
@@ -156,7 +157,7 @@ func TestReScheduling(t *testing.T) {
 				&PermitPlugin{name: "permit", statusCode: framework.Error},
 			},
 			action: func() error {
-				_, err := createNode(testContext.ClientSet, st.MakeNode().Name("fake-node").Obj())
+				_, err := testutils.CreateNode(testContext.ClientSet, st.MakeNode().Name("fake-node").Obj())
 				return err
 			},
 			wantFirstSchedulingError: true,
@@ -168,7 +169,7 @@ func TestReScheduling(t *testing.T) {
 				&ReservePlugin{name: "reserve", statusCode: framework.Unschedulable},
 			},
 			action: func() error {
-				_, err := createNode(testContext.ClientSet, st.MakeNode().Name("fake-node").Obj())
+				_, err := testutils.CreateNode(testContext.ClientSet, st.MakeNode().Name("fake-node").Obj())
 				return err
 			},
 			wantScheduled: true,
@@ -179,8 +180,8 @@ func TestReScheduling(t *testing.T) {
 				&ReservePlugin{name: "reserve", statusCode: framework.Unschedulable},
 			},
 			action: func() error {
-				_, err := createPausePod(testContext.ClientSet,
-					initPausePod(&testutils.PausePodConfig{Name: "test-pod-2", Namespace: testContext.NS.Name}))
+				_, err := testutils.CreatePausePod(testContext.ClientSet,
+					testutils.InitPausePod(&testutils.PausePodConfig{Name: "test-pod-2", Namespace: testContext.NS.Name}))
 				return err
 			},
 			wantScheduled: false,
@@ -191,7 +192,7 @@ func TestReScheduling(t *testing.T) {
 				&ReservePlugin{name: "reserve", statusCode: framework.Error},
 			},
 			action: func() error {
-				_, err := createNode(testContext.ClientSet, st.MakeNode().Name("fake-node").Obj())
+				_, err := testutils.CreateNode(testContext.ClientSet, st.MakeNode().Name("fake-node").Obj())
 				return err
 			},
 			wantFirstSchedulingError: true,
@@ -209,8 +210,8 @@ func TestReScheduling(t *testing.T) {
 				scheduler.WithFrameworkOutOfTreeRegistry(registry))
 			defer teardown()
 
-			pod, err := createPausePod(testCtx.ClientSet,
-				initPausePod(&testutils.PausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
+			pod, err := testutils.CreatePausePod(testCtx.ClientSet,
+				testutils.InitPausePod(&testutils.PausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
 			if err != nil {
 				t.Errorf("Error while creating a test pod: %v", err)
 			}
@@ -221,7 +222,7 @@ func TestReScheduling(t *testing.T) {
 					t.Errorf("Expected a scheduling error, but got: %v", err)
 				}
 			} else {
-				if err = waitForPodUnschedulable(testCtx.ClientSet, pod); err != nil {
+				if err = testutils.WaitForPodUnschedulable(testCtx.ClientSet, pod); err != nil {
 					t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
 				}
 			}
@@ -241,7 +242,7 @@ func TestReScheduling(t *testing.T) {
 					t.Errorf("Expected a scheduling error, but got: %v", err)
 				}
 			} else {
-				if err = waitForPodUnschedulable(testCtx.ClientSet, pod); err != nil {
+				if err = testutils.WaitForPodUnschedulable(testCtx.ClientSet, pod); err != nil {
 					t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
 				}
 			}

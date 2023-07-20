@@ -139,6 +139,12 @@
         "name": "nameValue",
         "expression": "expressionValue"
       }
+    ],
+    "variables": [
+      {
+        "name": "nameValue",
+        "expression": "expressionValue"
+      }
     ]
   },
   "status": {

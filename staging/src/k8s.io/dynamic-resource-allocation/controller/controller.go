@@ -50,6 +50,14 @@ import (
 type Controller interface {
 	// Run starts the controller.
 	Run(workers int)
+
+	// SetReservedFor can be used to disable adding the Pod which
+	// triggered allocation to the status.reservedFor. Normally,
+	// DRA drivers should always do that, so it's the default.
+	// But nothing in the protocol between the scheduler and
+	// a driver requires it, so at least for testing the control
+	// plane components it is useful to disable it.
+	SetReservedFor(enabled bool)
 }
 
 // Driver provides the actual allocation and deallocation operations.
@@ -146,6 +154,7 @@ type controller struct {
 	name                string
 	finalizer           string
 	driver              Driver
+	setReservedFor      bool
 	kubeClient          kubernetes.Interface
 	queue               workqueue.RateLimitingInterface
 	eventRecorder       record.EventRecorder
@@ -207,6 +216,7 @@ func New(
 		name:                name,
 		finalizer:           name + "/deletion-protection",
 		driver:              driver,
+		setReservedFor:      true,
 		kubeClient:          kubeClient,
 		rcLister:            rcInformer.Lister(),
 		rcSynced:            rcInformer.Informer().HasSynced,
@@ -230,6 +240,10 @@ func New(
 	}
 
 	return ctrl
+}
+
+func (ctrl *controller) SetReservedFor(enabled bool) {
+	ctrl.setReservedFor = enabled
 }
 
 func resourceEventHandlerFuncs(logger *klog.Logger, ctrl *controller) cache.ResourceEventHandlerFuncs {
@@ -609,7 +623,7 @@ func (ctrl *controller) allocateClaims(ctx context.Context, claims []*ClaimAlloc
 		claim := claimAllocation.Claim.DeepCopy()
 		claim.Status.Allocation = claimAllocation.Allocation
 		claim.Status.DriverName = ctrl.name
-		if selectedUser != nil {
+		if selectedUser != nil && ctrl.setReservedFor {
 			claim.Status.ReservedFor = append(claim.Status.ReservedFor, *selectedUser)
 		}
 		logger.V(6).Info("Updating claim after allocation", "claim", claim)
@@ -625,13 +639,20 @@ func (ctrl *controller) allocateClaims(ctx context.Context, claims []*ClaimAlloc
 }
 
 func (ctrl *controller) checkPodClaim(ctx context.Context, pod *v1.Pod, podClaim v1.PodResourceClaim) (*ClaimAllocation, error) {
-	claimName := resourceclaim.Name(pod, &podClaim)
-	key := pod.Namespace + "/" + claimName
+	claimName, mustCheckOwner, err := resourceclaim.Name(pod, &podClaim)
+	if err != nil {
+		return nil, err
+	}
+	if claimName == nil {
+		// Nothing to do.
+		return nil, nil
+	}
+	key := pod.Namespace + "/" + *claimName
 	claim, err := ctrl.getCachedClaim(ctx, key)
 	if claim == nil || err != nil {
 		return nil, err
 	}
-	if podClaim.Source.ResourceClaimTemplateName != nil {
+	if mustCheckOwner {
 		if err := resourceclaim.IsForPod(pod, claim); err != nil {
 			return nil, err
 		}

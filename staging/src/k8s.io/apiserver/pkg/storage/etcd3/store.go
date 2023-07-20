@@ -85,6 +85,12 @@ type store struct {
 	leaseManager        *leaseManager
 }
 
+func (s *store) RequestWatchProgress(ctx context.Context) error {
+	// Use watchContext to match ctx metadata provided when creating the watch.
+	// In best case scenario we would use the same context that watch was created, but there is no way access it from watchCache.
+	return s.client.RequestProgress(s.watchContext(ctx))
+}
+
 type objState struct {
 	obj   runtime.Object
 	meta  *storage.ResponseMeta

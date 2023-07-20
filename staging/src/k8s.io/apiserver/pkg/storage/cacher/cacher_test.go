@@ -31,9 +31,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/clock"
 )
 
@@ -145,6 +148,13 @@ func TestPreconditionalDeleteWithSuggestion(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
+	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestList(ctx, t, cacher, compactStorage(cacher, server.V3Client), true)
+}
+
+func TestListWithListFromCache(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)()
 	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestList(ctx, t, cacher, compactStorage(cacher, server.V3Client), true)
@@ -328,7 +338,7 @@ type setupOptions struct {
 	keyFunc        func(runtime.Object) (string, error)
 	indexerFuncs   map[string]storage.IndexerFunc
 	pagingEnabled  bool
-	clock          clock.Clock
+	clock          clock.WithTicker
 }
 
 type setupOption func(*setupOptions)

@@ -30,6 +30,10 @@ import (
 	"k8s.io/utils/pointer"
 )
 
+var (
+	containerRestartPolicyAlways = v1.ContainerRestartPolicyAlways
+)
+
 func TestGenerateContainersReadyCondition(t *testing.T) {
 	tests := []struct {
 		spec              *v1.PodSpec
@@ -111,6 +115,74 @@ func TestGenerateContainersReadyCondition(t *testing.T) {
 			},
 			podPhase:    v1.PodSucceeded,
 			expectReady: getPodCondition(v1.ContainersReady, v1.ConditionFalse, PodCompleted, ""),
+		},
+		{
+			spec: &v1.PodSpec{
+				InitContainers: []v1.Container{
+					{Name: "restartable-init-1", RestartPolicy: &containerRestartPolicyAlways},
+				},
+				Containers: []v1.Container{
+					{Name: "regular-1"},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				getReadyStatus("regular-1"),
+			},
+			podPhase:    v1.PodRunning,
+			expectReady: getPodCondition(v1.ContainersReady, v1.ConditionFalse, ContainersNotReady, "containers with unknown status: [restartable-init-1]"),
+		},
+		{
+			spec: &v1.PodSpec{
+				InitContainers: []v1.Container{
+					{Name: "restartable-init-1", RestartPolicy: &containerRestartPolicyAlways},
+					{Name: "restartable-init-2", RestartPolicy: &containerRestartPolicyAlways},
+				},
+				Containers: []v1.Container{
+					{Name: "regular-1"},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				getReadyStatus("restartable-init-1"),
+				getReadyStatus("restartable-init-2"),
+				getReadyStatus("regular-1"),
+			},
+			podPhase:    v1.PodRunning,
+			expectReady: getPodCondition(v1.ContainersReady, v1.ConditionTrue, "", ""),
+		},
+		{
+			spec: &v1.PodSpec{
+				InitContainers: []v1.Container{
+					{Name: "restartable-init-1", RestartPolicy: &containerRestartPolicyAlways},
+					{Name: "restartable-init-2", RestartPolicy: &containerRestartPolicyAlways},
+				},
+				Containers: []v1.Container{
+					{Name: "regular-1"},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				getReadyStatus("restartable-init-1"),
+				getReadyStatus("regular-1"),
+			},
+			podPhase:    v1.PodRunning,
+			expectReady: getPodCondition(v1.ContainersReady, v1.ConditionFalse, ContainersNotReady, "containers with unknown status: [restartable-init-2]"),
+		},
+		{
+			spec: &v1.PodSpec{
+				InitContainers: []v1.Container{
+					{Name: "restartable-init-1", RestartPolicy: &containerRestartPolicyAlways},
+					{Name: "restartable-init-2", RestartPolicy: &containerRestartPolicyAlways},
+				},
+				Containers: []v1.Container{
+					{Name: "regular-1"},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				getReadyStatus("restartable-init-1"),
+				getNotReadyStatus("restartable-init-2"),
+				getReadyStatus("regular-1"),
+			},
+			podPhase:    v1.PodRunning,
+			expectReady: getPodCondition(v1.ContainersReady, v1.ConditionFalse, ContainersNotReady, "containers with unready status: [restartable-init-2]"),
 		},
 	}
 

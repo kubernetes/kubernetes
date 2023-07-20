@@ -17,7 +17,6 @@ limitations under the License.
 package util
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"net"
@@ -28,9 +27,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/events"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
 
 	"k8s.io/klog/v2"
@@ -183,7 +184,7 @@ func MapIPsByIPFamily(ipStrings []string) map[v1.IPFamily][]string {
 	ipFamilyMap := map[v1.IPFamily][]string{}
 	for _, ip := range ipStrings {
 		// Handle only the valid IPs
-		if ipFamily := getIPFamilyFromIP(ip); ipFamily != "" {
+		if ipFamily := GetIPFamilyFromIP(ip); ipFamily != "" {
 			ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], ip)
 		} else {
 			// this function is called in multiple places. All of which
@@ -214,29 +215,26 @@ func MapCIDRsByIPFamily(cidrStrings []string) map[v1.IPFamily][]string {
 	return ipFamilyMap
 }
 
-// Returns the IP family of ipStr, or "" if ipStr can't be parsed as an IP
-func getIPFamilyFromIP(ipStr string) v1.IPFamily {
-	netIP := netutils.ParseIPSloppy(ipStr)
-	if netIP == nil {
-		return ""
-	}
-
-	if netutils.IsIPv6(netIP) {
-		return v1.IPv6Protocol
-	}
-	return v1.IPv4Protocol
+// GetIPFamilyFromIP Returns the IP family of ipStr, or "" if ipStr can't be parsed as an IP
+func GetIPFamilyFromIP(ipStr string) v1.IPFamily {
+	return convertToV1IPFamily(netutils.IPFamilyOfString(ipStr))
 }
 
 // Returns the IP family of cidrStr, or "" if cidrStr can't be parsed as a CIDR
 func getIPFamilyFromCIDR(cidrStr string) v1.IPFamily {
-	_, netCIDR, err := netutils.ParseCIDRSloppy(cidrStr)
-	if err != nil {
-		return ""
-	}
-	if netutils.IsIPv6CIDR(netCIDR) {
+	return convertToV1IPFamily(netutils.IPFamilyOfCIDRString(cidrStr))
+}
+
+// Convert netutils.IPFamily to v1.IPFamily
+func convertToV1IPFamily(ipFamily netutils.IPFamily) v1.IPFamily {
+	switch ipFamily {
+	case netutils.IPv4:
+		return v1.IPv4Protocol
+	case netutils.IPv6:
 		return v1.IPv6Protocol
 	}
-	return v1.IPv4Protocol
+
+	return ""
 }
 
 // OtherIPFamily returns the other ip family
@@ -321,67 +319,6 @@ func GetClusterIPByFamily(ipFamily v1.IPFamily, service *v1.Service) string {
 	return ""
 }
 
-type LineBuffer struct {
-	b     bytes.Buffer
-	lines int
-}
-
-// Write takes a list of arguments, each a string or []string, joins all the
-// individual strings with spaces, terminates with newline, and writes to buf.
-// Any other argument type will panic.
-func (buf *LineBuffer) Write(args ...interface{}) {
-	for i, arg := range args {
-		if i > 0 {
-			buf.b.WriteByte(' ')
-		}
-		switch x := arg.(type) {
-		case string:
-			buf.b.WriteString(x)
-		case []string:
-			for j, s := range x {
-				if j > 0 {
-					buf.b.WriteByte(' ')
-				}
-				buf.b.WriteString(s)
-			}
-		default:
-			panic(fmt.Sprintf("unknown argument type: %T", x))
-		}
-	}
-	buf.b.WriteByte('\n')
-	buf.lines++
-}
-
-// WriteBytes writes bytes to buffer, and terminates with newline.
-func (buf *LineBuffer) WriteBytes(bytes []byte) {
-	buf.b.Write(bytes)
-	buf.b.WriteByte('\n')
-	buf.lines++
-}
-
-// Reset clears buf
-func (buf *LineBuffer) Reset() {
-	buf.b.Reset()
-	buf.lines = 0
-}
-
-// Bytes returns the contents of buf as a []byte
-func (buf *LineBuffer) Bytes() []byte {
-	return buf.b.Bytes()
-}
-
-// String returns the contents of buf as a string
-func (buf *LineBuffer) String() string {
-	return buf.b.String()
-}
-
-// Lines returns the number of lines in buf. Note that more precisely, this returns the
-// number of times Write() or WriteBytes() was called; it assumes that you never wrote
-// any newlines to the buffer yourself.
-func (buf *LineBuffer) Lines() int {
-	return buf.lines
-}
-
 // RevertPorts is closing ports in replacementPortsMap but not in originalPortsMap. In other words, it only
 // closes the ports opened in this sync.
 func RevertPorts(replacementPortsMap, originalPortsMap map[netutils.LocalPort]netutils.Closeable) {
@@ -392,4 +329,14 @@ func RevertPorts(replacementPortsMap, originalPortsMap map[netutils.LocalPort]ne
 			v.Close()
 		}
 	}
+}
+
+func IsVIPMode(ing v1.LoadBalancerIngress) bool {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPMode) {
+		return true // backwards compat
+	}
+	if ing.IPMode == nil {
+		return true
+	}
+	return *ing.IPMode == v1.LoadBalancerIPModeVIP
 }

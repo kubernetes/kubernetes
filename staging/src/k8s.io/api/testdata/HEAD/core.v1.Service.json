@@ -93,6 +93,7 @@
         {
           "ip": "ipValue",
           "hostname": "hostnameValue",
+          "ipMode": "ipModeValue",
           "ports": [
             {
               "port": 1,

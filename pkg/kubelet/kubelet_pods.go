@@ -830,6 +830,19 @@ func (kl *Kubelet) podFieldSelectorRuntimeValue(fs *v1.ObjectFieldSelector, pod 
 			return "", err
 		}
 		return hostIPs[0].String(), nil
+	case "status.hostIPs":
+		if !utilfeature.DefaultFeatureGate.Enabled(features.PodHostIPs) {
+			return "", nil
+		}
+		hostIPs, err := kl.getHostIPsAnyWay()
+		if err != nil {
+			return "", err
+		}
+		ips := make([]string, 0, len(hostIPs))
+		for _, ip := range hostIPs {
+			ips = append(ips, ip.String())
+		}
+		return strings.Join(ips, ","), nil
 	case "status.podIP":
 		return podIP, nil
 	case "status.podIPs":
@@ -1725,14 +1738,15 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodReadyToStartContainersCondition) {
 		s.Conditions = append(s.Conditions, status.GeneratePodReadyToStartContainersCondition(pod, podStatus))
 	}
-	s.Conditions = append(s.Conditions, status.GeneratePodInitializedCondition(&pod.Spec, append(s.InitContainerStatuses, s.ContainerStatuses...), s.Phase))
-	s.Conditions = append(s.Conditions, status.GeneratePodReadyCondition(&pod.Spec, s.Conditions, s.ContainerStatuses, s.Phase))
-	s.Conditions = append(s.Conditions, status.GenerateContainersReadyCondition(&pod.Spec, s.ContainerStatuses, s.Phase))
+	allContainerStatuses := append(s.InitContainerStatuses, s.ContainerStatuses...)
+	s.Conditions = append(s.Conditions, status.GeneratePodInitializedCondition(&pod.Spec, allContainerStatuses, s.Phase))
+	s.Conditions = append(s.Conditions, status.GeneratePodReadyCondition(&pod.Spec, s.Conditions, allContainerStatuses, s.Phase))
+	s.Conditions = append(s.Conditions, status.GenerateContainersReadyCondition(&pod.Spec, allContainerStatuses, s.Phase))
 	s.Conditions = append(s.Conditions, v1.PodCondition{
 		Type:   v1.PodScheduled,
 		Status: v1.ConditionTrue,
 	})
-	// set HostIP and initialize PodIP/PodIPs for host network pods
+	// set HostIP/HostIPs and initialize PodIP/PodIPs for host network pods
 	if kl.kubeClient != nil {
 		hostIPs, err := kl.getHostIPsAnyWay()
 		if err != nil {
@@ -1746,6 +1760,13 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 				}
 			}
 			s.HostIP = hostIPs[0].String()
+			if utilfeature.DefaultFeatureGate.Enabled(features.PodHostIPs) {
+				s.HostIPs = []v1.HostIP{{IP: s.HostIP}}
+				if len(hostIPs) == 2 {
+					s.HostIPs = append(s.HostIPs, v1.HostIP{IP: hostIPs[1].String()})
+				}
+			}
+
 			// HostNetwork Pods inherit the node IPs as PodIPs. They are immutable once set,
 			// other than that if the node becomes dual-stack, we add the secondary IP.
 			if kubecontainer.IsHostNetworkPod(pod) {

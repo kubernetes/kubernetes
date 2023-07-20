@@ -112,6 +112,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 						"PageFaults":      bounded(1000, 1e9),
 						"MajorPageFaults": bounded(0, 100000),
 					}),
+					"Swap":               swapExpectation(memoryLimit),
 					"Accelerators":       gomega.BeEmpty(),
 					"Rootfs":             gomega.BeNil(),
 					"Logs":               gomega.BeNil(),
@@ -183,6 +184,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 							"PageFaults":      bounded(100, expectedPageFaultsUpperBound),
 							"MajorPageFaults": bounded(0, expectedMajorPageFaultsUpperBound),
 						}),
+						"Swap":         swapExpectation(memoryLimit),
 						"Accelerators": gomega.BeEmpty(),
 						"Rootfs": ptrMatchAllFields(gstruct.Fields{
 							"Time":           recent(maxStatsAge),
@@ -230,6 +232,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 					"PageFaults":      bounded(0, expectedPageFaultsUpperBound),
 					"MajorPageFaults": bounded(0, expectedMajorPageFaultsUpperBound),
 				}),
+				"Swap": swapExpectation(memoryLimit),
 				"VolumeStats": gstruct.MatchAllElements(summaryObjectID, gstruct.Elements{
 					"test-empty-dir": gstruct.MatchAllFields(gstruct.Fields{
 						"Name":              gomega.Equal("test-empty-dir"),
@@ -280,6 +283,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 						"PageFaults":      bounded(1000, 1e9),
 						"MajorPageFaults": bounded(0, 100000),
 					}),
+					"Swap": swapExpectation(memoryLimit),
 					// TODO(#28407): Handle non-eth0 network interface names.
 					"Network": ptrMatchAllFields(gstruct.Fields{
 						"Time": recent(maxStatsAge),
@@ -408,6 +412,27 @@ func bounded(lower, upper interface{}) types.GomegaMatcher {
 	return gstruct.PointTo(gomega.And(
 		gomega.BeNumerically(">=", lower),
 		gomega.BeNumerically("<=", upper)))
+}
+
+func swapExpectation(upper interface{}) types.GomegaMatcher {
+	// Size after which we consider memory to be "unlimited". This is not
+	// MaxInt64 due to rounding by the kernel.
+	const maxMemorySize = uint64(1 << 62)
+
+	swapBytesMatcher := gomega.Or(
+		gomega.BeNil(),
+		bounded(0, upper),
+		gstruct.PointTo(gomega.BeNumerically(">=", maxMemorySize)),
+	)
+
+	return gomega.Or(
+		gomega.BeNil(),
+		ptrMatchAllFields(gstruct.Fields{
+			"Time":               recent(maxStatsAge),
+			"SwapUsageBytes":     swapBytesMatcher,
+			"SwapAvailableBytes": swapBytesMatcher,
+		}),
+	)
 }
 
 func recent(d time.Duration) types.GomegaMatcher {

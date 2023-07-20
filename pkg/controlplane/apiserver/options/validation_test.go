@@ -22,8 +22,13 @@ import (
 
 	kubeapiserveradmission "k8s.io/apiserver/pkg/admission"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	basemetrics "k8s.io/component-base/metrics"
+	"k8s.io/kubernetes/pkg/features"
 
+	peerreconcilers "k8s.io/apiserver/pkg/reconcilers"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 )
 
@@ -75,6 +80,83 @@ func TestValidateAPIPriorityAndFairness(t *testing.T) {
 			}
 			if !strings.Contains(errMessageGot, test.errShouldContain) {
 				t.Errorf("Expected error message to contain: %q, but got: %q", test.errShouldContain, errMessageGot)
+			}
+		})
+	}
+}
+
+func TestValidateUnknownVersionInteroperabilityProxy(t *testing.T) {
+	tests := []struct {
+		name                 string
+		featureEnabled       bool
+		errShouldContain     string
+		peerCAFile           string
+		peerAdvertiseAddress peerreconcilers.PeerAdvertiseAddress
+	}{
+		{
+			name:             "feature disabled but peerCAFile set",
+			featureEnabled:   false,
+			peerCAFile:       "foo",
+			errShouldContain: "--peer-ca-file requires UnknownVersionInteroperabilityProxy feature to be turned on",
+		},
+		{
+			name:                 "feature disabled but peerAdvertiseIP set",
+			featureEnabled:       false,
+			peerAdvertiseAddress: peerreconcilers.PeerAdvertiseAddress{PeerAdvertiseIP: "1.2.3.4"},
+			errShouldContain:     "--peer-advertise-ip requires UnknownVersionInteroperabilityProxy feature to be turned on",
+		},
+		{
+			name:                 "feature disabled but peerAdvertisePort set",
+			featureEnabled:       false,
+			peerAdvertiseAddress: peerreconcilers.PeerAdvertiseAddress{PeerAdvertisePort: "1"},
+			errShouldContain:     "--peer-advertise-port requires UnknownVersionInteroperabilityProxy feature to be turned on",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			options := &Options{
+				PeerCAFile:           test.peerCAFile,
+				PeerAdvertiseAddress: test.peerAdvertiseAddress,
+			}
+			if test.featureEnabled {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.UnknownVersionInteroperabilityProxy, true)()
+			}
+			var errMessageGot string
+			if errs := validateUnknownVersionInteroperabilityProxyFlags(options); len(errs) > 0 {
+				errMessageGot = errs[0].Error()
+			}
+			if !strings.Contains(errMessageGot, test.errShouldContain) {
+				t.Errorf("Expected error message to contain: %q, but got: %q", test.errShouldContain, errMessageGot)
+			}
+
+		})
+	}
+}
+
+func TestValidateUnknownVersionInteroperabilityProxyFeature(t *testing.T) {
+	const conflict = "UnknownVersionInteroperabilityProxy feature requires StorageVersionAPI feature flag to be enabled"
+	tests := []struct {
+		name            string
+		featuresEnabled []featuregate.Feature
+	}{
+		{
+			name:            "enabled: UnknownVersionInteroperabilityProxy, disabled: StorageVersionAPI",
+			featuresEnabled: []featuregate.Feature{features.UnknownVersionInteroperabilityProxy},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			for _, feature := range test.featuresEnabled {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, true)()
+			}
+			var errMessageGot string
+			if errs := validateUnknownVersionInteroperabilityProxyFeature(); len(errs) > 0 {
+				errMessageGot = errs[0].Error()
+			}
+			if !strings.Contains(errMessageGot, conflict) {
+				t.Errorf("Expected error message to contain: %q, but got: %q", conflict, errMessageGot)
 			}
 		})
 	}

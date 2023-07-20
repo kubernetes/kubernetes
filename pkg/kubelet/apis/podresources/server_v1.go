@@ -90,11 +90,6 @@ func (p *v1PodResourcesServer) GetAllocatableResources(ctx context.Context, req 
 	metrics.PodResourcesEndpointRequestsTotalCount.WithLabelValues("v1").Inc()
 	metrics.PodResourcesEndpointRequestsGetAllocatableCount.WithLabelValues("v1").Inc()
 
-	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.KubeletPodResourcesGetAllocatable) {
-		metrics.PodResourcesEndpointErrorsGetAllocatableCount.WithLabelValues("v1").Inc()
-		return nil, fmt.Errorf("PodResources API GetAllocatableResources disabled")
-	}
-
 	response := &v1.AllocatableResourcesResponse{
 		Devices: p.devicesProvider.GetAllocatableDevices(),
 		CpuIds:  p.cpusProvider.GetAllocatableCPUs(),

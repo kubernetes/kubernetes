@@ -37,6 +37,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilpeerproxy "k8s.io/apiserver/pkg/util/peerproxy"
 	kubeexternalinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
@@ -57,6 +58,7 @@ func createAggregatorConfig(
 	externalInformers kubeexternalinformers.SharedInformerFactory,
 	serviceResolver aggregatorapiserver.ServiceResolver,
 	proxyTransport *http.Transport,
+	peerProxy utilpeerproxy.Interface,
 	pluginInitializers []admission.PluginInitializer,
 ) (*aggregatorapiserver.Config, error) {
 	// make a shallow copy to let us twiddle a few things
@@ -74,6 +76,16 @@ func createAggregatorConfig(
 		// The handler will block write requests to built-in resources until the
 		// target resources' storage versions are up-to-date.
 		genericConfig.BuildHandlerChainFunc = genericapiserver.BuildHandlerChainWithStorageVersionPrecondition
+	}
+
+	if peerProxy != nil {
+		originalHandlerChainBuilder := genericConfig.BuildHandlerChainFunc
+		genericConfig.BuildHandlerChainFunc = func(apiHandler http.Handler, c *genericapiserver.Config) http.Handler {
+			// Add peer proxy handler to aggregator-apiserver.
+			// wrap the peer proxy handler first.
+			apiHandler = peerProxy.WrapHandler(apiHandler)
+			return originalHandlerChainBuilder(apiHandler, c)
+		}
 	}
 
 	// copy the etcd options so we don't mutate originals.
@@ -104,6 +116,8 @@ func createAggregatorConfig(
 		ExtraConfig: aggregatorapiserver.ExtraConfig{
 			ProxyClientCertFile:       commandOptions.ProxyClientCertFile,
 			ProxyClientKeyFile:        commandOptions.ProxyClientKeyFile,
+			PeerCAFile:                commandOptions.PeerCAFile,
+			PeerAdvertiseAddress:      commandOptions.PeerAdvertiseAddress,
 			ServiceResolver:           serviceResolver,
 			ProxyTransport:            proxyTransport,
 			RejectForwardingRedirects: commandOptions.AggregatorRejectForwardingRedirects,

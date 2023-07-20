@@ -36,22 +36,6 @@ import (
 	"k8s.io/utils/pointer"
 )
 
-var (
-	createNode                 = testutils.CreateNode
-	createPausePod             = testutils.CreatePausePod
-	createPausePodWithResource = testutils.CreatePausePodWithResource
-	deletePod                  = testutils.DeletePod
-	initPausePod               = testutils.InitPausePod
-	initTest                   = testutils.InitTestSchedulerWithNS
-	nextPod                    = testutils.NextPod
-	nextPodOrDie               = testutils.NextPodOrDie
-	runPausePod                = testutils.RunPausePod
-	updateNode                 = testutils.UpdateNode
-	waitForNodesInCache        = testutils.WaitForNodesInCache
-	waitForPodUnschedulable    = testutils.WaitForPodUnschedulable
-	waitForReflection          = testutils.WaitForReflection
-)
-
 // The returned shutdown func will delete created resources and scheduler, resources should be those
 // that will affect the scheduling result, like nodes, pods, etc.. Namespaces should not be
 // deleted here because it's created together with the apiserver, they should be deleted

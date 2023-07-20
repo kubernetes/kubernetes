@@ -27,6 +27,7 @@ limitations under the License.
 //   - TODO https://github.com/kubernetes/kubeadm/issues/2890
 //   - Support custom environment variables in control plane components under `ClusterConfiguration`.
 //     Use `APIServer.ExtraEnvs`, `ControllerManager.ExtraEnvs`, `Scheduler.ExtraEnvs`,  `Etcd.Local.ExtraEnvs`.
+//   - The ResetConfiguration API type is now supported in v1beta4. Users are able to reset a node by passing a --config file to "kubeadm reset".
 //
 // Migration from old kubeadm config versions
 //

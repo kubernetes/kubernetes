@@ -114,4 +114,11 @@ func TestBootstrapPriorityLevelConfigurationWithBorrowing(t *testing.T) {
 			t.Errorf("bootstrap PriorityLevelConfiguration objects not accounted by this test: %v", names)
 		}
 	}
+	exemptPL := MandatoryPriorityLevelConfigurationExempt
+	if exemptPL.Spec.Exempt.NominalConcurrencyShares != nil && *exemptPL.Spec.Exempt.NominalConcurrencyShares != 0 {
+		t.Errorf("Expected exempt priority level to have NominalConcurrencyShares==0 but got %d instead", *exemptPL.Spec.Exempt.NominalConcurrencyShares)
+	}
+	if exemptPL.Spec.Exempt.LendablePercent != nil && *exemptPL.Spec.Exempt.LendablePercent != 0 {
+		t.Errorf("Expected exempt priority level to have LendablePercent==0 but got %d instead", *exemptPL.Spec.Exempt.LendablePercent)
+	}
 }

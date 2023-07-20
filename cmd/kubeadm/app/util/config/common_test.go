@@ -425,6 +425,31 @@ func TestMigrateOldConfig(t *testing.T) {
 			allowExperimental: false,
 			expectErr:         true,
 		},
+		{
+			name: "ResetConfiguration gets migrated from experimental API",
+			oldCfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
+			kind: ResetConfiguration
+			force: true
+			cleanupTmpDir: true
+			criSocket: unix:///var/run/containerd/containerd.sock
+			certificatesDir: /etc/kubernetes/pki
+			`, gvExperimental)),
+			expectedKinds: []string{
+				constants.ResetConfigurationKind,
+			},
+			allowExperimental: true,
+			expectErr:         false,
+		},
+		{
+			name: "ResetConfiguration from experimental API cannot be migrated",
+			oldCfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
+			kind: ResetConfiguration
+			`, gvExperimental)),
+			allowExperimental: false,
+			expectErr:         true,
+		},
 	}
 
 	for _, test := range tests {
@@ -546,6 +571,35 @@ func TestValidateConfig(t *testing.T) {
 			cfg: dedent.Dedent(fmt.Sprintf(`
 			apiVersion: %s
 			kind: InitConfiguration
+			`, gvExperimental)),
+			expectedError:     true,
+			allowExperimental: false,
+		},
+		{
+			name: "valid ResetConfiguration",
+			cfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
+			kind: ResetConfiguration
+			force: true
+			`, gvExperimental)),
+			expectedError:     false,
+			allowExperimental: true,
+		},
+		{
+			name: "invalid field in ResetConfiguration",
+			cfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
+			kind: ResetConfiguration
+			foo: bar
+			`, gvExperimental)),
+			expectedError:     true,
+			allowExperimental: true,
+		},
+		{
+			name: "experimental API is not allowed in ResetConfiguration",
+			cfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
+			kind: ResetConfiguration
 			`, gvExperimental)),
 			expectedError:     true,
 			allowExperimental: false,

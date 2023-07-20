@@ -600,6 +600,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		if a.group.ConvertabilityChecker != nil {
 			decodableVersions = a.group.ConvertabilityChecker.VersionsForGroupKind(fqKindToRegister.GroupKind())
 		}
+
 		resourceInfo = &storageversion.ResourceInfo{
 			GroupResource: schema.GroupResource{
 				Group:    a.group.GroupVersion.Group,
@@ -612,6 +613,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			EquivalentResourceMapper: a.group.EquivalentResourceRegistry,
 
 			DirectlyDecodableVersions: decodableVersions,
+
+			ServedVersions: a.group.AllServedVersionsByResource[path],
 		}
 	}
 
@@ -711,7 +714,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			requestScope = "resource"
 			operationSuffix = operationSuffix + "WithPath"
 		}
-		if strings.Index(action.Path, "/{name}") != -1 || action.Verb == "POST" {
+		if strings.Contains(action.Path, "/{name}") || action.Verb == "POST" {
 			requestScope = "resource"
 		}
 		if action.AllNamespaces {

@@ -59,6 +59,11 @@
     "reason": "reasonValue",
     "nominatedNodeName": "nominatedNodeNameValue",
     "hostIP": "hostIPValue",
+    "hostIPs": [
+      {
+        "ip": "ipValue"
+      }
+    ],
     "podIP": "podIPValue",
     "podIPs": [
       {
@@ -256,6 +261,12 @@
         }
       }
     ],
-    "resize": "resizeValue"
+    "resize": "resizeValue",
+    "resourceClaimStatuses": [
+      {
+        "name": "nameValue",
+        "resourceClaimName": "resourceClaimNameValue"
+      }
+    ]
   }
 }

@@ -33,5 +33,16 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				obj.LendablePercent = &i
 			}
 		},
+		func(obj *flowcontrol.ExemptPriorityLevelConfiguration, c fuzz.Continue) {
+			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+			if obj.NominalConcurrencyShares == nil {
+				i := int32(0)
+				obj.NominalConcurrencyShares = &i
+			}
+			if obj.LendablePercent == nil {
+				i := int32(0)
+				obj.LendablePercent = &i
+			}
+		},
 	}
 }

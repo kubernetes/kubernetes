@@ -63,6 +63,7 @@ const (
 	offsetFsBaseUsageBytes
 	offsetFsInodeUsage
 	offsetAcceleratorDutyCycle
+	offsetMemSwapUsageBytes
 )
 
 var (
@@ -101,6 +102,7 @@ func TestGetCgroupStats(t *testing.T) {
 	checkCPUStats(t, "", containerInfoSeed, cs.CPU)
 	checkMemoryStats(t, "", containerInfoSeed, containerInfo, cs.Memory)
 	checkNetworkStats(t, "", containerInfoSeed, ns)
+	checkSwapStats(t, "", containerInfoSeed, containerInfo, cs.Swap)
 
 	assert.Equal(cgroupName, cs.Name)
 	assert.Equal(metav1.NewTime(containerInfo.Spec.CreationTime), cs.StartTime)
@@ -497,7 +499,8 @@ func getTestContainerInfo(seed int, podName string, podNamespace string, contain
 		HasNetwork:   true,
 		Labels:       labels,
 		Memory: cadvisorapiv2.MemorySpec{
-			Limit: unlimitedMemory,
+			Limit:     unlimitedMemory,
+			SwapLimit: unlimitedMemory,
 		},
 		CustomMetrics: generateCustomMetricSpec(),
 	}
@@ -518,6 +521,7 @@ func getTestContainerInfo(seed int, podName string, podNamespace string, contain
 				Pgfault:    uint64(seed + offsetMemPageFaults),
 				Pgmajfault: uint64(seed + offsetMemMajorPageFaults),
 			},
+			Swap: uint64(seed + offsetMemSwapUsageBytes),
 		},
 		Network: &cadvisorapiv2.NetworkStats{
 			Interfaces: []cadvisorapiv1.InterfaceStats{{
@@ -693,6 +697,20 @@ func checkMemoryStats(t *testing.T, label string, seed int, info cadvisorapiv2.C
 	} else {
 		expected := info.Spec.Memory.Limit - *stats.WorkingSetBytes
 		assert.EqualValues(t, expected, *stats.AvailableBytes, label+".Mem.AvailableBytes")
+	}
+}
+
+func checkSwapStats(t *testing.T, label string, seed int, info cadvisorapiv2.ContainerInfo, stats *statsapi.SwapStats) {
+	label += ".Swap"
+
+	assert.EqualValues(t, testTime(timestamp, seed).Unix(), stats.Time.Time.Unix(), label+".Time")
+	assert.EqualValues(t, seed+offsetMemSwapUsageBytes, *stats.SwapUsageBytes, label+".SwapUsageBytes")
+
+	if !info.Spec.HasMemory || isMemoryUnlimited(info.Spec.Memory.SwapLimit) {
+		assert.Nil(t, stats.SwapAvailableBytes, label+".SwapAvailableBytes")
+	} else {
+		expected := info.Spec.Memory.Limit - *stats.SwapUsageBytes
+		assert.EqualValues(t, expected, *stats.SwapAvailableBytes, label+".AvailableBytes")
 	}
 }
 

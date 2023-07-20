@@ -55,12 +55,18 @@ type Token struct {
 }
 
 // tokenJSON is the struct representing the HTTP response from OAuth2
-// providers returning a token in JSON form.
+// providers returning a token or error in JSON form.
+// https://datatracker.ietf.org/doc/html/rfc6749#section-5.1
 type tokenJSON struct {
 	AccessToken  string         `json:"access_token"`
 	TokenType    string         `json:"token_type"`
 	RefreshToken string         `json:"refresh_token"`
 	ExpiresIn    expirationTime `json:"expires_in"` // at least PayPal returns string, while most return number
+	// error fields
+	// https://datatracker.ietf.org/doc/html/rfc6749#section-5.2
+	ErrorCode        string `json:"error"`
+	ErrorDescription string `json:"error_description"`
+	ErrorURI         string `json:"error_uri"`
 }
 
 func (e *tokenJSON) expiry() (t time.Time) {
@@ -236,21 +242,29 @@ func doTokenRoundTrip(ctx context.Context, req *http.Request) (*Token, error) {
 	if err != nil {
 		return nil, fmt.Errorf("oauth2: cannot fetch token: %v", err)
 	}
-	if code := r.StatusCode; code < 200 || code > 299 {
-		return nil, &RetrieveError{
-			Response: r,
-			Body:     body,
-		}
+
+	failureStatus := r.StatusCode < 200 || r.StatusCode > 299
+	retrieveError := &RetrieveError{
+		Response: r,
+		Body:     body,
+		// attempt to populate error detail below
 	}
 
 	var token *Token
 	content, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	switch content {
 	case "application/x-www-form-urlencoded", "text/plain":
+		// some endpoints return a query string
 		vals, err := url.ParseQuery(string(body))
 		if err != nil {
-			return nil, err
+			if failureStatus {
+				return nil, retrieveError
+			}
+			return nil, fmt.Errorf("oauth2: cannot parse response: %v", err)
 		}
+		retrieveError.ErrorCode = vals.Get("error")
+		retrieveError.ErrorDescription = vals.Get("error_description")
+		retrieveError.ErrorURI = vals.Get("error_uri")
 		token = &Token{
 			AccessToken:  vals.Get("access_token"),
 			TokenType:    vals.Get("token_type"),
@@ -265,8 +279,14 @@ func doTokenRoundTrip(ctx context.Context, req *http.Request) (*Token, error) {
 	default:
 		var tj tokenJSON
 		if err = json.Unmarshal(body, &tj); err != nil {
-			return nil, err
+			if failureStatus {
+				return nil, retrieveError
+			}
+			return nil, fmt.Errorf("oauth2: cannot parse json: %v", err)
 		}
+		retrieveError.ErrorCode = tj.ErrorCode
+		retrieveError.ErrorDescription = tj.ErrorDescription
+		retrieveError.ErrorURI = tj.ErrorURI
 		token = &Token{
 			AccessToken:  tj.AccessToken,
 			TokenType:    tj.TokenType,
@@ -276,17 +296,37 @@ func doTokenRoundTrip(ctx context.Context, req *http.Request) (*Token, error) {
 		}
 		json.Unmarshal(body, &token.Raw) // no error checks for optional fields
 	}
+	// according to spec, servers should respond status 400 in error case
+	// https://www.rfc-editor.org/rfc/rfc6749#section-5.2
+	// but some unorthodox servers respond 200 in error case
+	if failureStatus || retrieveError.ErrorCode != "" {
+		return nil, retrieveError
+	}
 	if token.AccessToken == "" {
 		return nil, errors.New("oauth2: server response missing access_token")
 	}
 	return token, nil
 }
 
+// mirrors oauth2.RetrieveError
 type RetrieveError struct {
-	Response *http.Response
-	Body     []byte
+	Response         *http.Response
+	Body             []byte
+	ErrorCode        string
+	ErrorDescription string
+	ErrorURI         string
 }
 
 func (r *RetrieveError) Error() string {
+	if r.ErrorCode != "" {
+		s := fmt.Sprintf("oauth2: %q", r.ErrorCode)
+		if r.ErrorDescription != "" {
+			s += fmt.Sprintf(" %q", r.ErrorDescription)
+		}
+		if r.ErrorURI != "" {
+			s += fmt.Sprintf(" %q", r.ErrorURI)
+		}
+		return s
+	}
 	return fmt.Sprintf("oauth2: cannot fetch token: %v\nResponse: %s", r.Response.Status, r.Body)
 }

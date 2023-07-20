@@ -86,6 +86,7 @@ const (
 	StorageVersionGarbageCollectorController     = "storageversion-garbage-collector-controller"
 	ResourceClaimController                      = "resourceclaim-controller"
 	LegacyServiceAccountTokenCleanerController   = "legacy-serviceaccount-token-cleaner-controller"
+	ValidatingAdmissionPolicyStatusController    = "validatingadmissionpolicy-status-controller"
 )
 
 // KCMControllerAliases returns a mapping of aliases to canonical controller names

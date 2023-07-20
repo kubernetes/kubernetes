@@ -598,6 +598,7 @@ resources:
 			// the following resources are not encrypted as they are not REST APIs and hence are not expected
 			// to be encrypted because it would be impossible to perform a storage migration on them
 			if strings.Contains(kv.String(), "masterleases") ||
+				strings.Contains(kv.String(), "peerserverleases") ||
 				strings.Contains(kv.String(), "serviceips") ||
 				strings.Contains(kv.String(), "servicenodeports") {
 				// assert that these resources are not encrypted with any provider
