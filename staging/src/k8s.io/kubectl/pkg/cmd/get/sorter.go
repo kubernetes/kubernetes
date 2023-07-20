@@ -54,9 +54,9 @@ func (s *SortingPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
 		}
 
 		sorter, err := NewTableSorter(table, parsedField)
-		if sorter != nil && errors.Is(err, ErrNoFieldMatch{}) {
+		if sorter != nil && errors.As(err, &ErrNoFieldMatch{}) {
 			klog.Warningln(err.Error())
-		} else if sorter == nil {
+		} else if sorter == nil || err != nil {
 			if err == nil {
 				return fmt.Errorf("unknown sorting error")
 			}
@@ -403,11 +403,6 @@ type ErrNoFieldMatch struct {
 // Error implements the error interface.
 func (e ErrNoFieldMatch) Error() string {
 	return fmt.Sprintf("couldn't find any field with path %q in the list of objects", e.field)
-}
-
-func (e ErrNoFieldMatch) Is(target error) bool {
-	_, ok := target.(*ErrNoFieldMatch)
-	return ok
 }
 
 // NewTableSorter creates a new table sorter with a given JSONPath field.
