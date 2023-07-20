@@ -701,7 +701,7 @@ func TestPrepareResources(t *testing.T) {
 	}
 }
 
-func TestUnprepareResouces(t *testing.T) {
+func TestUnprepareResources(t *testing.T) {
 	fakeKubeClient := fake.NewSimpleClientset()
 
 	for _, test := range []struct {
@@ -709,7 +709,6 @@ func TestUnprepareResouces(t *testing.T) {
 		driverName          string
 		pod                 *v1.Pod
 		claimInfo           *ClaimInfo
-		resourceClaim       *resourcev1alpha2.ResourceClaim
 		wantErr             bool
 		wantTimeout         bool
 		wantResourceSkipped bool
@@ -747,27 +746,6 @@ func TestUnprepareResouces(t *testing.T) {
 							DriverName: driverName,
 							Data:       "test data",
 						},
-					},
-				},
-			},
-			resourceClaim: &resourcev1alpha2.ResourceClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "another-claim-test",
-					Namespace: "test-namespace",
-					UID:       "test-reserved",
-				},
-				Spec: resourcev1alpha2.ResourceClaimSpec{
-					ResourceClassName: "test-class",
-				},
-				Status: resourcev1alpha2.ResourceClaimStatus{
-					DriverName: driverName,
-					Allocation: &resourcev1alpha2.AllocationResult{
-						ResourceHandles: []resourcev1alpha2.ResourceHandle{
-							{Data: "test-data", DriverName: driverName},
-						},
-					},
-					ReservedFor: []resourcev1alpha2.ResourceClaimConsumerReference{
-						{UID: "test-reserved"},
 					},
 				},
 			},
@@ -811,27 +789,6 @@ func TestUnprepareResouces(t *testing.T) {
 					ClaimName:  "test-pod-claim-1",
 					Namespace:  "test-namespace",
 					PodUIDs:    sets.Set[string]{"test-reserved": sets.Empty{}, "test-reserved-2": sets.Empty{}},
-				},
-			},
-			resourceClaim: &resourcev1alpha2.ResourceClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-pod-claim-1",
-					Namespace: "test-namespace",
-					UID:       "test-reserved",
-				},
-				Spec: resourcev1alpha2.ResourceClaimSpec{
-					ResourceClassName: "test-class",
-				},
-				Status: resourcev1alpha2.ResourceClaimStatus{
-					DriverName: driverName,
-					Allocation: &resourcev1alpha2.AllocationResult{
-						ResourceHandles: []resourcev1alpha2.ResourceHandle{
-							{Data: "test-data", DriverName: driverName},
-						},
-					},
-					ReservedFor: []resourcev1alpha2.ResourceClaimConsumerReference{
-						{UID: "test-reserved"},
-					},
 				},
 			},
 			wantResourceSkipped: true,
@@ -881,27 +838,6 @@ func TestUnprepareResouces(t *testing.T) {
 					},
 				},
 			},
-			resourceClaim: &resourcev1alpha2.ResourceClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-pod-claim-2",
-					Namespace: "test-namespace",
-					UID:       "test-reserved",
-				},
-				Spec: resourcev1alpha2.ResourceClaimSpec{
-					ResourceClassName: "test-class",
-				},
-				Status: resourcev1alpha2.ResourceClaimStatus{
-					DriverName: driverName,
-					Allocation: &resourcev1alpha2.AllocationResult{
-						ResourceHandles: []resourcev1alpha2.ResourceHandle{
-							{Data: "test-data", DriverName: driverName},
-						},
-					},
-					ReservedFor: []resourcev1alpha2.ResourceClaimConsumerReference{
-						{UID: "test-reserved"},
-					},
-				},
-			},
 			wantErr:     true,
 			wantTimeout: true,
 		},
@@ -947,27 +883,6 @@ func TestUnprepareResouces(t *testing.T) {
 							DriverName: driverName,
 							Data:       "test data",
 						},
-					},
-				},
-			},
-			resourceClaim: &resourcev1alpha2.ResourceClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-pod-claim-3",
-					Namespace: "test-namespace",
-					UID:       "test-reserved",
-				},
-				Spec: resourcev1alpha2.ResourceClaimSpec{
-					ResourceClassName: "test-class",
-				},
-				Status: resourcev1alpha2.ResourceClaimStatus{
-					DriverName: driverName,
-					Allocation: &resourcev1alpha2.AllocationResult{
-						ResourceHandles: []resourcev1alpha2.ResourceHandle{
-							{Data: "test-data"},
-						},
-					},
-					ReservedFor: []resourcev1alpha2.ResourceClaimConsumerReference{
-						{UID: "test-reserved"},
 					},
 				},
 			},
