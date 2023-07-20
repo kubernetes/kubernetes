@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utiljson "k8s.io/apimachinery/pkg/util/json"
@@ -70,6 +71,13 @@ var (
 			Kind:    paramsGVK.Kind + "List",
 		}, &unstructured.UnstructuredList{})
 
+		res.AddKnownTypeWithName(clusterScopedParamsGVK, &unstructured.Unstructured{})
+		res.AddKnownTypeWithName(schema.GroupVersionKind{
+			Group:   clusterScopedParamsGVK.Group,
+			Version: clusterScopedParamsGVK.Version,
+			Kind:    clusterScopedParamsGVK.Kind + "List",
+		}, &unstructured.UnstructuredList{})
+
 		if err := v1alpha1.AddToScheme(res); err != nil {
 			panic(err)
 		}
@@ -80,6 +88,13 @@ var (
 
 		return res
 	}()
+
+	clusterScopedParamsGVK schema.GroupVersionKind = schema.GroupVersionKind{
+		Group:   "example.com",
+		Version: "v1",
+		Kind:    "ClusterScopedParamsConfig",
+	}
+
 	paramsGVK schema.GroupVersionKind = schema.GroupVersionKind{
 		Group:   "example.com",
 		Version: "v1",
@@ -95,6 +110,7 @@ var (
 		})
 
 		res.Add(paramsGVK, meta.RESTScopeNamespace)
+		res.Add(clusterScopedParamsGVK, meta.RESTScopeRoot)
 		res.Add(definitionGVK, meta.RESTScopeRoot)
 		res.Add(bindingGVK, meta.RESTScopeRoot)
 		res.Add(v1.SchemeGroupVersion.WithKind("ConfigMap"), meta.RESTScopeNamespace)
@@ -133,6 +149,7 @@ var (
 			"kind":       paramsGVK.Kind,
 			"metadata": map[string]interface{}{
 				"name":            "replicas-test.example.com",
+				"namespace":       "default",
 				"resourceVersion": "1",
 			},
 			"maxReplicas": int64(3),
@@ -149,6 +166,8 @@ var (
 			ParamRef: &v1alpha1.ParamRef{
 				Name:      fakeParams.GetName(),
 				Namespace: fakeParams.GetNamespace(),
+				// fake object tracker does not populate defaults
+				ParameterNotFoundAction: ptrTo(v1alpha1.DenyAction),
 			},
 			ValidationActions: []v1alpha1.ValidationAction{v1alpha1.Deny},
 		},
@@ -195,6 +214,40 @@ var (
 		},
 	}
 )
+
+func newParam(name, namespace string, labels map[string]string) *unstructured.Unstructured {
+	if len(namespace) == 0 {
+		namespace = metav1.NamespaceDefault
+	}
+	res := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": paramsGVK.GroupVersion().String(),
+			"kind":       paramsGVK.Kind,
+			"metadata": map[string]interface{}{
+				"name":            name,
+				"namespace":       namespace,
+				"resourceVersion": "1",
+			},
+		},
+	}
+	res.SetLabels(labels)
+	return res
+}
+
+func newClusterScopedParam(name string, labels map[string]string) *unstructured.Unstructured {
+	res := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": clusterScopedParamsGVK.GroupVersion().String(),
+			"kind":       clusterScopedParamsGVK.Kind,
+			"metadata": map[string]interface{}{
+				"name":            name,
+				"resourceVersion": "1",
+			},
+		},
+	}
+	res.SetLabels(labels)
+	return res
+}
 
 // Interface which has fake compile functionality for use in tests
 // So that we can test the controller without pulling in any CEL functionality
@@ -562,7 +615,14 @@ func (c *celAdmissionController) getCurrentObject(obj runtime.Object) (runtime.O
 		}
 
 		// Param type. Just check informer for its GVK
-		item, err := paramInformer.Get(accessor.GetName())
+		var item runtime.Object
+		var err error
+		if namespace := accessor.GetNamespace(); len(namespace) > 0 {
+			item, err = paramInformer.Namespaced(namespace).Get(accessor.GetName())
+		} else {
+			item, err = paramInformer.Get(accessor.GetName())
+		}
+
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
 				return nil, nil
@@ -940,7 +1000,9 @@ func TestReconfigureBinding(t *testing.T) {
 			"apiVersion": paramsGVK.GroupVersion().String(),
 			"kind":       paramsGVK.Kind,
 			"metadata": map[string]interface{}{
-				"name":            "replicas-test2.example.com",
+				"name": "replicas-test2.example.com",
+				// fake object tracker does not populate missing namespace
+				"namespace":       "default",
 				"resourceVersion": "2",
 			},
 			"maxReplicas": int64(35),
@@ -976,8 +1038,9 @@ func TestReconfigureBinding(t *testing.T) {
 		Spec: v1alpha1.ValidatingAdmissionPolicyBindingSpec{
 			PolicyName: denyPolicy.Name,
 			ParamRef: &v1alpha1.ParamRef{
-				Name:      fakeParams2.GetName(),
-				Namespace: fakeParams2.GetNamespace(),
+				Name:                    fakeParams2.GetName(),
+				Namespace:               fakeParams2.GetNamespace(),
+				ParameterNotFoundAction: ptrTo(v1alpha1.DenyAction),
 			},
 			ValidationActions: []v1alpha1.ValidationAction{v1alpha1.Deny},
 		},
@@ -1019,7 +1082,7 @@ func TestReconfigureBinding(t *testing.T) {
 		&admission.RuntimeObjectInterfaces{},
 	)
 
-	require.ErrorContains(t, err, `failed to configure binding: replicas-test2.example.com not found`)
+	require.ErrorContains(t, err, "no params found for policy binding with `Deny` parameterNotFoundAction")
 
 	// Add the missing params
 	require.NoError(t, paramTracker.Add(fakeParams2))
@@ -1275,8 +1338,78 @@ func TestInvalidParamSourceInstanceName(t *testing.T) {
 	// expect the specific error to be that the param was not found, not that CRD
 	// is not existing
 	require.ErrorContains(t, err,
-		`failed to configure binding: replicas-test.example.com not found`)
+		"no params found for policy binding with `Deny` parameterNotFoundAction")
 	require.Len(t, passedParams, 0)
+}
+
+// Show that policy still gets evaluated with `nil` param if paramRef & namespaceParamRef
+// are both unset
+func TestEmptyParamRef(t *testing.T) {
+	reset()
+	testContext, testContextCancel := context.WithCancel(context.Background())
+	defer testContextCancel()
+
+	compiler := &fakeCompiler{}
+	validator := &fakeValidator{}
+	matcher := &fakeMatcher{
+		DefaultMatch: true,
+	}
+
+	handler, _, tracker, controller := setupFakeTest(t, compiler, matcher)
+
+	datalock := sync.Mutex{}
+	numCompiles := 0
+
+	compiler.RegisterDefinition(denyPolicy, func([]cel.ExpressionAccessor, cel.OptionalVariableDeclarations) cel.Filter {
+		datalock.Lock()
+		numCompiles += 1
+		datalock.Unlock()
+
+		return &fakeFilter{
+			keyId: denyPolicy.Spec.Validations[0].Expression,
+		}
+	})
+
+	validator.RegisterDefinition(denyPolicy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
+		// Versioned params must be nil to pass the test
+		if versionedParams != nil {
+			return ValidateResult{
+				Decisions: []PolicyDecision{
+					{
+						Action: ActionAdmit,
+					},
+				},
+			}
+		}
+		return ValidateResult{
+			Decisions: []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Message: "Denied",
+				},
+			},
+		}
+	})
+
+	require.NoError(t, tracker.Create(definitionsGVR, denyPolicy, denyPolicy.Namespace))
+	require.NoError(t, tracker.Create(bindingsGVR, denyBindingWithNoParamRef, denyBindingWithNoParamRef.Namespace))
+
+	// Wait for controller to reconcile given objects
+	require.NoError(t,
+		waitForReconcile(
+			testContext, controller,
+			denyBindingWithNoParamRef, denyPolicy))
+
+	err := handler.Validate(
+		testContext,
+		// Object is irrelevant/unchecked for this test. Just test that
+		// the evaluator is executed, and returns a denial
+		attributeRecord(nil, fakeParams, admission.Create),
+		&admission.RuntimeObjectInterfaces{},
+	)
+
+	require.ErrorContains(t, err, `Denied`)
+	require.Equal(t, 1, numCompiles)
 }
 
 // Shows that a definition with no param source works just fine, and has
@@ -1574,7 +1707,7 @@ func TestNativeTypeParam(t *testing.T) {
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "replicas-test.example.com",
-			Namespace:       "",
+			Namespace:       "default",
 			ResourceVersion: "1",
 		},
 		Data: map[string]string{
@@ -1805,6 +1938,615 @@ func TestAllValidationActions(t *testing.T) {
 	require.Equal(t, expected, value)
 
 	require.ErrorContains(t, err, "I'm sorry Dave")
+}
+
+func TestNamespaceParamRefName(t *testing.T) {
+	reset()
+	testContext, testContextCancel := context.WithCancel(context.Background())
+	defer testContextCancel()
+
+	compiler := &fakeCompiler{}
+	validator := &fakeValidator{}
+	matcher := &fakeMatcher{
+		DefaultMatch: true,
+	}
+	handler, _, tracker, controller := setupFakeTest(t, compiler, matcher)
+
+	compiles := atomic.Int64{}
+	evaluations := atomic.Int64{}
+
+	// Use ConfigMap native-typed param
+	nativeTypeParamPolicy := *denyPolicy
+	nativeTypeParamPolicy.Spec.ParamKind = &v1alpha1.ParamKind{
+		APIVersion: "v1",
+		Kind:       "ConfigMap",
+	}
+
+	namespaceParamBinding := *denyBinding
+	namespaceParamBinding.Spec.ParamRef = &v1alpha1.ParamRef{
+		Name: "replicas-test.example.com",
+	}
+
+	compiler.RegisterDefinition(&nativeTypeParamPolicy, func([]cel.ExpressionAccessor, cel.OptionalVariableDeclarations) cel.Filter {
+		compiles.Add(1)
+
+		return &fakeFilter{
+			keyId: nativeTypeParamPolicy.Spec.Validations[0].Expression,
+		}
+	})
+
+	lock := sync.Mutex{}
+	observedParamNamespaces := []string{}
+	validator.RegisterDefinition(&nativeTypeParamPolicy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
+		lock.Lock()
+		defer lock.Unlock()
+
+		evaluations.Add(1)
+		if p, ok := versionedParams.(*v1.ConfigMap); ok {
+			observedParamNamespaces = append(observedParamNamespaces, p.Namespace)
+			return ValidateResult{
+				Decisions: []PolicyDecision{
+					{
+						Action:  ActionDeny,
+						Message: "correct type",
+					},
+				},
+			}
+		}
+		return ValidateResult{
+			Decisions: []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Message: "Incorrect param type",
+				},
+			},
+		}
+	})
+
+	configMapParam := &v1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "replicas-test.example.com",
+			Namespace:       "default",
+			ResourceVersion: "1",
+		},
+		Data: map[string]string{
+			"coolkey": "default",
+		},
+	}
+	configMapParam2 := &v1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "replicas-test.example.com",
+			Namespace:       "mynamespace",
+			ResourceVersion: "1",
+		},
+		Data: map[string]string{
+			"coolkey": "mynamespace",
+		},
+	}
+	configMapParam3 := &v1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "replicas-test.example.com",
+			Namespace:       "othernamespace",
+			ResourceVersion: "1",
+		},
+		Data: map[string]string{
+			"coolkey": "othernamespace",
+		},
+	}
+	require.NoError(t, tracker.Create(definitionsGVR, &nativeTypeParamPolicy, nativeTypeParamPolicy.Namespace))
+	require.NoError(t, tracker.Create(bindingsGVR, &namespaceParamBinding, namespaceParamBinding.Namespace))
+	require.NoError(t, tracker.Add(configMapParam))
+	require.NoError(t, tracker.Add(configMapParam2))
+	require.NoError(t, tracker.Add(configMapParam3))
+
+	// Wait for controller to reconcile given objects
+	require.NoError(t,
+		waitForReconcile(
+			testContext, controller,
+			&namespaceParamBinding, &nativeTypeParamPolicy, configMapParam, configMapParam2, configMapParam3))
+
+	// Object is irrelevant/unchecked for this test. Just test that
+	// the evaluator is executed with correct namespace, and returns admit
+	// meaning the params passed was a configmap
+	err := handler.Validate(
+		testContext,
+		attributeRecord(nil, configMapParam, admission.Create),
+		&admission.RuntimeObjectInterfaces{},
+	)
+
+	func() {
+		lock.Lock()
+		defer lock.Unlock()
+		require.ErrorContains(t, err, "correct type")
+		require.EqualValues(t, 1, compiles.Load())
+		require.EqualValues(t, 1, evaluations.Load())
+	}()
+
+	err = handler.Validate(
+		testContext,
+		attributeRecord(nil, configMapParam2, admission.Create),
+		&admission.RuntimeObjectInterfaces{},
+	)
+
+	func() {
+		lock.Lock()
+		defer lock.Unlock()
+		require.ErrorContains(t, err, "correct type")
+		require.EqualValues(t, 1, compiles.Load())
+		require.EqualValues(t, 2, evaluations.Load())
+	}()
+
+	err = handler.Validate(
+		testContext,
+		attributeRecord(nil, configMapParam3, admission.Create),
+		&admission.RuntimeObjectInterfaces{},
+	)
+
+	func() {
+		lock.Lock()
+		defer lock.Unlock()
+		require.ErrorContains(t, err, "correct type")
+		require.EqualValues(t, 1, compiles.Load())
+		require.EqualValues(t, 3, evaluations.Load())
+	}()
+
+	err = handler.Validate(
+		testContext,
+		attributeRecord(nil, configMapParam, admission.Create),
+		&admission.RuntimeObjectInterfaces{},
+	)
+
+	func() {
+		lock.Lock()
+		defer lock.Unlock()
+		require.ErrorContains(t, err, "correct type")
+		require.EqualValues(t, []string{"default", "mynamespace", "othernamespace", "default"}, observedParamNamespaces)
+		require.EqualValues(t, 1, compiles.Load())
+		require.EqualValues(t, 4, evaluations.Load())
+	}()
+}
+
+func TestParamRef(t *testing.T) {
+	for _, paramIsClusterScoped := range []bool{false, true} {
+		for _, nameIsSet := range []bool{false, true} {
+			for _, namespaceIsSet := range []bool{false, true} {
+				if paramIsClusterScoped && namespaceIsSet {
+					// Skip invalid configuration
+					continue
+				}
+
+				for _, selectorIsSet := range []bool{false, true} {
+					if selectorIsSet && nameIsSet {
+						// SKip invalid configuration
+						continue
+					}
+
+					for _, denyNotFound := range []bool{false, true} {
+
+						name := "ParamRef"
+
+						if paramIsClusterScoped {
+							name = "ClusterScoped" + name
+						}
+
+						if nameIsSet {
+							name = name + "WithName"
+						} else if selectorIsSet {
+							name = name + "WithLabelSelector"
+						} else {
+							name = name + "WithEverythingSelector"
+						}
+
+						if namespaceIsSet {
+							name = name + "WithNamespace"
+						}
+
+						if denyNotFound {
+							name = name + "DenyNotFound"
+						} else {
+							name = name + "AllowNotFound"
+						}
+
+						t.Run(name, func(t *testing.T) {
+							// Test creating a policy with a cluster or namesapce-scoped param
+							// and binding with the provided configuration. Test will ensure
+							// that the provided configuration is capable of matching
+							// params as expected, and not matching params when not expected.
+							// Also ensures the NotFound setting works as expected with this particular
+							// configuration of ParamRef when all the previously
+							// matched params are deleted.
+							testParamRefCase(t, paramIsClusterScoped, nameIsSet, namespaceIsSet, selectorIsSet, denyNotFound)
+						})
+					}
+				}
+			}
+		}
+	}
+}
+
+// testParamRefCase constructs a ParamRef and policy with appropriate ParamKind
+// for the given parameters, then constructs a scenario with several matching/non-matching params
+// of varying names, namespaces, labels.
+//
+// Test then selects subset of params that should match provided configuration
+// and ensuers those params are the only ones used.
+//
+// Also ensures NotFound action is enforced correctly by deleting all found
+// params and ensuring the Action is used.
+//
+// This test is not meant to test every possible scenario of matching/not matching:
+// only that each ParamRef CAN be evaluated correctly for both cluster scoped
+// and namespace-scoped request kinds, and that the failure action is correctly
+// applied.
+func testParamRefCase(t *testing.T, paramIsClusterScoped, nameIsSet, namespaceIsSet, selectorIsSet, denyNotFound bool) {
+	// Create a cluster scoped and a namespace scoped CRD
+	policy := *denyPolicy
+	binding := *denyBinding
+	binding.Spec.ParamRef = &v1alpha1.ParamRef{}
+	paramRef := binding.Spec.ParamRef
+
+	shouldErrorOnClusterScopedRequests := !namespaceIsSet && !paramIsClusterScoped
+
+	matchingParamName := "replicas-test.example.com"
+	matchingNamespace := "mynamespace"
+	nonMatchingNamespace := "othernamespace"
+
+	matchingLabels := labels.Set{"doesitmatch": "yes"}
+	nonmatchingLabels := labels.Set{"doesitmatch": "no"}
+	otherNonmatchingLabels := labels.Set{"notaffiliated": "no"}
+
+	if paramIsClusterScoped {
+		policy.Spec.ParamKind = &v1alpha1.ParamKind{
+			APIVersion: clusterScopedParamsGVK.GroupVersion().String(),
+			Kind:       clusterScopedParamsGVK.Kind,
+		}
+	} else {
+		policy.Spec.ParamKind = &v1alpha1.ParamKind{
+			APIVersion: paramsGVK.GroupVersion().String(),
+			Kind:       paramsGVK.Kind,
+		}
+	}
+
+	if nameIsSet {
+		paramRef.Name = matchingParamName
+	} else if selectorIsSet {
+		paramRef.Selector = metav1.SetAsLabelSelector(matchingLabels)
+	} else {
+		paramRef.Selector = &metav1.LabelSelector{}
+	}
+
+	if namespaceIsSet {
+		paramRef.Namespace = matchingNamespace
+	}
+
+	if denyNotFound {
+		paramRef.ParameterNotFoundAction = ptrTo(v1alpha1.DenyAction)
+	} else {
+		paramRef.ParameterNotFoundAction = ptrTo(v1alpha1.AllowAction)
+	}
+
+	compiler := &fakeCompiler{}
+	validator := &fakeValidator{}
+	matcher := &fakeMatcher{
+		DefaultMatch: true,
+	}
+
+	var matchedParams []runtime.Object
+	paramLock := sync.Mutex{}
+	observeParam := func(p runtime.Object) {
+		paramLock.Lock()
+		defer paramLock.Unlock()
+		matchedParams = append(matchedParams, p)
+	}
+	getAndResetObservedParams := func() []runtime.Object {
+		paramLock.Lock()
+		defer paramLock.Unlock()
+		oldParams := matchedParams
+		matchedParams = nil
+		return oldParams
+	}
+
+	compiler.RegisterDefinition(&policy, func(ea []cel.ExpressionAccessor, ovd cel.OptionalVariableDeclarations) cel.Filter {
+		return &fakeFilter{
+			keyId: policy.Spec.Validations[0].Expression,
+		}
+	})
+
+	validator.RegisterDefinition(&policy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
+		observeParam(versionedParams)
+		return ValidateResult{
+			Decisions: []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Message: "Denied by policy",
+				},
+			},
+		}
+	})
+
+	handler, paramTracker, tracker, controller := setupFakeTest(t, compiler, matcher)
+
+	// Create library of params to try to fool the controller
+	params := []*unstructured.Unstructured{
+		newParam(matchingParamName, v1.NamespaceDefault, nonmatchingLabels),
+		newParam(matchingParamName, matchingNamespace, nonmatchingLabels),
+		newParam(matchingParamName, nonMatchingNamespace, nonmatchingLabels),
+
+		newParam(matchingParamName+"1", v1.NamespaceDefault, matchingLabels),
+		newParam(matchingParamName+"1", matchingNamespace, matchingLabels),
+		newParam(matchingParamName+"1", nonMatchingNamespace, matchingLabels),
+
+		newParam(matchingParamName+"2", v1.NamespaceDefault, otherNonmatchingLabels),
+		newParam(matchingParamName+"2", matchingNamespace, otherNonmatchingLabels),
+		newParam(matchingParamName+"2", nonMatchingNamespace, otherNonmatchingLabels),
+
+		newParam(matchingParamName+"3", v1.NamespaceDefault, otherNonmatchingLabels),
+		newParam(matchingParamName+"3", matchingNamespace, matchingLabels),
+		newParam(matchingParamName+"3", nonMatchingNamespace, matchingLabels),
+
+		newClusterScopedParam(matchingParamName, matchingLabels),
+		newClusterScopedParam(matchingParamName+"1", nonmatchingLabels),
+		newClusterScopedParam(matchingParamName+"2", otherNonmatchingLabels),
+		newClusterScopedParam(matchingParamName+"3", matchingLabels),
+		newClusterScopedParam(matchingParamName+"4", nonmatchingLabels),
+		newClusterScopedParam(matchingParamName+"5", otherNonmatchingLabels),
+	}
+
+	require.NoError(t, tracker.Create(definitionsGVR, &policy, policy.Namespace))
+	require.NoError(t, tracker.Create(bindingsGVR, &binding, binding.Namespace))
+	require.NoError(t, waitForReconcile(context.TODO(), controller, &policy, &binding))
+
+	for _, p := range params {
+		paramTracker.Add(p)
+	}
+
+	namespacedRequestObject := newParam("some param", nonMatchingNamespace, nil)
+	clusterScopedRequestObject := newClusterScopedParam("other param", nil)
+
+	// Validate a namespaced object, and verify that the params being validated
+	// are the ones we would expect
+	var expectedParamsForNamespacedRequest []*unstructured.Unstructured
+	for _, p := range params {
+		if p.GetAPIVersion() != policy.Spec.ParamKind.APIVersion || p.GetKind() != policy.Spec.ParamKind.Kind {
+			continue
+		} else if len(paramRef.Name) > 0 && p.GetName() != paramRef.Name {
+			continue
+		} else if len(paramRef.Namespace) > 0 && p.GetNamespace() != paramRef.Namespace {
+			continue
+		}
+
+		if !paramIsClusterScoped {
+			if len(paramRef.Namespace) == 0 && p.GetNamespace() != namespacedRequestObject.GetNamespace() {
+				continue
+			}
+		}
+
+		if paramRef.Selector != nil {
+			ls := p.GetLabels()
+			matched := true
+
+			for k, v := range paramRef.Selector.MatchLabels {
+				if l, hasLabel := ls[k]; !hasLabel {
+					matched = false
+					break
+				} else if l != v {
+					matched = false
+					break
+				}
+			}
+
+			// Empty selector matches everything
+			if len(paramRef.Selector.MatchExpressions) == 0 && len(paramRef.Selector.MatchLabels) == 0 {
+				matched = true
+			}
+
+			if !matched {
+				continue
+			}
+		}
+
+		expectedParamsForNamespacedRequest = append(expectedParamsForNamespacedRequest, p)
+		require.NoError(t, waitForReconcile(context.TODO(), controller, p))
+	}
+	require.NotEmpty(t, expectedParamsForNamespacedRequest, "all test cases should match at least one param")
+	require.ErrorContains(t, handler.Validate(context.TODO(), attributeRecord(nil, namespacedRequestObject, admission.Create), &admission.RuntimeObjectInterfaces{}), "Denied by policy")
+	require.ElementsMatch(t, expectedParamsForNamespacedRequest, getAndResetObservedParams(), "should exactly match expected params")
+
+	// Validate a cluster-scoped object, and verify that the params being validated
+	// are the ones we would expect
+	var expectedParamsForClusterScopedRequest []*unstructured.Unstructured
+	for _, p := range params {
+		if shouldErrorOnClusterScopedRequests {
+			continue
+		} else if p.GetAPIVersion() != policy.Spec.ParamKind.APIVersion || p.GetKind() != policy.Spec.ParamKind.Kind {
+			continue
+		} else if len(paramRef.Name) > 0 && p.GetName() != paramRef.Name {
+			continue
+		} else if len(paramRef.Namespace) > 0 && p.GetNamespace() != paramRef.Namespace {
+			continue
+		} else if !paramIsClusterScoped && len(paramRef.Namespace) == 0 && p.GetNamespace() != v1.NamespaceDefault {
+			continue
+		}
+
+		if paramRef.Selector != nil {
+			ls := p.GetLabels()
+			matched := true
+			for k, v := range paramRef.Selector.MatchLabels {
+				if l, hasLabel := ls[k]; !hasLabel {
+					matched = false
+					break
+				} else if l != v {
+					matched = false
+					break
+				}
+			}
+
+			// Empty selector matches everything
+			if len(paramRef.Selector.MatchExpressions) == 0 && len(paramRef.Selector.MatchLabels) == 0 {
+				matched = true
+			}
+
+			if !matched {
+				continue
+			}
+		}
+
+		expectedParamsForClusterScopedRequest = append(expectedParamsForClusterScopedRequest, p)
+		require.NoError(t, waitForReconcile(context.TODO(), controller, p))
+	}
+
+	err := handler.Validate(context.TODO(), attributeRecord(nil, clusterScopedRequestObject, admission.Create), &admission.RuntimeObjectInterfaces{})
+	if shouldErrorOnClusterScopedRequests {
+		// Cannot validate cliuster-scoped resources against a paramRef that sets namespace
+		require.ErrorContains(t, err, "failed to configure binding: cannot use namespaced paramRef in policy binding that matches cluster-scoped resources")
+	} else {
+		require.NotEmpty(t, expectedParamsForClusterScopedRequest, "all test cases should match at least one param")
+		require.ErrorContains(t, err, "Denied by policy")
+	}
+	require.ElementsMatch(t, expectedParamsForClusterScopedRequest, getAndResetObservedParams(), "should exactly match expected params")
+
+	// Remove all params matched by namespaced, and cluster-scoped validation.
+	// Validate again to make sure NotFoundAction is respected
+	var deleted []runtime.Object
+	for _, p := range expectedParamsForNamespacedRequest {
+		if paramIsClusterScoped {
+			require.NoError(t, paramTracker.Delete(paramsGVK.GroupVersion().WithResource("clusterscopedparamsconfigs"), p.GetNamespace(), p.GetName()))
+		} else {
+			require.NoError(t, paramTracker.Delete(paramsGVK.GroupVersion().WithResource("paramsconfigs"), p.GetNamespace(), p.GetName()))
+		}
+		deleted = append(deleted, p)
+	}
+
+	for _, p := range expectedParamsForClusterScopedRequest {
+		// Tracker.Delete docs says it wont raise error for not found, but its implmenetation
+		// pretty plainly does...
+		rsrsc := "paramsconfigs"
+		if paramIsClusterScoped {
+			rsrsc = "clusterscopedparamsconfigs"
+		}
+		if err := paramTracker.Delete(paramsGVK.GroupVersion().WithResource(rsrsc), p.GetNamespace(), p.GetName()); err != nil && !k8serrors.IsNotFound(err) {
+			require.NoError(t, err)
+			deleted = append(deleted, p)
+		}
+	}
+	require.NoError(t, waitForReconcileDeletion(context.TODO(), controller, deleted...))
+
+	controller.refreshPolicies()
+
+	// Check that NotFound is working correctly for both namespaeed & non-namespaced
+	// request object
+	err = handler.Validate(context.TODO(), attributeRecord(nil, namespacedRequestObject, admission.Create), &admission.RuntimeObjectInterfaces{})
+	if denyNotFound {
+		require.ErrorContains(t, err, "no params found for policy binding with `Deny` parameterNotFoundAction")
+	} else {
+		require.NoError(t, err, "Allow not found expects no error when no params found. Policy should have been skipped")
+	}
+	require.Empty(t, getAndResetObservedParams(), "policy should not have been evaluated")
+
+	err = handler.Validate(context.TODO(), attributeRecord(nil, clusterScopedRequestObject, admission.Create), &admission.RuntimeObjectInterfaces{})
+	if shouldErrorOnClusterScopedRequests {
+		require.ErrorContains(t, err, "failed to configure binding: cannot use namespaced paramRef in policy binding that matches cluster-scoped resources")
+
+	} else if denyNotFound {
+		require.ErrorContains(t, err, "no params found for policy binding with `Deny` parameterNotFoundAction")
+	} else {
+		require.NoError(t, err, "Allow not found expects no error when no params found. Policy should have been skipped")
+	}
+	require.Empty(t, getAndResetObservedParams(), "policy should not have been evaluated")
+}
+
+// If the ParamKind is ClusterScoped, and namespace param is used.
+// This is a Configuration Error of the policy
+func TestNamespaceParamRefClusterScopedParamError(t *testing.T) {
+	reset()
+	testContext, testContextCancel := context.WithCancel(context.Background())
+	defer testContextCancel()
+
+	compiler := &fakeCompiler{}
+	validator := &fakeValidator{}
+	matcher := &fakeMatcher{
+		DefaultMatch: true,
+	}
+	handler, _, tracker, controller := setupFakeTest(t, compiler, matcher)
+
+	compiles := atomic.Int64{}
+	evaluations := atomic.Int64{}
+
+	// Use ValidatingAdmissionPolicy for param type since it is cluster-scoped
+	nativeTypeParamPolicy := *denyPolicy
+	nativeTypeParamPolicy.Spec.ParamKind = &v1alpha1.ParamKind{
+		APIVersion: "admissionregistration.k8s.io/v1alpha1",
+		Kind:       "ValidatingAdmissionPolicy",
+	}
+
+	namespaceParamBinding := *denyBinding
+	namespaceParamBinding.Spec.ParamRef = &v1alpha1.ParamRef{
+		Name:      "other-param-to-use-with-no-label.example.com",
+		Namespace: "mynamespace",
+	}
+
+	compiler.RegisterDefinition(&nativeTypeParamPolicy, func([]cel.ExpressionAccessor, cel.OptionalVariableDeclarations) cel.Filter {
+		compiles.Add(1)
+
+		return &fakeFilter{
+			keyId: nativeTypeParamPolicy.Spec.Validations[0].Expression,
+		}
+	})
+
+	validator.RegisterDefinition(&nativeTypeParamPolicy, func(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) ValidateResult {
+		evaluations.Add(1)
+		if _, ok := versionedParams.(*v1alpha1.ValidatingAdmissionPolicy); ok {
+			return ValidateResult{
+				Decisions: []PolicyDecision{
+					{
+						Action:  ActionAdmit,
+						Message: "correct type",
+					},
+				},
+			}
+		}
+		return ValidateResult{
+			Decisions: []PolicyDecision{
+				{
+					Action:  ActionDeny,
+					Message: fmt.Sprintf("Incorrect param type %T", versionedParams),
+				},
+			},
+		}
+	})
+
+	require.NoError(t, tracker.Create(definitionsGVR, &nativeTypeParamPolicy, nativeTypeParamPolicy.Namespace))
+	require.NoError(t, tracker.Create(bindingsGVR, &namespaceParamBinding, namespaceParamBinding.Namespace))
+	// Wait for controller to reconcile given objects
+	require.NoError(t,
+		waitForReconcile(
+			testContext, controller,
+			&namespaceParamBinding, &nativeTypeParamPolicy))
+
+	// Object is irrelevant/unchecked for this test. Just test that
+	// the evaluator is executed with correct namespace, and returns admit
+	// meaning the params passed was a configmap
+	err := handler.Validate(
+		testContext,
+		attributeRecord(nil, fakeParams, admission.Create),
+		&admission.RuntimeObjectInterfaces{},
+	)
+
+	require.ErrorContains(t, err, "paramRef.namespace must not be provided for a cluster-scoped `paramKind`")
+	require.EqualValues(t, 1, compiles.Load())
+	require.EqualValues(t, 0, evaluations.Load())
 }
 
 func TestAuditAnnotations(t *testing.T) {

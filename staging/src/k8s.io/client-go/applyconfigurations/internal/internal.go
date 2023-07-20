@@ -366,6 +366,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: namespace
       type:
         scalar: string
+    - name: parameterNotFoundAction
+      type:
+        scalar: string
+    - name: selector
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
     elementRelationship: atomic
 - name: io.k8s.api.admissionregistration.v1alpha1.TypeChecking
   map:
