@@ -1060,7 +1060,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.Probe"
               }
             ],
-            "description": "Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
+            "description": "Periodic probe of container liveness. Container will be killed if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
           },
           "name": {
             "default": "",
@@ -1134,7 +1134,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.Probe"
               }
             ],
-            "description": "StartupProbe indicates that the Pod has successfully initialized. If specified, no other probes are executed until this completes successfully. If this probe fails, the Pod will be restarted, just as if the livenessProbe failed. This can be used to provide different probe parameters at the beginning of a Pod's lifecycle, when it might take a long time to load data or warm a cache, than during steady-state operation. This cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
+            "description": "StartupProbe indicates that the container has successfully initialized. If specified, no other probes are executed until this completes successfully. If this probe fails, the container will be killed, just as if the livenessProbe failed. This can be used to provide different probe parameters at the beginning of a container's lifecycle, when it might take a long time to load data or warm a cache, than during steady-state operation. This cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
           },
           "stdin": {
             "description": "Whether this container should allocate a buffer for stdin in the container runtime. If this is not set, reads from stdin in the container will always result in EOF. Default is false.",
