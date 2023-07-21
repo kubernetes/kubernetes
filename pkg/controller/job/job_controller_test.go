@@ -4602,10 +4602,11 @@ func TestJobApiBackoffReset(t *testing.T) {
 	if retries != 1 {
 		t.Fatalf("%s: expected exactly 1 retry, got %d", job.Name, retries)
 	}
+	// await for the actual requeue after processing of the pending queue is done
+	awaitForQueueLen(ctx, t, manager, 1)
 
 	// the queue is emptied on success
 	fakePodControl.Err = nil
-	manager.clock.Sleep(fastJobApiBackoff)
 	manager.processNextWorkItem(context.TODO())
 	verifyEmptyQueue(ctx, t, manager)
 }
