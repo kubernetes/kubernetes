@@ -362,6 +362,7 @@ func (o *DeleteOptions) RunDelete(f cmdutil.Factory) error {
 }
 
 func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
+	var input string
 	found := 0
 	if o.IgnoreNotFound {
 		r = r.IgnoreErrors(errors.IsNotFound)
@@ -382,6 +383,24 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 			}]; !ok {
 				// resource not in the list of previewed resources based on resourceLocation
 				return nil
+			}
+		}
+
+		if info.Mapping.GroupVersionKind.Kind == "Namespace" {
+			fmt.Fprintf(o.Out, "Warning: This deletes everything under the namespace!\n")
+			for {
+				fmt.Fprintf(o.Out, "please enter 'y' to confirm or 'n' to cancel: ")
+				fmt.Fscanln(o.In, &input)
+				input = strings.ToLower(input)
+				if input == "y" {
+					fmt.Fprintf(o.Out, "Confirmed\n")
+					break
+				} else if input == "n" {
+					fmt.Fprintf(o.Out, "Canceled\n")
+					return nil
+				} else {
+					fmt.Fprintf(o.Out, "Invalid input, please try again\n")
+				}
 			}
 		}
 
@@ -430,6 +449,9 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 	})
 	if err != nil {
 		return err
+	}
+	if input == "n" {
+		return nil
 	}
 	if found == 0 {
 		fmt.Fprintf(o.Out, "No resources found\n")
