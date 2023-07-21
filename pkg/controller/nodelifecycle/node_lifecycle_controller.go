@@ -1202,7 +1202,7 @@ func (nc *Controller) HealthyQPSFunc(nodeNum int) float32 {
 	return nc.evictionLimiterQPS
 }
 
-// ReducedQPSFunc returns the QPS for when a the cluster is large make
+// ReducedQPSFunc returns the QPS for when the cluster is large make
 // evictions slower, if they're small stop evictions altogether.
 func (nc *Controller) ReducedQPSFunc(nodeNum int) float32 {
 	if int32(nodeNum) > nc.largeClusterThreshold {
