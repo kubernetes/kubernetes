@@ -17,13 +17,13 @@ limitations under the License.
 package cel
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"math"
 	"reflect"
 	"regexp"
 	"strings"
-	"text/scanner"
 	"time"
 
 	celgo "github.com/google/cel-go/cel"
@@ -322,101 +322,117 @@ func unescapeSingleQuote(s string) (string, error) {
 	return unescaped, err
 }
 
-// ValidFieldPath returns a valid field path.
-func ValidFieldPath(fieldPath string, pathOfFieldPath *field.Path, schema *schema.Structural) (validFieldPath *field.Path, err *field.Error) {
-	validFieldPath = pathOfFieldPath
-	if len(fieldPath) == 0 {
-		return pathOfFieldPath, field.Invalid(pathOfFieldPath, fieldPath, "must not be empty")
-	}
-
-	invalidFieldError := field.Invalid(pathOfFieldPath, fieldPath, "does not refer to an valid field")
-
-	var s scanner.Scanner
-	s.Init(strings.NewReader(fieldPath))
-	s.Filename = pathOfFieldPath.String()
-	s.Mode = scanner.ScanInts | scanner.ScanIdents | scanner.ScanChars | scanner.ScanStrings
-	s.Error = func(s *scanner.Scanner, msg string) {
-		field.Invalid(pathOfFieldPath, fieldPath, fmt.Sprintf("failed to parse JSON Path: %s", msg))
-	}
-
-	found := false
-	for true {
-		tok := s.Scan()
-		if tok == scanner.EOF {
-			found = true
-			break
+// ValidFieldPath validates that jsonPath is a valid JSON Path containing only field and map accessors
+// that are valid for the given schema, and returns a field.Path representation of the validated jsonPath or an error.
+func ValidFieldPath(jsonPath string, schema *schema.Structural) (validFieldPath *field.Path, err error) {
+	appendToPath := func(name string, isNamed bool) error {
+		if !isNamed {
+			validFieldPath = validFieldPath.Key(name)
+			schema = schema.AdditionalProperties.Structural
+		} else {
+			validFieldPath = validFieldPath.Child(name)
+			val, ok := schema.Properties[name]
+			if !ok {
+				return fmt.Errorf("does not refer to a valid field")
+			}
+			schema = &val
 		}
-		switch schema.Type {
-		case "object":
-			isMapSyntax := false
-			if s.TokenText() == "[" {
-				isMapSyntax = true
-			} else if s.TokenText() != "." {
-				return pathOfFieldPath, field.Invalid(pathOfFieldPath, fieldPath, "expected [ or . but got: "+s.TokenText())
-			}
+		return nil
+	}
 
-			tok = s.Scan()
-			if tok == scanner.EOF {
-				return pathOfFieldPath, field.Invalid(pathOfFieldPath, fieldPath, "unexpected end of JSON path")
-			}
-			fieldName := s.TokenText()
-			if isMapSyntax {
-				if tok == scanner.Char {
-					newS := fieldName[1 : len(fieldName)-1]
-					newS, err := unescapeSingleQuote(newS)
-					if err != nil {
-						return pathOfFieldPath, field.Invalid(pathOfFieldPath, fieldPath, fmt.Sprintf("failed to unescape: %v", err))
+	validFieldPath = nil
+
+	scanner := bufio.NewScanner(strings.NewReader(jsonPath))
+
+	// configure the scanner to split the string into tokens.
+	// The three delimiters ('.', '[', ']') will be returned as single char tokens.
+	// All other text between delimiters is returned as string tokens.
+	scanner.Split(func(data []byte, atEOF bool) (advance int, token []byte, err error) {
+		if len(data) > 0 {
+			for i := 0; i < len(data); i++ {
+				// If in a single quoted string, look for the end of string
+				// ignoring delimiters.
+				if data[0] == '\'' {
+					if i > 0 && data[i] == '\'' && data[i-1] != '\\' {
+						// Return quoted string
+						return i + 1, data[:i+1], nil
 					}
-					fieldName = newS
-					if schema.AdditionalProperties != nil {
-						validFieldPath = validFieldPath.Key(fieldName)
+					continue
+				}
+				switch data[i] {
+				case '.', '[', ']': // delimiters
+					if i == 0 {
+						// Return the delimiter.
+						return 1, data[:1], nil
 					} else {
-						validFieldPath = validFieldPath.Child(fieldName)
+						// Return identifier leading up to the delimiter.
+						// The next call to split will return the delimiter.
+						return i, data[:i], nil
 					}
-				} else {
-					return pathOfFieldPath, field.Invalid(pathOfFieldPath, fieldPath, "unexpected format of fieldName: "+fieldName)
 				}
-			} else if tok != scanner.Ident {
-				return pathOfFieldPath, invalidFieldError
-			} else {
-				if schema.AdditionalProperties != nil {
-					validFieldPath = validFieldPath.Key(fieldName)
-				} else {
-					validFieldPath = validFieldPath.Child(fieldName)
-				}
+			}
+			if atEOF {
+				// Return the string.
+				return len(data), data, nil
+			}
+		}
+		return 0, nil, nil
+	})
+
+	var tok string
+	var isNamed bool
+	for scanner.Scan() {
+		tok = scanner.Text()
+		switch tok {
+		case "[":
+			if !scanner.Scan() {
+				return nil, fmt.Errorf("unexpected end of JSON path")
+			}
+			tok = scanner.Text()
+			if len(tok) < 2 || tok[0] != '\'' || tok[len(tok)-1] != '\'' {
+				return nil, fmt.Errorf("expected single quoted string but got %s", tok)
+			}
+			unescaped, err := unescapeSingleQuote(tok[1 : len(tok)-1])
+			if err != nil {
+				return nil, fmt.Errorf("invalid string literal: %v", err)
 			}
 
 			if schema.Properties != nil {
-				propertySchema, ok := schema.Properties[fieldName]
-				if ok {
-					schema = &propertySchema
-				} else {
-					return pathOfFieldPath, invalidFieldError
-				}
+				isNamed = true
 			} else if schema.AdditionalProperties != nil {
-				schema = schema.AdditionalProperties.Structural
+				isNamed = false
 			} else {
-				return pathOfFieldPath, invalidFieldError
+				return nil, fmt.Errorf("does not refer to a valid field")
 			}
-
-			if isMapSyntax {
-				if tok == scanner.EOF {
-					return pathOfFieldPath, field.Invalid(pathOfFieldPath, fieldPath, "unexpected end of JSON path")
-				}
-				s.Scan()
-				if s.TokenText() != "]" {
-					return pathOfFieldPath, field.Invalid(pathOfFieldPath, fieldPath, "expect ] but get: "+s.TokenText())
-				}
+			if err := appendToPath(unescaped, isNamed); err != nil {
+				return nil, err
+			}
+			if !scanner.Scan() {
+				return nil, fmt.Errorf("unexpected end of JSON path")
+			}
+			tok = scanner.Text()
+			if tok != "]" {
+				return nil, fmt.Errorf("expected ] but got %s", tok)
+			}
+		case ".":
+			if !scanner.Scan() {
+				return nil, fmt.Errorf("unexpected end of JSON path")
+			}
+			tok = scanner.Text()
+			if schema.Properties != nil {
+				isNamed = true
+			} else if schema.AdditionalProperties != nil {
+				isNamed = false
+			} else {
+				return nil, fmt.Errorf("does not refer to a valid field")
+			}
+			if err := appendToPath(tok, isNamed); err != nil {
+				return nil, err
 			}
 		default:
-			return pathOfFieldPath, invalidFieldError
+			return nil, fmt.Errorf("expected [ or . but got: %s", tok)
 		}
 	}
-
-	if !found {
-		return pathOfFieldPath, invalidFieldError
-	}
-
 	return validFieldPath, nil
 }
 

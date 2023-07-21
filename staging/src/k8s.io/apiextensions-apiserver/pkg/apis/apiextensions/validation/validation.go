@@ -1092,9 +1092,6 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 				allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("fieldPath"), rule.FieldPath, "fieldPath must not contain line breaks"))
 			}
 			if len(rule.FieldPath) > 0 {
-				if errs := validateSimpleJSONPath(rule.FieldPath, fldPath.Child("x-kubernetes-validations").Index(i).Child("fieldPath")); len(errs) > 0 {
-					allErrs.SchemaErrors = append(allErrs.SchemaErrors, errs...)
-				}
 				if !pathValid(schema, rule.FieldPath) {
 					allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("fieldPath"), rule.FieldPath, "fieldPath must be a valid path"))
 				}
@@ -1163,7 +1160,7 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 func pathValid(schema *apiextensions.JSONSchemaProps, path string) bool {
 	// To avoid duplicated code and better maintain, using ValidaFieldPath func to check if the path is valid
 	if ss, err := structuralschema.NewStructural(schema); err == nil {
-		_, err := cel.ValidFieldPath(path, nil, ss)
+		_, err := cel.ValidFieldPath(path, ss)
 		return err == nil
 	}
 	return true
