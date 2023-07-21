@@ -373,8 +373,8 @@ var _ = SIGDescribe("Deployment", func() {
 		deploymentGet := appsv1.Deployment{}
 		err = runtime.DefaultUnstructuredConverter.FromUnstructured(deploymentGetUnstructured.Object, &deploymentGet)
 		framework.ExpectNoError(err, "failed to convert the unstructured response to a Deployment")
-		framework.ExpectEqual(deploymentGet.Spec.Template.Spec.Containers[0].Image, testDeploymentUpdateImage, "failed to update image")
-		framework.ExpectEqual(deploymentGet.ObjectMeta.Labels["test-deployment"], "updated", "failed to update labels")
+		gomega.Expect(deploymentGet.Spec.Template.Spec.Containers[0].Image).To(gomega.Equal(testDeploymentUpdateImage), "failed to update image")
+		gomega.Expect(deploymentGet.ObjectMeta.Labels).To(gomega.HaveKeyWithValue("test-deployment", "updated"), "failed to update labels")
 
 		ctxUntil, cancel = context.WithTimeout(ctx, f.Timeouts.PodStart)
 		defer cancel()
@@ -432,8 +432,9 @@ var _ = SIGDescribe("Deployment", func() {
 		deploymentGet = appsv1.Deployment{}
 		err = runtime.DefaultUnstructuredConverter.FromUnstructured(deploymentGetUnstructured.Object, &deploymentGet)
 		framework.ExpectNoError(err, "failed to convert the unstructured response to a Deployment")
-		framework.ExpectEqual(deploymentGet.Spec.Template.Spec.Containers[0].Image, testDeploymentUpdateImage, "failed to update image")
-		framework.ExpectEqual(deploymentGet.ObjectMeta.Labels["test-deployment"], "updated", "failed to update labels")
+		gomega.Expect(deploymentGet.Spec.Template.Spec.Containers[0].Image).To(gomega.Equal(testDeploymentUpdateImage), "failed to update image")
+		gomega.Expect(deploymentGet.ObjectMeta.Labels).To(gomega.HaveKeyWithValue("test-deployment", "updated"), "failed to update labels")
+
 		ctxUntil, cancel = context.WithTimeout(ctx, f.Timeouts.PodStart)
 		defer cancel()
 		_, err = watchtools.Until(ctxUntil, deploymentsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
@@ -782,7 +783,7 @@ func testRollingUpdateDeployment(ctx context.Context, f *framework.Framework) {
 	framework.ExpectNoError(err)
 	_, allOldRSs, err := testutil.GetOldReplicaSets(deployment, c)
 	framework.ExpectNoError(err)
-	framework.ExpectEqual(len(allOldRSs), 1)
+	gomega.Expect(allOldRSs).To(gomega.HaveLen(1))
 }
 
 func testRecreateDeployment(ctx context.Context, f *framework.Framework) {
@@ -984,8 +985,8 @@ func testRolloverDeployment(ctx context.Context, f *framework.Framework) {
 }
 
 func ensureReplicas(rs *appsv1.ReplicaSet, replicas int32) {
-	framework.ExpectEqual(*rs.Spec.Replicas, replicas)
-	framework.ExpectEqual(rs.Status.Replicas, replicas)
+	gomega.Expect(*rs.Spec.Replicas).To(gomega.Equal(replicas))
+	gomega.Expect(rs.Status.Replicas).To(gomega.Equal(replicas))
 }
 
 func randomScale(d *appsv1.Deployment, i int) {
@@ -1141,7 +1142,7 @@ func testDeploymentsControllerRef(ctx context.Context, f *framework.Framework) {
 
 	framework.Logf("Verifying Deployment %q has only one ReplicaSet", deploymentName)
 	rsList := listDeploymentReplicaSets(ctx, c, ns, podLabels)
-	framework.ExpectEqual(len(rsList.Items), 1)
+	gomega.Expect(rsList.Items).To(gomega.HaveLen(1))
 
 	framework.Logf("Obtaining the ReplicaSet's UID")
 	orphanedRSUID := rsList.Items[0].UID
@@ -1172,10 +1173,10 @@ func testDeploymentsControllerRef(ctx context.Context, f *framework.Framework) {
 
 	framework.Logf("Verifying no extra ReplicaSet is created (Deployment %q still has only one ReplicaSet after adoption)", deploymentName)
 	rsList = listDeploymentReplicaSets(ctx, c, ns, podLabels)
-	framework.ExpectEqual(len(rsList.Items), 1)
+	gomega.Expect(rsList.Items).To(gomega.HaveLen(1))
 
 	framework.Logf("Verifying the ReplicaSet has the same UID as the orphaned ReplicaSet")
-	framework.ExpectEqual(rsList.Items[0].UID, orphanedRSUID)
+	gomega.Expect(rsList.Items[0].UID).To(gomega.Equal(orphanedRSUID))
 }
 
 // testProportionalScalingDeployment tests that when a RollingUpdate Deployment is scaled in the middle
@@ -1258,7 +1259,7 @@ func testProportionalScalingDeployment(ctx context.Context, f *framework.Framewo
 
 	// Second rollout's replicaset should have 0 available replicas.
 	framework.Logf("Verifying that the second rollout's replicaset has .status.availableReplicas = 0")
-	framework.ExpectEqual(secondRS.Status.AvailableReplicas, int32(0))
+	gomega.Expect(secondRS.Status.AvailableReplicas).To(gomega.Equal(int32(0)))
 
 	// Second rollout's replicaset should have Deployment's (replicas + maxSurge - first RS's replicas) = 10 + 3 - 8 = 5 for .spec.replicas.
 	newReplicas := replicas + int32(maxSurge) - minAvailableReplicas
@@ -1664,8 +1665,8 @@ func testDeploymentSubresources(ctx context.Context, f *framework.Framework) {
 	if err != nil {
 		framework.Failf("Failed to get scale subresource: %v", err)
 	}
-	framework.ExpectEqual(scale.Spec.Replicas, int32(1))
-	framework.ExpectEqual(scale.Status.Replicas, int32(1))
+	gomega.Expect(scale.Spec.Replicas).To(gomega.Equal(int32(1)))
+	gomega.Expect(scale.Status.Replicas).To(gomega.Equal(int32(1)))
 
 	ginkgo.By("updating a scale subresource")
 	scale.ResourceVersion = "" // indicate the scale update should be unconditional
@@ -1674,14 +1675,14 @@ func testDeploymentSubresources(ctx context.Context, f *framework.Framework) {
 	if err != nil {
 		framework.Failf("Failed to put scale subresource: %v", err)
 	}
-	framework.ExpectEqual(scaleResult.Spec.Replicas, int32(2))
+	gomega.Expect(scaleResult.Spec.Replicas).To(gomega.Equal(int32(2)))
 
 	ginkgo.By("verifying the deployment Spec.Replicas was modified")
 	deployment, err := c.AppsV1().Deployments(ns).Get(ctx, deploymentName, metav1.GetOptions{})
 	if err != nil {
 		framework.Failf("Failed to get deployment resource: %v", err)
 	}
-	framework.ExpectEqual(*(deployment.Spec.Replicas), int32(2))
+	gomega.Expect(*(deployment.Spec.Replicas)).To(gomega.Equal(int32(2)))
 
 	ginkgo.By("Patch a scale subresource")
 	scale.ResourceVersion = "" // indicate the scale update should be unconditional
@@ -1698,5 +1699,5 @@ func testDeploymentSubresources(ctx context.Context, f *framework.Framework) {
 
 	deployment, err = c.AppsV1().Deployments(ns).Get(ctx, deploymentName, metav1.GetOptions{})
 	framework.ExpectNoError(err, "Failed to get deployment resource: %v", err)
-	framework.ExpectEqual(*(deployment.Spec.Replicas), int32(4), "deployment should have 4 replicas")
+	gomega.Expect(*(deployment.Spec.Replicas)).To(gomega.Equal(int32(4)), "deployment should have 4 replicas")
 }

@@ -115,7 +115,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 			pdb.Spec.MinAvailable = &newMinAvailable
 			return pdb
 		}, cs.PolicyV1().PodDisruptionBudgets(ns).Update)
-		framework.ExpectEqual(updatedPDB.Spec.MinAvailable.String(), "2%")
+		gomega.Expect(updatedPDB.Spec.MinAvailable.String()).To(gomega.Equal("2%"))
 
 		ginkgo.By("patching the pdb")
 		patchedPDB := patchPDBOrDie(ctx, cs, dc, ns, defaultName, func(old *policyv1.PodDisruptionBudget) (bytes []byte, err error) {
@@ -127,7 +127,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 			framework.ExpectNoError(err, "failed to marshal JSON for new data")
 			return newBytes, nil
 		})
-		framework.ExpectEqual(patchedPDB.Spec.MinAvailable.String(), "3%")
+		gomega.Expect(patchedPDB.Spec.MinAvailable.String()).To(gomega.Equal("3%"))
 
 		deletePDBOrDie(ctx, cs, ns, defaultName)
 	})
@@ -500,7 +500,7 @@ func deletePDBOrDie(ctx context.Context, cs kubernetes.Interface, ns string, nam
 func listPDBs(ctx context.Context, cs kubernetes.Interface, ns string, labelSelector string, count int, expectedPDBNames []string) {
 	pdbList, err := cs.PolicyV1().PodDisruptionBudgets(ns).List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
 	framework.ExpectNoError(err, "Listing PDB set in namespace %s", ns)
-	framework.ExpectEqual(len(pdbList.Items), count, "Expecting %d PDBs returned in namespace %s", count, ns)
+	gomega.Expect(pdbList.Items).To(gomega.HaveLen(count), "Expecting %d PDBs returned in namespace %s", count, ns)
 
 	pdbNames := make([]string, 0)
 	for _, item := range pdbList.Items {
