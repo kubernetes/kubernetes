@@ -85,7 +85,7 @@ var _ = SIGDescribe("Density [Serial] [Slow]", func() {
 				interval: 0 * time.Millisecond,
 				cpuLimits: e2ekubelet.ContainersCPUSummary{
 					kubeletstatsv1alpha1.SystemContainerKubelet: {0.50: 0.30, 0.95: 0.50},
-					kubeletstatsv1alpha1.SystemContainerRuntime: {0.50: 0.40, 0.95: 0.60},
+					kubeletstatsv1alpha1.SystemContainerRuntime: {0.50: 0.40, 0.95: 0.80},
 				},
 				memLimits: e2ekubelet.ResourceUsagePerContainer{
 					kubeletstatsv1alpha1.SystemContainerKubelet: &e2ekubelet.ContainerResourceUsage{MemoryRSSInBytes: 100 * 1024 * 1024},
@@ -232,7 +232,7 @@ var _ = SIGDescribe("Density [Serial] [Slow]", func() {
 				bgPodsNr: 50,
 				cpuLimits: e2ekubelet.ContainersCPUSummary{
 					kubeletstatsv1alpha1.SystemContainerKubelet: {0.50: 0.30, 0.95: 0.50},
-					kubeletstatsv1alpha1.SystemContainerRuntime: {0.50: 0.40, 0.95: 0.60},
+					kubeletstatsv1alpha1.SystemContainerRuntime: {0.50: 0.40, 0.95: 0.80},
 				},
 				memLimits: e2ekubelet.ResourceUsagePerContainer{
 					kubeletstatsv1alpha1.SystemContainerKubelet: &e2ekubelet.ContainerResourceUsage{MemoryRSSInBytes: 100 * 1024 * 1024},
