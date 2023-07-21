@@ -146,11 +146,11 @@ spec:
   containers:
   - name: %s
     image: %s
-    restartPolicy: %s
     command: ["sh", "-c", "i=0; while [ $i -lt %d ]; do %s i=$(($i+1)); done; while true; do sleep 5; done"]
+  restartPolicy: %s
 `
 	file := staticPodPath(dir, name, namespace)
-	podYaml := fmt.Sprintf(template, name, namespace, name, image, string(restart), iterations, command)
+	podYaml := fmt.Sprintf(template, name, namespace, name, image, iterations, command, string(restart))
 
 	f, err := os.OpenFile(file, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0666)
 	if err != nil {
