@@ -144,6 +144,7 @@ type syncJobCtx struct {
 	expectedRmFinalizers            sets.Set[string]
 	uncounted                       *uncountedTerminatedPods
 	podsWithDelayedDeletionPerIndex map[int]*v1.Pod
+	terminating                     *int32
 }
 
 // NewController creates a new Job controller that keeps the relevant pods
@@ -783,11 +784,15 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 	if err != nil {
 		return err
 	}
-
+	var terminating *int32
+	if feature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) {
+		terminating = pointer.Int32(controller.CountTerminatingPods(pods))
+	}
 	jobCtx := &syncJobCtx{
 		job:                  &job,
 		pods:                 pods,
 		activePods:           controller.FilterActivePods(logger, pods),
+		terminating:          terminating,
 		uncounted:            newUncountedTerminatedPods(*job.Status.UncountedTerminatedPods),
 		expectedRmFinalizers: jm.finalizerExpectations.getExpectedUIDs(key),
 	}
@@ -919,6 +924,8 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 	needsStatusUpdate := suspendCondChanged || active != job.Status.Active || !pointer.Int32Equal(ready, job.Status.Ready)
 	job.Status.Active = active
 	job.Status.Ready = ready
+	job.Status.Terminating = jobCtx.terminating
+	needsStatusUpdate = needsStatusUpdate || !pointer.Int32Equal(job.Status.Terminating, jobCtx.terminating)
 	err = jm.trackJobStatusAndRemoveFinalizers(ctx, jobCtx, needsStatusUpdate)
 	if err != nil {
 		return fmt.Errorf("tracking status: %w", err)
@@ -1453,6 +1460,17 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 		return active, metrics.JobSyncActionPodsDeleted, err
 	}
 
+	var terminating int32 = 0
+	if onlyReplaceFailedPods(jobCtx.job) {
+		// For PodFailurePolicy specified but PodRecreationPolicy disabled
+		// we still need to count terminating pods for replica counts
+		// But we will not allow updates to status.
+		if jobCtx.terminating == nil {
+			terminating = controller.CountTerminatingPods(jobCtx.pods)
+		} else {
+			terminating = *jobCtx.terminating
+		}
+	}
 	wantActive := int32(0)
 	if job.Spec.Completions == nil {
 		// Job does not specify a number of completions.  Therefore, number active
@@ -1475,7 +1493,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 		}
 	}
 
-	rmAtLeast := active - wantActive
+	rmAtLeast := active + terminating - wantActive
 	if rmAtLeast < 0 {
 		rmAtLeast = 0
 	}
@@ -1495,7 +1513,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 		return active, metrics.JobSyncActionPodsDeleted, err
 	}
 
-	if active < wantActive {
+	if diff := wantActive - terminating - active; diff > 0 {
 		var remainingTime time.Duration
 		if !hasBackoffLimitPerIndex(job) {
 			// we compute the global remaining time for pod creation when backoffLimitPerIndex is not used
@@ -1505,7 +1523,6 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 			jm.enqueueSyncJobWithDelay(logger, job, remainingTime)
 			return 0, metrics.JobSyncActionPodsCreated, nil
 		}
-		diff := wantActive - active
 		if diff > int32(MaxPodCreateDeletePerSync) {
 			diff = int32(MaxPodCreateDeletePerSync)
 		}
@@ -1797,6 +1814,9 @@ func isPodFailed(p *v1.Pod, job *batch.Job) bool {
 	if p.Status.Phase == v1.PodFailed {
 		return true
 	}
+	if onlyReplaceFailedPods(job) {
+		return p.Status.Phase == v1.PodFailed
+	}
 	// Count deleted Pods as failures to account for orphan Pods that
 	// never have a chance to reach the Failed phase.
 	return p.DeletionTimestamp != nil && p.Status.Phase != v1.PodSucceeded
@@ -1848,4 +1868,14 @@ func countReadyPods(pods []*v1.Pod) int32 {
 		}
 	}
 	return cnt
+}
+
+// This checks if we should apply PodRecreationPolicy.
+// PodRecreationPolicy controls when we recreate pods if they are marked as terminating
+// Failed means that we recreate only once the pod has terminated.
+func onlyReplaceFailedPods(job *batch.Job) bool {
+	if feature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) && *job.Spec.PodReplacementPolicy == batch.Failed {
+		return true
+	}
+	return feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) && job.Spec.PodFailurePolicy != nil
 }

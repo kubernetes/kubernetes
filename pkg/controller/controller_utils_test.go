@@ -380,6 +380,31 @@ func TestDeletePodsAllowsMissing(t *testing.T) {
 	assert.True(t, apierrors.IsNotFound(err))
 }
 
+func TestCountTerminatingPods(t *testing.T) {
+	now := metav1.Now()
+
+	// This rc is not needed by the test, only the newPodList to give the pods labels/a namespace.
+	rc := newReplicationController(0)
+	podList := newPodList(nil, 7, v1.PodRunning, rc)
+	podList.Items[0].Status.Phase = v1.PodSucceeded
+	podList.Items[1].Status.Phase = v1.PodFailed
+	podList.Items[2].Status.Phase = v1.PodPending
+	podList.Items[2].SetDeletionTimestamp(&now)
+	podList.Items[3].Status.Phase = v1.PodRunning
+	podList.Items[3].SetDeletionTimestamp(&now)
+	var podPointers []*v1.Pod
+	for i := range podList.Items {
+		podPointers = append(podPointers, &podList.Items[i])
+	}
+
+	terminatingPods := CountTerminatingPods(podPointers)
+
+	assert.Equal(t, terminatingPods, int32(2))
+
+	terminatingList := FilterTerminatingPods(podPointers)
+	assert.Equal(t, len(terminatingList), int(2))
+}
+
 func TestActivePodFiltering(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	// This rc is not needed by the test, only the newPodList to give the pods labels/a namespace.
