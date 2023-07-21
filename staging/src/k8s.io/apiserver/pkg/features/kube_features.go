@@ -54,6 +54,7 @@ const (
 	// owner: @smarterclayton
 	// alpha: v1.8
 	// beta: v1.9
+	// stable: 1.29
 	//
 	// Allow API clients to retrieve resource lists in chunks rather than
 	// all at once.
@@ -231,7 +232,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	AdmissionWebhookMatchConditions: {Default: true, PreRelease: featuregate.Beta},
 
-	APIListChunking: {Default: true, PreRelease: featuregate.Beta},
+	APIListChunking: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 
 	APIPriorityAndFairness: {Default: true, PreRelease: featuregate.Beta},
 
